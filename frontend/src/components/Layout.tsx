@@ -20,8 +20,8 @@ export function Layout() {
   return (
     <div className="flex h-screen bg-gray-50">
       <aside className="w-56 bg-green-800 text-white flex flex-col">
-        <div className="px-4 py-5 font-bold text-lg tracking-wide border-b border-green-700">
-          IFVM
+        <div className="px-4 py-4 border-b border-green-700 flex justify-center">
+          <img src="/logo.png" alt="FVM Logo" className="h-20 w-20 rounded-full" />
         </div>
         <nav className="flex-1 py-4 space-y-1 px-2">
           {navItems.map(({ to, label }) => (

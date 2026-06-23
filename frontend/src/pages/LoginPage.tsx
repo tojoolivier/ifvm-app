@@ -23,7 +23,10 @@ export function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="bg-white shadow rounded-lg p-8 w-full max-w-sm">
-        <h1 className="text-xl font-bold text-green-800 mb-6">IFVM — Connexion</h1>
+        <div className="flex justify-center mb-4">
+          <img src="/logo.png" alt="FVM Logo" className="h-24 w-24 rounded-full" />
+        </div>
+        <h1 className="text-xl font-bold text-green-800 mb-6 text-center">IFVM — Connexion</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
