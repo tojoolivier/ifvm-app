@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ifvm_db}
+      POSTGRES_USER: ${POSTGRES_USER:-ifvm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ifvm_secret}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ifvm} -d ${POSTGRES_DB:-ifvm_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ifvm}:${POSTGRES_PASSWORD:-ifvm_secret}@db:5432/${POSTGRES_DB:-ifvm_db}
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production_use_a_long_random_string}
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRE_MINUTES: 60
+    volumes:
+      - ./backend/app:/app/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  frontend:
+    build: ./frontend
+    volumes:
+      - ./frontend/src:/app/src
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

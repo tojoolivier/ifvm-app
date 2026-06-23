@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+.ruff_cache/
+
+# Env
+.env
+*.env.local
+
+# Node
+node_modules/
+dist/
+.cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+
+# Docker
+*.log
+
+# Données géospatiales volumineuses (gérer avec Git LFS si nécessaire)
+*.fgb

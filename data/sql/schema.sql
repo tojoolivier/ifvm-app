@@ -58,13 +58,14 @@ CREATE TABLE utilisateur (
     id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     nom         VARCHAR(100) NOT NULL,
     prenom      VARCHAR(100) NOT NULL,
-    email       VARCHAR(200) NOT NULL UNIQUE,
-    role        VARCHAR(30)  NOT NULL CHECK (role IN (
-                    'prospecteur', 'chef_equipe', 'agent_encadreur',
-                    'pilote', 'mecanicien', 'chef_de_base', 'admin')),
-    pa_id       UUID REFERENCES poste_acridien(id),
-    actif       BOOLEAN      NOT NULL DEFAULT TRUE,
-    created_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
+    email         VARCHAR(200) NOT NULL UNIQUE,
+    password_hash VARCHAR(200) NOT NULL DEFAULT '',
+    role          VARCHAR(30)  NOT NULL CHECK (role IN (
+                      'prospecteur', 'chef_equipe', 'agent_encadreur',
+                      'pilote', 'mecanicien', 'chef_de_base', 'admin')),
+    pa_id         UUID REFERENCES poste_acridien(id),
+    actif         BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
 -- ══════════════════════════════════════════════
