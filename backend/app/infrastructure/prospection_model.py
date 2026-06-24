@@ -16,7 +16,9 @@ class ProspectionModel(Base):
     type_prospection: Mapped[str] = mapped_column(Text(), nullable=False)
     campagne_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("campagne.id"), nullable=False)
     prospecteur_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("utilisateur.id"), nullable=False)
-    station_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    station_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("station_fixe.id", deferrable=True, initially="deferred"), nullable=True
+    )
     n_releve: Mapped[str | None] = mapped_column(Text(), nullable=True)
     n_fiche: Mapped[str | None] = mapped_column(Text(), nullable=True)
     n_message: Mapped[str | None] = mapped_column(Text(), nullable=True)
@@ -53,6 +55,8 @@ class ProspectionModel(Base):
     infestations: Mapped[list["ProspectionInfestationModel"]] = relationship(
         back_populates="prospection", cascade="all, delete-orphan"
     )
+
+    station: Mapped["StationFixeModel | None"] = relationship()
 
     __table_args__ = (
         CheckConstraint(

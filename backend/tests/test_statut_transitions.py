@@ -47,13 +47,15 @@ async def validateur(db_session: AsyncSession) -> Utilisateur:
 # ---------------------------------------------------------------------------
 
 
-async def _creer_prospection(client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID) -> str:
+async def _creer_prospection(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+) -> str:
     resp = await client.post(
         "/prospections",
         json={
             "type_prospection": "intensive",
             "campagne_id": str(campagne_id),
-            "station_id": str(uuid.uuid4()),
+            "station_id": str(station_id),
             "date_prospection": "2026-06-25",
         },
         headers=auth_headers,
@@ -87,9 +89,9 @@ async def _changer_statut(
 
 @pytest.mark.asyncio
 async def test_transition_brouillon_en_attente(
-    client: AsyncClient, utilisateur: Utilisateur, auth_headers: dict, campagne_id: uuid.UUID
+    client: AsyncClient, utilisateur: Utilisateur, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id)
+    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
     code = await _changer_statut(client, pid, "en_attente", auth_headers)
     assert code == 200
 
@@ -103,9 +105,10 @@ async def test_transition_en_attente_verifiee(
     utilisateur: Utilisateur,
     auth_headers: dict,
     campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
     verificateur: Utilisateur,
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id)
+    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
     await _changer_statut(client, pid, "en_attente", auth_headers)
     code = await _changer_statut(client, pid, "verifiee", _headers(verificateur))
     assert code == 200
@@ -120,10 +123,11 @@ async def test_transition_verifiee_validee(
     utilisateur: Utilisateur,
     auth_headers: dict,
     campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
     verificateur: Utilisateur,
     validateur: Utilisateur,
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id)
+    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
     await _changer_statut(client, pid, "en_attente", auth_headers)
     await _changer_statut(client, pid, "verifiee", _headers(verificateur))
     code = await _changer_statut(client, pid, "validee", _headers(validateur))
@@ -139,10 +143,11 @@ async def test_transition_verifiee_rejetee(
     utilisateur: Utilisateur,
     auth_headers: dict,
     campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
     verificateur: Utilisateur,
     validateur: Utilisateur,
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id)
+    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
     await _changer_statut(client, pid, "en_attente", auth_headers)
     await _changer_statut(client, pid, "verifiee", _headers(verificateur))
     code = await _changer_statut(client, pid, "rejetee", _headers(validateur))
@@ -156,9 +161,9 @@ async def test_transition_verifiee_rejetee(
 
 @pytest.mark.asyncio
 async def test_transition_invalide_brouillon_validee(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id)
+    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
     code = await _changer_statut(client, pid, "validee", auth_headers)
     assert code == 400
 
@@ -169,9 +174,10 @@ async def test_transition_invalide_en_attente_validee(
     utilisateur: Utilisateur,
     auth_headers: dict,
     campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
     validateur: Utilisateur,
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id)
+    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
     await _changer_statut(client, pid, "en_attente", auth_headers)
     code = await _changer_statut(client, pid, "validee", _headers(validateur))
     assert code == 400
@@ -184,9 +190,9 @@ async def test_transition_invalide_en_attente_validee(
 
 @pytest.mark.asyncio
 async def test_prospecteur_ne_peut_pas_verifier(
-    client: AsyncClient, utilisateur: Utilisateur, auth_headers: dict, campagne_id: uuid.UUID
+    client: AsyncClient, utilisateur: Utilisateur, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id)
+    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
     await _changer_statut(client, pid, "en_attente", auth_headers)
     # Le même prospecteur tente de vérifier
     code = await _changer_statut(client, pid, "verifiee", auth_headers)
@@ -199,9 +205,10 @@ async def test_verificateur_ne_peut_pas_valider(
     utilisateur: Utilisateur,
     auth_headers: dict,
     campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
     verificateur: Utilisateur,
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id)
+    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
     await _changer_statut(client, pid, "en_attente", auth_headers)
     await _changer_statut(client, pid, "verifiee", _headers(verificateur))
     code = await _changer_statut(client, pid, "validee", _headers(verificateur))
@@ -215,9 +222,9 @@ async def test_verificateur_ne_peut_pas_valider(
 
 @pytest.mark.asyncio
 async def test_audit_log_cree_lors_transition(
-    client: AsyncClient, utilisateur: Utilisateur, auth_headers: dict, campagne_id: uuid.UUID
+    client: AsyncClient, utilisateur: Utilisateur, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id)
+    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
     await _changer_statut(client, pid, "en_attente", auth_headers)
 
     resp = await client.get(f"/prospections/{pid}/audit-log", headers=auth_headers)
@@ -234,9 +241,10 @@ async def test_audit_log_plusieurs_transitions(
     utilisateur: Utilisateur,
     auth_headers: dict,
     campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
     verificateur: Utilisateur,
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id)
+    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
     await _changer_statut(client, pid, "en_attente", auth_headers)
     await _changer_statut(client, pid, "verifiee", _headers(verificateur))
 
@@ -252,9 +260,9 @@ async def test_audit_log_plusieurs_transitions(
 
 @pytest.mark.asyncio
 async def test_ajouter_commentaire(
-    client: AsyncClient, utilisateur: Utilisateur, auth_headers: dict, campagne_id: uuid.UUID
+    client: AsyncClient, utilisateur: Utilisateur, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id)
+    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
 
     resp = await client.post(
         f"/prospections/{pid}/commentaire",

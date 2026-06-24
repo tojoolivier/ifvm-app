@@ -4,8 +4,9 @@ from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
-async def test_create_prospection_intensive(client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID):
-    station_id = uuid.uuid4()
+async def test_create_prospection_intensive(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+):
     response = await client.post(
         "/prospections",
         json={
@@ -41,12 +42,14 @@ async def test_create_intensive_sans_station_id_echoue(
 
 
 @pytest.mark.asyncio
-async def test_create_sans_campagne_id_echoue(client: AsyncClient, auth_headers: dict):
+async def test_create_sans_campagne_id_echoue(
+    client: AsyncClient, auth_headers: dict, station_id: uuid.UUID
+):
     response = await client.post(
         "/prospections",
         json={
             "type_prospection": "intensive",
-            "station_id": str(uuid.uuid4()),
+            "station_id": str(station_id),
             "date_prospection": "2026-06-25",
         },
         headers=auth_headers,
@@ -56,9 +59,8 @@ async def test_create_sans_campagne_id_echoue(client: AsyncClient, auth_headers:
 
 @pytest.mark.asyncio
 async def test_list_prospections_filtre_par_type(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
 ):
-    station_id = uuid.uuid4()
     await client.post(
         "/prospections",
         json={
@@ -78,8 +80,9 @@ async def test_list_prospections_filtre_par_type(
 
 
 @pytest.mark.asyncio
-async def test_get_prospection_par_id(client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID):
-    station_id = uuid.uuid4()
+async def test_get_prospection_par_id(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+):
     create_resp = await client.post(
         "/prospections",
         json={
@@ -105,14 +108,14 @@ async def test_get_prospection_inexistante_retourne_404(client: AsyncClient, aut
 
 @pytest.mark.asyncio
 async def test_update_prospection_brouillon(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
 ):
     create_resp = await client.post(
         "/prospections",
         json={
             "type_prospection": "intensive",
             "campagne_id": str(campagne_id),
-            "station_id": str(uuid.uuid4()),
+            "station_id": str(station_id),
             "date_prospection": "2026-06-25",
         },
         headers=auth_headers,
@@ -130,14 +133,14 @@ async def test_update_prospection_brouillon(
 
 @pytest.mark.asyncio
 async def test_update_prospection_non_brouillon_interdit(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
 ):
     create_resp = await client.post(
         "/prospections",
         json={
             "type_prospection": "intensive",
             "campagne_id": str(campagne_id),
-            "station_id": str(uuid.uuid4()),
+            "station_id": str(station_id),
             "date_prospection": "2026-06-25",
             "statut": "en_attente",
         },
@@ -155,14 +158,14 @@ async def test_update_prospection_non_brouillon_interdit(
 
 @pytest.mark.asyncio
 async def test_delete_prospection_brouillon(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
 ):
     create_resp = await client.post(
         "/prospections",
         json={
             "type_prospection": "intensive",
             "campagne_id": str(campagne_id),
-            "station_id": str(uuid.uuid4()),
+            "station_id": str(station_id),
             "date_prospection": "2026-06-25",
         },
         headers=auth_headers,
@@ -178,14 +181,14 @@ async def test_delete_prospection_brouillon(
 
 @pytest.mark.asyncio
 async def test_delete_prospection_non_brouillon_interdit(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
 ):
     create_resp = await client.post(
         "/prospections",
         json={
             "type_prospection": "intensive",
             "campagne_id": str(campagne_id),
-            "station_id": str(uuid.uuid4()),
+            "station_id": str(station_id),
             "date_prospection": "2026-06-25",
             "statut": "en_attente",
         },
@@ -198,13 +201,15 @@ async def test_delete_prospection_non_brouillon_interdit(
 
 
 @pytest.mark.asyncio
-async def test_list_filtre_statut(client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID):
+async def test_list_filtre_statut(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+):
     await client.post(
         "/prospections",
         json={
             "type_prospection": "intensive",
             "campagne_id": str(campagne_id),
-            "station_id": str(uuid.uuid4()),
+            "station_id": str(station_id),
             "date_prospection": "2026-06-25",
             "statut": "en_attente",
         },

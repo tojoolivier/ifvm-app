@@ -14,6 +14,7 @@ from app.auth import hash_password, create_access_token
 # Import all models so metadata knows about all tables
 import app.infrastructure.campagne_model  # noqa: F401
 import app.infrastructure.prospection_model  # noqa: F401
+import app.infrastructure.referentiel_model  # noqa: F401
 
 TEST_DATABASE_URL = "postgresql+asyncpg://ifvm:ifvm_secret@localhost:5432/ifvm_test"
 
@@ -86,3 +87,44 @@ async def campagne_id(db_session: AsyncSession, utilisateur: Utilisateur) -> uui
     db_session.add(c)
     await db_session.commit()
     return c.id
+
+
+@pytest_asyncio.fixture
+async def poste_acridien(db_session: AsyncSession):
+    from app.infrastructure.referentiel_model import PosteAcridienModel
+
+    pa = PosteAcridienModel(
+        id=uuid.uuid4(),
+        code="PA-TEST-01",
+        nom="Poste Test",
+        region="Test Region",
+    )
+    db_session.add(pa)
+    await db_session.commit()
+    await db_session.refresh(pa)
+    return pa
+
+
+@pytest_asyncio.fixture
+async def station_fixe(db_session: AsyncSession, poste_acridien):
+    from app.infrastructure.referentiel_model import StationFixeModel
+
+    station = StationFixeModel(
+        id=uuid.uuid4(),
+        code="ST-TEST-001",
+        nom="Station Test",
+        pa_id=poste_acridien.id,
+        latitude=-20.0,
+        longitude=45.0,
+        altitude=500,
+        actif=True,
+    )
+    db_session.add(station)
+    await db_session.commit()
+    await db_session.refresh(station)
+    return station
+
+
+@pytest_asyncio.fixture
+async def station_id(station_fixe) -> uuid.UUID:
+    return station_fixe.id

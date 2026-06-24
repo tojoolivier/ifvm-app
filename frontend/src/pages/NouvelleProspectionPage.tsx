@@ -100,6 +100,19 @@ interface Campagne {
   end_date: string | null
 }
 
+interface Station {
+  id: string
+  code: string
+  nom: string
+  pa_id: string
+  pa_code: string
+  pa_nom: string
+  latitude: number
+  longitude: number
+  altitude: number | null
+  actif: boolean
+}
+
 interface CaptureRow {
   id: number
   espece: string
@@ -239,6 +252,11 @@ export function NouvelleProspectionPage() {
   const { data: campagnes = [] } = useQuery<Campagne[]>({
     queryKey: ['campagnes'],
     queryFn: () => api.get('/campagnes').then((r) => r.data),
+  })
+
+  const { data: stations = [] } = useQuery<Station[]>({
+    queryKey: ['stations'],
+    queryFn: () => api.get('/stations').then((r) => r.data),
   })
 
   // Auto-sélection de la campagne en cours si unique
@@ -428,14 +446,29 @@ export function NouvelleProspectionPage() {
             </div>
 
             <div className="flex flex-col gap-1">
-              <Label htmlFor="station">Station fixe (ID)</Label>
-              <Input
+              <Label htmlFor="station">Station fixe</Label>
+              <select
                 id="station"
-                type="text"
                 value={stationId}
-                onChange={(e) => setStationId(e.target.value)}
-                placeholder="UUID de la station (optionnel)"
-              />
+                onChange={(e) => {
+                  const id = e.target.value
+                  setStationId(id)
+                  const station = stations.find((s) => s.id === id)
+                  if (station) {
+                    setLatitude(String(station.latitude))
+                    setLongitude(String(station.longitude))
+                    setAltitude(station.altitude != null ? String(station.altitude) : '')
+                  }
+                }}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="">— Choisir une station —</option>
+                {stations.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.code} — {s.nom} ({s.pa_code})
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="flex flex-col gap-1">

@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.presentation import campagne_routes, prospection_routes
+from app.presentation import campagne_routes, prospection_routes, referentiel_routes
 from app.routers import auth, users
 
 
@@ -25,6 +25,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(users.router, prefix="/users", tags=["users"])
 app.include_router(campagne_routes.router, prefix="/campagnes", tags=["campagnes"])
+app.include_router(referentiel_routes.router, prefix="", tags=["referentiels"])
 app.include_router(prospection_routes.router, prefix="/prospections", tags=["prospections"])
 
 
