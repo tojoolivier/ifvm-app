@@ -14,18 +14,50 @@ L'**IFVM** (Ivotoerana Famongorana ny Valala eto Madagasikara) est le centre nat
 
 ### Cinq fiches terrain
 
-| Fiche | Sigle | Rôle | Fréquence |
-|-------|-------|------|-----------|
-| Prospection extensive | — | Relevé rapide multi-stations (2 par fiche papier) | Quotidien terrain |
-| Prospection intensive | — | Relevé détaillé d'une station fixe | Hebdomadaire/campagne |
-| Relevé météorologique | — | Données journalières par station météo | Quotidien |
-| Compte-rendu de traitement | CRT | Rapport d'une opération de traitement | À chaque traitement |
-| Fiche de vol | — | Journal journalier d'un aéronef (1 vol = 1 CRT) | À chaque vol |
+| Fiche | Sigle | Rôle | Fréquence | Déclencheur |
+|-------|-------|------|-----------|-------------|
+| Prospection intensive | — | Relevé détaillé d'une station fixe | Hebdomadaire/campagne | Planifiée dans la campagne |
+| Prospection extensive | — | Relevé rapide multi-stations (2 par fiche papier) | Quotidien terrain | Résultats de l'intensive (équipe surveillance) |
+| Prospection de validation | — | Vérification d'un signalement | À la demande | Signalement agriculteur/non-specialiste |
+| Relevé météorologique | — | Données journalières par station météo | Quotidien | Quotidien |
+| Compte-rendu de traitement | CRT | Rapport d'une opération de traitement | À chaque traitement | Décision de traitement |
+| Fiche de vol | — | Journal journalier d'un aéronef (1 vol = 1 CRT) | À chaque vol | Vol effectué |
+
+### Chaînes de déclenchement
+
+```
+Campagne → Prospection Intensive → Équipe analyse → Prospection Extensive
+Agriculteur → Signalement → Prospection de Validation
+```
 
 ### Clarification terminologique
 
-- **Prospection de validation** : type de prospection lié aux stations `ponctuelle` (signalisation) — variante de la prospection extensive. À ne pas confondre avec :
-- **Validation de fiche** : acte de supervision (chef_de_base/admin approuve une fiche) — concept à définir
+- **Prospection de validation** : type de prospection déclenchée par un **signalement d'agriculteur ou non-specialiste**. Vérification sur le terrain si le signalement est réel. Station `ponctuelle`.
+- **Validation de fiche** : workflow en 3 étapes (voir ci-dessous). À ne pas confondre avec "prospection de validation".
+
+### Workflow de validation d'une fiche intensive
+
+**Règle métier** : une seule campagne en cours à la fois.
+
+```
+Prospecteur (app mobile)
+    └── remplit et soumet la fiche
+        └── Statut: "En attente"
+            └── Vérificateur (autre équipe)
+                └── vérifie + commentaires (audit log)
+                    └── Statut: "Vérifié"
+                        └── Validation finale (autre équipe, interface web)
+                            ├── Valide → Statut: "Validé" ✓
+                            └── Rejette → Statut: "Rejeté" ✗
+```
+
+**Statuts de fiche** : `Brouillon → En attente → Vérifié → Validé | Rejeté`
+
+**Synchronisation** (offline/online) : axe **indépendant** du workflow de validation. Géré séparément.
+
+**Audit log** : journal d'activité automatique, enregistre les modifications et commentaires.
+
+**Vérificateur** : autre équipe que le prospecteur. Pas de "renvoi pour correction" — communication via commentaires dans l'audit log.
 
 ### Hiérarchie géographique
 
@@ -94,15 +126,17 @@ Avant de partir sur le terrain, l'app doit télécharger :
 
 Chaque rôle a un dashboard adapté dans l'app mobile :
 
-| Rôle | Fiches accessibles |
-|------|---------------------|
-| `prospecteur` | Prospection extensive, Prospection intensive, Relevé météo |
-| `chef_equipe` | CRT + toutes prospections (lecture/écriture) |
-| `agent_encadreur` | CRT (lecture seule ou co-remplissage) |
-| `pilote` | Fiche de vol |
-| `mecanicien` | Fiche de vol |
-| `chef_de_base` | Tout en lecture/écriture + validation + sync status |
-| `admin` | Gestion utilisateurs + config postes acridiens + résolution conflits |
+| Rôle | Fiches accessibles | Description |
+|------|---------------------|-------------|
+| `prospecteur` | Prospection extensive, Prospection intensive, Relevé météo | Remplit et soumet les fiches terrain |
+| `verificateur` | Prospection intensive (vérification) | Autre équipe — vérifie les fiches soumises |
+| `validation_finale` | Prospection intensive (validation web) | Autre équipe — valide ou rejette sur l'interface web |
+| `chef_equipe` | CRT + toutes prospections (lecture/écriture) | Encadre l'équipe terrain |
+| `agent_encadreur` | CRT (lecture seule ou co-remplissage) | Co-remplissage CRT |
+| `pilote` | Fiche de vol | Pilote d'aéronef |
+| `mecanicien` | Fiche de vol | Mécanicien d'aéronef |
+| `chef_de_base` | Tout en lecture/écriture + validation + sync status | Supervise son PA |
+| `admin` | Gestion utilisateurs + config postes acridiens + résolution conflits | Configuration système |
 
 ---
 
@@ -112,20 +146,30 @@ Chaque rôle a un dashboard adapté dans l'app mobile :
 poste_acridien
 ├── station (type: fixe | ponctuelle)
 ├── station_meteo
-└── utilisateur (rôles: prospecteur, chef_equipe, agent_encadreur,
-                         pilote, mecanicien, chef_de_base, admin)
+└── utilisateur (rôles: prospecteur, verificateur, validation_finale, chef_equipe,
+                         agent_encadreur, pilote, mecanicien, chef_de_base, admin)
 
 releve_meteo → station_meteo
   └── mesure_meteo_jour (1 ligne / jour)
 
 prospection_extensive → station (ponctuelle)
 prospection_intensive → station (fixe)
+  ├── statut: brouillon | en_attente | verifiee | validee | rejetee
+  ├── statut_sync: synchronise | desynchronise
   ├── capture          (espece × stade × sexe × phase × nombre)
   ├── population_acridien (densités diffuses/groupées, accouplements, ponte)
   ├── infestation      (taches, bandes, vols, essaims)
   ├── vegetation       (7 strates × attributs ORPAD)
   ├── humidite_sol
   └── texture_sol
+
+audit_log
+  ├── fiche_type (intensive | extensive | validation | crt | vol | meteo)
+  ├── fiche_id
+  ├── auteur_id → utilisateur
+  ├── action (creation | modification | soumission | verification | validation | rejet | commentaire)
+  ├── details (JSON ou texte)
+  └── created_at
 
 compte_rendu_traitement (CRT)
   ├── → prospection_extensive OU prospection_intensive  (obligatoire)
