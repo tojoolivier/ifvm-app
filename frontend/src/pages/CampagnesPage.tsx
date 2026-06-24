@@ -13,6 +13,7 @@ interface Campagne {
 export function CampagnesPage() {
   const queryClient = useQueryClient()
   const [showModal, setShowModal] = useState(false)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -32,6 +33,14 @@ export function CampagnesPage() {
       resetForm()
     },
     onError: () => setError('Erreur lors de la création'),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/campagnes/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campagnes'] })
+      setDeleteId(null)
+    },
   })
 
   function resetForm() {
@@ -76,6 +85,7 @@ export function CampagnesPage() {
                 <th className="px-4 py-3">Date début</th>
                 <th className="px-4 py-3">Date fin</th>
                 <th className="px-4 py-3">Créé le</th>
+                <th className="px-4 py-3 w-20"></th>
               </tr>
             </thead>
             <tbody>
@@ -86,6 +96,14 @@ export function CampagnesPage() {
                   <td className="px-4 py-3">{c.end_date || '—'}</td>
                   <td className="px-4 py-3 text-gray-500">
                     {new Date(c.created_at).toLocaleDateString('fr-FR')}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={() => setDeleteId(c.id)}
+                      className="text-red-600 hover:text-red-800 text-sm"
+                    >
+                      Supprimer
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -150,6 +168,36 @@ export function CampagnesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {deleteId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4">
+            <div className="px-6 py-4 border-b">
+              <h2 className="text-lg font-semibold">Confirmer la suppression</h2>
+            </div>
+            <div className="px-6 py-4">
+              <p className="text-gray-600">
+                Voulez-vous vraiment supprimer cette campagne ?
+              </p>
+            </div>
+            <div className="px-6 py-4 border-t flex gap-3 justify-end">
+              <button
+                onClick={() => setDeleteId(null)}
+                className="border border-gray-300 px-4 py-2 rounded hover:bg-gray-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => deleteMutation.mutate(deleteId)}
+                disabled={deleteMutation.isPending}
+                className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleteMutation.isPending ? 'Suppression…' : 'Supprimer'}
+              </button>
+            </div>
           </div>
         </div>
       )}
