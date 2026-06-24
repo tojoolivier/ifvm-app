@@ -3,7 +3,7 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
 import { DashboardPage } from './pages/DashboardPage'
-import { CreateCampagnePage } from './pages/CreateCampagnePage'
+import { CampagnesPage } from './pages/CampagnesPage'
 
 export function AppRouter() {
   return (
@@ -13,7 +13,7 @@ export function AppRouter() {
         <Route element={<ProtectedRoute />}>
           <Route element={<Layout />}>
             <Route path="/" element={<DashboardPage />} />
-            <Route path="/campagnes/nouvelle" element={<CreateCampagnePage />} />
+            <Route path="/campagnes" element={<CampagnesPage />} />
           </Route>
         </Route>
       </Routes>
