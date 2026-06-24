@@ -1,6 +1,6 @@
 # Issue 04 — Frontend web : page liste des prospections intensives
 
-**Status:** ready-for-agent  
+**Status:** done  
 **Priority:** high  
 **Depends on:** 02
 
