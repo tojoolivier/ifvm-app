@@ -1,6 +1,6 @@
 # Issue 03 — API : transitions de statut et audit log
 
-**Status:** ready-for-agent  
+**Status:** done  
 **Priority:** high  
 **Depends on:** 02
 
@@ -10,14 +10,14 @@ Implémenter l'endpoint de changement de statut avec validation des transitions 
 
 ## Acceptance Criteria
 
-- [ ] `PATCH /prospections/{id}/statut` — changer le statut
-- [ ] Machine à états (transitions) portée par le **domaine** (`Prospection`), orchestrée par un use case `application/`
-- [ ] Validation des transitions : brouillon→en_attente, en_attente→verifiee, verifiee→validee, verifiee→rejetee
-- [ ] Refus des transitions invalides (400 Bad Request)
-- [ ] Vérification des permissions (qui peut faire quoi)
-- [ ] Enregistrement automatique dans l'audit log à chaque transition (port `AuditLogRepository` dans `domain/`, adapter `infrastructure/`)
-- [ ] `POST /prospections/{id}/commentaire` — ajouter un commentaire
-- [ ] `GET /prospections/{id}/audit-log` — historique des modifications
+- [x] `PATCH /prospections/{id}/statut` — changer le statut
+- [x] Machine à états (transitions) portée par le **domaine** (`Prospection`), orchestrée par un use case `application/`
+- [x] Validation des transitions : brouillon→en_attente, en_attente→verifiee, verifiee→validee, verifiee→rejetee
+- [x] Refus des transitions invalides (400 Bad Request)
+- [x] Vérification des permissions (qui peut faire quoi)
+- [x] Enregistrement automatique dans l'audit log à chaque transition (port `AuditLogRepository` dans `domain/`, adapter `infrastructure/`)
+- [x] `POST /prospections/{id}/commentaire` — ajouter un commentaire
+- [x] `GET /prospections/{id}/audit-log` — historique des modifications
 
 ## Technical Notes
 
