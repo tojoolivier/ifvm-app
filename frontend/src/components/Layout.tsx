@@ -4,6 +4,7 @@ const navItems = [
   { to: '/', label: 'Tableau de bord', exact: true },
   { to: '/campagnes', label: 'Campagnes' },
   { to: '/prospections', label: 'Prospections' },
+  { to: '/design-system', label: '🎨 Design System' },
 ]
 
 export function Layout() {

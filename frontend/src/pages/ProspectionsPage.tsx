@@ -1,7 +1,26 @@
 import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Card, CardContent } from '@/components/ui/card'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+} from '@/components/ui/table'
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select'
+import { cn } from '@/lib/utils'
 
 interface Campagne {
   id: string
@@ -45,7 +64,12 @@ const PAGE_SIZE = 20
 
 function StatutBadge({ statut }: { statut: string }) {
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${STATUT_CLASSES[statut] ?? 'bg-gray-100 text-gray-700'}`}>
+    <span
+      className={cn(
+        'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium',
+        STATUT_CLASSES[statut] ?? 'bg-gray-100 text-gray-700',
+      )}
+    >
       {STATUT_LABELS[statut] ?? statut}
     </span>
   )
@@ -62,6 +86,7 @@ export function ProspectionsPage() {
   const [filtreStation, setFiltreStation] = useState('')
   const [filtreDate, setFiltreDate] = useState('')
   const [page, setPage] = useState(1)
+  const navigate = useNavigate()
 
   const { data: prospections = [], isLoading } = useQuery<Prospection[]>({
     queryKey: ['prospections', 'intensive'],
@@ -91,6 +116,8 @@ export function ProspectionsPage() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
+  const hasFiltres = filtreStatut || filtreCampagne || filtreStation || filtreDate
+
   function resetFiltres() {
     setFiltreStatut('')
     setFiltreCampagne('')
@@ -99,152 +126,155 @@ export function ProspectionsPage() {
     setPage(1)
   }
 
-  function handleFiltreChange(setter: (v: string) => void) {
-    return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-      setter(e.target.value)
-      setPage(1)
-    }
-  }
+  function onStatutChange(v: string | null) { setFiltreStatut(v ?? ''); setPage(1) }
+  function onCampagneChange(v: string | null) { setFiltreCampagne(v ?? ''); setPage(1) }
 
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Prospections intensives</h1>
-        <Link
-          to="/prospections/new"
-          className="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800 text-sm"
-        >
+        <h1 className="text-2xl font-bold">Prospections intensives</h1>
+        <Link to="/prospections/new" className={buttonVariants()}>
           Nouvelle fiche
         </Link>
       </div>
 
       {/* Filtres */}
-      <div className="bg-white rounded-lg shadow p-4 mb-4 flex flex-wrap gap-3 items-end">
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Statut</label>
-          <select
-            value={filtreStatut}
-            onChange={handleFiltreChange(setFiltreStatut)}
-            className="border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-          >
-            <option value="">Tous</option>
-            {STATUTS.map((s) => (
-              <option key={s} value={s}>{STATUT_LABELS[s]}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Campagne</label>
-          <select
-            value={filtreCampagne}
-            onChange={handleFiltreChange(setFiltreCampagne)}
-            className="border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-          >
-            <option value="">Toutes</option>
-            {campagnes.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Station (début d'ID)</label>
-          <input
-            type="text"
-            value={filtreStation}
-            onChange={handleFiltreChange(setFiltreStation)}
-            placeholder="ex: a1b2c3…"
-            className="border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 w-36"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Date (à partir du)</label>
-          <input
-            type="date"
-            value={filtreDate}
-            onChange={handleFiltreChange(setFiltreDate)}
-            className="border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-          />
-        </div>
-        {(filtreStatut || filtreCampagne || filtreStation || filtreDate) && (
-          <button
-            onClick={resetFiltres}
-            className="text-sm text-gray-500 hover:text-gray-700 underline self-end pb-1.5"
-          >
-            Effacer les filtres
-          </button>
-        )}
-      </div>
+      <Card className="mb-4">
+        <CardContent className="pt-4 flex flex-wrap gap-3 items-end">
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">Statut</span>
+            <Select value={filtreStatut} onValueChange={onStatutChange}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Tous" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Tous</SelectItem>
+                {STATUTS.map((s) => (
+                  <SelectItem key={s} value={s}>{STATUT_LABELS[s]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-      {/* Tableau */}
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">Campagne</span>
+            <Select value={filtreCampagne} onValueChange={onCampagneChange}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Toutes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Toutes</SelectItem>
+                {campagnes.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">Station (début ID)</span>
+            <Input
+              type="text"
+              value={filtreStation}
+              onChange={(e) => { setFiltreStation(e.target.value); setPage(1) }}
+              placeholder="ex: a1b2c3…"
+              className="w-36"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">À partir du</span>
+            <Input
+              type="date"
+              value={filtreDate}
+              onChange={(e) => { setFiltreDate(e.target.value); setPage(1) }}
+              className="w-40"
+            />
+          </div>
+
+          {hasFiltres && (
+            <Button variant="ghost" size="sm" onClick={resetFiltres}>
+              Effacer les filtres
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Contenu */}
       {isLoading ? (
-        <p className="text-gray-400">Chargement…</p>
+        <p className="text-muted-foreground">Chargement…</p>
       ) : filtered.length === 0 ? (
-        <p className="text-gray-400">Aucune fiche trouvée.</p>
+        <p className="text-muted-foreground">Aucune fiche trouvée.</p>
       ) : (
         <>
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-gray-500 border-b bg-gray-50">
-                  <th className="px-4 py-3">Station</th>
-                  <th className="px-4 py-3">Date</th>
-                  <th className="px-4 py-3">Prospecteur</th>
-                  <th className="px-4 py-3">Statut</th>
-                  <th className="px-4 py-3">Campagne</th>
-                  <th className="px-4 py-3 w-20"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginated.map((p) => (
-                  <tr key={p.id} className="border-b last:border-0 hover:bg-gray-50">
-                    <td className="px-4 py-3 font-mono text-xs text-gray-600">
-                      {shortId(p.station_id)}
-                    </td>
-                    <td className="px-4 py-3">{p.date_prospection}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-gray-600">
-                      {shortId(p.prospecteur_id)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatutBadge statut={p.statut} />
-                    </td>
-                    <td className="px-4 py-3">
-                      {campagneMap[p.campagne_id] ?? shortId(p.campagne_id)}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Link
-                        to={`/prospections/${p.id}`}
-                        className="text-green-700 hover:text-green-900 text-sm font-medium"
-                      >
-                        Voir
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Station</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Prospecteur</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead>Campagne</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginated.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {shortId(p.station_id)}
+                      </TableCell>
+                      <TableCell>{p.date_prospection}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {shortId(p.prospecteur_id)}
+                      </TableCell>
+                      <TableCell>
+                        <StatutBadge statut={p.statut} />
+                      </TableCell>
+                      <TableCell>
+                        {campagneMap[p.campagne_id] ?? shortId(p.campagne_id)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => navigate(`/prospections/${p.id}`)}
+                        >
+                          Voir
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
 
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-4">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted-foreground">
                 {filtered.length} fiche{filtered.length > 1 ? 's' : ''} — page {page} / {totalPages}
               </p>
               <div className="flex gap-2">
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="border border-gray-300 px-3 py-1.5 rounded text-sm hover:bg-gray-50 disabled:opacity-40"
                 >
                   ← Précédent
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="border border-gray-300 px-3 py-1.5 rounded text-sm hover:bg-gray-50 disabled:opacity-40"
                 >
                   Suivant →
-                </button>
+                </Button>
               </div>
             </div>
           )}
