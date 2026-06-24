@@ -34,7 +34,7 @@ async def list_campagnes(
     return await use_case.execute()
 
 
-@router.post("/", response_model=CampagneRead, status_code=201)
+@router.post("", response_model=CampagneRead, status_code=201)
 async def create_campagne(
     body: CampagneCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
