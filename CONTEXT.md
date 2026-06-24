@@ -146,6 +146,54 @@ fiche_vol → CRT (1-1)
 
 ---
 
+## Application mobile — structure technique
+
+L'app mobile est initialisée dans `mobile/` avec Expo Router, NativeWind, et TypeScript strict.
+
+### Structure de navigation
+
+```
+mobile/src/app/
+├── _layout.tsx          # Root layout (Stack)
+├── (tabs)/
+│   ├── _layout.tsx      # Bottom tabs (écrans principaux)
+│   ├── index.tsx        # Dashboard
+│   └── explore.tsx      # Exploration
+└── (auth)/
+    ├── _layout.tsx      # Stack authentification
+    └── login.tsx        # Page de connexion
+```
+
+### Stack technique mobile
+
+| Composant | Technologie | Référence |
+|-----------|-------------|-----------|
+| Framework | Expo SDK 56 | `mobile/package.json` |
+| Navigation | Expo Router (file-based) | `mobile/src/app/` |
+| Styles | NativeWind v4 (Tailwind CSS) | `mobile/tailwind.config.js` |
+| Types | TypeScript strict | `mobile/tsconfig.json` |
+| Build | EAS Build (APK sideload) | `mobile/eas.json` |
+| Variables d'env | `EXPO_PUBLIC_API_URL` | `mobile/.env` |
+
+### Commandes essentielles
+
+```bash
+cd mobile
+npm start          # Serveur de développement
+npm test           # Tests de validation
+npx tsc --noEmit   # Vérification TypeScript
+```
+
+### Documentation détaillée
+
+| Document | Chemin |
+|----------|--------|
+| Service Overview | `docs/services/mobile-app/overview.md` |
+| Runbook développement | `docs/services/mobile-app/runbooks/development.md` |
+| ADR Scaffolding | `docs/adr/ADR-004-mobile-scaffolding.md` |
+
+---
+
 ## Fichiers clés
 
 | Fichier | Contenu |
@@ -155,3 +203,6 @@ fiche_vol → CRT (1-1)
 | `docs/adr/ADR-001-stack.md` | Choix PostgreSQL + FastAPI + React |
 | `docs/adr/ADR-002-sync.md` | Stratégie de synchronisation offline |
 | `docs/adr/ADR-003-mobile.md` | React Native vs PWA |
+| `docs/adr/ADR-004-mobile-scaffolding.md` | Choix techniques du scaffolding mobile |
+| `docs/services/mobile-app/overview.md` | Vue d'ensemble du service mobile |
+| `docs/services/mobile-app/runbooks/development.md` | Procédures de développement mobile |
