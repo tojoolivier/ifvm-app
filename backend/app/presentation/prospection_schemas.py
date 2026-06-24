@@ -97,6 +97,26 @@ class ProspectionUpdate(BaseModel):
     statut: str | None = None
 
 
+class StatutChange(BaseModel):
+    statut: str
+    commentaire: str | None = None
+
+
+class CommentaireCreate(BaseModel):
+    texte: str
+
+
+class AuditLogRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    fiche_type: str
+    fiche_id: uuid.UUID
+    auteur_id: uuid.UUID
+    action: str
+    details: dict[str, Any] | None
+    created_at: datetime
+
+
 class ProspectionRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

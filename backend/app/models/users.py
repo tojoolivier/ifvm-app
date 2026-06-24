@@ -7,7 +7,17 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
 
-ROLES = ("prospecteur", "chef_equipe", "agent_encadreur", "pilote", "mecanicien", "chef_de_base", "admin")
+ROLES = (
+    "prospecteur",
+    "verificateur",
+    "validation_finale",
+    "chef_equipe",
+    "agent_encadreur",
+    "pilote",
+    "mecanicien",
+    "chef_de_base",
+    "admin",
+)
 
 
 class Utilisateur(Base):

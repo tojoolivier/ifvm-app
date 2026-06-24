@@ -3,6 +3,23 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any
 
+# Qui peut déclencher quelle transition
+_TRANSITIONS: dict[str, dict[str, list[str]]] = {
+    "brouillon": {"en_attente": ["prospecteur"]},
+    "en_attente": {"verifiee": ["verificateur"]},
+    "verifiee": {
+        "validee": ["validation_finale"],
+        "rejetee": ["validation_finale"],
+    },
+}
+
+_ACTION_MAP: dict[str, str] = {
+    "en_attente": "soumission",
+    "verifiee": "verification",
+    "validee": "validation",
+    "rejetee": "rejet",
+}
+
 
 @dataclass
 class ProspectionPopulation:
@@ -87,6 +104,25 @@ class Prospection:
     populations: list[ProspectionPopulation] = field(default_factory=list)
     captures: list[ProspectionCapture] = field(default_factory=list)
     infestations: list[ProspectionInfestation] = field(default_factory=list)
+
+    def apply_transition(self, nouveau_statut: str, acteur_role: str) -> str:
+        """Valide et applique une transition de statut. Retourne l'action d'audit.
+
+        Raises ValueError pour transition inexistante, PermissionError pour rôle non autorisé.
+        """
+        transitions = _TRANSITIONS.get(self.statut, {})
+        if nouveau_statut not in transitions:
+            raise ValueError(
+                f"Transition '{self.statut}' → '{nouveau_statut}' invalide"
+            )
+        roles_autorises = transitions[nouveau_statut]
+        if acteur_role not in roles_autorises:
+            raise PermissionError(
+                f"Rôle '{acteur_role}' non autorisé pour passer de '{self.statut}' à '{nouveau_statut}'"
+            )
+        self.statut = nouveau_statut
+        self.updated_at = datetime.utcnow()
+        return _ACTION_MAP[nouveau_statut]
 
 
 @dataclass

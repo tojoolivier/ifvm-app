@@ -5,17 +5,28 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.prospection_use_cases import (
+    AjouterCommentaire,
+    ChangerStatut,
     CreateProspection,
     DeleteProspection,
+    GetAuditLog,
     GetProspection,
     ListProspections,
     UpdateProspection,
 )
 from app.auth import get_current_user
 from app.database import get_db
+from app.infrastructure.audit_log_repository import AuditLogRepositoryImpl
 from app.infrastructure.prospection_repository import ProspectionRepositoryImpl
 from app.models.users import Utilisateur
-from app.presentation.prospection_schemas import ProspectionCreate, ProspectionRead, ProspectionUpdate
+from app.presentation.prospection_schemas import (
+    AuditLogRead,
+    CommentaireCreate,
+    ProspectionCreate,
+    ProspectionRead,
+    ProspectionUpdate,
+    StatutChange,
+)
 
 router = APIRouter()
 
@@ -153,3 +164,63 @@ async def delete_prospection(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prospection non trouvée")
+
+
+@router.patch("/{prospection_id}/statut", response_model=ProspectionRead)
+async def changer_statut(
+    prospection_id: uuid.UUID,
+    body: StatutChange,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    prospection_repo = get_repository(db)
+    audit_repo = AuditLogRepositoryImpl(db)
+    use_case = ChangerStatut(prospection_repo, audit_repo)
+    try:
+        return await use_case.execute(
+            prospection_id=prospection_id,
+            nouveau_statut=body.statut,
+            acteur_id=current_user.id,
+            acteur_role=current_user.role,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
+@router.post("/{prospection_id}/commentaire", response_model=AuditLogRead, status_code=201)
+async def ajouter_commentaire(
+    prospection_id: uuid.UUID,
+    body: CommentaireCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    prospection_repo = get_repository(db)
+    audit_repo = AuditLogRepositoryImpl(db)
+    use_case = AjouterCommentaire(prospection_repo, audit_repo)
+    try:
+        return await use_case.execute(
+            prospection_id=prospection_id,
+            auteur_id=current_user.id,
+            texte=body.texte,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.get("/{prospection_id}/audit-log", response_model=list[AuditLogRead])
+async def get_audit_log(
+    prospection_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    prospection_repo = get_repository(db)
+    audit_repo = AuditLogRepositoryImpl(db)
+    use_case = GetAuditLog(prospection_repo, audit_repo)
+    try:
+        return await use_case.execute(prospection_id)
+    except LookupError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

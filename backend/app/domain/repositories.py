@@ -2,7 +2,7 @@ import uuid
 from abc import ABC, abstractmethod
 
 from app.domain.campagne import Campagne
-from app.domain.prospection import Prospection
+from app.domain.prospection import AuditLog, Prospection
 
 
 class CampagneRepository(ABC):
@@ -53,4 +53,14 @@ class ProspectionRepository(ABC):
 
     @abstractmethod
     async def delete(self, prospection_id: uuid.UUID) -> bool:
+        pass
+
+
+class AuditLogRepository(ABC):
+    @abstractmethod
+    async def create(self, entry: AuditLog) -> AuditLog:
+        pass
+
+    @abstractmethod
+    async def list_by_fiche(self, fiche_id: uuid.UUID) -> list[AuditLog]:
         pass

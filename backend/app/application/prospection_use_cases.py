@@ -2,8 +2,8 @@ import uuid
 from datetime import date, datetime
 from typing import Any
 
-from app.domain.prospection import Prospection
-from app.domain.repositories import ProspectionRepository
+from app.domain.prospection import AuditLog, Prospection
+from app.domain.repositories import AuditLogRepository, ProspectionRepository
 
 
 class CreateProspection:
@@ -189,3 +189,87 @@ class DeleteProspection:
         if prospection.statut != "brouillon":
             raise PermissionError("Seules les fiches en brouillon peuvent être supprimées")
         return await self.repository.delete(prospection_id)
+
+
+class ChangerStatut:
+    def __init__(
+        self,
+        prospection_repo: ProspectionRepository,
+        audit_repo: AuditLogRepository,
+    ):
+        self.prospection_repo = prospection_repo
+        self.audit_repo = audit_repo
+
+    async def execute(
+        self,
+        prospection_id: uuid.UUID,
+        nouveau_statut: str,
+        acteur_id: uuid.UUID,
+        acteur_role: str,
+    ) -> Prospection:
+        prospection = await self.prospection_repo.get_by_id(prospection_id)
+        if prospection is None:
+            raise LookupError("Prospection non trouvée")
+
+        statut_precedent = prospection.statut
+        action = prospection.apply_transition(nouveau_statut, acteur_role)
+
+        updated = await self.prospection_repo.update(prospection)
+
+        await self.audit_repo.create(
+            AuditLog(
+                fiche_type=prospection.type_prospection,
+                fiche_id=prospection_id,
+                auteur_id=acteur_id,
+                action=action,
+                details={"statut_precedent": statut_precedent, "nouveau_statut": nouveau_statut},
+            )
+        )
+
+        return updated
+
+
+class AjouterCommentaire:
+    def __init__(
+        self,
+        prospection_repo: ProspectionRepository,
+        audit_repo: AuditLogRepository,
+    ):
+        self.prospection_repo = prospection_repo
+        self.audit_repo = audit_repo
+
+    async def execute(
+        self,
+        prospection_id: uuid.UUID,
+        auteur_id: uuid.UUID,
+        texte: str,
+    ) -> AuditLog:
+        prospection = await self.prospection_repo.get_by_id(prospection_id)
+        if prospection is None:
+            raise LookupError("Prospection non trouvée")
+
+        return await self.audit_repo.create(
+            AuditLog(
+                fiche_type=prospection.type_prospection,
+                fiche_id=prospection_id,
+                auteur_id=auteur_id,
+                action="commentaire",
+                details={"texte": texte},
+            )
+        )
+
+
+class GetAuditLog:
+    def __init__(
+        self,
+        prospection_repo: ProspectionRepository,
+        audit_repo: AuditLogRepository,
+    ):
+        self.prospection_repo = prospection_repo
+        self.audit_repo = audit_repo
+
+    async def execute(self, prospection_id: uuid.UUID) -> list[AuditLog]:
+        prospection = await self.prospection_repo.get_by_id(prospection_id)
+        if prospection is None:
+            raise LookupError("Prospection non trouvée")
+        return await self.audit_repo.list_by_fiche(prospection_id)
