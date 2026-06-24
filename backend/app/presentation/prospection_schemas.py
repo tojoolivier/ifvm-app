@@ -125,6 +125,8 @@ class ProspectionRead(BaseModel):
     campagne_id: uuid.UUID
     prospecteur_id: uuid.UUID
     station_id: uuid.UUID | None
+    station_code: str | None = None
+    station_nom: str | None = None
     n_releve: str | None
     n_fiche: str | None
     n_message: str | None

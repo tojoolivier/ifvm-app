@@ -223,6 +223,7 @@ export function NouvelleProspectionPage() {
   // --- champs de base ---
   const [campagneId, setCampagneId] = useState('')
   const [stationId, setStationId] = useState('')
+  const [stationSearch, setStationSearch] = useState('')
   const [dateProspection, setDateProspection] = useState(new Date().toISOString().slice(0, 10))
   const [nReleve, setNReleve] = useState('')
   const [nFiche, setNFiche] = useState('')
@@ -258,6 +259,17 @@ export function NouvelleProspectionPage() {
     queryKey: ['stations'],
     queryFn: () => api.get('/stations').then((r) => r.data),
   })
+
+  const filteredStations = useMemo(() => {
+    if (!stationSearch) return stations
+    const q = stationSearch.toLowerCase()
+    return stations.filter(
+      (s) =>
+        s.code.toLowerCase().includes(q) ||
+        s.nom.toLowerCase().includes(q) ||
+        s.pa_code.toLowerCase().includes(q)
+    )
+  }, [stations, stationSearch])
 
   // Auto-sélection de la campagne en cours si unique
   const campagnesEnCours = useMemo(() => {
@@ -447,6 +459,14 @@ export function NouvelleProspectionPage() {
 
             <div className="flex flex-col gap-1">
               <Label htmlFor="station">Station fixe</Label>
+              <Input
+                id="station-search"
+                type="text"
+                value={stationSearch}
+                onChange={(e) => setStationSearch(e.target.value)}
+                placeholder="Rechercher par nom ou code..."
+                className="mb-1"
+              />
               <select
                 id="station"
                 value={stationId}
@@ -463,7 +483,7 @@ export function NouvelleProspectionPage() {
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="">— Choisir une station —</option>
-                {stations.map((s) => (
+                {filteredStations.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.code} — {s.nom} ({s.pa_code})
                   </option>

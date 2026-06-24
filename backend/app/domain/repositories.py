@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 
 from app.domain.campagne import Campagne
 from app.domain.prospection import AuditLog, Prospection
+from app.domain.referentiel import PosteAcridien, StationFixe
 
 
 class CampagneRepository(ABC):
@@ -63,4 +64,33 @@ class AuditLogRepository(ABC):
 
     @abstractmethod
     async def list_by_fiche(self, fiche_id: uuid.UUID) -> list[AuditLog]:
+        pass
+
+
+class PosteAcridienRepository(ABC):
+    @abstractmethod
+    async def list_all(self) -> list[PosteAcridien]:
+        pass
+
+    @abstractmethod
+    async def get_by_id(self, pa_id: uuid.UUID) -> PosteAcridien | None:
+        pass
+
+
+class StationFixeRepository(ABC):
+    @abstractmethod
+    async def list_by_filters(
+        self,
+        pa_id: uuid.UUID | None = None,
+        q: str | None = None,
+        actif: bool = True,
+    ) -> list[StationFixe]:
+        pass
+
+    @abstractmethod
+    async def get_by_id(self, station_id: uuid.UUID) -> StationFixe | None:
+        pass
+
+    @abstractmethod
+    async def exists(self, station_id: uuid.UUID) -> bool:
         pass

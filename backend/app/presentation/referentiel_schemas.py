@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
@@ -9,6 +10,7 @@ class PosteAcridienRead(BaseModel):
     code: str
     nom: str
     region: str | None
+    created_at: datetime
 
 
 class StationFixeRead(BaseModel):
@@ -23,3 +25,4 @@ class StationFixeRead(BaseModel):
     longitude: float
     altitude: float | None
     actif: bool
+    created_at: datetime

@@ -56,8 +56,6 @@ class ProspectionModel(Base):
         back_populates="prospection", cascade="all, delete-orphan"
     )
 
-    station: Mapped["StationFixeModel | None"] = relationship()
-
     __table_args__ = (
         CheckConstraint(
             "type_prospection IN ('intensive','extensive','validation')",
