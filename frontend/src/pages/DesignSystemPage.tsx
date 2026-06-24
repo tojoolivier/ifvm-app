@@ -374,6 +374,142 @@ export function DesignSystemPage() {
 
       <Separator />
 
+      {/* ── Espacements ── */}
+      <Section title="Espacements — scale Tailwind">
+        {/* Échelle de référence */}
+        <div className="space-y-2">
+          {[
+            { token: '0.5', px: '2px',  tw: 'p-0.5',  desc: 'Micro — badge interne, icône dense' },
+            { token: '1',   px: '4px',  tw: 'p-1',    desc: 'XS — gap entre éléments inline' },
+            { token: '1.5', px: '6px',  tw: 'p-1.5',  desc: 'XS+ — padding bouton xs/sm' },
+            { token: '2',   px: '8px',  tw: 'p-2',    desc: 'SM — cellule de table (TableCell p-2)' },
+            { token: '2.5', px: '10px', tw: 'p-2.5',  desc: 'SM+ — padding input (px-2.5)' },
+            { token: '3',   px: '12px', tw: 'p-3',    desc: 'MD — card compacte (size=sm)' },
+            { token: '4',   px: '16px', tw: 'p-4',    desc: 'MD+ — card standard, filtres' },
+            { token: '6',   px: '24px', tw: 'p-6',    desc: 'LG — padding de page principale' },
+            { token: '8',   px: '32px', tw: 'p-8',    desc: 'XL — padding large (design system page)' },
+            { token: '12',  px: '48px', tw: 'p-12',   desc: 'XXL — sections espacées' },
+          ].map(({ token, px, tw, desc }) => (
+            <div key={token} className="flex items-center gap-4">
+              <div className="w-16 text-right font-mono text-xs text-muted-foreground shrink-0">
+                {token}
+              </div>
+              <div
+                className="bg-green-200 border border-green-400 rounded shrink-0"
+                style={{ width: px, height: '16px', minWidth: px }}
+              />
+              <div className="flex items-center gap-2 min-w-0">
+                <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono shrink-0">{tw}</code>
+                <span className="text-xs text-muted-foreground">{px}</span>
+                <span className="text-xs text-foreground/60">— {desc}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Espacements — normes par contexte">
+        <div className="grid grid-cols-2 gap-4 text-sm">
+
+          {/* Page */}
+          <Card size="sm">
+            <CardHeader><CardTitle>Page / layout</CardTitle></CardHeader>
+            <CardContent className="space-y-1 text-muted-foreground text-xs">
+              <p><code className="font-mono bg-muted px-1 rounded">p-6</code> padding de la zone de contenu principale</p>
+              <p><code className="font-mono bg-muted px-1 rounded">mb-6</code> entre le header de page et son contenu</p>
+              <p><code className="font-mono bg-muted px-1 rounded">gap-3</code> entre éléments d'une barre d'actions</p>
+              <p><code className="font-mono bg-muted px-1 rounded">space-y-12</code> entre sections majeures (DS page)</p>
+            </CardContent>
+          </Card>
+
+          {/* Card */}
+          <Card size="sm">
+            <CardHeader><CardTitle>Card</CardTitle></CardHeader>
+            <CardContent className="space-y-1 text-muted-foreground text-xs">
+              <p><code className="font-mono bg-muted px-1 rounded">p-4</code> intérieur standard (via <code>--card-spacing</code>)</p>
+              <p><code className="font-mono bg-muted px-1 rounded">p-3</code> intérieur compact (<code>size="sm"</code>)</p>
+              <p><code className="font-mono bg-muted px-1 rounded">p-0 + CardContent</code> pour tables dans Card</p>
+              <p><code className="font-mono bg-muted px-1 rounded">mb-4</code> entre Card filtre et tableau</p>
+            </CardContent>
+          </Card>
+
+          {/* Table */}
+          <Card size="sm">
+            <CardHeader><CardTitle>Table</CardTitle></CardHeader>
+            <CardContent className="space-y-1 text-muted-foreground text-xs">
+              <p><code className="font-mono bg-muted px-1 rounded">p-2</code> cellules (<code>TableCell</code> par défaut)</p>
+              <p><code className="font-mono bg-muted px-1 rounded">h-10</code> hauteur en-tête (<code>TableHead</code>)</p>
+              <p>Pas de padding custom sur les lignes — utiliser <code>TableCell</code></p>
+            </CardContent>
+          </Card>
+
+          {/* Formulaire */}
+          <Card size="sm">
+            <CardHeader><CardTitle>Formulaire / filtres</CardTitle></CardHeader>
+            <CardContent className="space-y-1 text-muted-foreground text-xs">
+              <p><code className="font-mono bg-muted px-1 rounded">gap-3</code> entre champs d'une même ligne</p>
+              <p><code className="font-mono bg-muted px-1 rounded">gap-1</code> entre Label et Input</p>
+              <p><code className="font-mono bg-muted px-1 rounded">space-y-4</code> entre groupes de champs empilés</p>
+              <p><code className="font-mono bg-muted px-1 rounded">pt-4</code> CardContent d'un panneau de filtres</p>
+            </CardContent>
+          </Card>
+
+          {/* Navigation */}
+          <Card size="sm">
+            <CardHeader><CardTitle>Navigation (sidebar)</CardTitle></CardHeader>
+            <CardContent className="space-y-1 text-muted-foreground text-xs">
+              <p><code className="font-mono bg-muted px-1 rounded">px-4 py-4</code> logo / header sidebar</p>
+              <p><code className="font-mono bg-muted px-1 rounded">px-2 py-4</code> zone nav</p>
+              <p><code className="font-mono bg-muted px-1 rounded">px-3 py-2</code> item NavLink</p>
+              <p><code className="font-mono bg-muted px-1 rounded">space-y-1</code> entre items nav</p>
+            </CardContent>
+          </Card>
+
+          {/* Boutons & badges */}
+          <Card size="sm">
+            <CardHeader><CardTitle>Boutons &amp; badges</CardTitle></CardHeader>
+            <CardContent className="space-y-1 text-muted-foreground text-xs">
+              <p><code className="font-mono bg-muted px-1 rounded">gap-2</code> entre boutons adjacents</p>
+              <p><code className="font-mono bg-muted px-1 rounded">px-2 py-0.5</code> badge statut custom</p>
+              <p>Padding bouton géré par <code>size=</code> — ne pas surcharger</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Exemple visuel annoté */}
+        <div className="mt-6">
+          <p className="text-xs font-medium text-muted-foreground mb-3">Exemple annoté — structure d'une page liste</p>
+          <div className="border rounded-xl overflow-hidden text-xs font-mono">
+            <div className="bg-muted px-3 py-1 text-muted-foreground border-b">page.tsx</div>
+            <pre className="p-4 text-[11px] leading-5 overflow-x-auto">{`<div className="p-6">                      {/* padding page */}
+  <div className="flex justify-between mb-6"> {/* mb-6 header→contenu */}
+    <h1>Titre</h1>
+    <Button>Action</Button>
+  </div>
+
+  <Card className="mb-4">                    {/* mb-4 card→tableau */}
+    <CardContent className="pt-4 flex gap-3"> {/* gap-3 entre filtres */}
+      <div className="flex flex-col gap-1">   {/* gap-1 label→input */}
+        <Label />
+        <Input />
+      </div>
+    </CardContent>
+  </Card>
+
+  <Card>
+    <CardContent className="p-0">            {/* p-0 pour tables */}
+      <Table>
+        <TableCell>…</TableCell>              {/* p-2 par défaut */}
+      </Table>
+    </CardContent>
+  </Card>
+</div>`}</pre>
+          </div>
+        </div>
+      </Section>
+
+      <Separator />
+
       {/* ── Usage rules ── */}
       <Section title="Règles d'utilisation">
         <div className="space-y-3 text-sm">
