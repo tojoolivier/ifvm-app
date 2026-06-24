@@ -2,11 +2,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 
 const navItems = [
   { to: '/', label: 'Tableau de bord', exact: true },
-  { to: '/prospection/extensive', label: 'Prospection extensive' },
-  { to: '/prospection/intensive', label: 'Prospection intensive' },
-  { to: '/meteo', label: 'Météo' },
-  { to: '/traitement', label: 'CRT' },
-  { to: '/vol', label: 'Fiche de vol' },
+  { to: '/campagnes/nouvelle', label: 'Nouvelle campagne' },
 ]
 
 export function Layout() {
