@@ -2,7 +2,9 @@ import { Tabs, useRouter } from 'expo-router';
 import { Text, TouchableOpacity, View, StyleSheet } from 'react-native';
 import { useAuthStore } from '@/lib/auth-store';
 import { UserRole } from '@/lib/api-client';
+
 const IFVM_GREEN = '#1B5E1B';
+const IFVM_BG = '#162016';
 
 const ROLE_TABS: Record<UserRole, string[]> = {
   prospecteur: ['index', 'fiches'],
@@ -14,13 +16,13 @@ const ROLE_TABS: Record<UserRole, string[]> = {
   admin: ['index', 'prospection', 'fiches', 'supervision', 'sync', 'profile'],
 };
 
-const TAB_CONFIG: Record<string, { title: string; icon: string }> = {
-  index: { title: 'Accueil', icon: '⌂' },
-  prospection: { title: 'Prospection', icon: '🗺️' },
-  fiches: { title: 'Mes fiches', icon: '≡' },
-  supervision: { title: 'Supervision', icon: '👁️' },
-  sync: { title: 'Sync', icon: '🔄' },
-  profile: { title: 'Profil', icon: '👤' },
+const TAB_CONFIG: Record<string, { title: string }> = {
+  index: { title: 'Accueil' },
+  fiches: { title: 'Mes fiches' },
+  prospection: { title: 'Prospection' },
+  supervision: { title: 'Supervision' },
+  sync: { title: 'Sync' },
+  profile: { title: 'Profil' },
 };
 
 export default function TabLayout() {
@@ -44,48 +46,42 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: TAB_CONFIG.index.title,
-          tabBarIcon: ({ color }) => <TabIcon name="⌂" color={color as string} size={22} />,
+          title: 'Accueil',
           href: allowedTabs.includes('index') ? undefined : null,
         }}
       />
       <Tabs.Screen
         name="prospection"
         options={{
-          title: TAB_CONFIG.prospection.title,
-          tabBarIcon: ({ color }) => <TabIcon name="🗺️" color={color as string} />,
+          title: 'Prospection',
           href: allowedTabs.includes('prospection') ? undefined : null,
         }}
       />
       <Tabs.Screen
         name="fiches"
         options={{
-          title: TAB_CONFIG.fiches.title,
-          tabBarIcon: ({ color }) => <TabIcon name="≡" color={color as string} size={24} />,
+          title: 'Mes fiches',
           href: allowedTabs.includes('fiches') ? undefined : null,
         }}
       />
       <Tabs.Screen
         name="supervision"
         options={{
-          title: TAB_CONFIG.supervision.title,
-          tabBarIcon: ({ color }) => <TabIcon name="👁️" color={color as string} />,
+          title: 'Supervision',
           href: allowedTabs.includes('supervision') ? undefined : null,
         }}
       />
       <Tabs.Screen
         name="sync"
         options={{
-          title: TAB_CONFIG.sync.title,
-          tabBarIcon: ({ color }) => <TabIcon name="🔄" color={color as string} />,
+          title: 'Sync',
           href: allowedTabs.includes('sync') ? undefined : null,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: TAB_CONFIG.profile.title,
-          tabBarIcon: ({ color }) => <TabIcon name="👤" color={color as string} />,
+          title: 'Profil',
           href: allowedTabs.includes('profile') ? undefined : null,
         }}
       />
@@ -95,118 +91,118 @@ export default function TabLayout() {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function ProspecteurTabBar(props: any) {
-  const { state, descriptors, navigation, router } = props as {
+  const { state, navigation, router } = props as {
     state: { index: number; routes: Array<{ key: string; name: string }> };
-    descriptors: Record<string, { options: Record<string, unknown> }>;
     navigation: { emit: (e: Record<string, unknown>) => { defaultPrevented: boolean }; navigate: (n: string) => void };
     router: ReturnType<typeof useRouter>;
   };
 
-  const visibleRoutes = state.routes.filter(
-    (r) => descriptors[r.key]?.options?.href !== null
-  );
+  const activeRoute = state.routes[state.index]?.name;
+
+  const navigate = (routeName: string) => {
+    const route = state.routes.find((r) => r.name === routeName);
+    if (!route) return;
+    const isFocused = activeRoute === routeName;
+    const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+    if (!isFocused && !event.defaultPrevented) navigation.navigate(routeName);
+  };
 
   return (
-    <View style={styles.prospecteurBar}>
-      {visibleRoutes.map((route, i) => {
-        const isFocused = state.routes[state.index]?.name === route.name;
-        const config = TAB_CONFIG[route.name];
-        const showFAB = i === 0;
+    <View style={styles.bar}>
+      {/* Accueil */}
+      <TouchableOpacity style={styles.tabItem} onPress={() => navigate('index')} activeOpacity={0.7}>
+        <HomeIcon active={activeRoute === 'index'} />
+        <Text style={[styles.tabLabel, activeRoute === 'index' && styles.tabLabelActive]}>
+          Accueil
+        </Text>
+      </TouchableOpacity>
 
-        const onPress = () => {
-          const event = navigation.emit({
-            type: 'tabPress',
-            target: route.key,
-            canPreventDefault: true,
-          });
-          if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name);
-          }
-        };
+      {/* FAB central */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => router.push('/(tabs)/prospection')}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.fabIcon}>+</Text>
+      </TouchableOpacity>
 
-        return (
-          <View
-            key={route.key}
-            style={{ flexDirection: 'row', alignItems: 'center', flex: 1, justifyContent: 'center' }}
-          >
-            <TouchableOpacity style={styles.tabItem} onPress={onPress} activeOpacity={0.7}>
-              <Text style={[styles.tabIconText, { color: isFocused ? IFVM_GREEN : '#9CA3AF' }]}>
-                {config?.icon}
-              </Text>
-              <Text style={[styles.tabLabel, { color: isFocused ? IFVM_GREEN : '#9CA3AF' }]}>
-                {config?.title}
-              </Text>
-            </TouchableOpacity>
-
-            {showFAB && (
-              <TouchableOpacity
-                style={styles.fab}
-                onPress={() => router.push('/(tabs)/prospection')}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.fabIcon}>+</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        );
-      })}
+      {/* Mes fiches */}
+      <TouchableOpacity style={styles.tabItem} onPress={() => navigate('fiches')} activeOpacity={0.7}>
+        <FichesIcon active={activeRoute === 'fiches'} />
+        <Text style={[styles.tabLabel, activeRoute === 'fiches' && styles.tabLabelActive]}>
+          Mes fiches
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
-function TabIcon({ name, color, size = 20 }: { name: string; color: string; size?: number }) {
-  return <Text style={{ fontSize: size, color }}>{name}</Text>;
+function HomeIcon({ active }: { active: boolean }) {
+  const color = active ? IFVM_GREEN : '#9CA3AF';
+  return (
+    <Text style={{ fontSize: 20, color, lineHeight: 24, marginBottom: 2 }}>
+      ⌂
+    </Text>
+  );
+}
+
+function FichesIcon({ active }: { active: boolean }) {
+  const color = active ? IFVM_GREEN : '#9CA3AF';
+  return (
+    <View style={{ gap: 3, marginBottom: 4, alignItems: 'center' }}>
+      <View style={{ width: 18, height: 2, backgroundColor: color, borderRadius: 1 }} />
+      <View style={{ width: 18, height: 2, backgroundColor: color, borderRadius: 1 }} />
+      <View style={{ width: 18, height: 2, backgroundColor: color, borderRadius: 1 }} />
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E5E7EB',
-    height: 60,
+    backgroundColor: IFVM_BG,
+    borderTopWidth: 0,
   },
   tabLabel: {
     fontSize: 11,
     fontWeight: '500',
+    color: '#9CA3AF',
   },
-  prospecteurBar: {
+  tabLabelActive: {
+    color: IFVM_GREEN,
+  },
+  bar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E5E7EB',
+    backgroundColor: IFVM_BG,
     paddingBottom: 24,
-    paddingTop: 8,
-    paddingHorizontal: 8,
+    paddingTop: 10,
+    paddingHorizontal: 24,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#2A3D2A',
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 4,
-  },
-  tabIconText: {
-    fontSize: 20,
-    marginBottom: 2,
   },
   fab: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: IFVM_GREEN,
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 16,
-    shadowColor: IFVM_GREEN,
+    marginHorizontal: 24,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
   },
   fabIcon: {
     color: '#FFFFFF',
-    fontSize: 28,
-    lineHeight: 30,
+    fontSize: 30,
+    lineHeight: 34,
     fontWeight: '300',
   },
 });
