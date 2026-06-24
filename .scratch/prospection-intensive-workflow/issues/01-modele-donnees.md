@@ -1,6 +1,6 @@
 # Issue 01 — Modèle de données : prospection unifiée, statuts et audit log
 
-**Status:** ready-for-agent  
+**Status:** done  
 **Priority:** high  
 **Depends on:** none
 

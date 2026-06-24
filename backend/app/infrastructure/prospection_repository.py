@@ -1,0 +1,227 @@
+import uuid
+
+from sqlalchemy import select, delete
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.domain.prospection import (
+    Prospection,
+    ProspectionCapture,
+    ProspectionInfestation,
+    ProspectionPopulation,
+)
+from app.domain.repositories import ProspectionRepository
+from app.infrastructure.prospection_model import (
+    ProspectionModel,
+    ProspectionCaptureModel,
+    ProspectionInfestationModel,
+    ProspectionPopulationModel,
+)
+
+
+class ProspectionRepositoryImpl(ProspectionRepository):
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def get_by_id(self, prospection_id: uuid.UUID) -> Prospection | None:
+        result = await self.session.execute(
+            select(ProspectionModel)
+            .where(ProspectionModel.id == prospection_id)
+            .options(
+                selectinload(ProspectionModel.populations),
+                selectinload(ProspectionModel.captures),
+                selectinload(ProspectionModel.infestations),
+            )
+        )
+        model = result.scalar_one_or_none()
+        if model is None:
+            return None
+        return self._to_domain(model)
+
+    async def list_by_filters(
+        self,
+        type_prospection: str | None = None,
+        statut: str | None = None,
+        campagne_id: uuid.UUID | None = None,
+        station_id: uuid.UUID | None = None,
+        prospecteur_id: uuid.UUID | None = None,
+    ) -> list[Prospection]:
+        stmt = select(ProspectionModel).options(
+            selectinload(ProspectionModel.populations),
+            selectinload(ProspectionModel.captures),
+            selectinload(ProspectionModel.infestations),
+        )
+        if type_prospection is not None:
+            stmt = stmt.where(ProspectionModel.type_prospection == type_prospection)
+        if statut is not None:
+            stmt = stmt.where(ProspectionModel.statut == statut)
+        if campagne_id is not None:
+            stmt = stmt.where(ProspectionModel.campagne_id == campagne_id)
+        if station_id is not None:
+            stmt = stmt.where(ProspectionModel.station_id == station_id)
+        if prospecteur_id is not None:
+            stmt = stmt.where(ProspectionModel.prospecteur_id == prospecteur_id)
+        stmt = stmt.order_by(ProspectionModel.date_prospection.desc())
+        result = await self.session.execute(stmt)
+        return [self._to_domain(m) for m in result.scalars().all()]
+
+    async def create(self, prospection: Prospection) -> Prospection:
+        model = ProspectionModel(
+            id=prospection.id,
+            type_prospection=prospection.type_prospection,
+            campagne_id=prospection.campagne_id,
+            prospecteur_id=prospection.prospecteur_id,
+            station_id=prospection.station_id,
+            n_releve=prospection.n_releve,
+            n_fiche=prospection.n_fiche,
+            n_message=prospection.n_message,
+            date_prospection=prospection.date_prospection,
+            latitude=prospection.latitude,
+            longitude=prospection.longitude,
+            altitude=prospection.altitude,
+            biotope=prospection.biotope,
+            surf_station=prospection.surf_station,
+            surf_prospectee=prospection.surf_prospectee,
+            surf_infestee=prospection.surf_infestee,
+            degats_cultures=prospection.degats_cultures,
+            derniere_pluie=prospection.derniere_pluie,
+            intensite_pluie=prospection.intensite_pluie,
+            vegetation=prospection.vegetation,
+            sol=prospection.sol,
+            ennemis_naturels=prospection.ennemis_naturels,
+            observations=prospection.observations,
+            statut=prospection.statut,
+            statut_sync=prospection.statut_sync,
+            verified_by=prospection.verified_by,
+            verified_at=prospection.verified_at,
+            validated_by=prospection.validated_by,
+            validated_at=prospection.validated_at,
+            created_at=prospection.created_at,
+            updated_at=prospection.updated_at,
+        )
+        self.session.add(model)
+        await self.session.commit()
+        # Re-query with selectinload: refresh() ne charge pas les relations (MissingGreenlet)
+        return await self.get_by_id(model.id)
+
+    async def update(self, prospection: Prospection) -> Prospection:
+        result = await self.session.execute(
+            select(ProspectionModel).where(ProspectionModel.id == prospection.id)
+        )
+        model = result.scalar_one()
+        model.station_id = prospection.station_id
+        model.n_releve = prospection.n_releve
+        model.n_fiche = prospection.n_fiche
+        model.n_message = prospection.n_message
+        model.date_prospection = prospection.date_prospection
+        model.latitude = prospection.latitude
+        model.longitude = prospection.longitude
+        model.altitude = prospection.altitude
+        model.biotope = prospection.biotope
+        model.surf_station = prospection.surf_station
+        model.surf_prospectee = prospection.surf_prospectee
+        model.surf_infestee = prospection.surf_infestee
+        model.degats_cultures = prospection.degats_cultures
+        model.derniere_pluie = prospection.derniere_pluie
+        model.intensite_pluie = prospection.intensite_pluie
+        model.vegetation = prospection.vegetation
+        model.sol = prospection.sol
+        model.ennemis_naturels = prospection.ennemis_naturels
+        model.observations = prospection.observations
+        model.statut = prospection.statut
+        model.updated_at = prospection.updated_at
+        await self.session.commit()
+        # Re-query with selectinload: refresh() ne charge pas les relations (MissingGreenlet)
+        return await self.get_by_id(model.id)
+
+    async def delete(self, prospection_id: uuid.UUID) -> bool:
+        result = await self.session.execute(
+            delete(ProspectionModel).where(ProspectionModel.id == prospection_id)
+        )
+        await self.session.commit()
+        return result.rowcount > 0
+
+    def _to_domain(self, model: ProspectionModel) -> Prospection:
+        return Prospection(
+            id=model.id,
+            type_prospection=model.type_prospection,
+            campagne_id=model.campagne_id,
+            prospecteur_id=model.prospecteur_id,
+            station_id=model.station_id,
+            n_releve=model.n_releve,
+            n_fiche=model.n_fiche,
+            n_message=model.n_message,
+            date_prospection=model.date_prospection,
+            latitude=float(model.latitude) if model.latitude is not None else None,
+            longitude=float(model.longitude) if model.longitude is not None else None,
+            altitude=float(model.altitude) if model.altitude is not None else None,
+            biotope=model.biotope,
+            surf_station=float(model.surf_station) if model.surf_station is not None else None,
+            surf_prospectee=float(model.surf_prospectee) if model.surf_prospectee is not None else None,
+            surf_infestee=float(model.surf_infestee) if model.surf_infestee is not None else None,
+            degats_cultures=model.degats_cultures,
+            derniere_pluie=model.derniere_pluie,
+            intensite_pluie=model.intensite_pluie,
+            vegetation=model.vegetation,
+            sol=model.sol,
+            ennemis_naturels=model.ennemis_naturels,
+            observations=model.observations,
+            statut=model.statut,
+            statut_sync=model.statut_sync,
+            verified_by=model.verified_by,
+            verified_at=model.verified_at,
+            validated_by=model.validated_by,
+            validated_at=model.validated_at,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+            populations=[
+                ProspectionPopulation(
+                    id=p.id,
+                    prospection_id=p.prospection_id,
+                    espece=p.espece,
+                    categorie=p.categorie,
+                    densite_diffuse=float(p.densite_diffuse) if p.densite_diffuse is not None else None,
+                    densite_groupee=float(p.densite_groupee) if p.densite_groupee is not None else None,
+                    captures_nombre=p.captures_nombre,
+                    temps_capture=p.temps_capture,
+                    accouplement=p.accouplement,
+                    ponte=p.ponte,
+                )
+                for p in model.populations
+            ],
+            captures=[
+                ProspectionCapture(
+                    id=c.id,
+                    prospection_id=c.prospection_id,
+                    espece=c.espece,
+                    categorie=c.categorie,
+                    sexe=c.sexe,
+                    phase=c.phase,
+                    stade=c.stade,
+                    effectif=c.effectif,
+                )
+                for c in model.captures
+            ],
+            infestations=[
+                ProspectionInfestation(
+                    id=i.id,
+                    prospection_id=i.prospection_id,
+                    espece=i.espece,
+                    type_cible=i.type_cible,
+                    taille_min=float(i.taille_min) if i.taille_min is not None else None,
+                    taille_max=float(i.taille_max) if i.taille_max is not None else None,
+                    taille_moy=float(i.taille_moy) if i.taille_moy is not None else None,
+                    surface_tot=float(i.surface_tot) if i.surface_tot is not None else None,
+                    densite_min=float(i.densite_min) if i.densite_min is not None else None,
+                    densite_max=float(i.densite_max) if i.densite_max is not None else None,
+                    densite_moy=float(i.densite_moy) if i.densite_moy is not None else None,
+                    interdistance=float(i.interdistance) if i.interdistance is not None else None,
+                    comportement=i.comportement,
+                    direction_de=i.direction_de,
+                    direction_vers=i.direction_vers,
+                    vent_de=i.vent_de,
+                    vent_vitesse=float(i.vent_vitesse) if i.vent_vitesse is not None else None,
+                )
+                for i in model.infestations
+            ],
+        )

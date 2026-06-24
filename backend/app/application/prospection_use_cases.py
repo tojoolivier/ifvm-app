@@ -1,0 +1,191 @@
+import uuid
+from datetime import date, datetime
+from typing import Any
+
+from app.domain.prospection import Prospection
+from app.domain.repositories import ProspectionRepository
+
+
+class CreateProspection:
+    def __init__(self, repository: ProspectionRepository):
+        self.repository = repository
+
+    async def execute(
+        self,
+        type_prospection: str,
+        campagne_id: uuid.UUID,
+        prospecteur_id: uuid.UUID,
+        date_prospection: date,
+        station_id: uuid.UUID | None = None,
+        n_releve: str | None = None,
+        n_fiche: str | None = None,
+        n_message: str | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
+        altitude: float | None = None,
+        biotope: str | None = None,
+        surf_station: float | None = None,
+        surf_prospectee: float | None = None,
+        surf_infestee: float | None = None,
+        degats_cultures: str | None = None,
+        derniere_pluie: date | None = None,
+        intensite_pluie: str | None = None,
+        vegetation: dict[str, Any] | None = None,
+        sol: dict[str, Any] | None = None,
+        ennemis_naturels: str | None = None,
+        observations: str | None = None,
+        statut: str = "brouillon",
+    ) -> Prospection:
+        if type_prospection == "intensive" and station_id is None:
+            raise ValueError("station_id est obligatoire pour une prospection intensive")
+
+        now = datetime.utcnow()
+        prospection = Prospection(
+            type_prospection=type_prospection,
+            campagne_id=campagne_id,
+            prospecteur_id=prospecteur_id,
+            station_id=station_id,
+            date_prospection=date_prospection,
+            n_releve=n_releve,
+            n_fiche=n_fiche,
+            n_message=n_message,
+            latitude=latitude,
+            longitude=longitude,
+            altitude=altitude,
+            biotope=biotope,
+            surf_station=surf_station,
+            surf_prospectee=surf_prospectee,
+            surf_infestee=surf_infestee,
+            degats_cultures=degats_cultures,
+            derniere_pluie=derniere_pluie,
+            intensite_pluie=intensite_pluie,
+            vegetation=vegetation,
+            sol=sol,
+            ennemis_naturels=ennemis_naturels,
+            observations=observations,
+            statut=statut,
+            created_at=now,
+            updated_at=now,
+        )
+        return await self.repository.create(prospection)
+
+
+class ListProspections:
+    def __init__(self, repository: ProspectionRepository):
+        self.repository = repository
+
+    async def execute(
+        self,
+        type_prospection: str | None = None,
+        statut: str | None = None,
+        campagne_id: uuid.UUID | None = None,
+        station_id: uuid.UUID | None = None,
+        prospecteur_id: uuid.UUID | None = None,
+    ) -> list[Prospection]:
+        return await self.repository.list_by_filters(
+            type_prospection=type_prospection,
+            statut=statut,
+            campagne_id=campagne_id,
+            station_id=station_id,
+            prospecteur_id=prospecteur_id,
+        )
+
+
+class GetProspection:
+    def __init__(self, repository: ProspectionRepository):
+        self.repository = repository
+
+    async def execute(self, prospection_id: uuid.UUID) -> Prospection | None:
+        return await self.repository.get_by_id(prospection_id)
+
+
+class UpdateProspection:
+    def __init__(self, repository: ProspectionRepository):
+        self.repository = repository
+
+    async def execute(
+        self,
+        prospection_id: uuid.UUID,
+        station_id: uuid.UUID | None = None,
+        n_releve: str | None = None,
+        n_fiche: str | None = None,
+        n_message: str | None = None,
+        date_prospection: date | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
+        altitude: float | None = None,
+        biotope: str | None = None,
+        surf_station: float | None = None,
+        surf_prospectee: float | None = None,
+        surf_infestee: float | None = None,
+        degats_cultures: str | None = None,
+        derniere_pluie: date | None = None,
+        intensite_pluie: str | None = None,
+        vegetation: dict[str, Any] | None = None,
+        sol: dict[str, Any] | None = None,
+        ennemis_naturels: str | None = None,
+        observations: str | None = None,
+        statut: str | None = None,
+    ) -> Prospection | None:
+        prospection = await self.repository.get_by_id(prospection_id)
+        if prospection is None:
+            return None
+        if prospection.statut != "brouillon":
+            raise PermissionError("Seules les fiches en brouillon peuvent être modifiées")
+
+        if station_id is not None:
+            prospection.station_id = station_id
+        if n_releve is not None:
+            prospection.n_releve = n_releve
+        if n_fiche is not None:
+            prospection.n_fiche = n_fiche
+        if n_message is not None:
+            prospection.n_message = n_message
+        if date_prospection is not None:
+            prospection.date_prospection = date_prospection
+        if latitude is not None:
+            prospection.latitude = latitude
+        if longitude is not None:
+            prospection.longitude = longitude
+        if altitude is not None:
+            prospection.altitude = altitude
+        if biotope is not None:
+            prospection.biotope = biotope
+        if surf_station is not None:
+            prospection.surf_station = surf_station
+        if surf_prospectee is not None:
+            prospection.surf_prospectee = surf_prospectee
+        if surf_infestee is not None:
+            prospection.surf_infestee = surf_infestee
+        if degats_cultures is not None:
+            prospection.degats_cultures = degats_cultures
+        if derniere_pluie is not None:
+            prospection.derniere_pluie = derniere_pluie
+        if intensite_pluie is not None:
+            prospection.intensite_pluie = intensite_pluie
+        if vegetation is not None:
+            prospection.vegetation = vegetation
+        if sol is not None:
+            prospection.sol = sol
+        if ennemis_naturels is not None:
+            prospection.ennemis_naturels = ennemis_naturels
+        if observations is not None:
+            prospection.observations = observations
+        if statut is not None:
+            prospection.statut = statut
+        prospection.updated_at = datetime.utcnow()
+
+        return await self.repository.update(prospection)
+
+
+class DeleteProspection:
+    def __init__(self, repository: ProspectionRepository):
+        self.repository = repository
+
+    async def execute(self, prospection_id: uuid.UUID) -> bool:
+        prospection = await self.repository.get_by_id(prospection_id)
+        if prospection is None:
+            return False
+        if prospection.statut != "brouillon":
+            raise PermissionError("Seules les fiches en brouillon peuvent être supprimées")
+        return await self.repository.delete(prospection_id)
