@@ -26,5 +26,11 @@ dist/
 # Docker
 *.log
 
+# Terraform
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.backup
+infra/*.tfvars
+
 # Données géospatiales volumineuses (gérer avec Git LFS si nécessaire)
 *.fgb

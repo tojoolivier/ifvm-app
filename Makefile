@@ -37,3 +37,25 @@ shell-db:
 # Accéder au shell du backend
 shell-backend:
 	$(COMPOSE) exec backend bash
+
+# --- Infra ---
+TF = terraform -C infra
+
+tf-init:
+	$(TF) init
+
+tf-plan:
+	$(TF) plan
+
+tf-apply:
+	$(TF) apply -auto-approve
+
+tf-destroy:
+	$(TF) destroy -auto-approve
+
+tf-output:
+	$(TF) output
+
+# Déployer sur la VPS (SSH direct)
+deploy:
+	ssh root@$$(make tf-output | grep server_ip | awk '{print $$3}') "cd /opt/app && git pull && docker compose -f docker-compose.prod.yml up -d --build"
