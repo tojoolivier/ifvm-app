@@ -24,7 +24,7 @@ def get_repository(db: AsyncSession) -> CampagneRepositoryImpl:
     return CampagneRepositoryImpl(db)
 
 
-@router.get("/", response_model=list[CampagneRead])
+@router.get("", response_model=list[CampagneRead])
 async def list_campagnes(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Utilisateur, Depends(get_current_user)],
