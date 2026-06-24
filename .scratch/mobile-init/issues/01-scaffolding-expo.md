@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: completed
 
 ## What to build
 
@@ -6,14 +6,22 @@ Créer le projet React Native (Expo) dans `mobile/` avec le template `tabs` (Exp
 
 ## Acceptance criteria
 
-- [ ] Le dossier `mobile/` existe et `npx expo start` fonctionne
-- [ ] Expo Router (file-based routing) est actif avec le template tabs
-- [ ] TypeScript strict mode est activé dans `tsconfig.json`
-- [ ] NativeWind est configuré et fonctionnel (style de test appliqué)
-- [ ] Un fichier `.env` contient `EXPO_PUBLIC_API_URL=http://localhost:8000`
-- [ ] `eas.json` définit les profils `preview` (APK) et `production`
-- [ ] `package.json` définit le package name `com.ifvm.mobile` et le slug `ifvm-mobile`
-- [ ] La structure `mobile/app/` suit la navigation Expo Router (tabs + auth group)
+- [x] Le dossier `mobile/` existe et `npx expo start` fonctionne
+- [x] Expo Router (file-based routing) est actif avec le template tabs
+- [x] TypeScript strict mode est activé dans `tsconfig.json`
+- [x] NativeWind est configuré et fonctionnel (style de test appliqué)
+- [x] Un fichier `.env` contient `EXPO_PUBLIC_API_URL=http://localhost:8000`
+- [x] `eas.json` définit les profils `preview` (APK) et `production`
+- [x] `package.json` définit le package name `ifvm-mobile` et le slug `ifvm-mobile`
+- [x] La structure `mobile/src/app/` suit la navigation Expo Router (tabs + auth group)
+
+## Implementation notes
+
+- Projet créé avec `npx create-expo-app@latest mobile --template default`
+- NativeWind v4 configuré avec Tailwind CSS
+- Structure de navigation : `src/app/(tabs)/` pour les tabs, `src/app/(auth)/` pour l'authentification
+- Tests de validation ajoutés dans `mobile/__tests__/scaffolding.test.ts`
+- Script de validation shell ajouté dans `scripts/validate-scaffolding.sh`
 
 ## Blocked by
 
