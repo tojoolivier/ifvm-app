@@ -5,6 +5,7 @@ import { api } from '../api/client'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
 import {
   Table,
   TableHeader,
@@ -140,11 +141,11 @@ export function ProspectionsPage() {
 
       {/* Filtres */}
       <Card className="mb-4">
-        <CardContent className="flex flex-wrap gap-3 items-end">
+        <CardContent className="flex flex-wrap items-end gap-4">
           <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">Statut</span>
+            <Label htmlFor="filtre-statut">Statut</Label>
             <Select value={filtreStatut} onValueChange={onStatutChange}>
-              <SelectTrigger className="w-40">
+              <SelectTrigger id="filtre-statut" className="w-40">
                 <SelectValue placeholder="Tous" />
               </SelectTrigger>
               <SelectContent>
@@ -157,9 +158,9 @@ export function ProspectionsPage() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">Campagne</span>
+            <Label htmlFor="filtre-campagne">Campagne</Label>
             <Select value={filtreCampagne} onValueChange={onCampagneChange}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger id="filtre-campagne" className="w-48">
                 <SelectValue placeholder="Toutes" />
               </SelectTrigger>
               <SelectContent>
@@ -172,8 +173,9 @@ export function ProspectionsPage() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">Station (début ID)</span>
+            <Label htmlFor="filtre-station">Station (début ID)</Label>
             <Input
+              id="filtre-station"
               type="text"
               value={filtreStation}
               onChange={(e) => { setFiltreStation(e.target.value); setPage(1) }}
@@ -183,8 +185,9 @@ export function ProspectionsPage() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">À partir du</span>
+            <Label htmlFor="filtre-date">À partir du</Label>
             <Input
+              id="filtre-date"
               type="date"
               value={filtreDate}
               onChange={(e) => { setFiltreDate(e.target.value); setPage(1) }}
@@ -193,7 +196,7 @@ export function ProspectionsPage() {
           </div>
 
           {hasFiltres && (
-            <Button variant="ghost" size="sm" onClick={resetFiltres}>
+            <Button variant="ghost" size="sm" className="self-end" onClick={resetFiltres}>
               Effacer les filtres
             </Button>
           )}
