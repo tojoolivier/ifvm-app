@@ -22,7 +22,7 @@ Les agents de terrain utilisent une tablette Android sur le terrain. L'applicati
 
 ## Justification
 
-Le facteur décisif est **SQLite natif**. La stratégie de sync (ADR-002) repose sur des requêtes SQL structurées côté tablette — filtres par `sync_status`, `server_version`, jointures multi-tables. IndexedDB ne peut pas reproduire ça proprement.
+Le facteur décisif est **SQLite natif**. La stratégie de sync (ADR-002) repose sur des requêtes SQL structurées côté tablette — filtres par `statut_sync`, `server_version`, jointures multi-tables. IndexedDB ne peut pas reproduire ça proprement.
 
 Le GPS précis est un second facteur : les coordonnées des stations et des zones de traitement doivent être fiables en conditions terrain (mauvaise réception, GPS lent au démarrage).
 

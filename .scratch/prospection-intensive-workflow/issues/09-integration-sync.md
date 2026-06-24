@@ -20,7 +20,8 @@ S'assurer que le workflow de validation est correctement intégré avec le syst�
 ## Technical Notes
 
 - Le module de sync existant (`sync.tsx` mobile, `POST /sync/push`, `GET /sync/pull`) doit être étendu
-- Chaque table porte les colonnes `local_version`, `server_version`, `sync_status` (ADR-002)
+- Chaque table porte les colonnes `local_version`, `server_version`, `statut_sync` (ADR-002) ;
+  ces colonnes de versioning seront ajoutées au modèle `prospection` au moment d'implémenter le sync (différé de l'issue 01)
 - L'audit log doit être synchronisé séparément ou inclus dans la fiche
 
 ## Testing

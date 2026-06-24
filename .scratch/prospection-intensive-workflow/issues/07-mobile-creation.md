@@ -11,7 +11,8 @@ Implémenter l'écran mobile pour créer une fiche de prospection intensive depu
 ## Acceptance Criteria
 
 - [ ] Bouton "+" sur l'écran principal ou l'écran prospection
-- [ ] Sélection du type : Intensive / Extensive / Validation
+- [ ] Sélection du type : Intensive / Extensive / Validation (seul l'intensif est complet dans cette PRD)
+- [ ] Sélection de la campagne en cours (obligatoire, auto-sélectionnée)
 - [ ] Sélection de la station fixe (liste avec recherche)
 - [ ] Pré-remplissage des infos station
 - [ ] Formulaire complet avec tous les champs intensifs
@@ -25,7 +26,8 @@ Implémenter l'écran mobile pour créer une fiche de prospection intensive depu
 - Utiliser Expo Router pour la navigation
 - Utiliser NativeWind pour le style (cohérent avec Tailwind)
 - La sauvegarde offline utilise SQLite (Expo SQLite)
-- Le sync status est géré par le module de synchronisation existant
+- Le `statut_sync` est géré par le module de synchronisation existant
+- Saisie des captures : le sélecteur de `stade` est filtré par espèce (LMC ⇒ A1-A5, NSE ⇒ L1-L7)
 
 ## Testing
 

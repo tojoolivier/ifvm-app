@@ -10,13 +10,14 @@ Implémenter l'endpoint de changement de statut avec validation des transitions 
 
 ## Acceptance Criteria
 
-- [ ] `PATCH /prospections-intensives/{id}/statut` — changer le statut
+- [ ] `PATCH /prospections/{id}/statut` — changer le statut
+- [ ] Machine à états (transitions) portée par le **domaine** (`Prospection`), orchestrée par un use case `application/`
 - [ ] Validation des transitions : brouillon→en_attente, en_attente→verifiee, verifiee→validee, verifiee→rejetee
 - [ ] Refus des transitions invalides (400 Bad Request)
 - [ ] Vérification des permissions (qui peut faire quoi)
-- [ ] Enregistrement automatique dans l'audit log à chaque transition
-- [ ] `POST /prospections-intensives/{id}/commentaire` — ajouter un commentaire
-- [ ] `GET /prospections-intensives/{id}/audit-log` — historique des modifications
+- [ ] Enregistrement automatique dans l'audit log à chaque transition (port `AuditLogRepository` dans `domain/`, adapter `infrastructure/`)
+- [ ] `POST /prospections/{id}/commentaire` — ajouter un commentaire
+- [ ] `GET /prospections/{id}/audit-log` — historique des modifications
 
 ## Technical Notes
 
@@ -27,7 +28,8 @@ Implémenter l'endpoint de changement de statut avec validation des transitions 
 | verifiee → validee | validation_finale |
 | verifiee → rejetee | validation_finale |
 
-L'audit log est créé automatiquement lors de chaque appel à PATCH /statut.
+L'audit log est créé automatiquement lors de chaque appel à `PATCH /prospections/{id}/statut`.
+Les transitions invalides sont rejetées par l'entité de domaine (logique métier), pas par la couche présentation.
 
 ## Testing
 

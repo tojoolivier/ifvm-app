@@ -23,7 +23,7 @@ Créer la page web pour lister, filtrer et consulter les fiches de prospection i
 
 - Utiliser les composants shadcn/ui existants (table, button, select, badge)
 - Suivre le pattern de `CampagnesPage.tsx`
-- Appel API via `api.get('/prospections-intensives', { params })`
+- Appel API via `api.get('/prospections', { params: { type: 'intensive', ...filtres } })`
 - Navigation via React Router
 
 ## Testing

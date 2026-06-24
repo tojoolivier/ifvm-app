@@ -151,7 +151,7 @@ l'issue `01-modele-donnees.md`.
 Tables :
 - `prospection` (master) — références, géo, surfaces, `type_prospection`, workflow + sync, `vegetation`/`sol` en JSONB
 - `prospection_population` — densités par espèce × catégorie (queryable)
-- `prospection_capture` — matrice comptage espèce × catégorie × sexe? × phase × stade (`sexe` NULL en extensive)
+- `prospection_capture` — matrice comptage espèce × catégorie × sexe? × phase × stade (`sexe` NULL en extensive ; `stade` selon l'espèce : LMC⇒A1-A5, NSE⇒L1-L7)
 - `prospection_infestation` — taches / bandes / vols / essaims
 - `audit_log` — journal générique
 
@@ -161,29 +161,29 @@ Colonnes de workflow portées par le master `prospection` (utilisées par l'inte
 |---------|------|-------------|
 | statut | TEXT NOT NULL DEFAULT 'brouillon' | Statut du workflow de validation |
 | statut_sync | TEXT NOT NULL DEFAULT 'local' | Statut de synchronisation |
-| campagne_id | UUID FK → campagne | Campagne associée (nullable) |
+| campagne_id | UUID FK → campagne NOT NULL | Campagne en cours (obligatoire, tous types) |
 | verified_by | UUID FK → utilisateur | Vérificateur |
 | verified_at | TIMESTAMPTZ | Date de vérification |
 | validated_by | UUID FK → utilisateur | Validateur |
 | validated_at | TIMESTAMPTZ | Date de validation finale |
 
-> Les endpoints `/prospections-intensives` ci-dessous opèrent comme une **vue filtrée**
-> (`WHERE type_prospection = 'intensive'`) sur la table unifiée — le périmètre workflow de
-> cette PRD reste l'intensive. Extensive/validation = PRD ultérieurs (voir Out of Scope).
+> Les endpoints `/prospections` ci-dessous opèrent sur la **table unifiée**. Le filtre
+> `?type=intensive` (et la validation des permissions) cadre le périmètre de cette PRD sur
+> l'intensive. Extensive/validation = PRD ultérieurs (voir Out of Scope).
 
 ### API endpoints
 
-Backend FastAPI :
+Backend FastAPI (ressource unique `prospection`, discriminée par `type_prospection`) :
 
 | Méthode | Endpoint | Description |
 |---------|----------|-------------|
-| POST | `/prospections-intensives` | Créer une fiche (brouillon ou soumise) |
-| GET | `/prospections-intensives` | Lister les fiches (filtres: statut, campagne, station, prospecteur) |
-| GET | `/prospections-intensives/{id}` | Détail d'une fiche |
-| PUT | `/prospections-intensives/{id}` | Modifier une fiche |
-| PATCH | `/prospections-intensives/{id}/statut` | Changer le statut (soumettre, vérifier, valider, rejeter) |
-| POST | `/prospections-intensives/{id}/commentaire` | Ajouter un commentaire (audit log) |
-| GET | `/prospections-intensives/{id}/audit-log` | Historique des modifications |
+| POST | `/prospections` | Créer une fiche (`type_prospection` dans le body ; brouillon ou soumise) |
+| GET | `/prospections?type=intensive` | Lister les fiches (filtres: type, statut, campagne, station, prospecteur) |
+| GET | `/prospections/{id}` | Détail d'une fiche |
+| PUT | `/prospections/{id}` | Modifier une fiche |
+| PATCH | `/prospections/{id}/statut` | Changer le statut (soumettre, vérifier, valider, rejeter) |
+| POST | `/prospections/{id}/commentaire` | Ajouter un commentaire (audit log) |
+| GET | `/prospections/{id}/audit-log` | Historique des modifications |
 
 ### Navigation mobile
 
@@ -210,7 +210,7 @@ frontend/src/pages/
 
 ### Seam de test
 
-Le seam principal est l'**API endpoint `PATCH /prospections-intensives/{id}/statut`**. C'est ici que :
+Le seam principal est l'**API endpoint `PATCH /prospections/{id}/statut`**. C'est ici que :
 - La transition d'état est validée
 - L'audit log est créé automatiquement
 - Les permissions sont vérifiées (qui peut faire quoi)
@@ -230,7 +230,7 @@ Ce seam couvre tout le workflow : création, vérification, validation.
 
 | Module | Type de test |
 |--------|--------------|
-| API `/prospections-intensives` | Tests d'intégration (end-to-end avec DB) |
+| API `/prospections` (filtre `type=intensive`) | Tests d'intégration (end-to-end avec DB) |
 | Use cases de validation | Tests unitaires |
 | Audit log | Tests d'intégration |
 | Sync status | Tests unitaires (indépendant du workflow) |

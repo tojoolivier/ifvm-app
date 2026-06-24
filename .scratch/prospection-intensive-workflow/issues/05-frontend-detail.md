@@ -25,7 +25,7 @@ Créer la page de détail d'une fiche intensive avec affichage de l'audit log et
 
 - Utiliser les composants shadcn/ui (card, dialog, button, badge, textarea)
 - L'audit log est une liste triée par date décroissante
-- Les actions changent le statut via `PATCH /prospections-intensives/{id}/statut`
+- Les actions changent le statut via `PATCH /prospections/{id}/statut`
 
 ## Testing
 

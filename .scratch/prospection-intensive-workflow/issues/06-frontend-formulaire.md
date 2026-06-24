@@ -15,7 +15,7 @@ Créer le formulaire web pour créer une fiche de prospection intensive depuis l
 - [ ] Sélection de la station fixe (liste déroulante avec recherche)
 - [ ] Pré-remplissage des infos station (coordonnées, PA, altitude)
 - [ ] Tous les champs du formulaire intensif :
-  - Captures (espece × stade × sexe × phase × nombre)
+  - Captures (espece × stade × sexe × phase × effectif) — options de `stade` **filtrées par espèce** : LMC ⇒ A1-A5 (+ sous-stades A3-x/4), NSE ⇒ L1-L7
   - Population acridien (densités, accouplements, ponte)
   - Infestation (taches, bandes, vols, essaims)
   - Végétation (7 strates × attributs ORPAD)
@@ -30,7 +30,9 @@ Créer le formulaire web pour créer une fiche de prospection intensive depuis l
 - Utiliser les composants shadcn/ui (input, select, label, button, card)
 - Le formulaire doit être scrollable (beaucoup de champs)
 - Considérer un formulaire en étapes (wizard) si trop complexe
-- Les données de référence (stades, espèces) sont pré-chargées
+- Les données de référence (stades, espèces) sont pré-chargées ; le sélecteur de `stade`
+  dépend de l'espèce choisie (LMC ⇒ A, NSE ⇒ L)
+- La campagne en cours est obligatoire et auto-sélectionnée (règle « une seule campagne en cours »)
 
 ## Testing
 

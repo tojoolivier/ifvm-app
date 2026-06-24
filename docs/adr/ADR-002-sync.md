@@ -23,8 +23,8 @@ Le **serveur est source de vérité**. Chaque table porte trois colonnes de cont
 ```sql
 local_version    INTEGER NOT NULL DEFAULT 1,  -- incrémenté à chaque save local
 server_version   INTEGER NOT NULL DEFAULT 0,  -- 0 = jamais synchronisé
-sync_status      TEXT NOT NULL DEFAULT 'local'
-                   CHECK (sync_status IN ('local', 'synced', 'conflict'))
+statut_sync      TEXT NOT NULL DEFAULT 'local'
+                   CHECK (statut_sync IN ('local', 'synced', 'conflict'))
 ```
 
 ### Règles de push (tablette → serveur)
@@ -33,7 +33,7 @@ sync_status      TEXT NOT NULL DEFAULT 'local'
 |-----|-----------|--------|
 | Nouvelle fiche | `server_version = 0` | Push direct, serveur assigne `server_version = 1` |
 | Mise à jour sans conflit | `local_version > server_version` ET le serveur n'a pas modifié depuis la dernière sync | Push, serveur incrémente `server_version` |
-| **Conflit** | `server_version` côté serveur > `server_version` connu localement | Flag `sync_status = 'conflict'`, **ne pas écraser**, alerter le superviseur |
+| **Conflit** | `server_version` côté serveur > `server_version` connu localement | Flag `statut_sync = 'conflict'`, **ne pas écraser**, alerter l'admin |
 
 ### Règles de pull (serveur → tablette)
 
@@ -52,7 +52,7 @@ L'**admin** voit les fiches en `conflict` dans l'interface web. Il choisit :
 ```sql
 CREATE TABLE fiche_conflict_archive (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    table_name      TEXT NOT NULL,       -- 'prospection_intensive', 'crt', etc.
+    table_name      TEXT NOT NULL,       -- 'prospection' (table unifiée), 'crt', etc.
     fiche_id        UUID NOT NULL,
     version_locale  JSONB NOT NULL,      -- snapshot JSON de la version terrain
     version_serveur JSONB NOT NULL,      -- snapshot JSON de la version serveur
@@ -84,6 +84,6 @@ Le serveur valide l'unicité à la réception et renvoie un numéro corrigé si 
 
 ## Conséquences
 
-- Chaque table du schéma PostgreSQL ET SQLite doit porter `local_version`, `server_version`, `sync_status`, `created_by`
+- Chaque table du schéma PostgreSQL ET SQLite doit porter `local_version`, `server_version`, `statut_sync`, `created_by`
 - L'API FastAPI expose deux endpoints de sync : `POST /sync/push` (batch upload) et `GET /sync/pull?since={timestamp}`
 - Les conflits sont rares mais doivent être visibles dans le dashboard superviseur
