@@ -1,98 +1,150 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import { View, ScrollView, RefreshControl } from 'react-native';
+import { useCallback, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
+import { useAuthStore } from '@/lib/auth-store';
+import { useDashboardData } from '@/hooks/use-dashboard-data';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
+export default function DashboardScreen() {
+  const user = useAuthStore((s) => s.user);
+  const { postes, isLoading, error } = useDashboardData();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 1000);
+  }, []);
+
+  const isProspecteur = user?.role === 'prospecteur';
+  const isChefEquipe = user?.role === 'chef_equipe';
+
+  const greeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Bonjour';
+    if (hour < 18) return 'Bon après-midi';
+    return 'Bonsoir';
+  };
+
   return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+    <ThemedView className="flex-1">
+      <SafeAreaView className="flex-1">
+        <ScrollView
+          contentContainerStyle={{ paddingBottom: BottomTabInset + Spacing.three }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          <View className="px-6 pt-4" style={{ maxWidth: MaxContentWidth, alignSelf: 'center', width: '100%' }}>
+            <ThemedText type="subtitle" style={{ marginBottom: 4 }}>
+              {greeting()}, {user?.username ?? 'Agent'}
+            </ThemedText>
+            <ThemedText type="small" style={{ color: '#6B7280', marginBottom: Spacing.four }}>
+              {isProspecteur ? 'Prospecteur terrain' : isChefEquipe ? 'Chef d\'équipe' : 'Agent IFVM'}
+            </ThemedText>
 
-export default function HomeScreen() {
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+            {error && (
+              <ThemedView type="backgroundElement" className="rounded-xl p-4 mb-4">
+                <ThemedText type="small" style={{ color: '#DC2626', textAlign: 'center' }}>
+                  {error}
+                </ThemedText>
+              </ThemedView>
+            )}
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+            {isProspecteur && (
+              <ThemedView type="backgroundElement" className="rounded-xl p-5 mb-4">
+                <View className="flex-row items-center justify-between">
+                  <View>
+                    <ThemedText type="small" style={{ color: '#6B7280', marginBottom: 4 }}>
+                      Postes acridiens
+                    </ThemedText>
+                    <ThemedText type="title" style={{ fontSize: 40 }}>
+                      {isLoading ? '—' : postes.length}
+                    </ThemedText>
+                  </View>
+                  <View className="w-14 h-14 bg-green-100 rounded-xl items-center justify-center">
+                    <ThemedText style={{ fontSize: 28 }}>🗺️</ThemedText>
+                  </View>
+                </View>
+                <ThemedText type="small" style={{ color: '#6B7280', marginTop: 8 }}>
+                  {isLoading ? 'Chargement...' : `${postes.length} poste${postes.length > 1 ? 's' : ''} assigné${postes.length > 1 ? 's' : ''}`}
+                </ThemedText>
+              </ThemedView>
+            )}
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+            {isChefEquipe && (
+              <View className="gap-4">
+                <ThemedView type="backgroundElement" className="rounded-xl p-5">
+                  <View className="flex-row items-center justify-between">
+                    <View>
+                      <ThemedText type="small" style={{ color: '#6B7280', marginBottom: 4 }}>
+                        Postes acridiens
+                      </ThemedText>
+                      <ThemedText type="title" style={{ fontSize: 40 }}>
+                        {isLoading ? '—' : postes.length}
+                      </ThemedText>
+                    </View>
+                    <View className="w-14 h-14 bg-blue-100 rounded-xl items-center justify-center">
+                      <ThemedText style={{ fontSize: 28 }}>🗺️</ThemedText>
+                    </View>
+                  </View>
+                </ThemedView>
 
-        {Platform.OS === 'web' && <WebBadge />}
+                <ThemedView type="backgroundElement" className="rounded-xl p-5">
+                  <View className="flex-row items-center justify-between">
+                    <View>
+                      <ThemedText type="small" style={{ color: '#6B7280', marginBottom: 4 }}>
+                        Fiches assignées
+                      </ThemedText>
+                      <ThemedText type="title" style={{ fontSize: 40 }}>
+                        —
+                      </ThemedText>
+                    </View>
+                    <View className="w-14 h-14 bg-orange-100 rounded-xl items-center justify-center">
+                      <ThemedText style={{ fontSize: 28 }}>📋</ThemedText>
+                    </View>
+                  </View>
+                </ThemedView>
+
+                <ThemedView type="backgroundElement" className="rounded-xl p-5">
+                  <View className="flex-row items-center justify-between">
+                    <View>
+                      <ThemedText type="small" style={{ color: '#6B7280', marginBottom: 4 }}>
+                        Équipe active
+                      </ThemedText>
+                      <ThemedText type="title" style={{ fontSize: 40 }}>
+                        —
+                      </ThemedText>
+                    </View>
+                    <View className="w-14 h-14 bg-purple-100 rounded-xl items-center justify-center">
+                      <ThemedText style={{ fontSize: 28 }}>👥</ThemedText>
+                    </View>
+                  </View>
+                </ThemedView>
+              </View>
+            )}
+
+            {!isProspecteur && !isChefEquipe && (
+              <ThemedView type="backgroundElement" className="rounded-xl p-5">
+                <View className="flex-row items-center justify-between">
+                  <View>
+                    <ThemedText type="small" style={{ color: '#6B7280', marginBottom: 4 }}>
+                      Postes acridiens
+                    </ThemedText>
+                    <ThemedText type="title" style={{ fontSize: 40 }}>
+                      {isLoading ? '—' : postes.length}
+                    </ThemedText>
+                  </View>
+                  <View className="w-14 h-14 bg-green-100 rounded-xl items-center justify-center">
+                    <ThemedText style={{ fontSize: 28 }}>🗺️</ThemedText>
+                  </View>
+                </View>
+              </ThemedView>
+            )}
+          </View>
+        </ScrollView>
       </SafeAreaView>
     </ThemedView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
-});

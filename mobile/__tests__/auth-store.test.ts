@@ -25,7 +25,7 @@ function makeJwt(payload: Record<string, unknown>): string {
   return `${header}.${body}.${sig}`;
 }
 
-const TEST_USER = { id: 1, username: 'alice' };
+const TEST_USER = { id: 1, username: 'alice', role: 'prospecteur' as const };
 const TEST_TOKEN = makeJwt({ user_id: 1 });
 
 beforeEach(() => {
@@ -181,7 +181,7 @@ describe('useAuthStore', () => {
     it('should decode JWT and extract user_id on startup', async () => {
       const payload = { user_id: 42, sub: 'alice' };
       const token = makeJwt(payload);
-      const user = { id: 42, username: 'alice' };
+      const user = { id: 42, username: 'alice', role: 'prospecteur' as const };
 
       mockSecureStore.getItemAsync.mockResolvedValueOnce(token);
       mockApiClient.getProfile.mockResolvedValueOnce(user);
@@ -212,7 +212,7 @@ describe('useAuthStore', () => {
 
   describe('setUser', () => {
     it('should update user in state', () => {
-      const newUser = { id: 2, username: 'bob' };
+      const newUser = { id: 2, username: 'bob', role: 'chef_equipe' as const };
       useAuthStore.getState().setUser(newUser);
 
       expect(useAuthStore.getState().user).toEqual(newUser);

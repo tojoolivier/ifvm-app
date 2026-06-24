@@ -18,9 +18,12 @@ export interface Station {
   name: string;
 }
 
+export type UserRole = 'prospecteur' | 'chef_equipe' | 'admin' | 'technicien';
+
 export interface User {
   id: number;
   username: string;
+  role: UserRole;
 }
 
 type OnUnauthorized = () => void;
