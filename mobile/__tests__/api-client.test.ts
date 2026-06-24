@@ -45,7 +45,7 @@ describe('API Client', () => {
         json: async () => ({ access_token: 'token' }),
       });
 
-      await apiClient.login({ username: 'user', password: 'pass' });
+      await apiClient.login({ email: 'user@test.com', password: 'pass' });
 
       expect(mockFetch).toHaveBeenCalledWith(
         'http://test-api.com/auth/login',
@@ -96,7 +96,7 @@ describe('API Client', () => {
         json: async () => ({ access_token: 'token' }),
       });
 
-      await apiClient.login({ username: 'user', password: 'pass' });
+      await apiClient.login({ email: 'user@test.com', password: 'pass' });
 
       expect(mockFetch).toHaveBeenCalledWith(
         'http://custom-api.com/auth/login',
@@ -111,7 +111,7 @@ describe('API Client', () => {
         json: async () => ({ access_token: 'token' }),
       });
 
-      await apiClient.login({ username: 'user', password: 'pass' });
+      await apiClient.login({ email: 'user@test.com', password: 'pass' });
 
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:8000/auth/login',
@@ -127,13 +127,13 @@ describe('API Client', () => {
         json: async () => ({ access_token: 'token' }),
       });
 
-      await apiClient.login({ username: 'user', password: 'pass' });
+      await apiClient.login({ email: 'user@test.com', password: 'pass' });
 
       expect(mockFetch).toHaveBeenCalledWith(
         'http://test-api.com/auth/login',
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ username: 'user', password: 'pass' }),
+          body: JSON.stringify({ email: 'user@test.com', password: 'pass' }),
         })
       );
     });
@@ -173,7 +173,7 @@ describe('API Client', () => {
     it('getProfile should GET from /users/me', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ id: 1, username: 'user' }),
+        json: async () => ({ id: '550e8400-e29b-41d4-a716-446655440000', nom: 'Dupont', prenom: 'Alice', email: 'alice@test.com', role: 'prospecteur', actif: true, created_at: '2026-01-01T00:00:00Z' }),
       });
 
       await apiClient.getProfile('token');

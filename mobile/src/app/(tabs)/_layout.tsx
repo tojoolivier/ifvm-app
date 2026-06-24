@@ -7,8 +7,11 @@ import { UserRole } from '@/lib/api-client';
 const ROLE_TABS: Record<UserRole, string[]> = {
   prospecteur: ['index', 'prospection', 'sync', 'profile'],
   chef_equipe: ['index', 'fiches', 'supervision', 'sync', 'profile'],
+  agent_encadreur: ['index', 'prospection', 'sync', 'profile'],
+  pilote: ['index', 'prospection', 'sync', 'profile'],
+  mecanicien: ['index', 'sync', 'profile'],
+  chef_de_base: ['index', 'fiches', 'supervision', 'sync', 'profile'],
   admin: ['index', 'prospection', 'fiches', 'supervision', 'sync', 'profile'],
-  technicien: ['index', 'prospection', 'sync', 'profile'],
 };
 
 const TAB_CONFIG: Record<string, { title: string; icon: string }> = {

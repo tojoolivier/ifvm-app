@@ -27,7 +27,9 @@ export default function LoginScreen() {
     setIsLoading(true);
     try {
       await login(email.trim(), password);
-    } catch {
+      console.log('[login] login() returned successfully');
+    } catch (e) {
+      console.error('[login] login() threw:', e);
       setError('Identifiants incorrects. Veuillez réessayer.');
     } finally {
       setIsLoading(false);

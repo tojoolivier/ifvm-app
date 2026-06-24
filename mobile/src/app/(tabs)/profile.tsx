@@ -17,8 +17,11 @@ export default function ProfileScreen() {
   const roleLabels: Record<string, string> = {
     prospecteur: 'Prospecteur',
     chef_equipe: 'Chef d\'équipe',
+    agent_encadreur: 'Agent encadreur',
+    pilote: 'Pilote',
+    mecanicien: 'Mécanicien',
+    chef_de_base: 'Chef de base',
     admin: 'Administrateur',
-    technicien: 'Technicien',
   };
 
   return (
@@ -27,10 +30,10 @@ export default function ProfileScreen() {
         <View className="items-center mb-8">
           <View className="w-20 h-20 bg-green-100 rounded-full items-center justify-center mb-4">
             <ThemedText type="title" style={{ fontSize: 32, color: '#16a34a' }}>
-              {user?.username?.charAt(0).toUpperCase() ?? '?'}
+              {user?.prenom?.charAt(0).toUpperCase() ?? '?'}
             </ThemedText>
           </View>
-          <ThemedText type="subtitle">{user?.username ?? 'Utilisateur'}</ThemedText>
+          <ThemedText type="subtitle">{user?.prenom ?? 'Utilisateur'}</ThemedText>
           <ThemedText type="small" style={{ color: '#6B7280', marginTop: 4 }}>
             {roleLabels[user?.role ?? ''] ?? user?.role ?? 'Rôle inconnu'}
           </ThemedText>

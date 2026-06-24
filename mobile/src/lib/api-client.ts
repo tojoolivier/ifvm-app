@@ -1,5 +1,5 @@
 export interface LoginCredentials {
-  username: string;
+  email: string;
   password: string;
 }
 
@@ -18,12 +18,16 @@ export interface Station {
   name: string;
 }
 
-export type UserRole = 'prospecteur' | 'chef_equipe' | 'admin' | 'technicien';
+export type UserRole = 'prospecteur' | 'chef_equipe' | 'agent_encadreur' | 'pilote' | 'mecanicien' | 'chef_de_base' | 'admin';
 
 export interface User {
-  id: number;
-  username: string;
+  id: string;
+  nom: string;
+  prenom: string;
+  email: string;
   role: UserRole;
+  actif: boolean;
+  created_at: string;
 }
 
 type OnUnauthorized = () => void;

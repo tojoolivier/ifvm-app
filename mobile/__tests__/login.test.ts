@@ -1,11 +1,13 @@
 import { useAuthStore } from '../src/lib/auth-store';
-import * as SecureStore from 'expo-secure-store';
+import { storage } from '../src/lib/storage';
 import { apiClient } from '../src/lib/api-client';
 
-jest.mock('expo-secure-store', () => ({
-  getItemAsync: jest.fn(),
-  setItemAsync: jest.fn(),
-  deleteItemAsync: jest.fn(),
+jest.mock('../src/lib/storage', () => ({
+  storage: {
+    getItem: jest.fn(),
+    setItem: jest.fn(),
+    deleteItem: jest.fn(),
+  },
 }));
 
 jest.mock('../src/lib/api-client', () => ({
@@ -15,24 +17,24 @@ jest.mock('../src/lib/api-client', () => ({
   },
 }));
 
-const mockSecureStore = jest.mocked(SecureStore);
+const mockStorage = jest.mocked(storage);
 const mockApiClient = jest.mocked(apiClient);
 
 function makeJwt(payload: Record<string, unknown>): string {
-  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const body = btoa(JSON.stringify(payload));
+  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const body = btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   const sig = 'signature';
   return `${header}.${body}.${sig}`;
 }
 
-const TEST_USER = { id: 1, username: 'alice', role: 'prospecteur' as const };
-const TEST_TOKEN = makeJwt({ user_id: 1 });
+const TEST_USER = { id: '550e8400-e29b-41d4-a716-446655440000', nom: 'Dupont', prenom: 'Alice', email: 'alice@test.com', role: 'prospecteur' as const, actif: true, created_at: '2026-01-01T00:00:00Z' };
+const TEST_TOKEN = makeJwt({ user_id: '550e8400-e29b-41d4-a716-446655440000' });
 
 beforeEach(() => {
   jest.restoreAllMocks();
-  mockSecureStore.getItemAsync.mockReset();
-  mockSecureStore.setItemAsync.mockReset();
-  mockSecureStore.deleteItemAsync.mockReset();
+  mockStorage.getItem.mockReset();
+  mockStorage.setItem.mockReset();
+  mockStorage.deleteItem.mockReset();
   mockApiClient.login.mockReset();
   mockApiClient.getProfile.mockReset();
   useAuthStore.setState({
@@ -46,13 +48,13 @@ beforeEach(() => {
 describe('Login flow', () => {
   it('should call login with credentials and transition to authenticated', async () => {
     mockApiClient.login.mockResolvedValueOnce({ access_token: TEST_TOKEN });
-    mockSecureStore.setItemAsync.mockResolvedValueOnce(undefined);
+    mockStorage.setItem.mockResolvedValueOnce(undefined);
     mockApiClient.getProfile.mockResolvedValueOnce(TEST_USER);
 
-    await useAuthStore.getState().login('alice', 'password123');
+    await useAuthStore.getState().login('alice@test.com', 'password123');
 
     expect(mockApiClient.login).toHaveBeenCalledWith({
-      username: 'alice',
+      email: 'alice@test.com',
       password: 'password123',
     });
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
@@ -63,7 +65,7 @@ describe('Login flow', () => {
     mockApiClient.login.mockRejectedValueOnce(new Error('Invalid credentials'));
 
     await expect(
-      useAuthStore.getState().login('alice', 'wrong')
+      useAuthStore.getState().login('alice@test.com', 'wrong')
     ).rejects.toThrow('Login failed');
 
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
@@ -74,7 +76,7 @@ describe('Login flow', () => {
     mockApiClient.login.mockRejectedValueOnce(new Error('Network error'));
 
     await expect(
-      useAuthStore.getState().login('alice', 'pass')
+      useAuthStore.getState().login('alice@test.com', 'pass')
     ).rejects.toThrow();
 
     const state = useAuthStore.getState();
@@ -86,14 +88,14 @@ describe('Login flow', () => {
 
 describe('Auth guard logic', () => {
   it('should be unauthenticated when no token exists', () => {
-    mockSecureStore.getItemAsync.mockResolvedValue(null);
+    mockStorage.getItem.mockResolvedValue(null);
 
     const state = useAuthStore.getState();
     expect(state.isAuthenticated).toBe(false);
   });
 
   it('should become authenticated after successful init', async () => {
-    mockSecureStore.getItemAsync.mockResolvedValueOnce(TEST_TOKEN);
+    mockStorage.getItem.mockResolvedValueOnce(TEST_TOKEN);
     mockApiClient.getProfile.mockResolvedValueOnce(TEST_USER);
 
     await useAuthStore.getState().init();
@@ -102,9 +104,9 @@ describe('Auth guard logic', () => {
   });
 
   it('should remain unauthenticated when init fails with invalid token', async () => {
-    mockSecureStore.getItemAsync.mockResolvedValueOnce('bad-token');
+    mockStorage.getItem.mockResolvedValueOnce('bad-token');
     mockApiClient.getProfile.mockRejectedValueOnce(new Error('Unauthorized'));
-    mockSecureStore.deleteItemAsync.mockResolvedValueOnce(undefined);
+    mockStorage.deleteItem.mockResolvedValueOnce(undefined);
 
     await useAuthStore.getState().init();
 
@@ -119,7 +121,7 @@ describe('Token expiry handling', () => {
       user: TEST_USER,
       isAuthenticated: true,
     });
-    mockSecureStore.deleteItemAsync.mockResolvedValueOnce(undefined);
+    mockStorage.deleteItem.mockResolvedValueOnce(undefined);
 
     await useAuthStore.getState().logout();
 
@@ -133,10 +135,10 @@ describe('Token expiry handling', () => {
       user: TEST_USER,
       isAuthenticated: true,
     });
-    mockSecureStore.deleteItemAsync.mockResolvedValueOnce(undefined);
+    mockStorage.deleteItem.mockResolvedValueOnce(undefined);
 
     await useAuthStore.getState().logout();
 
-    expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith('auth_token');
+    expect(mockStorage.deleteItem).toHaveBeenCalledWith('auth_token');
   });
 });

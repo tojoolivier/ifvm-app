@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import * as SecureStore from 'expo-secure-store';
 import { apiClient, User } from './api-client';
+import { storage } from './storage';
 
 const tokenKey = 'auth_token';
 
@@ -45,7 +45,7 @@ interface AuthState {
 }
 
 interface AuthActions {
-  login: (username: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: User) => void;
   init: () => Promise<void>;
@@ -59,11 +59,11 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
 
   init: async () => {
     try {
-      const token = await SecureStore.getItemAsync(tokenKey);
+      const token = await storage.getItem(tokenKey);
       if (token) {
         const payload = decodeJwtPayload(token);
-        const userId = payload.user_id;
-        if (typeof userId === 'number') {
+        const userId = payload.sub ?? payload.user_id;
+        if (typeof userId === 'string' || typeof userId === 'number') {
           const user = await apiClient.getProfile(token);
           set({ token, user, isAuthenticated: true, isInitialized: true });
           return;
@@ -72,29 +72,40 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
       set({ isInitialized: true });
     } catch {
       try {
-        await SecureStore.deleteItemAsync(tokenKey);
+        await storage.deleteItem(tokenKey);
       } catch {
-        // SecureStore cleanup failed — ignore
+        // cleanup failed — ignore
       }
       set({ isInitialized: true });
     }
   },
 
-  login: async (username: string, password: string) => {
+  login: async (email: string, password: string) => {
     try {
-      const response = await apiClient.login({ username, password });
+      console.log('[auth] login start', email);
+      const response = await apiClient.login({ email, password });
+      console.log('[auth] login API ok, token:', response.access_token?.substring(0, 30));
       const token = response.access_token;
-      await SecureStore.setItemAsync(tokenKey, token);
-      const user = await apiClient.getProfile(token);
+      await storage.setItem(tokenKey, token);
+      console.log('[auth] token stored');
+      let user = null;
+      try {
+        user = await apiClient.getProfile(token);
+        console.log('[auth] getProfile ok:', user);
+      } catch (e) {
+        console.warn('[auth] getProfile failed:', e);
+      }
       set({ token, user, isAuthenticated: true });
-    } catch {
+      console.log('[auth] state set, isAuthenticated=true');
+    } catch (e) {
+      console.error('[auth] login FAILED:', e);
       set({ token: null, user: null, isAuthenticated: false });
       throw new Error('Login failed');
     }
   },
 
   logout: async () => {
-    await SecureStore.deleteItemAsync(tokenKey);
+    await storage.deleteItem(tokenKey);
     set({ token: null, user: null, isAuthenticated: false });
   },
 

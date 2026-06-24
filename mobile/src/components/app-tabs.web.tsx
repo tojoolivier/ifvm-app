@@ -20,8 +20,11 @@ import { UserRole } from '@/lib/api-client';
 const ROLE_TABS: Record<UserRole, string[]> = {
   prospecteur: ['/', 'prospection', 'sync', 'profile'],
   chef_equipe: ['/', 'fiches', 'supervision', 'sync', 'profile'],
+  agent_encadreur: ['/', 'prospection', 'sync', 'profile'],
+  pilote: ['/', 'prospection', 'sync', 'profile'],
+  mecanicien: ['/', 'sync', 'profile'],
+  chef_de_base: ['/', 'fiches', 'supervision', 'sync', 'profile'],
   admin: ['/', 'prospection', 'fiches', 'supervision', 'sync', 'profile'],
-  technicien: ['/', 'prospection', 'sync', 'profile'],
 };
 
 const TAB_LABELS: Record<string, string> = {

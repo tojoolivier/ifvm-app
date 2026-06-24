@@ -38,7 +38,7 @@ export default function DashboardScreen() {
         >
           <View className="px-6 pt-4" style={{ maxWidth: MaxContentWidth, alignSelf: 'center', width: '100%' }}>
             <ThemedText type="subtitle" style={{ marginBottom: 4 }}>
-              {greeting()}, {user?.username ?? 'Agent'}
+              {greeting()}, {user?.prenom ?? 'Agent'}
             </ThemedText>
             <ThemedText type="small" style={{ color: '#6B7280', marginBottom: Spacing.four }}>
               {isProspecteur ? 'Prospecteur terrain' : isChefEquipe ? 'Chef d\'équipe' : 'Agent IFVM'}

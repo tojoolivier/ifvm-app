@@ -1,11 +1,13 @@
 import { useAuthStore } from '../src/lib/auth-store';
-import * as SecureStore from 'expo-secure-store';
+import { storage } from '../src/lib/storage';
 import { apiClient } from '../src/lib/api-client';
 
-jest.mock('expo-secure-store', () => ({
-  getItemAsync: jest.fn(),
-  setItemAsync: jest.fn(),
-  deleteItemAsync: jest.fn(),
+jest.mock('../src/lib/storage', () => ({
+  storage: {
+    getItem: jest.fn(),
+    setItem: jest.fn(),
+    deleteItem: jest.fn(),
+  },
 }));
 
 jest.mock('../src/lib/api-client', () => ({
@@ -16,24 +18,24 @@ jest.mock('../src/lib/api-client', () => ({
   },
 }));
 
-const mockSecureStore = jest.mocked(SecureStore);
+const mockStorage = jest.mocked(storage);
 const mockApiClient = jest.mocked(apiClient);
 
 function makeJwt(payload: Record<string, unknown>): string {
-  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const body = btoa(JSON.stringify(payload));
+  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const body = btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   const sig = 'signature';
   return `${header}.${body}.${sig}`;
 }
 
-const TEST_TOKEN = makeJwt({ user_id: 1 });
-const TEST_USER = { id: 1, username: 'alice', role: 'prospecteur' as const };
+const TEST_TOKEN = makeJwt({ user_id: '550e8400-e29b-41d4-a716-446655440000' });
+const TEST_USER = { id: '550e8400-e29b-41d4-a716-446655440000', nom: 'Dupont', prenom: 'Alice', email: 'alice@test.com', role: 'prospecteur' as const, actif: true, created_at: '2026-01-01T00:00:00Z' };
 
 beforeEach(() => {
   jest.restoreAllMocks();
-  mockSecureStore.getItemAsync.mockReset();
-  mockSecureStore.setItemAsync.mockReset();
-  mockSecureStore.deleteItemAsync.mockReset();
+  mockStorage.getItem.mockReset();
+  mockStorage.setItem.mockReset();
+  mockStorage.deleteItem.mockReset();
   mockApiClient.login.mockReset();
   mockApiClient.getProfile.mockReset();
   useAuthStore.setState({
@@ -47,13 +49,13 @@ beforeEach(() => {
 describe('Profile screen logic', () => {
   it('should display user info after auth', async () => {
     mockApiClient.login.mockResolvedValueOnce({ access_token: TEST_TOKEN });
-    mockSecureStore.setItemAsync.mockResolvedValueOnce(undefined);
+    mockStorage.setItem.mockResolvedValueOnce(undefined);
     mockApiClient.getProfile.mockResolvedValueOnce(TEST_USER);
 
-    await useAuthStore.getState().login('alice', 'password123');
+    await useAuthStore.getState().login('alice@test.com', 'password123');
 
     const state = useAuthStore.getState();
-    expect(state.user?.username).toBe('alice');
+    expect(state.user?.prenom).toBe('Alice');
     expect(state.user?.role).toBe('prospecteur');
   });
 
@@ -63,7 +65,7 @@ describe('Profile screen logic', () => {
       user: TEST_USER,
       isAuthenticated: true,
     });
-    mockSecureStore.deleteItemAsync.mockResolvedValueOnce(undefined);
+    mockStorage.deleteItem.mockResolvedValueOnce(undefined);
 
     await useAuthStore.getState().logout();
 
@@ -78,11 +80,11 @@ describe('Profile screen logic', () => {
       user: TEST_USER,
       isAuthenticated: true,
     });
-    mockSecureStore.deleteItemAsync.mockResolvedValueOnce(undefined);
+    mockStorage.deleteItem.mockResolvedValueOnce(undefined);
 
     await useAuthStore.getState().logout();
 
-    expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith('auth_token');
+    expect(mockStorage.deleteItem).toHaveBeenCalledWith('auth_token');
   });
 });
 
@@ -93,7 +95,7 @@ describe('Token expiry redirect', () => {
       user: TEST_USER,
       isAuthenticated: true,
     });
-    mockSecureStore.deleteItemAsync.mockResolvedValueOnce(undefined);
+    mockStorage.deleteItem.mockResolvedValueOnce(undefined);
 
     await useAuthStore.getState().logout();
 
@@ -107,10 +109,10 @@ describe('Token expiry redirect', () => {
       user: TEST_USER,
       isAuthenticated: true,
     });
-    mockSecureStore.deleteItemAsync.mockResolvedValueOnce(undefined);
+    mockStorage.deleteItem.mockResolvedValueOnce(undefined);
 
     await useAuthStore.getState().logout();
 
-    expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith('auth_token');
+    expect(mockStorage.deleteItem).toHaveBeenCalledWith('auth_token');
   });
 });
