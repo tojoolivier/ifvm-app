@@ -52,7 +52,7 @@ Voir les ADR dans `docs/adr/` pour les décisions et leurs justifications.
 | Base de données centrale | PostgreSQL 16 |
 | Base de données locale (tablette) | SQLite (via Expo SQLite) |
 | API backend | FastAPI (Python) |
-| Interface web | React + TypeScript |
+| Interface web | React + TypeScript + shadcn/ui |
 | Application mobile | React Native (Expo) |
 
 ### Modèle de synchronisation
