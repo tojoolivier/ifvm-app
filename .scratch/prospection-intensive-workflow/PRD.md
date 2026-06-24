@@ -140,9 +140,22 @@ Table `audit_log` :
 | details | JSONB | Détails de l'action (champs modifiés, commentaire, etc.) |
 | created_at | TIMESTAMPTZ | Horodatage |
 
-### Modèle de données — Prospection intensive
+### Modèle de données — table `prospection` unifiée
 
-Ajouter à la table `prospection_intensive` :
+Les trois types de prospection (intensive, extensive, validation) partagent un même tronc.
+Plutôt qu'une table par type, on utilise **une seule table `prospection`** discriminée par
+`type_prospection` (`'intensive' | 'extensive' | 'validation'`), avec des tables enfants
+normalisées pour les données requêtables et du JSONB pour l'archival. Détail complet dans
+l'issue `01-modele-donnees.md`.
+
+Tables :
+- `prospection` (master) — références, géo, surfaces, `type_prospection`, workflow + sync, `vegetation`/`sol` en JSONB
+- `prospection_population` — densités par espèce × catégorie (queryable)
+- `prospection_capture` — matrice comptage espèce × catégorie × sexe? × phase × stade (`sexe` NULL en extensive)
+- `prospection_infestation` — taches / bandes / vols / essaims
+- `audit_log` — journal générique
+
+Colonnes de workflow portées par le master `prospection` (utilisées par l'intensive dans cette PRD) :
 
 | Colonne | Type | Description |
 |---------|------|-------------|
@@ -153,6 +166,10 @@ Ajouter à la table `prospection_intensive` :
 | verified_at | TIMESTAMPTZ | Date de vérification |
 | validated_by | UUID FK → utilisateur | Validateur |
 | validated_at | TIMESTAMPTZ | Date de validation finale |
+
+> Les endpoints `/prospections-intensives` ci-dessous opèrent comme une **vue filtrée**
+> (`WHERE type_prospection = 'intensive'`) sur la table unifiée — le périmètre workflow de
+> cette PRD reste l'intensive. Extensive/validation = PRD ultérieurs (voir Out of Scope).
 
 ### API endpoints
 

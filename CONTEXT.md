@@ -152,16 +152,16 @@ poste_acridien
 releve_meteo → station_meteo
   └── mesure_meteo_jour (1 ligne / jour)
 
-prospection_extensive → station (ponctuelle)
-prospection_intensive → station (fixe)
+prospection → station (fixe pour intensive, ponctuelle pour extensive/validation)
+  ├── type_prospection: intensive | extensive | validation   (table unique discriminée)
   ├── statut: brouillon | en_attente | verifiee | validee | rejetee
-  ├── statut_sync: synchronise | desynchronise
-  ├── capture          (espece × stade × sexe × phase × nombre)
-  ├── population_acridien (densités diffuses/groupées, accouplements, ponte)
-  ├── infestation      (taches, bandes, vols, essaims)
-  ├── vegetation       (7 strates × attributs ORPAD)
-  ├── humidite_sol
-  └── texture_sol
+  ├── statut_sync: local | synced | conflict
+  ├── vegetation       (JSONB : 7 strates × attributs ORPAD — intensive, archival)
+  ├── sol              (JSONB : humidité + texture — intensive, archival)
+  ├── prospection_population (densités diffuses/groupées, captures, accouplement, ponte)  [queryable]
+  ├── prospection_capture    (espece × categorie × sexe? × phase × stade × effectif)      [queryable]
+  │                          └── sexe NULL pour extensive/validation (absorbe les 2 granularités)
+  └── prospection_infestation (taches, bandes, vols, essaims)                             [queryable]
 
 audit_log
   ├── fiche_type (intensive | extensive | validation | crt | vol | meteo)
@@ -172,7 +172,7 @@ audit_log
   └── created_at
 
 compte_rendu_traitement (CRT)
-  ├── → prospection_extensive OU prospection_intensive  (obligatoire)
+  ├── → prospection  (obligatoire ; quel que soit le type_prospection)
   ├── crt_point_gps    (périmètre + 1ère passe)
   ├── crt_cible_espece
   ├── crt_zone_cible   (cultures, pâturage, apiculture…)
