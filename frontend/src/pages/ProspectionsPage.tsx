@@ -140,7 +140,7 @@ export function ProspectionsPage() {
 
       {/* Filtres */}
       <Card className="mb-4">
-        <CardContent className="pt-4 flex flex-wrap gap-3 items-end">
+        <CardContent className="flex flex-wrap gap-3 items-end">
           <div className="flex flex-col gap-1">
             <span className="text-xs font-medium text-muted-foreground">Statut</span>
             <Select value={filtreStatut} onValueChange={onStatutChange}>
