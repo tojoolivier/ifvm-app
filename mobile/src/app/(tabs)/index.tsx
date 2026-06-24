@@ -1,150 +1,279 @@
-import { View, ScrollView, RefreshControl } from 'react-native';
-import { useCallback, useState } from 'react';
+import {
+  View,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  Image,
+} from 'react-native';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
 import { useDashboardData } from '@/hooks/use-dashboard-data';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+
+const IFVM_GREEN = '#1B5E1B';
+const IFVM_GREEN_DARK = '#163F16';
+const IFVM_GREEN_CARD = '#1D6B1D';
+const IFVM_BG = '#162016';
 
 export default function DashboardScreen() {
   const user = useAuthStore((s) => s.user);
-  const { postes, isLoading, error } = useDashboardData();
-  const [refreshing, setRefreshing] = useState(false);
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+  const { postes, isLoading } = useDashboardData();
+  const router = useRouter();
 
   const isProspecteur = user?.role === 'prospecteur';
-  const isChefEquipe = user?.role === 'chef_equipe';
 
-  const greeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Bonjour';
-    if (hour < 18) return 'Bon après-midi';
-    return 'Bonsoir';
-  };
+  const today = new Date();
+  const dateLabel = today
+    .toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
+    .toUpperCase();
+
+  const posteActuel = postes[0];
+
+  if (!isProspecteur) {
+    return <SupervisorDashboard postes={postes} isLoading={isLoading} />;
+  }
 
   return (
-    <ThemedView className="flex-1">
-      <SafeAreaView className="flex-1">
-        <ScrollView
-          contentContainerStyle={{ paddingBottom: BottomTabInset + Spacing.three }}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-        >
-          <View className="px-6 pt-4" style={{ maxWidth: MaxContentWidth, alignSelf: 'center', width: '100%' }}>
-            <ThemedText type="subtitle" style={{ marginBottom: 4 }}>
-              {greeting()}, {user?.prenom ?? 'Agent'}
-            </ThemedText>
-            <ThemedText type="small" style={{ color: '#6B7280', marginBottom: Spacing.four }}>
-              {isProspecteur ? 'Prospecteur terrain' : isChefEquipe ? 'Chef d\'équipe' : 'Agent IFVM'}
-            </ThemedText>
-
-            {error && (
-              <ThemedView type="backgroundElement" className="rounded-xl p-4 mb-4">
-                <ThemedText type="small" style={{ color: '#DC2626', textAlign: 'center' }}>
-                  {error}
-                </ThemedText>
-              </ThemedView>
-            )}
-
-            {isProspecteur && (
-              <ThemedView type="backgroundElement" className="rounded-xl p-5 mb-4">
-                <View className="flex-row items-center justify-between">
-                  <View>
-                    <ThemedText type="small" style={{ color: '#6B7280', marginBottom: 4 }}>
-                      Postes acridiens
-                    </ThemedText>
-                    <ThemedText type="title" style={{ fontSize: 40 }}>
-                      {isLoading ? '—' : postes.length}
-                    </ThemedText>
-                  </View>
-                  <View className="w-14 h-14 bg-green-100 rounded-xl items-center justify-center">
-                    <ThemedText style={{ fontSize: 28 }}>🗺️</ThemedText>
-                  </View>
-                </View>
-                <ThemedText type="small" style={{ color: '#6B7280', marginTop: 8 }}>
-                  {isLoading ? 'Chargement...' : `${postes.length} poste${postes.length > 1 ? 's' : ''} assigné${postes.length > 1 ? 's' : ''}`}
-                </ThemedText>
-              </ThemedView>
-            )}
-
-            {isChefEquipe && (
-              <View className="gap-4">
-                <ThemedView type="backgroundElement" className="rounded-xl p-5">
-                  <View className="flex-row items-center justify-between">
-                    <View>
-                      <ThemedText type="small" style={{ color: '#6B7280', marginBottom: 4 }}>
-                        Postes acridiens
-                      </ThemedText>
-                      <ThemedText type="title" style={{ fontSize: 40 }}>
-                        {isLoading ? '—' : postes.length}
-                      </ThemedText>
-                    </View>
-                    <View className="w-14 h-14 bg-blue-100 rounded-xl items-center justify-center">
-                      <ThemedText style={{ fontSize: 28 }}>🗺️</ThemedText>
-                    </View>
-                  </View>
-                </ThemedView>
-
-                <ThemedView type="backgroundElement" className="rounded-xl p-5">
-                  <View className="flex-row items-center justify-between">
-                    <View>
-                      <ThemedText type="small" style={{ color: '#6B7280', marginBottom: 4 }}>
-                        Fiches assignées
-                      </ThemedText>
-                      <ThemedText type="title" style={{ fontSize: 40 }}>
-                        —
-                      </ThemedText>
-                    </View>
-                    <View className="w-14 h-14 bg-orange-100 rounded-xl items-center justify-center">
-                      <ThemedText style={{ fontSize: 28 }}>📋</ThemedText>
-                    </View>
-                  </View>
-                </ThemedView>
-
-                <ThemedView type="backgroundElement" className="rounded-xl p-5">
-                  <View className="flex-row items-center justify-between">
-                    <View>
-                      <ThemedText type="small" style={{ color: '#6B7280', marginBottom: 4 }}>
-                        Équipe active
-                      </ThemedText>
-                      <ThemedText type="title" style={{ fontSize: 40 }}>
-                        —
-                      </ThemedText>
-                    </View>
-                    <View className="w-14 h-14 bg-purple-100 rounded-xl items-center justify-center">
-                      <ThemedText style={{ fontSize: 28 }}>👥</ThemedText>
-                    </View>
-                  </View>
-                </ThemedView>
-              </View>
-            )}
-
-            {!isProspecteur && !isChefEquipe && (
-              <ThemedView type="backgroundElement" className="rounded-xl p-5">
-                <View className="flex-row items-center justify-between">
-                  <View>
-                    <ThemedText type="small" style={{ color: '#6B7280', marginBottom: 4 }}>
-                      Postes acridiens
-                    </ThemedText>
-                    <ThemedText type="title" style={{ fontSize: 40 }}>
-                      {isLoading ? '—' : postes.length}
-                    </ThemedText>
-                  </View>
-                  <View className="w-14 h-14 bg-green-100 rounded-xl items-center justify-center">
-                    <ThemedText style={{ fontSize: 28 }}>🗺️</ThemedText>
-                  </View>
-                </View>
-              </ThemedView>
-            )}
+    <View style={styles.root}>
+      {/* Header */}
+      <View style={styles.header}>
+        <SafeAreaView edges={['top']}>
+          <View style={styles.headerContent}>
+            <Image
+              source={require('../../../assets/images/logo-ifvm.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+            <View style={{ flex: 1 }}>
+              <ThemedText style={styles.headerTitle}>IFVM Terrain</ThemedText>
+              <ThemedText style={styles.headerSub}>
+                {user?.prenom} {user?.nom} · {posteActuel?.name ?? '—'}
+              </ThemedText>
+            </View>
           </View>
-        </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+        </SafeAreaView>
+      </View>
+
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+      >
+        {/* Carte bienvenue */}
+        <View style={styles.welcomeCard}>
+          <ThemedText style={styles.welcomeLabel}>Bonjour,</ThemedText>
+          <ThemedText style={styles.welcomeName}>
+            {user?.prenom} {user?.nom}
+          </ThemedText>
+          <ThemedText style={styles.welcomeSub}>
+            Prospecteur · {posteActuel?.name ?? '—'}
+          </ThemedText>
+        </View>
+
+        {/* Carte Mission du jour */}
+        <View style={styles.missionCard}>
+          <ThemedText style={styles.missionTitle}>MISSION DU JOUR · {dateLabel}</ThemedText>
+          <Row label="Campagne" value={isLoading ? '…' : 'LMC en cours'} />
+          <Row label="Poste acridien" value={isLoading ? '…' : (posteActuel?.name ?? '—')} />
+          <Row label="Chef d'équipe" value="—" />
+          <Row label="Stations cibles" value="—" />
+        </View>
+
+        {/* Compteurs */}
+        <View style={styles.countersRow}>
+          <Counter value={0} label="Fiches D." color="#16a34a" />
+          <Counter value={0} label="À sync." color="#d97706" />
+          <Counter value={isLoading ? 0 : postes.length} label="Stations" color="#2563eb" />
+        </View>
+
+        {/* Bouton principal */}
+        <TouchableOpacity
+          style={styles.btnPrimary}
+          onPress={() => router.push('/(tabs)/prospection')}
+          activeOpacity={0.85}
+        >
+          <ThemedText style={styles.btnPrimaryText}>
+            + Nouvelle fiche de prospection
+          </ThemedText>
+        </TouchableOpacity>
+
+        {/* Bouton secondaire */}
+        <TouchableOpacity
+          style={styles.btnSecondary}
+          onPress={() => router.push('/(tabs)/fiches')}
+          activeOpacity={0.85}
+        >
+          <ThemedText style={styles.btnSecondaryText}>Voir mes fiches</ThemedText>
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
   );
 }
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.missionRow}>
+      <ThemedText style={styles.missionRowLabel}>{label}</ThemedText>
+      <ThemedText style={styles.missionRowValue}>{value}</ThemedText>
+    </View>
+  );
+}
+
+function Counter({ value, label, color }: { value: number; label: string; color: string }) {
+  return (
+    <View style={styles.counter}>
+      <ThemedText style={[styles.counterValue, { color }]}>{value}</ThemedText>
+      <ThemedText style={styles.counterLabel}>{label}</ThemedText>
+    </View>
+  );
+}
+
+function SupervisorDashboard({ postes, isLoading }: { postes: { id: number; name: string }[]; isLoading: boolean }) {
+  return (
+    <View style={styles.root}>
+      <SafeAreaView edges={['top']}>
+        <View style={styles.header}>
+          <View style={styles.headerContent}>
+            <Image
+              source={require('../../../assets/images/logo-ifvm.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+            <ThemedText style={styles.headerTitle}>IFVM Terrain</ThemedText>
+          </View>
+        </View>
+      </SafeAreaView>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <ThemedText style={{ color: '#fff', fontSize: 18, fontWeight: '600' }}>
+          {isLoading ? 'Chargement…' : `${postes.length} poste(s) acridien(s)`}
+        </ThemedText>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: IFVM_BG,
+  },
+  header: {
+    backgroundColor: IFVM_GREEN_DARK,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingTop: 8,
+  },
+  logo: {
+    width: 36,
+    height: 36,
+  },
+  headerTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  headerSub: {
+    color: '#FFFFFFAA',
+    fontSize: 12,
+  },
+  welcomeCard: {
+    backgroundColor: IFVM_GREEN_CARD,
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 12,
+  },
+  welcomeLabel: {
+    color: '#FFFFFFCC',
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  welcomeName: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  welcomeSub: {
+    color: '#FFFFFFAA',
+    fontSize: 13,
+  },
+  missionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  missionTitle: {
+    color: IFVM_GREEN,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginBottom: 12,
+  },
+  missionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  missionRowLabel: {
+    color: '#6B7280',
+    fontSize: 13,
+  },
+  missionRowValue: {
+    color: '#111827',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  countersRow: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    marginBottom: 16,
+    overflow: 'hidden',
+  },
+  counter: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderRightColor: '#E5E7EB',
+  },
+  counterValue: {
+    fontSize: 28,
+    fontWeight: '700',
+  },
+  counterLabel: {
+    color: '#6B7280',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  btnPrimary: {
+    backgroundColor: IFVM_GREEN,
+    borderRadius: 10,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  btnPrimaryText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  btnSecondary: {
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF44',
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  btnSecondaryText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '500',
+  },
+});
