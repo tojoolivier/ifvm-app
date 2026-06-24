@@ -75,8 +75,6 @@ class Prospection:
     campagne_id: uuid.UUID = field(default_factory=uuid.uuid4)
     prospecteur_id: uuid.UUID = field(default_factory=uuid.uuid4)
     station_id: uuid.UUID | None = None
-    station_code: str | None = None
-    station_nom: str | None = None
     n_releve: str | None = None
     n_fiche: str | None = None
     n_message: str | None = None

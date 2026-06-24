@@ -19,7 +19,6 @@ from app.infrastructure.prospection_model import (
     ProspectionInfestationModel,
     ProspectionPopulationModel,
 )
-from app.infrastructure.referentiel_model import StationFixeModel
 
 
 class ProspectionRepositoryImpl(ProspectionRepository):
@@ -29,7 +28,6 @@ class ProspectionRepositoryImpl(ProspectionRepository):
     async def get_by_id(self, prospection_id: uuid.UUID) -> Prospection | None:
         result = await self.session.execute(
             select(ProspectionModel)
-            .outerjoin(StationFixeModel, ProspectionModel.station_id == StationFixeModel.id)
             .where(ProspectionModel.id == prospection_id)
             .options(
                 selectinload(ProspectionModel.populations),
@@ -37,12 +35,10 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                 selectinload(ProspectionModel.infestations),
             )
         )
-        row = result.first()
-        if row is None:
+        model = result.scalar_one_or_none()
+        if model is None:
             return None
-        model = row[0]
-        station_model = row[1] if len(row) > 1 else None
-        return self._to_domain(model, station_code=getattr(station_model, 'code', None), station_nom=getattr(station_model, 'nom', None))
+        return self._to_domain(model)
 
     async def list_by_filters(
         self,
@@ -151,15 +147,13 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         await self.session.commit()
         return result.rowcount > 0
 
-    def _to_domain(self, model: ProspectionModel, station_code: str | None = None, station_nom: str | None = None) -> Prospection:
+    def _to_domain(self, model: ProspectionModel) -> Prospection:
         return Prospection(
             id=model.id,
             type_prospection=model.type_prospection,
             campagne_id=model.campagne_id,
             prospecteur_id=model.prospecteur_id,
             station_id=model.station_id,
-            station_code=station_code,
-            station_nom=station_nom,
             n_releve=model.n_releve,
             n_fiche=model.n_fiche,
             n_message=model.n_message,
