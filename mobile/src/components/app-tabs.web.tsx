@@ -14,19 +14,40 @@ import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
 import { Colors, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useAuthStore } from '@/lib/auth-store';
+import { UserRole } from '@/lib/api-client';
+
+const ROLE_TABS: Record<UserRole, string[]> = {
+  prospecteur: ['/', 'prospection', 'sync', 'profile'],
+  chef_equipe: ['/', 'fiches', 'supervision', 'sync', 'profile'],
+  admin: ['/', 'prospection', 'fiches', 'supervision', 'sync', 'profile'],
+  technicien: ['/', 'prospection', 'sync', 'profile'],
+};
+
+const TAB_LABELS: Record<string, string> = {
+  '/': 'Dashboard',
+  prospection: 'Prospection',
+  fiches: 'Fiches',
+  supervision: 'Supervision',
+  sync: 'Sync',
+  profile: 'Profil',
+};
 
 export default function AppTabs() {
+  const user = useAuthStore((s) => s.user);
+  const role = user?.role ?? 'prospecteur';
+  const allowedTabs = ROLE_TABS[role] ?? ROLE_TABS.prospecteur;
+
   return (
     <Tabs>
       <TabSlot style={{ height: '100%' }} />
       <TabList asChild>
         <CustomTabList>
-          <TabTrigger name="home" href="/" asChild>
-            <TabButton>Home</TabButton>
-          </TabTrigger>
-          <TabTrigger name="explore" href="/explore" asChild>
-            <TabButton>Explore</TabButton>
-          </TabTrigger>
+          {allowedTabs.map((href) => (
+            <TabTrigger key={href} name={href} href={href === '/' ? '/' : `/${href}` as any} asChild>
+              <TabButton>{TAB_LABELS[href] ?? href}</TabButton>
+            </TabTrigger>
+          ))}
         </CustomTabList>
       </TabList>
     </Tabs>
@@ -55,7 +76,7 @@ export function CustomTabList(props: TabListProps) {
     <View {...props} style={styles.tabListContainer}>
       <ThemedView type="backgroundElement" style={styles.innerContainer}>
         <ThemedText type="smallBold" style={styles.brandText}>
-          Expo Starter
+          IFVM Mobile
         </ThemedText>
 
         {props.children}

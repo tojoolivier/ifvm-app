@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { useColorScheme } from 'react-native';
+import { Text, useColorScheme } from 'react-native';
 import { useAuthStore } from '@/lib/auth-store';
 import { Colors, type ThemeColor } from '@/constants/theme';
 import { UserRole } from '@/lib/api-client';
@@ -99,8 +99,8 @@ export default function TabLayout() {
 
 function TabIcon({ name, color }: { name: string; color: string | import('react-native').ColorValue }) {
   return (
-    <span style={{ fontSize: 20, color: color as string }}>
+    <Text style={{ fontSize: 20, color: color as string }}>
       {name}
-    </span>
+    </Text>
   );
 }
