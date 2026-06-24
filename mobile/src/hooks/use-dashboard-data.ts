@@ -8,7 +8,6 @@ export function useDashboardData() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const token = useAuthStore((s) => s.token);
-  const user = useAuthStore((s) => s.user);
   const onUnauthorized = useOnUnauthorized();
 
   useEffect(() => {
@@ -47,5 +46,5 @@ export function useDashboardData() {
     };
   }, [token]);
 
-  return { postes, isLoading, error, user };
+  return { postes, isLoading, error };
 }
