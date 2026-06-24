@@ -29,7 +29,12 @@ const TEST_USER = { id: 1, username: 'alice' };
 const TEST_TOKEN = makeJwt({ user_id: 1 });
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  jest.restoreAllMocks();
+  mockSecureStore.getItemAsync.mockReset();
+  mockSecureStore.setItemAsync.mockReset();
+  mockSecureStore.deleteItemAsync.mockReset();
+  mockApiClient.login.mockReset();
+  mockApiClient.getProfile.mockReset();
   useAuthStore.setState({
     token: null,
     user: null,
@@ -45,8 +50,7 @@ describe('useAuthStore', () => {
       mockSecureStore.setItemAsync.mockResolvedValueOnce(undefined);
       mockApiClient.getProfile.mockResolvedValueOnce(TEST_USER);
 
-      const { login } = useAuthStore.getState();
-      await login('alice', 'password123');
+      await useAuthStore.getState().login('alice', 'password123');
 
       const state = useAuthStore.getState();
       expect(state.token).toBe(TEST_TOKEN);
@@ -75,6 +79,33 @@ describe('useAuthStore', () => {
       await useAuthStore.getState().login('alice', 'password123');
 
       expect(mockApiClient.getProfile).toHaveBeenCalledWith(TEST_TOKEN);
+    });
+
+    it('should reset state on login failure', async () => {
+      mockApiClient.login.mockRejectedValueOnce(new Error('Invalid credentials'));
+
+      await expect(
+        useAuthStore.getState().login('alice', 'wrong')
+      ).rejects.toThrow('Login failed');
+
+      const state = useAuthStore.getState();
+      expect(state.token).toBeNull();
+      expect(state.user).toBeNull();
+      expect(state.isAuthenticated).toBe(false);
+    });
+
+    it('should reset state on profile fetch failure after login', async () => {
+      mockApiClient.login.mockResolvedValueOnce({ access_token: TEST_TOKEN });
+      mockSecureStore.setItemAsync.mockResolvedValueOnce(undefined);
+      mockApiClient.getProfile.mockRejectedValueOnce(new Error('Network error'));
+
+      await expect(
+        useAuthStore.getState().login('alice', 'password123')
+      ).rejects.toThrow('Login failed');
+
+      const state = useAuthStore.getState();
+      expect(state.token).toBeNull();
+      expect(state.isAuthenticated).toBe(false);
     });
   });
 
@@ -145,6 +176,37 @@ describe('useAuthStore', () => {
       expect(state.isAuthenticated).toBe(false);
       expect(state.isInitialized).toBe(true);
       expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith('auth_token');
+    });
+
+    it('should decode JWT and extract user_id on startup', async () => {
+      const payload = { user_id: 42, sub: 'alice' };
+      const token = makeJwt(payload);
+      const user = { id: 42, username: 'alice' };
+
+      mockSecureStore.getItemAsync.mockResolvedValueOnce(token);
+      mockApiClient.getProfile.mockResolvedValueOnce(user);
+      mockSecureStore.deleteItemAsync.mockResolvedValueOnce(undefined);
+
+      await useAuthStore.getState().init();
+
+      const state = useAuthStore.getState();
+      expect(state.token).toBe(token);
+      expect(state.user).toEqual(user);
+      expect(state.isAuthenticated).toBe(true);
+      expect(mockApiClient.getProfile).toHaveBeenCalledWith(token);
+    });
+
+    it('should remain unauthenticated if JWT has no user_id', async () => {
+      const token = makeJwt({ sub: 'alice' });
+
+      mockSecureStore.getItemAsync.mockResolvedValueOnce(token);
+      mockSecureStore.deleteItemAsync.mockResolvedValueOnce(undefined);
+
+      await useAuthStore.getState().init();
+
+      const state = useAuthStore.getState();
+      expect(state.isAuthenticated).toBe(false);
+      expect(state.isInitialized).toBe(true);
     });
   });
 
