@@ -17,7 +17,7 @@ L'**IFVM** (Ivotoerana Famongorana ny Valala eto Madagasikara) est le centre nat
 | Fiche | Sigle | Rôle | Fréquence | Déclencheur |
 |-------|-------|------|-----------|-------------|
 | Prospection intensive | — | Relevé détaillé d'une station fixe | Hebdomadaire/campagne | Planifiée dans la campagne |
-| Prospection extensive | — | Relevé rapide multi-stations (2 par fiche papier) | Quotidien terrain | Résultats de l'intensive (équipe surveillance) |
+| Prospection extensive | — | Relevé rapide ponctuel (la feuille papier en répète 2 ; en base 1 relevé = 1 ligne) | Quotidien terrain | Résultats de l'intensive (équipe surveillance) |
 | Prospection de validation | — | Vérification d'un signalement | À la demande | Signalement agriculteur/non-specialiste |
 | Relevé météorologique | — | Données journalières par station météo | Quotidien | Quotidien |
 | Compte-rendu de traitement | CRT | Rapport d'une opération de traitement | À chaque traitement | Décision de traitement |
@@ -34,6 +34,7 @@ Agriculteur → Signalement → Prospection de Validation
 
 - **Prospection de validation** : type de prospection déclenchée par un **signalement d'agriculteur ou non-specialiste**. Vérification sur le terrain si le signalement est réel. Station `ponctuelle`.
 - **Validation de fiche** : workflow en 3 étapes (voir ci-dessous). À ne pas confondre avec "prospection de validation".
+- **Relevé** vs **fiche papier** : l'unité d'enregistrement en base est le **relevé** (un point, une ligne `prospection`). La feuille papier de l'extensive juxtapose **2** relevés par commodité d'impression ; en base ils deviennent **2 lignes distinctes** (regroupables via `n_fiche`).
 
 ### Workflow de validation d'une fiche intensive
 
@@ -154,13 +155,17 @@ releve_meteo → station_meteo
 
 prospection → station (fixe pour intensive, ponctuelle pour extensive/validation)
   ├── type_prospection: intensive | extensive | validation   (table unique discriminée)
+  ├── campagne_id   OBLIGATOIRE — toujours la campagne en cours (règle « une seule campagne »)
+  ├── localisation  station_id si la position correspond à une station connue,
+  │                 sinon latitude/longitude ponctuels (les deux mécanismes, selon le cas)
   ├── statut: brouillon | en_attente | verifiee | validee | rejetee
   ├── statut_sync: local | synced | conflict
   ├── vegetation       (JSONB : 7 strates × attributs ORPAD — intensive, archival)
   ├── sol              (JSONB : humidité + texture — intensive, archival)
   ├── prospection_population (densités diffuses/groupées, captures, accouplement, ponte)  [queryable]
   ├── prospection_capture    (espece × categorie × sexe? × phase × stade × effectif)      [queryable]
-  │                          └── sexe NULL pour extensive/validation (absorbe les 2 granularités)
+  │                          ├── sexe NULL pour extensive/validation (absorbe les 2 granularités)
+  │                          └── stade contraint par espece : LMC ⇒ A1-A5, NSE ⇒ L1-L7
   └── prospection_infestation (taches, bandes, vols, essaims)                             [queryable]
 
 audit_log
@@ -247,6 +252,7 @@ npx tsc --noEmit   # Vérification TypeScript
 | `docs/adr/ADR-001-stack.md` | Choix PostgreSQL + FastAPI + React |
 | `docs/adr/ADR-002-sync.md` | Stratégie de synchronisation offline |
 | `docs/adr/ADR-003-mobile.md` | React Native vs PWA |
+| `docs/adr/ADR-006-prospection-unifiee.md` | Table unique discriminée pour les 3 types de prospection |
 | `docs/adr/ADR-004-mobile-scaffolding.md` | Choix techniques du scaffolding mobile |
 | `docs/services/mobile-app/overview.md` | Vue d'ensemble du service mobile |
 | `docs/services/mobile-app/runbooks/development.md` | Procédures de développement mobile |

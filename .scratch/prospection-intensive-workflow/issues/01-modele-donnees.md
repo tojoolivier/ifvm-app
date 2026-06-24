@@ -30,7 +30,7 @@ Cette issue ajoute aussi les colonnes de **workflow de validation** (statut, aud
 |---------|------|-------|
 | id | UUID PK | `gen_random_uuid()` |
 | type_prospection | TEXT NOT NULL | CHECK `('intensive','extensive','validation')` |
-| campagne_id | UUID FK → campagne | nullable |
+| campagne_id | UUID FK → campagne | **NOT NULL** — toujours la campagne en cours (tous types, y c. validation) |
 | prospecteur_id | UUID FK → utilisateur | NOT NULL (créateur) |
 | station_id | UUID FK → station | nullable (fixe pour intensive) |
 | n_releve | TEXT | nullable |
@@ -100,6 +100,10 @@ Une ligne par cellule de comptage. `sexe` NULL pour l'extensive/validation.
 
 > `stade` est un VARCHAR (et non un ENUM rigide) car l'intensive ajoute les sous-stades
 > `A3-1/4 … A3-4/4` et les larves `L6/L7` absents de l'extensive.
+>
+> **Contrainte métier** : le préfixe de `stade` est déterminé par l'**espèce** —
+> `LMC ⇒ A1-A5` (+ sous-stades), `NSE ⇒ L1-L7`. À garantir par validation applicative
+> (un CHECK SQL croisé `espece`/`stade` est possible mais lourd à maintenir vu les sous-stades).
 
 ### Table `prospection_infestation` (taches / bandes / vols / essaims — queryable)
 
