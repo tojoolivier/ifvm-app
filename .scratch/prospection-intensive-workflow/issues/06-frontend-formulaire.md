@@ -1,6 +1,6 @@
 # Issue 06 — Frontend web : formulaire de création
 
-**Status:** ready-for-agent  
+**Status:** done  
 **Priority:** high  
 **Depends on:** 02
 
