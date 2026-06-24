@@ -42,7 +42,7 @@ sync_status      TEXT NOT NULL DEFAULT 'local'
 
 ### Résolution de conflit
 
-Un superviseur (rôle `chef_equipe` ou `admin`) voit les fiches en `conflict` dans l'interface web. Il choisit :
+L'**admin** voit les fiches en `conflict` dans l'interface web. Il choisit :
 - **Garder version serveur** → version locale archivée dans `fiche_conflict_archive`
 - **Garder version terrain** → push forcé avec confirmation superviseur
 - **Fusionner manuellement** → édition directe côté serveur

@@ -22,6 +22,11 @@ L'**IFVM** (Ivotoerana Famongorana ny Valala eto Madagasikara) est le centre nat
 | Compte-rendu de traitement | CRT | Rapport d'une opération de traitement | À chaque traitement |
 | Fiche de vol | — | Journal journalier d'un aéronef (1 vol = 1 CRT) | À chaque vol |
 
+### Clarification terminologique
+
+- **Prospection de validation** : type de prospection lié aux stations `ponctuelle` (signalisation) — variante de la prospection extensive. À ne pas confondre avec :
+- **Validation de fiche** : acte de supervision (chef_de_base/admin approuve une fiche) — concept à définir
+
 ### Hiérarchie géographique
 
 ```
@@ -53,8 +58,51 @@ Voir les ADR dans `docs/adr/` pour les décisions et leurs justifications.
 ### Modèle de synchronisation
 
 **Ownership-based sync avec versioning serveur.**
-Chaque fiche appartient à son créateur. Le serveur est source de vérité. Les conflits (rare : supervision côté serveur + modification simultanée terrain) sont flaggés et tranchés par un superviseur.
+Chaque fiche appartient à son créateur. Le serveur est source de vérité. Les conflits (rare : modification simultanée terrain + serveur) sont flaggés et tranchés par l'**admin** depuis l'**interface web**.
 Détail : `docs/adr/ADR-002-sync.md`.
+
+### Contraintes offline
+
+- **Durée max hors-ligne** : 1 semaine de campagne terrain
+- **Stockage** : non limitant (~700 Ko pour 1 semaine à 10 fiches/jour)
+- **Intégrité** : la transactionnalité SQLite (ACID) protège contre les écritures interrompues (crash, batterie morte)
+
+### Données de référence pré-chargées
+
+Avant de partir sur le terrain, l'app doit télécharger :
+
+**Niveau 1 (indispensable)** :
+- Profil utilisateur (nom, rôle, PA affecté)
+- Liste des Postes Acridiens (id, code, nom)
+- Stations fixes du PA du prospecteur
+- Équipe (autres utilisateurs de son PA)
+
+**Niveau 2 (indispensable)** :
+- Noms de pesticides disponibles
+- Types de cultures / zones cibles
+- Codes stades d'espèces (LMC: A1-A5, NSE: L1-L7)
+
+### Gestion des conflits
+
+- **Qui tranche** : l'admin
+- **Depuis où** : interface web
+- **Comment** : choix d'une des deux versions OU fusion manuelle
+- **Archivage** : l'autre version va dans `fiche_conflict_archive`
+- Pas de rôle "superviseur" dans le système
+
+### Application mobile — rôles et écrans
+
+Chaque rôle a un dashboard adapté dans l'app mobile :
+
+| Rôle | Fiches accessibles |
+|------|---------------------|
+| `prospecteur` | Prospection extensive, Prospection intensive, Relevé météo |
+| `chef_equipe` | CRT + toutes prospections (lecture/écriture) |
+| `agent_encadreur` | CRT (lecture seule ou co-remplissage) |
+| `pilote` | Fiche de vol |
+| `mecanicien` | Fiche de vol |
+| `chef_de_base` | Tout en lecture/écriture + validation + sync status |
+| `admin` | Gestion utilisateurs + config postes acridiens + résolution conflits |
 
 ---
 
