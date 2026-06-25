@@ -511,18 +511,36 @@ export function NouvelleProspectionPage() {
               </Select>
             </div>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="date">
-                Date de prospection <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="date"
-                type="date"
-                value={dateProspection}
-                onChange={(e) => setDateProspection(e.target.value)}
-              />
+            {/* Colonne gauche : champs courts empilés (évite le couplage de
+                hauteur avec la cellule Station, plus haute car elle contient
+                deux champs). */}
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="date">
+                  Date de prospection <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={dateProspection}
+                  onChange={(e) => setDateProspection(e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="n-releve">N° relevé</Label>
+                  <Input id="n-releve" value={nReleve} onChange={(e) => setNReleve(e.target.value)} placeholder="ex: R-2026-001" />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="n-fiche">N° fiche</Label>
+                  <Input id="n-fiche" value={nFiche} onChange={(e) => setNFiche(e.target.value)} placeholder="ex: F-001" />
+                </div>
+              </div>
             </div>
 
+            {/* Colonne droite : Station fixe (recherche + liste). */}
             <div className="flex flex-col gap-2">
               <Label htmlFor="station">
                 Station fixe <span className="text-red-500">*</span>
@@ -533,7 +551,6 @@ export function NouvelleProspectionPage() {
                 value={stationSearch}
                 onChange={(e) => setStationSearch(e.target.value)}
                 placeholder="Rechercher par nom ou code..."
-                className="mb-1"
               />
               <select
                 id="station"
@@ -557,16 +574,6 @@ export function NouvelleProspectionPage() {
                   </option>
                 ))}
               </select>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="n-releve">N° relevé</Label>
-              <Input id="n-releve" value={nReleve} onChange={(e) => setNReleve(e.target.value)} placeholder="ex: R-2026-001" />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="n-fiche">N° fiche</Label>
-              <Input id="n-fiche" value={nFiche} onChange={(e) => setNFiche(e.target.value)} placeholder="ex: F-001" />
             </div>
           </div>
         </Section>

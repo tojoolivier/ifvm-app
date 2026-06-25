@@ -131,7 +131,7 @@ export function ProspectionsPage() {
   function onCampagneChange(v: string | null) { setFiltreCampagne(v ?? ''); setPage(1) }
 
   return (
-    <div className="p-6">
+    <div className="px-8 py-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Prospections intensives</h1>
         <Link to="/prospections/new" className={buttonVariants()}>
@@ -142,7 +142,7 @@ export function ProspectionsPage() {
       {/* Filtres */}
       <Card className="mb-4">
         <CardContent className="p-4 flex flex-wrap items-end gap-4">
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="filtre-statut">Statut</Label>
             <Select value={filtreStatut} onValueChange={onStatutChange}>
               <SelectTrigger id="filtre-statut" className="w-40">
@@ -157,7 +157,7 @@ export function ProspectionsPage() {
             </Select>
           </div>
 
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="filtre-campagne">Campagne</Label>
             <Select value={filtreCampagne} onValueChange={onCampagneChange}>
               <SelectTrigger id="filtre-campagne" className="w-48">
@@ -172,7 +172,7 @@ export function ProspectionsPage() {
             </Select>
           </div>
 
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="filtre-station">Station (début ID)</Label>
             <Input
               id="filtre-station"
@@ -184,7 +184,7 @@ export function ProspectionsPage() {
             />
           </div>
 
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="filtre-date">À partir du</Label>
             <Input
               id="filtre-date"
