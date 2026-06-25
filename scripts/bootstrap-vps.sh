@@ -66,13 +66,13 @@ JWT_EXPIRE_MINUTES=60
 VITE_API_URL=http://${DOMAIN}
 EOF
 
-docker compose -f docker-compose.prod.yml up -d --build
-docker compose -f docker-compose.prod.yml exec -T backend alembic upgrade head
+docker compose -f infra/docker-compose.prod.yml up -d --build
+docker compose -f infra/docker-compose.prod.yml exec -T backend alembic upgrade head
 
 # --- Backup cron ---
 apt-get install -y postgresql-client -q
 mkdir -p /var/backups/ifvm
-CRON_CMD="0 3 * * * docker compose -f $APP_DIR/docker-compose.prod.yml exec -T db pg_dump -U ifvm ifvm_db | gzip > /var/backups/ifvm/db_\$(date +\%Y\%m\%d).sql.gz"
+CRON_CMD="0 3 * * * docker compose -f $APP_DIR/infra/docker-compose.prod.yml exec -T db pg_dump -U ifvm ifvm_db | gzip > /var/backups/ifvm/db_\$(date +\%Y\%m\%d).sql.gz"
 (crontab -l 2>/dev/null | grep -v "ifvm"; echo "$CRON_CMD") | crontab -
 
 echo ""
