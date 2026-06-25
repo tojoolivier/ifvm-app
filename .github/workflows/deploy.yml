@@ -5,7 +5,6 @@ on:
     branches: [main]
 
 env:
-  VPS_IP: ${{ secrets.VPS_IP }}
   APP_DIR: /opt/app
 
 jobs:
@@ -21,8 +20,25 @@ jobs:
           host: ${{ secrets.VPS_IP }}
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: DOMAIN,POSTGRES_PASSWORD,JWT_SECRET
           script: |
             cd ${{ env.APP_DIR }}
+
+            # Mettre à jour le .env depuis les secrets GitHub
+            cat > .env <<EOF
+            POSTGRES_DB=ifvm_db
+            POSTGRES_USER=ifvm
+            POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+            JWT_SECRET=${JWT_SECRET}
+            JWT_ALGORITHM=HS256
+            JWT_EXPIRE_MINUTES=60
+            VITE_API_URL=http://${DOMAIN}
+            EOF
+
             GIT_SSH_COMMAND="ssh -i /root/.ssh/id_ed25519 -o StrictHostKeyChecking=no" git pull origin main
             docker compose -f infra/docker-compose.prod.yml up -d --build
             docker compose -f infra/docker-compose.prod.yml exec -T backend alembic upgrade head
+        env:
+          DOMAIN: ${{ secrets.DOMAIN }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
