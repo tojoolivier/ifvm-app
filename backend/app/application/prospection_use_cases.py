@@ -2,7 +2,13 @@ import uuid
 from datetime import date, datetime
 from typing import Any
 
-from app.domain.prospection import AuditLog, Prospection
+from app.domain.prospection import (
+    AuditLog,
+    Prospection,
+    ProspectionCapture,
+    ProspectionInfestation,
+    ProspectionPopulation,
+)
 from app.domain.repositories import AuditLogRepository, ProspectionRepository
 
 
@@ -35,6 +41,9 @@ class CreateProspection:
         ennemis_naturels: str | None = None,
         observations: str | None = None,
         statut: str = "brouillon",
+        populations: list[ProspectionPopulation] | None = None,
+        captures: list[ProspectionCapture] | None = None,
+        infestations: list[ProspectionInfestation] | None = None,
     ) -> Prospection:
         if type_prospection == "intensive" and station_id is None:
             raise ValueError("station_id est obligatoire pour une prospection intensive")
@@ -66,7 +75,16 @@ class CreateProspection:
             statut=statut,
             created_at=now,
             updated_at=now,
+            populations=populations or [],
+            captures=captures or [],
+            infestations=infestations or [],
         )
+        for child in prospection.populations:
+            child.prospection_id = prospection.id
+        for child in prospection.captures:
+            child.prospection_id = prospection.id
+        for child in prospection.infestations:
+            child.prospection_id = prospection.id
         return await self.repository.create(prospection)
 
 

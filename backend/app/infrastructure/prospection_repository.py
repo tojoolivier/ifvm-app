@@ -101,6 +101,53 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             created_at=prospection.created_at,
             updated_at=prospection.updated_at,
         )
+        model.populations = [
+            ProspectionPopulationModel(
+                id=p.id,
+                espece=p.espece,
+                categorie=p.categorie,
+                densite_diffuse=p.densite_diffuse,
+                densite_groupee=p.densite_groupee,
+                captures_nombre=p.captures_nombre,
+                temps_capture=p.temps_capture,
+                accouplement=p.accouplement,
+                ponte=p.ponte,
+            )
+            for p in prospection.populations
+        ]
+        model.captures = [
+            ProspectionCaptureModel(
+                id=c.id,
+                espece=c.espece,
+                categorie=c.categorie,
+                sexe=c.sexe,
+                phase=c.phase,
+                stade=c.stade,
+                effectif=c.effectif,
+            )
+            for c in prospection.captures
+        ]
+        model.infestations = [
+            ProspectionInfestationModel(
+                id=i.id,
+                espece=i.espece,
+                type_cible=i.type_cible,
+                taille_min=i.taille_min,
+                taille_max=i.taille_max,
+                taille_moy=i.taille_moy,
+                surface_tot=i.surface_tot,
+                densite_min=i.densite_min,
+                densite_max=i.densite_max,
+                densite_moy=i.densite_moy,
+                interdistance=i.interdistance,
+                comportement=i.comportement,
+                direction_de=i.direction_de,
+                direction_vers=i.direction_vers,
+                vent_de=i.vent_de,
+                vent_vitesse=i.vent_vitesse,
+            )
+            for i in prospection.infestations
+        ]
         self.session.add(model)
         try:
             await self.session.commit()

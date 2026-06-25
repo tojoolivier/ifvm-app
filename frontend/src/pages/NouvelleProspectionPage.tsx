@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
@@ -197,6 +197,11 @@ function parseNum(s: string): number | null {
   return isNaN(n) ? null : n
 }
 
+function parseInt0(s: string): number | null {
+  const n = parseInt(s, 10)
+  return isNaN(n) ? null : n
+}
+
 // ---------------------------------------------------------------------------
 // Section wrapper
 // ---------------------------------------------------------------------------
@@ -279,7 +284,8 @@ export function NouvelleProspectionPage() {
     )
   }, [campagnes])
 
-  useMemo(() => {
+  // Effet de bord : un setState ne doit pas vivre dans un useMemo (rendu impur).
+  useEffect(() => {
     if (campagnesEnCours.length === 1 && !campagneId) {
       setCampagneId(campagnesEnCours[0].id)
     }
@@ -307,6 +313,9 @@ export function NouvelleProspectionPage() {
         observations: observations || null,
         vegetation: buildVegetation(),
         sol: buildSol(),
+        captures: buildCaptures(),
+        populations: buildPopulations(),
+        infestations: buildInfestations(),
         statut: data.statut,
       }),
     onSuccess: () => {
@@ -335,10 +344,67 @@ export function NouvelleProspectionPage() {
     return { humidite: sol.humidite || null, texture: sol.texture || null }
   }
 
+  // Sérialise les captures : sexe forcé à null pour les larves (CHECK sexe IN F/M).
+  function buildCaptures() {
+    return captures.map((r) => ({
+      espece: r.espece,
+      categorie: r.categorie,
+      sexe: r.categorie === 'larve' ? null : r.sexe || null,
+      phase: r.phase,
+      stade: r.stade,
+      effectif: parseInt0(r.effectif) ?? 0,
+    }))
+  }
+
+  // N'envoie que les lignes de population réellement renseignées (évite 4 lignes vides).
+  function buildPopulations() {
+    return populations
+      .filter(
+        (r) =>
+          r.densite_diffuse ||
+          r.densite_groupee ||
+          r.captures_nombre ||
+          r.temps_capture ||
+          r.accouplement ||
+          r.ponte,
+      )
+      .map((r) => ({
+        espece: r.espece,
+        categorie: r.categorie,
+        densite_diffuse: parseNum(r.densite_diffuse),
+        densite_groupee: parseNum(r.densite_groupee),
+        captures_nombre: parseInt0(r.captures_nombre),
+        temps_capture: parseInt0(r.temps_capture),
+        accouplement: r.accouplement || null,
+        ponte: r.ponte || null,
+      }))
+  }
+
+  function buildInfestations() {
+    return infestations.map((r) => ({
+      espece: r.espece,
+      type_cible: r.type_cible,
+      taille_min: parseNum(r.taille_min),
+      taille_max: parseNum(r.taille_max),
+      taille_moy: parseNum(r.taille_moy),
+      surface_tot: parseNum(r.surface_tot),
+      densite_min: parseNum(r.densite_min),
+      densite_max: parseNum(r.densite_max),
+      densite_moy: parseNum(r.densite_moy),
+      interdistance: parseNum(r.interdistance),
+      comportement: r.comportement || null,
+      direction_de: r.direction_de || null,
+      direction_vers: r.direction_vers || null,
+      vent_de: r.vent_de || null,
+      vent_vitesse: parseNum(r.vent_vitesse),
+    }))
+  }
+
   function validate(): boolean {
     const errs: string[] = []
     if (!campagneId) errs.push('La campagne est obligatoire.')
     if (!dateProspection) errs.push('La date est obligatoire.')
+    if (!stationId) errs.push('La station fixe est obligatoire pour une prospection intensive.')
     setErrors(errs)
     return errs.length === 0
   }
@@ -403,7 +469,7 @@ export function NouvelleProspectionPage() {
   const isPending = mutation.isPending
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="px-8 py-6 max-w-4xl mx-auto">
       <div className="flex items-center gap-4 mb-6">
         <button
           onClick={() => navigate('/prospections')}
@@ -426,7 +492,7 @@ export function NouvelleProspectionPage() {
         {/* Section 1 : Informations générales */}
         <Section title="1. Informations générales">
           <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2 flex flex-col gap-1">
+            <div className="col-span-2 flex flex-col gap-2">
               <Label htmlFor="campagne">
                 Campagne <span className="text-red-500">*</span>
               </Label>
@@ -445,7 +511,7 @@ export function NouvelleProspectionPage() {
               </Select>
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="date">
                 Date de prospection <span className="text-red-500">*</span>
               </Label>
@@ -457,8 +523,10 @@ export function NouvelleProspectionPage() {
               />
             </div>
 
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="station">Station fixe</Label>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="station">
+                Station fixe <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="station-search"
                 type="text"
@@ -491,12 +559,12 @@ export function NouvelleProspectionPage() {
               </select>
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="n-releve">N° relevé</Label>
               <Input id="n-releve" value={nReleve} onChange={(e) => setNReleve(e.target.value)} placeholder="ex: R-2026-001" />
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="n-fiche">N° fiche</Label>
               <Input id="n-fiche" value={nFiche} onChange={(e) => setNFiche(e.target.value)} placeholder="ex: F-001" />
             </div>
@@ -506,27 +574,27 @@ export function NouvelleProspectionPage() {
         {/* Section 2 : Localisation */}
         <Section title="2. Localisation">
           <div className="grid grid-cols-3 gap-4">
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="lat">Latitude</Label>
               <Input id="lat" type="number" step="any" value={latitude} onChange={(e) => setLatitude(e.target.value)} placeholder="-20.1234" />
             </div>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="lon">Longitude</Label>
               <Input id="lon" type="number" step="any" value={longitude} onChange={(e) => setLongitude(e.target.value)} placeholder="44.5678" />
             </div>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="alt">Altitude (m)</Label>
               <Input id="alt" type="number" value={altitude} onChange={(e) => setAltitude(e.target.value)} placeholder="ex: 850" />
             </div>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="surf-station">Surface station (ha)</Label>
               <Input id="surf-station" type="number" step="any" value={surfStation} onChange={(e) => setSurfStation(e.target.value)} />
             </div>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="surf-prospectee">Surface prospectée (ha)</Label>
               <Input id="surf-prospectee" type="number" step="any" value={surfProspectee} onChange={(e) => setSurfProspectee(e.target.value)} />
             </div>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="surf-infestee">Surface infestée (ha)</Label>
               <Input id="surf-infestee" type="number" step="any" value={surfInfestee} onChange={(e) => setSurfInfestee(e.target.value)} />
             </div>
@@ -702,7 +770,7 @@ export function NouvelleProspectionPage() {
                 </button>
                 <p className="text-xs font-medium mb-3 text-muted-foreground">Infestation #{idx + 1}</p>
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-2">
                     <Label>Espèce</Label>
                     <Select value={row.espece} onValueChange={(v) => updateInfestation(row.id, 'espece', v ?? '')}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
@@ -712,7 +780,7 @@ export function NouvelleProspectionPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-2">
                     <Label>Type</Label>
                     <Select value={row.type_cible} onValueChange={(v) => updateInfestation(row.id, 'type_cible', v ?? '')}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
@@ -721,7 +789,7 @@ export function NouvelleProspectionPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-2">
                     <Label>Comportement</Label>
                     <Select value={row.comportement} onValueChange={(v) => updateInfestation(row.id, 'comportement', v ?? '')}>
                       <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
@@ -731,51 +799,51 @@ export function NouvelleProspectionPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-2">
                     <Label>Taille min (ha)</Label>
                     <Input type="number" step="any" value={row.taille_min} onChange={(e) => updateInfestation(row.id, 'taille_min', e.target.value)} />
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-2">
                     <Label>Taille moy (ha)</Label>
                     <Input type="number" step="any" value={row.taille_moy} onChange={(e) => updateInfestation(row.id, 'taille_moy', e.target.value)} />
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-2">
                     <Label>Taille max (ha)</Label>
                     <Input type="number" step="any" value={row.taille_max} onChange={(e) => updateInfestation(row.id, 'taille_max', e.target.value)} />
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-2">
                     <Label>Surface tot. (ha)</Label>
                     <Input type="number" step="any" value={row.surface_tot} onChange={(e) => updateInfestation(row.id, 'surface_tot', e.target.value)} />
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-2">
                     <Label>Densité min</Label>
                     <Input type="number" step="any" value={row.densite_min} onChange={(e) => updateInfestation(row.id, 'densite_min', e.target.value)} />
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-2">
                     <Label>Densité moy</Label>
                     <Input type="number" step="any" value={row.densite_moy} onChange={(e) => updateInfestation(row.id, 'densite_moy', e.target.value)} />
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-2">
                     <Label>Densité max</Label>
                     <Input type="number" step="any" value={row.densite_max} onChange={(e) => updateInfestation(row.id, 'densite_max', e.target.value)} />
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-2">
                     <Label>Interdistance (m)</Label>
                     <Input type="number" step="any" value={row.interdistance} onChange={(e) => updateInfestation(row.id, 'interdistance', e.target.value)} />
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-2">
                     <Label>Direction de</Label>
                     <Input value={row.direction_de} onChange={(e) => updateInfestation(row.id, 'direction_de', e.target.value)} placeholder="ex: N, NE…" />
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-2">
                     <Label>Direction vers</Label>
                     <Input value={row.direction_vers} onChange={(e) => updateInfestation(row.id, 'direction_vers', e.target.value)} placeholder="ex: S, SW…" />
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-2">
                     <Label>Vent de</Label>
                     <Input value={row.vent_de} onChange={(e) => updateInfestation(row.id, 'vent_de', e.target.value)} placeholder="ex: N" />
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-2">
                     <Label>Vitesse vent (km/h)</Label>
                     <Input type="number" step="any" value={row.vent_vitesse} onChange={(e) => updateInfestation(row.id, 'vent_vitesse', e.target.value)} />
                   </div>
@@ -838,7 +906,7 @@ export function NouvelleProspectionPage() {
         {/* Section 7 : Sol */}
         <Section title="7. Sol">
           <div className="grid grid-cols-2 gap-4 max-w-sm">
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2">
               <Label>Humidité du sol</Label>
               <Select value={sol.humidite} onValueChange={(v) => setSol((s) => ({ ...s, humidite: v ?? '' }))}>
                 <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
@@ -847,7 +915,7 @@ export function NouvelleProspectionPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2">
               <Label>Texture du sol</Label>
               <Select value={sol.texture} onValueChange={(v) => setSol((s) => ({ ...s, texture: v ?? '' }))}>
                 <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
@@ -862,7 +930,7 @@ export function NouvelleProspectionPage() {
         {/* Section 8 : Conditions environnementales */}
         <Section title="8. Conditions environnementales">
           <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="degats">Dégâts cultures</Label>
               <Select value={degats} onValueChange={(v) => setDegats(v ?? '')}>
                 <SelectTrigger id="degats"><SelectValue placeholder="—" /></SelectTrigger>
@@ -874,19 +942,19 @@ export function NouvelleProspectionPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="derniere-pluie">Dernière pluie</Label>
               <Input id="derniere-pluie" type="date" value={dernieresPluies} onChange={(e) => setDernieresPluies(e.target.value)} />
             </div>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="intensite-pluie">Intensité pluie</Label>
               <Input id="intensite-pluie" value={intensitePluie} onChange={(e) => setIntensitePluie(e.target.value)} placeholder="ex: forte, faible…" />
             </div>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="ennemis">Ennemis naturels</Label>
               <Input id="ennemis" value={ennemis} onChange={(e) => setEnnemis(e.target.value)} placeholder="ex: parasites, prédateurs…" />
             </div>
-            <div className="col-span-2 flex flex-col gap-1">
+            <div className="col-span-2 flex flex-col gap-2">
               <Label htmlFor="observations">Observations</Label>
               <textarea
                 id="observations"

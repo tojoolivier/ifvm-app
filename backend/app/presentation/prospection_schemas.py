@@ -49,6 +49,44 @@ class InfestationRead(BaseModel):
     vent_vitesse: float | None
 
 
+class PopulationCreate(BaseModel):
+    espece: str
+    categorie: str
+    densite_diffuse: float | None = None
+    densite_groupee: float | None = None
+    captures_nombre: int | None = None
+    temps_capture: int | None = None
+    accouplement: str | None = None
+    ponte: str | None = None
+
+
+class CaptureCreate(BaseModel):
+    espece: str
+    categorie: str
+    sexe: str | None = None
+    phase: str
+    stade: str
+    effectif: int = 0
+
+
+class InfestationCreate(BaseModel):
+    espece: str | None = None
+    type_cible: str
+    taille_min: float | None = None
+    taille_max: float | None = None
+    taille_moy: float | None = None
+    surface_tot: float | None = None
+    densite_min: float | None = None
+    densite_max: float | None = None
+    densite_moy: float | None = None
+    interdistance: float | None = None
+    comportement: str | None = None
+    direction_de: str | None = None
+    direction_vers: str | None = None
+    vent_de: str | None = None
+    vent_vitesse: float | None = None
+
+
 class ProspectionCreate(BaseModel):
     type_prospection: str
     campagne_id: uuid.UUID
@@ -72,6 +110,9 @@ class ProspectionCreate(BaseModel):
     ennemis_naturels: str | None = None
     observations: str | None = None
     statut: str = "brouillon"
+    populations: list[PopulationCreate] = []
+    captures: list[CaptureCreate] = []
+    infestations: list[InfestationCreate] = []
 
 
 class ProspectionUpdate(BaseModel):

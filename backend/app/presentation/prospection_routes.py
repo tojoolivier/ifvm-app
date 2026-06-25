@@ -16,6 +16,11 @@ from app.application.prospection_use_cases import (
 )
 from app.auth import get_current_user
 from app.database import get_db
+from app.domain.prospection import (
+    ProspectionCapture,
+    ProspectionInfestation,
+    ProspectionPopulation,
+)
 from app.domain.referentiel import StationNotFoundError
 from app.infrastructure.audit_log_repository import AuditLogRepositoryImpl
 from app.infrastructure.prospection_repository import ProspectionRepositoryImpl
@@ -90,6 +95,9 @@ async def create_prospection(
             ennemis_naturels=body.ennemis_naturels,
             observations=body.observations,
             statut=body.statut,
+            populations=[ProspectionPopulation(**p.model_dump()) for p in body.populations],
+            captures=[ProspectionCapture(**c.model_dump()) for c in body.captures],
+            infestations=[ProspectionInfestation(**i.model_dump()) for i in body.infestations],
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))

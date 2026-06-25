@@ -26,6 +26,52 @@ async def test_create_prospection_intensive(
 
 
 @pytest.mark.asyncio
+async def test_create_prospection_intensive_avec_sections(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+):
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "intensive",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-06-25",
+            "captures": [
+                {
+                    "espece": "LMC",
+                    "categorie": "larve",
+                    "sexe": None,
+                    "phase": "solitaire",
+                    "stade": "A1",
+                    "effectif": 12,
+                }
+            ],
+            "populations": [
+                {
+                    "espece": "LMC",
+                    "categorie": "imago",
+                    "densite_diffuse": 3.5,
+                    "accouplement": "rare",
+                }
+            ],
+            "infestations": [
+                {"espece": "NSE", "type_cible": "tache_larvaire", "surface_tot": 2.0}
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert len(data["captures"]) == 1
+    assert data["captures"][0]["effectif"] == 12
+    assert data["captures"][0]["sexe"] is None
+    assert len(data["populations"]) == 1
+    assert data["populations"][0]["densite_diffuse"] == 3.5
+    assert len(data["infestations"]) == 1
+    assert data["infestations"][0]["type_cible"] == "tache_larvaire"
+
+
+@pytest.mark.asyncio
 async def test_create_intensive_sans_station_id_echoue(
     client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
 ):
