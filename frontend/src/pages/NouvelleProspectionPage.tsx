@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { FormField } from '@/components/ui/form-field'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Stepper } from '@/components/ui/stepper'
 import {
   Select,
   SelectTrigger,
@@ -90,6 +91,13 @@ const TEXTURE_SOL = [
   { value: 'limoneux_argileux', label: 'Limoneux-argileux' },
   { value: 'argileux', label: 'Argileux' },
   { value: 'caillouteux', label: 'Caillouteux' },
+]
+
+const STEPS = [
+  { label: 'Général & Localisation' },
+  { label: 'Captures & Population' },
+  { label: 'Infestation, Végétation & Sol' },
+  { label: 'Conditions & Récap.' },
 ]
 
 // ---------------------------------------------------------------------------
@@ -309,6 +317,12 @@ export function NouvelleProspectionPage() {
   const lastSnapshotRef = useRef('')
   const isSubmittedRef = useRef(false)
 
+  // Stepper
+  const [currentStep, setCurrentStep] = useState(1)
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set())
+  const stepHeadingRef = useRef<HTMLHeadingElement>(null)
+  const stepChangedRef = useRef(false)
+
   // --- données ---
   const { data: campagnes = [] } = useQuery<Campagne[]>({
     queryKey: ['campagnes'],
@@ -339,7 +353,6 @@ export function NouvelleProspectionPage() {
     )
   }, [campagnes])
 
-  // Effet de bord : un setState ne doit pas vivre dans un useMemo (rendu impur).
   useEffect(() => {
     if (campagnesEnCours.length === 1 && !campagneId) {
       setCampagneId(campagnesEnCours[0].id)
@@ -363,6 +376,12 @@ export function NouvelleProspectionPage() {
       return rest
     })
   }, [campagneId, campagnes])
+
+  // Déplacer le focus vers le heading de l'étape après navigation
+  useEffect(() => {
+    if (!stepChangedRef.current) return
+    stepHeadingRef.current?.focus()
+  }, [currentStep])
 
   const mutation = useMutation({
     mutationFn: (data: { statut: string }) =>
@@ -475,6 +494,7 @@ export function NouvelleProspectionPage() {
     }))
   }
 
+  // Validation finale (soumission) — tous les champs du formulaire.
   function validate(): boolean {
     const formValues = {
       campagne_id: campagneId,
@@ -512,6 +532,74 @@ export function NouvelleProspectionPage() {
     setFieldErrors(errs)
     setErrors(summary)
     return summary.length === 0
+  }
+
+  // Validation par étape — ne vérifie que les champs de l'étape courante.
+  function validateStep(step: number): boolean {
+    const errs: Record<string, string> = {}
+
+    if (step === 1) {
+      if (!campagneId) errs.campagne_id = 'La campagne est obligatoire.'
+      if (!dateProspection) errs.date_prospection = 'La date est obligatoire.'
+      if (!stationId) errs.station_id = 'La station fixe est obligatoire pour une prospection intensive.'
+
+      if (campagneId && dateProspection) {
+        const campagne = campagnes.find((c) => c.id === campagneId)
+        if (campagne) {
+          if (dateProspection < campagne.start_date) {
+            errs.date_prospection = `La date est antérieure au début de la campagne (${campagne.start_date}).`
+          } else if (campagne.end_date && dateProspection > campagne.end_date) {
+            errs.date_prospection = `La date est postérieure à la fin de la campagne (${campagne.end_date}).`
+          }
+        }
+      }
+
+      if (latitude) {
+        const lat = parseFloat(latitude)
+        if (isNaN(lat) || lat < -90 || lat > 90) errs.latitude = 'La latitude doit être comprise entre -90 et 90.'
+      }
+      if (longitude) {
+        const lon = parseFloat(longitude)
+        if (isNaN(lon) || lon < -180 || lon > 180) errs.longitude = 'La longitude doit être comprise entre -180 et 180.'
+      }
+      if (altitude) {
+        const alt = parseFloat(altitude)
+        if (isNaN(alt) || alt < 0) errs.altitude = "L'altitude doit être un nombre positif."
+      }
+      const sp = surfProspectee ? parseFloat(surfProspectee) : null
+      const ss = surfStation ? parseFloat(surfStation) : null
+      const si = surfInfestee ? parseFloat(surfInfestee) : null
+      if (sp !== null && ss !== null && sp > ss)
+        errs.surf_prospectee = 'La surface prospectée ne peut pas dépasser la surface de la station.'
+      if (si !== null && sp !== null && si > sp)
+        errs.surf_infestee = 'La surface infestée ne peut pas dépasser la surface prospectée.'
+    } else if (step === 2) {
+      const hasCapture = captures.some((c) => parseInt(c.effectif, 10) > 0)
+      if (!hasCapture) errs.captures = 'Au moins une capture avec un effectif supérieur à 0 est requise.'
+    }
+    // Étapes 3 : tout optionnel, aucun blocage.
+
+    setFieldErrors(errs)
+    setErrors(Object.values(errs))
+    return Object.keys(errs).length === 0
+  }
+
+  function goToStep(step: number) {
+    stepChangedRef.current = true
+    setCurrentStep(step)
+    setErrors([])
+    setFieldErrors({})
+  }
+
+  function handleNext() {
+    const valid = validateStep(currentStep)
+    if (!valid) return
+    setCompletedSteps((prev) => { const s = new Set(prev); s.add(currentStep); return s })
+    goToStep(currentStep + 1)
+  }
+
+  function handlePrev() {
+    goToStep(currentStep - 1)
   }
 
   function applyDraft(draft: ProspectionDraftData) {
@@ -560,7 +648,6 @@ export function NouvelleProspectionPage() {
       prev.map((r) => {
         if (r.id !== id) return r
         const updated = { ...r, [field]: value }
-        // Réinitialiser le stade si l'espèce ou la catégorie change
         if (field === 'espece' || field === 'categorie') {
           const stades = getStades(
             field === 'espece' ? value : r.espece,
@@ -639,655 +726,803 @@ export function NouvelleProspectionPage() {
     currentLocation.pathname !== nextLocation.pathname,
   )
 
+  // Lookup helpers pour le récapitulatif
+  const campagneLabel = campagnes.find((c) => c.id === campagneId)?.name ?? '—'
+  const stationObj = stations.find((s) => s.id === stationId)
+  const stationLabel = stationObj ? `${stationObj.code} — ${stationObj.nom}` : '—'
+  const totalEffectif = captures.reduce((sum, c) => sum + (parseInt(c.effectif, 10) || 0), 0)
+  const stratesRenseignees = Object.values(vegetation).filter((v) => v.recouvrement).length
+
   return (
     <>
-    <div className="px-8 py-6 max-w-4xl mx-auto">
-      <div className="flex items-center gap-4 mb-6">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/prospections')}>
-          ← Retour
-        </Button>
-        <h1 className="text-2xl font-bold">Nouvelle fiche de prospection intensive</h1>
-        {lastSavedAt && (
-          <span className="ml-auto text-xs text-muted-foreground">
-            Brouillon sauvegardé à {lastSavedAt}
-          </span>
-        )}
-      </div>
+      <a
+        href="#step-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:shadow"
+      >
+        Aller au contenu
+      </a>
 
-      {storedDraft && !draftDismissed && (
-        <div className="mb-4 flex items-center justify-between rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-          <span>
-            Un brouillon du{' '}
-            {new Date(storedDraft.savedAt).toLocaleDateString('fr-FR')} à{' '}
-            {new Date(storedDraft.savedAt).toLocaleTimeString('fr-FR', {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}{' '}
-            existe.
-          </span>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                applyDraft(storedDraft)
-                setDraftDismissed(true)
-              }}
-            >
-              Reprendre
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                localStorage.removeItem(DRAFT_KEY)
-                setDraftDismissed(true)
-              }}
-            >
-              Commencer à zéro
-            </Button>
-          </div>
+      <div className="px-8 py-6 max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-6">
+          <Button variant="ghost" size="sm" onClick={() => navigate('/prospections')}>
+            ← Retour
+          </Button>
+          <h1 className="text-2xl font-bold">Nouvelle fiche de prospection intensive</h1>
+          {lastSavedAt && (
+            <span className="ml-auto text-xs text-muted-foreground">
+              Brouillon sauvegardé à {lastSavedAt}
+            </span>
+          )}
         </div>
-      )}
 
-      {errors.length > 0 && (
-        <div className="mb-4 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
-          <ul className="list-disc list-inside space-y-1">
-            {errors.map((e) => <li key={e}>{e}</li>)}
-          </ul>
-        </div>
-      )}
-
-      <div className="space-y-6">
-        {/* Section 1 : Informations générales */}
-        <Section title="1. Informations générales">
-          <div className="grid grid-cols-2 gap-4">
-            <FormField
-              label="Campagne"
-              required
-              error={fieldErrors.campagne_id}
-              className="col-span-2"
-              fieldId="campagne"
-            >
-              <Select value={campagneId} onValueChange={(v) => setCampagneId(v ?? '')}>
-                <SelectTrigger
-                  id="campagne"
-                  aria-describedby={fieldErrors.campagne_id ? 'campagne-error' : undefined}
-                >
-                  <SelectValue placeholder="Sélectionner une campagne" />
-                </SelectTrigger>
-                <SelectContent>
-                  {campagnes.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                      {campagnesEnCours.some((e) => e.id === c.id) && ' (en cours)'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FormField>
-
-            {/* Colonne gauche : champs courts empilés (évite le couplage de
-                hauteur avec la cellule Station, plus haute car elle contient
-                deux champs). */}
-            <div className="flex flex-col gap-4">
-              <FormField label="Date de prospection" required error={fieldErrors.date_prospection}>
-                <Input
-                  id="date"
-                  type="date"
-                  value={dateProspection}
-                  onChange={(e) => setDateProspection(e.target.value)}
-                  aria-describedby={fieldErrors.date_prospection ? 'date-error' : undefined}
-                />
-              </FormField>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="n-releve">N° relevé</Label>
-                  <Input id="n-releve" value={nReleve} onChange={(e) => setNReleve(e.target.value)} placeholder="ex: R-2026-001" />
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="n-fiche">N° fiche</Label>
-                  <Input id="n-fiche" value={nFiche} onChange={(e) => setNFiche(e.target.value)} placeholder="ex: F-001" />
-                </div>
-              </div>
-            </div>
-
-            {/* Colonne droite : Station fixe (recherche + liste). */}
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="station">
-                Station fixe <span aria-hidden="true"> *</span>
-              </Label>
-              <Input
-                id="station-search"
-                type="text"
-                value={stationSearch}
-                onChange={(e) => setStationSearch(e.target.value)}
-                placeholder="Rechercher par nom ou code..."
-              />
-              <Select
-                value={stationId}
-                onValueChange={(v) => {
-                  const id = v ?? ''
-                  setStationId(id)
-                  const station = stations.find((s) => s.id === id)
-                  if (station) {
-                    setLatitude(String(station.latitude))
-                    setLongitude(String(station.longitude))
-                    setAltitude(station.altitude != null ? String(station.altitude) : '')
-                  }
+        {/* Bannière de restauration de brouillon */}
+        {storedDraft && !draftDismissed && (
+          <div className="mb-4 flex items-center justify-between rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+            <span>
+              Un brouillon du{' '}
+              {new Date(storedDraft.savedAt).toLocaleDateString('fr-FR')} à{' '}
+              {new Date(storedDraft.savedAt).toLocaleTimeString('fr-FR', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}{' '}
+              existe.
+            </span>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  applyDraft(storedDraft)
+                  setDraftDismissed(true)
                 }}
               >
-                <SelectTrigger
-                  id="station"
-                  aria-describedby={fieldErrors.station_id ? 'station-error' : undefined}
-                >
-                  <SelectValue placeholder="— Choisir une station —" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">— Choisir une station —</SelectItem>
-                  {filteredStations.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.code} — {s.nom} ({s.pa_code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {fieldErrors.station_id && (
-                <p id="station-error" role="alert" aria-live="polite" className="text-sm text-destructive">
-                  {fieldErrors.station_id}
-                </p>
-              )}
+                Reprendre
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  localStorage.removeItem(DRAFT_KEY)
+                  setDraftDismissed(true)
+                }}
+              >
+                Commencer à zéro
+              </Button>
             </div>
           </div>
-        </Section>
+        )}
 
-        {/* Section 2 : Localisation */}
-        <Section title="2. Localisation">
-          <div className="grid grid-cols-3 gap-4">
-            <FormField label="Latitude" error={fieldErrors.latitude}>
-              <Input
-                id="lat"
-                type="number"
-                step="any"
-                value={latitude}
-                onChange={(e) => setLatitude(e.target.value)}
-                placeholder="-20.1234"
-                aria-describedby={fieldErrors.latitude ? 'lat-error' : undefined}
-              />
-            </FormField>
-            <FormField label="Longitude" error={fieldErrors.longitude}>
-              <Input
-                id="lon"
-                type="number"
-                step="any"
-                value={longitude}
-                onChange={(e) => setLongitude(e.target.value)}
-                placeholder="44.5678"
-                aria-describedby={fieldErrors.longitude ? 'lon-error' : undefined}
-              />
-            </FormField>
-            <FormField label="Altitude (m)" error={fieldErrors.altitude}>
-              <Input
-                id="alt"
-                type="number"
-                value={altitude}
-                onChange={(e) => setAltitude(e.target.value)}
-                placeholder="ex: 850"
-                aria-describedby={fieldErrors.altitude ? 'alt-error' : undefined}
-              />
-            </FormField>
-            <FormField label="Surface station (ha)" error={fieldErrors.surf_station}>
-              <Input
-                id="surf-station"
-                type="number"
-                step="any"
-                value={surfStation}
-                onChange={(e) => setSurfStation(e.target.value)}
-              />
-            </FormField>
-            <FormField label="Surface prospectée (ha)" error={fieldErrors.surf_prospectee}>
-              <Input
-                id="surf-prospectee"
-                type="number"
-                step="any"
-                value={surfProspectee}
-                onChange={(e) => setSurfProspectee(e.target.value)}
-                aria-describedby={fieldErrors.surf_prospectee ? 'surf-prospectee-error' : undefined}
-              />
-            </FormField>
-            <FormField label="Surface infestée (ha)" error={fieldErrors.surf_infestee}>
-              <Input
-                id="surf-infestee"
-                type="number"
-                step="any"
-                value={surfInfestee}
-                onChange={(e) => setSurfInfestee(e.target.value)}
-                aria-describedby={fieldErrors.surf_infestee ? 'surf-infestee-error' : undefined}
-              />
-            </FormField>
+        {/* Barre de progression */}
+        <Stepper
+          steps={STEPS}
+          current={currentStep}
+          completed={completedSteps}
+          onStepClick={goToStep}
+        />
+
+        {/* Heading de l'étape (cible du focus après navigation) */}
+        <h2
+          ref={stepHeadingRef}
+          tabIndex={-1}
+          className="sr-only focus:not-sr-only focus:mb-4 focus:text-lg focus:font-semibold focus:outline-none"
+        >
+          Étape {currentStep} sur {STEPS.length} — {STEPS[currentStep - 1].label}
+        </h2>
+
+        {/* Erreurs de l'étape courante */}
+        {errors.length > 0 && (
+          <div className="mb-4 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+            <ul className="list-disc list-inside space-y-1">
+              {errors.map((e) => <li key={e}>{e}</li>)}
+            </ul>
           </div>
-        </Section>
+        )}
 
-        {/* Section 3 : Captures */}
-        <Section title="3. Captures">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left">
-                  <th className="pb-2 pr-2 font-medium">Espèce</th>
-                  <th className="pb-2 pr-2 font-medium">Catégorie</th>
-                  <th className="pb-2 pr-2 font-medium">Stade</th>
-                  <th className="pb-2 pr-2 font-medium">Sexe</th>
-                  <th className="pb-2 pr-2 font-medium">Phase</th>
-                  <th className="pb-2 pr-2 font-medium">Effectif</th>
-                  <th className="pb-2 font-medium" />
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {captures.map((row) => {
-                  const stades = getStades(row.espece, row.categorie)
-                  return (
-                    <tr key={row.id} className="py-1">
-                      <td className="pr-2 py-1">
-                        <Select value={row.espece} onValueChange={(v) => updateCapture(row.id, 'espece', v ?? '')}>
-                          <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="LMC">LMC</SelectItem>
-                            <SelectItem value="NSE">NSE</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="pr-2 py-1">
-                        <Select value={row.categorie} onValueChange={(v) => updateCapture(row.id, 'categorie', v ?? '')}>
-                          <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="imago">Imago</SelectItem>
-                            <SelectItem value="larve">Larve</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="pr-2 py-1">
-                        <Select value={row.stade} onValueChange={(v) => updateCapture(row.id, 'stade', v ?? '')}>
-                          <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {stades.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="pr-2 py-1">
-                        <Select
-                          value={row.sexe}
-                          onValueChange={(v) => updateCapture(row.id, 'sexe', v ?? '')}
-                          disabled={row.categorie === 'larve'}
+        {/* Contenu de l'étape */}
+        <div id="step-content">
+
+          {/* ── Étape 1 : Informations générales + Localisation ── */}
+          {currentStep === 1 && (
+            <div role="group" aria-label="Étape 1 sur 4 : Informations générales et localisation">
+              <div className="space-y-6">
+                <Section title="1. Informations générales">
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      label="Campagne"
+                      required
+                      error={fieldErrors.campagne_id}
+                      className="col-span-2"
+                      fieldId="campagne"
+                    >
+                      <Select value={campagneId} onValueChange={(v) => setCampagneId(v ?? '')}>
+                        <SelectTrigger
+                          id="campagne"
+                          aria-describedby={fieldErrors.campagne_id ? 'campagne-error' : undefined}
                         >
-                          <SelectTrigger className="w-16"><SelectValue placeholder="—" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="M">M</SelectItem>
-                            <SelectItem value="F">F</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="pr-2 py-1">
-                        <Select value={row.phase} onValueChange={(v) => updateCapture(row.id, 'phase', v ?? '')}>
-                          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {PHASES.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="pr-2 py-1">
+                          <SelectValue placeholder="Sélectionner une campagne" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {campagnes.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.name}
+                              {campagnesEnCours.some((e) => e.id === c.id) && ' (en cours)'}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormField>
+
+                    <div className="flex flex-col gap-4">
+                      <FormField label="Date de prospection" required error={fieldErrors.date_prospection}>
                         <Input
-                          type="number"
-                          min={0}
-                          className="w-20"
-                          value={row.effectif}
-                          onChange={(e) => updateCapture(row.id, 'effectif', e.target.value)}
+                          id="date"
+                          type="date"
+                          value={dateProspection}
+                          onChange={(e) => setDateProspection(e.target.value)}
+                          aria-describedby={fieldErrors.date_prospection ? 'date-error' : undefined}
                         />
-                      </td>
-                      <td className="py-1">
+                      </FormField>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-2">
+                          <Label htmlFor="n-releve">N° relevé</Label>
+                          <Input id="n-releve" value={nReleve} onChange={(e) => setNReleve(e.target.value)} placeholder="ex: R-2026-001" />
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <Label htmlFor="n-fiche">N° fiche</Label>
+                          <Input id="n-fiche" value={nFiche} onChange={(e) => setNFiche(e.target.value)} placeholder="ex: F-001" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="station">
+                        Station fixe <span aria-hidden="true"> *</span>
+                      </Label>
+                      <Input
+                        id="station-search"
+                        type="text"
+                        value={stationSearch}
+                        onChange={(e) => setStationSearch(e.target.value)}
+                        placeholder="Rechercher par nom ou code..."
+                      />
+                      <Select
+                        value={stationId}
+                        onValueChange={(v) => {
+                          const id = v ?? ''
+                          setStationId(id)
+                          const station = stations.find((s) => s.id === id)
+                          if (station) {
+                            setLatitude(String(station.latitude))
+                            setLongitude(String(station.longitude))
+                            setAltitude(station.altitude != null ? String(station.altitude) : '')
+                          }
+                        }}
+                      >
+                        <SelectTrigger
+                          id="station"
+                          aria-describedby={fieldErrors.station_id ? 'station-error' : undefined}
+                        >
+                          <SelectValue placeholder="— Choisir une station —" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">— Choisir une station —</SelectItem>
+                          {filteredStations.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.code} — {s.nom} ({s.pa_code})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {fieldErrors.station_id && (
+                        <p id="station-error" role="alert" aria-live="polite" className="text-sm text-destructive">
+                          {fieldErrors.station_id}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </Section>
+
+                <Section title="2. Localisation">
+                  <div className="grid grid-cols-3 gap-4">
+                    <FormField label="Latitude" error={fieldErrors.latitude}>
+                      <Input
+                        id="lat"
+                        type="number"
+                        step="any"
+                        value={latitude}
+                        onChange={(e) => setLatitude(e.target.value)}
+                        placeholder="-20.1234"
+                        aria-describedby={fieldErrors.latitude ? 'lat-error' : undefined}
+                      />
+                    </FormField>
+                    <FormField label="Longitude" error={fieldErrors.longitude}>
+                      <Input
+                        id="lon"
+                        type="number"
+                        step="any"
+                        value={longitude}
+                        onChange={(e) => setLongitude(e.target.value)}
+                        placeholder="44.5678"
+                        aria-describedby={fieldErrors.longitude ? 'lon-error' : undefined}
+                      />
+                    </FormField>
+                    <FormField label="Altitude (m)" error={fieldErrors.altitude}>
+                      <Input
+                        id="alt"
+                        type="number"
+                        value={altitude}
+                        onChange={(e) => setAltitude(e.target.value)}
+                        placeholder="ex: 850"
+                        aria-describedby={fieldErrors.altitude ? 'alt-error' : undefined}
+                      />
+                    </FormField>
+                    <FormField label="Surface station (ha)" error={fieldErrors.surf_station}>
+                      <Input
+                        id="surf-station"
+                        type="number"
+                        step="any"
+                        value={surfStation}
+                        onChange={(e) => setSurfStation(e.target.value)}
+                      />
+                    </FormField>
+                    <FormField label="Surface prospectée (ha)" error={fieldErrors.surf_prospectee}>
+                      <Input
+                        id="surf-prospectee"
+                        type="number"
+                        step="any"
+                        value={surfProspectee}
+                        onChange={(e) => setSurfProspectee(e.target.value)}
+                        aria-describedby={fieldErrors.surf_prospectee ? 'surf-prospectee-error' : undefined}
+                      />
+                    </FormField>
+                    <FormField label="Surface infestée (ha)" error={fieldErrors.surf_infestee}>
+                      <Input
+                        id="surf-infestee"
+                        type="number"
+                        step="any"
+                        value={surfInfestee}
+                        onChange={(e) => setSurfInfestee(e.target.value)}
+                        aria-describedby={fieldErrors.surf_infestee ? 'surf-infestee-error' : undefined}
+                      />
+                    </FormField>
+                  </div>
+                </Section>
+              </div>
+            </div>
+          )}
+
+          {/* ── Étape 2 : Captures + Population acridienne ── */}
+          {currentStep === 2 && (
+            <div role="group" aria-label="Étape 2 sur 4 : Captures et population acridienne">
+              <div className="space-y-6">
+                <Section title="3. Captures">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left">
+                          <th className="pb-2 pr-2 font-medium">Espèce</th>
+                          <th className="pb-2 pr-2 font-medium">Catégorie</th>
+                          <th className="pb-2 pr-2 font-medium">Stade</th>
+                          <th className="pb-2 pr-2 font-medium">Sexe</th>
+                          <th className="pb-2 pr-2 font-medium">Phase</th>
+                          <th className="pb-2 pr-2 font-medium">Effectif</th>
+                          <th className="pb-2 font-medium" />
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {captures.map((row) => {
+                          const stades = getStades(row.espece, row.categorie)
+                          return (
+                            <tr key={row.id} className="py-1">
+                              <td className="pr-2 py-1">
+                                <Select value={row.espece} onValueChange={(v) => updateCapture(row.id, 'espece', v ?? '')}>
+                                  <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="LMC">LMC</SelectItem>
+                                    <SelectItem value="NSE">NSE</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </td>
+                              <td className="pr-2 py-1">
+                                <Select value={row.categorie} onValueChange={(v) => updateCapture(row.id, 'categorie', v ?? '')}>
+                                  <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="imago">Imago</SelectItem>
+                                    <SelectItem value="larve">Larve</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </td>
+                              <td className="pr-2 py-1">
+                                <Select value={row.stade} onValueChange={(v) => updateCapture(row.id, 'stade', v ?? '')}>
+                                  <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    {stades.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                              </td>
+                              <td className="pr-2 py-1">
+                                <Select
+                                  value={row.sexe}
+                                  onValueChange={(v) => updateCapture(row.id, 'sexe', v ?? '')}
+                                  disabled={row.categorie === 'larve'}
+                                >
+                                  <SelectTrigger className="w-16"><SelectValue placeholder="—" /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="M">M</SelectItem>
+                                    <SelectItem value="F">F</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </td>
+                              <td className="pr-2 py-1">
+                                <Select value={row.phase} onValueChange={(v) => updateCapture(row.id, 'phase', v ?? '')}>
+                                  <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    {PHASES.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                              </td>
+                              <td className="pr-2 py-1">
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  className="w-20"
+                                  value={row.effectif}
+                                  onChange={(e) => updateCapture(row.id, 'effectif', e.target.value)}
+                                />
+                              </td>
+                              <td className="py-1">
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => removeCapture(row.id)}
+                                  type="button"
+                                >
+                                  ✕
+                                </Button>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {fieldErrors.captures && (
+                    <p role="alert" aria-live="polite" className="mt-2 text-sm text-destructive">
+                      {fieldErrors.captures}
+                    </p>
+                  )}
+                  <Button variant="outline" size="sm" className="mt-3" onClick={addCapture} type="button">
+                    + Ajouter une ligne
+                  </Button>
+                </Section>
+
+                <Section title="4. Population acridienne (densités)">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left">
+                          <th className="pb-2 pr-2 font-medium">Espèce</th>
+                          <th className="pb-2 pr-2 font-medium">Cat.</th>
+                          <th className="pb-2 pr-2 font-medium">D. diffuse (/ha)</th>
+                          <th className="pb-2 pr-2 font-medium">D. groupée (/m²)</th>
+                          <th className="pb-2 pr-2 font-medium">Nb captures</th>
+                          <th className="pb-2 pr-2 font-medium">Temps (min)</th>
+                          <th className="pb-2 pr-2 font-medium">Accouplement</th>
+                          <th className="pb-2 font-medium">Ponte</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {populations.map((row, idx) => (
+                          <tr key={`${row.espece}-${row.categorie}`}>
+                            <td className="pr-2 py-1 font-medium">{row.espece}</td>
+                            <td className="pr-2 py-1 capitalize">{row.categorie}</td>
+                            <td className="pr-2 py-1">
+                              <Input type="number" step="any" className="w-24" value={row.densite_diffuse} onChange={(e) => updatePopulation(idx, 'densite_diffuse', e.target.value)} />
+                            </td>
+                            <td className="pr-2 py-1">
+                              <Input type="number" step="any" className="w-24" value={row.densite_groupee} onChange={(e) => updatePopulation(idx, 'densite_groupee', e.target.value)} />
+                            </td>
+                            <td className="pr-2 py-1">
+                              <Input type="number" className="w-20" value={row.captures_nombre} onChange={(e) => updatePopulation(idx, 'captures_nombre', e.target.value)} />
+                            </td>
+                            <td className="pr-2 py-1">
+                              <Input type="number" className="w-20" value={row.temps_capture} onChange={(e) => updatePopulation(idx, 'temps_capture', e.target.value)} />
+                            </td>
+                            <td className="pr-2 py-1">
+                              <Select value={row.accouplement} onValueChange={(v) => updatePopulation(idx, 'accouplement', v ?? '')}>
+                                <SelectTrigger className="w-28"><SelectValue placeholder="—" /></SelectTrigger>
+                                <SelectContent>
+                                  {ABONDANCE.map((a) => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </td>
+                            <td className="py-1">
+                              <Select value={row.ponte} onValueChange={(v) => updatePopulation(idx, 'ponte', v ?? '')}>
+                                <SelectTrigger className="w-28"><SelectValue placeholder="—" /></SelectTrigger>
+                                <SelectContent>
+                                  {ABONDANCE.map((a) => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Section>
+              </div>
+            </div>
+          )}
+
+          {/* ── Étape 3 : Infestation + Végétation + Sol ── */}
+          {currentStep === 3 && (
+            <div role="group" aria-label="Étape 3 sur 4 : Infestation, végétation et sol">
+              <div className="space-y-6">
+                <Section title="5. Infestation (taches, bandes, vols, essaims)">
+                  {infestations.length === 0 && (
+                    <p className="text-sm text-muted-foreground mb-3">Aucune infestation enregistrée.</p>
+                  )}
+                  <div className="space-y-4">
+                    {infestations.map((row, idx) => (
+                      <div key={row.id} className="border rounded p-3 relative">
                         <Button
                           variant="destructive"
                           size="sm"
-                          onClick={() => removeCapture(row.id)}
+                          className="absolute top-2 right-2"
+                          onClick={() => removeInfestation(row.id)}
                           type="button"
                         >
-                          ✕
+                          ✕ Supprimer
                         </Button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-          {fieldErrors.captures && (
-            <p role="alert" aria-live="polite" className="mt-2 text-sm text-destructive">
-              {fieldErrors.captures}
-            </p>
-          )}
-          <Button variant="outline" size="sm" className="mt-3" onClick={addCapture} type="button">
-            + Ajouter une ligne
-          </Button>
-        </Section>
+                        <p className="text-xs font-medium mb-3 text-muted-foreground">Infestation #{idx + 1}</p>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="flex flex-col gap-2">
+                            <Label>Espèce</Label>
+                            <Select value={row.espece} onValueChange={(v) => updateInfestation(row.id, 'espece', v ?? '')}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="LMC">LMC</SelectItem>
+                                <SelectItem value="NSE">NSE</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <Label>Type</Label>
+                            <Select value={row.type_cible} onValueChange={(v) => updateInfestation(row.id, 'type_cible', v ?? '')}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {TYPES_INFESTATION.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <Label>Comportement</Label>
+                            <Select value={row.comportement} onValueChange={(v) => updateInfestation(row.id, 'comportement', v ?? '')}>
+                              <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="repos">Repos</SelectItem>
+                                <SelectItem value="deplacement">Déplacement</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <Label>Taille min (ha)</Label>
+                            <Input type="number" step="any" value={row.taille_min} onChange={(e) => updateInfestation(row.id, 'taille_min', e.target.value)} />
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <Label>Taille moy (ha)</Label>
+                            <Input type="number" step="any" value={row.taille_moy} onChange={(e) => updateInfestation(row.id, 'taille_moy', e.target.value)} />
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <Label>Taille max (ha)</Label>
+                            <Input type="number" step="any" value={row.taille_max} onChange={(e) => updateInfestation(row.id, 'taille_max', e.target.value)} />
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <Label>Surface tot. (ha)</Label>
+                            <Input type="number" step="any" value={row.surface_tot} onChange={(e) => updateInfestation(row.id, 'surface_tot', e.target.value)} />
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <Label>Densité min</Label>
+                            <Input type="number" step="any" value={row.densite_min} onChange={(e) => updateInfestation(row.id, 'densite_min', e.target.value)} />
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <Label>Densité moy</Label>
+                            <Input type="number" step="any" value={row.densite_moy} onChange={(e) => updateInfestation(row.id, 'densite_moy', e.target.value)} />
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <Label>Densité max</Label>
+                            <Input type="number" step="any" value={row.densite_max} onChange={(e) => updateInfestation(row.id, 'densite_max', e.target.value)} />
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <Label>Interdistance (m)</Label>
+                            <Input type="number" step="any" value={row.interdistance} onChange={(e) => updateInfestation(row.id, 'interdistance', e.target.value)} />
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <Label>Direction de</Label>
+                            <Input value={row.direction_de} onChange={(e) => updateInfestation(row.id, 'direction_de', e.target.value)} placeholder="ex: N, NE…" />
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <Label>Direction vers</Label>
+                            <Input value={row.direction_vers} onChange={(e) => updateInfestation(row.id, 'direction_vers', e.target.value)} placeholder="ex: S, SW…" />
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <Label>Vent de</Label>
+                            <Input value={row.vent_de} onChange={(e) => updateInfestation(row.id, 'vent_de', e.target.value)} placeholder="ex: N" />
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <Label>Vitesse vent (km/h)</Label>
+                            <Input type="number" step="any" value={row.vent_vitesse} onChange={(e) => updateInfestation(row.id, 'vent_vitesse', e.target.value)} />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <Button variant="outline" size="sm" className="mt-3" onClick={addInfestation} type="button">
+                    + Ajouter une infestation
+                  </Button>
+                </Section>
 
-        {/* Section 4 : Population acridienne */}
-        <Section title="4. Population acridienne (densités)">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left">
-                  <th className="pb-2 pr-2 font-medium">Espèce</th>
-                  <th className="pb-2 pr-2 font-medium">Cat.</th>
-                  <th className="pb-2 pr-2 font-medium">D. diffuse (/ha)</th>
-                  <th className="pb-2 pr-2 font-medium">D. groupée (/m²)</th>
-                  <th className="pb-2 pr-2 font-medium">Nb captures</th>
-                  <th className="pb-2 pr-2 font-medium">Temps (min)</th>
-                  <th className="pb-2 pr-2 font-medium">Accouplement</th>
-                  <th className="pb-2 font-medium">Ponte</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {populations.map((row, idx) => (
-                  <tr key={`${row.espece}-${row.categorie}`}>
-                    <td className="pr-2 py-1 font-medium">{row.espece}</td>
-                    <td className="pr-2 py-1 capitalize">{row.categorie}</td>
-                    <td className="pr-2 py-1">
-                      <Input type="number" step="any" className="w-24" value={row.densite_diffuse} onChange={(e) => updatePopulation(idx, 'densite_diffuse', e.target.value)} />
-                    </td>
-                    <td className="pr-2 py-1">
-                      <Input type="number" step="any" className="w-24" value={row.densite_groupee} onChange={(e) => updatePopulation(idx, 'densite_groupee', e.target.value)} />
-                    </td>
-                    <td className="pr-2 py-1">
-                      <Input type="number" className="w-20" value={row.captures_nombre} onChange={(e) => updatePopulation(idx, 'captures_nombre', e.target.value)} />
-                    </td>
-                    <td className="pr-2 py-1">
-                      <Input type="number" className="w-20" value={row.temps_capture} onChange={(e) => updatePopulation(idx, 'temps_capture', e.target.value)} />
-                    </td>
-                    <td className="pr-2 py-1">
-                      <Select value={row.accouplement} onValueChange={(v) => updatePopulation(idx, 'accouplement', v ?? '')}>
-                        <SelectTrigger className="w-28"><SelectValue placeholder="—" /></SelectTrigger>
+                <Section title="6. Végétation (strates ORPAD)">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left">
+                          <th className="pb-2 pr-3 font-medium w-48">Strate</th>
+                          <th className="pb-2 pr-3 font-medium">Recouvrement (%)</th>
+                          <th className="pb-2 pr-3 font-medium">Phénologie</th>
+                          <th className="pb-2 font-medium">Activité végétative</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {STRATES_VEGETATION.map(({ key, label }) => (
+                          <tr key={key}>
+                            <td className="pr-3 py-2 text-xs text-muted-foreground">{label}</td>
+                            <td className="pr-3 py-2">
+                              <Select value={vegetation[key].recouvrement} onValueChange={(v) => updateStrate(key, 'recouvrement', v ?? '')}>
+                                <SelectTrigger className="w-28"><SelectValue placeholder="—" /></SelectTrigger>
+                                <SelectContent>
+                                  {RECOUVREMENT_OPTIONS.map((r) => <SelectItem key={r} value={r}>{r} %</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </td>
+                            <td className="pr-3 py-2">
+                              <Select value={vegetation[key].phenologie} onValueChange={(v) => updateStrate(key, 'phenologie', v ?? '')}>
+                                <SelectTrigger className="w-32"><SelectValue placeholder="—" /></SelectTrigger>
+                                <SelectContent>
+                                  {PHENOLOGIE_OPTIONS.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </td>
+                            <td className="py-2">
+                              <Select value={vegetation[key].activite} onValueChange={(v) => updateStrate(key, 'activite', v ?? '')}>
+                                <SelectTrigger className="w-28"><SelectValue placeholder="—" /></SelectTrigger>
+                                <SelectContent>
+                                  {ACTIVITE_OPTIONS.map((a) => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Section>
+
+                <Section title="7. Sol">
+                  <div className="grid grid-cols-2 gap-4 max-w-sm">
+                    <div className="flex flex-col gap-2">
+                      <Label>Humidité du sol</Label>
+                      <Select value={sol.humidite} onValueChange={(v) => setSol((s) => ({ ...s, humidite: v ?? '' }))}>
+                        <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                         <SelectContent>
-                          {ABONDANCE.map((a) => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}
+                          {HUMIDITE_SOL.map((h) => <SelectItem key={h.value} value={h.value}>{h.label}</SelectItem>)}
                         </SelectContent>
                       </Select>
-                    </td>
-                    <td className="py-1">
-                      <Select value={row.ponte} onValueChange={(v) => updatePopulation(idx, 'ponte', v ?? '')}>
-                        <SelectTrigger className="w-28"><SelectValue placeholder="—" /></SelectTrigger>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label>Texture du sol</Label>
+                      <Select value={sol.texture} onValueChange={(v) => setSol((s) => ({ ...s, texture: v ?? '' }))}>
+                        <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                         <SelectContent>
-                          {ABONDANCE.map((a) => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}
+                          {TEXTURE_SOL.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                         </SelectContent>
                       </Select>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Section>
-
-        {/* Section 5 : Infestation */}
-        <Section title="5. Infestation (taches, bandes, vols, essaims)">
-          {infestations.length === 0 && (
-            <p className="text-sm text-muted-foreground mb-3">Aucune infestation enregistrée.</p>
-          )}
-          <div className="space-y-4">
-            {infestations.map((row, idx) => (
-              <div key={row.id} className="border rounded p-3 relative">
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  className="absolute top-2 right-2"
-                  onClick={() => removeInfestation(row.id)}
-                  type="button"
-                >
-                  ✕ Supprimer
-                </Button>
-                <p className="text-xs font-medium mb-3 text-muted-foreground">Infestation #{idx + 1}</p>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="flex flex-col gap-2">
-                    <Label>Espèce</Label>
-                    <Select value={row.espece} onValueChange={(v) => updateInfestation(row.id, 'espece', v ?? '')}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="LMC">LMC</SelectItem>
-                        <SelectItem value="NSE">NSE</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <Label>Type</Label>
-                    <Select value={row.type_cible} onValueChange={(v) => updateInfestation(row.id, 'type_cible', v ?? '')}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {TYPES_INFESTATION.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label>Comportement</Label>
-                    <Select value={row.comportement} onValueChange={(v) => updateInfestation(row.id, 'comportement', v ?? '')}>
-                      <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="repos">Repos</SelectItem>
-                        <SelectItem value="deplacement">Déplacement</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label>Taille min (ha)</Label>
-                    <Input type="number" step="any" value={row.taille_min} onChange={(e) => updateInfestation(row.id, 'taille_min', e.target.value)} />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label>Taille moy (ha)</Label>
-                    <Input type="number" step="any" value={row.taille_moy} onChange={(e) => updateInfestation(row.id, 'taille_moy', e.target.value)} />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label>Taille max (ha)</Label>
-                    <Input type="number" step="any" value={row.taille_max} onChange={(e) => updateInfestation(row.id, 'taille_max', e.target.value)} />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label>Surface tot. (ha)</Label>
-                    <Input type="number" step="any" value={row.surface_tot} onChange={(e) => updateInfestation(row.id, 'surface_tot', e.target.value)} />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label>Densité min</Label>
-                    <Input type="number" step="any" value={row.densite_min} onChange={(e) => updateInfestation(row.id, 'densite_min', e.target.value)} />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label>Densité moy</Label>
-                    <Input type="number" step="any" value={row.densite_moy} onChange={(e) => updateInfestation(row.id, 'densite_moy', e.target.value)} />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label>Densité max</Label>
-                    <Input type="number" step="any" value={row.densite_max} onChange={(e) => updateInfestation(row.id, 'densite_max', e.target.value)} />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label>Interdistance (m)</Label>
-                    <Input type="number" step="any" value={row.interdistance} onChange={(e) => updateInfestation(row.id, 'interdistance', e.target.value)} />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label>Direction de</Label>
-                    <Input value={row.direction_de} onChange={(e) => updateInfestation(row.id, 'direction_de', e.target.value)} placeholder="ex: N, NE…" />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label>Direction vers</Label>
-                    <Input value={row.direction_vers} onChange={(e) => updateInfestation(row.id, 'direction_vers', e.target.value)} placeholder="ex: S, SW…" />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label>Vent de</Label>
-                    <Input value={row.vent_de} onChange={(e) => updateInfestation(row.id, 'vent_de', e.target.value)} placeholder="ex: N" />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label>Vitesse vent (km/h)</Label>
-                    <Input type="number" step="any" value={row.vent_vitesse} onChange={(e) => updateInfestation(row.id, 'vent_vitesse', e.target.value)} />
-                  </div>
-                </div>
+                </Section>
               </div>
-            ))}
-          </div>
-          <Button variant="outline" size="sm" className="mt-3" onClick={addInfestation} type="button">
-            + Ajouter une infestation
-          </Button>
-        </Section>
+            </div>
+          )}
 
-        {/* Section 6 : Végétation */}
-        <Section title="6. Végétation (strates ORPAD)">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left">
-                  <th className="pb-2 pr-3 font-medium w-48">Strate</th>
-                  <th className="pb-2 pr-3 font-medium">Recouvrement (%)</th>
-                  <th className="pb-2 pr-3 font-medium">Phénologie</th>
-                  <th className="pb-2 font-medium">Activité végétative</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {STRATES_VEGETATION.map(({ key, label }) => (
-                  <tr key={key}>
-                    <td className="pr-3 py-2 text-xs text-muted-foreground">{label}</td>
-                    <td className="pr-3 py-2">
-                      <Select value={vegetation[key].recouvrement} onValueChange={(v) => updateStrate(key, 'recouvrement', v ?? '')}>
-                        <SelectTrigger className="w-28"><SelectValue placeholder="—" /></SelectTrigger>
+          {/* ── Étape 4 : Conditions environnementales + Récapitulatif ── */}
+          {currentStep === 4 && (
+            <div role="group" aria-label="Étape 4 sur 4 : Conditions environnementales et récapitulatif">
+              <div className="space-y-6">
+                <Section title="8. Conditions environnementales">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="degats">Dégâts cultures</Label>
+                      <Select value={degats} onValueChange={(v) => setDegats(v ?? '')}>
+                        <SelectTrigger id="degats"><SelectValue placeholder="—" /></SelectTrigger>
                         <SelectContent>
-                          {RECOUVREMENT_OPTIONS.map((r) => <SelectItem key={r} value={r}>{r} %</SelectItem>)}
+                          <SelectItem value="nuls">Nuls</SelectItem>
+                          <SelectItem value="faibles">Faibles</SelectItem>
+                          <SelectItem value="moyens">Moyens</SelectItem>
+                          <SelectItem value="forts">Forts</SelectItem>
                         </SelectContent>
                       </Select>
-                    </td>
-                    <td className="pr-3 py-2">
-                      <Select value={vegetation[key].phenologie} onValueChange={(v) => updateStrate(key, 'phenologie', v ?? '')}>
-                        <SelectTrigger className="w-32"><SelectValue placeholder="—" /></SelectTrigger>
-                        <SelectContent>
-                          {PHENOLOGIE_OPTIONS.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="py-2">
-                      <Select value={vegetation[key].activite} onValueChange={(v) => updateStrate(key, 'activite', v ?? '')}>
-                        <SelectTrigger className="w-28"><SelectValue placeholder="—" /></SelectTrigger>
-                        <SelectContent>
-                          {ACTIVITE_OPTIONS.map((a) => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Section>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="derniere-pluie">Dernière pluie</Label>
+                      <Input id="derniere-pluie" type="date" value={dernieresPluies} onChange={(e) => setDernieresPluies(e.target.value)} />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="intensite-pluie">Intensité pluie</Label>
+                      <Input id="intensite-pluie" value={intensitePluie} onChange={(e) => setIntensitePluie(e.target.value)} placeholder="ex: forte, faible…" />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="ennemis">Ennemis naturels</Label>
+                      <Input id="ennemis" value={ennemis} onChange={(e) => setEnnemis(e.target.value)} placeholder="ex: parasites, prédateurs…" />
+                    </div>
+                    <div className="col-span-2 flex flex-col gap-2">
+                      <Label htmlFor="observations">Observations</Label>
+                      <Textarea
+                        id="observations"
+                        rows={3}
+                        value={observations}
+                        onChange={(e) => setObservations(e.target.value)}
+                        placeholder="Observations libres…"
+                        className="resize-none"
+                      />
+                    </div>
+                  </div>
+                </Section>
 
-        {/* Section 7 : Sol */}
-        <Section title="7. Sol">
-          <div className="grid grid-cols-2 gap-4 max-w-sm">
-            <div className="flex flex-col gap-2">
-              <Label>Humidité du sol</Label>
-              <Select value={sol.humidite} onValueChange={(v) => setSol((s) => ({ ...s, humidite: v ?? '' }))}>
-                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>
-                  {HUMIDITE_SOL.map((h) => <SelectItem key={h.value} value={h.value}>{h.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label>Texture du sol</Label>
-              <Select value={sol.texture} onValueChange={(v) => setSol((s) => ({ ...s, texture: v ?? '' }))}>
-                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>
-                  {TEXTURE_SOL.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </Section>
+                {/* Récapitulatif des étapes 1–3 */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Récapitulatif</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-5">
 
-        {/* Section 8 : Conditions environnementales */}
-        <Section title="8. Conditions environnementales">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="degats">Dégâts cultures</Label>
-              <Select value={degats} onValueChange={(v) => setDegats(v ?? '')}>
-                <SelectTrigger id="degats"><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="nuls">Nuls</SelectItem>
-                  <SelectItem value="faibles">Faibles</SelectItem>
-                  <SelectItem value="moyens">Moyens</SelectItem>
-                  <SelectItem value="forts">Forts</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="derniere-pluie">Dernière pluie</Label>
-              <Input id="derniere-pluie" type="date" value={dernieresPluies} onChange={(e) => setDernieresPluies(e.target.value)} />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="intensite-pluie">Intensité pluie</Label>
-              <Input id="intensite-pluie" value={intensitePluie} onChange={(e) => setIntensitePluie(e.target.value)} placeholder="ex: forte, faible…" />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="ennemis">Ennemis naturels</Label>
-              <Input id="ennemis" value={ennemis} onChange={(e) => setEnnemis(e.target.value)} placeholder="ex: parasites, prédateurs…" />
-            </div>
-            <div className="col-span-2 flex flex-col gap-2">
-              <Label htmlFor="observations">Observations</Label>
-              <Textarea
-                id="observations"
-                rows={3}
-                value={observations}
-                onChange={(e) => setObservations(e.target.value)}
-                placeholder="Observations libres…"
-                className="resize-none"
-              />
-            </div>
-          </div>
-        </Section>
+                    {/* Étape 1 */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-semibold">Étape 1 — Général &amp; Localisation</h3>
+                        <Button variant="ghost" size="sm" onClick={() => goToStep(1)}>Modifier</Button>
+                      </div>
+                      <dl className="grid grid-cols-[auto,1fr] gap-x-6 gap-y-1 text-sm">
+                        <dt className="text-muted-foreground">Campagne</dt>
+                        <dd>{campagneLabel}</dd>
+                        <dt className="text-muted-foreground">Date</dt>
+                        <dd>{dateProspection || '—'}</dd>
+                        <dt className="text-muted-foreground">Station</dt>
+                        <dd>{stationLabel}</dd>
+                        {nReleve && <><dt className="text-muted-foreground">N° relevé</dt><dd>{nReleve}</dd></>}
+                        {nFiche && <><dt className="text-muted-foreground">N° fiche</dt><dd>{nFiche}</dd></>}
+                        {latitude && (
+                          <>
+                            <dt className="text-muted-foreground">Coordonnées</dt>
+                            <dd>{latitude}, {longitude}{altitude ? `, alt. ${altitude} m` : ''}</dd>
+                          </>
+                        )}
+                        {surfStation && (
+                          <>
+                            <dt className="text-muted-foreground">Surfaces (ha)</dt>
+                            <dd>
+                              Station : {surfStation}
+                              {surfProspectee ? ` · Prospectée : ${surfProspectee}` : ''}
+                              {surfInfestee ? ` · Infestée : ${surfInfestee}` : ''}
+                            </dd>
+                          </>
+                        )}
+                      </dl>
+                    </div>
 
-        {/* Boutons d'action */}
-        <div className="flex gap-3 pb-8">
+                    <hr />
+
+                    {/* Étape 2 */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-semibold">Étape 2 — Captures &amp; Population</h3>
+                        <Button variant="ghost" size="sm" onClick={() => goToStep(2)}>Modifier</Button>
+                      </div>
+                      <dl className="grid grid-cols-[auto,1fr] gap-x-6 gap-y-1 text-sm">
+                        <dt className="text-muted-foreground">Captures</dt>
+                        <dd>{captures.length} ligne(s) — effectif total : {totalEffectif}</dd>
+                        {populations.some((r) => r.densite_diffuse || r.densite_groupee) && (
+                          <>
+                            <dt className="text-muted-foreground">Populations</dt>
+                            <dd>Données de densité renseignées</dd>
+                          </>
+                        )}
+                      </dl>
+                    </div>
+
+                    <hr />
+
+                    {/* Étape 3 */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-semibold">Étape 3 — Infestation, Végétation &amp; Sol</h3>
+                        <Button variant="ghost" size="sm" onClick={() => goToStep(3)}>Modifier</Button>
+                      </div>
+                      <dl className="grid grid-cols-[auto,1fr] gap-x-6 gap-y-1 text-sm">
+                        <dt className="text-muted-foreground">Infestations</dt>
+                        <dd>{infestations.length} enregistrée(s)</dd>
+                        <dt className="text-muted-foreground">Végétation</dt>
+                        <dd>{stratesRenseignees} strate(s) renseignée(s)</dd>
+                        <dt className="text-muted-foreground">Sol</dt>
+                        <dd>
+                          {sol.humidite || sol.texture
+                            ? [sol.humidite, sol.texture].filter(Boolean).join(' · ')
+                            : 'Non renseigné'}
+                        </dd>
+                      </dl>
+                    </div>
+
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+
+        </div>
+
+        {/* Navigation entre étapes */}
+        <div className="flex items-center justify-between mt-6 pb-8">
           <Button
             variant="outline"
-            onClick={() => handleSave('brouillon')}
-            disabled={isPending}
+            onClick={handlePrev}
+            disabled={currentStep === 1}
           >
-            {isPending ? 'Enregistrement…' : 'Sauvegarder (brouillon)'}
+            ← Précédent
           </Button>
-          <Button
-            onClick={() => handleSave('en_attente')}
-            disabled={isPending}
-          >
-            {isPending ? 'Envoi…' : 'Soumettre'}
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/prospections')}
-            disabled={isPending}
-          >
-            Annuler
-          </Button>
+
+          {currentStep < STEPS.length ? (
+            <Button onClick={handleNext}>
+              Suivant →
+            </Button>
+          ) : (
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => handleSave('brouillon')}
+                disabled={isPending}
+              >
+                {isPending ? 'Enregistrement…' : 'Sauvegarder (brouillon)'}
+              </Button>
+              <Button
+                onClick={() => handleSave('en_attente')}
+                disabled={isPending}
+              >
+                {isPending ? 'Envoi…' : 'Soumettre'}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
-    </div>
 
-    {blocker.state === 'blocked' && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-        <div className="mx-4 max-w-sm rounded-lg bg-white p-6 shadow-xl">
-          <p className="mb-4 text-sm">
-            Des modifications non soumises seront perdues. Quitter quand même ?
-          </p>
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" size="sm" onClick={() => blocker.reset()}>
-              Rester
-            </Button>
-            <Button variant="destructive" size="sm" onClick={() => blocker.proceed()}>
-              Quitter
-            </Button>
+      {/* Dialog de confirmation de navigation */}
+      {blocker.state === 'blocked' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 max-w-sm rounded-lg bg-white p-6 shadow-xl">
+            <p className="mb-4 text-sm">
+              Des modifications non soumises seront perdues. Quitter quand même ?
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" size="sm" onClick={() => blocker.reset()}>
+                Rester
+              </Button>
+              <Button variant="destructive" size="sm" onClick={() => blocker.proceed()}>
+                Quitter
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
-    )}
+      )}
     </>
   )
 }
