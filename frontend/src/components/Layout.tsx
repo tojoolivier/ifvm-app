@@ -1,19 +1,25 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { useCurrentUser } from '../hooks/useCurrentUser'
 
-const navItems = [
-  { to: '/', label: 'Tableau de bord', exact: true },
+const baseNavItems = [
+  { to: '/', label: 'Tableau de bord' },
   { to: '/campagnes', label: 'Campagnes' },
   { to: '/prospections', label: 'Prospections' },
-  { to: '/design-system', label: '🎨 Design System' },
 ]
 
 export function Layout() {
   const navigate = useNavigate()
+  const { data: currentUser } = useCurrentUser()
 
   function logout() {
     localStorage.removeItem('access_token')
     navigate('/login')
   }
+
+  const navItems = [
+    ...baseNavItems,
+    ...(currentUser?.role === 'admin' ? [{ to: '/users', label: 'Utilisateurs' }] : []),
+  ]
 
   return (
     <div className="flex h-screen bg-gray-50">

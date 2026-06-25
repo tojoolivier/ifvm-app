@@ -11,6 +11,11 @@ class UtilisateurCreate(BaseModel):
     role: str
 
 
+class UtilisateurUpdate(BaseModel):
+    role: str | None = None
+    actif: bool | None = None
+
+
 class UtilisateurRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
