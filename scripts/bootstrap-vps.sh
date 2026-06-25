@@ -3,10 +3,14 @@
 # À lancer une seule fois sur la VPS existante (Contabo ou autre) en tant que root.
 set -euo pipefail
 
-# --- Paramètres ---
-read -rp "Domaine (ex: app.example.com) : " DOMAIN
-read -rsp "Mot de passe PostgreSQL        : " POSTGRES_PASSWORD; echo
-read -rsp "Secret JWT (min 32 chars)      : " JWT_SECRET; echo
+# --- Paramètres (GitHub Secrets en priorité, sinon prompt) ---
+DOMAIN="${DOMAIN:-}"
+POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-}"
+JWT_SECRET="${JWT_SECRET:-}"
+
+[ -z "$DOMAIN" ]            && read -rp  "Domaine (ex: app.example.com) : " DOMAIN
+[ -z "$POSTGRES_PASSWORD" ] && read -rsp "Mot de passe PostgreSQL        : " POSTGRES_PASSWORD && echo
+[ -z "$JWT_SECRET" ]        && read -rsp "Secret JWT (min 32 chars)      : " JWT_SECRET && echo
 
 APP_DIR="/opt/app"
 REPO_URL="git@github.com:tojoolivier/ifvm-app.git"

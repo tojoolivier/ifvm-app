@@ -1,0 +1,36 @@
+name: Bootstrap VPS
+
+on:
+  workflow_dispatch:
+
+env:
+  APP_DIR: /opt/app
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Copier le script sur la VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_IP }}
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: scripts/bootstrap-vps.sh
+          target: /tmp/
+
+      - name: Lancer le bootstrap
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_IP }}
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: DOMAIN,POSTGRES_PASSWORD,JWT_SECRET
+          script: bash /tmp/scripts/bootstrap-vps.sh
+        env:
+          DOMAIN: ${{ secrets.DOMAIN }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
