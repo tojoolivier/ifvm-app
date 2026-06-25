@@ -9,7 +9,23 @@ read -rsp "Mot de passe PostgreSQL        : " POSTGRES_PASSWORD; echo
 read -rsp "Secret JWT (min 32 chars)      : " JWT_SECRET; echo
 
 APP_DIR="/opt/app"
-REPO_URL="https://github.com/olivierrakotondravao/ifvm.git"
+REPO_URL="git@github.com:tojoolivier/ifvm-app.git"
+
+# --- Clé SSH deploy (pour cloner le repo privé) ---
+if [ ! -f /root/.ssh/id_ed25519 ]; then
+  ssh-keygen -t ed25519 -C "ifvm-vps-deploy" -f /root/.ssh/id_ed25519 -N ""
+fi
+
+echo ""
+echo "=== Ajoute cette clé comme Deploy Key sur GitHub ==="
+echo "https://github.com/tojoolivier/ifvm-app/settings/keys/new"
+echo ""
+cat /root/.ssh/id_ed25519.pub
+echo ""
+read -rp "Appuie sur Entrée une fois la clé ajoutée sur GitHub..."
+
+# S'assurer que github.com est dans known_hosts
+ssh-keyscan -H github.com >> /root/.ssh/known_hosts 2>/dev/null
 
 # --- Docker ---
 if ! command -v docker &>/dev/null; then
