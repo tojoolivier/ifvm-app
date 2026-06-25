@@ -3,6 +3,10 @@
 # À lancer une seule fois sur la VPS existante (Contabo ou autre) en tant que root.
 set -euo pipefail
 
+export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
+export NEEDRESTART_SUSPEND=1
+
 # --- Paramètres (GitHub Secrets en priorité, sinon prompt) ---
 DOMAIN="${DOMAIN:-}"
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-}"
