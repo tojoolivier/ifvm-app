@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { FormField } from '@/components/ui/form-field'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Select,
@@ -14,6 +15,7 @@ import {
   SelectContent,
   SelectItem,
 } from '@/components/ui/select'
+import { prospectionFormSchema, validateProspectionCrossFields } from '@/lib/prospection-schema'
 
 // ---------------------------------------------------------------------------
 // Données de référence
@@ -254,6 +256,7 @@ export function NouvelleProspectionPage() {
   const [sol, setSol] = useState({ humidite: '', texture: '' })
 
   const [errors, setErrors] = useState<string[]>([])
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
   // --- données ---
   const { data: campagnes = [] } = useQuery<Campagne[]>({
@@ -291,6 +294,24 @@ export function NouvelleProspectionPage() {
       setCampagneId(campagnesEnCours[0].id)
     }
   }, [campagnesEnCours, campagneId])
+
+  // Validation date en temps réel quand la campagne change.
+  useEffect(() => {
+    if (!campagneId || !dateProspection) return
+    const campagne = campagnes.find((c) => c.id === campagneId)
+    if (!campagne) return
+    let err: string | undefined
+    if (dateProspection < campagne.start_date) {
+      err = `La date est antérieure au début de la campagne (${campagne.start_date}).`
+    } else if (campagne.end_date && dateProspection > campagne.end_date) {
+      err = `La date est postérieure à la fin de la campagne (${campagne.end_date}).`
+    }
+    setFieldErrors((prev) => {
+      if (err) return { ...prev, date_prospection: err }
+      const { date_prospection: _, ...rest } = prev
+      return rest
+    })
+  }, [campagneId, campagnes])
 
   const mutation = useMutation({
     mutationFn: (data: { statut: string }) =>
@@ -402,12 +423,42 @@ export function NouvelleProspectionPage() {
   }
 
   function validate(): boolean {
-    const errs: string[] = []
-    if (!campagneId) errs.push('La campagne est obligatoire.')
-    if (!dateProspection) errs.push('La date est obligatoire.')
-    if (!stationId) errs.push('La station fixe est obligatoire pour une prospection intensive.')
-    setErrors(errs)
-    return errs.length === 0
+    const formValues = {
+      campagne_id: campagneId,
+      date_prospection: dateProspection,
+      station_id: stationId,
+      latitude,
+      longitude,
+      altitude,
+      surf_station: surfStation,
+      surf_prospectee: surfProspectee,
+      surf_infestee: surfInfestee,
+      captures,
+    }
+
+    const result = prospectionFormSchema.safeParse(formValues)
+    const errs: Record<string, string> = {}
+    const summary: string[] = []
+
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        const key = String(issue.path[0] ?? '')
+        if (key && !errs[key]) errs[key] = issue.message
+        summary.push(issue.message)
+      }
+    }
+
+    const crossErrs = validateProspectionCrossFields(formValues, campagnes)
+    for (const [key, msg] of Object.entries(crossErrs)) {
+      if (!errs[key]) {
+        errs[key] = msg
+        summary.push(msg)
+      }
+    }
+
+    setFieldErrors(errs)
+    setErrors(summary)
+    return summary.length === 0
   }
 
   function handleSave(statut: 'brouillon' | 'en_attente') {
@@ -490,12 +541,18 @@ export function NouvelleProspectionPage() {
         {/* Section 1 : Informations générales */}
         <Section title="1. Informations générales">
           <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2 flex flex-col gap-2">
-              <Label htmlFor="campagne">
-                Campagne <span className="text-red-500">*</span>
-              </Label>
+            <FormField
+              label="Campagne"
+              required
+              error={fieldErrors.campagne_id}
+              className="col-span-2"
+              fieldId="campagne"
+            >
               <Select value={campagneId} onValueChange={(v) => setCampagneId(v ?? '')}>
-                <SelectTrigger id="campagne">
+                <SelectTrigger
+                  id="campagne"
+                  aria-describedby={fieldErrors.campagne_id ? 'campagne-error' : undefined}
+                >
                   <SelectValue placeholder="Sélectionner une campagne" />
                 </SelectTrigger>
                 <SelectContent>
@@ -507,23 +564,21 @@ export function NouvelleProspectionPage() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </FormField>
 
             {/* Colonne gauche : champs courts empilés (évite le couplage de
                 hauteur avec la cellule Station, plus haute car elle contient
                 deux champs). */}
             <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="date">
-                  Date de prospection <span className="text-red-500">*</span>
-                </Label>
+              <FormField label="Date de prospection" required error={fieldErrors.date_prospection}>
                 <Input
                   id="date"
                   type="date"
                   value={dateProspection}
                   onChange={(e) => setDateProspection(e.target.value)}
+                  aria-describedby={fieldErrors.date_prospection ? 'date-error' : undefined}
                 />
-              </div>
+              </FormField>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-2">
@@ -541,7 +596,7 @@ export function NouvelleProspectionPage() {
             {/* Colonne droite : Station fixe (recherche + liste). */}
             <div className="flex flex-col gap-2">
               <Label htmlFor="station">
-                Station fixe <span className="text-red-500">*</span>
+                Station fixe <span aria-hidden="true"> *</span>
               </Label>
               <Input
                 id="station-search"
@@ -563,7 +618,10 @@ export function NouvelleProspectionPage() {
                   }
                 }}
               >
-                <SelectTrigger id="station">
+                <SelectTrigger
+                  id="station"
+                  aria-describedby={fieldErrors.station_id ? 'station-error' : undefined}
+                >
                   <SelectValue placeholder="— Choisir une station —" />
                 </SelectTrigger>
                 <SelectContent>
@@ -575,6 +633,11 @@ export function NouvelleProspectionPage() {
                   ))}
                 </SelectContent>
               </Select>
+              {fieldErrors.station_id && (
+                <p id="station-error" role="alert" aria-live="polite" className="text-sm text-destructive">
+                  {fieldErrors.station_id}
+                </p>
+              )}
             </div>
           </div>
         </Section>
@@ -582,30 +645,67 @@ export function NouvelleProspectionPage() {
         {/* Section 2 : Localisation */}
         <Section title="2. Localisation">
           <div className="grid grid-cols-3 gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="lat">Latitude</Label>
-              <Input id="lat" type="number" step="any" value={latitude} onChange={(e) => setLatitude(e.target.value)} placeholder="-20.1234" />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="lon">Longitude</Label>
-              <Input id="lon" type="number" step="any" value={longitude} onChange={(e) => setLongitude(e.target.value)} placeholder="44.5678" />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="alt">Altitude (m)</Label>
-              <Input id="alt" type="number" value={altitude} onChange={(e) => setAltitude(e.target.value)} placeholder="ex: 850" />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="surf-station">Surface station (ha)</Label>
-              <Input id="surf-station" type="number" step="any" value={surfStation} onChange={(e) => setSurfStation(e.target.value)} />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="surf-prospectee">Surface prospectée (ha)</Label>
-              <Input id="surf-prospectee" type="number" step="any" value={surfProspectee} onChange={(e) => setSurfProspectee(e.target.value)} />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="surf-infestee">Surface infestée (ha)</Label>
-              <Input id="surf-infestee" type="number" step="any" value={surfInfestee} onChange={(e) => setSurfInfestee(e.target.value)} />
-            </div>
+            <FormField label="Latitude" error={fieldErrors.latitude}>
+              <Input
+                id="lat"
+                type="number"
+                step="any"
+                value={latitude}
+                onChange={(e) => setLatitude(e.target.value)}
+                placeholder="-20.1234"
+                aria-describedby={fieldErrors.latitude ? 'lat-error' : undefined}
+              />
+            </FormField>
+            <FormField label="Longitude" error={fieldErrors.longitude}>
+              <Input
+                id="lon"
+                type="number"
+                step="any"
+                value={longitude}
+                onChange={(e) => setLongitude(e.target.value)}
+                placeholder="44.5678"
+                aria-describedby={fieldErrors.longitude ? 'lon-error' : undefined}
+              />
+            </FormField>
+            <FormField label="Altitude (m)" error={fieldErrors.altitude}>
+              <Input
+                id="alt"
+                type="number"
+                value={altitude}
+                onChange={(e) => setAltitude(e.target.value)}
+                placeholder="ex: 850"
+                aria-describedby={fieldErrors.altitude ? 'alt-error' : undefined}
+              />
+            </FormField>
+            <FormField label="Surface station (ha)" error={fieldErrors.surf_station}>
+              <Input
+                id="surf-station"
+                type="number"
+                step="any"
+                value={surfStation}
+                onChange={(e) => setSurfStation(e.target.value)}
+              />
+            </FormField>
+            <FormField label="Surface prospectée (ha)" error={fieldErrors.surf_prospectee}>
+              <Input
+                id="surf-prospectee"
+                type="number"
+                step="any"
+                value={surfProspectee}
+                onChange={(e) => setSurfProspectee(e.target.value)}
+                aria-describedby={fieldErrors.surf_prospectee ? 'surf-prospectee-error' : undefined}
+              />
+            </FormField>
+            <FormField label="Surface infestée (ha)" error={fieldErrors.surf_infestee}>
+              <Input
+                id="surf-infestee"
+                type="number"
+                step="any"
+                value={surfInfestee}
+                onChange={(e) => setSurfInfestee(e.target.value)}
+                aria-describedby={fieldErrors.surf_infestee ? 'surf-infestee-error' : undefined}
+              />
+            </FormField>
           </div>
         </Section>
 
@@ -701,6 +801,11 @@ export function NouvelleProspectionPage() {
               </tbody>
             </table>
           </div>
+          {fieldErrors.captures && (
+            <p role="alert" aria-live="polite" className="mt-2 text-sm text-destructive">
+              {fieldErrors.captures}
+            </p>
+          )}
           <Button variant="outline" size="sm" className="mt-3" onClick={addCapture} type="button">
             + Ajouter une ligne
           </Button>
