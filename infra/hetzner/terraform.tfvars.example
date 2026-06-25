@@ -1,0 +1,7 @@
+hcloud_token      = "your_hetzner_api_token"
+ssh_public_key    = "ssh-ed25519 AAAA... your-key"
+domain            = "app.example.com"
+server_type       = "cpx31"
+location          = "fsn1"
+postgres_password = "a_very_strong_password"
+jwt_secret        = "a_very_long_random_string_at_least_32_chars"
