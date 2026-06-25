@@ -10,32 +10,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Préparer la deploy key git localement
-        run: |
-          echo "${{ secrets.VPS_DEPLOY_KEY }}" | base64 -d > /tmp/vps_git_deploy
-          chmod 600 /tmp/vps_git_deploy
-
-      - name: Copier la deploy key sur la VPS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VPS_IP }}
-          username: root
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: /tmp/vps_git_deploy
-          target: /root/.ssh/
-          strip_components: 2
-
-      - name: Fixer les permissions de la deploy key
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.VPS_IP }}
-          username: root
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            mv /root/.ssh/vps_git_deploy /root/.ssh/id_ed25519
-            chmod 600 /root/.ssh/id_ed25519
-            ssh-keyscan -H github.com >> /root/.ssh/known_hosts 2>/dev/null
-
       - name: Copier le script bootstrap sur la VPS
         uses: appleboy/scp-action@v0.1.7
         with:
