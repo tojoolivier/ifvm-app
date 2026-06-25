@@ -36,8 +36,8 @@ jobs:
             EOF
 
             GIT_SSH_COMMAND="ssh -i /root/.ssh/id_ed25519 -o StrictHostKeyChecking=no" git pull origin main
-            docker compose -f infra/docker-compose.prod.yml up -d --build
-            docker compose -f infra/docker-compose.prod.yml exec -T backend alembic upgrade head
+            docker compose -f infra/docker-compose.prod.yml --env-file .env up -d --build
+            docker compose -f infra/docker-compose.prod.yml --env-file .env exec -T backend alembic upgrade head
         env:
           DOMAIN: ${{ secrets.DOMAIN }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}

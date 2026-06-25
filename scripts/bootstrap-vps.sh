@@ -70,8 +70,8 @@ JWT_EXPIRE_MINUTES=60
 VITE_API_URL=http://${DOMAIN}
 EOF
 
-docker compose -f infra/docker-compose.prod.yml up -d --build
-docker compose -f infra/docker-compose.prod.yml exec -T backend alembic upgrade head
+docker compose -f infra/docker-compose.prod.yml --env-file .env up -d --build
+docker compose -f infra/docker-compose.prod.yml --env-file .env exec -T backend alembic upgrade head
 
 # --- Backup cron ---
 apt-get install -y postgresql-client -q
