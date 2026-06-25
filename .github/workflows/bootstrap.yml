@@ -3,9 +3,6 @@ name: Bootstrap VPS
 on:
   workflow_dispatch:
 
-env:
-  APP_DIR: /opt/app
-
 jobs:
   bootstrap:
     runs-on: ubuntu-latest
@@ -13,7 +10,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Copier le script sur la VPS
+      - name: Installer la deploy key git sur la VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_IP }}
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: VPS_DEPLOY_KEY
+          script: |
+            mkdir -p /root/.ssh
+            echo "$VPS_DEPLOY_KEY" > /root/.ssh/id_ed25519
+            chmod 600 /root/.ssh/id_ed25519
+        env:
+          VPS_DEPLOY_KEY: ${{ secrets.VPS_DEPLOY_KEY }}
+
+      - name: Copier le script bootstrap sur la VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_IP }}

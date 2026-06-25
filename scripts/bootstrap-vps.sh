@@ -15,20 +15,7 @@ JWT_SECRET="${JWT_SECRET:-}"
 APP_DIR="/opt/app"
 REPO_URL="git@github.com:tojoolivier/ifvm-app.git"
 
-# --- Clé SSH deploy (pour cloner le repo privé) ---
-if [ ! -f /root/.ssh/id_ed25519 ]; then
-  ssh-keygen -t ed25519 -C "ifvm-vps-deploy" -f /root/.ssh/id_ed25519 -N ""
-fi
-
-echo ""
-echo "=== Ajoute cette clé comme Deploy Key sur GitHub ==="
-echo "https://github.com/tojoolivier/ifvm-app/settings/keys/new"
-echo ""
-cat /root/.ssh/id_ed25519.pub
-echo ""
-read -rp "Appuie sur Entrée une fois la clé ajoutée sur GitHub..."
-
-# S'assurer que github.com est dans known_hosts
+# --- Clé SSH deploy (injectée par GitHub Actions via VPS_DEPLOY_KEY) ---
 ssh-keyscan -H github.com >> /root/.ssh/known_hosts 2>/dev/null
 
 # --- Docker ---
