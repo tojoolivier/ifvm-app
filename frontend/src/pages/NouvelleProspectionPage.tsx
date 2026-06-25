@@ -5,6 +5,7 @@ import { api } from '../api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Select,
@@ -471,12 +472,9 @@ export function NouvelleProspectionPage() {
   return (
     <div className="px-8 py-6 max-w-4xl mx-auto">
       <div className="flex items-center gap-4 mb-6">
-        <button
-          onClick={() => navigate('/prospections')}
-          className="text-sm text-muted-foreground hover:text-foreground"
-        >
+        <Button variant="ghost" size="sm" onClick={() => navigate('/prospections')}>
           ← Retour
-        </button>
+        </Button>
         <h1 className="text-2xl font-bold">Nouvelle fiche de prospection intensive</h1>
       </div>
 
@@ -552,11 +550,10 @@ export function NouvelleProspectionPage() {
                 onChange={(e) => setStationSearch(e.target.value)}
                 placeholder="Rechercher par nom ou code..."
               />
-              <select
-                id="station"
+              <Select
                 value={stationId}
-                onChange={(e) => {
-                  const id = e.target.value
+                onValueChange={(v) => {
+                  const id = v ?? ''
                   setStationId(id)
                   const station = stations.find((s) => s.id === id)
                   if (station) {
@@ -565,15 +562,19 @@ export function NouvelleProspectionPage() {
                     setAltitude(station.altitude != null ? String(station.altitude) : '')
                   }
                 }}
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <option value="">— Choisir une station —</option>
-                {filteredStations.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.code} — {s.nom} ({s.pa_code})
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="station">
+                  <SelectValue placeholder="— Choisir une station —" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">— Choisir une station —</SelectItem>
+                  {filteredStations.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.code} — {s.nom} ({s.pa_code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </Section>
@@ -685,13 +686,14 @@ export function NouvelleProspectionPage() {
                         />
                       </td>
                       <td className="py-1">
-                        <button
+                        <Button
+                          variant="destructive"
+                          size="sm"
                           onClick={() => removeCapture(row.id)}
-                          className="text-red-500 hover:text-red-700 text-xs px-1"
                           type="button"
                         >
                           ✕
-                        </button>
+                        </Button>
                       </td>
                     </tr>
                   )
@@ -768,13 +770,15 @@ export function NouvelleProspectionPage() {
           <div className="space-y-4">
             {infestations.map((row, idx) => (
               <div key={row.id} className="border rounded p-3 relative">
-                <button
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="absolute top-2 right-2"
                   onClick={() => removeInfestation(row.id)}
-                  className="absolute top-2 right-2 text-red-500 hover:text-red-700 text-xs"
                   type="button"
                 >
                   ✕ Supprimer
-                </button>
+                </Button>
                 <p className="text-xs font-medium mb-3 text-muted-foreground">Infestation #{idx + 1}</p>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="flex flex-col gap-2">
@@ -963,13 +967,13 @@ export function NouvelleProspectionPage() {
             </div>
             <div className="col-span-2 flex flex-col gap-2">
               <Label htmlFor="observations">Observations</Label>
-              <textarea
+              <Textarea
                 id="observations"
                 rows={3}
                 value={observations}
                 onChange={(e) => setObservations(e.target.value)}
-                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
                 placeholder="Observations libres…"
+                className="resize-none"
               />
             </div>
           </div>
