@@ -11,10 +11,12 @@ export NEEDRESTART_SUSPEND=1
 DOMAIN="${DOMAIN:-}"
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-}"
 JWT_SECRET="${JWT_SECRET:-}"
+LETSENCRYPT_EMAIL="${LETSENCRYPT_EMAIL:-}"
 
-[ -z "$DOMAIN" ]            && read -rp  "Domaine (ex: app.example.com) : " DOMAIN
-[ -z "$POSTGRES_PASSWORD" ] && read -rsp "Mot de passe PostgreSQL        : " POSTGRES_PASSWORD && echo
-[ -z "$JWT_SECRET" ]        && read -rsp "Secret JWT (min 32 chars)      : " JWT_SECRET && echo
+[ -z "$DOMAIN" ]             && read -rp  "Domaine (ex: app.example.com) : " DOMAIN
+[ -z "$POSTGRES_PASSWORD" ]  && read -rsp "Mot de passe PostgreSQL        : " POSTGRES_PASSWORD && echo
+[ -z "$JWT_SECRET" ]         && read -rsp "Secret JWT (min 32 chars)      : " JWT_SECRET && echo
+[ -z "$LETSENCRYPT_EMAIL" ]  && read -rp  "Email Let's Encrypt            : " LETSENCRYPT_EMAIL
 
 APP_DIR="/opt/app"
 REPO_URL="git@github.com:tojoolivier/ifvm-app.git"
@@ -67,11 +69,28 @@ POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 JWT_SECRET=${JWT_SECRET}
 JWT_ALGORITHM=HS256
 JWT_EXPIRE_MINUTES=60
+DOMAIN=${DOMAIN}
 VITE_API_URL=https://${DOMAIN}
 EOF
 
+# Démarrage initial (nginx en HTTP-only, challenge ACME prêt)
 docker compose -f infra/docker-compose.prod.yml --env-file .env up -d --build
 docker compose -f infra/docker-compose.prod.yml --env-file .env exec -T backend alembic upgrade head
+
+# --- HTTPS / Let's Encrypt ---
+echo ">>> Provisioning du certificat Let's Encrypt pour $DOMAIN..."
+docker compose -f infra/docker-compose.prod.yml --env-file .env run --rm certbot \
+  certbot certonly \
+    --webroot \
+    --webroot-path /var/www/certbot \
+    --email "$LETSENCRYPT_EMAIL" \
+    --agree-tos \
+    --no-eff-email \
+    -d "$DOMAIN"
+
+# Redémarre nginx — il détecte le certificat et passe en HTTPS automatiquement
+docker compose -f infra/docker-compose.prod.yml --env-file .env restart nginx
+echo ">>> HTTPS actif sur https://$DOMAIN"
 
 # --- Backup cron ---
 apt-get install -y postgresql-client -q
@@ -81,6 +100,6 @@ CRON_CMD="0 3 * * * docker compose -f $APP_DIR/infra/docker-compose.prod.yml exe
 
 echo ""
 echo "=== Bootstrap terminé ==="
-echo "Application disponible sur http://${DOMAIN}"
+echo "Application disponible sur https://${DOMAIN}"
 echo "Pour les déploiements suivants, GitHub Actions s'en charge automatiquement."
 echo "Ajoute VPS_IP=$(curl -s ifconfig.me) et SSH_PRIVATE_KEY dans les secrets GitHub."

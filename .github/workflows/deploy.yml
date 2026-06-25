@@ -32,6 +32,7 @@ jobs:
             JWT_SECRET=${JWT_SECRET}
             JWT_ALGORITHM=HS256
             JWT_EXPIRE_MINUTES=60
+            DOMAIN=${DOMAIN}
             VITE_API_URL=https://${DOMAIN}
             EOF
 

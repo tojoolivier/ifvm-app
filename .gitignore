@@ -8,6 +8,10 @@ dist/
 
 # Env
 .env
+
+# nginx-conf.d/default.conf est dans le repo (config HTTP initiale) mais sera
+# écrasée par init-ssl.sh lors de la provisioning HTTPS. Ne pas re-committer
+# après provisioning car elle contiendrait le domaine de prod.
 *.env.local
 
 # Node

@@ -25,9 +25,10 @@ jobs:
           host: ${{ secrets.VPS_IP }}
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: DOMAIN,POSTGRES_PASSWORD,JWT_SECRET
+          envs: DOMAIN,POSTGRES_PASSWORD,JWT_SECRET,LETSENCRYPT_EMAIL
           script: bash /tmp/scripts/bootstrap-vps.sh
         env:
           DOMAIN: ${{ secrets.DOMAIN }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          LETSENCRYPT_EMAIL: ${{ secrets.LETSENCRYPT_EMAIL }}
