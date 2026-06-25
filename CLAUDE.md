@@ -15,3 +15,10 @@ Single-context layout: one `CONTEXT.md` + `docs/adr/` at the repo root. See `doc
 
 ### styles
 respond in french (soit plus pedagogue)
+
+### Design system
+After every frontend modification (new component, style change, token update), run:
+```bash
+npx @google/design.md lint DESIGN.md
+```
+Fix all warnings before considering the task done.
