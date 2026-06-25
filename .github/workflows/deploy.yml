@@ -21,8 +21,16 @@ jobs:
           host: ${{ secrets.VPS_IP }}
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: VPS_DEPLOY_KEY
           script: |
+            # S'assurer que la deploy key git est à jour
+            echo "$VPS_DEPLOY_KEY" | base64 -d > /root/.ssh/id_ed25519
+            chmod 600 /root/.ssh/id_ed25519
+            ssh-keyscan -H github.com >> /root/.ssh/known_hosts 2>/dev/null
+
             cd ${{ env.APP_DIR }}
             GIT_SSH_COMMAND="ssh -i /root/.ssh/id_ed25519 -o StrictHostKeyChecking=no" git pull origin main
             docker compose -f docker-compose.prod.yml up -d --build
             docker compose -f docker-compose.prod.yml exec -T backend alembic upgrade head
+        env:
+          VPS_DEPLOY_KEY: ${{ secrets.VPS_DEPLOY_KEY }}

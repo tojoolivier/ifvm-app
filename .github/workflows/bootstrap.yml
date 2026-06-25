@@ -19,7 +19,7 @@ jobs:
           envs: VPS_DEPLOY_KEY
           script: |
             mkdir -p /root/.ssh
-            echo "$VPS_DEPLOY_KEY" > /root/.ssh/id_ed25519
+            echo "$VPS_DEPLOY_KEY" | base64 -d > /root/.ssh/id_ed25519
             chmod 600 /root/.ssh/id_ed25519
         env:
           VPS_DEPLOY_KEY: ${{ secrets.VPS_DEPLOY_KEY }}
