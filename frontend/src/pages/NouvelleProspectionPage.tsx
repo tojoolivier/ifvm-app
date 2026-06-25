@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { useNavigate, useBlocker } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { Button } from '@/components/ui/button'
@@ -206,6 +206,48 @@ function parseInt0(s: string): number | null {
 }
 
 // ---------------------------------------------------------------------------
+// Draft auto-save
+// ---------------------------------------------------------------------------
+
+const DRAFT_KEY = 'prospection-draft'
+
+interface ProspectionDraftData {
+  savedAt: string
+  campagneId: string
+  stationId: string
+  stationSearch: string
+  dateProspection: string
+  nReleve: string
+  nFiche: string
+  latitude: string
+  longitude: string
+  altitude: string
+  surfStation: string
+  surfProspectee: string
+  surfInfestee: string
+  degats: string
+  dernieresPluies: string
+  intensitePluie: string
+  ennemis: string
+  observations: string
+  nextId: number
+  captures: CaptureRow[]
+  populations: PopulationRow[]
+  infestations: InfestationRow[]
+  vegetation: Record<string, StrateVegetation>
+  sol: { humidite: string; texture: string }
+}
+
+function loadDraft(): ProspectionDraftData | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY)
+    return raw ? (JSON.parse(raw) as ProspectionDraftData) : null
+  } catch {
+    return null
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Section wrapper
 // ---------------------------------------------------------------------------
 
@@ -257,6 +299,15 @@ export function NouvelleProspectionPage() {
 
   const [errors, setErrors] = useState<string[]>([])
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+
+  // Draft auto-save
+  const [storedDraft] = useState<ProspectionDraftData | null>(loadDraft)
+  const [draftDismissed, setDraftDismissed] = useState(false)
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
+
+  const formRef = useRef<Omit<ProspectionDraftData, 'savedAt'>>({} as Omit<ProspectionDraftData, 'savedAt'>)
+  const lastSnapshotRef = useRef('')
+  const isSubmittedRef = useRef(false)
 
   // --- données ---
   const { data: campagnes = [] } = useQuery<Campagne[]>({
@@ -341,6 +392,8 @@ export function NouvelleProspectionPage() {
         statut: data.statut,
       }),
     onSuccess: () => {
+      isSubmittedRef.current = true
+      localStorage.removeItem(DRAFT_KEY)
       queryClient.invalidateQueries({ queryKey: ['prospections'] })
       navigate('/prospections')
     },
@@ -461,6 +514,32 @@ export function NouvelleProspectionPage() {
     return summary.length === 0
   }
 
+  function applyDraft(draft: ProspectionDraftData) {
+    setCampagneId(draft.campagneId)
+    setStationId(draft.stationId)
+    setStationSearch(draft.stationSearch)
+    setDateProspection(draft.dateProspection)
+    setNReleve(draft.nReleve)
+    setNFiche(draft.nFiche)
+    setLatitude(draft.latitude)
+    setLongitude(draft.longitude)
+    setAltitude(draft.altitude)
+    setSurfStation(draft.surfStation)
+    setSurfProspectee(draft.surfProspectee)
+    setSurfInfestee(draft.surfInfestee)
+    setDegats(draft.degats)
+    setDernieresPluies(draft.dernieresPluies)
+    setIntensitePluie(draft.intensitePluie)
+    setEnnemis(draft.ennemis)
+    setObservations(draft.observations)
+    setNextId(draft.nextId)
+    setCaptures(draft.captures)
+    setPopulations(draft.populations)
+    setInfestations(draft.infestations)
+    setVegetation(draft.vegetation)
+    setSol(draft.sol)
+  }
+
   function handleSave(statut: 'brouillon' | 'en_attente') {
     if (!validate()) return
     mutation.mutate({ statut })
@@ -518,16 +597,98 @@ export function NouvelleProspectionPage() {
     setVegetation((prev) => ({ ...prev, [key]: { ...prev[key], [field]: value } }))
   }
 
+  // Keep formRef fresh every render so the auto-save interval always reads latest state.
+  formRef.current = {
+    campagneId, stationId, stationSearch, dateProspection, nReleve, nFiche,
+    latitude, longitude, altitude, surfStation, surfProspectee, surfInfestee,
+    degats, dernieresPluies, intensitePluie, ennemis, observations,
+    nextId, captures, populations, infestations, vegetation, sol,
+  }
+
   const isPending = mutation.isPending
 
+  // Auto-save toutes les 30s si l'état a changé depuis la dernière sauvegarde.
+  useEffect(() => {
+    if (isPending) return
+    const id = setInterval(() => {
+      const snap = JSON.stringify(formRef.current)
+      if (snap === lastSnapshotRef.current) return
+      const draft: ProspectionDraftData = { savedAt: new Date().toISOString(), ...formRef.current }
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+      lastSnapshotRef.current = snap
+      setLastSavedAt(new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }))
+    }, 30_000)
+    return () => clearInterval(id)
+  }, [isPending])
+
+  // Avertissement navigateur natif (onglet fermé, F5…)
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isSubmittedRef.current) return
+      if (!formRef.current.campagneId && !formRef.current.stationId) return
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [])
+
+  const blocker = useBlocker(({ currentLocation, nextLocation }) =>
+    !isSubmittedRef.current &&
+    (formRef.current.campagneId !== '' || formRef.current.stationId !== '') &&
+    currentLocation.pathname !== nextLocation.pathname,
+  )
+
   return (
+    <>
     <div className="px-8 py-6 max-w-4xl mx-auto">
       <div className="flex items-center gap-4 mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/prospections')}>
           ← Retour
         </Button>
         <h1 className="text-2xl font-bold">Nouvelle fiche de prospection intensive</h1>
+        {lastSavedAt && (
+          <span className="ml-auto text-xs text-muted-foreground">
+            Brouillon sauvegardé à {lastSavedAt}
+          </span>
+        )}
       </div>
+
+      {storedDraft && !draftDismissed && (
+        <div className="mb-4 flex items-center justify-between rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+          <span>
+            Un brouillon du{' '}
+            {new Date(storedDraft.savedAt).toLocaleDateString('fr-FR')} à{' '}
+            {new Date(storedDraft.savedAt).toLocaleTimeString('fr-FR', {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}{' '}
+            existe.
+          </span>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                applyDraft(storedDraft)
+                setDraftDismissed(true)
+              }}
+            >
+              Reprendre
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                localStorage.removeItem(DRAFT_KEY)
+                setDraftDismissed(true)
+              }}
+            >
+              Commencer à zéro
+            </Button>
+          </div>
+        </div>
+      )}
 
       {errors.length > 0 && (
         <div className="mb-4 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
@@ -1109,5 +1270,24 @@ export function NouvelleProspectionPage() {
         </div>
       </div>
     </div>
+
+    {blocker.state === 'blocked' && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="mx-4 max-w-sm rounded-lg bg-white p-6 shadow-xl">
+          <p className="mb-4 text-sm">
+            Des modifications non soumises seront perdues. Quitter quand même ?
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" size="sm" onClick={() => blocker.reset()}>
+              Rester
+            </Button>
+            <Button variant="destructive" size="sm" onClick={() => blocker.proceed()}>
+              Quitter
+            </Button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
