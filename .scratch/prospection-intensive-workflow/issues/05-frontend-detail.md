@@ -1,6 +1,6 @@
 # Issue 05 — Frontend web : page détail et audit log
 
-**Status:** ready-for-agent  
+**Status:** done  
 **Priority:** high  
 **Depends on:** 04
 
@@ -10,16 +10,16 @@ Créer la page de détail d'une fiche intensive avec affichage de l'audit log et
 
 ## Acceptance Criteria
 
-- [ ] Page `/prospections/:id` avec tous les champs de la fiche
-- [ ] Affichage de la station sélectionnée (nom, coordonnées, PA)
-- [ ] Section "Audit log" avec historique chronologique
-- [ ] Chaque entrée d'audit log affiche : auteur, date, action, détails/commentaire
-- [ ] Boutons d'action selon le statut et le rôle :
+- [x] Page `/prospections/:id` avec tous les champs de la fiche
+- [x] Affichage de la station sélectionnée (nom, coordonnées, PA)
+- [x] Section "Audit log" avec historique chronologique
+- [x] Chaque entrée d'audit log affiche : auteur, date, action, détails/commentaire
+- [x] Boutons d'action selon le statut et le rôle :
   - Si `en_attente` et rôle `verificateur` → bouton "Vérifier"
   - Si `verifiee` et rôle `validation_finale` → boutons "Valider" / "Rejeter"
-- [ ] Modale de confirmation pour validation/rejet
-- [ ] Champ de commentaire obligatoire lors du rejet
-- [ ] Indicateur de sync status (synchronisé/désynchronisé)
+- [x] Modale de confirmation pour validation/rejet
+- [x] Champ de commentaire obligatoire lors du rejet
+- [x] Indicateur de sync status (synchronisé/désynchronisé)
 
 ## Technical Notes
 
