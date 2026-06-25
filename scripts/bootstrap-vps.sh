@@ -67,7 +67,7 @@ POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 JWT_SECRET=${JWT_SECRET}
 JWT_ALGORITHM=HS256
 JWT_EXPIRE_MINUTES=60
-VITE_API_URL=http://${DOMAIN}
+VITE_API_URL=https://${DOMAIN}
 EOF
 
 docker compose -f infra/docker-compose.prod.yml --env-file .env up -d --build
