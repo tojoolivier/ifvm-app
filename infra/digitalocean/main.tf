@@ -52,11 +52,11 @@ resource "digitalocean_firewall" "default" {
 }
 
 resource "digitalocean_droplet" "default" {
-  name      = "ifvm-prod"
-  size      = var.droplet_size
-  region    = var.region
-  image     = "ubuntu-24-04-x64"
-  ssh_keys  = [digitalocean_ssh_key.default.fingerprint]
+  name     = "ifvm-prod"
+  size     = var.droplet_size
+  region   = var.region
+  image    = "ubuntu-24-04-x64"
+  ssh_keys = [digitalocean_ssh_key.default.fingerprint]
 
   user_data = templatefile("${path.module}/../cloud-init.sh", {
     domain            = var.domain

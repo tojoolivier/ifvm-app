@@ -13,7 +13,17 @@ variable "ssh_public_key" {
 variable "domain" {
   description = "Nom de domaine de l'application"
   type        = string
-  default     = "app.example.com"
+}
+
+variable "cloudflare_zone_name" {
+  description = "Nom de la zone Cloudflare (domaine racine)"
+  type        = string
+}
+
+variable "cloudflare_api_token" {
+  description = "Token API Cloudflare avec permissions DNS + Origin CA"
+  type        = string
+  sensitive   = true
 }
 
 variable "server_type" {

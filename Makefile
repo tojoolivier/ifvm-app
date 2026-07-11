@@ -14,48 +14,45 @@ build:
 logs:
 	$(COMPOSE) logs -f
 
-# Générer une nouvelle migration après modification des modèles SQLAlchemy
 migrate:
 	$(COMPOSE) exec backend alembic revision --autogenerate -m "$(msg)"
 
-# Appliquer toutes les migrations en attente
 upgrade:
 	$(COMPOSE) exec backend alembic upgrade head
 
-# Revenir à la migration précédente
 downgrade:
 	$(COMPOSE) exec backend alembic downgrade -1
 
-# Insérer les données de référence
 seed:
 	$(COMPOSE) exec backend python -m app.seed
 
-# Accéder à psql
 shell-db:
 	$(COMPOSE) exec db psql -U ifvm -d ifvm_db
 
-# Accéder au shell du backend
 shell-backend:
 	$(COMPOSE) exec backend bash
 
-# --- Infra ---
-TF = terraform -C infra
+# --- Infra Contabo (principal) ---
+TF_CONTABO = terraform -chdir=infra/contabo
 
 tf-init:
-	$(TF) init
+	$(TF_CONTABO) init
 
 tf-plan:
-	$(TF) plan
+	$(TF_CONTABO) plan
 
 tf-apply:
-	$(TF) apply -auto-approve
+	$(TF_CONTABO) apply -auto-approve
 
 tf-destroy:
-	$(TF) destroy -auto-approve
+	$(TF_CONTABO) destroy -auto-approve
 
 tf-output:
-	$(TF) output
+	$(TF_CONTABO) output
+
+tf-fmt:
+	terraform -chdir=infra fmt -recursive
 
 # Déployer sur la VPS (SSH direct)
 deploy:
-	ssh root@$$(make tf-output | grep server_ip | awk '{print $$3}') "cd /opt/app && git pull && docker compose -f docker-compose.prod.yml up -d --build"
+	ssh root@$$(make tf-output | grep instance_ip | awk '{print $$3}') "cd /opt/app && git pull && docker compose -f docker-compose.prod.yml --env-file .env up -d --build"

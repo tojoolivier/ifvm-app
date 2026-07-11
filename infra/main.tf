@@ -4,11 +4,23 @@ terraform {
       source  = "hetznercloud/hcloud"
       version = "~> 1.50"
     }
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 5.0"
+    }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
+    }
   }
 }
 
 provider "hcloud" {
   token = var.hcloud_token
+}
+
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token
 }
 
 resource "hcloud_ssh_key" "default" {
@@ -53,10 +65,12 @@ resource "hcloud_server" "default" {
     domain            = var.domain
     postgres_password = var.postgres_password
     jwt_secret        = var.jwt_secret
+    origin_cert       = base64encode(cloudflare_origin_ca_certificate.app.certificate)
+    origin_key        = base64encode(tls_private_key.origin_ca.private_key_pem)
   })
 
   labels = {
-    env  = "production"
-    app  = "ifvm"
+    env = "production"
+    app = "ifvm"
   }
 }
