@@ -2,7 +2,7 @@
 
 ### Issue tracker
 
-Issues live as local markdown files under `.scratch/`. No remote issue tracker in use. See `docs/agents/issue-tracker.md`.
+Issues live as GitHub Issues in `tojoolivier/ifvm-app` (via `gh`). External PRs are not treated as a triage surface. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
