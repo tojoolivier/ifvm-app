@@ -25,6 +25,8 @@ import {
   markGrilleCompleted,
   getProspectionPopulation,
   saveProspectionPopulation,
+  getProspectionInfestation,
+  saveProspectionInfestation,
 } from '../src/lib/prospection-repository';
 
 const BASE_INPUT = {
@@ -441,6 +443,80 @@ describe('saveProspectionPopulation', () => {
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE prospection_population SET'),
       [10, 2, 'battage', 'rare', 'peu', 'existing-id']
+    );
+  });
+});
+
+describe('getProspectionInfestation', () => {
+  it('returns null when no row matches', async () => {
+    getFirstAsync.mockResolvedValueOnce(undefined);
+
+    const result = await getProspectionInfestation(BASE_INPUT.id);
+
+    expect(result).toBeNull();
+    expect(getFirstAsync).toHaveBeenCalledWith(expect.any(String), [BASE_INPUT.id]);
+  });
+
+  it('returns the matching row', async () => {
+    const row = {
+      type_cible: 'essaim',
+      taille_min: 1,
+      taille_max: 2,
+      taille_moy: 1.5,
+      surface_tot: 5,
+      densite_min: 1,
+      densite_max: 3,
+      densite_moy: 2,
+      interdistance: 1,
+      comportement: 'repos',
+      direction_vers: 'N',
+      vent_de: 'S',
+      vent_vitesse: 10,
+    };
+    getFirstAsync.mockResolvedValueOnce(row);
+
+    const result = await getProspectionInfestation(BASE_INPUT.id);
+
+    expect(result).toEqual(row);
+  });
+});
+
+describe('saveProspectionInfestation', () => {
+  const ROW = {
+    type_cible: 'essaim',
+    taille_min: 1,
+    taille_max: 2,
+    taille_moy: 1.5,
+    surface_tot: 5,
+    densite_min: 1,
+    densite_max: 3,
+    densite_moy: 2,
+    interdistance: 1,
+    comportement: 'repos',
+    direction_vers: 'N',
+    vent_de: 'S',
+    vent_vitesse: 10,
+  };
+
+  it('inserts a new row when none exists for the prospection', async () => {
+    getFirstAsync.mockResolvedValueOnce(undefined);
+
+    await saveProspectionInfestation(BASE_INPUT.id, ROW);
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO prospection_infestation'),
+      expect.arrayContaining([BASE_INPUT.id, 'essaim', 1, 2, 1.5, 5, 1, 3, 2, 1, 'repos', 'N', 'S', 10])
+    );
+  });
+
+  it('updates the existing row when one already exists', async () => {
+    getFirstAsync.mockResolvedValueOnce({ id: 'existing-id' });
+
+    await saveProspectionInfestation(BASE_INPUT.id, ROW);
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE prospection_infestation SET'),
+      ['essaim', 1, 2, 1.5, 5, 1, 3, 2, 1, 'repos', 'N', 'S', 10, 'existing-id']
     );
   });
 });

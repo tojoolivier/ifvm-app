@@ -88,6 +88,27 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
 
     CREATE INDEX IF NOT EXISTS ix_prospection_population_prospection_id
       ON prospection_population(prospection_id);
+
+    CREATE TABLE IF NOT EXISTS prospection_infestation (
+      id TEXT PRIMARY KEY NOT NULL,
+      prospection_id TEXT NOT NULL REFERENCES prospection(id) ON DELETE CASCADE,
+      type_cible TEXT NOT NULL,
+      taille_min REAL,
+      taille_max REAL,
+      taille_moy REAL,
+      surface_tot REAL,
+      densite_min REAL,
+      densite_max REAL,
+      densite_moy REAL,
+      interdistance REAL,
+      comportement TEXT,
+      direction_vers TEXT,
+      vent_de TEXT,
+      vent_vitesse REAL
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_prospection_infestation_prospection_id
+      ON prospection_infestation(prospection_id);
   `);
 
   return db;

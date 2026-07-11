@@ -1,129 +1,82 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getProspection, getProspectionPopulation, DraftProspection } from '@/lib/prospection-repository';
-import { parseEspeceSelection } from '@/lib/prospection-especes';
+import { getProspection, getProspectionInfestation, DraftProspection } from '@/lib/prospection-repository';
 import {
-  DensitesState,
-  EMPTY_DENSITES,
-  METHODE_OPTIONS,
-  MethodeMesure,
-  parseDensites,
-  saveDensites,
-} from '@/lib/prospection-densites';
+  COMPORTEMENT_OPTIONS,
+  Comportement,
+  DIRECTION_OPTIONS,
+  Direction,
+  EMPTY_INFESTATION_COMPORTEMENT,
+  InfestationComportementState,
+  parseInfestationComportement,
+  saveInfestationComportement,
+} from '@/lib/prospection-infestation';
 
 const IFVM_GREEN = '#1B5E1B';
 const IFVM_GREEN_DARK = '#163F16';
 
-type NextRoute = 'plan' | 'infestation' | 'vegetation';
+type NextRoute = 'plan' | 'vegetation';
 
-export default function DensitesScreen() {
+export default function InfestationComportementScreen() {
   const router = useRouter();
-  const { draftId, espece, next } = useLocalSearchParams<{
-    draftId: string;
-    espece: 'LMC' | 'NSE';
-    next: NextRoute;
-  }>();
+  const { draftId, next } = useLocalSearchParams<{ draftId: string; next: NextRoute }>();
 
   const [draft, setDraft] = useState<DraftProspection | null>(null);
-  const [state, setState] = useState<DensitesState>(EMPTY_DENSITES);
+  const [state, setState] = useState<InfestationComportementState>(EMPTY_INFESTATION_COMPORTEMENT);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!draftId || !espece) return;
+    if (!draftId) return;
     getProspection(draftId).then(async (row) => {
       setDraft(row);
       if (!row) return;
-      const [imago, larve] = await Promise.all([
-        getProspectionPopulation(row.id, espece, 'imago'),
-        getProspectionPopulation(row.id, espece, 'larve'),
-      ]);
-      setState(parseDensites(imago, larve));
+      const infestation = await getProspectionInfestation(row.id);
+      setState(parseInfestationComportement(infestation));
     });
-  }, [draftId, espece]);
-
-  const hasImago = useMemo(() => {
-    if (!draft) return false;
-    const selection = parseEspeceSelection(draft.especes);
-    return espece === 'LMC' ? selection.lmcImago : selection.nseImago;
-  }, [draft, espece]);
+  }, [draftId]);
 
   const handleContinuer = async () => {
-    if (!draft || !espece) return;
+    if (!draft) return;
     setIsSaving(true);
     setSaveError(null);
     try {
-      await saveDensites(draft.id, espece, state);
-      if (hasImago) {
-        router.push({
-          pathname: '/(prospection)/reproduction',
-          params: { draftId: draft.id, espece, next },
-        });
-      } else {
-        router.push({ pathname: `/(prospection)/${next}`, params: { draftId: draft.id } });
-      }
+      await saveInfestationComportement(draft.id, state);
+      router.push({ pathname: `/(prospection)/${next ?? 'vegetation'}`, params: { draftId: draft.id } });
     } catch {
-      setSaveError('Impossible d’enregistrer les densités localement');
+      setSaveError('Impossible d’enregistrer le comportement localement');
     } finally {
       setIsSaving(false);
     }
   };
 
-  if (!draft || !espece) {
+  if (!draft) {
     return <View style={styles.root} />;
   }
 
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.header}>
-        <Text style={styles.headerTitle}>Densités — {espece}</Text>
+        <Text style={styles.headerTitle}>Infestation — Comportement</Text>
         <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: '75%' }]} />
+          <View style={[styles.progressFill, { width: '90%' }]} />
         </View>
-        <Text style={styles.progressLabel}>Étape 3/4</Text>
+        <Text style={styles.progressLabel}>Étape 4/4</Text>
       </SafeAreaView>
 
       <ScrollView style={styles.content} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
         <View style={styles.card}>
-          <Text style={styles.cardLabel}>Population diffuse (/ha)</Text>
-          <DensiteField
-            label="Imagos"
-            value={state.diffuseImago}
-            onChangeText={(v) => setState((prev) => ({ ...prev, diffuseImago: v }))}
-          />
-          <DensiteField
-            label="Larves"
-            value={state.diffuseLarve}
-            onChangeText={(v) => setState((prev) => ({ ...prev, diffuseLarve: v }))}
-          />
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Population groupée « taches / bandes » (/m²)</Text>
-          <DensiteField
-            label="Imagos"
-            value={state.groupeeImago}
-            onChangeText={(v) => setState((prev) => ({ ...prev, groupeeImago: v }))}
-          />
-          <DensiteField
-            label="Larves"
-            value={state.groupeeLarve}
-            onChangeText={(v) => setState((prev) => ({ ...prev, groupeeLarve: v }))}
-          />
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Méthode de mesure</Text>
+          <Text style={styles.cardLabel}>État</Text>
           <View style={styles.chipsRow}>
-            {METHODE_OPTIONS.map((option) => {
-              const active = state.methode === option.value;
+            {COMPORTEMENT_OPTIONS.map((option) => {
+              const active = state.comportement === option.value;
               return (
                 <TouchableOpacity
                   key={option.value}
                   style={[styles.chip, active && styles.chipActive]}
-                  onPress={() => setState((prev) => ({ ...prev, methode: option.value as MethodeMesure }))}
+                  onPress={() => setState((prev) => ({ ...prev, comportement: option.value as Comportement }))}
                   activeOpacity={0.85}
                 >
                   <Text style={[styles.chipText, active && styles.chipTextActive]}>{option.label}</Text>
@@ -133,36 +86,65 @@ export default function DensitesScreen() {
           </View>
         </View>
 
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>Direction du déplacement</Text>
+          <View style={styles.chipsRow}>
+            {DIRECTION_OPTIONS.map((option) => {
+              const active = state.directionVers === option.value;
+              return (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[styles.chip, active && styles.chipActive]}
+                  onPress={() => setState((prev) => ({ ...prev, directionVers: option.value as Direction }))}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{option.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>Vent — direction</Text>
+          <View style={styles.chipsRow}>
+            {DIRECTION_OPTIONS.map((option) => {
+              const active = state.ventDe === option.value;
+              return (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[styles.chip, active && styles.chipActive]}
+                  onPress={() => setState((prev) => ({ ...prev, ventDe: option.value as Direction }))}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{option.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>Vent — vitesse (km/h)</Text>
+          <View style={styles.fieldRow}>
+            <Text style={styles.rowLabel}>Vitesse</Text>
+            <TextInput
+              style={styles.fieldInput}
+              value={state.ventVitesse}
+              onChangeText={(v) => setState((prev) => ({ ...prev, ventVitesse: v }))}
+              keyboardType="decimal-pad"
+              placeholder="0"
+              placeholderTextColor="#9CA3AF"
+            />
+          </View>
+        </View>
+
         {saveError && <Text style={styles.errorText}>{saveError}</Text>}
 
         <TouchableOpacity style={styles.btnContinuer} onPress={handleContinuer} disabled={isSaving} activeOpacity={0.85}>
           <Text style={styles.btnContinuerText}>{isSaving ? 'Enregistrement…' : 'Continuer'}</Text>
         </TouchableOpacity>
       </ScrollView>
-    </View>
-  );
-}
-
-function DensiteField({
-  label,
-  value,
-  onChangeText,
-}: {
-  label: string;
-  value: string;
-  onChangeText: (v: string) => void;
-}) {
-  return (
-    <View style={styles.fieldRow}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <TextInput
-        style={styles.fieldInput}
-        value={value}
-        onChangeText={onChangeText}
-        keyboardType="decimal-pad"
-        placeholder="0"
-        placeholderTextColor="#9CA3AF"
-      />
     </View>
   );
 }

@@ -317,6 +317,78 @@ export async function saveProspectionPopulation(prospectionId: string, row: Popu
   }
 }
 
+export interface InfestationRow {
+  type_cible: string;
+  taille_min: number | null;
+  taille_max: number | null;
+  taille_moy: number | null;
+  surface_tot: number | null;
+  densite_min: number | null;
+  densite_max: number | null;
+  densite_moy: number | null;
+  interdistance: number | null;
+  comportement: string | null;
+  direction_vers: string | null;
+  vent_de: string | null;
+  vent_vitesse: number | null;
+}
+
+/** Relit la ligne `prospection_infestation` d'une fiche (une infestation décrite par fiche), ou `null` si absente. */
+export async function getProspectionInfestation(prospectionId: string): Promise<InfestationRow | null> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<InfestationRow>(
+    `SELECT type_cible, taille_min, taille_max, taille_moy, surface_tot,
+            densite_min, densite_max, densite_moy, interdistance,
+            comportement, direction_vers, vent_de, vent_vitesse
+     FROM prospection_infestation WHERE prospection_id = ?`,
+    [prospectionId]
+  );
+  return row ?? null;
+}
+
+/** Insère ou remplace l'unique ligne `prospection_infestation` d'une fiche. */
+export async function saveProspectionInfestation(prospectionId: string, row: InfestationRow): Promise<void> {
+  const db = await getDb();
+  const existing = await db.getFirstAsync<{ id: string }>(
+    'SELECT id FROM prospection_infestation WHERE prospection_id = ?',
+    [prospectionId]
+  );
+  const values = [
+    row.type_cible,
+    row.taille_min,
+    row.taille_max,
+    row.taille_moy,
+    row.surface_tot,
+    row.densite_min,
+    row.densite_max,
+    row.densite_moy,
+    row.interdistance,
+    row.comportement,
+    row.direction_vers,
+    row.vent_de,
+    row.vent_vitesse,
+  ];
+  if (existing) {
+    await db.runAsync(
+      `UPDATE prospection_infestation SET
+        type_cible = ?, taille_min = ?, taille_max = ?, taille_moy = ?, surface_tot = ?,
+        densite_min = ?, densite_max = ?, densite_moy = ?, interdistance = ?,
+        comportement = ?, direction_vers = ?, vent_de = ?, vent_vitesse = ?
+       WHERE id = ?`,
+      [...values, existing.id]
+    );
+  } else {
+    await db.runAsync(
+      `INSERT INTO prospection_infestation (
+        id, prospection_id, type_cible, taille_min, taille_max, taille_moy, surface_tot,
+        densite_min, densite_max, densite_moy, interdistance,
+        comportement, direction_vers, vent_de, vent_vitesse
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [generateId(), prospectionId, ...values]
+    );
+  }
+}
+
 /** Marque la fiche brouillon comme complète (statut 'en_attente'), indépendamment de l'état réseau. */
 export async function completeProspection(id: string): Promise<DraftProspection> {
   const db = await getDb();

@@ -15,7 +15,7 @@ import {
 const IFVM_GREEN = '#1B5E1B';
 const IFVM_GREEN_DARK = '#163F16';
 
-type NextRoute = 'plan' | 'vegetation';
+type NextRoute = 'plan' | 'infestation' | 'vegetation';
 
 export default function ReproductionScreen() {
   const router = useRouter();

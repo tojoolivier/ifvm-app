@@ -180,7 +180,8 @@ export default function CapturesScreen() {
       }
 
       const items = buildPlanItems(grilles, completed);
-      const next = isPlanComplete(items) ? 'vegetation' : 'plan';
+      const hasInfestation = (draft.surf_infestee ?? 0) > 0;
+      const next = isPlanComplete(items) ? (hasInfestation ? 'infestation' : 'vegetation') : 'plan';
 
       if (isEspeceComplete(grilles, completed, grille.espece)) {
         router.push({

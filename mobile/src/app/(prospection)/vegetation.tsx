@@ -39,6 +39,7 @@ export default function VegetationScreen() {
   }, [draftId]);
 
   const canContinue = isVegetationSolComplete(state) && !isSaving;
+  const backRoute = (draft?.surf_infestee ?? 0) > 0 ? 'infestation-comportement' : 'captures';
 
   const handleVerifierEtEnregistrer = async () => {
     if (!draft || !isVegetationSolComplete(state)) return;
@@ -57,9 +58,7 @@ export default function VegetationScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.push({ pathname: '/(prospection)/captures', params: { draftId } })}
-        >
+        <TouchableOpacity onPress={() => router.push({ pathname: `/(prospection)/${backRoute}`, params: { draftId } })}>
           <Text style={styles.backLink}>‹ Retour</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Végétation & sol</Text>
