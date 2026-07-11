@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
+import { getDb } from '@/lib/prospection-db';
 import '../global.css';
 
 function useAuthGuard() {
@@ -31,6 +32,10 @@ function useAuthGuard() {
 export default function RootLayout() {
   useAuthGuard();
   const isInitialized = useAuthStore((s) => s.isInitialized);
+
+  useEffect(() => {
+    getDb();
+  }, []);
 
   if (!isInitialized) {
     return (
