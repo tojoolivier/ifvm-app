@@ -37,6 +37,7 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
       n_message TEXT,
       especes TEXT, -- JSON EspeceSelection (écran Filtre espèces), local uniquement
       capture_started_at TEXT, -- horodatage de démarrage du chrono (écran Captures), local uniquement
+      grilles_completees TEXT, -- JSON string[] des grilles "espece|categorie" terminées (écran Plan de relevé), local uniquement
       date_prospection TEXT NOT NULL,
       latitude REAL,
       longitude REAL,

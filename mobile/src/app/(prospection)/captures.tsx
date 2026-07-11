@@ -2,8 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getProspection, listProspectionCaptures, DraftProspection } from '@/lib/prospection-repository';
+import {
+  getProspection,
+  listProspectionCaptures,
+  markGrilleCompleted,
+  DraftProspection,
+} from '@/lib/prospection-repository';
 import { buildGrilles, parseEspeceSelection } from '@/lib/prospection-especes';
+import { buildPlanItems, grilleKey, isPlanComplete, parseGrillesCompletees } from '@/lib/prospection-plan';
 import {
   CaptureCounts,
   PHENOTYPES,
@@ -100,13 +106,16 @@ export default function CapturesScreen() {
     setSaveError(null);
     try {
       await saveCaptureCounts(draft.id, grille.espece, grille.categorie, counts);
-      if (grilleIndex + 1 < grilles.length) {
-        router.push({
-          pathname: '/(prospection)/captures',
-          params: { draftId: draft.id, grilleIndex: String(grilleIndex + 1) },
-        });
-      } else {
+      if (grilles.length <= 1) {
         router.push({ pathname: '/(prospection)/vegetation', params: { draftId: draft.id } });
+        return;
+      }
+      const updated = await markGrilleCompleted(draft.id, grilleKey(grille));
+      const items = buildPlanItems(grilles, parseGrillesCompletees(updated.grilles_completees));
+      if (isPlanComplete(items)) {
+        router.push({ pathname: '/(prospection)/vegetation', params: { draftId: draft.id } });
+      } else {
+        router.push({ pathname: '/(prospection)/plan', params: { draftId: draft.id } });
       }
     } catch {
       setSaveError('Impossible d’enregistrer les captures localement');
@@ -116,11 +125,8 @@ export default function CapturesScreen() {
   };
 
   const handleRetour = () => {
-    if (grilleIndex > 0) {
-      router.push({
-        pathname: '/(prospection)/captures',
-        params: { draftId, grilleIndex: String(grilleIndex - 1) },
-      });
+    if (grilles.length > 1) {
+      router.push({ pathname: '/(prospection)/plan', params: { draftId } });
     } else {
       router.push({ pathname: '/(prospection)/especes', params: { draftId } });
     }

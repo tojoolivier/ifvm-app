@@ -40,6 +40,7 @@ const BASE_DRAFT: DraftProspection = {
   n_fiche: 'IFVM-2026-0001',
   especes: null,
   capture_started_at: '2026-07-11T08:00:00.000Z',
+  grilles_completees: null,
   date_prospection: '2026-07-11',
   latitude: -18.9,
   longitude: 47.5,

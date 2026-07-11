@@ -27,6 +27,7 @@ export interface DraftProspection {
   n_fiche: string | null;
   especes: string | null;
   capture_started_at: string | null;
+  grilles_completees: string | null;
   date_prospection: string;
   latitude: number | null;
   longitude: number | null;
@@ -152,6 +153,29 @@ export async function startCaptureTimer(id: string): Promise<DraftProspection> {
     "UPDATE prospection SET capture_started_at = ?, updated_at = ? WHERE id = ? AND capture_started_at IS NULL",
     [now, now, id]
   );
+
+  const updated = await getProspection(id);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
+/** Marque une grille (clé "espece|categorie") comme terminée dans le plan de relevé (idempotent). */
+export async function markGrilleCompleted(id: string, grilleKey: string): Promise<DraftProspection> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  const current = await getProspection(id);
+  const existing: unknown = current?.grilles_completees ? JSON.parse(current.grilles_completees) : [];
+  const completed = new Set<string>(Array.isArray(existing) ? existing : []);
+  completed.add(grilleKey);
+
+  await db.runAsync('UPDATE prospection SET grilles_completees = ?, updated_at = ? WHERE id = ?', [
+    JSON.stringify([...completed]),
+    now,
+    id,
+  ]);
 
   const updated = await getProspection(id);
   if (!updated) {

@@ -24,6 +24,7 @@ const STORED_ROW: DraftProspection = {
   n_fiche: 'FI-20260711-111111',
   especes: null,
   capture_started_at: null,
+  grilles_completees: null,
   date_prospection: '2026-07-11',
   latitude: -18.9,
   longitude: 47.5,

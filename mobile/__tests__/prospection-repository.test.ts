@@ -22,6 +22,7 @@ import {
   startCaptureTimer,
   saveProspectionCaptures,
   listProspectionCaptures,
+  markGrilleCompleted,
 } from '../src/lib/prospection-repository';
 
 const BASE_INPUT = {
@@ -288,6 +289,56 @@ describe('startCaptureTimer', () => {
     getFirstAsync.mockResolvedValueOnce(null);
 
     await expect(startCaptureTimer(BASE_INPUT.id)).rejects.toThrow(
+      'Échec de la mise à jour de la fiche brouillon locale'
+    );
+  });
+});
+
+describe('markGrilleCompleted', () => {
+  it('stores the first completed grille as a single-element JSON array', async () => {
+    getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW, grilles_completees: null });
+    getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW, grilles_completees: JSON.stringify(['LMC|imago']) });
+
+    await markGrilleCompleted(BASE_INPUT.id, 'LMC|imago');
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE prospection SET grilles_completees'),
+      [JSON.stringify(['LMC|imago']), expect.any(String), BASE_INPUT.id]
+    );
+  });
+
+  it('is idempotent and accumulates distinct grilles', async () => {
+    getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW, grilles_completees: JSON.stringify(['LMC|imago']) });
+    getFirstAsync.mockResolvedValueOnce({
+      ...STORED_ROW,
+      grilles_completees: JSON.stringify(['LMC|imago', 'NSE|imago']),
+    });
+
+    await markGrilleCompleted(BASE_INPUT.id, 'NSE|imago');
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE prospection SET grilles_completees'),
+      [JSON.stringify(['LMC|imago', 'NSE|imago']), expect.any(String), BASE_INPUT.id]
+    );
+  });
+
+  it('re-marking the same grille does not duplicate it', async () => {
+    getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW, grilles_completees: JSON.stringify(['LMC|imago']) });
+    getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW, grilles_completees: JSON.stringify(['LMC|imago']) });
+
+    await markGrilleCompleted(BASE_INPUT.id, 'LMC|imago');
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE prospection SET grilles_completees'),
+      [JSON.stringify(['LMC|imago']), expect.any(String), BASE_INPUT.id]
+    );
+  });
+
+  it('throws if the row cannot be read back after the update', async () => {
+    getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW, grilles_completees: null });
+    getFirstAsync.mockResolvedValueOnce(null);
+
+    await expect(markGrilleCompleted(BASE_INPUT.id, 'LMC|imago')).rejects.toThrow(
       'Échec de la mise à jour de la fiche brouillon locale'
     );
   });
