@@ -16,23 +16,32 @@ import {
   Phenotype,
   Sexe,
   CAPTURES_MAX,
+  LMC_LARVE_CAPTURES_MAX,
+  LMC_LARVE_STADES,
   NSE_CAPTURES_MAX,
+  NSE_LARVE_CAPTURES_MAX,
+  NSE_LARVE_STADES,
   NSE_PHENOTYPES,
   NSE_STADES,
   NsePhenotype,
   chronoSeconds,
   decrementCapture,
+  decrementLarveCapture,
   decrementNseCapture,
+  dominantLarvePhenotype,
   dominantNsePhenotype,
   dominantPhenotype,
   ensureCaptureTimerStarted,
   formatChrono,
   incrementCapture,
+  incrementLarveCapture,
   incrementNseCapture,
-  nseCaptureKey,
+  larveCaptureKey,
   parseCaptureRows,
+  parseLarveCaptureRows,
   parseNseCaptureRows,
   saveCaptureCounts,
+  saveLarveCaptureCounts,
   saveNseCaptureCounts,
   stadeForSexeSwitch,
   stadesForSexe,
@@ -65,7 +74,9 @@ export default function CapturesScreen() {
     [draft]
   );
   const grille = grilles[grilleIndex];
-  const isNse = grille?.espece === 'NSE';
+  const isImagoNse = grille?.espece === 'NSE' && grille?.categorie === 'imago';
+  const isLarve = grille?.categorie === 'larve';
+  const sansSexe = isImagoNse || isLarve;
 
   useEffect(() => {
     if (!draftId) return;
@@ -76,15 +87,23 @@ export default function CapturesScreen() {
     });
   }, [draftId]);
 
+  const larveStades = grille?.espece === 'LMC' ? LMC_LARVE_STADES : NSE_LARVE_STADES;
+  const larvePhenotypeOptions = grille?.espece === 'NSE' ? NSE_PHENOTYPES : PHENOTYPES;
+  const larveCapturesMax = grille?.espece === 'LMC' ? LMC_LARVE_CAPTURES_MAX : NSE_LARVE_CAPTURES_MAX;
+
   useEffect(() => {
     if (!draft || !grille) return;
     setSexe('F');
-    setSelectedPhenotype(isNse ? NSE_PHENOTYPES[0].value : 'solitaire');
-    setSelectedStade(isNse ? NSE_STADES[0] : stadesForSexe('F')[0]);
+    setSelectedPhenotype(
+      isImagoNse ? NSE_PHENOTYPES[0].value : isLarve ? larvePhenotypeOptions[0].value : 'solitaire'
+    );
+    setSelectedStade(isImagoNse ? NSE_STADES[0] : isLarve ? larveStades[0] : stadesForSexe('F')[0]);
     listProspectionCaptures(draft.id, grille.espece, grille.categorie).then((rows) => {
-      setCounts(isNse ? parseNseCaptureRows(rows) : parseCaptureRows(rows));
+      setCounts(
+        isImagoNse ? parseNseCaptureRows(rows) : isLarve ? parseLarveCaptureRows(rows) : parseCaptureRows(rows)
+      );
     });
-  }, [draft, grille, isNse]);
+  }, [draft, grille, isImagoNse, isLarve, larvePhenotypeOptions, larveStades]);
 
   useEffect(() => {
     if (!draft?.capture_started_at) return;
@@ -94,15 +113,19 @@ export default function CapturesScreen() {
     return () => clearInterval(interval);
   }, [draft?.capture_started_at]);
 
-  const stades = isNse ? NSE_STADES : stadesForSexe(sexe);
-  const phenotypeOptions = isNse ? NSE_PHENOTYPES : PHENOTYPES;
-  const capturesMax = isNse ? NSE_CAPTURES_MAX : CAPTURES_MAX;
+  const stades = isImagoNse ? NSE_STADES : isLarve ? larveStades : stadesForSexe(sexe);
+  const phenotypeOptions = isImagoNse ? NSE_PHENOTYPES : isLarve ? larvePhenotypeOptions : PHENOTYPES;
+  const capturesMax = isImagoNse ? NSE_CAPTURES_MAX : isLarve ? larveCapturesMax : CAPTURES_MAX;
   const total = totalCaptures(counts);
   const totalFemelles = totalBySexe(counts, 'F');
   const totalMales = totalBySexe(counts, 'M');
-  const dominant = isNse ? dominantNsePhenotype(counts) : dominantPhenotype(counts);
-  const currentCount = isNse
-    ? counts[nseCaptureKey(selectedPhenotype as NsePhenotype, selectedStade)] ?? 0
+  const dominant = isImagoNse
+    ? dominantNsePhenotype(counts)
+    : isLarve
+    ? (dominantLarvePhenotype(counts) as Phenotype | NsePhenotype | null)
+    : dominantPhenotype(counts);
+  const currentCount = sansSexe
+    ? counts[larveCaptureKey(selectedPhenotype, selectedStade)] ?? 0
     : counts[`${sexe}|${selectedPhenotype}|${selectedStade}`] ?? 0;
 
   const handleSexe = (next: Sexe) => {
@@ -112,16 +135,20 @@ export default function CapturesScreen() {
 
   const handleIncrement = (phenotype: Phenotype | NsePhenotype) => {
     setCounts((prev) =>
-      isNse
+      isImagoNse
         ? incrementNseCapture(prev, phenotype as NsePhenotype, selectedStade)
+        : isLarve
+        ? incrementLarveCapture(prev, phenotype, selectedStade, capturesMax)
         : incrementCapture(prev, sexe, phenotype as Phenotype, selectedStade)
     );
   };
 
   const handleDecrement = (phenotype: Phenotype | NsePhenotype) => {
     setCounts((prev) =>
-      isNse
+      isImagoNse
         ? decrementNseCapture(prev, phenotype as NsePhenotype, selectedStade)
+        : isLarve
+        ? decrementLarveCapture(prev, phenotype, selectedStade)
         : decrementCapture(prev, sexe, phenotype as Phenotype, selectedStade)
     );
   };
@@ -131,8 +158,10 @@ export default function CapturesScreen() {
     setIsSaving(true);
     setSaveError(null);
     try {
-      if (isNse) {
+      if (isImagoNse) {
         await saveNseCaptureCounts(draft.id, counts);
+      } else if (isLarve) {
+        await saveLarveCaptureCounts(draft.id, grille.espece, counts);
       } else {
         await saveCaptureCounts(draft.id, grille.espece, grille.categorie, counts);
       }
@@ -190,10 +219,10 @@ export default function CapturesScreen() {
           <Text style={styles.chronoMax}>max 30:00</Text>
         </View>
 
-        {isNse ? (
+        {sansSexe ? (
           <View style={styles.card}>
             <Text style={styles.cardLabel}>Sexe</Text>
-            <Text style={styles.summaryTextSub}>Non requis (pas de distinction ♀/♂ pour Nomadacris)</Text>
+            <Text style={styles.summaryTextSub}>Non requis (pas de distinction ♀/♂)</Text>
           </View>
         ) : (
           <View style={styles.card}>
@@ -225,8 +254,8 @@ export default function CapturesScreen() {
           <Text style={styles.cardLabel}>Phénotype</Text>
           {phenotypeOptions.map(({ value, label }) => {
             const active = selectedPhenotype === value;
-            const count = isNse
-              ? counts[nseCaptureKey(value as NsePhenotype, selectedStade)] ?? 0
+            const count = sansSexe
+              ? counts[larveCaptureKey(value, selectedStade)] ?? 0
               : counts[`${sexe}|${value}|${selectedStade}`] ?? 0;
             return (
               <View key={value} style={[styles.phenotypeRow, active && styles.phenotypeRowActive]}>
@@ -258,7 +287,7 @@ export default function CapturesScreen() {
         <View style={styles.card}>
           <Text style={styles.summaryText}>
             Total {total}/{capturesMax}
-            {isNse ? '' : ` · F ${totalFemelles} · M ${totalMales}`}
+            {sansSexe ? '' : ` · F ${totalFemelles} · M ${totalMales}`}
           </Text>
           <Text style={styles.summaryText}>
             Phénotype dominant : {dominant ? phenotypeOptions.find((p) => p.value === dominant)?.label : '—'}

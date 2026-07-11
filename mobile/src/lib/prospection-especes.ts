@@ -4,6 +4,7 @@ export interface EspeceSelection {
   lmcImago: boolean;
   lmcLarve: boolean;
   nseImago: boolean;
+  nseLarve: boolean;
 }
 
 export interface GrilleACapturer {
@@ -15,11 +16,14 @@ export const EMPTY_ESPECE_SELECTION: EspeceSelection = {
   lmcImago: false,
   lmcLarve: false,
   nseImago: false,
+  nseLarve: false,
 };
 
 /** Nombre de grilles de capture à remplir, une par toggle actif. */
 export function countGrilles(selection: EspeceSelection): number {
-  return [selection.lmcImago, selection.lmcLarve, selection.nseImago].filter(Boolean).length;
+  return [selection.lmcImago, selection.lmcLarve, selection.nseImago, selection.nseLarve].filter(
+    Boolean
+  ).length;
 }
 
 export function hasSelection(selection: EspeceSelection): boolean {
@@ -32,6 +36,7 @@ export function buildGrilles(selection: EspeceSelection): GrilleACapturer[] {
   if (selection.lmcImago) grilles.push({ espece: 'LMC', categorie: 'imago' });
   if (selection.lmcLarve) grilles.push({ espece: 'LMC', categorie: 'larve' });
   if (selection.nseImago) grilles.push({ espece: 'NSE', categorie: 'imago' });
+  if (selection.nseLarve) grilles.push({ espece: 'NSE', categorie: 'larve' });
   return grilles;
 }
 
@@ -44,6 +49,7 @@ export function parseEspeceSelection(raw: string | null): EspeceSelection {
       lmcImago: Boolean(parsed.lmcImago),
       lmcLarve: Boolean(parsed.lmcLarve),
       nseImago: Boolean(parsed.nseImago),
+      nseLarve: Boolean(parsed.nseLarve),
     };
   } catch {
     return { ...EMPTY_ESPECE_SELECTION };

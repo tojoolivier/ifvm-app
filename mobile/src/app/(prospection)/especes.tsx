@@ -24,6 +24,7 @@ export default function EspecesScreen() {
     lmcImago: false,
     lmcLarve: false,
     nseImago: false,
+    nseLarve: false,
   });
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -85,6 +86,7 @@ export default function EspecesScreen() {
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Nomadacris septemfasciata (NSE)</Text>
           <ToggleRow label="Imagos" active={selection.nseImago} onPress={() => toggle('nseImago')} />
+          <ToggleRow label="Larves" active={selection.nseLarve} onPress={() => toggle('nseLarve')} />
         </View>
 
         <View style={styles.card}>

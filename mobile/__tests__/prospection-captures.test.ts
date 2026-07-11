@@ -9,25 +9,37 @@ import {
   CAPTURES_MAX,
   CHRONO_MAX_SECONDS,
   FEMALE_STADES,
+  LMC_LARVE_CAPTURES_MAX,
+  LMC_LARVE_STADES,
   MALE_STADES,
   NSE_CAPTURES_MAX,
+  NSE_LARVE_CAPTURES_MAX,
+  NSE_LARVE_STADES,
   NSE_PHENOTYPES,
   NSE_STADES,
+  PHENOTYPES,
   buildCaptureRows,
+  buildLarveCaptureRows,
   buildNseCaptureRows,
   chronoSeconds,
   decrementCapture,
+  decrementLarveCapture,
   decrementNseCapture,
+  dominantLarvePhenotype,
   dominantNsePhenotype,
   dominantPhenotype,
   ensureCaptureTimerStarted,
   formatChrono,
   incrementCapture,
+  incrementLarveCapture,
   incrementNseCapture,
+  larveCaptureKey,
   nseCaptureKey,
   parseCaptureRows,
+  parseLarveCaptureRows,
   parseNseCaptureRows,
   saveCaptureCounts,
+  saveLarveCaptureCounts,
   saveNseCaptureCounts,
   stadeForSexeSwitch,
   stadesForSexe,
@@ -249,6 +261,57 @@ describe('Nomadacris imagos (NSE) — pas de bascule sexe', () => {
 
     expect(mockSaveCaptures).toHaveBeenCalledWith('prospection-1', 'NSE', 'imago', [
       { espece: 'NSE', categorie: 'imago', sexe: null, phase: 'gregaire', stade: 'A5', effectif: 1 },
+    ]);
+  });
+});
+
+describe('Larves LMC (L1→L5) & NSE (L1→L7) — pas de bascule sexe', () => {
+  it('exposes distinct stade sets per espèce', () => {
+    expect(LMC_LARVE_STADES).toEqual(['L1', 'L2', 'L3', 'L4', 'L5']);
+    expect(NSE_LARVE_STADES).toEqual(['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7']);
+  });
+
+  it('caps captures at a plafond distinct from the imago plafonds of each espèce', () => {
+    expect(LMC_LARVE_CAPTURES_MAX).not.toBe(CAPTURES_MAX);
+    expect(NSE_LARVE_CAPTURES_MAX).not.toBe(NSE_CAPTURES_MAX);
+
+    const atMax = { [larveCaptureKey('solitaire', 'L1')]: LMC_LARVE_CAPTURES_MAX };
+    expect(incrementLarveCapture(atMax, 'gregaire', 'L2', LMC_LARVE_CAPTURES_MAX)).toBe(atMax);
+  });
+
+  it('increments and decrements without a sexe dimension, reusing the 4 phénotypes for LMC larves', () => {
+    const incremented = incrementLarveCapture({}, 'transiens', 'L3', LMC_LARVE_CAPTURES_MAX);
+    expect(incremented).toEqual({ [larveCaptureKey('transiens', 'L3')]: 1 });
+
+    const decremented = decrementLarveCapture(incremented, 'transiens', 'L3');
+    expect(decremented).toEqual({ [larveCaptureKey('transiens', 'L3')]: 0 });
+
+    expect(PHENOTYPES.map((p) => p.value)).toContain('solitaro_trans');
+  });
+
+  it('picks the dominant phénotype across stades', () => {
+    const counts = {
+      [larveCaptureKey('solitaire', 'L1')]: 1,
+      [larveCaptureKey('gregaire', 'L4')]: 5,
+      [larveCaptureKey('gregaire', 'L2')]: 2,
+    };
+    expect(dominantLarvePhenotype(counts)).toBe('gregaire');
+  });
+
+  it('builds rows with categorie=larve and sexe=null and round-trips back to counts', () => {
+    const counts = { [larveCaptureKey('transiens', 'L2')]: 4 };
+    const rows = buildLarveCaptureRows('LMC', counts);
+    expect(rows).toEqual([
+      { espece: 'LMC', categorie: 'larve', sexe: null, phase: 'transiens', stade: 'L2', effectif: 4 },
+    ]);
+    expect(parseLarveCaptureRows(rows)).toEqual(counts);
+  });
+
+  it('persists NSE larves via saveProspectionCaptures with categorie=larve and sexe=null', async () => {
+    await saveLarveCaptureCounts('prospection-1', 'NSE', { [larveCaptureKey('gregaire', 'L7')]: 2 });
+
+    expect(mockSaveCaptures).toHaveBeenCalledWith('prospection-1', 'NSE', 'larve', [
+      { espece: 'NSE', categorie: 'larve', sexe: null, phase: 'gregaire', stade: 'L7', effectif: 2 },
     ]);
   });
 });

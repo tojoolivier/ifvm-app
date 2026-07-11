@@ -52,24 +52,32 @@ describe('countGrilles / hasSelection', () => {
   });
 
   it('counts each active toggle independently', () => {
-    expect(countGrilles({ lmcImago: true, lmcLarve: false, nseImago: false })).toBe(1);
-    expect(countGrilles({ lmcImago: true, lmcLarve: true, nseImago: false })).toBe(2);
-    expect(countGrilles({ lmcImago: true, lmcLarve: true, nseImago: true })).toBe(3);
-    expect(hasSelection({ lmcImago: false, lmcLarve: true, nseImago: false })).toBe(true);
+    expect(countGrilles({ lmcImago: true, lmcLarve: false, nseImago: false, nseLarve: false })).toBe(1);
+    expect(countGrilles({ lmcImago: true, lmcLarve: true, nseImago: false, nseLarve: false })).toBe(2);
+    expect(countGrilles({ lmcImago: true, lmcLarve: true, nseImago: true, nseLarve: false })).toBe(3);
+    expect(countGrilles({ lmcImago: true, lmcLarve: true, nseImago: true, nseLarve: true })).toBe(4);
+    expect(hasSelection({ lmcImago: false, lmcLarve: true, nseImago: false, nseLarve: false })).toBe(true);
   });
 });
 
 describe('buildGrilles', () => {
-  it('returns one grille per active toggle, LMC before NSE', () => {
-    expect(buildGrilles({ lmcImago: true, lmcLarve: true, nseImago: true })).toEqual([
+  it('returns one grille per active toggle, LMC before NSE, imago before larve', () => {
+    expect(buildGrilles({ lmcImago: true, lmcLarve: true, nseImago: true, nseLarve: true })).toEqual([
       { espece: 'LMC', categorie: 'imago' },
       { espece: 'LMC', categorie: 'larve' },
       { espece: 'NSE', categorie: 'imago' },
+      { espece: 'NSE', categorie: 'larve' },
     ]);
   });
 
   it('returns an empty list when nothing is selected', () => {
     expect(buildGrilles(EMPTY_ESPECE_SELECTION)).toEqual([]);
+  });
+
+  it('includes only the NSE larve grille when it is the sole toggle active', () => {
+    expect(buildGrilles({ lmcImago: false, lmcLarve: false, nseImago: false, nseLarve: true })).toEqual([
+      { espece: 'NSE', categorie: 'larve' },
+    ]);
   });
 });
 
@@ -83,15 +91,20 @@ describe('parseEspeceSelection', () => {
   });
 
   it('parses a stored selection back', () => {
-    const stored = JSON.stringify({ lmcImago: true, lmcLarve: false, nseImago: true });
-    expect(parseEspeceSelection(stored)).toEqual({ lmcImago: true, lmcLarve: false, nseImago: true });
+    const stored = JSON.stringify({ lmcImago: true, lmcLarve: false, nseImago: true, nseLarve: true });
+    expect(parseEspeceSelection(stored)).toEqual({
+      lmcImago: true,
+      lmcLarve: false,
+      nseImago: true,
+      nseLarve: true,
+    });
   });
 });
 
 describe('saveEspeceSelection', () => {
   it('persists the selection via the repository as JSON', async () => {
     mockUpdate.mockResolvedValueOnce(STORED_ROW);
-    const selection = { lmcImago: true, lmcLarve: false, nseImago: true };
+    const selection = { lmcImago: true, lmcLarve: false, nseImago: true, nseLarve: false };
 
     const result = await saveEspeceSelection(STORED_ROW.id, selection);
 

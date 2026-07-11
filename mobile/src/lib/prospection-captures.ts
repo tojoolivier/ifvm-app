@@ -225,3 +225,78 @@ export function parseNseCaptureRows(rows: CaptureRow[]): CaptureCounts {
 export async function saveNseCaptureCounts(prospectionId: string, counts: CaptureCounts): Promise<void> {
   await saveProspectionCaptures(prospectionId, 'NSE', 'imago', buildNseCaptureRows(counts));
 }
+
+/** Larves : jeu de stades propre à chaque espèce (ADR-006 — stade contraint par espèce). */
+export const LMC_LARVE_STADES = ['L1', 'L2', 'L3', 'L4', 'L5'];
+export const NSE_LARVE_STADES = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'];
+
+/** Plafonds propres aux larves, distincts des plafonds imagos (fiche papier IFVM). */
+export const LMC_LARVE_CAPTURES_MAX = 40;
+export const NSE_LARVE_CAPTURES_MAX = 20;
+
+/** Grilles larves (LMC comme NSE) : pas de bascule sexe, ni chez l'un ni chez l'autre — clé `phénotype|stade`, même forme que les grilles NSE imagos. */
+export function larveCaptureKey(phenotype: string, stade: string): string {
+  return `${phenotype}|${stade}`;
+}
+
+export function dominantLarvePhenotype<P extends string>(counts: CaptureCounts): P | null {
+  const totals: Record<string, number> = {};
+  for (const [key, n] of Object.entries(counts)) {
+    const phenotype = key.split('|')[0];
+    totals[phenotype] = (totals[phenotype] ?? 0) + n;
+  }
+  let best: string | null = null;
+  let bestCount = 0;
+  for (const [phenotype, n] of Object.entries(totals)) {
+    if (n > bestCount) {
+      best = phenotype;
+      bestCount = n;
+    }
+  }
+  return best as P | null;
+}
+
+export function incrementLarveCapture(
+  counts: CaptureCounts,
+  phenotype: string,
+  stade: string,
+  max: number
+): CaptureCounts {
+  if (totalCaptures(counts) >= max) return counts;
+  const key = larveCaptureKey(phenotype, stade);
+  return { ...counts, [key]: (counts[key] ?? 0) + 1 };
+}
+
+export function decrementLarveCapture(counts: CaptureCounts, phenotype: string, stade: string): CaptureCounts {
+  const key = larveCaptureKey(phenotype, stade);
+  const current = counts[key] ?? 0;
+  if (current <= 0) return counts;
+  return { ...counts, [key]: current - 1 };
+}
+
+/** Larves : pas de bascule sexe, `sexe` est persisté à NULL (cf. ADR-006), `categorie` fixée à 'larve'. */
+export function buildLarveCaptureRows(espece: 'LMC' | 'NSE', counts: CaptureCounts): CaptureRow[] {
+  const rows: CaptureRow[] = [];
+  for (const [key, effectif] of Object.entries(counts)) {
+    if (effectif <= 0) continue;
+    const [phenotype, stade] = key.split('|');
+    rows.push({ espece, categorie: 'larve', sexe: null, phase: phenotype, stade, effectif });
+  }
+  return rows;
+}
+
+export function parseLarveCaptureRows(rows: CaptureRow[]): CaptureCounts {
+  const counts: CaptureCounts = {};
+  for (const row of rows) {
+    counts[larveCaptureKey(row.phase, row.stade)] = row.effectif;
+  }
+  return counts;
+}
+
+export async function saveLarveCaptureCounts(
+  prospectionId: string,
+  espece: 'LMC' | 'NSE',
+  counts: CaptureCounts
+): Promise<void> {
+  await saveProspectionCaptures(prospectionId, espece, 'larve', buildLarveCaptureRows(espece, counts));
+}
