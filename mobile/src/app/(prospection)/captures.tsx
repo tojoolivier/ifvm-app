@@ -9,7 +9,13 @@ import {
   DraftProspection,
 } from '@/lib/prospection-repository';
 import { buildGrilles, parseEspeceSelection } from '@/lib/prospection-especes';
-import { buildPlanItems, grilleKey, isPlanComplete, parseGrillesCompletees } from '@/lib/prospection-plan';
+import {
+  buildPlanItems,
+  grilleKey,
+  isEspeceComplete,
+  isPlanComplete,
+  parseGrillesCompletees,
+} from '@/lib/prospection-plan';
 import {
   CaptureCounts,
   PHENOTYPES,
@@ -165,17 +171,26 @@ export default function CapturesScreen() {
       } else {
         await saveCaptureCounts(draft.id, grille.espece, grille.categorie, counts);
       }
+      let completed: Set<string>;
       if (grilles.length <= 1) {
-        router.push({ pathname: '/(prospection)/vegetation', params: { draftId: draft.id } });
+        completed = new Set([grilleKey(grille)]);
+      } else {
+        const updated = await markGrilleCompleted(draft.id, grilleKey(grille));
+        completed = parseGrillesCompletees(updated.grilles_completees);
+      }
+
+      const items = buildPlanItems(grilles, completed);
+      const next = isPlanComplete(items) ? 'vegetation' : 'plan';
+
+      if (isEspeceComplete(grilles, completed, grille.espece)) {
+        router.push({
+          pathname: '/(prospection)/densites',
+          params: { draftId: draft.id, espece: grille.espece, next },
+        });
         return;
       }
-      const updated = await markGrilleCompleted(draft.id, grilleKey(grille));
-      const items = buildPlanItems(grilles, parseGrillesCompletees(updated.grilles_completees));
-      if (isPlanComplete(items)) {
-        router.push({ pathname: '/(prospection)/vegetation', params: { draftId: draft.id } });
-      } else {
-        router.push({ pathname: '/(prospection)/plan', params: { draftId: draft.id } });
-      }
+
+      router.push({ pathname: `/(prospection)/${next}`, params: { draftId: draft.id } });
     } catch {
       setSaveError('Impossible d’enregistrer les captures localement');
     } finally {

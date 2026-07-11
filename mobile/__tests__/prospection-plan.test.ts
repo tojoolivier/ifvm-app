@@ -3,6 +3,7 @@ import {
   countTerminees,
   grilleKey,
   grilleLabel,
+  isEspeceComplete,
   isPlanComplete,
   parseGrillesCompletees,
 } from '../src/lib/prospection-plan';
@@ -71,5 +72,30 @@ describe('buildPlanItems / countTerminees / isPlanComplete', () => {
   it('preserves the original index for navigation back to a grille', () => {
     const items = buildPlanItems(grilles, new Set());
     expect(items.map((i) => i.index)).toEqual([0, 1, 2]);
+  });
+});
+
+describe('isEspeceComplete', () => {
+  const grilles = [LMC_IMAGO, LMC_LARVE, NSE_IMAGO];
+
+  it('is false when no grille of the espece is completed', () => {
+    expect(isEspeceComplete(grilles, new Set(), 'LMC')).toBe(false);
+  });
+
+  it('is false when only some grilles of the espece are completed', () => {
+    expect(isEspeceComplete(grilles, new Set(['LMC|imago']), 'LMC')).toBe(false);
+  });
+
+  it('is true once every grille of the espece is completed, regardless of other especes', () => {
+    expect(isEspeceComplete(grilles, new Set(['LMC|imago', 'LMC|larve']), 'LMC')).toBe(true);
+  });
+
+  it('is true for a single-grille espece once that grille is completed', () => {
+    expect(isEspeceComplete(grilles, new Set(['NSE|imago']), 'NSE')).toBe(true);
+  });
+
+  it('is false for an espece absent from the grille list', () => {
+    expect(isEspeceComplete(grilles, new Set(['LMC|imago', 'LMC|larve', 'NSE|imago']), 'NSE')).toBe(true);
+    expect(isEspeceComplete([LMC_IMAGO], new Set(['LMC|imago']), 'NSE')).toBe(false);
   });
 });

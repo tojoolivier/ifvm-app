@@ -23,6 +23,8 @@ import {
   saveProspectionCaptures,
   listProspectionCaptures,
   markGrilleCompleted,
+  getProspectionPopulation,
+  saveProspectionPopulation,
 } from '../src/lib/prospection-repository';
 
 const BASE_INPUT = {
@@ -378,6 +380,68 @@ describe('listProspectionCaptures', () => {
 
     expect(result).toEqual(rows);
     expect(getAllAsync).toHaveBeenCalledWith(expect.any(String), [BASE_INPUT.id, 'LMC', 'imago']);
+  });
+});
+
+describe('getProspectionPopulation', () => {
+  it('returns null when no row matches', async () => {
+    getFirstAsync.mockResolvedValueOnce(undefined);
+
+    const result = await getProspectionPopulation(BASE_INPUT.id, 'LMC', 'imago');
+
+    expect(result).toBeNull();
+    expect(getFirstAsync).toHaveBeenCalledWith(expect.any(String), [BASE_INPUT.id, 'LMC', 'imago']);
+  });
+
+  it('returns the matching row', async () => {
+    const row = {
+      espece: 'LMC',
+      categorie: 'imago',
+      densite_diffuse: 10,
+      densite_groupee: 2,
+      methode: 'battage',
+      accouplement: 'rare',
+      ponte: 'peu',
+    };
+    getFirstAsync.mockResolvedValueOnce(row);
+
+    const result = await getProspectionPopulation(BASE_INPUT.id, 'LMC', 'imago');
+
+    expect(result).toEqual(row);
+  });
+});
+
+describe('saveProspectionPopulation', () => {
+  const ROW = {
+    espece: 'LMC' as const,
+    categorie: 'imago' as const,
+    densite_diffuse: 10,
+    densite_groupee: 2,
+    methode: 'battage',
+    accouplement: 'rare',
+    ponte: 'peu',
+  };
+
+  it('inserts a new row when none exists for the espece/categorie', async () => {
+    getFirstAsync.mockResolvedValueOnce(undefined);
+
+    await saveProspectionPopulation(BASE_INPUT.id, ROW);
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO prospection_population'),
+      expect.arrayContaining([BASE_INPUT.id, 'LMC', 'imago', 10, 2, 'battage', 'rare', 'peu'])
+    );
+  });
+
+  it('updates the existing row when one already exists', async () => {
+    getFirstAsync.mockResolvedValueOnce({ id: 'existing-id' });
+
+    await saveProspectionPopulation(BASE_INPUT.id, ROW);
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE prospection_population SET'),
+      [10, 2, 'battage', 'rare', 'peu', 'existing-id']
+    );
   });
 });
 

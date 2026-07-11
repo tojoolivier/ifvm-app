@@ -262,6 +262,61 @@ export async function listAllProspectionCaptures(prospectionId: string): Promise
   );
 }
 
+export interface PopulationRow {
+  espece: 'LMC' | 'NSE';
+  categorie: 'imago' | 'larve';
+  densite_diffuse: number | null;
+  densite_groupee: number | null;
+  methode: string | null;
+  accouplement: string | null;
+  ponte: string | null;
+}
+
+/** Relit la ligne `prospection_population` d'une espece/categorie donnée, ou `null` si absente. */
+export async function getProspectionPopulation(
+  prospectionId: string,
+  espece: string,
+  categorie: string
+): Promise<PopulationRow | null> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<PopulationRow>(
+    'SELECT espece, categorie, densite_diffuse, densite_groupee, methode, accouplement, ponte FROM prospection_population WHERE prospection_id = ? AND espece = ? AND categorie = ?',
+    [prospectionId, espece, categorie]
+  );
+  return row ?? null;
+}
+
+/** Insère ou remplace la ligne `prospection_population` d'une espece/categorie (une ligne par couple, cf. contrainte unique). */
+export async function saveProspectionPopulation(prospectionId: string, row: PopulationRow): Promise<void> {
+  const db = await getDb();
+  const existing = await db.getFirstAsync<{ id: string }>(
+    'SELECT id FROM prospection_population WHERE prospection_id = ? AND espece = ? AND categorie = ?',
+    [prospectionId, row.espece, row.categorie]
+  );
+  if (existing) {
+    await db.runAsync(
+      'UPDATE prospection_population SET densite_diffuse = ?, densite_groupee = ?, methode = ?, accouplement = ?, ponte = ? WHERE id = ?',
+      [row.densite_diffuse, row.densite_groupee, row.methode, row.accouplement, row.ponte, existing.id]
+    );
+  } else {
+    await db.runAsync(
+      `INSERT INTO prospection_population (id, prospection_id, espece, categorie, densite_diffuse, densite_groupee, methode, accouplement, ponte)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        generateId(),
+        prospectionId,
+        row.espece,
+        row.categorie,
+        row.densite_diffuse,
+        row.densite_groupee,
+        row.methode,
+        row.accouplement,
+        row.ponte,
+      ]
+    );
+  }
+}
+
 /** Marque la fiche brouillon comme complète (statut 'en_attente'), indépendamment de l'état réseau. */
 export async function completeProspection(id: string): Promise<DraftProspection> {
   const db = await getDb();

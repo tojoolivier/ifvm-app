@@ -20,13 +20,14 @@ describe('prospection-db', () => {
     expect(openDatabaseAsync).toHaveBeenCalledWith('ifvm.db');
   });
 
-  it('creates the prospection and prospection_capture tables', async () => {
+  it('creates the prospection, prospection_capture and prospection_population tables', async () => {
     await getDb();
 
     expect(execAsync).toHaveBeenCalledTimes(1);
     const sql = execAsync.mock.calls[0][0] as string;
     expect(sql).toContain('CREATE TABLE IF NOT EXISTS prospection ');
     expect(sql).toContain('CREATE TABLE IF NOT EXISTS prospection_capture');
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS prospection_population');
     expect(sql).toContain("REFERENCES prospection(id) ON DELETE CASCADE");
   });
 

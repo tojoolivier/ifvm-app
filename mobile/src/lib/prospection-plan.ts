@@ -44,3 +44,13 @@ export function countTerminees(items: PlanItem[]): number {
 export function isPlanComplete(items: PlanItem[]): boolean {
   return items.length > 0 && items.every((item) => item.statut === 'terminee');
 }
+
+/** Vrai une fois toutes les grilles d'une espèce donnée (imago + larve le cas échéant) terminées. */
+export function isEspeceComplete(
+  grilles: GrilleACapturer[],
+  completed: Set<string>,
+  espece: GrilleACapturer['espece']
+): boolean {
+  const especeGrilles = grilles.filter((g) => g.espece === espece);
+  return especeGrilles.length > 0 && especeGrilles.every((g) => completed.has(grilleKey(g)));
+}
