@@ -18,6 +18,9 @@ import {
   countUnsyncedProspections,
   updateProspectionReference,
   updateProspectionEspeces,
+  startCaptureTimer,
+  saveProspectionCaptures,
+  listProspectionCaptures,
 } from '../src/lib/prospection-repository';
 
 const BASE_INPUT = {
@@ -36,6 +39,7 @@ const STORED_ROW = {
   station_id: null,
   n_fiche: null,
   especes: null,
+  capture_started_at: null,
   date_prospection: BASE_INPUT.dateProspection,
   latitude: null,
   longitude: null,
@@ -223,6 +227,64 @@ describe('updateProspectionEspeces', () => {
     await expect(updateProspectionEspeces(BASE_INPUT.id, ESPECES_JSON)).rejects.toThrow(
       'Échec de la mise à jour de la fiche brouillon locale'
     );
+  });
+});
+
+describe('startCaptureTimer', () => {
+  it('sets capture_started_at only when not already running', async () => {
+    getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW, capture_started_at: '2026-07-11T10:00:00.000Z' });
+
+    await startCaptureTimer(BASE_INPUT.id);
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('capture_started_at IS NULL'),
+      expect.arrayContaining([BASE_INPUT.id])
+    );
+  });
+
+  it('throws if the row cannot be read back after the update', async () => {
+    getFirstAsync.mockResolvedValueOnce(null);
+
+    await expect(startCaptureTimer(BASE_INPUT.id)).rejects.toThrow(
+      'Échec de la mise à jour de la fiche brouillon locale'
+    );
+  });
+});
+
+describe('saveProspectionCaptures', () => {
+  const ROWS = [{ espece: 'LMC' as const, categorie: 'imago' as const, sexe: 'F' as const, phase: 'solitaire', stade: 'A1', effectif: 2 }];
+
+  it('deletes existing rows for the grille then inserts the new ones', async () => {
+    await saveProspectionCaptures(BASE_INPUT.id, 'LMC', 'imago', ROWS);
+
+    expect(runAsync).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('DELETE FROM prospection_capture'),
+      [BASE_INPUT.id, 'LMC', 'imago']
+    );
+    expect(runAsync).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('INSERT INTO prospection_capture'),
+      expect.arrayContaining([BASE_INPUT.id, 'LMC', 'imago', 'F', 'solitaire', 'A1', 2])
+    );
+  });
+
+  it('only deletes when there are no rows to persist', async () => {
+    await saveProspectionCaptures(BASE_INPUT.id, 'LMC', 'imago', []);
+
+    expect(runAsync).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('listProspectionCaptures', () => {
+  it('lists rows for a given grille', async () => {
+    const rows = [{ espece: 'LMC', categorie: 'imago', sexe: 'F', phase: 'solitaire', stade: 'A1', effectif: 2 }];
+    getAllAsync.mockResolvedValueOnce(rows);
+
+    const result = await listProspectionCaptures(BASE_INPUT.id, 'LMC', 'imago');
+
+    expect(result).toEqual(rows);
+    expect(getAllAsync).toHaveBeenCalledWith(expect.any(String), [BASE_INPUT.id, 'LMC', 'imago']);
   });
 });
 

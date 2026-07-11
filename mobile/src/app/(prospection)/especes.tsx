@@ -48,8 +48,7 @@ export default function EspecesScreen() {
     setSaveError(null);
     try {
       await saveEspeceSelection(draft.id, selection);
-      // L'écran Compteur de captures (#6) n'existe pas encore : retour à l'accueil en attendant.
-      router.push('/(tabs)/prospection');
+      router.push({ pathname: '/(prospection)/captures', params: { draftId: draft.id, grilleIndex: '0' } });
     } catch {
       setSaveError("Impossible d'enregistrer la sélection localement");
     } finally {

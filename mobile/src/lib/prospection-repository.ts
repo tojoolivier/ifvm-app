@@ -1,4 +1,5 @@
 import { getDb } from './prospection-db';
+import { generateId } from './id';
 
 export type TypeProspection = 'intensive' | 'extensive' | 'validation';
 
@@ -25,6 +26,7 @@ export interface DraftProspection {
   station_id: string | null;
   n_fiche: string | null;
   especes: string | null;
+  capture_started_at: string | null;
   date_prospection: string;
   latitude: number | null;
   longitude: number | null;
@@ -136,6 +138,66 @@ export async function updateProspectionEspeces(id: string, especes: string): Pro
     throw new Error('Échec de la mise à jour de la fiche brouillon locale');
   }
   return updated;
+}
+
+/** Démarre le chrono de la session de captures (n'écrase pas un chrono déjà démarré). */
+export async function startCaptureTimer(id: string): Promise<DraftProspection> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    "UPDATE prospection SET capture_started_at = ?, updated_at = ? WHERE id = ? AND capture_started_at IS NULL",
+    [now, now, id]
+  );
+
+  const updated = await getProspection(id);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
+export interface CaptureRow {
+  espece: 'LMC' | 'NSE';
+  categorie: 'imago' | 'larve';
+  sexe: 'F' | 'M';
+  phase: string; // phénotype : solitaire | solitaro_trans | transiens | gregaire
+  stade: string; // A1, A234, A3¼… selon l'espece/sexe
+  effectif: number;
+}
+
+/** Remplace les lignes `prospection_capture` d'une grille (espece/categorie) par le comptage courant. */
+export async function saveProspectionCaptures(
+  prospectionId: string,
+  espece: string,
+  categorie: string,
+  rows: CaptureRow[]
+): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(
+    'DELETE FROM prospection_capture WHERE prospection_id = ? AND espece = ? AND categorie = ?',
+    [prospectionId, espece, categorie]
+  );
+  for (const row of rows) {
+    await db.runAsync(
+      `INSERT INTO prospection_capture (id, prospection_id, espece, categorie, sexe, phase, stade, effectif)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [generateId(), prospectionId, espece, categorie, row.sexe, row.phase, row.stade, row.effectif]
+    );
+  }
+}
+
+/** Relit les lignes `prospection_capture` d'une grille (espece/categorie) donnée. */
+export async function listProspectionCaptures(
+  prospectionId: string,
+  espece: string,
+  categorie: string
+): Promise<CaptureRow[]> {
+  const db = await getDb();
+  return db.getAllAsync<CaptureRow>(
+    'SELECT espece, categorie, sexe, phase, stade, effectif FROM prospection_capture WHERE prospection_id = ? AND espece = ? AND categorie = ?',
+    [prospectionId, espece, categorie]
+  );
 }
 
 /** Relit une fiche locale par id, ou `null` si elle n'existe pas. */
