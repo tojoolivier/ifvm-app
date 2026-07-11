@@ -1,6 +1,6 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
 import {
@@ -17,17 +17,27 @@ const EMPTY_DATA: AccueilViewModel = { unsyncedCount: 0, activeDraft: null, rece
 
 export default function ProspectionScreen() {
   const router = useRouter();
+  const { justSaved } = useLocalSearchParams<{ justSaved?: string }>();
   const user = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.token);
   const [data, setData] = useState<AccueilViewModel>(EMPTY_DATA);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showSavedToast, setShowSavedToast] = useState(false);
 
   const refresh = useCallback(() => {
     loadAccueilData().then(setData);
   }, []);
 
   useFocusEffect(refresh);
+
+  useEffect(() => {
+    if (justSaved !== '1') return;
+    setShowSavedToast(true);
+    router.setParams({ justSaved: undefined });
+    const timeout = setTimeout(() => setShowSavedToast(false), 3000);
+    return () => clearTimeout(timeout);
+  }, [justSaved, router]);
 
   const resumeDraft = (draft: DraftProspection) => {
     router.push({ pathname: '/(prospection)/reference', params: { draftId: draft.id } });
@@ -58,6 +68,12 @@ export default function ProspectionScreen() {
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+        {showSavedToast && (
+          <View style={styles.toast}>
+            <Text style={styles.toastText}>Fiche enregistrée hors-ligne</Text>
+          </View>
+        )}
+
         {data.unsyncedCount > 0 && (
           <View style={styles.banner}>
             <Text style={styles.bannerText}>
@@ -124,6 +140,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   bannerText: { color: '#92400E', fontSize: 13, fontWeight: '600' },
+  toast: {
+    backgroundColor: '#DCFCE7',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+  },
+  toastText: { color: '#15803d', fontSize: 13, fontWeight: '600', textAlign: 'center' },
   draftCard: {
     backgroundColor: '#DCFCE7',
     borderRadius: 10,

@@ -46,8 +46,7 @@ export default function VegetationScreen() {
     setSaveError(null);
     try {
       await saveVegetationSol(draft.id, state);
-      // Le Récapitulatif (#8) n'existe pas encore : retour à l'accueil en attendant.
-      router.push('/(tabs)/prospection');
+      router.push({ pathname: '/(prospection)/recapitulatif', params: { draftId: draft.id } });
     } catch {
       setSaveError('Impossible d’enregistrer la végétation & sol localement');
     } finally {

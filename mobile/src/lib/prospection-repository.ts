@@ -229,6 +229,43 @@ export async function listProspectionCaptures(
   );
 }
 
+/** Relit toutes les lignes `prospection_capture` d'une fiche, toutes grilles espèce/catégorie confondues. */
+export async function listAllProspectionCaptures(prospectionId: string): Promise<CaptureRow[]> {
+  const db = await getDb();
+  return db.getAllAsync<CaptureRow>(
+    'SELECT espece, categorie, sexe, phase, stade, effectif FROM prospection_capture WHERE prospection_id = ?',
+    [prospectionId]
+  );
+}
+
+/** Marque la fiche brouillon comme complète (statut 'en_attente'), indépendamment de l'état réseau. */
+export async function completeProspection(id: string): Promise<DraftProspection> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync("UPDATE prospection SET statut = 'en_attente', updated_at = ? WHERE id = ?", [now, id]);
+
+  const updated = await getProspection(id);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
+/** Marque la fiche comme synchronisée avec le serveur, après succès de l'envoi. */
+export async function markProspectionSynced(id: string): Promise<DraftProspection> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync("UPDATE prospection SET statut_sync = 'synced', updated_at = ? WHERE id = ?", [now, id]);
+
+  const updated = await getProspection(id);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
 /** Relit une fiche locale par id, ou `null` si elle n'existe pas. */
 export async function getProspection(id: string): Promise<DraftProspection | null> {
   const db = await getDb();

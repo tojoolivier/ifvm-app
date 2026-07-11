@@ -37,6 +37,38 @@ export interface User {
   created_at: string;
 }
 
+export interface ProspectionCaptureInput {
+  espece: string;
+  categorie: string;
+  sexe: string | null;
+  phase: string;
+  stade: string;
+  effectif: number;
+}
+
+export interface ProspectionCreateInput {
+  type_prospection: string;
+  campagne_id: string;
+  station_id?: string | null;
+  n_fiche?: string | null;
+  date_prospection: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  altitude?: number | null;
+  surf_station?: number | null;
+  surf_prospectee?: number | null;
+  surf_infestee?: number | null;
+  degats_cultures?: string | null;
+  vegetation?: Record<string, unknown> | null;
+  sol?: Record<string, unknown> | null;
+  statut?: string;
+  captures?: ProspectionCaptureInput[];
+}
+
+export interface ProspectionCreateResponse {
+  id: string;
+}
+
 type OnUnauthorized = () => void;
 
 const getBaseUrl = (): string => {
@@ -99,5 +131,18 @@ export const apiClient = {
 
   getCampagnes: async (token: string, onUnauthorized?: OnUnauthorized): Promise<Campagne[]> => {
     return makeRequest<Campagne[]>('/campagnes', { method: 'GET' }, token, onUnauthorized);
+  },
+
+  createProspection: async (
+    token: string,
+    body: ProspectionCreateInput,
+    onUnauthorized?: OnUnauthorized
+  ): Promise<ProspectionCreateResponse> => {
+    return makeRequest<ProspectionCreateResponse>(
+      '/prospections',
+      { method: 'POST', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
   },
 };
