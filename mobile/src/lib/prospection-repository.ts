@@ -23,6 +23,7 @@ export interface DraftProspection {
   campagne_id: string;
   prospecteur_id: string;
   station_id: string | null;
+  n_fiche: string | null;
   date_prospection: string;
   latitude: number | null;
   longitude: number | null;
@@ -34,6 +35,16 @@ export interface DraftProspection {
   statut_sync: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface ReferenceUpdateInput {
+  latitude: number;
+  longitude: number;
+  altitude: number | null;
+  surfStation: number;
+  surfProspectee: number;
+  surfInfestee: number;
+  nFiche: string;
 }
 
 /** Crée une fiche brouillon en local (SQLite), sans dépendance réseau. */
@@ -73,6 +84,40 @@ export async function createDraftProspection(
     throw new Error('Échec de la création de la fiche brouillon locale');
   }
   return created;
+}
+
+/** Persiste la position GPS, les surfaces et le n° de fiche saisis à l'écran Référence. */
+export async function updateProspectionReference(
+  id: string,
+  input: ReferenceUpdateInput
+): Promise<DraftProspection> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    `UPDATE prospection SET
+      latitude = ?, longitude = ?, altitude = ?,
+      surf_station = ?, surf_prospectee = ?, surf_infestee = ?,
+      n_fiche = ?, updated_at = ?
+     WHERE id = ?`,
+    [
+      input.latitude,
+      input.longitude,
+      input.altitude,
+      input.surfStation,
+      input.surfProspectee,
+      input.surfInfestee,
+      input.nFiche,
+      now,
+      id,
+    ]
+  );
+
+  const updated = await getProspection(id);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
 }
 
 /** Relit une fiche locale par id, ou `null` si elle n'existe pas. */

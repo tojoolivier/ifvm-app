@@ -30,8 +30,7 @@ export default function ProspectionScreen() {
   useFocusEffect(refresh);
 
   const resumeDraft = (draft: DraftProspection) => {
-    // La navigation vers l'écran exact du parcours (Référence & position GPS) arrive avec #4.
-    router.push({ pathname: '/(tabs)/prospection', params: { draftId: draft.id } });
+    router.push({ pathname: '/(prospection)/reference', params: { draftId: draft.id } });
   };
 
   const handleNewProspection = async () => {

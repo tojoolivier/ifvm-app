@@ -16,6 +16,7 @@ import {
   listDraftProspections,
   listRecentProspections,
   countUnsyncedProspections,
+  updateProspectionReference,
 } from '../src/lib/prospection-repository';
 
 const BASE_INPUT = {
@@ -32,6 +33,7 @@ const STORED_ROW = {
   campagne_id: BASE_INPUT.campagneId,
   prospecteur_id: BASE_INPUT.prospecteurId,
   station_id: null,
+  n_fiche: null,
   date_prospection: BASE_INPUT.dateProspection,
   latitude: null,
   longitude: null,
@@ -139,6 +141,54 @@ describe('listRecentProspections', () => {
     await listRecentProspections();
 
     expect(getAllAsync).toHaveBeenCalledWith(expect.any(String), [20]);
+  });
+});
+
+describe('updateProspectionReference', () => {
+  const REFERENCE_INPUT = {
+    latitude: -18.9,
+    longitude: 47.5,
+    altitude: 1280,
+    surfStation: 10,
+    surfProspectee: 8,
+    surfInfestee: 2,
+    nFiche: 'FI-20260711-111111',
+  };
+
+  it('updates position, surfaces and n° fiche on the draft row', async () => {
+    getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW, ...REFERENCE_INPUT });
+
+    await updateProspectionReference(BASE_INPUT.id, REFERENCE_INPUT);
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE prospection SET'),
+      expect.arrayContaining([
+        REFERENCE_INPUT.latitude,
+        REFERENCE_INPUT.longitude,
+        REFERENCE_INPUT.altitude,
+        REFERENCE_INPUT.surfStation,
+        REFERENCE_INPUT.surfProspectee,
+        REFERENCE_INPUT.surfInfestee,
+        REFERENCE_INPUT.nFiche,
+      ])
+    );
+  });
+
+  it('returns the updated row read back from local storage', async () => {
+    const updated = { ...STORED_ROW, ...REFERENCE_INPUT };
+    getFirstAsync.mockResolvedValueOnce(updated);
+
+    const result = await updateProspectionReference(BASE_INPUT.id, REFERENCE_INPUT);
+
+    expect(result).toEqual(updated);
+  });
+
+  it('throws if the row cannot be read back after the update', async () => {
+    getFirstAsync.mockResolvedValueOnce(null);
+
+    await expect(updateProspectionReference(BASE_INPUT.id, REFERENCE_INPUT)).rejects.toThrow(
+      'Échec de la mise à jour de la fiche brouillon locale'
+    );
   });
 });
 
