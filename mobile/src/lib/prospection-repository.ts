@@ -213,7 +213,7 @@ export async function updateProspectionVegetation(
 export interface CaptureRow {
   espece: 'LMC' | 'NSE';
   categorie: 'imago' | 'larve';
-  sexe: 'F' | 'M';
+  sexe: 'F' | 'M' | null;
   phase: string; // phénotype : solitaire | solitaro_trans | transiens | gregaire
   stade: string; // A1, A234, A3¼… selon l'espece/sexe
   effectif: number;

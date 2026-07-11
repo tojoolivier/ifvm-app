@@ -16,14 +16,24 @@ import {
   Phenotype,
   Sexe,
   CAPTURES_MAX,
+  NSE_CAPTURES_MAX,
+  NSE_PHENOTYPES,
+  NSE_STADES,
+  NsePhenotype,
   chronoSeconds,
   decrementCapture,
+  decrementNseCapture,
+  dominantNsePhenotype,
   dominantPhenotype,
   ensureCaptureTimerStarted,
   formatChrono,
   incrementCapture,
+  incrementNseCapture,
+  nseCaptureKey,
   parseCaptureRows,
+  parseNseCaptureRows,
   saveCaptureCounts,
+  saveNseCaptureCounts,
   stadeForSexeSwitch,
   stadesForSexe,
   totalBySexe,
@@ -43,7 +53,7 @@ export default function CapturesScreen() {
 
   const [draft, setDraft] = useState<DraftProspection | null>(null);
   const [sexe, setSexe] = useState<Sexe>('F');
-  const [selectedPhenotype, setSelectedPhenotype] = useState<Phenotype>('solitaire');
+  const [selectedPhenotype, setSelectedPhenotype] = useState<Phenotype | NsePhenotype>('solitaire');
   const [selectedStade, setSelectedStade] = useState<string>(stadesForSexe('F')[0]);
   const [counts, setCounts] = useState<CaptureCounts>({});
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -55,6 +65,7 @@ export default function CapturesScreen() {
     [draft]
   );
   const grille = grilles[grilleIndex];
+  const isNse = grille?.espece === 'NSE';
 
   useEffect(() => {
     if (!draftId) return;
@@ -67,10 +78,13 @@ export default function CapturesScreen() {
 
   useEffect(() => {
     if (!draft || !grille) return;
+    setSexe('F');
+    setSelectedPhenotype(isNse ? NSE_PHENOTYPES[0].value : 'solitaire');
+    setSelectedStade(isNse ? NSE_STADES[0] : stadesForSexe('F')[0]);
     listProspectionCaptures(draft.id, grille.espece, grille.categorie).then((rows) => {
-      setCounts(parseCaptureRows(rows));
+      setCounts(isNse ? parseNseCaptureRows(rows) : parseCaptureRows(rows));
     });
-  }, [draft, grille]);
+  }, [draft, grille, isNse]);
 
   useEffect(() => {
     if (!draft?.capture_started_at) return;
@@ -80,24 +94,36 @@ export default function CapturesScreen() {
     return () => clearInterval(interval);
   }, [draft?.capture_started_at]);
 
-  const stades = stadesForSexe(sexe);
+  const stades = isNse ? NSE_STADES : stadesForSexe(sexe);
+  const phenotypeOptions = isNse ? NSE_PHENOTYPES : PHENOTYPES;
+  const capturesMax = isNse ? NSE_CAPTURES_MAX : CAPTURES_MAX;
   const total = totalCaptures(counts);
   const totalFemelles = totalBySexe(counts, 'F');
   const totalMales = totalBySexe(counts, 'M');
-  const dominant = dominantPhenotype(counts);
-  const currentCount = counts[`${sexe}|${selectedPhenotype}|${selectedStade}`] ?? 0;
+  const dominant = isNse ? dominantNsePhenotype(counts) : dominantPhenotype(counts);
+  const currentCount = isNse
+    ? counts[nseCaptureKey(selectedPhenotype as NsePhenotype, selectedStade)] ?? 0
+    : counts[`${sexe}|${selectedPhenotype}|${selectedStade}`] ?? 0;
 
   const handleSexe = (next: Sexe) => {
     setSexe(next);
     setSelectedStade((prev) => stadeForSexeSwitch(prev, next));
   };
 
-  const handleIncrement = (phenotype: Phenotype) => {
-    setCounts((prev) => incrementCapture(prev, sexe, phenotype, selectedStade));
+  const handleIncrement = (phenotype: Phenotype | NsePhenotype) => {
+    setCounts((prev) =>
+      isNse
+        ? incrementNseCapture(prev, phenotype as NsePhenotype, selectedStade)
+        : incrementCapture(prev, sexe, phenotype as Phenotype, selectedStade)
+    );
   };
 
-  const handleDecrement = (phenotype: Phenotype) => {
-    setCounts((prev) => decrementCapture(prev, sexe, phenotype, selectedStade));
+  const handleDecrement = (phenotype: Phenotype | NsePhenotype) => {
+    setCounts((prev) =>
+      isNse
+        ? decrementNseCapture(prev, phenotype as NsePhenotype, selectedStade)
+        : decrementCapture(prev, sexe, phenotype as Phenotype, selectedStade)
+    );
   };
 
   const handleContinuer = async () => {
@@ -105,7 +131,11 @@ export default function CapturesScreen() {
     setIsSaving(true);
     setSaveError(null);
     try {
-      await saveCaptureCounts(draft.id, grille.espece, grille.categorie, counts);
+      if (isNse) {
+        await saveNseCaptureCounts(draft.id, counts);
+      } else {
+        await saveCaptureCounts(draft.id, grille.espece, grille.categorie, counts);
+      }
       if (grilles.length <= 1) {
         router.push({ pathname: '/(prospection)/vegetation', params: { draftId: draft.id } });
         return;
@@ -160,13 +190,20 @@ export default function CapturesScreen() {
           <Text style={styles.chronoMax}>max 30:00</Text>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Sexe</Text>
-          <View style={styles.sexeRow}>
-            <SexeButton label="Femelles" active={sexe === 'F'} onPress={() => handleSexe('F')} />
-            <SexeButton label="Mâles" active={sexe === 'M'} onPress={() => handleSexe('M')} />
+        {isNse ? (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Sexe</Text>
+            <Text style={styles.summaryTextSub}>Non requis (pas de distinction ♀/♂ pour Nomadacris)</Text>
           </View>
-        </View>
+        ) : (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Sexe</Text>
+            <View style={styles.sexeRow}>
+              <SexeButton label="Femelles" active={sexe === 'F'} onPress={() => handleSexe('F')} />
+              <SexeButton label="Mâles" active={sexe === 'M'} onPress={() => handleSexe('M')} />
+            </View>
+          </View>
+        )}
 
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Phase</Text>
@@ -186,9 +223,11 @@ export default function CapturesScreen() {
 
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Phénotype</Text>
-          {PHENOTYPES.map(({ value, label }) => {
+          {phenotypeOptions.map(({ value, label }) => {
             const active = selectedPhenotype === value;
-            const count = counts[`${sexe}|${value}|${selectedStade}`] ?? 0;
+            const count = isNse
+              ? counts[nseCaptureKey(value as NsePhenotype, selectedStade)] ?? 0
+              : counts[`${sexe}|${value}|${selectedStade}`] ?? 0;
             return (
               <View key={value} style={[styles.phenotypeRow, active && styles.phenotypeRowActive]}>
                 <TouchableOpacity style={styles.phenotypeLabelWrap} onPress={() => setSelectedPhenotype(value)}>
@@ -206,7 +245,7 @@ export default function CapturesScreen() {
                   <TouchableOpacity
                     style={styles.counterBtn}
                     onPress={() => handleIncrement(value)}
-                    disabled={!active || total >= CAPTURES_MAX}
+                    disabled={!active || total >= capturesMax}
                   >
                     <Text style={styles.counterBtnText}>+</Text>
                   </TouchableOpacity>
@@ -218,10 +257,11 @@ export default function CapturesScreen() {
 
         <View style={styles.card}>
           <Text style={styles.summaryText}>
-            Total {total}/{CAPTURES_MAX} · F {totalFemelles} · M {totalMales}
+            Total {total}/{capturesMax}
+            {isNse ? '' : ` · F ${totalFemelles} · M ${totalMales}`}
           </Text>
           <Text style={styles.summaryText}>
-            Phénotype dominant : {dominant ? PHENOTYPES.find((p) => p.value === dominant)?.label : '—'}
+            Phénotype dominant : {dominant ? phenotypeOptions.find((p) => p.value === dominant)?.label : '—'}
           </Text>
           <Text style={styles.summaryTextSub}>Sélection courante : {currentCount}</Text>
         </View>

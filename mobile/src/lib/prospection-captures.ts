@@ -22,6 +22,19 @@ export const PHENOTYPES: { value: Phenotype; label: string }[] = [
 export const CAPTURES_MAX = 50;
 export const CHRONO_MAX_SECONDS = 30 * 60;
 
+/** Nomadacris imagos : pas de sous-stades, 3 phénotypes (pas de "Solitaro-trans"), plafond propre (fiche papier IFVM). */
+export type NsePhenotype = 'solitaire' | 'transiens' | 'gregaire';
+
+export const NSE_STADES = MALE_STADES;
+
+export const NSE_PHENOTYPES: { value: NsePhenotype; label: string }[] = [
+  { value: 'solitaire', label: 'Solitaires' },
+  { value: 'transiens', label: 'Transiens' },
+  { value: 'gregaire', label: 'Grégaires' },
+];
+
+export const NSE_CAPTURES_MAX = 30;
+
 /** Comptage courant, indexé par clé `sexe|phénotype|stade`. */
 export interface CaptureCounts {
   [key: string]: number;
@@ -92,6 +105,48 @@ export function decrementCapture(
   return { ...counts, [key]: current - 1 };
 }
 
+export function nseCaptureKey(phenotype: NsePhenotype, stade: string): string {
+  return `${phenotype}|${stade}`;
+}
+
+export function dominantNsePhenotype(counts: CaptureCounts): NsePhenotype | null {
+  const totals: Partial<Record<NsePhenotype, number>> = {};
+  for (const [key, n] of Object.entries(counts)) {
+    const phenotype = key.split('|')[0] as NsePhenotype;
+    totals[phenotype] = (totals[phenotype] ?? 0) + n;
+  }
+  let best: NsePhenotype | null = null;
+  let bestCount = 0;
+  for (const [phenotype, n] of Object.entries(totals) as [NsePhenotype, number][]) {
+    if (n > bestCount) {
+      best = phenotype;
+      bestCount = n;
+    }
+  }
+  return best;
+}
+
+export function incrementNseCapture(
+  counts: CaptureCounts,
+  phenotype: NsePhenotype,
+  stade: string
+): CaptureCounts {
+  if (totalCaptures(counts) >= NSE_CAPTURES_MAX) return counts;
+  const key = nseCaptureKey(phenotype, stade);
+  return { ...counts, [key]: (counts[key] ?? 0) + 1 };
+}
+
+export function decrementNseCapture(
+  counts: CaptureCounts,
+  phenotype: NsePhenotype,
+  stade: string
+): CaptureCounts {
+  const key = nseCaptureKey(phenotype, stade);
+  const current = counts[key] ?? 0;
+  if (current <= 0) return counts;
+  return { ...counts, [key]: current - 1 };
+}
+
 /** Chrono écoulé depuis `startedAt`, plafonné à CHRONO_MAX_SECONDS. */
 export function chronoSeconds(startedAt: string | null, now: Date = new Date()): number {
   if (!startedAt) return 0;
@@ -146,4 +201,27 @@ export async function saveCaptureCounts(
   counts: CaptureCounts
 ): Promise<void> {
   await saveProspectionCaptures(prospectionId, espece, categorie, buildCaptureRows(espece, categorie, counts));
+}
+
+/** Nomadacris imagos : pas de bascule sexe, `sexe` est persisté à NULL (cf. ADR-006). */
+export function buildNseCaptureRows(counts: CaptureCounts): CaptureRow[] {
+  const rows: CaptureRow[] = [];
+  for (const [key, effectif] of Object.entries(counts)) {
+    if (effectif <= 0) continue;
+    const [phenotype, stade] = key.split('|') as [NsePhenotype, string];
+    rows.push({ espece: 'NSE', categorie: 'imago', sexe: null, phase: phenotype, stade, effectif });
+  }
+  return rows;
+}
+
+export function parseNseCaptureRows(rows: CaptureRow[]): CaptureCounts {
+  const counts: CaptureCounts = {};
+  for (const row of rows) {
+    counts[nseCaptureKey(row.phase as NsePhenotype, row.stade)] = row.effectif;
+  }
+  return counts;
+}
+
+export async function saveNseCaptureCounts(prospectionId: string, counts: CaptureCounts): Promise<void> {
+  await saveProspectionCaptures(prospectionId, 'NSE', 'imago', buildNseCaptureRows(counts));
 }

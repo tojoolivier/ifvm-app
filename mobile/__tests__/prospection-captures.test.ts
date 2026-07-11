@@ -10,15 +10,25 @@ import {
   CHRONO_MAX_SECONDS,
   FEMALE_STADES,
   MALE_STADES,
+  NSE_CAPTURES_MAX,
+  NSE_PHENOTYPES,
+  NSE_STADES,
   buildCaptureRows,
+  buildNseCaptureRows,
   chronoSeconds,
   decrementCapture,
+  decrementNseCapture,
+  dominantNsePhenotype,
   dominantPhenotype,
   ensureCaptureTimerStarted,
   formatChrono,
   incrementCapture,
+  incrementNseCapture,
+  nseCaptureKey,
   parseCaptureRows,
+  parseNseCaptureRows,
   saveCaptureCounts,
+  saveNseCaptureCounts,
   stadeForSexeSwitch,
   stadesForSexe,
   totalBySexe,
@@ -191,6 +201,54 @@ describe('saveCaptureCounts', () => {
 
     expect(mockSaveCaptures).toHaveBeenCalledWith('prospection-1', 'LMC', 'imago', [
       { espece: 'LMC', categorie: 'imago', sexe: 'F', phase: 'solitaire', stade: 'A1', effectif: 2 },
+    ]);
+  });
+});
+
+describe('Nomadacris imagos (NSE) — pas de bascule sexe', () => {
+  it('exposes the simplified phase set (A1/A234/A5) shared with LMC males', () => {
+    expect(NSE_STADES).toEqual(MALE_STADES);
+  });
+
+  it('exposes 3 phénotypes, no Solitaro-trans', () => {
+    expect(NSE_PHENOTYPES.map((p) => p.value)).toEqual(['solitaire', 'transiens', 'gregaire']);
+  });
+
+  it('increments and decrements without a sexe dimension', () => {
+    const incremented = incrementNseCapture({}, 'transiens', 'A234');
+    expect(incremented).toEqual({ [nseCaptureKey('transiens', 'A234')]: 1 });
+
+    const decremented = decrementNseCapture(incremented, 'transiens', 'A234');
+    expect(decremented).toEqual({ [nseCaptureKey('transiens', 'A234')]: 0 });
+  });
+
+  it('caps the total at NSE_CAPTURES_MAX, distinct from LMC', () => {
+    expect(NSE_CAPTURES_MAX).not.toBe(CAPTURES_MAX);
+    const counts = { [nseCaptureKey('gregaire', 'A5')]: NSE_CAPTURES_MAX };
+    expect(incrementNseCapture(counts, 'solitaire', 'A1')).toBe(counts);
+  });
+
+  it('picks the dominant phénotype across stades', () => {
+    const counts = {
+      [nseCaptureKey('solitaire', 'A1')]: 2,
+      [nseCaptureKey('gregaire', 'A5')]: 5,
+      [nseCaptureKey('gregaire', 'A234')]: 1,
+    };
+    expect(dominantNsePhenotype(counts)).toBe('gregaire');
+  });
+
+  it('builds rows with sexe=null and round-trips back to counts', () => {
+    const counts = { [nseCaptureKey('transiens', 'A1')]: 4 };
+    const rows = buildNseCaptureRows(counts);
+    expect(rows).toEqual([{ espece: 'NSE', categorie: 'imago', sexe: null, phase: 'transiens', stade: 'A1', effectif: 4 }]);
+    expect(parseNseCaptureRows(rows)).toEqual(counts);
+  });
+
+  it('persists via saveProspectionCaptures with sexe=null', async () => {
+    await saveNseCaptureCounts('prospection-1', { [nseCaptureKey('gregaire', 'A5')]: 1 });
+
+    expect(mockSaveCaptures).toHaveBeenCalledWith('prospection-1', 'NSE', 'imago', [
+      { espece: 'NSE', categorie: 'imago', sexe: null, phase: 'gregaire', stade: 'A5', effectif: 1 },
     ]);
   });
 });
