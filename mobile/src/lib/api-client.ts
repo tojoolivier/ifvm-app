@@ -18,6 +18,13 @@ export interface Station {
   name: string;
 }
 
+export interface Campagne {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string | null;
+}
+
 export type UserRole = 'prospecteur' | 'chef_equipe' | 'agent_encadreur' | 'pilote' | 'mecanicien' | 'chef_de_base' | 'admin';
 
 export interface User {
@@ -88,5 +95,9 @@ export const apiClient = {
 
   getProfile: async (token: string, onUnauthorized?: OnUnauthorized): Promise<User> => {
     return makeRequest<User>('/users/me', { method: 'GET' }, token, onUnauthorized);
+  },
+
+  getCampagnes: async (token: string, onUnauthorized?: OnUnauthorized): Promise<Campagne[]> => {
+    return makeRequest<Campagne[]>('/campagnes', { method: 'GET' }, token, onUnauthorized);
   },
 };
