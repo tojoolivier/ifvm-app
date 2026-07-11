@@ -76,8 +76,7 @@ export default function ReferenceScreen() {
     setSaveError(null);
     try {
       await saveReference({ draftId: draft.id, position, surfaces, numeroFiche });
-      // L'écran Filtre espèces (#5) n'existe pas encore : retour à l'accueil en attendant.
-      router.push('/(tabs)/prospection');
+      router.push({ pathname: '/(prospection)/especes', params: { draftId: draft.id } });
     } catch {
       setSaveError("Impossible d'enregistrer la fiche localement");
     } finally {

@@ -15,6 +15,7 @@ const STORED_ROW: DraftProspection = {
   prospecteur_id: '33333333-3333-3333-3333-333333333333',
   station_id: null,
   n_fiche: 'FI-20260711-111111',
+  especes: null,
   date_prospection: '2026-07-11',
   latitude: -18.9,
   longitude: 47.5,

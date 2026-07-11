@@ -24,6 +24,7 @@ export interface DraftProspection {
   prospecteur_id: string;
   station_id: string | null;
   n_fiche: string | null;
+  especes: string | null;
   date_prospection: string;
   latitude: number | null;
   longitude: number | null;
@@ -111,6 +112,23 @@ export async function updateProspectionReference(
       now,
       id,
     ]
+  );
+
+  const updated = await getProspection(id);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
+/** Persiste la sélection espèces/stades saisie à l'écran Filtre espèces. */
+export async function updateProspectionEspeces(id: string, especes: string): Promise<DraftProspection> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    'UPDATE prospection SET especes = ?, updated_at = ? WHERE id = ?',
+    [especes, now, id]
   );
 
   const updated = await getProspection(id);

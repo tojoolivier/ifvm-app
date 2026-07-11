@@ -17,6 +17,7 @@ import {
   listRecentProspections,
   countUnsyncedProspections,
   updateProspectionReference,
+  updateProspectionEspeces,
 } from '../src/lib/prospection-repository';
 
 const BASE_INPUT = {
@@ -34,6 +35,7 @@ const STORED_ROW = {
   prospecteur_id: BASE_INPUT.prospecteurId,
   station_id: null,
   n_fiche: null,
+  especes: null,
   date_prospection: BASE_INPUT.dateProspection,
   latitude: null,
   longitude: null,
@@ -187,6 +189,38 @@ describe('updateProspectionReference', () => {
     getFirstAsync.mockResolvedValueOnce(null);
 
     await expect(updateProspectionReference(BASE_INPUT.id, REFERENCE_INPUT)).rejects.toThrow(
+      'Échec de la mise à jour de la fiche brouillon locale'
+    );
+  });
+});
+
+describe('updateProspectionEspeces', () => {
+  const ESPECES_JSON = JSON.stringify({ lmcImago: true, lmcLarve: false, nseImago: true });
+
+  it('updates the especes column on the draft row', async () => {
+    getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW, especes: ESPECES_JSON });
+
+    await updateProspectionEspeces(BASE_INPUT.id, ESPECES_JSON);
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE prospection SET especes'),
+      expect.arrayContaining([ESPECES_JSON, BASE_INPUT.id])
+    );
+  });
+
+  it('returns the updated row read back from local storage', async () => {
+    const updated = { ...STORED_ROW, especes: ESPECES_JSON };
+    getFirstAsync.mockResolvedValueOnce(updated);
+
+    const result = await updateProspectionEspeces(BASE_INPUT.id, ESPECES_JSON);
+
+    expect(result).toEqual(updated);
+  });
+
+  it('throws if the row cannot be read back after the update', async () => {
+    getFirstAsync.mockResolvedValueOnce(null);
+
+    await expect(updateProspectionEspeces(BASE_INPUT.id, ESPECES_JSON)).rejects.toThrow(
       'Échec de la mise à jour de la fiche brouillon locale'
     );
   });
