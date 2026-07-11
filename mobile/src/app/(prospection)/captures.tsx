@@ -106,8 +106,7 @@ export default function CapturesScreen() {
           params: { draftId: draft.id, grilleIndex: String(grilleIndex + 1) },
         });
       } else {
-        // L'écran Végétation & sol (#7) n'existe pas encore : retour à l'accueil en attendant.
-        router.push('/(tabs)/prospection');
+        router.push({ pathname: '/(prospection)/vegetation', params: { draftId: draft.id } });
       }
     } catch {
       setSaveError('Impossible d’enregistrer les captures localement');

@@ -34,6 +34,9 @@ export interface DraftProspection {
   surf_station: number | null;
   surf_prospectee: number | null;
   surf_infestee: number | null;
+  degats_cultures: string | null;
+  vegetation: string | null;
+  sol: string | null;
   statut: string;
   statut_sync: string;
   created_at: string;
@@ -148,6 +151,32 @@ export async function startCaptureTimer(id: string): Promise<DraftProspection> {
   await db.runAsync(
     "UPDATE prospection SET capture_started_at = ?, updated_at = ? WHERE id = ? AND capture_started_at IS NULL",
     [now, now, id]
+  );
+
+  const updated = await getProspection(id);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
+export interface VegetationUpdateInput {
+  vegetation: string;
+  sol: string;
+  degatsCultures: string | null;
+}
+
+/** Persiste la végétation, le sol et les dégâts culture saisis à l'écran Végétation & sol (JSONB archival, cf. ADR-006). */
+export async function updateProspectionVegetation(
+  id: string,
+  input: VegetationUpdateInput
+): Promise<DraftProspection> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    'UPDATE prospection SET vegetation = ?, sol = ?, degats_cultures = ?, updated_at = ? WHERE id = ?',
+    [input.vegetation, input.sol, input.degatsCultures, now, id]
   );
 
   const updated = await getProspection(id);

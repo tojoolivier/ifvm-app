@@ -18,6 +18,7 @@ import {
   countUnsyncedProspections,
   updateProspectionReference,
   updateProspectionEspeces,
+  updateProspectionVegetation,
   startCaptureTimer,
   saveProspectionCaptures,
   listProspectionCaptures,
@@ -225,6 +226,47 @@ describe('updateProspectionEspeces', () => {
     getFirstAsync.mockResolvedValueOnce(null);
 
     await expect(updateProspectionEspeces(BASE_INPUT.id, ESPECES_JSON)).rejects.toThrow(
+      'Échec de la mise à jour de la fiche brouillon locale'
+    );
+  });
+});
+
+describe('updateProspectionVegetation', () => {
+  const VEGETATION_INPUT = {
+    vegetation: JSON.stringify({ recouvrement_herbeux: 40 }),
+    sol: JSON.stringify({ humidite: 'surface', texture: 'limoneuse' }),
+    degatsCultures: 'nuls',
+  };
+
+  it('updates vegetation/sol/degats_cultures columns on the draft row', async () => {
+    getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW, ...VEGETATION_INPUT });
+
+    await updateProspectionVegetation(BASE_INPUT.id, VEGETATION_INPUT);
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE prospection SET vegetation'),
+      expect.arrayContaining([
+        VEGETATION_INPUT.vegetation,
+        VEGETATION_INPUT.sol,
+        VEGETATION_INPUT.degatsCultures,
+        BASE_INPUT.id,
+      ])
+    );
+  });
+
+  it('returns the updated row read back from local storage', async () => {
+    const updated = { ...STORED_ROW, ...VEGETATION_INPUT };
+    getFirstAsync.mockResolvedValueOnce(updated);
+
+    const result = await updateProspectionVegetation(BASE_INPUT.id, VEGETATION_INPUT);
+
+    expect(result).toEqual(updated);
+  });
+
+  it('throws if the row cannot be read back after the update', async () => {
+    getFirstAsync.mockResolvedValueOnce(null);
+
+    await expect(updateProspectionVegetation(BASE_INPUT.id, VEGETATION_INPUT)).rejects.toThrow(
       'Échec de la mise à jour de la fiche brouillon locale'
     );
   });
