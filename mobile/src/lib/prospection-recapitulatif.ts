@@ -18,9 +18,12 @@ import {
 import {
   DEGATS_OPTIONS,
   HUMIDITE_OPTIONS,
+  STRATE_KEYS,
+  STRATE_LABELS,
   TEXTURE_OPTIONS,
   VegetationSolState,
   parseVegetationSol,
+  totalRecouvrement,
 } from './prospection-vegetation';
 
 export interface RecapitulatifViewModel {
@@ -42,7 +45,10 @@ export interface RecapitulatifViewModel {
 
 /** Synthèse textuelle de la végétation/sol saisis, dérivée des mêmes données que l'écran Végétation & sol. */
 export function buildVegetationSummary(state: VegetationSolState): string {
-  const parts: string[] = [`Recouvrement herbeux ${state.recouvrementHerbeux}%`];
+  const strateParts = STRATE_KEYS.filter((key) => state.strates[key].recouvrement > 0)
+    .map((key) => `${STRATE_LABELS[key]} ${state.strates[key].recouvrement}%`)
+    .join(', ');
+  const parts: string[] = [`Strates (${totalRecouvrement(state.strates)}%) : ${strateParts || '—'}`];
   if (state.humidite) {
     parts.push(`Humidité ${HUMIDITE_OPTIONS.find((o) => o.value === state.humidite)?.label}`);
   }

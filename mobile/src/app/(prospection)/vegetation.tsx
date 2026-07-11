@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, PanResponder, LayoutChangeEvent } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, PanResponder, LayoutChangeEvent } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getProspection, DraftProspection } from '@/lib/prospection-repository';
@@ -9,6 +9,12 @@ import {
   DegatsCultures,
   HUMIDITE_OPTIONS,
   Humidite,
+  PHENOLOGIE_OPTIONS,
+  Phenologie,
+  STRATES_DETAILLABLES,
+  STRATE_KEYS,
+  STRATE_LABELS,
+  StrateKey,
   TEXTURE_OPTIONS,
   Texture,
   VegetationSolState,
@@ -16,6 +22,7 @@ import {
   isVegetationSolComplete,
   parseVegetationSol,
   saveVegetationSol,
+  totalRecouvrement,
 } from '@/lib/prospection-vegetation';
 
 const IFVM_GREEN = '#1B5E1B';
@@ -27,6 +34,7 @@ export default function VegetationScreen() {
 
   const [draft, setDraft] = useState<DraftProspection | null>(null);
   const [state, setState] = useState<VegetationSolState>(DEFAULT_VEGETATION_SOL);
+  const [expanded, setExpanded] = useState<StrateKey | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -40,6 +48,15 @@ export default function VegetationScreen() {
 
   const canContinue = isVegetationSolComplete(state) && !isSaving;
   const backRoute = (draft?.surf_infestee ?? 0) > 0 ? 'infestation-comportement' : 'captures';
+  const total = totalRecouvrement(state.strates);
+  const totalOk = total === 100;
+
+  const updateStrate = (key: StrateKey, patch: Partial<{ recouvrement: number; phenologie: Phenologie; hauteur: number | null }>) => {
+    setState((prev) => ({
+      ...prev,
+      strates: { ...prev.strates, [key]: { ...prev.strates[key], ...patch } },
+    }));
+  };
 
   const handleVerifierEtEnregistrer = async () => {
     if (!draft || !isVegetationSolComplete(state)) return;
@@ -70,12 +87,70 @@ export default function VegetationScreen() {
 
       <ScrollView style={styles.content} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
         <View style={styles.card}>
-          <Text style={styles.cardLabel}>Recouvrement strate herbeuse</Text>
-          <RecouvrementSlider
-            value={state.recouvrementHerbeux}
-            onChange={(v) => setState((prev) => ({ ...prev, recouvrementHerbeux: v }))}
-          />
+          <View style={styles.totalRow}>
+            <Text style={styles.cardLabel}>Recouvrement des strates</Text>
+            <Text style={[styles.totalValue, totalOk ? styles.totalValueOk : styles.totalValueError]}>
+              {total}% / 100%
+            </Text>
+          </View>
+          {!totalOk && (
+            <Text style={styles.errorText}>Le total des recouvrements doit atteindre 100%.</Text>
+          )}
         </View>
+
+        {STRATE_KEYS.map((key) => {
+          const detail = state.strates[key];
+          const isDetaillable = STRATES_DETAILLABLES.includes(key);
+          const isExpanded = expanded === key;
+          return (
+            <View key={key} style={styles.card}>
+              <TouchableOpacity
+                onPress={() => isDetaillable && setExpanded(isExpanded ? null : key)}
+                activeOpacity={isDetaillable ? 0.7 : 1}
+                style={styles.strateHeader}
+              >
+                <Text style={styles.cardLabel}>{STRATE_LABELS[key]}</Text>
+                {isDetaillable && <Text style={styles.expandToggle}>{isExpanded ? '▲' : '▼'}</Text>}
+              </TouchableOpacity>
+              <RecouvrementSlider
+                value={detail.recouvrement}
+                onChange={(v) => updateStrate(key, { recouvrement: v })}
+              />
+
+              {isDetaillable && isExpanded && (
+                <View style={styles.strateDetail}>
+                  <Text style={styles.detailLabel}>Phénologie</Text>
+                  <View style={styles.chipsRow}>
+                    {PHENOLOGIE_OPTIONS.map((option) => {
+                      const active = detail.phenologie === option.value;
+                      return (
+                        <TouchableOpacity
+                          key={option.value}
+                          style={[styles.chip, active && styles.chipActive]}
+                          onPress={() => updateStrate(key, { phenologie: option.value })}
+                          activeOpacity={0.85}
+                        >
+                          <Text style={[styles.chipText, active && styles.chipTextActive]}>{option.label}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                  <Text style={styles.detailLabel}>Hauteur (m)</Text>
+                  <TextInput
+                    style={styles.hauteurInput}
+                    keyboardType="decimal-pad"
+                    placeholder="0.0"
+                    value={detail.hauteur !== null ? String(detail.hauteur) : ''}
+                    onChangeText={(text) => {
+                      const parsed = parseFloat(text.replace(',', '.'));
+                      updateStrate(key, { hauteur: Number.isFinite(parsed) ? parsed : null });
+                    }}
+                  />
+                </View>
+              )}
+            </View>
+          );
+        })}
 
         <SingleChoiceCard<Humidite>
           label="Humidité du sol"
@@ -190,6 +265,23 @@ const styles = StyleSheet.create({
   content: { flex: 1 },
   card: { backgroundColor: '#FFFFFF', borderRadius: 10, padding: 14, marginBottom: 12 },
   cardLabel: { fontSize: 12, fontWeight: '700', color: '#6B7280', marginBottom: 8, textTransform: 'uppercase' },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  totalValue: { fontSize: 13, fontWeight: '700' },
+  totalValueOk: { color: IFVM_GREEN },
+  totalValueError: { color: '#dc2626' },
+  strateHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  expandToggle: { fontSize: 12, color: '#6B7280' },
+  strateDetail: { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#E5E7EB' },
+  detailLabel: { fontSize: 11, fontWeight: '700', color: '#6B7280', marginTop: 8, marginBottom: 6, textTransform: 'uppercase' },
+  hauteurInput: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    color: '#111827',
+  },
   sliderTrack: {
     height: 32,
     justifyContent: 'center',

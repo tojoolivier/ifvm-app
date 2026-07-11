@@ -24,7 +24,15 @@ import {
   buildVegetationSummary,
   enregistrerEtSynchroniser,
 } from '../src/lib/prospection-recapitulatif';
-import { DEFAULT_VEGETATION_SOL, VegetationSolState } from '../src/lib/prospection-vegetation';
+import { DEFAULT_VEGETATION_SOL, STRATE_KEYS, StratesState, VegetationSolState } from '../src/lib/prospection-vegetation';
+
+function stratesWithTotal(recouvrementByKey: Partial<Record<(typeof STRATE_KEYS)[number], number>>): StratesState {
+  const strates = {} as StratesState;
+  for (const key of STRATE_KEYS) {
+    strates[key] = { recouvrement: recouvrementByKey[key] ?? 0, phenologie: null, hauteur: null };
+  }
+  return strates;
+}
 
 const mockCreateProspection = jest.mocked(apiClient.createProspection);
 const mockCompleteProspection = jest.mocked(completeProspection);
@@ -49,7 +57,7 @@ const BASE_DRAFT: DraftProspection = {
   surf_prospectee: 8,
   surf_infestee: 2,
   degats_cultures: 'faibles',
-  vegetation: JSON.stringify({ recouvrement_herbeux: 40 }),
+  vegetation: JSON.stringify({ strates: stratesWithTotal({ herbeuse: 40, sol_nu: 60 }) }),
   sol: JSON.stringify({ humidite: 'surface', texture: 'limoneuse' }),
   statut: 'brouillon',
   statut_sync: 'local',
@@ -68,19 +76,19 @@ beforeEach(() => {
 });
 
 describe('buildVegetationSummary', () => {
-  it('always includes the recouvrement herbeux', () => {
-    expect(buildVegetationSummary(DEFAULT_VEGETATION_SOL)).toBe('Recouvrement herbeux 0%');
+  it('always includes the strates total, with a placeholder when nothing is set', () => {
+    expect(buildVegetationSummary(DEFAULT_VEGETATION_SOL)).toBe('Strates (0%) : —');
   });
 
-  it('appends the labels of every selector that is set', () => {
+  it('appends the labels of every selector that is set, plus non-zero strates', () => {
     const state: VegetationSolState = {
-      recouvrementHerbeux: 40,
+      strates: stratesWithTotal({ herbeuse: 40, sol_nu: 60 }),
       humidite: 'surface',
       texture: 'limoneuse',
       degatsCultures: 'faibles',
     };
     expect(buildVegetationSummary(state)).toBe(
-      'Recouvrement herbeux 40% · Humidité Surf. · Texture Limoneuse · Dégâts culture Faibles'
+      'Strates (100%) : Herbeuse 40%, Sol nu 60% · Humidité Surf. · Texture Limoneuse · Dégâts culture Faibles'
     );
   });
 });
@@ -99,7 +107,7 @@ describe('buildRecapitulatif', () => {
     expect(recap.surfStation).toBe(10);
     expect(recap.surfProspectee).toBe(8);
     expect(recap.surfInfestee).toBe(2);
-    expect(recap.vegetationSummary).toContain('Recouvrement herbeux 40%');
+    expect(recap.vegetationSummary).toContain('Herbeuse 40%');
   });
 
   it('falls back to GPS coordinates as the station label when no station is set', async () => {
@@ -139,7 +147,7 @@ describe('enregistrerEtSynchroniser', () => {
       'tok',
       expect.objectContaining({
         campagne_id: COMPLETED.campagne_id,
-        vegetation: { recouvrement_herbeux: 40 },
+        vegetation: { strates: stratesWithTotal({ herbeuse: 40, sol_nu: 60 }) },
         sol: { humidite: 'surface', texture: 'limoneuse' },
         captures: [
           { espece: 'LMC', categorie: 'imago', sexe: 'F', phase: 'gregaire', stade: 'A1', effectif: 5 },
