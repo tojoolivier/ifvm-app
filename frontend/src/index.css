@@ -67,3 +67,28 @@
     color: hsl(var(--foreground));
   }
 }
+
+/* Vue imprimable A4 (#19) : n'affiche que .fiche-imprimable à l'impression. */
+.fiche-imprimable {
+  display: none;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .fiche-imprimable,
+  .fiche-imprimable * {
+    visibility: visible;
+  }
+
+  .fiche-imprimable {
+    display: block;
+    position: absolute;
+    inset: 0;
+    width: 210mm;
+    padding: 12mm;
+    margin: 0 auto;
+  }
+}
