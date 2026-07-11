@@ -14,6 +14,8 @@ import {
   createDraftProspection,
   getProspection,
   listDraftProspections,
+  listRecentProspections,
+  countUnsyncedProspections,
 } from '../src/lib/prospection-repository';
 
 const BASE_INPUT = {
@@ -115,5 +117,48 @@ describe('listDraftProspections', () => {
     expect(getAllAsync).toHaveBeenCalledWith(
       expect.stringContaining("WHERE statut = 'brouillon'")
     );
+  });
+});
+
+describe('listRecentProspections', () => {
+  it('lists all statuses ordered by most recently updated, capped at the given limit', async () => {
+    getAllAsync.mockResolvedValueOnce([STORED_ROW]);
+
+    const result = await listRecentProspections(5);
+
+    expect(result).toEqual([STORED_ROW]);
+    expect(getAllAsync).toHaveBeenCalledWith(
+      expect.stringContaining('ORDER BY updated_at DESC LIMIT ?'),
+      [5]
+    );
+  });
+
+  it('defaults the limit to 20', async () => {
+    getAllAsync.mockResolvedValueOnce([]);
+
+    await listRecentProspections();
+
+    expect(getAllAsync).toHaveBeenCalledWith(expect.any(String), [20]);
+  });
+});
+
+describe('countUnsyncedProspections', () => {
+  it('counts rows whose statut_sync is not synced', async () => {
+    getFirstAsync.mockResolvedValueOnce({ count: 3 });
+
+    const result = await countUnsyncedProspections();
+
+    expect(result).toBe(3);
+    expect(getFirstAsync).toHaveBeenCalledWith(
+      expect.stringContaining("statut_sync != 'synced'")
+    );
+  });
+
+  it('returns 0 when the query yields no row', async () => {
+    getFirstAsync.mockResolvedValueOnce(undefined);
+
+    const result = await countUnsyncedProspections();
+
+    expect(result).toBe(0);
   });
 });

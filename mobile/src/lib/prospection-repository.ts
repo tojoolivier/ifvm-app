@@ -92,3 +92,21 @@ export async function listDraftProspections(): Promise<DraftProspection[]> {
     "SELECT * FROM prospection WHERE statut = 'brouillon' ORDER BY updated_at DESC"
   );
 }
+
+/** Liste les fiches locales les plus récentes, tous statuts confondus (pour l'accueil). */
+export async function listRecentProspections(limit = 20): Promise<DraftProspection[]> {
+  const db = await getDb();
+  return db.getAllAsync<DraftProspection>(
+    'SELECT * FROM prospection ORDER BY updated_at DESC LIMIT ?',
+    [limit]
+  );
+}
+
+/** Compte les fiches locales pas encore synchronisées avec le serveur. */
+export async function countUnsyncedProspections(): Promise<number> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ count: number }>(
+    "SELECT COUNT(*) as count FROM prospection WHERE statut_sync != 'synced'"
+  );
+  return row?.count ?? 0;
+}
