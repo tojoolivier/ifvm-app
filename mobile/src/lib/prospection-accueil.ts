@@ -1,5 +1,6 @@
-import { apiClient, Campagne } from './api-client';
+import { apiClient, Campagne, ProspectionRead } from './api-client';
 import { generateId } from './id';
+import { STATUT_VALIDE } from './prospection-fiche-lecture';
 import {
   createDraftProspection,
   countUnsyncedProspections,
@@ -13,6 +14,7 @@ export interface AccueilViewModel {
   unsyncedCount: number;
   activeDraft: DraftProspection | null;
   recent: DraftProspection[];
+  validated: ProspectionRead[];
 }
 
 /** Charge les données de l'écran Accueil depuis le store local — aucune dépendance réseau. */
@@ -27,7 +29,24 @@ export async function loadAccueilData(): Promise<AccueilViewModel> {
     unsyncedCount,
     activeDraft: drafts[0] ?? null,
     recent,
+    validated: [],
   };
+}
+
+/**
+ * Récupère les fiches au statut Validé du prospecteur courant depuis le serveur (#16) —
+ * seul endroit où le statut final "Validé" existe, l'app locale ne connaît que jusqu'à
+ * "en_attente". Échec silencieux hors-ligne (liste vide), cohérent avec l'offline-first.
+ */
+export async function loadValidatedProspections(
+  token: string,
+  prospecteurId: string
+): Promise<ProspectionRead[]> {
+  try {
+    return await apiClient.listProspections(token, { statut: STATUT_VALIDE, prospecteur_id: prospecteurId });
+  } catch {
+    return [];
+  }
 }
 
 /** Choisit la campagne en cours parmi les campagnes connues (règle : une seule campagne à la fois). */

@@ -5,15 +5,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
 import {
   loadAccueilData,
+  loadValidatedProspections,
   startNewProspection,
   AccueilViewModel,
 } from '@/lib/prospection-accueil';
 import { DraftProspection } from '@/lib/prospection-repository';
+import { ProspectionRead } from '@/lib/api-client';
 
 const IFVM_GREEN = '#1B5E1B';
 const IFVM_GREEN_DARK = '#163F16';
 
-const EMPTY_DATA: AccueilViewModel = { unsyncedCount: 0, activeDraft: null, recent: [] };
+const EMPTY_DATA: AccueilViewModel = { unsyncedCount: 0, activeDraft: null, recent: [], validated: [] };
 
 export default function ProspectionScreen() {
   const router = useRouter();
@@ -27,7 +29,12 @@ export default function ProspectionScreen() {
 
   const refresh = useCallback(() => {
     loadAccueilData().then(setData);
-  }, []);
+    if (user && token) {
+      loadValidatedProspections(token, user.id).then((validated) =>
+        setData((current) => ({ ...current, validated }))
+      );
+    }
+  }, [user, token]);
 
   useFocusEffect(refresh);
 
@@ -41,6 +48,10 @@ export default function ProspectionScreen() {
 
   const resumeDraft = (draft: DraftProspection) => {
     router.push({ pathname: '/(prospection)/reference', params: { draftId: draft.id } });
+  };
+
+  const openFicheLecture = (prospection: ProspectionRead) => {
+    router.push({ pathname: '/(prospection)/fiche-lecture', params: { id: prospection.id } });
   };
 
   const handleNewProspection = async () => {
@@ -110,6 +121,25 @@ export default function ProspectionScreen() {
           )}
         </View>
 
+        {data.validated.length > 0 && (
+          <View style={styles.list}>
+            <Text style={styles.sectionTitle}>Fiches validées</Text>
+            {data.validated.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.card}
+                onPress={() => openFicheLecture(item)}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.cardTitle}>
+                  {item.n_fiche ?? item.date_prospection} · {item.date_prospection}
+                </Text>
+                <Text style={styles.cardStatutValide}>Validée ✓</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
         {error && <Text style={styles.errorText}>{error}</Text>}
 
         <TouchableOpacity
@@ -166,6 +196,8 @@ const styles = StyleSheet.create({
   },
   cardTitle: { fontSize: 14, fontWeight: '600', color: '#111827' },
   cardStatut: { fontSize: 12, color: '#6B7280' },
+  cardStatutValide: { fontSize: 12, color: '#15803d', fontWeight: '700' },
+  sectionTitle: { fontSize: 13, fontWeight: '700', color: '#374151', marginBottom: 2 },
   errorText: { color: '#dc2626', fontSize: 13, marginBottom: 12, textAlign: 'center' },
   btnNouvelle: {
     backgroundColor: IFVM_GREEN,

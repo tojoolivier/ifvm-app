@@ -10,6 +10,7 @@ import {
 jest.mock('../src/lib/api-client', () => ({
   apiClient: {
     getCampagnes: jest.fn(),
+    listProspections: jest.fn(),
   },
 }));
 
@@ -22,6 +23,7 @@ jest.mock('../src/lib/prospection-repository', () => ({
 
 import {
   loadAccueilData,
+  loadValidatedProspections,
   pickCurrentCampagneId,
   startNewProspection,
 } from '../src/lib/prospection-accueil';
@@ -70,7 +72,7 @@ describe('loadAccueilData', () => {
 
     const result = await loadAccueilData();
 
-    expect(result).toEqual({ unsyncedCount: 0, activeDraft: null, recent: [] });
+    expect(result).toEqual({ unsyncedCount: 0, activeDraft: null, recent: [], validated: [] });
   });
 
   it('surfaces the most recent draft and the unsynced count', async () => {
@@ -142,5 +144,26 @@ describe('startNewProspection', () => {
       startNewProspection({ token: 'tok', prospecteurId: 'p1' })
     ).rejects.toThrow('Aucune campagne en cours');
     expect(mockCreateDraft).not.toHaveBeenCalled();
+  });
+});
+
+describe('loadValidatedProspections', () => {
+  it('fetches fiches with statut validee for the given prospecteur', async () => {
+    mockApiClient.listProspections.mockResolvedValueOnce([]);
+
+    await loadValidatedProspections('tok', 'p1');
+
+    expect(mockApiClient.listProspections).toHaveBeenCalledWith('tok', {
+      statut: 'validee',
+      prospecteur_id: 'p1',
+    });
+  });
+
+  it('returns an empty list instead of throwing when offline', async () => {
+    mockApiClient.listProspections.mockRejectedValueOnce(new Error('offline'));
+
+    const result = await loadValidatedProspections('tok', 'p1');
+
+    expect(result).toEqual([]);
   });
 });
