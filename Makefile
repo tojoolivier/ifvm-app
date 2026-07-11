@@ -3,7 +3,7 @@ COMPOSE = docker compose
 .PHONY: up down build logs migrate seed shell-db shell-backend
 
 up:
-	$(COMPOSE) up --build
+	$(COMPOSE) up -d
 
 down:
 	$(COMPOSE) down

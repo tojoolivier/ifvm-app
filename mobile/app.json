@@ -37,7 +37,13 @@
         }
       ],
       "expo-secure-store",
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "IFVM a besoin de votre position pour géoréférencer les prospections."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
