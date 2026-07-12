@@ -7,6 +7,7 @@ import { CampagnesPage } from './pages/CampagnesPage'
 import { ProspectionsPage } from './pages/ProspectionsPage'
 import { NouvelleProspectionPage } from './pages/NouvelleProspectionPage'
 import { ProspectionDetailPage } from './pages/ProspectionDetailPage'
+import { SynthesesPage } from './pages/SynthesesPage'
 import { DesignSystemPage } from './pages/DesignSystemPage'
 import { UsersPage } from './pages/UsersPage'
 
@@ -23,6 +24,7 @@ const router = createBrowserRouter([
           { path: '/prospections', element: <ProspectionsPage /> },
           { path: '/prospections/new', element: <NouvelleProspectionPage /> },
           { path: '/prospections/:id', element: <ProspectionDetailPage /> },
+          { path: '/syntheses', element: <SynthesesPage /> },
           { path: '/design-system', element: <DesignSystemPage /> },
           { path: '/users', element: <UsersPage /> },
         ],
