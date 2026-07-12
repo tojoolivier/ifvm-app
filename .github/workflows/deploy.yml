@@ -1,45 +1,85 @@
-name: Deploy to Production
+name: Build and deploy
 
 on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+  packages: write
+
 env:
-  APP_DIR: /opt/app
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/ifvm-app-backend
+  FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/ifvm-app-frontend
 
 jobs:
-  deploy:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: tag
+        run: echo "tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:${{ steps.tag.outputs.tag }}
+            ${{ env.BACKEND_IMAGE }}:latest
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile.prod
+          push: true
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:${{ steps.tag.outputs.tag }}
+            ${{ env.FRONTEND_IMAGE }}:latest
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+  update-manifests:
+    needs: build-and-push
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout infra-k8s
         uses: actions/checkout@v4
-
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.VPS_IP }}
-          username: root
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: DOMAIN,POSTGRES_PASSWORD,JWT_SECRET
-          script: |
-            cd ${{ env.APP_DIR }}
+          repository: tojoolivier/infra-k8s
+          ssh-key: ${{ secrets.INFRA_REPO_DEPLOY_KEY }}
 
-            # Mettre à jour le .env depuis les secrets GitHub
-            cat > .env <<EOF
-            POSTGRES_DB=ifvm_db
-            POSTGRES_USER=ifvm
-            POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-            JWT_SECRET=${JWT_SECRET}
-            JWT_ALGORITHM=HS256
-            JWT_EXPIRE_MINUTES=60
-            DOMAIN=${DOMAIN}
-            VITE_API_URL=https://${DOMAIN}
-            EOF
+      - name: Bump image tags
+        run: |
+          TAG="${{ needs.build-and-push.outputs.tag }}"
+          sed -i "s|image: ghcr.io/tojoolivier/ifvm-app-backend:.*|image: ghcr.io/tojoolivier/ifvm-app-backend:${TAG}|" \
+            clusters/production/apps/ifvm-app/manifests/backend.yaml
+          sed -i "s|image: ghcr.io/tojoolivier/ifvm-app-frontend:.*|image: ghcr.io/tojoolivier/ifvm-app-frontend:${TAG}|" \
+            clusters/production/apps/ifvm-app/manifests/frontend.yaml
 
-            GIT_SSH_COMMAND="ssh -i /root/.ssh/id_ed25519 -o StrictHostKeyChecking=no" git pull origin main
-            docker compose -f infra/docker-compose.prod.yml --env-file .env up -d --build
-            docker compose -f infra/docker-compose.prod.yml --env-file .env exec -T backend alembic upgrade head
-        env:
-          DOMAIN: ${{ secrets.DOMAIN }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      - name: Commit and push
+        run: |
+          git config user.name "ifvm-app-ci"
+          git config user.email "ci@ifvm-app"
+          if git diff --quiet; then
+            echo "No manifest changes to deploy"
+            exit 0
+          fi
+          git commit -am "Deploy ifvm-app ${{ needs.build-and-push.outputs.tag }}"
+          git push

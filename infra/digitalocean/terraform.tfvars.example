@@ -1,7 +1,0 @@
-do_token          = "your_digitalocean_api_token"
-ssh_public_key    = "ssh-ed25519 AAAA... your-key"
-domain            = "app.example.com"
-droplet_size      = "s-2vcpu-4gb"
-region            = "fra1"
-postgres_password = "a_very_strong_password"
-jwt_secret        = "a_very_long_random_string_at_least_32_chars"
