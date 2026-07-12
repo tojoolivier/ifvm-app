@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
@@ -15,35 +15,21 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import {
+  buildFicheImprimable,
+  isFicheValidee,
+  type CaptureRead,
+  type InfestationRead,
+  type PopulationRead,
+} from '@/lib/prospection-fiche-lecture'
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-interface Population {
-  id: string
-  espece: string
-  categorie: string
-  stade: string
-  phase: string
-  nombre_individus: number
-  abondance: string
-}
-
-interface Capture {
-  id: string
-  espece: string
-  categorie: string
-  stade: string
-  nombre: number
-}
-
-interface Infestation {
-  id: string
-  type_infestation: string
-  superficie_ha: number | null
-  commentaire: string | null
-}
+type Population = PopulationRead
+type Capture = CaptureRead
+type Infestation = InfestationRead
 
 interface ProspectionDetail {
   id: string
@@ -57,6 +43,14 @@ interface ProspectionDetail {
   n_fiche: string | null
   n_releve: string | null
   created_at: string
+  latitude: number | null
+  longitude: number | null
+  surf_station: number | null
+  surf_prospectee: number | null
+  surf_infestee: number | null
+  vegetation: Record<string, unknown> | null
+  sol: Record<string, unknown> | null
+  degats_cultures: string | null
   populations: Population[]
   captures: Capture[]
   infestations: Infestation[]
@@ -255,6 +249,7 @@ export function ProspectionDetailPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [activeAction, setActiveAction] = useState<ActionType>(null)
+  const [showPrintView, setShowPrintView] = useState(false)
 
   const { data: prospection, isLoading, isError } = useQuery<ProspectionDetail>({
     queryKey: ['prospection', id],
@@ -316,6 +311,17 @@ export function ProspectionDetailPage() {
 
   const canVerifier = statut === 'en_attente' && role === 'verificateur'
   const canValiderOuRejeter = statut === 'verifiee' && role === 'validation_finale'
+  const ficheValidee = isFicheValidee(statut)
+
+  const validationEntry = auditLogSorted.find((entry) => entry.action === 'validation')
+
+  useEffect(() => {
+    if (!showPrintView) return
+    const handleAfterPrint = () => setShowPrintView(false)
+    window.addEventListener('afterprint', handleAfterPrint)
+    window.print()
+    return () => window.removeEventListener('afterprint', handleAfterPrint)
+  }, [showPrintView])
 
   if (isLoading) {
     return <div className="px-8 py-6 text-muted-foreground">Chargement…</div>
@@ -353,6 +359,11 @@ export function ProspectionDetailPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 mt-1">
+          {ficheValidee && (
+            <Button variant="outline" size="sm" onClick={() => setShowPrintView(true)}>
+              Exporter en PDF
+            </Button>
+          )}
           <SyncBadge statut_sync={prospection.statut_sync} />
           <StatutBadge statut={prospection.statut} />
         </div>
@@ -434,10 +445,8 @@ export function ProspectionDetailPage() {
                 <tr>
                   <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Espèce</th>
                   <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Catégorie</th>
-                  <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Stade</th>
-                  <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Phase</th>
-                  <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground">Individus</th>
-                  <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Abondance</th>
+                  <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground">Densité diffuse /ha</th>
+                  <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground">Densité groupée /ha</th>
                 </tr>
               </thead>
               <tbody>
@@ -445,10 +454,8 @@ export function ProspectionDetailPage() {
                   <tr key={pop.id} className="border-b last:border-0">
                     <td className="px-4 py-2 font-medium">{pop.espece}</td>
                     <td className="px-4 py-2 capitalize">{pop.categorie}</td>
-                    <td className="px-4 py-2">{pop.stade}</td>
-                    <td className="px-4 py-2">{pop.phase}</td>
-                    <td className="px-4 py-2 text-right">{pop.nombre_individus}</td>
-                    <td className="px-4 py-2">{pop.abondance}</td>
+                    <td className="px-4 py-2 text-right">{pop.densite_diffuse ?? '—'}</td>
+                    <td className="px-4 py-2 text-right">{pop.densite_groupee ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -470,7 +477,8 @@ export function ProspectionDetailPage() {
                   <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Espèce</th>
                   <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Catégorie</th>
                   <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Stade</th>
-                  <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground">Nombre</th>
+                  <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Phase</th>
+                  <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground">Effectif</th>
                 </tr>
               </thead>
               <tbody>
@@ -479,7 +487,8 @@ export function ProspectionDetailPage() {
                     <td className="px-4 py-2 font-medium">{cap.espece}</td>
                     <td className="px-4 py-2 capitalize">{cap.categorie}</td>
                     <td className="px-4 py-2">{cap.stade}</td>
-                    <td className="px-4 py-2 text-right">{cap.nombre}</td>
+                    <td className="px-4 py-2">{cap.phase}</td>
+                    <td className="px-4 py-2 text-right">{cap.effectif}</td>
                   </tr>
                 ))}
               </tbody>
@@ -498,17 +507,17 @@ export function ProspectionDetailPage() {
             <table className="w-full text-sm">
               <thead className="border-b bg-muted/50">
                 <tr>
-                  <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Type</th>
-                  <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground">Superficie (ha)</th>
-                  <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Commentaire</th>
+                  <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Type de cible</th>
+                  <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground">Surface totale (ha)</th>
+                  <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Comportement</th>
                 </tr>
               </thead>
               <tbody>
                 {prospection.infestations.map((inf) => (
                   <tr key={inf.id} className="border-b last:border-0">
-                    <td className="px-4 py-2">{inf.type_infestation}</td>
-                    <td className="px-4 py-2 text-right">{inf.superficie_ha ?? '—'}</td>
-                    <td className="px-4 py-2 text-muted-foreground">{inf.commentaire ?? '—'}</td>
+                    <td className="px-4 py-2">{inf.type_cible}</td>
+                    <td className="px-4 py-2 text-right">{inf.surface_tot ?? '—'}</td>
+                    <td className="px-4 py-2 text-muted-foreground">{inf.comportement ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -576,6 +585,97 @@ export function ProspectionDetailPage() {
           isPending={mutation.isPending}
         />
       )}
+
+      {showPrintView && (
+        <FicheImprimable
+          prospection={prospection}
+          station={station}
+          validateurId={validationEntry?.auteur_id ?? null}
+        />
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Vue imprimable A4 (#19) — mise en page dédiée à l'export PDF d'une fiche
+// validée, dérivée des données déjà chargées par ProspectionDetailPage.
+// ---------------------------------------------------------------------------
+
+function FicheImprimable({
+  prospection,
+  station,
+  validateurId,
+}: {
+  prospection: ProspectionDetail
+  station: StationDetail | undefined
+  validateurId: string | null
+}) {
+  const synthese = buildFicheImprimable(prospection)
+  const stationLabel = station ? `${station.nom} (${station.pa_nom})` : shortId(prospection.station_id)
+
+  return (
+    <div data-testid="fiche-imprimable" className="fiche-imprimable">
+      <header className="text-center mb-6">
+        <p className="text-xs uppercase tracking-wide text-muted-foreground">IFVM — Fiche de prospection</p>
+        <h2 className="text-xl font-bold">Fiche n° {synthese.nFiche}</h2>
+        <p className="inline-flex items-center gap-1 mt-1 text-sm font-medium text-green-700">
+          Validé ✓{validateurId ? ` — par ${shortId(validateurId)}` : ''}
+        </p>
+      </header>
+
+      <dl className="grid grid-cols-2 gap-4 mb-4 text-sm">
+        <Field label="Prospecteur" value={shortId(prospection.prospecteur_id)} />
+        <Field label="Date de prospection" value={synthese.dateProspection} />
+        <Field label="Point d'appui / station" value={stationLabel} />
+        <Field label="Position GPS" value={synthese.positionGps} />
+        <Field
+          label="Surfaces (station / prospectée / infestée, ha)"
+          value={`${synthese.surfStation ?? '—'} / ${synthese.surfProspectee ?? '—'} / ${synthese.surfInfestee ?? '—'}`}
+        />
+      </dl>
+
+      <h3 className="text-sm font-semibold mt-4 mb-2">Synthèse par espèce</h3>
+      <table className="w-full text-sm border">
+        <thead>
+          <tr className="border-b bg-muted/50">
+            <th className="text-left px-2 py-1">Espèce</th>
+            <th className="text-right px-2 py-1">Capturés</th>
+            <th className="text-right px-2 py-1">Densité diffuse /ha</th>
+            <th className="text-right px-2 py-1">Densité groupée /ha</th>
+            <th className="text-left px-2 py-1">Phénotype dominant</th>
+          </tr>
+        </thead>
+        <tbody>
+          {synthese.especes.length === 0 ? (
+            <tr>
+              <td colSpan={5} className="px-2 py-2 text-muted-foreground text-center">
+                Aucune capture enregistrée.
+              </td>
+            </tr>
+          ) : (
+            synthese.especes.map((e) => (
+              <tr key={e.espece} className="border-b">
+                <td className="px-2 py-1 font-medium">{e.espece}</td>
+                <td className="px-2 py-1 text-right">{e.totalCaptures}</td>
+                <td className="px-2 py-1 text-right">{e.densiteDiffuse ?? '—'}</td>
+                <td className="px-2 py-1 text-right">{e.densiteGroupee ?? '—'}</td>
+                <td className="px-2 py-1">{e.phenotypeDominantLabel}</td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+
+      <h3 className="text-sm font-semibold mt-4 mb-2">Synthèse infestation</h3>
+      <p className="text-sm">
+        {synthese.infestation.hasInfestation
+          ? `${synthese.infestation.typeLabel} — surface ${synthese.infestation.surfaceTot ?? '—'} ha — ${synthese.infestation.comportementLabel}`
+          : 'Aucune infestation renseignée.'}
+      </p>
+
+      <h3 className="text-sm font-semibold mt-4 mb-2">Synthèse végétation / sol</h3>
+      <p className="text-sm">{synthese.vegetationSummary}</p>
     </div>
   )
 }

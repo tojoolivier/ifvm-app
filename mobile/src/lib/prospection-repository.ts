@@ -1,4 +1,5 @@
 import { getDb } from './prospection-db';
+import { generateId } from './id';
 
 export type TypeProspection = 'intensive' | 'extensive' | 'validation';
 
@@ -23,6 +24,10 @@ export interface DraftProspection {
   campagne_id: string;
   prospecteur_id: string;
   station_id: string | null;
+  n_fiche: string | null;
+  especes: string | null;
+  capture_started_at: string | null;
+  grilles_completees: string | null;
   date_prospection: string;
   latitude: number | null;
   longitude: number | null;
@@ -30,10 +35,23 @@ export interface DraftProspection {
   surf_station: number | null;
   surf_prospectee: number | null;
   surf_infestee: number | null;
+  degats_cultures: string | null;
+  vegetation: string | null;
+  sol: string | null;
   statut: string;
   statut_sync: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface ReferenceUpdateInput {
+  latitude: number;
+  longitude: number;
+  altitude: number | null;
+  surfStation: number;
+  surfProspectee: number;
+  surfInfestee: number;
+  nFiche: string;
 }
 
 /** Crée une fiche brouillon en local (SQLite), sans dépendance réseau. */
@@ -75,6 +93,330 @@ export async function createDraftProspection(
   return created;
 }
 
+/** Persiste la position GPS, les surfaces et le n° de fiche saisis à l'écran Référence. */
+export async function updateProspectionReference(
+  id: string,
+  input: ReferenceUpdateInput
+): Promise<DraftProspection> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    `UPDATE prospection SET
+      latitude = ?, longitude = ?, altitude = ?,
+      surf_station = ?, surf_prospectee = ?, surf_infestee = ?,
+      n_fiche = ?, updated_at = ?
+     WHERE id = ?`,
+    [
+      input.latitude,
+      input.longitude,
+      input.altitude,
+      input.surfStation,
+      input.surfProspectee,
+      input.surfInfestee,
+      input.nFiche,
+      now,
+      id,
+    ]
+  );
+
+  const updated = await getProspection(id);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
+/** Persiste la sélection espèces/stades saisie à l'écran Filtre espèces. */
+export async function updateProspectionEspeces(id: string, especes: string): Promise<DraftProspection> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    'UPDATE prospection SET especes = ?, updated_at = ? WHERE id = ?',
+    [especes, now, id]
+  );
+
+  const updated = await getProspection(id);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
+/** Démarre le chrono de la session de captures (n'écrase pas un chrono déjà démarré). */
+export async function startCaptureTimer(id: string): Promise<DraftProspection> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    "UPDATE prospection SET capture_started_at = ?, updated_at = ? WHERE id = ? AND capture_started_at IS NULL",
+    [now, now, id]
+  );
+
+  const updated = await getProspection(id);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
+/** Marque une grille (clé "espece|categorie") comme terminée dans le plan de relevé (idempotent). */
+export async function markGrilleCompleted(id: string, grilleKey: string): Promise<DraftProspection> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  const current = await getProspection(id);
+  const existing: unknown = current?.grilles_completees ? JSON.parse(current.grilles_completees) : [];
+  const completed = new Set<string>(Array.isArray(existing) ? existing : []);
+  completed.add(grilleKey);
+
+  await db.runAsync('UPDATE prospection SET grilles_completees = ?, updated_at = ? WHERE id = ?', [
+    JSON.stringify([...completed]),
+    now,
+    id,
+  ]);
+
+  const updated = await getProspection(id);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
+export interface VegetationUpdateInput {
+  vegetation: string;
+  sol: string;
+  degatsCultures: string | null;
+}
+
+/** Persiste la végétation, le sol et les dégâts culture saisis à l'écran Végétation & sol (JSONB archival, cf. ADR-006). */
+export async function updateProspectionVegetation(
+  id: string,
+  input: VegetationUpdateInput
+): Promise<DraftProspection> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    'UPDATE prospection SET vegetation = ?, sol = ?, degats_cultures = ?, updated_at = ? WHERE id = ?',
+    [input.vegetation, input.sol, input.degatsCultures, now, id]
+  );
+
+  const updated = await getProspection(id);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
+export interface CaptureRow {
+  espece: 'LMC' | 'NSE';
+  categorie: 'imago' | 'larve';
+  sexe: 'F' | 'M' | null;
+  phase: string; // phénotype : solitaire | solitaro_trans | transiens | gregaire
+  stade: string; // A1, A234, A3¼… selon l'espece/sexe
+  effectif: number;
+}
+
+/** Remplace les lignes `prospection_capture` d'une grille (espece/categorie) par le comptage courant. */
+export async function saveProspectionCaptures(
+  prospectionId: string,
+  espece: string,
+  categorie: string,
+  rows: CaptureRow[]
+): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(
+    'DELETE FROM prospection_capture WHERE prospection_id = ? AND espece = ? AND categorie = ?',
+    [prospectionId, espece, categorie]
+  );
+  for (const row of rows) {
+    await db.runAsync(
+      `INSERT INTO prospection_capture (id, prospection_id, espece, categorie, sexe, phase, stade, effectif)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [generateId(), prospectionId, espece, categorie, row.sexe, row.phase, row.stade, row.effectif]
+    );
+  }
+}
+
+/** Relit les lignes `prospection_capture` d'une grille (espece/categorie) donnée. */
+export async function listProspectionCaptures(
+  prospectionId: string,
+  espece: string,
+  categorie: string
+): Promise<CaptureRow[]> {
+  const db = await getDb();
+  return db.getAllAsync<CaptureRow>(
+    'SELECT espece, categorie, sexe, phase, stade, effectif FROM prospection_capture WHERE prospection_id = ? AND espece = ? AND categorie = ?',
+    [prospectionId, espece, categorie]
+  );
+}
+
+/** Relit toutes les lignes `prospection_capture` d'une fiche, toutes grilles espèce/catégorie confondues. */
+export async function listAllProspectionCaptures(prospectionId: string): Promise<CaptureRow[]> {
+  const db = await getDb();
+  return db.getAllAsync<CaptureRow>(
+    'SELECT espece, categorie, sexe, phase, stade, effectif FROM prospection_capture WHERE prospection_id = ?',
+    [prospectionId]
+  );
+}
+
+export interface PopulationRow {
+  espece: 'LMC' | 'NSE';
+  categorie: 'imago' | 'larve';
+  densite_diffuse: number | null;
+  densite_groupee: number | null;
+  methode: string | null;
+  accouplement: string | null;
+  ponte: string | null;
+}
+
+/** Relit la ligne `prospection_population` d'une espece/categorie donnée, ou `null` si absente. */
+export async function getProspectionPopulation(
+  prospectionId: string,
+  espece: string,
+  categorie: string
+): Promise<PopulationRow | null> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<PopulationRow>(
+    'SELECT espece, categorie, densite_diffuse, densite_groupee, methode, accouplement, ponte FROM prospection_population WHERE prospection_id = ? AND espece = ? AND categorie = ?',
+    [prospectionId, espece, categorie]
+  );
+  return row ?? null;
+}
+
+/** Insère ou remplace la ligne `prospection_population` d'une espece/categorie (une ligne par couple, cf. contrainte unique). */
+export async function saveProspectionPopulation(prospectionId: string, row: PopulationRow): Promise<void> {
+  const db = await getDb();
+  const existing = await db.getFirstAsync<{ id: string }>(
+    'SELECT id FROM prospection_population WHERE prospection_id = ? AND espece = ? AND categorie = ?',
+    [prospectionId, row.espece, row.categorie]
+  );
+  if (existing) {
+    await db.runAsync(
+      'UPDATE prospection_population SET densite_diffuse = ?, densite_groupee = ?, methode = ?, accouplement = ?, ponte = ? WHERE id = ?',
+      [row.densite_diffuse, row.densite_groupee, row.methode, row.accouplement, row.ponte, existing.id]
+    );
+  } else {
+    await db.runAsync(
+      `INSERT INTO prospection_population (id, prospection_id, espece, categorie, densite_diffuse, densite_groupee, methode, accouplement, ponte)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        generateId(),
+        prospectionId,
+        row.espece,
+        row.categorie,
+        row.densite_diffuse,
+        row.densite_groupee,
+        row.methode,
+        row.accouplement,
+        row.ponte,
+      ]
+    );
+  }
+}
+
+export interface InfestationRow {
+  type_cible: string;
+  taille_min: number | null;
+  taille_max: number | null;
+  taille_moy: number | null;
+  surface_tot: number | null;
+  densite_min: number | null;
+  densite_max: number | null;
+  densite_moy: number | null;
+  interdistance: number | null;
+  comportement: string | null;
+  direction_vers: string | null;
+  vent_de: string | null;
+  vent_vitesse: number | null;
+}
+
+/** Relit la ligne `prospection_infestation` d'une fiche (une infestation décrite par fiche), ou `null` si absente. */
+export async function getProspectionInfestation(prospectionId: string): Promise<InfestationRow | null> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<InfestationRow>(
+    `SELECT type_cible, taille_min, taille_max, taille_moy, surface_tot,
+            densite_min, densite_max, densite_moy, interdistance,
+            comportement, direction_vers, vent_de, vent_vitesse
+     FROM prospection_infestation WHERE prospection_id = ?`,
+    [prospectionId]
+  );
+  return row ?? null;
+}
+
+/** Insère ou remplace l'unique ligne `prospection_infestation` d'une fiche. */
+export async function saveProspectionInfestation(prospectionId: string, row: InfestationRow): Promise<void> {
+  const db = await getDb();
+  const existing = await db.getFirstAsync<{ id: string }>(
+    'SELECT id FROM prospection_infestation WHERE prospection_id = ?',
+    [prospectionId]
+  );
+  const values = [
+    row.type_cible,
+    row.taille_min,
+    row.taille_max,
+    row.taille_moy,
+    row.surface_tot,
+    row.densite_min,
+    row.densite_max,
+    row.densite_moy,
+    row.interdistance,
+    row.comportement,
+    row.direction_vers,
+    row.vent_de,
+    row.vent_vitesse,
+  ];
+  if (existing) {
+    await db.runAsync(
+      `UPDATE prospection_infestation SET
+        type_cible = ?, taille_min = ?, taille_max = ?, taille_moy = ?, surface_tot = ?,
+        densite_min = ?, densite_max = ?, densite_moy = ?, interdistance = ?,
+        comportement = ?, direction_vers = ?, vent_de = ?, vent_vitesse = ?
+       WHERE id = ?`,
+      [...values, existing.id]
+    );
+  } else {
+    await db.runAsync(
+      `INSERT INTO prospection_infestation (
+        id, prospection_id, type_cible, taille_min, taille_max, taille_moy, surface_tot,
+        densite_min, densite_max, densite_moy, interdistance,
+        comportement, direction_vers, vent_de, vent_vitesse
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [generateId(), prospectionId, ...values]
+    );
+  }
+}
+
+/** Marque la fiche brouillon comme complète (statut 'en_attente'), indépendamment de l'état réseau. */
+export async function completeProspection(id: string): Promise<DraftProspection> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync("UPDATE prospection SET statut = 'en_attente', updated_at = ? WHERE id = ?", [now, id]);
+
+  const updated = await getProspection(id);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
+/** Marque la fiche comme synchronisée avec le serveur, après succès de l'envoi. */
+export async function markProspectionSynced(id: string): Promise<DraftProspection> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync("UPDATE prospection SET statut_sync = 'synced', updated_at = ? WHERE id = ?", [now, id]);
+
+  const updated = await getProspection(id);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
 /** Relit une fiche locale par id, ou `null` si elle n'existe pas. */
 export async function getProspection(id: string): Promise<DraftProspection | null> {
   const db = await getDb();
@@ -91,4 +433,22 @@ export async function listDraftProspections(): Promise<DraftProspection[]> {
   return db.getAllAsync<DraftProspection>(
     "SELECT * FROM prospection WHERE statut = 'brouillon' ORDER BY updated_at DESC"
   );
+}
+
+/** Liste les fiches locales les plus récentes, tous statuts confondus (pour l'accueil). */
+export async function listRecentProspections(limit = 20): Promise<DraftProspection[]> {
+  const db = await getDb();
+  return db.getAllAsync<DraftProspection>(
+    'SELECT * FROM prospection ORDER BY updated_at DESC LIMIT ?',
+    [limit]
+  );
+}
+
+/** Compte les fiches locales pas encore synchronisées avec le serveur. */
+export async function countUnsyncedProspections(): Promise<number> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ count: number }>(
+    "SELECT COUNT(*) as count FROM prospection WHERE statut_sync != 'synced'"
+  );
+  return row?.count ?? 0;
 }
