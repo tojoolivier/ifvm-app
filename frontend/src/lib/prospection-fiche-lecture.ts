@@ -25,6 +25,7 @@ export interface InfestationRead {
   id: string
   type_cible: string
   surface_tot: number | null
+  densite_moy: number | null
   comportement: string | null
 }
 

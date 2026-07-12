@@ -65,7 +65,7 @@ describe('buildInfestationSynthese', () => {
 
   it('résout les labels de type de cible et comportement', () => {
     const infestations: InfestationRead[] = [
-      { id: 'i1', type_cible: 'essaim', surface_tot: 12.5, comportement: 'deplacement' },
+      { id: 'i1', type_cible: 'essaim', surface_tot: 12.5, densite_moy: null, comportement: 'deplacement' },
     ]
     expect(buildInfestationSynthese(infestations)).toEqual({
       hasInfestation: true,
@@ -108,7 +108,7 @@ describe('buildFicheImprimable', () => {
       degats_cultures: 'nuls',
       captures: [{ id: '1', espece: 'LMC', categorie: 'imago', phase: 'gregaire', stade: 'A1', effectif: 5 }],
       populations: [],
-      infestations: [{ id: 'i1', type_cible: 'essaim', surface_tot: 10, comportement: 'repos' }],
+      infestations: [{ id: 'i1', type_cible: 'essaim', surface_tot: 10, densite_moy: null, comportement: 'repos' }],
     })
 
     expect(vm.nFiche).toBe('F-042')

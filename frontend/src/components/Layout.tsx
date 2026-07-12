@@ -5,6 +5,7 @@ const baseNavItems = [
   { to: '/', label: 'Tableau de bord' },
   { to: '/campagnes', label: 'Campagnes' },
   { to: '/prospections', label: 'Prospections' },
+  { to: '/carte', label: 'Carte des infestations' },
   { to: '/syntheses', label: 'Synthèses & export' },
 ]
 
