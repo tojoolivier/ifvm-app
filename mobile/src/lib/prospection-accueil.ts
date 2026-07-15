@@ -1,3 +1,5 @@
+// src/lib/prospection-accueil.ts
+
 import { apiClient, Campagne, ProspectionRead } from './api-client';
 import { generateId } from './id';
 import { STATUT_VALIDE } from './prospection-fiche-lecture';
@@ -43,7 +45,10 @@ export async function loadValidatedProspections(
   prospecteurId: string
 ): Promise<ProspectionRead[]> {
   try {
-    return await apiClient.listProspections(token, { statut: STATUT_VALIDE, prospecteur_id: prospecteurId });
+    return await apiClient.listProspections(token, { 
+      statut: STATUT_VALIDE, 
+      prospecteur_id: prospecteurId 
+    });
   } catch {
     return [];
   }
@@ -61,6 +66,9 @@ export function pickCurrentCampagneId(
     (c) => c.start_date <= iso && (!c.end_date || c.end_date >= iso)
   );
   const pool = enCours.length > 0 ? enCours : campagnes;
+
+  // Sécurité : vérifier que pool n'est pas vide
+  if (pool.length === 0) return null;
 
   return [...pool].sort((a, b) => b.start_date.localeCompare(a.start_date))[0].id;
 }

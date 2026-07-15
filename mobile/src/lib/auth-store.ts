@@ -1,3 +1,5 @@
+// src/lib/auth-store.ts
+
 import { create } from 'zustand';
 import { apiClient, User } from './api-client';
 import { storage } from './storage';
