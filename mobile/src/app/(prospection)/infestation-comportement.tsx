@@ -1,5 +1,3 @@
-// src/app/(prospection)/infestation-comportement.tsx
-
 import { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';

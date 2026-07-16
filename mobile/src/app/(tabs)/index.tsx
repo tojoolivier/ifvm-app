@@ -1,4 +1,3 @@
-// src/app/(tabs)/index.tsx
 import {
   View,
   ScrollView,

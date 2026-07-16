@@ -1,5 +1,3 @@
-// src/app/(tabs)/fiches.tsx
-
 import { useState, useMemo, useRef } from 'react';
 import {
   View,

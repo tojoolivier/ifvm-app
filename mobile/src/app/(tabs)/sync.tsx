@@ -1,5 +1,3 @@
-// src/app/(tabs)/sync.tsx
-
 import { useState, useEffect, useCallback } from 'react';
 import {
   View,

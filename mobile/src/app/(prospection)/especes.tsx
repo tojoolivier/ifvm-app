@@ -1,5 +1,3 @@
-// src/app/(prospection)/especes.tsx
-
 import { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';

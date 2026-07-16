@@ -1,5 +1,3 @@
-// src/app/(tabs)/supervision.tsx
-
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 

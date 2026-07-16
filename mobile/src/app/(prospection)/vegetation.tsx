@@ -1,5 +1,3 @@
-// src/app/(prospection)/vegetation.tsx
-
 import { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, PanResponder, LayoutChangeEvent } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';

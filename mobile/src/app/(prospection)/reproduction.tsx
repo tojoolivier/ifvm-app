@@ -1,5 +1,3 @@
-// src/app/(prospection)/reproduction.tsx
-
 import { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';

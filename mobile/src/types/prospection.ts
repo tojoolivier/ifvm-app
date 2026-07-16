@@ -1,4 +1,3 @@
-// src/types/prospection.ts
 export type ProspectionType = 'cdv' | 'ifvm';
 export type FicheStatus = 'brouillon' | 'envoye' | 'verifie' | 'rejete' | 'valide';
 

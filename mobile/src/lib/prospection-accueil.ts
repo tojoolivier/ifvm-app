@@ -1,5 +1,3 @@
-// src/lib/prospection-accueil.ts
-
 import { apiClient, Campagne, ProspectionRead } from './api-client';
 import { generateId } from './id';
 import { STATUT_VALIDE } from './prospection-fiche-lecture';

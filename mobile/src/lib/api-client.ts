@@ -1,4 +1,3 @@
-// src/lib/api-client.ts
 export interface LoginCredentials {
   email: string;
   password: string;

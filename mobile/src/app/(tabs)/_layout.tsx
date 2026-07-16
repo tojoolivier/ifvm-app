@@ -1,4 +1,3 @@
-// src/app/(tabs)/_layout.tsx
 import { Tabs, useRouter } from 'expo-router';
 import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
 import { useAuthStore } from '@/lib/auth-store';

@@ -1,4 +1,3 @@
-// src/app/(tabs)/notifications.tsx
 import {
   View,
   FlatList,

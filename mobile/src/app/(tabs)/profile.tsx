@@ -1,4 +1,3 @@
-// src/app/(tabs)/profile.tsx
 import { View, TouchableOpacity, ScrollView, StyleSheet, Image, Dimensions, Switch, SafeAreaView, Alert, ActivityIndicator, TextInput, Modal, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
