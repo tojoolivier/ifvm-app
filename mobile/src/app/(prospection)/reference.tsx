@@ -132,6 +132,7 @@ export default function ReferenceScreen() {
           <Row label="Saisie le" value={dateHeure} />
         </View>
 
+        {/* ✅ Le problème est ici - assurez-vous qu'il n'y a pas d'espace */}
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Surfaces (ha)</Text>
           <SurfaceField label="Surface station" value={surfStation} onChangeText={setSurfStation} />
