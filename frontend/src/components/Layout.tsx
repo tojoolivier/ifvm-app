@@ -3,10 +3,6 @@ import { useCurrentUser } from '../hooks/useCurrentUser'
 
 const baseNavItems = [
   { to: '/', label: 'Tableau de bord' },
-  { to: '/campagnes', label: 'Campagnes' },
-  { to: '/prospections', label: 'Prospections' },
-  { to: '/carte', label: 'Carte des infestations' },
-  { to: '/syntheses', label: 'Synthèses & export' },
 ]
 
 export function Layout() {
@@ -15,12 +11,39 @@ export function Layout() {
 
   function logout() {
     localStorage.removeItem('access_token')
+    localStorage.removeItem('user_role')
+    localStorage.removeItem('user_name')
+    localStorage.removeItem('user_email')
+    localStorage.removeItem('user_id')
     navigate('/login')
   }
 
+  const role = currentUser?.role || localStorage.getItem('user_role')
+
   const navItems = [
     ...baseNavItems,
-    ...(currentUser?.role === 'admin' ? [{ to: '/users', label: 'Utilisateurs' }] : []),
+    ...(role === 'admin' || role === 'chef'
+      ? [
+          { to: '/campagnes', label: 'Campagnes' },
+          { to: '/prospections', label: 'Prospections' },
+          { to: '/carte', label: 'Carte des infestations' },
+          { to: '/syntheses', label: 'Synthèses & export' },
+          { to: '/users', label: 'Utilisateurs' },
+          { to: '/stations', label: 'Stations' }, // ✅ Ajout de la page Stations
+        ]
+      : []),
+    ...(role === 'verificateur' || role === 'prospecteur'
+      ? [
+          { to: '/prospections', label: 'Prospections' },
+          { to: '/carte', label: 'Carte des infestations' },
+        ]
+      : []),
+    ...(role === 'validation_finale'
+      ? [
+          { to: '/validation-finale', label: 'Validation finale' },
+          { to: '/carte', label: 'Carte des infestations' },
+        ]
+      : []),
   ]
 
   return (
