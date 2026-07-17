@@ -450,10 +450,14 @@ export function StationPage() {
             <option value="all">Toutes les régions</option>
             {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
-          <select value={selectedDistrict} onChange={(e) => handleFilterDistrictChange(e.target.value)} className="px-4 py-2 border rounded-xl text-sm bg-white">
-            <option value="all">Tous les districts</option>
-            {filterDistricts.map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
+        <select 
+  value={selectedDistrict} 
+  onChange={(e) => setSelectedDistrict(e.target.value)} 
+  className="px-4 py-2 border rounded-xl text-sm bg-white"
+>
+  <option value="all">Tous les districts</option>
+  {filterDistricts.map(d => <option key={d} value={d}>{d}</option>)}
+</select>
           <select value={selectedZone} onChange={(e) => setSelectedZone(e.target.value)} className="px-4 py-2 border rounded-xl text-sm bg-white">
             <option value="all">Toutes les zones</option>
             {ZONES.map(z => <option key={z} value={z}>{z}</option>)}
