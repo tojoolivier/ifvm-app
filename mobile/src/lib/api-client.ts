@@ -154,6 +154,9 @@ const getBaseUrl = (): string => {
   return process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 };
 
+// Constante pour l'URL de base (utilisée pour changePassword)
+const API_URL = getBaseUrl();
+
 const makeRequest = async <T>(
   endpoint: string,
   options: RequestInit = {},
@@ -182,7 +185,8 @@ const makeRequest = async <T>(
   }
 
   if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
   }
 
   return response.json();
@@ -248,5 +252,32 @@ export const apiClient = {
     onUnauthorized?: OnUnauthorized
   ): Promise<ProspectionRead> => {
     return makeRequest<ProspectionRead>(`/prospections/${id}`, { method: 'GET' }, token, onUnauthorized);
+  },
+
+  // ============================================
+  // CHANGEMENT DE MOT DE PASSE
+  // ============================================
+  changePassword: async (
+    data: { currentPassword: string; newPassword: string },
+    token: string | null
+  ): Promise<void> => {
+    try {
+      const response = await fetch(`${API_URL}/auth/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || 'Erreur lors du changement de mot de passe');
+      }
+    } catch (error) {
+      console.error('Erreur changement mot de passe:', error);
+      throw error;
+    }
   },
 };
