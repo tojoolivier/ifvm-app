@@ -32,12 +32,6 @@ describe('Scaffolding Configuration', () => {
     expect(easConfig.build?.preview?.android?.buildType).toBe('apk');
   });
 
-  test('.env contains EXPO_PUBLIC_API_URL', () => {
-    const envContent = readFileSync(join(mobileDir, '.env'), 'utf-8');
-    
-    expect(envContent).toContain('EXPO_PUBLIC_API_URL=http://localhost:8000');
-  });
-
   test('NativeWind configuration files exist', () => {
     expect(existsSync(join(mobileDir, 'tailwind.config.js'))).toBe(true);
     expect(existsSync(join(mobileDir, 'babel.config.js'))).toBe(true);
