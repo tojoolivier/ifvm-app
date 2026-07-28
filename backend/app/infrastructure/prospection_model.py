@@ -2,7 +2,8 @@ import uuid
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import Date, ForeignKey, Integer, Numeric, Text, TIMESTAMP, CheckConstraint, UniqueConstraint
+import sqlalchemy as sa
+from sqlalchemy import Date, ForeignKey, Integer, Numeric, Text, TIMESTAMP, CheckConstraint, UniqueConstraint, Boolean
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -35,16 +36,26 @@ class ProspectionModel(Base):
     intensite_pluie: Mapped[str | None] = mapped_column(Text(), nullable=True)
     vegetation: Mapped[dict | None] = mapped_column(JSONB(), nullable=True)
     sol: Mapped[dict | None] = mapped_column(JSONB(), nullable=True)
+    verdissement: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
+    hauteur_strate: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
     ennemis_naturels: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    pullulation_nb: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    interdistance: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
+    taille_info: Mapped[dict | None] = mapped_column(JSONB(), nullable=True)
+    essaim_type: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    essaim_vol_dir_de: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    essaim_vol_dir_vers: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    essaim_pose: Mapped[bool | None] = mapped_column(Boolean(), nullable=True)
+    surface_contaminee: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
     observations: Mapped[str | None] = mapped_column(Text(), nullable=True)
-    statut: Mapped[str] = mapped_column(Text(), nullable=False, default="brouillon")
-    statut_sync: Mapped[str] = mapped_column(Text(), nullable=False, default="local")
+    statut: Mapped[str] = mapped_column(Text(), nullable=False, server_default="brouillon")
+    statut_sync: Mapped[str] = mapped_column(Text(), nullable=False, server_default="local")
     verified_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("utilisateur.id"), nullable=True)
     verified_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
     validated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("utilisateur.id"), nullable=True)
     validated_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default=sa.text("now()"))
+    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default=sa.text("now()"), onupdate=sa.text("now()"))
 
     populations: Mapped[list["ProspectionPopulationModel"]] = relationship(
         back_populates="prospection", cascade="all, delete-orphan"
@@ -72,6 +83,14 @@ class ProspectionModel(Base):
         CheckConstraint(
             "degats_cultures IN ('nuls','faibles','moyens','forts')",
             name="ck_prospection_degats_cultures",
+        ),
+        CheckConstraint(
+            "biotope IN ('xerophyle', 'mesophyle', 'hydrophyle')",
+            name="ck_prospection_biotope",
+        ),
+        CheckConstraint(
+            "essaim_type IN ('clair', 'dense', 'tres_dense')",
+            name="ck_prospection_essaim_type",
         ),
     )
 
@@ -121,7 +140,7 @@ class ProspectionCaptureModel(Base):
     sexe: Mapped[str | None] = mapped_column(Text(), nullable=True)
     phase: Mapped[str] = mapped_column(Text(), nullable=False)
     stade: Mapped[str] = mapped_column(Text(), nullable=False)
-    effectif: Mapped[int] = mapped_column(Integer(), nullable=False, default=0)
+    effectif: Mapped[int] = mapped_column(Integer(), nullable=False, server_default="0")
 
     prospection: Mapped["ProspectionModel"] = relationship(back_populates="captures")
 
@@ -183,7 +202,7 @@ class AuditLogModel(Base):
     auteur_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("utilisateur.id"), nullable=False)
     action: Mapped[str] = mapped_column(Text(), nullable=False)
     details: Mapped[dict | None] = mapped_column(JSONB(), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default=sa.text("now()"))
 
     __table_args__ = (
         CheckConstraint(

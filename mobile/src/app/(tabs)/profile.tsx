@@ -5,7 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { useState, useEffect } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
-import { storage } from '@/lib/storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient } from '@/lib/api-client';
 
 const { width } = Dimensions.get('window');
@@ -17,6 +17,7 @@ const IFVM_GREEN_BG = '#E8F5E9';
 const IFVM_BG_LIGHT = '#F0F2F5';
 const CARD_BG = '#FFFFFF';
 const IFVM_RED = '#E74C3C';
+const IFVM_RED_BG = '#FCE4EC';
 const IFVM_BLUE = '#2196F3';
 const IFVM_ORANGE = '#E67E22';
 const HEADER_BG = '#1B5E1B';
@@ -52,7 +53,7 @@ export default function ProfileScreen() {
 
   const loadProfileImage = async () => {
     try {
-      const image = await storage.getItem(PROFILE_IMAGE_KEY);
+      const image = await AsyncStorage.getItem(PROFILE_IMAGE_KEY);
       if (image) {
         setProfileImage(image);
       }
@@ -62,8 +63,21 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = async () => {
-    await logout();
-    router.replace('/(auth)/login');
+    Alert.alert(
+      'Déconnexion',
+      'Voulez-vous vraiment vous déconnecter ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Se déconnecter',
+          style: 'destructive',
+          onPress: async () => {
+            await logout();
+            router.replace('/(auth)/login');
+          }
+        }
+      ]
+    );
   };
 
   const roleLabels: Record<string, string> = {
@@ -101,42 +115,44 @@ export default function ProfileScreen() {
   const roleColor = roleColors[userRole] || IFVM_GREEN;
   const roleIcon = roleIcons[userRole] || '👤';
 
+  const compteCreeLe = user?.created_at 
+    ? new Date(user.created_at).toLocaleDateString('fr-FR', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric'
+      })
+    : '—';
+
+  const userEmail = user?.email || '—';
+
   // ============================================
-  // FONCTIONS PHOTO DE PROFIL - CORRIGÉES
+  // FONCTIONS PHOTO DE PROFIL - SIMPLIFIÉES
   // ============================================
 
-  // Obtenir le répertoire de l'application de manière sécurisée
-  const getDocumentDirectory = (): string => {
-    if (Platform.OS === 'web') {
-      return '';
-    }
+  const saveProfileImage = async (uri: string) => {
+    setIsLoading(true);
     try {
-      const docDir = (FileSystem as any).documentDirectory;
-      return docDir || '';
+      // ✅ Stocker directement l'URI dans AsyncStorage (pas besoin de copier)
+      await AsyncStorage.setItem(PROFILE_IMAGE_KEY, uri);
+      setProfileImage(uri);
+      
+      Alert.alert('✅ Succès', 'Photo de profil mise à jour !');
     } catch (error) {
-      console.error('Erreur récupération répertoire:', error);
-      return '';
+      console.error('Erreur sauvegarde image:', error);
+      Alert.alert('❌ Erreur', 'Impossible de sauvegarder l\'image');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Demander les permissions et ouvrir la caméra
   const takePhoto = async () => {
     try {
-      console.log('📷 Tentative d\'ouverture de la caméra...');
-      
-      // Demander la permission caméra
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      console.log('📷 Statut permission caméra:', status);
-      
       if (status !== 'granted') {
-        Alert.alert(
-          'Permission refusée', 
-          'Vous devez autoriser l\'accès à la caméra pour prendre une photo.'
-        );
+        Alert.alert('Permission refusée', 'Vous devez autoriser l\'accès à la caméra.');
         return;
       }
 
-      // Ouvrir la caméra
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -144,37 +160,23 @@ export default function ProfileScreen() {
         quality: 0.8,
       });
 
-      console.log('📷 Résultat caméra:', result);
-
       if (!result.canceled && result.assets && result.assets.length > 0) {
         await saveProfileImage(result.assets[0].uri);
-      } else {
-        console.log('📷 Prise de photo annulée');
       }
     } catch (error) {
-      console.error('📷 Erreur prise de photo:', error);
-      Alert.alert('Erreur', 'Impossible de prendre la photo: ' + (error as Error).message);
+      console.error('Erreur prise de photo:', error);
+      Alert.alert('❌ Erreur', 'Impossible de prendre la photo');
     }
   };
 
-  // Demander les permissions et ouvrir la galerie
   const pickImage = async () => {
     try {
-      console.log('🖼️ Tentative d\'ouverture de la galerie...');
-      
-      // Demander la permission galerie
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      console.log('🖼️ Statut permission galerie:', status);
-      
       if (status !== 'granted') {
-        Alert.alert(
-          'Permission refusée', 
-          'Vous devez autoriser l\'accès à la galerie pour choisir une photo.'
-        );
+        Alert.alert('Permission refusée', 'Vous devez autoriser l\'accès à la galerie.');
         return;
       }
 
-      // Ouvrir la galerie
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -182,51 +184,12 @@ export default function ProfileScreen() {
         quality: 0.8,
       });
 
-      console.log('🖼️ Résultat galerie:', result);
-
       if (!result.canceled && result.assets && result.assets.length > 0) {
         await saveProfileImage(result.assets[0].uri);
-      } else {
-        console.log('🖼️ Sélection annulée');
       }
     } catch (error) {
-      console.error('🖼️ Erreur sélection image:', error);
-      Alert.alert('Erreur', 'Impossible de sélectionner l\'image: ' + (error as Error).message);
-    }
-  };
-
-  const saveProfileImage = async (uri: string) => {
-    setIsLoading(true);
-    try {
-      console.log('💾 Sauvegarde de l\'image:', uri);
-      
-      const docDir = getDocumentDirectory();
-      let fileUri = uri;
-
-      // Si nous sommes sur mobile et que le répertoire est disponible
-      if (docDir) {
-        const fileName = `profile_${user?.id || 'user'}_${Date.now()}.jpg`;
-        fileUri = docDir + fileName;
-        
-        console.log('💾 Copie vers:', fileUri);
-        
-        // Copier le fichier vers le répertoire de l'application
-        await FileSystem.copyAsync({
-          from: uri,
-          to: fileUri,
-        });
-      }
-
-      // Sauvegarder le chemin dans le storage
-      await storage.setItem(PROFILE_IMAGE_KEY, fileUri);
-      setProfileImage(fileUri);
-      
-      Alert.alert('Succès', 'Photo de profil mise à jour !');
-    } catch (error) {
-      console.error('💾 Erreur sauvegarde image:', error);
-      Alert.alert('Erreur', 'Impossible de sauvegarder l\'image');
-    } finally {
-      setIsLoading(false);
+      console.error('Erreur sélection image:', error);
+      Alert.alert('❌ Erreur', 'Impossible de sélectionner l\'image');
     }
   };
 
@@ -235,22 +198,18 @@ export default function ProfileScreen() {
       'Supprimer la photo',
       'Voulez-vous vraiment supprimer votre photo de profil ?',
       [
-        { text: 'Annuler', style: 'cancel' as const },
+        { text: 'Annuler', style: 'cancel' },
         {
           text: 'Supprimer',
-          style: 'destructive' as const,
+          style: 'destructive',
           onPress: async () => {
             try {
-              const docDir = getDocumentDirectory();
-              if (profileImage && docDir) {
-                await FileSystem.deleteAsync(profileImage, { idempotent: true });
-              }
-              await storage.deleteItem(PROFILE_IMAGE_KEY);
+              await AsyncStorage.removeItem(PROFILE_IMAGE_KEY);
               setProfileImage(null);
-              Alert.alert('Succès', 'Photo de profil supprimée');
+              Alert.alert('✅ Succès', 'Photo de profil supprimée');
             } catch (error) {
               console.error('Erreur suppression image:', error);
-              Alert.alert('Erreur', 'Impossible de supprimer l\'image');
+              Alert.alert('❌ Erreur', 'Impossible de supprimer l\'image');
             }
           }
         }
@@ -258,36 +217,19 @@ export default function ProfileScreen() {
     );
   };
 
-  // Fonction principale pour ouvrir le sélecteur
   const showImagePickerOptions = () => {
-    console.log('🔘 Ouverture du menu photo de profil');
     Alert.alert(
       'Photo de profil',
       'Choisissez une option',
       [
-        { 
-          text: '📷 Prendre une photo', 
-          onPress: () => {
-            console.log('📷 Option: Prendre une photo');
-            takePhoto();
-          }
-        },
-        { 
-          text: '🖼️ Choisir dans la galerie', 
-          onPress: () => {
-            console.log('🖼️ Option: Choisir dans la galerie');
-            pickImage();
-          }
-        },
+        { text: '📷 Prendre une photo', onPress: takePhoto },
+        { text: '🖼️ Choisir dans la galerie', onPress: pickImage },
         ...(profileImage ? [{ 
           text: '🗑️ Supprimer la photo', 
           style: 'destructive' as const, 
-          onPress: () => {
-            console.log('🗑️ Option: Supprimer la photo');
-            removeProfileImage();
-          }
+          onPress: removeProfileImage 
         }] : []),
-        { text: 'Annuler', style: 'cancel' as const },
+        { text: 'Annuler', style: 'cancel' },
       ]
     );
   };
@@ -297,7 +239,6 @@ export default function ProfileScreen() {
   // ============================================
 
   const handleChangePassword = async () => {
-    // Validation
     if (!currentPassword.trim()) {
       Alert.alert('Erreur', 'Veuillez entrer votre mot de passe actuel');
       return;
@@ -319,7 +260,7 @@ export default function ProfileScreen() {
       }, token);
 
       Alert.alert(
-        'Succès',
+        '✅ Succès',
         'Votre mot de passe a été modifié avec succès',
         [
           {
@@ -336,7 +277,7 @@ export default function ProfileScreen() {
     } catch (error: any) {
       console.error('Erreur changement mot de passe:', error);
       Alert.alert(
-        'Erreur',
+        '❌ Erreur',
         error?.message || 'Impossible de modifier le mot de passe. Vérifiez votre mot de passe actuel.'
       );
     } finally {
@@ -394,7 +335,6 @@ export default function ProfileScreen() {
                   {user?.prenom?.charAt(0).toUpperCase() ?? '?'}
                 </ThemedText>
               )}
-              {/* Icône caméra avec son propre TouchableOpacity */}
               <TouchableOpacity
                 style={styles.cameraIconContainer}
                 onPress={(e) => {
@@ -415,6 +355,7 @@ export default function ProfileScreen() {
           <ThemedText style={styles.userName}>
             {user?.prenom} {user?.nom}
           </ThemedText>
+          <ThemedText style={styles.userEmail}>{userEmail}</ThemedText>
           <ThemedText style={styles.userRole}>
             {roleIcon} {roleLabel}
           </ThemedText>
@@ -425,8 +366,9 @@ export default function ProfileScreen() {
           <ThemedText style={styles.sectionTitle}>📋 Informations personnelles</ThemedText>
           <View style={styles.infoCard}>
             <InfoItem label="Nom complet" value={`${user?.prenom || ''} ${user?.nom || ''}`} />
-            <InfoItem label="Email" value={user?.email || 'Non défini'} />
+            <InfoItem label="Email" value={userEmail} />
             <InfoItem label="Rôle" value={roleLabel} />
+            <InfoItem label="Compte créé le" value={compteCreeLe} />
           </View>
         </View>
 
@@ -471,6 +413,11 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Version */}
+        <View style={styles.versionContainer}>
+          <ThemedText style={styles.versionText}>Version 1.0.0</ThemedText>
+        </View>
+
         {/* Bouton déconnexion */}
         <TouchableOpacity
           style={styles.logoutButton}
@@ -506,7 +453,6 @@ export default function ProfileScreen() {
             </View>
 
             <View style={styles.modalBody}>
-              {/* Mot de passe actuel */}
               <View style={styles.inputContainer}>
                 <ThemedText style={styles.inputLabel}>Mot de passe actuel</ThemedText>
                 <View style={styles.passwordInputContainer}>
@@ -529,7 +475,6 @@ export default function ProfileScreen() {
                 </View>
               </View>
 
-              {/* Nouveau mot de passe */}
               <View style={styles.inputContainer}>
                 <ThemedText style={styles.inputLabel}>Nouveau mot de passe</ThemedText>
                 <View style={styles.passwordInputContainer}>
@@ -550,12 +495,9 @@ export default function ProfileScreen() {
                     </ThemedText>
                   </TouchableOpacity>
                 </View>
-                <ThemedText style={styles.inputHint}>
-                  Minimum 6 caractères
-                </ThemedText>
+                <ThemedText style={styles.inputHint}>Minimum 6 caractères</ThemedText>
               </View>
 
-              {/* Confirmation mot de passe */}
               <View style={styles.inputContainer}>
                 <ThemedText style={styles.inputLabel}>Confirmer le mot de passe</ThemedText>
                 <View style={styles.passwordInputContainer}>
@@ -578,7 +520,6 @@ export default function ProfileScreen() {
                 </View>
               </View>
 
-              {/* Boutons */}
               <View style={styles.modalButtons}>
                 <TouchableOpacity
                   style={[styles.modalButton, styles.modalButtonCancel]}
@@ -777,22 +718,15 @@ const styles = StyleSheet.create({
     color: '#1A237E',
     marginTop: 12,
   },
-  userRole: {
+  userEmail: {
     fontSize: 14,
     color: '#757575',
     marginTop: 2,
   },
-  changePhotoButton: {
-    marginTop: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: IFVM_GREEN_BG,
-  },
-  changePhotoText: {
-    fontSize: 12,
-    color: IFVM_GREEN,
-    fontWeight: '500',
+  userRole: {
+    fontSize: 14,
+    color: '#757575',
+    marginTop: 2,
   },
   infoSection: {
     paddingHorizontal: 16,
