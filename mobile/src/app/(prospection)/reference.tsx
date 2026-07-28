@@ -3,8 +3,8 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getCurrentPosition, GpsPosition, LocationPermissionDeniedError } from '@/lib/location';
-import { getProspection, DraftProspection } from '@/lib/prospection-repository';
-import { generateNumeroFiche, saveReference, validateSurfaces } from '@/lib/prospection-reference';
+import { getProspection, DraftProspection, updateProspectionReference } from '@/lib/prospection-repository';
+import { generateNumeroFiche, validateSurfaces } from '@/lib/prospection-reference';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isSmallScreen = SCREEN_WIDTH < 380;
@@ -15,6 +15,13 @@ const IFVM_GREEN_LIGHT = '#E8F3E8';
 
 type GpsStatus = 'loading' | 'success' | 'error';
 
+// Types de prospection
+const TYPE_OPTIONS = [
+  { value: 'intensive', label: 'Intensive' },
+  { value: 'extensive', label: 'Extensive' },
+  { value: 'validation', label: 'Validation' },
+];
+
 export default function ReferenceScreen() {
   const router = useRouter();
   const { draftId } = useLocalSearchParams<{ draftId: string }>();
@@ -24,15 +31,35 @@ export default function ReferenceScreen() {
   const [position, setPosition] = useState<GpsPosition | null>(null);
   const [gpsError, setGpsError] = useState<string | null>(null);
 
+  // Champs de référence
+  const [selectedType, setSelectedType] = useState<string>('intensive');
+  const [nReleve, setNReleve] = useState('');
+  const [nMessage, setNMessage] = useState('');
   const [surfStation, setSurfStation] = useState('');
   const [surfProspectee, setSurfProspectee] = useState('');
   const [surfInfestee, setSurfInfestee] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  // Date automatique du jour
+  const todayDate = useMemo(() => {
+    const now = new Date();
+    return now.toISOString().split('T')[0];
+  }, []);
+
   useEffect(() => {
     if (!draftId) return;
-    getProspection(draftId).then(setDraft);
+    getProspection(draftId).then((row) => {
+      setDraft(row);
+      if (row) {
+        setSelectedType(row.type_prospection || 'intensive');
+        setNReleve(row.n_releve ?? '');
+        setNMessage(row.n_message ?? '');
+        setSurfStation(row.surf_station?.toString() ?? '');
+        setSurfProspectee(row.surf_prospectee?.toString() ?? '');
+        setSurfInfestee(row.surf_infestee?.toString() ?? '');
+      }
+    });
   }, [draftId]);
 
   useEffect(() => {
@@ -79,32 +106,88 @@ export default function ReferenceScreen() {
     setIsSaving(true);
     setSaveError(null);
     try {
-      await saveReference({ draftId: draft.id, position, surfaces, numeroFiche });
-      router.push({ pathname: '/(prospection)/especes', params: { draftId: draft.id } });
-    } catch {
+      await updateProspectionReference(draft.id, {
+        typeProspection: selectedType,
+        latitude: position.latitude,
+        longitude: position.longitude,
+        altitude: position.altitude ?? null,
+        nReleve: nReleve || null,
+        nMessage: nMessage || null,
+        surfStation: surfaces.surfStation!,
+        surfProspectee: surfaces.surfProspectee!,
+        surfInfestee: surfaces.surfInfestee!,
+        nFiche: numeroFiche,
+        dateProspection: todayDate,
+      });
+      
+      router.push({ 
+        pathname: '/(prospection)/especes', 
+        params: { draftId: draft.id } 
+      });
+    } catch (error) {
+      console.error('Erreur sauvegarde:', error);
       setSaveError("Impossible d'enregistrer la fiche localement");
     } finally {
       setIsSaving(false);
     }
   };
 
-  const dateHeure = draft
-    ? new Date(draft.created_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
-    : '';
+  // Fonction pour annuler la création de la fiche
+  const handleAnnuler = () => {
+    // Retourner à l'écran principal de prospection
+    router.push('/(tabs)/prospection');
+  };
+
+  // Affichage de la date formatée
+  const formattedDate = useMemo(() => {
+    if (!todayDate) return '';
+    const date = new Date(todayDate);
+    return date.toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  }, [todayDate]);
+
+  // Fonction pour réessayer d'obtenir la position GPS
+  const handleRetryGps = () => {
+    setGpsStatus('loading');
+    setGpsError(null);
+    getCurrentPosition()
+      .then((pos) => {
+        setPosition(pos);
+        setGpsStatus('success');
+      })
+      .catch((err) => {
+        setGpsError(
+          err instanceof LocationPermissionDeniedError
+            ? 'Permission de localisation refusée'
+            : 'Position GPS indisponible'
+        );
+        setGpsStatus('error');
+      });
+  };
+
+  if (!draft) {
+    return (
+      <View style={styles.root}>
+        <SafeAreaView edges={['top']} style={styles.header}>
+          <View style={styles.headerContent}>
+            <View style={styles.headerTextContainer}>
+              <Text style={styles.headerTitle}>Chargement...</Text>
+            </View>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.header}>
         <View style={styles.headerContent}>
-          <TouchableOpacity 
-            style={styles.backBtn} 
-            onPress={() => router.push('/(tabs)/prospection')}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.backIcon}>‹</Text>
-          </TouchableOpacity>
           <View style={styles.headerTextContainer}>
-            <Text style={styles.headerTitle}>Référence &amp; position</Text>
+            <Text style={styles.headerTitle}>Référence & position</Text>
             <Text style={styles.headerSub}>Étape 1/4</Text>
           </View>
           <View style={styles.headerRight} />
@@ -120,6 +203,39 @@ export default function ReferenceScreen() {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
+        {/* Carte Type de prospection */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardIcon}>📋</Text>
+            <Text style={styles.cardTitle}>Type de prospection</Text>
+          </View>
+          <View style={styles.typeSelector}>
+            {TYPE_OPTIONS.map((option) => (
+              <TouchableOpacity
+                key={option.value}
+                style={[
+                  styles.typeOption,
+                  selectedType === option.value && styles.typeOptionActive,
+                ]}
+                onPress={() => setSelectedType(option.value)}
+                activeOpacity={0.85}
+              >
+                <Text style={[
+                  styles.typeOptionText,
+                  selectedType === option.value && styles.typeOptionTextActive,
+                ]}>
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {selectedType === 'intensive' && (
+            <View style={styles.typeHint}>
+              <Text style={styles.typeHintText}>⚠️ Station obligatoire pour une prospection intensive</Text>
+            </View>
+          )}
+        </View>
+
         {/* Carte GPS */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
@@ -141,6 +257,9 @@ export default function ReferenceScreen() {
             <View style={styles.errorBox}>
               <Text style={styles.errorBoxIcon}>⚠️</Text>
               <Text style={styles.errorBoxText}>{gpsError}</Text>
+              <TouchableOpacity onPress={handleRetryGps} style={styles.retryBtn}>
+                <Text style={styles.retryBtnText}>Réessayer</Text>
+              </TouchableOpacity>
             </View>
           )}
           {gpsStatus === 'success' && position && (
@@ -156,7 +275,7 @@ export default function ReferenceScreen() {
               <View style={styles.gpsRowInfo}>
                 <Text style={styles.gpsLabel}>Altitude</Text>
                 <Text style={styles.gpsValue}>
-                  {position.altitude != null ? `${position.altitude.toFixed(0)} m` : '—'}
+                  {position.altitude != null ? `${position.altitude.toFixed(1)} m` : '⛔ Non disponible'}
                 </Text>
               </View>
               <View style={[styles.gpsRowInfo, styles.gpsRowInfoLast]}>
@@ -165,6 +284,13 @@ export default function ReferenceScreen() {
                   {position.accuracy != null ? `${position.accuracy.toFixed(0)} m` : '—'}
                 </Text>
               </View>
+              {position.altitude == null && (
+                <View style={styles.altitudeWarning}>
+                  <Text style={styles.altitudeWarningText}>
+                    ⚠️ L'altitude n'est pas disponible. Vous pouvez la saisir manuellement plus tard.
+                  </Text>
+                </View>
+              )}
             </View>
           )}
         </View>
@@ -175,9 +301,20 @@ export default function ReferenceScreen() {
             <Text style={styles.cardIcon}>📄</Text>
             <Text style={styles.cardTitle}>Informations</Text>
           </View>
-          <Row label="N° fiche" value={numeroFiche} />
-          <Row label="Date" value={draft?.date_prospection ?? ''} />
-          <Row label="Saisie le" value={dateHeure} />
+          <Row label="N° fiche" value={numeroFiche || '—'} />
+          <Row label="Date" value={formattedDate} />
+          <TextField
+            label="N° relevé"
+            value={nReleve}
+            onChangeText={setNReleve}
+            placeholder="Ex: RELEVE-001"
+          />
+          <TextField
+            label="N° message"
+            value={nMessage}
+            onChangeText={setNMessage}
+            placeholder="Ex: MSG-2024-001"
+          />
         </View>
 
         {/* Carte Surfaces */}
@@ -186,9 +323,21 @@ export default function ReferenceScreen() {
             <Text style={styles.cardIcon}>📐</Text>
             <Text style={styles.cardTitle}>Surfaces (ha)</Text>
           </View>
-          <SurfaceField label="Surface station" value={surfStation} onChangeText={setSurfStation} />
-          <SurfaceField label="Surface prospectée" value={surfProspectee} onChangeText={setSurfProspectee} />
-          <SurfaceField label="Surface infestée" value={surfInfestee} onChangeText={setSurfInfestee} />
+          <SurfaceField 
+            label="Surface station" 
+            value={surfStation} 
+            onChangeText={setSurfStation} 
+          />
+          <SurfaceField 
+            label="Surface prospectée" 
+            value={surfProspectee} 
+            onChangeText={setSurfProspectee} 
+          />
+          <SurfaceField 
+            label="Surface infestée" 
+            value={surfInfestee} 
+            onChangeText={setSurfInfestee} 
+          />
           {!surfacesValid && (surfStation || surfProspectee || surfInfestee) && (
             <View style={styles.validationBox}>
               <Text style={styles.validationText}>⚠️ infestée ≤ prospectée ≤ station</Text>
@@ -203,16 +352,28 @@ export default function ReferenceScreen() {
           </View>
         )}
 
-        <TouchableOpacity
-          style={[styles.btnContinuer, !canContinue && styles.btnDisabled]}
-          onPress={handleContinuer}
-          disabled={!canContinue}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.btnContinuerText}>
-            {isSaving ? '⏳ Enregistrement…' : '➡️ Continuer'}
-          </Text>
-        </TouchableOpacity>
+        {/* Boutons de même taille */}
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={[styles.btn, styles.btnAnnuler, isSaving && styles.btnDisabled]}
+            onPress={handleAnnuler}
+            disabled={isSaving}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.btnAnnulerText}>✕ Annuler</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.btn, styles.btnContinuer, !canContinue && styles.btnDisabled]}
+            onPress={handleContinuer}
+            disabled={!canContinue}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.btnContinuerText}>
+              {isSaving ? '⏳ Enregistrement…' : '➡️ Continuer'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </View>
   );
@@ -230,6 +391,31 @@ function Row({ label, value }: { label: string; value: string }) {
     <View style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
       <Text style={styles.rowValue}>{value || '—'}</Text>
+    </View>
+  );
+}
+
+function TextField({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <View style={styles.textField}>
+      <Text style={styles.rowLabel}>{label}</Text>
+      <TextInput
+        style={styles.textInput}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor="#9CA3AF"
+      />
     </View>
   );
 }
@@ -366,6 +552,45 @@ const styles = StyleSheet.create({
   cardBadgeText: {
     fontSize: 14,
   },
+  typeSelector: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  typeOption: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#D1D5DB',
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  typeOptionActive: {
+    backgroundColor: IFVM_GREEN_LIGHT,
+    borderColor: IFVM_GREEN,
+  },
+  typeOptionText: {
+    color: '#6B7280',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  typeOptionTextActive: {
+    color: IFVM_GREEN_DARK,
+  },
+  typeHint: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginTop: 8,
+  },
+  typeHintText: {
+    color: '#92400E',
+    fontSize: 12,
+    fontWeight: '500',
+  },
   gpsRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -400,6 +625,29 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  altitudeWarning: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 6,
+    padding: 8,
+    marginTop: 8,
+  },
+  altitudeWarningText: {
+    color: '#92400E',
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  retryBtn: {
+    backgroundColor: IFVM_GREEN,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginLeft: 8,
+  },
+  retryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -415,6 +663,27 @@ const styles = StyleSheet.create({
     color: '#111827',
     fontSize: 13,
     fontWeight: '600',
+  },
+  textField: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F9FAFB',
+  },
+  textInput: {
+    flex: 1,
+    marginLeft: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontSize: 13,
+    color: '#111827',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 6,
+    minWidth: 120,
+    textAlign: 'right',
   },
   surfaceField: {
     flexDirection: 'row',
@@ -471,17 +740,34 @@ const styles = StyleSheet.create({
     fontSize: 13,
     flex: 1,
   },
-  btnContinuer: {
-    backgroundColor: IFVM_GREEN,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: 10,
     marginTop: 4,
+  },
+  btn: {
+    flex: 1, // Les deux boutons prennent la même largeur
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
+    minHeight: 56, // Même hauteur minimale
+  },
+  btnContinuer: {
+    backgroundColor: IFVM_GREEN,
+  },
+  btnAnnuler: {
+    backgroundColor: '#EF4444',
+  },
+  btnAnnulerText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
   },
   btnDisabled: {
     opacity: 0.5,

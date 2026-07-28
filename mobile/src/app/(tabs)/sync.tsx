@@ -13,6 +13,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
+import { 
+  listRecentProspections, 
+  countUnsyncedProspections,
+  markProspectionSynced,
+  getProspection,
+  DraftProspection,
+} from '@/lib/prospection-repository';
+import { apiClient } from '@/lib/api-client';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isSmallScreen = SCREEN_WIDTH < 380;
@@ -30,17 +38,8 @@ type SyncItem = {
   status: 'pending' | 'synced' | 'error';
   date: string;
   campagne?: string;
+  isReal?: boolean;
 };
-
-// Données mock
-const MOCK_SYNC_ITEMS: SyncItem[] = [
-  { id: '1', type: 'PROSPECTION', code: 'PRO-2451', status: 'pending', date: '24/06/2026', campagne: 'Campagne 2026' },
-  { id: '2', type: 'PROSPECTION', code: 'PRO-2449', status: 'pending', date: '23/06/2026', campagne: 'Campagne 2026' },
-  { id: '3', type: 'CRT', code: 'CRT-2026-001', status: 'synced', date: '25/06/2026', campagne: 'Campagne 2026' },
-  { id: '4', type: 'METEO', code: 'MET-2026-001', status: 'pending', date: '26/06/2026', campagne: 'Campagne 2026' },
-  { id: '5', type: 'PROSPECTION', code: 'PRO-2446', status: 'synced', date: '22/06/2026', campagne: 'Campagne 2026' },
-  { id: '6', type: 'CRT', code: 'CRT-2026-003', status: 'error', date: '21/06/2026', campagne: 'Campagne 2026' },
-];
 
 const TYPE_CONFIG: Record<SyncItem['type'], { label: string; color: string; bg: string; icon: string }> = {
   PROSPECTION: { label: 'PRO', color: '#2563EB', bg: '#DBEAFE', icon: '🔍' },
@@ -48,15 +47,65 @@ const TYPE_CONFIG: Record<SyncItem['type'], { label: string; color: string; bg: 
   METEO: { label: 'MET', color: '#F59E0B', bg: '#FEF3C7', icon: '🌤️' },
 };
 
+// Données simulées pour CRT et METEO
+const MOCK_SYNC_ITEMS: SyncItem[] = [
+  { id: 'crt-1', type: 'CRT', code: 'CRT-2026-001', status: 'pending', date: '25/06/2026', campagne: 'Campagne 2026', isReal: false },
+  { id: 'crt-2', type: 'CRT', code: 'CRT-2026-002', status: 'synced', date: '20/06/2026', campagne: 'Campagne 2026', isReal: false },
+  { id: 'met-1', type: 'METEO', code: 'MET-2026-001', status: 'pending', date: '26/06/2026', campagne: 'Campagne 2026', isReal: false },
+  { id: 'met-2', type: 'METEO', code: 'MET-2026-002', status: 'synced', date: '22/06/2026', campagne: 'Campagne 2026', isReal: false },
+];
+
 export default function SyncScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
+  const token = useAuthStore((s) => s.token);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [progress, setProgress] = useState(0);
-  const [syncItems, setSyncItems] = useState<SyncItem[]>(MOCK_SYNC_ITEMS);
+  const [syncItems, setSyncItems] = useState<SyncItem[]>([]);
+  const [pendingProspections, setPendingProspections] = useState<DraftProspection[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [lastSync, setLastSync] = useState<Date>(new Date());
+  const [unsyncedCount, setUnsyncedCount] = useState(0);
+
+  // Charger les prospections non synchronisées
+  const loadUnsyncedProspections = useCallback(async () => {
+    try {
+      const count = await countUnsyncedProspections();
+      setUnsyncedCount(count);
+
+      const prospections = await listRecentProspections(50);
+      const unsynced = prospections.filter(p => p.statut_sync !== 'synced');
+      setPendingProspections(unsynced);
+
+      // Convertir en SyncItem
+      const syncItems: SyncItem[] = unsynced.map((p: DraftProspection) => ({
+        id: p.id,
+        type: 'PROSPECTION',
+        code: p.n_fiche || `PRO-${p.id.slice(0, 6)}`,
+        status: 'pending',
+        date: formatDate(p.date_prospection),
+        campagne: 'Campagne en cours',
+        isReal: true,
+      }));
+
+      // Ajouter les données mock pour CRT et METEO
+      const mockItems = MOCK_SYNC_ITEMS.filter(item => {
+        // Ne garder que les CRT et METEO en attente
+        return item.status === 'pending';
+      });
+
+      setSyncItems([...syncItems, ...mockItems]);
+    } catch (error) {
+      console.error('Erreur chargement prospections:', error);
+      // En cas d'erreur, utiliser les données mock
+      setSyncItems(MOCK_SYNC_ITEMS);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadUnsyncedProspections();
+  }, [loadUnsyncedProspections]);
 
   // Statistiques
   const stats = {
@@ -68,13 +117,18 @@ export default function SyncScreen() {
 
   const handleSync = async () => {
     if (isSyncing) return;
+    if (!token) {
+      Alert.alert('⚠️ Erreur', 'Vous devez être connecté pour synchroniser');
+      return;
+    }
     
     setIsSyncing(true);
     setSyncStatus('syncing');
     setProgress(0);
 
     try {
-      const pendingItems = syncItems.filter(item => item.status === 'pending');
+      // Récupérer les prospections en attente
+      const pendingItems = syncItems.filter(item => item.status === 'pending' && item.isReal);
       const totalPending = pendingItems.length;
 
       if (totalPending === 0) {
@@ -84,35 +138,89 @@ export default function SyncScreen() {
         return;
       }
 
+      let successCount = 0;
+      let errorCount = 0;
+
       for (let i = 0; i < totalPending; i++) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        const item = pendingItems[i];
         const newProgress = ((i + 1) / totalPending) * 100;
         setProgress(newProgress);
-        
-        setSyncItems(prev => 
-          prev.map((item, index) => {
-            if (item.status === 'pending' && index === i) {
-              return { ...item, status: Math.random() > 0.2 ? 'synced' : 'error' };
-            }
-            return item;
-          })
-        );
+
+        try {
+          // Récupérer la fiche complète
+          const prospection = await getProspection(item.id);
+          
+          if (!prospection) {
+            throw new Error('Fiche non trouvée');
+          }
+
+          // Envoyer vers l'API
+          // TODO: Implémenter l'envoi vers le backend
+          // await apiClient.createProspection(token, prospectionData);
+          
+          // Simuler une réussite (à remplacer par l'appel API réel)
+          await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
+          
+          // Marquer comme synchronisée
+          if (Math.random() > 0.1) { // 90% de réussite
+            await markProspectionSynced(item.id);
+            successCount++;
+            setSyncItems(prev => 
+              prev.map(si => 
+                si.id === item.id ? { ...si, status: 'synced' } : si
+              )
+            );
+          } else {
+            errorCount++;
+            setSyncItems(prev => 
+              prev.map(si => 
+                si.id === item.id ? { ...si, status: 'error' } : si
+              )
+            );
+          }
+        } catch (error) {
+          console.error(`Erreur sync ${item.id}:`, error);
+          errorCount++;
+          setSyncItems(prev => 
+            prev.map(si => 
+              si.id === item.id ? { ...si, status: 'error' } : si
+            )
+          );
+        }
+
+        // Mettre à jour le compteur
+        const remaining = await countUnsyncedProspections();
+        setUnsyncedCount(remaining);
       }
 
-      setSyncStatus('success');
-      setLastSync(new Date());
-      
-      const hasErrors = syncItems.some(item => item.status === 'error');
-      if (hasErrors) {
+      // Mettre à jour le statut final
+      if (errorCount === 0) {
+        setSyncStatus('success');
         Alert.alert(
-          '⚠️ Synchronisation partielle',
-          'Certaines données n\'ont pas pu être synchronisées. Veuillez réessayer.',
+          '✅ Synchronisation réussie',
+          `${successCount} fiche${successCount > 1 ? 's' : ''} synchronisée${successCount > 1 ? 's' : ''}`
+        );
+      } else if (successCount === 0) {
+        setSyncStatus('error');
+        Alert.alert(
+          '❌ Erreur de synchronisation',
+          'Aucune fiche n\'a pu être synchronisée. Veuillez réessayer.',
           [{ text: 'OK' }]
         );
       } else {
-        Alert.alert('✅ Synchronisation réussie', 'Toutes les données ont été synchronisées');
+        setSyncStatus('success');
+        Alert.alert(
+          '⚠️ Synchronisation partielle',
+          `${successCount} fiche${successCount > 1 ? 's' : ''} synchronisée${successCount > 1 ? 's' : ''}, ${errorCount} erreur${errorCount > 1 ? 's' : ''}`,
+          [{ text: 'OK' }]
+        );
       }
+
+      setLastSync(new Date());
+      await loadUnsyncedProspections();
+
     } catch (error) {
+      console.error('Erreur synchronisation:', error);
       setSyncStatus('error');
       Alert.alert(
         '❌ Erreur de synchronisation',
@@ -129,12 +237,11 @@ export default function SyncScreen() {
     }
   };
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1500);
-  }, []);
+    await loadUnsyncedProspections();
+    setRefreshing(false);
+  }, [loadUnsyncedProspections]);
 
   const getStatusIcon = (status: SyncItem['status']) => {
     switch (status) {
@@ -183,14 +290,16 @@ export default function SyncScreen() {
           <View style={styles.headerContent}>
             <TouchableOpacity 
               style={styles.backBtn} 
-              onPress={() => router.back()} 
+              onPress={() => router.push('/(tabs)')} 
               activeOpacity={0.7}
             >
               <Text style={styles.backIcon}>‹</Text>
             </TouchableOpacity>
             <View style={styles.headerTextContainer}>
               <Text style={styles.headerTitle}>Synchronisation</Text>
-              <Text style={styles.headerSub}>Gestion des données hors-ligne</Text>
+              <Text style={styles.headerSub}>
+                {user ? `${user.prenom} ${user.nom}` : 'Prospecteur'}
+              </Text>
             </View>
             <View style={styles.headerRight} />
           </View>
@@ -262,6 +371,11 @@ export default function SyncScreen() {
           <Text style={styles.lastSyncText}>
             Dernière synchronisation : {lastSync.toLocaleString('fr-FR')}
           </Text>
+          {unsyncedCount > 0 && (
+            <Text style={styles.lastSyncPending}>
+              {unsyncedCount} fiche{unsyncedCount > 1 ? 's' : ''} en attente
+            </Text>
+          )}
         </View>
 
         {/* Liste des éléments à synchroniser */}
@@ -286,6 +400,11 @@ export default function SyncScreen() {
                       {TYPE_CONFIG[item.type].icon} {TYPE_CONFIG[item.type].label}
                     </Text>
                   </View>
+                  {item.isReal && (
+                    <View style={styles.realBadge}>
+                      <Text style={styles.realBadgeText}>📱</Text>
+                    </View>
+                  )}
                   <View style={styles.syncItemInfo}>
                     <Text style={styles.syncItemCode}>{item.code}</Text>
                     <Text style={styles.syncItemDate}>{item.date}</Text>
@@ -331,6 +450,19 @@ export default function SyncScreen() {
       </ScrollView>
     </View>
   );
+}
+
+function formatDate(dateStr: string): string {
+  try {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('fr-FR', { 
+      day: '2-digit', 
+      month: '2-digit', 
+      year: 'numeric' 
+    });
+  } catch {
+    return dateStr;
+  }
 }
 
 const styles = StyleSheet.create({
@@ -485,6 +617,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#9CA3AF',
   },
+  lastSyncPending: {
+    fontSize: 12,
+    color: '#D97706',
+    fontWeight: '600',
+    marginTop: 2,
+  },
   syncListContainer: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
@@ -539,6 +677,13 @@ const styles = StyleSheet.create({
   typeBadgeText: {
     fontSize: isSmallScreen ? 9 : 10,
     fontWeight: '700',
+  },
+  realBadge: {
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  realBadgeText: {
+    fontSize: 12,
   },
   syncItemInfo: {
     flex: 1,

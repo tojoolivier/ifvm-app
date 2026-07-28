@@ -81,7 +81,7 @@ function toDisplayValue(value: number | null): string {
   return value != null ? String(value) : '';
 }
 
-/** Relit la description d'infestation déjà saisie (ligne `prospection_infestation`), état vide si absente. */
+/** Relit la description d'infestation déjà saisie */
 export function parseInfestationDescription(row: InfestationRow | null): InfestationDescriptionState {
   if (!row) return EMPTY_INFESTATION_DESCRIPTION;
   return {
@@ -97,7 +97,7 @@ export function parseInfestationDescription(row: InfestationRow | null): Infesta
   };
 }
 
-/** Relit le comportement d'infestation déjà saisi (ligne `prospection_infestation`), état vide si absent. */
+/** Relit le comportement d'infestation déjà saisi */
 export function parseInfestationComportement(row: InfestationRow | null): InfestationComportementState {
   if (!row) return EMPTY_INFESTATION_COMPORTEMENT;
   return {
@@ -112,13 +112,15 @@ export function isInfestationDescriptionComplete(state: InfestationDescriptionSt
   return state.typeCible != null;
 }
 
-/** Persiste la description d'infestation, en préservant le comportement déjà saisi (écran suivant). */
+/** Persiste la description d'infestation, en préservant le comportement déjà saisi */
 export async function saveInfestationDescription(
   prospectionId: string,
-  state: InfestationDescriptionState
+  state: InfestationDescriptionState,
+  espece?: string | null  // ← Rendre optionnel avec ?
 ): Promise<void> {
   const existing = await getProspectionInfestation(prospectionId);
   await saveProspectionInfestation(prospectionId, {
+    espece: espece ?? existing?.espece ?? null,  // ← Utiliser existing si non fourni
     type_cible: state.typeCible ?? '',
     taille_min: toNumberOrNull(state.tailleMin),
     taille_max: toNumberOrNull(state.tailleMax),
@@ -135,13 +137,14 @@ export async function saveInfestationDescription(
   });
 }
 
-/** Persiste le comportement d'infestation, en préservant la description déjà saisie. */
+/** Persiste le comportement d'infestation, en préservant la description déjà saisie */
 export async function saveInfestationComportement(
   prospectionId: string,
   state: InfestationComportementState
 ): Promise<void> {
   const existing = await getProspectionInfestation(prospectionId);
   await saveProspectionInfestation(prospectionId, {
+    espece: existing?.espece ?? null,
     type_cible: existing?.type_cible ?? '',
     taille_min: existing?.taille_min ?? null,
     taille_max: existing?.taille_max ?? null,

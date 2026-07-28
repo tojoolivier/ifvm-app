@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, PanResponder, LayoutChangeEvent } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getProspection, DraftProspection } from '@/lib/prospection-repository';
+import { getProspection, DraftProspection, updateProspectionVegetation } from '@/lib/prospection-repository';
 import {
   DEFAULT_VEGETATION_SOL,
   DEGATS_OPTIONS,
@@ -27,6 +27,7 @@ import {
 
 const IFVM_GREEN = '#1B5E1B';
 const IFVM_GREEN_DARK = '#163F16';
+const IFVM_GREEN_LIGHT = '#E8F3E8';
 
 export default function VegetationScreen() {
   const router = useRouter();
@@ -35,6 +36,11 @@ export default function VegetationScreen() {
   const [draft, setDraft] = useState<DraftProspection | null>(null);
   const [state, setState] = useState<VegetationSolState>(DEFAULT_VEGETATION_SOL);
   const [expanded, setExpanded] = useState<StrateKey | null>(null);
+  
+  // Champs généraux de la migration 0005
+  const [verdissement, setVerdissement] = useState<string>('');
+  const [hauteurStrate, setHauteurStrate] = useState<string>('');
+  
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -42,7 +48,11 @@ export default function VegetationScreen() {
     if (!draftId) return;
     getProspection(draftId).then((row) => {
       setDraft(row);
-      if (row) setState(parseVegetationSol(row.vegetation, row.sol, row.degats_cultures));
+      if (row) {
+        setState(parseVegetationSol(row.vegetation, row.sol, row.degats_cultures));
+        setVerdissement(row.verdissement?.toString() ?? '');
+        setHauteurStrate(row.hauteur_strate?.toString() ?? '');
+      }
     });
   }, [draftId]);
 
@@ -63,21 +73,43 @@ export default function VegetationScreen() {
     setIsSaving(true);
     setSaveError(null);
     try {
+      // Sauvegarder d'abord la végétation/sol
       await saveVegetationSol(draft.id, state);
-      router.push({ pathname: '/(prospection)/recapitulatif', params: { draftId: draft.id } });
-    } catch {
+      
+      // Puis sauvegarder les champs généraux
+      await updateProspectionVegetation(draft.id, {
+        vegetation: JSON.stringify({ strates: state.strates }),
+        sol: JSON.stringify({ humidite: state.humidite, texture: state.texture }),
+        degatsCultures: state.degatsCultures,
+        verdissement: verdissement ? parseFloat(verdissement.replace(',', '.')) : null,
+        hauteurStrate: hauteurStrate ? parseFloat(hauteurStrate.replace(',', '.')) : null,
+      });
+      
+      router.push({ 
+        pathname: '/(prospection)/recapitulatif', 
+        params: { draftId: draft.id } 
+      });
+    } catch (error) {
+      console.error('Erreur sauvegarde végétation:', error);
       setSaveError('Impossible d’enregistrer la végétation & sol localement');
     } finally {
       setIsSaving(false);
     }
   };
 
+  const handleRetour = () => {
+    if (!draft) return;
+    router.push({
+      // @ts-ignore
+      pathname: `/(prospection)/${backRoute}`,
+      params: { draftId: draft.id }
+    });
+  };
+
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.header}>
-        <TouchableOpacity onPress={() => router.push({ pathname: `/(prospection)/${backRoute}`, params: { draftId } })}>
-          <Text style={styles.backLink}>‹ Retour</Text>
-        </TouchableOpacity>
+        {/* Suppression du bouton de retour dans la navbar */}
         <Text style={styles.headerTitle}>Végétation & sol</Text>
         <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: '100%' }]} />
@@ -85,7 +117,12 @@ export default function VegetationScreen() {
         <Text style={styles.progressLabel}>Étape 4/4</Text>
       </SafeAreaView>
 
-      <ScrollView style={styles.content} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+      <ScrollView 
+        style={styles.content} 
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Recouvrement des strates */}
         <View style={styles.card}>
           <View style={styles.totalRow}>
             <Text style={styles.cardLabel}>Recouvrement des strates</Text>
@@ -98,6 +135,7 @@ export default function VegetationScreen() {
           )}
         </View>
 
+        {/* Strates */}
         {STRATE_KEYS.map((key) => {
           const detail = state.strates[key];
           const isDetaillable = STRATES_DETAILLABLES.includes(key);
@@ -152,6 +190,34 @@ export default function VegetationScreen() {
           );
         })}
 
+        {/* Champs généraux - Migration 0005 */}
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>Végétation générale</Text>
+          
+          <View style={styles.fieldRow}>
+            <Text style={styles.fieldLabel}>Verdissement (%)</Text>
+            <TextInput
+              style={styles.fieldInput}
+              keyboardType="decimal-pad"
+              placeholder="0.0"
+              value={verdissement}
+              onChangeText={setVerdissement}
+            />
+          </View>
+          
+          <View style={styles.fieldRow}>
+            <Text style={styles.fieldLabel}>Hauteur strate (m)</Text>
+            <TextInput
+              style={styles.fieldInput}
+              keyboardType="decimal-pad"
+              placeholder="0.0"
+              value={hauteurStrate}
+              onChangeText={setHauteurStrate}
+            />
+          </View>
+        </View>
+
+        {/* Humidité du sol */}
         <SingleChoiceCard<Humidite>
           label="Humidité du sol"
           options={HUMIDITE_OPTIONS}
@@ -159,6 +225,7 @@ export default function VegetationScreen() {
           onSelect={(humidite) => setState((prev) => ({ ...prev, humidite }))}
         />
 
+        {/* Texture du sol */}
         <SingleChoiceCard<Texture>
           label="Texture du sol"
           options={TEXTURE_OPTIONS}
@@ -166,6 +233,7 @@ export default function VegetationScreen() {
           onSelect={(texture) => setState((prev) => ({ ...prev, texture }))}
         />
 
+        {/* Dégâts sur culture */}
         <SingleChoiceCard<DegatsCultures>
           label="Dégâts sur culture"
           options={DEGATS_OPTIONS}
@@ -173,16 +241,35 @@ export default function VegetationScreen() {
           onSelect={(degatsCultures) => setState((prev) => ({ ...prev, degatsCultures }))}
         />
 
-        {saveError && <Text style={styles.errorText}>{saveError}</Text>}
+        {saveError && (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorBoxIcon}>❌</Text>
+            <Text style={styles.errorText}>{saveError}</Text>
+          </View>
+        )}
 
-        <TouchableOpacity
-          style={[styles.btnContinuer, !canContinue && styles.btnDisabled]}
-          onPress={handleVerifierEtEnregistrer}
-          disabled={!canContinue}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.btnContinuerText}>{isSaving ? 'Enregistrement…' : 'Vérifier & enregistrer'}</Text>
-        </TouchableOpacity>
+        {/* Boutons en bas - même taille */}
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={[styles.btn, styles.btnRetourner, isSaving && styles.btnDisabled]}
+            onPress={handleRetour}
+            disabled={isSaving}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.btnRetournerText}>← Retour</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.btn, styles.btnContinuer, !canContinue && styles.btnDisabled]}
+            onPress={handleVerifierEtEnregistrer}
+            disabled={!canContinue}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.btnContinuerText}>
+              {isSaving ? '⏳ Enregistrement…' : '✅ Enregistrer'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </View>
   );
@@ -255,24 +342,95 @@ function SingleChoiceCard<T extends string>({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F3F4F6' },
-  header: { backgroundColor: IFVM_GREEN_DARK, paddingHorizontal: 16, paddingBottom: 14 },
-  backLink: { color: '#FFFFFFCC', fontSize: 13, marginBottom: 6 },
-  headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700', marginBottom: 10 },
-  progressTrack: { height: 4, backgroundColor: '#FFFFFF33', borderRadius: 2, overflow: 'hidden' },
-  progressFill: { height: 4, backgroundColor: '#FFFFFF' },
-  progressLabel: { color: '#FFFFFFAA', fontSize: 11, marginTop: 4 },
-  content: { flex: 1 },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 10, padding: 14, marginBottom: 12 },
-  cardLabel: { fontSize: 12, fontWeight: '700', color: '#6B7280', marginBottom: 8, textTransform: 'uppercase' },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  totalValue: { fontSize: 13, fontWeight: '700' },
-  totalValueOk: { color: IFVM_GREEN },
-  totalValueError: { color: '#dc2626' },
-  strateHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  expandToggle: { fontSize: 12, color: '#6B7280' },
-  strateDetail: { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#E5E7EB' },
-  detailLabel: { fontSize: 11, fontWeight: '700', color: '#6B7280', marginTop: 8, marginBottom: 6, textTransform: 'uppercase' },
+  root: { 
+    flex: 1, 
+    backgroundColor: '#F3F4F6' 
+  },
+  header: { 
+    backgroundColor: IFVM_GREEN_DARK, 
+    paddingHorizontal: 16, 
+    paddingBottom: 14 
+  },
+  headerTitle: { 
+    color: '#FFFFFF', 
+    fontSize: 18, 
+    fontWeight: '700', 
+    marginBottom: 10 
+  },
+  progressTrack: { 
+    height: 4, 
+    backgroundColor: '#FFFFFF33', 
+    borderRadius: 2, 
+    overflow: 'hidden' 
+  },
+  progressFill: { 
+    height: 4, 
+    backgroundColor: '#FFFFFF' 
+  },
+  progressLabel: { 
+    color: '#FFFFFFAA', 
+    fontSize: 11, 
+    marginTop: 4 
+  },
+  content: { 
+    flex: 1 
+  },
+  contentContainer: {
+    padding: 16,
+    paddingBottom: 100,
+  },
+  card: { 
+    backgroundColor: '#FFFFFF', 
+    borderRadius: 10, 
+    padding: 14, 
+    marginBottom: 12 
+  },
+  cardLabel: { 
+    fontSize: 12, 
+    fontWeight: '700', 
+    color: '#6B7280', 
+    marginBottom: 8, 
+    textTransform: 'uppercase' 
+  },
+  totalRow: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center' 
+  },
+  totalValue: { 
+    fontSize: 13, 
+    fontWeight: '700' 
+  },
+  totalValueOk: { 
+    color: IFVM_GREEN 
+  },
+  totalValueError: { 
+    color: '#dc2626' 
+  },
+  strateHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: 4 
+  },
+  expandToggle: { 
+    fontSize: 12, 
+    color: '#6B7280' 
+  },
+  strateDetail: { 
+    marginTop: 10, 
+    paddingTop: 10, 
+    borderTopWidth: 1, 
+    borderTopColor: '#E5E7EB' 
+  },
+  detailLabel: { 
+    fontSize: 11, 
+    fontWeight: '700', 
+    color: '#6B7280', 
+    marginTop: 8, 
+    marginBottom: 6, 
+    textTransform: 'uppercase' 
+  },
   hauteurInput: {
     borderWidth: 1,
     borderColor: '#D1D5DB',
@@ -311,8 +469,42 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#FFFFFF',
   },
-  sliderValue: { color: '#111827', fontSize: 13, fontWeight: '600', marginTop: 4, textAlign: 'right' },
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  sliderValue: { 
+    color: '#111827', 
+    fontSize: 13, 
+    fontWeight: '600', 
+    marginTop: 4, 
+    textAlign: 'right' 
+  },
+  fieldRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  fieldLabel: {
+    color: '#6B7280',
+    fontSize: 13,
+  },
+  fieldInput: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    minWidth: 90,
+    textAlign: 'right',
+    color: '#111827',
+    fontSize: 13,
+    backgroundColor: '#FFFFFF',
+  },
+  chipsRow: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    gap: 8 
+  },
   chip: {
     paddingVertical: 8,
     paddingHorizontal: 12,
@@ -320,11 +512,72 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#D1D5DB',
   },
-  chipActive: { backgroundColor: '#E8F3E8', borderColor: IFVM_GREEN },
-  chipText: { color: '#111827', fontSize: 13, fontWeight: '600' },
-  chipTextActive: { color: IFVM_GREEN_DARK },
-  errorText: { color: '#dc2626', fontSize: 13, marginBottom: 8 },
-  btnContinuer: { backgroundColor: IFVM_GREEN, borderRadius: 10, paddingVertical: 16, alignItems: 'center', marginTop: 4 },
-  btnDisabled: { opacity: 0.5 },
-  btnContinuerText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
+  chipActive: { 
+    backgroundColor: IFVM_GREEN_LIGHT, 
+    borderColor: IFVM_GREEN 
+  },
+  chipText: { 
+    color: '#111827', 
+    fontSize: 13, 
+    fontWeight: '600' 
+  },
+  chipTextActive: { 
+    color: IFVM_GREEN_DARK 
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEE2E2',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  errorBoxIcon: {
+    fontSize: 16,
+    marginRight: 8,
+  },
+  errorText: { 
+    color: '#DC2626', 
+    fontSize: 13,
+    flex: 1,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  btn: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    minHeight: 56,
+  },
+  btnContinuer: { 
+    backgroundColor: IFVM_GREEN,
+  },
+  btnRetourner: {
+    backgroundColor: '#6B7280', // Gris pour le retour
+  },
+  btnRetournerText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  btnContinuerText: { 
+    color: '#FFFFFF', 
+    fontSize: 15, 
+    fontWeight: '600' 
+  },
+  btnDisabled: { 
+    opacity: 0.5 
+  },
 });

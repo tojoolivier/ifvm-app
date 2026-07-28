@@ -1,5 +1,5 @@
-export type ProspectionType = 'cdv' | 'ifvm';
-export type FicheStatus = 'brouillon' | 'envoye' | 'verifie' | 'rejete' | 'valide';
+export type ProspectionType = 'intensive' | 'extensive' | 'validation';
+export type FicheStatus = 'brouillon' | 'en_attente' | 'verifiee' | 'rejetee' | 'validee';
 
 export interface CdVData {
   references: {
@@ -104,6 +104,14 @@ export interface FicheHistorique {
   commentaire?: string;
 }
 
+export interface EssaimData {
+  type: 'clair' | 'dense' | 'tres_dense' | null;
+  directionDe: string | null;
+  directionVers: string | null;
+  pose: boolean | null;
+  surfaceContaminee: number | null;
+}
+
 export interface Prospection {
   id: string;
   type: ProspectionType;
@@ -118,6 +126,22 @@ export interface Prospection {
   };
   status: FicheStatus;
   synced: boolean;
+  // Champs de la migration 0005
+  verdissement?: number | null;
+  hauteur_strate?: number | null;
+  pullulation_nb?: number | null;
+  interdistance?: number | null;
+  taille_info?: {
+    long?: number;
+    large?: number;
+    epaisseur?: number;
+  } | null;
+  essaim_type?: 'clair' | 'dense' | 'tres_dense' | null;
+  essaim_vol_dir_de?: string | null;
+  essaim_vol_dir_vers?: string | null;
+  essaim_pose?: boolean | null;
+  surface_contaminee?: number | null;
+  // Données principales
   data: CdVData | IFVMData;
   createdAt: string;
   updatedAt?: string;

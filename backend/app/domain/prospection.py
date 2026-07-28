@@ -91,7 +91,17 @@ class Prospection:
     intensite_pluie: str | None = None
     vegetation: dict[str, Any] | None = None
     sol: dict[str, Any] | None = None
+    verdissement: float | None = None
+    hauteur_strate: float | None = None
     ennemis_naturels: str | None = None
+    pullulation_nb: int | None = None
+    interdistance: float | None = None
+    taille_info: dict[str, float] | None = None
+    essaim_type: str | None = None
+    essaim_vol_dir_de: str | None = None
+    essaim_vol_dir_vers: str | None = None
+    essaim_pose: bool | None = None
+    surface_contaminee: float | None = None
     observations: str | None = None
     statut: str = "brouillon"
     statut_sync: str = "local"

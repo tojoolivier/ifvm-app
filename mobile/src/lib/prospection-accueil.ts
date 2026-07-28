@@ -65,7 +65,6 @@ export function pickCurrentCampagneId(
   );
   const pool = enCours.length > 0 ? enCours : campagnes;
 
-  // Sécurité : vérifier que pool n'est pas vide
   if (pool.length === 0) return null;
 
   return [...pool].sort((a, b) => b.start_date.localeCompare(a.start_date))[0].id;
