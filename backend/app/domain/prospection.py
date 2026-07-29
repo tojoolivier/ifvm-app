@@ -66,6 +66,25 @@ class ProspectionInfestation:
     direction_vers: str | None = None
     vent_de: str | None = None
     vent_vitesse: float | None = None
+    
+    # ==========================================
+    # NOUVEAUX CHAMPS - Imagos (B)
+    # ==========================================
+    pullulation_nb: int | None = None
+    taille_long: float | None = None
+    taille_large: float | None = None
+    taille_epaisseur: float | None = None
+    essaim_en_vol: bool | None = None
+    essaim_pose: bool | None = None
+    type_essaim: str | None = None  # vol_clair, dense, tres_dense
+    
+    # ==========================================
+    # NOUVEAUX CHAMPS - Larves (C)
+    # ==========================================
+    nb_taches_bandes: int | None = None
+    interdistance_m: float | None = None
+    surface_contaminee_ha: float | None = None
+    type_larve: str | None = None  # tache_larvaire, bande_larvaire
 
 
 @dataclass
@@ -94,14 +113,6 @@ class Prospection:
     verdissement: float | None = None
     hauteur_strate: float | None = None
     ennemis_naturels: str | None = None
-    pullulation_nb: int | None = None
-    interdistance: float | None = None
-    taille_info: dict[str, float] | None = None
-    essaim_type: str | None = None
-    essaim_vol_dir_de: str | None = None
-    essaim_vol_dir_vers: str | None = None
-    essaim_pose: bool | None = None
-    surface_contaminee: float | None = None
     observations: str | None = None
     statut: str = "brouillon"
     statut_sync: str = "local"
@@ -111,6 +122,26 @@ class Prospection:
     validated_at: datetime | None = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
+    
+    # ==========================================
+    # NOUVEAUX CHAMPS - Références (A)
+    # ==========================================
+    region: str | None = None
+    district: str | None = None
+    commune: str | None = None
+    za: str | None = None  # Zone Antiacridienne
+    pa_code: str | None = None  # Poste Acridien
+    
+    # ==========================================
+    # NOUVEAUX CHAMPS - Observations (D)
+    # ==========================================
+    degats_cultures_pourcent: int | None = None
+    verdissement_pourcent: int | None = None
+    hauteur_herbe_cm: float | None = None
+    
+    # ==========================================
+    # RELATIONSHIPS
+    # ==========================================
     populations: list[ProspectionPopulation] = field(default_factory=list)
     captures: list[ProspectionCapture] = field(default_factory=list)
     infestations: list[ProspectionInfestation] = field(default_factory=list)

@@ -39,14 +39,6 @@ class ProspectionModel(Base):
     verdissement: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
     hauteur_strate: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
     ennemis_naturels: Mapped[str | None] = mapped_column(Text(), nullable=True)
-    pullulation_nb: Mapped[int | None] = mapped_column(Integer(), nullable=True)
-    interdistance: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
-    taille_info: Mapped[dict | None] = mapped_column(JSONB(), nullable=True)
-    essaim_type: Mapped[str | None] = mapped_column(Text(), nullable=True)
-    essaim_vol_dir_de: Mapped[str | None] = mapped_column(Text(), nullable=True)
-    essaim_vol_dir_vers: Mapped[str | None] = mapped_column(Text(), nullable=True)
-    essaim_pose: Mapped[bool | None] = mapped_column(Boolean(), nullable=True)
-    surface_contaminee: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
     observations: Mapped[str | None] = mapped_column(Text(), nullable=True)
     statut: Mapped[str] = mapped_column(Text(), nullable=False, server_default="brouillon")
     statut_sync: Mapped[str] = mapped_column(Text(), nullable=False, server_default="local")
@@ -57,6 +49,25 @@ class ProspectionModel(Base):
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default=sa.text("now()"))
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default=sa.text("now()"), onupdate=sa.text("now()"))
 
+    # ==========================================
+    # NOUVEAUX CHAMPS - Références (A)
+    # ==========================================
+    region: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    district: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    commune: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    za: Mapped[str | None] = mapped_column(Text(), nullable=True)  # Zone Antiacridienne
+    pa_code: Mapped[str | None] = mapped_column(Text(), nullable=True)  # Poste Acridien
+
+    # ==========================================
+    # NOUVEAUX CHAMPS - Observations (D)
+    # ==========================================
+    degats_cultures_pourcent: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    verdissement_pourcent: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    hauteur_herbe_cm: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
+
+    # ==========================================
+    # RELATIONSHIPS
+    # ==========================================
     populations: Mapped[list["ProspectionPopulationModel"]] = relationship(
         back_populates="prospection", cascade="all, delete-orphan"
     )
@@ -87,10 +98,6 @@ class ProspectionModel(Base):
         CheckConstraint(
             "biotope IN ('xerophyle', 'mesophyle', 'hydrophyle')",
             name="ck_prospection_biotope",
-        ),
-        CheckConstraint(
-            "essaim_type IN ('clair', 'dense', 'tres_dense')",
-            name="ck_prospection_essaim_type",
         ),
     )
 
@@ -178,6 +185,25 @@ class ProspectionInfestationModel(Base):
     vent_de: Mapped[str | None] = mapped_column(Text(), nullable=True)
     vent_vitesse: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
 
+    # ==========================================
+    # NOUVEAUX CHAMPS - Imagos (B)
+    # ==========================================
+    pullulation_nb: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    taille_long: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
+    taille_large: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
+    taille_epaisseur: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
+    essaim_en_vol: Mapped[bool | None] = mapped_column(Boolean(), nullable=True)
+    essaim_pose: Mapped[bool | None] = mapped_column(Boolean(), nullable=True)
+    type_essaim: Mapped[str | None] = mapped_column(Text(), nullable=True)
+
+    # ==========================================
+    # NOUVEAUX CHAMPS - Larves (C)
+    # ==========================================
+    nb_taches_bandes: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    interdistance_m: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
+    surface_contaminee_ha: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
+    type_larve: Mapped[str | None] = mapped_column(Text(), nullable=True)
+
     prospection: Mapped["ProspectionModel"] = relationship(back_populates="infestations")
 
     __table_args__ = (
@@ -189,6 +215,15 @@ class ProspectionInfestationModel(Base):
         CheckConstraint(
             "comportement IN ('repos','deplacement')",
             name="ck_prospection_infestation_comportement",
+        ),
+        # Nouvelles contraintes
+        CheckConstraint(
+            "type_essaim IN ('vol_clair', 'dense', 'tres_dense')",
+            name="ck_prospection_infestation_type_essaim",
+        ),
+        CheckConstraint(
+            "type_larve IN ('tache_larvaire', 'bande_larvaire')",
+            name="ck_prospection_infestation_type_larve",
         ),
     )
 
