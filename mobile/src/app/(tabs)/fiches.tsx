@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
-import { getProspection, listRecentProspections, DraftProspection } from '@/lib/prospection-repository';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isSmallScreen = SCREEN_WIDTH < 380;
@@ -36,7 +35,6 @@ interface FicheItem {
   date: string;
   statut: StatutFiche;
   campagne?: string;
-  isReal?: boolean;
 }
 
 const STATUT_CONFIG: Record<StatutFiche, { label: string; color: string; bg: string }> = {
@@ -52,60 +50,74 @@ const TYPE_CONFIG: Record<TypeFiche, { label: string; color: string; bg: string;
   METEO:       { label: 'MET', color: '#F59E0B', bg: '#FEF3C7', icon: '🌤️' },
 };
 
-// Données simulées pour CRT et METEO
-const MOCK_CRT_FICHES: FicheItem[] = [
+// Données mock
+const MOCK_FICHES: FicheItem[] = [
   { 
-    id: 'crt-1', 
+    id: '1', 
+    code: 'PRO-2451', 
+    type: 'PROSPECTION',
+    typeProspection: 'EXT',
+    poste: 'PA Betioky', 
+    date: '24/06/2026', 
+    statut: 'en_attente',
+    campagne: 'Campagne 2026'
+  },
+  { 
+    id: '2', 
+    code: 'PRO-2449', 
+    type: 'PROSPECTION',
+    typeProspection: 'EXT',
+    poste: 'PA Betioky', 
+    date: '23/06/2026', 
+    statut: 'verifiee',
+    campagne: 'Campagne 2026'
+  },
+  { 
+    id: '3', 
+    code: 'PRO-2446', 
+    type: 'PROSPECTION',
+    typeProspection: 'INT',
+    poste: 'PA Betioky', 
+    date: '22/06/2026', 
+    statut: 'validee',
+    campagne: 'Campagne 2026'
+  },
+  { 
+    id: '4', 
+    code: 'PRO-2440', 
+    type: 'PROSPECTION',
+    typeProspection: 'EXT',
+    poste: 'PA Betioky', 
+    date: '19/06/2026', 
+    statut: 'rejetee',
+    campagne: 'Campagne 2026'
+  },
+  { 
+    id: '5', 
     code: 'CRT-2026-001', 
     type: 'CRT',
     poste: 'PA Toliara', 
     date: '25/06/2026', 
     statut: 'en_attente',
-    campagne: 'Campagne 2026',
-    isReal: false,
+    campagne: 'Campagne 2026'
   },
   { 
-    id: 'crt-2', 
+    id: '6', 
     code: 'CRT-2026-002', 
     type: 'CRT',
     poste: 'PA Morondava', 
     date: '20/06/2026', 
     statut: 'validee',
-    campagne: 'Campagne 2026',
-    isReal: false,
+    campagne: 'Campagne 2026'
   },
-  { 
-    id: 'crt-3', 
-    code: 'CRT-2026-003', 
-    type: 'CRT',
-    poste: 'PA Toliara', 
-    date: '15/06/2026', 
-    statut: 'verifiee',
-    campagne: 'Campagne 2026',
-    isReal: false,
-  },
-];
-
-const MOCK_METEO_FICHES: FicheItem[] = [
   {
-    id: 'met-1',
+    id: '7',
     code: 'MET-2026-001',
     type: 'METEO',
     poste: 'PA Toliara',
     date: '26/06/2026',
     statut: 'en_attente',
-    campagne: 'Campagne 2026',
-    isReal: false,
-  },
-  {
-    id: 'met-2',
-    code: 'MET-2026-002',
-    type: 'METEO',
-    poste: 'PA Morondava',
-    date: '22/06/2026',
-    statut: 'validee',
-    campagne: 'Campagne 2026',
-    isReal: false,
+    campagne: 'Campagne 2026'
   },
 ];
 
@@ -114,8 +126,6 @@ export default function FichesScreen() {
   const user = useAuthStore((s) => s.user);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<TypeFiche | 'TOUS'>('TOUS');
-  const [realProspections, setRealProspections] = useState<FicheItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const scrollViewRef = useRef<ScrollView>(null);
   const { width: windowWidth } = useWindowDimensions();
 
@@ -124,73 +134,37 @@ export default function FichesScreen() {
   const mois = today.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
   const periodeLabel = `Décade ${decade} · ${mois}`;
 
-  // Charger les prospections réelles depuis la base de données
-  useEffect(() => {
-    const loadProspections = async () => {
-      setIsLoading(true);
-      try {
-        const prospections = await listRecentProspections(20);
-        const mapped: FicheItem[] = prospections.map((p: DraftProspection) => ({
-          id: p.id,
-          code: p.n_fiche || `PRO-${p.id.slice(0, 6)}`,
-          type: 'PROSPECTION',
-          typeProspection: p.type_prospection === 'intensive' ? 'INT' : 
-                           p.type_prospection === 'extensive' ? 'EXT' : undefined,
-          poste: p.station_id || '📍 Localité',
-          date: formatDate(p.date_prospection),
-          statut: p.statut as StatutFiche || 'en_attente',
-          campagne: 'Campagne en cours',
-          isReal: true,
-        }));
-        setRealProspections(mapped);
-      } catch (error) {
-        console.error('Erreur chargement prospections:', error);
-        setRealProspections([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadProspections();
-  }, []);
-
-  // Combiner les fiches réelles et simulées
-  const allFiches = useMemo(() => {
-    const prospections = realProspections.map(p => ({ ...p, type: 'PROSPECTION' as TypeFiche }));
-    const crtData = filterType === 'TOUS' || filterType === 'CRT' ? MOCK_CRT_FICHES : [];
-    const meteoData = filterType === 'TOUS' || filterType === 'METEO' ? MOCK_METEO_FICHES : [];
-    return [...prospections, ...crtData, ...meteoData];
-  }, [realProspections, filterType]);
-
+  // Filtrer les fiches
   const fichesFiltrees = useMemo(() => {
-    return allFiches.filter(fiche => {
+    return MOCK_FICHES.filter(fiche => {
       const matchSearch = searchQuery === '' || 
         fiche.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
         fiche.poste.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (fiche.campagne && fiche.campagne.toLowerCase().includes(searchQuery.toLowerCase()));
       
       const matchType = filterType === 'TOUS' || fiche.type === filterType;
+      
       return matchSearch && matchType;
     });
-  }, [allFiches, searchQuery, filterType]);
+  }, [searchQuery, filterType]);
 
   const handleFichePress = (fiche: FicheItem) => {
-    try {
-      if (fiche.type === 'PROSPECTION') {
-        router.push({
-          pathname: '/(prospection)/reference',
-          params: { draftId: fiche.id }
-        });
-      } else if (fiche.type === 'CRT') {
-        // TODO: Créer la page CRT
-        router.push('/(tabs)'); // CORRIGÉ: utilisation de '/(tabs)/'
-      } else if (fiche.type === 'METEO') {
-        // TODO: Créer la page METEO
-        router.push('/(tabs)'); // CORRIGÉ: utilisation de '/(tabs)/'
-      }
-    } catch (error) {
-      console.error('Erreur navigation:', error);
-      router.push('/(tabs)'); // CORRIGÉ: fallback vers '/(tabs)/'
+    if (fiche.type === 'PROSPECTION') {
+      router.push({
+        pathname: '/(prospection)/especes',
+        params: { draftId: fiche.id }
+      });
+    } else if (fiche.type === 'CRT') {
+      router.push({
+        pathname: '/(tabs)/fiches',
+        params: { id: fiche.id, view: 'crt' }
+      });
+    } else {
+      // Météo
+      router.push({
+        pathname: '/(tabs)/fiches',
+        params: { id: fiche.id, view: 'meteo' }
+      });
     }
   };
 
@@ -201,6 +175,7 @@ export default function FichesScreen() {
     />
   );
 
+  // Déterminer si on affiche les icônes
   const showIcons = windowWidth >= 400;
 
   return (
@@ -211,7 +186,7 @@ export default function FichesScreen() {
           <View style={styles.headerContent}>
             <TouchableOpacity 
               style={styles.backBtn} 
-              onPress={() => router.push('/(tabs)')} // CORRIGÉ: utilisation de '/(tabs)/'
+              onPress={() => router.back()} 
               activeOpacity={0.7}
             >
               <Text style={styles.backIcon}>‹</Text>
@@ -246,7 +221,7 @@ export default function FichesScreen() {
         </View>
       </View>
 
-      {/* Filtres */}
+      {/* Filtres - Version responsive simple */}
       <View style={styles.filtersWrapper}>
         <ScrollView 
           ref={scrollViewRef}
@@ -294,7 +269,7 @@ export default function FichesScreen() {
       {/* Nombre de résultats */}
       <View style={styles.resultCountContainer}>
         <Text style={styles.resultCount}>
-          {isLoading ? 'Chargement...' : `${fichesFiltrees.length} fiche${fichesFiltrees.length > 1 ? 's' : ''}`}
+          {fichesFiltrees.length} fiche{fichesFiltrees.length > 1 ? 's' : ''}
           {searchQuery !== '' && ` · "${searchQuery}"`}
         </Text>
       </View>
@@ -318,7 +293,6 @@ export default function FichesScreen() {
         initialNumToRender={10}
         maxToRenderPerBatch={10}
         windowSize={5}
-        extraData={filterType}
       />
 
       {/* Bouton Nouvelle fiche */}
@@ -334,12 +308,12 @@ export default function FichesScreen() {
 }
 
 function FicheCard({ fiche, onPress }: { fiche: FicheItem; onPress: () => void }) {
-  const statut = STATUT_CONFIG[fiche.statut] || STATUT_CONFIG.en_attente;
+  const statut = STATUT_CONFIG[fiche.statut];
   const type = TYPE_CONFIG[fiche.type];
 
   return (
     <TouchableOpacity 
-      style={[styles.card, fiche.isReal && styles.cardReal]} 
+      style={styles.card} 
       onPress={onPress} 
       activeOpacity={0.7}
     >
@@ -355,11 +329,6 @@ function FicheCard({ fiche, onPress }: { fiche: FicheItem; onPress: () => void }
               <Text style={[styles.subTypeText, { color: TYPE_CONFIG.PROSPECTION.color }]}>
                 {fiche.typeProspection}
               </Text>
-            </View>
-          )}
-          {fiche.isReal && (
-            <View style={styles.realBadge}>
-              <Text style={styles.realBadgeText}>📱</Text>
             </View>
           )}
           <View style={[styles.statutBadge, { backgroundColor: statut.bg }]}>
@@ -383,19 +352,6 @@ function FicheCard({ fiche, onPress }: { fiche: FicheItem; onPress: () => void }
       </View>
     </TouchableOpacity>
   );
-}
-
-function formatDate(dateStr: string): string {
-  try {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('fr-FR', { 
-      day: '2-digit', 
-      month: '2-digit', 
-      year: 'numeric' 
-    });
-  } catch {
-    return dateStr;
-  }
 }
 
 const styles = StyleSheet.create({
@@ -488,7 +444,6 @@ const styles = StyleSheet.create({
   filtersContent: {
     paddingHorizontal: 16,
     gap: 8,
-    flexDirection: 'row',
   },
   filterChip: {
     paddingHorizontal: isSmallScreen ? 12 : 14,
@@ -559,10 +514,6 @@ const styles = StyleSheet.create({
       width: '100%',
     }),
   },
-  cardReal: {
-    borderLeftWidth: 3,
-    borderLeftColor: IFVM_GREEN,
-  },
   cardContent: {
     padding: 14,
   },
@@ -592,13 +543,6 @@ const styles = StyleSheet.create({
   subTypeText: {
     fontSize: 10,
     fontWeight: '600',
-  },
-  realBadge: {
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-  },
-  realBadgeText: {
-    fontSize: 12,
   },
   statutBadge: {
     paddingHorizontal: 10,

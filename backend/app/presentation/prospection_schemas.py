@@ -2,33 +2,7 @@ import uuid
 from datetime import date, datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
-from enum import Enum
-
-
-class TypeProspection(str, Enum):
-    INTENSIVE = "intensive"
-    EXTENSIVE = "extensive"
-    VALIDATION = "validation"
-
-
-class Biotope(str, Enum):
-    XEROPHYLE = "xerophyle"
-    MESOPHYLE = "mesophyle"
-    HYDROPHYLE = "hydrophyle"
-
-
-class EssaimType(str, Enum):
-    CLAIR = "clair"
-    DENSE = "dense"
-    TRES_DENSE = "tres_dense"
-
-
-class DegatsCultures(str, Enum):
-    NULS = "nuls"
-    FAIBLES = "faibles"
-    MOYENS = "moyens"
-    FORTS = "forts"
+from pydantic import BaseModel, ConfigDict
 
 
 class PopulationRead(BaseModel):
@@ -114,7 +88,7 @@ class InfestationCreate(BaseModel):
 
 
 class ProspectionCreate(BaseModel):
-    type_prospection: TypeProspection
+    type_prospection: str
     campagne_id: uuid.UUID
     station_id: uuid.UUID | None = None
     n_releve: str | None = None
@@ -124,43 +98,21 @@ class ProspectionCreate(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
     altitude: float | None = None
-    biotope: Biotope | None = None
-    surf_station: float | None = Field(None, ge=0)
-    surf_prospectee: float | None = Field(None, ge=0)
-    surf_infestee: float | None = Field(None, ge=0)
-    degats_cultures: DegatsCultures | None = None
+    biotope: str | None = None
+    surf_station: float | None = None
+    surf_prospectee: float | None = None
+    surf_infestee: float | None = None
+    degats_cultures: str | None = None
     derniere_pluie: date | None = None
     intensite_pluie: str | None = None
     vegetation: dict[str, Any] | None = None
     sol: dict[str, Any] | None = None
-    verdissement: float | None = Field(None, ge=0, le=100)
-    hauteur_strate: float | None = Field(None, ge=0)
     ennemis_naturels: str | None = None
-    pullulation_nb: int | None = Field(None, ge=0)
-    interdistance: float | None = Field(None, ge=0)
-    taille_info: dict[str, float] | None = None
-    essaim_type: EssaimType | None = None
-    essaim_vol_dir_de: str | None = None
-    essaim_vol_dir_vers: str | None = None
-    essaim_pose: bool | None = None
-    surface_contaminee: float | None = Field(None, ge=0)
     observations: str | None = None
     statut: str = "brouillon"
     populations: list[PopulationCreate] = []
     captures: list[CaptureCreate] = []
     infestations: list[InfestationCreate] = []
-
-    @field_validator('taille_info')
-    @classmethod
-    def validate_taille_info(cls, v: dict | None) -> dict | None:
-        if v is not None:
-            required_keys = {'long', 'large', 'epaisseur'}
-            if not all(key in v for key in required_keys):
-                raise ValueError('taille_info must contain long, large, epaisseur')
-            for key in required_keys:
-                if v.get(key, 0) < 0:
-                    raise ValueError(f'{key} must be >= 0')
-        return v
 
 
 class ProspectionUpdate(BaseModel):
@@ -172,26 +124,16 @@ class ProspectionUpdate(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
     altitude: float | None = None
-    biotope: Biotope | None = None
-    surf_station: float | None = Field(None, ge=0)
-    surf_prospectee: float | None = Field(None, ge=0)
-    surf_infestee: float | None = Field(None, ge=0)
-    degats_cultures: DegatsCultures | None = None
+    biotope: str | None = None
+    surf_station: float | None = None
+    surf_prospectee: float | None = None
+    surf_infestee: float | None = None
+    degats_cultures: str | None = None
     derniere_pluie: date | None = None
     intensite_pluie: str | None = None
     vegetation: dict[str, Any] | None = None
     sol: dict[str, Any] | None = None
-    verdissement: float | None = Field(None, ge=0, le=100)
-    hauteur_strate: float | None = Field(None, ge=0)
     ennemis_naturels: str | None = None
-    pullulation_nb: int | None = Field(None, ge=0)
-    interdistance: float | None = Field(None, ge=0)
-    taille_info: dict[str, float] | None = None
-    essaim_type: EssaimType | None = None
-    essaim_vol_dir_de: str | None = None
-    essaim_vol_dir_vers: str | None = None
-    essaim_pose: bool | None = None
-    surface_contaminee: float | None = Field(None, ge=0)
     observations: str | None = None
     statut: str | None = None
 
@@ -240,17 +182,7 @@ class ProspectionRead(BaseModel):
     intensite_pluie: str | None
     vegetation: dict[str, Any] | None
     sol: dict[str, Any] | None
-    verdissement: float | None
-    hauteur_strate: float | None
     ennemis_naturels: str | None
-    pullulation_nb: int | None
-    interdistance: float | None
-    taille_info: dict[str, float] | None
-    essaim_type: str | None
-    essaim_vol_dir_de: str | None
-    essaim_vol_dir_vers: str | None
-    essaim_pose: bool | None
-    surface_contaminee: float | None
     observations: str | None
     statut: str
     statut_sync: str

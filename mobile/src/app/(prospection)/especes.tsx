@@ -14,7 +14,6 @@ import {
 
 const IFVM_GREEN = '#1B5E1B';
 const IFVM_GREEN_DARK = '#163F16';
-const IFVM_GREEN_LIGHT = '#E8F3E8';
 
 export default function EspecesScreen() {
   const router = useRouter();
@@ -56,12 +55,6 @@ export default function EspecesScreen() {
 
   const grilleCount = useMemo(() => countGrilles(selection), [selection]);
   const canContinue = hasSelection(selection) && !isSaving;
-  
-  // Vérifier combien d'espèces sont sélectionnées
-  const selectedCount = useMemo(() => {
-    const keys = Object.keys(selection) as (keyof EspeceSelection)[];
-    return keys.filter(key => selection[key]).length;
-  }, [selection]);
 
   const toggle = (key: keyof EspeceSelection) => {
     setSelection((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -96,14 +89,6 @@ export default function EspecesScreen() {
     }
   };
 
-  const handleRetour = () => {
-    if (!draft) return;
-    router.push({
-      pathname: '/(prospection)/reference',
-      params: { draftId: draft.id }
-    });
-  };
-
   // État de chargement
   if (isLoading) {
     return (
@@ -122,7 +107,6 @@ export default function EspecesScreen() {
         <TouchableOpacity 
           style={styles.btnRetour}
           onPress={() => router.back()}
-          activeOpacity={0.85}
         >
           <Text style={styles.btnRetourText}>Retour</Text>
         </TouchableOpacity>
@@ -133,17 +117,20 @@ export default function EspecesScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.header}>
-        {/* Suppression du bouton de retour dans la navbar */}
+        <TouchableOpacity 
+          onPress={() => router.push({ 
+            pathname: '/(prospection)/reference', 
+            params: { draftId } 
+          })}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.backLink}>‹ Référence & position</Text>
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>Espèces observées</Text>
         <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: '50%' }]} />
         </View>
-        <View style={styles.progressInfo}>
-          <Text style={styles.progressLabel}>Étape 2/4</Text>
-          <Text style={styles.progressCount}>
-            {selectedCount > 0 ? `${selectedCount} sélectionnée${selectedCount > 1 ? 's' : ''}` : 'Aucune sélection'}
-          </Text>
-        </View>
+        <Text style={styles.progressLabel}>Étape 2/4</Text>
       </SafeAreaView>
 
       <ScrollView 
@@ -151,71 +138,42 @@ export default function EspecesScreen() {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* LMC */}
         <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardLabel}>Locusta migratoria capito</Text>
-            <Text style={styles.cardSubLabel}>LMC</Text>
-          </View>
+          <Text style={styles.cardLabel}>Locusta migratoria capito (LMC)</Text>
           <ToggleRow 
             label="Imagos" 
             active={selection.lmcImago} 
-            onPress={() => toggle('lmcImago')}
-            description="Adultes"
+            onPress={() => toggle('lmcImago')} 
           />
           <ToggleRow 
             label="Larves" 
             active={selection.lmcLarve} 
-            onPress={() => toggle('lmcLarve')}
-            description="Stades larvaires"
+            onPress={() => toggle('lmcLarve')} 
           />
         </View>
 
-        {/* NSE */}
         <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardLabel}>Nomadacris septemfasciata</Text>
-            <Text style={styles.cardSubLabel}>NSE</Text>
-          </View>
+          <Text style={styles.cardLabel}>Nomadacris septemfasciata (NSE)</Text>
           <ToggleRow 
             label="Imagos" 
             active={selection.nseImago} 
-            onPress={() => toggle('nseImago')}
-            description="Adultes"
+            onPress={() => toggle('nseImago')} 
           />
           <ToggleRow 
             label="Larves" 
             active={selection.nseLarve} 
-            onPress={() => toggle('nseLarve')}
-            description="Stades larvaires"
+            onPress={() => toggle('nseLarve')} 
           />
         </View>
 
-        {/* Récapitulatif */}
         <View style={styles.card}>
-          <Text style={styles.cardLabel}>Récapitulatif</Text>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Grilles à remplir</Text>
-            <Text style={styles.summaryValue}>{grilleCount}</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Sélections</Text>
-            <Text style={styles.summaryValue}>{selectedCount}</Text>
-          </View>
+          <Text style={styles.grilleCount}>
+            {grilleCount} grille{grilleCount > 1 ? 's' : ''} à remplir
+          </Text>
           {!hasSelection(selection) && (
-            <View style={styles.warningBox}>
-              <Text style={styles.warningText}>⚠️ Sélectionnez au moins une espèce pour continuer</Text>
-            </View>
-          )}
-          {hasSelection(selection) && grilleCount === 1 && (
-            <View style={styles.infoBox}>
-              <Text style={styles.infoText}>💡 Une seule grille à remplir</Text>
-            </View>
-          )}
-          {hasSelection(selection) && grilleCount > 1 && (
-            <View style={styles.infoBox}>
-              <Text style={styles.infoText}>📋 {grilleCount} grilles à remplir dans le plan de relevé</Text>
-            </View>
+            <Text style={styles.hintText}>
+              Sélectionnez au moins une espèce pour continuer
+            </Text>
           )}
         </View>
 
@@ -225,44 +183,26 @@ export default function EspecesScreen() {
           </View>
         )}
 
-        {/* Boutons en bas - même taille */}
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={[styles.btn, styles.btnRetourner, isSaving && styles.btnDisabled]}
-            onPress={handleRetour}
-            disabled={isSaving}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.btnRetournerText}>← Retour</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.btn, styles.btnContinuer, !canContinue && styles.btnDisabled]}
-            onPress={handleContinuer}
-            disabled={!canContinue}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.btnContinuerText}>
-              {isSaving ? '⏳ Enregistrement…' : 'Continuer →'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={[styles.btnContinuer, !canContinue && styles.btnDisabled]}
+          onPress={handleContinuer}
+          disabled={!canContinue}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.btnContinuerText}>
+            {isSaving ? 'Enregistrement…' : 'Continuer'}
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
 }
 
-// Composant ToggleRow optimisé
-const ToggleRow = ({ 
-  label, 
-  active, 
-  onPress,
-  description
-}: { 
+// Composant ToggleRow optimisé avec memo
+const ToggleRow = ({ label, active, onPress }: { 
   label: string; 
   active: boolean; 
   onPress: () => void;
-  description?: string;
 }) => {
   return (
     <TouchableOpacity
@@ -270,17 +210,10 @@ const ToggleRow = ({
       onPress={onPress}
       activeOpacity={0.85}
     >
-      <View style={styles.toggleLeft}>
-        <Text style={[styles.toggleLabel, active && styles.toggleLabelActive]}>
-          {label}
-        </Text>
-        {description && (
-          <Text style={styles.toggleDescription}>{description}</Text>
-        )}
-      </View>
-      <View style={[styles.toggleIndicator, active && styles.toggleIndicatorActive]}>
-        {active && <View style={styles.toggleIndicatorDot} />}
-      </View>
+      <Text style={[styles.toggleLabel, active && styles.toggleLabelActive]}>
+        {label}
+      </Text>
+      <View style={[styles.toggleIndicator, active && styles.toggleIndicatorActive]} />
     </TouchableOpacity>
   );
 };
@@ -291,7 +224,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6' 
   },
   centered: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -305,6 +237,11 @@ const styles = StyleSheet.create({
     backgroundColor: IFVM_GREEN_DARK, 
     paddingHorizontal: 16, 
     paddingBottom: 14 
+  },
+  backLink: { 
+    color: '#FFFFFFCC', 
+    fontSize: 13, 
+    marginBottom: 6 
   },
   headerTitle: { 
     color: '#FFFFFF', 
@@ -322,18 +259,10 @@ const styles = StyleSheet.create({
     height: 4, 
     backgroundColor: '#FFFFFF' 
   },
-  progressInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
   progressLabel: { 
     color: '#FFFFFFAA', 
     fontSize: 11, 
-  },
-  progressCount: {
-    color: '#FFFFFFAA',
-    fontSize: 11,
+    marginTop: 4 
   },
   content: { 
     flex: 1 
@@ -346,33 +275,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF', 
     borderRadius: 10, 
     padding: 14, 
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12 
   },
   cardLabel: { 
     fontSize: 12, 
     fontWeight: '700', 
     color: '#6B7280', 
+    marginBottom: 8, 
     textTransform: 'uppercase' 
-  },
-  cardSubLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: IFVM_GREEN,
-    backgroundColor: IFVM_GREEN_LIGHT,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
   },
   toggleRow: {
     flexDirection: 'row',
@@ -386,11 +296,8 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   toggleRowActive: { 
-    backgroundColor: IFVM_GREEN_LIGHT, 
+    backgroundColor: '#E8F3E8', 
     borderColor: IFVM_GREEN 
-  },
-  toggleLeft: {
-    flex: 1,
   },
   toggleLabel: { 
     color: '#111827', 
@@ -400,67 +307,28 @@ const styles = StyleSheet.create({
   toggleLabelActive: { 
     color: IFVM_GREEN_DARK 
   },
-  toggleDescription: {
-    fontSize: 11,
-    color: '#6B7280',
-    marginTop: 1,
-  },
   toggleIndicator: { 
-    width: 24, 
-    height: 24, 
-    borderRadius: 12, 
+    width: 20, 
+    height: 20, 
+    borderRadius: 10, 
     borderWidth: 2, 
-    borderColor: '#D1D5DB',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: '#D1D5DB' 
   },
   toggleIndicatorActive: { 
     backgroundColor: IFVM_GREEN, 
     borderColor: IFVM_GREEN 
   },
-  toggleIndicatorDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#FFFFFF',
+  grilleCount: { 
+    color: '#111827', 
+    fontSize: 14, 
+    fontWeight: '600', 
+    textAlign: 'center' 
   },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  summaryLabel: {
+  hintText: {
     color: '#6B7280',
-    fontSize: 13,
-  },
-  summaryValue: {
-    color: '#111827',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  warningBox: {
-    backgroundColor: '#FEF3C7',
-    borderRadius: 6,
-    padding: 10,
-    marginTop: 8,
-  },
-  warningText: {
-    color: '#92400E',
     fontSize: 12,
     textAlign: 'center',
-  },
-  infoBox: {
-    backgroundColor: '#E0F2FE',
-    borderRadius: 6,
-    padding: 10,
-    marginTop: 8,
-  },
-  infoText: {
-    color: '#0369A1',
-    fontSize: 12,
-    textAlign: 'center',
+    marginTop: 6,
   },
   errorContainer: {
     backgroundColor: '#FEE2E2',
@@ -469,46 +337,24 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   errorText: { 
-    color: '#DC2626', 
+    color: '#dc2626', 
     fontSize: 13,
     textAlign: 'center',
   },
-  buttonContainer: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 4,
-  },
-  btn: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-    minHeight: 56,
-  },
   btnContinuer: { 
-    backgroundColor: IFVM_GREEN,
+    backgroundColor: IFVM_GREEN, 
+    borderRadius: 10, 
+    paddingVertical: 16, 
+    alignItems: 'center', 
+    marginTop: 4 
   },
-  btnRetourner: {
-    backgroundColor: '#6B7280', // Gris pour le retour
-  },
-  btnRetournerText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '600',
+  btnDisabled: { 
+    opacity: 0.5 
   },
   btnContinuerText: { 
     color: '#FFFFFF', 
     fontSize: 15, 
     fontWeight: '600' 
-  },
-  btnDisabled: { 
-    opacity: 0.5 
   },
   btnRetour: {
     backgroundColor: IFVM_GREEN,
