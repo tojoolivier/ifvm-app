@@ -66,6 +66,26 @@ class ProspectionInfestation:
     direction_vers: str | None = None
     vent_de: str | None = None
     vent_vitesse: float | None = None
+    surf_infestee_pourcent: float | None = None
+
+    # ==========================================
+    # NOUVEAUX CHAMPS - Imagos (B)
+    # ==========================================
+    pullulation_nb: int | None = None
+    taille_long: float | None = None
+    taille_large: float | None = None
+    taille_epaisseur: float | None = None
+    essaim_en_vol: bool | None = None
+    essaim_pose: bool | None = None
+    type_essaim: str | None = None
+
+    # ==========================================
+    # NOUVEAUX CHAMPS - Larves (C)
+    # ==========================================
+    nb_taches_bandes: int | None = None
+    interdistance_m: float | None = None
+    surface_contaminee_ha: float | None = None
+    type_larve: str | None = None
 
 
 @dataclass
@@ -91,6 +111,8 @@ class Prospection:
     intensite_pluie: str | None = None
     vegetation: dict[str, Any] | None = None
     sol: dict[str, Any] | None = None
+    verdissement: float | None = None
+    hauteur_strate: float | None = None
     ennemis_naturels: str | None = None
     observations: str | None = None
     statut: str = "brouillon"
@@ -101,6 +123,23 @@ class Prospection:
     validated_at: datetime | None = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
+
+    # ==========================================
+    # NOUVEAUX CHAMPS - Références (A)
+    # ==========================================
+    region: str | None = None
+    district: str | None = None
+    commune: str | None = None
+    za: str | None = None
+    pa_code: str | None = None
+
+    # ==========================================
+    # NOUVEAUX CHAMPS - Observations (D)
+    # ==========================================
+    degats_cultures_pourcent: int | None = None
+    verdissement_pourcent: int | None = None
+    hauteur_herbe_cm: float | None = None
+
     populations: list[ProspectionPopulation] = field(default_factory=list)
     captures: list[ProspectionCapture] = field(default_factory=list)
     infestations: list[ProspectionInfestation] = field(default_factory=list)
