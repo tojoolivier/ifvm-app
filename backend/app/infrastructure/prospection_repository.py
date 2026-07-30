@@ -90,17 +90,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             intensite_pluie=prospection.intensite_pluie,
             vegetation=prospection.vegetation,
             sol=prospection.sol,
-            verdissement=prospection.verdissement,
-            hauteur_strate=prospection.hauteur_strate,
             ennemis_naturels=prospection.ennemis_naturels,
-            pullulation_nb=prospection.pullulation_nb,
-            interdistance=prospection.interdistance,
-            taille_info=prospection.taille_info,
-            essaim_type=prospection.essaim_type,
-            essaim_vol_dir_de=prospection.essaim_vol_dir_de,
-            essaim_vol_dir_vers=prospection.essaim_vol_dir_vers,
-            essaim_pose=prospection.essaim_pose,
-            surface_contaminee=prospection.surface_contaminee,
             observations=prospection.observations,
             statut=prospection.statut,
             statut_sync=prospection.statut_sync,
@@ -164,6 +154,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         except IntegrityError:
             await self.session.rollback()
             raise StationNotFoundError("station_id ne référence pas une station fixe existante")
+        # Re-query with selectinload: refresh() ne charge pas les relations (MissingGreenlet)
         return await self.get_by_id(model.id)
 
     async def update(self, prospection: Prospection) -> Prospection:
@@ -188,21 +179,12 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         model.intensite_pluie = prospection.intensite_pluie
         model.vegetation = prospection.vegetation
         model.sol = prospection.sol
-        model.verdissement = prospection.verdissement
-        model.hauteur_strate = prospection.hauteur_strate
         model.ennemis_naturels = prospection.ennemis_naturels
-        model.pullulation_nb = prospection.pullulation_nb
-        model.interdistance = prospection.interdistance
-        model.taille_info = prospection.taille_info
-        model.essaim_type = prospection.essaim_type
-        model.essaim_vol_dir_de = prospection.essaim_vol_dir_de
-        model.essaim_vol_dir_vers = prospection.essaim_vol_dir_vers
-        model.essaim_pose = prospection.essaim_pose
-        model.surface_contaminee = prospection.surface_contaminee
         model.observations = prospection.observations
         model.statut = prospection.statut
         model.updated_at = prospection.updated_at
         await self.session.commit()
+        # Re-query with selectinload: refresh() ne charge pas les relations (MissingGreenlet)
         return await self.get_by_id(model.id)
 
     async def delete(self, prospection_id: uuid.UUID) -> bool:
@@ -235,17 +217,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             intensite_pluie=model.intensite_pluie,
             vegetation=model.vegetation,
             sol=model.sol,
-            verdissement=float(model.verdissement) if model.verdissement is not None else None,
-            hauteur_strate=float(model.hauteur_strate) if model.hauteur_strate is not None else None,
             ennemis_naturels=model.ennemis_naturels,
-            pullulation_nb=model.pullulation_nb,
-            interdistance=float(model.interdistance) if model.interdistance is not None else None,
-            taille_info=model.taille_info,
-            essaim_type=model.essaim_type,
-            essaim_vol_dir_de=model.essaim_vol_dir_de,
-            essaim_vol_dir_vers=model.essaim_vol_dir_vers,
-            essaim_pose=model.essaim_pose,
-            surface_contaminee=float(model.surface_contaminee) if model.surface_contaminee is not None else None,
             observations=model.observations,
             statut=model.statut,
             statut_sync=model.statut_sync,

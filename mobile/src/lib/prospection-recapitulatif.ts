@@ -5,8 +5,6 @@ import {
   completeProspection,
   listAllProspectionCaptures,
   markProspectionSynced,
-  PopulationRow,
-  InfestationRow,
 } from './prospection-repository';
 import {
   PHENOTYPES,
@@ -27,7 +25,6 @@ import {
   parseVegetationSol,
   totalRecouvrement,
 } from './prospection-vegetation';
-import { getDb } from './prospection-db';
 
 export interface RecapitulatifViewModel {
   nFiche: string;
@@ -46,7 +43,7 @@ export interface RecapitulatifViewModel {
   longitude: number | null;
 }
 
-/** Synthèse textuelle de la végétation/sol saisis */
+/** Synthèse textuelle de la végétation/sol saisis, dérivée des mêmes données que l'écran Végétation & sol. */
 export function buildVegetationSummary(state: VegetationSolState): string {
   const strateParts = STRATE_KEYS.filter((key) => state.strates[key].recouvrement > 0)
     .map((key) => `${STRATE_LABELS[key]} ${state.strates[key].recouvrement}%`)
@@ -64,7 +61,7 @@ export function buildVegetationSummary(state: VegetationSolState): string {
   return parts.join(' · ');
 }
 
-/** Construit le récapitulatif à partir des données déjà saisies */
+/** Construit le récapitulatif à partir des données déjà saisies aux écrans précédents (aucune resaisie). */
 export async function buildRecapitulatif(draft: DraftProspection): Promise<RecapitulatifViewModel> {
   const rows = await listAllProspectionCaptures(draft.id);
   const counts = parseCaptureRows(rows);
@@ -105,51 +102,10 @@ function buildCapturesPayload(rows: CaptureRow[]): ProspectionCaptureInput[] {
   }));
 }
 
-async function buildPopulationsPayload(prospectionId: string): Promise<any[]> {
-  const db = await getDb();
-  const rows = await db.getAllAsync<PopulationRow>(
-    'SELECT espece, categorie, densite_diffuse, densite_groupee, accouplement, ponte FROM prospection_population WHERE prospection_id = ?',
-    [prospectionId]
-  );
-  return rows.map(row => ({
-    espece: row.espece,
-    categorie: row.categorie,
-    densite_diffuse: row.densite_diffuse ?? undefined,
-    densite_groupee: row.densite_groupee ?? undefined,
-    accouplement: row.accouplement ?? undefined,
-    ponte: row.ponte ?? undefined,
-  }));
-}
-
-async function buildInfestationsPayload(prospectionId: string): Promise<any[]> {
-  const db = await getDb();
-  const row = await db.getFirstAsync<InfestationRow>(
-    `SELECT type_cible, taille_min, taille_max, taille_moy, surface_tot,
-            densite_min, densite_max, densite_moy, interdistance,
-            comportement, direction_vers, vent_de, vent_vitesse
-     FROM prospection_infestation WHERE prospection_id = ?`,
-    [prospectionId]
-  );
-  if (!row) return [];
-  return [{
-    type_cible: row.type_cible,
-    taille_min: row.taille_min ?? undefined,
-    taille_max: row.taille_max ?? undefined,
-    taille_moy: row.taille_moy ?? undefined,
-    surface_tot: row.surface_tot ?? undefined,
-    densite_min: row.densite_min ?? undefined,
-    densite_max: row.densite_max ?? undefined,
-    densite_moy: row.densite_moy ?? undefined,
-    interdistance: row.interdistance ?? undefined,
-    comportement: row.comportement ?? undefined,
-    direction_vers: row.direction_vers ?? undefined,
-    vent_de: row.vent_de ?? undefined,
-    vent_vitesse: row.vent_vitesse ?? undefined,
-  }];
-}
-
 /**
- * Enregistre la fiche hors-ligne puis tente une synchronisation vers l'API
+ * Enregistre la fiche hors-ligne (toujours, indépendamment du réseau) puis tente une
+ * synchronisation vers l'API. L'échec de synchronisation n'est jamais bloquant (offline-first,
+ * cf. ADR-002) : la fiche reste locale et « à synchroniser ».
  */
 export async function enregistrerEtSynchroniser(
   draft: DraftProspection,
@@ -157,76 +113,29 @@ export async function enregistrerEtSynchroniser(
 ): Promise<{ synced: boolean }> {
   const completed = await completeProspection(draft.id);
   const rows = await listAllProspectionCaptures(draft.id);
-  const populations = await buildPopulationsPayload(draft.id);
-  const infestations = await buildInfestationsPayload(draft.id);
-
-  // ✅ CORRECTION: Si le type est 'intensive' et qu'il n'y a pas de station_id,
-  // on le force en 'extensive'
-  let typeProspection = completed.type_prospection;
-  let stationId: string | null = completed.station_id ?? null;
-
-  if (typeProspection === 'intensive' && !stationId) {
-    console.warn('⚠️ Prospection intensive sans station, conversion en extensive');
-    typeProspection = 'extensive';
-    stationId = null;
-  }
-
-  // ✅ Construction du payload avec les bons types
-  const payload = {
-    type_prospection: typeProspection as 'intensive' | 'extensive' | 'validation',
-    campagne_id: completed.campagne_id,
-    station_id: stationId, // ✅ string | null, pas undefined
-    n_releve: null,
-    n_fiche: completed.n_fiche ?? null,
-    n_message: null,
-    date_prospection: completed.date_prospection,
-    latitude: completed.latitude ?? null,
-    longitude: completed.longitude ?? null,
-    altitude: completed.altitude ?? null,
-    biotope: completed.biotope ?? null,
-    surf_station: completed.surf_station ?? null,
-    surf_prospectee: completed.surf_prospectee ?? null,
-    surf_infestee: completed.surf_infestee ?? null,
-    degats_cultures: completed.degats_cultures ?? null,
-    derniere_pluie: completed.derniere_pluie ?? null,
-    intensite_pluie: completed.intensite_pluie ?? null,
-    vegetation: completed.vegetation ? JSON.parse(completed.vegetation) : null,
-    sol: completed.sol ? JSON.parse(completed.sol) : null,
-    verdissement: completed.verdissement ?? null,
-    hauteur_strate: completed.hauteur_strate ?? null,
-    ennemis_naturels: completed.ennemis_naturels ?? null,
-    pullulation_nb: completed.pullulation_nb ?? null,
-    interdistance: completed.interdistance ?? null,
-    taille_info: completed.taille_info ? JSON.parse(completed.taille_info) : null,
-    essaim_type: completed.essaim_type ?? null,
-    essaim_vol_dir_de: completed.essaim_vol_dir_de ?? null,
-    essaim_vol_dir_vers: completed.essaim_vol_dir_vers ?? null,
-    essaim_pose: completed.essaim_pose ?? null,
-    surface_contaminee: completed.surface_contaminee ?? null,
-    observations: completed.observations ?? null,
-    statut: 'en_attente',
-    populations: populations,
-    captures: buildCapturesPayload(rows),
-    infestations: infestations,
-  };
-
-  console.log('📤 === DONNÉES ENVOYÉES ===');
-  console.log('📌 Type (corrigé):', payload.type_prospection);
-  console.log('📌 Station:', payload.station_id);
-  console.log('📌 Populations:', payload.populations?.length || 0);
-  console.log('📌 Captures:', payload.captures?.length || 0);
-  console.log('📌 Infestations:', payload.infestations?.length || 0);
 
   try {
-    const result = await apiClient.createProspection(token, payload);
-    console.log('✅ Synchronisation réussie:', result);
+    await apiClient.createProspection(token, {
+      type_prospection: completed.type_prospection,
+      campagne_id: completed.campagne_id,
+      station_id: completed.station_id,
+      n_fiche: completed.n_fiche,
+      date_prospection: completed.date_prospection,
+      latitude: completed.latitude,
+      longitude: completed.longitude,
+      altitude: completed.altitude,
+      surf_station: completed.surf_station,
+      surf_prospectee: completed.surf_prospectee,
+      surf_infestee: completed.surf_infestee,
+      degats_cultures: completed.degats_cultures,
+      vegetation: completed.vegetation ? JSON.parse(completed.vegetation) : null,
+      sol: completed.sol ? JSON.parse(completed.sol) : null,
+      statut: completed.statut,
+      captures: buildCapturesPayload(rows),
+    });
     await markProspectionSynced(completed.id);
     return { synced: true };
-  } catch (error: any) {
-    console.error('❌ Erreur de synchronisation:', error);
-    if (error.response) {
-      console.error('📄 Réponse du serveur:', error.response.data);
-    }
+  } catch {
     return { synced: false };
   }
 }

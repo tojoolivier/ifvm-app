@@ -14,14 +14,23 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
 import { ThemedText } from '@/components/themed-text';
 import { useState, useCallback, useRef, useEffect } from 'react';
-import {
-  listRecentProspections,
-  countUnsyncedProspections,
-  getProspection,
-  DraftProspection,
-} from '@/lib/prospection-repository';
+import { 
+  getProspectionsByUser, 
+  getNotifications, 
+  getUnreadNotifications,
+  getStatsByStatus,
+  checkPendingSyncNotifications,
+  shouldCheckSync,
+  updateLastSyncCheck,
+  getPendingSyncCount,
+  addNotification,
+} from '@/lib/storage';
 import * as Network from 'expo-network';
 import * as Location from 'expo-location';
+
+// ============================================
+// CONSTANTES - PALETTE CLAIRE
+// ============================================
 
 const IFVM_GREEN = '#1B5E1B';
 const IFVM_GREEN_LIGHT = '#4CAF50';
@@ -46,26 +55,34 @@ const isTablet = width >= 768;
 // Configuration des statuts
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: string; bgColor: string }> = {
   brouillon: { label: 'Brouillon', color: '#9E9E9E', icon: '📝', bgColor: '#F5F5F5' },
-  en_attente: { label: 'En attente', color: IFVM_ORANGE, icon: '📤', bgColor: IFVM_ORANGE_BG },
-  verifiee: { label: 'Vérifiée', color: IFVM_BLUE, icon: '✅', bgColor: IFVM_BLUE_BG },
-  rejetee: { label: 'Rejetée', color: IFVM_RED, icon: '❌', bgColor: IFVM_RED_BG },
-  validee: { label: 'Validée', color: IFVM_GREEN_LIGHT, icon: '🏆', bgColor: IFVM_GREEN_BG },
+  envoye: { label: 'Envoyé', color: IFVM_ORANGE, icon: '📤', bgColor: IFVM_ORANGE_BG },
+  verifie: { label: 'Vérifié', color: IFVM_BLUE, icon: '✅', bgColor: IFVM_BLUE_BG },
+  rejete: { label: 'Rejeté', color: IFVM_RED, icon: '❌', bgColor: IFVM_RED_BG },
+  valide: { label: 'Validé', color: IFVM_GREEN_LIGHT, icon: '🏆', bgColor: IFVM_GREEN_BG },
 };
+
+// ============================================
+// COMPOSANT PRINCIPAL
+// ============================================
 
 export default function DashboardScreen() {
   const user = useAuthStore((s) => s.user);
   const router = useRouter();
   
-  const [prospections, setProspections] = useState<DraftProspection[]>([]);
+  const [prospections, setProspections] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [stats, setStats] = useState<Record<string, number>>({});
   const [refreshing, setRefreshing] = useState(false);
   const [position, setPosition] = useState<{ latitude: number; longitude: number } | null>(null);
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [showSyncBanner, setShowSyncBanner] = useState(false);
-  const [isConnected, setIsConnected] = useState<boolean>(true); // ✅ Initialisé à true
   
+  // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
+
+  // Référence pour le timer de vérification
   const syncCheckInterval = useRef<NodeJS.Timeout | null>(null);
 
   // Récupérer la position
@@ -101,34 +118,58 @@ export default function DashboardScreen() {
   // Vérifier la connectivité et la synchronisation
   const checkSyncStatus = async () => {
     try {
+      // Vérifier la connexion réseau
       const networkState = await Network.getNetworkStateAsync();
-      // ✅ Correction: utiliser ?? pour gérer undefined
-      const connected = networkState.isConnected ?? false;
-      const reachable = networkState.isInternetReachable ?? false;
-      const isNetworkAvailable = connected && reachable;
+      const isConnected = networkState.isConnected && networkState.isInternetReachable;
       
-      setIsConnected(isNetworkAvailable);
-      
-      const pendingCount = await countUnsyncedProspections();
-      setPendingSyncCount(pendingCount);
-      setShowSyncBanner(pendingCount > 0 && isNetworkAvailable);
+      if (isConnected) {
+        // Si connecté, vérifier les fiches en attente
+        const pendingCount = await getPendingSyncCount();
+        setPendingSyncCount(pendingCount);
+        setShowSyncBanner(pendingCount > 0);
+        
+        if (pendingCount > 0) {
+          // Ajouter une notification de synchronisation disponible
+          await addNotification({
+            ficheId: 'sync_available',
+            type: 'sync_available',
+            message: `📶 ${pendingCount} fiche(s) en attente de synchronisation. Une connexion Internet est disponible.`,
+            status: 'sync_available',
+          });
+        }
+      } else {
+        // Si pas connecté, vérifier les fiches en attente depuis plus de 3 jours
+        const shouldCheck = await shouldCheckSync();
+        if (shouldCheck) {
+          const pendingFiches = await checkPendingSyncNotifications();
+          setPendingSyncCount(pendingFiches.length);
+          setShowSyncBanner(pendingFiches.length > 0);
+          await updateLastSyncCheck();
+        }
+      }
     } catch (error) {
       console.error('Erreur vérification sync:', error);
-      setIsConnected(false);
-      setShowSyncBanner(false);
     }
   };
 
+  // Effet pour vérifier la sync au chargement et périodiquement
   useEffect(() => {
+    // Vérification initiale
     checkSyncStatus();
-    syncCheckInterval.current = setInterval(checkSyncStatus, 30 * 60 * 1000);
 
+    // Vérification toutes les 30 minutes
+    syncCheckInterval.current = setInterval(() => {
+      checkSyncStatus();
+    }, 30 * 60 * 1000);
+
+    // Écouter les changements d'état de l'application
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState === 'active') {
         checkSyncStatus();
       }
     });
 
+    // Nettoyage
     return () => {
       if (syncCheckInterval.current) {
         clearInterval(syncCheckInterval.current);
@@ -139,24 +180,23 @@ export default function DashboardScreen() {
 
   // Charger les données
   const loadData = async () => {
+    if (!user?.id) return;
+    
     try {
-      const [fiches, pendingCount] = await Promise.all([
-        listRecentProspections(50),
-        countUnsyncedProspections(),
+      const [fiches, notifs, unread, statsData, pendingCount] = await Promise.all([
+        getProspectionsByUser(user.id),
+        getNotifications(),
+        getUnreadNotifications(),
+        getStatsByStatus(user.id),
+        getPendingSyncCount(),
       ]);
       
       setProspections(fiches);
-      setPendingSyncCount(pendingCount);
-      setShowSyncBanner(pendingCount > 0 && isConnected);
-
-      // Calculer les statistiques par statut
-      const statsData: Record<string, number> = {};
-      fiches.forEach((f: DraftProspection) => {
-        const statut = f.statut || 'brouillon';
-        statsData[statut] = (statsData[statut] || 0) + 1;
-      });
+      setNotifications(notifs);
+      setUnreadCount(unread.length);
       setStats(statsData);
-
+      setPendingSyncCount(pendingCount);
+      setShowSyncBanner(pendingCount > 0);
     } catch (error) {
       console.error('Erreur chargement données:', error);
     }
@@ -165,7 +205,7 @@ export default function DashboardScreen() {
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, [])
+    }, [user])
   );
 
   const onRefresh = async () => {
@@ -184,35 +224,19 @@ export default function DashboardScreen() {
     router.push(path as any);
   };
 
+  // Vérifier si des fiches ont changé de statut
+  const hasUpdates = notifications.some((n: any) => !n.lu);
+
+  // Statistiques totales
   const totalFiches = prospections.length;
   const statsList = [
     { key: 'total', emoji: '📋', value: totalFiches, label: 'Total', color: IFVM_BLUE, bgColor: IFVM_BLUE_BG },
     { key: 'brouillon', emoji: '📝', value: stats.brouillon || 0, label: 'Brouillons', color: '#9E9E9E', bgColor: '#F5F5F5' },
-    { key: 'en_attente', emoji: '📤', value: stats.en_attente || 0, label: 'En attente', color: IFVM_ORANGE, bgColor: IFVM_ORANGE_BG },
-    { key: 'verifiee', emoji: '✅', value: stats.verifiee || 0, label: 'Vérifiées', color: IFVM_BLUE, bgColor: IFVM_BLUE_BG },
-    { key: 'validee', emoji: '🏆', value: stats.validee || 0, label: 'Validées', color: IFVM_GREEN_LIGHT, bgColor: IFVM_GREEN_BG },
-    { key: 'rejetee', emoji: '❌', value: stats.rejetee || 0, label: 'Rejetées', color: IFVM_RED, bgColor: IFVM_RED_BG },
+    { key: 'envoye', emoji: '📤', value: stats.envoye || 0, label: 'Envoyés', color: IFVM_ORANGE, bgColor: IFVM_ORANGE_BG },
+    { key: 'verifie', emoji: '✅', value: stats.verifie || 0, label: 'Vérifiés', color: IFVM_BLUE, bgColor: IFVM_BLUE_BG },
+    { key: 'valide', emoji: '🏆', value: stats.valide || 0, label: 'Validés', color: IFVM_GREEN_LIGHT, bgColor: IFVM_GREEN_BG },
+    { key: 'rejete', emoji: '❌', value: stats.rejete || 0, label: 'Rejetés', color: IFVM_RED, bgColor: IFVM_RED_BG },
   ];
-
-  const getStatusConfig = (statut: string) => {
-    return STATUS_CONFIG[statut] || STATUS_CONFIG.brouillon;
-  };
-
-  const getProspectionType = (type: string) => {
-    if (type === 'intensive') return '📄 Intensive';
-    if (type === 'extensive') return '📄 Extensive';
-    if (type === 'validation') return '📄 Validation';
-    return '📄 Prospection';
-  };
-
-  const formatDate = (dateStr: string) => {
-    try {
-      const date = new Date(dateStr);
-      return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    } catch {
-      return dateStr;
-    }
-  };
 
   return (
     <View style={styles.root}>
@@ -232,14 +256,14 @@ export default function DashboardScreen() {
               </ThemedText>
             </View>
             <TouchableOpacity 
-              onPress={() => navigateTo('/(tabs)/sync')}
-              style={styles.syncButton}
+              onPress={() => navigateTo('/(tabs)/notifications')}
+              style={styles.notificationButton}
             >
-              <ThemedText style={styles.syncIcon}>🔄</ThemedText>
-              {pendingSyncCount > 0 && (
-                <View style={styles.syncBadge}>
-                  <ThemedText style={styles.syncBadgeText}>
-                    {pendingSyncCount > 9 ? '9+' : pendingSyncCount}
+              <ThemedText style={styles.notificationIcon}>🔔</ThemedText>
+              {unreadCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <ThemedText style={styles.notificationBadgeText}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
                   </ThemedText>
                 </View>
               )}
@@ -279,10 +303,8 @@ export default function DashboardScreen() {
             </View>
           </View>
           <View style={styles.welcomeFooter}>
-            <View style={[styles.statusDot, { backgroundColor: isConnected ? IFVM_GREEN_LIGHT : IFVM_RED }]} />
-            <ThemedText style={styles.statusText}>
-              {isConnected ? 'Connecté' : 'Hors-ligne'}
-            </ThemedText>
+            <View style={styles.statusDot} />
+            <ThemedText style={styles.statusText}>Connecté</ThemedText>
             {position && (
               <View style={styles.positionContainer}>
                 <ThemedText style={styles.positionIcon}>📍</ThemedText>
@@ -291,17 +313,17 @@ export default function DashboardScreen() {
                 </ThemedText>
               </View>
             )}
-            {pendingSyncCount > 0 && (
+            {hasUpdates && (
               <View style={styles.updateBadge}>
-                <ThemedText style={styles.updateBadgeText}>📤 {pendingSyncCount} à sync.</ThemedText>
+                <ThemedText style={styles.updateBadgeText}>🔄 Mises à jour</ThemedText>
               </View>
             )}
           </View>
         </Animated.View>
 
         {/* Bannière de synchronisation */}
-        {showSyncBanner && pendingSyncCount > 0 && (
-          <Animated.View style={[styles.syncBanner, { opacity: fadeAnim }]}>
+        {showSyncBanner && (
+          <Animated.View style={[styles.syncBanner, { opacity: fadeAnim, transform: [{ translateY: Animated.multiply(slideAnim, new Animated.Value(0.7)) }] }]}>
             <View style={styles.syncBannerContent}>
               <View style={styles.syncBannerIcon}>
                 <ThemedText style={styles.syncBannerIconText}>📡</ThemedText>
@@ -311,7 +333,7 @@ export default function DashboardScreen() {
                   {pendingSyncCount} fiche(s) en attente
                 </ThemedText>
                 <ThemedText style={styles.syncBannerSub}>
-                  Synchronisez vos fiches dès que possible
+                  {pendingSyncCount > 3 ? '⚠️ Certaines fiches attendent depuis plus de 3 jours' : 'Synchronisez vos fiches dès que possible'}
                 </ThemedText>
               </View>
               <TouchableOpacity 
@@ -325,22 +347,22 @@ export default function DashboardScreen() {
         )}
 
         {/* Statistiques */}
-        <Animated.View style={[styles.statsGrid, { opacity: fadeAnim }]}>
+        <Animated.View style={[styles.statsGrid, { opacity: fadeAnim, transform: [{ translateY: Animated.multiply(slideAnim, new Animated.Value(0.5)) }] }]}>
           {statsList.map((stat, index) => (
-            <View 
+            <StatCard 
               key={index}
-              style={[styles.statCard, { backgroundColor: stat.bgColor }]}
-            >
-              <ThemedText style={styles.statEmoji}>{stat.emoji}</ThemedText>
-              <ThemedText style={[styles.statValue, { color: stat.color }]}>{stat.value}</ThemedText>
-              <ThemedText style={[styles.statLabel, { color: TEXT_BLACK }]}>{stat.label}</ThemedText>
-            </View>
+              emoji={stat.emoji}
+              value={stat.value}
+              label={stat.label}
+              color={stat.color}
+              bgColor={stat.bgColor}
+            />
           ))}
         </Animated.View>
 
         {/* Dernières fiches */}
         {prospections.length > 0 && (
-          <Animated.View style={[styles.recentSection, { opacity: fadeAnim }]}>
+          <Animated.View style={[styles.recentSection, { opacity: fadeAnim, transform: [{ translateY: Animated.multiply(slideAnim, new Animated.Value(0.1)) }] }]}>
             <View style={styles.sectionHeader}>
               <ThemedText style={styles.sectionTitle}>📋 Mes fiches</ThemedText>
               <TouchableOpacity onPress={() => navigateTo('/(tabs)/fiches')}>
@@ -348,35 +370,33 @@ export default function DashboardScreen() {
               </TouchableOpacity>
             </View>
             {prospections.slice(0, 5).map((fiche, index) => {
-              const statusConfig = getStatusConfig(fiche.statut);
+              const status = fiche.status || 'brouillon';
+              const statusConfig = STATUS_CONFIG[status];
               return (
                 <TouchableOpacity
-                  key={fiche.id}
+                  key={index}
                   style={[styles.ficheCard, index === Math.min(4, prospections.length - 1) && styles.ficheCardLast]}
-                  onPress={() => router.push({ 
-                    pathname: '/(prospection)/reference',
-                    params: { draftId: fiche.id }
-                  } as any)}
+                  onPress={() => router.push({ pathname: '/(tabs)/fiches/[id]', params: { id: fiche.id } } as any)}
                   activeOpacity={0.7}
                 >
                   <View style={styles.ficheCardLeft}>
                     <View style={[styles.ficheStatus, { backgroundColor: statusConfig.color }]} />
                     <View>
                       <ThemedText style={styles.ficheTitle}>
-                        {getProspectionType(fiche.type_prospection)}
+                        {fiche.type === 'cdv' ? '📄 CdV' : '🦗 IFVM'}
                       </ThemedText>
                       <ThemedText style={styles.ficheSub}>
-                        {fiche.station_id || '📍 Station non spécifiée'}
+                        {fiche.station || 'Station non spécifiée'}
                       </ThemedText>
                     </View>
                   </View>
                   <View style={styles.ficheCardRight}>
-                    <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
+                    <View style={[styles.statusBadge, { backgroundColor: statusConfig.color + '15' }]}>
                       <ThemedText style={[styles.statusBadgeText, { color: statusConfig.color }]}>
                         {statusConfig.icon} {statusConfig.label}
                       </ThemedText>
                     </View>
-                    <ThemedText style={styles.ficheDate}>{formatDate(fiche.date_prospection)}</ThemedText>
+                    <ThemedText style={styles.ficheDate}>{fiche.date}</ThemedText>
                   </View>
                 </TouchableOpacity>
               );
@@ -399,9 +419,7 @@ export default function DashboardScreen() {
             onPress={() => navigateTo('/(tabs)/sync')}
             activeOpacity={0.85}
           >
-            <ThemedText style={styles.btnSecondaryText}>
-              {pendingSyncCount > 0 ? `🔄 Synchroniser (${pendingSyncCount})` : '✅ Tout est synchronisé'}
-            </ThemedText>
+            <ThemedText style={styles.btnSecondaryText}>🔄 Synchroniser mes données</ThemedText>
           </TouchableOpacity>
         </Animated.View>
 
@@ -413,6 +431,30 @@ export default function DashboardScreen() {
     </View>
   );
 }
+
+// ============================================
+// COMPOSANTS ENFANTS
+// ============================================
+
+function StatCard({ emoji, value, label, color, bgColor }: { 
+  emoji: string; 
+  value: number; 
+  label: string; 
+  color: string;
+  bgColor: string;
+}) {
+  return (
+    <View style={[styles.statCard, { backgroundColor: bgColor }]}>
+      <ThemedText style={styles.statEmoji}>{emoji}</ThemedText>
+      <ThemedText style={[styles.statValue, { color }]}>{value}</ThemedText>
+      <ThemedText style={[styles.statLabel, { color: TEXT_BLACK }]}>{label}</ThemedText>
+    </View>
+  );
+}
+
+// ============================================
+// STYLES - FOND CLAIR AVEC TEXTES NOIRS
+// ============================================
 
 const styles = StyleSheet.create({
   root: {
@@ -465,16 +507,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 1,
   },
-  syncButton: {
+  notificationButton: {
     position: 'relative',
     padding: 8,
     backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: 20,
   },
-  syncIcon: {
-    fontSize: 20,
+  notificationIcon: {
+    fontSize: 22,
   },
-  syncBadge: {
+  notificationBadge: {
     position: 'absolute',
     top: -2,
     right: -2,
@@ -488,7 +530,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: HEADER_BG,
   },
-  syncBadgeText: {
+  notificationBadgeText: {
     color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '700',
@@ -573,6 +615,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
+    backgroundColor: IFVM_GREEN_LIGHT,
     marginRight: 6,
   },
   statusText: {

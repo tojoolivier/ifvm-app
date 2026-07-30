@@ -38,17 +38,7 @@ class CreateProspection:
         intensite_pluie: str | None = None,
         vegetation: dict[str, Any] | None = None,
         sol: dict[str, Any] | None = None,
-        verdissement: float | None = None,
-        hauteur_strate: float | None = None,
         ennemis_naturels: str | None = None,
-        pullulation_nb: int | None = None,
-        interdistance: float | None = None,
-        taille_info: dict[str, float] | None = None,
-        essaim_type: str | None = None,
-        essaim_vol_dir_de: str | None = None,
-        essaim_vol_dir_vers: str | None = None,
-        essaim_pose: bool | None = None,
-        surface_contaminee: float | None = None,
         observations: str | None = None,
         statut: str = "brouillon",
         populations: list[ProspectionPopulation] | None = None,
@@ -80,17 +70,7 @@ class CreateProspection:
             intensite_pluie=intensite_pluie,
             vegetation=vegetation,
             sol=sol,
-            verdissement=verdissement,
-            hauteur_strate=hauteur_strate,
             ennemis_naturels=ennemis_naturels,
-            pullulation_nb=pullulation_nb,
-            interdistance=interdistance,
-            taille_info=taille_info,
-            essaim_type=essaim_type,
-            essaim_vol_dir_de=essaim_vol_dir_de,
-            essaim_vol_dir_vers=essaim_vol_dir_vers,
-            essaim_pose=essaim_pose,
-            surface_contaminee=surface_contaminee,
             observations=observations,
             statut=statut,
             created_at=now,
@@ -161,17 +141,7 @@ class UpdateProspection:
         intensite_pluie: str | None = None,
         vegetation: dict[str, Any] | None = None,
         sol: dict[str, Any] | None = None,
-        verdissement: float | None = None,
-        hauteur_strate: float | None = None,
         ennemis_naturels: str | None = None,
-        pullulation_nb: int | None = None,
-        interdistance: float | None = None,
-        taille_info: dict[str, float] | None = None,
-        essaim_type: str | None = None,
-        essaim_vol_dir_de: str | None = None,
-        essaim_vol_dir_vers: str | None = None,
-        essaim_pose: bool | None = None,
-        surface_contaminee: float | None = None,
         observations: str | None = None,
         statut: str | None = None,
     ) -> Prospection | None:
@@ -215,28 +185,8 @@ class UpdateProspection:
             prospection.vegetation = vegetation
         if sol is not None:
             prospection.sol = sol
-        if verdissement is not None:
-            prospection.verdissement = verdissement
-        if hauteur_strate is not None:
-            prospection.hauteur_strate = hauteur_strate
         if ennemis_naturels is not None:
             prospection.ennemis_naturels = ennemis_naturels
-        if pullulation_nb is not None:
-            prospection.pullulation_nb = pullulation_nb
-        if interdistance is not None:
-            prospection.interdistance = interdistance
-        if taille_info is not None:
-            prospection.taille_info = taille_info
-        if essaim_type is not None:
-            prospection.essaim_type = essaim_type
-        if essaim_vol_dir_de is not None:
-            prospection.essaim_vol_dir_de = essaim_vol_dir_de
-        if essaim_vol_dir_vers is not None:
-            prospection.essaim_vol_dir_vers = essaim_vol_dir_vers
-        if essaim_pose is not None:
-            prospection.essaim_pose = essaim_pose
-        if surface_contaminee is not None:
-            prospection.surface_contaminee = surface_contaminee
         if observations is not None:
             prospection.observations = observations
         if statut is not None:
