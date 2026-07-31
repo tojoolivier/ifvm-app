@@ -70,19 +70,48 @@ export interface InfestationSyntheseViewModel {
   typeLabel: string;
   surfaceTot: number | null;
   comportementLabel: string;
+  pullulationNb: number | null;
+  tailleEssaim: string;
+  typeEssaim: string | null;
+  typeLarve: string | null;
+  surfaceContamineeHa: number | null;
+  surfInfesteePourcent: number | null;
 }
 
 /** Bandeau niveau d'infestation : type de cible, surface, comportement — dérivé de la ligne prospection_infestation. */
 export function buildInfestationSynthese(infestations: InfestationRead[]): InfestationSyntheseViewModel {
   const infestation = infestations[0];
   if (!infestation) {
-    return { hasInfestation: false, typeLabel: '—', surfaceTot: null, comportementLabel: '—' };
+    return {
+      hasInfestation: false,
+      typeLabel: '—',
+      surfaceTot: null,
+      comportementLabel: '—',
+      pullulationNb: null,
+      tailleEssaim: '—',
+      typeEssaim: null,
+      typeLarve: null,
+      surfaceContamineeHa: null,
+      surfInfesteePourcent: null,
+    };
   }
+
+  const tailleParts: string[] = [];
+  if (infestation.taille_long) tailleParts.push(`L:${infestation.taille_long}m`);
+  if (infestation.taille_large) tailleParts.push(`l:${infestation.taille_large}m`);
+  if (infestation.taille_epaisseur) tailleParts.push(`E:${infestation.taille_epaisseur}m`);
+
   return {
     hasInfestation: true,
     typeLabel: TYPE_CIBLE_OPTIONS.find((o) => o.value === infestation.type_cible)?.label ?? infestation.type_cible,
     surfaceTot: infestation.surface_tot,
     comportementLabel: infestation.comportement === 'deplacement' ? 'Déplacement' : infestation.comportement === 'repos' ? 'Repos' : '—',
+    pullulationNb: infestation.pullulation_nb,
+    tailleEssaim: tailleParts.length > 0 ? tailleParts.join(' ') : '—',
+    typeEssaim: infestation.type_essaim,
+    typeLarve: infestation.type_larve,
+    surfaceContamineeHa: infestation.surface_contaminee_ha,
+    surfInfesteePourcent: infestation.surf_infestee_pourcent,
   };
 }
 
@@ -94,6 +123,14 @@ export interface FicheLectureViewModel {
   especes: EspeceSyntheseViewModel[];
   infestation: InfestationSyntheseViewModel;
   vegetationSummary: string;
+  region: string | null;
+  district: string | null;
+  commune: string | null;
+  za: string | null;
+  pa_code: string | null;
+  degatsCulturesPourcent: number | null;
+  verdissementPourcent: number | null;
+  hauteurHerbeCm: number | null;
 }
 
 /** Construit la vue de la Fiche de lecture (#16) à partir de la fiche telle que renvoyée par l'API — aucune resaisie. */
@@ -109,9 +146,20 @@ export function buildFicheLecture(prospection: ProspectionRead): FicheLectureVie
       parseVegetationSol(
         prospection.vegetation ? JSON.stringify(prospection.vegetation) : null,
         prospection.sol ? JSON.stringify(prospection.sol) : null,
-        prospection.degats_cultures
+        prospection.degats_cultures,
+        prospection.degats_cultures_pourcent,
+        prospection.verdissement_pourcent,
+        prospection.hauteur_herbe_cm
       )
     ),
+    region: prospection.region,
+    district: prospection.district,
+    commune: prospection.commune,
+    za: prospection.za,
+    pa_code: prospection.pa_code,
+    degatsCulturesPourcent: prospection.degats_cultures_pourcent,
+    verdissementPourcent: prospection.verdissement_pourcent,
+    hauteurHerbeCm: prospection.hauteur_herbe_cm,
   };
 }
 

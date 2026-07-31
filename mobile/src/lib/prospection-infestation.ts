@@ -6,6 +6,10 @@ import {
 
 export type TypeCible = 'tache_larvaire' | 'bande_larvaire' | 'vol_clair' | 'essaim';
 
+export type TypeEssaim = 'vol_clair' | 'dense' | 'tres_dense';
+
+export type TypeLarve = 'tache_larvaire' | 'bande_larvaire';
+
 export const TYPE_CIBLE_OPTIONS: { value: TypeCible; label: string }[] = [
   { value: 'tache_larvaire', label: 'Tache larvaire' },
   { value: 'bande_larvaire', label: 'Bande larvaire' },
@@ -43,6 +47,18 @@ export interface InfestationDescriptionState {
   densiteMax: string;
   densiteMoy: string;
   interdistance: string;
+  pullulationNb: string;
+  tailleLong: string;
+  tailleLarge: string;
+  tailleEpaisseur: string;
+  essaimEnVol: boolean | null;
+  essaimPose: boolean | null;
+  typeEssaim: TypeEssaim | null;
+  nbTachesBandes: string;
+  interdistanceM: string;
+  surfaceContamineeHa: string;
+  typeLarve: TypeLarve | null;
+  surfInfesteePourcent: string;
 }
 
 export const EMPTY_INFESTATION_DESCRIPTION: InfestationDescriptionState = {
@@ -55,6 +71,18 @@ export const EMPTY_INFESTATION_DESCRIPTION: InfestationDescriptionState = {
   densiteMax: '',
   densiteMoy: '',
   interdistance: '',
+  pullulationNb: '',
+  tailleLong: '',
+  tailleLarge: '',
+  tailleEpaisseur: '',
+  essaimEnVol: null,
+  essaimPose: null,
+  typeEssaim: null,
+  nbTachesBandes: '',
+  interdistanceM: '',
+  surfaceContamineeHa: '',
+  typeLarve: null,
+  surfInfesteePourcent: '',
 };
 
 export interface InfestationComportementState {
@@ -81,7 +109,6 @@ function toDisplayValue(value: number | null): string {
   return value != null ? String(value) : '';
 }
 
-/** Relit la description d'infestation déjà saisie (ligne `prospection_infestation`), état vide si absente. */
 export function parseInfestationDescription(row: InfestationRow | null): InfestationDescriptionState {
   if (!row) return EMPTY_INFESTATION_DESCRIPTION;
   return {
@@ -94,10 +121,21 @@ export function parseInfestationDescription(row: InfestationRow | null): Infesta
     densiteMax: toDisplayValue(row.densite_max),
     densiteMoy: toDisplayValue(row.densite_moy),
     interdistance: toDisplayValue(row.interdistance),
+    pullulationNb: toDisplayValue(row.pullulation_nb),
+    tailleLong: toDisplayValue(row.taille_long),
+    tailleLarge: toDisplayValue(row.taille_large),
+    tailleEpaisseur: toDisplayValue(row.taille_epaisseur),
+    essaimEnVol: row.essaim_en_vol ?? null,
+    essaimPose: row.essaim_pose ?? null,
+    typeEssaim: (row.type_essaim as TypeEssaim) ?? null,
+    nbTachesBandes: toDisplayValue(row.nb_taches_bandes),
+    interdistanceM: toDisplayValue(row.interdistance_m),
+    surfaceContamineeHa: toDisplayValue(row.surface_contaminee_ha),
+    typeLarve: (row.type_larve as TypeLarve) ?? null,
+    surfInfesteePourcent: toDisplayValue(row.surf_infestee_pourcent),
   };
 }
 
-/** Relit le comportement d'infestation déjà saisi (ligne `prospection_infestation`), état vide si absent. */
 export function parseInfestationComportement(row: InfestationRow | null): InfestationComportementState {
   if (!row) return EMPTY_INFESTATION_COMPORTEMENT;
   return {
@@ -112,7 +150,6 @@ export function isInfestationDescriptionComplete(state: InfestationDescriptionSt
   return state.typeCible != null;
 }
 
-/** Persiste la description d'infestation, en préservant le comportement déjà saisi (écran suivant). */
 export async function saveInfestationDescription(
   prospectionId: string,
   state: InfestationDescriptionState
@@ -129,13 +166,25 @@ export async function saveInfestationDescription(
     densite_moy: toNumberOrNull(state.densiteMoy),
     interdistance: toNumberOrNull(state.interdistance),
     comportement: existing?.comportement ?? null,
+    direction_de: existing?.direction_de ?? null,
     direction_vers: existing?.direction_vers ?? null,
     vent_de: existing?.vent_de ?? null,
     vent_vitesse: existing?.vent_vitesse ?? null,
+    pullulation_nb: toNumberOrNull(state.pullulationNb),
+    taille_long: toNumberOrNull(state.tailleLong),
+    taille_large: toNumberOrNull(state.tailleLarge),
+    taille_epaisseur: toNumberOrNull(state.tailleEpaisseur),
+    essaim_en_vol: state.essaimEnVol ?? null,
+    essaim_pose: state.essaimPose ?? null,
+    type_essaim: state.typeEssaim ?? null,
+    nb_taches_bandes: toNumberOrNull(state.nbTachesBandes),
+    interdistance_m: toNumberOrNull(state.interdistanceM),
+    surface_contaminee_ha: toNumberOrNull(state.surfaceContamineeHa),
+    type_larve: state.typeLarve ?? null,
+    surf_infestee_pourcent: toNumberOrNull(state.surfInfesteePourcent),
   });
 }
 
-/** Persiste le comportement d'infestation, en préservant la description déjà saisie. */
 export async function saveInfestationComportement(
   prospectionId: string,
   state: InfestationComportementState
@@ -152,8 +201,21 @@ export async function saveInfestationComportement(
     densite_moy: existing?.densite_moy ?? null,
     interdistance: existing?.interdistance ?? null,
     comportement: state.comportement,
+    direction_de: existing?.direction_de ?? null,
     direction_vers: state.directionVers,
     vent_de: state.ventDe,
     vent_vitesse: toNumberOrNull(state.ventVitesse),
+    pullulation_nb: existing?.pullulation_nb ?? null,
+    taille_long: existing?.taille_long ?? null,
+    taille_large: existing?.taille_large ?? null,
+    taille_epaisseur: existing?.taille_epaisseur ?? null,
+    essaim_en_vol: existing?.essaim_en_vol ?? null,
+    essaim_pose: existing?.essaim_pose ?? null,
+    type_essaim: existing?.type_essaim ?? null,
+    nb_taches_bandes: existing?.nb_taches_bandes ?? null,
+    interdistance_m: existing?.interdistance_m ?? null,
+    surface_contaminee_ha: existing?.surface_contaminee_ha ?? null,
+    type_larve: existing?.type_larve ?? null,
+    surf_infestee_pourcent: existing?.surf_infestee_pourcent ?? null,
   });
 }

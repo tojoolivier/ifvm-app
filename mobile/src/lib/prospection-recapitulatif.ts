@@ -41,9 +41,16 @@ export interface RecapitulatifViewModel {
   surfInfestee: number | null;
   latitude: number | null;
   longitude: number | null;
+  region: string | null;
+  district: string | null;
+  commune: string | null;
+  za: string | null;
+  pa_code: string | null;
+  degats_cultures_pourcent: number | null;
+  verdissement_pourcent: number | null;
+  hauteur_herbe_cm: number | null;
 }
 
-/** Synthèse textuelle de la végétation/sol saisis, dérivée des mêmes données que l'écran Végétation & sol. */
 export function buildVegetationSummary(state: VegetationSolState): string {
   const strateParts = STRATE_KEYS.filter((key) => state.strates[key].recouvrement > 0)
     .map((key) => `${STRATE_LABELS[key]} ${state.strates[key].recouvrement}%`)
@@ -61,12 +68,18 @@ export function buildVegetationSummary(state: VegetationSolState): string {
   return parts.join(' · ');
 }
 
-/** Construit le récapitulatif à partir des données déjà saisies aux écrans précédents (aucune resaisie). */
 export async function buildRecapitulatif(draft: DraftProspection): Promise<RecapitulatifViewModel> {
   const rows = await listAllProspectionCaptures(draft.id);
   const counts = parseCaptureRows(rows);
   const dominant = dominantPhenotype(counts);
-  const vegState = parseVegetationSol(draft.vegetation, draft.sol, draft.degats_cultures);
+  const vegState = parseVegetationSol(
+    draft.vegetation,
+    draft.sol,
+    draft.degats_cultures,
+    draft.degats_cultures_pourcent,
+    draft.verdissement_pourcent,
+    draft.hauteur_herbe_cm
+  );
 
   return {
     nFiche: draft.n_fiche ?? '—',
@@ -83,6 +96,14 @@ export async function buildRecapitulatif(draft: DraftProspection): Promise<Recap
     surfInfestee: draft.surf_infestee,
     latitude: draft.latitude,
     longitude: draft.longitude,
+    region: draft.region ?? null,
+    district: draft.district ?? null,
+    commune: draft.commune ?? null,
+    za: draft.za ?? null,
+    pa_code: draft.pa_code ?? null,
+    degats_cultures_pourcent: draft.degats_cultures_pourcent ?? null,
+    verdissement_pourcent: draft.verdissement_pourcent ?? null,
+    hauteur_herbe_cm: draft.hauteur_herbe_cm ?? null,
   };
 }
 
@@ -102,11 +123,6 @@ function buildCapturesPayload(rows: CaptureRow[]): ProspectionCaptureInput[] {
   }));
 }
 
-/**
- * Enregistre la fiche hors-ligne (toujours, indépendamment du réseau) puis tente une
- * synchronisation vers l'API. L'échec de synchronisation n'est jamais bloquant (offline-first,
- * cf. ADR-002) : la fiche reste locale et « à synchroniser ».
- */
 export async function enregistrerEtSynchroniser(
   draft: DraftProspection,
   token: string
@@ -132,6 +148,14 @@ export async function enregistrerEtSynchroniser(
       sol: completed.sol ? JSON.parse(completed.sol) : null,
       statut: completed.statut,
       captures: buildCapturesPayload(rows),
+      region: completed.region,
+      district: completed.district,
+      commune: completed.commune,
+      za: completed.za,
+      pa_code: completed.pa_code,
+      degats_cultures_pourcent: completed.degats_cultures_pourcent,
+      verdissement_pourcent: completed.verdissement_pourcent,
+      hauteur_herbe_cm: completed.hauteur_herbe_cm,
     });
     await markProspectionSynced(completed.id);
     return { synced: true };

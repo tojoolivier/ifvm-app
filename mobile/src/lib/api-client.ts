@@ -63,6 +63,15 @@ export interface ProspectionCreateInput {
   sol?: Record<string, unknown> | null;
   statut?: string;
   captures?: ProspectionCaptureInput[];
+  // ========== NOUVEAUX CHAMPS ==========
+  region?: string | null;
+  district?: string | null;
+  commune?: string | null;
+  za?: string | null;
+  pa_code?: string | null;
+  degats_cultures_pourcent?: number | null;
+  verdissement_pourcent?: number | null;
+  hauteur_herbe_cm?: number | null;
 }
 
 export interface ProspectionCreateResponse {
@@ -108,6 +117,19 @@ export interface InfestationRead {
   direction_vers: string | null;
   vent_de: string | null;
   vent_vitesse: number | null;
+  // ========== NOUVEAUX CHAMPS ==========
+  pullulation_nb: number | null;
+  taille_long: number | null;
+  taille_large: number | null;
+  taille_epaisseur: number | null;
+  essaim_en_vol: boolean | null;
+  essaim_pose: boolean | null;
+  type_essaim: string | null;
+  nb_taches_bandes: number | null;
+  interdistance_m: number | null;
+  surface_contaminee_ha: number | null;
+  type_larve: string | null;
+  surf_infestee_pourcent: number | null;
 }
 
 export interface ProspectionRead {
@@ -141,6 +163,15 @@ export interface ProspectionRead {
   populations: PopulationRead[];
   captures: CaptureRead[];
   infestations: InfestationRead[];
+  // ========== NOUVEAUX CHAMPS ==========
+  region: string | null;
+  district: string | null;
+  commune: string | null;
+  za: string | null;
+  pa_code: string | null;
+  degats_cultures_pourcent: number | null;
+  verdissement_pourcent: number | null;
+  hauteur_herbe_cm: number | null;
 }
 
 export interface ListProspectionsParams {
@@ -154,7 +185,6 @@ const getBaseUrl = (): string => {
   return process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 };
 
-// Constante pour l'URL de base (utilisée pour changePassword)
 const API_URL = getBaseUrl();
 
 const makeRequest = async <T>(
@@ -254,9 +284,6 @@ export const apiClient = {
     return makeRequest<ProspectionRead>(`/prospections/${id}`, { method: 'GET' }, token, onUnauthorized);
   },
 
-  // ============================================
-  // CHANGEMENT DE MOT DE PASSE
-  // ============================================
   changePassword: async (
     data: { currentPassword: string; newPassword: string },
     token: string | null

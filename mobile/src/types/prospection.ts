@@ -37,10 +37,15 @@ export interface IFVMData {
     longitudeE: string;
     typeStation: string;
     surface: string;
+    region: string;
+    district: string;
+    commune: string;
+    za: string;
   };
   images: {
     captures: {
       a1: string; a2: string; a3: string; a4: string; a5: string;
+      a1b: string; a2b: string; a5b: string;
     };
     sol: {
       nbreSol: string;
@@ -70,7 +75,7 @@ export interface IFVMData {
   };
   larves: {
     captures: {
-      l1: string; l2: string; l3: string; l4: string; l5: string; l6: string;
+      l1: string; l2: string; l3: string; l4: string; l5: string; l6: string; l7: string;
     };
     population: {
       diffDHa: string;
