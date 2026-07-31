@@ -249,7 +249,7 @@ describe('updateProspectionVegetation', () => {
     await updateProspectionVegetation(BASE_INPUT.id, VEGETATION_INPUT);
 
     expect(runAsync).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE prospection SET vegetation'),
+      expect.stringContaining('UPDATE prospection SET'),
       expect.arrayContaining([
         VEGETATION_INPUT.vegetation,
         VEGETATION_INPUT.sol,
@@ -493,9 +493,22 @@ describe('saveProspectionInfestation', () => {
     densite_moy: 2,
     interdistance: 1,
     comportement: 'repos',
+    direction_de: null,
     direction_vers: 'N',
     vent_de: 'S',
     vent_vitesse: 10,
+    pullulation_nb: null,
+    taille_long: null,
+    taille_large: null,
+    taille_epaisseur: null,
+    essaim_en_vol: null,
+    essaim_pose: null,
+    type_essaim: null,
+    nb_taches_bandes: null,
+    interdistance_m: null,
+    surface_contaminee_ha: null,
+    type_larve: null,
+    surf_infestee_pourcent: null,
   };
 
   it('inserts a new row when none exists for the prospection', async () => {
@@ -516,7 +529,12 @@ describe('saveProspectionInfestation', () => {
 
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE prospection_infestation SET'),
-      ['essaim', 1, 2, 1.5, 5, 1, 3, 2, 1, 'repos', 'N', 'S', 10, 'existing-id']
+      [
+        'essaim', 1, 2, 1.5, 5, 1, 3, 2, 1, 'repos',
+        null, 'N', 'S', 10,
+        null, null, null, null, null, null, null, null, null, null, null, null,
+        'existing-id',
+      ]
     );
   });
 });

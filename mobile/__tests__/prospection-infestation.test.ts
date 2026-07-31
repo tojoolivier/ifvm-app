@@ -37,9 +37,22 @@ const ROW: InfestationRow = {
   densite_moy: 10,
   interdistance: 4,
   comportement: 'deplacement',
+  direction_de: null,
   direction_vers: 'NE',
   vent_de: 'S',
   vent_vitesse: 15,
+  pullulation_nb: null,
+  taille_long: null,
+  taille_large: null,
+  taille_epaisseur: null,
+  essaim_en_vol: null,
+  essaim_pose: null,
+  type_essaim: null,
+  nb_taches_bandes: null,
+  interdistance_m: null,
+  surface_contaminee_ha: null,
+  type_larve: null,
+  surf_infestee_pourcent: null,
 };
 
 describe('TYPE_CIBLE_OPTIONS / COMPORTEMENT_OPTIONS / DIRECTION_OPTIONS', () => {
@@ -77,6 +90,18 @@ describe('parseInfestationDescription', () => {
       densiteMax: '20',
       densiteMoy: '10',
       interdistance: '4',
+      pullulationNb: '',
+      tailleLong: '',
+      tailleLarge: '',
+      tailleEpaisseur: '',
+      essaimEnVol: null,
+      essaimPose: null,
+      typeEssaim: null,
+      nbTachesBandes: '',
+      interdistanceM: '',
+      surfaceContamineeHa: '',
+      typeLarve: null,
+      surfInfesteePourcent: '',
     });
   });
 });
@@ -113,6 +138,7 @@ describe('saveInfestationDescription', () => {
     mockGetInfestation.mockResolvedValueOnce(ROW);
 
     await saveInfestationDescription('prospection-1', {
+      ...EMPTY_INFESTATION_DESCRIPTION,
       typeCible: 'essaim',
       tailleMin: '2',
       tailleMax: '6',
@@ -135,9 +161,22 @@ describe('saveInfestationDescription', () => {
       densite_moy: 20,
       interdistance: 2,
       comportement: 'deplacement',
+      direction_de: null,
       direction_vers: 'NE',
       vent_de: 'S',
       vent_vitesse: 15,
+      pullulation_nb: null,
+      taille_long: null,
+      taille_large: null,
+      taille_epaisseur: null,
+      essaim_en_vol: null,
+      essaim_pose: null,
+      type_essaim: null,
+      nb_taches_bandes: null,
+      interdistance_m: null,
+      surface_contaminee_ha: null,
+      type_larve: null,
+      surf_infestee_pourcent: null,
     });
   });
 
@@ -178,9 +217,22 @@ describe('saveInfestationComportement', () => {
       densite_moy: 10,
       interdistance: 4,
       comportement: 'repos',
+      direction_de: null,
       direction_vers: 'S',
       vent_de: 'N',
       vent_vitesse: 5,
+      pullulation_nb: null,
+      taille_long: null,
+      taille_large: null,
+      taille_epaisseur: null,
+      essaim_en_vol: null,
+      essaim_pose: null,
+      type_essaim: null,
+      nb_taches_bandes: null,
+      interdistance_m: null,
+      surface_contaminee_ha: null,
+      type_larve: null,
+      surf_infestee_pourcent: null,
     });
   });
 });

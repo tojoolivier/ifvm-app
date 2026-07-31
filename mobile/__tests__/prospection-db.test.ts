@@ -1,7 +1,17 @@
 import { getDb, resetDbForTests } from '../src/lib/prospection-db';
 
+const MIGRATED_COLUMNS = [
+  'region', 'district', 'commune', 'za', 'pa_code',
+  'degats_cultures_pourcent', 'verdissement_pourcent', 'hauteur_herbe_cm',
+  'espece', 'direction_de', 'pullulation_nb', 'taille_long', 'taille_large',
+  'taille_epaisseur', 'essaim_en_vol', 'essaim_pose', 'type_essaim',
+  'nb_taches_bandes', 'interdistance_m', 'surface_contaminee_ha',
+  'type_larve', 'surf_infestee_pourcent',
+].map((name) => ({ name }));
+
 const execAsync = jest.fn().mockResolvedValue(undefined);
-const openDatabaseAsync = jest.fn().mockResolvedValue({ execAsync });
+const getAllAsync = jest.fn().mockResolvedValue(MIGRATED_COLUMNS);
+const openDatabaseAsync = jest.fn().mockResolvedValue({ execAsync, getAllAsync });
 
 jest.mock('expo-sqlite', () => ({
   openDatabaseAsync: (...args: unknown[]) => openDatabaseAsync(...args),
@@ -11,6 +21,7 @@ beforeEach(() => {
   resetDbForTests();
   openDatabaseAsync.mockClear();
   execAsync.mockClear();
+  getAllAsync.mockClear();
 });
 
 describe('prospection-db', () => {

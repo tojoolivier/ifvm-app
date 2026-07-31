@@ -14,7 +14,14 @@ const STORED_ROW: DraftProspection = {
   campagne_id: '22222222-2222-2222-2222-222222222222',
   prospecteur_id: '33333333-3333-3333-3333-333333333333',
   station_id: null,
+  region: null,
+  district: null,
+  commune: null,
+  za: null,
+  pa_code: null,
+  n_releve: null,
   n_fiche: 'FI-20260711-111111',
+  n_message: null,
   especes: null,
   capture_started_at: null,
   grilles_completees: null,
@@ -26,8 +33,15 @@ const STORED_ROW: DraftProspection = {
   surf_prospectee: 8,
   surf_infestee: 2,
   degats_cultures: null,
+  degats_cultures_pourcent: null,
+  verdissement_pourcent: null,
+  hauteur_herbe_cm: null,
+  derniere_pluie: null,
+  intensite_pluie: null,
   vegetation: null,
   sol: null,
+  ennemis_naturels: null,
+  observations: null,
   statut: 'brouillon',
   statut_sync: 'local',
   created_at: '2026-07-11T00:00:00.000Z',
@@ -100,6 +114,7 @@ describe('saveReference', () => {
       position: POSITION,
       surfaces: { surfStation: 10, surfProspectee: 8, surfInfestee: 2 },
       numeroFiche: STORED_ROW.n_fiche as string,
+      references: { region: null, district: null, commune: null, za: null, pa_code: null },
     });
 
     expect(result).toEqual(STORED_ROW);
@@ -111,6 +126,11 @@ describe('saveReference', () => {
       surfProspectee: 8,
       surfInfestee: 2,
       nFiche: STORED_ROW.n_fiche,
+      region: null,
+      district: null,
+      commune: null,
+      za: null,
+      pa_code: null,
     });
   });
 
@@ -121,6 +141,7 @@ describe('saveReference', () => {
         position: POSITION,
         surfaces: { surfStation: 5, surfProspectee: 8, surfInfestee: 2 },
         numeroFiche: 'FI-20260711-111111',
+        references: { region: null, district: null, commune: null, za: null, pa_code: null },
       })
     ).rejects.toThrow('Surfaces invalides');
 

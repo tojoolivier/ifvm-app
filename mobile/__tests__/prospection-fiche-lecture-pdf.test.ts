@@ -8,8 +8,27 @@ function recap(overrides: Partial<FicheLectureViewModel> = {}): FicheLectureView
     stationLabel: 'Station Nord',
     dateProspection: '2026-07-05',
     especes: [],
-    infestation: { hasInfestation: false, typeLabel: '—', surfaceTot: null, comportementLabel: '—' },
+    infestation: {
+      hasInfestation: false,
+      typeLabel: '—',
+      surfaceTot: null,
+      comportementLabel: '—',
+      pullulationNb: null,
+      tailleEssaim: '—',
+      typeEssaim: null,
+      typeLarve: null,
+      surfaceContamineeHa: null,
+      surfInfesteePourcent: null,
+    },
     vegetationSummary: 'Strates (100%) : Herbeuse 100%',
+    region: null,
+    district: null,
+    commune: null,
+    za: null,
+    pa_code: null,
+    degatsCulturesPourcent: null,
+    verdissementPourcent: null,
+    hauteurHerbeCm: null,
     ...overrides,
   };
 }
@@ -40,8 +59,8 @@ describe('buildFicheLecturePdfHtml', () => {
     expect(html).toContain('&lt;script&gt;');
   });
 
-  it("n'affiche pas de bloc infestation quand hasInfestation est faux", () => {
+  it("affiche 'Aucune infestation enregistrée' quand hasInfestation est faux", () => {
     const html = buildFicheLecturePdfHtml(recap(), '—');
-    expect(html).not.toContain('<h2>Infestation</h2>');
+    expect(html).toContain('Aucune infestation enregistrée');
   });
 });

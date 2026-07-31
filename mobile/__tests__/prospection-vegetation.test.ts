@@ -72,6 +72,9 @@ describe('isVegetationSolComplete', () => {
       humidite: 'surface',
       texture: 'limoneuse',
       degatsCultures: 'nuls',
+      degatsCulturesPourcent: null,
+      verdissementPourcent: null,
+      hauteurHerbeCm: null,
     };
     expect(isVegetationSolComplete(state)).toBe(false);
   });
@@ -82,6 +85,9 @@ describe('isVegetationSolComplete', () => {
       humidite: 'surface',
       texture: 'limoneuse',
       degatsCultures: 'nuls',
+      degatsCulturesPourcent: null,
+      verdissementPourcent: null,
+      hauteurHerbeCm: null,
     };
     expect(isVegetationSolComplete(state)).toBe(true);
   });
@@ -97,6 +103,9 @@ describe('buildVegetationJson / buildSolJson / parseVegetationSol', () => {
       humidite: '5_12cm',
       texture: 'sable_fin',
       degatsCultures: 'moyens',
+      degatsCulturesPourcent: null,
+      verdissementPourcent: null,
+      hauteurHerbeCm: null,
     };
 
     const vegetation = buildVegetationJson(state);
@@ -125,6 +134,9 @@ describe('saveVegetationSol', () => {
       humidite: '12_30cm',
       texture: 'argileuse',
       degatsCultures: 'faibles',
+      degatsCulturesPourcent: null,
+      verdissementPourcent: null,
+      hauteurHerbeCm: null,
     };
 
     await saveVegetationSol('prospection-1', state);
@@ -133,6 +145,9 @@ describe('saveVegetationSol', () => {
       vegetation: buildVegetationJson(state),
       sol: buildSolJson(state),
       degatsCultures: 'faibles',
+      degatsCulturesPourcent: null,
+      verdissementPourcent: null,
+      hauteurHerbeCm: null,
     });
   });
 });

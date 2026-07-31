@@ -69,6 +69,14 @@ function prospection(overrides: Partial<ProspectionRead> = {}): ProspectionRead 
     populations: [],
     captures: [],
     infestations: [],
+    region: null,
+    district: null,
+    commune: null,
+    za: null,
+    pa_code: null,
+    degats_cultures_pourcent: null,
+    verdissement_pourcent: null,
+    hauteur_herbe_cm: null,
     ...overrides,
   };
 }
@@ -113,6 +121,12 @@ describe('buildInfestationSynthese', () => {
       typeLabel: '—',
       surfaceTot: null,
       comportementLabel: '—',
+      pullulationNb: null,
+      tailleEssaim: '—',
+      typeEssaim: null,
+      typeLarve: null,
+      surfaceContamineeHa: null,
+      surfInfesteePourcent: null,
     });
   });
 
@@ -134,6 +148,18 @@ describe('buildInfestationSynthese', () => {
       direction_vers: 'N',
       vent_de: null,
       vent_vitesse: null,
+      pullulation_nb: null,
+      taille_long: null,
+      taille_large: null,
+      taille_epaisseur: null,
+      essaim_en_vol: null,
+      essaim_pose: null,
+      type_essaim: null,
+      nb_taches_bandes: null,
+      interdistance_m: null,
+      surface_contaminee_ha: null,
+      type_larve: null,
+      surf_infestee_pourcent: null,
     };
 
     expect(buildInfestationSynthese([infestation])).toEqual({
@@ -141,6 +167,12 @@ describe('buildInfestationSynthese', () => {
       typeLabel: 'Essaim',
       surfaceTot: 3.5,
       comportementLabel: 'Déplacement',
+      pullulationNb: null,
+      tailleEssaim: '—',
+      typeEssaim: null,
+      typeLarve: null,
+      surfaceContamineeHa: null,
+      surfInfesteePourcent: null,
     });
   });
 });

@@ -40,7 +40,14 @@ const STORED_ROW: DraftProspection = {
   campagne_id: '22222222-2222-2222-2222-222222222222',
   prospecteur_id: '33333333-3333-3333-3333-333333333333',
   station_id: null,
+  region: null,
+  district: null,
+  commune: null,
+  za: null,
+  pa_code: null,
+  n_releve: null,
   n_fiche: null,
+  n_message: null,
   especes: null,
   capture_started_at: null,
   grilles_completees: null,
@@ -52,8 +59,15 @@ const STORED_ROW: DraftProspection = {
   surf_prospectee: null,
   surf_infestee: null,
   degats_cultures: null,
+  degats_cultures_pourcent: null,
+  verdissement_pourcent: null,
+  hauteur_herbe_cm: null,
+  derniere_pluie: null,
+  intensite_pluie: null,
   vegetation: null,
   sol: null,
+  ennemis_naturels: null,
+  observations: null,
   statut: 'brouillon',
   statut_sync: 'local',
   created_at: '2026-07-11T00:00:00.000Z',
@@ -142,7 +156,7 @@ describe('startNewProspection', () => {
 
     await expect(
       startNewProspection({ token: 'tok', prospecteurId: 'p1' })
-    ).rejects.toThrow('Aucune campagne en cours');
+    ).rejects.toThrow('Aucune campagne disponible');
     expect(mockCreateDraft).not.toHaveBeenCalled();
   });
 });
