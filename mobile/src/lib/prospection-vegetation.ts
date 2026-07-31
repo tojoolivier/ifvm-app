@@ -5,7 +5,6 @@ export type Texture = 'limoneuse' | 'argileuse' | 'sable_fin' | 'gravier' | 'cai
 export type DegatsCultures = 'nuls' | 'faibles' | 'moyens' | 'forts';
 export type Phenologie = 'verdissement' | 'feuillaison' | 'floraison' | 'fructification' | 'sec';
 
-/** 6 strates du référentiel ORPAD (issue #15) ; `sol_nu` n'a pas de phénologie/hauteur. */
 export type StrateKey = 'arboree' | 'arbustive' | 'buissonneuse' | 'herbeuse' | 'cultures_seches' | 'sol_nu';
 
 export const STRATE_KEYS: StrateKey[] = ['arboree', 'arbustive', 'buissonneuse', 'herbeuse', 'cultures_seches', 'sol_nu'];
@@ -19,7 +18,6 @@ export const STRATE_LABELS: Record<StrateKey, string> = {
   sol_nu: 'Sol nu',
 };
 
-/** `sol_nu` n'a pas de couvert végétal : pas de phénologie/hauteur à détailler. */
 export const STRATES_DETAILLABLES: StrateKey[] = ['arboree', 'arbustive', 'buissonneuse', 'herbeuse', 'cultures_seches'];
 
 export const HUMIDITE_OPTIONS: { value: Humidite; label: string }[] = [
@@ -66,6 +64,9 @@ export interface VegetationSolState {
   humidite: Humidite | null;
   texture: Texture | null;
   degatsCultures: DegatsCultures | null;
+  degatsCulturesPourcent: number | null;
+  verdissementPourcent: number | null;
+  hauteurHerbeCm: number | null;
 }
 
 function defaultStrateDetail(): StrateDetail {
@@ -84,14 +85,15 @@ export const DEFAULT_VEGETATION_SOL: VegetationSolState = {
   humidite: null,
   texture: null,
   degatsCultures: null,
+  degatsCulturesPourcent: null,
+  verdissementPourcent: null,
+  hauteurHerbeCm: null,
 };
 
-/** Ramène une valeur de curseur dans la plage [0, 100], arrondie à l'entier. */
 export function clampRecouvrement(value: number): number {
   return Math.round(Math.max(0, Math.min(100, value)));
 }
 
-/** Somme des recouvrements des 6 strates. Doit atteindre 100 pour valider l'écran. */
 export function totalRecouvrement(strates: StratesState): number {
   return STRATE_KEYS.reduce((sum, key) => sum + strates[key].recouvrement, 0);
 }
@@ -105,12 +107,15 @@ export function isVegetationSolComplete(state: VegetationSolState): boolean {
   );
 }
 
-/** Sérialise l'état en JSONB `vegetation` (archival, jamais filtré — cf. ADR-006). */
 export function buildVegetationJson(state: VegetationSolState): string {
-  return JSON.stringify({ strates: state.strates });
+  return JSON.stringify({ 
+    strates: state.strates,
+    verdissement_pourcent: state.verdissementPourcent,
+    hauteur_herbe_cm: state.hauteurHerbeCm,
+    degats_cultures_pourcent: state.degatsCulturesPourcent,
+  });
 }
 
-/** Sérialise l'état en JSONB `sol` (archival, jamais filtré — cf. ADR-006). */
 export function buildSolJson(state: VegetationSolState): string {
   return JSON.stringify({ humidite: state.humidite, texture: state.texture });
 }
@@ -118,7 +123,10 @@ export function buildSolJson(state: VegetationSolState): string {
 export function parseVegetationSol(
   vegetation: string | null,
   sol: string | null,
-  degatsCultures: string | null
+  degatsCultures: string | null,
+  degatsCulturesPourcent: number | null = null,
+  verdissementPourcent: number | null = null,
+  hauteurHerbeCm: number | null = null
 ): VegetationSolState {
   const veg = vegetation ? JSON.parse(vegetation) : {};
   const solParsed = sol ? JSON.parse(sol) : {};
@@ -136,7 +144,6 @@ export function parseVegetationSol(
       }
     }
   } else if (typeof veg.recouvrement_herbeux === 'number') {
-    // Ancien format à strate unique (avant #15) : migré vers la strate herbeuse.
     strates.herbeuse = { recouvrement: clampRecouvrement(veg.recouvrement_herbeux), phenologie: null, hauteur: null };
   }
   return {
@@ -144,14 +151,19 @@ export function parseVegetationSol(
     humidite: (solParsed.humidite as Humidite) ?? null,
     texture: (solParsed.texture as Texture) ?? null,
     degatsCultures: (degatsCultures as DegatsCultures) ?? null,
+    degatsCulturesPourcent: degatsCulturesPourcent ?? null,
+    verdissementPourcent: verdissementPourcent ?? null,
+    hauteurHerbeCm: hauteurHerbeCm ?? null,
   };
 }
 
-/** Persiste la végétation/sol/dégâts saisis à l'écran Végétation & sol. */
 export async function saveVegetationSol(prospectionId: string, state: VegetationSolState): Promise<void> {
   await updateProspectionVegetation(prospectionId, {
     vegetation: buildVegetationJson(state),
     sol: buildSolJson(state),
     degatsCultures: state.degatsCultures,
+    degatsCulturesPourcent: state.degatsCulturesPourcent,
+    verdissementPourcent: state.verdissementPourcent,
+    hauteurHerbeCm: state.hauteurHerbeCm,
   });
 }

@@ -7,6 +7,14 @@ export interface SurfaceInputs {
   surfInfestee: number | null;
 }
 
+export interface ReferenceInputs {
+  region: string | null;
+  district: string | null;
+  commune: string | null;
+  za: string | null;
+  pa_code: string | null;
+}
+
 /** Valide la contrainte métier `infestée <= prospectée <= station` (ADR-006). */
 export function validateSurfaces({ surfStation, surfProspectee, surfInfestee }: SurfaceInputs): boolean {
   if (surfStation == null || surfProspectee == null || surfInfestee == null) return false;
@@ -27,6 +35,7 @@ export async function saveReference(params: {
   position: GpsPosition;
   surfaces: SurfaceInputs;
   numeroFiche: string;
+  references: ReferenceInputs;
 }): Promise<DraftProspection> {
   const { surfStation, surfProspectee, surfInfestee } = params.surfaces;
   if (!validateSurfaces(params.surfaces) || surfStation == null || surfProspectee == null || surfInfestee == null) {
@@ -41,5 +50,10 @@ export async function saveReference(params: {
     surfProspectee,
     surfInfestee,
     nFiche: params.numeroFiche,
+    region: params.references.region,
+    district: params.references.district,
+    commune: params.references.commune,
+    za: params.references.za,
+    pa_code: params.references.pa_code,
   });
 }
