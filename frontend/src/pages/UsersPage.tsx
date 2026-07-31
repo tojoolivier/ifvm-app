@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { AxiosError } from 'axios'
 import { api } from '../api/client'
 import { Utilisateur } from '../types'
 
@@ -50,7 +51,7 @@ export function UsersPage() {
       setShowCreate(false)
       resetForm()
     },
-    onError: (err: any) => {
+    onError: (err: AxiosError<{ detail?: string }>) => {
       setCreateError(err.response?.data?.detail || 'Erreur lors de la création')
     },
   })

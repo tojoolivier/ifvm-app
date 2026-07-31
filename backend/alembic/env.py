@@ -1,10 +1,9 @@
 import asyncio
-import os
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from alembic import context
 from app.config import settings
 from app.models import Base  # noqa: F401 — registers all models
 

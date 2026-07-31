@@ -1,10 +1,5 @@
 import { getProspectionPopulation, saveProspectionPopulation, PopulationRow } from '../src/lib/prospection-repository';
 
-jest.mock('../src/lib/prospection-repository', () => ({
-  getProspectionPopulation: jest.fn(),
-  saveProspectionPopulation: jest.fn(),
-}));
-
 import {
   EMPTY_DENSITES,
   EMPTY_REPRODUCTION,
@@ -15,6 +10,11 @@ import {
   saveDensites,
   saveReproduction,
 } from '../src/lib/prospection-densites';
+
+jest.mock('../src/lib/prospection-repository', () => ({
+  getProspectionPopulation: jest.fn(),
+  saveProspectionPopulation: jest.fn(),
+}));
 
 const mockGetPopulation = jest.mocked(getProspectionPopulation);
 const mockSavePopulation = jest.mocked(saveProspectionPopulation);

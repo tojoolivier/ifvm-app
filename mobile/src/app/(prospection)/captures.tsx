@@ -99,16 +99,19 @@ export default function CapturesScreen() {
 
   useEffect(() => {
     if (!draft || !grille) return;
-    setSexe('F');
-    setSelectedPhenotype(
-      isImagoNse ? NSE_PHENOTYPES[0].value : isLarve ? larvePhenotypeOptions[0].value : 'solitaire'
-    );
-    setSelectedStade(isImagoNse ? NSE_STADES[0] : isLarve ? larveStades[0] : stadesForSexe('F')[0]);
+    const id = setTimeout(() => {
+      setSexe('F');
+      setSelectedPhenotype(
+        isImagoNse ? NSE_PHENOTYPES[0].value : isLarve ? larvePhenotypeOptions[0].value : 'solitaire'
+      );
+      setSelectedStade(isImagoNse ? NSE_STADES[0] : isLarve ? larveStades[0] : stadesForSexe('F')[0]);
+    }, 0);
     listProspectionCaptures(draft.id, grille.espece, grille.categorie).then((rows) => {
       setCounts(
         isImagoNse ? parseNseCaptureRows(rows) : isLarve ? parseLarveCaptureRows(rows) : parseCaptureRows(rows)
       );
     });
+    return () => clearTimeout(id);
   }, [draft, grille, isImagoNse, isLarve, larvePhenotypeOptions, larveStades]);
 
   useEffect(() => {

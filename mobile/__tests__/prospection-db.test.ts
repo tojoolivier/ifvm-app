@@ -1,11 +1,11 @@
+import { getDb, resetDbForTests } from '../src/lib/prospection-db';
+
 const execAsync = jest.fn().mockResolvedValue(undefined);
 const openDatabaseAsync = jest.fn().mockResolvedValue({ execAsync });
 
 jest.mock('expo-sqlite', () => ({
   openDatabaseAsync: (...args: unknown[]) => openDatabaseAsync(...args),
 }));
-
-import { getDb, resetDbForTests } from '../src/lib/prospection-db';
 
 beforeEach(() => {
   resetDbForTests();

@@ -7,6 +7,13 @@ import {
   DraftProspection,
 } from '../src/lib/prospection-repository';
 
+import {
+  loadAccueilData,
+  loadValidatedProspections,
+  pickCurrentCampagneId,
+  startNewProspection,
+} from '../src/lib/prospection-accueil';
+
 jest.mock('../src/lib/api-client', () => ({
   apiClient: {
     getCampagnes: jest.fn(),
@@ -20,13 +27,6 @@ jest.mock('../src/lib/prospection-repository', () => ({
   listDraftProspections: jest.fn(),
   listRecentProspections: jest.fn(),
 }));
-
-import {
-  loadAccueilData,
-  loadValidatedProspections,
-  pickCurrentCampagneId,
-  startNewProspection,
-} from '../src/lib/prospection-accueil';
 
 const mockApiClient = jest.mocked(apiClient);
 const mockCreateDraft = jest.mocked(createDraftProspection);

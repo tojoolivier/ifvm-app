@@ -7,6 +7,13 @@ import {
   markProspectionSynced,
 } from '../src/lib/prospection-repository';
 
+import {
+  buildRecapitulatif,
+  buildVegetationSummary,
+  enregistrerEtSynchroniser,
+} from '../src/lib/prospection-recapitulatif';
+import { DEFAULT_VEGETATION_SOL, STRATE_KEYS, StratesState, VegetationSolState } from '../src/lib/prospection-vegetation';
+
 jest.mock('../src/lib/api-client', () => ({
   apiClient: {
     createProspection: jest.fn(),
@@ -18,13 +25,6 @@ jest.mock('../src/lib/prospection-repository', () => ({
   listAllProspectionCaptures: jest.fn(),
   markProspectionSynced: jest.fn(),
 }));
-
-import {
-  buildRecapitulatif,
-  buildVegetationSummary,
-  enregistrerEtSynchroniser,
-} from '../src/lib/prospection-recapitulatif';
-import { DEFAULT_VEGETATION_SOL, STRATE_KEYS, StratesState, VegetationSolState } from '../src/lib/prospection-vegetation';
 
 function stratesWithTotal(recouvrementByKey: Partial<Record<(typeof STRATE_KEYS)[number], number>>): StratesState {
   const strates = {} as StratesState;

@@ -2,7 +2,9 @@
 Script de données initiales. Usage :
     docker compose exec backend python -m app.seed
 """
+
 import asyncio
+
 from app.auth import hash_password
 from app.database import AsyncSessionLocal
 from app.models.users import Utilisateur

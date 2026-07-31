@@ -13,7 +13,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
 import { ThemedText } from '@/components/themed-text';
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { 
   getProspectionsByUser, 
   getNotifications, 
@@ -79,16 +79,11 @@ export default function DashboardScreen() {
   const [showSyncBanner, setShowSyncBanner] = useState(false);
   
   // Animations
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
+  const fadeAnim = useMemo(() => new Animated.Value(0), []);
+  const slideAnim = useMemo(() => new Animated.Value(30), []);
 
   // Référence pour le timer de vérification
   const syncCheckInterval = useRef<NodeJS.Timeout | null>(null);
-
-  // Récupérer la position
-  useEffect(() => {
-    getLocation();
-  }, []);
 
   const getLocation = async () => {
     try {
@@ -107,13 +102,19 @@ export default function DashboardScreen() {
     }
   };
 
+  // Récupérer la position
+  useEffect(() => {
+    const id = setTimeout(() => getLocation(), 0);
+    return () => clearTimeout(id);
+  }, []);
+
   // Animation d'entrée
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
       Animated.timing(slideAnim, { toValue: 0, duration: 500, useNativeDriver: true }),
     ]).start();
-  }, []);
+  }, [fadeAnim, slideAnim]);
 
   // Vérifier la connectivité et la synchronisation
   const checkSyncStatus = async () => {
@@ -155,7 +156,7 @@ export default function DashboardScreen() {
   // Effet pour vérifier la sync au chargement et périodiquement
   useEffect(() => {
     // Vérification initiale
-    checkSyncStatus();
+    const initialCheck = setTimeout(() => checkSyncStatus(), 0);
 
     // Vérification toutes les 30 minutes
     syncCheckInterval.current = setInterval(() => {
@@ -171,6 +172,7 @@ export default function DashboardScreen() {
 
     // Nettoyage
     return () => {
+      clearTimeout(initialCheck);
       if (syncCheckInterval.current) {
         clearInterval(syncCheckInterval.current);
       }
@@ -179,9 +181,9 @@ export default function DashboardScreen() {
   }, []);
 
   // Charger les données
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!user?.id) return;
-    
+
     try {
       const [fiches, notifs, unread, statsData, pendingCount] = await Promise.all([
         getProspectionsByUser(user.id),
@@ -200,12 +202,12 @@ export default function DashboardScreen() {
     } catch (error) {
       console.error('Erreur chargement données:', error);
     }
-  };
+  }, [user]);
 
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, [user])
+    }, [loadData])
   );
 
   const onRefresh = async () => {

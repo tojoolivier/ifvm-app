@@ -20,7 +20,7 @@ export default function EspecesScreen() {
   const { draftId } = useLocalSearchParams<{ draftId: string }>();
 
   const [draft, setDraft] = useState<DraftProspection | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!!draftId);
   const [selection, setSelection] = useState<EspeceSelection>({
     lmcImago: false,
     lmcLarve: false,
@@ -31,11 +31,8 @@ export default function EspecesScreen() {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!draftId) {
-      setIsLoading(false);
-      return;
-    }
-    
+    if (!draftId) return;
+
     const loadDraft = async () => {
       try {
         const row = await getProspection(draftId);

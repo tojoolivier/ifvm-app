@@ -79,7 +79,8 @@ export function useDashboardData() {
   };
 
   useEffect(() => {
-    loadData();
+    const id = setTimeout(() => loadData(), 0);
+    return () => clearTimeout(id);
   }, []);
 
   return {

@@ -1,10 +1,10 @@
 import { updateProspectionReference, DraftProspection } from '../src/lib/prospection-repository';
 
+import { validateSurfaces, generateNumeroFiche, saveReference } from '../src/lib/prospection-reference';
+
 jest.mock('../src/lib/prospection-repository', () => ({
   updateProspectionReference: jest.fn(),
 }));
-
-import { validateSurfaces, generateNumeroFiche, saveReference } from '../src/lib/prospection-reference';
 
 const mockUpdate = jest.mocked(updateProspectionReference);
 

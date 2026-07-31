@@ -2,10 +2,10 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
+import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-import bcrypt
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -47,5 +47,7 @@ async def get_current_user(
 
     user = await db.get(Utilisateur, uuid.UUID(user_id))
     if user is None or not user.actif:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Utilisateur introuvable")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Utilisateur introuvable"
+        )
     return user

@@ -63,8 +63,7 @@ class StationFixeRepositoryImpl(StationFixeRepository):
         if q is not None:
             like_pattern = f"%{q}%"
             stmt = stmt.where(
-                StationFixeModel.code.ilike(like_pattern)
-                | StationFixeModel.nom.ilike(like_pattern)
+                StationFixeModel.code.ilike(like_pattern) | StationFixeModel.nom.ilike(like_pattern)
             )
 
         stmt = stmt.order_by(StationFixeModel.code)

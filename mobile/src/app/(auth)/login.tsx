@@ -10,7 +10,6 @@ import {
   ScrollView,
   StyleSheet,
   Dimensions,
-  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
@@ -19,7 +18,6 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isSmallScreen = SCREEN_WIDTH < 380;
 
 const IFVM_GREEN = '#1B5E1B';
-const IFVM_GREEN_DARK = '#163F16';
 const IFVM_GREEN_LIGHT = '#E8F3E8';
 
 export default function LoginScreen() {

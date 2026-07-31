@@ -1,11 +1,11 @@
 import uuid
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import create_access_token, hash_password
 from app.models.users import Utilisateur
-from app.auth import hash_password, create_access_token
-
 
 # ---------------------------------------------------------------------------
 # Fixtures utilisateurs par rôle
@@ -89,7 +89,11 @@ async def _changer_statut(
 
 @pytest.mark.asyncio
 async def test_transition_brouillon_en_attente(
-    client: AsyncClient, utilisateur: Utilisateur, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    utilisateur: Utilisateur,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
 ):
     pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
     code = await _changer_statut(client, pid, "en_attente", auth_headers)
@@ -190,7 +194,11 @@ async def test_transition_invalide_en_attente_validee(
 
 @pytest.mark.asyncio
 async def test_prospecteur_ne_peut_pas_verifier(
-    client: AsyncClient, utilisateur: Utilisateur, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    utilisateur: Utilisateur,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
 ):
     pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
     await _changer_statut(client, pid, "en_attente", auth_headers)
@@ -222,7 +230,11 @@ async def test_verificateur_ne_peut_pas_valider(
 
 @pytest.mark.asyncio
 async def test_audit_log_cree_lors_transition(
-    client: AsyncClient, utilisateur: Utilisateur, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    utilisateur: Utilisateur,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
 ):
     pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
     await _changer_statut(client, pid, "en_attente", auth_headers)
@@ -260,7 +272,11 @@ async def test_audit_log_plusieurs_transitions(
 
 @pytest.mark.asyncio
 async def test_ajouter_commentaire(
-    client: AsyncClient, utilisateur: Utilisateur, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    utilisateur: Utilisateur,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
 ):
     pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
 
@@ -273,14 +289,12 @@ async def test_ajouter_commentaire(
 
     audit_resp = await client.get(f"/prospections/{pid}/audit-log", headers=auth_headers)
     logs = audit_resp.json()
-    commentaires = [l for l in logs if l["action"] == "commentaire"]
+    commentaires = [log for log in logs if log["action"] == "commentaire"]
     assert len(commentaires) >= 1
     assert commentaires[0]["details"]["texte"] == "Données cohérentes avec le relevé terrain."
 
 
 @pytest.mark.asyncio
-async def test_audit_log_prospection_inexistante(
-    client: AsyncClient, auth_headers: dict
-):
+async def test_audit_log_prospection_inexistante(client: AsyncClient, auth_headers: dict):
     resp = await client.get(f"/prospections/{uuid.uuid4()}/audit-log", headers=auth_headers)
     assert resp.status_code == 404

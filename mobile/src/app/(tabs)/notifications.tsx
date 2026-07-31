@@ -34,10 +34,6 @@ export default function NotificationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
 
-  useEffect(() => {
-    loadNotifications();
-  }, []);
-
   const loadNotifications = async () => {
     try {
       const data = await getNotifications();
@@ -46,6 +42,11 @@ export default function NotificationsScreen() {
       console.error('Erreur chargement notifications:', error);
     }
   };
+
+  useEffect(() => {
+    const id = setTimeout(() => loadNotifications(), 0);
+    return () => clearTimeout(id);
+  }, []);
 
   const handleNotificationPress = async (notification: any) => {
     await markNotificationAsRead(notification.id);

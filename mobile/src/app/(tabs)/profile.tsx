@@ -1,4 +1,4 @@
-import { View, TouchableOpacity, ScrollView, StyleSheet, Image, Dimensions, Switch, SafeAreaView, Alert, ActivityIndicator, TextInput, Modal, Platform } from 'react-native';
+import { View, TouchableOpacity, ScrollView, StyleSheet, Image, Switch, SafeAreaView, Alert, ActivityIndicator, TextInput, Modal, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
 import { ThemedText } from '@/components/themed-text';
@@ -8,11 +8,7 @@ import * as FileSystem from 'expo-file-system';
 import { storage } from '@/lib/storage';
 import { apiClient } from '@/lib/api-client';
 
-const { width } = Dimensions.get('window');
-const isTablet = width >= 768;
-
 const IFVM_GREEN = '#1B5E1B';
-const IFVM_GREEN_LIGHT = '#4CAF50';
 const IFVM_GREEN_BG = '#E8F5E9';
 const IFVM_BG_LIGHT = '#F0F2F5';
 const CARD_BG = '#FFFFFF';
@@ -45,11 +41,6 @@ export default function ProfileScreen() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Charger l'image de profil au montage
-  useEffect(() => {
-    loadProfileImage();
-  }, []);
-
   const loadProfileImage = async () => {
     try {
       const image = await storage.getItem(PROFILE_IMAGE_KEY);
@@ -60,6 +51,12 @@ export default function ProfileScreen() {
       console.error('Erreur chargement image:', error);
     }
   };
+
+  // Charger l'image de profil au montage
+  useEffect(() => {
+    const id = setTimeout(() => loadProfileImage(), 0);
+    return () => clearTimeout(id);
+  }, []);
 
   const handleLogout = async () => {
     await logout();

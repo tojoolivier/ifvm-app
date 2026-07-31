@@ -1,4 +1,5 @@
 import uuid
+
 import pytest
 from httpx import AsyncClient
 
@@ -24,7 +25,9 @@ async def test_list_stations(client: AsyncClient, auth_headers: dict, station_fi
 
 
 @pytest.mark.asyncio
-async def test_list_stations_filtre_par_pa(client: AsyncClient, auth_headers: dict, station_fixe, poste_acridien):
+async def test_list_stations_filtre_par_pa(
+    client: AsyncClient, auth_headers: dict, station_fixe, poste_acridien
+):
     response = await client.get(f"/stations?pa_id={poste_acridien.id}", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
@@ -32,7 +35,9 @@ async def test_list_stations_filtre_par_pa(client: AsyncClient, auth_headers: di
 
 
 @pytest.mark.asyncio
-async def test_list_stations_recherche_textuelle(client: AsyncClient, auth_headers: dict, station_fixe):
+async def test_list_stations_recherche_textuelle(
+    client: AsyncClient, auth_headers: dict, station_fixe
+):
     response = await client.get("/stations?q=Test", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()

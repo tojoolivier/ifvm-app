@@ -5,6 +5,7 @@ from datetime import datetime
 
 class StationNotFoundError(Exception):
     """station_id ne référence pas une station fixe existante."""
+
     pass
 
 

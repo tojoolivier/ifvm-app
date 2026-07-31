@@ -1,5 +1,3 @@
-jest.mock('../src/lib/prospection-repository', () => ({}));
-
 import { CaptureRead, InfestationRead, PopulationRead, ProspectionRead } from '../src/lib/api-client';
 import {
   STATUT_VALIDE,
@@ -8,6 +6,8 @@ import {
   buildInfestationSynthese,
   isFicheValidee,
 } from '../src/lib/prospection-fiche-lecture';
+
+jest.mock('../src/lib/prospection-repository', () => ({}));
 
 function capture(overrides: Partial<CaptureRead> = {}): CaptureRead {
   return {

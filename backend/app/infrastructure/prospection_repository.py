@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -14,9 +14,9 @@ from app.domain.prospection import (
 from app.domain.referentiel import StationNotFoundError
 from app.domain.repositories import ProspectionRepository
 from app.infrastructure.prospection_model import (
-    ProspectionModel,
     ProspectionCaptureModel,
     ProspectionInfestationModel,
+    ProspectionModel,
     ProspectionPopulationModel,
 )
 
@@ -117,7 +117,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             verdissement_pourcent=prospection.verdissement_pourcent,
             hauteur_herbe_cm=prospection.hauteur_herbe_cm,
         )
-        
+
         model.populations = [
             ProspectionPopulationModel(
                 id=p.id,
@@ -132,7 +132,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             )
             for p in prospection.populations
         ]
-        
+
         model.captures = [
             ProspectionCaptureModel(
                 id=c.id,
@@ -145,7 +145,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             )
             for c in prospection.captures
         ]
-        
+
         model.infestations = [
             ProspectionInfestationModel(
                 id=i.id,
@@ -185,7 +185,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             )
             for i in prospection.infestations
         ]
-        
+
         self.session.add(model)
         try:
             await self.session.commit()
@@ -199,7 +199,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             select(ProspectionModel).where(ProspectionModel.id == prospection.id)
         )
         model = result.scalar_one()
-        
+
         model.station_id = prospection.station_id
         model.n_releve = prospection.n_releve
         model.n_fiche = prospection.n_fiche
@@ -223,7 +223,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         model.observations = prospection.observations
         model.statut = prospection.statut
         model.updated_at = prospection.updated_at
-        
+
         # ==========================================
         # NOUVEAUX CHAMPS - Références (A)
         # ==========================================
@@ -232,21 +232,21 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         model.commune = prospection.commune
         model.za = prospection.za
         model.pa_code = prospection.pa_code
-        
+
         # ==========================================
         # NOUVEAUX CHAMPS - Observations (D)
         # ==========================================
         model.degats_cultures_pourcent = prospection.degats_cultures_pourcent
         model.verdissement_pourcent = prospection.verdissement_pourcent
         model.hauteur_herbe_cm = prospection.hauteur_herbe_cm
-        
+
         # Mise à jour des infestations
         await self.session.execute(
             delete(ProspectionInfestationModel).where(
                 ProspectionInfestationModel.prospection_id == prospection.id
             )
         )
-        
+
         for i in prospection.infestations:
             new_infestation = ProspectionInfestationModel(
                 id=i.id,
@@ -285,7 +285,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                 type_larve=i.type_larve,
             )
             self.session.add(new_infestation)
-        
+
         await self.session.commit()
         return await self.get_by_id(model.id)
 
@@ -312,7 +312,9 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             altitude=float(model.altitude) if model.altitude is not None else None,
             biotope=model.biotope,
             surf_station=float(model.surf_station) if model.surf_station is not None else None,
-            surf_prospectee=float(model.surf_prospectee) if model.surf_prospectee is not None else None,
+            surf_prospectee=float(model.surf_prospectee)
+            if model.surf_prospectee is not None
+            else None,
             surf_infestee=float(model.surf_infestee) if model.surf_infestee is not None else None,
             degats_cultures=model.degats_cultures,
             derniere_pluie=model.derniere_pluie,
@@ -320,7 +322,9 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             vegetation=model.vegetation,
             sol=model.sol,
             verdissement=float(model.verdissement) if model.verdissement is not None else None,
-            hauteur_strate=float(model.hauteur_strate) if model.hauteur_strate is not None else None,
+            hauteur_strate=float(model.hauteur_strate)
+            if model.hauteur_strate is not None
+            else None,
             ennemis_naturels=model.ennemis_naturels,
             observations=model.observations,
             statut=model.statut,
@@ -344,7 +348,9 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             # ==========================================
             degats_cultures_pourcent=model.degats_cultures_pourcent,
             verdissement_pourcent=model.verdissement_pourcent,
-            hauteur_herbe_cm=float(model.hauteur_herbe_cm) if model.hauteur_herbe_cm is not None else None,
+            hauteur_herbe_cm=float(model.hauteur_herbe_cm)
+            if model.hauteur_herbe_cm is not None
+            else None,
             # ==========================================
             # RELATIONSHIPS
             # ==========================================
@@ -354,8 +360,12 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                     prospection_id=p.prospection_id,
                     espece=p.espece,
                     categorie=p.categorie,
-                    densite_diffuse=float(p.densite_diffuse) if p.densite_diffuse is not None else None,
-                    densite_groupee=float(p.densite_groupee) if p.densite_groupee is not None else None,
+                    densite_diffuse=float(p.densite_diffuse)
+                    if p.densite_diffuse is not None
+                    else None,
+                    densite_groupee=float(p.densite_groupee)
+                    if p.densite_groupee is not None
+                    else None,
                     captures_nombre=p.captures_nombre,
                     temps_capture=p.temps_capture,
                     accouplement=p.accouplement,
@@ -401,7 +411,9 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                     pullulation_nb=i.pullulation_nb,
                     taille_long=float(i.taille_long) if i.taille_long is not None else None,
                     taille_large=float(i.taille_large) if i.taille_large is not None else None,
-                    taille_epaisseur=float(i.taille_epaisseur) if i.taille_epaisseur is not None else None,
+                    taille_epaisseur=float(i.taille_epaisseur)
+                    if i.taille_epaisseur is not None
+                    else None,
                     essaim_en_vol=i.essaim_en_vol,
                     essaim_pose=i.essaim_pose,
                     type_essaim=i.type_essaim,
@@ -409,8 +421,12 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                     # NOUVEAUX CHAMPS - Larves (C)
                     # ==========================================
                     nb_taches_bandes=i.nb_taches_bandes,
-                    interdistance_m=float(i.interdistance_m) if i.interdistance_m is not None else None,
-                    surface_contaminee_ha=float(i.surface_contaminee_ha) if i.surface_contaminee_ha is not None else None,
+                    interdistance_m=float(i.interdistance_m)
+                    if i.interdistance_m is not None
+                    else None,
+                    surface_contaminee_ha=float(i.surface_contaminee_ha)
+                    if i.surface_contaminee_ha is not None
+                    else None,
                     type_larve=i.type_larve,
                 )
                 for i in model.infestations

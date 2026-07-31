@@ -1,6 +1,5 @@
 import { Tabs, useRouter } from 'expo-router';
 import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
-import { useAuthStore } from '@/lib/auth-store';
 
 const IFVM_GREEN = '#1B5E1B';
 
@@ -28,7 +27,6 @@ const LABELS: TabIconMap = {
 };
 
 export default function TabLayout() {
-  const user = useAuthStore((s) => s.user);
   const router = useRouter();
 
   return (

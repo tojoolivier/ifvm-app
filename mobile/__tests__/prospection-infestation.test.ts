@@ -1,10 +1,5 @@
 import { getProspectionInfestation, saveProspectionInfestation, InfestationRow } from '../src/lib/prospection-repository';
 
-jest.mock('../src/lib/prospection-repository', () => ({
-  getProspectionInfestation: jest.fn(),
-  saveProspectionInfestation: jest.fn(),
-}));
-
 import {
   COMPORTEMENT_OPTIONS,
   DIRECTION_OPTIONS,
@@ -17,6 +12,11 @@ import {
   saveInfestationComportement,
   saveInfestationDescription,
 } from '../src/lib/prospection-infestation';
+
+jest.mock('../src/lib/prospection-repository', () => ({
+  getProspectionInfestation: jest.fn(),
+  saveProspectionInfestation: jest.fn(),
+}));
 
 const mockGetInfestation = jest.mocked(getProspectionInfestation);
 const mockSaveInfestation = jest.mocked(saveProspectionInfestation);

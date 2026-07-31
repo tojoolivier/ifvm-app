@@ -10,10 +10,9 @@ Script idempotent : utilise INSERT ... ON CONFLICT DO UPDATE SET ... pour chaque
 """
 
 import asyncio
-import json
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.config import settings
 
@@ -28,40 +27,130 @@ REFERENTIEL_DATA = {
     ],
     "stations_fixes": [
         # PA-BL-01 : Bekily
-        {"code": "ST-BL-001", "nom": "Manambaro Nord", "pa_code": "PA-BL-01",
-         "latitude": -24.7833, "longitude": 45.6167, "altitude": 320},
-        {"code": "ST-BL-002", "nom": "Bekily Centre", "pa_code": "PA-BL-01",
-         "latitude": -24.2333, "longitude": 45.3833, "altitude": 410},
-        {"code": "ST-BL-003", "nom": "Morombe Sud", "pa_code": "PA-BL-01",
-         "latitude": -25.1500, "longitude": 45.3000, "altitude": 80},
+        {
+            "code": "ST-BL-001",
+            "nom": "Manambaro Nord",
+            "pa_code": "PA-BL-01",
+            "latitude": -24.7833,
+            "longitude": 45.6167,
+            "altitude": 320,
+        },
+        {
+            "code": "ST-BL-002",
+            "nom": "Bekily Centre",
+            "pa_code": "PA-BL-01",
+            "latitude": -24.2333,
+            "longitude": 45.3833,
+            "altitude": 410,
+        },
+        {
+            "code": "ST-BL-003",
+            "nom": "Morombe Sud",
+            "pa_code": "PA-BL-01",
+            "latitude": -25.1500,
+            "longitude": 45.3000,
+            "altitude": 80,
+        },
         # PA-AN-01 : Amboasary
-        {"code": "ST-AN-001", "nom": "Amboasary Bas", "pa_code": "PA-AN-01",
-         "latitude": -24.0333, "longitude": 46.4333, "altitude": 45},
-        {"code": "ST-AN-002", "nom": "Beheloka", "pa_code": "PA-AN-01",
-         "latitude": -24.5500, "longitude": 46.7500, "altitude": 15},
-        {"code": "ST-AN-003", "nom": "Tolanaro Port", "pa_code": "PA-AN-01",
-         "latitude": -25.0333, "longitude": 46.9833, "altitude": 10},
+        {
+            "code": "ST-AN-001",
+            "nom": "Amboasary Bas",
+            "pa_code": "PA-AN-01",
+            "latitude": -24.0333,
+            "longitude": 46.4333,
+            "altitude": 45,
+        },
+        {
+            "code": "ST-AN-002",
+            "nom": "Beheloka",
+            "pa_code": "PA-AN-01",
+            "latitude": -24.5500,
+            "longitude": 46.7500,
+            "altitude": 15,
+        },
+        {
+            "code": "ST-AN-003",
+            "nom": "Tolanaro Port",
+            "pa_code": "PA-AN-01",
+            "latitude": -25.0333,
+            "longitude": 46.9833,
+            "altitude": 10,
+        },
         # PA-TN-01 : Toliara
-        {"code": "ST-TN-001", "nom": "Toliara Ville", "pa_code": "PA-TN-01",
-         "latitude": -23.3500, "longitude": 43.6667, "altitude": 8},
-        {"code": "ST-TN-002", "nom": "Morondava Nord", "pa_code": "PA-TN-01",
-         "latitude": -20.4833, "longitude": 44.3167, "altitude": 5},
-        {"code": "ST-TN-003", "nom": "Beloha", "pa_code": "PA-TN-01",
-         "latitude": -25.1667, "longitude": 45.0500, "altitude": 150},
+        {
+            "code": "ST-TN-001",
+            "nom": "Toliara Ville",
+            "pa_code": "PA-TN-01",
+            "latitude": -23.3500,
+            "longitude": 43.6667,
+            "altitude": 8,
+        },
+        {
+            "code": "ST-TN-002",
+            "nom": "Morondava Nord",
+            "pa_code": "PA-TN-01",
+            "latitude": -20.4833,
+            "longitude": 44.3167,
+            "altitude": 5,
+        },
+        {
+            "code": "ST-TN-003",
+            "nom": "Beloha",
+            "pa_code": "PA-TN-01",
+            "latitude": -25.1667,
+            "longitude": 45.0500,
+            "altitude": 150,
+        },
         # PA-MN-01 : Mananjary
-        {"code": "ST-MN-001", "nom": "Mananjary Centre", "pa_code": "PA-MN-01",
-         "latitude": -21.2167, "longitude": 48.3333, "altitude": 10},
-        {"code": "ST-MN-002", "nom": "Nosy Varika", "pa_code": "PA-MN-01",
-         "latitude": -20.5833, "longitude": 48.5333, "altitude": 5},
-        {"code": "ST-MN-003", "nom": "Vatomandry", "pa_code": "PA-MN-01",
-         "latitude": -19.3333, "longitude": 48.9500, "altitude": 15},
+        {
+            "code": "ST-MN-001",
+            "nom": "Mananjary Centre",
+            "pa_code": "PA-MN-01",
+            "latitude": -21.2167,
+            "longitude": 48.3333,
+            "altitude": 10,
+        },
+        {
+            "code": "ST-MN-002",
+            "nom": "Nosy Varika",
+            "pa_code": "PA-MN-01",
+            "latitude": -20.5833,
+            "longitude": 48.5333,
+            "altitude": 5,
+        },
+        {
+            "code": "ST-MN-003",
+            "nom": "Vatomandry",
+            "pa_code": "PA-MN-01",
+            "latitude": -19.3333,
+            "longitude": 48.9500,
+            "altitude": 15,
+        },
         # PA-AN-02 : Antsirabe
-        {"code": "ST-AN-004", "nom": "Antsirabe Nord", "pa_code": "PA-AN-02",
-         "latitude": -19.8500, "longitude": 47.0333, "altitude": 1500},
-        {"code": "ST-AN-005", "nom": "Ambositra", "pa_code": "PA-AN-02",
-         "latitude": -20.5167, "longitude": 47.2500, "altitude": 1350},
-        {"code": "ST-AN-006", "nom": "Fianarantsoa", "pa_code": "PA-AN-02",
-         "latitude": -21.4500, "longitude": 47.0833, "altitude": 1100},
+        {
+            "code": "ST-AN-004",
+            "nom": "Antsirabe Nord",
+            "pa_code": "PA-AN-02",
+            "latitude": -19.8500,
+            "longitude": 47.0333,
+            "altitude": 1500,
+        },
+        {
+            "code": "ST-AN-005",
+            "nom": "Ambositra",
+            "pa_code": "PA-AN-02",
+            "latitude": -20.5167,
+            "longitude": 47.2500,
+            "altitude": 1350,
+        },
+        {
+            "code": "ST-AN-006",
+            "nom": "Fianarantsoa",
+            "pa_code": "PA-AN-02",
+            "latitude": -21.4500,
+            "longitude": 47.0833,
+            "altitude": 1100,
+        },
     ],
 }
 

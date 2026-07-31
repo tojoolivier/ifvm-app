@@ -1,20 +1,19 @@
 import uuid
-import pytest
-import pytest_asyncio
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy import text
 
-from app.main import app as fastapi_app
-from app.database import get_db
-from app.models.base import Base
-from app.models.users import Utilisateur
-from app.auth import hash_password, create_access_token
+import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 # Import all models so metadata knows about all tables
 import app.infrastructure.campagne_model  # noqa: F401
 import app.infrastructure.prospection_model  # noqa: F401
 import app.infrastructure.referentiel_model  # noqa: F401
+from app.auth import create_access_token, hash_password
+from app.database import get_db
+from app.main import app as fastapi_app
+from app.models.base import Base
+from app.models.users import Utilisateur
 
 TEST_DATABASE_URL = "postgresql+asyncpg://ifvm:ifvm_secret@localhost:5432/ifvm_test"
 
@@ -74,8 +73,9 @@ async def auth_headers(utilisateur: Utilisateur) -> dict:
 
 @pytest_asyncio.fixture
 async def campagne_id(db_session: AsyncSession, utilisateur: Utilisateur) -> uuid.UUID:
-    from app.infrastructure.campagne_model import CampagneModel
     from datetime import date
+
+    from app.infrastructure.campagne_model import CampagneModel
 
     c = CampagneModel(
         id=uuid.uuid4(),

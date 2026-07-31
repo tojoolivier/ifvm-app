@@ -7,7 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application.referentiel_use_cases import GetStation, ListPostesAcridiens, ListStations
 from app.auth import get_current_user
 from app.database import get_db
-from app.infrastructure.referentiel_repository import PosteAcridienRepositoryImpl, StationFixeRepositoryImpl
+from app.infrastructure.referentiel_repository import (
+    PosteAcridienRepositoryImpl,
+    StationFixeRepositoryImpl,
+)
 from app.models.users import Utilisateur
 from app.presentation.referentiel_schemas import PosteAcridienRead, StationFixeRead
 

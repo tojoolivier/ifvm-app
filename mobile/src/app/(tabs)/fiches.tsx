@@ -8,12 +8,10 @@ import {
   TextInput,
   FlatList,
   Dimensions,
-  Platform,
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useAuthStore } from '@/lib/auth-store';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isSmallScreen = SCREEN_WIDTH < 380;
@@ -123,7 +121,6 @@ const MOCK_FICHES: FicheItem[] = [
 
 export default function FichesScreen() {
   const router = useRouter();
-  const user = useAuthStore((s) => s.user);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<TypeFiche | 'TOUS'>('TOUS');
   const scrollViewRef = useRef<ScrollView>(null);

@@ -1,9 +1,5 @@
 import { updateProspectionVegetation } from '../src/lib/prospection-repository';
 
-jest.mock('../src/lib/prospection-repository', () => ({
-  updateProspectionVegetation: jest.fn(),
-}));
-
 import {
   DEFAULT_VEGETATION_SOL,
   STRATE_KEYS,
@@ -17,6 +13,10 @@ import {
   saveVegetationSol,
   totalRecouvrement,
 } from '../src/lib/prospection-vegetation';
+
+jest.mock('../src/lib/prospection-repository', () => ({
+  updateProspectionVegetation: jest.fn(),
+}));
 
 const mockUpdateVegetation = jest.mocked(updateProspectionVegetation);
 

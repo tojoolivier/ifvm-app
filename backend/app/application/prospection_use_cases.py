@@ -111,14 +111,14 @@ class CreateProspection:
             verdissement_pourcent=verdissement_pourcent,
             hauteur_herbe_cm=hauteur_herbe_cm,
         )
-        
+
         for child in prospection.populations:
             child.prospection_id = prospection.id
         for child in prospection.captures:
             child.prospection_id = prospection.id
         for child in prospection.infestations:
             child.prospection_id = prospection.id
-            
+
         return await self.repository.create(prospection)
 
 
@@ -198,7 +198,7 @@ class UpdateProspection:
         prospection = await self.repository.get_by_id(prospection_id)
         if prospection is None:
             return None
-            
+
         if prospection.statut != "brouillon":
             raise PermissionError("Seules les fiches en brouillon peuvent être modifiées")
 
@@ -246,7 +246,7 @@ class UpdateProspection:
             prospection.observations = observations
         if statut is not None:
             prospection.statut = statut
-            
+
         # ==========================================
         # Mise à jour des nouveaux champs - Références (A)
         # ==========================================
@@ -260,7 +260,7 @@ class UpdateProspection:
             prospection.za = za
         if pa_code is not None:
             prospection.pa_code = pa_code
-            
+
         # ==========================================
         # Mise à jour des nouveaux champs - Observations (D)
         # ==========================================
@@ -270,7 +270,7 @@ class UpdateProspection:
             prospection.verdissement_pourcent = verdissement_pourcent
         if hauteur_herbe_cm is not None:
             prospection.hauteur_herbe_cm = hauteur_herbe_cm
-            
+
         prospection.updated_at = datetime.utcnow()
 
         return await self.repository.update(prospection)

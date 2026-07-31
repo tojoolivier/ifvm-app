@@ -1,3 +1,5 @@
+import { getCurrentPosition, LocationPermissionDeniedError } from '../src/lib/location';
+
 const requestForegroundPermissionsAsync = jest.fn();
 const getCurrentPositionAsync = jest.fn();
 
@@ -6,8 +8,6 @@ jest.mock('expo-location', () => ({
     requestForegroundPermissionsAsync(...args),
   getCurrentPositionAsync: (...args: unknown[]) => getCurrentPositionAsync(...args),
 }));
-
-import { getCurrentPosition, LocationPermissionDeniedError } from '../src/lib/location';
 
 beforeEach(() => {
   requestForegroundPermissionsAsync.mockReset();

@@ -40,10 +40,13 @@ export default function ProspectionScreen() {
 
   useEffect(() => {
     if (justSaved !== '1') return;
-    setShowSavedToast(true);
     router.setParams({ justSaved: undefined });
-    const timeout = setTimeout(() => setShowSavedToast(false), 3000);
-    return () => clearTimeout(timeout);
+    const showTimeout = setTimeout(() => setShowSavedToast(true), 0);
+    const hideTimeout = setTimeout(() => setShowSavedToast(false), 3000);
+    return () => {
+      clearTimeout(showTimeout);
+      clearTimeout(hideTimeout);
+    };
   }, [justSaved, router]);
 
   const resumeDraft = (draft: DraftProspection) => {

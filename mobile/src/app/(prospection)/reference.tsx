@@ -37,8 +37,6 @@ export default function ReferenceScreen() {
 
   useEffect(() => {
     let cancelled = false;
-    setGpsStatus('loading');
-    setGpsError(null);
 
     getCurrentPosition()
       .then((pos) => {

@@ -1,9 +1,5 @@
 import { updateProspectionEspeces, DraftProspection } from '../src/lib/prospection-repository';
 
-jest.mock('../src/lib/prospection-repository', () => ({
-  updateProspectionEspeces: jest.fn(),
-}));
-
 import {
   countGrilles,
   hasSelection,
@@ -12,6 +8,10 @@ import {
   saveEspeceSelection,
   EMPTY_ESPECE_SELECTION,
 } from '../src/lib/prospection-especes';
+
+jest.mock('../src/lib/prospection-repository', () => ({
+  updateProspectionEspeces: jest.fn(),
+}));
 
 const mockUpdate = jest.mocked(updateProspectionEspeces);
 

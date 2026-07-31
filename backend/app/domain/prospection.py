@@ -151,13 +151,12 @@ class Prospection:
         """
         transitions = _TRANSITIONS.get(self.statut, {})
         if nouveau_statut not in transitions:
-            raise ValueError(
-                f"Transition '{self.statut}' → '{nouveau_statut}' invalide"
-            )
+            raise ValueError(f"Transition '{self.statut}' → '{nouveau_statut}' invalide")
         roles_autorises = transitions[nouveau_statut]
         if acteur_role not in roles_autorises:
             raise PermissionError(
-                f"Rôle '{acteur_role}' non autorisé pour passer de '{self.statut}' à '{nouveau_statut}'"
+                f"Rôle '{acteur_role}' non autorisé pour passer de "
+                f"'{self.statut}' à '{nouveau_statut}'"
             )
         self.statut = nouveau_statut
         self.updated_at = datetime.utcnow()

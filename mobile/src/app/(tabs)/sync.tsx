@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useAuthStore } from '@/lib/auth-store';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isSmallScreen = SCREEN_WIDTH < 380;
@@ -20,7 +19,6 @@ const isTablet = SCREEN_WIDTH >= 768;
 
 const IFVM_GREEN = '#1B5E1B';
 const IFVM_GREEN_DARK = '#163F16';
-const IFVM_GREEN_LIGHT = '#E8F3E8';
 
 type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
 type SyncItem = {
@@ -50,7 +48,6 @@ const TYPE_CONFIG: Record<SyncItem['type'], { label: string; color: string; bg: 
 
 export default function SyncScreen() {
   const router = useRouter();
-  const user = useAuthStore((s) => s.user);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [progress, setProgress] = useState(0);
@@ -112,7 +109,7 @@ export default function SyncScreen() {
       } else {
         Alert.alert('✅ Synchronisation réussie', 'Toutes les données ont été synchronisées');
       }
-    } catch (error) {
+    } catch {
       setSyncStatus('error');
       Alert.alert(
         '❌ Erreur de synchronisation',

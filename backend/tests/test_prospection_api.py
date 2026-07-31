@@ -1,4 +1,5 @@
 import uuid
+
 import pytest
 from httpx import AsyncClient
 
@@ -54,9 +55,7 @@ async def test_create_prospection_intensive_avec_sections(
                     "accouplement": "rare",
                 }
             ],
-            "infestations": [
-                {"espece": "NSE", "type_cible": "tache_larvaire", "surface_tot": 2.0}
-            ],
+            "infestations": [{"espece": "NSE", "type_cible": "tache_larvaire", "surface_tot": 2.0}],
         },
         headers=auth_headers,
     )
@@ -114,7 +113,7 @@ async def test_create_prospection_avec_nouveaux_champs(
     )
     assert response.status_code == 201
     data = response.json()
-    
+
     assert data["region"] == "Diana"
     assert data["district"] == "Ambanja"
     assert data["commune"] == "Ambanja"
@@ -123,7 +122,7 @@ async def test_create_prospection_avec_nouveaux_champs(
     assert data["degats_cultures_pourcent"] == 25
     assert data["verdissement_pourcent"] == 60
     assert data["hauteur_herbe_cm"] == 30.5
-    
+
     assert len(data["infestations"]) == 1
     infestation = data["infestations"][0]
     assert infestation["pullulation_nb"] == 3
@@ -186,7 +185,7 @@ async def test_create_prospection_avec_infestation_complete(
     )
     assert response.status_code == 201
     data = response.json()
-    
+
     infestation = data["infestations"][0]
     assert infestation["type_cible"] == "bande_larvaire"
     assert infestation["pullulation_nb"] == 2
@@ -431,7 +430,7 @@ async def test_list_filtre_statut(
     )
 
     response = await client.get(
-        f"/prospections?type=intensive&statut=en_attente", headers=auth_headers
+        "/prospections?type=intensive&statut=en_attente", headers=auth_headers
     )
     assert response.status_code == 200
     data = response.json()
@@ -482,7 +481,7 @@ async def test_create_prospection_avec_stades_larvaires_l6_l7(
     )
     assert response.status_code == 201
     data = response.json()
-    
+
     captures = data["captures"]
     stades = [c["stade"] for c in captures]
     assert "L6" in stades

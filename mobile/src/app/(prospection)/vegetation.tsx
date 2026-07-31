@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, PanResponder, LayoutChangeEvent } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -189,25 +189,26 @@ export default function VegetationScreen() {
 }
 
 function RecouvrementSlider({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  const trackWidthRef = useRef(1);
+  const [trackWidth, setTrackWidth] = useState(1);
 
   const handleLayout = (event: LayoutChangeEvent) => {
-    trackWidthRef.current = event.nativeEvent.layout.width || 1;
+    setTrackWidth(event.nativeEvent.layout.width || 1);
   };
 
-  const updateFromLocationX = (locationX: number) => {
-    const percent = (locationX / trackWidthRef.current) * 100;
-    onChange(clampRecouvrement(percent));
-  };
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt) => updateFromLocationX(evt.nativeEvent.locationX),
-      onPanResponderMove: (evt) => updateFromLocationX(evt.nativeEvent.locationX),
-    })
-  ).current;
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (evt) => {
+          onChange(clampRecouvrement((evt.nativeEvent.locationX / trackWidth) * 100));
+        },
+        onPanResponderMove: (evt) => {
+          onChange(clampRecouvrement((evt.nativeEvent.locationX / trackWidth) * 100));
+        },
+      }),
+    [trackWidth, onChange]
+  );
 
   return (
     <View>

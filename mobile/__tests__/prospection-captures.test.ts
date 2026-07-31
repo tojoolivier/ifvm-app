@@ -1,10 +1,5 @@
 import { startCaptureTimer, saveProspectionCaptures, DraftProspection } from '../src/lib/prospection-repository';
 
-jest.mock('../src/lib/prospection-repository', () => ({
-  startCaptureTimer: jest.fn(),
-  saveProspectionCaptures: jest.fn(),
-}));
-
 import {
   CAPTURES_MAX,
   CHRONO_MAX_SECONDS,
@@ -46,6 +41,11 @@ import {
   totalBySexe,
   totalCaptures,
 } from '../src/lib/prospection-captures';
+
+jest.mock('../src/lib/prospection-repository', () => ({
+  startCaptureTimer: jest.fn(),
+  saveProspectionCaptures: jest.fn(),
+}));
 
 const mockStartTimer = jest.mocked(startCaptureTimer);
 const mockSaveCaptures = jest.mocked(saveProspectionCaptures);
