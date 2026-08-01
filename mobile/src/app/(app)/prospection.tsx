@@ -76,8 +76,20 @@ export default function ProspectionScreen() {
     <View style={styles.root}>
       <View style={styles.header}>
         <SafeAreaView edges={['top']}>
-          <Text style={styles.headerTitle}>Prospection</Text>
-          <Text style={styles.headerSub}>Fiches hors-ligne du prospecteur</Text>
+          <View style={styles.headerContent}>
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={() => router.back()}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.backIcon}>‹</Text>
+            </TouchableOpacity>
+            <View style={styles.headerTextContainer}>
+              <Text style={styles.headerTitle}>Prospection</Text>
+              <Text style={styles.headerSub}>Fiches hors-ligne du prospecteur</Text>
+            </View>
+            <View style={styles.headerRight} />
+          </View>
         </SafeAreaView>
       </View>
 
@@ -162,7 +174,12 @@ export default function ProspectionScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#F3F4F6' },
-  header: { backgroundColor: IFVM_GREEN_DARK, paddingHorizontal: 16, paddingBottom: 14, paddingTop: 8 },
+  header: { backgroundColor: IFVM_GREEN_DARK, paddingHorizontal: 16, paddingBottom: 14 },
+  headerContent: { flexDirection: 'row', alignItems: 'center', paddingTop: 8 },
+  backBtn: { width: 32, height: 32, borderRadius: 8, backgroundColor: '#FFFFFF22', alignItems: 'center', justifyContent: 'center' },
+  backIcon: { color: '#FFFFFF', fontSize: 22, fontWeight: '300', lineHeight: 26, marginTop: -2 },
+  headerTextContainer: { flex: 1, marginLeft: 12 },
+  headerRight: { width: 32 },
   headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
   headerSub: { color: '#FFFFFFAA', fontSize: 12, marginTop: 1 },
   content: { flex: 1 },

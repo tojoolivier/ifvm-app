@@ -96,7 +96,7 @@ export default function ReferenceScreen() {
         <View style={styles.headerContent}>
           <TouchableOpacity 
             style={styles.backBtn} 
-            onPress={() => router.push('/(tabs)/prospection')}
+            onPress={() => router.push('/(app)/prospection')}
             activeOpacity={0.7}
           >
             <Text style={styles.backIcon}>‹</Text>

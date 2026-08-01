@@ -34,7 +34,7 @@ export default function RecapitulatifScreen() {
     setSaveError(null);
     try {
       await enregistrerEtSynchroniser(draft, token);
-      router.push({ pathname: '/(tabs)/prospection', params: { justSaved: '1' } });
+      router.push({ pathname: '/(app)/prospection', params: { justSaved: '1' } });
     } catch {
       setSaveError("Impossible d'enregistrer la fiche localement");
     } finally {

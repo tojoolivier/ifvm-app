@@ -350,6 +350,13 @@ export default function ProfileScreen() {
       <View style={styles.header}>
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.headerContent}>
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={() => router.back()}
+              activeOpacity={0.7}
+            >
+              <ThemedText style={styles.backIcon}>‹</ThemedText>
+            </TouchableOpacity>
             <Image
               source={require('../../../assets/images/logo-ifvm.png')}
               style={styles.logo}
@@ -361,7 +368,6 @@ export default function ProfileScreen() {
                 {user?.prenom} {user?.nom}
               </ThemedText>
             </View>
-            <View style={{ width: 40 }} />
           </View>
         </SafeAreaView>
       </View>
@@ -673,12 +679,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 8,
   },
+  backBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF22',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backIcon: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '300',
+    lineHeight: 26,
+    marginTop: -2,
+  },
   logo: {
     width: 44,
     height: 44,
     borderRadius: 22,
     backgroundColor: 'rgba(255,255,255,0.15)',
     padding: 6,
+    marginLeft: 10,
   },
   headerTextContainer: {
     flex: 1,
