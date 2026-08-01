@@ -1,0 +1,5 @@
+{
+  "mobile/**/*.{js,jsx,ts,tsx}": ["bash -c 'cd mobile && npx expo lint --fix'"],
+  "frontend/**/*.{js,jsx,ts,tsx}": ["bash -c 'cd frontend && npx eslint --fix'"],
+  "backend/**/*.py": ["ruff check --fix", "ruff format"]
+}
