@@ -140,14 +140,3 @@ export interface Prospection {
   tempsTraitement?: number;
   commentaires?: string;
 }
-
-export interface Notification {
-  id: string;
-  ficheId: string;
-  type: 'validation' | 'rejet' | 'verification';
-  message: string;
-  date: string;
-  lu: boolean;
-  status: FicheStatus;
-  motif?: string;
-}
