@@ -3,7 +3,7 @@
 
 .DEFAULT_GOAL := help
 .PHONY: help install pods pods-clean start start-clean ios android web \
-        lint test resync clean nuke doctor
+        lint format test resync clean nuke doctor
 
 ## Affiche cette aide
 help:
@@ -48,6 +48,10 @@ web:
 ## Lint
 lint:
 	npx expo lint
+
+## Formate le code (corrections auto ESLint)
+format:
+	npx expo lint --fix
 
 ## Tests Jest
 test:

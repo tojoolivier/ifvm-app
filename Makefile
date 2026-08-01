@@ -1,6 +1,6 @@
 COMPOSE = docker compose
 
-.PHONY: up down build logs migrate seed shell-db shell-backend
+.PHONY: up down build logs migrate seed shell-db shell-backend lint format
 
 up:
 	$(COMPOSE) up -d
@@ -31,6 +31,12 @@ shell-db:
 
 shell-backend:
 	$(COMPOSE) exec backend bash
+
+lint:
+	$(MAKE) -C mobile lint
+
+format:
+	$(MAKE) -C mobile format
 
 # --- Infra Contabo (principal) ---
 TF_CONTABO = terraform -chdir=infra/contabo
