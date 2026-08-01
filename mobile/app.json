@@ -48,7 +48,9 @@
         {
           "locationWhenInUsePermission": "IFVM a besoin de votre position pour géoréférencer les prospections."
         }
-      ]
+      ],
+      "expo-sharing",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
