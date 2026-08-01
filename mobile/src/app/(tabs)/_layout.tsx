@@ -11,8 +11,6 @@ type TabIconMap = {
 const ICONS: TabIconMap = {
   index: '🏠',
   prospection: '📝',
-  fiches: '📋',
-  notifications: '🔔',
   sync: '🔄',
   profile: '👤',
 };
@@ -20,8 +18,6 @@ const ICONS: TabIconMap = {
 const LABELS: TabIconMap = {
   index: 'Accueil',
   prospection: 'Prospection',
-  fiches: 'Mes fiches',
-  notifications: 'Notifications',
   sync: 'Sync',
   profile: 'Profil',
 };
@@ -36,8 +32,8 @@ export default function TabLayout() {
     >
       <Tabs.Screen name="index" options={{ title: 'Accueil', href: undefined }} />
       <Tabs.Screen name="prospection" options={{ title: 'Prospection', href: undefined }} />
-      <Tabs.Screen name="fiches" options={{ title: 'Mes fiches', href: undefined }} />
-      <Tabs.Screen name="notifications" options={{ title: 'Notifications', href: undefined }} />
+      <Tabs.Screen name="fiches" options={{ href: null }} />
+      <Tabs.Screen name="notifications" options={{ href: null }} />
       <Tabs.Screen name="sync" options={{ title: 'Sync', href: undefined }} />
       <Tabs.Screen name="profile" options={{ title: 'Profil', href: undefined }} />
     </Tabs>
@@ -55,7 +51,7 @@ function BottomBar(props: any) {
     if (active !== name && !ev.defaultPrevented) navigation.navigate(name);
   };
 
-  const tabs = ['index', 'prospection', 'fiches', 'notifications', 'sync', 'profile'];
+  const tabs = ['index', 'prospection', 'sync', 'profile'];
 
   return (
     <View style={styles.bar}>
