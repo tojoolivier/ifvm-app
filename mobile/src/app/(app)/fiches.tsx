@@ -153,13 +153,13 @@ export default function FichesScreen() {
       });
     } else if (fiche.type === 'CRT') {
       router.push({
-        pathname: '/(tabs)/fiches',
+        pathname: '/(app)/fiches',
         params: { id: fiche.id, view: 'crt' }
       });
     } else {
       // Météo
       router.push({
-        pathname: '/(tabs)/fiches',
+        pathname: '/(app)/fiches',
         params: { id: fiche.id, view: 'meteo' }
       });
     }
@@ -295,7 +295,7 @@ export default function FichesScreen() {
       {/* Bouton Nouvelle fiche */}
       <TouchableOpacity
         style={styles.btnNouvelle}
-        onPress={() => router.push('/(tabs)/prospection')}
+        onPress={() => router.push('/(app)/prospection')}
         activeOpacity={0.85}
       >
         <Text style={styles.btnNouvelleText}>+ Nouvelle fiche</Text>
