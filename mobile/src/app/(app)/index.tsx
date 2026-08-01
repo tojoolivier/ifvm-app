@@ -177,14 +177,11 @@ export default function DashboardScreen() {
       <View style={styles.header}>
         <SafeAreaView style={styles.safeArea}>
           <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-            <View style={styles.headerTopRow}>
-              <ThemedText style={styles.networkStatus}>
-                {isOffline ? '⚠ Hors-ligne' : '● En ligne'}
-              </ThemedText>
-              <TouchableOpacity onPress={() => navigateTo('/(app)/profile')} activeOpacity={0.7}>
-                <ThemedText style={styles.gearIcon}>⚙️</ThemedText>
-              </TouchableOpacity>
-            </View>
+            {isOffline && (
+              <View style={styles.headerTopRow}>
+                <ThemedText style={styles.networkStatus}>⚠ Hors-ligne</ThemedText>
+              </View>
+            )}
 
             <View style={styles.headerContent}>
               <Image
@@ -199,6 +196,9 @@ export default function DashboardScreen() {
                 </ThemedText>
                 <ThemedText style={styles.headerRole}>Agent de terrain</ThemedText>
               </View>
+              <TouchableOpacity onPress={() => navigateTo('/(app)/profile')} activeOpacity={0.7}>
+                <ThemedText style={styles.gearIcon}>⚙️</ThemedText>
+              </TouchableOpacity>
             </View>
 
             <View style={styles.badgeRow}>
@@ -409,7 +409,6 @@ const styles = StyleSheet.create({
   },
   headerTopRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: 8,
   },
