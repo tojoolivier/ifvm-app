@@ -14,16 +14,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
 import { ThemedText } from '@/components/themed-text';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { 
-  getProspectionsByUser, 
-  getNotifications, 
-  getUnreadNotifications,
+import {
+  getProspectionsByUser,
   getStatsByStatus,
-  checkPendingSyncNotifications,
+  checkPendingSync,
   shouldCheckSync,
   updateLastSyncCheck,
   getPendingSyncCount,
-  addNotification,
 } from '@/lib/storage';
 import * as Network from 'expo-network';
 import * as Location from 'expo-location';
@@ -70,8 +67,6 @@ export default function DashboardScreen() {
   const router = useRouter();
   
   const [prospections, setProspections] = useState<any[]>([]);
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [stats, setStats] = useState<Record<string, number>>({});
   const [refreshing, setRefreshing] = useState(false);
   const [position, setPosition] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -128,21 +123,11 @@ export default function DashboardScreen() {
         const pendingCount = await getPendingSyncCount();
         setPendingSyncCount(pendingCount);
         setShowSyncBanner(pendingCount > 0);
-        
-        if (pendingCount > 0) {
-          // Ajouter une notification de synchronisation disponible
-          await addNotification({
-            ficheId: 'sync_available',
-            type: 'sync_available',
-            message: `📶 ${pendingCount} fiche(s) en attente de synchronisation. Une connexion Internet est disponible.`,
-            status: 'sync_available',
-          });
-        }
       } else {
         // Si pas connecté, vérifier les fiches en attente depuis plus de 3 jours
         const shouldCheck = await shouldCheckSync();
         if (shouldCheck) {
-          const pendingFiches = await checkPendingSyncNotifications();
+          const pendingFiches = await checkPendingSync();
           setPendingSyncCount(pendingFiches.length);
           setShowSyncBanner(pendingFiches.length > 0);
           await updateLastSyncCheck();
@@ -185,17 +170,13 @@ export default function DashboardScreen() {
     if (!user?.id) return;
 
     try {
-      const [fiches, notifs, unread, statsData, pendingCount] = await Promise.all([
+      const [fiches, statsData, pendingCount] = await Promise.all([
         getProspectionsByUser(user.id),
-        getNotifications(),
-        getUnreadNotifications(),
         getStatsByStatus(user.id),
         getPendingSyncCount(),
       ]);
-      
+
       setProspections(fiches);
-      setNotifications(notifs);
-      setUnreadCount(unread.length);
       setStats(statsData);
       setPendingSyncCount(pendingCount);
       setShowSyncBanner(pendingCount > 0);
@@ -226,9 +207,6 @@ export default function DashboardScreen() {
     router.push(path as any);
   };
 
-  // Vérifier si des fiches ont changé de statut
-  const hasUpdates = notifications.some((n: any) => !n.lu);
-
   // Statistiques totales
   const totalFiches = prospections.length;
   const statsList = [
@@ -257,19 +235,6 @@ export default function DashboardScreen() {
                 {user?.prenom} {user?.nom} · Prospecteur
               </ThemedText>
             </View>
-            <TouchableOpacity 
-              onPress={() => navigateTo('/(tabs)/notifications')}
-              style={styles.notificationButton}
-            >
-              <ThemedText style={styles.notificationIcon}>🔔</ThemedText>
-              {unreadCount > 0 && (
-                <View style={styles.notificationBadge}>
-                  <ThemedText style={styles.notificationBadgeText}>
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </ThemedText>
-                </View>
-              )}
-            </TouchableOpacity>
           </Animated.View>
         </SafeAreaView>
       </View>
@@ -313,11 +278,6 @@ export default function DashboardScreen() {
                 <ThemedText style={styles.positionText}>
                   {position.latitude.toFixed(4)}, {position.longitude.toFixed(4)}
                 </ThemedText>
-              </View>
-            )}
-            {hasUpdates && (
-              <View style={styles.updateBadge}>
-                <ThemedText style={styles.updateBadgeText}>🔄 Mises à jour</ThemedText>
               </View>
             )}
           </View>
@@ -509,34 +469,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 1,
   },
-  notificationButton: {
-    position: 'relative',
-    padding: 8,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 20,
-  },
-  notificationIcon: {
-    fontSize: 22,
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    backgroundColor: IFVM_RED,
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 5,
-    borderWidth: 2,
-    borderColor: HEADER_BG,
-  },
-  notificationBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '700',
-  },
   scrollContent: {
     padding: 16,
     paddingBottom: 40,
@@ -640,17 +572,6 @@ const styles = StyleSheet.create({
   positionText: {
     color: TEXT_BLACK,
     fontSize: 10,
-  },
-  updateBadge: {
-    backgroundColor: IFVM_ORANGE_BG,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  updateBadgeText: {
-    color: IFVM_ORANGE,
-    fontSize: 10,
-    fontWeight: '600',
   },
   syncBanner: {
     backgroundColor: IFVM_ORANGE_BG,

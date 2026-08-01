@@ -33,7 +33,6 @@ export default function TabLayout() {
       <Tabs.Screen name="index" options={{ title: 'Accueil', href: undefined }} />
       <Tabs.Screen name="prospection" options={{ title: 'Prospection', href: undefined }} />
       <Tabs.Screen name="fiches" options={{ href: null }} />
-      <Tabs.Screen name="notifications" options={{ href: null }} />
       <Tabs.Screen name="sync" options={{ title: 'Sync', href: undefined }} />
       <Tabs.Screen name="profile" options={{ title: 'Profil', href: undefined }} />
     </Tabs>

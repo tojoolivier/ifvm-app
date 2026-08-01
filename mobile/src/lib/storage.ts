@@ -145,8 +145,6 @@ export const markAllAsSynced = async (): Promise<void> => {
 // Nouvelles fonctions pour le dashboard prospecteur
 // ============================================
 
-const NOTIFICATIONS_KEY = '@notifications';
-
 // Récupérer les prospections d'un utilisateur spécifique
 export const getProspectionsByUser = async (userId: string): Promise<any[]> => {
   try {
@@ -154,69 +152,6 @@ export const getProspectionsByUser = async (userId: string): Promise<any[]> => {
     return prospections.filter((p: any) => p.prospecteurId === userId);
   } catch (error) {
     console.error('Erreur lecture prospections utilisateur:', error);
-    return [];
-  }
-};
-
-// Ajouter une notification
-export const addNotification = async (notification: any): Promise<void> => {
-  try {
-    const notifications = await getNotifications();
-    const newNotification = {
-      ...notification,
-      id: Date.now().toString(),
-      date: new Date().toISOString(),
-      lu: false,
-    };
-    await storage.setItem(NOTIFICATIONS_KEY, JSON.stringify([newNotification, ...notifications]));
-  } catch (error) {
-    console.error('Erreur ajout notification:', error);
-  }
-};
-
-// Récupérer toutes les notifications
-export const getNotifications = async (): Promise<any[]> => {
-  try {
-    const data = await storage.getItem(NOTIFICATIONS_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch (error) {
-    console.error('Erreur lecture notifications:', error);
-    return [];
-  }
-};
-
-// Marquer une notification comme lue
-export const markNotificationAsRead = async (id: string): Promise<void> => {
-  try {
-    const notifications = await getNotifications();
-    const index = notifications.findIndex((n: any) => n.id === id);
-    if (index !== -1) {
-      notifications[index].lu = true;
-      await storage.setItem(NOTIFICATIONS_KEY, JSON.stringify(notifications));
-    }
-  } catch (error) {
-    console.error('Erreur marquage notification:', error);
-  }
-};
-
-// Marquer toutes les notifications comme lues
-export const markAllNotificationsAsRead = async (): Promise<void> => {
-  try {
-    const notifications = await getNotifications();
-    const updated = notifications.map((n: any) => ({ ...n, lu: true }));
-    await storage.setItem(NOTIFICATIONS_KEY, JSON.stringify(updated));
-  } catch (error) {
-    console.error('Erreur marquage toutes notifications:', error);
-  }
-};
-
-// Récupérer les notifications non lues
-export const getUnreadNotifications = async (): Promise<any[]> => {
-  try {
-    const notifications = await getNotifications();
-    return notifications.filter((n: any) => !n.lu);
-  } catch (error) {
-    console.error('Erreur lecture notifications non lues:', error);
     return [];
   }
 };
@@ -248,14 +183,6 @@ export const envoyerFiche = async (id: string, userId: string, userNom: string):
       };
       
       await storage.setItem(STORAGE_KEYS.PROSPECTIONS, JSON.stringify(prospections));
-      
-      // Créer une notification
-      await addNotification({
-        ficheId: id,
-        type: 'verification',
-        message: `Votre fiche "${fiche.station || 'Station'}" a été envoyée pour validation`,
-        status: 'envoye',
-      });
     }
   } catch (error) {
     console.error('Erreur envoi fiche:', error);
@@ -298,24 +225,11 @@ export const updateFicheStatus = async (
         case 'verifie':
           updates.verifieLe = new Date().toISOString();
           updates.verifiePar = utilisateur;
-          await addNotification({
-            ficheId: id,
-            type: 'verification',
-            message: `Votre fiche "${fiche.station || 'Station'}" a été vérifiée`,
-            status: 'verifie',
-          });
           break;
         case 'rejete':
           updates.rejeteLe = new Date().toISOString();
           updates.rejetePar = utilisateur;
           updates.motifRejet = motif;
-          await addNotification({
-            ficheId: id,
-            type: 'rejet',
-            message: `Votre fiche "${fiche.station || 'Station'}" a été rejetée`,
-            status: 'rejete',
-            motif: motif,
-          });
           break;
         case 'valide':
           updates.valideLe = new Date().toISOString();
@@ -325,12 +239,6 @@ export const updateFicheStatus = async (
             const valide = new Date().getTime();
             updates.tempsTraitement = Math.round((valide - envoy) / (1000 * 60));
           }
-          await addNotification({
-            ficheId: id,
-            type: 'validation',
-            message: `✅ Votre fiche "${fiche.station || 'Station'}" a été validée !`,
-            status: 'valide',
-          });
           break;
       }
 
@@ -359,49 +267,24 @@ export const getStatsByStatus = async (userId: string): Promise<Record<string, n
 };
 
 // ============================================
-// FONCTIONS DE SYNC ET NOTIFICATIONS
+// FONCTIONS DE SYNC
 // ============================================
 
 const SYNC_CHECK_KEY = '@last_sync_check';
-const SYNC_REMINDER_KEY = '@sync_reminder_sent';
 
 // Vérifier les fiches en attente de synchronisation depuis plus de 3 jours
-export const checkPendingSyncNotifications = async (): Promise<any[]> => {
+export const checkPendingSync = async (): Promise<any[]> => {
   try {
     const prospections = await getProspections();
     const now = new Date();
     const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
-    
+
     // Fiches non synchronisées créées il y a plus de 3 jours
-    const pendingFiches = prospections.filter((p: any) => {
+    return prospections.filter((p: any) => {
       if (p.synced) return false;
       const createdAt = new Date(p.createdAt);
       return createdAt < threeDaysAgo;
     });
-
-    // Vérifier si une notification de rappel a déjà été envoyée
-    const reminderSent = await storage.getItem(SYNC_REMINDER_KEY);
-    const lastReminderDate = reminderSent ? new Date(reminderSent) : null;
-    
-    // Envoyer une notification si le dernier rappel date de plus de 24h
-    const shouldSendReminder = !lastReminderDate || 
-      (now.getTime() - lastReminderDate.getTime() > 24 * 60 * 60 * 1000);
-
-    if (pendingFiches.length > 0 && shouldSendReminder) {
-      // Ajouter une notification de rappel
-      await addNotification({
-        ficheId: 'sync_reminder',
-        type: 'sync_reminder',
-        message: `📡 ${pendingFiches.length} fiche(s) en attente de synchronisation depuis plus de 3 jours. Veuillez vous connecter à Internet pour les synchroniser.`,
-        status: 'sync_reminder',
-        motif: pendingFiches.map((f: any) => `- ${f.station || 'Station inconnue'} (${f.date})`).join('\n'),
-      });
-      
-      // Mettre à jour la date du dernier rappel
-      await storage.setItem(SYNC_REMINDER_KEY, now.toISOString());
-    }
-
-    return pendingFiches;
   } catch (error) {
     console.error('Erreur vérification sync:', error);
     return [];

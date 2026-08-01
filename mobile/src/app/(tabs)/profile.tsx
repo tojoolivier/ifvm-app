@@ -25,7 +25,6 @@ export default function ProfileScreen() {
   const logout = useAuthStore((s) => s.logout);
   const token = useAuthStore((s) => s.token);
   
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [locationEnabled, setLocationEnabled] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
@@ -447,12 +446,6 @@ export default function ProfileScreen() {
         <View style={styles.preferencesSection}>
           <ThemedText style={styles.sectionTitle}>⚙️ Préférences</ThemedText>
           <View style={styles.preferencesCard}>
-            <PreferenceItem
-              icon="🔔"
-              label="Notifications"
-              value={notificationsEnabled}
-              onToggle={setNotificationsEnabled}
-            />
             <PreferenceItem
               icon="📍"
               label="Localisation"
