@@ -4,12 +4,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Network from 'expo-network';
 import { useAuthStore } from '@/lib/auth-store';
-import {
-  loadAccueilData,
-  loadValidatedProspections,
-  startNewProspection,
-  AccueilViewModel,
-} from '@/lib/prospection-accueil';
+import { loadAccueilData, loadValidatedProspections, AccueilViewModel } from '@/lib/prospection-accueil';
 import { DraftProspection } from '@/lib/prospection-repository';
 import { ProspectionRead } from '@/lib/api-client';
 
@@ -41,8 +36,6 @@ export default function ProspectionScreen() {
   const user = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.token);
   const [data, setData] = useState<AccueilViewModel>(EMPTY_DATA);
-  const [isCreating, setIsCreating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [showSavedToast, setShowSavedToast] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
 
@@ -99,19 +92,8 @@ export default function ProspectionScreen() {
     return [...draftItems, ...validatedItems].sort((a, b) => b.date.localeCompare(a.date));
   }, [data.recent, data.validated]);
 
-  const handleNewProspection = async () => {
-    if (!user || !token) return;
-    setIsCreating(true);
-    setError(null);
-    try {
-      const draft = await startNewProspection({ token, prospecteurId: user.id });
-      refresh();
-      resumeDraft(draft);
-    } catch {
-      setError('Impossible de démarrer une nouvelle fiche (campagne introuvable ou hors-ligne).');
-    } finally {
-      setIsCreating(false);
-    }
+  const handleNewProspection = () => {
+    router.push('/(prospection)/type-chooser' as any);
   };
 
   return (
@@ -199,19 +181,15 @@ export default function ProspectionScreen() {
           )}
         </View>
 
-        {error && <Text style={styles.errorText}>{error}</Text>}
       </ScrollView>
 
       <SafeAreaView edges={['bottom']} style={styles.footer}>
         <TouchableOpacity
-          style={[styles.btnNouvelle, isCreating && styles.btnDisabled]}
+          style={styles.btnNouvelle}
           onPress={handleNewProspection}
-          disabled={isCreating}
           activeOpacity={0.85}
         >
-          <Text style={styles.btnNouvelleText}>
-            {isCreating ? 'Création…' : '+ Nouvelle prospection'}
-          </Text>
+          <Text style={styles.btnNouvelleText}>+ Nouvelle prospection</Text>
         </TouchableOpacity>
       </SafeAreaView>
     </View>

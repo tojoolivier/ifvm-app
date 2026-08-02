@@ -29,3 +29,28 @@ export async function getCurrentPosition(): Promise<GpsPosition> {
     accuracy: position.coords.accuracy,
   };
 }
+
+export interface AdministrativeArea {
+  region: string | null;
+  district: string | null;
+  commune: string | null;
+}
+
+/**
+ * Géocodage inverse best-effort : l'API d'Expo renvoie des champs administratifs
+ * génériques (region/subregion/city) qui ne correspondent pas exactement au découpage
+ * malgache région/district/commune — mapping heuristique, jamais bloquant en cas d'échec.
+ */
+export async function reverseGeocode(latitude: number, longitude: number): Promise<AdministrativeArea> {
+  try {
+    const [result] = await Location.reverseGeocodeAsync({ latitude, longitude });
+    if (!result) return { region: null, district: null, commune: null };
+    return {
+      region: result.region ?? null,
+      district: result.subregion ?? null,
+      commune: result.city ?? result.district ?? null,
+    };
+  } catch {
+    return { region: null, district: null, commune: null };
+  }
+}
