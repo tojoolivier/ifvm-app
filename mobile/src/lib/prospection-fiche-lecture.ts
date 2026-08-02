@@ -2,9 +2,9 @@ import { CaptureRead, InfestationRead, PopulationRead, ProspectionRead } from '.
 
 export const STATUT_VALIDE = 'validee';
 
-type Phenotype = 'solitaire' | 'solitaro_trans' | 'transiens' | 'gregaire';
+export type Phenotype = 'solitaire' | 'solitaro_trans' | 'transiens' | 'gregaire';
 
-const PHENOTYPES: { value: Phenotype; label: string }[] = [
+export const PHENOTYPES: { value: Phenotype; label: string }[] = [
   { value: 'solitaire', label: 'Solitaires' },
   { value: 'solitaro_trans', label: 'Solitaro-trans' },
   { value: 'transiens', label: 'Transiens' },
@@ -13,16 +13,16 @@ const PHENOTYPES: { value: Phenotype; label: string }[] = [
 
 type TypeCible = 'tache_larvaire' | 'bande_larvaire' | 'vol_clair' | 'essaim';
 
-const TYPE_CIBLE_OPTIONS: { value: TypeCible; label: string }[] = [
+export const TYPE_CIBLE_OPTIONS: { value: TypeCible; label: string }[] = [
   { value: 'tache_larvaire', label: 'Tache larvaire' },
   { value: 'bande_larvaire', label: 'Bande larvaire' },
   { value: 'vol_clair', label: 'Vol clair' },
   { value: 'essaim', label: 'Essaim' },
 ];
 
-type Humidite = 'surface' | '0_5cm' | '5_12cm' | '12_30cm' | 'gt_30cm';
-type Texture = 'limoneuse' | 'argileuse' | 'sable_fin' | 'gravier' | 'cailloux';
-type DegatsCultures = 'nuls' | 'faibles' | 'moyens' | 'forts';
+export type Humidite = 'surface' | '0_5cm' | '5_12cm' | '12_30cm' | 'gt_30cm';
+export type Texture = 'limoneuse' | 'argileuse' | 'sable_fin' | 'gravier' | 'cailloux';
+export type DegatsCultures = 'nuls' | 'faibles' | 'moyens' | 'forts';
 type Phenologie = 'verdissement' | 'feuillaison' | 'floraison' | 'fructification' | 'sec';
 type StrateKey = 'arboree' | 'arbustive' | 'buissonneuse' | 'herbeuse' | 'cultures_seches' | 'sol_nu';
 
@@ -37,7 +37,7 @@ const STRATE_LABELS: Record<StrateKey, string> = {
   sol_nu: 'Sol nu',
 };
 
-const HUMIDITE_OPTIONS: { value: Humidite; label: string }[] = [
+export const HUMIDITE_OPTIONS: { value: Humidite; label: string }[] = [
   { value: 'surface', label: 'Surf.' },
   { value: '0_5cm', label: '0,5 cm' },
   { value: '5_12cm', label: '5-12 cm' },
@@ -45,7 +45,7 @@ const HUMIDITE_OPTIONS: { value: Humidite; label: string }[] = [
   { value: 'gt_30cm', label: '>30' },
 ];
 
-const TEXTURE_OPTIONS: { value: Texture; label: string }[] = [
+export const TEXTURE_OPTIONS: { value: Texture; label: string }[] = [
   { value: 'limoneuse', label: 'Limoneuse' },
   { value: 'argileuse', label: 'Argileuse' },
   { value: 'sable_fin', label: 'Sable fin' },
@@ -53,7 +53,7 @@ const TEXTURE_OPTIONS: { value: Texture; label: string }[] = [
   { value: 'cailloux', label: 'Cailloux' },
 ];
 
-const DEGATS_OPTIONS: { value: DegatsCultures; label: string }[] = [
+export const DEGATS_OPTIONS: { value: DegatsCultures; label: string }[] = [
   { value: 'nuls', label: 'Nuls' },
   { value: 'faibles', label: 'Faibles' },
   { value: 'moyens', label: 'Moyens' },
