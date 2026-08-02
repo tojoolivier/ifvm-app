@@ -1,10 +1,155 @@
 import { CaptureRead, InfestationRead, PopulationRead, ProspectionRead } from './api-client';
-import { PHENOTYPES } from './prospection-captures';
-import { TYPE_CIBLE_OPTIONS } from './prospection-infestation';
-import { parseVegetationSol } from './prospection-vegetation';
-import { buildVegetationSummary } from './prospection-recapitulatif';
 
 export const STATUT_VALIDE = 'validee';
+
+type Phenotype = 'solitaire' | 'solitaro_trans' | 'transiens' | 'gregaire';
+
+const PHENOTYPES: { value: Phenotype; label: string }[] = [
+  { value: 'solitaire', label: 'Solitaires' },
+  { value: 'solitaro_trans', label: 'Solitaro-trans' },
+  { value: 'transiens', label: 'Transiens' },
+  { value: 'gregaire', label: 'Grégaires' },
+];
+
+type TypeCible = 'tache_larvaire' | 'bande_larvaire' | 'vol_clair' | 'essaim';
+
+const TYPE_CIBLE_OPTIONS: { value: TypeCible; label: string }[] = [
+  { value: 'tache_larvaire', label: 'Tache larvaire' },
+  { value: 'bande_larvaire', label: 'Bande larvaire' },
+  { value: 'vol_clair', label: 'Vol clair' },
+  { value: 'essaim', label: 'Essaim' },
+];
+
+type Humidite = 'surface' | '0_5cm' | '5_12cm' | '12_30cm' | 'gt_30cm';
+type Texture = 'limoneuse' | 'argileuse' | 'sable_fin' | 'gravier' | 'cailloux';
+type DegatsCultures = 'nuls' | 'faibles' | 'moyens' | 'forts';
+type Phenologie = 'verdissement' | 'feuillaison' | 'floraison' | 'fructification' | 'sec';
+type StrateKey = 'arboree' | 'arbustive' | 'buissonneuse' | 'herbeuse' | 'cultures_seches' | 'sol_nu';
+
+const STRATE_KEYS: StrateKey[] = ['arboree', 'arbustive', 'buissonneuse', 'herbeuse', 'cultures_seches', 'sol_nu'];
+
+const STRATE_LABELS: Record<StrateKey, string> = {
+  arboree: 'Arborée',
+  arbustive: 'Arbustive',
+  buissonneuse: 'Buissonneuse',
+  herbeuse: 'Herbeuse',
+  cultures_seches: 'Cultures sèches',
+  sol_nu: 'Sol nu',
+};
+
+const HUMIDITE_OPTIONS: { value: Humidite; label: string }[] = [
+  { value: 'surface', label: 'Surf.' },
+  { value: '0_5cm', label: '0,5 cm' },
+  { value: '5_12cm', label: '5-12 cm' },
+  { value: '12_30cm', label: '12-30' },
+  { value: 'gt_30cm', label: '>30' },
+];
+
+const TEXTURE_OPTIONS: { value: Texture; label: string }[] = [
+  { value: 'limoneuse', label: 'Limoneuse' },
+  { value: 'argileuse', label: 'Argileuse' },
+  { value: 'sable_fin', label: 'Sable fin' },
+  { value: 'gravier', label: 'Gravier' },
+  { value: 'cailloux', label: 'Cailloux' },
+];
+
+const DEGATS_OPTIONS: { value: DegatsCultures; label: string }[] = [
+  { value: 'nuls', label: 'Nuls' },
+  { value: 'faibles', label: 'Faibles' },
+  { value: 'moyens', label: 'Moyens' },
+  { value: 'forts', label: 'Forts' },
+];
+
+interface StrateDetail {
+  recouvrement: number;
+  phenologie: Phenologie | null;
+  hauteur: number | null;
+}
+
+type StratesState = Record<StrateKey, StrateDetail>;
+
+interface VegetationSolState {
+  strates: StratesState;
+  humidite: Humidite | null;
+  texture: Texture | null;
+  degatsCultures: DegatsCultures | null;
+  degatsCulturesPourcent: number | null;
+  verdissementPourcent: number | null;
+  hauteurHerbeCm: number | null;
+}
+
+function defaultStrateDetail(): StrateDetail {
+  return { recouvrement: 0, phenologie: null, hauteur: null };
+}
+
+function defaultStrates(): StratesState {
+  return STRATE_KEYS.reduce((acc, key) => {
+    acc[key] = defaultStrateDetail();
+    return acc;
+  }, {} as StratesState);
+}
+
+function clampRecouvrement(value: number): number {
+  return Math.round(Math.max(0, Math.min(100, value)));
+}
+
+function totalRecouvrement(strates: StratesState): number {
+  return STRATE_KEYS.reduce((sum, key) => sum + strates[key].recouvrement, 0);
+}
+
+function parseVegetationSol(
+  vegetation: string | null,
+  sol: string | null,
+  degatsCultures: string | null,
+  degatsCulturesPourcent: number | null = null,
+  verdissementPourcent: number | null = null,
+  hauteurHerbeCm: number | null = null
+): VegetationSolState {
+  const veg = vegetation ? JSON.parse(vegetation) : {};
+  const solParsed = sol ? JSON.parse(sol) : {};
+  const strates = defaultStrates();
+  const parsedStrates = veg.strates ?? null;
+  if (parsedStrates) {
+    for (const key of STRATE_KEYS) {
+      const detail = parsedStrates[key];
+      if (detail) {
+        strates[key] = {
+          recouvrement: clampRecouvrement(detail.recouvrement ?? 0),
+          phenologie: (detail.phenologie as Phenologie) ?? null,
+          hauteur: typeof detail.hauteur === 'number' ? detail.hauteur : null,
+        };
+      }
+    }
+  } else if (typeof veg.recouvrement_herbeux === 'number') {
+    strates.herbeuse = { recouvrement: clampRecouvrement(veg.recouvrement_herbeux), phenologie: null, hauteur: null };
+  }
+  return {
+    strates,
+    humidite: (solParsed.humidite as Humidite) ?? null,
+    texture: (solParsed.texture as Texture) ?? null,
+    degatsCultures: (degatsCultures as DegatsCultures) ?? null,
+    degatsCulturesPourcent: degatsCulturesPourcent ?? null,
+    verdissementPourcent: verdissementPourcent ?? null,
+    hauteurHerbeCm: hauteurHerbeCm ?? null,
+  };
+}
+
+function buildVegetationSummary(state: VegetationSolState): string {
+  const strateParts = STRATE_KEYS.filter((key) => state.strates[key].recouvrement > 0)
+    .map((key) => `${STRATE_LABELS[key]} ${state.strates[key].recouvrement}%`)
+    .join(', ');
+  const parts: string[] = [`Strates (${totalRecouvrement(state.strates)}%) : ${strateParts || '—'}`];
+  if (state.humidite) {
+    parts.push(`Humidité ${HUMIDITE_OPTIONS.find((o) => o.value === state.humidite)?.label}`);
+  }
+  if (state.texture) {
+    parts.push(`Texture ${TEXTURE_OPTIONS.find((o) => o.value === state.texture)?.label}`);
+  }
+  if (state.degatsCultures) {
+    parts.push(`Dégâts culture ${DEGATS_OPTIONS.find((o) => o.value === state.degatsCultures)?.label}`);
+  }
+  return parts.join(' · ');
+}
 
 /** Une fiche n'est consultable en lecture (#16) que si elle a atteint le statut final Validé. */
 export function isFicheValidee(prospection: Pick<ProspectionRead, 'statut'>): boolean {

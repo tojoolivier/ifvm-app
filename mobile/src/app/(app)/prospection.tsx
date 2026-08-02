@@ -72,7 +72,7 @@ export default function ProspectionScreen() {
   }, [justSaved, router]);
 
   const resumeDraft = (draft: DraftProspection) => {
-    router.push({ pathname: '/(prospection)/reference', params: { draftId: draft.id } });
+    router.push({ pathname: '/(prospection)/reference' as any, params: { draftId: draft.id } });
   };
 
   const openFicheLecture = (prospection: ProspectionRead) => {

@@ -148,7 +148,7 @@ export default function FichesScreen() {
   const handleFichePress = (fiche: FicheItem) => {
     if (fiche.type === 'PROSPECTION') {
       router.push({
-        pathname: '/(prospection)/especes',
+        pathname: '/(prospection)/especes' as any,
         params: { draftId: fiche.id }
       });
     } else if (fiche.type === 'CRT') {
