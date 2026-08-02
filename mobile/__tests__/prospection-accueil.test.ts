@@ -4,6 +4,7 @@ import {
   countUnsyncedProspections,
   listDraftProspections,
   listRecentProspections,
+  deleteProspection,
   DraftProspection,
 } from '../src/lib/prospection-repository';
 
@@ -12,6 +13,7 @@ import {
   loadValidatedProspections,
   pickCurrentCampagneId,
   startNewProspection,
+  deleteDraftProspection,
 } from '../src/lib/prospection-accueil';
 
 jest.mock('../src/lib/api-client', () => ({
@@ -26,6 +28,7 @@ jest.mock('../src/lib/prospection-repository', () => ({
   countUnsyncedProspections: jest.fn(),
   listDraftProspections: jest.fn(),
   listRecentProspections: jest.fn(),
+  deleteProspection: jest.fn(),
 }));
 
 const mockApiClient = jest.mocked(apiClient);
@@ -33,6 +36,7 @@ const mockCreateDraft = jest.mocked(createDraftProspection);
 const mockCountUnsynced = jest.mocked(countUnsyncedProspections);
 const mockListDrafts = jest.mocked(listDraftProspections);
 const mockListRecent = jest.mocked(listRecentProspections);
+const mockDeleteLocal = jest.mocked(deleteProspection);
 
 const STORED_ROW: DraftProspection = {
   id: '11111111-1111-1111-1111-111111111111',
@@ -179,5 +183,23 @@ describe('loadValidatedProspections', () => {
     const result = await loadValidatedProspections('tok', 'p1');
 
     expect(result).toEqual([]);
+  });
+});
+
+describe('deleteDraftProspection', () => {
+  it('deletes the local row when the draft is a brouillon', async () => {
+    mockDeleteLocal.mockResolvedValueOnce(true);
+
+    await deleteDraftProspection({ ...STORED_ROW, statut: 'brouillon' });
+
+    expect(mockDeleteLocal).toHaveBeenCalledWith(STORED_ROW.id);
+  });
+
+  it('refuses to delete a fiche that is no longer a brouillon', async () => {
+    await expect(
+      deleteDraftProspection({ ...STORED_ROW, statut: 'en_attente' })
+    ).rejects.toThrow('brouillon');
+
+    expect(mockDeleteLocal).not.toHaveBeenCalled();
   });
 });
