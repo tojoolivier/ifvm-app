@@ -50,6 +50,16 @@ class GetStation:
 
 
 @dataclass
+class ReferentielSinceCursors:
+    postes_acridiens: datetime | None = None
+    stations_fixes: datetime | None = None
+    utilisateurs_equipe: datetime | None = None
+    pesticides: datetime | None = None
+    cultures: datetime | None = None
+    codes_stades: datetime | None = None
+
+
+@dataclass
 class ReferentielPullResult:
     postes_acridiens: list[PosteAcridien]
     stations_fixes: list[StationFixe]
@@ -78,14 +88,16 @@ class PullReferentiel:
         self.code_stade_repository = code_stade_repository
 
     async def execute(
-        self, pa_id: uuid.UUID | None, since: datetime | None
+        self, pa_id: uuid.UUID | None, cursors: ReferentielSinceCursors
     ) -> ReferentielPullResult:
         return ReferentielPullResult(
-            postes_acridiens=await self.poste_repository.list_since(since),
-            stations_fixes=await self.station_repository.list_since(pa_id, since),
-            utilisateurs_equipe=await self.equipe_repository.list_since(pa_id, since),
-            pesticides=await self.pesticide_repository.list_since(since),
-            cultures=await self.culture_repository.list_since(since),
-            codes_stades=await self.code_stade_repository.list_since(since),
+            postes_acridiens=await self.poste_repository.list_since(cursors.postes_acridiens),
+            stations_fixes=await self.station_repository.list_since(pa_id, cursors.stations_fixes),
+            utilisateurs_equipe=await self.equipe_repository.list_since(
+                pa_id, cursors.utilisateurs_equipe
+            ),
+            pesticides=await self.pesticide_repository.list_since(cursors.pesticides),
+            cultures=await self.culture_repository.list_since(cursors.cultures),
+            codes_stades=await self.code_stade_repository.list_since(cursors.codes_stades),
             server_time=datetime.now(timezone.utc),
         )

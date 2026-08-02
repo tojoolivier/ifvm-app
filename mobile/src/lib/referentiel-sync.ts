@@ -5,6 +5,7 @@ import {
   PesticideSync,
   PosteAcridienSync,
   ReferentielPullResponse,
+  ReferentielSinceCursors,
   StationFixeSync,
   UtilisateurEquipeSync,
 } from './api-client';
@@ -21,22 +22,23 @@ const ENTITY_TYPES: EntityType[] = [
   'codes_stades',
 ];
 
-/** Curseur unique envoyé au serveur : le plus ancien des curseurs par entité, ou null si l'une d'elles n'a jamais été synchronisée. */
-async function getSinceCursor(
+/** ADR-007 : chaque table référentiel se rafraîchit indépendamment — un curseur par type d'entité. */
+async function getPerEntityCursors(
   db: Awaited<ReturnType<typeof getReferentielDb>>
-): Promise<string | null> {
+): Promise<ReferentielSinceCursors> {
   const rows = await db.getAllAsync<{ entity_type: string; last_pull_at: string | null }>(
     'SELECT entity_type, last_pull_at FROM referentiel_sync_meta'
   );
-  const cursors = new Map(rows.map((row) => [row.entity_type, row.last_pull_at]));
+  const stored = new Map(rows.map((row) => [row.entity_type, row.last_pull_at]));
 
-  let oldest: string | null = null;
-  for (const entityType of ENTITY_TYPES) {
-    const cursor = cursors.get(entityType);
-    if (!cursor) return null;
-    if (oldest === null || cursor < oldest) oldest = cursor;
-  }
-  return oldest;
+  return {
+    postes_acridiens: stored.get('postes_acridiens') ?? null,
+    stations_fixes: stored.get('stations_fixes') ?? null,
+    utilisateurs_equipe: stored.get('utilisateurs_equipe') ?? null,
+    pesticides: stored.get('pesticides') ?? null,
+    cultures: stored.get('cultures') ?? null,
+    codes_stades: stored.get('codes_stades') ?? null,
+  };
 }
 
 async function upsertPostesAcridiens(
@@ -160,9 +162,9 @@ async function updateSyncCursor(
 /** Tire le référentiel depuis le serveur et l'upsert localement. Lève en cas d'échec réseau/API. */
 export async function pullReferentiel(token: string, onUnauthorized?: () => void): Promise<void> {
   const db = await getReferentielDb();
-  const since = await getSinceCursor(db);
+  const cursors = await getPerEntityCursors(db);
 
-  const response = await apiClient.pullReferentiel(token, since, onUnauthorized);
+  const response = await apiClient.pullReferentiel(token, cursors, onUnauthorized);
 
   await upsertPostesAcridiens(db, response.postes_acridiens.upserts);
   await upsertStationsFixes(db, response.stations_fixes.upserts);

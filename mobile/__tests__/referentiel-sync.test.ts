@@ -35,39 +35,46 @@ function emptyResponse(serverTime: string) {
 }
 
 describe('pullReferentiel', () => {
-  it('pulls with since=null when no cursor has been stored yet', async () => {
+  it('sends null cursors for every entity type when nothing has been synced yet', async () => {
     mockPullReferentiel.mockResolvedValue(emptyResponse('2026-08-02T00:00:00Z'));
 
     await pullReferentiel('token-1');
 
-    expect(mockPullReferentiel).toHaveBeenCalledWith('token-1', null, undefined);
+    expect(mockPullReferentiel).toHaveBeenCalledWith(
+      'token-1',
+      {
+        postes_acridiens: null,
+        stations_fixes: null,
+        utilisateurs_equipe: null,
+        pesticides: null,
+        cultures: null,
+        codes_stades: null,
+      },
+      undefined
+    );
   });
 
-  it('pulls with the oldest stored cursor across entity types', async () => {
+  it('sends each entity its own stored cursor, independently of the others', async () => {
     getAllAsync.mockResolvedValue([
       { entity_type: 'postes_acridiens', last_pull_at: '2026-08-01T00:00:00Z' },
       { entity_type: 'stations_fixes', last_pull_at: '2026-07-30T00:00:00Z' },
-      { entity_type: 'utilisateurs_equipe', last_pull_at: '2026-08-01T00:00:00Z' },
-      { entity_type: 'pesticides', last_pull_at: '2026-08-01T00:00:00Z' },
-      { entity_type: 'cultures', last_pull_at: '2026-08-01T00:00:00Z' },
-      { entity_type: 'codes_stades', last_pull_at: '2026-08-01T00:00:00Z' },
     ]);
     mockPullReferentiel.mockResolvedValue(emptyResponse('2026-08-02T00:00:00Z'));
 
     await pullReferentiel('token-1');
 
-    expect(mockPullReferentiel).toHaveBeenCalledWith('token-1', '2026-07-30T00:00:00Z', undefined);
-  });
-
-  it('falls back to since=null if any entity type has never been synced', async () => {
-    getAllAsync.mockResolvedValue([
-      { entity_type: 'postes_acridiens', last_pull_at: '2026-08-01T00:00:00Z' },
-    ]);
-    mockPullReferentiel.mockResolvedValue(emptyResponse('2026-08-02T00:00:00Z'));
-
-    await pullReferentiel('token-1');
-
-    expect(mockPullReferentiel).toHaveBeenCalledWith('token-1', null, undefined);
+    expect(mockPullReferentiel).toHaveBeenCalledWith(
+      'token-1',
+      {
+        postes_acridiens: '2026-08-01T00:00:00Z',
+        stations_fixes: '2026-07-30T00:00:00Z',
+        utilisateurs_equipe: null,
+        pesticides: null,
+        cultures: null,
+        codes_stades: null,
+      },
+      undefined
+    );
   });
 
   it('upserts each poste acridien idempotently by id', async () => {
@@ -118,7 +125,7 @@ describe('pullReferentiel', () => {
     );
   });
 
-  it('updates the sync cursor for every entity type to the response server_time', async () => {
+  it('updates the sync cursor for every entity type to its own response server_time', async () => {
     mockPullReferentiel.mockResolvedValue(emptyResponse('2026-08-02T00:00:00Z'));
 
     await pullReferentiel('token-1');
