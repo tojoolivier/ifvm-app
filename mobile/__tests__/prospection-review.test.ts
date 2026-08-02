@@ -43,6 +43,8 @@ function draft(overrides: Partial<DraftProspection> = {}): DraftProspection {
     commune: null,
     za: null,
     pa_code: null,
+    pa_nom: null,
+    station_nom: null,
     degats_cultures_pourcent: null,
     verdissement_pourcent: null,
     hauteur_herbe_cm: null,

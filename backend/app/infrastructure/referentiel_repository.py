@@ -132,9 +132,7 @@ class StationFixeRepositoryImpl(StationFixeRepository):
         )
         return result.scalar_one_or_none() is not None
 
-    async def list_since(
-        self, pa_id: uuid.UUID | None, since: datetime | None
-    ) -> list[StationFixe]:
+    async def list_since(self, since: datetime | None) -> list[StationFixe]:
         stmt = (
             select(
                 StationFixeModel,
@@ -144,10 +142,6 @@ class StationFixeRepositoryImpl(StationFixeRepository):
             .join(PosteAcridienModel, StationFixeModel.pa_id == PosteAcridienModel.id)
             .order_by(StationFixeModel.code)
         )
-        if pa_id is not None:
-            stmt = stmt.where(StationFixeModel.pa_id == pa_id)
-        else:
-            return []
         if since is not None:
             stmt = stmt.where(StationFixeModel.updated_at > since)
 

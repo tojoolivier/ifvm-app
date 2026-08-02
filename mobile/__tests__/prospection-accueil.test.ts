@@ -49,6 +49,8 @@ const STORED_ROW: DraftProspection = {
   commune: null,
   za: null,
   pa_code: null,
+  pa_nom: null,
+  station_nom: null,
   n_releve: null,
   n_fiche: null,
   n_message: null,

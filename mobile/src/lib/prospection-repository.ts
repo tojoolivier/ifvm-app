@@ -34,6 +34,8 @@ export interface DraftProspection {
   commune: string | null;
   za: string | null;
   pa_code: string | null;
+  pa_nom: string | null;
+  station_nom: string | null;
   degats_cultures_pourcent: number | null;
   verdissement_pourcent: number | null;
   hauteur_herbe_cm: number | null;
@@ -76,6 +78,9 @@ export interface ReferenceUpdateInput {
   commune?: string | null;
   za?: string | null;
   pa_code?: string | null;
+  pa_nom?: string | null;
+  stationId?: string | null;
+  station_nom?: string | null;
 }
 
 export async function createDraftProspection(
@@ -134,7 +139,8 @@ export async function updateProspectionReference(
       latitude = ?, longitude = ?, altitude = ?,
       surf_station = ?, surf_prospectee = ?, surf_infestee = ?,
       n_fiche = ?,
-      region = ?, district = ?, commune = ?, za = ?, pa_code = ?,
+      region = ?, district = ?, commune = ?, za = ?, pa_code = ?, pa_nom = ?,
+      station_id = ?, station_nom = ?,
       updated_at = ?
      WHERE id = ?`,
     [
@@ -150,6 +156,9 @@ export async function updateProspectionReference(
       input.commune ?? null,
       input.za ?? null,
       input.pa_code ?? null,
+      input.pa_nom ?? null,
+      input.stationId ?? null,
+      input.station_nom ?? null,
       now,
       id,
     ]

@@ -113,7 +113,7 @@ async def code_stade(db_session: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_pull_since_null_returns_full_referentiel_scoped_to_agent_pa(
+async def test_pull_since_null_returns_full_referentiel_unscoped(
     client: AsyncClient,
     utilisateur_avec_pa,
     collegue_meme_pa,
@@ -134,7 +134,7 @@ async def test_pull_since_null_returns_full_referentiel_scoped_to_agent_pa(
     assert pa_codes == {poste_acridien.code, autre_poste_acridien.code}
 
     station_codes = {s["code"] for s in body["stations_fixes"]["upserts"]}
-    assert station_codes == {station_fixe.code}
+    assert station_codes == {station_fixe.code, station_autre_pa.code}
 
     equipe_emails = {u["email"] for u in body["utilisateurs_equipe"]["upserts"]}
     assert equipe_emails == {utilisateur_avec_pa.email, collegue_meme_pa.email}
@@ -209,11 +209,15 @@ async def test_pull_requires_auth(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_pull_without_pa_returns_no_stations_or_equipe(
-    client: AsyncClient, auth_headers, station_fixe
+async def test_pull_without_pa_still_returns_all_stations_and_equipe(
+    client: AsyncClient, auth_headers, utilisateur_avec_pa, station_fixe
 ):
+    """Le référentiel offline n'est plus scopé au PA du demandeur (cf. besoin de sélection
+    manuelle du PA/station sur la fiche, quel que soit le PA affecté à l'agent)."""
     response = await client.get("/referentiel/pull", headers=auth_headers)
     assert response.status_code == 200
     body = response.json()
-    assert body["stations_fixes"]["upserts"] == []
-    assert body["utilisateurs_equipe"]["upserts"] == []
+    station_codes = {s["code"] for s in body["stations_fixes"]["upserts"]}
+    assert station_codes == {station_fixe.code}
+    equipe_emails = {u["email"] for u in body["utilisateurs_equipe"]["upserts"]}
+    assert utilisateur_avec_pa.email in equipe_emails

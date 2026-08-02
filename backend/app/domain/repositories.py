@@ -108,17 +108,13 @@ class StationFixeRepository(ABC):
         pass
 
     @abstractmethod
-    async def list_since(
-        self, pa_id: uuid.UUID | None, since: datetime | None
-    ) -> list[StationFixe]:
+    async def list_since(self, since: datetime | None) -> list[StationFixe]:
         pass
 
 
 class UtilisateurEquipeRepository(ABC):
     @abstractmethod
-    async def list_since(
-        self, pa_id: uuid.UUID | None, since: datetime | None
-    ) -> list[UtilisateurEquipe]:
+    async def list_since(self, since: datetime | None) -> list[UtilisateurEquipe]:
         pass
 
 
