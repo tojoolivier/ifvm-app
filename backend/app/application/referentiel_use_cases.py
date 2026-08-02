@@ -90,6 +90,9 @@ class PullReferentiel:
     async def execute(
         self, pa_id: uuid.UUID | None, cursors: ReferentielSinceCursors
     ) -> ReferentielPullResult:
+        # Capturé avant les requêtes : une entité modifiée pendant leur exécution doit
+        # rester au-dessus de ce curseur pour être reprise au pull suivant, pas sautée.
+        server_time = datetime.now(timezone.utc)
         return ReferentielPullResult(
             postes_acridiens=await self.poste_repository.list_since(cursors.postes_acridiens),
             stations_fixes=await self.station_repository.list_since(pa_id, cursors.stations_fixes),
@@ -99,5 +102,5 @@ class PullReferentiel:
             pesticides=await self.pesticide_repository.list_since(cursors.pesticides),
             cultures=await self.culture_repository.list_since(cursors.cultures),
             codes_stades=await self.code_stade_repository.list_since(cursors.codes_stades),
-            server_time=datetime.now(timezone.utc),
+            server_time=server_time,
         )
