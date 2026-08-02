@@ -75,7 +75,7 @@ async def get_station(
 @router.get("/referentiel/pull", response_model=ReferentielPullResponse)
 async def pull_referentiel(
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[Utilisateur, Depends(get_current_user)],
+    _current_user: Annotated[Utilisateur, Depends(get_current_user)],
     since_postes_acridiens: datetime | None = Query(default=None),
     since_stations_fixes: datetime | None = Query(default=None),
     since_utilisateurs_equipe: datetime | None = Query(default=None),
@@ -99,7 +99,7 @@ async def pull_referentiel(
         cultures=since_cultures,
         codes_stades=since_codes_stades,
     )
-    result = await use_case.execute(pa_id=current_user.pa_id, cursors=cursors)
+    result = await use_case.execute(cursors=cursors)
 
     return ReferentielPullResponse(
         postes_acridiens=EntityPull(

@@ -159,6 +159,16 @@ async function updateSyncCursor(
   );
 }
 
+/**
+ * Efface les curseurs locaux pour forcer un pull complet au prochain appel — nécessaire pour
+ * rattraper les entités qu'un pull incrémental antérieur (curseur déjà avancé) ne redemandera
+ * jamais, faute de modification depuis.
+ */
+export async function resetReferentielSyncCursors(): Promise<void> {
+  const db = await getReferentielDb();
+  await db.runAsync('DELETE FROM referentiel_sync_meta');
+}
+
 /** Tire le référentiel depuis le serveur et l'upsert localement. Lève en cas d'échec réseau/API. */
 export async function pullReferentiel(token: string, onUnauthorized?: () => void): Promise<void> {
   const db = await getReferentielDb();

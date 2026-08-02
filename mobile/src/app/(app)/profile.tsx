@@ -7,6 +7,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { storage } from '@/lib/storage';
 import { apiClient } from '@/lib/api-client';
+import { pullReferentiel, resetReferentielSyncCursors } from '@/lib/referentiel-sync';
 
 const IFVM_GREEN = '#1B5E1B';
 const IFVM_GREEN_BG = '#E8F5E9';
@@ -29,6 +30,7 @@ export default function ProfileScreen() {
   const [darkMode, setDarkMode] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   
   // État pour la modification du mot de passe
   const [modalVisible, setModalVisible] = useState(false);
@@ -60,6 +62,20 @@ export default function ProfileScreen() {
   const handleLogout = async () => {
     await logout();
     router.replace('/(auth)/login');
+  };
+
+  const handleForcePull = async () => {
+    if (!token || isSyncing) return;
+    setIsSyncing(true);
+    try {
+      await resetReferentielSyncCursors();
+      await pullReferentiel(token);
+      Alert.alert('Succès', 'Référentiel synchronisé.');
+    } catch {
+      Alert.alert('Erreur', 'Impossible de synchroniser le référentiel pour le moment.');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const roleLabels: Record<string, string> = {
@@ -445,6 +461,29 @@ export default function ProfileScreen() {
               <ThemedText style={styles.securityText}>Changer le mot de passe</ThemedText>
             </View>
             <ThemedText style={styles.securityArrow}>→</ThemedText>
+          </TouchableOpacity>
+        </View>
+
+        {/* Synchronisation */}
+        <View style={styles.infoSection}>
+          <ThemedText style={styles.sectionTitle}>🔄 Synchronisation</ThemedText>
+          <TouchableOpacity
+            style={styles.securityButton}
+            onPress={handleForcePull}
+            disabled={isSyncing}
+            activeOpacity={0.8}
+          >
+            <View style={styles.securityButtonLeft}>
+              <ThemedText style={styles.securityIcon}>📡</ThemedText>
+              <ThemedText style={styles.securityText}>
+                {isSyncing ? 'Synchronisation…' : 'Forcer la synchronisation du référentiel'}
+              </ThemedText>
+            </View>
+            {isSyncing ? (
+              <ActivityIndicator color={IFVM_GREEN} />
+            ) : (
+              <ThemedText style={styles.securityArrow}>→</ThemedText>
+            )}
           </TouchableOpacity>
         </View>
 

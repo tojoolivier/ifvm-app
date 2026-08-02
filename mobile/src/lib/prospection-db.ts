@@ -137,6 +137,8 @@ async function migrateProspectionTable(db: SQLite.SQLiteDatabase): Promise<void>
     { name: 'commune', type: 'TEXT' },
     { name: 'za', type: 'TEXT' },
     { name: 'pa_code', type: 'TEXT' },
+    { name: 'pa_nom', type: 'TEXT' },
+    { name: 'station_nom', type: 'TEXT' },
     { name: 'degats_cultures_pourcent', type: 'INTEGER' },
     { name: 'verdissement_pourcent', type: 'INTEGER' },
     { name: 'hauteur_herbe_cm', type: 'REAL' },

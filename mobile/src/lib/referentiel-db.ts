@@ -19,6 +19,70 @@ export function resetReferentielDbForTests(): void {
   migrated = false;
 }
 
+export interface PosteAcridien {
+  id: string;
+  code: string;
+  nom: string;
+  region: string | null;
+}
+
+export interface StationFixe {
+  id: string;
+  code: string;
+  nom: string;
+  paId: string;
+  latitude: number;
+  longitude: number;
+  altitude: number | null;
+}
+
+/** Liste des PA actifs, triés par nom — alimente le sélecteur "Manuel" du PA. */
+export async function listPostesAcridiens(): Promise<PosteAcridien[]> {
+  const db = await getReferentielDb();
+  return db.getAllAsync<PosteAcridien>(
+    'SELECT id, code, nom, region FROM poste_acridien WHERE actif = 1 ORDER BY nom'
+  );
+}
+
+/** Stations actives d'un PA donné — alimente le sélecteur "Manuel" de la station. */
+export async function listStationsByPoste(paId: string): Promise<StationFixe[]> {
+  const db = await getReferentielDb();
+  return db.getAllAsync<StationFixe>(
+    'SELECT id, code, nom, pa_id as paId, latitude, longitude, altitude FROM station_fixe WHERE pa_id = ? AND actif = 1 ORDER BY nom',
+    [paId]
+  );
+}
+
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+/** Station active la plus proche d'une position GPS — résout le mode "Auto" du PA/station. */
+export async function findNearestStation(latitude: number, longitude: number): Promise<StationFixe | null> {
+  const db = await getReferentielDb();
+  const stations = await db.getAllAsync<StationFixe>(
+    'SELECT id, code, nom, pa_id as paId, latitude, longitude, altitude FROM station_fixe WHERE actif = 1'
+  );
+  if (stations.length === 0) return null;
+
+  let nearest = stations[0];
+  let bestDistance = haversineKm(latitude, longitude, nearest.latitude, nearest.longitude);
+  for (const station of stations.slice(1)) {
+    const distance = haversineKm(latitude, longitude, station.latitude, station.longitude);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      nearest = station;
+    }
+  }
+  return nearest;
+}
+
 async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void> {
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS poste_acridien (

@@ -19,6 +19,8 @@ export interface RecapitulatifViewModel {
   totalMales: number;
   phenotypeDominantLabel: string;
   dureeSession: string;
+  pa: string;
+  station: string;
   surfStation: number | null;
   surfProspectee: number | null;
   surfInfestee: number | null;
@@ -55,6 +57,8 @@ export function buildRecapitulatif(
     totalMales: totalBySexe(counts, 'M'),
     phenotypeDominantLabel: dominant ? PHENOTYPES.find((p) => p.value === dominant)?.label ?? '—' : '—',
     dureeSession: formatChrono(chronoSeconds(draft.capture_started_at)),
+    pa: draft.pa_nom ?? '—',
+    station: draft.station_nom ?? '—',
     surfStation: draft.surf_station,
     surfProspectee: draft.surf_prospectee,
     surfInfestee: draft.surf_infestee,
@@ -97,6 +101,8 @@ function buildProspectionPayload(draft: DraftProspection) {
     commune: draft.commune,
     za: draft.za,
     pa_code: draft.pa_code,
+    pa_nom: draft.pa_nom,
+    station_nom: draft.station_nom,
     degats_cultures_pourcent: draft.degats_cultures_pourcent,
     verdissement_pourcent: draft.verdissement_pourcent,
     hauteur_herbe_cm: draft.hauteur_herbe_cm,

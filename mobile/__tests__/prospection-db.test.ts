@@ -1,7 +1,7 @@
 import { getDb, resetDbForTests } from '../src/lib/prospection-db';
 
 const MIGRATED_COLUMNS = [
-  'region', 'district', 'commune', 'za', 'pa_code',
+  'region', 'district', 'commune', 'za', 'pa_code', 'pa_nom', 'station_nom',
   'degats_cultures_pourcent', 'verdissement_pourcent', 'hauteur_herbe_cm',
   'espece', 'direction_de', 'pullulation_nb', 'taille_long', 'taille_large',
   'taille_epaisseur', 'essaim_en_vol', 'essaim_pose', 'type_essaim',

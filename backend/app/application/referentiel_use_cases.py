@@ -87,17 +87,15 @@ class PullReferentiel:
         self.culture_repository = culture_repository
         self.code_stade_repository = code_stade_repository
 
-    async def execute(
-        self, pa_id: uuid.UUID | None, cursors: ReferentielSinceCursors
-    ) -> ReferentielPullResult:
+    async def execute(self, cursors: ReferentielSinceCursors) -> ReferentielPullResult:
         # Capturé avant les requêtes : une entité modifiée pendant leur exécution doit
         # rester au-dessus de ce curseur pour être reprise au pull suivant, pas sautée.
         server_time = datetime.now(timezone.utc)
         return ReferentielPullResult(
             postes_acridiens=await self.poste_repository.list_since(cursors.postes_acridiens),
-            stations_fixes=await self.station_repository.list_since(pa_id, cursors.stations_fixes),
+            stations_fixes=await self.station_repository.list_since(cursors.stations_fixes),
             utilisateurs_equipe=await self.equipe_repository.list_since(
-                pa_id, cursors.utilisateurs_equipe
+                cursors.utilisateurs_equipe
             ),
             pesticides=await self.pesticide_repository.list_since(cursors.pesticides),
             cultures=await self.culture_repository.list_since(cursors.cultures),

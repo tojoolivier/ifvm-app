@@ -1,4 +1,3 @@
-import uuid
 from datetime import datetime
 
 from sqlalchemy import select
@@ -19,12 +18,8 @@ class UtilisateurEquipeRepositoryImpl(UtilisateurEquipeRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def list_since(
-        self, pa_id: uuid.UUID | None, since: datetime | None
-    ) -> list[UtilisateurEquipe]:
-        if pa_id is None:
-            return []
-        stmt = select(Utilisateur).where(Utilisateur.pa_id == pa_id).order_by(Utilisateur.nom)
+    async def list_since(self, since: datetime | None) -> list[UtilisateurEquipe]:
+        stmt = select(Utilisateur).order_by(Utilisateur.nom)
         if since is not None:
             stmt = stmt.where(Utilisateur.updated_at > since)
         result = await self.session.execute(stmt)

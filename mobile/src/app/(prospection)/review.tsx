@@ -122,6 +122,9 @@ export default function ReviewScreen() {
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Référence</Text>
             <Text style={styles.paragraph}>
+              PA <Text style={styles.paragraphStrong}>{recap.pa}</Text> · Station{' '}
+              <Text style={styles.paragraphStrong}>{recap.station}</Text>
+              {'\n'}
               Surf. prospectée <Text style={styles.paragraphStrong}>{recap.surfProspectee ?? '—'} ha</Text> · station{' '}
               <Text style={styles.paragraphStrong}>{recap.surfStation ?? '—'} ha</Text> · GPS{' '}
               <Text style={styles.mono}>

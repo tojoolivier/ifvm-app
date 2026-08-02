@@ -1,12 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm } from '@tanstack/react-form';
 import { getCurrentPosition, reverseGeocode, GpsPosition, LocationPermissionDeniedError } from '@/lib/location';
+import {
+  findNearestStation,
+  listPostesAcridiens,
+  listStationsByPoste,
+  PosteAcridien,
+  StationFixe,
+} from '@/lib/referentiel-db';
 import { updateProspectionReference } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { referenceSchema, ReferenceFormValues } from '@/lib/prospection-reference-schema';
+
+const INACTIVE_BG = '#efeada';
+const INACTIVE_TEXT = '#9a9484';
+const GPS_BADGE_BG = '#eaf2ec';
+
+type SelectMode = 'auto' | 'manuel';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -42,6 +55,24 @@ export default function ReferenceScreen() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
 
+  const [postes, setPostes] = useState<PosteAcridien[]>([]);
+  const [stationsForPa, setStationsForPa] = useState<StationFixe[]>([]);
+  const [paMode, setPaMode] = useState<SelectMode>('auto');
+  const [stationMode, setStationMode] = useState<SelectMode>('auto');
+  const [pa, setPa] = useState<PosteAcridien | null>(null);
+  const [station, setStation] = useState<StationFixe | null>(null);
+  const [autoPa, setAutoPa] = useState<PosteAcridien | null>(null);
+  const [autoStation, setAutoStation] = useState<StationFixe | null>(null);
+
+  const paModeRef = useRef<SelectMode>('auto');
+  const stationModeRef = useRef<SelectMode>('auto');
+  useEffect(() => {
+    paModeRef.current = paMode;
+  }, [paMode]);
+  useEffect(() => {
+    stationModeRef.current = stationMode;
+  }, [stationMode]);
+
   useEffect(() => {
     if (draftId && draft?.id !== draftId) {
       hydrateFromDraft(draftId);
@@ -49,11 +80,27 @@ export default function ReferenceScreen() {
   }, [draftId, draft?.id, hydrateFromDraft]);
 
   useEffect(() => {
+    listPostesAcridiens().then(setPostes).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     getCurrentPosition()
       .then(async (pos) => {
         setPosition(pos);
-        const area = await reverseGeocode(pos.latitude, pos.longitude);
+        const [area, nearestStation, postesList] = await Promise.all([
+          reverseGeocode(pos.latitude, pos.longitude),
+          findNearestStation(pos.latitude, pos.longitude),
+          listPostesAcridiens(),
+        ]);
         setAdminArea(area);
+        if (!nearestStation) return;
+        const nearestPa = postesList.find((p) => p.id === nearestStation.paId) ?? null;
+        setAutoStation(nearestStation);
+        setAutoPa(nearestPa);
+        if (nearestPa && paModeRef.current === 'auto') {
+          await applyPa(nearestPa);
+          if (stationModeRef.current === 'auto') setStation(nearestStation);
+        }
       })
       .catch((e) => {
         setLocationError(
@@ -63,6 +110,43 @@ export default function ReferenceScreen() {
         );
       });
   }, []);
+
+  async function applyPa(poste: PosteAcridien): Promise<StationFixe[]> {
+    setPa(poste);
+    const list = await listStationsByPoste(poste.id);
+    setStationsForPa(list);
+    return list;
+  }
+
+  async function setPaAuto() {
+    setPaMode('auto');
+    if (!autoPa) return;
+    await applyPa(autoPa);
+    if (stationModeRef.current === 'auto' && autoStation) setStation(autoStation);
+  }
+
+  function setPaManuel() {
+    setPaMode('manuel');
+  }
+
+  async function selectPa(poste: PosteAcridien) {
+    const list = await applyPa(poste);
+    setStation((current) => (current && list.some((s) => s.id === current.id) ? current : list[0] ?? null));
+  }
+
+  function setStationAuto() {
+    setStationMode('auto');
+    if (autoStation) setStation(autoStation);
+  }
+
+  function setStationManuel() {
+    setStationMode('manuel');
+  }
+
+  function selectStation(next: StationFixe) {
+    setStation(next);
+    setStationMode('manuel');
+  }
 
   const form = useForm({
     defaultValues: {
@@ -97,6 +181,10 @@ export default function ReferenceScreen() {
           region: adminArea.region,
           district: adminArea.district,
           commune: adminArea.commune,
+          pa_code: pa?.code ?? null,
+          pa_nom: pa?.nom ?? null,
+          stationId: station?.id ?? null,
+          station_nom: station?.nom ?? null,
         });
         setDraft(updated);
         router.push({ pathname: '/(prospection)/species' as any, params: { draftId } });
@@ -153,6 +241,76 @@ export default function ReferenceScreen() {
                 ([adminArea.region, adminArea.district, adminArea.commune].filter(Boolean).join(' · ') ||
                   'Localisation en cours…')}
             </Text>
+          </View>
+
+          <View style={styles.refCard}>
+            <View style={styles.refHeaderRow}>
+              <Text style={styles.refLabel}>2. Poste acridien (PA)</Text>
+              <View style={styles.toggleTrack}>
+                <TouchableOpacity onPress={setPaAuto} activeOpacity={0.7}>
+                  <Text style={[styles.toggleSegment, paMode === 'auto' && styles.toggleSegmentActive]}>Auto</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={setPaManuel} activeOpacity={0.7}>
+                  <Text style={[styles.toggleSegment, paMode === 'manuel' && styles.toggleSegmentActive]}>Manuel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            {paMode === 'auto' ? (
+              <View style={styles.autoValueRow}>
+                <Text style={styles.autoValueText}>{pa?.nom ?? '…'}</Text>
+                <View style={styles.gpsBadge}>
+                  <Text style={styles.gpsBadgeText}>📡 via GPS</Text>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.chipsRow}>
+                {postes.map((poste) => {
+                  const active = poste.id === pa?.id;
+                  return (
+                    <TouchableOpacity key={poste.id} onPress={() => selectPa(poste)} activeOpacity={0.7}>
+                      <Text style={[styles.chip, active && styles.chipActive]}>{poste.nom}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+
+          <View style={styles.refCard}>
+            <View style={styles.refHeaderRow}>
+              <Text style={styles.refLabel}>5. Station</Text>
+              <View style={styles.toggleTrack}>
+                <TouchableOpacity onPress={setStationAuto} activeOpacity={0.7}>
+                  <Text style={[styles.toggleSegment, stationMode === 'auto' && styles.toggleSegmentActive]}>
+                    Auto
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={setStationManuel} activeOpacity={0.7}>
+                  <Text style={[styles.toggleSegment, stationMode === 'manuel' && styles.toggleSegmentActive]}>
+                    Manuel
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            {stationMode === 'auto' ? (
+              <View style={styles.autoValueRow}>
+                <Text style={styles.autoValueText}>{station?.nom ?? '…'}</Text>
+                <View style={styles.gpsBadge}>
+                  <Text style={styles.gpsBadgeText}>📡 via GPS</Text>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.chipsRow}>
+                {stationsForPa.map((s) => {
+                  const active = s.id === station?.id;
+                  return (
+                    <TouchableOpacity key={s.id} onPress={() => selectStation(s)} activeOpacity={0.7}>
+                      <Text style={[styles.chip, active && styles.chipActive]}>{s.nom}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
           </View>
 
           <View style={styles.metaRow}>
@@ -252,6 +410,36 @@ const styles = StyleSheet.create({
   gpsFieldLabel: { color: '#ffffffbf', fontSize: 8.5, textTransform: 'uppercase' },
   gpsFieldValue: { color: '#fff', fontWeight: '600', fontSize: 12.5 },
   gpsAdminText: { color: '#ffffffd9', fontSize: 10.5 },
+  refCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 12, padding: 13, marginBottom: 11 },
+  refHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  refLabel: { fontSize: 9, fontWeight: '700', color: INACTIVE_TEXT, textTransform: 'uppercase', letterSpacing: 0.5 },
+  toggleTrack: { flexDirection: 'row', backgroundColor: INACTIVE_BG, borderRadius: 8, padding: 2, gap: 2 },
+  toggleSegment: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 6,
+    color: INACTIVE_TEXT,
+    overflow: 'hidden',
+  },
+  toggleSegmentActive: { backgroundColor: GREEN, color: '#fff' },
+  autoValueRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  autoValueText: { fontSize: 15, fontWeight: '700', color: TEXT },
+  gpsBadge: { backgroundColor: GPS_BADGE_BG, borderRadius: 20, paddingHorizontal: 7, paddingVertical: 2 },
+  gpsBadgeText: { fontSize: 9, fontWeight: '600', color: GREEN },
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: TEXT_SECONDARY,
+    backgroundColor: INACTIVE_BG,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  chipActive: { backgroundColor: GREEN, color: '#fff', fontWeight: '700' },
   metaRow: { flexDirection: 'row', gap: 9, marginBottom: 14 },
   metaField: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 9 },
   metaLabel: { fontSize: 9, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase' },
