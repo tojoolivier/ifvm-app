@@ -105,14 +105,28 @@ seul le serveur écrit. Conséquence directe :
 ### Endpoint API
 
 ```
-GET /referentiel/pull?since={timestamp|null}
+GET /referentiel/pull?since_postes_acridiens={timestamp|absent}
+                      &since_stations_fixes={timestamp|absent}
+                      &since_utilisateurs_equipe={timestamp|absent}
+                      &since_pesticides={timestamp|absent}
+                      &since_cultures={timestamp|absent}
+                      &since_codes_stades={timestamp|absent}
 ```
+
+Un paramètre `since_<entity_type>` indépendant par type d'entité, plutôt qu'un `since`
+global — cohérent avec `referentiel_sync_meta` qui garde un curseur par entité (voir
+schéma SQLite ci-dessous) : chaque table se rafraîchit à son propre rythme dans un même
+appel, sans qu'une entité en retard force le re-téléchargement des entités déjà à jour.
+Paramètre absent = premier pull pour cette entité, renvoie l'intégralité du périmètre PA
+de l'agent pour cette seule entité.
 
 Réponse : un objet par type d'entité du périmètre (`postes_acridiens`, `stations_fixes`,
 `utilisateurs_equipe`, `pesticides`, `cultures`, `codes_stades`), chacun sous la forme
-`{ upserts: [...], server_time: timestamp }`. `since=null` (premier login) renvoie
-l'intégralité du référentiel du PA de l'agent. Un `actif=false` dans `upserts` vaut
-soft-delete côté client.
+`{ upserts: [...], server_time: timestamp }`. Un `actif=false` dans `upserts` vaut
+soft-delete côté client. `server_time` est capturé côté serveur avant l'exécution des
+requêtes (et non après), pour qu'une entité modifiée pendant le traitement de la requête
+reste au-dessus du curseur écrit localement et soit reprise au pull suivant plutôt que
+sautée silencieusement.
 
 ### Schéma SQLite (tablette)
 
@@ -129,8 +143,9 @@ chaque table référentiel indépendamment plutôt qu'en bloc.
 
 ## Conséquences
 
-- Nouvel endpoint API `GET /referentiel/pull?since={timestamp}` (pattern identique à
-  `/sync/pull` d'ADR-002, appliqué aux entités référentiel).
+- Nouvel endpoint API `GET /referentiel/pull` avec un curseur `since_<entity_type>` par
+  type d'entité (pattern inspiré de `/sync/pull` d'ADR-002, adapté aux entités référentiel
+  pour permettre un rafraîchissement réellement indépendant par table).
 - Tables référentiel côté PostgreSQL ET SQLite portent un champ de dernière modification
   (`updated_at`) et un flag `actif` pour le soft-delete (déjà présent sur `station_fixe`, à
   généraliser aux autres tables référentiel du périmètre).
