@@ -152,6 +152,36 @@ REFERENTIEL_DATA = {
             "altitude": 1100,
         },
     ],
+    "pesticides": [
+        {"code": "PEST-FEN", "nom": "Fenitrothion"},
+        {"code": "PEST-MAL", "nom": "Malathion"},
+        {"code": "PEST-CHL", "nom": "Chlorpyrifos"},
+        {"code": "PEST-DEL", "nom": "Deltaméthrine"},
+    ],
+    "cultures": [
+        {"code": "CULT-RIZ", "nom": "Riz"},
+        {"code": "CULT-MAI", "nom": "Maïs"},
+        {"code": "CULT-MAN", "nom": "Manioc"},
+        {"code": "CULT-PAT", "nom": "Patate douce"},
+        {"code": "CULT-VEG", "nom": "Zone non cultivée / végétation naturelle"},
+    ],
+    "codes_stades": [
+        {"code": "A1", "espece": "LMC", "libelle": "Imago stade A1"},
+        {"code": "A2", "espece": "LMC", "libelle": "Imago stade A2"},
+        {"code": "A3", "espece": "LMC", "libelle": "Imago stade A3"},
+        {"code": "A4", "espece": "LMC", "libelle": "Imago stade A4"},
+        {"code": "A5", "espece": "LMC", "libelle": "Imago stade A5"},
+        {"code": "A1b", "espece": "LMC", "libelle": "Imago mâle stade A1"},
+        {"code": "A2b", "espece": "LMC", "libelle": "Imago mâle stade A2"},
+        {"code": "A5b", "espece": "LMC", "libelle": "Imago mâle stade A5"},
+        {"code": "L1", "espece": "NSE", "libelle": "Larve stade L1"},
+        {"code": "L2", "espece": "NSE", "libelle": "Larve stade L2"},
+        {"code": "L3", "espece": "NSE", "libelle": "Larve stade L3"},
+        {"code": "L4", "espece": "NSE", "libelle": "Larve stade L4"},
+        {"code": "L5", "espece": "NSE", "libelle": "Larve stade L5"},
+        {"code": "L6", "espece": "NSE", "libelle": "Larve stade L6"},
+        {"code": "L7", "espece": "NSE", "libelle": "Larve stade L7"},
+    ],
 }
 
 
@@ -167,7 +197,8 @@ async def load_fixtures():
                     VALUES (:code, :nom, :region)
                     ON CONFLICT (code) DO UPDATE SET
                         nom = EXCLUDED.nom,
-                        region = EXCLUDED.region
+                        region = EXCLUDED.region,
+                        updated_at = now()
                 """),
                 pa,
             )
@@ -192,7 +223,8 @@ async def load_fixtures():
                         pa_id = EXCLUDED.pa_id,
                         latitude = EXCLUDED.latitude,
                         longitude = EXCLUDED.longitude,
-                        altitude = EXCLUDED.altitude
+                        altitude = EXCLUDED.altitude,
+                        updated_at = now()
                 """),
                 {
                     "code": st["code"],
@@ -204,9 +236,52 @@ async def load_fixtures():
                 },
             )
 
+        # Charger les pesticides
+        for p in REFERENTIEL_DATA["pesticides"]:
+            await conn.execute(
+                text("""
+                    INSERT INTO pesticide (code, nom)
+                    VALUES (:code, :nom)
+                    ON CONFLICT (code) DO UPDATE SET
+                        nom = EXCLUDED.nom,
+                        updated_at = now()
+                """),
+                p,
+            )
+
+        # Charger les cultures
+        for c in REFERENTIEL_DATA["cultures"]:
+            await conn.execute(
+                text("""
+                    INSERT INTO culture (code, nom)
+                    VALUES (:code, :nom)
+                    ON CONFLICT (code) DO UPDATE SET
+                        nom = EXCLUDED.nom,
+                        updated_at = now()
+                """),
+                c,
+            )
+
+        # Charger les codes stades
+        for cs in REFERENTIEL_DATA["codes_stades"]:
+            await conn.execute(
+                text("""
+                    INSERT INTO code_stade (code, espece, libelle)
+                    VALUES (:code, :espece, :libelle)
+                    ON CONFLICT (code) DO UPDATE SET
+                        espece = EXCLUDED.espece,
+                        libelle = EXCLUDED.libelle,
+                        updated_at = now()
+                """),
+                cs,
+            )
+
     await engine.dispose()
     print(f"✓ {len(REFERENTIEL_DATA['postes_acridiens'])} postes acridiens chargés")
     print(f"✓ {len(REFERENTIEL_DATA['stations_fixes'])} stations fixes chargées")
+    print(f"✓ {len(REFERENTIEL_DATA['pesticides'])} pesticides chargés")
+    print(f"✓ {len(REFERENTIEL_DATA['cultures'])} cultures chargées")
+    print(f"✓ {len(REFERENTIEL_DATA['codes_stades'])} codes stades chargés")
 
 
 if __name__ == "__main__":

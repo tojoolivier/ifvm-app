@@ -15,7 +15,9 @@ class PosteAcridien:
     code: str = ""
     nom: str = ""
     region: str | None = None
+    actif: bool = True
     created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
 
 
 @dataclass
@@ -31,3 +33,44 @@ class StationFixe:
     altitude: float | None = None
     actif: bool = True
     created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class UtilisateurEquipe:
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    nom: str = ""
+    prenom: str = ""
+    email: str = ""
+    role: str = ""
+    pa_id: uuid.UUID | None = None
+    actif: bool = True
+    updated_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class Pesticide:
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    code: str = ""
+    nom: str = ""
+    actif: bool = True
+    updated_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class Culture:
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    code: str = ""
+    nom: str = ""
+    actif: bool = True
+    updated_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class CodeStade:
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    code: str = ""
+    espece: str = ""
+    libelle: str = ""
+    actif: bool = True
+    updated_at: datetime = field(default_factory=datetime.utcnow)

@@ -5,9 +5,13 @@ import { useAuthStore } from '@/lib/auth-store';
 export function useOnUnauthorized() {
   const router = useRouter();
   const logout = useAuthStore((s) => s.logout);
+  const refreshToken = useAuthStore((s) => s.refreshToken);
 
   return useCallback(async () => {
+    const refreshed = await refreshToken();
+    if (refreshed) return;
+
     await logout();
     router.replace('/(auth)/login');
-  }, [logout, router]);
+  }, [refreshToken, logout, router]);
 }

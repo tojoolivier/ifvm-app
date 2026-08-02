@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useAuthStore } from '@/lib/auth-store';
+import { pullReferentiel } from '@/lib/referentiel-sync';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isSmallScreen = SCREEN_WIDTH < 380;
@@ -48,12 +50,14 @@ const TYPE_CONFIG: Record<SyncItem['type'], { label: string; color: string; bg: 
 
 export default function SyncScreen() {
   const router = useRouter();
+  const token = useAuthStore((s) => s.token);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [progress, setProgress] = useState(0);
   const [syncItems, setSyncItems] = useState<SyncItem[]>(MOCK_SYNC_ITEMS);
   const [refreshing, setRefreshing] = useState(false);
   const [lastSync, setLastSync] = useState<Date>(new Date());
+  const [referentielError, setReferentielError] = useState<string | null>(null);
 
   // Statistiques
   const stats = {
@@ -65,10 +69,21 @@ export default function SyncScreen() {
 
   const handleSync = async () => {
     if (isSyncing) return;
-    
+
     setIsSyncing(true);
     setSyncStatus('syncing');
     setProgress(0);
+    setReferentielError(null);
+
+    if (token) {
+      try {
+        await pullReferentiel(token);
+      } catch (error) {
+        setReferentielError(
+          error instanceof Error ? error.message : 'Échec de la synchronisation du référentiel'
+        );
+      }
+    }
 
     try {
       const pendingItems = syncItems.filter(item => item.status === 'pending');
@@ -251,6 +266,11 @@ export default function SyncScreen() {
         {syncStatus === 'error' && (
           <View style={[styles.statusBanner, styles.statusError]}>
             <Text style={styles.statusBannerText}>❌ Erreur de synchronisation</Text>
+          </View>
+        )}
+        {referentielError && (
+          <View style={[styles.statusBanner, styles.statusError]}>
+            <Text style={styles.statusBannerText}>❌ Référentiel : {referentielError}</Text>
           </View>
         )}
 

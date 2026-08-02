@@ -48,7 +48,7 @@ beforeEach(() => {
 
 describe('Profile screen logic', () => {
   it('should display user info after auth', async () => {
-    mockApiClient.login.mockResolvedValueOnce({ access_token: TEST_TOKEN });
+    mockApiClient.login.mockResolvedValueOnce({ access_token: TEST_TOKEN, refresh_token: 'refresh-token-value' });
     mockStorage.setItem.mockResolvedValueOnce(undefined);
     mockApiClient.getProfile.mockResolvedValueOnce(TEST_USER);
 

@@ -25,10 +25,43 @@ def verify_password(plain: str, hashed: str) -> bool:
 def create_access_token(user_id: uuid.UUID) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
     return jwt.encode(
-        {"sub": str(user_id), "exp": expire},
+        {"sub": str(user_id), "type": "access", "exp": expire},
         settings.JWT_SECRET,
         algorithm=settings.JWT_ALGORITHM,
     )
+
+
+def create_refresh_token(user_id: uuid.UUID) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(days=settings.JWT_REFRESH_EXPIRE_DAYS)
+    return jwt.encode(
+        {"sub": str(user_id), "type": "refresh", "exp": expire},
+        settings.JWT_SECRET,
+        algorithm=settings.JWT_ALGORITHM,
+    )
+
+
+async def get_user_from_refresh_token(
+    token: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    from app.models.users import Utilisateur
+
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None or payload.get("type") != "refresh":
+            raise ValueError
+    except (JWTError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token invalide"
+        )
+
+    user = await db.get(Utilisateur, uuid.UUID(user_id))
+    if user is None or not user.actif:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Utilisateur introuvable"
+        )
+    return user
 
 
 async def get_current_user(
