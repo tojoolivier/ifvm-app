@@ -256,6 +256,9 @@ export interface ReferentielPullResponse {
   codes_stades: EntityPull<CodeStadeSync>;
 }
 
+/** Curseur `since` propre à chaque type d'entité référentiel (ADR-007 : rafraîchissement indépendant par table). */
+export type ReferentielSinceCursors = { [K in keyof ReferentielPullResponse]: string | null };
+
 type OnUnauthorized = () => void;
 
 const getBaseUrl = (): string => {
@@ -352,12 +355,19 @@ export const apiClient = {
 
   pullReferentiel: async (
     token: string,
-    since: string | null,
+    cursors: ReferentielSinceCursors,
     onUnauthorized?: OnUnauthorized
   ): Promise<ReferentielPullResponse> => {
-    const qs = since ? `?since=${encodeURIComponent(since)}` : '';
+    const query = new URLSearchParams();
+    if (cursors.postes_acridiens) query.set('since_postes_acridiens', cursors.postes_acridiens);
+    if (cursors.stations_fixes) query.set('since_stations_fixes', cursors.stations_fixes);
+    if (cursors.utilisateurs_equipe) query.set('since_utilisateurs_equipe', cursors.utilisateurs_equipe);
+    if (cursors.pesticides) query.set('since_pesticides', cursors.pesticides);
+    if (cursors.cultures) query.set('since_cultures', cursors.cultures);
+    if (cursors.codes_stades) query.set('since_codes_stades', cursors.codes_stades);
+    const qs = query.toString();
     return makeRequest<ReferentielPullResponse>(
-      `/referentiel/pull${qs}`,
+      `/referentiel/pull${qs ? `?${qs}` : ''}`,
       { method: 'GET' },
       token,
       onUnauthorized

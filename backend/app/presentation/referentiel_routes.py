@@ -10,6 +10,7 @@ from app.application.referentiel_use_cases import (
     ListPostesAcridiens,
     ListStations,
     PullReferentiel,
+    ReferentielSinceCursors,
 )
 from app.auth import get_current_user
 from app.database import get_db
@@ -75,7 +76,12 @@ async def get_station(
 async def pull_referentiel(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[Utilisateur, Depends(get_current_user)],
-    since: datetime | None = Query(default=None),
+    since_postes_acridiens: datetime | None = Query(default=None),
+    since_stations_fixes: datetime | None = Query(default=None),
+    since_utilisateurs_equipe: datetime | None = Query(default=None),
+    since_pesticides: datetime | None = Query(default=None),
+    since_cultures: datetime | None = Query(default=None),
+    since_codes_stades: datetime | None = Query(default=None),
 ):
     use_case = PullReferentiel(
         poste_repository=PosteAcridienRepositoryImpl(db),
@@ -85,7 +91,15 @@ async def pull_referentiel(
         culture_repository=CultureRepositoryImpl(db),
         code_stade_repository=CodeStadeRepositoryImpl(db),
     )
-    result = await use_case.execute(pa_id=current_user.pa_id, since=since)
+    cursors = ReferentielSinceCursors(
+        postes_acridiens=since_postes_acridiens,
+        stations_fixes=since_stations_fixes,
+        utilisateurs_equipe=since_utilisateurs_equipe,
+        pesticides=since_pesticides,
+        cultures=since_cultures,
+        codes_stades=since_codes_stades,
+    )
+    result = await use_case.execute(pa_id=current_user.pa_id, cursors=cursors)
 
     return ReferentielPullResponse(
         postes_acridiens=EntityPull(

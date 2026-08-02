@@ -157,10 +157,33 @@ async def test_pull_since_timestamp_returns_only_recent_upserts(
     client: AsyncClient, auth_headers, poste_acridien
 ):
     future = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
-    response = await client.get("/referentiel/pull", params={"since": future}, headers=auth_headers)
+    response = await client.get(
+        "/referentiel/pull",
+        params={"since_postes_acridiens": future},
+        headers=auth_headers,
+    )
     assert response.status_code == 200
     body = response.json()
     assert body["postes_acridiens"]["upserts"] == []
+
+
+@pytest.mark.asyncio
+async def test_pull_cursors_are_independent_per_entity(
+    client: AsyncClient, auth_headers, poste_acridien, pesticide
+):
+    future = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+
+    response = await client.get(
+        "/referentiel/pull",
+        params={"since_postes_acridiens": future},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["postes_acridiens"]["upserts"] == []
+    pesticide_codes = {p["code"] for p in body["pesticides"]["upserts"]}
+    assert pesticide_codes == {pesticide.code}
 
 
 @pytest.mark.asyncio
