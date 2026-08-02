@@ -5,6 +5,12 @@ export interface LoginCredentials {
 
 export interface LoginResponse {
   access_token: string;
+  refresh_token: string;
+  token_type?: string;
+}
+
+export interface RefreshResponse {
+  access_token: string;
   token_type?: string;
 }
 
@@ -179,6 +185,77 @@ export interface ListProspectionsParams {
   prospecteur_id?: string;
 }
 
+export interface EntityPull<T> {
+  upserts: T[];
+  server_time: string;
+}
+
+export interface PosteAcridienSync {
+  id: string;
+  code: string;
+  nom: string;
+  region: string | null;
+  actif: boolean;
+  updated_at: string;
+}
+
+export interface StationFixeSync {
+  id: string;
+  code: string;
+  nom: string;
+  pa_id: string;
+  latitude: number;
+  longitude: number;
+  altitude: number | null;
+  actif: boolean;
+  updated_at: string;
+}
+
+export interface UtilisateurEquipeSync {
+  id: string;
+  nom: string;
+  prenom: string;
+  email: string;
+  role: string;
+  pa_id: string | null;
+  actif: boolean;
+  updated_at: string;
+}
+
+export interface PesticideSync {
+  id: string;
+  code: string;
+  nom: string;
+  actif: boolean;
+  updated_at: string;
+}
+
+export interface CultureSync {
+  id: string;
+  code: string;
+  nom: string;
+  actif: boolean;
+  updated_at: string;
+}
+
+export interface CodeStadeSync {
+  id: string;
+  code: string;
+  espece: string;
+  libelle: string;
+  actif: boolean;
+  updated_at: string;
+}
+
+export interface ReferentielPullResponse {
+  postes_acridiens: EntityPull<PosteAcridienSync>;
+  stations_fixes: EntityPull<StationFixeSync>;
+  utilisateurs_equipe: EntityPull<UtilisateurEquipeSync>;
+  pesticides: EntityPull<PesticideSync>;
+  cultures: EntityPull<CultureSync>;
+  codes_stades: EntityPull<CodeStadeSync>;
+}
+
 type OnUnauthorized = () => void;
 
 const getBaseUrl = (): string => {
@@ -264,6 +341,27 @@ export const apiClient = {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
+  },
+
+  refresh: async (refreshToken: string): Promise<RefreshResponse> => {
+    return makeRequest<RefreshResponse>('/auth/refresh', {
+      method: 'POST',
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+  },
+
+  pullReferentiel: async (
+    token: string,
+    since: string | null,
+    onUnauthorized?: OnUnauthorized
+  ): Promise<ReferentielPullResponse> => {
+    const qs = since ? `?since=${encodeURIComponent(since)}` : '';
+    return makeRequest<ReferentielPullResponse>(
+      `/referentiel/pull${qs}`,
+      { method: 'GET' },
+      token,
+      onUnauthorized
+    );
   },
 
   getPostes: async (token: string, onUnauthorized?: OnUnauthorized): Promise<Poste[]> => {

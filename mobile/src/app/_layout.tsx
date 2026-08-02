@@ -4,6 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
 import { getDb } from '@/lib/prospection-db';
+import { useReferentielAutoSync } from '@/hooks/use-referentiel-auto-sync';
 import '../global.css';
 
 function useAuthGuard() {
@@ -33,6 +34,8 @@ function useAuthGuard() {
 export default function RootLayout() {
   useAuthGuard();
   const isInitialized = useAuthStore((s) => s.isInitialized);
+  const token = useAuthStore((s) => s.token);
+  useReferentielAutoSync(token);
 
   useEffect(() => {
     getDb();

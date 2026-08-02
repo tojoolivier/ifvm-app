@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
@@ -26,3 +27,83 @@ class StationFixeRead(BaseModel):
     altitude: float | None
     actif: bool
     created_at: datetime
+
+
+class PosteAcridienSyncRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    code: str
+    nom: str
+    region: str | None
+    actif: bool
+    updated_at: datetime
+
+
+class StationFixeSyncRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    code: str
+    nom: str
+    pa_id: uuid.UUID
+    latitude: float
+    longitude: float
+    altitude: float | None
+    actif: bool
+    updated_at: datetime
+
+
+class UtilisateurEquipeSyncRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    nom: str
+    prenom: str
+    email: str
+    role: str
+    pa_id: uuid.UUID | None
+    actif: bool
+    updated_at: datetime
+
+
+class PesticideSyncRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    code: str
+    nom: str
+    actif: bool
+    updated_at: datetime
+
+
+class CultureSyncRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    code: str
+    nom: str
+    actif: bool
+    updated_at: datetime
+
+
+class CodeStadeSyncRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    code: str
+    espece: str
+    libelle: str
+    actif: bool
+    updated_at: datetime
+
+
+T = TypeVar("T")
+
+
+class EntityPull(BaseModel, Generic[T]):
+    upserts: list[T]
+    server_time: datetime
+
+
+class ReferentielPullResponse(BaseModel):
+    postes_acridiens: EntityPull[PosteAcridienSyncRead]
+    stations_fixes: EntityPull[StationFixeSyncRead]
+    utilisateurs_equipe: EntityPull[UtilisateurEquipeSyncRead]
+    pesticides: EntityPull[PesticideSyncRead]
+    cultures: EntityPull[CultureSyncRead]
+    codes_stades: EntityPull[CodeStadeSyncRead]
