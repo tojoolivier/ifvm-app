@@ -187,6 +187,38 @@ const getBaseUrl = (): string => {
 
 const API_URL = getBaseUrl();
 
+interface FastApiValidationError {
+  loc: (string | number)[];
+  msg: string;
+}
+
+/**
+ * FastAPI renvoie les erreurs sous `detail` — une chaîne pour les HTTPException
+ * métier, ou un tableau d'erreurs Pydantic pour les 422 de validation. Sans ceci,
+ * l'appelant ne voit qu'un générique "HTTP error! status: 422" inexploitable.
+ */
+function extractErrorMessage(errorData: unknown): string | null {
+  if (typeof errorData !== 'object' || errorData === null) return null;
+  const data = errorData as Record<string, unknown>;
+
+  if (typeof data.message === 'string') return data.message;
+
+  const detail = data.detail;
+  if (typeof detail === 'string') return detail;
+
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .filter((item): item is FastApiValidationError => typeof item?.msg === 'string')
+      .map((item) => {
+        const field = Array.isArray(item.loc) ? item.loc[item.loc.length - 1] : null;
+        return field ? `${field}: ${item.msg}` : item.msg;
+      });
+    if (messages.length > 0) return messages.join('; ');
+  }
+
+  return null;
+}
+
 const makeRequest = async <T>(
   endpoint: string,
   options: RequestInit = {},
@@ -216,7 +248,11 @@ const makeRequest = async <T>(
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    throw new Error(extractErrorMessage(errorData) || `HTTP error! status: ${response.status}`);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
   }
 
   return response.json();
@@ -282,6 +318,14 @@ export const apiClient = {
     onUnauthorized?: OnUnauthorized
   ): Promise<ProspectionRead> => {
     return makeRequest<ProspectionRead>(`/prospections/${id}`, { method: 'GET' }, token, onUnauthorized);
+  },
+
+  deleteProspection: async (
+    token: string,
+    id: string,
+    onUnauthorized?: OnUnauthorized
+  ): Promise<void> => {
+    return makeRequest<void>(`/prospections/${id}`, { method: 'DELETE' }, token, onUnauthorized);
   },
 
   changePassword: async (

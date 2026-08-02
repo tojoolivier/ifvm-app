@@ -5,6 +5,7 @@ import {
   DraftProspection,
   completeProspection,
   markProspectionSynced,
+  listAllProspectionCaptures,
 } from './prospection-repository';
 import { PHENOTYPES } from './prospection-fiche-lecture';
 import { CaptureCounts, dominantPhenotype, rowsToCounts, totalBySexe, totalCaptures } from './prospection-capture-store';
@@ -74,6 +75,34 @@ function buildCapturesPayload(rows: CaptureRow[]): ProspectionCaptureInput[] {
   }));
 }
 
+function buildProspectionPayload(draft: DraftProspection) {
+  return {
+    type_prospection: draft.type_prospection,
+    campagne_id: draft.campagne_id,
+    station_id: draft.station_id,
+    n_fiche: draft.n_fiche,
+    date_prospection: draft.date_prospection,
+    latitude: draft.latitude,
+    longitude: draft.longitude,
+    altitude: draft.altitude,
+    surf_station: draft.surf_station,
+    surf_prospectee: draft.surf_prospectee,
+    surf_infestee: draft.surf_infestee,
+    degats_cultures: draft.degats_cultures,
+    vegetation: draft.vegetation ? JSON.parse(draft.vegetation) : null,
+    sol: draft.sol ? JSON.parse(draft.sol) : null,
+    statut: draft.statut,
+    region: draft.region,
+    district: draft.district,
+    commune: draft.commune,
+    za: draft.za,
+    pa_code: draft.pa_code,
+    degats_cultures_pourcent: draft.degats_cultures_pourcent,
+    verdissement_pourcent: draft.verdissement_pourcent,
+    hauteur_herbe_cm: draft.hauteur_herbe_cm,
+  };
+}
+
 /**
  * Écrit d'abord la fiche localement (toujours — c'est la référence hors-ligne, cf. ADR-002),
  * puis envoie directement au serveur si une connexion est disponible ; sinon la fiche reste
@@ -92,34 +121,26 @@ export async function enregistrerEtSynchroniser(
 
   try {
     await apiClient.createProspection(token, {
-      type_prospection: completed.type_prospection,
-      campagne_id: completed.campagne_id,
-      station_id: completed.station_id,
-      n_fiche: completed.n_fiche,
-      date_prospection: completed.date_prospection,
-      latitude: completed.latitude,
-      longitude: completed.longitude,
-      altitude: completed.altitude,
-      surf_station: completed.surf_station,
-      surf_prospectee: completed.surf_prospectee,
-      surf_infestee: completed.surf_infestee,
-      degats_cultures: completed.degats_cultures,
-      vegetation: completed.vegetation ? JSON.parse(completed.vegetation) : null,
-      sol: completed.sol ? JSON.parse(completed.sol) : null,
-      statut: completed.statut,
+      ...buildProspectionPayload(completed),
       captures: buildCapturesPayload(captures),
-      region: completed.region,
-      district: completed.district,
-      commune: completed.commune,
-      za: completed.za,
-      pa_code: completed.pa_code,
-      degats_cultures_pourcent: completed.degats_cultures_pourcent,
-      verdissement_pourcent: completed.verdissement_pourcent,
-      hauteur_herbe_cm: completed.hauteur_herbe_cm,
     });
     await markProspectionSynced(completed.id);
     return { synced: true };
   } catch {
     return { synced: false };
   }
+}
+
+/**
+ * Relance l'envoi d'une fiche déjà complétée mais restée `statut_sync != 'synced'`
+ * (échec silencieux précédent). Contrairement à enregistrerEtSynchroniser, l'erreur
+ * n'est PAS avalée : l'appelant (UI) doit pouvoir afficher un toast d'échec.
+ */
+export async function retrySyncProspection(draft: DraftProspection, token: string): Promise<void> {
+  const captures = await listAllProspectionCaptures(draft.id);
+  await apiClient.createProspection(token, {
+    ...buildProspectionPayload(draft),
+    captures: buildCapturesPayload(captures),
+  });
+  await markProspectionSynced(draft.id);
 }

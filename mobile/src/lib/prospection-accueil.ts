@@ -4,6 +4,7 @@ import { STATUT_VALIDE } from './prospection-fiche-lecture';
 import {
   createDraftProspection,
   countUnsyncedProspections,
+  deleteProspection as deleteLocalProspection,
   listDraftProspections,
   listRecentProspections,
   DraftProspection,
@@ -50,6 +51,14 @@ export async function loadValidatedProspections(
   } catch {
     return [];
   }
+}
+
+/** Supprime une fiche brouillon en local. Refuse toute fiche déjà complétée (elle n'existe alors que côté serveur, où le backend applique la même règle). */
+export async function deleteDraftProspection(draft: DraftProspection): Promise<void> {
+  if (draft.statut !== 'brouillon') {
+    throw new Error('Seules les fiches en brouillon peuvent être supprimées.');
+  }
+  await deleteLocalProspection(draft.id);
 }
 
 /** Choisit la campagne en cours parmi les campagnes connues (règle : une seule campagne à la fois). */

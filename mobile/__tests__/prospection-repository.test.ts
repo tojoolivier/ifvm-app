@@ -15,6 +15,7 @@ import {
   saveProspectionPopulation,
   getProspectionInfestation,
   saveProspectionInfestation,
+  deleteProspection,
 } from '../src/lib/prospection-repository';
 
 const runAsync = jest.fn().mockResolvedValue({ lastInsertRowId: 1, changes: 1 });
@@ -557,5 +558,27 @@ describe('countUnsyncedProspections', () => {
     const result = await countUnsyncedProspections();
 
     expect(result).toBe(0);
+  });
+});
+
+describe('deleteProspection', () => {
+  it('deletes the row and returns true when a row was removed', async () => {
+    runAsync.mockResolvedValueOnce({ lastInsertRowId: 0, changes: 1 });
+
+    const result = await deleteProspection(BASE_INPUT.id);
+
+    expect(result).toBe(true);
+    expect(runAsync).toHaveBeenCalledWith(
+      'DELETE FROM prospection WHERE id = ?',
+      [BASE_INPUT.id]
+    );
+  });
+
+  it('returns false when no row matched the id', async () => {
+    runAsync.mockResolvedValueOnce({ lastInsertRowId: 0, changes: 0 });
+
+    const result = await deleteProspection('missing-id');
+
+    expect(result).toBe(false);
   });
 });

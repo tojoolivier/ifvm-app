@@ -88,6 +88,47 @@ describe('API Client', () => {
     });
   });
 
+  describe('Error message extraction', () => {
+    it('surfaces a plain string "detail" (FastAPI HTTPException) instead of the generic status text', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        json: async () => ({ detail: 'Seules les fiches brouillon peuvent être supprimées' }),
+      });
+
+      await expect(apiClient.getProfile('token')).rejects.toThrow(
+        'Seules les fiches brouillon peuvent être supprimées'
+      );
+    });
+
+    it('surfaces FastAPI/Pydantic validation errors (422, "detail" as an array) as a readable message', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        json: async () => ({
+          detail: [
+            { loc: ['body', 'campagne_id'], msg: 'field required', type: 'value_error.missing' },
+            { loc: ['body', 'date_prospection'], msg: 'invalid date format', type: 'value_error' },
+          ],
+        }),
+      });
+
+      await expect(apiClient.getProfile('token')).rejects.toThrow(
+        'campagne_id: field required; date_prospection: invalid date format'
+      );
+    });
+
+    it('falls back to the HTTP status when the error body has no usable detail', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({}),
+      });
+
+      await expect(apiClient.getProfile('token')).rejects.toThrow('HTTP error! status: 500');
+    });
+  });
+
   describe('Base URL configuration', () => {
     it('should use EXPO_PUBLIC_API_URL environment variable', async () => {
       process.env.EXPO_PUBLIC_API_URL = 'http://custom-api.com';
@@ -182,6 +223,24 @@ describe('API Client', () => {
         'http://test-api.com/users/me',
         expect.objectContaining({
           method: 'GET',
+        })
+      );
+    });
+
+    it('deleteProspection should DELETE /prospections/{id}', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 204,
+        json: async () => { throw new Error('no body'); },
+      });
+
+      await apiClient.deleteProspection('token', 'fiche-1');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://test-api.com/prospections/fiche-1',
+        expect.objectContaining({
+          method: 'DELETE',
+          headers: expect.objectContaining({ 'Authorization': 'Bearer token' }),
         })
       );
     });

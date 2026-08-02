@@ -1,11 +1,24 @@
-import { CaptureRow, DraftProspection, completeProspection, markProspectionSynced } from '../src/lib/prospection-repository';
+import {
+  CaptureRow,
+  DraftProspection,
+  completeProspection,
+  markProspectionSynced,
+  listAllProspectionCaptures,
+} from '../src/lib/prospection-repository';
 import { apiClient } from '../src/lib/api-client';
 import * as Network from 'expo-network';
-import { buildRecapitulatif, chronoSeconds, enregistrerEtSynchroniser, formatChrono } from '../src/lib/prospection-review';
+import {
+  buildRecapitulatif,
+  chronoSeconds,
+  enregistrerEtSynchroniser,
+  retrySyncProspection,
+  formatChrono,
+} from '../src/lib/prospection-review';
 
 jest.mock('../src/lib/prospection-repository', () => ({
   completeProspection: jest.fn(),
   markProspectionSynced: jest.fn(),
+  listAllProspectionCaptures: jest.fn(),
 }));
 jest.mock('../src/lib/api-client', () => ({
   apiClient: { createProspection: jest.fn() },
@@ -16,6 +29,7 @@ const mockCompleteProspection = jest.mocked(completeProspection);
 const mockMarkSynced = jest.mocked(markProspectionSynced);
 const mockCreateProspection = jest.mocked(apiClient.createProspection);
 const mockGetNetworkState = jest.mocked(Network.getNetworkStateAsync);
+const mockListAllCaptures = jest.mocked(listAllProspectionCaptures);
 
 function draft(overrides: Partial<DraftProspection> = {}): DraftProspection {
   return {
@@ -65,6 +79,7 @@ beforeEach(() => {
   mockMarkSynced.mockReset();
   mockCreateProspection.mockReset();
   mockGetNetworkState.mockReset();
+  mockListAllCaptures.mockReset();
 });
 
 describe('formatChrono / chronoSeconds', () => {
@@ -139,6 +154,30 @@ describe('enregistrerEtSynchroniser', () => {
     const result = await enregistrerEtSynchroniser(draft(), [], 'token-1');
 
     expect(result).toEqual({ synced: false });
+    expect(mockMarkSynced).not.toHaveBeenCalled();
+  });
+});
+
+describe('retrySyncProspection', () => {
+  it('renvoie la fiche en_attente au serveur puis la marque synchronisée', async () => {
+    mockListAllCaptures.mockResolvedValue([]);
+    mockCreateProspection.mockResolvedValue({ id: 'remote-1' });
+    mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
+
+    await retrySyncProspection(draft({ statut: 'en_attente' }), 'token-1');
+
+    expect(mockListAllCaptures).toHaveBeenCalledWith('draft-1');
+    expect(mockCreateProspection).toHaveBeenCalled();
+    expect(mockMarkSynced).toHaveBeenCalledWith('draft-1');
+  });
+
+  it("laisse remonter l'erreur au lieu de l'avaler, pour que l'appelant puisse afficher un toast", async () => {
+    mockListAllCaptures.mockResolvedValue([]);
+    mockCreateProspection.mockRejectedValue(new Error('Erreur serveur 500'));
+
+    await expect(retrySyncProspection(draft({ statut: 'en_attente' }), 'token-1')).rejects.toThrow(
+      'Erreur serveur 500'
+    );
     expect(mockMarkSynced).not.toHaveBeenCalled();
   });
 });
