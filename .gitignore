@@ -38,3 +38,4 @@ infra/*.tfvars
 
 # Données géospatiales volumineuses (gérer avec Git LFS si nécessaire)
 *.fgb
+docker-compose.yml.bak

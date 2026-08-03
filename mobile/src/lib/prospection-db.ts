@@ -84,6 +84,7 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
       methode TEXT,
       accouplement TEXT,
       ponte TEXT,
+      phase TEXT,
       captures_sol INTEGER,
       captures_trans INTEGER,
       captures_greg INTEGER,
@@ -226,10 +227,14 @@ async function migrateInfestationTable(db: SQLite.SQLiteDatabase): Promise<void>
 // MIGRATION POUR LA TABLE PROSPECTION_POPULATION
 // ==========================================
 async function migratePopulationTable(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migration] Vérification des colonnes de prospection_population...');
+  
   const tableInfo = await db.getAllAsync<{ name: string }>('PRAGMA table_info(prospection_population)');
   const columnNames = tableInfo.map(row => row.name);
+  console.log('[Migration] Colonnes existantes:', columnNames);
 
   const columnsToAdd = [
+    { name: 'phase', type: 'TEXT' },
     { name: 'captures_sol', type: 'INTEGER' },
     { name: 'captures_trans', type: 'INTEGER' },
     { name: 'captures_greg', type: 'INTEGER' },
@@ -244,11 +249,15 @@ async function migratePopulationTable(db: SQLite.SQLiteDatabase): Promise<void> 
 
   for (const col of columnsToAdd) {
     if (!columnNames.includes(col.name)) {
+      console.log(`[Migration] Ajout de la colonne ${col.name} sur prospection_population...`);
       try {
         await db.execAsync(`ALTER TABLE prospection_population ADD COLUMN ${col.name} ${col.type};`);
+        console.log(`[Migration] ✅ Colonne ${col.name} ajoutée`);
       } catch (error) {
-        console.warn(`[Migration] ⚠️ Impossible d'ajouter ${col.name} sur prospection_population:`, error);
+        console.warn(`[Migration] ⚠️ Impossible d'ajouter ${col.name}:`, error);
       }
+    } else {
+      console.log(`[Migration] ⏭️ Colonne ${col.name} existe déjà`);
     }
   }
 }
