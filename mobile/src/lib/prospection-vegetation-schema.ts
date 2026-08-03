@@ -1,5 +1,5 @@
 import * as yup from 'yup';
-import { DegatsCultures, Humidite, Texture } from './prospection-fiche-lecture';
+import { Humidite, Texture } from './prospection-fiche-lecture';
 
 export interface StrateFormValues {
   surfRel: number | null;
@@ -15,9 +15,6 @@ export interface VegetationFormValues {
   strate: StrateFormValues;
   humidite: Humidite | null;
   texture: Texture | null;
-  degatsCultures: DegatsCultures | null;
-  ennemis?: string;
-  observation?: string;
 }
 
 const strateSchema = yup.object({
@@ -34,7 +31,4 @@ export const vegetationSchema = yup.object({
   strate: strateSchema.required(),
   humidite: yup.string().nullable().required('Humidité du sol requise'),
   texture: yup.string().nullable().required('Texture du sol requise'),
-  degatsCultures: yup.string().nullable().required('Dégâts sur culture requis'),
-  ennemis: yup.string().optional(),
-  observation: yup.string().optional(),
 });

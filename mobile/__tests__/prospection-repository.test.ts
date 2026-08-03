@@ -7,6 +7,7 @@ import {
   updateProspectionReference,
   updateProspectionEspeces,
   updateProspectionVegetation,
+  updateProspectionObservations,
   startCaptureTimer,
   saveProspectionCaptures,
   listProspectionCaptures,
@@ -254,23 +255,21 @@ describe('updateProspectionVegetation', () => {
   const VEGETATION_INPUT = {
     vegetation: JSON.stringify({ recouvrement_herbeux: 40 }),
     sol: JSON.stringify({ humidite: 'surface', texture: 'limoneuse' }),
-    degatsCultures: 'nuls',
   };
 
-  it('updates vegetation/sol/degats_cultures columns on the draft row', async () => {
+  it('updates vegetation/sol columns on the draft row, without touching degats_cultures/ennemis/observations (owned by Observations screen)', async () => {
     getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW, ...VEGETATION_INPUT });
 
     await updateProspectionVegetation(BASE_INPUT.id, VEGETATION_INPUT);
 
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE prospection SET'),
-      expect.arrayContaining([
-        VEGETATION_INPUT.vegetation,
-        VEGETATION_INPUT.sol,
-        VEGETATION_INPUT.degatsCultures,
-        BASE_INPUT.id,
-      ])
+      expect.arrayContaining([VEGETATION_INPUT.vegetation, VEGETATION_INPUT.sol, BASE_INPUT.id])
     );
+    const sql = runAsync.mock.calls[0][0] as string;
+    expect(sql).not.toContain('degats_cultures =');
+    expect(sql).not.toContain('ennemis_naturels');
+    expect(sql).not.toContain('observations =');
   });
 
   it('returns the updated row read back from local storage', async () => {
@@ -289,19 +288,46 @@ describe('updateProspectionVegetation', () => {
       'Échec de la mise à jour de la fiche brouillon locale'
     );
   });
+});
 
-  it('persists ennemis naturels et observation libre (colonnes déjà en base, jamais écrites jusqu\'ici)', async () => {
-    getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW, ...VEGETATION_INPUT });
+describe('updateProspectionObservations', () => {
+  const OBSERVATIONS_INPUT = {
+    degatsCultures: 'moyens',
+    ennemisNaturels: 'Oiseaux, Mantes',
+    observations: 'RAS',
+  };
 
-    await updateProspectionVegetation(BASE_INPUT.id, {
-      ...VEGETATION_INPUT,
-      ennemisNaturels: 'oiseaux, mantes',
-      observations: 'RAS',
-    });
+  it('updates only degats_cultures/ennemis_naturels/observations columns', async () => {
+    getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW, ...OBSERVATIONS_INPUT });
+
+    await updateProspectionObservations(BASE_INPUT.id, OBSERVATIONS_INPUT);
 
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE prospection SET'),
-      expect.arrayContaining(['oiseaux, mantes', 'RAS'])
+      [
+        OBSERVATIONS_INPUT.degatsCultures,
+        OBSERVATIONS_INPUT.ennemisNaturels,
+        OBSERVATIONS_INPUT.observations,
+        expect.any(String),
+        BASE_INPUT.id,
+      ]
+    );
+  });
+
+  it('returns the updated row read back from local storage', async () => {
+    const updated = { ...STORED_ROW, ...OBSERVATIONS_INPUT };
+    getFirstAsync.mockResolvedValueOnce(updated);
+
+    const result = await updateProspectionObservations(BASE_INPUT.id, OBSERVATIONS_INPUT);
+
+    expect(result).toEqual(updated);
+  });
+
+  it('throws if the row cannot be read back after the update', async () => {
+    getFirstAsync.mockResolvedValueOnce(null);
+
+    await expect(updateProspectionObservations(BASE_INPUT.id, OBSERVATIONS_INPUT)).rejects.toThrow(
+      'Échec de la mise à jour de la fiche brouillon locale'
     );
   });
 });
@@ -561,6 +587,9 @@ describe('saveProspectionInfestation', () => {
     type_essaim: null,
     nb_taches_bandes: null,
     interdistance_m: null,
+    interdistance_min: null,
+    interdistance_max: null,
+    interdistance_moy: null,
     surface_contaminee_ha: null,
     type_larve: null,
     surf_infestee_pourcent: null,
@@ -588,7 +617,7 @@ describe('saveProspectionInfestation', () => {
       [
         null, 'essaim', 1, 2, 1.5, 5, 1, 3, 2, 1, 'repos',
         null, 'N', 'S', 10,
-        null, null, null, null, null, null, null, null, null, null, null, null,
+        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
         'existing-id',
       ]
     );

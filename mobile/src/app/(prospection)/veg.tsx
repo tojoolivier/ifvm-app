@@ -4,7 +4,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm } from '@tanstack/react-form';
 import {
-  DEGATS_OPTIONS,
   HUMIDITE_OPTIONS,
   ORPAD_STAGES,
   STRATE_KEYS,
@@ -18,7 +17,6 @@ import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { StrateFormValues, VegetationFormValues, vegetationSchema } from '@/lib/prospection-vegetation-schema';
 
 const GREEN = '#235a36';
-const ORANGE = '#e89b2b';
 const BG = '#faf7ef';
 const TEXT = '#16201a';
 const TEXT_SECONDARY = '#6f6a59';
@@ -48,9 +46,6 @@ export default function VegetationScreen() {
       strate: strates[selectedStrate],
       humidite: null,
       texture: null,
-      degatsCultures: null,
-      ennemis: '',
-      observation: '',
     } as VegetationFormValues,
     onSubmit: async ({ value }) => {
       if (!draftId) return;
@@ -71,12 +66,9 @@ export default function VegetationScreen() {
         const updated = await updateProspectionVegetation(draftId, {
           vegetation: JSON.stringify({ strates: { ...strates, [selectedStrate]: payload.strate } }),
           sol: JSON.stringify({ humidite: payload.humidite, texture: payload.texture }),
-          degatsCultures: payload.degatsCultures,
-          ennemisNaturels: payload.ennemis || null,
-          observations: payload.observation || null,
         });
         setDraft(updated);
-        router.push({ pathname: '/(prospection)/review' as any, params: { draftId } });
+        router.push({ pathname: '/(prospection)/observations' as any, params: { draftId } });
       } finally {
         setIsSaving(false);
       }
@@ -260,58 +252,6 @@ export default function VegetationScreen() {
             )}
           </form.Field>
 
-          <form.Field name="degatsCultures">
-            {(field) => (
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Dégâts sur culture</Text>
-                <View style={styles.chipsRow}>
-                  {DEGATS_OPTIONS.map((option) => {
-                    const active = option.value === field.state.value;
-                    return (
-                      <TouchableOpacity
-                        key={option.value}
-                        style={[styles.smallChip, styles.smallChipFlex, active && styles.smallChipActive]}
-                        onPress={() => field.handleChange(option.value)}
-                      >
-                        <Text style={[styles.smallChipText, active && styles.smallChipTextActive]}>{option.label}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            )}
-          </form.Field>
-
-          <form.Field name="ennemis">
-            {(field) => (
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Ennemis naturels observés</Text>
-                <TextInput
-                  value={field.state.value}
-                  onChangeText={field.handleChange}
-                  placeholder="ex. oiseaux, mantes, champignons…"
-                  style={styles.textInput}
-                />
-              </View>
-            )}
-          </form.Field>
-
-          <form.Field name="observation">
-            {(field) => (
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Observation</Text>
-                <TextInput
-                  value={field.state.value}
-                  onChangeText={field.handleChange}
-                  placeholder="Tout évènement susceptible de compléter les observations…"
-                  multiline
-                  numberOfLines={3}
-                  style={[styles.textInput, styles.textArea]}
-                />
-              </View>
-            )}
-          </form.Field>
-
           {Object.values(formErrors).map((message) => (
             <Text key={message} style={styles.errorText}>
               {message}
@@ -319,9 +259,13 @@ export default function VegetationScreen() {
           ))}
         </ScrollView>
 
+        <Text style={styles.totalRec}>
+          Total recouvrement : {STRATE_KEYS.reduce((sum, key) => sum + strates[key].recouvrement, 0)}%
+        </Text>
+
         <View style={styles.footer}>
           <TouchableOpacity style={styles.continueButton} onPress={form.handleSubmit} disabled={isSaving} activeOpacity={0.85}>
-            <Text style={styles.continueButtonText}>{isSaving ? 'Enregistrement…' : 'Vérifier & enregistrer ✓'}</Text>
+            <Text style={styles.continueButtonText}>{isSaving ? 'Enregistrement…' : 'Continuer  ›'}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -364,10 +308,9 @@ const styles = StyleSheet.create({
   smallChipActive: { backgroundColor: GREEN },
   smallChipText: { fontSize: 11, fontWeight: '600', color: TEXT_SECONDARY },
   smallChipTextActive: { fontWeight: '700', color: '#fff' },
-  textInput: { backgroundColor: '#f6f3e9', borderRadius: 7, padding: 8, fontSize: 12, fontWeight: '500', color: TEXT },
-  textArea: { minHeight: 70, textAlignVertical: 'top' },
   errorText: { color: '#c0412b', fontSize: 11, marginBottom: 4 },
+  totalRec: { textAlign: 'center', fontSize: 10, fontWeight: '600', color: '#9a9484', letterSpacing: 0.3, paddingVertical: 4 },
   footer: { padding: 16 },
-  continueButton: { backgroundColor: ORANGE, borderRadius: 13, padding: 15, alignItems: 'center' },
-  continueButtonText: { color: TEXT, fontWeight: '800', fontSize: 15 },
+  continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
+  continueButtonText: { color: '#fff', fontWeight: '800', fontSize: 15 },
 });

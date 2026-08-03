@@ -227,18 +227,40 @@ export async function markGrilleCompleted(id: string, grilleKey: string): Promis
   return updated;
 }
 
+export interface ObservationsUpdateInput {
+  degatsCultures: string | null;
+  ennemisNaturels: string | null;
+  observations: string | null;
+}
+
+/** N'écrit que les colonnes de l'écran Observations, sans toucher vegetation/sol déjà enregistrés par l'écran Strates. */
+export async function updateProspectionObservations(id: string, input: ObservationsUpdateInput): Promise<DraftProspection> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    `UPDATE prospection SET
+      degats_cultures = ?, ennemis_naturels = ?, observations = ?,
+      updated_at = ? WHERE id = ?`,
+    [input.degatsCultures, input.ennemisNaturels, input.observations, now, id]
+  );
+
+  const updated = await getProspection(id);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
 export interface VegetationUpdateInput {
   vegetation: string;
   sol: string;
-  degatsCultures: string | null;
   degatsCulturesPourcent?: number | null;
   verdissementPourcent?: number | null;
   hauteurHerbeCm?: number | null;
-  ennemisNaturels?: string | null;
-  observations?: string | null;
 }
 
-// Dans updateProspectionVegetation, corriger la chaîne SQL
+/** Dégâts sur culture / ennemis naturels / observation libre sont désormais possédés par l'écran Observations (cf. `updateProspectionObservations`) — ne pas les toucher ici pour ne pas écraser leur saisie au retour sur l'écran Strates. */
 export async function updateProspectionVegetation(
   id: string,
   input: VegetationUpdateInput
@@ -248,19 +270,15 @@ export async function updateProspectionVegetation(
 
   await db.runAsync(
     `UPDATE prospection SET
-      vegetation = ?, sol = ?, degats_cultures = ?,
+      vegetation = ?, sol = ?,
       degats_cultures_pourcent = ?, verdissement_pourcent = ?, hauteur_herbe_cm = ?,
-      ennemis_naturels = ?, observations = ?,
       updated_at = ? WHERE id = ?`,
     [
       input.vegetation,
       input.sol,
-      input.degatsCultures,
       input.degatsCulturesPourcent ?? null,
       input.verdissementPourcent ?? null,
       input.hauteurHerbeCm ?? null,
-      input.ennemisNaturels ?? null,
-      input.observations ?? null,
       now,
       id,
     ]
@@ -408,6 +426,9 @@ export interface InfestationRow {
   type_essaim: string | null;
   nb_taches_bandes: number | null;
   interdistance_m: number | null;
+  interdistance_min: number | null;
+  interdistance_max: number | null;
+  interdistance_moy: number | null;
   surface_contaminee_ha: number | null;
   type_larve: string | null;
   surf_infestee_pourcent: number | null;
@@ -418,8 +439,8 @@ const INFESTATION_COLUMNS = `espece, type_cible, taille_min, taille_max, taille_
             comportement, direction_de, direction_vers, vent_de, vent_vitesse,
             pullulation_nb, taille_long, taille_large, taille_epaisseur,
             essaim_en_vol, essaim_pose, type_essaim,
-            nb_taches_bandes, interdistance_m, surface_contaminee_ha,
-            type_larve, surf_infestee_pourcent`;
+            nb_taches_bandes, interdistance_m, interdistance_min, interdistance_max, interdistance_moy,
+            surface_contaminee_ha, type_larve, surf_infestee_pourcent`;
 
 export async function getProspectionInfestation(
   prospectionId: string,
@@ -481,6 +502,9 @@ export async function saveProspectionInfestation(
     row.type_essaim,
     row.nb_taches_bandes,
     row.interdistance_m,
+    row.interdistance_min,
+    row.interdistance_max,
+    row.interdistance_moy,
     row.surface_contaminee_ha,
     row.type_larve,
     row.surf_infestee_pourcent,
@@ -494,8 +518,8 @@ export async function saveProspectionInfestation(
         comportement = ?, direction_de = ?, direction_vers = ?, vent_de = ?, vent_vitesse = ?,
         pullulation_nb = ?, taille_long = ?, taille_large = ?, taille_epaisseur = ?,
         essaim_en_vol = ?, essaim_pose = ?, type_essaim = ?,
-        nb_taches_bandes = ?, interdistance_m = ?, surface_contaminee_ha = ?,
-        type_larve = ?, surf_infestee_pourcent = ?
+        nb_taches_bandes = ?, interdistance_m = ?, interdistance_min = ?, interdistance_max = ?, interdistance_moy = ?,
+        surface_contaminee_ha = ?, type_larve = ?, surf_infestee_pourcent = ?
        WHERE id = ?`,
       [...values, existing.id]
     );
@@ -507,9 +531,9 @@ export async function saveProspectionInfestation(
         comportement, direction_de, direction_vers, vent_de, vent_vitesse,
         pullulation_nb, taille_long, taille_large, taille_epaisseur,
         essaim_en_vol, essaim_pose, type_essaim,
-        nb_taches_bandes, interdistance_m, surface_contaminee_ha,
-        type_larve, surf_infestee_pourcent
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        nb_taches_bandes, interdistance_m, interdistance_min, interdistance_max, interdistance_moy,
+        surface_contaminee_ha, type_larve, surf_infestee_pourcent
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [generateId(), prospectionId, ...values]
     );
   }

@@ -108,7 +108,7 @@ export default function CapturesScreen() {
   const handleBack = () => {
     if (hasSexeToggle) {
       router.replace({
-        pathname: '/(prospection)/density' as any,
+        pathname: '/(prospection)/accouplement' as any,
         params: { draftId, grilleIndex: String(store.currentGrilleIndex) },
       });
     } else if (store.currentGrilleIndex > 0) {
