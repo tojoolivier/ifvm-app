@@ -114,6 +114,16 @@ async def create_prospection(
             degats_cultures_pourcent=body.degats_cultures_pourcent,
             verdissement_pourcent=body.verdissement_pourcent,
             hauteur_herbe_cm=body.hauteur_herbe_cm,
+            # ==========================================
+            # NOUVEAUX CHAMPS - Extensif & Validation
+            # ==========================================
+            station_libre=body.station_libre,
+            type_station=body.type_station,
+            verdure_strate=body.verdure_strate,
+            signalement_source=body.signalement_source,
+            signalement_date=body.signalement_date,
+            signalement_description=body.signalement_description,
+            conclusion_validation=body.conclusion_validation,
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
@@ -183,6 +193,16 @@ async def update_prospection(
             degats_cultures_pourcent=body.degats_cultures_pourcent,
             verdissement_pourcent=body.verdissement_pourcent,
             hauteur_herbe_cm=body.hauteur_herbe_cm,
+            # ==========================================
+            # NOUVEAUX CHAMPS - Extensif & Validation
+            # ==========================================
+            station_libre=body.station_libre,
+            type_station=body.type_station,
+            verdure_strate=body.verdure_strate,
+            signalement_source=body.signalement_source,
+            signalement_date=body.signalement_date,
+            signalement_description=body.signalement_description,
+            conclusion_validation=body.conclusion_validation,
         )
     except PermissionError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))

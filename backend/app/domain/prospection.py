@@ -34,6 +34,24 @@ class ProspectionPopulation:
     accouplement: str | None = None
     ponte: str | None = None
 
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif Imagos (B)
+    # ==========================================
+    captures_sol: int | None = None
+    captures_trans: int | None = None
+    captures_greg: int | None = None
+    stade_imago: str | None = None
+    essaim_observe: bool | None = None
+
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif Larves (C)
+    # ==========================================
+    densites_larve: dict[str, int] | None = None
+    tache_larvaire: bool | None = None
+    bande_larvaire: bool | None = None
+    interdistance: float | None = None
+    deplacement: str | None = None
+
 
 @dataclass
 class ProspectionCapture:
@@ -139,6 +157,17 @@ class Prospection:
     degats_cultures_pourcent: int | None = None
     verdissement_pourcent: int | None = None
     hauteur_herbe_cm: float | None = None
+
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif & Validation
+    # ==========================================
+    station_libre: str | None = None
+    type_station: str | None = None
+    verdure_strate: str | None = None
+    signalement_source: str | None = None
+    signalement_date: str | None = None
+    signalement_description: str | None = None
+    conclusion_validation: str | None = None
 
     populations: list[ProspectionPopulation] = field(default_factory=list)
     captures: list[ProspectionCapture] = field(default_factory=list)

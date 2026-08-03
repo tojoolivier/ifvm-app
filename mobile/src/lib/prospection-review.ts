@@ -138,6 +138,17 @@ function buildPopulationsPayload(rows: PopulationRow[]): ProspectionPopulationIn
     densite_groupee: row.densite_groupee,
     accouplement: row.accouplement,
     ponte: row.ponte,
+    captures_sol: row.captures_sol ?? null,
+    captures_trans: row.captures_trans ?? null,
+    captures_greg: row.captures_greg ?? null,
+    stade_imago: row.stade_imago ?? null,
+    // SQLite renvoie les booléens comme des entiers 0/1 (pas de type BOOLEAN natif) — coercition explicite avant l'envoi API.
+    essaim_observe: row.essaim_observe != null ? Boolean(row.essaim_observe) : null,
+    densites_larve: row.densites_larve ? JSON.parse(row.densites_larve) : null,
+    tache_larvaire: row.tache_larvaire != null ? Boolean(row.tache_larvaire) : null,
+    bande_larvaire: row.bande_larvaire != null ? Boolean(row.bande_larvaire) : null,
+    interdistance: row.interdistance ?? null,
+    deplacement: row.deplacement ?? null,
   }));
 }
 
@@ -160,6 +171,8 @@ function buildProspectionPayload(draft: DraftProspection) {
     surf_prospectee: draft.surf_prospectee,
     surf_infestee: draft.surf_infestee,
     degats_cultures: draft.degats_cultures,
+    derniere_pluie: draft.derniere_pluie,
+    intensite_pluie: draft.intensite_pluie,
     vegetation: draft.vegetation ? JSON.parse(draft.vegetation) : null,
     sol: draft.sol ? JSON.parse(draft.sol) : null,
     ennemis_naturels: draft.ennemis_naturels,
@@ -175,6 +188,13 @@ function buildProspectionPayload(draft: DraftProspection) {
     degats_cultures_pourcent: draft.degats_cultures_pourcent,
     verdissement_pourcent: draft.verdissement_pourcent,
     hauteur_herbe_cm: draft.hauteur_herbe_cm,
+    station_libre: draft.station_libre,
+    type_station: draft.type_station,
+    verdure_strate: draft.verdure_strate,
+    signalement_source: draft.signalement_source,
+    signalement_date: draft.signalement_date,
+    signalement_description: draft.signalement_description,
+    conclusion_validation: draft.conclusion_validation,
   };
 }
 

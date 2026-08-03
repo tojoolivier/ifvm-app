@@ -8,6 +8,9 @@ import {
   updateProspectionEspeces,
   updateProspectionVegetation,
   updateProspectionObservations,
+  updateProspectionExtensiveReference,
+  updateProspectionExtensiveObservations,
+  concludeValidation,
   startCaptureTimer,
   saveProspectionCaptures,
   listProspectionCaptures,
@@ -332,6 +335,95 @@ describe('updateProspectionObservations', () => {
   });
 });
 
+describe('updateProspectionExtensiveReference', () => {
+  const REF_INPUT = {
+    latitude: 18.8792,
+    longitude: 47.5079,
+    stationLibre: 'Ambohimanga',
+    typeStation: 'riziere_bordure',
+    surfStation: 2.1,
+    nMessage: '2026-0301',
+  };
+
+  it('writes station_libre/type_station/surf_station/n_message, not station_id lookup fields', async () => {
+    getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW });
+
+    await updateProspectionExtensiveReference(BASE_INPUT.id, REF_INPUT);
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE prospection SET'),
+      [
+        REF_INPUT.latitude,
+        REF_INPUT.longitude,
+        REF_INPUT.stationLibre,
+        REF_INPUT.typeStation,
+        REF_INPUT.surfStation,
+        REF_INPUT.nMessage,
+        expect.any(String),
+        BASE_INPUT.id,
+      ]
+    );
+  });
+
+  it('throws if the row cannot be read back after the update', async () => {
+    getFirstAsync.mockResolvedValueOnce(null);
+
+    await expect(updateProspectionExtensiveReference(BASE_INPUT.id, REF_INPUT)).rejects.toThrow(
+      'Échec de la mise à jour de la fiche brouillon locale'
+    );
+  });
+});
+
+describe('updateProspectionExtensiveObservations', () => {
+  const OBS_INPUT = {
+    degatsCulturesPourcent: 15,
+    verdureStrate: 'moyenne',
+    hauteurHerbeCm: 32,
+    dernierePluie: '22/06',
+    intensitePluie: 'faible',
+  };
+
+  it('writes degats/verdure/hauteur/pluie columns', async () => {
+    getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW });
+
+    await updateProspectionExtensiveObservations(BASE_INPUT.id, OBS_INPUT);
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE prospection SET'),
+      [
+        OBS_INPUT.degatsCulturesPourcent,
+        OBS_INPUT.verdureStrate,
+        OBS_INPUT.hauteurHerbeCm,
+        OBS_INPUT.dernierePluie,
+        OBS_INPUT.intensitePluie,
+        expect.any(String),
+        BASE_INPUT.id,
+      ]
+    );
+  });
+});
+
+describe('concludeValidation', () => {
+  it('writes conclusion_validation without touching statut', async () => {
+    getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW, conclusion_validation: 'confirmee' });
+
+    await concludeValidation(BASE_INPUT.id, 'confirmee');
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE prospection SET conclusion_validation'),
+      ['confirmee', expect.any(String), BASE_INPUT.id]
+    );
+  });
+
+  it('throws if the row cannot be read back after the update', async () => {
+    getFirstAsync.mockResolvedValueOnce(null);
+
+    await expect(concludeValidation(BASE_INPUT.id, 'infirmee')).rejects.toThrow(
+      'Échec de la mise à jour de la fiche brouillon locale'
+    );
+  });
+});
+
 describe('startCaptureTimer', () => {
   it('sets capture_started_at only when not already running', async () => {
     getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW, capture_started_at: '2026-07-11T10:00:00.000Z' });
@@ -497,7 +589,7 @@ describe('saveProspectionPopulation', () => {
 
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE prospection_population SET'),
-      [10, 2, 'battage', 'rare', 'peu', 'existing-id']
+      [10, 2, 'battage', 'rare', 'peu', null, null, null, null, null, null, null, null, null, null, 'existing-id']
     );
   });
 });

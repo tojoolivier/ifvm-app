@@ -91,6 +91,17 @@ class ProspectionModel(Base):
     verdissement_pourcent: Mapped[int | None] = mapped_column(Integer(), nullable=True)
     hauteur_herbe_cm: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
 
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif & Validation
+    # ==========================================
+    station_libre: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    type_station: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    verdure_strate: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    signalement_source: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    signalement_date: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    signalement_description: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    conclusion_validation: Mapped[str | None] = mapped_column(Text(), nullable=True)
+
     populations: Mapped[list["ProspectionPopulationModel"]] = relationship(
         back_populates="prospection", cascade="all, delete-orphan"
     )
@@ -122,6 +133,18 @@ class ProspectionModel(Base):
             "biotope IN ('xerophyle', 'mesophyle', 'hydrophyle')",
             name="ck_prospection_biotope",
         ),
+        CheckConstraint(
+            "type_station IN ('riziere_bordure','bas_fond','plateau','jachere','culture')",
+            name="ck_prospection_type_station",
+        ),
+        CheckConstraint(
+            "verdure_strate IN ('faible','moyenne','forte')",
+            name="ck_prospection_verdure_strate",
+        ),
+        CheckConstraint(
+            "conclusion_validation IN ('confirmee','infirmee')",
+            name="ck_prospection_conclusion_validation",
+        ),
     )
 
 
@@ -141,6 +164,24 @@ class ProspectionPopulationModel(Base):
     accouplement: Mapped[str | None] = mapped_column(Text(), nullable=True)
     ponte: Mapped[str | None] = mapped_column(Text(), nullable=True)
 
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif Imagos (B)
+    # ==========================================
+    captures_sol: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    captures_trans: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    captures_greg: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    stade_imago: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    essaim_observe: Mapped[bool | None] = mapped_column(Boolean(), nullable=True)
+
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif Larves (C)
+    # ==========================================
+    densites_larve: Mapped[dict | None] = mapped_column(JSONB(), nullable=True)
+    tache_larvaire: Mapped[bool | None] = mapped_column(Boolean(), nullable=True)
+    bande_larvaire: Mapped[bool | None] = mapped_column(Boolean(), nullable=True)
+    interdistance: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
+    deplacement: Mapped[str | None] = mapped_column(Text(), nullable=True)
+
     prospection: Mapped["ProspectionModel"] = relationship(back_populates="populations")
 
     __table_args__ = (
@@ -155,6 +196,14 @@ class ProspectionPopulationModel(Base):
         CheckConstraint(
             "ponte IN ('neant','rare','peu','beaucoup','dominant')",
             name="ck_prospection_population_ponte",
+        ),
+        CheckConstraint(
+            "stade_imago IN ('A1','A2','A3','A4','A5')",
+            name="ck_prospection_population_stade_imago",
+        ),
+        CheckConstraint(
+            "deplacement IN ('repos','perchee')",
+            name="ck_prospection_population_deplacement",
         ),
         UniqueConstraint("prospection_id", "espece", "categorie", name="uq_prospection_population"),
     )

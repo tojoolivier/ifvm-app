@@ -84,6 +84,9 @@ export async function startNewProspection(params: {
   token: string;
   prospecteurId: string;
   typeProspection?: TypeProspection;
+  signalementSource?: string | null;
+  signalementDate?: string | null;
+  signalementDescription?: string | null;
 }): Promise<DraftProspection> {
   console.log('[startNewProspection] ===== DEBUT =====');
   console.log('[startNewProspection] token:', params.token?.substring(0, 30) + '...');
@@ -129,6 +132,9 @@ export async function startNewProspection(params: {
       commune: null,
       za: null,
       pa_code: null,
+      signalementSource: params.signalementSource ?? null,
+      signalementDate: params.signalementDate ?? null,
+      signalementDescription: params.signalementDescription ?? null,
     });
 
     console.log('[startNewProspection] ✅ Brouillon créé:', draft.id);

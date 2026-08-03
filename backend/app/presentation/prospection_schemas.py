@@ -48,6 +48,24 @@ class PopulationRead(BaseModel):
     accouplement: str | None
     ponte: str | None
 
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif Imagos (B)
+    # ==========================================
+    captures_sol: int | None = None
+    captures_trans: int | None = None
+    captures_greg: int | None = None
+    stade_imago: str | None = None
+    essaim_observe: bool | None = None
+
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif Larves (C)
+    # ==========================================
+    densites_larve: dict[str, int] | None = None
+    tache_larvaire: bool | None = None
+    bande_larvaire: bool | None = None
+    interdistance: float | None = None
+    deplacement: str | None = None
+
 
 class CaptureRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -109,6 +127,24 @@ class PopulationCreate(BaseModel):
     temps_capture: int | None = None
     accouplement: str | None = None
     ponte: str | None = None
+
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif Imagos (B)
+    # ==========================================
+    captures_sol: int | None = Field(None, ge=0)
+    captures_trans: int | None = Field(None, ge=0)
+    captures_greg: int | None = Field(None, ge=0)
+    stade_imago: str | None = None
+    essaim_observe: bool | None = None
+
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif Larves (C)
+    # ==========================================
+    densites_larve: dict[str, int] | None = None
+    tache_larvaire: bool | None = None
+    bande_larvaire: bool | None = None
+    interdistance: float | None = Field(None, ge=0)
+    deplacement: str | None = None
 
 
 class CaptureCreate(BaseModel):
@@ -200,6 +236,17 @@ class ProspectionCreate(BaseModel):
     verdissement_pourcent: int | None = Field(None, ge=0, le=100)
     hauteur_herbe_cm: float | None = Field(None, ge=0)
 
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif & Validation
+    # ==========================================
+    station_libre: str | None = None
+    type_station: str | None = None
+    verdure_strate: str | None = None
+    signalement_source: str | None = None
+    signalement_date: str | None = None
+    signalement_description: str | None = None
+    conclusion_validation: str | None = None
+
     populations: list[PopulationCreate] = []
     captures: list[CaptureCreate] = []
     infestations: list[InfestationCreate] = []
@@ -245,6 +292,17 @@ class ProspectionUpdate(BaseModel):
     degats_cultures_pourcent: int | None = Field(None, ge=0, le=100)
     verdissement_pourcent: int | None = Field(None, ge=0, le=100)
     hauteur_herbe_cm: float | None = Field(None, ge=0)
+
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif & Validation
+    # ==========================================
+    station_libre: str | None = None
+    type_station: str | None = None
+    verdure_strate: str | None = None
+    signalement_source: str | None = None
+    signalement_date: str | None = None
+    signalement_description: str | None = None
+    conclusion_validation: str | None = None
 
 
 class StatutChange(BaseModel):
@@ -315,6 +373,17 @@ class ProspectionRead(BaseModel):
     degats_cultures_pourcent: int | None = None
     verdissement_pourcent: int | None = None
     hauteur_herbe_cm: float | None = None
+
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif & Validation
+    # ==========================================
+    station_libre: str | None = None
+    type_station: str | None = None
+    verdure_strate: str | None = None
+    signalement_source: str | None = None
+    signalement_date: str | None = None
+    signalement_description: str | None = None
+    conclusion_validation: str | None = None
 
     populations: list[PopulationRead] = []
     captures: list[CaptureRead] = []

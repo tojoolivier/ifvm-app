@@ -35,8 +35,23 @@ export default function TypeChooserScreen() {
     }
   };
 
-  const chooseExtensive = () => {
-    setError('Le mode extensif arrive bientôt.');
+  const chooseExtensive = async () => {
+    if (!user || !token || isCreating) return;
+    setIsCreating(true);
+    setError(null);
+    try {
+      const draft = await startNewProspection({ token, prospecteurId: user.id, typeProspection: 'extensive' });
+      await hydrateFromDraft(draft.id);
+      router.replace({ pathname: '/(prospection)/extensive-reference' as any, params: { draftId: draft.id } });
+    } catch {
+      setError('Impossible de démarrer une nouvelle fiche (campagne introuvable ou hors-ligne).');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const chooseValidation = () => {
+    router.push('/(prospection)/extensive-signalement' as any);
   };
 
   return (
@@ -62,10 +77,17 @@ export default function TypeChooserScreen() {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.card} onPress={chooseExtensive} activeOpacity={0.85}>
+          <TouchableOpacity style={styles.card} onPress={chooseExtensive} disabled={isCreating} activeOpacity={0.85}>
             <Text style={styles.cardTitle}>Extensif</Text>
             <Text style={styles.cardSubtitle}>
-              Densités agrégées par phase (A1–A5 / L1–L6) — mêmes espèces LMC/NSE.
+              Densités agrégées par phase (A1–A5 / L1–L7) — mêmes espèces LMC/NSE.
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.card, styles.cardDashed]} onPress={chooseValidation} activeOpacity={0.85}>
+            <Text style={styles.cardTitle}>☑ Vérifier un signalement</Text>
+            <Text style={styles.cardSubtitle}>
+              Même fiche A→D, conclue par Confirmée / Infirmée sur place.
             </Text>
           </TouchableOpacity>
 
@@ -85,6 +107,7 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 16 },
   card: { borderRadius: 14, padding: 17, marginBottom: 12, backgroundColor: '#fff', borderWidth: 1.5, borderColor: BORDER },
   cardIntensive: { backgroundColor: GREEN, borderWidth: 0 },
+  cardDashed: { borderStyle: 'dashed', borderColor: '#bdb6a2' },
   cardTitle: { fontSize: 15, fontWeight: '800', color: TEXT },
   cardTitleIntensive: { fontSize: 15, fontWeight: '800', color: '#fff' },
   cardSubtitle: { fontSize: 11.5, lineHeight: 16, color: TEXT_SECONDARY, marginTop: 4 },

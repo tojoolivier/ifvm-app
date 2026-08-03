@@ -116,6 +116,16 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             degats_cultures_pourcent=prospection.degats_cultures_pourcent,
             verdissement_pourcent=prospection.verdissement_pourcent,
             hauteur_herbe_cm=prospection.hauteur_herbe_cm,
+            # ==========================================
+            # NOUVEAUX CHAMPS - Extensif & Validation
+            # ==========================================
+            station_libre=prospection.station_libre,
+            type_station=prospection.type_station,
+            verdure_strate=prospection.verdure_strate,
+            signalement_source=prospection.signalement_source,
+            signalement_date=prospection.signalement_date,
+            signalement_description=prospection.signalement_description,
+            conclusion_validation=prospection.conclusion_validation,
         )
 
         model.populations = [
@@ -129,6 +139,16 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                 temps_capture=p.temps_capture,
                 accouplement=p.accouplement,
                 ponte=p.ponte,
+                captures_sol=p.captures_sol,
+                captures_trans=p.captures_trans,
+                captures_greg=p.captures_greg,
+                stade_imago=p.stade_imago,
+                essaim_observe=p.essaim_observe,
+                densites_larve=p.densites_larve,
+                tache_larvaire=p.tache_larvaire,
+                bande_larvaire=p.bande_larvaire,
+                interdistance=p.interdistance,
+                deplacement=p.deplacement,
             )
             for p in prospection.populations
         ]
@@ -239,6 +259,17 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         model.degats_cultures_pourcent = prospection.degats_cultures_pourcent
         model.verdissement_pourcent = prospection.verdissement_pourcent
         model.hauteur_herbe_cm = prospection.hauteur_herbe_cm
+
+        # ==========================================
+        # NOUVEAUX CHAMPS - Extensif & Validation
+        # ==========================================
+        model.station_libre = prospection.station_libre
+        model.type_station = prospection.type_station
+        model.verdure_strate = prospection.verdure_strate
+        model.signalement_source = prospection.signalement_source
+        model.signalement_date = prospection.signalement_date
+        model.signalement_description = prospection.signalement_description
+        model.conclusion_validation = prospection.conclusion_validation
 
         # Mise à jour des infestations
         await self.session.execute(
@@ -352,6 +383,16 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             if model.hauteur_herbe_cm is not None
             else None,
             # ==========================================
+            # NOUVEAUX CHAMPS - Extensif & Validation
+            # ==========================================
+            station_libre=model.station_libre,
+            type_station=model.type_station,
+            verdure_strate=model.verdure_strate,
+            signalement_source=model.signalement_source,
+            signalement_date=model.signalement_date,
+            signalement_description=model.signalement_description,
+            conclusion_validation=model.conclusion_validation,
+            # ==========================================
             # RELATIONSHIPS
             # ==========================================
             populations=[
@@ -370,6 +411,16 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                     temps_capture=p.temps_capture,
                     accouplement=p.accouplement,
                     ponte=p.ponte,
+                    captures_sol=p.captures_sol,
+                    captures_trans=p.captures_trans,
+                    captures_greg=p.captures_greg,
+                    stade_imago=p.stade_imago,
+                    essaim_observe=p.essaim_observe,
+                    densites_larve=p.densites_larve,
+                    tache_larvaire=p.tache_larvaire,
+                    bande_larvaire=p.bande_larvaire,
+                    interdistance=float(p.interdistance) if p.interdistance is not None else None,
+                    deplacement=p.deplacement,
                 )
                 for p in model.populations
             ],

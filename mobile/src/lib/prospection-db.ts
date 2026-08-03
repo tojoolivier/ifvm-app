@@ -84,6 +84,16 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
       methode TEXT,
       accouplement TEXT,
       ponte TEXT,
+      captures_sol INTEGER,
+      captures_trans INTEGER,
+      captures_greg INTEGER,
+      stade_imago TEXT,
+      essaim_observe INTEGER,
+      densites_larve TEXT,
+      tache_larvaire INTEGER,
+      bande_larvaire INTEGER,
+      interdistance REAL,
+      deplacement TEXT,
       UNIQUE(prospection_id, espece, categorie)
     );
 
@@ -117,6 +127,7 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
   // ==========================================
   await migrateProspectionTable(db);
   await migrateInfestationTable(db);
+  await migratePopulationTable(db);
 
   return db;
 }
@@ -142,6 +153,13 @@ async function migrateProspectionTable(db: SQLite.SQLiteDatabase): Promise<void>
     { name: 'degats_cultures_pourcent', type: 'INTEGER' },
     { name: 'verdissement_pourcent', type: 'INTEGER' },
     { name: 'hauteur_herbe_cm', type: 'REAL' },
+    { name: 'station_libre', type: 'TEXT' },
+    { name: 'type_station', type: 'TEXT' },
+    { name: 'verdure_strate', type: 'TEXT' },
+    { name: 'signalement_source', type: 'TEXT' },
+    { name: 'signalement_date', type: 'TEXT' },
+    { name: 'signalement_description', type: 'TEXT' },
+    { name: 'conclusion_validation', type: 'TEXT' },
   ];
 
   for (const col of columnsToAdd) {
@@ -200,6 +218,37 @@ async function migrateInfestationTable(db: SQLite.SQLiteDatabase): Promise<void>
       }
     } else {
       console.log(`[Migration] ⏭️ Colonne ${col.name} existe déjà`);
+    }
+  }
+}
+
+// ==========================================
+// MIGRATION POUR LA TABLE PROSPECTION_POPULATION
+// ==========================================
+async function migratePopulationTable(db: SQLite.SQLiteDatabase): Promise<void> {
+  const tableInfo = await db.getAllAsync<{ name: string }>('PRAGMA table_info(prospection_population)');
+  const columnNames = tableInfo.map(row => row.name);
+
+  const columnsToAdd = [
+    { name: 'captures_sol', type: 'INTEGER' },
+    { name: 'captures_trans', type: 'INTEGER' },
+    { name: 'captures_greg', type: 'INTEGER' },
+    { name: 'stade_imago', type: 'TEXT' },
+    { name: 'essaim_observe', type: 'INTEGER' },
+    { name: 'densites_larve', type: 'TEXT' },
+    { name: 'tache_larvaire', type: 'INTEGER' },
+    { name: 'bande_larvaire', type: 'INTEGER' },
+    { name: 'interdistance', type: 'REAL' },
+    { name: 'deplacement', type: 'TEXT' },
+  ];
+
+  for (const col of columnsToAdd) {
+    if (!columnNames.includes(col.name)) {
+      try {
+        await db.execAsync(`ALTER TABLE prospection_population ADD COLUMN ${col.name} ${col.type};`);
+      } catch (error) {
+        console.warn(`[Migration] ⚠️ Impossible d'ajouter ${col.name} sur prospection_population:`, error);
+      }
     }
   }
 }
