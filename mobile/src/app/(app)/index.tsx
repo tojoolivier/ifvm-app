@@ -14,13 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
 import { ThemedText } from '@/components/themed-text';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import {
-  getProspectionsByUser,
-  checkPendingSync,
-  shouldCheckSync,
-  updateLastSyncCheck,
-  getPendingSyncCount,
-} from '@/lib/storage';
+import { listRecentProspections, countUnsyncedProspections, DraftProspection } from '@/lib/prospection-repository';
 import * as Network from 'expo-network';
 
 // ============================================
@@ -52,7 +46,7 @@ export default function DashboardScreen() {
   const user = useAuthStore((s) => s.user);
   const router = useRouter();
 
-  const [prospections, setProspections] = useState<any[]>([]);
+  const [prospections, setProspections] = useState<DraftProspection[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [showSyncBanner, setShowSyncBanner] = useState(false);
@@ -80,19 +74,9 @@ export default function DashboardScreen() {
       const isConnected = networkState.isConnected && networkState.isInternetReachable;
       setIsOffline(!isConnected);
 
-      if (isConnected) {
-        const pendingCount = await getPendingSyncCount();
-        setPendingSyncCount(pendingCount);
-        setShowSyncBanner(pendingCount > 0);
-      } else {
-        const shouldCheck = await shouldCheckSync();
-        if (shouldCheck) {
-          const pendingFiches = await checkPendingSync();
-          setPendingSyncCount(pendingFiches.length);
-          setShowSyncBanner(pendingFiches.length > 0);
-          await updateLastSyncCheck();
-        }
-      }
+      const pendingCount = await countUnsyncedProspections();
+      setPendingSyncCount(pendingCount);
+      setShowSyncBanner(pendingCount > 0);
     } catch (error) {
       console.error('Erreur vérification sync:', error);
     }
@@ -127,8 +111,8 @@ export default function DashboardScreen() {
 
     try {
       const [fiches, pendingCount] = await Promise.all([
-        getProspectionsByUser(user.id),
-        getPendingSyncCount(),
+        listRecentProspections(),
+        countUnsyncedProspections(),
       ]);
 
       setProspections(fiches);
@@ -166,7 +150,7 @@ export default function DashboardScreen() {
       const day = new Date(monday);
       day.setDate(monday.getDate() + i);
       const dayKey = day.toISOString().split('T')[0];
-      const count = prospections.filter((p) => p.date === dayKey).length;
+      const count = prospections.filter((p) => p.date_prospection === dayKey).length;
       return { count, isToday: i === dayIndex };
     });
   }, [prospections]);
@@ -263,33 +247,36 @@ export default function DashboardScreen() {
                 <ThemedText style={styles.viewAll}>Tout voir ›</ThemedText>
               </TouchableOpacity>
             </View>
-            {prospections.slice(0, 5).map((fiche, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[styles.ficheCard, index === Math.min(4, prospections.length - 1) && styles.ficheCardLast]}
-                onPress={() => navigateTo('/(app)/fiches')}
-                activeOpacity={0.7}
-              >
-                <View>
-                  <ThemedText style={styles.ficheTitle}>{fiche.station || 'Station non spécifiée'}</ThemedText>
-                  <ThemedText style={styles.ficheSub}>
-                    N°{fiche.id} · {fiche.date}
-                  </ThemedText>
-                </View>
-                <View
-                  style={[
-                    styles.statusBadge,
-                    { backgroundColor: fiche.synced ? IFVM_GREEN_BG : IFVM_ORANGE_BG },
-                  ]}
+            {prospections.slice(0, 5).map((fiche, index) => {
+              const synced = fiche.statut_sync === 'synced';
+              return (
+                <TouchableOpacity
+                  key={fiche.id}
+                  style={[styles.ficheCard, index === Math.min(4, prospections.length - 1) && styles.ficheCardLast]}
+                  onPress={() => navigateTo('/(app)/fiches')}
+                  activeOpacity={0.7}
                 >
-                  <ThemedText
-                    style={[styles.statusBadgeText, { color: fiche.synced ? IFVM_GREEN_LIGHT : IFVM_ORANGE }]}
+                  <View>
+                    <ThemedText style={styles.ficheTitle}>{fiche.station_nom || 'Station non spécifiée'}</ThemedText>
+                    <ThemedText style={styles.ficheSub}>
+                      N°{fiche.n_fiche ?? '—'} · {fiche.date_prospection}
+                    </ThemedText>
+                  </View>
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      { backgroundColor: synced ? IFVM_GREEN_BG : IFVM_ORANGE_BG },
+                    ]}
                   >
-                    {fiche.synced ? 'SYNCHRO ✓' : 'À SYNCHRO'}
-                  </ThemedText>
-                </View>
-              </TouchableOpacity>
-            ))}
+                    <ThemedText
+                      style={[styles.statusBadgeText, { color: synced ? IFVM_GREEN_LIGHT : IFVM_ORANGE }]}
+                    >
+                      {synced ? 'SYNCHRO ✓' : 'À SYNCHRO'}
+                    </ThemedText>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </Animated.View>
         )}
 

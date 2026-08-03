@@ -3,6 +3,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
+import { useDebugStore } from '@/lib/debug-store';
 import { getDb } from '@/lib/prospection-db';
 import { useReferentielAutoSync } from '@/hooks/use-referentiel-auto-sync';
 import '../global.css';
@@ -39,6 +40,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     getDb();
+    useDebugStore.getState().init();
   }, []);
 
   if (!isInitialized) {

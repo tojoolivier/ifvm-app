@@ -8,6 +8,7 @@ import * as FileSystem from 'expo-file-system';
 import { storage } from '@/lib/storage';
 import { apiClient } from '@/lib/api-client';
 import { pullReferentiel, resetReferentielSyncCursors } from '@/lib/referentiel-sync';
+import { useDebugStore } from '@/lib/debug-store';
 
 const IFVM_GREEN = '#1B5E1B';
 const IFVM_GREEN_BG = '#E8F5E9';
@@ -18,14 +19,16 @@ const IFVM_BLUE = '#2196F3';
 const IFVM_ORANGE = '#E67E22';
 const HEADER_BG = '#1B5E1B';
 
-const PROFILE_IMAGE_KEY = '@profile_image';
+const PROFILE_IMAGE_KEY = 'profile_image';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const token = useAuthStore((s) => s.token);
-  
+  const debugEnabled = useDebugStore((s) => s.enabled);
+  const setDebugEnabled = useDebugStore((s) => s.setEnabled);
+
   const [locationEnabled, setLocationEnabled] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
@@ -504,6 +507,32 @@ export default function ProfileScreen() {
               onToggle={setDarkMode}
             />
           </View>
+        </View>
+
+        {/* Débogage */}
+        <View style={styles.infoSection}>
+          <ThemedText style={styles.sectionTitle}>🐞 Débogage</ThemedText>
+          <View style={styles.preferencesCard}>
+            <PreferenceItem
+              icon="🐞"
+              label="Mode débogage"
+              value={debugEnabled}
+              onToggle={setDebugEnabled}
+            />
+          </View>
+          {debugEnabled && (
+            <TouchableOpacity
+              style={styles.securityButton}
+              onPress={() => router.push('/(app)/debug-logs')}
+              activeOpacity={0.8}
+            >
+              <View style={styles.securityButtonLeft}>
+                <ThemedText style={styles.securityIcon}>📋</ThemedText>
+                <ThemedText style={styles.securityText}>Journal des requêtes</ThemedText>
+              </View>
+              <ThemedText style={styles.securityArrow}>→</ThemedText>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Bouton déconnexion */}

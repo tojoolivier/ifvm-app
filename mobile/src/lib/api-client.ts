@@ -1,3 +1,23 @@
+import { useRequestLogStore, RequestLogEntry } from './request-log-store';
+
+const REDACTED = '[redacted]';
+
+/** Ne jamais logger de secrets : mots de passe en clair dans le body des routes auth. */
+function redactBody(url: string, body: string | null | undefined): string | null | undefined {
+  if (body == null) return body;
+  if (url.includes('/auth/login') || url.includes('/auth/change-password') || url.includes('/auth/refresh')) {
+    return REDACTED;
+  }
+  return body;
+}
+
+function logRequest(entry: Omit<RequestLogEntry, 'id'>): void {
+  useRequestLogStore.getState().addEntry({
+    ...entry,
+    requestBody: redactBody(entry.url, entry.requestBody),
+  });
+}
+
 export interface LoginCredentials {
   email: string;
   password: string;
@@ -366,10 +386,29 @@ const makeRequest = async <T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  const startedAt = new Date();
+  const startTime = Date.now();
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (error) {
+    logRequest({
+      method: options.method || 'GET',
+      url,
+      status: null,
+      ok: false,
+      durationMs: Date.now() - startTime,
+      startedAt: startedAt.toISOString(),
+      requestBody: typeof options.body === 'string' ? options.body : null,
+      error: error instanceof Error ? error.message : 'Erreur réseau',
+    });
+    throw error;
+  }
+
+  const responseClone = response.clone();
 
   if (response.status === 401 && onUnauthorized) {
     onUnauthorized();
@@ -377,12 +416,43 @@ const makeRequest = async <T>(
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
+    logRequest({
+      method: options.method || 'GET',
+      url,
+      status: response.status,
+      ok: false,
+      durationMs: Date.now() - startTime,
+      startedAt: startedAt.toISOString(),
+      requestBody: typeof options.body === 'string' ? options.body : null,
+      responseBody: await responseClone.text().catch(() => null),
+    });
     throw new Error(extractErrorMessage(errorData) || `HTTP error! status: ${response.status}`);
   }
 
   if (response.status === 204) {
+    logRequest({
+      method: options.method || 'GET',
+      url,
+      status: response.status,
+      ok: true,
+      durationMs: Date.now() - startTime,
+      startedAt: startedAt.toISOString(),
+      requestBody: typeof options.body === 'string' ? options.body : null,
+      responseBody: null,
+    });
     return undefined as T;
   }
+
+  logRequest({
+    method: options.method || 'GET',
+    url,
+    status: response.status,
+    ok: true,
+    durationMs: Date.now() - startTime,
+    startedAt: startedAt.toISOString(),
+    requestBody: typeof options.body === 'string' ? options.body : null,
+    responseBody: await responseClone.text().catch(() => null),
+  });
 
   return response.json();
 };
@@ -489,14 +559,27 @@ export const apiClient = {
     data: { currentPassword: string; newPassword: string },
     token: string | null
   ): Promise<void> => {
+    const url = `${API_URL}/auth/change-password`;
+    const startedAt = new Date();
+    const startTime = Date.now();
     try {
-      const response = await fetch(`${API_URL}/auth/change-password`, {
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify(data),
+      });
+
+      logRequest({
+        method: 'POST',
+        url,
+        status: response.status,
+        ok: response.ok,
+        durationMs: Date.now() - startTime,
+        startedAt: startedAt.toISOString(),
+        requestBody: JSON.stringify(data),
       });
 
       if (!response.ok) {

@@ -1,0 +1,157 @@
+import { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { useRequestLogStore, RequestLogEntry } from '@/lib/request-log-store';
+import { useDebugStore } from '@/lib/debug-store';
+
+const IFVM_GREEN_DARK = '#163F16';
+
+function statusColor(entry: RequestLogEntry): string {
+  if (!entry.ok) return '#DC2626';
+  if (entry.status && entry.status >= 200 && entry.status < 300) return '#15803D';
+  return '#D97706';
+}
+
+function LogRow({ entry }: { entry: RequestLogEntry }) {
+  const [expanded, setExpanded] = useState(false);
+  const time = new Date(entry.startedAt).toLocaleTimeString('fr-FR');
+
+  return (
+    <TouchableOpacity style={styles.row} onPress={() => setExpanded((e) => !e)} activeOpacity={0.7}>
+      <View style={styles.rowHeader}>
+        <View style={[styles.statusDot, { backgroundColor: statusColor(entry) }]} />
+        <Text style={styles.method}>{entry.method}</Text>
+        <Text style={styles.url} numberOfLines={expanded ? undefined : 1}>{entry.url}</Text>
+      </View>
+      <View style={styles.rowMeta}>
+        <Text style={styles.metaText}>{entry.status ?? 'ERR'} · {entry.durationMs}ms · {time}</Text>
+      </View>
+      {expanded && (
+        <View style={styles.detail}>
+          {entry.error && <Text style={styles.detailError}>Erreur : {entry.error}</Text>}
+          {entry.requestBody != null && (
+            <>
+              <Text style={styles.detailLabel}>Requête</Text>
+              <Text style={styles.detailBody}>{entry.requestBody}</Text>
+            </>
+          )}
+          {entry.responseBody != null && (
+            <>
+              <Text style={styles.detailLabel}>Réponse</Text>
+              <Text style={styles.detailBody}>{entry.responseBody}</Text>
+            </>
+          )}
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+export default function DebugLogsScreen() {
+  const router = useRouter();
+  const entries = useRequestLogStore((s) => s.entries);
+  const clear = useRequestLogStore((s) => s.clear);
+  const debugEnabled = useDebugStore((s) => s.enabled);
+
+  const handleClear = () => {
+    Alert.alert('Vider le journal ?', 'Toutes les requêtes enregistrées seront effacées.', [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Vider', style: 'destructive', onPress: clear },
+    ]);
+  };
+
+  return (
+    <View style={styles.root}>
+      <View style={styles.header}>
+        <SafeAreaView edges={['top']}>
+          <View style={styles.headerContent}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
+              <Text style={styles.backIcon}>‹</Text>
+            </TouchableOpacity>
+            <View style={styles.headerTextContainer}>
+              <Text style={styles.headerTitle}>Journal des requêtes</Text>
+              <Text style={styles.headerSub}>{entries.length} requête{entries.length > 1 ? 's' : ''}</Text>
+            </View>
+            <TouchableOpacity style={styles.clearBtn} onPress={handleClear} activeOpacity={0.7}>
+              <Text style={styles.clearBtnText}>Vider</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </View>
+
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        {!debugEnabled && (
+          <View style={styles.notice}>
+            <Text style={styles.noticeText}>
+              Le mode débogage est désactivé — aucune nouvelle requête ne sera enregistrée. Activez-le depuis le profil.
+            </Text>
+          </View>
+        )}
+        {entries.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyIcon}>📭</Text>
+            <Text style={styles.emptyTitle}>Aucune requête enregistrée</Text>
+          </View>
+        ) : (
+          entries.map((entry) => <LogRow key={entry.id} entry={entry} />)
+        )}
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#F3F4F6' },
+  header: { backgroundColor: IFVM_GREEN_DARK, paddingHorizontal: 16, paddingBottom: 14 },
+  headerContent: { flexDirection: 'row', alignItems: 'center', paddingTop: 8 },
+  backBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF22',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backIcon: { color: '#FFFFFF', fontSize: 22, fontWeight: '300', lineHeight: 26, marginTop: -2 },
+  headerTextContainer: { flex: 1, marginLeft: 12 },
+  headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
+  headerSub: { color: '#FFFFFFAA', fontSize: 12, marginTop: 1 },
+  clearBtn: { paddingHorizontal: 10, paddingVertical: 6 },
+  clearBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
+  container: { flex: 1 },
+  contentContainer: { padding: 16, paddingBottom: 40 },
+  notice: {
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+  },
+  noticeText: { fontSize: 12, color: '#78350F' },
+  row: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  rowHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  method: { fontSize: 12, fontWeight: '700', color: '#111827', width: 44 },
+  url: { flex: 1, fontSize: 12, color: '#374151' },
+  rowMeta: { marginTop: 4, marginLeft: 16 },
+  metaText: { fontSize: 11, color: '#9CA3AF' },
+  detail: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#F3F4F6' },
+  detailError: { fontSize: 12, color: '#DC2626', marginBottom: 4 },
+  detailLabel: { fontSize: 11, fontWeight: '700', color: '#6B7280', marginTop: 4 },
+  detailBody: { fontSize: 11, color: '#111827', fontFamily: 'monospace' },
+  emptyContainer: { alignItems: 'center', paddingVertical: 60 },
+  emptyIcon: { fontSize: 40, marginBottom: 8 },
+  emptyTitle: { fontSize: 16, fontWeight: '600', color: '#111827' },
+});
