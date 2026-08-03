@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-nati
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { parseEspeceSelection, buildGrilles } from '@/lib/prospection-especes';
-import { CAPTURES_MAX, PHENOTYPES, Phenotype, grilleKeyToString, stadesFor } from '@/lib/prospection-especes-stades';
+import { capturesMaxFor, phenotypesFor, Phenotype, grilleKeyToString, stadesFor } from '@/lib/prospection-especes-stades';
 import { chronoSeconds, formatChrono } from '@/lib/prospection-review';
 import { markGrilleCompleted, saveProspectionCaptures, startCaptureTimer } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
@@ -95,14 +95,31 @@ export default function CapturesScreen() {
     );
   }
 
-  const hasSexeToggle = grille.espece === 'LMC' && grille.categorie === 'imago';
+  const hasSexeToggle = grille.categorie === 'imago';
   const stades = stadesFor(grille.espece, grille.categorie, store.sexe);
   const total = totalCaptures(store.counts);
-  const max = CAPTURES_MAX[grille.espece];
+  const max = capturesMaxFor(grille.espece, grille.categorie);
+  const phenotypes = phenotypesFor(grille.espece, grille.categorie);
   const dominant = dominantPhenotype(store.counts);
   const isLastGrille = store.currentGrilleIndex === store.grilleOrder.length - 1;
   const seconds = chronoSeconds(draft?.capture_started_at ?? null);
   void tick;
+
+  const handleBack = () => {
+    if (hasSexeToggle) {
+      router.replace({
+        pathname: '/(prospection)/density' as any,
+        params: { draftId, grilleIndex: String(store.currentGrilleIndex) },
+      });
+    } else if (store.currentGrilleIndex > 0) {
+      router.replace({
+        pathname: '/(prospection)/captures' as any,
+        params: { draftId, grilleIndex: String(store.currentGrilleIndex - 1) },
+      });
+    } else {
+      router.replace({ pathname: '/(prospection)/species' as any, params: { draftId } });
+    }
+  };
 
   const handleContinue = async () => {
     if (!draftId || isSaving) return;
@@ -114,10 +131,12 @@ export default function CapturesScreen() {
       store.markCurrentGrilleCompleted();
       await refreshCaptures();
       if (isLastGrille) {
-        router.push({ pathname: '/(prospection)/veg' as any, params: { draftId } });
+        router.push({ pathname: '/(prospection)/infestation' as any, params: { draftId } });
       } else {
+        const nextGrille = store.grilleOrder[store.currentGrilleIndex + 1];
+        const nextScreen = nextGrille.categorie === 'imago' ? 'density' : 'captures';
         router.replace({
-          pathname: '/(prospection)/captures' as any,
+          pathname: `/(prospection)/${nextScreen}` as any,
           params: { draftId, grilleIndex: String(store.currentGrilleIndex + 1) },
         });
       }
@@ -130,7 +149,7 @@ export default function CapturesScreen() {
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.safe}>
         <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
+          <TouchableOpacity onPress={handleBack} activeOpacity={0.7}>
             <Text style={styles.back}>‹</Text>
           </TouchableOpacity>
           <Text style={styles.title}>
@@ -146,6 +165,7 @@ export default function CapturesScreen() {
               <Text style={styles.statValueMax}> / {max}</Text>
             </Text>
           </View>
+          {hasSexeToggle && (
           <View style={styles.statCard}>
             <Text style={styles.statLabel}>Chrono</Text>
             <Text style={styles.statValue}>
@@ -153,6 +173,7 @@ export default function CapturesScreen() {
               <Text style={styles.statValueMaxDim}>/30</Text>
             </Text>
           </View>
+          )}
         </View>
 
         <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16 }}>
@@ -199,7 +220,7 @@ export default function CapturesScreen() {
 
           <Text style={styles.sectionLabel}>Phénotype — touchez puis ＋ / −</Text>
           <View style={styles.phenoList}>
-            {PHENOTYPES.map((pheno) => {
+            {phenotypes.map((pheno) => {
               const active = pheno.value === store.currentPhenotype;
               const count = store.currentStade
                 ? store.counts[captureKey(store.sexe, pheno.value as Phenotype, store.currentStade)] ?? 0
@@ -235,7 +256,7 @@ export default function CapturesScreen() {
               {hasSexeToggle && `♀ ${totalBySexe(store.counts, 'F')} · ♂ ${totalBySexe(store.counts, 'M')} · `}
               phénotype dominant :{' '}
               <Text style={styles.summaryBold}>
-                {dominant ? PHENOTYPES.find((p) => p.value === dominant)?.label : '—'}
+                {dominant ? phenotypes.find((p) => p.value === dominant)?.label : '—'}
               </Text>
             </Text>
           </View>
@@ -243,7 +264,7 @@ export default function CapturesScreen() {
 
         <View style={styles.footer}>
           <TouchableOpacity style={styles.continueButton} onPress={handleContinue} disabled={isSaving} activeOpacity={0.85}>
-            <Text style={styles.continueButtonText}>{isLastGrille ? 'Végétation  ›' : 'Grille suivante  ›'}</Text>
+            <Text style={styles.continueButtonText}>{isLastGrille ? 'Infestation  ›' : 'Grille suivante  ›'}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>

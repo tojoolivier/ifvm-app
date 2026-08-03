@@ -73,6 +73,7 @@ export interface ReferenceUpdateInput {
   surfProspectee: number;
   surfInfestee: number;
   nFiche: string;
+  nReleve?: string | null;
   region?: string | null;
   district?: string | null;
   commune?: string | null;
@@ -138,7 +139,7 @@ export async function updateProspectionReference(
     `UPDATE prospection SET
       latitude = ?, longitude = ?, altitude = ?,
       surf_station = ?, surf_prospectee = ?, surf_infestee = ?,
-      n_fiche = ?,
+      n_fiche = ?, n_releve = ?,
       region = ?, district = ?, commune = ?, za = ?, pa_code = ?, pa_nom = ?,
       station_id = ?, station_nom = ?,
       updated_at = ?
@@ -151,6 +152,7 @@ export async function updateProspectionReference(
       input.surfProspectee,
       input.surfInfestee,
       input.nFiche,
+      input.nReleve ?? null,
       input.region ?? null,
       input.district ?? null,
       input.commune ?? null,
@@ -232,6 +234,8 @@ export interface VegetationUpdateInput {
   degatsCulturesPourcent?: number | null;
   verdissementPourcent?: number | null;
   hauteurHerbeCm?: number | null;
+  ennemisNaturels?: string | null;
+  observations?: string | null;
 }
 
 // Dans updateProspectionVegetation, corriger la chaîne SQL
@@ -246,6 +250,7 @@ export async function updateProspectionVegetation(
     `UPDATE prospection SET
       vegetation = ?, sol = ?, degats_cultures = ?,
       degats_cultures_pourcent = ?, verdissement_pourcent = ?, hauteur_herbe_cm = ?,
+      ennemis_naturels = ?, observations = ?,
       updated_at = ? WHERE id = ?`,
     [
       input.vegetation,
@@ -254,6 +259,8 @@ export async function updateProspectionVegetation(
       input.degatsCulturesPourcent ?? null,
       input.verdissementPourcent ?? null,
       input.hauteurHerbeCm ?? null,
+      input.ennemisNaturels ?? null,
+      input.observations ?? null,
       now,
       id,
     ]
@@ -338,6 +345,14 @@ export async function getProspectionPopulation(
   return row ?? null;
 }
 
+export async function listAllProspectionPopulations(prospectionId: string): Promise<PopulationRow[]> {
+  const db = await getDb();
+  return db.getAllAsync<PopulationRow>(
+    'SELECT espece, categorie, densite_diffuse, densite_groupee, methode, accouplement, ponte FROM prospection_population WHERE prospection_id = ?',
+    [prospectionId]
+  );
+}
+
 export async function saveProspectionPopulation(prospectionId: string, row: PopulationRow): Promise<void> {
   const db = await getDb();
   const existing = await db.getFirstAsync<{ id: string }>(
@@ -369,6 +384,7 @@ export async function saveProspectionPopulation(prospectionId: string, row: Popu
 }
 
 export interface InfestationRow {
+  espece: string | null;
   type_cible: string;
   taille_min: number | null;
   taille_max: number | null;
@@ -397,27 +413,43 @@ export interface InfestationRow {
   surf_infestee_pourcent: number | null;
 }
 
-export async function getProspectionInfestation(prospectionId: string): Promise<InfestationRow | null> {
-  const db = await getDb();
-  const row = await db.getFirstAsync<InfestationRow>(
-    `SELECT type_cible, taille_min, taille_max, taille_moy, surface_tot,
+const INFESTATION_COLUMNS = `espece, type_cible, taille_min, taille_max, taille_moy, surface_tot,
             densite_min, densite_max, densite_moy, interdistance,
             comportement, direction_de, direction_vers, vent_de, vent_vitesse,
             pullulation_nb, taille_long, taille_large, taille_epaisseur,
             essaim_en_vol, essaim_pose, type_essaim,
             nb_taches_bandes, interdistance_m, surface_contaminee_ha,
-            type_larve, surf_infestee_pourcent
-     FROM prospection_infestation WHERE prospection_id = ?`,
-    [prospectionId]
+            type_larve, surf_infestee_pourcent`;
+
+export async function getProspectionInfestation(
+  prospectionId: string,
+  typeCible: string
+): Promise<InfestationRow | null> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<InfestationRow>(
+    `SELECT ${INFESTATION_COLUMNS} FROM prospection_infestation WHERE prospection_id = ? AND type_cible = ?`,
+    [prospectionId, typeCible]
   );
   return row ?? null;
 }
 
-export async function saveProspectionInfestation(prospectionId: string, row: InfestationRow): Promise<void> {
+export async function listAllProspectionInfestations(prospectionId: string): Promise<InfestationRow[]> {
+  const db = await getDb();
+  return db.getAllAsync<InfestationRow>(
+    `SELECT ${INFESTATION_COLUMNS} FROM prospection_infestation WHERE prospection_id = ?`,
+    [prospectionId]
+  );
+}
+
+export async function saveProspectionInfestation(
+  prospectionId: string,
+  typeCible: string,
+  row: InfestationRow
+): Promise<void> {
   const db = await getDb();
   const existing = await db.getFirstAsync<{ id: string }>(
-    'SELECT id FROM prospection_infestation WHERE prospection_id = ?',
-    [prospectionId]
+    'SELECT id FROM prospection_infestation WHERE prospection_id = ? AND type_cible = ?',
+    [prospectionId, typeCible]
   );
 
   // Convertir les booleans en nombres pour SQLite
@@ -425,6 +457,7 @@ export async function saveProspectionInfestation(prospectionId: string, row: Inf
   const essaimPose = row.essaim_pose === true ? 1 : (row.essaim_pose === false ? 0 : null);
 
   const values = [
+    row.espece,
     row.type_cible,
     row.taille_min,
     row.taille_max,
@@ -456,7 +489,7 @@ export async function saveProspectionInfestation(prospectionId: string, row: Inf
   if (existing) {
     await db.runAsync(
       `UPDATE prospection_infestation SET
-        type_cible = ?, taille_min = ?, taille_max = ?, taille_moy = ?, surface_tot = ?,
+        espece = ?, type_cible = ?, taille_min = ?, taille_max = ?, taille_moy = ?, surface_tot = ?,
         densite_min = ?, densite_max = ?, densite_moy = ?, interdistance = ?,
         comportement = ?, direction_de = ?, direction_vers = ?, vent_de = ?, vent_vitesse = ?,
         pullulation_nb = ?, taille_long = ?, taille_large = ?, taille_epaisseur = ?,
@@ -469,14 +502,14 @@ export async function saveProspectionInfestation(prospectionId: string, row: Inf
   } else {
     await db.runAsync(
       `INSERT INTO prospection_infestation (
-        id, prospection_id, type_cible, taille_min, taille_max, taille_moy, surface_tot,
+        id, prospection_id, espece, type_cible, taille_min, taille_max, taille_moy, surface_tot,
         densite_min, densite_max, densite_moy, interdistance,
         comportement, direction_de, direction_vers, vent_de, vent_vitesse,
         pullulation_nb, taille_long, taille_large, taille_epaisseur,
         essaim_en_vol, essaim_pose, type_essaim,
         nb_taches_bandes, interdistance_m, surface_contaminee_ha,
         type_larve, surf_infestee_pourcent
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [generateId(), prospectionId, ...values]
     );
   }

@@ -25,24 +25,25 @@ describe('countGrilles / hasSelection', () => {
   });
 
   it('compte les toggles actifs', () => {
-    const selection = { lmcImago: true, lmcLarve: false, nseImago: true };
+    const selection = { lmcImago: true, lmcLarve: false, nseImago: true, nseLarve: false };
     expect(countGrilles(selection)).toBe(2);
     expect(hasSelection(selection)).toBe(true);
   });
 });
 
 describe('buildGrilles', () => {
-  it("respecte l'ordre du prototype : LMC imago, LMC larve, NSE imago", () => {
-    const grilles = buildGrilles({ lmcImago: true, lmcLarve: true, nseImago: true });
+  it("respecte l'ordre du prototype : LMC imago, LMC larve, NSE imago, NSE larve", () => {
+    const grilles = buildGrilles({ lmcImago: true, lmcLarve: true, nseImago: true, nseLarve: true });
     expect(grilles).toEqual([
       { espece: 'LMC', categorie: 'imago' },
       { espece: 'LMC', categorie: 'larve' },
       { espece: 'NSE', categorie: 'imago' },
+      { espece: 'NSE', categorie: 'larve' },
     ]);
   });
 
   it('ne renvoie que les toggles activés', () => {
-    expect(buildGrilles({ lmcImago: false, lmcLarve: true, nseImago: false })).toEqual([
+    expect(buildGrilles({ lmcImago: false, lmcLarve: true, nseImago: false, nseLarve: false })).toEqual([
       { espece: 'LMC', categorie: 'larve' },
     ]);
   });
@@ -58,10 +59,13 @@ describe('parseEspeceSelection', () => {
   });
 
   it('parse une sélection JSON valide', () => {
-    expect(parseEspeceSelection(JSON.stringify({ lmcImago: true, lmcLarve: false, nseImago: true }))).toEqual({
+    expect(
+      parseEspeceSelection(JSON.stringify({ lmcImago: true, lmcLarve: false, nseImago: true, nseLarve: true }))
+    ).toEqual({
       lmcImago: true,
       lmcLarve: false,
       nseImago: true,
+      nseLarve: true,
     });
   });
 });
@@ -76,7 +80,7 @@ describe('saveEspeceSelection', () => {
 
   it('persiste la sélection en JSON', async () => {
     mockUpdate.mockResolvedValue({} as any);
-    const selection = { lmcImago: true, lmcLarve: false, nseImago: false };
+    const selection = { lmcImago: true, lmcLarve: false, nseImago: false, nseLarve: false };
     await saveEspeceSelection('draft-1', selection);
     expect(mockUpdate).toHaveBeenCalledWith('draft-1', JSON.stringify(selection));
   });

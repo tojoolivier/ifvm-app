@@ -1,18 +1,36 @@
 import * as Network from 'expo-network';
-import { apiClient, ProspectionCaptureInput } from './api-client';
+import {
+  apiClient,
+  ProspectionCaptureInput,
+  ProspectionInfestationInput,
+  ProspectionPopulationInput,
+} from './api-client';
 import {
   CaptureRow,
   DraftProspection,
+  InfestationRow,
+  PopulationRow,
   completeProspection,
   markProspectionSynced,
   listAllProspectionCaptures,
+  listAllProspectionPopulations,
+  listAllProspectionInfestations,
 } from './prospection-repository';
-import { PHENOTYPES } from './prospection-fiche-lecture';
+import { PHENOTYPES, TYPE_CIBLE_OPTIONS } from './prospection-fiche-lecture';
 import { CaptureCounts, dominantPhenotype, rowsToCounts, totalBySexe, totalCaptures } from './prospection-capture-store';
-import { CHRONO_MAX_SECONDS } from './prospection-especes-stades';
+import { CHRONO_MAX_SECONDS, capturesMaxFor, phenotypesFor } from './prospection-especes-stades';
+import { buildGrilles, parseEspeceSelection } from './prospection-especes';
+
+export interface ReviewGroupViewModel {
+  label: string;
+  total: number;
+  max: number;
+  dominantLabel: string;
+}
 
 export interface RecapitulatifViewModel {
   nFiche: string;
+  nReleve: string;
   dateProspection: string;
   totalCaptures: number;
   totalFemelles: number;
@@ -27,6 +45,35 @@ export interface RecapitulatifViewModel {
   latitude: number | null;
   longitude: number | null;
   vegetationSummary: string;
+  reviewGroups: ReviewGroupViewModel[];
+  infestationSummary: string;
+}
+
+const ESPECE_LABEL = { LMC: 'Locusta', NSE: 'Nomadacris' } as const;
+const CATEGORIE_LABEL = { imago: 'Imagos', larve: 'Larves' } as const;
+
+function buildReviewGroups(draft: DraftProspection, captures: CaptureRow[]): ReviewGroupViewModel[] {
+  const grilles = buildGrilles(parseEspeceSelection(draft.especes));
+  return grilles.map((grille) => {
+    const rows = captures.filter((c) => c.espece === grille.espece && c.categorie === grille.categorie);
+    const counts = rowsToCounts(rows);
+    const dominant = dominantPhenotype(counts);
+    const phenotypes = phenotypesFor(grille.espece, grille.categorie);
+    return {
+      label: `${ESPECE_LABEL[grille.espece]} — ${CATEGORIE_LABEL[grille.categorie]}`,
+      total: totalCaptures(counts),
+      max: capturesMaxFor(grille.espece, grille.categorie),
+      dominantLabel: dominant ? phenotypes.find((p) => p.value === dominant)?.label ?? '—' : '—',
+    };
+  });
+}
+
+/** Une formation est "renseignée" si sa surface totale ou sa densité moyenne est saisie (même règle que l'écran Infestation). */
+function buildInfestationSummary(infestations: InfestationRow[]): string {
+  const filled = infestations.filter((row) => row.surface_tot != null || row.densite_moy != null);
+  if (filled.length === 0) return 'Aucune formation renseignée.';
+  const labels = filled.map((row) => TYPE_CIBLE_OPTIONS.find((o) => o.value === row.type_cible)?.label ?? row.type_cible);
+  return `${labels.join(', ')} renseignée${filled.length > 1 ? 's' : ''}.`;
 }
 
 export function chronoSeconds(startedAt: string | null, now: Date = new Date()): number {
@@ -44,13 +91,15 @@ export function formatChrono(seconds: number): string {
 export function buildRecapitulatif(
   draft: DraftProspection,
   captures: CaptureRow[],
-  vegetationSummary: string
+  vegetationSummary: string,
+  infestations: InfestationRow[]
 ): RecapitulatifViewModel {
   const counts: CaptureCounts = rowsToCounts(captures);
   const dominant = dominantPhenotype(counts);
 
   return {
     nFiche: draft.n_fiche ?? '—',
+    nReleve: draft.n_releve ?? '—',
     dateProspection: draft.date_prospection,
     totalCaptures: totalCaptures(counts),
     totalFemelles: totalBySexe(counts, 'F'),
@@ -65,6 +114,8 @@ export function buildRecapitulatif(
     latitude: draft.latitude,
     longitude: draft.longitude,
     vegetationSummary,
+    reviewGroups: buildReviewGroups(draft, captures),
+    infestationSummary: buildInfestationSummary(infestations),
   };
 }
 
@@ -79,11 +130,27 @@ function buildCapturesPayload(rows: CaptureRow[]): ProspectionCaptureInput[] {
   }));
 }
 
+function buildPopulationsPayload(rows: PopulationRow[]): ProspectionPopulationInput[] {
+  return rows.map((row) => ({
+    espece: row.espece,
+    categorie: row.categorie,
+    densite_diffuse: row.densite_diffuse,
+    densite_groupee: row.densite_groupee,
+    accouplement: row.accouplement,
+    ponte: row.ponte,
+  }));
+}
+
+function buildInfestationsPayload(rows: InfestationRow[]): ProspectionInfestationInput[] {
+  return rows.map((row) => ({ ...row }));
+}
+
 function buildProspectionPayload(draft: DraftProspection) {
   return {
     type_prospection: draft.type_prospection,
     campagne_id: draft.campagne_id,
     station_id: draft.station_id,
+    n_releve: draft.n_releve,
     n_fiche: draft.n_fiche,
     date_prospection: draft.date_prospection,
     latitude: draft.latitude,
@@ -95,6 +162,8 @@ function buildProspectionPayload(draft: DraftProspection) {
     degats_cultures: draft.degats_cultures,
     vegetation: draft.vegetation ? JSON.parse(draft.vegetation) : null,
     sol: draft.sol ? JSON.parse(draft.sol) : null,
+    ennemis_naturels: draft.ennemis_naturels,
+    observations: draft.observations,
     statut: draft.statut,
     region: draft.region,
     district: draft.district,
@@ -126,9 +195,15 @@ export async function enregistrerEtSynchroniser(
   if (!isOnline) return { synced: false };
 
   try {
+    const [populations, infestations] = await Promise.all([
+      listAllProspectionPopulations(completed.id),
+      listAllProspectionInfestations(completed.id),
+    ]);
     await apiClient.createProspection(token, {
       ...buildProspectionPayload(completed),
       captures: buildCapturesPayload(captures),
+      populations: buildPopulationsPayload(populations),
+      infestations: buildInfestationsPayload(infestations),
     });
     await markProspectionSynced(completed.id);
     return { synced: true };
@@ -143,10 +218,16 @@ export async function enregistrerEtSynchroniser(
  * n'est PAS avalée : l'appelant (UI) doit pouvoir afficher un toast d'échec.
  */
 export async function retrySyncProspection(draft: DraftProspection, token: string): Promise<void> {
-  const captures = await listAllProspectionCaptures(draft.id);
+  const [captures, populations, infestations] = await Promise.all([
+    listAllProspectionCaptures(draft.id),
+    listAllProspectionPopulations(draft.id),
+    listAllProspectionInfestations(draft.id),
+  ]);
   await apiClient.createProspection(token, {
     ...buildProspectionPayload(draft),
     captures: buildCapturesPayload(captures),
+    populations: buildPopulationsPayload(populations),
+    infestations: buildInfestationsPayload(infestations),
   });
   await markProspectionSynced(draft.id);
 }

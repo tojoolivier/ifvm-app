@@ -11,6 +11,11 @@ export const PHENOTYPES: { value: Phenotype; label: string }[] = [
   { value: 'gregaire', label: 'Grégaires' },
 ];
 
+/** NSE larve n'a pas de phénotype intermédiaire "Solitaro-trans" (PDF). */
+export const PHENOTYPES_3: { value: Phenotype; label: string }[] = PHENOTYPES.filter(
+  (p) => p.value !== 'solitaro_trans'
+);
+
 type TypeCible = 'tache_larvaire' | 'bande_larvaire' | 'vol_clair' | 'essaim';
 
 export const TYPE_CIBLE_OPTIONS: { value: TypeCible; label: string }[] = [
@@ -21,20 +26,24 @@ export const TYPE_CIBLE_OPTIONS: { value: TypeCible; label: string }[] = [
 ];
 
 export type Humidite = 'surface' | '0_5cm' | '5_12cm' | '12_30cm' | 'gt_30cm';
-export type Texture = 'limoneuse' | 'argileuse' | 'sable_fin' | 'gravier' | 'cailloux';
+export type Texture = 'limoneuse' | 'argileuse' | 'sable_fin' | 'sable_grossier' | 'gravier' | 'cailloux' | 'bloc';
 export type DegatsCultures = 'nuls' | 'faibles' | 'moyens' | 'forts';
-type Phenologie = 'verdissement' | 'feuillaison' | 'floraison' | 'fructification' | 'sec';
-type StrateKey = 'arboree' | 'arbustive' | 'buissonneuse' | 'herbeuse' | 'cultures_seches' | 'sol_nu';
+/** Stades ORPAD (PDF cols f-j) : multi-select par strate, pas exclusif. */
+export type OrpadStage = 'Germ.' | 'Feuille' | 'Fleur' | 'Fruit' | 'Sec';
+export type StrateKey = 'arboree' | 'arbustive' | 'buissonneuse' | 'herbeuse' | 'cultures_seches' | 'cultures_hygro';
 
-const STRATE_KEYS: StrateKey[] = ['arboree', 'arbustive', 'buissonneuse', 'herbeuse', 'cultures_seches', 'sol_nu'];
+export const ORPAD_STAGES: OrpadStage[] = ['Germ.', 'Feuille', 'Fleur', 'Fruit', 'Sec'];
 
-const STRATE_LABELS: Record<StrateKey, string> = {
-  arboree: 'Arborée',
-  arbustive: 'Arbustive',
-  buissonneuse: 'Buissonneuse',
-  herbeuse: 'Herbeuse',
+/** Les 6 strates du PDF (rows 37-42). "Sol nu" n'est pas une strate : c'est un champ (`solNu`) à l'intérieur de chaque strate (col k). */
+export const STRATE_KEYS: StrateKey[] = ['arboree', 'arbustive', 'buissonneuse', 'herbeuse', 'cultures_seches', 'cultures_hygro'];
+
+export const STRATE_LABELS: Record<StrateKey, string> = {
+  arboree: 'Strate arborée',
+  arbustive: 'Strate arbustive',
+  buissonneuse: 'Strate buissonneuse',
+  herbeuse: 'Strate herbeuse',
   cultures_seches: 'Cultures sèches',
-  sol_nu: 'Sol nu',
+  cultures_hygro: 'Cultures hygrophiles',
 };
 
 export const HUMIDITE_OPTIONS: { value: Humidite; label: string }[] = [
@@ -49,8 +58,10 @@ export const TEXTURE_OPTIONS: { value: Texture; label: string }[] = [
   { value: 'limoneuse', label: 'Limoneuse' },
   { value: 'argileuse', label: 'Argileuse' },
   { value: 'sable_fin', label: 'Sable fin' },
+  { value: 'sable_grossier', label: 'Sable grossier' },
   { value: 'gravier', label: 'Gravier' },
   { value: 'cailloux', label: 'Cailloux' },
+  { value: 'bloc', label: 'Bloc' },
 ];
 
 export const DEGATS_OPTIONS: { value: DegatsCultures; label: string }[] = [
@@ -60,26 +71,27 @@ export const DEGATS_OPTIONS: { value: DegatsCultures; label: string }[] = [
   { value: 'forts', label: 'Forts' },
 ];
 
-interface StrateDetail {
+export interface StrateDetail {
+  surfRel: number | null;
+  hMoy: number | null;
   recouvrement: number;
-  phenologie: Phenologie | null;
-  hauteur: number | null;
+  verdissement: number | null;
+  repousse: number | null;
+  orpad: string[];
+  solNu: number | null;
 }
 
-type StratesState = Record<StrateKey, StrateDetail>;
+export type StratesState = Record<StrateKey, StrateDetail>;
 
-interface VegetationSolState {
+export interface VegetationSolState {
   strates: StratesState;
   humidite: Humidite | null;
   texture: Texture | null;
   degatsCultures: DegatsCultures | null;
-  degatsCulturesPourcent: number | null;
-  verdissementPourcent: number | null;
-  hauteurHerbeCm: number | null;
 }
 
-function defaultStrateDetail(): StrateDetail {
-  return { recouvrement: 0, phenologie: null, hauteur: null };
+export function defaultStrateDetail(): StrateDetail {
+  return { surfRel: null, hMoy: null, recouvrement: 0, verdissement: null, repousse: null, orpad: [], solNu: null };
 }
 
 function defaultStrates(): StratesState {
@@ -93,17 +105,10 @@ function clampRecouvrement(value: number): number {
   return Math.round(Math.max(0, Math.min(100, value)));
 }
 
-function totalRecouvrement(strates: StratesState): number {
-  return STRATE_KEYS.reduce((sum, key) => sum + strates[key].recouvrement, 0);
-}
-
-function parseVegetationSol(
+export function parseVegetationSol(
   vegetation: string | null,
   sol: string | null,
-  degatsCultures: string | null,
-  degatsCulturesPourcent: number | null = null,
-  verdissementPourcent: number | null = null,
-  hauteurHerbeCm: number | null = null
+  degatsCultures: string | null
 ): VegetationSolState {
   const veg = vegetation ? JSON.parse(vegetation) : {};
   const solParsed = sol ? JSON.parse(sol) : {};
@@ -114,31 +119,30 @@ function parseVegetationSol(
       const detail = parsedStrates[key];
       if (detail) {
         strates[key] = {
+          surfRel: typeof detail.surfRel === 'number' ? detail.surfRel : null,
+          hMoy: typeof detail.hMoy === 'number' ? detail.hMoy : null,
           recouvrement: clampRecouvrement(detail.recouvrement ?? 0),
-          phenologie: (detail.phenologie as Phenologie) ?? null,
-          hauteur: typeof detail.hauteur === 'number' ? detail.hauteur : null,
+          verdissement: typeof detail.verdissement === 'number' ? detail.verdissement : null,
+          repousse: typeof detail.repousse === 'number' ? detail.repousse : null,
+          orpad: Array.isArray(detail.orpad) ? detail.orpad : [],
+          solNu: typeof detail.solNu === 'number' ? detail.solNu : null,
         };
       }
     }
-  } else if (typeof veg.recouvrement_herbeux === 'number') {
-    strates.herbeuse = { recouvrement: clampRecouvrement(veg.recouvrement_herbeux), phenologie: null, hauteur: null };
   }
   return {
     strates,
     humidite: (solParsed.humidite as Humidite) ?? null,
     texture: (solParsed.texture as Texture) ?? null,
     degatsCultures: (degatsCultures as DegatsCultures) ?? null,
-    degatsCulturesPourcent: degatsCulturesPourcent ?? null,
-    verdissementPourcent: verdissementPourcent ?? null,
-    hauteurHerbeCm: hauteurHerbeCm ?? null,
   };
 }
 
-function buildVegetationSummary(state: VegetationSolState): string {
+export function buildVegetationSummary(state: VegetationSolState): string {
   const strateParts = STRATE_KEYS.filter((key) => state.strates[key].recouvrement > 0)
     .map((key) => `${STRATE_LABELS[key]} ${state.strates[key].recouvrement}%`)
     .join(', ');
-  const parts: string[] = [`Strates (${totalRecouvrement(state.strates)}%) : ${strateParts || '—'}`];
+  const parts: string[] = [strateParts ? `Strates : ${strateParts}` : 'Strates : —'];
   if (state.humidite) {
     parts.push(`Humidité ${HUMIDITE_OPTIONS.find((o) => o.value === state.humidite)?.label}`);
   }
@@ -291,10 +295,7 @@ export function buildFicheLecture(prospection: ProspectionRead): FicheLectureVie
       parseVegetationSol(
         prospection.vegetation ? JSON.stringify(prospection.vegetation) : null,
         prospection.sol ? JSON.stringify(prospection.sol) : null,
-        prospection.degats_cultures,
-        prospection.degats_cultures_pourcent,
-        prospection.verdissement_pourcent,
-        prospection.hauteur_herbe_cm
+        prospection.degats_cultures
       )
     ),
     region: prospection.region,
