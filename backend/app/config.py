@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     JWT_SECRET: str = "change_me"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60
+    JWT_REFRESH_EXPIRE_DAYS: int = 14
 
     model_config = {"env_file": ".env"}
 

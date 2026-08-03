@@ -1,15 +1,36 @@
 import uuid
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.referentiel_use_cases import GetStation, ListPostesAcridiens, ListStations
+from app.application.referentiel_use_cases import (
+    GetStation,
+    ListPostesAcridiens,
+    ListStations,
+    PullReferentiel,
+    ReferentielSinceCursors,
+)
 from app.auth import get_current_user
 from app.database import get_db
-from app.infrastructure.referentiel_repository import PosteAcridienRepositoryImpl, StationFixeRepositoryImpl
+from app.infrastructure.referentiel_repository import (
+    PosteAcridienRepositoryImpl,
+    StationFixeRepositoryImpl,
+)
+from app.infrastructure.referentiel_sync_repository import (
+    CodeStadeRepositoryImpl,
+    CultureRepositoryImpl,
+    PesticideRepositoryImpl,
+    UtilisateurEquipeRepositoryImpl,
+)
 from app.models.users import Utilisateur
-from app.presentation.referentiel_schemas import PosteAcridienRead, StationFixeRead
+from app.presentation.referentiel_schemas import (
+    EntityPull,
+    PosteAcridienRead,
+    ReferentielPullResponse,
+    StationFixeRead,
+)
 
 router = APIRouter()
 
@@ -49,3 +70,46 @@ async def get_station(
     if station is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Station non trouvée")
     return station
+
+
+@router.get("/referentiel/pull", response_model=ReferentielPullResponse)
+async def pull_referentiel(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _current_user: Annotated[Utilisateur, Depends(get_current_user)],
+    since_postes_acridiens: datetime | None = Query(default=None),
+    since_stations_fixes: datetime | None = Query(default=None),
+    since_utilisateurs_equipe: datetime | None = Query(default=None),
+    since_pesticides: datetime | None = Query(default=None),
+    since_cultures: datetime | None = Query(default=None),
+    since_codes_stades: datetime | None = Query(default=None),
+):
+    use_case = PullReferentiel(
+        poste_repository=PosteAcridienRepositoryImpl(db),
+        station_repository=StationFixeRepositoryImpl(db),
+        equipe_repository=UtilisateurEquipeRepositoryImpl(db),
+        pesticide_repository=PesticideRepositoryImpl(db),
+        culture_repository=CultureRepositoryImpl(db),
+        code_stade_repository=CodeStadeRepositoryImpl(db),
+    )
+    cursors = ReferentielSinceCursors(
+        postes_acridiens=since_postes_acridiens,
+        stations_fixes=since_stations_fixes,
+        utilisateurs_equipe=since_utilisateurs_equipe,
+        pesticides=since_pesticides,
+        cultures=since_cultures,
+        codes_stades=since_codes_stades,
+    )
+    result = await use_case.execute(cursors=cursors)
+
+    return ReferentielPullResponse(
+        postes_acridiens=EntityPull(
+            upserts=result.postes_acridiens, server_time=result.server_time
+        ),
+        stations_fixes=EntityPull(upserts=result.stations_fixes, server_time=result.server_time),
+        utilisateurs_equipe=EntityPull(
+            upserts=result.utilisateurs_equipe, server_time=result.server_time
+        ),
+        pesticides=EntityPull(upserts=result.pesticides, server_time=result.server_time),
+        cultures=EntityPull(upserts=result.cultures, server_time=result.server_time),
+        codes_stades=EntityPull(upserts=result.codes_stades, server_time=result.server_time),
+    )

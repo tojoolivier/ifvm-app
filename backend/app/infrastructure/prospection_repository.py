@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -14,9 +14,9 @@ from app.domain.prospection import (
 from app.domain.referentiel import StationNotFoundError
 from app.domain.repositories import ProspectionRepository
 from app.infrastructure.prospection_model import (
-    ProspectionModel,
     ProspectionCaptureModel,
     ProspectionInfestationModel,
+    ProspectionModel,
     ProspectionPopulationModel,
 )
 
@@ -90,6 +90,8 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             intensite_pluie=prospection.intensite_pluie,
             vegetation=prospection.vegetation,
             sol=prospection.sol,
+            verdissement=prospection.verdissement,
+            hauteur_strate=prospection.hauteur_strate,
             ennemis_naturels=prospection.ennemis_naturels,
             observations=prospection.observations,
             statut=prospection.statut,
@@ -100,7 +102,22 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             validated_at=prospection.validated_at,
             created_at=prospection.created_at,
             updated_at=prospection.updated_at,
+            # ==========================================
+            # NOUVEAUX CHAMPS - Références (A)
+            # ==========================================
+            region=prospection.region,
+            district=prospection.district,
+            commune=prospection.commune,
+            za=prospection.za,
+            pa_code=prospection.pa_code,
+            # ==========================================
+            # NOUVEAUX CHAMPS - Observations (D)
+            # ==========================================
+            degats_cultures_pourcent=prospection.degats_cultures_pourcent,
+            verdissement_pourcent=prospection.verdissement_pourcent,
+            hauteur_herbe_cm=prospection.hauteur_herbe_cm,
         )
+
         model.populations = [
             ProspectionPopulationModel(
                 id=p.id,
@@ -115,6 +132,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             )
             for p in prospection.populations
         ]
+
         model.captures = [
             ProspectionCaptureModel(
                 id=c.id,
@@ -127,9 +145,11 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             )
             for c in prospection.captures
         ]
+
         model.infestations = [
             ProspectionInfestationModel(
                 id=i.id,
+                prospection_id=prospection.id,
                 espece=i.espece,
                 type_cible=i.type_cible,
                 taille_min=i.taille_min,
@@ -145,16 +165,33 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                 direction_vers=i.direction_vers,
                 vent_de=i.vent_de,
                 vent_vitesse=i.vent_vitesse,
+                # ==========================================
+                # NOUVEAUX CHAMPS - Imagos (B)
+                # ==========================================
+                pullulation_nb=i.pullulation_nb,
+                taille_long=i.taille_long,
+                taille_large=i.taille_large,
+                taille_epaisseur=i.taille_epaisseur,
+                essaim_en_vol=i.essaim_en_vol,
+                essaim_pose=i.essaim_pose,
+                type_essaim=i.type_essaim,
+                # ==========================================
+                # NOUVEAUX CHAMPS - Larves (C)
+                # ==========================================
+                nb_taches_bandes=i.nb_taches_bandes,
+                interdistance_m=i.interdistance_m,
+                surface_contaminee_ha=i.surface_contaminee_ha,
+                type_larve=i.type_larve,
             )
             for i in prospection.infestations
         ]
+
         self.session.add(model)
         try:
             await self.session.commit()
         except IntegrityError:
             await self.session.rollback()
             raise StationNotFoundError("station_id ne référence pas une station fixe existante")
-        # Re-query with selectinload: refresh() ne charge pas les relations (MissingGreenlet)
         return await self.get_by_id(model.id)
 
     async def update(self, prospection: Prospection) -> Prospection:
@@ -162,6 +199,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             select(ProspectionModel).where(ProspectionModel.id == prospection.id)
         )
         model = result.scalar_one()
+
         model.station_id = prospection.station_id
         model.n_releve = prospection.n_releve
         model.n_fiche = prospection.n_fiche
@@ -179,12 +217,76 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         model.intensite_pluie = prospection.intensite_pluie
         model.vegetation = prospection.vegetation
         model.sol = prospection.sol
+        model.verdissement = prospection.verdissement
+        model.hauteur_strate = prospection.hauteur_strate
         model.ennemis_naturels = prospection.ennemis_naturels
         model.observations = prospection.observations
         model.statut = prospection.statut
         model.updated_at = prospection.updated_at
+
+        # ==========================================
+        # NOUVEAUX CHAMPS - Références (A)
+        # ==========================================
+        model.region = prospection.region
+        model.district = prospection.district
+        model.commune = prospection.commune
+        model.za = prospection.za
+        model.pa_code = prospection.pa_code
+
+        # ==========================================
+        # NOUVEAUX CHAMPS - Observations (D)
+        # ==========================================
+        model.degats_cultures_pourcent = prospection.degats_cultures_pourcent
+        model.verdissement_pourcent = prospection.verdissement_pourcent
+        model.hauteur_herbe_cm = prospection.hauteur_herbe_cm
+
+        # Mise à jour des infestations
+        await self.session.execute(
+            delete(ProspectionInfestationModel).where(
+                ProspectionInfestationModel.prospection_id == prospection.id
+            )
+        )
+
+        for i in prospection.infestations:
+            new_infestation = ProspectionInfestationModel(
+                id=i.id,
+                prospection_id=prospection.id,
+                espece=i.espece,
+                type_cible=i.type_cible,
+                taille_min=i.taille_min,
+                taille_max=i.taille_max,
+                taille_moy=i.taille_moy,
+                surface_tot=i.surface_tot,
+                densite_min=i.densite_min,
+                densite_max=i.densite_max,
+                densite_moy=i.densite_moy,
+                interdistance=i.interdistance,
+                comportement=i.comportement,
+                direction_de=i.direction_de,
+                direction_vers=i.direction_vers,
+                vent_de=i.vent_de,
+                vent_vitesse=i.vent_vitesse,
+                # ==========================================
+                # NOUVEAUX CHAMPS - Imagos (B)
+                # ==========================================
+                pullulation_nb=i.pullulation_nb,
+                taille_long=i.taille_long,
+                taille_large=i.taille_large,
+                taille_epaisseur=i.taille_epaisseur,
+                essaim_en_vol=i.essaim_en_vol,
+                essaim_pose=i.essaim_pose,
+                type_essaim=i.type_essaim,
+                # ==========================================
+                # NOUVEAUX CHAMPS - Larves (C)
+                # ==========================================
+                nb_taches_bandes=i.nb_taches_bandes,
+                interdistance_m=i.interdistance_m,
+                surface_contaminee_ha=i.surface_contaminee_ha,
+                type_larve=i.type_larve,
+            )
+            self.session.add(new_infestation)
+
         await self.session.commit()
-        # Re-query with selectinload: refresh() ne charge pas les relations (MissingGreenlet)
         return await self.get_by_id(model.id)
 
     async def delete(self, prospection_id: uuid.UUID) -> bool:
@@ -210,13 +312,19 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             altitude=float(model.altitude) if model.altitude is not None else None,
             biotope=model.biotope,
             surf_station=float(model.surf_station) if model.surf_station is not None else None,
-            surf_prospectee=float(model.surf_prospectee) if model.surf_prospectee is not None else None,
+            surf_prospectee=float(model.surf_prospectee)
+            if model.surf_prospectee is not None
+            else None,
             surf_infestee=float(model.surf_infestee) if model.surf_infestee is not None else None,
             degats_cultures=model.degats_cultures,
             derniere_pluie=model.derniere_pluie,
             intensite_pluie=model.intensite_pluie,
             vegetation=model.vegetation,
             sol=model.sol,
+            verdissement=float(model.verdissement) if model.verdissement is not None else None,
+            hauteur_strate=float(model.hauteur_strate)
+            if model.hauteur_strate is not None
+            else None,
             ennemis_naturels=model.ennemis_naturels,
             observations=model.observations,
             statut=model.statut,
@@ -227,14 +335,37 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             validated_at=model.validated_at,
             created_at=model.created_at,
             updated_at=model.updated_at,
+            # ==========================================
+            # NOUVEAUX CHAMPS - Références (A)
+            # ==========================================
+            region=model.region,
+            district=model.district,
+            commune=model.commune,
+            za=model.za,
+            pa_code=model.pa_code,
+            # ==========================================
+            # NOUVEAUX CHAMPS - Observations (D)
+            # ==========================================
+            degats_cultures_pourcent=model.degats_cultures_pourcent,
+            verdissement_pourcent=model.verdissement_pourcent,
+            hauteur_herbe_cm=float(model.hauteur_herbe_cm)
+            if model.hauteur_herbe_cm is not None
+            else None,
+            # ==========================================
+            # RELATIONSHIPS
+            # ==========================================
             populations=[
                 ProspectionPopulation(
                     id=p.id,
                     prospection_id=p.prospection_id,
                     espece=p.espece,
                     categorie=p.categorie,
-                    densite_diffuse=float(p.densite_diffuse) if p.densite_diffuse is not None else None,
-                    densite_groupee=float(p.densite_groupee) if p.densite_groupee is not None else None,
+                    densite_diffuse=float(p.densite_diffuse)
+                    if p.densite_diffuse is not None
+                    else None,
+                    densite_groupee=float(p.densite_groupee)
+                    if p.densite_groupee is not None
+                    else None,
                     captures_nombre=p.captures_nombre,
                     temps_capture=p.temps_capture,
                     accouplement=p.accouplement,
@@ -274,6 +405,29 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                     direction_vers=i.direction_vers,
                     vent_de=i.vent_de,
                     vent_vitesse=float(i.vent_vitesse) if i.vent_vitesse is not None else None,
+                    # ==========================================
+                    # NOUVEAUX CHAMPS - Imagos (B)
+                    # ==========================================
+                    pullulation_nb=i.pullulation_nb,
+                    taille_long=float(i.taille_long) if i.taille_long is not None else None,
+                    taille_large=float(i.taille_large) if i.taille_large is not None else None,
+                    taille_epaisseur=float(i.taille_epaisseur)
+                    if i.taille_epaisseur is not None
+                    else None,
+                    essaim_en_vol=i.essaim_en_vol,
+                    essaim_pose=i.essaim_pose,
+                    type_essaim=i.type_essaim,
+                    # ==========================================
+                    # NOUVEAUX CHAMPS - Larves (C)
+                    # ==========================================
+                    nb_taches_bandes=i.nb_taches_bandes,
+                    interdistance_m=float(i.interdistance_m)
+                    if i.interdistance_m is not None
+                    else None,
+                    surface_contaminee_ha=float(i.surface_contaminee_ha)
+                    if i.surface_contaminee_ha is not None
+                    else None,
+                    type_larve=i.type_larve,
                 )
                 for i in model.infestations
             ],

@@ -4,6 +4,7 @@ import { STATUT_VALIDE } from './prospection-fiche-lecture';
 import {
   createDraftProspection,
   countUnsyncedProspections,
+  deleteProspection as deleteLocalProspection,
   listDraftProspections,
   listRecentProspections,
   DraftProspection,
@@ -43,10 +44,21 @@ export async function loadValidatedProspections(
   prospecteurId: string
 ): Promise<ProspectionRead[]> {
   try {
-    return await apiClient.listProspections(token, { statut: STATUT_VALIDE, prospecteur_id: prospecteurId });
+    return await apiClient.listProspections(token, { 
+      statut: STATUT_VALIDE, 
+      prospecteur_id: prospecteurId 
+    });
   } catch {
     return [];
   }
+}
+
+/** Supprime une fiche brouillon en local. Refuse toute fiche déjà complétée (elle n'existe alors que côté serveur, où le backend applique la même règle). */
+export async function deleteDraftProspection(draft: DraftProspection): Promise<void> {
+  if (draft.statut !== 'brouillon') {
+    throw new Error('Seules les fiches en brouillon peuvent être supprimées.');
+  }
+  await deleteLocalProspection(draft.id);
 }
 
 /** Choisit la campagne en cours parmi les campagnes connues (règle : une seule campagne à la fois). */
@@ -62,6 +74,8 @@ export function pickCurrentCampagneId(
   );
   const pool = enCours.length > 0 ? enCours : campagnes;
 
+  if (pool.length === 0) return null;
+
   return [...pool].sort((a, b) => b.start_date.localeCompare(a.start_date))[0].id;
 }
 
@@ -71,17 +85,58 @@ export async function startNewProspection(params: {
   prospecteurId: string;
   typeProspection?: TypeProspection;
 }): Promise<DraftProspection> {
-  const campagnes = await apiClient.getCampagnes(params.token);
-  const campagneId = pickCurrentCampagneId(campagnes);
-  if (!campagneId) {
-    throw new Error('Aucune campagne en cours — impossible de démarrer une nouvelle fiche');
-  }
+  console.log('[startNewProspection] ===== DEBUT =====');
+  console.log('[startNewProspection] token:', params.token?.substring(0, 30) + '...');
+  console.log('[startNewProspection] prospecteurId:', params.prospecteurId);
+  console.log('[startNewProspection] typeProspection:', params.typeProspection);
 
-  return createDraftProspection({
-    id: generateId(),
-    typeProspection: params.typeProspection ?? 'intensive',
-    campagneId,
-    prospecteurId: params.prospecteurId,
-    dateProspection: new Date().toISOString().slice(0, 10),
-  });
+  try {
+    console.log('[startNewProspection] Appel à apiClient.getCampagnes()...');
+    const campagnes = await apiClient.getCampagnes(params.token);
+    console.log('[startNewProspection] Campagnes récupérées:', campagnes.length);
+    console.log('[startNewProspection] Campagnes:', JSON.stringify(campagnes, null, 2));
+
+    if (campagnes.length === 0) {
+      console.error('[startNewProspection] ❌ Aucune campagne trouvée dans la base !');
+      throw new Error('Aucune campagne disponible. Veuillez contacter l\'administrateur.');
+    }
+
+    const campagneId = pickCurrentCampagneId(campagnes);
+    console.log('[startNewProspection] campagneId après pickCurrentCampagneId:', campagneId);
+
+    // Si aucune campagne en cours, prendre la première disponible
+    let selectedCampagneId = campagneId;
+    if (!selectedCampagneId && campagnes.length > 0) {
+      selectedCampagneId = campagnes[0].id;
+      console.log('[startNewProspection] Aucune campagne en cours, utilisation de la première:', selectedCampagneId);
+    }
+
+    if (!selectedCampagneId) {
+      console.error('[startNewProspection] ❌ Impossible de sélectionner une campagne');
+      throw new Error('Aucune campagne disponible. Veuillez contacter l\'administrateur.');
+    }
+
+    console.log('[startNewProspection] ✅ Campagne sélectionnée:', selectedCampagneId);
+
+    const draft = await createDraftProspection({
+      id: generateId(),
+      typeProspection: params.typeProspection ?? 'intensive',
+      campagneId: selectedCampagneId,
+      prospecteurId: params.prospecteurId,
+      dateProspection: new Date().toISOString().slice(0, 10),
+      region: null,
+      district: null,
+      commune: null,
+      za: null,
+      pa_code: null,
+    });
+
+    console.log('[startNewProspection] ✅ Brouillon créé:', draft.id);
+    console.log('[startNewProspection] ===== FIN =====');
+    return draft;
+
+  } catch (error) {
+    console.error('[startNewProspection] ❌ Erreur:', error);
+    throw error;
+  }
 }

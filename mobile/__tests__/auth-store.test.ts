@@ -14,6 +14,7 @@ jest.mock('../src/lib/api-client', () => ({
   apiClient: {
     login: jest.fn(),
     getProfile: jest.fn(),
+    refresh: jest.fn(),
   },
 }));
 
@@ -29,6 +30,7 @@ function makeJwt(payload: Record<string, unknown>): string {
 
 const TEST_USER = { id: '550e8400-e29b-41d4-a716-446655440000', nom: 'Dupont', prenom: 'Alice', email: 'alice@test.com', role: 'prospecteur' as const, actif: true, created_at: '2026-01-01T00:00:00Z' };
 const TEST_TOKEN = makeJwt({ user_id: '550e8400-e29b-41d4-a716-446655440000' });
+const TEST_REFRESH_TOKEN = 'refresh-token-value';
 
 beforeEach(() => {
   jest.restoreAllMocks();
@@ -37,6 +39,7 @@ beforeEach(() => {
   mockStorage.deleteItem.mockReset();
   mockApiClient.login.mockReset();
   mockApiClient.getProfile.mockReset();
+  mockApiClient.refresh.mockReset();
   useAuthStore.setState({
     token: null,
     user: null,
@@ -48,7 +51,7 @@ beforeEach(() => {
 describe('useAuthStore', () => {
   describe('login', () => {
     it('should transition from unauthenticated to authenticated', async () => {
-      mockApiClient.login.mockResolvedValueOnce({ access_token: TEST_TOKEN });
+      mockApiClient.login.mockResolvedValueOnce({ access_token: TEST_TOKEN, refresh_token: TEST_REFRESH_TOKEN });
       mockStorage.setItem.mockResolvedValueOnce(undefined);
       mockApiClient.getProfile.mockResolvedValueOnce(TEST_USER);
 
@@ -61,7 +64,7 @@ describe('useAuthStore', () => {
     });
 
     it('should persist token in SecureStore', async () => {
-      mockApiClient.login.mockResolvedValueOnce({ access_token: TEST_TOKEN });
+      mockApiClient.login.mockResolvedValueOnce({ access_token: TEST_TOKEN, refresh_token: TEST_REFRESH_TOKEN });
       mockStorage.setItem.mockResolvedValueOnce(undefined);
       mockApiClient.getProfile.mockResolvedValueOnce(TEST_USER);
 
@@ -71,10 +74,14 @@ describe('useAuthStore', () => {
         'auth_token',
         TEST_TOKEN
       );
+      expect(mockStorage.setItem).toHaveBeenCalledWith(
+        'refresh_token',
+        TEST_REFRESH_TOKEN
+      );
     });
 
     it('should fetch profile after login', async () => {
-      mockApiClient.login.mockResolvedValueOnce({ access_token: TEST_TOKEN });
+      mockApiClient.login.mockResolvedValueOnce({ access_token: TEST_TOKEN, refresh_token: TEST_REFRESH_TOKEN });
       mockStorage.setItem.mockResolvedValueOnce(undefined);
       mockApiClient.getProfile.mockResolvedValueOnce(TEST_USER);
 
@@ -97,7 +104,7 @@ describe('useAuthStore', () => {
     });
 
     it('should still login when profile fetch fails after login', async () => {
-      mockApiClient.login.mockResolvedValueOnce({ access_token: TEST_TOKEN });
+      mockApiClient.login.mockResolvedValueOnce({ access_token: TEST_TOKEN, refresh_token: TEST_REFRESH_TOKEN });
       mockStorage.setItem.mockResolvedValueOnce(undefined);
       mockApiClient.getProfile.mockRejectedValueOnce(new Error('Network error'));
 
@@ -208,6 +215,46 @@ describe('useAuthStore', () => {
       const state = useAuthStore.getState();
       expect(state.isAuthenticated).toBe(false);
       expect(state.isInitialized).toBe(true);
+    });
+  });
+
+  describe('refreshToken', () => {
+    it('exchanges the stored refresh token for a new access token', async () => {
+      mockStorage.getItem.mockResolvedValueOnce(TEST_REFRESH_TOKEN);
+      mockApiClient.refresh.mockResolvedValueOnce({ access_token: 'new-access-token' });
+      mockStorage.setItem.mockResolvedValueOnce(undefined);
+
+      const result = await useAuthStore.getState().refreshToken();
+
+      expect(result).toBe(true);
+      expect(mockApiClient.refresh).toHaveBeenCalledWith(TEST_REFRESH_TOKEN);
+      expect(mockStorage.setItem).toHaveBeenCalledWith('auth_token', 'new-access-token');
+      expect(useAuthStore.getState().token).toBe('new-access-token');
+    });
+
+    it('returns false without calling the API when no refresh token is stored', async () => {
+      mockStorage.getItem.mockResolvedValueOnce(null);
+
+      const result = await useAuthStore.getState().refreshToken();
+
+      expect(result).toBe(false);
+      expect(mockApiClient.refresh).not.toHaveBeenCalled();
+    });
+
+    it('logs out and returns false when the refresh token is rejected', async () => {
+      useAuthStore.setState({ token: TEST_TOKEN, user: TEST_USER, isAuthenticated: true });
+      mockStorage.getItem.mockResolvedValueOnce(TEST_REFRESH_TOKEN);
+      mockApiClient.refresh.mockRejectedValueOnce(new Error('expired'));
+      mockStorage.deleteItem.mockResolvedValue(undefined);
+
+      const result = await useAuthStore.getState().refreshToken();
+
+      expect(result).toBe(false);
+      expect(mockStorage.deleteItem).toHaveBeenCalledWith('auth_token');
+      expect(mockStorage.deleteItem).toHaveBeenCalledWith('refresh_token');
+      const state = useAuthStore.getState();
+      expect(state.token).toBeNull();
+      expect(state.isAuthenticated).toBe(false);
     });
   });
 

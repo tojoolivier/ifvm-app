@@ -3,6 +3,7 @@ import { apiClient, User } from './api-client';
 import { storage } from './storage';
 
 const tokenKey = 'auth_token';
+const refreshTokenKey = 'refresh_token';
 
 const B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 const B64_LOOKUP: Record<number, number> = {};
@@ -49,6 +50,7 @@ interface AuthActions {
   logout: () => Promise<void>;
   setUser: (user: User) => void;
   init: () => Promise<void>;
+  refreshToken: () => Promise<boolean>;
 }
 
 export const useAuthStore = create<AuthState & AuthActions>((set) => ({
@@ -87,6 +89,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
       console.log('[auth] login API ok, token:', response.access_token?.substring(0, 30));
       const token = response.access_token;
       await storage.setItem(tokenKey, token);
+      await storage.setItem(refreshTokenKey, response.refresh_token);
       console.log('[auth] token stored');
       let user = null;
       try {
@@ -106,10 +109,28 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
 
   logout: async () => {
     await storage.deleteItem(tokenKey);
+    await storage.deleteItem(refreshTokenKey);
     set({ token: null, user: null, isAuthenticated: false });
   },
 
   setUser: (user: User) => {
     set({ user });
+  },
+
+  refreshToken: async () => {
+    const refreshToken = await storage.getItem(refreshTokenKey);
+    if (!refreshToken) return false;
+
+    try {
+      const response = await apiClient.refresh(refreshToken);
+      await storage.setItem(tokenKey, response.access_token);
+      set({ token: response.access_token });
+      return true;
+    } catch {
+      await storage.deleteItem(tokenKey);
+      await storage.deleteItem(refreshTokenKey);
+      set({ token: null, user: null, isAuthenticated: false });
+      return false;
+    }
   },
 }));

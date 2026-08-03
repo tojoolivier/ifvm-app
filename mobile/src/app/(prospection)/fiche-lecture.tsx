@@ -58,7 +58,7 @@ export default function FicheLectureScreen() {
     return (
       <View style={styles.root}>
         <SafeAreaView edges={['top']} style={styles.header}>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/prospection')}>
+          <TouchableOpacity onPress={() => router.push('/(app)/prospection')}>
             <Text style={styles.backLink}>‹ Retour</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Fiche de lecture</Text>
@@ -78,7 +78,7 @@ export default function FicheLectureScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.header}>
-        <TouchableOpacity onPress={() => router.push('/(tabs)/prospection')}>
+        <TouchableOpacity onPress={() => router.push('/(app)/prospection')}>
           <Text style={styles.backLink}>‹ Retour</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Fiche de lecture</Text>

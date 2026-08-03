@@ -8,11 +8,16 @@ export interface DraftProspectionInput {
   typeProspection: TypeProspection;
   campagneId: string;
   prospecteurId: string;
-  dateProspection: string; // ISO date (yyyy-mm-dd)
+  dateProspection: string;
   stationId?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   altitude?: number | null;
+  region?: string | null;
+  district?: string | null;
+  commune?: string | null;
+  za?: string | null;
+  pa_code?: string | null;
   surfStation?: number | null;
   surfProspectee?: number | null;
   surfInfestee?: number | null;
@@ -24,7 +29,19 @@ export interface DraftProspection {
   campagne_id: string;
   prospecteur_id: string;
   station_id: string | null;
+  region: string | null;
+  district: string | null;
+  commune: string | null;
+  za: string | null;
+  pa_code: string | null;
+  pa_nom: string | null;
+  station_nom: string | null;
+  degats_cultures_pourcent: number | null;
+  verdissement_pourcent: number | null;
+  hauteur_herbe_cm: number | null;
+  n_releve: string | null;
   n_fiche: string | null;
+  n_message: string | null;
   especes: string | null;
   capture_started_at: string | null;
   grilles_completees: string | null;
@@ -36,8 +53,12 @@ export interface DraftProspection {
   surf_prospectee: number | null;
   surf_infestee: number | null;
   degats_cultures: string | null;
+  derniere_pluie: string | null;
+  intensite_pluie: string | null;
   vegetation: string | null;
   sol: string | null;
+  ennemis_naturels: string | null;
+  observations: string | null;
   statut: string;
   statut_sync: string;
   created_at: string;
@@ -52,9 +73,17 @@ export interface ReferenceUpdateInput {
   surfProspectee: number;
   surfInfestee: number;
   nFiche: string;
+  nReleve?: string | null;
+  region?: string | null;
+  district?: string | null;
+  commune?: string | null;
+  za?: string | null;
+  pa_code?: string | null;
+  pa_nom?: string | null;
+  stationId?: string | null;
+  station_nom?: string | null;
 }
 
-/** Crée une fiche brouillon en local (SQLite), sans dépendance réseau. */
 export async function createDraftProspection(
   input: DraftProspectionInput
 ): Promise<DraftProspection> {
@@ -64,16 +93,22 @@ export async function createDraftProspection(
   await db.runAsync(
     `INSERT INTO prospection (
       id, type_prospection, campagne_id, prospecteur_id, station_id,
+      region, district, commune, za, pa_code,
       date_prospection, latitude, longitude, altitude,
       surf_station, surf_prospectee, surf_infestee,
       statut, statut_sync, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'brouillon', 'local', ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'brouillon', 'local', ?, ?)`,
     [
       input.id,
       input.typeProspection,
       input.campagneId,
       input.prospecteurId,
       input.stationId ?? null,
+      input.region ?? null,
+      input.district ?? null,
+      input.commune ?? null,
+      input.za ?? null,
+      input.pa_code ?? null,
       input.dateProspection,
       input.latitude ?? null,
       input.longitude ?? null,
@@ -93,7 +128,6 @@ export async function createDraftProspection(
   return created;
 }
 
-/** Persiste la position GPS, les surfaces et le n° de fiche saisis à l'écran Référence. */
 export async function updateProspectionReference(
   id: string,
   input: ReferenceUpdateInput
@@ -105,7 +139,10 @@ export async function updateProspectionReference(
     `UPDATE prospection SET
       latitude = ?, longitude = ?, altitude = ?,
       surf_station = ?, surf_prospectee = ?, surf_infestee = ?,
-      n_fiche = ?, updated_at = ?
+      n_fiche = ?, n_releve = ?,
+      region = ?, district = ?, commune = ?, za = ?, pa_code = ?, pa_nom = ?,
+      station_id = ?, station_nom = ?,
+      updated_at = ?
      WHERE id = ?`,
     [
       input.latitude,
@@ -115,6 +152,15 @@ export async function updateProspectionReference(
       input.surfProspectee,
       input.surfInfestee,
       input.nFiche,
+      input.nReleve ?? null,
+      input.region ?? null,
+      input.district ?? null,
+      input.commune ?? null,
+      input.za ?? null,
+      input.pa_code ?? null,
+      input.pa_nom ?? null,
+      input.stationId ?? null,
+      input.station_nom ?? null,
       now,
       id,
     ]
@@ -127,7 +173,6 @@ export async function updateProspectionReference(
   return updated;
 }
 
-/** Persiste la sélection espèces/stades saisie à l'écran Filtre espèces. */
 export async function updateProspectionEspeces(id: string, especes: string): Promise<DraftProspection> {
   const db = await getDb();
   const now = new Date().toISOString();
@@ -144,7 +189,6 @@ export async function updateProspectionEspeces(id: string, especes: string): Pro
   return updated;
 }
 
-/** Démarre le chrono de la session de captures (n'écrase pas un chrono déjà démarré). */
 export async function startCaptureTimer(id: string): Promise<DraftProspection> {
   const db = await getDb();
   const now = new Date().toISOString();
@@ -161,7 +205,6 @@ export async function startCaptureTimer(id: string): Promise<DraftProspection> {
   return updated;
 }
 
-/** Marque une grille (clé "espece|categorie") comme terminée dans le plan de relevé (idempotent). */
 export async function markGrilleCompleted(id: string, grilleKey: string): Promise<DraftProspection> {
   const db = await getDb();
   const now = new Date().toISOString();
@@ -184,13 +227,40 @@ export async function markGrilleCompleted(id: string, grilleKey: string): Promis
   return updated;
 }
 
+export interface ObservationsUpdateInput {
+  degatsCultures: string | null;
+  ennemisNaturels: string | null;
+  observations: string | null;
+}
+
+/** N'écrit que les colonnes de l'écran Observations, sans toucher vegetation/sol déjà enregistrés par l'écran Strates. */
+export async function updateProspectionObservations(id: string, input: ObservationsUpdateInput): Promise<DraftProspection> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    `UPDATE prospection SET
+      degats_cultures = ?, ennemis_naturels = ?, observations = ?,
+      updated_at = ? WHERE id = ?`,
+    [input.degatsCultures, input.ennemisNaturels, input.observations, now, id]
+  );
+
+  const updated = await getProspection(id);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
 export interface VegetationUpdateInput {
   vegetation: string;
   sol: string;
-  degatsCultures: string | null;
+  degatsCulturesPourcent?: number | null;
+  verdissementPourcent?: number | null;
+  hauteurHerbeCm?: number | null;
 }
 
-/** Persiste la végétation, le sol et les dégâts culture saisis à l'écran Végétation & sol (JSONB archival, cf. ADR-006). */
+/** Dégâts sur culture / ennemis naturels / observation libre sont désormais possédés par l'écran Observations (cf. `updateProspectionObservations`) — ne pas les toucher ici pour ne pas écraser leur saisie au retour sur l'écran Strates. */
 export async function updateProspectionVegetation(
   id: string,
   input: VegetationUpdateInput
@@ -199,8 +269,19 @@ export async function updateProspectionVegetation(
   const now = new Date().toISOString();
 
   await db.runAsync(
-    'UPDATE prospection SET vegetation = ?, sol = ?, degats_cultures = ?, updated_at = ? WHERE id = ?',
-    [input.vegetation, input.sol, input.degatsCultures, now, id]
+    `UPDATE prospection SET
+      vegetation = ?, sol = ?,
+      degats_cultures_pourcent = ?, verdissement_pourcent = ?, hauteur_herbe_cm = ?,
+      updated_at = ? WHERE id = ?`,
+    [
+      input.vegetation,
+      input.sol,
+      input.degatsCulturesPourcent ?? null,
+      input.verdissementPourcent ?? null,
+      input.hauteurHerbeCm ?? null,
+      now,
+      id,
+    ]
   );
 
   const updated = await getProspection(id);
@@ -214,12 +295,11 @@ export interface CaptureRow {
   espece: 'LMC' | 'NSE';
   categorie: 'imago' | 'larve';
   sexe: 'F' | 'M' | null;
-  phase: string; // phénotype : solitaire | solitaro_trans | transiens | gregaire
-  stade: string; // A1, A234, A3¼… selon l'espece/sexe
+  phase: string;
+  stade: string;
   effectif: number;
 }
 
-/** Remplace les lignes `prospection_capture` d'une grille (espece/categorie) par le comptage courant. */
 export async function saveProspectionCaptures(
   prospectionId: string,
   espece: string,
@@ -240,7 +320,6 @@ export async function saveProspectionCaptures(
   }
 }
 
-/** Relit les lignes `prospection_capture` d'une grille (espece/categorie) donnée. */
 export async function listProspectionCaptures(
   prospectionId: string,
   espece: string,
@@ -253,7 +332,6 @@ export async function listProspectionCaptures(
   );
 }
 
-/** Relit toutes les lignes `prospection_capture` d'une fiche, toutes grilles espèce/catégorie confondues. */
 export async function listAllProspectionCaptures(prospectionId: string): Promise<CaptureRow[]> {
   const db = await getDb();
   return db.getAllAsync<CaptureRow>(
@@ -272,7 +350,6 @@ export interface PopulationRow {
   ponte: string | null;
 }
 
-/** Relit la ligne `prospection_population` d'une espece/categorie donnée, ou `null` si absente. */
 export async function getProspectionPopulation(
   prospectionId: string,
   espece: string,
@@ -286,7 +363,14 @@ export async function getProspectionPopulation(
   return row ?? null;
 }
 
-/** Insère ou remplace la ligne `prospection_population` d'une espece/categorie (une ligne par couple, cf. contrainte unique). */
+export async function listAllProspectionPopulations(prospectionId: string): Promise<PopulationRow[]> {
+  const db = await getDb();
+  return db.getAllAsync<PopulationRow>(
+    'SELECT espece, categorie, densite_diffuse, densite_groupee, methode, accouplement, ponte FROM prospection_population WHERE prospection_id = ?',
+    [prospectionId]
+  );
+}
+
 export async function saveProspectionPopulation(prospectionId: string, row: PopulationRow): Promise<void> {
   const db = await getDb();
   const existing = await db.getFirstAsync<{ id: string }>(
@@ -318,6 +402,7 @@ export async function saveProspectionPopulation(prospectionId: string, row: Popu
 }
 
 export interface InfestationRow {
+  espece: string | null;
   type_cible: string;
   taille_min: number | null;
   taille_max: number | null;
@@ -328,32 +413,72 @@ export interface InfestationRow {
   densite_moy: number | null;
   interdistance: number | null;
   comportement: string | null;
+  direction_de: string | null;
   direction_vers: string | null;
   vent_de: string | null;
   vent_vitesse: number | null;
+  pullulation_nb: number | null;
+  taille_long: number | null;
+  taille_large: number | null;
+  taille_epaisseur: number | null;
+  essaim_en_vol: boolean | null;
+  essaim_pose: boolean | null;
+  type_essaim: string | null;
+  nb_taches_bandes: number | null;
+  interdistance_m: number | null;
+  interdistance_min: number | null;
+  interdistance_max: number | null;
+  interdistance_moy: number | null;
+  surface_contaminee_ha: number | null;
+  type_larve: string | null;
+  surf_infestee_pourcent: number | null;
 }
 
-/** Relit la ligne `prospection_infestation` d'une fiche (une infestation décrite par fiche), ou `null` si absente. */
-export async function getProspectionInfestation(prospectionId: string): Promise<InfestationRow | null> {
+const INFESTATION_COLUMNS = `espece, type_cible, taille_min, taille_max, taille_moy, surface_tot,
+            densite_min, densite_max, densite_moy, interdistance,
+            comportement, direction_de, direction_vers, vent_de, vent_vitesse,
+            pullulation_nb, taille_long, taille_large, taille_epaisseur,
+            essaim_en_vol, essaim_pose, type_essaim,
+            nb_taches_bandes, interdistance_m, interdistance_min, interdistance_max, interdistance_moy,
+            surface_contaminee_ha, type_larve, surf_infestee_pourcent`;
+
+export async function getProspectionInfestation(
+  prospectionId: string,
+  typeCible: string
+): Promise<InfestationRow | null> {
   const db = await getDb();
   const row = await db.getFirstAsync<InfestationRow>(
-    `SELECT type_cible, taille_min, taille_max, taille_moy, surface_tot,
-            densite_min, densite_max, densite_moy, interdistance,
-            comportement, direction_vers, vent_de, vent_vitesse
-     FROM prospection_infestation WHERE prospection_id = ?`,
-    [prospectionId]
+    `SELECT ${INFESTATION_COLUMNS} FROM prospection_infestation WHERE prospection_id = ? AND type_cible = ?`,
+    [prospectionId, typeCible]
   );
   return row ?? null;
 }
 
-/** Insère ou remplace l'unique ligne `prospection_infestation` d'une fiche. */
-export async function saveProspectionInfestation(prospectionId: string, row: InfestationRow): Promise<void> {
+export async function listAllProspectionInfestations(prospectionId: string): Promise<InfestationRow[]> {
   const db = await getDb();
-  const existing = await db.getFirstAsync<{ id: string }>(
-    'SELECT id FROM prospection_infestation WHERE prospection_id = ?',
+  return db.getAllAsync<InfestationRow>(
+    `SELECT ${INFESTATION_COLUMNS} FROM prospection_infestation WHERE prospection_id = ?`,
     [prospectionId]
   );
+}
+
+export async function saveProspectionInfestation(
+  prospectionId: string,
+  typeCible: string,
+  row: InfestationRow
+): Promise<void> {
+  const db = await getDb();
+  const existing = await db.getFirstAsync<{ id: string }>(
+    'SELECT id FROM prospection_infestation WHERE prospection_id = ? AND type_cible = ?',
+    [prospectionId, typeCible]
+  );
+
+  // Convertir les booleans en nombres pour SQLite
+  const essaimEnVol = row.essaim_en_vol === true ? 1 : (row.essaim_en_vol === false ? 0 : null);
+  const essaimPose = row.essaim_pose === true ? 1 : (row.essaim_pose === false ? 0 : null);
+
   const values = [
+    row.espece,
     row.type_cible,
     row.taille_min,
     row.taille_max,
@@ -364,32 +489,56 @@ export async function saveProspectionInfestation(prospectionId: string, row: Inf
     row.densite_moy,
     row.interdistance,
     row.comportement,
+    row.direction_de,
     row.direction_vers,
     row.vent_de,
     row.vent_vitesse,
+    row.pullulation_nb,
+    row.taille_long,
+    row.taille_large,
+    row.taille_epaisseur,
+    essaimEnVol,
+    essaimPose,
+    row.type_essaim,
+    row.nb_taches_bandes,
+    row.interdistance_m,
+    row.interdistance_min,
+    row.interdistance_max,
+    row.interdistance_moy,
+    row.surface_contaminee_ha,
+    row.type_larve,
+    row.surf_infestee_pourcent,
   ];
+
   if (existing) {
     await db.runAsync(
       `UPDATE prospection_infestation SET
-        type_cible = ?, taille_min = ?, taille_max = ?, taille_moy = ?, surface_tot = ?,
+        espece = ?, type_cible = ?, taille_min = ?, taille_max = ?, taille_moy = ?, surface_tot = ?,
         densite_min = ?, densite_max = ?, densite_moy = ?, interdistance = ?,
-        comportement = ?, direction_vers = ?, vent_de = ?, vent_vitesse = ?
+        comportement = ?, direction_de = ?, direction_vers = ?, vent_de = ?, vent_vitesse = ?,
+        pullulation_nb = ?, taille_long = ?, taille_large = ?, taille_epaisseur = ?,
+        essaim_en_vol = ?, essaim_pose = ?, type_essaim = ?,
+        nb_taches_bandes = ?, interdistance_m = ?, interdistance_min = ?, interdistance_max = ?, interdistance_moy = ?,
+        surface_contaminee_ha = ?, type_larve = ?, surf_infestee_pourcent = ?
        WHERE id = ?`,
       [...values, existing.id]
     );
   } else {
     await db.runAsync(
       `INSERT INTO prospection_infestation (
-        id, prospection_id, type_cible, taille_min, taille_max, taille_moy, surface_tot,
+        id, prospection_id, espece, type_cible, taille_min, taille_max, taille_moy, surface_tot,
         densite_min, densite_max, densite_moy, interdistance,
-        comportement, direction_vers, vent_de, vent_vitesse
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        comportement, direction_de, direction_vers, vent_de, vent_vitesse,
+        pullulation_nb, taille_long, taille_large, taille_epaisseur,
+        essaim_en_vol, essaim_pose, type_essaim,
+        nb_taches_bandes, interdistance_m, interdistance_min, interdistance_max, interdistance_moy,
+        surface_contaminee_ha, type_larve, surf_infestee_pourcent
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [generateId(), prospectionId, ...values]
     );
   }
 }
 
-/** Marque la fiche brouillon comme complète (statut 'en_attente'), indépendamment de l'état réseau. */
 export async function completeProspection(id: string): Promise<DraftProspection> {
   const db = await getDb();
   const now = new Date().toISOString();
@@ -403,7 +552,6 @@ export async function completeProspection(id: string): Promise<DraftProspection>
   return updated;
 }
 
-/** Marque la fiche comme synchronisée avec le serveur, après succès de l'envoi. */
 export async function markProspectionSynced(id: string): Promise<DraftProspection> {
   const db = await getDb();
   const now = new Date().toISOString();
@@ -417,7 +565,6 @@ export async function markProspectionSynced(id: string): Promise<DraftProspectio
   return updated;
 }
 
-/** Relit une fiche locale par id, ou `null` si elle n'existe pas. */
 export async function getProspection(id: string): Promise<DraftProspection | null> {
   const db = await getDb();
   const row = await db.getFirstAsync<DraftProspection>(
@@ -427,7 +574,6 @@ export async function getProspection(id: string): Promise<DraftProspection | nul
   return row ?? null;
 }
 
-/** Liste les fiches encore à l'état brouillon, les plus récentes en premier. */
 export async function listDraftProspections(): Promise<DraftProspection[]> {
   const db = await getDb();
   return db.getAllAsync<DraftProspection>(
@@ -435,7 +581,6 @@ export async function listDraftProspections(): Promise<DraftProspection[]> {
   );
 }
 
-/** Liste les fiches locales les plus récentes, tous statuts confondus (pour l'accueil). */
 export async function listRecentProspections(limit = 20): Promise<DraftProspection[]> {
   const db = await getDb();
   return db.getAllAsync<DraftProspection>(
@@ -444,11 +589,19 @@ export async function listRecentProspections(limit = 20): Promise<DraftProspecti
   );
 }
 
-/** Compte les fiches locales pas encore synchronisées avec le serveur. */
 export async function countUnsyncedProspections(): Promise<number> {
   const db = await getDb();
   const row = await db.getFirstAsync<{ count: number }>(
     "SELECT COUNT(*) as count FROM prospection WHERE statut_sync != 'synced'"
   );
   return row?.count ?? 0;
+}
+
+export async function deleteProspection(id: string): Promise<boolean> {
+  const db = await getDb();
+  const result = await db.runAsync(
+    'DELETE FROM prospection WHERE id = ?',
+    [id]
+  );
+  return result.changes > 0;
 }

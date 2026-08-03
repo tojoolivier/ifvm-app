@@ -1,0 +1,149 @@
+import { getReferentielDb } from '../src/lib/referentiel-db';
+import { apiClient } from '../src/lib/api-client';
+import { pullReferentiel } from '../src/lib/referentiel-sync';
+
+jest.mock('../src/lib/referentiel-db', () => ({
+  getReferentielDb: jest.fn(),
+}));
+jest.mock('../src/lib/api-client', () => ({
+  apiClient: { pullReferentiel: jest.fn() },
+}));
+
+const mockGetReferentielDb = jest.mocked(getReferentielDb);
+const mockPullReferentiel = jest.mocked(apiClient.pullReferentiel);
+
+const runAsync = jest.fn().mockResolvedValue(undefined);
+const getAllAsync = jest.fn();
+
+const db = { runAsync, getAllAsync } as unknown as Awaited<ReturnType<typeof getReferentielDb>>;
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockGetReferentielDb.mockResolvedValue(db);
+  getAllAsync.mockResolvedValue([]);
+});
+
+function emptyResponse(serverTime: string) {
+  return {
+    postes_acridiens: { upserts: [], server_time: serverTime },
+    stations_fixes: { upserts: [], server_time: serverTime },
+    utilisateurs_equipe: { upserts: [], server_time: serverTime },
+    pesticides: { upserts: [], server_time: serverTime },
+    cultures: { upserts: [], server_time: serverTime },
+    codes_stades: { upserts: [], server_time: serverTime },
+  };
+}
+
+describe('pullReferentiel', () => {
+  it('sends null cursors for every entity type when nothing has been synced yet', async () => {
+    mockPullReferentiel.mockResolvedValue(emptyResponse('2026-08-02T00:00:00Z'));
+
+    await pullReferentiel('token-1');
+
+    expect(mockPullReferentiel).toHaveBeenCalledWith(
+      'token-1',
+      {
+        postes_acridiens: null,
+        stations_fixes: null,
+        utilisateurs_equipe: null,
+        pesticides: null,
+        cultures: null,
+        codes_stades: null,
+      },
+      undefined
+    );
+  });
+
+  it('sends each entity its own stored cursor, independently of the others', async () => {
+    getAllAsync.mockResolvedValue([
+      { entity_type: 'postes_acridiens', last_pull_at: '2026-08-01T00:00:00Z' },
+      { entity_type: 'stations_fixes', last_pull_at: '2026-07-30T00:00:00Z' },
+    ]);
+    mockPullReferentiel.mockResolvedValue(emptyResponse('2026-08-02T00:00:00Z'));
+
+    await pullReferentiel('token-1');
+
+    expect(mockPullReferentiel).toHaveBeenCalledWith(
+      'token-1',
+      {
+        postes_acridiens: '2026-08-01T00:00:00Z',
+        stations_fixes: '2026-07-30T00:00:00Z',
+        utilisateurs_equipe: null,
+        pesticides: null,
+        cultures: null,
+        codes_stades: null,
+      },
+      undefined
+    );
+  });
+
+  it('upserts each poste acridien idempotently by id', async () => {
+    mockPullReferentiel.mockResolvedValue({
+      ...emptyResponse('2026-08-02T00:00:00Z'),
+      postes_acridiens: {
+        upserts: [
+          { id: 'pa-1', code: 'PA-01', nom: 'Bekily', region: 'Androy', actif: true, updated_at: '2026-08-01T00:00:00Z' },
+        ],
+        server_time: '2026-08-02T00:00:00Z',
+      },
+    });
+
+    await pullReferentiel('token-1');
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO poste_acridien'),
+      ['pa-1', 'PA-01', 'Bekily', 'Androy', 1, '2026-08-01T00:00:00Z']
+    );
+  });
+
+  it('masks actif=false rows without deleting them (soft-delete upsert)', async () => {
+    mockPullReferentiel.mockResolvedValue({
+      ...emptyResponse('2026-08-02T00:00:00Z'),
+      stations_fixes: {
+        upserts: [
+          {
+            id: 'st-1',
+            code: 'ST-01',
+            nom: 'Station',
+            pa_id: 'pa-1',
+            latitude: -20,
+            longitude: 45,
+            altitude: null,
+            actif: false,
+            updated_at: '2026-08-01T00:00:00Z',
+          },
+        ],
+        server_time: '2026-08-02T00:00:00Z',
+      },
+    });
+
+    await pullReferentiel('token-1');
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO station_fixe'),
+      ['st-1', 'ST-01', 'Station', 'pa-1', -20, 45, null, 0, '2026-08-01T00:00:00Z']
+    );
+  });
+
+  it('updates the sync cursor for every entity type to its own response server_time', async () => {
+    mockPullReferentiel.mockResolvedValue(emptyResponse('2026-08-02T00:00:00Z'));
+
+    await pullReferentiel('token-1');
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO referentiel_sync_meta'),
+      ['postes_acridiens', '2026-08-02T00:00:00Z']
+    );
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO referentiel_sync_meta'),
+      ['codes_stades', '2026-08-02T00:00:00Z']
+    );
+  });
+
+  it('propagates errors from the API without updating cursors', async () => {
+    mockPullReferentiel.mockRejectedValue(new Error('network down'));
+
+    await expect(pullReferentiel('token-1')).rejects.toThrow('network down');
+    expect(runAsync).not.toHaveBeenCalledWith(expect.stringContaining('referentiel_sync_meta'), expect.anything());
+  });
+});

@@ -92,12 +92,28 @@ async def create_prospection(
             intensite_pluie=body.intensite_pluie,
             vegetation=body.vegetation,
             sol=body.sol,
+            verdissement=body.verdissement,
+            hauteur_strate=body.hauteur_strate,
             ennemis_naturels=body.ennemis_naturels,
             observations=body.observations,
             statut=body.statut,
             populations=[ProspectionPopulation(**p.model_dump()) for p in body.populations],
             captures=[ProspectionCapture(**c.model_dump()) for c in body.captures],
             infestations=[ProspectionInfestation(**i.model_dump()) for i in body.infestations],
+            # ==========================================
+            # NOUVEAUX CHAMPS - Références (A)
+            # ==========================================
+            region=body.region,
+            district=body.district,
+            commune=body.commune,
+            za=body.za,
+            pa_code=body.pa_code,
+            # ==========================================
+            # NOUVEAUX CHAMPS - Observations (D)
+            # ==========================================
+            degats_cultures_pourcent=body.degats_cultures_pourcent,
+            verdissement_pourcent=body.verdissement_pourcent,
+            hauteur_herbe_cm=body.hauteur_herbe_cm,
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
@@ -148,9 +164,25 @@ async def update_prospection(
             intensite_pluie=body.intensite_pluie,
             vegetation=body.vegetation,
             sol=body.sol,
+            verdissement=body.verdissement,
+            hauteur_strate=body.hauteur_strate,
             ennemis_naturels=body.ennemis_naturels,
             observations=body.observations,
             statut=body.statut,
+            # ==========================================
+            # NOUVEAUX CHAMPS - Références (A)
+            # ==========================================
+            region=body.region,
+            district=body.district,
+            commune=body.commune,
+            za=body.za,
+            pa_code=body.pa_code,
+            # ==========================================
+            # NOUVEAUX CHAMPS - Observations (D)
+            # ==========================================
+            degats_cultures_pourcent=body.degats_cultures_pourcent,
+            verdissement_pourcent=body.verdissement_pourcent,
+            hauteur_herbe_cm=body.hauteur_herbe_cm,
         )
     except PermissionError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))

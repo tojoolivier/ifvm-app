@@ -1,405 +1,321 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { parseEspeceSelection, buildGrilles } from '@/lib/prospection-especes';
+import { capturesMaxFor, phenotypesFor, Phenotype, grilleKeyToString, stadesFor } from '@/lib/prospection-especes-stades';
+import { chronoSeconds, formatChrono } from '@/lib/prospection-review';
+import { markGrilleCompleted, saveProspectionCaptures, startCaptureTimer } from '@/lib/prospection-repository';
+import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import {
-  getProspection,
-  listProspectionCaptures,
-  markGrilleCompleted,
-  DraftProspection,
-} from '@/lib/prospection-repository';
-import { buildGrilles, parseEspeceSelection } from '@/lib/prospection-especes';
-import {
-  buildPlanItems,
-  grilleKey,
-  isEspeceComplete,
-  isPlanComplete,
-  parseGrillesCompletees,
-} from '@/lib/prospection-plan';
-import {
-  CaptureCounts,
-  PHENOTYPES,
-  Phenotype,
-  Sexe,
-  CAPTURES_MAX,
-  LMC_LARVE_CAPTURES_MAX,
-  LMC_LARVE_STADES,
-  NSE_CAPTURES_MAX,
-  NSE_LARVE_CAPTURES_MAX,
-  NSE_LARVE_STADES,
-  NSE_PHENOTYPES,
-  NSE_STADES,
-  NsePhenotype,
-  chronoSeconds,
-  decrementCapture,
-  decrementLarveCapture,
-  decrementNseCapture,
-  dominantLarvePhenotype,
-  dominantNsePhenotype,
+  captureKey,
+  countsToRows,
   dominantPhenotype,
-  ensureCaptureTimerStarted,
-  formatChrono,
-  incrementCapture,
-  incrementLarveCapture,
-  incrementNseCapture,
-  larveCaptureKey,
-  parseCaptureRows,
-  parseLarveCaptureRows,
-  parseNseCaptureRows,
-  saveCaptureCounts,
-  saveLarveCaptureCounts,
-  saveNseCaptureCounts,
-  stadeForSexeSwitch,
-  stadesForSexe,
   totalBySexe,
   totalCaptures,
-} from '@/lib/prospection-captures';
+  useProspectionCaptureStore,
+} from '@/lib/prospection-capture-store';
 
-const IFVM_GREEN = '#1B5E1B';
-const IFVM_GREEN_DARK = '#163F16';
+const GREEN = '#235a36';
+const BG = '#faf7ef';
+const TEXT = '#16201a';
+const TEXT_SECONDARY = '#6f6a59';
+const BORDER = '#e7e0cd';
+const INACTIVE_BG = '#efeada';
+
+const ESPECE_LABEL = { LMC: 'Locusta', NSE: 'Nomadacris' } as const;
+const CATEGORIE_LABEL = { imago: 'Imagos', larve: 'Larves' } as const;
+
+function parseGrillesCompletees(raw: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 export default function CapturesScreen() {
   const router = useRouter();
-  const { draftId, grilleIndex: grilleIndexParam } = useLocalSearchParams<{
-    draftId: string;
-    grilleIndex?: string;
-  }>();
-  const grilleIndex = grilleIndexParam ? Number(grilleIndexParam) : 0;
+  const { draftId, grilleIndex } = useLocalSearchParams<{ draftId: string; grilleIndex: string }>();
+  const draft = useProspectionWizardStore((s) => s.draft);
+  const captures = useProspectionWizardStore((s) => s.captures);
+  const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
+  const setDraft = useProspectionWizardStore((s) => s.setDraft);
+  const refreshCaptures = useProspectionWizardStore((s) => s.refreshCaptures);
 
-  const [draft, setDraft] = useState<DraftProspection | null>(null);
-  const [sexe, setSexe] = useState<Sexe>('F');
-  const [selectedPhenotype, setSelectedPhenotype] = useState<Phenotype | NsePhenotype>('solitaire');
-  const [selectedStade, setSelectedStade] = useState<string>(stadesForSexe('F')[0]);
-  const [counts, setCounts] = useState<CaptureCounts>({});
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const store = useProspectionCaptureStore();
+  const [tick, setTick] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const grilles = useMemo(
-    () => (draft ? buildGrilles(parseEspeceSelection(draft.especes)) : []),
-    [draft]
-  );
-  const grille = grilles[grilleIndex];
-  const isImagoNse = grille?.espece === 'NSE' && grille?.categorie === 'imago';
-  const isLarve = grille?.categorie === 'larve';
-  const sansSexe = isImagoNse || isLarve;
+  const requestedIndex = Number(grilleIndex ?? '0');
+  const grille = store.grilleOrder[store.currentGrilleIndex];
 
   useEffect(() => {
     if (!draftId) return;
-    getProspection(draftId).then(async (row) => {
-      if (!row) return;
-      const started = await ensureCaptureTimerStarted(row);
-      setDraft(started);
-    });
-  }, [draftId]);
-
-  const larveStades = grille?.espece === 'LMC' ? LMC_LARVE_STADES : NSE_LARVE_STADES;
-  const larvePhenotypeOptions = grille?.espece === 'NSE' ? NSE_PHENOTYPES : PHENOTYPES;
-  const larveCapturesMax = grille?.espece === 'LMC' ? LMC_LARVE_CAPTURES_MAX : NSE_LARVE_CAPTURES_MAX;
+    (async () => {
+      if (draft?.id !== draftId) {
+        await hydrateFromDraft(draftId);
+      }
+    })();
+  }, [draftId, draft?.id, hydrateFromDraft]);
 
   useEffect(() => {
-    if (!draft || !grille) return;
-    setSexe('F');
-    setSelectedPhenotype(
-      isImagoNse ? NSE_PHENOTYPES[0].value : isLarve ? larvePhenotypeOptions[0].value : 'solitaire'
-    );
-    setSelectedStade(isImagoNse ? NSE_STADES[0] : isLarve ? larveStades[0] : stadesForSexe('F')[0]);
-    listProspectionCaptures(draft.id, grille.espece, grille.categorie).then((rows) => {
-      setCounts(
-        isImagoNse ? parseNseCaptureRows(rows) : isLarve ? parseLarveCaptureRows(rows) : parseCaptureRows(rows)
-      );
-    });
-  }, [draft, grille, isImagoNse, isLarve, larvePhenotypeOptions, larveStades]);
+    if (!draft || draft.id !== draftId) return;
+    if (store.grilleOrder.length === 0) {
+      const selection = parseEspeceSelection(draft.especes);
+      const grilles = buildGrilles(selection);
+      const completed = parseGrillesCompletees(draft.grilles_completees);
+      store.initGrilles(grilles, completed, captures);
+    }
+  }, [draft, draftId, captures]);
 
   useEffect(() => {
-    if (!draft?.capture_started_at) return;
-    const tick = () => setElapsedSeconds(chronoSeconds(draft.capture_started_at));
-    tick();
-    const interval = setInterval(tick, 1000);
+    if (store.grilleOrder.length > 0 && requestedIndex !== store.currentGrilleIndex) {
+      store.goToGrille(requestedIndex, captures);
+    }
+  }, [requestedIndex, store.grilleOrder.length]);
+
+  useEffect(() => {
+    if (!draftId || draft?.capture_started_at) return;
+    startCaptureTimer(draftId).then(setDraft);
+  }, [draftId, draft?.capture_started_at]);
+
+  useEffect(() => {
+    const interval = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(interval);
-  }, [draft?.capture_started_at]);
+  }, []);
 
-  const stades = isImagoNse ? NSE_STADES : isLarve ? larveStades : stadesForSexe(sexe);
-  const phenotypeOptions = isImagoNse ? NSE_PHENOTYPES : isLarve ? larvePhenotypeOptions : PHENOTYPES;
-  const capturesMax = isImagoNse ? NSE_CAPTURES_MAX : isLarve ? larveCapturesMax : CAPTURES_MAX;
-  const total = totalCaptures(counts);
-  const totalFemelles = totalBySexe(counts, 'F');
-  const totalMales = totalBySexe(counts, 'M');
-  const dominant = isImagoNse
-    ? dominantNsePhenotype(counts)
-    : isLarve
-    ? (dominantLarvePhenotype(counts) as Phenotype | NsePhenotype | null)
-    : dominantPhenotype(counts);
-  const currentCount = sansSexe
-    ? counts[larveCaptureKey(selectedPhenotype, selectedStade)] ?? 0
-    : counts[`${sexe}|${selectedPhenotype}|${selectedStade}`] ?? 0;
-
-  const handleSexe = (next: Sexe) => {
-    setSexe(next);
-    setSelectedStade((prev) => stadeForSexeSwitch(prev, next));
-  };
-
-  const handleIncrement = (phenotype: Phenotype | NsePhenotype) => {
-    setCounts((prev) =>
-      isImagoNse
-        ? incrementNseCapture(prev, phenotype as NsePhenotype, selectedStade)
-        : isLarve
-        ? incrementLarveCapture(prev, phenotype, selectedStade, capturesMax)
-        : incrementCapture(prev, sexe, phenotype as Phenotype, selectedStade)
+  if (!grille) {
+    return (
+      <View style={styles.root}>
+        <SafeAreaView style={styles.safe} />
+      </View>
     );
+  }
+
+  const hasSexeToggle = grille.categorie === 'imago';
+  const stades = stadesFor(grille.espece, grille.categorie, store.sexe);
+  const total = totalCaptures(store.counts);
+  const max = capturesMaxFor(grille.espece, grille.categorie);
+  const phenotypes = phenotypesFor(grille.espece, grille.categorie);
+  const dominant = dominantPhenotype(store.counts);
+  const isLastGrille = store.currentGrilleIndex === store.grilleOrder.length - 1;
+  const seconds = chronoSeconds(draft?.capture_started_at ?? null);
+  void tick;
+
+  const handleBack = () => {
+    if (hasSexeToggle) {
+      router.replace({
+        pathname: '/(prospection)/accouplement' as any,
+        params: { draftId, grilleIndex: String(store.currentGrilleIndex) },
+      });
+    } else if (store.currentGrilleIndex > 0) {
+      router.replace({
+        pathname: '/(prospection)/captures' as any,
+        params: { draftId, grilleIndex: String(store.currentGrilleIndex - 1) },
+      });
+    } else {
+      router.replace({ pathname: '/(prospection)/species' as any, params: { draftId } });
+    }
   };
 
-  const handleDecrement = (phenotype: Phenotype | NsePhenotype) => {
-    setCounts((prev) =>
-      isImagoNse
-        ? decrementNseCapture(prev, phenotype as NsePhenotype, selectedStade)
-        : isLarve
-        ? decrementLarveCapture(prev, phenotype, selectedStade)
-        : decrementCapture(prev, sexe, phenotype as Phenotype, selectedStade)
-    );
-  };
-
-  const handleContinuer = async () => {
-    if (!draft || !grille) return;
+  const handleContinue = async () => {
+    if (!draftId || isSaving) return;
     setIsSaving(true);
-    setSaveError(null);
     try {
-      if (isImagoNse) {
-        await saveNseCaptureCounts(draft.id, counts);
-      } else if (isLarve) {
-        await saveLarveCaptureCounts(draft.id, grille.espece, counts);
+      const rows = countsToRows(grille.espece, grille.categorie, store.counts);
+      await saveProspectionCaptures(draftId, grille.espece, grille.categorie, rows);
+      await markGrilleCompleted(draftId, grilleKeyToString(grille));
+      store.markCurrentGrilleCompleted();
+      await refreshCaptures();
+      if (isLastGrille) {
+        router.push({ pathname: '/(prospection)/infestation' as any, params: { draftId } });
       } else {
-        await saveCaptureCounts(draft.id, grille.espece, grille.categorie, counts);
-      }
-      let completed: Set<string>;
-      if (grilles.length <= 1) {
-        completed = new Set([grilleKey(grille)]);
-      } else {
-        const updated = await markGrilleCompleted(draft.id, grilleKey(grille));
-        completed = parseGrillesCompletees(updated.grilles_completees);
-      }
-
-      const items = buildPlanItems(grilles, completed);
-      const hasInfestation = (draft.surf_infestee ?? 0) > 0;
-      const next = isPlanComplete(items) ? (hasInfestation ? 'infestation' : 'vegetation') : 'plan';
-
-      if (isEspeceComplete(grilles, completed, grille.espece)) {
-        router.push({
-          pathname: '/(prospection)/densites',
-          params: { draftId: draft.id, espece: grille.espece, next },
+        const nextGrille = store.grilleOrder[store.currentGrilleIndex + 1];
+        const nextScreen = nextGrille.categorie === 'imago' ? 'density' : 'captures';
+        router.replace({
+          pathname: `/(prospection)/${nextScreen}` as any,
+          params: { draftId, grilleIndex: String(store.currentGrilleIndex + 1) },
         });
-        return;
       }
-
-      router.push({ pathname: `/(prospection)/${next}`, params: { draftId: draft.id } });
-    } catch {
-      setSaveError('Impossible d’enregistrer les captures localement');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleRetour = () => {
-    if (grilles.length > 1) {
-      router.push({ pathname: '/(prospection)/plan', params: { draftId } });
-    } else {
-      router.push({ pathname: '/(prospection)/especes', params: { draftId } });
-    }
-  };
-
-  if (!draft || !grille) {
-    return <View style={styles.root} />;
-  }
-
   return (
     <View style={styles.root}>
-      <SafeAreaView edges={['top']} style={styles.header}>
-        <TouchableOpacity onPress={handleRetour}>
-          <Text style={styles.backLink}>‹ Retour</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          Captures — {grille.espece} {grille.categorie === 'imago' ? 'Imagos' : 'Larves'}
-        </Text>
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: '75%' }]} />
-        </View>
-        <Text style={styles.progressLabel}>Étape 3/4</Text>
-      </SafeAreaView>
-
-      <ScrollView style={styles.content} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
-        <View style={styles.card}>
-          <View style={styles.chronoRow}>
-            <Text style={styles.chronoLabel}>Chrono</Text>
-            <Text style={styles.chronoValue}>{formatChrono(elapsedSeconds)}</Text>
-          </View>
-          <Text style={styles.chronoMax}>max 30:00</Text>
+      <SafeAreaView edges={['top']} style={styles.safe}>
+        <View style={styles.headerRow}>
+          <TouchableOpacity onPress={handleBack} activeOpacity={0.7}>
+            <Text style={styles.back}>‹</Text>
+          </TouchableOpacity>
+          <Text style={styles.title}>
+            Captures · {ESPECE_LABEL[grille.espece]} — {CATEGORIE_LABEL[grille.categorie]}
+          </Text>
         </View>
 
-        {sansSexe ? (
-          <View style={styles.card}>
-            <Text style={styles.cardLabel}>Sexe</Text>
-            <Text style={styles.summaryTextSub}>Non requis (pas de distinction ♀/♂)</Text>
+        <View style={styles.statsRow}>
+          <View style={styles.statCardPrimary}>
+            <Text style={styles.statLabelPrimary}>Total capturé</Text>
+            <Text style={styles.statValuePrimary}>
+              {total}
+              <Text style={styles.statValueMax}> / {max}</Text>
+            </Text>
           </View>
-        ) : (
-          <View style={styles.card}>
-            <Text style={styles.cardLabel}>Sexe</Text>
-            <View style={styles.sexeRow}>
-              <SexeButton label="Femelles" active={sexe === 'F'} onPress={() => handleSexe('F')} />
-              <SexeButton label="Mâles" active={sexe === 'M'} onPress={() => handleSexe('M')} />
-            </View>
+          {hasSexeToggle && (
+          <View style={styles.statCard}>
+            <Text style={styles.statLabel}>Chrono</Text>
+            <Text style={styles.statValue}>
+              {formatChrono(seconds)}
+              <Text style={styles.statValueMaxDim}>/30</Text>
+            </Text>
           </View>
-        )}
-
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Phase</Text>
-          <View style={styles.chipsRow}>
-            {stades.map((stade) => (
-              <TouchableOpacity
-                key={stade}
-                style={[styles.chip, selectedStade === stade && styles.chipActive]}
-                onPress={() => setSelectedStade(stade)}
-                activeOpacity={0.85}
-              >
-                <Text style={[styles.chipText, selectedStade === stade && styles.chipTextActive]}>{stade}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          )}
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Phénotype</Text>
-          {phenotypeOptions.map(({ value, label }) => {
-            const active = selectedPhenotype === value;
-            const count = sansSexe
-              ? counts[larveCaptureKey(value, selectedStade)] ?? 0
-              : counts[`${sexe}|${value}|${selectedStade}`] ?? 0;
-            return (
-              <View key={value} style={[styles.phenotypeRow, active && styles.phenotypeRowActive]}>
-                <TouchableOpacity style={styles.phenotypeLabelWrap} onPress={() => setSelectedPhenotype(value)}>
-                  <Text style={[styles.phenotypeLabel, active && styles.phenotypeLabelActive]}>{label}</Text>
+        <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16 }}>
+          {hasSexeToggle && (
+            <>
+              <View style={styles.sexeRow}>
+                <TouchableOpacity
+                  style={[styles.sexeToggle, store.sexe === 'F' && styles.sexeToggleActive]}
+                  onPress={() => store.setSexe('F')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.sexeText, store.sexe === 'F' && styles.sexeTextActive]}>♀ Femelles</Text>
                 </TouchableOpacity>
-                <View style={styles.counterControls}>
-                  <TouchableOpacity
-                    style={styles.counterBtn}
-                    onPress={() => handleDecrement(value)}
-                    disabled={!active}
-                  >
-                    <Text style={styles.counterBtnText}>−</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.counterValue}>{count}</Text>
-                  <TouchableOpacity
-                    style={styles.counterBtn}
-                    onPress={() => handleIncrement(value)}
-                    disabled={!active || total >= capturesMax}
-                  >
-                    <Text style={styles.counterBtnText}>+</Text>
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity
+                  style={[styles.sexeToggle, store.sexe === 'M' && styles.sexeToggleActive]}
+                  onPress={() => store.setSexe('M')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.sexeText, store.sexe === 'M' && styles.sexeTextActive]}>♂ Mâles</Text>
+                </TouchableOpacity>
               </View>
-            );
-          })}
+              <Text style={styles.sexeHint}>
+                {store.sexe === 'F' ? '♀ détaillé par stade (A1→A5 + sous-stades A3)' : '♂ simplifié : A1 / A234 (fusionné) / A5'}
+              </Text>
+            </>
+          )}
+
+          <Text style={styles.sectionLabel}>Phase</Text>
+          <View style={styles.chipsRow}>
+            {stades.map((stade) => {
+              const active = stade === store.currentStade;
+              return (
+                <TouchableOpacity
+                  key={stade}
+                  onPress={() => store.setStade(stade)}
+                  style={[styles.chip, active && styles.chipActive]}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{stade}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <Text style={styles.sectionLabel}>Phénotype — touchez puis ＋ / −</Text>
+          <View style={styles.phenoList}>
+            {phenotypes.map((pheno) => {
+              const active = pheno.value === store.currentPhenotype;
+              const count = store.currentStade
+                ? store.counts[captureKey(store.sexe, pheno.value as Phenotype, store.currentStade)] ?? 0
+                : 0;
+              return (
+                <TouchableOpacity
+                  key={pheno.value}
+                  onPress={() => store.setPhenotype(pheno.value as Phenotype)}
+                  style={[styles.phenoRow, active && styles.phenoRowActive]}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.phenoLabel, active && styles.phenoLabelActive]}>{pheno.label}</Text>
+                  {active ? (
+                    <View style={styles.counterRow}>
+                      <TouchableOpacity style={styles.counterButton} onPress={store.decrement}>
+                        <Text style={styles.counterButtonText}>−</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.counterValue}>{count}</Text>
+                      <TouchableOpacity style={[styles.counterButton, styles.counterButtonAdd]} onPress={store.increment}>
+                        <Text style={[styles.counterButtonText, styles.counterButtonAddText]}>+</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <Text style={styles.phenoCount}>{count}</Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <View style={styles.summary}>
+            <Text style={styles.summaryText}>
+              {hasSexeToggle && `♀ ${totalBySexe(store.counts, 'F')} · ♂ ${totalBySexe(store.counts, 'M')} · `}
+              phénotype dominant :{' '}
+              <Text style={styles.summaryBold}>
+                {dominant ? phenotypes.find((p) => p.value === dominant)?.label : '—'}
+              </Text>
+            </Text>
+          </View>
+        </ScrollView>
+
+        <View style={styles.footer}>
+          <TouchableOpacity style={styles.continueButton} onPress={handleContinue} disabled={isSaving} activeOpacity={0.85}>
+            <Text style={styles.continueButtonText}>{isLastGrille ? 'Infestation  ›' : 'Grille suivante  ›'}</Text>
+          </TouchableOpacity>
         </View>
-
-        <View style={styles.card}>
-          <Text style={styles.summaryText}>
-            Total {total}/{capturesMax}
-            {sansSexe ? '' : ` · F ${totalFemelles} · M ${totalMales}`}
-          </Text>
-          <Text style={styles.summaryText}>
-            Phénotype dominant : {dominant ? phenotypeOptions.find((p) => p.value === dominant)?.label : '—'}
-          </Text>
-          <Text style={styles.summaryTextSub}>Sélection courante : {currentCount}</Text>
-        </View>
-
-        {saveError && <Text style={styles.errorText}>{saveError}</Text>}
-
-        <TouchableOpacity style={styles.btnContinuer} onPress={handleContinuer} disabled={isSaving} activeOpacity={0.85}>
-          <Text style={styles.btnContinuerText}>{isSaving ? 'Enregistrement…' : 'Continuer'}</Text>
-        </TouchableOpacity>
-      </ScrollView>
+      </SafeAreaView>
     </View>
   );
 }
 
-function SexeButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  return (
-    <TouchableOpacity
-      style={[styles.sexeBtn, active && styles.sexeBtnActive]}
-      onPress={onPress}
-      activeOpacity={0.85}
-    >
-      <Text style={[styles.sexeBtnText, active && styles.sexeBtnTextActive]}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
-
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F3F4F6' },
-  header: { backgroundColor: IFVM_GREEN_DARK, paddingHorizontal: 16, paddingBottom: 14 },
-  backLink: { color: '#FFFFFFCC', fontSize: 13, marginBottom: 6 },
-  headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700', marginBottom: 10 },
-  progressTrack: { height: 4, backgroundColor: '#FFFFFF33', borderRadius: 2, overflow: 'hidden' },
-  progressFill: { height: 4, backgroundColor: '#FFFFFF' },
-  progressLabel: { color: '#FFFFFFAA', fontSize: 11, marginTop: 4 },
-  content: { flex: 1 },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 10, padding: 14, marginBottom: 12 },
-  cardLabel: { fontSize: 12, fontWeight: '700', color: '#6B7280', marginBottom: 8, textTransform: 'uppercase' },
-  chronoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  chronoLabel: { color: '#6B7280', fontSize: 13 },
-  chronoValue: { color: '#111827', fontSize: 22, fontWeight: '700' },
-  chronoMax: { color: '#9CA3AF', fontSize: 11, textAlign: 'right' },
-  sexeRow: { flexDirection: 'row', gap: 8 },
-  sexeBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    alignItems: 'center',
-  },
-  sexeBtnActive: { backgroundColor: IFVM_GREEN, borderColor: IFVM_GREEN },
-  sexeBtnText: { color: '#111827', fontSize: 14, fontWeight: '600' },
-  sexeBtnTextActive: { color: '#FFFFFF' },
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-  },
-  chipActive: { backgroundColor: '#E8F3E8', borderColor: IFVM_GREEN },
-  chipText: { color: '#111827', fontSize: 13, fontWeight: '600' },
-  chipTextActive: { color: IFVM_GREEN_DARK },
-  phenotypeRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    marginTop: 6,
-  },
-  phenotypeRowActive: { backgroundColor: '#E8F3E8', borderColor: IFVM_GREEN },
-  phenotypeLabelWrap: { flex: 1 },
-  phenotypeLabel: { color: '#111827', fontSize: 14, fontWeight: '600' },
-  phenotypeLabelActive: { color: IFVM_GREEN_DARK },
-  counterControls: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  counterBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: IFVM_GREEN,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  counterBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700', lineHeight: 18 },
-  counterValue: { color: '#111827', fontSize: 15, fontWeight: '700', minWidth: 24, textAlign: 'center' },
-  summaryText: { color: '#111827', fontSize: 13, fontWeight: '600', marginBottom: 4 },
-  summaryTextSub: { color: '#6B7280', fontSize: 12 },
-  errorText: { color: '#dc2626', fontSize: 13, marginBottom: 8 },
-  btnContinuer: { backgroundColor: IFVM_GREEN, borderRadius: 10, paddingVertical: 16, alignItems: 'center', marginTop: 4 },
-  btnContinuerText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
+  root: { flex: 1, backgroundColor: BG },
+  safe: { flex: 1 },
+  headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
+  title: { fontSize: 14, fontWeight: '700', color: TEXT },
+  statsRow: { marginHorizontal: 16, marginBottom: 10, flexDirection: 'row', gap: 9 },
+  statCardPrimary: { flex: 1, backgroundColor: GREEN, borderRadius: 12, padding: 10 },
+  statCard: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 12, padding: 10 },
+  statLabelPrimary: { color: '#ffffffcc', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 },
+  statLabel: { color: '#9a9484', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 },
+  statValuePrimary: { color: '#fff', fontWeight: '700', fontSize: 21 },
+  statValue: { color: TEXT, fontWeight: '700', fontSize: 21 },
+  statValueMax: { fontSize: 12, color: '#ffffffb3' },
+  statValueMaxDim: { fontSize: 11, color: '#bdb6a2' },
+  scroll: { flex: 1 },
+  sexeRow: { flexDirection: 'row', gap: 7, backgroundColor: INACTIVE_BG, borderRadius: 11, padding: 4, marginBottom: 11 },
+  sexeToggle: { flex: 1, borderRadius: 8, padding: 9, alignItems: 'center' },
+  sexeToggleActive: { backgroundColor: '#fff' },
+  sexeText: { fontWeight: '700', fontSize: 13, color: '#9a9484' },
+  sexeTextActive: { color: TEXT },
+  sexeHint: { fontSize: 10, color: '#9a9484', marginBottom: 9 },
+  sectionLabel: { fontSize: 9.5, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 7 },
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
+  chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER },
+  chipActive: { backgroundColor: GREEN, borderColor: GREEN },
+  chipText: { fontSize: 12, fontWeight: '600', color: TEXT_SECONDARY },
+  chipTextActive: { fontWeight: '700', color: '#fff' },
+  phenoList: { gap: 6, paddingBottom: 6 },
+  phenoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, padding: 12 },
+  phenoRowActive: { borderWidth: 2, borderColor: GREEN, paddingVertical: 6, paddingLeft: 13, paddingRight: 8 },
+  phenoLabel: { fontSize: 13, fontWeight: '600', color: TEXT_SECONDARY },
+  phenoLabelActive: { fontWeight: '700', color: TEXT },
+  phenoCount: { fontSize: 14, fontWeight: '600', color: '#bdb6a2' },
+  counterRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  counterButton: { width: 36, height: 36, borderRadius: 9, backgroundColor: INACTIVE_BG, alignItems: 'center', justifyContent: 'center' },
+  counterButtonAdd: { backgroundColor: GREEN },
+  counterButtonText: { fontSize: 19, fontWeight: '700', color: TEXT_SECONDARY },
+  counterButtonAddText: { color: '#fff' },
+  counterValue: { fontSize: 18, fontWeight: '700', color: TEXT, minWidth: 20, textAlign: 'center' },
+  summary: { marginTop: 4, backgroundColor: '#eaf2ec', borderRadius: 9, padding: 10 },
+  summaryText: { fontSize: 10.5, color: GREEN },
+  summaryBold: { fontWeight: '700' },
+  footer: { padding: 16 },
+  continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 14, alignItems: 'center' },
+  continueButtonText: { color: '#fff', fontWeight: '800', fontSize: 14 },
 });

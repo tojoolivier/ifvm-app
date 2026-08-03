@@ -8,14 +8,24 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StyleSheet,
+  Dimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isSmallScreen = SCREEN_WIDTH < 380;
+
+const IFVM_GREEN = '#1B5E1B';
+const IFVM_GREEN_LIGHT = '#E8F3E8';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const login = useAuthStore((s) => s.login);
 
   const handleSubmit = async () => {
@@ -27,7 +37,6 @@ export default function LoginScreen() {
     setIsLoading(true);
     try {
       await login(email.trim(), password);
-      console.log('[login] login() returned successfully');
     } catch (e) {
       console.error('[login] login() threw:', e);
       setError('Identifiants incorrects. Veuillez réessayer.');
@@ -37,32 +46,34 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      className="flex-1 bg-white"
-    >
-      <ScrollView
-        contentContainerStyle={{ flexGrow: 1 }}
-        keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={styles.root}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
       >
-        <View className="flex-1 justify-center items-center px-8">
-          <View className="items-center mb-10">
-            <View className="w-20 h-20 bg-green-600 rounded-2xl items-center justify-center mb-4">
-              <Text className="text-white text-3xl font-bold">IF</Text>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Logo et titre */}
+          <View style={styles.headerSection}>
+            <View style={styles.logoContainer}>
+              <Text style={styles.logoText}>IF</Text>
             </View>
-            <Text className="text-2xl font-bold text-gray-900">IFVM Mobile</Text>
-            <Text className="text-sm text-gray-500 mt-1">
-              Informatique Forestière et Végétation Marginale
+            <Text style={styles.title}>IFVM Mobile</Text>
+            <Text style={styles.subtitle}>
+              Ivotoerana Famongorana Valala et Madagasikara
             </Text>
           </View>
 
-          <View className="w-full gap-4">
-            <View>
-              <Text className="text-sm font-medium text-gray-700 mb-1.5">
-                Email
-              </Text>
+          {/* Formulaire */}
+          <View style={styles.formContainer}>
+            {/* Email */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Email</Text>
               <TextInput
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg text-base"
+                style={[styles.input, email && styles.inputFilled]}
                 placeholder="votre@email.com"
                 placeholderTextColor="#9CA3AF"
                 value={email}
@@ -76,48 +87,249 @@ export default function LoginScreen() {
               />
             </View>
 
-            <View>
-              <Text className="text-sm font-medium text-gray-700 mb-1.5">
-                Mot de passe
-              </Text>
-              <TextInput
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg text-base"
-                placeholder="••••••••"
-                placeholderTextColor="#9CA3AF"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                textContentType="password"
-                autoComplete="password"
-                editable={!isLoading}
-              />
+            {/* Mot de passe */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Mot de passe</Text>
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={[styles.passwordInput, password && styles.inputFilled]}
+                  placeholder="••••••••"
+                  placeholderTextColor="#9CA3AF"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  textContentType="password"
+                  autoComplete="password"
+                  editable={!isLoading}
+                />
+                <TouchableOpacity
+                  style={styles.eyeButton}
+                  onPress={() => setShowPassword(!showPassword)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.eyeButtonText}>
+                    {showPassword ? '👁️' : '👁️‍🗨️'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
+            {/* Mot de passe oublié */}
+            <TouchableOpacity style={styles.forgotPassword} activeOpacity={0.7}>
+              <Text style={styles.forgotPasswordText}>Mot de passe oublié ?</Text>
+            </TouchableOpacity>
+
+            {/* Erreur */}
             {error && (
-              <View className="bg-red-50 border border-red-200 rounded-lg px-4 py-3">
-                <Text className="text-red-700 text-sm text-center">{error}</Text>
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorIcon}>⚠️</Text>
+                <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
 
+            {/* Bouton de connexion */}
             <TouchableOpacity
-              className={`w-full py-3.5 rounded-lg items-center justify-center ${
-                isLoading ? 'bg-green-400' : 'bg-green-600'
-              }`}
+              style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
               onPress={handleSubmit}
               disabled={isLoading}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
             >
               {isLoading ? (
-                <ActivityIndicator color="#ffffff" size="small" />
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                  <Text style={styles.loginButtonText}>Connexion...</Text>
+                </View>
               ) : (
-                <Text className="text-white font-semibold text-base">
-                  Se connecter
-                </Text>
+                <Text style={styles.loginButtonText}>Se connecter</Text>
               )}
             </TouchableOpacity>
+
+            {/* Footer */}
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>
+                © 2026 IFVM - Tous droits réservés
+              </Text>
+              <Text style={styles.footerVersion}>Version 1.0.0</Text>
+            </View>
           </View>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  container: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    justifyContent: 'center',
+  },
+  headerSection: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  logoContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    backgroundColor: IFVM_GREEN,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    shadowColor: IFVM_GREEN,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  logoText: {
+    color: '#FFFFFF',
+    fontSize: 32,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  title: {
+    fontSize: isSmallScreen ? 22 : 24,
+    fontWeight: '700',
+    color: '#111827',
+    letterSpacing: 0.5,
+  },
+  subtitle: {
+    fontSize: isSmallScreen ? 12 : 13,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 4,
+    maxWidth: 300,
+  },
+  formContainer: {
+    width: '100%',
+    maxWidth: 400,
+    alignSelf: 'center',
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 6,
+  },
+  input: {
+    width: '100%',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 10,
+    fontSize: 15,
+    color: '#111827',
+  },
+  inputFilled: {
+    borderColor: IFVM_GREEN,
+    backgroundColor: IFVM_GREEN_LIGHT,
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#111827',
+    backgroundColor: 'transparent',
+  },
+  eyeButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  eyeButtonText: {
+    fontSize: 20,
+  },
+  forgotPassword: {
+    alignSelf: 'flex-end',
+    marginBottom: 20,
+  },
+  forgotPasswordText: {
+    fontSize: 13,
+    color: IFVM_GREEN,
+    fontWeight: '500',
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+  },
+  errorIcon: {
+    fontSize: 16,
+    marginRight: 8,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#DC2626',
+  },
+  loginButton: {
+    width: '100%',
+    paddingVertical: 14,
+    backgroundColor: IFVM_GREEN,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: IFVM_GREEN,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  loginButtonDisabled: {
+    opacity: 0.6,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  loginButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  footer: {
+    marginTop: 24,
+    alignItems: 'center',
+  },
+  footerText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  footerVersion: {
+    fontSize: 11,
+    color: '#D1D5DB',
+    marginTop: 4,
+  },
+});

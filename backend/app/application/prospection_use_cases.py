@@ -38,12 +38,28 @@ class CreateProspection:
         intensite_pluie: str | None = None,
         vegetation: dict[str, Any] | None = None,
         sol: dict[str, Any] | None = None,
+        verdissement: float | None = None,
+        hauteur_strate: float | None = None,
         ennemis_naturels: str | None = None,
         observations: str | None = None,
         statut: str = "brouillon",
         populations: list[ProspectionPopulation] | None = None,
         captures: list[ProspectionCapture] | None = None,
         infestations: list[ProspectionInfestation] | None = None,
+        # ==========================================
+        # NOUVEAUX CHAMPS - Références (A)
+        # ==========================================
+        region: str | None = None,
+        district: str | None = None,
+        commune: str | None = None,
+        za: str | None = None,
+        pa_code: str | None = None,
+        # ==========================================
+        # NOUVEAUX CHAMPS - Observations (D)
+        # ==========================================
+        degats_cultures_pourcent: int | None = None,
+        verdissement_pourcent: int | None = None,
+        hauteur_herbe_cm: float | None = None,
     ) -> Prospection:
         if type_prospection == "intensive" and station_id is None:
             raise ValueError("station_id est obligatoire pour une prospection intensive")
@@ -70,6 +86,8 @@ class CreateProspection:
             intensite_pluie=intensite_pluie,
             vegetation=vegetation,
             sol=sol,
+            verdissement=verdissement,
+            hauteur_strate=hauteur_strate,
             ennemis_naturels=ennemis_naturels,
             observations=observations,
             statut=statut,
@@ -78,13 +96,29 @@ class CreateProspection:
             populations=populations or [],
             captures=captures or [],
             infestations=infestations or [],
+            # ==========================================
+            # NOUVEAUX CHAMPS - Références (A)
+            # ==========================================
+            region=region,
+            district=district,
+            commune=commune,
+            za=za,
+            pa_code=pa_code,
+            # ==========================================
+            # NOUVEAUX CHAMPS - Observations (D)
+            # ==========================================
+            degats_cultures_pourcent=degats_cultures_pourcent,
+            verdissement_pourcent=verdissement_pourcent,
+            hauteur_herbe_cm=hauteur_herbe_cm,
         )
+
         for child in prospection.populations:
             child.prospection_id = prospection.id
         for child in prospection.captures:
             child.prospection_id = prospection.id
         for child in prospection.infestations:
             child.prospection_id = prospection.id
+
         return await self.repository.create(prospection)
 
 
@@ -141,13 +175,30 @@ class UpdateProspection:
         intensite_pluie: str | None = None,
         vegetation: dict[str, Any] | None = None,
         sol: dict[str, Any] | None = None,
+        verdissement: float | None = None,
+        hauteur_strate: float | None = None,
         ennemis_naturels: str | None = None,
         observations: str | None = None,
         statut: str | None = None,
+        # ==========================================
+        # NOUVEAUX CHAMPS - Références (A)
+        # ==========================================
+        region: str | None = None,
+        district: str | None = None,
+        commune: str | None = None,
+        za: str | None = None,
+        pa_code: str | None = None,
+        # ==========================================
+        # NOUVEAUX CHAMPS - Observations (D)
+        # ==========================================
+        degats_cultures_pourcent: int | None = None,
+        verdissement_pourcent: int | None = None,
+        hauteur_herbe_cm: float | None = None,
     ) -> Prospection | None:
         prospection = await self.repository.get_by_id(prospection_id)
         if prospection is None:
             return None
+
         if prospection.statut != "brouillon":
             raise PermissionError("Seules les fiches en brouillon peuvent être modifiées")
 
@@ -185,12 +236,41 @@ class UpdateProspection:
             prospection.vegetation = vegetation
         if sol is not None:
             prospection.sol = sol
+        if verdissement is not None:
+            prospection.verdissement = verdissement
+        if hauteur_strate is not None:
+            prospection.hauteur_strate = hauteur_strate
         if ennemis_naturels is not None:
             prospection.ennemis_naturels = ennemis_naturels
         if observations is not None:
             prospection.observations = observations
         if statut is not None:
             prospection.statut = statut
+
+        # ==========================================
+        # Mise à jour des nouveaux champs - Références (A)
+        # ==========================================
+        if region is not None:
+            prospection.region = region
+        if district is not None:
+            prospection.district = district
+        if commune is not None:
+            prospection.commune = commune
+        if za is not None:
+            prospection.za = za
+        if pa_code is not None:
+            prospection.pa_code = pa_code
+
+        # ==========================================
+        # Mise à jour des nouveaux champs - Observations (D)
+        # ==========================================
+        if degats_cultures_pourcent is not None:
+            prospection.degats_cultures_pourcent = degats_cultures_pourcent
+        if verdissement_pourcent is not None:
+            prospection.verdissement_pourcent = verdissement_pourcent
+        if hauteur_herbe_cm is not None:
+            prospection.hauteur_herbe_cm = hauteur_herbe_cm
+
         prospection.updated_at = datetime.utcnow()
 
         return await self.repository.update(prospection)

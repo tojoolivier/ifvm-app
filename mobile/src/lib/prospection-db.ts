@@ -20,8 +20,9 @@ export function resetDbForTests(): void {
 async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
   const db = await SQLite.openDatabaseAsync(DB_NAME);
 
-  // Miroir du schéma PostgreSQL (backend/alembic/versions/0003_add_prospection.py),
-  // limité aux colonnes nécessaires à la saisie hors-ligne.
+  // ==========================================
+  // 1. CRÉATION DES TABLES (si elles n'existent pas)
+  // ==========================================
   await db.execAsync(`
     PRAGMA journal_mode = WAL;
     PRAGMA foreign_keys = ON;
@@ -35,9 +36,9 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
       n_releve TEXT,
       n_fiche TEXT,
       n_message TEXT,
-      especes TEXT, -- JSON EspeceSelection (écran Filtre espèces), local uniquement
-      capture_started_at TEXT, -- horodatage de démarrage du chrono (écran Captures), local uniquement
-      grilles_completees TEXT, -- JSON string[] des grilles "espece|categorie" terminées (écran Plan de relevé), local uniquement
+      especes TEXT,
+      capture_started_at TEXT,
+      grilles_completees TEXT,
       date_prospection TEXT NOT NULL,
       latitude REAL,
       longitude REAL,
@@ -80,7 +81,7 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
       categorie TEXT NOT NULL,
       densite_diffuse REAL,
       densite_groupee REAL,
-      methode TEXT, -- battage | comptage_direct : local uniquement, pas de colonne backend équivalente pour l'instant
+      methode TEXT,
       accouplement TEXT,
       ponte TEXT,
       UNIQUE(prospection_id, espece, categorie)
@@ -111,5 +112,94 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
       ON prospection_infestation(prospection_id);
   `);
 
+  // ==========================================
+  // 2. MIGRATION : Ajout des colonnes manquantes
+  // ==========================================
+  await migrateProspectionTable(db);
+  await migrateInfestationTable(db);
+
   return db;
+}
+
+// ==========================================
+// MIGRATION POUR LA TABLE PROSPECTION
+// ==========================================
+async function migrateProspectionTable(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migration] Vérification des colonnes de prospection...');
+  
+  const tableInfo = await db.getAllAsync<{ name: string }>('PRAGMA table_info(prospection)');
+  const columnNames = tableInfo.map(row => row.name);
+  console.log('[Migration] Colonnes existantes:', columnNames);
+
+  const columnsToAdd = [
+    { name: 'region', type: 'TEXT' },
+    { name: 'district', type: 'TEXT' },
+    { name: 'commune', type: 'TEXT' },
+    { name: 'za', type: 'TEXT' },
+    { name: 'pa_code', type: 'TEXT' },
+    { name: 'pa_nom', type: 'TEXT' },
+    { name: 'station_nom', type: 'TEXT' },
+    { name: 'degats_cultures_pourcent', type: 'INTEGER' },
+    { name: 'verdissement_pourcent', type: 'INTEGER' },
+    { name: 'hauteur_herbe_cm', type: 'REAL' },
+  ];
+
+  for (const col of columnsToAdd) {
+    if (!columnNames.includes(col.name)) {
+      console.log(`[Migration] Ajout de la colonne ${col.name}...`);
+      try {
+        await db.execAsync(`ALTER TABLE prospection ADD COLUMN ${col.name} ${col.type};`);
+        console.log(`[Migration] ✅ Colonne ${col.name} ajoutée`);
+      } catch (error) {
+        console.warn(`[Migration] ⚠️ Impossible d'ajouter ${col.name}:`, error);
+      }
+    } else {
+      console.log(`[Migration] ⏭️ Colonne ${col.name} existe déjà`);
+    }
+  }
+}
+
+// ==========================================
+// MIGRATION POUR LA TABLE PROSPECTION_INFESTATION
+// ==========================================
+async function migrateInfestationTable(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migration] Vérification des colonnes de prospection_infestation...');
+  
+  const tableInfo = await db.getAllAsync<{ name: string }>('PRAGMA table_info(prospection_infestation)');
+  const columnNames = tableInfo.map(row => row.name);
+  console.log('[Migration] Colonnes existantes:', columnNames);
+
+  const columnsToAdd = [
+    { name: 'espece', type: 'TEXT' },
+    { name: 'direction_de', type: 'TEXT' },
+    { name: 'pullulation_nb', type: 'INTEGER' },
+    { name: 'taille_long', type: 'REAL' },
+    { name: 'taille_large', type: 'REAL' },
+    { name: 'taille_epaisseur', type: 'REAL' },
+    { name: 'essaim_en_vol', type: 'INTEGER' },
+    { name: 'essaim_pose', type: 'INTEGER' },
+    { name: 'type_essaim', type: 'TEXT' },
+    { name: 'nb_taches_bandes', type: 'INTEGER' },
+    { name: 'interdistance_m', type: 'REAL' },
+    { name: 'interdistance_min', type: 'REAL' },
+    { name: 'interdistance_max', type: 'REAL' },
+    { name: 'interdistance_moy', type: 'REAL' },
+    { name: 'surface_contaminee_ha', type: 'REAL' },
+    { name: 'type_larve', type: 'TEXT' },
+    { name: 'surf_infestee_pourcent', type: 'REAL' },
+  ];
+
+  for (const col of columnsToAdd) {
+    if (!columnNames.includes(col.name)) {
+      console.log(`[Migration] Ajout de la colonne ${col.name} sur prospection_infestation...`);
+      try {
+        await db.execAsync(`ALTER TABLE prospection_infestation ADD COLUMN ${col.name} ${col.type};`);
+        console.log(`[Migration] ✅ Colonne ${col.name} ajoutée`);
+      } catch (error) {
+        console.warn(`[Migration] ⚠️ Impossible d'ajouter ${col.name}:`, error);
+      }
+    } else {
+      console.log(`[Migration] ⏭️ Colonne ${col.name} existe déjà`);
+    }
+  }
 }

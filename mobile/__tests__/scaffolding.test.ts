@@ -32,12 +32,6 @@ describe('Scaffolding Configuration', () => {
     expect(easConfig.build?.preview?.android?.buildType).toBe('apk');
   });
 
-  test('.env contains EXPO_PUBLIC_API_URL', () => {
-    const envContent = readFileSync(join(mobileDir, '.env'), 'utf-8');
-    
-    expect(envContent).toContain('EXPO_PUBLIC_API_URL=http://localhost:8000');
-  });
-
   test('NativeWind configuration files exist', () => {
     expect(existsSync(join(mobileDir, 'tailwind.config.js'))).toBe(true);
     expect(existsSync(join(mobileDir, 'babel.config.js'))).toBe(true);
@@ -49,10 +43,10 @@ describe('Scaffolding Configuration', () => {
     const appDir = join(mobileDir, 'src', 'app');
     
     expect(existsSync(join(appDir, '_layout.tsx'))).toBe(true);
-    expect(existsSync(join(appDir, '(tabs)', '_layout.tsx'))).toBe(true);
-    expect(existsSync(join(appDir, '(tabs)', 'index.tsx'))).toBe(true);
-    expect(existsSync(join(appDir, '(tabs)', 'prospection.tsx'))).toBe(true);
-    expect(existsSync(join(appDir, '(tabs)', 'profile.tsx'))).toBe(true);
+    expect(existsSync(join(appDir, '(app)', '_layout.tsx'))).toBe(true);
+    expect(existsSync(join(appDir, '(app)', 'index.tsx'))).toBe(true);
+    expect(existsSync(join(appDir, '(app)', 'prospection.tsx'))).toBe(true);
+    expect(existsSync(join(appDir, '(app)', 'profile.tsx'))).toBe(true);
     expect(existsSync(join(appDir, '(auth)', '_layout.tsx'))).toBe(true);
     expect(existsSync(join(appDir, '(auth)', 'login.tsx'))).toBe(true);
   });

@@ -1,8 +1,11 @@
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
+import { useDebugStore } from '@/lib/debug-store';
 import { getDb } from '@/lib/prospection-db';
+import { useReferentielAutoSync } from '@/hooks/use-referentiel-auto-sync';
 import '../global.css';
 
 function useAuthGuard() {
@@ -24,7 +27,7 @@ function useAuthGuard() {
     if (!isAuthenticated && !inAuthGroup) {
       router.replace('/(auth)/login');
     } else if (isAuthenticated && inAuthGroup) {
-      router.replace('/(tabs)');
+      router.replace('/(app)');
     }
   }, [isAuthenticated, isInitialized, segments, router]);
 }
@@ -32,9 +35,12 @@ function useAuthGuard() {
 export default function RootLayout() {
   useAuthGuard();
   const isInitialized = useAuthStore((s) => s.isInitialized);
+  const token = useAuthStore((s) => s.token);
+  useReferentielAutoSync(token);
 
   useEffect(() => {
     getDb();
+    useDebugStore.getState().init();
   }, []);
 
   if (!isInitialized) {
@@ -46,9 +52,12 @@ export default function RootLayout() {
   }
 
   return (
-    <Stack>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-    </Stack>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <Stack>
+        <Stack.Screen name="(app)" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="(prospection)" options={{ headerShown: false }} />
+      </Stack>
+    </GestureHandlerRootView>
   );
 }

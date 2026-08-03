@@ -1,9 +1,17 @@
 import uuid
 from abc import ABC, abstractmethod
+from datetime import datetime
 
 from app.domain.campagne import Campagne
 from app.domain.prospection import AuditLog, Prospection
-from app.domain.referentiel import PosteAcridien, StationFixe
+from app.domain.referentiel import (
+    CodeStade,
+    Culture,
+    Pesticide,
+    PosteAcridien,
+    StationFixe,
+    UtilisateurEquipe,
+)
 
 
 class CampagneRepository(ABC):
@@ -76,6 +84,10 @@ class PosteAcridienRepository(ABC):
     async def get_by_id(self, pa_id: uuid.UUID) -> PosteAcridien | None:
         pass
 
+    @abstractmethod
+    async def list_since(self, since: datetime | None) -> list[PosteAcridien]:
+        pass
+
 
 class StationFixeRepository(ABC):
     @abstractmethod
@@ -93,4 +105,32 @@ class StationFixeRepository(ABC):
 
     @abstractmethod
     async def exists(self, station_id: uuid.UUID) -> bool:
+        pass
+
+    @abstractmethod
+    async def list_since(self, since: datetime | None) -> list[StationFixe]:
+        pass
+
+
+class UtilisateurEquipeRepository(ABC):
+    @abstractmethod
+    async def list_since(self, since: datetime | None) -> list[UtilisateurEquipe]:
+        pass
+
+
+class PesticideRepository(ABC):
+    @abstractmethod
+    async def list_since(self, since: datetime | None) -> list[Pesticide]:
+        pass
+
+
+class CultureRepository(ABC):
+    @abstractmethod
+    async def list_since(self, since: datetime | None) -> list[Culture]:
+        pass
+
+
+class CodeStadeRepository(ABC):
+    @abstractmethod
+    async def list_since(self, since: datetime | None) -> list[CodeStade]:
         pass

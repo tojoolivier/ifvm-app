@@ -1,231 +1,472 @@
-import { useEffect, useMemo, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getCurrentPosition, GpsPosition, LocationPermissionDeniedError } from '@/lib/location';
-import { getProspection, DraftProspection } from '@/lib/prospection-repository';
-import { generateNumeroFiche, saveReference, validateSurfaces } from '@/lib/prospection-reference';
+import { useForm } from '@tanstack/react-form';
+import { getCurrentPosition, reverseGeocode, GpsPosition, LocationPermissionDeniedError } from '@/lib/location';
+import {
+  findNearestStation,
+  listPostesAcridiens,
+  listStationsByPoste,
+  PosteAcridien,
+  StationFixe,
+} from '@/lib/referentiel-db';
+import { updateProspectionReference } from '@/lib/prospection-repository';
+import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
+import { referenceSchema, ReferenceFormValues } from '@/lib/prospection-reference-schema';
 
-const IFVM_GREEN = '#1B5E1B';
-const IFVM_GREEN_DARK = '#163F16';
+const INACTIVE_BG = '#efeada';
+const INACTIVE_TEXT = '#9a9484';
+const GPS_BADGE_BG = '#eaf2ec';
 
-type GpsStatus = 'loading' | 'success' | 'error';
+type SelectMode = 'auto' | 'manuel';
+
+const GREEN = '#235a36';
+const BG = '#faf7ef';
+const TEXT = '#16201a';
+const TEXT_SECONDARY = '#6f6a59';
+const BORDER = '#e7e0cd';
+
+function generateNumeroFiche(draftId: string, dateProspection: string): string {
+  const datePart = dateProspection.replace(/-/g, '');
+  const idPart = draftId.replace(/-/g, '').slice(0, 6).toUpperCase();
+  return `FI-${datePart}-${idPart}`;
+}
+
+/** N° relevé — dérivé de la station/session GPS résolue (PDF champ 1), jamais saisi manuellement. */
+function generateNumeroReleve(stationId: string | null, dateProspection: string): string {
+  const datePart = dateProspection.replace(/-/g, '');
+  const stationPart = (stationId ?? 'XXX').replace(/-/g, '').slice(0, 6).toUpperCase();
+  return `REL-${stationPart}-${datePart}`;
+}
+
+function formatDateHeure(date: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(date.getDate())}/${p(date.getMonth() + 1)} ${p(date.getHours())}:${p(date.getMinutes())}`;
+}
 
 export default function ReferenceScreen() {
   const router = useRouter();
   const { draftId } = useLocalSearchParams<{ draftId: string }>();
+  const draft = useProspectionWizardStore((s) => s.draft);
+  const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
+  const setDraft = useProspectionWizardStore((s) => s.setDraft);
 
-  const [draft, setDraft] = useState<DraftProspection | null>(null);
-  const [gpsStatus, setGpsStatus] = useState<GpsStatus>('loading');
   const [position, setPosition] = useState<GpsPosition | null>(null);
-  const [gpsError, setGpsError] = useState<string | null>(null);
-
-  const [surfStation, setSurfStation] = useState('');
-  const [surfProspectee, setSurfProspectee] = useState('');
-  const [surfInfestee, setSurfInfestee] = useState('');
+  const [adminArea, setAdminArea] = useState<{ region: string | null; district: string | null; commune: string | null }>({
+    region: null,
+    district: null,
+    commune: null,
+  });
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const [postes, setPostes] = useState<PosteAcridien[]>([]);
+  const [stationsForPa, setStationsForPa] = useState<StationFixe[]>([]);
+  const [paMode, setPaMode] = useState<SelectMode>('auto');
+  const [stationMode, setStationMode] = useState<SelectMode>('auto');
+  const [pa, setPa] = useState<PosteAcridien | null>(null);
+  const [station, setStation] = useState<StationFixe | null>(null);
+  const [autoPa, setAutoPa] = useState<PosteAcridien | null>(null);
+  const [autoStation, setAutoStation] = useState<StationFixe | null>(null);
+
+  const paModeRef = useRef<SelectMode>('auto');
+  const stationModeRef = useRef<SelectMode>('auto');
+  useEffect(() => {
+    paModeRef.current = paMode;
+  }, [paMode]);
+  useEffect(() => {
+    stationModeRef.current = stationMode;
+  }, [stationMode]);
 
   useEffect(() => {
-    if (!draftId) return;
-    getProspection(draftId).then(setDraft);
-  }, [draftId]);
+    if (draftId && draft?.id !== draftId) {
+      hydrateFromDraft(draftId);
+    }
+  }, [draftId, draft?.id, hydrateFromDraft]);
 
   useEffect(() => {
-    let cancelled = false;
-    setGpsStatus('loading');
-    setGpsError(null);
+    listPostesAcridiens().then(setPostes).catch(() => {});
+  }, []);
 
+  useEffect(() => {
     getCurrentPosition()
-      .then((pos) => {
-        if (cancelled) return;
+      .then(async (pos) => {
         setPosition(pos);
-        setGpsStatus('success');
+        const [area, nearestStation, postesList] = await Promise.all([
+          reverseGeocode(pos.latitude, pos.longitude),
+          findNearestStation(pos.latitude, pos.longitude),
+          listPostesAcridiens(),
+        ]);
+        setAdminArea(area);
+        if (!nearestStation) return;
+        const nearestPa = postesList.find((p) => p.id === nearestStation.paId) ?? null;
+        setAutoStation(nearestStation);
+        setAutoPa(nearestPa);
+        if (nearestPa && paModeRef.current === 'auto') {
+          await applyPa(nearestPa);
+          if (stationModeRef.current === 'auto') setStation(nearestStation);
+        }
       })
-      .catch((err) => {
-        if (cancelled) return;
-        setGpsError(
-          err instanceof LocationPermissionDeniedError
+      .catch((e) => {
+        setLocationError(
+          e instanceof LocationPermissionDeniedError
             ? 'Permission de localisation refusée'
             : 'Position GPS indisponible'
         );
-        setGpsStatus('error');
       });
-
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
-  const numeroFiche = useMemo(
-    () => (draft ? generateNumeroFiche(draft.id, draft.date_prospection) : ''),
-    [draft]
-  );
+  async function applyPa(poste: PosteAcridien): Promise<StationFixe[]> {
+    setPa(poste);
+    const list = await listStationsByPoste(poste.id);
+    setStationsForPa(list);
+    return list;
+  }
 
-  const surfaces = {
-    surfStation: parseDecimal(surfStation),
-    surfProspectee: parseDecimal(surfProspectee),
-    surfInfestee: parseDecimal(surfInfestee),
-  };
-  const surfacesValid = validateSurfaces(surfaces);
-  const canContinue = gpsStatus === 'success' && surfacesValid && !isSaving;
+  async function setPaAuto() {
+    setPaMode('auto');
+    if (!autoPa) return;
+    await applyPa(autoPa);
+    if (stationModeRef.current === 'auto' && autoStation) setStation(autoStation);
+  }
 
-  const handleContinuer = async () => {
-    if (!draft || !position || !surfacesValid) return;
-    setIsSaving(true);
-    setSaveError(null);
-    try {
-      await saveReference({ draftId: draft.id, position, surfaces, numeroFiche });
-      router.push({ pathname: '/(prospection)/especes', params: { draftId: draft.id } });
-    } catch {
-      setSaveError("Impossible d'enregistrer la fiche localement");
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  function setPaManuel() {
+    setPaMode('manuel');
+  }
 
-  const dateHeure = draft
-    ? new Date(draft.created_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
-    : '';
+  async function selectPa(poste: PosteAcridien) {
+    const list = await applyPa(poste);
+    setStation((current) => (current && list.some((s) => s.id === current.id) ? current : list[0] ?? null));
+  }
+
+  function setStationAuto() {
+    setStationMode('auto');
+    if (autoStation) setStation(autoStation);
+  }
+
+  function setStationManuel() {
+    setStationMode('manuel');
+  }
+
+  function selectStation(next: StationFixe) {
+    setStation(next);
+    setStationMode('manuel');
+  }
+
+  const form = useForm({
+    defaultValues: {
+      surfStation: draft?.surf_station != null ? String(draft.surf_station) : '',
+      surfProspectee: draft?.surf_prospectee != null ? String(draft.surf_prospectee) : '',
+      surfInfestee: draft?.surf_infestee != null ? String(draft.surf_infestee) : '',
+    } as ReferenceFormValues,
+    onSubmit: async ({ value }) => {
+      if (!draftId) return;
+      try {
+        await referenceSchema.validate(value, { abortEarly: false });
+      } catch (validationError: any) {
+        const errors: Record<string, string> = {};
+        for (const err of validationError.inner ?? []) {
+          if (err.path) errors[err.path] = err.message;
+        }
+        setFormErrors(errors);
+        return;
+      }
+      setFormErrors({});
+      setIsSaving(true);
+      try {
+        const dateProspection = draft?.date_prospection ?? new Date().toISOString().slice(0, 10);
+        const nFiche = generateNumeroFiche(draftId, dateProspection);
+        const nReleve = generateNumeroReleve(station?.id ?? null, dateProspection);
+        const updated = await updateProspectionReference(draftId, {
+          latitude: position?.latitude ?? 0,
+          longitude: position?.longitude ?? 0,
+          altitude: position?.altitude ?? null,
+          surfStation: Number(value.surfStation),
+          surfProspectee: Number(value.surfProspectee),
+          surfInfestee: Number(value.surfInfestee),
+          nFiche,
+          nReleve,
+          region: adminArea.region,
+          district: adminArea.district,
+          commune: adminArea.commune,
+          pa_code: pa?.code ?? null,
+          pa_nom: pa?.nom ?? null,
+          stationId: station?.id ?? null,
+          station_nom: station?.nom ?? null,
+        });
+        setDraft(updated);
+        router.push({ pathname: '/(prospection)/species' as any, params: { draftId } });
+      } finally {
+        setIsSaving(false);
+      }
+    },
+  });
+
+  const nFichePreview = draftId ? generateNumeroFiche(draftId, draft?.date_prospection ?? '') : '—';
+  const nRelevePreview = generateNumeroReleve(station?.id ?? null, draft?.date_prospection ?? '');
 
   return (
     <View style={styles.root}>
-      <SafeAreaView edges={['top']} style={styles.header}>
-        <TouchableOpacity onPress={() => router.push('/(tabs)/prospection')}>
-          <Text style={styles.backLink}>‹ Accueil</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Référence & position</Text>
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: '25%' }]} />
+      <SafeAreaView edges={['top']} style={styles.safe}>
+        <View style={styles.headerRow}>
+          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
+            <Text style={styles.back}>‹</Text>
+          </TouchableOpacity>
+          <Text style={styles.title}>Nouvelle prospection</Text>
         </View>
-        <Text style={styles.progressLabel}>Étape 1/4</Text>
+        <View style={styles.progressRow}>
+          <View style={[styles.progressBar, styles.progressActive]} />
+          <View style={styles.progressBar} />
+          <View style={styles.progressBar} />
+          <View style={styles.progressBar} />
+        </View>
+
+        <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16 }}>
+          <View style={styles.gpsCard}>
+            <View style={styles.gpsHeaderRow}>
+              <Text style={styles.gpsTitle}>📍 Position acquise</Text>
+              <View style={styles.accuracyBadge}>
+                <Text style={styles.accuracyText}>
+                  {position?.accuracy != null ? `± ${Math.round(position.accuracy)} m` : '…'}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.gpsFieldsRow}>
+              <View style={styles.gpsField}>
+                <Text style={styles.gpsFieldLabel}>Latitude</Text>
+                <Text style={styles.gpsFieldValue}>{position ? position.latitude.toFixed(4) : '—'}</Text>
+              </View>
+              <View style={styles.gpsField}>
+                <Text style={styles.gpsFieldLabel}>Longitude</Text>
+                <Text style={styles.gpsFieldValue}>{position ? position.longitude.toFixed(4) : '—'}</Text>
+              </View>
+              <View style={[styles.gpsField, { flex: 0.75 }]}>
+                <Text style={styles.gpsFieldLabel}>Alt.</Text>
+                <Text style={styles.gpsFieldValue}>{position?.altitude != null ? Math.round(position.altitude) : '—'}</Text>
+              </View>
+            </View>
+            <Text style={styles.gpsAdminText}>
+              {locationError ??
+                ([adminArea.region, adminArea.district, adminArea.commune].filter(Boolean).join(' · ') ||
+                  'Localisation en cours…')}
+            </Text>
+          </View>
+
+          <View style={styles.refCard}>
+            <View style={styles.refHeaderRow}>
+              <Text style={styles.refLabel}>2. Poste acridien (PA)</Text>
+              <View style={styles.toggleTrack}>
+                <TouchableOpacity onPress={setPaAuto} activeOpacity={0.7}>
+                  <Text style={[styles.toggleSegment, paMode === 'auto' && styles.toggleSegmentActive]}>Auto</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={setPaManuel} activeOpacity={0.7}>
+                  <Text style={[styles.toggleSegment, paMode === 'manuel' && styles.toggleSegmentActive]}>Manuel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            {paMode === 'auto' ? (
+              <View style={styles.autoValueRow}>
+                <Text style={styles.autoValueText}>{pa?.nom ?? '…'}</Text>
+                <View style={styles.gpsBadge}>
+                  <Text style={styles.gpsBadgeText}>📡 via GPS</Text>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.chipsRow}>
+                {postes.map((poste) => {
+                  const active = poste.id === pa?.id;
+                  return (
+                    <TouchableOpacity key={poste.id} onPress={() => selectPa(poste)} activeOpacity={0.7}>
+                      <Text style={[styles.chip, active && styles.chipActive]}>{poste.nom}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+
+          <View style={styles.refCard}>
+            <View style={styles.refHeaderRow}>
+              <Text style={styles.refLabel}>5. Station</Text>
+              <View style={styles.toggleTrack}>
+                <TouchableOpacity onPress={setStationAuto} activeOpacity={0.7}>
+                  <Text style={[styles.toggleSegment, stationMode === 'auto' && styles.toggleSegmentActive]}>
+                    Auto
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={setStationManuel} activeOpacity={0.7}>
+                  <Text style={[styles.toggleSegment, stationMode === 'manuel' && styles.toggleSegmentActive]}>
+                    Manuel
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            {stationMode === 'auto' ? (
+              <View style={styles.autoValueRow}>
+                <Text style={styles.autoValueText}>{station?.nom ?? '…'}</Text>
+                <View style={styles.gpsBadge}>
+                  <Text style={styles.gpsBadgeText}>📡 via GPS</Text>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.chipsRow}>
+                {stationsForPa.map((s) => {
+                  const active = s.id === station?.id;
+                  return (
+                    <TouchableOpacity key={s.id} onPress={() => selectStation(s)} activeOpacity={0.7}>
+                      <Text style={[styles.chip, active && styles.chipActive]}>{s.nom}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+
+          <View style={styles.metaRow}>
+            <View style={styles.metaField}>
+              <Text style={styles.metaLabel}>N° Fiche ⟳</Text>
+              <Text style={styles.metaValue}>{nFichePreview}</Text>
+            </View>
+            <View style={styles.metaField}>
+              <Text style={styles.metaLabel}>N° relevé ⟳</Text>
+              <Text style={styles.metaValue}>{nRelevePreview}</Text>
+            </View>
+            <View style={styles.metaField}>
+              <Text style={styles.metaLabel}>Date/heure ⟳</Text>
+              <Text style={styles.metaValue}>{formatDateHeure(new Date())}</Text>
+            </View>
+          </View>
+
+          <Text style={styles.sectionLabel}>Surfaces (ha) — saisie</Text>
+          <View style={styles.surfacesRow}>
+            <form.Field name="surfStation">
+              {(field) => (
+                <View style={styles.surfaceField}>
+                  <Text style={styles.surfaceLabel}>Station</Text>
+                  <TextInput
+                    value={field.state.value}
+                    onChangeText={field.handleChange}
+                    keyboardType="decimal-pad"
+                    style={styles.surfaceInput}
+                  />
+                </View>
+              )}
+            </form.Field>
+            <form.Field name="surfProspectee">
+              {(field) => (
+                <View style={styles.surfaceField}>
+                  <Text style={styles.surfaceLabel}>Prospectée</Text>
+                  <TextInput
+                    value={field.state.value}
+                    onChangeText={field.handleChange}
+                    keyboardType="decimal-pad"
+                    style={styles.surfaceInput}
+                  />
+                </View>
+              )}
+            </form.Field>
+            <form.Field name="surfInfestee">
+              {(field) => (
+                <View style={styles.surfaceField}>
+                  <Text style={styles.surfaceLabel}>Infestée</Text>
+                  <TextInput
+                    value={field.state.value}
+                    onChangeText={field.handleChange}
+                    keyboardType="decimal-pad"
+                    placeholder="—"
+                    style={styles.surfaceInput}
+                  />
+                </View>
+              )}
+            </form.Field>
+          </View>
+          {Object.values(formErrors).map((message) => (
+            <Text key={message} style={styles.errorText}>
+              {message}
+            </Text>
+          ))}
+          <Text style={styles.hintText}>Tapez une valeur — les autres champs se calculent ensuite automatiquement.</Text>
+        </ScrollView>
+
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={styles.continueButton}
+            onPress={form.handleSubmit}
+            disabled={isSaving}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.continueButtonText}>{isSaving ? 'Enregistrement…' : 'Continuer  ›'}</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
-
-      <ScrollView style={styles.content} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Position GPS</Text>
-          {gpsStatus === 'loading' && (
-            <View style={styles.gpsRow}>
-              <ActivityIndicator color={IFVM_GREEN} />
-              <Text style={styles.gpsLoadingText}>Acquisition de la position…</Text>
-            </View>
-          )}
-          {gpsStatus === 'error' && <Text style={styles.gpsErrorText}>{gpsError}</Text>}
-          {gpsStatus === 'success' && position && (
-            <View>
-              <Text style={styles.gpsValue}>
-                Lat {position.latitude.toFixed(5)} · Lon {position.longitude.toFixed(5)}
-              </Text>
-              <Text style={styles.gpsSub}>
-                Altitude {position.altitude != null ? `${position.altitude.toFixed(0)} m` : '—'} · Précision{' '}
-                {position.accuracy != null ? `${position.accuracy.toFixed(0)} m` : '—'}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        <View style={styles.card}>
-          <Row label="N° fiche" value={numeroFiche} />
-          <Row label="Date" value={draft?.date_prospection ?? ''} />
-          <Row label="Saisie le" value={dateHeure} />
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Surfaces (ha)</Text>
-          <SurfaceField label="Surface station" value={surfStation} onChangeText={setSurfStation} />
-          <SurfaceField label="Surface prospectée" value={surfProspectee} onChangeText={setSurfProspectee} />
-          <SurfaceField label="Surface infestée" value={surfInfestee} onChangeText={setSurfInfestee} />
-          {!surfacesValid && (surfStation || surfProspectee || surfInfestee) && (
-            <Text style={styles.gpsErrorText}>infestée ≤ prospectée ≤ station</Text>
-          )}
-        </View>
-
-        {saveError && <Text style={styles.gpsErrorText}>{saveError}</Text>}
-
-        <TouchableOpacity
-          style={[styles.btnContinuer, !canContinue && styles.btnDisabled]}
-          onPress={handleContinuer}
-          disabled={!canContinue}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.btnContinuerText}>{isSaving ? 'Enregistrement…' : 'Continuer'}</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
-  );
-}
-
-function parseDecimal(value: string): number | null {
-  if (value.trim() === '') return null;
-  const normalized = value.replace(',', '.');
-  const n = Number(normalized);
-  return Number.isFinite(n) ? n : null;
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue}>{value}</Text>
-    </View>
-  );
-}
-
-function SurfaceField({
-  label,
-  value,
-  onChangeText,
-}: {
-  label: string;
-  value: string;
-  onChangeText: (v: string) => void;
-}) {
-  return (
-    <View style={styles.surfaceField}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <TextInput
-        style={styles.surfaceInput}
-        value={value}
-        onChangeText={onChangeText}
-        keyboardType="decimal-pad"
-        placeholder="0"
-        placeholderTextColor="#9CA3AF"
-      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F3F4F6' },
-  header: { backgroundColor: IFVM_GREEN_DARK, paddingHorizontal: 16, paddingBottom: 14 },
-  backLink: { color: '#FFFFFFCC', fontSize: 13, marginBottom: 6 },
-  headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700', marginBottom: 10 },
-  progressTrack: { height: 4, backgroundColor: '#FFFFFF33', borderRadius: 2, overflow: 'hidden' },
-  progressFill: { height: 4, backgroundColor: '#FFFFFF' },
-  progressLabel: { color: '#FFFFFFAA', fontSize: 11, marginTop: 4 },
-  content: { flex: 1 },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 10, padding: 14, marginBottom: 12 },
-  cardLabel: { fontSize: 12, fontWeight: '700', color: '#6B7280', marginBottom: 8, textTransform: 'uppercase' },
-  gpsRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  gpsLoadingText: { color: '#6B7280', fontSize: 13 },
-  gpsErrorText: { color: '#dc2626', fontSize: 13 },
-  gpsValue: { color: '#111827', fontSize: 15, fontWeight: '600' },
-  gpsSub: { color: '#6B7280', fontSize: 12, marginTop: 2 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
-  rowLabel: { color: '#6B7280', fontSize: 13 },
-  rowValue: { color: '#111827', fontSize: 13, fontWeight: '600' },
-  surfaceField: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 },
-  surfaceInput: {
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    minWidth: 90,
-    textAlign: 'right',
-    color: '#111827',
+  root: { flex: 1, backgroundColor: BG },
+  safe: { flex: 1 },
+  headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
+  title: { fontSize: 15, fontWeight: '700', color: TEXT },
+  progressRow: { flexDirection: 'row', gap: 5, paddingHorizontal: 18, paddingBottom: 12 },
+  progressBar: { flex: 1, height: 5, borderRadius: 3, backgroundColor: '#dcd5c2' },
+  progressActive: { backgroundColor: GREEN },
+  scroll: { flex: 1 },
+  gpsCard: { backgroundColor: GREEN, borderRadius: 13, padding: 14, marginBottom: 12 },
+  gpsHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9 },
+  gpsTitle: { color: '#fff', fontWeight: '700', fontSize: 12 },
+  accuracyBadge: { backgroundColor: '#ffffff2e', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
+  accuracyText: { color: '#fff', fontSize: 9.5, fontWeight: '600' },
+  gpsFieldsRow: { flexDirection: 'row', gap: 8, marginBottom: 9 },
+  gpsField: { flex: 1, backgroundColor: '#ffffff1f', borderRadius: 8, padding: 7 },
+  gpsFieldLabel: { color: '#ffffffbf', fontSize: 8.5, textTransform: 'uppercase' },
+  gpsFieldValue: { color: '#fff', fontWeight: '600', fontSize: 12.5 },
+  gpsAdminText: { color: '#ffffffd9', fontSize: 10.5 },
+  refCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 12, padding: 13, marginBottom: 11 },
+  refHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  refLabel: { fontSize: 9, fontWeight: '700', color: INACTIVE_TEXT, textTransform: 'uppercase', letterSpacing: 0.5 },
+  toggleTrack: { flexDirection: 'row', backgroundColor: INACTIVE_BG, borderRadius: 8, padding: 2, gap: 2 },
+  toggleSegment: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 6,
+    color: INACTIVE_TEXT,
+    overflow: 'hidden',
   },
-  btnContinuer: { backgroundColor: IFVM_GREEN, borderRadius: 10, paddingVertical: 16, alignItems: 'center', marginTop: 4 },
-  btnDisabled: { opacity: 0.5 },
-  btnContinuerText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
+  toggleSegmentActive: { backgroundColor: GREEN, color: '#fff' },
+  autoValueRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  autoValueText: { fontSize: 15, fontWeight: '700', color: TEXT },
+  gpsBadge: { backgroundColor: GPS_BADGE_BG, borderRadius: 20, paddingHorizontal: 7, paddingVertical: 2 },
+  gpsBadgeText: { fontSize: 9, fontWeight: '600', color: GREEN },
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: TEXT_SECONDARY,
+    backgroundColor: INACTIVE_BG,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  chipActive: { backgroundColor: GREEN, color: '#fff', fontWeight: '700' },
+  metaRow: { flexDirection: 'row', gap: 9, marginBottom: 14 },
+  metaField: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 9 },
+  metaLabel: { fontSize: 9, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase' },
+  metaValue: { fontSize: 13, fontWeight: '600', color: TEXT },
+  sectionLabel: { fontSize: 11, fontWeight: '700', color: TEXT_SECONDARY, textTransform: 'uppercase', marginBottom: 9 },
+  surfacesRow: { flexDirection: 'row', gap: 9, marginBottom: 8 },
+  surfaceField: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 9 },
+  surfaceLabel: { fontSize: 9.5, color: '#9a9484', marginBottom: 2 },
+  surfaceInput: { fontSize: 18, fontWeight: '700', color: TEXT, padding: 0 },
+  hintText: { fontSize: 10.5, color: '#9a9484', paddingHorizontal: 2 },
+  errorText: { color: '#c0412b', fontSize: 11, marginBottom: 4 },
+  footer: { padding: 16 },
+  continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
+  continueButtonText: { color: '#fff', fontWeight: '800', fontSize: 15 },
 });

@@ -1,13 +1,17 @@
-jest.mock('../src/lib/prospection-repository', () => ({}));
-
 import { CaptureRead, InfestationRead, PopulationRead, ProspectionRead } from '../src/lib/api-client';
 import {
   STATUT_VALIDE,
+  STRATE_KEYS,
+  TEXTURE_OPTIONS,
   buildEspecesSynthese,
   buildFicheLecture,
   buildInfestationSynthese,
+  buildVegetationSummary,
   isFicheValidee,
+  parseVegetationSol,
 } from '../src/lib/prospection-fiche-lecture';
+
+jest.mock('../src/lib/prospection-repository', () => ({}));
 
 function capture(overrides: Partial<CaptureRead> = {}): CaptureRead {
   return {
@@ -69,6 +73,14 @@ function prospection(overrides: Partial<ProspectionRead> = {}): ProspectionRead 
     populations: [],
     captures: [],
     infestations: [],
+    region: null,
+    district: null,
+    commune: null,
+    za: null,
+    pa_code: null,
+    degats_cultures_pourcent: null,
+    verdissement_pourcent: null,
+    hauteur_herbe_cm: null,
     ...overrides,
   };
 }
@@ -113,6 +125,12 @@ describe('buildInfestationSynthese', () => {
       typeLabel: '—',
       surfaceTot: null,
       comportementLabel: '—',
+      pullulationNb: null,
+      tailleEssaim: '—',
+      typeEssaim: null,
+      typeLarve: null,
+      surfaceContamineeHa: null,
+      surfInfesteePourcent: null,
     });
   });
 
@@ -134,6 +152,18 @@ describe('buildInfestationSynthese', () => {
       direction_vers: 'N',
       vent_de: null,
       vent_vitesse: null,
+      pullulation_nb: null,
+      taille_long: null,
+      taille_large: null,
+      taille_epaisseur: null,
+      essaim_en_vol: null,
+      essaim_pose: null,
+      type_essaim: null,
+      nb_taches_bandes: null,
+      interdistance_m: null,
+      surface_contaminee_ha: null,
+      type_larve: null,
+      surf_infestee_pourcent: null,
     };
 
     expect(buildInfestationSynthese([infestation])).toEqual({
@@ -141,6 +171,12 @@ describe('buildInfestationSynthese', () => {
       typeLabel: 'Essaim',
       surfaceTot: 3.5,
       comportementLabel: 'Déplacement',
+      pullulationNb: null,
+      tailleEssaim: '—',
+      typeEssaim: null,
+      typeLarve: null,
+      surfaceContamineeHa: null,
+      surfInfesteePourcent: null,
     });
   });
 });
@@ -169,5 +205,55 @@ describe('buildFicheLecture', () => {
   it('dérive la station depuis les coordonnées quand aucune station n\'est renseignée', () => {
     const p = prospection({ station_id: null, latitude: -18.9, longitude: 47.5 });
     expect(buildFicheLecture(p).stationLabel).toBe('-18.9000, 47.5000');
+  });
+});
+
+describe('STRATE_KEYS', () => {
+  it('contient les 6 strates du handoff (cultures_hygro remplace sol_nu, qui est un champ par strate)', () => {
+    expect(STRATE_KEYS).toEqual(['arboree', 'arbustive', 'buissonneuse', 'herbeuse', 'cultures_seches', 'cultures_hygro']);
+  });
+});
+
+describe('TEXTURE_OPTIONS', () => {
+  it('propose les 7 textures du PDF, y compris sable grossier et bloc', () => {
+    expect(TEXTURE_OPTIONS.map((o) => o.value)).toEqual([
+      'limoneuse',
+      'argileuse',
+      'sable_fin',
+      'sable_grossier',
+      'gravier',
+      'cailloux',
+      'bloc',
+    ]);
+  });
+});
+
+describe('parseVegetationSol / buildVegetationSummary (multi-strate)', () => {
+  it('parse une strate complète et calcule le résumé sur le recouvrement de chaque strate renseignée', () => {
+    const vegetation = JSON.stringify({
+      strates: {
+        herbeuse: { surfRel: 40, hMoy: 0.3, recouvrement: 70, verdissement: 20, repousse: 10, orpad: ['Fleur'], solNu: 5 },
+        arboree: { surfRel: 10, hMoy: 4, recouvrement: 15, verdissement: 0, repousse: 0, orpad: [], solNu: 0 },
+      },
+    });
+    const sol = JSON.stringify({ humidite: '5_12cm', texture: 'sable_grossier' });
+
+    const state = parseVegetationSol(vegetation, sol, 'moyens');
+
+    expect(state.strates.herbeuse).toEqual({
+      surfRel: 40, hMoy: 0.3, recouvrement: 70, verdissement: 20, repousse: 10, orpad: ['Fleur'], solNu: 5,
+    });
+    expect(state.strates.buissonneuse.recouvrement).toBe(0);
+
+    const summary = buildVegetationSummary(state);
+    expect(summary).toContain('Strate herbeuse 70%');
+    expect(summary).toContain('Strate arborée 15%');
+    expect(summary).toContain('Texture Sable grossier');
+    expect(summary).toContain('Dégâts culture Moyens');
+  });
+
+  it('ne casse pas sur un JSON vide', () => {
+    const state = parseVegetationSol(null, null, null);
+    expect(STRATE_KEYS.every((k) => state.strates[k].recouvrement === 0)).toBe(true);
   });
 });

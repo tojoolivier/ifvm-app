@@ -20,7 +20,9 @@ async def me(current_user: Annotated[Utilisateur, Depends(get_current_user)]):
 
 def require_admin(current_user: Annotated[Utilisateur, Depends(get_current_user)]) -> Utilisateur:
     if current_user.role != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès réservé aux admins")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Accès réservé aux admins"
+        )
     return current_user
 
 

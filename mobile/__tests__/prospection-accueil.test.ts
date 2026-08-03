@@ -4,8 +4,17 @@ import {
   countUnsyncedProspections,
   listDraftProspections,
   listRecentProspections,
+  deleteProspection,
   DraftProspection,
 } from '../src/lib/prospection-repository';
+
+import {
+  loadAccueilData,
+  loadValidatedProspections,
+  pickCurrentCampagneId,
+  startNewProspection,
+  deleteDraftProspection,
+} from '../src/lib/prospection-accueil';
 
 jest.mock('../src/lib/api-client', () => ({
   apiClient: {
@@ -19,20 +28,15 @@ jest.mock('../src/lib/prospection-repository', () => ({
   countUnsyncedProspections: jest.fn(),
   listDraftProspections: jest.fn(),
   listRecentProspections: jest.fn(),
+  deleteProspection: jest.fn(),
 }));
-
-import {
-  loadAccueilData,
-  loadValidatedProspections,
-  pickCurrentCampagneId,
-  startNewProspection,
-} from '../src/lib/prospection-accueil';
 
 const mockApiClient = jest.mocked(apiClient);
 const mockCreateDraft = jest.mocked(createDraftProspection);
 const mockCountUnsynced = jest.mocked(countUnsyncedProspections);
 const mockListDrafts = jest.mocked(listDraftProspections);
 const mockListRecent = jest.mocked(listRecentProspections);
+const mockDeleteLocal = jest.mocked(deleteProspection);
 
 const STORED_ROW: DraftProspection = {
   id: '11111111-1111-1111-1111-111111111111',
@@ -40,7 +44,16 @@ const STORED_ROW: DraftProspection = {
   campagne_id: '22222222-2222-2222-2222-222222222222',
   prospecteur_id: '33333333-3333-3333-3333-333333333333',
   station_id: null,
+  region: null,
+  district: null,
+  commune: null,
+  za: null,
+  pa_code: null,
+  pa_nom: null,
+  station_nom: null,
+  n_releve: null,
   n_fiche: null,
+  n_message: null,
   especes: null,
   capture_started_at: null,
   grilles_completees: null,
@@ -52,8 +65,15 @@ const STORED_ROW: DraftProspection = {
   surf_prospectee: null,
   surf_infestee: null,
   degats_cultures: null,
+  degats_cultures_pourcent: null,
+  verdissement_pourcent: null,
+  hauteur_herbe_cm: null,
+  derniere_pluie: null,
+  intensite_pluie: null,
   vegetation: null,
   sol: null,
+  ennemis_naturels: null,
+  observations: null,
   statut: 'brouillon',
   statut_sync: 'local',
   created_at: '2026-07-11T00:00:00.000Z',
@@ -142,7 +162,7 @@ describe('startNewProspection', () => {
 
     await expect(
       startNewProspection({ token: 'tok', prospecteurId: 'p1' })
-    ).rejects.toThrow('Aucune campagne en cours');
+    ).rejects.toThrow('Aucune campagne disponible');
     expect(mockCreateDraft).not.toHaveBeenCalled();
   });
 });
@@ -165,5 +185,23 @@ describe('loadValidatedProspections', () => {
     const result = await loadValidatedProspections('tok', 'p1');
 
     expect(result).toEqual([]);
+  });
+});
+
+describe('deleteDraftProspection', () => {
+  it('deletes the local row when the draft is a brouillon', async () => {
+    mockDeleteLocal.mockResolvedValueOnce(true);
+
+    await deleteDraftProspection({ ...STORED_ROW, statut: 'brouillon' });
+
+    expect(mockDeleteLocal).toHaveBeenCalledWith(STORED_ROW.id);
+  });
+
+  it('refuses to delete a fiche that is no longer a brouillon', async () => {
+    await expect(
+      deleteDraftProspection({ ...STORED_ROW, statut: 'en_attente' })
+    ).rejects.toThrow('brouillon');
+
+    expect(mockDeleteLocal).not.toHaveBeenCalled();
   });
 });
