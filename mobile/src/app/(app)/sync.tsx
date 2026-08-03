@@ -11,9 +11,12 @@ import {
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
 import { pullReferentiel } from '@/lib/referentiel-sync';
+import { loadAccueilData, AccueilViewModel } from '@/lib/prospection-accueil';
+import { retrySyncProspection } from '@/lib/prospection-review';
+import { DraftProspection } from '@/lib/prospection-repository';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isSmallScreen = SCREEN_WIDTH < 380;
@@ -22,58 +25,48 @@ const isTablet = SCREEN_WIDTH >= 768;
 const IFVM_GREEN = '#1B5E1B';
 const IFVM_GREEN_DARK = '#163F16';
 
+const EMPTY_DATA: AccueilViewModel = { unsyncedCount: 0, activeDraft: null, recent: [], validated: [] };
+
 type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
-type SyncItem = {
-  id: string;
-  type: 'PROSPECTION' | 'CRT' | 'METEO';
-  code: string;
-  status: 'pending' | 'synced' | 'error';
-  date: string;
-  campagne?: string;
-};
-
-// Données mock
-const MOCK_SYNC_ITEMS: SyncItem[] = [
-  { id: '1', type: 'PROSPECTION', code: 'PRO-2451', status: 'pending', date: '24/06/2026', campagne: 'Campagne 2026' },
-  { id: '2', type: 'PROSPECTION', code: 'PRO-2449', status: 'pending', date: '23/06/2026', campagne: 'Campagne 2026' },
-  { id: '3', type: 'CRT', code: 'CRT-2026-001', status: 'synced', date: '25/06/2026', campagne: 'Campagne 2026' },
-  { id: '4', type: 'METEO', code: 'MET-2026-001', status: 'pending', date: '26/06/2026', campagne: 'Campagne 2026' },
-  { id: '5', type: 'PROSPECTION', code: 'PRO-2446', status: 'synced', date: '22/06/2026', campagne: 'Campagne 2026' },
-  { id: '6', type: 'CRT', code: 'CRT-2026-003', status: 'error', date: '21/06/2026', campagne: 'Campagne 2026' },
-];
-
-const TYPE_CONFIG: Record<SyncItem['type'], { label: string; color: string; bg: string; icon: string }> = {
-  PROSPECTION: { label: 'PRO', color: '#2563EB', bg: '#DBEAFE', icon: '🔍' },
-  CRT: { label: 'CRT', color: '#7C3AED', bg: '#EDE9FE', icon: '📋' },
-  METEO: { label: 'MET', color: '#F59E0B', bg: '#FEF3C7', icon: '🌤️' },
-};
 
 export default function SyncScreen() {
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
+  const [data, setData] = useState<AccueilViewModel>(EMPTY_DATA);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
-  const [progress, setProgress] = useState(0);
-  const [syncItems, setSyncItems] = useState<SyncItem[]>(MOCK_SYNC_ITEMS);
+  const [failures, setFailures] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [lastSync, setLastSync] = useState<Date>(new Date());
+  const [lastSync, setLastSync] = useState<Date | null>(null);
   const [referentielError, setReferentielError] = useState<string | null>(null);
 
-  // Statistiques
+  const refresh = useCallback(() => {
+    loadAccueilData().then(setData);
+  }, []);
+
+  useFocusEffect(refresh);
+
+  // Fiches complétées localement mais pas encore confirmées côté serveur (cf. prospection.tsx).
+  const pendingFiches = data.recent.filter(
+    (item) => item.statut === 'en_attente' && item.statut_sync !== 'synced'
+  );
+  const syncedFiches = data.recent.filter((item) => item.statut_sync === 'synced');
+
   const stats = {
-    total: syncItems.length,
-    pending: syncItems.filter(item => item.status === 'pending').length,
-    synced: syncItems.filter(item => item.status === 'synced').length,
-    error: syncItems.filter(item => item.status === 'error').length,
+    total: data.recent.length,
+    pending: pendingFiches.length,
+    synced: syncedFiches.length,
   };
+
+  const ficheLabel = (draft: DraftProspection) => draft.n_fiche ?? `Fiche du ${draft.date_prospection}`;
 
   const handleSync = async () => {
     if (isSyncing) return;
 
     setIsSyncing(true);
     setSyncStatus('syncing');
-    setProgress(0);
     setReferentielError(null);
+    setFailures([]);
 
     if (token) {
       try {
@@ -85,107 +78,50 @@ export default function SyncScreen() {
       }
     }
 
-    try {
-      const pendingItems = syncItems.filter(item => item.status === 'pending');
-      const totalPending = pendingItems.length;
-
-      if (totalPending === 0) {
-        setSyncStatus('idle');
-        Alert.alert('✅ Synchronisation', 'Aucune donnée à synchroniser');
-        setIsSyncing(false);
-        return;
+    if (pendingFiches.length === 0 || !token) {
+      setSyncStatus(pendingFiches.length === 0 ? 'idle' : 'error');
+      if (pendingFiches.length === 0) {
+        Alert.alert('✅ Synchronisation', 'Aucune fiche à synchroniser');
       }
+      setIsSyncing(false);
+      return;
+    }
 
-      for (let i = 0; i < totalPending; i++) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        const newProgress = ((i + 1) / totalPending) * 100;
-        setProgress(newProgress);
-        
-        setSyncItems(prev => 
-          prev.map((item, index) => {
-            if (item.status === 'pending' && index === i) {
-              return { ...item, status: Math.random() > 0.2 ? 'synced' : 'error' };
-            }
-            return item;
-          })
-        );
+    const currentFailures: string[] = [];
+    for (const draft of pendingFiches) {
+      try {
+        await retrySyncProspection(draft, token);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'erreur inconnue';
+        currentFailures.push(`${ficheLabel(draft)} : ${message}`);
       }
+    }
 
+    setFailures(currentFailures);
+    setLastSync(new Date());
+    refresh();
+
+    if (currentFailures.length === 0) {
       setSyncStatus('success');
-      setLastSync(new Date());
-      
-      const hasErrors = syncItems.some(item => item.status === 'error');
-      if (hasErrors) {
-        Alert.alert(
-          '⚠️ Synchronisation partielle',
-          'Certaines données n\'ont pas pu être synchronisées. Veuillez réessayer.',
-          [{ text: 'OK' }]
-        );
-      } else {
-        Alert.alert('✅ Synchronisation réussie', 'Toutes les données ont été synchronisées');
-      }
-    } catch {
+      Alert.alert('✅ Synchronisation réussie', 'Toutes les fiches ont été synchronisées');
+    } else {
       setSyncStatus('error');
       Alert.alert(
-        '❌ Erreur de synchronisation',
-        'Une erreur est survenue lors de la synchronisation. Veuillez réessayer.',
+        '⚠️ Synchronisation partielle',
+        'Certaines fiches n\'ont pas pu être synchronisées. Veuillez réessayer.',
         [{ text: 'OK' }]
       );
-    } finally {
-      setIsSyncing(false);
-      setTimeout(() => {
-        if (syncStatus !== 'error') {
-          setSyncStatus('idle');
-        }
-      }, 3000);
     }
+
+    setIsSyncing(false);
+    setTimeout(() => setSyncStatus((current) => (current === 'error' ? current : 'idle')), 3000);
   };
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1500);
+    await loadAccueilData().then(setData);
+    setRefreshing(false);
   }, []);
-
-  const getStatusIcon = (status: SyncItem['status']) => {
-    switch (status) {
-      case 'synced':
-        return '✅';
-      case 'pending':
-        return '⏳';
-      case 'error':
-        return '❌';
-      default:
-        return '⏳';
-    }
-  };
-
-  const getStatusLabel = (status: SyncItem['status']) => {
-    switch (status) {
-      case 'synced':
-        return 'Synchronisé';
-      case 'pending':
-        return 'En attente';
-      case 'error':
-        return 'Erreur';
-      default:
-        return 'En attente';
-    }
-  };
-
-  const getStatusColor = (status: SyncItem['status']) => {
-    switch (status) {
-      case 'synced':
-        return '#15803D';
-      case 'pending':
-        return '#D97706';
-      case 'error':
-        return '#DC2626';
-      default:
-        return '#6B7280';
-    }
-  };
 
   return (
     <View style={styles.root}>
@@ -193,9 +129,9 @@ export default function SyncScreen() {
       <View style={styles.header}>
         <SafeAreaView edges={['top']}>
           <View style={styles.headerContent}>
-            <TouchableOpacity 
-              style={styles.backBtn} 
-              onPress={() => router.back()} 
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={() => router.back()}
               activeOpacity={0.7}
             >
               <Text style={styles.backIcon}>‹</Text>
@@ -233,39 +169,23 @@ export default function SyncScreen() {
             <Text style={[styles.statNumber, { color: '#15803D' }]}>{stats.synced}</Text>
             <Text style={styles.statLabel}>Synchronisé</Text>
           </View>
-          {stats.error > 0 && (
-            <>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Text style={[styles.statNumber, { color: '#DC2626' }]}>{stats.error}</Text>
-                <Text style={styles.statLabel}>Erreur</Text>
-              </View>
-            </>
-          )}
         </View>
 
-        {/* Barre de progression */}
+        {/* Statut de synchronisation */}
         {isSyncing && (
           <View style={styles.progressContainer}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressLabel}>Synchronisation en cours...</Text>
-              <Text style={styles.progressPercentage}>{Math.round(progress)}%</Text>
-            </View>
-            <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${progress}%` }]} />
-            </View>
+            <ActivityIndicator color={IFVM_GREEN} />
+            <Text style={styles.progressLabel}>Synchronisation en cours…</Text>
           </View>
         )}
-
-        {/* Statut de synchronisation */}
-        {syncStatus === 'success' && (
+        {syncStatus === 'success' && !isSyncing && (
           <View style={[styles.statusBanner, styles.statusSuccess]}>
             <Text style={styles.statusBannerText}>✅ Synchronisation réussie</Text>
           </View>
         )}
-        {syncStatus === 'error' && (
+        {failures.length > 0 && (
           <View style={[styles.statusBanner, styles.statusError]}>
-            <Text style={styles.statusBannerText}>❌ Erreur de synchronisation</Text>
+            <Text style={styles.statusBannerText}>❌ {failures.join('\n')}</Text>
           </View>
         )}
         {referentielError && (
@@ -275,49 +195,42 @@ export default function SyncScreen() {
         )}
 
         {/* Dernière synchronisation */}
-        <View style={styles.lastSyncContainer}>
-          <Text style={styles.lastSyncText}>
-            Dernière synchronisation : {lastSync.toLocaleString('fr-FR')}
-          </Text>
-        </View>
+        {lastSync && (
+          <View style={styles.lastSyncContainer}>
+            <Text style={styles.lastSyncText}>
+              Dernière synchronisation : {lastSync.toLocaleString('fr-FR')}
+            </Text>
+          </View>
+        )}
 
-        {/* Liste des éléments à synchroniser */}
+        {/* Liste des fiches à synchroniser */}
         <View style={styles.syncListContainer}>
           <View style={styles.syncListHeader}>
-            <Text style={styles.syncListTitle}>Éléments à synchroniser</Text>
-            <Text style={styles.syncListCount}>{syncItems.length}</Text>
+            <Text style={styles.syncListTitle}>Fiches en attente</Text>
+            <Text style={styles.syncListCount}>{pendingFiches.length}</Text>
           </View>
-          
-          {syncItems.length === 0 ? (
+
+          {pendingFiches.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyIcon}>📭</Text>
-              <Text style={styles.emptyTitle}>Aucune donnée</Text>
-              <Text style={styles.emptySub}>Toutes vos données sont synchronisées</Text>
+              <Text style={styles.emptyTitle}>Aucune fiche en attente</Text>
+              <Text style={styles.emptySub}>Toutes vos prospections sont synchronisées</Text>
             </View>
           ) : (
-            syncItems.map((item) => (
-              <View key={item.id} style={styles.syncItem}>
+            pendingFiches.map((draft) => (
+              <View key={draft.id} style={styles.syncItem}>
                 <View style={styles.syncItemLeft}>
-                  <View style={[styles.typeBadge, { backgroundColor: TYPE_CONFIG[item.type].bg }]}>
-                    <Text style={[styles.typeBadgeText, { color: TYPE_CONFIG[item.type].color }]}>
-                      {TYPE_CONFIG[item.type].icon} {TYPE_CONFIG[item.type].label}
-                    </Text>
+                  <View style={[styles.typeBadge, { backgroundColor: '#DBEAFE' }]}>
+                    <Text style={[styles.typeBadgeText, { color: '#2563EB' }]}>🔍 PRO</Text>
                   </View>
                   <View style={styles.syncItemInfo}>
-                    <Text style={styles.syncItemCode}>{item.code}</Text>
-                    <Text style={styles.syncItemDate}>{item.date}</Text>
-                    {item.campagne && (
-                      <Text style={styles.syncItemCampagne}>{item.campagne}</Text>
-                    )}
+                    <Text style={styles.syncItemCode}>{draft.n_fiche ?? '—'}</Text>
+                    <Text style={styles.syncItemDate}>{draft.date_prospection}</Text>
                   </View>
                 </View>
                 <View style={styles.syncItemRight}>
-                  <Text style={[styles.syncItemStatus, { color: getStatusColor(item.status) }]}>
-                    {getStatusIcon(item.status)}
-                  </Text>
-                  <Text style={[styles.syncItemStatusLabel, { color: getStatusColor(item.status) }]}>
-                    {getStatusLabel(item.status)}
-                  </Text>
+                  <Text style={[styles.syncItemStatus, { color: '#D97706' }]}>⏳</Text>
+                  <Text style={[styles.syncItemStatusLabel, { color: '#D97706' }]}>En attente</Text>
                 </View>
               </View>
             ))
@@ -326,10 +239,7 @@ export default function SyncScreen() {
 
         {/* Bouton de synchronisation */}
         <TouchableOpacity
-          style={[
-            styles.syncButton,
-            isSyncing && styles.syncButtonDisabled,
-          ]}
+          style={[styles.syncButton, isSyncing && styles.syncButtonDisabled]}
           onPress={handleSync}
           disabled={isSyncing}
           activeOpacity={0.85}
@@ -436,6 +346,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E7EB',
   },
   progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
@@ -446,32 +359,10 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
   progressLabel: {
     fontSize: 13,
     color: '#6B7280',
     fontWeight: '500',
-  },
-  progressPercentage: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: IFVM_GREEN,
-  },
-  progressTrack: {
-    height: 6,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: 6,
-    backgroundColor: IFVM_GREEN,
-    borderRadius: 3,
   },
   statusBanner: {
     padding: 12,
@@ -568,11 +459,6 @@ const styles = StyleSheet.create({
   syncItemDate: {
     fontSize: isSmallScreen ? 10 : 11,
     color: '#9CA3AF',
-    marginTop: 1,
-  },
-  syncItemCampagne: {
-    fontSize: 10,
-    color: '#6B7280',
     marginTop: 1,
   },
   syncItemRight: {
