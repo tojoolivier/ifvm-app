@@ -20,7 +20,7 @@ const ROLE_LABELS: Record<string, string> = {
   prospecteur: 'Prospecteur',
   verificateur: 'Vérificateur',
   validation_finale: 'Validation finale',
-  chef_equipe: 'Chef d\'équipe',
+  chef_equipe: "Chef d'équipe",
   agent_encadreur: 'Agent encadreur',
   pilote: 'Pilote',
   mecanicien: 'Mécanicien',
@@ -40,12 +40,12 @@ export function UsersPage() {
 
   const { data: users = [], isLoading } = useQuery<Utilisateur[]>({
     queryKey: ['users'],
-    queryFn: () => api.get('/users').then((r) => r.data),
+    queryFn: () => api.get('/users/').then((r) => r.data),
   })
 
   const createMutation = useMutation({
     mutationFn: (data: { nom: string; prenom: string; email: string; password: string; role: string }) =>
-      api.post('/users', data),
+      api.post('/users/', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       setShowCreate(false)
@@ -61,6 +61,9 @@ export function UsersPage() {
       api.patch(`/users/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
+    },
+    onError: (err: AxiosError<{ detail?: string }>) => {
+      alert(err.response?.data?.detail || 'Erreur lors de la mise à jour')
     },
   })
 
@@ -85,7 +88,7 @@ export function UsersPage() {
         <h1 className="text-2xl font-bold text-gray-800">Gestion des utilisateurs</h1>
         <button
           onClick={() => setShowCreate(true)}
-          className="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800"
+          className="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800 transition"
         >
           Nouvel utilisateur
         </button>
@@ -117,8 +120,9 @@ export function UsersPage() {
                   <td className="px-4 py-3">
                     <select
                       value={u.role}
+                      disabled={updateMutation.isPending}
                       onChange={(e) => updateMutation.mutate({ id: u.id, role: e.target.value })}
-                      className="border border-gray-200 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="border border-gray-200 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
                     >
                       {ROLES.map((r) => (
                         <option key={r} value={r}>
@@ -129,8 +133,9 @@ export function UsersPage() {
                   </td>
                   <td className="px-4 py-3">
                     <button
+                      disabled={updateMutation.isPending}
                       onClick={() => updateMutation.mutate({ id: u.id, actif: !u.actif })}
-                      className={`px-2 py-1 rounded text-xs font-medium ${
+                      className={`px-2 py-1 rounded text-xs font-medium transition disabled:opacity-50 ${
                         u.actif
                           ? 'bg-green-100 text-green-800 hover:bg-green-200'
                           : 'bg-red-100 text-red-800 hover:bg-red-200'
@@ -221,14 +226,17 @@ export function UsersPage() {
                 <button
                   type="submit"
                   disabled={createMutation.isPending}
-                  className="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800 disabled:opacity-50"
+                  className="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800 disabled:opacity-50 transition"
                 >
                   {createMutation.isPending ? 'Création…' : 'Créer'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setShowCreate(false); resetForm() }}
-                  className="border border-gray-300 px-4 py-2 rounded hover:bg-gray-50"
+                  onClick={() => {
+                    setShowCreate(false)
+                    resetForm()
+                  }}
+                  className="border border-gray-300 px-4 py-2 rounded hover:bg-gray-50 transition"
                 >
                   Annuler
                 </button>
