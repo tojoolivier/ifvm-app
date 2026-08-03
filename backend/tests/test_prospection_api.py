@@ -547,3 +547,119 @@ async def test_create_prospection_avec_type_larve_enum(
         assert response.status_code == 201
         data = response.json()
         assert data["infestations"][0]["type_larve"] == type_larve
+
+
+@pytest.mark.asyncio
+async def test_create_prospection_extensive_avec_populations_agregees(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+):
+    """Fiche extensive : comptages agrégés par phénotype (B) et densités par stade (C)."""
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "extensive",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-07-29",
+            "station_libre": "Ambohimanga",
+            "type_station": "riziere_bordure",
+            "verdure_strate": "moyenne",
+            "populations": [
+                {
+                    "espece": "LMC",
+                    "categorie": "imago",
+                    "captures_sol": 3,
+                    "captures_trans": 14,
+                    "captures_greg": 0,
+                    "stade_imago": "A2",
+                    "densite_diffuse": 2.4,
+                    "essaim_observe": False,
+                },
+                {
+                    "espece": "NSE",
+                    "categorie": "larve",
+                    "densites_larve": {
+                        "L1": 0,
+                        "L2": 0,
+                        "L3": 31,
+                        "L4": 0,
+                        "L5": 0,
+                        "L6": 0,
+                        "L7": 0,
+                    },
+                    "tache_larvaire": True,
+                    "bande_larvaire": False,
+                    "interdistance": 0.6,
+                    "deplacement": "repos",
+                },
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert data["station_libre"] == "Ambohimanga"
+    assert data["type_station"] == "riziere_bordure"
+    assert data["verdure_strate"] == "moyenne"
+
+    imago = next(p for p in data["populations"] if p["categorie"] == "imago")
+    assert imago["captures_sol"] == 3
+    assert imago["captures_trans"] == 14
+    assert imago["stade_imago"] == "A2"
+    assert imago["essaim_observe"] is False
+
+    larve = next(p for p in data["populations"] if p["categorie"] == "larve")
+    assert larve["densites_larve"]["L3"] == 31
+    assert larve["tache_larvaire"] is True
+    assert larve["bande_larvaire"] is False
+    assert larve["interdistance"] == 0.6
+    assert larve["deplacement"] == "repos"
+
+
+@pytest.mark.asyncio
+async def test_create_prospection_validation_avec_signalement_et_conclusion(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+):
+    """Fiche de validation : signalement affiché, conclusion binaire (pas de motif ni statut)."""
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "validation",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-07-29",
+            "signalement_source": "Rasoanaivo (habitant)",
+            "signalement_date": "25/06",
+            "signalement_description": "Beaucoup de criquets près du champ de riz, côté est",
+            "conclusion_validation": "confirmee",
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert data["type_prospection"] == "validation"
+    assert data["signalement_source"] == "Rasoanaivo (habitant)"
+    assert data["signalement_date"] == "25/06"
+    assert data["signalement_description"].startswith("Beaucoup de criquets")
+    assert data["conclusion_validation"] == "confirmee"
+    # Statut brouillon standard : la conclusion n'implique aucun état d'approbation intermédiaire.
+    assert data["statut"] == "brouillon"
+
+
+@pytest.mark.asyncio
+async def test_create_prospection_conclusion_invalide_echoue(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+):
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "validation",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-07-29",
+            "conclusion_validation": "peut-etre",
+        },
+        headers=auth_headers,
+    )
+    # Le check constraint SQL rejette la valeur ; la route mappe l'IntegrityError résultante en 409.
+    assert response.status_code == 409

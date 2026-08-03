@@ -60,6 +60,16 @@ class CreateProspection:
         degats_cultures_pourcent: int | None = None,
         verdissement_pourcent: int | None = None,
         hauteur_herbe_cm: float | None = None,
+        # ==========================================
+        # NOUVEAUX CHAMPS - Extensif & Validation
+        # ==========================================
+        station_libre: str | None = None,
+        type_station: str | None = None,
+        verdure_strate: str | None = None,
+        signalement_source: str | None = None,
+        signalement_date: str | None = None,
+        signalement_description: str | None = None,
+        conclusion_validation: str | None = None,
     ) -> Prospection:
         if type_prospection == "intensive" and station_id is None:
             raise ValueError("station_id est obligatoire pour une prospection intensive")
@@ -110,6 +120,16 @@ class CreateProspection:
             degats_cultures_pourcent=degats_cultures_pourcent,
             verdissement_pourcent=verdissement_pourcent,
             hauteur_herbe_cm=hauteur_herbe_cm,
+            # ==========================================
+            # NOUVEAUX CHAMPS - Extensif & Validation
+            # ==========================================
+            station_libre=station_libre,
+            type_station=type_station,
+            verdure_strate=verdure_strate,
+            signalement_source=signalement_source,
+            signalement_date=signalement_date,
+            signalement_description=signalement_description,
+            conclusion_validation=conclusion_validation,
         )
 
         for child in prospection.populations:
@@ -194,6 +214,16 @@ class UpdateProspection:
         degats_cultures_pourcent: int | None = None,
         verdissement_pourcent: int | None = None,
         hauteur_herbe_cm: float | None = None,
+        # ==========================================
+        # NOUVEAUX CHAMPS - Extensif & Validation
+        # ==========================================
+        station_libre: str | None = None,
+        type_station: str | None = None,
+        verdure_strate: str | None = None,
+        signalement_source: str | None = None,
+        signalement_date: str | None = None,
+        signalement_description: str | None = None,
+        conclusion_validation: str | None = None,
     ) -> Prospection | None:
         prospection = await self.repository.get_by_id(prospection_id)
         if prospection is None:
@@ -270,6 +300,24 @@ class UpdateProspection:
             prospection.verdissement_pourcent = verdissement_pourcent
         if hauteur_herbe_cm is not None:
             prospection.hauteur_herbe_cm = hauteur_herbe_cm
+
+        # ==========================================
+        # Mise à jour des nouveaux champs - Extensif & Validation
+        # ==========================================
+        if station_libre is not None:
+            prospection.station_libre = station_libre
+        if type_station is not None:
+            prospection.type_station = type_station
+        if verdure_strate is not None:
+            prospection.verdure_strate = verdure_strate
+        if signalement_source is not None:
+            prospection.signalement_source = signalement_source
+        if signalement_date is not None:
+            prospection.signalement_date = signalement_date
+        if signalement_description is not None:
+            prospection.signalement_description = signalement_description
+        if conclusion_validation is not None:
+            prospection.conclusion_validation = conclusion_validation
 
         prospection.updated_at = datetime.utcnow()
 

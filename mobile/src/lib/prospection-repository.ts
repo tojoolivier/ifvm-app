@@ -21,6 +21,9 @@ export interface DraftProspectionInput {
   surfStation?: number | null;
   surfProspectee?: number | null;
   surfInfestee?: number | null;
+  signalementSource?: string | null;
+  signalementDate?: string | null;
+  signalementDescription?: string | null;
 }
 
 export interface DraftProspection {
@@ -39,6 +42,13 @@ export interface DraftProspection {
   degats_cultures_pourcent: number | null;
   verdissement_pourcent: number | null;
   hauteur_herbe_cm: number | null;
+  station_libre: string | null;
+  type_station: string | null;
+  verdure_strate: string | null;
+  signalement_source: string | null;
+  signalement_date: string | null;
+  signalement_description: string | null;
+  conclusion_validation: string | null;
   n_releve: string | null;
   n_fiche: string | null;
   n_message: string | null;
@@ -96,8 +106,9 @@ export async function createDraftProspection(
       region, district, commune, za, pa_code,
       date_prospection, latitude, longitude, altitude,
       surf_station, surf_prospectee, surf_infestee,
+      signalement_source, signalement_date, signalement_description,
       statut, statut_sync, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'brouillon', 'local', ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'brouillon', 'local', ?, ?)`,
     [
       input.id,
       input.typeProspection,
@@ -116,6 +127,9 @@ export async function createDraftProspection(
       input.surfStation ?? null,
       input.surfProspectee ?? null,
       input.surfInfestee ?? null,
+      input.signalementSource ?? null,
+      input.signalementDate ?? null,
+      input.signalementDescription ?? null,
       now,
       now,
     ]
@@ -181,6 +195,107 @@ export async function updateProspectionEspeces(id: string, especes: string): Pro
     'UPDATE prospection SET especes = ?, updated_at = ? WHERE id = ?',
     [especes, now, id]
   );
+
+  const updated = await getProspection(id);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
+export interface ExtensiveReferenceUpdateInput {
+  latitude: number | null;
+  longitude: number | null;
+  stationLibre: string | null;
+  typeStation: string | null;
+  surfStation: number | null;
+  nMessage: string | null;
+}
+
+/** Écran A (Références) du parcours extensif : station libre (texte), pas de lookup référentiel. */
+export async function updateProspectionExtensiveReference(
+  id: string,
+  input: ExtensiveReferenceUpdateInput
+): Promise<DraftProspection> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    `UPDATE prospection SET
+      latitude = ?, longitude = ?, station_libre = ?, type_station = ?,
+      surf_station = ?, n_message = ?,
+      updated_at = ? WHERE id = ?`,
+    [
+      input.latitude,
+      input.longitude,
+      input.stationLibre,
+      input.typeStation,
+      input.surfStation,
+      input.nMessage,
+      now,
+      id,
+    ]
+  );
+
+  const updated = await getProspection(id);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
+export interface ExtensiveObservationsUpdateInput {
+  degatsCulturesPourcent: number | null;
+  verdureStrate: string | null;
+  hauteurHerbeCm: number | null;
+  dernierePluie: string | null;
+  intensitePluie: string | null;
+}
+
+/** Écran D (Observations) du parcours extensif — commun aux deux espèces. */
+export async function updateProspectionExtensiveObservations(
+  id: string,
+  input: ExtensiveObservationsUpdateInput
+): Promise<DraftProspection> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    `UPDATE prospection SET
+      degats_cultures_pourcent = ?, verdure_strate = ?, hauteur_herbe_cm = ?,
+      derniere_pluie = ?, intensite_pluie = ?,
+      updated_at = ? WHERE id = ?`,
+    [
+      input.degatsCulturesPourcent,
+      input.verdureStrate,
+      input.hauteurHerbeCm,
+      input.dernierePluie,
+      input.intensitePluie,
+      now,
+      id,
+    ]
+  );
+
+  const updated = await getProspection(id);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
+/** Enregistre la conclusion binaire d'une prospection de validation (Confirmée / Infirmée) — pas de motif, pas d'état intermédiaire. */
+export async function concludeValidation(
+  id: string,
+  conclusion: 'confirmee' | 'infirmee'
+): Promise<DraftProspection> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync('UPDATE prospection SET conclusion_validation = ?, updated_at = ? WHERE id = ?', [
+    conclusion,
+    now,
+    id,
+  ]);
 
   const updated = await getProspection(id);
   if (!updated) {
@@ -348,7 +463,27 @@ export interface PopulationRow {
   methode: string | null;
   accouplement: string | null;
   ponte: string | null;
+  // ==========================================
+  // Extensif Imagos (B)
+  // ==========================================
+  captures_sol?: number | null;
+  captures_trans?: number | null;
+  captures_greg?: number | null;
+  stade_imago?: string | null;
+  essaim_observe?: boolean | null;
+  // ==========================================
+  // Extensif Larves (C)
+  // ==========================================
+  densites_larve?: string | null;
+  tache_larvaire?: boolean | null;
+  bande_larvaire?: boolean | null;
+  interdistance?: number | null;
+  deplacement?: string | null;
 }
+
+const POPULATION_COLUMNS = `espece, categorie, densite_diffuse, densite_groupee, methode, accouplement, ponte,
+            captures_sol, captures_trans, captures_greg, stade_imago, essaim_observe,
+            densites_larve, tache_larvaire, bande_larvaire, interdistance, deplacement`;
 
 export async function getProspectionPopulation(
   prospectionId: string,
@@ -357,7 +492,7 @@ export async function getProspectionPopulation(
 ): Promise<PopulationRow | null> {
   const db = await getDb();
   const row = await db.getFirstAsync<PopulationRow>(
-    'SELECT espece, categorie, densite_diffuse, densite_groupee, methode, accouplement, ponte FROM prospection_population WHERE prospection_id = ? AND espece = ? AND categorie = ?',
+    `SELECT ${POPULATION_COLUMNS} FROM prospection_population WHERE prospection_id = ? AND espece = ? AND categorie = ?`,
     [prospectionId, espece, categorie]
   );
   return row ?? null;
@@ -366,7 +501,7 @@ export async function getProspectionPopulation(
 export async function listAllProspectionPopulations(prospectionId: string): Promise<PopulationRow[]> {
   const db = await getDb();
   return db.getAllAsync<PopulationRow>(
-    'SELECT espece, categorie, densite_diffuse, densite_groupee, methode, accouplement, ponte FROM prospection_population WHERE prospection_id = ?',
+    `SELECT ${POPULATION_COLUMNS} FROM prospection_population WHERE prospection_id = ?`,
     [prospectionId]
   );
 }
@@ -377,15 +512,49 @@ export async function saveProspectionPopulation(prospectionId: string, row: Popu
     'SELECT id FROM prospection_population WHERE prospection_id = ? AND espece = ? AND categorie = ?',
     [prospectionId, row.espece, row.categorie]
   );
+
+  // Convertir les booleans en nombres pour SQLite
+  const essaimObserve = row.essaim_observe === true ? 1 : (row.essaim_observe === false ? 0 : null);
+  const tacheLarvaire = row.tache_larvaire === true ? 1 : (row.tache_larvaire === false ? 0 : null);
+  const bandeLarvaire = row.bande_larvaire === true ? 1 : (row.bande_larvaire === false ? 0 : null);
+
+  const extensiveValues = [
+    row.captures_sol ?? null,
+    row.captures_trans ?? null,
+    row.captures_greg ?? null,
+    row.stade_imago ?? null,
+    essaimObserve,
+    row.densites_larve ?? null,
+    tacheLarvaire,
+    bandeLarvaire,
+    row.interdistance ?? null,
+    row.deplacement ?? null,
+  ];
+
   if (existing) {
     await db.runAsync(
-      'UPDATE prospection_population SET densite_diffuse = ?, densite_groupee = ?, methode = ?, accouplement = ?, ponte = ? WHERE id = ?',
-      [row.densite_diffuse, row.densite_groupee, row.methode, row.accouplement, row.ponte, existing.id]
+      `UPDATE prospection_population SET
+        densite_diffuse = ?, densite_groupee = ?, methode = ?, accouplement = ?, ponte = ?,
+        captures_sol = ?, captures_trans = ?, captures_greg = ?, stade_imago = ?, essaim_observe = ?,
+        densites_larve = ?, tache_larvaire = ?, bande_larvaire = ?, interdistance = ?, deplacement = ?
+       WHERE id = ?`,
+      [
+        row.densite_diffuse,
+        row.densite_groupee,
+        row.methode,
+        row.accouplement,
+        row.ponte,
+        ...extensiveValues,
+        existing.id,
+      ]
     );
   } else {
     await db.runAsync(
-      `INSERT INTO prospection_population (id, prospection_id, espece, categorie, densite_diffuse, densite_groupee, methode, accouplement, ponte)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO prospection_population (
+        id, prospection_id, espece, categorie, densite_diffuse, densite_groupee, methode, accouplement, ponte,
+        captures_sol, captures_trans, captures_greg, phase, essaim_observe,
+        densites_larve, tache_larvaire, bande_larvaire, interdistance, deplacement
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         generateId(),
         prospectionId,
@@ -396,6 +565,7 @@ export async function saveProspectionPopulation(prospectionId: string, row: Popu
         row.methode,
         row.accouplement,
         row.ponte,
+        ...extensiveValues,
       ]
     );
   }

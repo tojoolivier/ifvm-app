@@ -81,6 +81,18 @@ export interface ProspectionPopulationInput {
   temps_capture?: number | null;
   accouplement?: string | null;
   ponte?: string | null;
+  // ========== Extensif Imagos (B) ==========
+  captures_sol?: number | null;
+  captures_trans?: number | null;
+  captures_greg?: number | null;
+  stade_imago?: string | null;
+  essaim_observe?: boolean | null;
+  // ========== Extensif Larves (C) ==========
+  densites_larve?: Record<string, number> | null;
+  tache_larvaire?: boolean | null;
+  bande_larvaire?: boolean | null;
+  interdistance?: number | null;
+  deplacement?: string | null;
 }
 
 export interface ProspectionInfestationInput {
@@ -130,6 +142,8 @@ export interface ProspectionCreateInput {
   surf_prospectee?: number | null;
   surf_infestee?: number | null;
   degats_cultures?: string | null;
+  derniere_pluie?: string | null;
+  intensite_pluie?: string | null;
   vegetation?: Record<string, unknown> | null;
   sol?: Record<string, unknown> | null;
   ennemis_naturels?: string | null;
@@ -147,6 +161,14 @@ export interface ProspectionCreateInput {
   degats_cultures_pourcent?: number | null;
   verdissement_pourcent?: number | null;
   hauteur_herbe_cm?: number | null;
+  // ========== Extensif & Validation ==========
+  station_libre?: string | null;
+  type_station?: string | null;
+  verdure_strate?: string | null;
+  signalement_source?: string | null;
+  signalement_date?: string | null;
+  signalement_description?: string | null;
+  conclusion_validation?: string | null;
 }
 
 export interface ProspectionCreateResponse {
