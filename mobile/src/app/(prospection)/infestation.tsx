@@ -207,6 +207,15 @@ export default function InfestationScreen() {
         <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16 }}>
           {tab === 'desc' && (
             <>
+              <View style={styles.toggleTrack}>
+                <TouchableOpacity onPress={() => setTab('desc')} activeOpacity={0.7} style={styles.toggleSegmentTouchable}>
+                  <Text style={[styles.toggleSegment, tab === 'desc' && styles.toggleSegmentActive]}>Description</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setTab('comport')} activeOpacity={0.7} style={styles.toggleSegmentTouchable}>
+                  <Text style={styles.toggleSegment}>Comportement</Text>
+                </TouchableOpacity>
+              </View>
+
               <Text style={styles.sectionLabel}>Type de cible</Text>
               <View style={styles.targetRow}>
                 {TYPE_CIBLE_OPTIONS.map((option) => {
@@ -222,15 +231,6 @@ export default function InfestationScreen() {
                     </TouchableOpacity>
                   );
                 })}
-              </View>
-
-              <View style={styles.toggleTrack}>
-                <TouchableOpacity onPress={() => setTab('desc')} activeOpacity={0.7} style={styles.toggleSegmentTouchable}>
-                  <Text style={[styles.toggleSegment, tab === 'desc' && styles.toggleSegmentActive]}>Description</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setTab('comport')} activeOpacity={0.7} style={styles.toggleSegmentTouchable}>
-                  <Text style={styles.toggleSegment}>Comportement</Text>
-                </TouchableOpacity>
               </View>
             </>
           )}
@@ -425,97 +425,97 @@ export default function InfestationScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
-  headerRow: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  back: { fontSize: 28, fontWeight: '700', color: TEXT_SECONDARY },
-  title: { fontSize: 20, fontWeight: '800', color: TEXT },
+  headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
+  title: { fontSize: 16, fontWeight: '800', color: TEXT },
   scroll: { flex: 1 },
-  sectionLabel: { fontSize: 12, fontWeight: '700', color: '#9a9484', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 18, marginBottom: 10 },
-  targetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 18 },
+  sectionLabel: { fontSize: 10, fontWeight: '700', color: '#9a9484', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 12, marginBottom: 7 },
+  targetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
   targetChip: {
     flexBasis: '47%',
     flexGrow: 1,
-    paddingVertical: 22,
-    paddingHorizontal: 12,
-    borderRadius: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 10,
+    borderRadius: 11,
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: BORDER,
     alignItems: 'center',
   },
   targetChipActive: { backgroundColor: TARGET_ACTIVE, borderColor: TARGET_ACTIVE },
-  targetChipText: { fontSize: 16, fontWeight: '700', color: TEXT },
+  targetChipText: { fontSize: 13, fontWeight: '700', color: TEXT },
   targetChipTextActive: { fontWeight: '800', color: '#fff' },
-  toggleTrack: { flexDirection: 'row', backgroundColor: INACTIVE_BG, borderRadius: 14, padding: 4, gap: 4, marginBottom: 20 },
+  toggleTrack: { flexDirection: 'row', backgroundColor: INACTIVE_BG, borderRadius: 11, padding: 3, gap: 3, marginBottom: 14 },
   toggleSegmentTouchable: { flex: 1 },
   toggleSegment: {
-    fontSize: 15,
+    fontSize: 12.5,
     fontWeight: '700',
     textAlign: 'center',
-    paddingVertical: 14,
-    borderRadius: 11,
+    paddingVertical: 9,
+    borderRadius: 8,
     color: '#9a9484',
   },
   toggleSegmentActive: { backgroundColor: '#fff', color: TEXT },
-  card: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 14, padding: 16 },
-  cardTitle: { fontSize: 15, fontWeight: '700', color: TEXT, marginBottom: 12 },
-  fieldGroupLabel: { fontSize: 12, fontWeight: '700', color: '#9a9484', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 10, marginTop: 18 },
-  row3: { flexDirection: 'row', gap: 9 },
-  row2: { flexDirection: 'row', gap: 9, marginTop: 10 },
-  row2NoMargin: { flexDirection: 'row', gap: 9 },
-  box: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 14, paddingVertical: 16, paddingHorizontal: 12, minHeight: 82 },
-  boxCaption: { fontSize: 13, fontWeight: '500', color: '#9a9484', marginBottom: 4 },
+  card: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 12, padding: 14 },
+  cardTitle: { fontSize: 13, fontWeight: '700', color: TEXT, marginBottom: 10 },
+  fieldGroupLabel: { fontSize: 10, fontWeight: '700', color: '#9a9484', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 7, marginTop: 12 },
+  row3: { flexDirection: 'row', gap: 7 },
+  row2: { flexDirection: 'row', gap: 7, marginTop: 7 },
+  row2NoMargin: { flexDirection: 'row', gap: 7 },
+  box: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 11, paddingVertical: 10, paddingHorizontal: 9, minHeight: 62 },
+  boxCaption: { fontSize: 10.5, fontWeight: '500', color: '#9a9484', marginBottom: 3 },
   boxCaptionEmphasis: { color: 'rgba(255,255,255,0.75)' },
-  boxValue: { fontSize: 24, fontWeight: '700', color: TEXT, padding: 0 },
+  boxValue: { fontSize: 17, fontWeight: '700', color: TEXT, padding: 0 },
   boxValueEmphasis: { color: '#fff' },
   boxEmphasis: { backgroundColor: GREEN, borderColor: GREEN },
-  chip: { flex: 1, alignItems: 'center', paddingVertical: 18, borderRadius: 12, backgroundColor: INACTIVE_BG },
+  chip: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 10, backgroundColor: INACTIVE_BG },
   chipActive: { backgroundColor: GREEN },
-  chipText: { fontSize: 15, fontWeight: '700', color: TEXT_SECONDARY },
+  chipText: { fontSize: 12.5, fontWeight: '700', color: TEXT_SECONDARY },
   chipTextActive: { fontWeight: '800', color: '#fff' },
   footer: { padding: 16 },
-  continueButton: { backgroundColor: GREEN, borderRadius: 27, paddingVertical: 19, alignItems: 'center' },
-  continueButtonText: { color: '#fff', fontWeight: '800', fontSize: 17 },
-  insightCallout: { backgroundColor: '#fbeae6', borderRadius: 12, padding: 14, marginTop: 14 },
-  insightText: { fontSize: 13, lineHeight: 18, fontWeight: '500', color: '#a8422c' },
-  compassCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 14, padding: 16, marginTop: 10 },
-  compassCircle: { width: 190, height: 190, alignSelf: 'center', borderWidth: 2, borderColor: BORDER, borderRadius: 95, marginBottom: 14 },
-  compassCardinal: { position: 'absolute', fontSize: 13, fontWeight: '700', color: '#9a9484' },
-  compassCardinalN: { top: 6, left: '50%', marginLeft: -6 },
-  compassCardinalS: { bottom: 6, left: '50%', marginLeft: -6 },
-  compassCardinalO: { left: 10, top: '50%', marginTop: -8 },
-  compassCardinalE: { right: 10, top: '50%', marginTop: -8 },
+  continueButton: { backgroundColor: GREEN, borderRadius: 15, paddingVertical: 15, alignItems: 'center' },
+  continueButtonText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  insightCallout: { backgroundColor: '#fbeae6', borderRadius: 10, padding: 11, marginTop: 10 },
+  insightText: { fontSize: 11.5, lineHeight: 16, fontWeight: '500', color: '#a8422c' },
+  compassCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 12, padding: 14, marginTop: 7 },
+  compassCircle: { width: 150, height: 150, alignSelf: 'center', borderWidth: 2, borderColor: BORDER, borderRadius: 75, marginBottom: 8 },
+  compassCardinal: { position: 'absolute', fontSize: 10.5, fontWeight: '700', color: '#9a9484' },
+  compassCardinalN: { top: 4, left: '50%', marginLeft: -5 },
+  compassCardinalS: { bottom: 4, left: '50%', marginLeft: -5 },
+  compassCardinalO: { left: 7, top: '50%', marginTop: -7 },
+  compassCardinalE: { right: 7, top: '50%', marginTop: -7 },
   compassArrow: {
     position: 'absolute',
     top: '50%',
     left: '50%',
-    width: 3,
-    height: 66,
+    width: 2.5,
+    height: 52,
     backgroundColor: TARGET_ACTIVE,
-    marginLeft: -1.5,
-    marginTop: -66,
+    marginLeft: -1.25,
+    marginTop: -52,
     transformOrigin: 'bottom center',
   } as any,
   compassArrowDot: {
     position: 'absolute',
     top: '50%',
     left: '50%',
-    width: 11,
-    height: 11,
-    borderRadius: 5.5,
-    marginLeft: -5.5,
-    marginTop: -5.5,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+    marginLeft: -4.5,
+    marginTop: -4.5,
     backgroundColor: TARGET_ACTIVE,
   },
-  compassChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
-  compassChip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 9, backgroundColor: INACTIVE_BG },
+  compassChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
+  compassChip: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 7, backgroundColor: INACTIVE_BG },
   compassChipActive: { backgroundColor: TARGET_ACTIVE },
-  compassChipText: { fontSize: 13, fontWeight: '700', color: TEXT_SECONDARY },
+  compassChipText: { fontSize: 11, fontWeight: '700', color: TEXT_SECONDARY },
   compassChipTextActive: { fontWeight: '800', color: '#fff' },
-  infoBox: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 14, paddingVertical: 16, paddingHorizontal: 12, minHeight: 82 },
+  infoBox: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 11, paddingVertical: 10, paddingHorizontal: 9, minHeight: 62 },
   infoBoxHighlighted: { borderWidth: 2, borderColor: GREEN },
-  infoBoxLabel: { fontSize: 13, fontWeight: '500', color: '#9a9484', marginBottom: 4 },
-  infoBoxValue: { fontSize: 20, fontWeight: '700', color: TEXT },
-  infoBoxInputRow: { flexDirection: 'row', alignItems: 'baseline', gap: 5 },
-  infoBoxInput: { flex: 1, fontSize: 24, fontWeight: '700', color: TEXT, padding: 0 },
-  infoBoxUnit: { fontSize: 13, fontWeight: '600', color: '#9a9484' },
+  infoBoxLabel: { fontSize: 10.5, fontWeight: '500', color: '#9a9484', marginBottom: 3 },
+  infoBoxValue: { fontSize: 15, fontWeight: '700', color: TEXT },
+  infoBoxInputRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+  infoBoxInput: { flex: 1, fontSize: 17, fontWeight: '700', color: TEXT, padding: 0 },
+  infoBoxUnit: { fontSize: 10.5, fontWeight: '600', color: '#9a9484' },
 });
