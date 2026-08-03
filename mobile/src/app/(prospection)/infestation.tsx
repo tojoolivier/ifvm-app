@@ -260,54 +260,66 @@ export default function InfestationScreen() {
                 </View>
               </View>
 
-              <Text style={styles.fieldGroupLabel}>Densité /m² (min / max / moy)</Text>
+              <Text style={styles.sectionLabel}>Densité (/m²)</Text>
               <View style={styles.row3}>
-                <TextInput
-                  value={form.densMin}
-                  onChangeText={(v) => setField('densMin', v)}
-                  placeholder="min"
-                  keyboardType="decimal-pad"
-                  style={styles.smallInput}
-                />
-                <TextInput
-                  value={form.densMax}
-                  onChangeText={(v) => setField('densMax', v)}
-                  placeholder="max"
-                  keyboardType="decimal-pad"
-                  style={styles.smallInput}
-                />
-                <TextInput
-                  value={form.densMoy}
-                  onChangeText={(v) => setField('densMoy', v)}
-                  placeholder="moy"
-                  keyboardType="decimal-pad"
-                  style={[styles.smallInput, styles.smallInputEmphasis]}
-                />
+                <View style={styles.box}>
+                  <Text style={styles.boxCaption}>min</Text>
+                  <TextInput
+                    value={form.densMin}
+                    onChangeText={(v) => setField('densMin', v)}
+                    keyboardType="decimal-pad"
+                    style={styles.boxValue}
+                  />
+                </View>
+                <View style={styles.box}>
+                  <Text style={styles.boxCaption}>max</Text>
+                  <TextInput
+                    value={form.densMax}
+                    onChangeText={(v) => setField('densMax', v)}
+                    keyboardType="decimal-pad"
+                    style={styles.boxValue}
+                  />
+                </View>
+                <View style={[styles.box, styles.boxEmphasis]}>
+                  <Text style={[styles.boxCaption, styles.boxCaptionEmphasis]}>moy</Text>
+                  <TextInput
+                    value={form.densMoy}
+                    onChangeText={(v) => setField('densMoy', v)}
+                    keyboardType="decimal-pad"
+                    style={[styles.boxValue, styles.boxValueEmphasis]}
+                  />
+                </View>
               </View>
 
-              <Text style={styles.fieldGroupLabel}>Interdistance (m) (min / max / moy)</Text>
+              <Text style={styles.sectionLabel}>Interdistance (m)</Text>
               <View style={styles.row3}>
-                <TextInput
-                  value={form.interdistanceMin}
-                  onChangeText={(v) => setField('interdistanceMin', v)}
-                  placeholder="min"
-                  keyboardType="decimal-pad"
-                  style={styles.smallInput}
-                />
-                <TextInput
-                  value={form.interdistanceMax}
-                  onChangeText={(v) => setField('interdistanceMax', v)}
-                  placeholder="max"
-                  keyboardType="decimal-pad"
-                  style={styles.smallInput}
-                />
-                <TextInput
-                  value={form.interdistanceMoy}
-                  onChangeText={(v) => setField('interdistanceMoy', v)}
-                  placeholder="moy"
-                  keyboardType="decimal-pad"
-                  style={styles.smallInput}
-                />
+                <View style={styles.box}>
+                  <Text style={styles.boxCaption}>min</Text>
+                  <TextInput
+                    value={form.interdistanceMin}
+                    onChangeText={(v) => setField('interdistanceMin', v)}
+                    keyboardType="decimal-pad"
+                    style={styles.boxValue}
+                  />
+                </View>
+                <View style={styles.box}>
+                  <Text style={styles.boxCaption}>max</Text>
+                  <TextInput
+                    value={form.interdistanceMax}
+                    onChangeText={(v) => setField('interdistanceMax', v)}
+                    keyboardType="decimal-pad"
+                    style={styles.boxValue}
+                  />
+                </View>
+                <View style={styles.box}>
+                  <Text style={styles.boxCaption}>moy</Text>
+                  <TextInput
+                    value={form.interdistanceMoy}
+                    onChangeText={(v) => setField('interdistanceMoy', v)}
+                    keyboardType="decimal-pad"
+                    style={styles.boxValue}
+                  />
+                </View>
               </View>
 
               {descInsight && (
@@ -413,84 +425,97 @@ export default function InfestationScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
-  headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
-  title: { fontSize: 15, fontWeight: '700', color: TEXT },
+  headerRow: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  back: { fontSize: 28, fontWeight: '700', color: TEXT_SECONDARY },
+  title: { fontSize: 20, fontWeight: '800', color: TEXT },
   scroll: { flex: 1 },
-  sectionLabel: { fontSize: 9, fontWeight: '700', color: '#9a9484', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 7 },
-  targetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 },
-  targetChip: { paddingHorizontal: 12, paddingVertical: 9, borderRadius: 8, backgroundColor: INACTIVE_BG },
-  targetChipActive: { backgroundColor: TARGET_ACTIVE },
-  targetChipText: { fontSize: 11.5, fontWeight: '600', color: TEXT_SECONDARY },
-  targetChipTextActive: { fontWeight: '700', color: '#fff' },
-  toggleTrack: { flexDirection: 'row', backgroundColor: INACTIVE_BG, borderRadius: 8, padding: 2, gap: 2, marginBottom: 14 },
+  sectionLabel: { fontSize: 12, fontWeight: '700', color: '#9a9484', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 18, marginBottom: 10 },
+  targetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 18 },
+  targetChip: {
+    flexBasis: '47%',
+    flexGrow: 1,
+    paddingVertical: 22,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: BORDER,
+    alignItems: 'center',
+  },
+  targetChipActive: { backgroundColor: TARGET_ACTIVE, borderColor: TARGET_ACTIVE },
+  targetChipText: { fontSize: 16, fontWeight: '700', color: TEXT },
+  targetChipTextActive: { fontWeight: '800', color: '#fff' },
+  toggleTrack: { flexDirection: 'row', backgroundColor: INACTIVE_BG, borderRadius: 14, padding: 4, gap: 4, marginBottom: 20 },
   toggleSegmentTouchable: { flex: 1 },
   toggleSegment: {
-    fontSize: 11.5,
+    fontSize: 15,
     fontWeight: '700',
     textAlign: 'center',
-    paddingVertical: 8,
-    borderRadius: 6,
+    paddingVertical: 14,
+    borderRadius: 11,
     color: '#9a9484',
   },
   toggleSegmentActive: { backgroundColor: '#fff', color: TEXT },
-  card: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 12, padding: 14 },
-  cardTitle: { fontSize: 12.5, fontWeight: '700', color: TEXT, marginBottom: 9 },
-  fieldGroupLabel: { fontSize: 9, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 5, marginTop: 7 },
-  row3: { flexDirection: 'row', gap: 7 },
-  row2: { flexDirection: 'row', gap: 7, marginTop: 7 },
-  row2NoMargin: { flexDirection: 'row', gap: 7 },
-  smallInput: { flex: 1, backgroundColor: INACTIVE_BG, borderRadius: 6, padding: 7, fontSize: 11.5, fontWeight: '600', color: TEXT, textAlign: 'center' },
-  smallInputEmphasis: { backgroundColor: GREEN, color: '#fff' },
-  fullInput: { backgroundColor: INACTIVE_BG, borderRadius: 6, padding: 7, fontSize: 11, fontWeight: '600', color: TEXT },
-  chip: { flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: 7, backgroundColor: INACTIVE_BG },
+  card: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 14, padding: 16 },
+  cardTitle: { fontSize: 15, fontWeight: '700', color: TEXT, marginBottom: 12 },
+  fieldGroupLabel: { fontSize: 12, fontWeight: '700', color: '#9a9484', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 10, marginTop: 18 },
+  row3: { flexDirection: 'row', gap: 9 },
+  row2: { flexDirection: 'row', gap: 9, marginTop: 10 },
+  row2NoMargin: { flexDirection: 'row', gap: 9 },
+  box: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 14, paddingVertical: 16, paddingHorizontal: 12, minHeight: 82 },
+  boxCaption: { fontSize: 13, fontWeight: '500', color: '#9a9484', marginBottom: 4 },
+  boxCaptionEmphasis: { color: 'rgba(255,255,255,0.75)' },
+  boxValue: { fontSize: 24, fontWeight: '700', color: TEXT, padding: 0 },
+  boxValueEmphasis: { color: '#fff' },
+  boxEmphasis: { backgroundColor: GREEN, borderColor: GREEN },
+  chip: { flex: 1, alignItems: 'center', paddingVertical: 18, borderRadius: 12, backgroundColor: INACTIVE_BG },
   chipActive: { backgroundColor: GREEN },
-  chipText: { fontSize: 11, fontWeight: '600', color: TEXT_SECONDARY },
-  chipTextActive: { fontWeight: '700', color: '#fff' },
+  chipText: { fontSize: 15, fontWeight: '700', color: TEXT_SECONDARY },
+  chipTextActive: { fontWeight: '800', color: '#fff' },
   footer: { padding: 16 },
-  continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
-  continueButtonText: { color: '#fff', fontWeight: '800', fontSize: 15 },
-  insightCallout: { backgroundColor: '#fbeae6', borderRadius: 10, padding: 11, marginTop: 8 },
-  insightText: { fontSize: 11.5, lineHeight: 16, fontWeight: '500', color: '#a8422c' },
-  compassCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 12, padding: 14, marginTop: 7 },
-  compassCircle: { width: 130, height: 130, alignSelf: 'center', borderWidth: 2, borderColor: BORDER, borderRadius: 65, marginBottom: 4 },
-  compassCardinal: { position: 'absolute', fontSize: 9, fontWeight: '700', color: '#9a9484' },
-  compassCardinalN: { top: 2, left: '50%', marginLeft: -5 },
-  compassCardinalS: { bottom: 2, left: '50%', marginLeft: -5 },
-  compassCardinalO: { left: 4, top: '50%', marginTop: -6 },
-  compassCardinalE: { right: 4, top: '50%', marginTop: -6 },
+  continueButton: { backgroundColor: GREEN, borderRadius: 27, paddingVertical: 19, alignItems: 'center' },
+  continueButtonText: { color: '#fff', fontWeight: '800', fontSize: 17 },
+  insightCallout: { backgroundColor: '#fbeae6', borderRadius: 12, padding: 14, marginTop: 14 },
+  insightText: { fontSize: 13, lineHeight: 18, fontWeight: '500', color: '#a8422c' },
+  compassCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 14, padding: 16, marginTop: 10 },
+  compassCircle: { width: 190, height: 190, alignSelf: 'center', borderWidth: 2, borderColor: BORDER, borderRadius: 95, marginBottom: 14 },
+  compassCardinal: { position: 'absolute', fontSize: 13, fontWeight: '700', color: '#9a9484' },
+  compassCardinalN: { top: 6, left: '50%', marginLeft: -6 },
+  compassCardinalS: { bottom: 6, left: '50%', marginLeft: -6 },
+  compassCardinalO: { left: 10, top: '50%', marginTop: -8 },
+  compassCardinalE: { right: 10, top: '50%', marginTop: -8 },
   compassArrow: {
     position: 'absolute',
     top: '50%',
     left: '50%',
-    width: 2,
-    height: 46,
+    width: 3,
+    height: 66,
     backgroundColor: TARGET_ACTIVE,
-    marginLeft: -1,
-    marginTop: -46,
+    marginLeft: -1.5,
+    marginTop: -66,
     transformOrigin: 'bottom center',
   } as any,
   compassArrowDot: {
     position: 'absolute',
     top: '50%',
     left: '50%',
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginLeft: -4,
-    marginTop: -4,
+    width: 11,
+    height: 11,
+    borderRadius: 5.5,
+    marginLeft: -5.5,
+    marginTop: -5.5,
     backgroundColor: TARGET_ACTIVE,
   },
-  compassChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, justifyContent: 'center' },
-  compassChip: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6, backgroundColor: INACTIVE_BG },
+  compassChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
+  compassChip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 9, backgroundColor: INACTIVE_BG },
   compassChipActive: { backgroundColor: TARGET_ACTIVE },
-  compassChipText: { fontSize: 10.5, fontWeight: '600', color: TEXT_SECONDARY },
-  compassChipTextActive: { fontWeight: '700', color: '#fff' },
-  infoBox: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 9 },
+  compassChipText: { fontSize: 13, fontWeight: '700', color: TEXT_SECONDARY },
+  compassChipTextActive: { fontWeight: '800', color: '#fff' },
+  infoBox: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 14, paddingVertical: 16, paddingHorizontal: 12, minHeight: 82 },
   infoBoxHighlighted: { borderWidth: 2, borderColor: GREEN },
-  infoBoxLabel: { fontSize: 8.5, fontWeight: '500', color: '#9a9484' },
-  infoBoxValue: { fontSize: 14, fontWeight: '700', color: TEXT },
-  infoBoxInputRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
-  infoBoxInput: { flex: 1, fontSize: 14, fontWeight: '700', color: TEXT, padding: 0 },
-  infoBoxUnit: { fontSize: 10, fontWeight: '600', color: '#9a9484' },
+  infoBoxLabel: { fontSize: 13, fontWeight: '500', color: '#9a9484', marginBottom: 4 },
+  infoBoxValue: { fontSize: 20, fontWeight: '700', color: TEXT },
+  infoBoxInputRow: { flexDirection: 'row', alignItems: 'baseline', gap: 5 },
+  infoBoxInput: { flex: 1, fontSize: 24, fontWeight: '700', color: TEXT, padding: 0 },
+  infoBoxUnit: { fontSize: 13, fontWeight: '600', color: '#9a9484' },
 });
