@@ -88,6 +88,9 @@ export interface ProspectionInfestationInput {
   type_essaim?: string | null;
   nb_taches_bandes?: number | null;
   interdistance_m?: number | null;
+  interdistance_min?: number | null;
+  interdistance_max?: number | null;
+  interdistance_moy?: number | null;
   surface_contaminee_ha?: number | null;
   type_larve?: string | null;
   surf_infestee_pourcent?: number | null;

@@ -5,8 +5,8 @@ const MIGRATED_COLUMNS = [
   'degats_cultures_pourcent', 'verdissement_pourcent', 'hauteur_herbe_cm',
   'espece', 'direction_de', 'pullulation_nb', 'taille_long', 'taille_large',
   'taille_epaisseur', 'essaim_en_vol', 'essaim_pose', 'type_essaim',
-  'nb_taches_bandes', 'interdistance_m', 'surface_contaminee_ha',
-  'type_larve', 'surf_infestee_pourcent',
+  'nb_taches_bandes', 'interdistance_m', 'interdistance_min', 'interdistance_max', 'interdistance_moy',
+  'surface_contaminee_ha', 'type_larve', 'surf_infestee_pourcent',
 ].map((name) => ({ name }));
 
 const execAsync = jest.fn().mockResolvedValue(undefined);

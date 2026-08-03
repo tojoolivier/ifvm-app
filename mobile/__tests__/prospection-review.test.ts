@@ -144,7 +144,7 @@ describe('buildRecapitulatif', () => {
 
   it("résume l'infestation : formations renseignées listées, sinon 'aucune'", () => {
     const filled = buildRecapitulatif(draft(), [], '', [
-      { espece: null, type_cible: 'essaim', taille_min: null, taille_max: null, taille_moy: null, surface_tot: 5, densite_min: null, densite_max: null, densite_moy: null, interdistance: null, comportement: null, direction_de: null, direction_vers: null, vent_de: null, vent_vitesse: null, pullulation_nb: null, taille_long: null, taille_large: null, taille_epaisseur: null, essaim_en_vol: null, essaim_pose: null, type_essaim: null, nb_taches_bandes: null, interdistance_m: null, surface_contaminee_ha: null, type_larve: null, surf_infestee_pourcent: null },
+      { espece: null, type_cible: 'essaim', taille_min: null, taille_max: null, taille_moy: null, surface_tot: 5, densite_min: null, densite_max: null, densite_moy: null, interdistance: null, comportement: null, direction_de: null, direction_vers: null, vent_de: null, vent_vitesse: null, pullulation_nb: null, taille_long: null, taille_large: null, taille_epaisseur: null, essaim_en_vol: null, essaim_pose: null, type_essaim: null, nb_taches_bandes: null, interdistance_m: null, interdistance_min: null, interdistance_max: null, interdistance_moy: null, surface_contaminee_ha: null, type_larve: null, surf_infestee_pourcent: null },
     ]);
     expect(filled.infestationSummary).toBe('Essaim renseignée.');
 
@@ -163,7 +163,7 @@ describe('enregistrerEtSynchroniser', () => {
       { espece: 'LMC', categorie: 'imago', densite_diffuse: 5, densite_groupee: 1, methode: null, accouplement: 'rare', ponte: null },
     ]);
     mockListAllInfestations.mockResolvedValue([
-      { espece: null, type_cible: 'essaim', taille_min: null, taille_max: null, taille_moy: null, surface_tot: 5, densite_min: null, densite_max: null, densite_moy: null, interdistance: null, comportement: null, direction_de: null, direction_vers: null, vent_de: null, vent_vitesse: null, pullulation_nb: null, taille_long: null, taille_large: null, taille_epaisseur: null, essaim_en_vol: null, essaim_pose: null, type_essaim: null, nb_taches_bandes: null, interdistance_m: null, surface_contaminee_ha: null, type_larve: null, surf_infestee_pourcent: null },
+      { espece: null, type_cible: 'essaim', taille_min: null, taille_max: null, taille_moy: null, surface_tot: 5, densite_min: null, densite_max: null, densite_moy: null, interdistance: null, comportement: null, direction_de: null, direction_vers: null, vent_de: null, vent_vitesse: null, pullulation_nb: null, taille_long: null, taille_large: null, taille_epaisseur: null, essaim_en_vol: null, essaim_pose: null, type_essaim: null, nb_taches_bandes: null, interdistance_m: null, interdistance_min: null, interdistance_max: null, interdistance_moy: null, surface_contaminee_ha: null, type_larve: null, surf_infestee_pourcent: null },
     ]);
 
     const result = await enregistrerEtSynchroniser(draft(), [], 'token-1');

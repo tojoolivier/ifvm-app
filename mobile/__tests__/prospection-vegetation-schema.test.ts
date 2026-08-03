@@ -9,16 +9,13 @@ describe('vegetationSchema', () => {
         strate: VALID_STRATE,
         humidite: '5_12cm',
         texture: 'limoneuse',
-        degatsCultures: 'moyens',
-        ennemis: 'oiseaux',
-        observation: 'RAS',
       })
     ).resolves.toBeTruthy();
   });
 
   it('rejette si une option requise est manquante', async () => {
     await expect(
-      vegetationSchema.validate({ strate: VALID_STRATE, humidite: null, texture: 'limoneuse', degatsCultures: 'moyens' })
+      vegetationSchema.validate({ strate: VALID_STRATE, humidite: null, texture: 'limoneuse' })
     ).rejects.toThrow();
   });
 
@@ -28,14 +25,7 @@ describe('vegetationSchema', () => {
         strate: { ...VALID_STRATE, recouvrement: 150 },
         humidite: '5_12cm',
         texture: 'limoneuse',
-        degatsCultures: 'moyens',
       })
     ).rejects.toThrow();
-  });
-
-  it('accepte ennemis/observation absents (facultatifs)', async () => {
-    await expect(
-      vegetationSchema.validate({ strate: VALID_STRATE, humidite: '5_12cm', texture: 'limoneuse', degatsCultures: 'moyens' })
-    ).resolves.toBeTruthy();
   });
 });
