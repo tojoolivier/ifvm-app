@@ -52,10 +52,52 @@ export interface ProspectionCaptureInput {
   effectif: number;
 }
 
+export interface ProspectionPopulationInput {
+  espece: string;
+  categorie: string;
+  densite_diffuse?: number | null;
+  densite_groupee?: number | null;
+  captures_nombre?: number | null;
+  temps_capture?: number | null;
+  accouplement?: string | null;
+  ponte?: string | null;
+}
+
+export interface ProspectionInfestationInput {
+  espece?: string | null;
+  type_cible: string;
+  taille_min?: number | null;
+  taille_max?: number | null;
+  taille_moy?: number | null;
+  surface_tot?: number | null;
+  densite_min?: number | null;
+  densite_max?: number | null;
+  densite_moy?: number | null;
+  interdistance?: number | null;
+  comportement?: string | null;
+  direction_de?: string | null;
+  direction_vers?: string | null;
+  vent_de?: string | null;
+  vent_vitesse?: number | null;
+  pullulation_nb?: number | null;
+  taille_long?: number | null;
+  taille_large?: number | null;
+  taille_epaisseur?: number | null;
+  essaim_en_vol?: boolean | null;
+  essaim_pose?: boolean | null;
+  type_essaim?: string | null;
+  nb_taches_bandes?: number | null;
+  interdistance_m?: number | null;
+  surface_contaminee_ha?: number | null;
+  type_larve?: string | null;
+  surf_infestee_pourcent?: number | null;
+}
+
 export interface ProspectionCreateInput {
   type_prospection: string;
   campagne_id: string;
   station_id?: string | null;
+  n_releve?: string | null;
   n_fiche?: string | null;
   date_prospection: string;
   latitude?: number | null;
@@ -67,8 +109,12 @@ export interface ProspectionCreateInput {
   degats_cultures?: string | null;
   vegetation?: Record<string, unknown> | null;
   sol?: Record<string, unknown> | null;
+  ennemis_naturels?: string | null;
+  observations?: string | null;
   statut?: string;
   captures?: ProspectionCaptureInput[];
+  populations?: ProspectionPopulationInput[];
+  infestations?: ProspectionInfestationInput[];
   // ========== NOUVEAUX CHAMPS ==========
   region?: string | null;
   district?: string | null;

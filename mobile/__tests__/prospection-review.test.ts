@@ -4,6 +4,8 @@ import {
   completeProspection,
   markProspectionSynced,
   listAllProspectionCaptures,
+  listAllProspectionPopulations,
+  listAllProspectionInfestations,
 } from '../src/lib/prospection-repository';
 import { apiClient } from '../src/lib/api-client';
 import * as Network from 'expo-network';
@@ -19,6 +21,8 @@ jest.mock('../src/lib/prospection-repository', () => ({
   completeProspection: jest.fn(),
   markProspectionSynced: jest.fn(),
   listAllProspectionCaptures: jest.fn(),
+  listAllProspectionPopulations: jest.fn(),
+  listAllProspectionInfestations: jest.fn(),
 }));
 jest.mock('../src/lib/api-client', () => ({
   apiClient: { createProspection: jest.fn() },
@@ -30,6 +34,8 @@ const mockMarkSynced = jest.mocked(markProspectionSynced);
 const mockCreateProspection = jest.mocked(apiClient.createProspection);
 const mockGetNetworkState = jest.mocked(Network.getNetworkStateAsync);
 const mockListAllCaptures = jest.mocked(listAllProspectionCaptures);
+const mockListAllPopulations = jest.mocked(listAllProspectionPopulations);
+const mockListAllInfestations = jest.mocked(listAllProspectionInfestations);
 
 function draft(overrides: Partial<DraftProspection> = {}): DraftProspection {
   return {
@@ -82,6 +88,8 @@ beforeEach(() => {
   mockCreateProspection.mockReset();
   mockGetNetworkState.mockReset();
   mockListAllCaptures.mockReset();
+  mockListAllPopulations.mockReset().mockResolvedValue([]);
+  mockListAllInfestations.mockReset().mockResolvedValue([]);
 });
 
 describe('formatChrono / chronoSeconds', () => {
@@ -106,7 +114,7 @@ describe('buildRecapitulatif', () => {
       { espece: 'LMC', categorie: 'imago', sexe: 'F', phase: 'transiens', stade: 'A1', effectif: 5 },
       { espece: 'LMC', categorie: 'imago', sexe: 'M', phase: 'gregaire', stade: 'A1', effectif: 2 },
     ];
-    const recap = buildRecapitulatif(draft(), rows, 'Strate herbeuse 70%');
+    const recap = buildRecapitulatif(draft(), rows, 'Strate herbeuse 70%', []);
     expect(recap.totalCaptures).toBe(7);
     expect(recap.totalFemelles).toBe(5);
     expect(recap.totalMales).toBe(2);
@@ -116,9 +124,32 @@ describe('buildRecapitulatif', () => {
   });
 
   it("affiche '—' si aucune capture", () => {
-    const recap = buildRecapitulatif(draft(), [], '');
+    const recap = buildRecapitulatif(draft(), [], '', []);
     expect(recap.phenotypeDominantLabel).toBe('—');
     expect(recap.totalCaptures).toBe(0);
+  });
+
+  it('construit une carte par groupe actif (espèce+catégorie), avec total/max/dominant propres', () => {
+    const d = draft({ especes: JSON.stringify({ lmcImago: true, lmcLarve: true, nseImago: false, nseLarve: false }) });
+    const rows: CaptureRow[] = [
+      { espece: 'LMC', categorie: 'imago', sexe: 'F', phase: 'transiens', stade: 'A1', effectif: 5 },
+      { espece: 'LMC', categorie: 'larve', sexe: null, phase: 'gregaire', stade: 'L1', effectif: 3 },
+    ];
+    const recap = buildRecapitulatif(d, rows, '', []);
+    expect(recap.reviewGroups).toEqual([
+      { label: 'Locusta — Imagos', total: 5, max: 50, dominantLabel: 'Transiens' },
+      { label: 'Locusta — Larves', total: 3, max: 65, dominantLabel: 'Grégaires' },
+    ]);
+  });
+
+  it("résume l'infestation : formations renseignées listées, sinon 'aucune'", () => {
+    const filled = buildRecapitulatif(draft(), [], '', [
+      { espece: null, type_cible: 'essaim', taille_min: null, taille_max: null, taille_moy: null, surface_tot: 5, densite_min: null, densite_max: null, densite_moy: null, interdistance: null, comportement: null, direction_de: null, direction_vers: null, vent_de: null, vent_vitesse: null, pullulation_nb: null, taille_long: null, taille_large: null, taille_epaisseur: null, essaim_en_vol: null, essaim_pose: null, type_essaim: null, nb_taches_bandes: null, interdistance_m: null, surface_contaminee_ha: null, type_larve: null, surf_infestee_pourcent: null },
+    ]);
+    expect(filled.infestationSummary).toBe('Essaim renseignée.');
+
+    const empty = buildRecapitulatif(draft(), [], '', []);
+    expect(empty.infestationSummary).toBe('Aucune formation renseignée.');
   });
 });
 
@@ -128,11 +159,26 @@ describe('enregistrerEtSynchroniser', () => {
     mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
     mockCreateProspection.mockResolvedValue({ id: 'remote-1' });
     mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
+    mockListAllPopulations.mockResolvedValue([
+      { espece: 'LMC', categorie: 'imago', densite_diffuse: 5, densite_groupee: 1, methode: null, accouplement: 'rare', ponte: null },
+    ]);
+    mockListAllInfestations.mockResolvedValue([
+      { espece: null, type_cible: 'essaim', taille_min: null, taille_max: null, taille_moy: null, surface_tot: 5, densite_min: null, densite_max: null, densite_moy: null, interdistance: null, comportement: null, direction_de: null, direction_vers: null, vent_de: null, vent_vitesse: null, pullulation_nb: null, taille_long: null, taille_large: null, taille_epaisseur: null, essaim_en_vol: null, essaim_pose: null, type_essaim: null, nb_taches_bandes: null, interdistance_m: null, surface_contaminee_ha: null, type_larve: null, surf_infestee_pourcent: null },
+    ]);
 
     const result = await enregistrerEtSynchroniser(draft(), [], 'token-1');
 
     expect(mockCompleteProspection).toHaveBeenCalledWith('draft-1');
-    expect(mockCreateProspection).toHaveBeenCalled();
+    expect(mockListAllPopulations).toHaveBeenCalledWith('draft-1');
+    expect(mockListAllInfestations).toHaveBeenCalledWith('draft-1');
+    expect(mockCreateProspection).toHaveBeenCalledWith(
+      'token-1',
+      expect.objectContaining({
+        n_releve: null,
+        populations: [expect.objectContaining({ espece: 'LMC', categorie: 'imago', densite_diffuse: 5 })],
+        infestations: [expect.objectContaining({ type_cible: 'essaim', surface_tot: 5 })],
+      })
+    );
     expect(mockMarkSynced).toHaveBeenCalledWith('draft-1');
     expect(result).toEqual({ synced: true });
   });
@@ -169,6 +215,8 @@ describe('retrySyncProspection', () => {
     await retrySyncProspection(draft({ statut: 'en_attente' }), 'token-1');
 
     expect(mockListAllCaptures).toHaveBeenCalledWith('draft-1');
+    expect(mockListAllPopulations).toHaveBeenCalledWith('draft-1');
+    expect(mockListAllInfestations).toHaveBeenCalledWith('draft-1');
     expect(mockCreateProspection).toHaveBeenCalled();
     expect(mockMarkSynced).toHaveBeenCalledWith('draft-1');
   });

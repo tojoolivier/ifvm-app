@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import {
-  CAPTURES_MAX,
+  capturesMaxFor,
   Categorie,
   Espece,
   GrilleKey,
@@ -110,7 +110,7 @@ export const useProspectionCaptureStore = create<CaptureLoopState>((set, get) =>
       grilleOrder: order,
       completedGrilleKeys: completed,
       currentGrilleIndex: index,
-      sexe: grille?.espece === 'LMC' && grille.categorie === 'imago' ? 'F' : null,
+      sexe: grille?.categorie === 'imago' ? 'F' : null,
       currentPhenotype: 'transiens',
       currentStade: grille ? stadesFor(grille.espece, grille.categorie, 'F')[0] : null,
       counts: grille ? countsForGrille(grille, allCaptures) : {},
@@ -120,7 +120,7 @@ export const useProspectionCaptureStore = create<CaptureLoopState>((set, get) =>
   goToGrille: (index, allCaptures) => {
     const grille = get().grilleOrder[index];
     if (!grille) return;
-    const sexe = grille.espece === 'LMC' && grille.categorie === 'imago' ? 'F' : null;
+    const sexe = grille.categorie === 'imago' ? 'F' : null;
     set({
       currentGrilleIndex: index,
       sexe,
@@ -152,7 +152,7 @@ export const useProspectionCaptureStore = create<CaptureLoopState>((set, get) =>
     const state = get();
     const grille = state.grilleOrder[state.currentGrilleIndex];
     if (!grille || !state.currentStade || !state.currentPhenotype) return;
-    if (totalCaptures(state.counts) >= CAPTURES_MAX[grille.espece]) return;
+    if (totalCaptures(state.counts) >= capturesMaxFor(grille.espece, grille.categorie)) return;
     const key = captureKey(state.sexe, state.currentPhenotype, state.currentStade);
     set({ counts: { ...state.counts, [key]: (state.counts[key] ?? 0) + 1 } });
   },

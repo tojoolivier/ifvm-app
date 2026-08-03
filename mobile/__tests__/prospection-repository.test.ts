@@ -13,8 +13,10 @@ import {
   markGrilleCompleted,
   getProspectionPopulation,
   saveProspectionPopulation,
+  listAllProspectionPopulations,
   getProspectionInfestation,
   saveProspectionInfestation,
+  listAllProspectionInfestations,
   deleteProspection,
 } from '../src/lib/prospection-repository';
 
@@ -203,6 +205,17 @@ describe('updateProspectionReference', () => {
       'Échec de la mise à jour de la fiche brouillon locale'
     );
   });
+
+  it('persists n° relevé quand fourni', async () => {
+    getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW, ...REFERENCE_INPUT, n_releve: 'REL-STA1-20260711' });
+
+    await updateProspectionReference(BASE_INPUT.id, { ...REFERENCE_INPUT, nReleve: 'REL-STA1-20260711' });
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE prospection SET'),
+      expect.arrayContaining(['REL-STA1-20260711'])
+    );
+  });
 });
 
 describe('updateProspectionEspeces', () => {
@@ -274,6 +287,21 @@ describe('updateProspectionVegetation', () => {
 
     await expect(updateProspectionVegetation(BASE_INPUT.id, VEGETATION_INPUT)).rejects.toThrow(
       'Échec de la mise à jour de la fiche brouillon locale'
+    );
+  });
+
+  it('persists ennemis naturels et observation libre (colonnes déjà en base, jamais écrites jusqu\'ici)', async () => {
+    getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW, ...VEGETATION_INPUT });
+
+    await updateProspectionVegetation(BASE_INPUT.id, {
+      ...VEGETATION_INPUT,
+      ennemisNaturels: 'oiseaux, mantes',
+      observations: 'RAS',
+    });
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE prospection SET'),
+      expect.arrayContaining(['oiseaux, mantes', 'RAS'])
     );
   });
 });
@@ -448,18 +476,31 @@ describe('saveProspectionPopulation', () => {
   });
 });
 
+describe('listAllProspectionPopulations', () => {
+  it('lists every espece/categorie row for the prospection', async () => {
+    const rows = [{ espece: 'LMC', categorie: 'imago' }, { espece: 'NSE', categorie: 'larve' }];
+    getAllAsync.mockResolvedValueOnce(rows);
+
+    const result = await listAllProspectionPopulations(BASE_INPUT.id);
+
+    expect(result).toEqual(rows);
+    expect(getAllAsync).toHaveBeenCalledWith(expect.any(String), [BASE_INPUT.id]);
+  });
+});
+
 describe('getProspectionInfestation', () => {
-  it('returns null when no row matches', async () => {
+  it('returns null when no row matches the type_cible', async () => {
     getFirstAsync.mockResolvedValueOnce(undefined);
 
-    const result = await getProspectionInfestation(BASE_INPUT.id);
+    const result = await getProspectionInfestation(BASE_INPUT.id, 'essaim');
 
     expect(result).toBeNull();
-    expect(getFirstAsync).toHaveBeenCalledWith(expect.any(String), [BASE_INPUT.id]);
+    expect(getFirstAsync).toHaveBeenCalledWith(expect.any(String), [BASE_INPUT.id, 'essaim']);
   });
 
-  it('returns the matching row', async () => {
+  it('returns the matching row for that type_cible', async () => {
     const row = {
+      espece: null,
       type_cible: 'essaim',
       taille_min: 1,
       taille_max: 2,
@@ -476,14 +517,27 @@ describe('getProspectionInfestation', () => {
     };
     getFirstAsync.mockResolvedValueOnce(row);
 
-    const result = await getProspectionInfestation(BASE_INPUT.id);
+    const result = await getProspectionInfestation(BASE_INPUT.id, 'essaim');
 
     expect(result).toEqual(row);
   });
 });
 
+describe('listAllProspectionInfestations', () => {
+  it('lists every formation row for the prospection', async () => {
+    const rows = [{ type_cible: 'essaim' }, { type_cible: 'vol_clair' }];
+    getAllAsync.mockResolvedValueOnce(rows);
+
+    const result = await listAllProspectionInfestations(BASE_INPUT.id);
+
+    expect(result).toEqual(rows);
+    expect(getAllAsync).toHaveBeenCalledWith(expect.any(String), [BASE_INPUT.id]);
+  });
+});
+
 describe('saveProspectionInfestation', () => {
   const ROW = {
+    espece: null,
     type_cible: 'essaim',
     taille_min: 1,
     taille_max: 2,
@@ -512,26 +566,27 @@ describe('saveProspectionInfestation', () => {
     surf_infestee_pourcent: null,
   };
 
-  it('inserts a new row when none exists for the prospection', async () => {
+  it('inserts a new row when none exists for this prospection + type_cible', async () => {
     getFirstAsync.mockResolvedValueOnce(undefined);
 
-    await saveProspectionInfestation(BASE_INPUT.id, ROW);
+    await saveProspectionInfestation(BASE_INPUT.id, 'essaim', ROW);
 
+    expect(getFirstAsync).toHaveBeenCalledWith(expect.any(String), [BASE_INPUT.id, 'essaim']);
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO prospection_infestation'),
-      expect.arrayContaining([BASE_INPUT.id, 'essaim', 1, 2, 1.5, 5, 1, 3, 2, 1, 'repos', 'N', 'S', 10])
+      expect.arrayContaining([BASE_INPUT.id, null, 'essaim', 1, 2, 1.5, 5, 1, 3, 2, 1, 'repos', 'N', 'S', 10])
     );
   });
 
-  it('updates the existing row when one already exists', async () => {
+  it('updates the existing row for the same type_cible, leaving other formations untouched', async () => {
     getFirstAsync.mockResolvedValueOnce({ id: 'existing-id' });
 
-    await saveProspectionInfestation(BASE_INPUT.id, ROW);
+    await saveProspectionInfestation(BASE_INPUT.id, 'essaim', ROW);
 
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE prospection_infestation SET'),
       [
-        'essaim', 1, 2, 1.5, 5, 1, 3, 2, 1, 'repos',
+        null, 'essaim', 1, 2, 1.5, 5, 1, 3, 2, 1, 'repos',
         null, 'N', 'S', 10,
         null, null, null, null, null, null, null, null, null, null, null, null,
         'existing-id',

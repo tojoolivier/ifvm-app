@@ -5,28 +5,31 @@ export interface EspeceSelection {
   lmcImago: boolean;
   lmcLarve: boolean;
   nseImago: boolean;
+  nseLarve: boolean;
 }
 
 export const EMPTY_ESPECE_SELECTION: EspeceSelection = {
   lmcImago: false,
   lmcLarve: false,
   nseImago: false,
+  nseLarve: false,
 };
 
 export function hasSelection(selection: EspeceSelection): boolean {
-  return selection.lmcImago || selection.lmcLarve || selection.nseImago;
+  return selection.lmcImago || selection.lmcLarve || selection.nseImago || selection.nseLarve;
 }
 
 export function countGrilles(selection: EspeceSelection): number {
-  return [selection.lmcImago, selection.lmcLarve, selection.nseImago].filter(Boolean).length;
+  return [selection.lmcImago, selection.lmcLarve, selection.nseImago, selection.nseLarve].filter(Boolean).length;
 }
 
-/** Ordre d'affichage du prototype : LMC imagos, LMC larves, NSE imagos. NSE larve n'est jamais proposé. */
+/** Ordre d'affichage du prototype : LMC imagos, LMC larves, NSE imagos, NSE larves. */
 export function buildGrilles(selection: EspeceSelection): GrilleKey[] {
   const grilles: GrilleKey[] = [];
   if (selection.lmcImago) grilles.push({ espece: 'LMC', categorie: 'imago' });
   if (selection.lmcLarve) grilles.push({ espece: 'LMC', categorie: 'larve' });
   if (selection.nseImago) grilles.push({ espece: 'NSE', categorie: 'imago' });
+  if (selection.nseLarve) grilles.push({ espece: 'NSE', categorie: 'larve' });
   return grilles;
 }
 
@@ -38,6 +41,7 @@ export function parseEspeceSelection(raw: string | null): EspeceSelection {
       lmcImago: Boolean(parsed.lmcImago),
       lmcLarve: Boolean(parsed.lmcLarve),
       nseImago: Boolean(parsed.nseImago),
+      nseLarve: Boolean(parsed.nseLarve),
     };
   } catch {
     return { ...EMPTY_ESPECE_SELECTION };

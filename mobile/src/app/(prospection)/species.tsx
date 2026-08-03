@@ -41,7 +41,8 @@ export default function SpeciesScreen() {
       await saveEspeceSelection(draftId, selection);
       const grilles = buildGrilles(selection);
       initGrilles(grilles, [], captures);
-      router.push({ pathname: '/(prospection)/captures' as any, params: { draftId, grilleIndex: '0' } });
+      const firstScreen = grilles[0]?.categorie === 'imago' ? 'density' : 'captures';
+      router.push({ pathname: `/(prospection)/${firstScreen}` as any, params: { draftId, grilleIndex: '0' } });
     } finally {
       setIsSaving(false);
     }
@@ -100,9 +101,13 @@ export default function SpeciesScreen() {
               >
                 <Text style={[styles.toggleText, selection.nseImago && styles.toggleTextActive]}>Imagos</Text>
               </TouchableOpacity>
-              <View style={styles.toggleDisabled}>
-                <Text style={styles.toggleDisabledText}>Larves</Text>
-              </View>
+              <TouchableOpacity
+                style={[styles.toggle, selection.nseLarve && styles.toggleActive]}
+                onPress={() => toggle('nseLarve')}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.toggleText, selection.nseLarve && styles.toggleTextActive]}>Larves</Text>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -149,8 +154,6 @@ const styles = StyleSheet.create({
   toggleActive: { backgroundColor: GREEN },
   toggleText: { fontWeight: '700', fontSize: 12.5, color: INACTIVE_TEXT },
   toggleTextActive: { color: '#fff' },
-  toggleDisabled: { flex: 1, borderRadius: 9, padding: 11, alignItems: 'center', backgroundColor: INACTIVE_BG },
-  toggleDisabledText: { fontWeight: '600', fontSize: 12.5, color: '#bdb6a2' },
   stepsHint: { marginTop: 4, backgroundColor: '#eaf2ec', borderRadius: 11, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
   stepsHintIcon: { fontSize: 18 },
   stepsHintText: { flex: 1, fontSize: 11.5, lineHeight: 16, color: GREEN },

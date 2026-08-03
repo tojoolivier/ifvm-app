@@ -77,6 +77,18 @@ describe('useProspectionCaptureStore', () => {
     expect(state.currentStade).toBe('A1');
   });
 
+  it('initGrilles positionne aussi le sexe F pour NSE imago (même bascule que LMC)', () => {
+    useProspectionCaptureStore.getState().initGrilles([{ espece: 'NSE', categorie: 'imago' }], [], []);
+    const state = useProspectionCaptureStore.getState();
+    expect(state.sexe).toBe('F');
+    expect(state.currentStade).toBe('A1');
+  });
+
+  it('initGrilles ne positionne pas de sexe pour les larves (LMC ou NSE)', () => {
+    useProspectionCaptureStore.getState().initGrilles([{ espece: 'NSE', categorie: 'larve' }], [], []);
+    expect(useProspectionCaptureStore.getState().sexe).toBeNull();
+  });
+
   it('initGrilles reprend sur la première grille non complétée', () => {
     const order = [
       { espece: 'LMC' as const, categorie: 'imago' as const },
@@ -86,11 +98,20 @@ describe('useProspectionCaptureStore', () => {
     expect(useProspectionCaptureStore.getState().currentGrilleIndex).toBe(1);
   });
 
-  it('increment respecte le plafond de captures par espèce', () => {
+  it('increment respecte le plafond de captures par espèce+catégorie (NSE imago : 30)', () => {
     useProspectionCaptureStore.getState().initGrilles([{ espece: 'NSE', categorie: 'imago' }], [], []);
-    useProspectionCaptureStore.setState({ counts: { 'transiens|A1': 30 } });
+    useProspectionCaptureStore.setState({ counts: { 'F|transiens|A1': 30 } });
     useProspectionCaptureStore.getState().increment();
-    expect(useProspectionCaptureStore.getState().counts['transiens|A1']).toBe(30);
+    expect(useProspectionCaptureStore.getState().counts['F|transiens|A1']).toBe(30);
+  });
+
+  it('increment respecte le plafond spécifique aux larves (NSE larve : 75, distinct de NSE imago 30)', () => {
+    useProspectionCaptureStore.getState().initGrilles([{ espece: 'NSE', categorie: 'larve' }], [], []);
+    useProspectionCaptureStore.setState({ counts: { 'transiens|L1': 74 } });
+    useProspectionCaptureStore.getState().increment();
+    expect(totalCaptures(useProspectionCaptureStore.getState().counts)).toBe(75);
+    useProspectionCaptureStore.getState().increment();
+    expect(totalCaptures(useProspectionCaptureStore.getState().counts)).toBe(75);
   });
 
   it('decrement ne descend jamais sous 0', () => {
