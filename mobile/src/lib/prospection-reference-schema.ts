@@ -25,4 +25,8 @@ export const referenceSchema = yup.object({
     .min(0, 'La surface infestée ne peut pas être négative')
     .required('Surface infestée requise')
     .max(yup.ref('surfProspectee'), 'La surface infestée ne peut pas dépasser la surface prospectée'),
+    biotope: yup
+    .string()
+    .oneOf(['Xerophyle', 'Mesophyle', 'Hydrophyle'] as const)
+    .nullable(),
 });

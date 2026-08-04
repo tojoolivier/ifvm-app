@@ -20,6 +20,8 @@ import { PHENOTYPES, TYPE_CIBLE_OPTIONS } from './prospection-fiche-lecture';
 import { CaptureCounts, dominantPhenotype, rowsToCounts, totalBySexe, totalCaptures } from './prospection-capture-store';
 import { CHRONO_MAX_SECONDS, capturesMaxFor, phenotypesFor } from './prospection-especes-stades';
 import { buildGrilles, parseEspeceSelection } from './prospection-especes';
+import { getDb } from './prospection-db';
+import { pullReferentiel } from './referentiel-sync';
 
 export interface ReviewGroupViewModel {
   label: string;
@@ -68,7 +70,6 @@ function buildReviewGroups(draft: DraftProspection, captures: CaptureRow[]): Rev
   });
 }
 
-/** Une formation est "renseignée" si sa surface totale ou sa densité moyenne est saisie (même règle que l'écran Infestation). */
 function buildInfestationSummary(infestations: InfestationRow[]): string {
   const filled = infestations.filter((row) => row.surface_tot != null || row.densite_moy != null);
   if (filled.length === 0) return 'Aucune formation renseignée.';
@@ -119,90 +120,164 @@ export function buildRecapitulatif(
   };
 }
 
+async function ensureStationExists(token: string): Promise<string | null> {
+  const db = await getDb();
+  
+  const stations = await db.getAllAsync<{ id: string }>(
+    'SELECT id FROM station_fixe WHERE actif = 1 LIMIT 1'
+  );
+  
+  if (stations.length > 0) {
+    console.log(`✅ Station locale trouvée: ${stations[0].id}`);
+    return stations[0].id;
+  }
+  
+  console.log('🔄 Aucune station locale, synchronisation des référentiels...');
+  try {
+    await pullReferentiel(token);
+    console.log('✅ Référentiels synchronisés');
+    
+    const newStations = await db.getAllAsync<{ id: string }>(
+      'SELECT id FROM station_fixe WHERE actif = 1 LIMIT 1'
+    );
+    
+    if (newStations.length > 0) {
+      console.log(`✅ Station trouvée après sync: ${newStations[0].id}`);
+      return newStations[0].id;
+    }
+  } catch (error) {
+    console.error('❌ Erreur lors de la synchronisation:', error);
+  }
+  
+  return null;
+}
+
 function buildCapturesPayload(rows: CaptureRow[]): ProspectionCaptureInput[] {
   return rows.map((row) => ({
     espece: row.espece,
     categorie: row.categorie,
-    sexe: row.sexe,
-    phase: row.phase,
-    stade: row.stade,
-    effectif: row.effectif,
+    sexe: row.sexe || null,
+    phase: row.phase || 'inconnu',
+    stade: row.stade || 'inconnu',
+    effectif: row.effectif ? Number(row.effectif) : 0,
   }));
+}
+
+async function buildProspectionPayload(draft: DraftProspection, token: string) {
+  let stationId = draft.station_id;
+  
+  if (draft.type_prospection === 'intensive' && !stationId) {
+    console.warn(`⚠️ station_id manquant pour ${draft.id}, tentative de récupération...`);
+    
+    if (!token) {
+      throw new Error('Token manquant pour la synchronisation');
+    }
+    
+    stationId = await ensureStationExists(token);
+    
+    if (!stationId) {
+      throw new Error('Aucune station disponible. Veuillez synchroniser les référentiels dans l\'onglet Synchronisation.');
+    }
+    
+    console.log(`✅ station_id trouvé: ${stationId}`);
+  }
+  
+  return {
+    type_prospection: draft.type_prospection,
+    campagne_id: draft.campagne_id,
+    station_id: stationId || null,
+    n_releve: draft.n_releve || null,
+    n_fiche: draft.n_fiche || null,
+    n_message: draft.n_message || null,
+    date_prospection: draft.date_prospection,
+    latitude: draft.latitude ? Number(draft.latitude) : null,
+    longitude: draft.longitude ? Number(draft.longitude) : null,
+    altitude: draft.altitude ? Number(draft.altitude) : null,
+    biotope: draft.biotope || null,
+    surf_station: draft.surf_station ? Number(draft.surf_station) : null,
+    surf_prospectee: draft.surf_prospectee ? Number(draft.surf_prospectee) : null,
+    surf_infestee: draft.surf_infestee ? Number(draft.surf_infestee) : null,
+    degats_cultures: draft.degats_cultures || null,
+    derniere_pluie: draft.derniere_pluie || null,
+    intensite_pluie: draft.intensite_pluie || null,
+    vegetation: draft.vegetation ? JSON.parse(draft.vegetation) : null,
+    sol: draft.sol ? JSON.parse(draft.sol) : null,
+    ennemis_naturels: draft.ennemis_naturels || null,
+    observations: draft.observations || null,
+    statut: draft.statut || 'brouillon',
+    region: draft.region || null,
+    district: draft.district || null,
+    commune: draft.commune || null,
+    za: draft.za || null,
+    pa_code: draft.pa_code || null,
+    pa_nom: draft.pa_nom || null,
+    station_nom: draft.station_nom || null,
+    degats_cultures_pourcent: draft.degats_cultures_pourcent ? Number(draft.degats_cultures_pourcent) : null,
+    verdissement_pourcent: draft.verdissement_pourcent ? Number(draft.verdissement_pourcent) : null,
+    hauteur_herbe_cm: draft.hauteur_herbe_cm ? Number(draft.hauteur_herbe_cm) : null,
+    station_libre: draft.station_libre || null,
+    type_station: draft.type_station || null,
+    verdure_strate: draft.verdure_strate || null,
+    signalement_source: draft.signalement_source || null,
+    signalement_date: draft.signalement_date || null,
+    signalement_description: draft.signalement_description || null,
+    conclusion_validation: draft.conclusion_validation || null,
+  };
 }
 
 function buildPopulationsPayload(rows: PopulationRow[]): ProspectionPopulationInput[] {
   return rows.map((row) => ({
     espece: row.espece,
     categorie: row.categorie,
-    densite_diffuse: row.densite_diffuse,
-    densite_groupee: row.densite_groupee,
-    accouplement: row.accouplement,
-    ponte: row.ponte,
-    captures_sol: row.captures_sol ?? null,
-    captures_trans: row.captures_trans ?? null,
-    captures_greg: row.captures_greg ?? null,
-    stade_imago: row.stade_imago ?? null,
-    // SQLite renvoie les booléens comme des entiers 0/1 (pas de type BOOLEAN natif) — coercition explicite avant l'envoi API.
+    densite_diffuse: row.densite_diffuse ? Number(row.densite_diffuse) : null,
+    densite_groupee: row.densite_groupee ? Number(row.densite_groupee) : null,
+    accouplement: row.accouplement || null,
+    ponte: row.ponte || null,
+    captures_sol: row.captures_sol ? Number(row.captures_sol) : null,
+    captures_trans: row.captures_trans ? Number(row.captures_trans) : null,
+    captures_greg: row.captures_greg ? Number(row.captures_greg) : null,
+    stade_imago: row.stade_imago || null,
     essaim_observe: row.essaim_observe != null ? Boolean(row.essaim_observe) : null,
     densites_larve: row.densites_larve ? JSON.parse(row.densites_larve) : null,
     tache_larvaire: row.tache_larvaire != null ? Boolean(row.tache_larvaire) : null,
     bande_larvaire: row.bande_larvaire != null ? Boolean(row.bande_larvaire) : null,
-    interdistance: row.interdistance ?? null,
-    deplacement: row.deplacement ?? null,
+    interdistance: row.interdistance ? Number(row.interdistance) : null,
+    deplacement: row.deplacement || null,
   }));
 }
 
 function buildInfestationsPayload(rows: InfestationRow[]): ProspectionInfestationInput[] {
-  return rows.map((row) => ({ ...row }));
+  return rows.map((row) => ({
+    type_cible: row.type_cible,
+    espece: row.espece || null,
+    taille_min: row.taille_min ? Number(row.taille_min) : null,
+    taille_max: row.taille_max ? Number(row.taille_max) : null,
+    taille_moy: row.taille_moy ? Number(row.taille_moy) : null,
+    surface_tot: row.surface_tot ? Number(row.surface_tot) : null,
+    densite_min: row.densite_min ? Number(row.densite_min) : null,
+    densite_max: row.densite_max ? Number(row.densite_max) : null,
+    densite_moy: row.densite_moy ? Number(row.densite_moy) : null,
+    interdistance: row.interdistance ? Number(row.interdistance) : null,
+    comportement: row.comportement || null,
+    direction_de: row.direction_de || null,
+    direction_vers: row.direction_vers || null,
+    vent_de: row.vent_de || null,
+    vent_vitesse: row.vent_vitesse ? Number(row.vent_vitesse) : null,
+    pullulation_nb: row.pullulation_nb ? Number(row.pullulation_nb) : null,
+    taille_long: row.taille_long ? Number(row.taille_long) : null,
+    taille_large: row.taille_large ? Number(row.taille_large) : null,
+    taille_epaisseur: row.taille_epaisseur ? Number(row.taille_epaisseur) : null,
+    essaim_en_vol: row.essaim_en_vol != null ? Boolean(row.essaim_en_vol) : null,
+    essaim_pose: row.essaim_pose != null ? Boolean(row.essaim_pose) : null,
+    type_essaim: row.type_essaim || null,
+    nb_taches_bandes: row.nb_taches_bandes ? Number(row.nb_taches_bandes) : null,
+    interdistance_m: row.interdistance_m ? Number(row.interdistance_m) : null,
+    surface_contaminee_ha: row.surface_contaminee_ha ? Number(row.surface_contaminee_ha) : null,
+    type_larve: row.type_larve || null,
+    surf_infestee_pourcent: row.surf_infestee_pourcent ? Number(row.surf_infestee_pourcent) : null,
+  }));
 }
 
-function buildProspectionPayload(draft: DraftProspection) {
-  return {
-    type_prospection: draft.type_prospection,
-    campagne_id: draft.campagne_id,
-    station_id: draft.station_id,
-    n_releve: draft.n_releve,
-    n_fiche: draft.n_fiche,
-    date_prospection: draft.date_prospection,
-    latitude: draft.latitude,
-    longitude: draft.longitude,
-    altitude: draft.altitude,
-    surf_station: draft.surf_station,
-    surf_prospectee: draft.surf_prospectee,
-    surf_infestee: draft.surf_infestee,
-    degats_cultures: draft.degats_cultures,
-    derniere_pluie: draft.derniere_pluie,
-    intensite_pluie: draft.intensite_pluie,
-    vegetation: draft.vegetation ? JSON.parse(draft.vegetation) : null,
-    sol: draft.sol ? JSON.parse(draft.sol) : null,
-    ennemis_naturels: draft.ennemis_naturels,
-    observations: draft.observations,
-    statut: draft.statut,
-    region: draft.region,
-    district: draft.district,
-    commune: draft.commune,
-    za: draft.za,
-    pa_code: draft.pa_code,
-    pa_nom: draft.pa_nom,
-    station_nom: draft.station_nom,
-    degats_cultures_pourcent: draft.degats_cultures_pourcent,
-    verdissement_pourcent: draft.verdissement_pourcent,
-    hauteur_herbe_cm: draft.hauteur_herbe_cm,
-    station_libre: draft.station_libre,
-    type_station: draft.type_station,
-    verdure_strate: draft.verdure_strate,
-    signalement_source: draft.signalement_source,
-    signalement_date: draft.signalement_date,
-    signalement_description: draft.signalement_description,
-    conclusion_validation: draft.conclusion_validation,
-  };
-}
-
-/**
- * Écrit d'abord la fiche localement (toujours — c'est la référence hors-ligne, cf. ADR-002),
- * puis envoie directement au serveur si une connexion est disponible ; sinon la fiche reste
- * en `statut_sync = 'local'`, synchronisée plus tard par le module de sync existant.
- */
 export async function enregistrerEtSynchroniser(
   draft: DraftProspection,
   captures: CaptureRow[],
@@ -220,7 +295,7 @@ export async function enregistrerEtSynchroniser(
       listAllProspectionInfestations(completed.id),
     ]);
     await apiClient.createProspection(token, {
-      ...buildProspectionPayload(completed),
+      ...(await buildProspectionPayload(completed, token)),
       captures: buildCapturesPayload(captures),
       populations: buildPopulationsPayload(populations),
       infestations: buildInfestationsPayload(infestations),
@@ -232,22 +307,34 @@ export async function enregistrerEtSynchroniser(
   }
 }
 
-/**
- * Relance l'envoi d'une fiche déjà complétée mais restée `statut_sync != 'synced'`
- * (échec silencieux précédent). Contrairement à enregistrerEtSynchroniser, l'erreur
- * n'est PAS avalée : l'appelant (UI) doit pouvoir afficher un toast d'échec.
- */
 export async function retrySyncProspection(draft: DraftProspection, token: string): Promise<void> {
-  const [captures, populations, infestations] = await Promise.all([
-    listAllProspectionCaptures(draft.id),
-    listAllProspectionPopulations(draft.id),
-    listAllProspectionInfestations(draft.id),
-  ]);
-  await apiClient.createProspection(token, {
-    ...buildProspectionPayload(draft),
-    captures: buildCapturesPayload(captures),
-    populations: buildPopulationsPayload(populations),
-    infestations: buildInfestationsPayload(infestations),
-  });
-  await markProspectionSynced(draft.id);
+  console.log(`🔄 Synchronisation de ${draft.id}...`);
+  
+  try {
+    const [captures, populations, infestations] = await Promise.all([
+      listAllProspectionCaptures(draft.id),
+      listAllProspectionPopulations(draft.id),
+      listAllProspectionInfestations(draft.id),
+    ]);
+    
+    const payload = {
+      ...(await buildProspectionPayload(draft, token)),
+      captures: buildCapturesPayload(captures),
+      populations: buildPopulationsPayload(populations),
+      infestations: buildInfestationsPayload(infestations),
+    };
+    
+    console.log('📤 Payload envoyé avec station_id:', payload.station_id);
+    
+    await apiClient.createProspection(token, payload);
+    await markProspectionSynced(draft.id);
+    console.log(`✅ ${draft.id} synchronisé`);
+  } catch (error) {
+    console.error(`❌ Erreur pour ${draft.id}:`, error);
+    if (error && typeof error === 'object' && 'response' in error) {
+      const err = error as { response?: { data?: unknown } };
+      console.error('Détails:', err.response?.data);
+    }
+    throw error;
+  }
 }

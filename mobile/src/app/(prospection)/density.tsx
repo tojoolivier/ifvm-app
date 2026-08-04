@@ -120,7 +120,7 @@ export default function DensityScreen() {
 
           <Text style={styles.sectionLabel}>Méthode</Text>
           <View style={styles.chipsRow}>
-            {(['battage', 'comptage_direct'] as const).map((option) => {
+            {(['visuel', 'comptage_direct'] as const).map((option) => {
               const active = option === population.methode;
               return (
                 <TouchableOpacity
@@ -130,7 +130,7 @@ export default function DensityScreen() {
                   activeOpacity={0.8}
                 >
                   <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                    {option === 'battage' ? 'Battage' : 'Comptage direct'}
+                    {option === 'visuel' ? 'Visuel' : 'Comptage direct'}
                   </Text>
                 </TouchableOpacity>
               );
