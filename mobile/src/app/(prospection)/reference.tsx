@@ -27,6 +27,12 @@ const TEXT = '#16201a';
 const TEXT_SECONDARY = '#6f6a59';
 const BORDER = '#e7e0cd';
 
+const BIOTOPE_OPTIONS = [
+  { label: 'Xérophyle', value: 'Xerophyle' },
+  { label: 'Mésophyle', value: 'Mesophyle' },
+  { label: 'Hydrophyle', value: 'Hydrophyle' },
+];
+
 function generateNumeroFiche(draftId: string, dateProspection: string): string {
   const datePart = dateProspection.replace(/-/g, '');
   const idPart = draftId.replace(/-/g, '').slice(0, 6).toUpperCase();
@@ -160,7 +166,8 @@ export default function ReferenceScreen() {
       surfStation: draft?.surf_station != null ? String(draft.surf_station) : '',
       surfProspectee: draft?.surf_prospectee != null ? String(draft.surf_prospectee) : '',
       surfInfestee: draft?.surf_infestee != null ? String(draft.surf_infestee) : '',
-    } as ReferenceFormValues,
+      biotope: draft?.biotope ?? null,
+    } as ReferenceFormValues & { biotope: string | null },
     onSubmit: async ({ value }) => {
       if (!draftId) return;
       try {
@@ -186,6 +193,7 @@ export default function ReferenceScreen() {
           surfStation: Number(value.surfStation),
           surfProspectee: Number(value.surfProspectee),
           surfInfestee: Number(value.surfInfestee),
+          biotope: value.biotope ?? null,
           nFiche,
           nReleve,
           region: adminArea.region,
@@ -346,7 +354,7 @@ export default function ReferenceScreen() {
                 <View style={styles.surfaceField}>
                   <Text style={styles.surfaceLabel}>Station</Text>
                   <TextInput
-                    value={field.state.value}
+                    value={field.state.value ?? ''}
                     onChangeText={field.handleChange}
                     keyboardType="decimal-pad"
                     style={styles.surfaceInput}
@@ -359,7 +367,7 @@ export default function ReferenceScreen() {
                 <View style={styles.surfaceField}>
                   <Text style={styles.surfaceLabel}>Prospectée</Text>
                   <TextInput
-                    value={field.state.value}
+                    value={field.state.value ?? ''}
                     onChangeText={field.handleChange}
                     keyboardType="decimal-pad"
                     style={styles.surfaceInput}
@@ -372,7 +380,7 @@ export default function ReferenceScreen() {
                 <View style={styles.surfaceField}>
                   <Text style={styles.surfaceLabel}>Infestée</Text>
                   <TextInput
-                    value={field.state.value}
+                    value={field.state.value ?? ''}
                     onChangeText={field.handleChange}
                     keyboardType="decimal-pad"
                     placeholder="—"
@@ -382,6 +390,38 @@ export default function ReferenceScreen() {
               )}
             </form.Field>
           </View>
+
+          {/* ========== BIOTOPE ========== */}
+          <form.Field name="biotope">
+            {(field) => (
+              <View style={styles.biotopeContainer}>
+                <Text style={styles.sectionLabel}>Type de biotope</Text>
+                <View style={styles.biotopeOptions}>
+                  {BIOTOPE_OPTIONS.map((option) => (
+                    <TouchableOpacity
+                      key={option.value}
+                      style={[
+                        styles.biotopeChip,
+                        field.state.value === option.value && styles.biotopeChipActive,
+                      ]}
+                      onPress={() => field.handleChange(option.value)}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.biotopeChipText,
+                          field.state.value === option.value && styles.biotopeChipTextActive,
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+          </form.Field>
+
           {Object.values(formErrors).map((message) => (
             <Text key={message} style={styles.errorText}>
               {message}
@@ -464,6 +504,28 @@ const styles = StyleSheet.create({
   surfaceField: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 9 },
   surfaceLabel: { fontSize: 9.5, color: '#9a9484', marginBottom: 2 },
   surfaceInput: { fontSize: 18, fontWeight: '700', color: TEXT, padding: 0 },
+  biotopeContainer: { marginTop: 4, marginBottom: 12 },
+  biotopeOptions: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  biotopeChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: INACTIVE_BG,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  biotopeChipActive: {
+    backgroundColor: GREEN,
+    borderColor: GREEN,
+  },
+  biotopeChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: TEXT_SECONDARY,
+  },
+  biotopeChipTextActive: {
+    color: '#fff',
+  },
   hintText: { fontSize: 10.5, color: '#9a9484', paddingHorizontal: 2 },
   errorText: { color: '#c0412b', fontSize: 11, marginBottom: 4 },
   footer: { padding: 16 },

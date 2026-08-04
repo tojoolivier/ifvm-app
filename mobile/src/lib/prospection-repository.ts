@@ -13,6 +13,7 @@ export interface DraftProspectionInput {
   latitude?: number | null;
   longitude?: number | null;
   altitude?: number | null;
+  biotope?: string | null;
   region?: string | null;
   district?: string | null;
   commune?: string | null;
@@ -32,6 +33,7 @@ export interface DraftProspection {
   campagne_id: string;
   prospecteur_id: string;
   station_id: string | null;
+  biotope: string | null;
   region: string | null;
   district: string | null;
   commune: string | null;
@@ -82,6 +84,7 @@ export interface ReferenceUpdateInput {
   surfStation: number;
   surfProspectee: number;
   surfInfestee: number;
+  biotope?: string | null;
   nFiche: string;
   nReleve?: string | null;
   region?: string | null;
@@ -103,18 +106,19 @@ export async function createDraftProspection(
   await db.runAsync(
     `INSERT INTO prospection (
       id, type_prospection, campagne_id, prospecteur_id, station_id,
-      region, district, commune, za, pa_code,
+      biotope, region, district, commune, za, pa_code,
       date_prospection, latitude, longitude, altitude,
       surf_station, surf_prospectee, surf_infestee,
       signalement_source, signalement_date, signalement_description,
       statut, statut_sync, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'brouillon', 'local', ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'brouillon', 'local', ?, ?)`,
     [
       input.id,
       input.typeProspection,
       input.campagneId,
       input.prospecteurId,
       input.stationId ?? null,
+      input.biotope ?? null,
       input.region ?? null,
       input.district ?? null,
       input.commune ?? null,
@@ -153,6 +157,7 @@ export async function updateProspectionReference(
     `UPDATE prospection SET
       latitude = ?, longitude = ?, altitude = ?,
       surf_station = ?, surf_prospectee = ?, surf_infestee = ?,
+      biotope = ?,
       n_fiche = ?, n_releve = ?,
       region = ?, district = ?, commune = ?, za = ?, pa_code = ?, pa_nom = ?,
       station_id = ?, station_nom = ?,
@@ -165,6 +170,7 @@ export async function updateProspectionReference(
       input.surfStation,
       input.surfProspectee,
       input.surfInfestee,
+      input.biotope ?? null,
       input.nFiche,
       input.nReleve ?? null,
       input.region ?? null,
@@ -212,7 +218,6 @@ export interface ExtensiveReferenceUpdateInput {
   nMessage: string | null;
 }
 
-/** Écran A (Références) du parcours extensif : station libre (texte), pas de lookup référentiel. */
 export async function updateProspectionExtensiveReference(
   id: string,
   input: ExtensiveReferenceUpdateInput
@@ -252,7 +257,6 @@ export interface ExtensiveObservationsUpdateInput {
   intensitePluie: string | null;
 }
 
-/** Écran D (Observations) du parcours extensif — commun aux deux espèces. */
 export async function updateProspectionExtensiveObservations(
   id: string,
   input: ExtensiveObservationsUpdateInput
@@ -283,7 +287,6 @@ export async function updateProspectionExtensiveObservations(
   return updated;
 }
 
-/** Enregistre la conclusion binaire d'une prospection de validation (Confirmée / Infirmée) — pas de motif, pas d'état intermédiaire. */
 export async function concludeValidation(
   id: string,
   conclusion: 'confirmee' | 'infirmee'
@@ -348,7 +351,6 @@ export interface ObservationsUpdateInput {
   observations: string | null;
 }
 
-/** N'écrit que les colonnes de l'écran Observations, sans toucher vegetation/sol déjà enregistrés par l'écran Strates. */
 export async function updateProspectionObservations(id: string, input: ObservationsUpdateInput): Promise<DraftProspection> {
   const db = await getDb();
   const now = new Date().toISOString();
@@ -375,7 +377,6 @@ export interface VegetationUpdateInput {
   hauteurHerbeCm?: number | null;
 }
 
-/** Dégâts sur culture / ennemis naturels / observation libre sont désormais possédés par l'écran Observations (cf. `updateProspectionObservations`) — ne pas les toucher ici pour ne pas écraser leur saisie au retour sur l'écran Strates. */
 export async function updateProspectionVegetation(
   id: string,
   input: VegetationUpdateInput
@@ -463,17 +464,11 @@ export interface PopulationRow {
   methode: string | null;
   accouplement: string | null;
   ponte: string | null;
-  // ==========================================
-  // Extensif Imagos (B)
-  // ==========================================
   captures_sol?: number | null;
   captures_trans?: number | null;
   captures_greg?: number | null;
   stade_imago?: string | null;
   essaim_observe?: boolean | null;
-  // ==========================================
-  // Extensif Larves (C)
-  // ==========================================
   densites_larve?: string | null;
   tache_larvaire?: boolean | null;
   bande_larvaire?: boolean | null;
@@ -513,7 +508,6 @@ export async function saveProspectionPopulation(prospectionId: string, row: Popu
     [prospectionId, row.espece, row.categorie]
   );
 
-  // Convertir les booleans en nombres pour SQLite
   const essaimObserve = row.essaim_observe === true ? 1 : (row.essaim_observe === false ? 0 : null);
   const tacheLarvaire = row.tache_larvaire === true ? 1 : (row.tache_larvaire === false ? 0 : null);
   const bandeLarvaire = row.bande_larvaire === true ? 1 : (row.bande_larvaire === false ? 0 : null);
@@ -643,7 +637,6 @@ export async function saveProspectionInfestation(
     [prospectionId, typeCible]
   );
 
-  // Convertir les booleans en nombres pour SQLite
   const essaimEnVol = row.essaim_en_vol === true ? 1 : (row.essaim_en_vol === false ? 0 : null);
   const essaimPose = row.essaim_pose === true ? 1 : (row.essaim_pose === false ? 0 : null);
 
@@ -733,6 +726,17 @@ export async function markProspectionSynced(id: string): Promise<DraftProspectio
     throw new Error('Échec de la mise à jour de la fiche brouillon locale');
   }
   return updated;
+}
+
+export async function deleteDraftProspection(draft: DraftProspection): Promise<void> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+  
+  // Mettre à jour le statut pour marquer comme supprimé
+  await db.runAsync(
+    "UPDATE prospection SET statut = 'supprime', updated_at = ? WHERE id = ?",
+    [now, draft.id]
+  );
 }
 
 export async function getProspection(id: string): Promise<DraftProspection | null> {
