@@ -3,6 +3,8 @@ from datetime import date, datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
+# 🔑 Import du schéma de la station fixe
+from app.presentation.referentiel_schemas import StationFixeRead
 
 
 class PopulationRead(BaseModel):
@@ -191,3 +193,6 @@ class ProspectionRead(BaseModel):
     populations: list[PopulationRead] = []
     captures: list[CaptureRead] = []
     infestations: list[InfestationRead] = []
+
+    # 🔑 CLÉ DU SUCCÈS : Ajout de la relation station dans la réponse JSON
+    station: StationFixeRead | None = None

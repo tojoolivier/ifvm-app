@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
@@ -39,11 +39,19 @@ export function LoginPage() {
 
   const navigate = useNavigate()
 
+  // Redirection automatique si l'utilisateur possède déjà un token valide
+  useEffect(() => {
+    const token = localStorage.getItem('access_token')
+    if (token) {
+      navigate('/', { replace: true })
+    }
+  }, [navigate])
+
   const loginMutation = useMutation({
     mutationFn: () => login(email, password),
     onSuccess: (data) => {
       localStorage.setItem('access_token', data.access_token)
-      navigate('/')
+      navigate('/', { replace: true })
     },
   })
 

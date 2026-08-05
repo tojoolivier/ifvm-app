@@ -6,7 +6,10 @@ from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.config import settings
-from app.models import Base  # noqa: F401 — registers all models
+
+# 🔑 FIX : on importe app.models, qui se charge lui-même d'enregistrer
+# tous les modèles (Base, Utilisateur, référentiel, prospection, etc.)
+from app.models import Base  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

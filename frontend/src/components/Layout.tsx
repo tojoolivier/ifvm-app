@@ -7,7 +7,7 @@ const baseNavItems = [
 
 export function Layout() {
   const navigate = useNavigate()
-  const { data: currentUser } = useCurrentUser()
+  const { data: currentUser, isLoading } = useCurrentUser()
 
   function logout() {
     localStorage.removeItem('access_token')
@@ -18,27 +18,33 @@ export function Layout() {
     navigate('/login')
   }
 
+  // Récupération sécurisée du rôle
   const role = currentUser?.role || localStorage.getItem('user_role')
+
+  // Pendant le chargement de l'utilisateur, on peut afficher un état de transition ou laisser le menu de base
+  const isAdminOrChef = role === 'admin' || role === 'chef_equipe' || role === 'chef_de_base'
+  const isVerifierOrProspecteur = role === 'verificateur' || role === 'prospecteur'
+  const isValidation = role === 'validation_finale'
 
   const navItems = [
     ...baseNavItems,
-    ...(role === 'admin' || role === 'chef'
+    ...(isAdminOrChef
       ? [
           { to: '/campagnes', label: 'Campagnes' },
           { to: '/prospections', label: 'Prospections' },
           { to: '/carte', label: 'Carte des infestations' },
           { to: '/syntheses', label: 'Synthèses & export' },
           { to: '/users', label: 'Utilisateurs' },
-          { to: '/stations', label: 'Stations' }, // ✅ Ajout de la page Stations
+          { to: '/stations', label: 'Stations' },
         ]
       : []),
-    ...(role === 'verificateur' || role === 'prospecteur'
+    ...(isVerifierOrProspecteur
       ? [
           { to: '/prospections', label: 'Prospections' },
           { to: '/carte', label: 'Carte des infestations' },
         ]
       : []),
-    ...(role === 'validation_finale'
+    ...(isValidation
       ? [
           { to: '/validation-finale', label: 'Validation finale' },
           { to: '/carte', label: 'Carte des infestations' },

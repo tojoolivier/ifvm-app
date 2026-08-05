@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
-import { Plus, Edit, Trash2, Search, Eye, ChevronLeft, ChevronRight, X, RefreshCw, Download } from 'lucide-react'
+import { Plus, Edit, Trash2, Search, Eye, ChevronLeft, ChevronRight, X } from 'lucide-react'
 
 interface Station {
   id: string
@@ -362,7 +362,10 @@ export function StationPage() {
     const a = document.createElement('a')
     a.href = url
     a.download = `stations_${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(a)
     a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(url)
   }
 
   const getTypeBadge = (type: string) => {
@@ -394,13 +397,16 @@ export function StationPage() {
             <p className="text-sm text-gray-500 mt-1">Gérez les stations météorologiques</p>
           </div>
           <div className="flex gap-2">
-            <button onClick={fetchStations} className="bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-xl text-sm flex items-center gap-2">
-              <RefreshCw className="h-4 w-4" /> Actualiser
+            <button 
+              onClick={exportCSV} 
+              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+            >
+              Exporter
             </button>
-            <button onClick={exportCSV} className="bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-2 rounded-xl text-sm flex items-center gap-2">
-              <Download className="h-4 w-4" /> Exporter
-            </button>
-            <button onClick={handleCreate} className="bg-green-600 text-white px-4 py-2 rounded-xl hover:bg-green-700 flex items-center gap-2">
+            <button 
+              onClick={handleCreate} 
+              className="bg-green-600 text-white px-4 py-2 rounded-xl hover:bg-green-700 flex items-center gap-2 transition-colors"
+            >
               <Plus className="h-4 w-4" /> Ajouter
             </button>
           </div>
@@ -450,14 +456,14 @@ export function StationPage() {
             <option value="all">Toutes les régions</option>
             {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
-        <select 
-  value={selectedDistrict} 
-  onChange={(e) => setSelectedDistrict(e.target.value)} 
-  className="px-4 py-2 border rounded-xl text-sm bg-white"
->
-  <option value="all">Tous les districts</option>
-  {filterDistricts.map(d => <option key={d} value={d}>{d}</option>)}
-</select>
+          <select 
+            value={selectedDistrict} 
+            onChange={(e) => setSelectedDistrict(e.target.value)} 
+            className="px-4 py-2 border rounded-xl text-sm bg-white"
+          >
+            <option value="all">Tous les districts</option>
+            {filterDistricts.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
           <select value={selectedZone} onChange={(e) => setSelectedZone(e.target.value)} className="px-4 py-2 border rounded-xl text-sm bg-white">
             <option value="all">Toutes les zones</option>
             {ZONES.map(z => <option key={z} value={z}>{z}</option>)}
@@ -636,8 +642,6 @@ export function StationPage() {
                           className="w-full border rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-green-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                         />
                       )}
-                      {/* ⚠️ Districts sans liste de communes connue (ex. Toliara I, Antsiranana I,
-                          Nosy Be — districts à commune unique) : repli en saisie libre. */}
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-1">Zone antiacridienne *</label>

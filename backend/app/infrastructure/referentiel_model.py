@@ -36,3 +36,12 @@ class StationFixeModel(Base):
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
 
     poste: Mapped["PosteAcridienModel"] = relationship(back_populates="stations")
+    prospections: Mapped[list["ProspectionModel"]] = relationship(back_populates="station")
+
+    @property
+    def pa_code(self) -> str | None:
+        return self.poste.code if self.poste else None
+
+    @property
+    def pa_nom(self) -> str | None:
+        return self.poste.nom if self.poste else None

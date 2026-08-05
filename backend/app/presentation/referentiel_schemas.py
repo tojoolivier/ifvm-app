@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict
 
 class PosteAcridienRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     code: str
     nom: str
@@ -15,6 +16,7 @@ class PosteAcridienRead(BaseModel):
 
 class StationFixeRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     code: str
     nom: str

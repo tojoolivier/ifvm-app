@@ -1,4 +1,4 @@
-import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
@@ -24,8 +24,9 @@ const router = createBrowserRouter([
       {
         element: <Layout />,
         children: [
-          // Dashboard principal
+          // Dashboard principal (couvre à la fois la racine et /dashboard)
           { path: '/', element: <DashboardPage /> },
+          { path: '/dashboard', element: <DashboardPage /> },
           
           // Gestion des campagnes
           { path: '/campagnes', element: <CampagnesPage /> },
@@ -50,8 +51,8 @@ const router = createBrowserRouter([
     ],
   },
   
-  // Redirection par défaut
-  { path: '*', element: <LoginPage /> },
+  // Redirection par défaut pour toutes les URLs inconnues (évite les boucles vers /login)
+  { path: '*', element: <Navigate to="/" replace /> },
 ])
 
 export function AppRouter() {

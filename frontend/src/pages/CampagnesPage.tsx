@@ -18,6 +18,7 @@ export function CampagnesPage() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [error, setError] = useState('')
+  const [deleteError, setDeleteError] = useState('')
 
   const { data: campagnes = [], isLoading } = useQuery<Campagne[]>({
     queryKey: ['campagnes'],
@@ -40,6 +41,13 @@ export function CampagnesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['campagnes'] })
       setDeleteId(null)
+      setDeleteError('')
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setDeleteError(
+        msg ?? 'Impossible de supprimer cette campagne (des prospections y sont peut-être liées).'
+      )
     },
   })
 
@@ -99,7 +107,7 @@ export function CampagnesPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
-                      onClick={() => setDeleteId(c.id)}
+                      onClick={() => { setDeleteId(c.id); setDeleteError('') }}
                       className="text-red-600 hover:text-red-800 text-sm"
                     >
                       Supprimer
@@ -179,13 +187,16 @@ export function CampagnesPage() {
               <h2 className="text-lg font-semibold">Confirmer la suppression</h2>
             </div>
             <div className="px-6 py-4">
+              {deleteError && (
+                <div className="bg-red-50 text-red-700 p-3 rounded text-sm mb-3">{deleteError}</div>
+              )}
               <p className="text-gray-600">
                 Voulez-vous vraiment supprimer cette campagne ?
               </p>
             </div>
             <div className="px-6 py-4 border-t flex gap-3 justify-end">
               <button
-                onClick={() => setDeleteId(null)}
+                onClick={() => { setDeleteId(null); setDeleteError('') }}
                 className="border border-gray-300 px-4 py-2 rounded hover:bg-gray-50"
               >
                 Annuler
