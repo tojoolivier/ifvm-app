@@ -169,6 +169,16 @@ def upgrade() -> None:
         ),
     )
 
+    op.execute(
+        """
+        COMMENT ON COLUMN crt.espece
+        IS 'Espece cible du traitement: LMC (Locusta migratoria capito), NSE (Nomadacris
+        septemfasciata), ou MELANGE lorsque le traitement couvre une zone ou les deux especes
+        sont presentes simultanement (contrairement a prospection.espece qui ne connait que
+        LMC|NSE, une observation de terrain porte toujours sur une seule espece a la fois)'
+        """
+    )
+
     # ===== INDEX =====
     op.create_index("ix_crt_prospection_id", "crt", ["prospection_id"])
     op.create_index("ix_crt_numero", "crt", ["numero_crt"])
@@ -232,6 +242,7 @@ def upgrade() -> None:
             nullable=False,
             server_default=sa.text("now()"),
         ),
+        sa.UniqueConstraint("crt_id", "type_materiel", name="uq_crt_materiel"),
     )
     op.create_index("ix_crt_materiel_crt_id", "crt_materiel", ["crt_id"])
 
