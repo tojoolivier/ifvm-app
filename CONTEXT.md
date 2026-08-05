@@ -179,7 +179,8 @@ audit_log
 compte_rendu_traitement (CRT)
   ├── → prospection  (obligatoire ; quel que soit le type_prospection)
   ├── crt_point_gps    (périmètre + 1ère passe)
-  ├── crt_cible_espece
+  ├── crt_cible_espece (LMC | NSE | MELANGE — domaine volontairement plus large que
+  │                     prospection.espece, cf. note ci-dessous)
   ├── crt_zone_cible   (cultures, pâturage, apiculture…)
   ├── crt_moyens_humains
   ├── crt_moyens_materiels
@@ -192,6 +193,14 @@ fiche_vol → CRT (1-1)
   ├── fiche_vol_cumul     (jour / décade / campagne)
   └── fiche_vol_pesticide
 ```
+
+> **Domaine `espece` : `crt` vs `prospection`.** `prospection.espece` et
+> `prospection_population.espece` n'autorisent que `LMC|NSE` : une observation de terrain
+> porte toujours sur une seule espèce à la fois. `crt.espece` autorise en plus `MELANGE`,
+> qui signifie que le traitement couvre une zone où **LMC et NSE sont présentes
+> simultanément** — ce n'est pas une 3ᵉ espèce, c'est un fait propre à l'échelle du
+> traitement (zone mixte), pas à celle de l'observation. La divergence de domaine entre
+> les deux tables est donc intentionnelle, pas un oubli.
 
 ---
 
