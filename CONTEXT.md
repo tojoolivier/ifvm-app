@@ -20,7 +20,7 @@ L'**IFVM** (Ivotoerana Famongorana ny Valala eto Madagasikara) est le centre nat
 | Prospection extensive | — | Relevé rapide ponctuel (la feuille papier en répète 2 ; en base 1 relevé = 1 ligne) | Quotidien terrain | Résultats de l'intensive (équipe surveillance) |
 | Prospection de validation | — | Vérification d'un signalement | À la demande | Signalement agriculteur/non-specialiste |
 | Relevé météorologique | — | Données journalières par station météo | Quotidien | Quotidien |
-| Compte-rendu de traitement | CRT | Rapport d'une opération de traitement | À chaque traitement | Décision de traitement |
+| Compte-rendu de traitement | CRT | Rapport d'une opération de traitement (table `traitement` — voir note ci-dessous) | À chaque traitement | Décision de traitement |
 | Fiche de vol | — | Journal journalier d'un aéronef (1 vol = 1 CRT) | À chaque vol | Vol effectué |
 
 ### Chaînes de déclenchement
@@ -169,38 +169,51 @@ prospection → station (fixe pour intensive, ponctuelle pour extensive/validati
   └── prospection_infestation (taches, bandes, vols, essaims)                             [queryable]
 
 audit_log
-  ├── fiche_type (intensive | extensive | validation | crt | vol | meteo)
+  ├── fiche_type (intensive | extensive | validation | traitement | vol | meteo)
   ├── fiche_id
   ├── auteur_id → utilisateur
   ├── action (creation | modification | soumission | verification | validation | rejet | commentaire)
   ├── details (JSON ou texte)
   └── created_at
 
-compte_rendu_traitement (CRT)
-  ├── → prospection  (obligatoire ; quel que soit le type_prospection)
-  ├── crt_point_gps    (périmètre + 1ère passe)
-  ├── crt_cible_espece (LMC | NSE | MELANGE — domaine volontairement plus large que
-  │                     prospection.espece, cf. note ci-dessous)
-  ├── crt_zone_cible   (cultures, pâturage, apiculture…)
-  ├── crt_moyens_humains
-  ├── crt_moyens_materiels
-  ├── crt_pesticide
-  ├── crt_non_cible
-  └── crt_habitat_proximite
+traitement (ex-CRT — le sigle CRT désigne le compte-rendu affiché à l'utilisateur
+            via numero_fiche, pas la table, qui représente l'événement de traitement
+            lui-même ; voir docs/data-model-traitement-v2.md)
+  ├── → prospection      (obligatoire ; quel que soit le type_prospection)
+  ├── type_traitement    (AERIEN | TERRESTRE — discriminant de spécialisation disjointe totale)
+  ├── zones_exposées, végétation, empoisonnement, évaluation du risque, comportement
+  │   anormal, mortalité (JSONB / colonnes inchangées depuis le CRT à plat d'origine)
+  ├── cible              (1-1, weak entity, snapshot à la création)
+  │   └── espece (LMC | NSE | MELANGE — domaine volontairement plus large que
+  │               prospection.espece, cf. note ci-dessous)
+  ├── traitement_aerien  (1-1 si type_traitement=AERIEN)
+  │   └── traitement_rotation (1-N, une cuve = une ligne, produit_id → pesticide)
+  ├── traitement_terrestre (1-1 si type_traitement=TERRESTRE)
+  │   ├── traitement_produit_utilise (1-N, produit_id → pesticide)
+  │   └── traitement_origine_id (auto-réf traitement.id, reprise de traitement —
+  │                               pointe vers la fiche précédente immédiate, pas la racine)
+  └── traitement_signature (1-N selon rôle : PILOTE | MECANICIEN | CHEF_DE_BASE |
+                             CHEF_EQUIPE | CONSULTANT_INTERNATIONAL)
 
-fiche_vol → CRT (1-1)
+fiche_vol → traitement (1-1, hors périmètre — future table)
   ├── fiche_vol_passage   (jusqu'à 20 passages/jour)
   ├── fiche_vol_cumul     (jour / décade / campagne)
   └── fiche_vol_pesticide
 ```
 
-> **Domaine `espece` : `crt` vs `prospection`.** `prospection.espece` et
+> **Domaine `espece` : `cible` vs `prospection`.** `prospection.espece` et
 > `prospection_population.espece` n'autorisent que `LMC|NSE` : une observation de terrain
-> porte toujours sur une seule espèce à la fois. `crt.espece` autorise en plus `MELANGE`,
-> qui signifie que le traitement couvre une zone où **LMC et NSE sont présentes
-> simultanément** — ce n'est pas une 3ᵉ espèce, c'est un fait propre à l'échelle du
-> traitement (zone mixte), pas à celle de l'observation. La divergence de domaine entre
-> les deux tables est donc intentionnelle, pas un oubli.
+> porte toujours sur une seule espèce à la fois. `cible.espece` (sur `traitement`) autorise
+> en plus `MELANGE`, qui signifie que le traitement couvre une zone où **LMC et NSE sont
+> présentes simultanément** — ce n'est pas une 3ᵉ espèce, c'est un fait propre à l'échelle
+> du traitement (zone mixte), pas à celle de l'observation. La divergence de domaine entre
+> les deux tables est donc intentionnelle, pas un oubli (le formulaire papier source a
+> bien une case "Mélange" distincte de LMC/NSE).
+
+> **Spécialisation `traitement_aerien`/`traitement_terrestre`.** Method 1 (spécialisation
+> disjointe totale) : `type_traitement` est le discriminant, une ligne `traitement` a
+> exactement une ligne fille correspondante. Détail complet du modèle et des décisions
+> de conception dans `docs/data-model-traitement-v2.md`.
 
 ---
 
