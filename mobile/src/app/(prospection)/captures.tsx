@@ -3,18 +3,11 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-nati
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { parseEspeceSelection, buildGrilles } from '@/lib/prospection-especes';
-import { capturesMaxFor, phenotypesFor, Phenotype, grilleKeyToString, stadesFor } from '@/lib/prospection-especes-stades';
+import { capturesMaxFor, grilleKeyToString } from '@/lib/prospection-especes-stades';
 import { chronoSeconds, formatChrono } from '@/lib/prospection-review';
 import { markGrilleCompleted, saveProspectionCaptures, startCaptureTimer } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
-import {
-  captureKey,
-  countsToRows,
-  dominantPhenotype,
-  totalBySexe,
-  totalCaptures,
-  useProspectionCaptureStore,
-} from '@/lib/prospection-capture-store';
+import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
 import { TextInput } from 'react-native-gesture-handler';
 
 const GREEN = '#235a36';
@@ -26,11 +19,6 @@ const INACTIVE_BG = '#efeada';
 
 const ESPECE_LABEL = { LMC: 'Locusta', NSE: 'Nomadacris' } as const;
 const CATEGORIE_LABEL = { imago: 'Imagos', larve: 'Larves' } as const;
-
-// ==========================================
-// TYPES POUR LA NOUVELLE LOGIQUE
-// ==========================================
-type Phase = 'solitaire' | 'transiens' | 'solitario_transiens' | 'gregaire';
 
 // ==========================================
 // CONFIGURATION DES STADES PAR ESPÈCE ET SEXE
@@ -78,11 +66,6 @@ const PHASES_CONFIG = {
   },
 };
 
-interface CaptureData {
-  stades: Record<string, number>;
-  phases: Record<string, number>;
-}
-
 function parseGrillesCompletees(raw: string | null): string[] {
   if (!raw) return [];
   try {
@@ -106,23 +89,23 @@ export default function CapturesScreen() {
   const [tick, setTick] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
 
-  // ==========================================
-  // ÉTAT LOCAL POUR LES CAPTURES
-  // ==========================================
-  const [captureData, setCaptureData] = useState<CaptureData>({
-    stades: {},
-    phases: {},
-  });
-
-  const [currentSexe, setCurrentSexe] = useState<'F' | 'M'>('F');
-
   const requestedIndex = Number(grilleIndex ?? '0');
   const grille = store.grilleOrder[store.currentGrilleIndex];
+  const isImago = grille?.categorie === 'imago';
+  const isLarve = grille?.categorie === 'larve';
 
-  // ==========================================
-  // OBTENIR LES STADES ET PHASES POUR LA GRILLE COURANTE
-  // ==========================================
+  // Récupérer les données du store
+  const currentSexe = store.currentSexe;
+  const stadesData = store.stadesData;
+  const phasesData = store.phasesData;
+  const totalStades = Object.values(stadesData).reduce((a, b) => a + b, 0);
+  const totalPhases = Object.values(phasesData).reduce((a, b) => a + b, 0);
+  const totalCapturesCount = totalPhases;
+  const isConsistent = totalStades === totalPhases;
+
+  // Obtenir les listes pour l'affichage
   const getStadesList = () => {
+    if (!grille) return [];
     if (grille.categorie === 'imago') {
       return STADES_CONFIG.imago[grille.espece]?.[currentSexe] || [];
     } else {
@@ -131,6 +114,7 @@ export default function CapturesScreen() {
   };
 
   const getPhasesList = () => {
+    if (!grille) return [];
     const category = grille.categorie as 'imago' | 'larve';
     const sexeKey = grille.categorie === 'imago' ? currentSexe : 'F';
     return PHASES_CONFIG[grille.espece]?.[category]?.[sexeKey] || [];
@@ -138,83 +122,6 @@ export default function CapturesScreen() {
 
   const stadesList = getStadesList();
   const phasesList = getPhasesList();
-  const isImago = grille.categorie === 'imago';
-  const isLarve = grille.categorie === 'larve';
-
-  // Initialiser les données de capture quand la grille change
-  useEffect(() => {
-    const newStades: Record<string, number> = {};
-    const newPhases: Record<string, number> = {};
-
-    for (const stade of stadesList) {
-      newStades[stade] = 0;
-    }
-    for (const phase of phasesList) {
-      newPhases[phase] = 0;
-    }
-
-    setCaptureData({
-      stades: newStades,
-      phases: newPhases,
-    });
-  }, [grille, currentSexe]);
-
-  // ==========================================
-  // CALCULS
-  // ==========================================
-  const totalStades = Object.values(captureData.stades).reduce((a, b) => a + b, 0);
-  const totalPhases = Object.values(captureData.phases).reduce((a, b) => a + b, 0);
-
-  // Pour les imagos et les larves, le total est la somme des phases
-  const totalCapturesCount = totalPhases;
-
-  // Cohérence : stades = phases pour les deux catégories
-  const isConsistent = totalStades === totalPhases;
-
-  // ==========================================
-  // GESTIONNAIRES
-  // ==========================================
-  const handleStadeChange = (stade: string, value: number) => {
-    setCaptureData((prev) => ({
-      ...prev,
-      stades: { ...prev.stades, [stade]: Math.max(0, value) },
-    }));
-  };
-
-  const handlePhaseChange = (phase: string, value: number) => {
-    setCaptureData((prev) => ({
-      ...prev,
-      phases: { ...prev.phases, [phase]: Math.max(0, value) },
-    }));
-  };
-
-  const incrementStade = (stade: string) => {
-    setCaptureData((prev) => ({
-      ...prev,
-      stades: { ...prev.stades, [stade]: (prev.stades[stade] || 0) + 1 },
-    }));
-  };
-
-  const decrementStade = (stade: string) => {
-    setCaptureData((prev) => ({
-      ...prev,
-      stades: { ...prev.stades, [stade]: Math.max(0, (prev.stades[stade] || 0) - 1) },
-    }));
-  };
-
-  const incrementPhase = (phase: string) => {
-    setCaptureData((prev) => ({
-      ...prev,
-      phases: { ...prev.phases, [phase]: (prev.phases[phase] || 0) + 1 },
-    }));
-  };
-
-  const decrementPhase = (phase: string) => {
-    setCaptureData((prev) => ({
-      ...prev,
-      phases: { ...prev.phases, [phase]: Math.max(0, (prev.phases[phase] || 0) - 1) },
-    }));
-  };
 
   // ==========================================
   // EFFETS
@@ -236,18 +143,18 @@ export default function CapturesScreen() {
       const completed = parseGrillesCompletees(draft.grilles_completees);
       store.initGrilles(grilles, completed, captures);
     }
-  }, [draft, draftId, captures]);
+  }, [draft, draftId, captures, store]);
 
   useEffect(() => {
     if (store.grilleOrder.length > 0 && requestedIndex !== store.currentGrilleIndex) {
       store.goToGrille(requestedIndex, captures);
     }
-  }, [requestedIndex, store.grilleOrder.length]);
+  }, [requestedIndex, store.grilleOrder.length, store, captures]);
 
   useEffect(() => {
     if (!draftId || draft?.capture_started_at) return;
     startCaptureTimer(draftId).then(setDraft);
-  }, [draftId, draft?.capture_started_at]);
+  }, [draftId, draft?.capture_started_at, setDraft]);
 
   useEffect(() => {
     const interval = setInterval(() => setTick((t) => t + 1), 1000);
@@ -281,7 +188,6 @@ export default function CapturesScreen() {
   const handleContinue = async () => {
     if (!draftId || isSaving) return;
 
-    // Vérifier la cohérence pour les deux catégories
     if (!isConsistent) {
       alert(
         `⚠️ Incohérence des données :\n` +
@@ -295,11 +201,10 @@ export default function CapturesScreen() {
     setIsSaving(true);
     try {
       const rows = [];
-      
+
       if (isImago) {
-        // Pour les imagos, créer une ligne par phase
         for (const phase of phasesList) {
-          const count = captureData.phases[phase] || 0;
+          const count = phasesData[phase] || 0;
           if (count > 0) {
             rows.push({
               espece: grille.espece,
@@ -312,9 +217,8 @@ export default function CapturesScreen() {
           }
         }
       } else {
-        // Pour les larves, créer une ligne par phase
         for (const phase of phasesList) {
-          const count = captureData.phases[phase] || 0;
+          const count = phasesData[phase] || 0;
           if (count > 0) {
             rows.push({
               espece: grille.espece,
@@ -332,7 +236,7 @@ export default function CapturesScreen() {
       await markGrilleCompleted(draftId, grilleKeyToString(grille));
       store.markCurrentGrilleCompleted();
       await refreshCaptures();
-      
+
       if (isLastGrille) {
         router.push({ pathname: '/(prospection)/infestation' as any, params: { draftId } });
       } else {
@@ -350,28 +254,28 @@ export default function CapturesScreen() {
 
   const renderSexeToggle = () => {
     if (!isImago) return null;
-    
+
     return (
       <>
         <View style={styles.sexeRow}>
           <TouchableOpacity
             style={[styles.sexeToggle, currentSexe === 'F' && styles.sexeToggleActive]}
-            onPress={() => setCurrentSexe('F')}
+            onPress={() => store.setSexe('F')}
             activeOpacity={0.8}
           >
             <Text style={[styles.sexeText, currentSexe === 'F' && styles.sexeTextActive]}>♀ Femelles</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.sexeToggle, currentSexe === 'M' && styles.sexeToggleActive]}
-            onPress={() => setCurrentSexe('M')}
+            onPress={() => store.setSexe('M')}
             activeOpacity={0.8}
           >
             <Text style={[styles.sexeText, currentSexe === 'M' && styles.sexeTextActive]}>♂ Mâles</Text>
           </TouchableOpacity>
         </View>
         <Text style={styles.sexeHint}>
-          {currentSexe === 'F' 
-            ? '♀ Stades: A1, A2, A3, A3-1/4, A3-1/2, A3-3/4, A3-4/4, A4, A5' 
+          {currentSexe === 'F'
+            ? '♀ Stades: A1, A2, A3, A3-1/4, A3-1/2, A3-3/4, A3-4/4, A4, A5'
             : '♂ Stades: A1, A123, A5'}
         </Text>
       </>
@@ -397,10 +301,10 @@ export default function CapturesScreen() {
               {phase.replace('_', ' ')}
             </Text>
             <TextInput
-              value={String(captureData.phases[phase] || 0)}
+              value={String(phasesData[phase] || 0)}
               onChangeText={(text) => {
                 const val = parseInt(text) || 0;
-                handlePhaseChange(phase, val);
+                store.updatePhase(phase, val);
               }}
               keyboardType="number-pad"
               style={[styles.tableCell, styles.tableCellValue, styles.tableInput]}
@@ -408,13 +312,13 @@ export default function CapturesScreen() {
             <View style={[styles.tableCell, styles.tableCellActions, styles.tableActionsRow]}>
               <TouchableOpacity
                 style={styles.smallCounterButton}
-                onPress={() => decrementPhase(phase)}
+                onPress={() => store.decrementPhase(phase)}
               >
                 <Text style={styles.smallCounterText}>−</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.smallCounterButton, styles.smallCounterButtonAdd]}
-                onPress={() => incrementPhase(phase)}
+                onPress={() => store.incrementPhase(phase)}
               >
                 <Text style={[styles.smallCounterText, styles.smallCounterTextAdd]}>+</Text>
               </TouchableOpacity>
@@ -450,10 +354,10 @@ export default function CapturesScreen() {
               {stade}
             </Text>
             <TextInput
-              value={String(captureData.stades[stade] || 0)}
+              value={String(stadesData[stade] || 0)}
               onChangeText={(text) => {
                 const val = parseInt(text) || 0;
-                handleStadeChange(stade, val);
+                store.updateStade(stade, val);
               }}
               keyboardType="number-pad"
               style={[styles.tableCell, styles.tableCellValue, styles.tableInput]}
@@ -461,13 +365,13 @@ export default function CapturesScreen() {
             <View style={[styles.tableCell, styles.tableCellActions, styles.tableActionsRow]}>
               <TouchableOpacity
                 style={styles.smallCounterButton}
-                onPress={() => decrementStade(stade)}
+                onPress={() => store.decrementStade(stade)}
               >
                 <Text style={styles.smallCounterText}>−</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.smallCounterButton, styles.smallCounterButtonAdd]}
-                onPress={() => incrementStade(stade)}
+                onPress={() => store.incrementStade(stade)}
               >
                 <Text style={[styles.smallCounterText, styles.smallCounterTextAdd]}>+</Text>
               </TouchableOpacity>
@@ -514,18 +418,10 @@ export default function CapturesScreen() {
         </View>
 
         <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16 }}>
-          {/* Sélecteur de sexe (uniquement pour les imagos) */}
           {renderSexeToggle()}
-
-          {/* Tableau des stades */}
           {renderStades()}
-
-          {/* Tableau des phases */}
           {renderPhases()}
 
-          {/* ==========================================
-              NOMBRE DE CAPTURES (calculé automatiquement)
-              ========================================== */}
           <View style={styles.totalCaptureContainer}>
             <Text style={styles.totalCaptureLabel}>📋 Nombre de captures</Text>
             <View style={styles.totalCaptureValueContainer}>
@@ -533,9 +429,6 @@ export default function CapturesScreen() {
             </View>
           </View>
 
-          {/* ==========================================
-              VÉRIFICATION DE COHÉRENCE
-              ========================================== */}
           {!isConsistent && (
             <View style={styles.warningContainer}>
               <Text style={styles.warningText}>
@@ -558,10 +451,7 @@ export default function CapturesScreen() {
 
         <View style={styles.footer}>
           <TouchableOpacity
-            style={[
-              styles.continueButton,
-              !isConsistent && styles.continueButtonDisabled,
-            ]}
+            style={[styles.continueButton, !isConsistent && styles.continueButtonDisabled]}
             onPress={handleContinue}
             disabled={isSaving || !isConsistent}
             activeOpacity={0.85}
@@ -620,9 +510,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 7,
   },
-  // ==========================================
-  // STYLES TABLEAUX
-  // ==========================================
   tableSection: {
     backgroundColor: '#fff',
     borderRadius: 10,
@@ -701,9 +588,6 @@ const styles = StyleSheet.create({
   smallCounterButtonAdd: { backgroundColor: GREEN },
   smallCounterText: { fontSize: 14, fontWeight: '700', color: TEXT_SECONDARY },
   smallCounterTextAdd: { color: '#fff' },
-  // ==========================================
-  // TOTAL CAPTURES (calculé automatiquement)
-  // ==========================================
   totalCaptureContainer: {
     backgroundColor: '#FFFFFF',
     borderRadius: 10,
@@ -728,9 +612,6 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '800',
   },
-  // ==========================================
-  // STATUS
-  // ==========================================
   warningContainer: {
     backgroundColor: '#fef2f2',
     borderRadius: 8,

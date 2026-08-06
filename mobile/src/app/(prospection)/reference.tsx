@@ -79,7 +79,6 @@ export default function ReferenceScreen() {
 
   const paModeRef = useRef<SelectMode>('auto');
   const stationModeRef = useRef<SelectMode>('auto');
-  const isGpsMounted = useRef(true);
 
   useEffect(() => {
     paModeRef.current = paMode;
@@ -100,24 +99,21 @@ export default function ReferenceScreen() {
   }, []);
 
   // ==========================================
-  // CAPTURE GPS AUTOMATIQUE (corrigé)
+  // CAPTURE GPS AUTOMATIQUE (CORRIGÉ)
   // ==========================================
   useEffect(() => {
     let isActive = true;
-    let isMounted = true;
 
     const captureGps = async () => {
-      if (!isMounted) return;
-
       try {
         const pos = await getCurrentPosition();
-        if (!isActive || !isMounted) return;
+        if (!isActive) return;
 
         setPosition(pos);
         setLocationError(null);
 
         const area = await reverseGeocode(pos.latitude, pos.longitude);
-        if (!isActive || !isMounted) return;
+        if (!isActive) return;
         setAdminArea(area);
 
         const [nearestStation, postesList] = await Promise.all([
@@ -125,7 +121,7 @@ export default function ReferenceScreen() {
           listPostesAcridiens(),
         ]);
 
-        if (!isActive || !isMounted) return;
+        if (!isActive) return;
 
         if (nearestStation) {
           const nearestPa = postesList.find((p) => p.id === nearestStation.paId) ?? null;
@@ -140,14 +136,14 @@ export default function ReferenceScreen() {
           }
         }
       } catch (error) {
-        if (!isActive || !isMounted) return;
+        if (!isActive) return;
         const message = error instanceof LocationPermissionDeniedError
           ? 'Permission de localisation refusée. Veuillez activer la localisation dans les paramètres.'
           : 'Position GPS indisponible. Vérifiez que la localisation est activée.';
         setLocationError(message);
         Alert.alert('⚠️ Localisation', message);
       } finally {
-        if (isActive && isMounted) {
+        if (isActive) {
           setIsGpsLoading(false);
         }
       }
@@ -157,7 +153,6 @@ export default function ReferenceScreen() {
 
     return () => {
       isActive = false;
-      isMounted = false;
     };
   }, []);
 
