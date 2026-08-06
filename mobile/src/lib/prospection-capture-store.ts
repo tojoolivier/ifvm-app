@@ -14,6 +14,49 @@ import { CaptureRow } from './prospection-repository';
 
 export type CaptureCounts = Record<string, number>;
 
+// ==========================================
+// CONFIGURATION IMPORTÉE DU COMPOSANT
+// ==========================================
+const STADES_CONFIG = {
+  imago: {
+    LMC: {
+      F: ['A1', 'A2', 'A3', 'A3-1/4', 'A3-1/2', 'A3-3/4', 'A3-4/4', 'A4', 'A5'],
+      M: ['A1', 'A123', 'A5'],
+    },
+    NSE: {
+      F: ['A1', 'A2', 'A3', 'A3-1/4', 'A3-1/2', 'A3-3/4', 'A3-4/4', 'A4', 'A5'],
+      M: ['A1', 'A123', 'A5'],
+    },
+  },
+  larve: {
+    LMC: ['L1', 'L2', 'L3', 'L4', 'L5'],
+    NSE: ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'],
+  },
+};
+
+const PHASES_CONFIG = {
+  LMC: {
+    imago: {
+      F: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
+      M: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
+    },
+    larve: {
+      F: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
+      M: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
+    },
+  },
+  NSE: {
+    imago: {
+      F: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
+      M: ['solitaire', 'transiens', 'gregaire'],
+    },
+    larve: {
+      F: ['solitaire', 'transiens', 'gregaire'],
+      M: ['solitaire', 'transiens', 'gregaire'],
+    },
+  },
+};
+
 export function captureKey(sexe: Sexe | null, phenotype: Phenotype, stade: string): string {
   return sexe ? `${sexe}|${phenotype}|${stade}` : `${phenotype}|${stade}`;
 }
@@ -65,6 +108,28 @@ export function countsToRows(espece: Espece, categorie: Categorie, counts: Captu
   return rows;
 }
 
+// ==========================================
+// FONCTIONS D'INITIALISATION DES STADES/PHASES
+// ==========================================
+function getInitialStades(stadesList: string[]): Record<string, number> {
+  const newStades: Record<string, number> = {};
+  for (const stade of stadesList) {
+    newStades[stade] = 0;
+  }
+  return newStades;
+}
+
+function getInitialPhases(phasesList: string[]): Record<string, number> {
+  const newPhases: Record<string, number> = {};
+  for (const phase of phasesList) {
+    newPhases[phase] = 0;
+  }
+  return newPhases;
+}
+
+// ==========================================
+// INTERFACE DU STORE
+// ==========================================
 interface CaptureLoopState {
   grilleOrder: GrilleKey[];
   currentGrilleIndex: number;
@@ -73,6 +138,10 @@ interface CaptureLoopState {
   currentStade: string | null;
   currentPhenotype: Phenotype | null;
   counts: CaptureCounts;
+  // NOUVEAUX CHAMPS POUR STADES/PHASES
+  stadesData: Record<string, number>;
+  phasesData: Record<string, number>;
+  currentSexe: Sexe;
 
   initGrilles: (order: GrilleKey[], completed: string[], allCaptures: CaptureRow[]) => void;
   goToGrille: (index: number, allCaptures: CaptureRow[]) => void;
@@ -83,6 +152,13 @@ interface CaptureLoopState {
   increment: () => void;
   decrement: () => void;
   reset: () => void;
+  // NOUVELLES FONCTIONS
+  updateStade: (stade: string, value: number) => void;
+  updatePhase: (phase: string, value: number) => void;
+  incrementStade: (stade: string) => void;
+  decrementStade: (stade: string) => void;
+  incrementPhase: (phase: string) => void;
+  decrementPhase: (phase: string) => void;
 }
 
 function firstIncompleteIndex(order: GrilleKey[], completed: string[]): number {
@@ -94,6 +170,25 @@ function countsForGrille(grille: GrilleKey, allCaptures: CaptureRow[]): CaptureC
   return rowsToCounts(allCaptures.filter((row) => row.espece === grille.espece && row.categorie === grille.categorie));
 }
 
+// ==========================================
+// INITIALISATION DES DONNÉES STADES/PHASES
+// ==========================================
+function initStadesPhases(grille: GrilleKey, sexe: Sexe): { stades: Record<string, number>; phases: Record<string, number> } {
+  const category = grille.categorie as 'imago' | 'larve';
+  const sexeKey = grille.categorie === 'imago' ? sexe : 'F';
+  
+  const stadesList = grille.categorie === 'imago'
+    ? STADES_CONFIG.imago[grille.espece]?.[sexe] || []
+    : STADES_CONFIG.larve[grille.espece] || [];
+  
+  const phasesList = PHASES_CONFIG[grille.espece]?.[category]?.[sexeKey] || [];
+  
+  return {
+    stades: getInitialStades(stadesList),
+    phases: getInitialPhases(phasesList),
+  };
+}
+
 export const useProspectionCaptureStore = create<CaptureLoopState>((set, get) => ({
   grilleOrder: [],
   currentGrilleIndex: 0,
@@ -102,18 +197,27 @@ export const useProspectionCaptureStore = create<CaptureLoopState>((set, get) =>
   currentStade: null,
   currentPhenotype: null,
   counts: {},
+  stadesData: {},
+  phasesData: {},
+  currentSexe: 'F',
 
   initGrilles: (order, completed, allCaptures) => {
     const index = firstIncompleteIndex(order, completed);
     const grille = order[index];
+    const sexe = grille?.categorie === 'imago' ? 'F' : null;
+    const stadesPhases = grille ? initStadesPhases(grille, 'F') : { stades: {}, phases: {} };
+    
     set({
       grilleOrder: order,
       completedGrilleKeys: completed,
       currentGrilleIndex: index,
-      sexe: grille?.categorie === 'imago' ? 'F' : null,
+      sexe: sexe,
+      currentSexe: 'F',
       currentPhenotype: 'transiens',
       currentStade: grille ? stadesFor(grille.espece, grille.categorie, 'F')[0] : null,
       counts: grille ? countsForGrille(grille, allCaptures) : {},
+      stadesData: stadesPhases.stades,
+      phasesData: stadesPhases.phases,
     });
   },
 
@@ -121,12 +225,17 @@ export const useProspectionCaptureStore = create<CaptureLoopState>((set, get) =>
     const grille = get().grilleOrder[index];
     if (!grille) return;
     const sexe = grille.categorie === 'imago' ? 'F' : null;
+    const stadesPhases = initStadesPhases(grille, 'F');
+    
     set({
       currentGrilleIndex: index,
       sexe,
+      currentSexe: 'F',
       currentPhenotype: 'transiens',
       currentStade: stadesFor(grille.espece, grille.categorie, sexe)[0],
       counts: countsForGrille(grille, allCaptures),
+      stadesData: stadesPhases.stades,
+      phasesData: stadesPhases.phases,
     });
   },
 
@@ -142,7 +251,19 @@ export const useProspectionCaptureStore = create<CaptureLoopState>((set, get) =>
   },
 
   setSexe: (sexe) => {
-    set((state) => ({ sexe, currentStade: remapStadeForSexeChange(state.currentStade, sexe) }));
+    const grille = get().grilleOrder[get().currentGrilleIndex];
+    if (!grille) return;
+    
+    // Mettre à jour sexe et stades/phases
+    const stadesPhases = initStadesPhases(grille, sexe);
+    
+    set((state) => ({
+      sexe,
+      currentSexe: sexe,
+      currentStade: remapStadeForSexeChange(state.currentStade, sexe),
+      stadesData: stadesPhases.stades,
+      phasesData: stadesPhases.phases,
+    }));
   },
 
   setStade: (stade) => set({ currentStade: stade }),
@@ -166,6 +287,45 @@ export const useProspectionCaptureStore = create<CaptureLoopState>((set, get) =>
     set({ counts: { ...state.counts, [key]: current - 1 } });
   },
 
+  // ==========================================
+  // NOUVELLES FONCTIONS POUR STADES/PHASES
+  // ==========================================
+  updateStade: (stade: string, value: number) => {
+    set((state) => ({
+      stadesData: { ...state.stadesData, [stade]: Math.max(0, value) },
+    }));
+  },
+
+  updatePhase: (phase: string, value: number) => {
+    set((state) => ({
+      phasesData: { ...state.phasesData, [phase]: Math.max(0, value) },
+    }));
+  },
+
+  incrementStade: (stade: string) => {
+    set((state) => ({
+      stadesData: { ...state.stadesData, [stade]: (state.stadesData[stade] || 0) + 1 },
+    }));
+  },
+
+  decrementStade: (stade: string) => {
+    set((state) => ({
+      stadesData: { ...state.stadesData, [stade]: Math.max(0, (state.stadesData[stade] || 0) - 1) },
+    }));
+  },
+
+  incrementPhase: (phase: string) => {
+    set((state) => ({
+      phasesData: { ...state.phasesData, [phase]: (state.phasesData[phase] || 0) + 1 },
+    }));
+  },
+
+  decrementPhase: (phase: string) => {
+    set((state) => ({
+      phasesData: { ...state.phasesData, [phase]: Math.max(0, (state.phasesData[phase] || 0) - 1) },
+    }));
+  },
+
   reset: () => {
     set({
       grilleOrder: [],
@@ -175,6 +335,9 @@ export const useProspectionCaptureStore = create<CaptureLoopState>((set, get) =>
       currentStade: null,
       currentPhenotype: null,
       counts: {},
+      stadesData: {},
+      phasesData: {},
+      currentSexe: 'F',
     });
   },
 }));
