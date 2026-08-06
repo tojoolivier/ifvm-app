@@ -71,14 +71,14 @@ export default function TypeChooserScreen() {
             disabled={isCreating}
             activeOpacity={0.85}
           >
-            <Text style={styles.cardTitleIntensive}>{isCreating ? 'Création…' : 'Intensif'}</Text>
+            <Text style={styles.cardTitleIntensive}>{isCreating ? 'Création…' : 'Intensive'}</Text>
             <Text style={styles.cardSubtitleIntensive}>
               Captures détaillées par phénotype, sexe et phase — ce parcours.
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.card} onPress={chooseExtensive} disabled={isCreating} activeOpacity={0.85}>
-            <Text style={styles.cardTitle}>Extensif</Text>
+            <Text style={styles.cardTitle}>Extensive</Text>
             <Text style={styles.cardSubtitle}>
               Densités agrégées par phase (A1–A5 / L1–L7) — mêmes espèces LMC/NSE.
             </Text>
