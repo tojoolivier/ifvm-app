@@ -1,3 +1,28 @@
+jest.mock('expo-sqlite', () => ({
+  openDatabaseAsync: jest.fn().mockResolvedValue({
+    execAsync: jest.fn().mockResolvedValue(undefined),
+    runAsync: jest.fn().mockResolvedValue({ changes: 0 }),
+    getAllAsync: jest.fn().mockResolvedValue([]),
+    getFirstAsync: jest.fn().mockResolvedValue(null),
+  }),
+}));
+
+// Mock de prospection-db avec une station
+jest.mock('../src/lib/prospection-db', () => ({
+  getDb: jest.fn().mockResolvedValue({
+    execAsync: jest.fn().mockResolvedValue(undefined),
+    runAsync: jest.fn().mockResolvedValue({ changes: 1 }),
+    getAllAsync: jest.fn().mockResolvedValue([{ id: 'station-1' }]),
+    getFirstAsync: jest.fn().mockResolvedValue({ id: 'station-1' }),
+  }),
+}));
+
+// Mock de referentiel-sync
+jest.mock('../src/lib/referentiel-sync', () => ({
+  pullReferentiel: jest.fn().mockResolvedValue(undefined),
+}));
+
+
 import {
   CaptureRow,
   DraftProspection,
@@ -44,6 +69,7 @@ function draft(overrides: Partial<DraftProspection> = {}): DraftProspection {
     campagne_id: 'camp-1',
     prospecteur_id: 'user-1',
     station_id: null,
+    biotope: 'Mesophyle',
     region: null,
     district: null,
     commune: null,

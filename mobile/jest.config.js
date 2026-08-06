@@ -7,4 +7,7 @@ module.exports = {
     '^.+\\.tsx?$': 'ts-jest',
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
+  transformIgnorePatterns: [
+  'node_modules/(?!(expo-sqlite|expo|@expo|react-native|react-native-.*)/)'
+  ]
 };
