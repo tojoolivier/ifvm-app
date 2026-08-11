@@ -2,6 +2,7 @@ import uuid
 from datetime import date, datetime, time
 from typing import Any
 
+from app.domain.prospection import Prospection
 from app.domain.repositories import (
     ProspectionRepository,
     TraitementRepository,
@@ -52,6 +53,104 @@ async def _persister_avec_numero_fiche_unique(
     )
 
 
+def _valider_dates(date_traitement: date, date_validation: date) -> None:
+    if date_validation < date_traitement:
+        raise ValueError("date_validation doit être postérieure ou égale à date_traitement")
+
+
+def _generer_et_valider_numero_fiche(
+    numero_fiche: str | None, prenom_chef: str, date_traitement: date, type_libelle: str
+) -> str:
+    base_numero = numero_fiche or generer_numero_fiche(
+        prenom_chef, date_traitement, type_traitement=type_libelle
+    )
+    if len(base_numero) > _NUMERO_FICHE_MAX_LENGTH:
+        raise ValueError(
+            f"numero_fiche '{base_numero}' dépasse {_NUMERO_FICHE_MAX_LENGTH} caractères"
+        )
+    return base_numero
+
+
+def _construire_traitement_base(
+    *,
+    prospection: Prospection,
+    base_numero: str,
+    type_traitement: str,
+    mode_traitement: str | None,
+    date_traitement: date,
+    date_validation: date,
+    localite: str,
+    region: str | None,
+    district: str | None,
+    commune: str | None,
+    latitude: float | None,
+    longitude: float | None,
+    altitude: float | None,
+    kit_combinaison: bool,
+    kit_gants: bool,
+    kit_lunettes: bool,
+    kit_masques: bool,
+    kit_boite: bool,
+    zones_exposees: dict[str, Any] | None,
+    hauteur_strate_herbeuse_m: float | None,
+    hauteur_strate_arboree_m: float | None,
+    recouvrement_percent: int | None,
+    empoisonnement: bool,
+    empoisonnement_type: str | None,
+    empoisonnement_mode: str | None,
+    empoisonnement_autre: str | None,
+    evaluation_risque: dict[str, Any] | None,
+    comportement_anormal: bool,
+    comportement_non_cibles: dict[str, Any] | None,
+    mortalite: bool,
+    mortalite_familles: dict[str, Any] | None,
+) -> Traitement:
+    """Construit le `Traitement` brouillon + snapshot `Cible`, commun aux deux spécialisations."""
+    now = datetime.utcnow()
+    traitement = Traitement(
+        prospection_id=prospection.id,
+        numero_fiche=base_numero,
+        type_traitement=type_traitement,
+        mode_traitement=mode_traitement,
+        date_traitement=date_traitement,
+        date_validation=date_validation,
+        localite=localite,
+        region=region,
+        district=district,
+        commune=commune,
+        latitude=latitude,
+        longitude=longitude,
+        altitude=altitude,
+        kit_combinaison=kit_combinaison,
+        kit_gants=kit_gants,
+        kit_lunettes=kit_lunettes,
+        kit_masques=kit_masques,
+        kit_boite=kit_boite,
+        zones_exposees=zones_exposees,
+        hauteur_strate_herbeuse_m=hauteur_strate_herbeuse_m,
+        hauteur_strate_arboree_m=hauteur_strate_arboree_m,
+        recouvrement_percent=recouvrement_percent,
+        empoisonnement=empoisonnement,
+        empoisonnement_type=empoisonnement_type,
+        empoisonnement_mode=empoisonnement_mode,
+        empoisonnement_autre=empoisonnement_autre,
+        evaluation_risque=evaluation_risque,
+        comportement_anormal=comportement_anormal,
+        comportement_non_cibles=comportement_non_cibles,
+        mortalite=mortalite,
+        mortalite_familles=mortalite_familles,
+        statut="brouillon",
+        created_at=now,
+        updated_at=now,
+    )
+
+    cible = construire_cible(prospection)
+    cible.traitement_id = traitement.id
+    traitement.cible = cible
+
+    return traitement
+
+
 class CreateTraitementAerien:
     def __init__(
         self,
@@ -100,8 +199,7 @@ class CreateTraitementAerien:
         mortalite: bool = False,
         mortalite_familles: dict[str, Any] | None = None,
     ) -> Traitement:
-        if date_validation < date_traitement:
-            raise ValueError("date_validation doit être postérieure ou égale à date_traitement")
+        _valider_dates(date_traitement, date_validation)
 
         prospection = await self.prospection_repository.get_by_id(prospection_id)
         if prospection is None:
@@ -116,16 +214,13 @@ class CreateTraitementAerien:
                 "avec le rôle 'chef_de_base'"
             )
 
-        base_numero = numero_fiche or generer_numero_fiche(chef.prenom, date_traitement)
-        if len(base_numero) > _NUMERO_FICHE_MAX_LENGTH:
-            raise ValueError(
-                f"numero_fiche '{base_numero}' dépasse {_NUMERO_FICHE_MAX_LENGTH} caractères"
-            )
+        base_numero = _generer_et_valider_numero_fiche(
+            numero_fiche, chef.prenom, date_traitement, "Aerien"
+        )
 
-        now = datetime.utcnow()
-        traitement = Traitement(
-            prospection_id=prospection_id,
-            numero_fiche=base_numero,
+        traitement = _construire_traitement_base(
+            prospection=prospection,
+            base_numero=base_numero,
             type_traitement="AERIEN",
             mode_traitement=mode_traitement,
             date_traitement=date_traitement,
@@ -155,14 +250,7 @@ class CreateTraitementAerien:
             comportement_non_cibles=comportement_non_cibles,
             mortalite=mortalite,
             mortalite_familles=mortalite_familles,
-            statut="brouillon",
-            created_at=now,
-            updated_at=now,
         )
-
-        cible = construire_cible(prospection)
-        cible.traitement_id = traitement.id
-        traitement.cible = cible
 
         traitement.aerien = TraitementAerien(
             traitement_id=traitement.id,
@@ -240,8 +328,7 @@ class CreateTraitementTerrestre:
         mortalite: bool = False,
         mortalite_familles: dict[str, Any] | None = None,
     ) -> Traitement:
-        if date_validation < date_traitement:
-            raise ValueError("date_validation doit être postérieure ou égale à date_traitement")
+        _valider_dates(date_traitement, date_validation)
         if heure_fin <= heure_debut:
             raise ValueError("heure_fin doit être postérieure à heure_debut")
 
@@ -258,18 +345,13 @@ class CreateTraitementTerrestre:
                 "avec le rôle 'chef_equipe'"
             )
 
-        base_numero = numero_fiche or generer_numero_fiche(
-            chef.prenom, date_traitement, type_traitement="Terrestre"
+        base_numero = _generer_et_valider_numero_fiche(
+            numero_fiche, chef.prenom, date_traitement, "Terrestre"
         )
-        if len(base_numero) > _NUMERO_FICHE_MAX_LENGTH:
-            raise ValueError(
-                f"numero_fiche '{base_numero}' dépasse {_NUMERO_FICHE_MAX_LENGTH} caractères"
-            )
 
-        now = datetime.utcnow()
-        traitement = Traitement(
-            prospection_id=prospection_id,
-            numero_fiche=base_numero,
+        traitement = _construire_traitement_base(
+            prospection=prospection,
+            base_numero=base_numero,
             type_traitement="TERRESTRE",
             mode_traitement=mode_traitement,
             date_traitement=date_traitement,
@@ -299,14 +381,8 @@ class CreateTraitementTerrestre:
             comportement_non_cibles=comportement_non_cibles,
             mortalite=mortalite,
             mortalite_familles=mortalite_familles,
-            statut="brouillon",
-            created_at=now,
-            updated_at=now,
         )
-
-        cible = construire_cible(prospection)
-        cible.traitement_id = traitement.id
-        traitement.cible = cible
+        cible = traitement.cible
 
         terrestre = TraitementTerrestre(
             traitement_id=traitement.id,
