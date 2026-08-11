@@ -76,7 +76,7 @@ class CibleRead(BaseModel):
     grandes_larves: str | None
     vols_clairs_essaims: str | None
     repartition_population: str | None
-    surface_infestee_ha: float
+    surface_infestee_ha: float | None
 
     @field_serializer(
         "espece",
@@ -84,8 +84,9 @@ class CibleRead(BaseModel):
         "grandes_larves",
         "vols_clairs_essaims",
         "repartition_population",
+        "surface_infestee_ha",
     )
-    def _remplacer_absent(self, valeur: str | None) -> str:
+    def _remplacer_absent(self, valeur: str | float | None) -> str | float:
         return valeur if valeur is not None else NON_RENSEIGNE
 
 

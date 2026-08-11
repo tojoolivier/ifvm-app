@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.repositories import UtilisateurRepository
-from app.domain.traitement import UtilisateurRef
+from app.domain.utilisateur import UtilisateurRef
 from app.models.users import Utilisateur
 
 

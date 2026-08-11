@@ -12,7 +12,8 @@ from app.domain.referentiel import (
     StationFixe,
     UtilisateurEquipe,
 )
-from app.domain.traitement import Traitement, UtilisateurRef
+from app.domain.traitement import Traitement
+from app.domain.utilisateur import UtilisateurRef
 
 
 class CampagneRepository(ABC):

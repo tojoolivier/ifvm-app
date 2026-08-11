@@ -89,7 +89,7 @@ class CibleModel(Base):
     grandes_larves: Mapped[str | None] = mapped_column(String(50), nullable=True)
     vols_clairs_essaims: Mapped[str | None] = mapped_column(String(50), nullable=True)
     repartition_population: Mapped[str | None] = mapped_column(String(30), nullable=True)
-    surface_infestee_ha: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    surface_infestee_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
 
     traitement: Mapped[TraitementModel] = relationship(back_populates="cible")
 

@@ -18,6 +18,7 @@ from app.domain.traitement import (
 )
 
 _MAX_TENTATIVES_NUMERO_FICHE = 50
+_NUMERO_FICHE_MAX_LENGTH = 50  # doit rester aligné avec traitement.numero_fiche String(50)
 
 
 class CreateTraitementAerien:
@@ -85,6 +86,10 @@ class CreateTraitementAerien:
             )
 
         base_numero = numero_fiche or generer_numero_fiche(chef.prenom, date_traitement)
+        if len(base_numero) > _NUMERO_FICHE_MAX_LENGTH:
+            raise ValueError(
+                f"numero_fiche '{base_numero}' dépasse {_NUMERO_FICHE_MAX_LENGTH} caractères"
+            )
 
         now = datetime.utcnow()
         traitement = Traitement(
@@ -140,7 +145,12 @@ class CreateTraitementAerien:
             try:
                 return await self.traitement_repository.create(traitement)
             except NumeroFicheConflitError:
-                traitement.numero_fiche = f"{base_numero}-{suffixe}"
+                candidat = generer_numero_fiche(chef.prenom, date_traitement, suffixe=suffixe)
+                if len(candidat) > _NUMERO_FICHE_MAX_LENGTH:
+                    raise ValueError(
+                        f"numero_fiche '{candidat}' dépasse {_NUMERO_FICHE_MAX_LENGTH} caractères"
+                    ) from None
+                traitement.numero_fiche = candidat
         raise NumeroFicheConflitError(
             f"Impossible de générer un numero_fiche unique à partir de '{base_numero}'"
         )

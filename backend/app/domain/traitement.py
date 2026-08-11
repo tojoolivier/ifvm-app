@@ -19,15 +19,6 @@ class NumeroFicheConflitError(Exception):
 
 
 @dataclass
-class UtilisateurRef:
-    """Projection minimale d'un utilisateur pour les besoins du domaine traitement."""
-
-    id: uuid.UUID
-    prenom: str
-    role: str
-
-
-@dataclass
 class Cible:
     traitement_id: uuid.UUID = field(default_factory=uuid.uuid4)
     espece: str | None = None
@@ -35,7 +26,7 @@ class Cible:
     grandes_larves: str | None = None
     vols_clairs_essaims: str | None = None
     repartition_population: str | None = None
-    surface_infestee_ha: float = 0.0
+    surface_infestee_ha: float | None = None
 
 
 @dataclass
@@ -151,7 +142,5 @@ def construire_cible(prospection: Prospection) -> Cible:
         grandes_larves=str(grandes_total) if larves_renseignees else None,
         vols_clairs_essaims=vols_clairs_essaims,
         repartition_population=repartition,
-        surface_infestee_ha=prospection.surf_infestee
-        if prospection.surf_infestee is not None
-        else 0.0,
+        surface_infestee_ha=prospection.surf_infestee,
     )
