@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, time
 from typing import Any
 
 from app.domain.prospection import Prospection
@@ -12,6 +12,10 @@ class ProspectionIntrouvableError(LookupError):
 
 class ChefDeBaseInvalideError(PermissionError):
     """chef_de_base_id ne référence pas un utilisateur avec le rôle chef_de_base."""
+
+
+class ChefEquipeInvalideError(PermissionError):
+    """chef_equipe_id ne référence pas un utilisateur avec le rôle chef_equipe."""
 
 
 class NumeroFicheConflitError(Exception):
@@ -71,6 +75,49 @@ class TraitementAerien:
 
 
 @dataclass
+class TraitementTerrestre:
+    traitement_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    heure_debut: time = field(default_factory=lambda: time(0, 0))
+    heure_fin: time = field(default_factory=lambda: time(0, 0))
+    vitesse_vent_ms: float = 0.0
+    direction_vent: str | None = None
+    temperature_c: float = 0.0
+    reprise_traitement: bool = False
+    traitement_origine_id: uuid.UUID | None = None
+    chef_equipe_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    agent_encadreur_id: uuid.UUID | None = None
+    consultant_international: str | None = None
+    surface_atomiseur_ha: float | None = None
+    surface_disque_rotatif_ha: float | None = None
+    surface_ulvamast_ha: float | None = None
+    surface_traitee_ha: float | None = None
+    surface_cumulee_ha: float | None = None
+    surface_restante_ha: float | None = None
+    surface_restante_abandonnee: bool | None = None
+    essence_litres: float | None = None
+    nb_piles: int | None = None
+
+    def recalculer_surfaces(
+        self, surface_infestee_ha: float | None, surface_cumulee_precedente: float = 0.0
+    ) -> None:
+        """Seul chemin d'écriture pour surface_traitee_ha/surface_cumulee_ha/surface_restante_ha.
+
+        surface_restante_ha est ramenée à 0 si négative (critère CDG §9).
+        """
+        self.surface_traitee_ha = (
+            (self.surface_atomiseur_ha or 0.0)
+            + (self.surface_disque_rotatif_ha or 0.0)
+            + (self.surface_ulvamast_ha or 0.0)
+        )
+        self.surface_cumulee_ha = surface_cumulee_precedente + self.surface_traitee_ha
+        self.surface_restante_ha = (
+            max(surface_infestee_ha - self.surface_cumulee_ha, 0.0)
+            if surface_infestee_ha is not None
+            else None
+        )
+
+
+@dataclass
 class Traitement:
     id: uuid.UUID = field(default_factory=uuid.uuid4)
     prospection_id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -111,13 +158,17 @@ class Traitement:
 
     cible: Cible | None = None
     aerien: TraitementAerien | None = None
+    terrestre: TraitementTerrestre | None = None
 
 
 def generer_numero_fiche(
-    prenom_chef: str, date_traitement: date, suffixe: int | None = None
+    prenom_chef: str,
+    date_traitement: date,
+    suffixe: int | None = None,
+    type_traitement: str = "Aerien",
 ) -> str:
-    """Numéro de fiche lisible: [Prénom du chef]-[Aerien]-[Date], suffixe en cas de collision."""
-    base = f"{prenom_chef}-Aerien-{date_traitement.isoformat()}"
+    """Numéro de fiche lisible: [Prénom du chef]-[Aerien|Terrestre]-[Date], suffixe si collision."""
+    base = f"{prenom_chef}-{type_traitement}-{date_traitement.isoformat()}"
     if suffixe is None:
         return base
     return f"{base}-{suffixe}"

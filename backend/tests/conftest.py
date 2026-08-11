@@ -90,6 +90,23 @@ async def chef_de_base(db_session: AsyncSession) -> Utilisateur:
 
 
 @pytest_asyncio.fixture
+async def chef_equipe(db_session: AsyncSession) -> Utilisateur:
+    user = Utilisateur(
+        id=uuid.uuid4(),
+        nom="Andria",
+        prenom="Hery",
+        email=f"hery.chefequipe+{uuid.uuid4().hex[:6]}@test.mg",
+        password_hash=hash_password("secret"),
+        role="chef_equipe",
+        actif=True,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
 async def campagne_id(db_session: AsyncSession, utilisateur: Utilisateur) -> uuid.UUID:
     from datetime import date
 

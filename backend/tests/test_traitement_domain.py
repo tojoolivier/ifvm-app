@@ -1,17 +1,19 @@
 import uuid
-from datetime import date
+from datetime import date, time
 
 import pytest
 
 from app.application.traitement_use_cases import (
     AddRotation,
     CreateTraitementAerien,
+    CreateTraitementTerrestre,
     RemoveRotation,
     UpdateRotation,
 )
 from app.domain.prospection import Prospection, ProspectionPopulation
 from app.domain.traitement import (
     ChefDeBaseInvalideError,
+    ChefEquipeInvalideError,
     NumeroFicheConflitError,
     ProspectionIntrouvableError,
     Rotation,
@@ -19,6 +21,7 @@ from app.domain.traitement import (
     Traitement,
     TraitementAerien,
     TraitementIntrouvableError,
+    TraitementTerrestre,
     construire_cible,
     generer_numero_fiche,
 )
@@ -35,6 +38,13 @@ def test_numero_fiche_format():
 
 def test_numero_fiche_avec_suffixe():
     assert generer_numero_fiche("Hery", date(2026, 8, 11), suffixe=2) == "Hery-Aerien-2026-08-11-2"
+
+
+def test_numero_fiche_terrestre():
+    assert (
+        generer_numero_fiche("Hery", date(2026, 8, 11), type_traitement="Terrestre")
+        == "Hery-Terrestre-2026-08-11"
+    )
 
 
 # ==========================================
@@ -456,3 +466,172 @@ async def test_remove_rotation_introuvable():
     use_case = RemoveRotation(repo)
     with pytest.raises(RotationIntrouvableError):
         await use_case.execute(traitement_id=traitement.id, rotation_id=uuid.uuid4())
+
+
+# ==========================================
+# TraitementTerrestre.recalculer_surfaces
+# ==========================================
+
+
+def test_recalculer_surfaces_somme_trois_materiels():
+    terrestre = TraitementTerrestre(
+        surface_atomiseur_ha=10.0, surface_disque_rotatif_ha=5.5, surface_ulvamast_ha=2.25
+    )
+    terrestre.recalculer_surfaces(surface_infestee_ha=100.0)
+    assert terrestre.surface_traitee_ha == 17.75
+    assert terrestre.surface_cumulee_ha == 17.75
+    assert terrestre.surface_restante_ha == 82.25
+
+
+def test_recalculer_surfaces_aucun_materiel_traite_zero():
+    terrestre = TraitementTerrestre()
+    terrestre.recalculer_surfaces(surface_infestee_ha=50.0)
+    assert terrestre.surface_traitee_ha == 0.0
+    assert terrestre.surface_restante_ha == 50.0
+
+
+def test_recalculer_surfaces_restante_plancher_zero_cdg_9():
+    """Critère d'acceptation CDG §9 : surface_restante_ha ne descend jamais sous 0."""
+    terrestre = TraitementTerrestre(surface_atomiseur_ha=80.0)
+    terrestre.recalculer_surfaces(surface_infestee_ha=50.0)
+    assert terrestre.surface_traitee_ha == 80.0
+    assert terrestre.surface_restante_ha == 0.0
+
+
+def test_recalculer_surfaces_infestee_none_restante_none():
+    terrestre = TraitementTerrestre(surface_atomiseur_ha=10.0)
+    terrestre.recalculer_surfaces(surface_infestee_ha=None)
+    assert terrestre.surface_traitee_ha == 10.0
+    assert terrestre.surface_restante_ha is None
+
+
+def test_recalculer_surfaces_avec_cumul_precedent():
+    terrestre = TraitementTerrestre(surface_atomiseur_ha=10.0)
+    terrestre.recalculer_surfaces(surface_infestee_ha=100.0, surface_cumulee_precedente=30.0)
+    assert terrestre.surface_traitee_ha == 10.0
+    assert terrestre.surface_cumulee_ha == 40.0
+    assert terrestre.surface_restante_ha == 60.0
+
+
+# ==========================================
+# CreateTraitementTerrestre (fakes en mémoire)
+# ==========================================
+
+
+_CHEF_EQUIPE = UtilisateurRef(id=uuid.uuid4(), prenom="Hery", role="chef_equipe")
+
+
+def _use_case_terrestre(
+    prospection: Prospection | None = None,
+    chef: UtilisateurRef | None = None,
+    conflits: int = 0,
+) -> tuple[CreateTraitementTerrestre, FakeTraitementRepo]:
+    repo = FakeTraitementRepo(conflits=conflits)
+    return (
+        CreateTraitementTerrestre(
+            traitement_repository=repo,
+            prospection_repository=FakeProspectionRepo(prospection),
+            utilisateur_repository=FakeUtilisateurRepo(chef),
+        ),
+        repo,
+    )
+
+
+def _args_terrestre(**overrides):
+    args = dict(
+        prospection_id=uuid.uuid4(),
+        date_traitement=date(2026, 8, 11),
+        date_validation=date(2026, 8, 12),
+        localite="Betioky",
+        heure_debut=time(6, 0),
+        heure_fin=time(9, 0),
+        vitesse_vent_ms=1.5,
+        temperature_c=24.0,
+        chef_equipe_id=_CHEF_EQUIPE.id,
+    )
+    args.update(overrides)
+    return args
+
+
+@pytest.mark.asyncio
+async def test_creation_terrestre_genere_numero_fiche_et_recalcule_surfaces():
+    prospection = _prospection(surf_infestee=100.0)
+    use_case, repo = _use_case_terrestre(prospection=prospection, chef=_CHEF_EQUIPE)
+    traitement = await use_case.execute(
+        **_args_terrestre(
+            surface_atomiseur_ha=10.0,
+            surface_disque_rotatif_ha=5.0,
+            surface_restante_abandonnee=False,
+        )
+    )
+
+    assert traitement.numero_fiche == "Hery-Terrestre-2026-08-11"
+    assert traitement.statut == "brouillon"
+    assert traitement.type_traitement == "TERRESTRE"
+    assert traitement.terrestre is not None
+    assert traitement.terrestre.chef_equipe_id == _CHEF_EQUIPE.id
+    assert traitement.terrestre.surface_traitee_ha == 15.0
+    assert traitement.terrestre.surface_restante_ha == 85.0
+    assert repo.crees == [traitement]
+
+
+@pytest.mark.asyncio
+async def test_terrestre_conflit_numero_fiche_ajoute_suffixe_incremental():
+    use_case, repo = _use_case_terrestre(prospection=_prospection(), chef=_CHEF_EQUIPE, conflits=2)
+    traitement = await use_case.execute(**_args_terrestre())
+    assert traitement.numero_fiche == "Hery-Terrestre-2026-08-11-3"
+
+
+@pytest.mark.asyncio
+async def test_terrestre_rejette_chef_equipe_avec_mauvais_role():
+    mauvais_chef = UtilisateurRef(id=uuid.uuid4(), prenom="Jean", role="prospecteur")
+    use_case, _ = _use_case_terrestre(prospection=_prospection(), chef=mauvais_chef)
+    with pytest.raises(ChefEquipeInvalideError):
+        await use_case.execute(**_args_terrestre(chef_equipe_id=mauvais_chef.id))
+
+
+@pytest.mark.asyncio
+async def test_terrestre_rejette_chef_equipe_inconnu():
+    use_case, _ = _use_case_terrestre(prospection=_prospection(), chef=None)
+    with pytest.raises(ChefEquipeInvalideError):
+        await use_case.execute(**_args_terrestre())
+
+
+@pytest.mark.asyncio
+async def test_terrestre_rejette_prospection_inexistante():
+    use_case, _ = _use_case_terrestre(prospection=None, chef=_CHEF_EQUIPE)
+    with pytest.raises(ProspectionIntrouvableError):
+        await use_case.execute(**_args_terrestre())
+
+
+@pytest.mark.asyncio
+async def test_terrestre_rejette_heure_fin_anterieure_ou_egale():
+    use_case, _ = _use_case_terrestre(prospection=_prospection(), chef=_CHEF_EQUIPE)
+    with pytest.raises(ValueError):
+        await use_case.execute(**_args_terrestre(heure_debut=time(9, 0), heure_fin=time(9, 0)))
+
+
+@pytest.mark.asyncio
+async def test_terrestre_rejette_date_validation_anterieure():
+    use_case, _ = _use_case_terrestre(prospection=_prospection(), chef=_CHEF_EQUIPE)
+    with pytest.raises(ValueError):
+        await use_case.execute(
+            **_args_terrestre(date_traitement=date(2026, 8, 11), date_validation=date(2026, 8, 10))
+        )
+
+
+@pytest.mark.asyncio
+async def test_terrestre_rejette_surface_restante_positive_sans_abandonnee():
+    """surface_restante_abandonnee obligatoire dès que surface_restante_ha > 0 (contrainte DB)."""
+    prospection = _prospection(surf_infestee=100.0)
+    use_case, _ = _use_case_terrestre(prospection=prospection, chef=_CHEF_EQUIPE)
+    with pytest.raises(ValueError):
+        await use_case.execute(**_args_terrestre(surface_atomiseur_ha=10.0))
+
+
+@pytest.mark.asyncio
+async def test_terrestre_accepte_surface_restante_nulle_sans_abandonnee():
+    prospection = _prospection(surf_infestee=10.0)
+    use_case, _ = _use_case_terrestre(prospection=prospection, chef=_CHEF_EQUIPE)
+    traitement = await use_case.execute(**_args_terrestre(surface_atomiseur_ha=25.0))
+    assert traitement.terrestre.surface_restante_ha == 0.0
