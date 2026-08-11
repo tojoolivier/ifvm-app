@@ -9,6 +9,7 @@ from app.domain.repositories import TraitementRepository
 from app.domain.traitement import (
     Cible,
     NumeroFicheConflitError,
+    ProduitUtilise,
     Rotation,
     Traitement,
     TraitementAerien,
@@ -16,6 +17,7 @@ from app.domain.traitement import (
 )
 from app.infrastructure.traitement_model import (
     CibleModel,
+    ProduitUtiliseModel,
     RotationModel,
     TraitementAerienModel,
     TraitementModel,
@@ -34,7 +36,9 @@ class TraitementRepositoryImpl(TraitementRepository):
             .options(
                 selectinload(TraitementModel.cible),
                 selectinload(TraitementModel.aerien).selectinload(TraitementAerienModel.rotations),
-                selectinload(TraitementModel.terrestre),
+                selectinload(TraitementModel.terrestre).selectinload(
+                    TraitementTerrestreModel.produits
+                ),
             )
         )
         model = result.scalar_one_or_none()
@@ -141,6 +145,7 @@ class TraitementRepositoryImpl(TraitementRepository):
                 surface_restante_abandonnee=traitement.terrestre.surface_restante_abandonnee,
                 essence_litres=traitement.terrestre.essence_litres,
                 nb_piles=traitement.terrestre.nb_piles,
+                total_pesticide_l=traitement.terrestre.total_pesticide_l,
             )
 
         self.session.add(model)
@@ -215,6 +220,46 @@ class TraitementRepositoryImpl(TraitementRepository):
 
         await self._persister_totaux(traitement_id, nb_rotations, total_pesticide_l)
         return await self.get_by_id(traitement_id)
+
+    async def add_produit(
+        self,
+        traitement_id: uuid.UUID,
+        produit: ProduitUtilise,
+        total_pesticide_l: float | None,
+    ) -> Traitement:
+        self.session.add(
+            ProduitUtiliseModel(
+                id=produit.id,
+                traitement_terrestre_id=traitement_id,
+                numero=produit.numero,
+                produit_id=produit.produit_id,
+                quantite_l=produit.quantite_l,
+            )
+        )
+        await self._persister_total_pesticide(traitement_id, total_pesticide_l)
+        return await self.get_by_id(traitement_id)
+
+    async def remove_produit(
+        self,
+        traitement_id: uuid.UUID,
+        produit_utilise_id: uuid.UUID,
+        total_pesticide_l: float | None,
+    ) -> Traitement:
+        produit_model = await self.session.get(ProduitUtiliseModel, produit_utilise_id)
+        await self.session.delete(produit_model)
+
+        await self._persister_total_pesticide(traitement_id, total_pesticide_l)
+        return await self.get_by_id(traitement_id)
+
+    async def _persister_total_pesticide(
+        self,
+        traitement_id: uuid.UUID,
+        total_pesticide_l: float | None,
+    ) -> None:
+        terrestre_model = await self.session.get(TraitementTerrestreModel, traitement_id)
+        terrestre_model.total_pesticide_l = total_pesticide_l
+        await self.session.commit()
+        self.session.expire(terrestre_model, ["produits"])
 
     async def _persister_totaux(
         self,
@@ -346,6 +391,19 @@ class TraitementRepositoryImpl(TraitementRepository):
                 if model.terrestre.essence_litres is not None
                 else None,
                 nb_piles=model.terrestre.nb_piles,
+                total_pesticide_l=float(model.terrestre.total_pesticide_l)
+                if model.terrestre.total_pesticide_l is not None
+                else None,
+                produits=[
+                    ProduitUtilise(
+                        id=p.id,
+                        traitement_terrestre_id=p.traitement_terrestre_id,
+                        numero=p.numero,
+                        produit_id=p.produit_id,
+                        quantite_l=float(p.quantite_l),
+                    )
+                    for p in model.terrestre.produits
+                ],
             )
             if model.terrestre is not None
             else None,

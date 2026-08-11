@@ -12,6 +12,8 @@ from app.domain.traitement import (
     ChefDeBaseInvalideError,
     ChefEquipeInvalideError,
     NumeroFicheConflitError,
+    ProduitUtilise,
+    ProduitUtiliseIntrouvableError,
     ProspectionIntrouvableError,
     Rotation,
     RotationIntrouvableError,
@@ -552,4 +554,70 @@ class RemoveRotation:
 
         return await self.repository.remove_rotation(
             traitement_id, rotation_id, aerien.nb_rotations, aerien.total_pesticide_l
+        )
+
+
+async def _get_traitement_terrestre(
+    repository: TraitementRepository, traitement_id: uuid.UUID
+) -> Traitement:
+    traitement = await repository.get_by_id(traitement_id)
+    if traitement is None or traitement.terrestre is None:
+        raise TraitementIntrouvableError(f"Traitement terrestre {traitement_id} introuvable")
+    return traitement
+
+
+def _trouver_produit(
+    terrestre: TraitementTerrestre, produit_utilise_id: uuid.UUID
+) -> ProduitUtilise:
+    produit = next((p for p in terrestre.produits if p.id == produit_utilise_id), None)
+    if produit is None:
+        raise ProduitUtiliseIntrouvableError(
+            f"Produit utilisé {produit_utilise_id} introuvable pour le traitement "
+            f"{terrestre.traitement_id}"
+        )
+    return produit
+
+
+class AddProduitUtilise:
+    def __init__(self, repository: TraitementRepository):
+        self.repository = repository
+
+    async def execute(
+        self,
+        traitement_id: uuid.UUID,
+        produit_id: uuid.UUID,
+        quantite_l: float,
+    ) -> Traitement:
+        traitement = await _get_traitement_terrestre(self.repository, traitement_id)
+        terrestre = traitement.terrestre
+
+        prochain_numero = max((p.numero for p in terrestre.produits), default=0) + 1
+        produit = ProduitUtilise(
+            traitement_terrestre_id=terrestre.traitement_id,
+            numero=prochain_numero,
+            produit_id=produit_id,
+            quantite_l=quantite_l,
+        )
+        terrestre.produits.append(produit)
+        terrestre.recalculer_total_pesticide()
+
+        return await self.repository.add_produit(
+            traitement_id, produit, terrestre.total_pesticide_l
+        )
+
+
+class RemoveProduitUtilise:
+    def __init__(self, repository: TraitementRepository):
+        self.repository = repository
+
+    async def execute(self, traitement_id: uuid.UUID, produit_utilise_id: uuid.UUID) -> Traitement:
+        traitement = await _get_traitement_terrestre(self.repository, traitement_id)
+        terrestre = traitement.terrestre
+        produit = _trouver_produit(terrestre, produit_utilise_id)
+
+        terrestre.produits.remove(produit)
+        terrestre.recalculer_total_pesticide()
+
+        return await self.repository.remove_produit(
+            traitement_id, produit_utilise_id, terrestre.total_pesticide_l
         )

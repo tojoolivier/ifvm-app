@@ -149,6 +149,20 @@ class RotationRead(BaseModel):
     vent_fin_ms: float
 
 
+class ProduitUtiliseCreate(BaseModel):
+    produit_id: uuid.UUID
+    quantite_l: float = Field(..., gt=0)
+
+
+class ProduitUtiliseRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    numero: int
+    produit_id: uuid.UUID
+    quantite_l: float
+
+
 class TraitementAerienRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -183,6 +197,8 @@ class TraitementTerrestreRead(BaseModel):
     surface_restante_abandonnee: bool | None
     essence_litres: float | None
     nb_piles: int | None
+    total_pesticide_l: float | None
+    produits: list[ProduitUtiliseRead] = []
 
 
 class TraitementRead(BaseModel):

@@ -189,9 +189,15 @@ class TraitementTerrestreModel(Base):
     surface_restante_abandonnee: Mapped[bool | None] = mapped_column(Boolean(), nullable=True)
     essence_litres: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     nb_piles: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    total_pesticide_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
 
     traitement: Mapped[TraitementModel] = relationship(
         back_populates="terrestre", foreign_keys=[traitement_id]
+    )
+    produits: Mapped[list["ProduitUtiliseModel"]] = relationship(
+        back_populates="terrestre",
+        cascade="all, delete-orphan",
+        order_by="ProduitUtiliseModel.numero",
     )
 
     __table_args__ = (
@@ -204,5 +210,29 @@ class TraitementTerrestreModel(Base):
             "surface_restante_ha IS NULL OR surface_restante_ha <= 0"
             " OR surface_restante_abandonnee IS NOT NULL",
             name="ck_traitement_terrestre_surface_restante",
+        ),
+    )
+
+
+class ProduitUtiliseModel(Base):
+    __tablename__ = "traitement_produit_utilise"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    traitement_terrestre_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("traitement_terrestre.traitement_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    numero: Mapped[int] = mapped_column(Integer(), nullable=False)
+    produit_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("pesticide.id"), nullable=False
+    )
+    quantite_l: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+
+    terrestre: Mapped[TraitementTerrestreModel] = relationship(back_populates="produits")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "traitement_terrestre_id", "numero", name="uq_traitement_produit_utilise_numero"
         ),
     )

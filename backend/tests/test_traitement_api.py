@@ -487,6 +487,218 @@ async def test_create_traitement_sans_aerien_ni_terrestre_422(
     assert resp.status_code == 422
 
 
+@pytest.fixture
+def payload_produit(pesticide):
+    produit_id = str(pesticide.id)
+
+    def _build(**overrides):
+        payload = {"produit_id": produit_id, "quantite_l": 10.0}
+        payload.update(overrides)
+        return payload
+
+    return _build
+
+
+async def _creer_traitement_terrestre(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+):
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    resp = await client.post(
+        "/traitements", json=payload_traitement_terrestre(prospection_id), headers=auth_headers
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()["id"]
+
+
+@pytest.mark.asyncio
+async def test_add_produit_recalcule_total(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement_terrestre,
+    payload_produit,
+):
+    traitement_id = await _creer_traitement_terrestre(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+    )
+    resp = await client.post(
+        f"/traitements/{traitement_id}/produits",
+        json=payload_produit(),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["terrestre"]["total_pesticide_l"] == 10.0
+    assert len(body["terrestre"]["produits"]) == 1
+    assert body["terrestre"]["produits"][0]["numero"] == 1
+
+
+@pytest.mark.asyncio
+async def test_ajout_trois_produits_recalcule_total(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement_terrestre,
+    payload_produit,
+):
+    traitement_id = await _creer_traitement_terrestre(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+    )
+    for quantite in (10.0, 15.5, 8.25):
+        resp = await client.post(
+            f"/traitements/{traitement_id}/produits",
+            json=payload_produit(quantite_l=quantite),
+            headers=auth_headers,
+        )
+        assert resp.status_code == 201, resp.text
+
+    final = await client.get(f"/traitements/{traitement_id}", headers=auth_headers)
+    assert final.status_code == 200
+    terrestre = final.json()["terrestre"]
+    assert len(terrestre["produits"]) == 3
+    assert terrestre["total_pesticide_l"] == 33.75
+
+
+@pytest.mark.asyncio
+async def test_delete_produit_recalcule_total(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement_terrestre,
+    payload_produit,
+):
+    traitement_id = await _creer_traitement_terrestre(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+    )
+    r1 = await client.post(
+        f"/traitements/{traitement_id}/produits",
+        json=payload_produit(quantite_l=10.0),
+        headers=auth_headers,
+    )
+    r2 = await client.post(
+        f"/traitements/{traitement_id}/produits",
+        json=payload_produit(quantite_l=5.0),
+        headers=auth_headers,
+    )
+    produit_id_1 = r1.json()["terrestre"]["produits"][0]["id"]
+
+    resp = await client.delete(
+        f"/traitements/{traitement_id}/produits/{produit_id_1}", headers=auth_headers
+    )
+    assert resp.status_code == 200, resp.text
+    terrestre = resp.json()["terrestre"]
+    assert len(terrestre["produits"]) == 1
+    assert terrestre["total_pesticide_l"] == 5.0
+    assert r2.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_delete_dernier_produit_repasse_total_a_none(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement_terrestre,
+    payload_produit,
+):
+    traitement_id = await _creer_traitement_terrestre(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+    )
+    created = await client.post(
+        f"/traitements/{traitement_id}/produits",
+        json=payload_produit(),
+        headers=auth_headers,
+    )
+    produit_id = created.json()["terrestre"]["produits"][0]["id"]
+
+    resp = await client.delete(
+        f"/traitements/{traitement_id}/produits/{produit_id}", headers=auth_headers
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["terrestre"]["total_pesticide_l"] is None
+    assert resp.json()["terrestre"]["produits"] == []
+
+
+@pytest.mark.asyncio
+async def test_add_produit_traitement_inexistant_404(
+    client, auth_headers, payload_produit, db_engine
+):
+    resp = await client.post(
+        f"/traitements/{uuid.uuid4()}/produits", json=payload_produit(), headers=auth_headers
+    )
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_add_produit_traitement_aerien_404(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_produit
+):
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    resp = await client.post(
+        f"/traitements/{traitement_id}/produits",
+        json=payload_produit(),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_produit_inexistant_404(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement_terrestre,
+):
+    traitement_id = await _creer_traitement_terrestre(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+    )
+    resp = await client.delete(
+        f"/traitements/{traitement_id}/produits/{uuid.uuid4()}", headers=auth_headers
+    )
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_produit_dun_autre_traitement_404(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement_terrestre,
+    payload_produit,
+):
+    traitement_1 = await _creer_traitement_terrestre(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+    )
+    traitement_2 = await _creer_traitement_terrestre(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+    )
+    created = await client.post(
+        f"/traitements/{traitement_1}/produits", json=payload_produit(), headers=auth_headers
+    )
+    produit_id = created.json()["terrestre"]["produits"][0]["id"]
+
+    resp = await client.delete(
+        f"/traitements/{traitement_2}/produits/{produit_id}", headers=auth_headers
+    )
+    assert resp.status_code == 404
+
+    verif = await client.get(f"/traitements/{traitement_1}", headers=auth_headers)
+    assert len(verif.json()["terrestre"]["produits"]) == 1
+
+
 @pytest.mark.asyncio
 async def test_get_traitement_terrestre(
     client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre

@@ -30,6 +30,10 @@ class RotationIntrouvableError(LookupError):
     """La rotation référencée n'existe pas pour ce traitement aérien."""
 
 
+class ProduitUtiliseIntrouvableError(LookupError):
+    """Le produit utilisé référencé n'existe pas pour ce traitement terrestre."""
+
+
 @dataclass
 class Cible:
     traitement_id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -75,6 +79,15 @@ class TraitementAerien:
 
 
 @dataclass
+class ProduitUtilise:
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    traitement_terrestre_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    numero: int = 0
+    produit_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    quantite_l: float = 0.0
+
+
+@dataclass
 class TraitementTerrestre:
     traitement_id: uuid.UUID = field(default_factory=uuid.uuid4)
     heure_debut: time = field(default_factory=lambda: time(0, 0))
@@ -96,6 +109,12 @@ class TraitementTerrestre:
     surface_restante_abandonnee: bool | None = None
     essence_litres: float | None = None
     nb_piles: int | None = None
+    total_pesticide_l: float | None = None
+    produits: list[ProduitUtilise] = field(default_factory=list)
+
+    def recalculer_total_pesticide(self) -> None:
+        """Seul chemin d'écriture pour total_pesticide_l — jamais en lecture."""
+        self.total_pesticide_l = sum(p.quantite_l for p in self.produits) if self.produits else None
 
     def recalculer_surfaces(
         self, surface_infestee_ha: float | None, surface_cumulee_precedente: float = 0.0
