@@ -5,9 +5,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.traitement_use_cases import (
+    AddRotation,
     CreateTraitementAerien,
     GetTraitement,
     ListTraitements,
+    RemoveRotation,
+    UpdateRotation,
 )
 from app.auth import get_current_user
 from app.database import get_db
@@ -15,12 +18,14 @@ from app.domain.traitement import (
     ChefDeBaseInvalideError,
     NumeroFicheConflitError,
     ProspectionIntrouvableError,
+    RotationIntrouvableError,
+    TraitementIntrouvableError,
 )
 from app.infrastructure.prospection_repository import ProspectionRepositoryImpl
 from app.infrastructure.traitement_repository import TraitementRepositoryImpl
 from app.infrastructure.utilisateur_repository import UtilisateurRepositoryImpl
 from app.models.users import Utilisateur
-from app.presentation.traitement_schemas import TraitementCreate, TraitementRead
+from app.presentation.traitement_schemas import RotationCreate, TraitementCreate, TraitementRead
 
 router = APIRouter()
 
@@ -114,3 +119,65 @@ async def get_traitement(
     if traitement is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Traitement non trouvé")
     return traitement
+
+
+@router.post("/{traitement_id}/rotations", response_model=TraitementRead, status_code=201)
+async def add_rotation(
+    traitement_id: uuid.UUID,
+    body: RotationCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = AddRotation(get_repository(db))
+    try:
+        return await use_case.execute(
+            traitement_id=traitement_id,
+            numero_cuve=body.numero_cuve,
+            produit_id=body.produit_id,
+            quantite_l=body.quantite_l,
+            temperature_debut_c=body.temperature_debut_c,
+            temperature_fin_c=body.temperature_fin_c,
+            vent_debut_ms=body.vent_debut_ms,
+            vent_fin_ms=body.vent_fin_ms,
+        )
+    except TraitementIntrouvableError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.put("/{traitement_id}/rotations/{rotation_id}", response_model=TraitementRead)
+async def update_rotation(
+    traitement_id: uuid.UUID,
+    rotation_id: uuid.UUID,
+    body: RotationCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = UpdateRotation(get_repository(db))
+    try:
+        return await use_case.execute(
+            traitement_id=traitement_id,
+            rotation_id=rotation_id,
+            numero_cuve=body.numero_cuve,
+            produit_id=body.produit_id,
+            quantite_l=body.quantite_l,
+            temperature_debut_c=body.temperature_debut_c,
+            temperature_fin_c=body.temperature_fin_c,
+            vent_debut_ms=body.vent_debut_ms,
+            vent_fin_ms=body.vent_fin_ms,
+        )
+    except (TraitementIntrouvableError, RotationIntrouvableError) as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.delete("/{traitement_id}/rotations/{rotation_id}", response_model=TraitementRead)
+async def remove_rotation(
+    traitement_id: uuid.UUID,
+    rotation_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = RemoveRotation(get_repository(db))
+    try:
+        return await use_case.execute(traitement_id=traitement_id, rotation_id=rotation_id)
+    except (TraitementIntrouvableError, RotationIntrouvableError) as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

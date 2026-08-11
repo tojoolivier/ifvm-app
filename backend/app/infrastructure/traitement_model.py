@@ -11,6 +11,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -118,3 +119,33 @@ class TraitementAerienModel(Base):
     total_pesticide_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
 
     traitement: Mapped[TraitementModel] = relationship(back_populates="aerien")
+    rotations: Mapped[list["RotationModel"]] = relationship(
+        back_populates="aerien", cascade="all, delete-orphan", order_by="RotationModel.numero"
+    )
+
+
+class RotationModel(Base):
+    __tablename__ = "traitement_rotation"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    traitement_aerien_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("traitement_aerien.traitement_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    numero: Mapped[int] = mapped_column(Integer(), nullable=False)
+    numero_cuve: Mapped[str] = mapped_column(String(50), nullable=False)
+    produit_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("pesticide.id"), nullable=False
+    )
+    quantite_l: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    temperature_debut_c: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    temperature_fin_c: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    vent_debut_ms: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    vent_fin_ms: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+
+    aerien: Mapped[TraitementAerienModel] = relationship(back_populates="rotations")
+
+    __table_args__ = (
+        UniqueConstraint("traitement_aerien_id", "numero", name="uq_traitement_rotation_numero"),
+    )

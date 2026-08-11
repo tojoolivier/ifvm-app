@@ -90,6 +90,30 @@ class CibleRead(BaseModel):
         return valeur if valeur is not None else NON_RENSEIGNE
 
 
+class RotationCreate(BaseModel):
+    numero_cuve: str = Field(..., min_length=1, max_length=50)
+    produit_id: uuid.UUID
+    quantite_l: float = Field(..., gt=0)
+    temperature_debut_c: float
+    temperature_fin_c: float
+    vent_debut_ms: float = Field(..., ge=0)
+    vent_fin_ms: float = Field(..., ge=0)
+
+
+class RotationRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    numero: int
+    numero_cuve: str
+    produit_id: uuid.UUID
+    quantite_l: float
+    temperature_debut_c: float
+    temperature_fin_c: float
+    vent_debut_ms: float
+    vent_fin_ms: float
+
+
 class TraitementAerienRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -99,6 +123,7 @@ class TraitementAerienRead(BaseModel):
     consultant_international: str | None
     nb_rotations: int
     total_pesticide_l: float | None
+    rotations: list[RotationRead] = []
 
 
 class TraitementRead(BaseModel):

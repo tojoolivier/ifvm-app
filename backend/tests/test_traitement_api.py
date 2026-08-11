@@ -142,6 +142,182 @@ async def test_get_traitement_inexistant_404(client, auth_headers, db_engine):
     assert resp.status_code == 404
 
 
+@pytest.fixture
+def payload_rotation(pesticide):
+    produit_id = str(pesticide.id)
+
+    def _build(**overrides):
+        payload = {
+            "numero_cuve": "C1",
+            "produit_id": produit_id,
+            "quantite_l": 10.0,
+            "temperature_debut_c": 25.0,
+            "temperature_fin_c": 27.0,
+            "vent_debut_ms": 2.0,
+            "vent_fin_ms": 3.0,
+        }
+        payload.update(overrides)
+        return payload
+
+    return _build
+
+
+async def _creer_traitement(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+):
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    resp = await client.post(
+        "/traitements", json=payload_traitement(prospection_id), headers=auth_headers
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()["id"]
+
+
+@pytest.mark.asyncio
+async def test_add_rotation_incremente_totaux(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_rotation
+):
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    resp = await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["aerien"]["nb_rotations"] == 1
+    assert body["aerien"]["total_pesticide_l"] == 10.0
+    assert len(body["aerien"]["rotations"]) == 1
+    assert body["aerien"]["rotations"][0]["numero"] == 1
+
+
+@pytest.mark.asyncio
+async def test_creer_traitement_avec_trois_rotations_cdg_9(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_rotation
+):
+    """Critère d'acceptation CDG §9: nb_rotations=3, total_pesticide_l = somme des 3 quantités."""
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    for quantite in (10.0, 15.5, 8.25):
+        resp = await client.post(
+            f"/traitements/{traitement_id}/rotations",
+            json=payload_rotation(quantite_l=quantite),
+            headers=auth_headers,
+        )
+        assert resp.status_code == 201, resp.text
+
+    final = await client.get(f"/traitements/{traitement_id}", headers=auth_headers)
+    assert final.status_code == 200
+    aerien = final.json()["aerien"]
+    assert aerien["nb_rotations"] == 3
+    assert aerien["total_pesticide_l"] == 33.75
+
+
+@pytest.mark.asyncio
+async def test_update_rotation_recalcule_totaux(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_rotation
+):
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    created = await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(quantite_l=10.0),
+        headers=auth_headers,
+    )
+    rotation_id = created.json()["aerien"]["rotations"][0]["id"]
+
+    resp = await client.put(
+        f"/traitements/{traitement_id}/rotations/{rotation_id}",
+        json=payload_rotation(quantite_l=20.0),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    aerien = resp.json()["aerien"]
+    assert aerien["nb_rotations"] == 1
+    assert aerien["total_pesticide_l"] == 20.0
+
+
+@pytest.mark.asyncio
+async def test_delete_rotation_recalcule_totaux(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_rotation
+):
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    r1 = await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(quantite_l=10.0),
+        headers=auth_headers,
+    )
+    r2 = await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(quantite_l=5.0),
+        headers=auth_headers,
+    )
+    rotation_id_1 = r1.json()["aerien"]["rotations"][0]["id"]
+
+    resp = await client.delete(
+        f"/traitements/{traitement_id}/rotations/{rotation_id_1}", headers=auth_headers
+    )
+    assert resp.status_code == 200, resp.text
+    aerien = resp.json()["aerien"]
+    assert aerien["nb_rotations"] == 1
+    assert aerien["total_pesticide_l"] == 5.0
+    assert r2.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_add_rotation_traitement_inexistant_404(
+    client, auth_headers, payload_rotation, db_engine
+):
+    resp = await client.post(
+        f"/traitements/{uuid.uuid4()}/rotations", json=payload_rotation(), headers=auth_headers
+    )
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_rotation_inexistante_404(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+):
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    resp = await client.delete(
+        f"/traitements/{traitement_id}/rotations/{uuid.uuid4()}", headers=auth_headers
+    )
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_rotation_dun_autre_traitement_404(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_rotation
+):
+    traitement_1 = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    traitement_2 = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    created = await client.post(
+        f"/traitements/{traitement_1}/rotations", json=payload_rotation(), headers=auth_headers
+    )
+    rotation_id = created.json()["aerien"]["rotations"][0]["id"]
+
+    resp = await client.delete(
+        f"/traitements/{traitement_2}/rotations/{rotation_id}", headers=auth_headers
+    )
+    assert resp.status_code == 404
+
+    # la rotation appartient toujours au traitement 1, ses totaux sont intacts
+    verif = await client.get(f"/traitements/{traitement_1}", headers=auth_headers)
+    assert verif.json()["aerien"]["nb_rotations"] == 1
+
+
 @pytest.mark.asyncio
 async def test_list_traitements_filtres(
     client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement

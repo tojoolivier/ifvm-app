@@ -9,11 +9,13 @@ from app.domain.repositories import TraitementRepository
 from app.domain.traitement import (
     Cible,
     NumeroFicheConflitError,
+    Rotation,
     Traitement,
     TraitementAerien,
 )
 from app.infrastructure.traitement_model import (
     CibleModel,
+    RotationModel,
     TraitementAerienModel,
     TraitementModel,
 )
@@ -29,7 +31,7 @@ class TraitementRepositoryImpl(TraitementRepository):
             .where(TraitementModel.id == traitement_id)
             .options(
                 selectinload(TraitementModel.cible),
-                selectinload(TraitementModel.aerien),
+                selectinload(TraitementModel.aerien).selectinload(TraitementAerienModel.rotations),
             )
         )
         model = result.scalar_one_or_none()
@@ -44,7 +46,7 @@ class TraitementRepositoryImpl(TraitementRepository):
     ) -> list[Traitement]:
         stmt = select(TraitementModel).options(
             selectinload(TraitementModel.cible),
-            selectinload(TraitementModel.aerien),
+            selectinload(TraitementModel.aerien).selectinload(TraitementAerienModel.rotations),
         )
         if type_traitement is not None:
             stmt = stmt.where(TraitementModel.type_traitement == type_traitement)
@@ -131,6 +133,74 @@ class TraitementRepositoryImpl(TraitementRepository):
             raise
         return await self.get_by_id(model.id)
 
+    async def add_rotation(
+        self,
+        traitement_id: uuid.UUID,
+        rotation: Rotation,
+        nb_rotations: int,
+        total_pesticide_l: float | None,
+    ) -> Traitement:
+        self.session.add(
+            RotationModel(
+                id=rotation.id,
+                traitement_aerien_id=traitement_id,
+                numero=rotation.numero,
+                numero_cuve=rotation.numero_cuve,
+                produit_id=rotation.produit_id,
+                quantite_l=rotation.quantite_l,
+                temperature_debut_c=rotation.temperature_debut_c,
+                temperature_fin_c=rotation.temperature_fin_c,
+                vent_debut_ms=rotation.vent_debut_ms,
+                vent_fin_ms=rotation.vent_fin_ms,
+            )
+        )
+        await self._persister_totaux(traitement_id, nb_rotations, total_pesticide_l)
+        return await self.get_by_id(traitement_id)
+
+    async def update_rotation(
+        self,
+        traitement_id: uuid.UUID,
+        rotation: Rotation,
+        nb_rotations: int,
+        total_pesticide_l: float | None,
+    ) -> Traitement:
+        rotation_model = await self.session.get(RotationModel, rotation.id)
+        rotation_model.numero_cuve = rotation.numero_cuve
+        rotation_model.produit_id = rotation.produit_id
+        rotation_model.quantite_l = rotation.quantite_l
+        rotation_model.temperature_debut_c = rotation.temperature_debut_c
+        rotation_model.temperature_fin_c = rotation.temperature_fin_c
+        rotation_model.vent_debut_ms = rotation.vent_debut_ms
+        rotation_model.vent_fin_ms = rotation.vent_fin_ms
+
+        await self._persister_totaux(traitement_id, nb_rotations, total_pesticide_l)
+        return await self.get_by_id(traitement_id)
+
+    async def remove_rotation(
+        self,
+        traitement_id: uuid.UUID,
+        rotation_id: uuid.UUID,
+        nb_rotations: int,
+        total_pesticide_l: float | None,
+    ) -> Traitement:
+        rotation_model = await self.session.get(RotationModel, rotation_id)
+        await self.session.delete(rotation_model)
+
+        await self._persister_totaux(traitement_id, nb_rotations, total_pesticide_l)
+        return await self.get_by_id(traitement_id)
+
+    async def _persister_totaux(
+        self,
+        traitement_id: uuid.UUID,
+        nb_rotations: int,
+        total_pesticide_l: float | None,
+    ) -> None:
+        aerien_model = await self.session.get(TraitementAerienModel, traitement_id)
+        aerien_model.nb_rotations = nb_rotations
+        aerien_model.total_pesticide_l = total_pesticide_l
+        await self.session.commit()
+        self.session.expire(aerien_model, ["rotations"])
+
     def _to_domain(self, model: TraitementModel) -> Traitement:
         return Traitement(
             id=model.id,
@@ -196,6 +266,21 @@ class TraitementRepositoryImpl(TraitementRepository):
                 total_pesticide_l=float(model.aerien.total_pesticide_l)
                 if model.aerien.total_pesticide_l is not None
                 else None,
+                rotations=[
+                    Rotation(
+                        id=r.id,
+                        traitement_aerien_id=r.traitement_aerien_id,
+                        numero=r.numero,
+                        numero_cuve=r.numero_cuve,
+                        produit_id=r.produit_id,
+                        quantite_l=float(r.quantite_l),
+                        temperature_debut_c=float(r.temperature_debut_c),
+                        temperature_fin_c=float(r.temperature_fin_c),
+                        vent_debut_ms=float(r.vent_debut_ms),
+                        vent_fin_ms=float(r.vent_fin_ms),
+                    )
+                    for r in model.aerien.rotations
+                ],
             )
             if model.aerien is not None
             else None,
