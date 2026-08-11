@@ -18,6 +18,14 @@ class NumeroFicheConflitError(Exception):
     """Le numero_fiche viole la contrainte UNIQUE — l'appelant doit réessayer avec un suffixe."""
 
 
+class TraitementIntrouvableError(LookupError):
+    """Le traitement référencé n'existe pas, ou n'est pas de type aérien."""
+
+
+class RotationIntrouvableError(LookupError):
+    """La rotation référencée n'existe pas pour ce traitement aérien."""
+
+
 @dataclass
 class Cible:
     traitement_id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -30,6 +38,20 @@ class Cible:
 
 
 @dataclass
+class Rotation:
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    traitement_aerien_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    numero: int = 0
+    numero_cuve: str = ""
+    produit_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    quantite_l: float = 0.0
+    temperature_debut_c: float = 0.0
+    temperature_fin_c: float = 0.0
+    vent_debut_ms: float = 0.0
+    vent_fin_ms: float = 0.0
+
+
+@dataclass
 class TraitementAerien:
     traitement_id: uuid.UUID = field(default_factory=uuid.uuid4)
     pilote: str = ""
@@ -38,6 +60,14 @@ class TraitementAerien:
     consultant_international: str | None = None
     nb_rotations: int = 0
     total_pesticide_l: float | None = None
+    rotations: list[Rotation] = field(default_factory=list)
+
+    def recalculer_totaux(self) -> None:
+        """Seul chemin d'écriture pour nb_rotations/total_pesticide_l — jamais en lecture."""
+        self.nb_rotations = len(self.rotations)
+        self.total_pesticide_l = (
+            sum(r.quantite_l for r in self.rotations) if self.rotations else None
+        )
 
 
 @dataclass

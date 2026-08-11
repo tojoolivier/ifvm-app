@@ -11,8 +11,11 @@ from app.domain.traitement import (
     ChefDeBaseInvalideError,
     NumeroFicheConflitError,
     ProspectionIntrouvableError,
+    Rotation,
+    RotationIntrouvableError,
     Traitement,
     TraitementAerien,
+    TraitementIntrouvableError,
     construire_cible,
     generer_numero_fiche,
 )
@@ -176,4 +179,111 @@ class ListTraitements:
         return await self.repository.list_by_filters(
             type_traitement=type_traitement,
             prospection_id=prospection_id,
+        )
+
+
+async def _get_traitement_aerien(
+    repository: TraitementRepository, traitement_id: uuid.UUID
+) -> Traitement:
+    traitement = await repository.get_by_id(traitement_id)
+    if traitement is None or traitement.aerien is None:
+        raise TraitementIntrouvableError(f"Traitement aérien {traitement_id} introuvable")
+    return traitement
+
+
+def _trouver_rotation(aerien: TraitementAerien, rotation_id: uuid.UUID) -> Rotation:
+    rotation = next((r for r in aerien.rotations if r.id == rotation_id), None)
+    if rotation is None:
+        raise RotationIntrouvableError(
+            f"Rotation {rotation_id} introuvable pour le traitement {aerien.traitement_id}"
+        )
+    return rotation
+
+
+class AddRotation:
+    def __init__(self, repository: TraitementRepository):
+        self.repository = repository
+
+    async def execute(
+        self,
+        traitement_id: uuid.UUID,
+        numero_cuve: str,
+        produit_id: uuid.UUID,
+        quantite_l: float,
+        temperature_debut_c: float,
+        temperature_fin_c: float,
+        vent_debut_ms: float,
+        vent_fin_ms: float,
+    ) -> Traitement:
+        traitement = await _get_traitement_aerien(self.repository, traitement_id)
+        aerien = traitement.aerien
+
+        prochain_numero = max((r.numero for r in aerien.rotations), default=0) + 1
+        rotation = Rotation(
+            traitement_aerien_id=aerien.traitement_id,
+            numero=prochain_numero,
+            numero_cuve=numero_cuve,
+            produit_id=produit_id,
+            quantite_l=quantite_l,
+            temperature_debut_c=temperature_debut_c,
+            temperature_fin_c=temperature_fin_c,
+            vent_debut_ms=vent_debut_ms,
+            vent_fin_ms=vent_fin_ms,
+        )
+        aerien.rotations.append(rotation)
+        aerien.recalculer_totaux()
+
+        return await self.repository.add_rotation(
+            traitement_id, rotation, aerien.nb_rotations, aerien.total_pesticide_l
+        )
+
+
+class UpdateRotation:
+    def __init__(self, repository: TraitementRepository):
+        self.repository = repository
+
+    async def execute(
+        self,
+        traitement_id: uuid.UUID,
+        rotation_id: uuid.UUID,
+        numero_cuve: str,
+        produit_id: uuid.UUID,
+        quantite_l: float,
+        temperature_debut_c: float,
+        temperature_fin_c: float,
+        vent_debut_ms: float,
+        vent_fin_ms: float,
+    ) -> Traitement:
+        traitement = await _get_traitement_aerien(self.repository, traitement_id)
+        aerien = traitement.aerien
+        rotation = _trouver_rotation(aerien, rotation_id)
+
+        rotation.numero_cuve = numero_cuve
+        rotation.produit_id = produit_id
+        rotation.quantite_l = quantite_l
+        rotation.temperature_debut_c = temperature_debut_c
+        rotation.temperature_fin_c = temperature_fin_c
+        rotation.vent_debut_ms = vent_debut_ms
+        rotation.vent_fin_ms = vent_fin_ms
+        aerien.recalculer_totaux()
+
+        return await self.repository.update_rotation(
+            traitement_id, rotation, aerien.nb_rotations, aerien.total_pesticide_l
+        )
+
+
+class RemoveRotation:
+    def __init__(self, repository: TraitementRepository):
+        self.repository = repository
+
+    async def execute(self, traitement_id: uuid.UUID, rotation_id: uuid.UUID) -> Traitement:
+        traitement = await _get_traitement_aerien(self.repository, traitement_id)
+        aerien = traitement.aerien
+        rotation = _trouver_rotation(aerien, rotation_id)
+
+        aerien.rotations.remove(rotation)
+        aerien.recalculer_totaux()
+
+        return await self.repository.remove_rotation(
+            traitement_id, rotation_id, aerien.nb_rotations, aerien.total_pesticide_l
         )

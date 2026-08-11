@@ -146,3 +146,18 @@ async def station_fixe(db_session: AsyncSession, poste_acridien):
 @pytest_asyncio.fixture
 async def station_id(station_fixe) -> uuid.UUID:
     return station_fixe.id
+
+
+@pytest_asyncio.fixture
+async def pesticide(db_session: AsyncSession):
+    from app.infrastructure.referentiel_model import PesticideModel
+
+    p = PesticideModel(
+        id=uuid.uuid4(),
+        code=f"PEST-{uuid.uuid4().hex[:6]}",
+        nom="Fenitrothion",
+    )
+    db_session.add(p)
+    await db_session.commit()
+    await db_session.refresh(p)
+    return p

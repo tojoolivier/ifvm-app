@@ -12,7 +12,7 @@ from app.domain.referentiel import (
     StationFixe,
     UtilisateurEquipe,
 )
-from app.domain.traitement import Traitement
+from app.domain.traitement import Rotation, Traitement
 from app.domain.utilisateur import UtilisateurRef
 
 
@@ -83,6 +83,36 @@ class TraitementRepository(ABC):
     @abstractmethod
     async def create(self, traitement: Traitement) -> Traitement:
         """Raises NumeroFicheConflitError si numero_fiche existe déjà."""
+        pass
+
+    @abstractmethod
+    async def add_rotation(
+        self,
+        traitement_id: uuid.UUID,
+        rotation: Rotation,
+        nb_rotations: int,
+        total_pesticide_l: float | None,
+    ) -> Traitement:
+        pass
+
+    @abstractmethod
+    async def update_rotation(
+        self,
+        traitement_id: uuid.UUID,
+        rotation: Rotation,
+        nb_rotations: int,
+        total_pesticide_l: float | None,
+    ) -> Traitement:
+        pass
+
+    @abstractmethod
+    async def remove_rotation(
+        self,
+        traitement_id: uuid.UUID,
+        rotation_id: uuid.UUID,
+        nb_rotations: int,
+        total_pesticide_l: float | None,
+    ) -> Traitement:
         pass
 
 

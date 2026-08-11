@@ -3,13 +3,22 @@ from datetime import date
 
 import pytest
 
-from app.application.traitement_use_cases import CreateTraitementAerien
+from app.application.traitement_use_cases import (
+    AddRotation,
+    CreateTraitementAerien,
+    RemoveRotation,
+    UpdateRotation,
+)
 from app.domain.prospection import Prospection, ProspectionPopulation
 from app.domain.traitement import (
     ChefDeBaseInvalideError,
     NumeroFicheConflitError,
     ProspectionIntrouvableError,
+    Rotation,
+    RotationIntrouvableError,
     Traitement,
+    TraitementAerien,
+    TraitementIntrouvableError,
     construire_cible,
     generer_numero_fiche,
 )
@@ -237,3 +246,213 @@ async def test_rejette_date_validation_anterieure():
         await use_case.execute(
             **_args(date_traitement=date(2026, 8, 11), date_validation=date(2026, 8, 10))
         )
+
+
+# ==========================================
+# TraitementAerien.recalculer_totaux
+# ==========================================
+
+
+def _rotation(**overrides) -> Rotation:
+    args = dict(
+        numero_cuve="C1",
+        produit_id=uuid.uuid4(),
+        quantite_l=10.0,
+        temperature_debut_c=25.0,
+        temperature_fin_c=27.0,
+        vent_debut_ms=2.0,
+        vent_fin_ms=3.0,
+    )
+    args.update(overrides)
+    return Rotation(**args)
+
+
+def test_recalculer_totaux_sans_rotation():
+    aerien = TraitementAerien()
+    aerien.recalculer_totaux()
+    assert aerien.nb_rotations == 0
+    assert aerien.total_pesticide_l is None
+
+
+def test_recalculer_totaux_trois_rotations():
+    aerien = TraitementAerien()
+    aerien.rotations = [
+        _rotation(numero=1, quantite_l=10.0),
+        _rotation(numero=2, quantite_l=15.5),
+        _rotation(numero=3, quantite_l=8.25),
+    ]
+    aerien.recalculer_totaux()
+    assert aerien.nb_rotations == 3
+    assert aerien.total_pesticide_l == 33.75
+
+
+def test_recalculer_totaux_apres_suppression():
+    aerien = TraitementAerien()
+    r1, r2 = _rotation(numero=1, quantite_l=10.0), _rotation(numero=2, quantite_l=5.0)
+    aerien.rotations = [r1, r2]
+    aerien.recalculer_totaux()
+    aerien.rotations.remove(r1)
+    aerien.recalculer_totaux()
+    assert aerien.nb_rotations == 1
+    assert aerien.total_pesticide_l == 5.0
+
+
+def test_recalculer_totaux_derniere_suppression_repasse_a_none():
+    aerien = TraitementAerien()
+    r1 = _rotation(numero=1, quantite_l=10.0)
+    aerien.rotations = [r1]
+    aerien.recalculer_totaux()
+    aerien.rotations.remove(r1)
+    aerien.recalculer_totaux()
+    assert aerien.nb_rotations == 0
+    assert aerien.total_pesticide_l is None
+
+
+# ==========================================
+# AddRotation / UpdateRotation / RemoveRotation (fakes en mémoire)
+# ==========================================
+
+
+class FakeTraitementRepoRotations:
+    def __init__(self, traitement: Traitement | None):
+        self.traitement = traitement
+
+    async def get_by_id(self, traitement_id):
+        return self.traitement
+
+    async def list_by_filters(self, **kwargs):
+        return []
+
+    async def create(self, traitement):
+        return traitement
+
+    async def add_rotation(self, traitement_id, rotation, nb_rotations, total_pesticide_l):
+        self.traitement.aerien.nb_rotations = nb_rotations
+        self.traitement.aerien.total_pesticide_l = total_pesticide_l
+        return self.traitement
+
+    async def update_rotation(self, traitement_id, rotation, nb_rotations, total_pesticide_l):
+        self.traitement.aerien.nb_rotations = nb_rotations
+        self.traitement.aerien.total_pesticide_l = total_pesticide_l
+        return self.traitement
+
+    async def remove_rotation(self, traitement_id, rotation_id, nb_rotations, total_pesticide_l):
+        self.traitement.aerien.nb_rotations = nb_rotations
+        self.traitement.aerien.total_pesticide_l = total_pesticide_l
+        return self.traitement
+
+
+def _traitement_aerien(rotations: list[Rotation] | None = None) -> Traitement:
+    aerien = TraitementAerien()
+    aerien.rotations = rotations or []
+    return Traitement(aerien=aerien)
+
+
+def _rotation_args(**overrides):
+    args = dict(
+        numero_cuve="C1",
+        produit_id=uuid.uuid4(),
+        quantite_l=10.0,
+        temperature_debut_c=25.0,
+        temperature_fin_c=27.0,
+        vent_debut_ms=2.0,
+        vent_fin_ms=3.0,
+    )
+    args.update(overrides)
+    return args
+
+
+@pytest.mark.asyncio
+async def test_add_rotation_incremente_totaux():
+    traitement = _traitement_aerien()
+    repo = FakeTraitementRepoRotations(traitement)
+    use_case = AddRotation(repo)
+
+    resultat = await use_case.execute(traitement_id=traitement.id, **_rotation_args())
+
+    assert resultat.aerien.nb_rotations == 1
+    assert resultat.aerien.total_pesticide_l == 10.0
+
+
+@pytest.mark.asyncio
+async def test_add_rotation_numero_auto_incremente():
+    existante = _rotation(numero=1, quantite_l=10.0)
+    traitement = _traitement_aerien([existante])
+    repo = FakeTraitementRepoRotations(traitement)
+    use_case = AddRotation(repo)
+
+    await use_case.execute(traitement_id=traitement.id, **_rotation_args(quantite_l=5.0))
+
+    assert [r.numero for r in traitement.aerien.rotations] == [1, 2]
+    assert traitement.aerien.nb_rotations == 2
+    assert traitement.aerien.total_pesticide_l == 15.0
+
+
+@pytest.mark.asyncio
+async def test_add_rotation_traitement_introuvable():
+    repo = FakeTraitementRepoRotations(None)
+    use_case = AddRotation(repo)
+    with pytest.raises(TraitementIntrouvableError):
+        await use_case.execute(traitement_id=uuid.uuid4(), **_rotation_args())
+
+
+@pytest.mark.asyncio
+async def test_add_rotation_traitement_non_aerien():
+    traitement = Traitement(aerien=None)
+    repo = FakeTraitementRepoRotations(traitement)
+    use_case = AddRotation(repo)
+    with pytest.raises(TraitementIntrouvableError):
+        await use_case.execute(traitement_id=traitement.id, **_rotation_args())
+
+
+@pytest.mark.asyncio
+async def test_update_rotation_recalcule_totaux():
+    existante = _rotation(numero=1, quantite_l=10.0)
+    traitement = _traitement_aerien([existante])
+    repo = FakeTraitementRepoRotations(traitement)
+    use_case = UpdateRotation(repo)
+
+    resultat = await use_case.execute(
+        traitement_id=traitement.id,
+        rotation_id=existante.id,
+        **_rotation_args(quantite_l=20.0),
+    )
+
+    assert resultat.aerien.nb_rotations == 1
+    assert resultat.aerien.total_pesticide_l == 20.0
+    assert existante.quantite_l == 20.0
+
+
+@pytest.mark.asyncio
+async def test_update_rotation_introuvable():
+    traitement = _traitement_aerien()
+    repo = FakeTraitementRepoRotations(traitement)
+    use_case = UpdateRotation(repo)
+    with pytest.raises(RotationIntrouvableError):
+        await use_case.execute(
+            traitement_id=traitement.id, rotation_id=uuid.uuid4(), **_rotation_args()
+        )
+
+
+@pytest.mark.asyncio
+async def test_remove_rotation_recalcule_totaux():
+    r1 = _rotation(numero=1, quantite_l=10.0)
+    r2 = _rotation(numero=2, quantite_l=5.0)
+    traitement = _traitement_aerien([r1, r2])
+    repo = FakeTraitementRepoRotations(traitement)
+    use_case = RemoveRotation(repo)
+
+    resultat = await use_case.execute(traitement_id=traitement.id, rotation_id=r1.id)
+
+    assert resultat.aerien.nb_rotations == 1
+    assert resultat.aerien.total_pesticide_l == 5.0
+    assert traitement.aerien.rotations == [r2]
+
+
+@pytest.mark.asyncio
+async def test_remove_rotation_introuvable():
+    traitement = _traitement_aerien()
+    repo = FakeTraitementRepoRotations(traitement)
+    use_case = RemoveRotation(repo)
+    with pytest.raises(RotationIntrouvableError):
+        await use_case.execute(traitement_id=traitement.id, rotation_id=uuid.uuid4())
