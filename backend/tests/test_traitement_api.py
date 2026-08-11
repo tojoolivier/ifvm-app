@@ -133,7 +133,7 @@ async def test_get_traitement_snapshot_non_renseigne(
     assert cible["grandes_larves"] == "non renseigné"
     assert cible["vols_clairs_essaims"] == "non renseigné"
     assert cible["repartition_population"] == "non renseigné"
-    assert cible["surface_infestee_ha"] == 0.0
+    assert cible["surface_infestee_ha"] == "non renseigné"
 
 
 @pytest.mark.asyncio

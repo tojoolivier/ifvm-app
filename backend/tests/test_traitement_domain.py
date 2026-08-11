@@ -10,10 +10,10 @@ from app.domain.traitement import (
     NumeroFicheConflitError,
     ProspectionIntrouvableError,
     Traitement,
-    UtilisateurRef,
     construire_cible,
     generer_numero_fiche,
 )
+from app.domain.utilisateur import UtilisateurRef
 
 # ==========================================
 # generer_numero_fiche
@@ -44,7 +44,7 @@ def test_cible_prospection_vide_tout_absent():
     assert cible.grandes_larves is None
     assert cible.vols_clairs_essaims is None
     assert cible.repartition_population is None
-    assert cible.surface_infestee_ha == 0.0
+    assert cible.surface_infestee_ha is None
 
 
 def test_cible_espece_unique():
@@ -220,6 +220,14 @@ async def test_rejette_prospection_inexistante():
     use_case, _ = _use_case(prospection=None, chef=_CHEF)
     with pytest.raises(ProspectionIntrouvableError):
         await use_case.execute(**_args())
+
+
+@pytest.mark.asyncio
+async def test_rejette_numero_fiche_trop_long():
+    chef_nom_long = UtilisateurRef(id=uuid.uuid4(), prenom="X" * 45, role="chef_de_base")
+    use_case, _ = _use_case(prospection=_prospection(), chef=chef_nom_long)
+    with pytest.raises(ValueError):
+        await use_case.execute(**_args(chef_de_base_id=chef_nom_long.id))
 
 
 @pytest.mark.asyncio

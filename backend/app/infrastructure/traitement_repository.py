@@ -119,7 +119,12 @@ class TraitementRepositoryImpl(TraitementRepository):
             await self.session.commit()
         except IntegrityError as e:
             await self.session.rollback()
-            if "numero_fiche" in str(e.orig):
+            # asyncpg enveloppe l'erreur pilote d'origine (avec .constraint_name) dans
+            # un wrapper SQLAlchemy minimal ; l'original reste accessible via __cause__.
+            constraint_name = getattr(e.orig, "constraint_name", None) or getattr(
+                e.orig.__cause__, "constraint_name", None
+            )
+            if constraint_name == "traitement_numero_fiche_key":
                 raise NumeroFicheConflitError(
                     f"numero_fiche '{traitement.numero_fiche}' déjà utilisé"
                 ) from e
@@ -175,7 +180,9 @@ class TraitementRepositoryImpl(TraitementRepository):
                 grandes_larves=model.cible.grandes_larves,
                 vols_clairs_essaims=model.cible.vols_clairs_essaims,
                 repartition_population=model.cible.repartition_population,
-                surface_infestee_ha=float(model.cible.surface_infestee_ha),
+                surface_infestee_ha=float(model.cible.surface_infestee_ha)
+                if model.cible.surface_infestee_ha is not None
+                else None,
             )
             if model.cible is not None
             else None,
