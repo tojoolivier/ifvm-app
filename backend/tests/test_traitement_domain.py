@@ -4,9 +4,11 @@ from datetime import date, time
 import pytest
 
 from app.application.traitement_use_cases import (
+    AddProduitUtilise,
     AddRotation,
     CreateTraitementAerien,
     CreateTraitementTerrestre,
+    RemoveProduitUtilise,
     RemoveRotation,
     UpdateRotation,
 )
@@ -15,6 +17,8 @@ from app.domain.traitement import (
     ChefDeBaseInvalideError,
     ChefEquipeInvalideError,
     NumeroFicheConflitError,
+    ProduitUtilise,
+    ProduitUtiliseIntrouvableError,
     ProspectionIntrouvableError,
     Rotation,
     RotationIntrouvableError,
@@ -635,3 +639,154 @@ async def test_terrestre_accepte_surface_restante_nulle_sans_abandonnee():
     use_case, _ = _use_case_terrestre(prospection=prospection, chef=_CHEF_EQUIPE)
     traitement = await use_case.execute(**_args_terrestre(surface_atomiseur_ha=25.0))
     assert traitement.terrestre.surface_restante_ha == 0.0
+
+
+# ==========================================
+# TraitementTerrestre.recalculer_total_pesticide
+# ==========================================
+
+
+def _produit(**overrides) -> ProduitUtilise:
+    args = dict(produit_id=uuid.uuid4(), quantite_l=10.0)
+    args.update(overrides)
+    return ProduitUtilise(**args)
+
+
+def test_recalculer_total_pesticide_sans_produit():
+    terrestre = TraitementTerrestre()
+    terrestre.recalculer_total_pesticide()
+    assert terrestre.total_pesticide_l is None
+
+
+def test_recalculer_total_pesticide_trois_produits():
+    terrestre = TraitementTerrestre()
+    terrestre.produits = [
+        _produit(numero=1, quantite_l=10.0),
+        _produit(numero=2, quantite_l=15.5),
+        _produit(numero=3, quantite_l=8.25),
+    ]
+    terrestre.recalculer_total_pesticide()
+    assert terrestre.total_pesticide_l == 33.75
+
+
+def test_recalculer_total_pesticide_apres_suppression():
+    terrestre = TraitementTerrestre()
+    p1, p2 = _produit(numero=1, quantite_l=10.0), _produit(numero=2, quantite_l=5.0)
+    terrestre.produits = [p1, p2]
+    terrestre.recalculer_total_pesticide()
+    terrestre.produits.remove(p1)
+    terrestre.recalculer_total_pesticide()
+    assert terrestre.total_pesticide_l == 5.0
+
+
+def test_recalculer_total_pesticide_derniere_suppression_repasse_a_none():
+    terrestre = TraitementTerrestre()
+    p1 = _produit(numero=1, quantite_l=10.0)
+    terrestre.produits = [p1]
+    terrestre.recalculer_total_pesticide()
+    terrestre.produits.remove(p1)
+    terrestre.recalculer_total_pesticide()
+    assert terrestre.total_pesticide_l is None
+
+
+# ==========================================
+# AddProduitUtilise / RemoveProduitUtilise (fakes en mémoire)
+# ==========================================
+
+
+class FakeTraitementRepoProduits:
+    def __init__(self, traitement: Traitement | None):
+        self.traitement = traitement
+
+    async def get_by_id(self, traitement_id):
+        return self.traitement
+
+    async def list_by_filters(self, **kwargs):
+        return []
+
+    async def create(self, traitement):
+        return traitement
+
+    async def add_produit(self, traitement_id, produit, total_pesticide_l):
+        self.traitement.terrestre.total_pesticide_l = total_pesticide_l
+        return self.traitement
+
+    async def remove_produit(self, traitement_id, produit_id, total_pesticide_l):
+        self.traitement.terrestre.total_pesticide_l = total_pesticide_l
+        return self.traitement
+
+
+def _traitement_terrestre(produits: list[ProduitUtilise] | None = None) -> Traitement:
+    terrestre = TraitementTerrestre()
+    terrestre.produits = produits or []
+    return Traitement(terrestre=terrestre)
+
+
+def _produit_args(**overrides):
+    args = dict(produit_id=uuid.uuid4(), quantite_l=10.0)
+    args.update(overrides)
+    return args
+
+
+@pytest.mark.asyncio
+async def test_add_produit_recalcule_total():
+    traitement = _traitement_terrestre()
+    repo = FakeTraitementRepoProduits(traitement)
+    use_case = AddProduitUtilise(repo)
+
+    resultat = await use_case.execute(traitement_id=traitement.id, **_produit_args())
+
+    assert resultat.terrestre.total_pesticide_l == 10.0
+
+
+@pytest.mark.asyncio
+async def test_add_produit_numero_auto_incremente():
+    existant = _produit(numero=1, quantite_l=10.0)
+    traitement = _traitement_terrestre([existant])
+    repo = FakeTraitementRepoProduits(traitement)
+    use_case = AddProduitUtilise(repo)
+
+    await use_case.execute(traitement_id=traitement.id, **_produit_args(quantite_l=5.0))
+
+    assert [p.numero for p in traitement.terrestre.produits] == [1, 2]
+    assert traitement.terrestre.total_pesticide_l == 15.0
+
+
+@pytest.mark.asyncio
+async def test_add_produit_traitement_introuvable():
+    repo = FakeTraitementRepoProduits(None)
+    use_case = AddProduitUtilise(repo)
+    with pytest.raises(TraitementIntrouvableError):
+        await use_case.execute(traitement_id=uuid.uuid4(), **_produit_args())
+
+
+@pytest.mark.asyncio
+async def test_add_produit_traitement_non_terrestre():
+    traitement = Traitement(terrestre=None)
+    repo = FakeTraitementRepoProduits(traitement)
+    use_case = AddProduitUtilise(repo)
+    with pytest.raises(TraitementIntrouvableError):
+        await use_case.execute(traitement_id=traitement.id, **_produit_args())
+
+
+@pytest.mark.asyncio
+async def test_remove_produit_recalcule_total():
+    p1 = _produit(numero=1, quantite_l=10.0)
+    p2 = _produit(numero=2, quantite_l=5.0)
+    traitement = _traitement_terrestre([p1, p2])
+    repo = FakeTraitementRepoProduits(traitement)
+    use_case = RemoveProduitUtilise(repo)
+
+    resultat = await use_case.execute(traitement_id=traitement.id, produit_utilise_id=p1.id)
+
+    assert resultat.terrestre.total_pesticide_l == 5.0
+    assert traitement.terrestre.produits == [p2]
+
+
+@pytest.mark.asyncio
+async def test_remove_produit_introuvable():
+    traitement = _traitement_terrestre()
+    repo = FakeTraitementRepoProduits(traitement)
+    use_case = RemoveProduitUtilise(repo)
+    with pytest.raises(ProduitUtiliseIntrouvableError):
+        await use_case.execute(traitement_id=traitement.id, produit_utilise_id=uuid.uuid4())

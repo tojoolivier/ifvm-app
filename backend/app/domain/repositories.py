@@ -12,7 +12,7 @@ from app.domain.referentiel import (
     StationFixe,
     UtilisateurEquipe,
 )
-from app.domain.traitement import Rotation, Traitement
+from app.domain.traitement import ProduitUtilise, Rotation, Traitement
 from app.domain.utilisateur import UtilisateurRef
 
 
@@ -111,6 +111,24 @@ class TraitementRepository(ABC):
         traitement_id: uuid.UUID,
         rotation_id: uuid.UUID,
         nb_rotations: int,
+        total_pesticide_l: float | None,
+    ) -> Traitement:
+        pass
+
+    @abstractmethod
+    async def add_produit(
+        self,
+        traitement_id: uuid.UUID,
+        produit: ProduitUtilise,
+        total_pesticide_l: float | None,
+    ) -> Traitement:
+        pass
+
+    @abstractmethod
+    async def remove_produit(
+        self,
+        traitement_id: uuid.UUID,
+        produit_utilise_id: uuid.UUID,
         total_pesticide_l: float | None,
     ) -> Traitement:
         pass

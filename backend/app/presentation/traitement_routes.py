@@ -5,11 +5,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.traitement_use_cases import (
+    AddProduitUtilise,
     AddRotation,
     CreateTraitementAerien,
     CreateTraitementTerrestre,
     GetTraitement,
     ListTraitements,
+    RemoveProduitUtilise,
     RemoveRotation,
     UpdateRotation,
 )
@@ -19,6 +21,7 @@ from app.domain.traitement import (
     ChefDeBaseInvalideError,
     ChefEquipeInvalideError,
     NumeroFicheConflitError,
+    ProduitUtiliseIntrouvableError,
     ProspectionIntrouvableError,
     RotationIntrouvableError,
     TraitementIntrouvableError,
@@ -27,7 +30,12 @@ from app.infrastructure.prospection_repository import ProspectionRepositoryImpl
 from app.infrastructure.traitement_repository import TraitementRepositoryImpl
 from app.infrastructure.utilisateur_repository import UtilisateurRepositoryImpl
 from app.models.users import Utilisateur
-from app.presentation.traitement_schemas import RotationCreate, TraitementCreate, TraitementRead
+from app.presentation.traitement_schemas import (
+    ProduitUtiliseCreate,
+    RotationCreate,
+    TraitementCreate,
+    TraitementRead,
+)
 
 router = APIRouter()
 
@@ -214,4 +222,38 @@ async def remove_rotation(
     try:
         return await use_case.execute(traitement_id=traitement_id, rotation_id=rotation_id)
     except (TraitementIntrouvableError, RotationIntrouvableError) as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.post("/{traitement_id}/produits", response_model=TraitementRead, status_code=201)
+async def add_produit(
+    traitement_id: uuid.UUID,
+    body: ProduitUtiliseCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = AddProduitUtilise(get_repository(db))
+    try:
+        return await use_case.execute(
+            traitement_id=traitement_id,
+            produit_id=body.produit_id,
+            quantite_l=body.quantite_l,
+        )
+    except TraitementIntrouvableError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.delete("/{traitement_id}/produits/{produit_utilise_id}", response_model=TraitementRead)
+async def remove_produit(
+    traitement_id: uuid.UUID,
+    produit_utilise_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = RemoveProduitUtilise(get_repository(db))
+    try:
+        return await use_case.execute(
+            traitement_id=traitement_id, produit_utilise_id=produit_utilise_id
+        )
+    except (TraitementIntrouvableError, ProduitUtiliseIntrouvableError) as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
