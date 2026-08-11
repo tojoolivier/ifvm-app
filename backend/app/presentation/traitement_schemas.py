@@ -1,9 +1,9 @@
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, time
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 
 NON_RENSEIGNE = "non renseigné"
 
@@ -26,11 +26,39 @@ class EmpoisonnementMode(str, Enum):
     AUTRE = "AUTRE"
 
 
+class DirectionVent(str, Enum):
+    N = "N"
+    NE = "NE"
+    E = "E"
+    SE = "SE"
+    S = "S"
+    SO = "SO"
+    O = "O"  # noqa: E741 — point cardinal Ouest, pas une variable ambiguë
+    NO = "NO"
+
+
 class TraitementAerienCreate(BaseModel):
     pilote: str = Field(..., min_length=1, max_length=255)
     mecanicien: str = Field(..., min_length=1, max_length=255)
     chef_de_base_id: uuid.UUID
     consultant_international: str | None = Field(None, max_length=255)
+
+
+class TraitementTerrestreCreate(BaseModel):
+    heure_debut: time
+    heure_fin: time
+    vitesse_vent_ms: float = Field(..., ge=0)
+    direction_vent: DirectionVent | None = None
+    temperature_c: float
+    chef_equipe_id: uuid.UUID
+    agent_encadreur_id: uuid.UUID | None = None
+    consultant_international: str | None = Field(None, max_length=255)
+    surface_atomiseur_ha: float | None = Field(None, ge=0)
+    surface_disque_rotatif_ha: float | None = Field(None, ge=0)
+    surface_ulvamast_ha: float | None = Field(None, ge=0)
+    surface_restante_abandonnee: bool | None = None
+    essence_litres: float | None = Field(None, ge=0)
+    nb_piles: int | None = Field(None, ge=0)
 
 
 class TraitementCreate(BaseModel):
@@ -65,7 +93,14 @@ class TraitementCreate(BaseModel):
     mortalite: bool = False
     mortalite_familles: dict[str, Any] | None = None
 
-    aerien: TraitementAerienCreate
+    aerien: TraitementAerienCreate | None = None
+    terrestre: TraitementTerrestreCreate | None = None
+
+    @model_validator(mode="after")
+    def _un_seul_type_traitement(self) -> "TraitementCreate":
+        if (self.aerien is None) == (self.terrestre is None):
+            raise ValueError("Fournir exactement un des deux champs 'aerien' ou 'terrestre'")
+        return self
 
 
 class CibleRead(BaseModel):
@@ -126,6 +161,30 @@ class TraitementAerienRead(BaseModel):
     rotations: list[RotationRead] = []
 
 
+class TraitementTerrestreRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    heure_debut: time
+    heure_fin: time
+    vitesse_vent_ms: float
+    direction_vent: str | None
+    temperature_c: float
+    reprise_traitement: bool
+    traitement_origine_id: uuid.UUID | None
+    chef_equipe_id: uuid.UUID
+    agent_encadreur_id: uuid.UUID | None
+    consultant_international: str | None
+    surface_atomiseur_ha: float | None
+    surface_disque_rotatif_ha: float | None
+    surface_ulvamast_ha: float | None
+    surface_traitee_ha: float | None
+    surface_cumulee_ha: float | None
+    surface_restante_ha: float | None
+    surface_restante_abandonnee: bool | None
+    essence_litres: float | None
+    nb_piles: int | None
+
+
 class TraitementRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -168,3 +227,4 @@ class TraitementRead(BaseModel):
 
     cible: CibleRead | None
     aerien: TraitementAerienRead | None
+    terrestre: TraitementTerrestreRead | None

@@ -1,5 +1,5 @@
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application.traitement_use_cases import (
     AddRotation,
     CreateTraitementAerien,
+    CreateTraitementTerrestre,
     GetTraitement,
     ListTraitements,
     RemoveRotation,
@@ -16,6 +17,7 @@ from app.auth import get_current_user
 from app.database import get_db
 from app.domain.traitement import (
     ChefDeBaseInvalideError,
+    ChefEquipeInvalideError,
     NumeroFicheConflitError,
     ProspectionIntrouvableError,
     RotationIntrouvableError,
@@ -49,55 +51,87 @@ async def list_traitements(
     )
 
 
+def _champs_communs(body: TraitementCreate) -> dict[str, Any]:
+    return dict(
+        prospection_id=body.prospection_id,
+        numero_fiche=body.numero_fiche,
+        mode_traitement=body.mode_traitement,
+        date_traitement=body.date_traitement,
+        date_validation=body.date_validation,
+        localite=body.localite,
+        region=body.region,
+        district=body.district,
+        commune=body.commune,
+        latitude=body.latitude,
+        longitude=body.longitude,
+        altitude=body.altitude,
+        kit_combinaison=body.kit_combinaison,
+        kit_gants=body.kit_gants,
+        kit_lunettes=body.kit_lunettes,
+        kit_masques=body.kit_masques,
+        kit_boite=body.kit_boite,
+        zones_exposees=body.zones_exposees,
+        hauteur_strate_herbeuse_m=body.hauteur_strate_herbeuse_m,
+        hauteur_strate_arboree_m=body.hauteur_strate_arboree_m,
+        recouvrement_percent=body.recouvrement_percent,
+        empoisonnement=body.empoisonnement,
+        empoisonnement_type=body.empoisonnement_type,
+        empoisonnement_mode=body.empoisonnement_mode,
+        empoisonnement_autre=body.empoisonnement_autre,
+        evaluation_risque=body.evaluation_risque,
+        comportement_anormal=body.comportement_anormal,
+        comportement_non_cibles=body.comportement_non_cibles,
+        mortalite=body.mortalite,
+        mortalite_familles=body.mortalite_familles,
+    )
+
+
 @router.post("", response_model=TraitementRead, status_code=201)
 async def create_traitement(
     body: TraitementCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Utilisateur, Depends(get_current_user)],
 ):
-    use_case = CreateTraitementAerien(
-        traitement_repository=get_repository(db),
-        prospection_repository=ProspectionRepositoryImpl(db),
-        utilisateur_repository=UtilisateurRepositoryImpl(db),
-    )
+    repository = get_repository(db)
+    prospection_repository = ProspectionRepositoryImpl(db)
+    utilisateur_repository = UtilisateurRepositoryImpl(db)
     try:
-        return await use_case.execute(
-            prospection_id=body.prospection_id,
-            numero_fiche=body.numero_fiche,
-            mode_traitement=body.mode_traitement,
-            date_traitement=body.date_traitement,
-            date_validation=body.date_validation,
-            localite=body.localite,
-            region=body.region,
-            district=body.district,
-            commune=body.commune,
-            latitude=body.latitude,
-            longitude=body.longitude,
-            altitude=body.altitude,
-            kit_combinaison=body.kit_combinaison,
-            kit_gants=body.kit_gants,
-            kit_lunettes=body.kit_lunettes,
-            kit_masques=body.kit_masques,
-            kit_boite=body.kit_boite,
-            zones_exposees=body.zones_exposees,
-            hauteur_strate_herbeuse_m=body.hauteur_strate_herbeuse_m,
-            hauteur_strate_arboree_m=body.hauteur_strate_arboree_m,
-            recouvrement_percent=body.recouvrement_percent,
-            empoisonnement=body.empoisonnement,
-            empoisonnement_type=body.empoisonnement_type,
-            empoisonnement_mode=body.empoisonnement_mode,
-            empoisonnement_autre=body.empoisonnement_autre,
-            evaluation_risque=body.evaluation_risque,
-            comportement_anormal=body.comportement_anormal,
-            comportement_non_cibles=body.comportement_non_cibles,
-            mortalite=body.mortalite,
-            mortalite_familles=body.mortalite_familles,
-            pilote=body.aerien.pilote,
-            mecanicien=body.aerien.mecanicien,
-            chef_de_base_id=body.aerien.chef_de_base_id,
-            consultant_international=body.aerien.consultant_international,
+        if body.aerien is not None:
+            use_case = CreateTraitementAerien(
+                traitement_repository=repository,
+                prospection_repository=prospection_repository,
+                utilisateur_repository=utilisateur_repository,
+            )
+            return await use_case.execute(
+                **_champs_communs(body),
+                pilote=body.aerien.pilote,
+                mecanicien=body.aerien.mecanicien,
+                chef_de_base_id=body.aerien.chef_de_base_id,
+                consultant_international=body.aerien.consultant_international,
+            )
+        use_case_terrestre = CreateTraitementTerrestre(
+            traitement_repository=repository,
+            prospection_repository=prospection_repository,
+            utilisateur_repository=utilisateur_repository,
         )
-    except ChefDeBaseInvalideError as e:
+        return await use_case_terrestre.execute(
+            **_champs_communs(body),
+            heure_debut=body.terrestre.heure_debut,
+            heure_fin=body.terrestre.heure_fin,
+            vitesse_vent_ms=body.terrestre.vitesse_vent_ms,
+            direction_vent=body.terrestre.direction_vent,
+            temperature_c=body.terrestre.temperature_c,
+            chef_equipe_id=body.terrestre.chef_equipe_id,
+            agent_encadreur_id=body.terrestre.agent_encadreur_id,
+            consultant_international=body.terrestre.consultant_international,
+            surface_atomiseur_ha=body.terrestre.surface_atomiseur_ha,
+            surface_disque_rotatif_ha=body.terrestre.surface_disque_rotatif_ha,
+            surface_ulvamast_ha=body.terrestre.surface_ulvamast_ha,
+            surface_restante_abandonnee=body.terrestre.surface_restante_abandonnee,
+            essence_litres=body.terrestre.essence_litres,
+            nb_piles=body.terrestre.nb_piles,
+        )
+    except (ChefDeBaseInvalideError, ChefEquipeInvalideError) as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except ProspectionIntrouvableError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

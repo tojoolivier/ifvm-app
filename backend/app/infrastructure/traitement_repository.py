@@ -12,12 +12,14 @@ from app.domain.traitement import (
     Rotation,
     Traitement,
     TraitementAerien,
+    TraitementTerrestre,
 )
 from app.infrastructure.traitement_model import (
     CibleModel,
     RotationModel,
     TraitementAerienModel,
     TraitementModel,
+    TraitementTerrestreModel,
 )
 
 
@@ -32,6 +34,7 @@ class TraitementRepositoryImpl(TraitementRepository):
             .options(
                 selectinload(TraitementModel.cible),
                 selectinload(TraitementModel.aerien).selectinload(TraitementAerienModel.rotations),
+                selectinload(TraitementModel.terrestre),
             )
         )
         model = result.scalar_one_or_none()
@@ -47,6 +50,7 @@ class TraitementRepositoryImpl(TraitementRepository):
         stmt = select(TraitementModel).options(
             selectinload(TraitementModel.cible),
             selectinload(TraitementModel.aerien).selectinload(TraitementAerienModel.rotations),
+            selectinload(TraitementModel.terrestre),
         )
         if type_traitement is not None:
             stmt = stmt.where(TraitementModel.type_traitement == type_traitement)
@@ -114,6 +118,29 @@ class TraitementRepositoryImpl(TraitementRepository):
                 consultant_international=traitement.aerien.consultant_international,
                 nb_rotations=traitement.aerien.nb_rotations,
                 total_pesticide_l=traitement.aerien.total_pesticide_l,
+            )
+
+        if traitement.terrestre is not None:
+            model.terrestre = TraitementTerrestreModel(
+                heure_debut=traitement.terrestre.heure_debut,
+                heure_fin=traitement.terrestre.heure_fin,
+                vitesse_vent_ms=traitement.terrestre.vitesse_vent_ms,
+                direction_vent=traitement.terrestre.direction_vent,
+                temperature_c=traitement.terrestre.temperature_c,
+                reprise_traitement=traitement.terrestre.reprise_traitement,
+                traitement_origine_id=traitement.terrestre.traitement_origine_id,
+                chef_equipe_id=traitement.terrestre.chef_equipe_id,
+                agent_encadreur_id=traitement.terrestre.agent_encadreur_id,
+                consultant_international=traitement.terrestre.consultant_international,
+                surface_atomiseur_ha=traitement.terrestre.surface_atomiseur_ha,
+                surface_disque_rotatif_ha=traitement.terrestre.surface_disque_rotatif_ha,
+                surface_ulvamast_ha=traitement.terrestre.surface_ulvamast_ha,
+                surface_traitee_ha=traitement.terrestre.surface_traitee_ha,
+                surface_cumulee_ha=traitement.terrestre.surface_cumulee_ha,
+                surface_restante_ha=traitement.terrestre.surface_restante_ha,
+                surface_restante_abandonnee=traitement.terrestre.surface_restante_abandonnee,
+                essence_litres=traitement.terrestre.essence_litres,
+                nb_piles=traitement.terrestre.nb_piles,
             )
 
         self.session.add(model)
@@ -283,5 +310,43 @@ class TraitementRepositoryImpl(TraitementRepository):
                 ],
             )
             if model.aerien is not None
+            else None,
+            terrestre=TraitementTerrestre(
+                traitement_id=model.terrestre.traitement_id,
+                heure_debut=model.terrestre.heure_debut,
+                heure_fin=model.terrestre.heure_fin,
+                vitesse_vent_ms=float(model.terrestre.vitesse_vent_ms),
+                direction_vent=model.terrestre.direction_vent,
+                temperature_c=float(model.terrestre.temperature_c),
+                reprise_traitement=model.terrestre.reprise_traitement,
+                traitement_origine_id=model.terrestre.traitement_origine_id,
+                chef_equipe_id=model.terrestre.chef_equipe_id,
+                agent_encadreur_id=model.terrestre.agent_encadreur_id,
+                consultant_international=model.terrestre.consultant_international,
+                surface_atomiseur_ha=float(model.terrestre.surface_atomiseur_ha)
+                if model.terrestre.surface_atomiseur_ha is not None
+                else None,
+                surface_disque_rotatif_ha=float(model.terrestre.surface_disque_rotatif_ha)
+                if model.terrestre.surface_disque_rotatif_ha is not None
+                else None,
+                surface_ulvamast_ha=float(model.terrestre.surface_ulvamast_ha)
+                if model.terrestre.surface_ulvamast_ha is not None
+                else None,
+                surface_traitee_ha=float(model.terrestre.surface_traitee_ha)
+                if model.terrestre.surface_traitee_ha is not None
+                else None,
+                surface_cumulee_ha=float(model.terrestre.surface_cumulee_ha)
+                if model.terrestre.surface_cumulee_ha is not None
+                else None,
+                surface_restante_ha=float(model.terrestre.surface_restante_ha)
+                if model.terrestre.surface_restante_ha is not None
+                else None,
+                surface_restante_abandonnee=model.terrestre.surface_restante_abandonnee,
+                essence_litres=float(model.terrestre.essence_litres)
+                if model.terrestre.essence_litres is not None
+                else None,
+                nb_piles=model.terrestre.nb_piles,
+            )
+            if model.terrestre is not None
             else None,
         )

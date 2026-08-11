@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, time
 
 from sqlalchemy import (
     TIMESTAMP,
@@ -11,6 +11,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    Time,
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -70,6 +71,12 @@ class TraitementModel(Base):
     )
     aerien: Mapped["TraitementAerienModel | None"] = relationship(
         back_populates="traitement", cascade="all, delete-orphan", uselist=False
+    )
+    terrestre: Mapped["TraitementTerrestreModel | None"] = relationship(
+        back_populates="traitement",
+        cascade="all, delete-orphan",
+        uselist=False,
+        foreign_keys="TraitementTerrestreModel.traitement_id",
     )
 
     __table_args__ = (
@@ -148,4 +155,54 @@ class RotationModel(Base):
 
     __table_args__ = (
         UniqueConstraint("traitement_aerien_id", "numero", name="uq_traitement_rotation_numero"),
+    )
+
+
+class TraitementTerrestreModel(Base):
+    __tablename__ = "traitement_terrestre"
+
+    traitement_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("traitement.id", ondelete="CASCADE"), primary_key=True
+    )
+    heure_debut: Mapped[time] = mapped_column(Time(), nullable=False)
+    heure_fin: Mapped[time] = mapped_column(Time(), nullable=False)
+    vitesse_vent_ms: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    direction_vent: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    temperature_c: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    reprise_traitement: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=False)
+    traitement_origine_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("traitement.id"), nullable=True
+    )
+    chef_equipe_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("utilisateur.id"), nullable=False
+    )
+    agent_encadreur_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("utilisateur.id"), nullable=True
+    )
+    consultant_international: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    surface_atomiseur_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    surface_disque_rotatif_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    surface_ulvamast_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    surface_traitee_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    surface_cumulee_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    surface_restante_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    surface_restante_abandonnee: Mapped[bool | None] = mapped_column(Boolean(), nullable=True)
+    essence_litres: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    nb_piles: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+
+    traitement: Mapped[TraitementModel] = relationship(
+        back_populates="terrestre", foreign_keys=[traitement_id]
+    )
+
+    __table_args__ = (
+        CheckConstraint("heure_fin > heure_debut", name="ck_traitement_terrestre_heures"),
+        CheckConstraint(
+            "direction_vent IN ('N','NE','E','SE','S','SO','O','NO')",
+            name="ck_traitement_terrestre_direction_vent",
+        ),
+        CheckConstraint(
+            "surface_restante_ha IS NULL OR surface_restante_ha <= 0"
+            " OR surface_restante_abandonnee IS NOT NULL",
+            name="ck_traitement_terrestre_surface_restante",
+        ),
     )

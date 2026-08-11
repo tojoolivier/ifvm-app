@@ -346,3 +346,163 @@ async def test_list_traitements_filtres(
         "/traitements", params={"type_traitement": "TERRESTRE"}, headers=auth_headers
     )
     assert vide.json() == []
+
+
+@pytest.fixture
+def payload_traitement_terrestre(chef_equipe):
+    def _build(prospection_id, **overrides):
+        payload = {
+            "prospection_id": str(prospection_id),
+            "date_traitement": "2026-08-11",
+            "date_validation": "2026-08-12",
+            "localite": "Betioky",
+            "terrestre": {
+                "heure_debut": "06:00:00",
+                "heure_fin": "09:00:00",
+                "vitesse_vent_ms": 1.5,
+                "temperature_c": 24.0,
+                "chef_equipe_id": str(chef_equipe.id),
+            },
+        }
+        payload.update(overrides)
+        return payload
+
+    return _build
+
+
+@pytest.mark.asyncio
+async def test_create_traitement_terrestre_brouillon(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+):
+    prospection_id = await _creer_prospection(
+        db_session,
+        campagne_id,
+        utilisateur,
+        surf_infestee=100.0,
+        populations=[{"espece": "LMC", "categorie": "imago"}],
+    )
+    payload = payload_traitement_terrestre(prospection_id)
+    payload["terrestre"]["surface_atomiseur_ha"] = 10.0
+    payload["terrestre"]["surface_disque_rotatif_ha"] = 5.0
+    payload["terrestre"]["surface_ulvamast_ha"] = 2.0
+    payload["terrestre"]["surface_restante_abandonnee"] = False
+
+    resp = await client.post("/traitements", json=payload, headers=auth_headers)
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["statut"] == "brouillon"
+    assert body["type_traitement"] == "TERRESTRE"
+    assert body["numero_fiche"] == "Hery-Terrestre-2026-08-11"
+    assert body["cible"]["surface_infestee_ha"] == 100.0
+    assert body["terrestre"]["surface_traitee_ha"] == 17.0
+    assert body["terrestre"]["surface_restante_ha"] == 83.0
+
+
+@pytest.mark.asyncio
+async def test_create_traitement_terrestre_surface_restante_plancher_zero(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+):
+    """Critère d'acceptation CDG §9: surface_restante_ha ne descend jamais sous 0."""
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surf_infestee=10.0
+    )
+    payload = payload_traitement_terrestre(prospection_id)
+    payload["terrestre"]["surface_atomiseur_ha"] = 25.0
+
+    resp = await client.post("/traitements", json=payload, headers=auth_headers)
+    assert resp.status_code == 201, resp.text
+    terrestre = resp.json()["terrestre"]
+    assert terrestre["surface_traitee_ha"] == 25.0
+    assert terrestre["surface_restante_ha"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_create_traitement_terrestre_surface_restante_positive_sans_abandonnee_422(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+):
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surf_infestee=100.0
+    )
+    payload = payload_traitement_terrestre(prospection_id)
+    payload["terrestre"]["surface_atomiseur_ha"] = 10.0
+
+    resp = await client.post("/traitements", json=payload, headers=auth_headers)
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_terrestre_deux_fois_suffixe_incremental(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+):
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    r1 = await client.post(
+        "/traitements", json=payload_traitement_terrestre(prospection_id), headers=auth_headers
+    )
+    r2 = await client.post(
+        "/traitements", json=payload_traitement_terrestre(prospection_id), headers=auth_headers
+    )
+    assert r1.status_code == 201
+    assert r2.status_code == 201, r2.text
+    assert r1.json()["numero_fiche"] == "Hery-Terrestre-2026-08-11"
+    assert r2.json()["numero_fiche"] == "Hery-Terrestre-2026-08-11-2"
+
+
+@pytest.mark.asyncio
+async def test_create_terrestre_heure_fin_anterieure_422(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+):
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    payload = payload_traitement_terrestre(prospection_id)
+    payload["terrestre"]["heure_debut"] = "09:00:00"
+    payload["terrestre"]["heure_fin"] = "09:00:00"
+
+    resp = await client.post("/traitements", json=payload, headers=auth_headers)
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_terrestre_rejette_mauvais_role_403(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+):
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    payload = payload_traitement_terrestre(prospection_id)
+    # utilisateur (fixture) a le rôle 'prospecteur', pas 'chef_equipe'
+    payload["terrestre"]["chef_equipe_id"] = str(utilisateur.id)
+    resp = await client.post("/traitements", json=payload, headers=auth_headers)
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_create_traitement_sans_aerien_ni_terrestre_422(
+    client, auth_headers, db_session, campagne_id, utilisateur
+):
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    payload = {
+        "prospection_id": str(prospection_id),
+        "date_traitement": "2026-08-11",
+        "date_validation": "2026-08-12",
+        "localite": "Betioky",
+    }
+    resp = await client.post("/traitements", json=payload, headers=auth_headers)
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_get_traitement_terrestre(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+):
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surf_infestee=50.0
+    )
+    payload = payload_traitement_terrestre(prospection_id)
+    payload["terrestre"]["surface_restante_abandonnee"] = True
+    created = await client.post("/traitements", json=payload, headers=auth_headers)
+    traitement_id = created.json()["id"]
+
+    resp = await client.get(f"/traitements/{traitement_id}", headers=auth_headers)
+    assert resp.status_code == 200
+    terrestre = resp.json()["terrestre"]
+    assert terrestre["heure_debut"] == "06:00:00"
+    assert terrestre["heure_fin"] == "09:00:00"
+    assert terrestre["surface_traitee_ha"] == 0.0
+    assert terrestre["surface_restante_ha"] == 50.0
