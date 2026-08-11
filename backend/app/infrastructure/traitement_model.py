@@ -7,12 +7,14 @@ from sqlalchemy import (
     CheckConstraint,
     Date,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
     Text,
     Time,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -210,6 +212,12 @@ class TraitementTerrestreModel(Base):
             "surface_restante_ha IS NULL OR surface_restante_ha <= 0"
             " OR surface_restante_abandonnee IS NOT NULL",
             name="ck_traitement_terrestre_surface_restante",
+        ),
+        Index(
+            "uq_traitement_terrestre_origine_id",
+            "traitement_origine_id",
+            unique=True,
+            postgresql_where=text("traitement_origine_id IS NOT NULL"),
         ),
     )
 

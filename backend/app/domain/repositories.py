@@ -77,12 +77,19 @@ class TraitementRepository(ABC):
         self,
         type_traitement: str | None = None,
         prospection_id: uuid.UUID | None = None,
+        chef_equipe_id: uuid.UUID | None = None,
+        reprenable: bool | None = None,
     ) -> list[Traitement]:
         pass
 
     @abstractmethod
     async def create(self, traitement: Traitement) -> Traitement:
         """Raises NumeroFicheConflitError si numero_fiche existe déjà."""
+        pass
+
+    @abstractmethod
+    async def origine_deja_utilisee(self, traitement_origine_id: uuid.UUID) -> bool:
+        """True si une fiche terrestre désigne déjà `traitement_origine_id` comme origine."""
         pass
 
     @abstractmethod

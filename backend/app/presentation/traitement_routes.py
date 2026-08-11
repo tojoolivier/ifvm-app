@@ -25,6 +25,8 @@ from app.domain.traitement import (
     ProspectionIntrouvableError,
     RotationIntrouvableError,
     TraitementIntrouvableError,
+    TraitementOrigineDejaUtiliseeError,
+    TraitementOrigineIntrouvableError,
 )
 from app.infrastructure.prospection_repository import ProspectionRepositoryImpl
 from app.infrastructure.traitement_repository import TraitementRepositoryImpl
@@ -50,12 +52,16 @@ async def list_traitements(
     _: Annotated[Utilisateur, Depends(get_current_user)],
     type_traitement: str | None = Query(default=None),
     prospection_id: uuid.UUID | None = Query(default=None),
+    chef_equipe_id: uuid.UUID | None = Query(default=None),
+    reprenable: bool | None = Query(default=None),
 ):
     repository = get_repository(db)
     use_case = ListTraitements(repository)
     return await use_case.execute(
         type_traitement=type_traitement,
         prospection_id=prospection_id,
+        chef_equipe_id=chef_equipe_id,
+        reprenable=reprenable,
     )
 
 
@@ -138,12 +144,14 @@ async def create_traitement(
             surface_restante_abandonnee=body.terrestre.surface_restante_abandonnee,
             essence_litres=body.terrestre.essence_litres,
             nb_piles=body.terrestre.nb_piles,
+            reprise_traitement=body.terrestre.reprise_traitement,
+            traitement_origine_id=body.terrestre.traitement_origine_id,
         )
     except (ChefDeBaseInvalideError, ChefEquipeInvalideError) as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
-    except ProspectionIntrouvableError as e:
+    except (ProspectionIntrouvableError, TraitementOrigineIntrouvableError) as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except NumeroFicheConflitError as e:
+    except (NumeroFicheConflitError, TraitementOrigineDejaUtiliseeError) as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))

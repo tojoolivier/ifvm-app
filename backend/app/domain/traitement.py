@@ -34,6 +34,14 @@ class ProduitUtiliseIntrouvableError(LookupError):
     """Le produit utilisé référencé n'existe pas pour ce traitement terrestre."""
 
 
+class TraitementOrigineIntrouvableError(LookupError):
+    """traitement_origine_id ne référence pas un traitement terrestre existant."""
+
+
+class TraitementOrigineDejaUtiliseeError(Exception):
+    """La fiche d'origine est déjà désignée comme origine par une autre fiche (chaîne linéaire)."""
+
+
 @dataclass
 class Cible:
     traitement_id: uuid.UUID = field(default_factory=uuid.uuid4)

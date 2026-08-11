@@ -25,6 +25,8 @@ from app.domain.traitement import (
     Traitement,
     TraitementAerien,
     TraitementIntrouvableError,
+    TraitementOrigineDejaUtiliseeError,
+    TraitementOrigineIntrouvableError,
     TraitementTerrestre,
     construire_cible,
     generer_numero_fiche,
@@ -129,9 +131,16 @@ def test_cible_surface_infestee_reprise():
 
 
 class FakeTraitementRepo:
-    def __init__(self, conflits: int = 0):
+    def __init__(
+        self,
+        conflits: int = 0,
+        traitements_par_id: dict | None = None,
+        origines_deja_utilisees: set | None = None,
+    ):
         self.conflits = conflits
         self.crees: list[Traitement] = []
+        self.traitements_par_id = traitements_par_id or {}
+        self.origines_deja_utilisees = origines_deja_utilisees or set()
 
     async def create(self, traitement: Traitement) -> Traitement:
         if self.conflits > 0:
@@ -141,10 +150,13 @@ class FakeTraitementRepo:
         return traitement
 
     async def get_by_id(self, traitement_id):
-        return None
+        return self.traitements_par_id.get(traitement_id)
 
     async def list_by_filters(self, **kwargs):
         return []
+
+    async def origine_deja_utilisee(self, traitement_origine_id) -> bool:
+        return traitement_origine_id in self.origines_deja_utilisees
 
 
 class FakeProspectionRepo:
@@ -529,8 +541,14 @@ def _use_case_terrestre(
     prospection: Prospection | None = None,
     chef: UtilisateurRef | None = None,
     conflits: int = 0,
+    traitements_par_id: dict | None = None,
+    origines_deja_utilisees: set | None = None,
 ) -> tuple[CreateTraitementTerrestre, FakeTraitementRepo]:
-    repo = FakeTraitementRepo(conflits=conflits)
+    repo = FakeTraitementRepo(
+        conflits=conflits,
+        traitements_par_id=traitements_par_id,
+        origines_deja_utilisees=origines_deja_utilisees,
+    )
     return (
         CreateTraitementTerrestre(
             traitement_repository=repo,
@@ -639,6 +657,98 @@ async def test_terrestre_accepte_surface_restante_nulle_sans_abandonnee():
     use_case, _ = _use_case_terrestre(prospection=prospection, chef=_CHEF_EQUIPE)
     traitement = await use_case.execute(**_args_terrestre(surface_atomiseur_ha=25.0))
     assert traitement.terrestre.surface_restante_ha == 0.0
+
+
+# ==========================================
+# CreateTraitementTerrestre — reprise de traitement (issue #71)
+# ==========================================
+
+
+def _fiche_origine(surface_cumulee_ha: float = 40.0) -> Traitement:
+    """Fiche terrestre existante, utilisable comme origine d'une reprise."""
+    origine = Traitement(terrestre=TraitementTerrestre())
+    origine.terrestre.surface_cumulee_ha = surface_cumulee_ha
+    return origine
+
+
+@pytest.mark.asyncio
+async def test_reprise_lit_surface_cumulee_de_la_fiche_origine_un_seul_niveau():
+    """CDG §9 : reprend surface_cumulee_ha déjà consolidé de l'origine, sans récursion."""
+    origine = _fiche_origine(surface_cumulee_ha=40.0)
+    prospection = _prospection(surf_infestee=100.0)
+    use_case, _ = _use_case_terrestre(
+        prospection=prospection,
+        chef=_CHEF_EQUIPE,
+        traitements_par_id={origine.id: origine},
+    )
+    traitement = await use_case.execute(
+        **_args_terrestre(
+            surface_atomiseur_ha=10.0,
+            surface_restante_abandonnee=False,
+            reprise_traitement=True,
+            traitement_origine_id=origine.id,
+        )
+    )
+    assert traitement.terrestre.reprise_traitement is True
+    assert traitement.terrestre.traitement_origine_id == origine.id
+    assert traitement.terrestre.surface_traitee_ha == 10.0
+    assert traitement.terrestre.surface_cumulee_ha == 50.0
+    assert traitement.terrestre.surface_restante_ha == 50.0
+
+
+@pytest.mark.asyncio
+async def test_reprise_sans_traitement_origine_id_rejetee():
+    use_case, _ = _use_case_terrestre(prospection=_prospection(), chef=_CHEF_EQUIPE)
+    with pytest.raises(ValueError):
+        await use_case.execute(**_args_terrestre(reprise_traitement=True))
+
+
+@pytest.mark.asyncio
+async def test_traitement_origine_id_sans_reprise_rejete():
+    use_case, _ = _use_case_terrestre(prospection=_prospection(), chef=_CHEF_EQUIPE)
+    with pytest.raises(ValueError):
+        await use_case.execute(
+            **_args_terrestre(reprise_traitement=False, traitement_origine_id=uuid.uuid4())
+        )
+
+
+@pytest.mark.asyncio
+async def test_reprise_origine_introuvable():
+    use_case, _ = _use_case_terrestre(prospection=_prospection(), chef=_CHEF_EQUIPE)
+    with pytest.raises(TraitementOrigineIntrouvableError):
+        await use_case.execute(
+            **_args_terrestre(reprise_traitement=True, traitement_origine_id=uuid.uuid4())
+        )
+
+
+@pytest.mark.asyncio
+async def test_reprise_origine_non_terrestre_introuvable():
+    origine_aerienne = Traitement(aerien=TraitementAerien())
+    use_case, _ = _use_case_terrestre(
+        prospection=_prospection(),
+        chef=_CHEF_EQUIPE,
+        traitements_par_id={origine_aerienne.id: origine_aerienne},
+    )
+    with pytest.raises(TraitementOrigineIntrouvableError):
+        await use_case.execute(
+            **_args_terrestre(reprise_traitement=True, traitement_origine_id=origine_aerienne.id)
+        )
+
+
+@pytest.mark.asyncio
+async def test_reprise_origine_deja_utilisee_rejetee():
+    """Préserve le modèle 'chaîne linéaire' : une fiche ne peut être origine qu'une fois."""
+    origine = _fiche_origine()
+    use_case, _ = _use_case_terrestre(
+        prospection=_prospection(surf_infestee=100.0),
+        chef=_CHEF_EQUIPE,
+        traitements_par_id={origine.id: origine},
+        origines_deja_utilisees={origine.id},
+    )
+    with pytest.raises(TraitementOrigineDejaUtiliseeError):
+        await use_case.execute(
+            **_args_terrestre(reprise_traitement=True, traitement_origine_id=origine.id)
+        )
 
 
 # ==========================================

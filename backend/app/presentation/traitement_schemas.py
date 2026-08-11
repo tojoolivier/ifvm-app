@@ -59,6 +59,20 @@ class TraitementTerrestreCreate(BaseModel):
     surface_restante_abandonnee: bool | None = None
     essence_litres: float | None = Field(None, ge=0)
     nb_piles: int | None = Field(None, ge=0)
+    reprise_traitement: bool = False
+    traitement_origine_id: uuid.UUID | None = None
+
+    @model_validator(mode="after")
+    def _origine_requise_si_reprise(self) -> "TraitementTerrestreCreate":
+        if self.reprise_traitement and self.traitement_origine_id is None:
+            raise ValueError(
+                "traitement_origine_id est obligatoire lorsque reprise_traitement=True"
+            )
+        if not self.reprise_traitement and self.traitement_origine_id is not None:
+            raise ValueError(
+                "traitement_origine_id ne peut être renseigné que si reprise_traitement=True"
+            )
+        return self
 
 
 class TraitementCreate(BaseModel):

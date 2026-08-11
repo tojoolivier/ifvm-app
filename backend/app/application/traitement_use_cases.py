@@ -20,6 +20,8 @@ from app.domain.traitement import (
     Traitement,
     TraitementAerien,
     TraitementIntrouvableError,
+    TraitementOrigineDejaUtiliseeError,
+    TraitementOrigineIntrouvableError,
     TraitementTerrestre,
     construire_cible,
     generer_numero_fiche,
@@ -303,6 +305,8 @@ class CreateTraitementTerrestre:
         surface_restante_abandonnee: bool | None = None,
         essence_litres: float | None = None,
         nb_piles: int | None = None,
+        reprise_traitement: bool = False,
+        traitement_origine_id: uuid.UUID | None = None,
         numero_fiche: str | None = None,
         mode_traitement: str | None = None,
         region: str | None = None,
@@ -333,6 +337,28 @@ class CreateTraitementTerrestre:
         _valider_dates(date_traitement, date_validation)
         if heure_fin <= heure_debut:
             raise ValueError("heure_fin doit être postérieure à heure_debut")
+
+        surface_cumulee_precedente = 0.0
+        if reprise_traitement:
+            if traitement_origine_id is None:
+                raise ValueError(
+                    "traitement_origine_id est obligatoire lorsque reprise_traitement=True"
+                )
+            origine = await self.traitement_repository.get_by_id(traitement_origine_id)
+            if origine is None or origine.terrestre is None:
+                raise TraitementOrigineIntrouvableError(
+                    f"Fiche d'origine {traitement_origine_id} introuvable ou non terrestre"
+                )
+            if await self.traitement_repository.origine_deja_utilisee(traitement_origine_id):
+                raise TraitementOrigineDejaUtiliseeError(
+                    f"La fiche {traitement_origine_id} est déjà désignée comme origine "
+                    "par une autre fiche"
+                )
+            surface_cumulee_precedente = origine.terrestre.surface_cumulee_ha or 0.0
+        elif traitement_origine_id is not None:
+            raise ValueError(
+                "traitement_origine_id ne peut être renseigné que si reprise_traitement=True"
+            )
 
         prospection = await self.prospection_repository.get_by_id(prospection_id)
         if prospection is None:
@@ -393,8 +419,8 @@ class CreateTraitementTerrestre:
             vitesse_vent_ms=vitesse_vent_ms,
             direction_vent=direction_vent,
             temperature_c=temperature_c,
-            reprise_traitement=False,
-            traitement_origine_id=None,
+            reprise_traitement=reprise_traitement,
+            traitement_origine_id=traitement_origine_id,
             chef_equipe_id=chef_equipe_id,
             agent_encadreur_id=agent_encadreur_id,
             consultant_international=consultant_international,
@@ -405,7 +431,7 @@ class CreateTraitementTerrestre:
             essence_litres=essence_litres,
             nb_piles=nb_piles,
         )
-        terrestre.recalculer_surfaces(cible.surface_infestee_ha)
+        terrestre.recalculer_surfaces(cible.surface_infestee_ha, surface_cumulee_precedente)
         if (
             terrestre.surface_restante_ha
             and terrestre.surface_restante_ha > 0
@@ -443,10 +469,14 @@ class ListTraitements:
         self,
         type_traitement: str | None = None,
         prospection_id: uuid.UUID | None = None,
+        chef_equipe_id: uuid.UUID | None = None,
+        reprenable: bool | None = None,
     ) -> list[Traitement]:
         return await self.repository.list_by_filters(
             type_traitement=type_traitement,
             prospection_id=prospection_id,
+            chef_equipe_id=chef_equipe_id,
+            reprenable=reprenable,
         )
 
 
