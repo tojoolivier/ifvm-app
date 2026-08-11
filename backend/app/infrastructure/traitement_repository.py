@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -13,6 +13,7 @@ from app.domain.traitement import (
     Rotation,
     Traitement,
     TraitementAerien,
+    TraitementOrigineDejaUtiliseeError,
     TraitementTerrestre,
 )
 from app.infrastructure.traitement_model import (
@@ -50,19 +51,48 @@ class TraitementRepositoryImpl(TraitementRepository):
         self,
         type_traitement: str | None = None,
         prospection_id: uuid.UUID | None = None,
+        chef_equipe_id: uuid.UUID | None = None,
+        reprenable: bool | None = None,
     ) -> list[Traitement]:
         stmt = select(TraitementModel).options(
             selectinload(TraitementModel.cible),
             selectinload(TraitementModel.aerien).selectinload(TraitementAerienModel.rotations),
-            selectinload(TraitementModel.terrestre),
+            selectinload(TraitementModel.terrestre).selectinload(TraitementTerrestreModel.produits),
         )
         if type_traitement is not None:
             stmt = stmt.where(TraitementModel.type_traitement == type_traitement)
         if prospection_id is not None:
             stmt = stmt.where(TraitementModel.prospection_id == prospection_id)
+        if chef_equipe_id is not None or reprenable:
+            stmt = stmt.join(
+                TraitementTerrestreModel,
+                TraitementTerrestreModel.traitement_id == TraitementModel.id,
+            )
+        if chef_equipe_id is not None:
+            stmt = stmt.where(TraitementTerrestreModel.chef_equipe_id == chef_equipe_id)
+        if reprenable:
+            origines_utilisees = select(TraitementTerrestreModel.traitement_origine_id).where(
+                TraitementTerrestreModel.traitement_origine_id.is_not(None)
+            )
+            stmt = stmt.where(
+                TraitementModel.type_traitement == "TERRESTRE",
+                or_(
+                    TraitementTerrestreModel.surface_restante_ha.is_(None),
+                    TraitementTerrestreModel.surface_restante_ha > 0,
+                ),
+                TraitementModel.id.not_in(origines_utilisees),
+            )
         stmt = stmt.order_by(TraitementModel.date_traitement.desc())
         result = await self.session.execute(stmt)
         return [self._to_domain(m) for m in result.scalars().all()]
+
+    async def origine_deja_utilisee(self, traitement_origine_id: uuid.UUID) -> bool:
+        result = await self.session.execute(
+            select(TraitementTerrestreModel.traitement_id).where(
+                TraitementTerrestreModel.traitement_origine_id == traitement_origine_id
+            )
+        )
+        return result.scalar_one_or_none() is not None
 
     async def create(self, traitement: Traitement) -> Traitement:
         model = TraitementModel(
@@ -161,6 +191,11 @@ class TraitementRepositoryImpl(TraitementRepository):
             if constraint_name == "traitement_numero_fiche_key":
                 raise NumeroFicheConflitError(
                     f"numero_fiche '{traitement.numero_fiche}' déjà utilisé"
+                ) from e
+            if constraint_name == "uq_traitement_terrestre_origine_id":
+                raise TraitementOrigineDejaUtiliseeError(
+                    f"La fiche {traitement.terrestre.traitement_origine_id} est déjà "
+                    "désignée comme origine par une autre fiche"
                 ) from e
             raise
         return await self.get_by_id(model.id)

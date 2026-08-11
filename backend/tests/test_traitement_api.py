@@ -1,3 +1,4 @@
+import copy
 import uuid
 from datetime import date
 
@@ -697,6 +698,199 @@ async def test_delete_produit_dun_autre_traitement_404(
 
     verif = await client.get(f"/traitements/{traitement_1}", headers=auth_headers)
     assert len(verif.json()["terrestre"]["produits"]) == 1
+
+
+async def _creer_fiche_terrestre_chainee(
+    client,
+    auth_headers,
+    base_payload: dict,
+    *,
+    surface_atomiseur_ha: float,
+    traitement_origine_id=None,
+):
+    """Fixture-factory : crée un maillon de la chaîne de reprise (racine ou reprise).
+
+    `base_payload` est cloné à chaque appel — évite de rappeler la fixture
+    `payload_traitement_terrestre` (donc de relire `chef_equipe.id`) à chaque maillon.
+    """
+    payload = copy.deepcopy(base_payload)
+    payload["terrestre"]["surface_atomiseur_ha"] = surface_atomiseur_ha
+    payload["terrestre"]["surface_restante_abandonnee"] = False
+    if traitement_origine_id is not None:
+        payload["terrestre"]["reprise_traitement"] = True
+        payload["terrestre"]["traitement_origine_id"] = str(traitement_origine_id)
+    resp = await client.post("/traitements", json=payload, headers=auth_headers)
+    assert resp.status_code == 201, resp.text
+    return resp.json()
+
+
+@pytest.mark.asyncio
+async def test_reprise_chaine_a_plusieurs_maillons(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+):
+    """CDG §9 : chaque maillon reprend surface_cumulee_ha du précédent, sur un seul niveau."""
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surf_infestee=200.0
+    )
+    base_payload = payload_traitement_terrestre(prospection_id)
+
+    maillon_1 = await _creer_fiche_terrestre_chainee(
+        client,
+        auth_headers,
+        base_payload,
+        surface_atomiseur_ha=30.0,
+    )
+    assert maillon_1["terrestre"]["surface_cumulee_ha"] == 30.0
+
+    maillon_2 = await _creer_fiche_terrestre_chainee(
+        client,
+        auth_headers,
+        base_payload,
+        surface_atomiseur_ha=20.0,
+        traitement_origine_id=maillon_1["id"],
+    )
+    assert maillon_2["terrestre"]["surface_cumulee_ha"] == 50.0
+    assert maillon_2["terrestre"]["reprise_traitement"] is True
+    assert maillon_2["terrestre"]["traitement_origine_id"] == maillon_1["id"]
+
+    maillon_3 = await _creer_fiche_terrestre_chainee(
+        client,
+        auth_headers,
+        base_payload,
+        surface_atomiseur_ha=25.0,
+        traitement_origine_id=maillon_2["id"],
+    )
+    assert maillon_3["terrestre"]["surface_cumulee_ha"] == 75.0
+    assert maillon_3["terrestre"]["surface_restante_ha"] == 125.0
+
+
+@pytest.mark.asyncio
+async def test_reprise_origine_deja_utilisee_409(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+):
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surf_infestee=200.0
+    )
+    base_payload = payload_traitement_terrestre(prospection_id)
+
+    maillon_1 = await _creer_fiche_terrestre_chainee(
+        client,
+        auth_headers,
+        base_payload,
+        surface_atomiseur_ha=30.0,
+    )
+    await _creer_fiche_terrestre_chainee(
+        client,
+        auth_headers,
+        base_payload,
+        surface_atomiseur_ha=20.0,
+        traitement_origine_id=maillon_1["id"],
+    )
+
+    payload = copy.deepcopy(base_payload)
+    payload["terrestre"]["surface_atomiseur_ha"] = 15.0
+    payload["terrestre"]["surface_restante_abandonnee"] = False
+    payload["terrestre"]["reprise_traitement"] = True
+    payload["terrestre"]["traitement_origine_id"] = maillon_1["id"]
+    resp = await client.post("/traitements", json=payload, headers=auth_headers)
+    assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_reprise_origine_introuvable_404(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+):
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    payload = payload_traitement_terrestre(prospection_id)
+    payload["terrestre"]["reprise_traitement"] = True
+    payload["terrestre"]["traitement_origine_id"] = str(uuid.uuid4())
+    resp = await client.post("/traitements", json=payload, headers=auth_headers)
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_reprise_traitement_sans_origine_id_422(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+):
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    payload = payload_traitement_terrestre(prospection_id)
+    payload["terrestre"]["reprise_traitement"] = True
+    resp = await client.post("/traitements", json=payload, headers=auth_headers)
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_list_traitements_reprenable_exclut_origine_deja_utilisee_et_surface_epuisee(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+):
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surf_infestee=100.0
+    )
+    base_payload = payload_traitement_terrestre(prospection_id)
+
+    # racine déjà utilisée comme origine par un autre maillon -> exclue, même si sa
+    # propre surface_restante_ha > 0
+    origine_utilisee = await _creer_fiche_terrestre_chainee(
+        client,
+        auth_headers,
+        base_payload,
+        surface_atomiseur_ha=10.0,
+    )
+    # cette reprise n'est elle-même l'origine de personne -> reste reprenable
+    maillon_reprenable = await _creer_fiche_terrestre_chainee(
+        client,
+        auth_headers,
+        base_payload,
+        surface_atomiseur_ha=10.0,
+        traitement_origine_id=origine_utilisee["id"],
+    )
+    # fiche à surface_restante_ha = 0 -> exclue
+    epuisee = await _creer_fiche_terrestre_chainee(
+        client,
+        auth_headers,
+        base_payload,
+        surface_atomiseur_ha=100.0,
+    )
+    assert epuisee["terrestre"]["surface_restante_ha"] == 0.0
+    # fiche indépendante encore reprenable
+    reprenable = await _creer_fiche_terrestre_chainee(
+        client,
+        auth_headers,
+        base_payload,
+        surface_atomiseur_ha=5.0,
+    )
+
+    resp = await client.get(
+        "/traitements",
+        params={"type_traitement": "TERRESTRE", "reprenable": "true"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    ids = {t["id"] for t in resp.json()}
+    assert ids == {maillon_reprenable["id"], reprenable["id"]}
+
+
+@pytest.mark.asyncio
+async def test_list_traitements_filtre_chef_equipe_id(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement_terrestre,
+    chef_equipe,
+):
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    base_payload = payload_traitement_terrestre(prospection_id)
+    await _creer_fiche_terrestre_chainee(
+        client, auth_headers, base_payload, surface_atomiseur_ha=1.0
+    )
+
+    resp = await client.get(
+        "/traitements", params={"chef_equipe_id": str(chef_equipe.id)}, headers=auth_headers
+    )
+    assert resp.status_code == 200
+    assert len(resp.json()) == 1
 
 
 @pytest.mark.asyncio
