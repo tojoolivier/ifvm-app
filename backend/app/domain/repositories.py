@@ -12,6 +12,7 @@ from app.domain.referentiel import (
     StationFixe,
     UtilisateurEquipe,
 )
+from app.domain.traitement import Traitement, UtilisateurRef
 
 
 class CampagneRepository(ABC):
@@ -62,6 +63,31 @@ class ProspectionRepository(ABC):
 
     @abstractmethod
     async def delete(self, prospection_id: uuid.UUID) -> bool:
+        pass
+
+
+class TraitementRepository(ABC):
+    @abstractmethod
+    async def get_by_id(self, traitement_id: uuid.UUID) -> Traitement | None:
+        pass
+
+    @abstractmethod
+    async def list_by_filters(
+        self,
+        type_traitement: str | None = None,
+        prospection_id: uuid.UUID | None = None,
+    ) -> list[Traitement]:
+        pass
+
+    @abstractmethod
+    async def create(self, traitement: Traitement) -> Traitement:
+        """Raises NumeroFicheConflitError si numero_fiche existe déjà."""
+        pass
+
+
+class UtilisateurRepository(ABC):
+    @abstractmethod
+    async def get_by_id(self, utilisateur_id: uuid.UUID) -> UtilisateurRef | None:
         pass
 
 
