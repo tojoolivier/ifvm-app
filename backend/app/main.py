@@ -4,7 +4,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
-from app.presentation import campagne_routes, prospection_routes, referentiel_routes
+from app.presentation import (
+    campagne_routes,
+    prospection_routes,
+    referentiel_routes,
+    traitement_routes,
+)
 from app.routers import auth, users
 
 
@@ -29,6 +34,7 @@ app.include_router(users.router, prefix="/users", tags=["users"])
 app.include_router(campagne_routes.router, prefix="/campagnes", tags=["campagnes"])
 app.include_router(referentiel_routes.router, prefix="", tags=["referentiels"])
 app.include_router(prospection_routes.router, prefix="/prospections", tags=["prospections"])
+app.include_router(traitement_routes.router, prefix="/traitements", tags=["traitements"])
 
 
 @app.get("/health", tags=["system"])

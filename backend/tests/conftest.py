@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 import app.infrastructure.campagne_model  # noqa: F401
 import app.infrastructure.prospection_model  # noqa: F401
 import app.infrastructure.referentiel_model  # noqa: F401
+import app.infrastructure.traitement_model  # noqa: F401
 from app.auth import create_access_token, hash_password
 from app.database import get_db
 from app.main import app as fastapi_app
@@ -69,6 +70,23 @@ async def utilisateur(db_session: AsyncSession) -> Utilisateur:
 async def auth_headers(utilisateur: Utilisateur) -> dict:
     token = create_access_token(utilisateur.id)
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest_asyncio.fixture
+async def chef_de_base(db_session: AsyncSession) -> Utilisateur:
+    user = Utilisateur(
+        id=uuid.uuid4(),
+        nom="Andria",
+        prenom="Hery",
+        email=f"hery.andria+{uuid.uuid4().hex[:6]}@test.mg",
+        password_hash=hash_password("secret"),
+        role="chef_de_base",
+        actif=True,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
 
 
 @pytest_asyncio.fixture
