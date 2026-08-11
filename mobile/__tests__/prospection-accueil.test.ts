@@ -44,6 +44,7 @@ const STORED_ROW: DraftProspection = {
   campagne_id: '22222222-2222-2222-2222-222222222222',
   prospecteur_id: '33333333-3333-3333-3333-333333333333',
   station_id: null,
+  biotope: 'Mesophyle',
   region: null,
   district: null,
   commune: null,
