@@ -63,7 +63,7 @@ export default function LoginScreen() {
             </View>
             <Text style={styles.title}>IFVM Mobile</Text>
             <Text style={styles.subtitle}>
-              Ivotoerana Famongorana Valala et Madagasikara
+              Ivotoerana Famongorana Valala eto Madagasikara
             </Text>
           </View>
 

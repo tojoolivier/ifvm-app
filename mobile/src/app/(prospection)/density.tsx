@@ -63,12 +63,10 @@ export default function DensityScreen() {
 
   const handleBack = () => {
     if (isFirstGrille) {
-      router.replace({ pathname: '/(prospection)/species' as any, params: { draftId } });
+      // CORRECTION: Utiliser le chemin correct avec les paramètres dans l'URL
+      router.replace(`/(prospection)/species?draftId=${draftId}`);
     } else {
-      router.replace({
-        pathname: '/(prospection)/captures' as any,
-        params: { draftId, grilleIndex: String(requestedIndex - 1) },
-      });
+      router.replace(`/(prospection)/captures?draftId=${draftId}&grilleIndex=${requestedIndex - 1}`);
     }
   };
 
@@ -77,10 +75,8 @@ export default function DensityScreen() {
     setIsSaving(true);
     try {
       await saveProspectionPopulation(draftId, population);
-      router.replace({
-        pathname: '/(prospection)/accouplement' as any,
-        params: { draftId, grilleIndex: String(requestedIndex) },
-      });
+      // CORRECTION: Utiliser le chemin correct avec les paramètres dans l'URL
+      router.replace(`/(prospection)/accouplement?draftId=${draftId}&grilleIndex=${requestedIndex}`);
     } finally {
       setIsSaving(false);
     }
