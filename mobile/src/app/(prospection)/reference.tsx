@@ -99,7 +99,7 @@ export default function ReferenceScreen() {
   }, []);
 
   // ==========================================
-  // CAPTURE GPS AUTOMATIQUE (CORRIGÉ)
+  // CAPTURE GPS AUTOMATIQUE
   // ==========================================
   useEffect(() => {
     let isActive = true;
@@ -193,6 +193,9 @@ export default function ReferenceScreen() {
     setStationMode('manuel');
   }
 
+  // Détection du type intensif
+  const isIntensive = draft?.type_prospection === 'intensive';
+
   const form = useForm({
     defaultValues: {
       surfStation: draft?.surf_station != null ? String(draft.surf_station) : '',
@@ -211,13 +214,31 @@ export default function ReferenceScreen() {
         return;
       }
 
-      try {
-        await referenceSchema.validate(value, { abortEarly: false });
-      } catch (validationError: any) {
-        const errors: Record<string, string> = {};
-        for (const err of validationError.inner ?? []) {
-          if (err.path) errors[err.path] = err.message;
+      // VALIDATION PERSONNALISÉE
+      const errors: Record<string, string> = {};
+
+      // Biotope est TOUJOURS obligatoire
+      if (!value.biotope) {
+        errors.biotope = 'Le type de biotope est obligatoire';
+      }
+
+      // Surface station TOUJOURS obligatoire
+      if (!value.surfStation || Number(value.surfStation) <= 0) {
+        errors.surfStation = 'La surface de la station est obligatoire';
+      }
+
+      // Pour le type extensif : prospectée et infestée sont obligatoires
+      if (!isIntensive) {
+        if (!value.surfProspectee || Number(value.surfProspectee) <= 0) {
+          errors.surfProspectee = 'La surface prospectée est obligatoire';
         }
+        if (!value.surfInfestee || Number(value.surfInfestee) <= 0) {
+          errors.surfInfestee = 'La surface infestée est obligatoire';
+        }
+      }
+
+      // Si des erreurs, on les affiche
+      if (Object.keys(errors).length > 0) {
         setFormErrors(errors);
         return;
       }
@@ -230,13 +251,17 @@ export default function ReferenceScreen() {
         const nFiche = generateNumeroFiche(draftId, dateProspection);
         const nReleve = generateNumeroReleve(station?.id ?? null, dateProspection);
 
+        // Préparer les données avec des valeurs par défaut (0 pour intensif)
+        const surfProspecteeValue = value.surfProspectee ? Number(value.surfProspectee) : 0;
+        const surfInfesteeValue = value.surfInfestee ? Number(value.surfInfestee) : 0;
+
         const updated = await updateProspectionReference(draftId, {
           latitude: position.latitude,
           longitude: position.longitude,
           altitude: position.altitude ?? null,
           surfStation: Number(value.surfStation),
-          surfProspectee: Number(value.surfProspectee),
-          surfInfestee: Number(value.surfInfestee),
+          surfProspectee: surfProspecteeValue,
+          surfInfestee: surfInfesteeValue,
           biotope: value.biotope ?? null,
           nFiche,
           nReleve,
@@ -422,16 +447,22 @@ export default function ReferenceScreen() {
 
           {/* ===== Surfaces ===== */}
           <Text style={styles.sectionLabel}>Surfaces (ha) — saisie</Text>
+          {isIntensive && (
+            <Text style={styles.infoText}>
+              ℹ️ Mode intensif : les surfaces prospectée et infestée ne sont pas obligatoires
+            </Text>
+          )}
           <View style={styles.surfacesRow}>
             <form.Field name="surfStation">
               {(field) => (
                 <View style={styles.surfaceField}>
-                  <Text style={styles.surfaceLabel}>Station</Text>
+                  <Text style={[styles.surfaceLabel, styles.requiredLabel]}>Station *</Text>
                   <TextInput
                     value={field.state.value ?? ''}
                     onChangeText={field.handleChange}
                     keyboardType="decimal-pad"
                     style={styles.surfaceInput}
+                    placeholder="0"
                   />
                 </View>
               )}
@@ -439,12 +470,18 @@ export default function ReferenceScreen() {
             <form.Field name="surfProspectee">
               {(field) => (
                 <View style={styles.surfaceField}>
-                  <Text style={styles.surfaceLabel}>Prospectée</Text>
+                  <Text style={[
+                    styles.surfaceLabel,
+                    !isIntensive && styles.requiredLabel
+                  ]}>
+                    Prospectée {!isIntensive && '*'}
+                  </Text>
                   <TextInput
                     value={field.state.value ?? ''}
                     onChangeText={field.handleChange}
                     keyboardType="decimal-pad"
                     style={styles.surfaceInput}
+                    placeholder={isIntensive ? '0' : '0'}
                   />
                 </View>
               )}
@@ -452,13 +489,18 @@ export default function ReferenceScreen() {
             <form.Field name="surfInfestee">
               {(field) => (
                 <View style={styles.surfaceField}>
-                  <Text style={styles.surfaceLabel}>Infestée</Text>
+                  <Text style={[
+                    styles.surfaceLabel,
+                    !isIntensive && styles.requiredLabel
+                  ]}>
+                    Infestée {!isIntensive && '*'}
+                  </Text>
                   <TextInput
                     value={field.state.value ?? ''}
                     onChangeText={field.handleChange}
                     keyboardType="decimal-pad"
-                    placeholder="—"
                     style={styles.surfaceInput}
+                    placeholder={isIntensive ? '0' : '0'}
                   />
                 </View>
               )}
@@ -469,7 +511,7 @@ export default function ReferenceScreen() {
           <form.Field name="biotope">
             {(field) => (
               <View style={styles.biotopeContainer}>
-                <Text style={styles.sectionLabel}>Type de biotope</Text>
+                <Text style={[styles.sectionLabel, styles.requiredLabel]}>Type de biotope *</Text>
                 <View style={styles.biotopeOptions}>
                   {BIOTOPE_OPTIONS.map((option) => (
                     <TouchableOpacity
@@ -628,6 +670,9 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 9,
   },
+  requiredLabel: {
+    color: '#c0412b',
+  },
   surfacesRow: { flexDirection: 'row', gap: 9, marginBottom: 8 },
   surfaceField: {
     flex: 1,
@@ -663,6 +708,15 @@ const styles = StyleSheet.create({
   },
   hintText: { fontSize: 10.5, color: '#9a9484', paddingHorizontal: 2 },
   errorText: { color: '#c0412b', fontSize: 11, marginBottom: 4 },
+  infoText: {
+    fontSize: 11,
+    color: '#6f6a59',
+    marginBottom: 8,
+    fontStyle: 'italic',
+    backgroundColor: '#f0ede6',
+    padding: 8,
+    borderRadius: 6,
+  },
   footer: { padding: 16 },
   continueButton: {
     backgroundColor: GREEN,
