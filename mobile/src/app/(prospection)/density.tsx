@@ -47,7 +47,7 @@ export default function DensityScreen() {
     getProspectionPopulation(draftId, grille.espece, grille.categorie).then((row) => {
       setPopulation(row ?? emptyPopulation(grille.espece));
     });
-  }, [draftId, grille?.espece, grille?.categorie]);
+  }, [draftId, grille]);
 
   if (!grille || !population) {
     return (
