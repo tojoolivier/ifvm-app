@@ -139,6 +139,55 @@ async def test_create_prospection_avec_nouveaux_champs(
 
 
 @pytest.mark.asyncio
+async def test_create_prospection_population_methode_phase(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+):
+    """Régression: methode/phase (population) et surf_infestee_pourcent (infestation)
+    existent côté ORM/Pydantic mais avaient été oubliés dans le mapping du domaine
+    (ProspectionPopulation / ProspectionInfestation), ce qui faisait planter la
+    création avec un TypeError silencieux hors tests (aucun test n'envoyait ces
+    champs avant cette régression)."""
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "extensive",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-07-29",
+            "populations": [
+                {
+                    "espece": "LMC",
+                    "categorie": "imago",
+                    "densite_diffuse": 3.5,
+                    "methode": "comptage_direct",
+                    "phase": "gregaire",
+                }
+            ],
+            "infestations": [
+                {
+                    "espece": "NSE",
+                    "type_cible": "tache_larvaire",
+                    "surface_tot": 2.0,
+                    "surf_infestee_pourcent": 45.0,
+                }
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    data = response.json()
+
+    assert len(data["populations"]) == 1
+    population = data["populations"][0]
+    assert population["methode"] == "comptage_direct"
+    assert population["phase"] == "gregaire"
+
+    assert len(data["infestations"]) == 1
+    infestation = data["infestations"][0]
+    assert infestation["surf_infestee_pourcent"] == 45.0
+
+
+@pytest.mark.asyncio
 async def test_create_prospection_avec_infestation_complete(
     client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
 ):
