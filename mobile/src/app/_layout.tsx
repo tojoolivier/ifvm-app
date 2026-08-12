@@ -6,6 +6,9 @@ import { useAuthStore } from '@/lib/auth-store';
 import { useDebugStore } from '@/lib/debug-store';
 import { getDb } from '@/lib/prospection-db';
 import { useReferentielAutoSync } from '@/hooks/use-referentiel-auto-sync';
+import { ErrorBanner } from '@/components/error-banner';
+import { ErrorBoundary } from '@/components/error-boundary';
+import { installGlobalErrorHandlers } from '@/lib/global-error-handler';
 import '../global.css';
 
 function useAuthGuard() {
@@ -41,6 +44,7 @@ export default function RootLayout() {
   useEffect(() => {
     getDb();
     useDebugStore.getState().init();
+    installGlobalErrorHandlers();
   }, []);
 
   if (!isInitialized) {
@@ -53,11 +57,14 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <Stack>
-        <Stack.Screen name="(app)" options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(prospection)" options={{ headerShown: false }} />
-      </Stack>
+      <ErrorBoundary>
+        <Stack>
+          <Stack.Screen name="(app)" options={{ headerShown: false }} />
+          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+          <Stack.Screen name="(prospection)" options={{ headerShown: false }} />
+        </Stack>
+      </ErrorBoundary>
+      <ErrorBanner />
     </GestureHandlerRootView>
   );
 }

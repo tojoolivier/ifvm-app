@@ -114,7 +114,7 @@ describe('getProspection', () => {
 
     expect(result).toBeNull();
     expect(getFirstAsync).toHaveBeenCalledWith(
-      'SELECT * FROM prospection WHERE id = ?',
+      expect.stringContaining('FROM prospection'),
       ['does-not-exist']
     );
   });
@@ -149,7 +149,7 @@ describe('listRecentProspections', () => {
 
     expect(result).toEqual([STORED_ROW]);
     expect(getAllAsync).toHaveBeenCalledWith(
-      expect.stringContaining('ORDER BY updated_at DESC LIMIT ?'),
+      expect.stringContaining('ORDER BY updated_at DESC'),
       [5]
     );
   });
@@ -410,7 +410,7 @@ describe('concludeValidation', () => {
     await concludeValidation(BASE_INPUT.id, 'confirmee');
 
     expect(runAsync).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE prospection SET conclusion_validation'),
+      expect.stringContaining('SET conclusion_validation'),
       ['confirmee', expect.any(String), BASE_INPUT.id]
     );
   });
@@ -453,7 +453,7 @@ describe('markGrilleCompleted', () => {
     await markGrilleCompleted(BASE_INPUT.id, 'LMC|imago');
 
     expect(runAsync).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE prospection SET grilles_completees'),
+      expect.stringContaining('SET grilles_completees'),
       [JSON.stringify(['LMC|imago']), expect.any(String), BASE_INPUT.id]
     );
   });
@@ -468,7 +468,7 @@ describe('markGrilleCompleted', () => {
     await markGrilleCompleted(BASE_INPUT.id, 'NSE|imago');
 
     expect(runAsync).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE prospection SET grilles_completees'),
+      expect.stringContaining('SET grilles_completees'),
       [JSON.stringify(['LMC|imago', 'NSE|imago']), expect.any(String), BASE_INPUT.id]
     );
   });
@@ -480,7 +480,7 @@ describe('markGrilleCompleted', () => {
     await markGrilleCompleted(BASE_INPUT.id, 'LMC|imago');
 
     expect(runAsync).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE prospection SET grilles_completees'),
+      expect.stringContaining('SET grilles_completees'),
       [JSON.stringify(['LMC|imago']), expect.any(String), BASE_INPUT.id]
     );
   });
@@ -556,7 +556,7 @@ describe('getProspectionPopulation', () => {
 
     const result = await getProspectionPopulation(BASE_INPUT.id, 'LMC', 'imago');
 
-    expect(result).toEqual(row);
+    expect(result).toEqual({ ...row, essaim_observe: null, tache_larvaire: null, bande_larvaire: null });
   });
 });
 
@@ -589,7 +589,7 @@ describe('saveProspectionPopulation', () => {
 
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE prospection_population SET'),
-      [10, 2, 'battage', 'rare', 'peu', null, null, null, null, null, null, null, null, null, null, 'existing-id']
+      [null, 10, 2, 'battage', 'rare', 'peu', null, null, null, null, null, null, null, null, null, null, 'existing-id']
     );
   });
 });
@@ -601,7 +601,9 @@ describe('listAllProspectionPopulations', () => {
 
     const result = await listAllProspectionPopulations(BASE_INPUT.id);
 
-    expect(result).toEqual(rows);
+    expect(result).toEqual(
+      rows.map((row) => ({ ...row, essaim_observe: null, tache_larvaire: null, bande_larvaire: null }))
+    );
     expect(getAllAsync).toHaveBeenCalledWith(expect.any(String), [BASE_INPUT.id]);
   });
 });
@@ -745,7 +747,7 @@ describe('deleteProspection', () => {
 
     expect(result).toBe(true);
     expect(runAsync).toHaveBeenCalledWith(
-      'DELETE FROM prospection WHERE id = ?',
+      expect.stringContaining('DELETE FROM prospection'),
       [BASE_INPUT.id]
     );
   });

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAsyncAction } from '@/hooks/use-async-action';
 import { accouplementOptionsFor } from '@/lib/prospection-especes-stades';
 import { accouplementInsight } from '@/lib/prospection-accouplement-insight';
 import { dominantPhenotype, rowsToCounts , useProspectionCaptureStore } from '@/lib/prospection-capture-store';
@@ -41,7 +42,7 @@ export default function AccouplementScreen() {
 
   const [population, setPopulation] = useState<PopulationRow | null>(null);
   const [dominant, setDominant] = useState<ReturnType<typeof dominantPhenotype>>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const { run, isRunning: isSaving } = useAsyncAction();
 
   useEffect(() => {
     if (!draftId || !grille) return;
@@ -79,19 +80,22 @@ export default function AccouplementScreen() {
     });
   };
 
-  const handleContinue = async () => {
-    if (!draftId || isSaving) return;
-    setIsSaving(true);
-    try {
-      await saveProspectionPopulation(draftId, population);
-      router.replace({
-        pathname: '/(prospection)/captures' as any,
-        params: { draftId, grilleIndex: String(requestedIndex) },
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const handleContinue = () =>
+    run(
+      async () => {
+        await saveProspectionPopulation(draftId, population);
+        router.replace({
+          pathname: '/(prospection)/captures' as any,
+          params: { draftId, grilleIndex: String(requestedIndex) },
+        });
+      },
+      {
+        screen: 'accouplement',
+        precondition: !!draftId,
+        preconditionMessage: 'Session de saisie perdue — revenez à l’écran précédent et réessayez.',
+        context: { draftId, espece: grille.espece, grilleIndex: requestedIndex },
+      }
+    );
 
   return (
     <View style={styles.root}>
