@@ -1,19 +1,33 @@
-name: Lint
+name: PR Validation
 
 on:
   pull_request:
     branches: [main]
 
 concurrency:
-  group: lint-${{ github.ref }}
+  group: pr-validation-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  lint-backend:
+  backend:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ifvm
+          POSTGRES_PASSWORD: ifvm_secret
+          POSTGRES_DB: ifvm_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -21,12 +35,13 @@ jobs:
         with:
           python-version: "3.12"
 
-      - run: pip install ruff
+      - run: pip install -r requirements-dev.txt
 
       - run: ruff check .
       - run: ruff format --check .
+      - run: pytest
 
-  lint-frontend:
+  frontend:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -42,8 +57,9 @@ jobs:
 
       - run: npm ci
       - run: npm run lint
+      - run: npm test
 
-  lint-mobile:
+  mobile:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -61,3 +77,4 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run check:schema-drift
+      - run: npm test
