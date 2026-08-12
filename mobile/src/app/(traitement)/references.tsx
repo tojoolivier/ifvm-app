@@ -9,10 +9,13 @@ import {
   updateTraitementReference,
   getTraitement,
 } from '@/lib/traitement-repository';
+import { getProspection } from '@/lib/prospection-repository';
+import { STATUT_VALIDE } from '@/lib/prospection-fiche-lecture';
 import { generateId } from '@/lib/id';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import { validateReferences } from '@/lib/traitement-validation';
 import { Card } from '@/components/traitement/Card';
+import { DateField } from '@/components/traitement/DateField';
 import { ProgressBar } from '@/components/traitement/ProgressBar';
 import { SegmentedControl } from '@/components/traitement/SegmentedControl';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
@@ -29,6 +32,15 @@ import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes
  * type-spécifiques ; l'écran C les complète ensuite via updateTraitementAerien/
  * updateTraitementTerrestre (ajoutés à traitement-repository.ts pour ce lot).
  */
+
+/** Formate une date ISO ("2026-07-30" ou "2026-07-30T10:00:00Z") en JJ/MM/AAAA pour l'affichage. */
+function formatDateFr(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const [year, month, day] = iso.split('T')[0].split('-');
+  if (!year || !month || !day) return null;
+  return `${day}/${month}/${year}`;
+}
+
 export default function ReferencesScreen() {
   const router = useRouter();
   const { prospectionId: routeProspectionId, traitementId: routeTraitementId, isValidationView } =
@@ -44,8 +56,11 @@ export default function ReferencesScreen() {
   const [isGpsLoading, setIsGpsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [prospectionStatut, setProspectionStatut] = useState<string | null>(null);
+  const [prospectionUpdatedAt, setProspectionUpdatedAt] = useState<string | null>(null);
 
   const readOnly = isValidationView === '1';
+  const hasGps = store.ref.latitude != null && store.ref.longitude != null;
 
   useEffect(() => {
     if (routeTraitementId) {
@@ -71,6 +86,15 @@ export default function ReferencesScreen() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeTraitementId]);
+
+  useEffect(() => {
+    if (!prospectionId) return;
+    getProspection(prospectionId).then((prospection) => {
+      if (!prospection) return;
+      setProspectionStatut(prospection.statut);
+      setProspectionUpdatedAt(prospection.updated_at);
+    });
+  }, [prospectionId]);
 
   const captureGps = async () => {
     setIsGpsLoading(true);
@@ -146,14 +170,21 @@ export default function ReferencesScreen() {
     }
   };
 
+  const regionDistrictCommune = [store.ref.region, store.ref.district, store.ref.commune].filter(Boolean).join(' · ');
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Retour">
+            <Text style={styles.backChevron}>‹</Text>
+          </TouchableOpacity>
+          <Text style={styles.title}>A — Type &amp; références</Text>
+        </View>
         <ProgressBar currentIndex={0} />
-        <Text style={styles.title}>Références</Text>
 
         <View style={styles.field}>
-          <Text style={styles.label}>Type de traitement*</Text>
+          <Text style={styles.label}>Type de traitement *</Text>
           <SegmentedControl
             options={[
               { value: 'AERIEN', label: 'Aérien' },
@@ -180,87 +211,83 @@ export default function ReferencesScreen() {
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.label}>N° de fiche</Text>
-          <Text style={styles.monoReadonly}>{store.ref.numeroFiche ?? 'généré à l’enregistrement'}</Text>
+          <Text style={styles.label}>N° de fiche (auto)</Text>
+          <Card variant="default" style={styles.ficheCard}>
+            <Text style={styles.monoReadonly}>{store.ref.numeroFiche ?? '(généré à la saisie)'}</Text>
+            <Text style={styles.note}>Prénom du chef — Type — Date ISO, suffixe en cas de collision.</Text>
+          </Card>
         </View>
 
         <View style={styles.row}>
           <View style={[styles.field, styles.flex1]}>
-            <Text style={styles.label}>Date de traitement*</Text>
-            <TextInput
+            <Text style={styles.label}>Date de traitement *</Text>
+            <DateField
               editable={!readOnly}
-              style={styles.input}
-              placeholder="AAAA-MM-JJ"
-              value={store.ref.dateTraitement ?? ''}
-              onChangeText={(v) => store.updateRef({ dateTraitement: v })}
+              value={store.ref.dateTraitement ?? null}
+              onChange={(v) => store.updateRef({ dateTraitement: v })}
             />
           </View>
           <View style={[styles.field, styles.flex1]}>
-            <Text style={styles.label}>Date de validation*</Text>
-            <TextInput
-              editable={!readOnly}
-              style={styles.input}
-              placeholder="AAAA-MM-JJ"
-              value={dateValidation ?? ''}
-              onChangeText={setDateValidation}
-            />
+            <Text style={styles.label}>Date de validation *</Text>
+            <DateField editable={!readOnly} value={dateValidation} onChange={setDateValidation} />
           </View>
         </View>
         {errors.dateTraitement && <Text style={styles.error}>{errors.dateTraitement}</Text>}
         {errors.dateValidation && <Text style={styles.error}>{errors.dateValidation}</Text>}
 
         <View style={styles.field}>
-          <Text style={styles.label}>Fiche de prospection liée*</Text>
+          <Text style={styles.label}>Fiche de prospection liée *</Text>
           <Card variant="default" style={styles.prospectionCard}>
+            <Text style={styles.label}>N° fiche de prospection</Text>
             <Text style={styles.prospectionText}>{prospectionId ?? '—'}</Text>
+            <Text style={styles.note}>
+              {prospectionStatut === STATUT_VALIDE && prospectionUpdatedAt
+                ? `Validée le ${formatDateFr(prospectionUpdatedAt)} · lecture seule`
+                : 'Lecture seule'}
+            </Text>
           </Card>
           {errors.prospectionId && <Text style={styles.error}>{errors.prospectionId}</Text>}
         </View>
 
         <View style={styles.field}>
           <Text style={styles.label}>Localisation</Text>
-          <TouchableOpacity style={styles.gpsButton} onPress={captureGps} disabled={readOnly || isGpsLoading}>
-            <Text style={styles.gpsButtonText}>📍 {isGpsLoading ? 'Capture GPS en cours…' : 'Capturer la position'}</Text>
+          <TouchableOpacity style={styles.gpsRow} onPress={captureGps} disabled={readOnly || isGpsLoading}>
+            <Text style={styles.gpsRowText}>GPS &amp; géocodage inverse</Text>
+            <Text style={[styles.gpsStatus, hasGps && styles.gpsStatusActive]}>
+              {isGpsLoading ? 'Localisation…' : hasGps ? '📍 Localisé' : 'Localiser'}
+            </Text>
           </TouchableOpacity>
-          <Text style={styles.note}>
-            {store.ref.latitude != null && store.ref.longitude != null
-              ? `${store.ref.latitude.toFixed(5)}, ${store.ref.longitude.toFixed(5)} · alt. ${store.ref.altitude ?? '—'} m`
-              : 'Position non capturée'}
-          </Text>
-          <TextInput
-            editable={!readOnly}
-            style={styles.input}
-            placeholder="Région"
-            value={store.ref.region ?? ''}
-            onChangeText={(v) => store.updateRef({ region: v })}
-          />
-          <TextInput
-            editable={!readOnly}
-            style={styles.input}
-            placeholder="District"
-            value={store.ref.district ?? ''}
-            onChangeText={(v) => store.updateRef({ district: v })}
-          />
-          <TextInput
-            editable={!readOnly}
-            style={styles.input}
-            placeholder="Commune"
-            value={store.ref.commune ?? ''}
-            onChangeText={(v) => store.updateRef({ commune: v })}
-          />
-          <TextInput
-            editable={!readOnly}
-            style={styles.input}
-            placeholder="Localité*"
-            value={store.ref.localite ?? ''}
-            onChangeText={(v) => store.updateRef({ localite: v })}
-          />
+
+          <Card variant="info" style={styles.coordCard}>
+            <Text style={styles.label}>Coord. (auto) · altitude</Text>
+            <Text style={styles.coordValue}>
+              {hasGps
+                ? `${store.ref.latitude!.toFixed(4)}, ${store.ref.longitude!.toFixed(4)} · ${store.ref.altitude ?? '—'} m`
+                : 'Position non capturée'}
+            </Text>
+          </Card>
+
+          <Card variant="default" style={styles.regionCard}>
+            <Text style={styles.label}>Région · district · commune (auto, hors-ligne)</Text>
+            <Text style={styles.coordValue}>{regionDistrictCommune || '—'}</Text>
+          </Card>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Localité * (saisie manuelle)</Text>
+            <TextInput
+              editable={!readOnly}
+              style={styles.input}
+              placeholder="Localité"
+              value={store.ref.localite ?? ''}
+              onChangeText={(v) => store.updateRef({ localite: v })}
+            />
+          </View>
           {errors.localite && <Text style={styles.error}>{errors.localite}</Text>}
         </View>
 
         {!readOnly && (
           <TouchableOpacity style={styles.continueButton} onPress={handleContinuer} disabled={isSaving}>
-            <Text style={styles.continueButtonText}>{isSaving ? 'Enregistrement…' : 'Continuer  ›'}</Text>
+            <Text style={styles.continueButtonText}>{isSaving ? 'Enregistrement…' : 'Continuer — Cibles ›'}</Text>
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -271,11 +298,19 @@ export default function ReferencesScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: traitementColors.fondApp },
   content: { padding: 16, gap: 14 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  backChevron: { fontFamily: traitementFonts.uiExtraBold, fontSize: traitementTypeSizes.titreEcran + 6, color: traitementColors.texteTitre },
   title: { fontFamily: traitementFonts.uiExtraBold, fontSize: traitementTypeSizes.titreEcran, color: traitementColors.texteTitre },
   field: { gap: 5 },
   row: { flexDirection: 'row', gap: 8 },
   flex1: { flex: 1 },
-  label: { fontFamily: traitementFonts.uiMedium, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
+  label: {
+    fontFamily: traitementFonts.uiSemiBold,
+    fontSize: traitementTypeSizes.label,
+    color: traitementColors.texteLabel,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
   note: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.label, color: traitementColors.texteNote },
   input: {
     minHeight: 44,
@@ -290,16 +325,16 @@ const styles = StyleSheet.create({
   },
   monoReadonly: { fontFamily: traitementFonts.mono, fontSize: traitementTypeSizes.corps, color: traitementColors.texteSecondaire },
   error: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.label, color: traitementColors.erreurTexte },
-  prospectionCard: { borderWidth: 2, borderColor: traitementColors.vertPrincipal },
-  prospectionText: { fontFamily: traitementFonts.mono, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre },
-  gpsButton: {
-    minHeight: 44,
-    justifyContent: 'center',
-    backgroundColor: traitementColors.infoFond,
-    borderRadius: traitementRadii.chip,
-    paddingHorizontal: 10,
-  },
-  gpsButtonText: { fontFamily: traitementFonts.uiMedium, fontSize: traitementTypeSizes.corps, color: traitementColors.vertPrincipal },
+  ficheCard: { gap: 4 },
+  prospectionCard: { borderWidth: 2, borderColor: traitementColors.vertPrincipal, gap: 4 },
+  prospectionText: { fontFamily: traitementFonts.monoBold, fontSize: traitementTypeSizes.valeurDerivee, color: traitementColors.texteTitre },
+  gpsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 32 },
+  gpsRowText: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.corps, color: traitementColors.texteSecondaire },
+  gpsStatus: { fontFamily: traitementFonts.uiSemiBold, fontSize: traitementTypeSizes.corps, color: traitementColors.texteLabel },
+  gpsStatusActive: { color: traitementColors.vertPrincipal },
+  coordCard: { gap: 4 },
+  coordValue: { fontFamily: traitementFonts.monoBold, fontSize: traitementTypeSizes.corps + 1, color: traitementColors.texteTitre },
+  regionCard: { gap: 4 },
   continueButton: {
     minHeight: 44,
     justifyContent: 'center',

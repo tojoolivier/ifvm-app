@@ -137,6 +137,8 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                 densite_groupee=p.densite_groupee,
                 captures_nombre=p.captures_nombre,
                 temps_capture=p.temps_capture,
+                methode=p.methode,
+                phase=p.phase,
                 accouplement=p.accouplement,
                 ponte=p.ponte,
                 captures_sol=p.captures_sol,
@@ -185,6 +187,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                 direction_vers=i.direction_vers,
                 vent_de=i.vent_de,
                 vent_vitesse=i.vent_vitesse,
+                surf_infestee_pourcent=i.surf_infestee_pourcent,
                 # ==========================================
                 # NOUVEAUX CHAMPS - Imagos (B)
                 # ==========================================
@@ -200,6 +203,9 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                 # ==========================================
                 nb_taches_bandes=i.nb_taches_bandes,
                 interdistance_m=i.interdistance_m,
+                interdistance_min=i.interdistance_min,
+                interdistance_max=i.interdistance_max,
+                interdistance_moy=i.interdistance_moy,
                 surface_contaminee_ha=i.surface_contaminee_ha,
                 type_larve=i.type_larve,
             )
@@ -409,6 +415,8 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                     else None,
                     captures_nombre=p.captures_nombre,
                     temps_capture=p.temps_capture,
+                    methode=p.methode,
+                    phase=p.phase,
                     accouplement=p.accouplement,
                     ponte=p.ponte,
                     captures_sol=p.captures_sol,
@@ -456,6 +464,9 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                     direction_vers=i.direction_vers,
                     vent_de=i.vent_de,
                     vent_vitesse=float(i.vent_vitesse) if i.vent_vitesse is not None else None,
+                    surf_infestee_pourcent=float(i.surf_infestee_pourcent)
+                    if i.surf_infestee_pourcent is not None
+                    else None,
                     # ==========================================
                     # NOUVEAUX CHAMPS - Imagos (B)
                     # ==========================================
@@ -474,6 +485,15 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                     nb_taches_bandes=i.nb_taches_bandes,
                     interdistance_m=float(i.interdistance_m)
                     if i.interdistance_m is not None
+                    else None,
+                    interdistance_min=float(i.interdistance_min)
+                    if i.interdistance_min is not None
+                    else None,
+                    interdistance_max=float(i.interdistance_max)
+                    if i.interdistance_max is not None
+                    else None,
+                    interdistance_moy=float(i.interdistance_moy)
+                    if i.interdistance_moy is not None
                     else None,
                     surface_contaminee_ha=float(i.surface_contaminee_ha)
                     if i.surface_contaminee_ha is not None

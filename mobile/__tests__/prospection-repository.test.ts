@@ -589,7 +589,7 @@ describe('saveProspectionPopulation', () => {
 
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE prospection_population SET'),
-      [null, 10, 2, 'battage', 'rare', 'peu', null, null, null, null, null, null, null, null, null, null, 'existing-id']
+      [null, null, null, 10, 2, 'battage', 'rare', 'peu', null, null, null, null, null, null, null, null, null, null, 'existing-id']
     );
   });
 });

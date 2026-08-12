@@ -31,6 +31,8 @@ class ProspectionPopulation:
     densite_groupee: float | None = None
     captures_nombre: int | None = None
     temps_capture: int | None = None
+    methode: str | None = None
+    phase: str | None = None
     accouplement: str | None = None
     ponte: str | None = None
 
@@ -102,6 +104,9 @@ class ProspectionInfestation:
     # ==========================================
     nb_taches_bandes: int | None = None
     interdistance_m: float | None = None
+    interdistance_min: float | None = None
+    interdistance_max: float | None = None
+    interdistance_moy: float | None = None
     surface_contaminee_ha: float | None = None
     type_larve: str | None = None
 
