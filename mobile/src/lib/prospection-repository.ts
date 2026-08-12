@@ -934,6 +934,8 @@ export async function saveProspectionPopulation(
     await db.runAsync(
       `UPDATE prospection_population SET
         phase = ?,
+        captures_nombre = ?,
+        temps_capture = ?,
         densite_diffuse = ?,
         densite_groupee = ?,
         methode = ?,
@@ -952,6 +954,8 @@ export async function saveProspectionPopulation(
        WHERE id = ?`,
       [
         row.phase ?? null,
+        row.captures_nombre ?? null,
+        row.temps_capture ?? null,
         row.densite_diffuse,
         row.densite_groupee,
         row.methode,
@@ -972,6 +976,8 @@ export async function saveProspectionPopulation(
       espece,
       categorie,
       phase,
+      captures_nombre,
+      temps_capture,
       densite_diffuse,
       densite_groupee,
       methode,
@@ -989,8 +995,8 @@ export async function saveProspectionPopulation(
       deplacement
     )
     VALUES (
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
     )`,
     [
       generateId(),
@@ -998,6 +1004,8 @@ export async function saveProspectionPopulation(
       row.espece,
       row.categorie,
       row.phase ?? null,
+      row.captures_nombre ?? null,
+      row.temps_capture ?? null,
       row.densite_diffuse,
       row.densite_groupee,
       row.methode,
@@ -1168,7 +1176,7 @@ export async function saveProspectionInfestation(
     VALUES (
       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
     )`,
     [
       generateId(),
