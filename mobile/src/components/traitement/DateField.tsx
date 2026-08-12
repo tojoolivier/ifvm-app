@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Text, TouchableOpacity, View, StyleSheet, Platform } from 'react-native';
+import { Text, TouchableOpacity, View, StyleSheet, Platform, Modal } from 'react-native';
 import DateTimePicker, { DateTimePickerChangeEvent } from '@react-native-community/datetimepicker';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from './tokens';
 
@@ -50,16 +50,34 @@ export function DateField({ value, onChange, editable = true, placeholder = 'JJ/
       >
         <Text style={value ? styles.value : styles.placeholder}>{value ? formatDateFr(value) : placeholder}</Text>
       </TouchableOpacity>
-      {show && (
-        <DateTimePicker
-          value={value ? fromIsoDate(value) : new Date()}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'inline' : 'calendar'}
-          minimumDate={minimumDate}
-          maximumDate={maximumDate}
-          onValueChange={onValueChange}
-          onDismiss={() => setShow(false)}
-        />
+      {show && Platform.OS === 'ios' ? (
+        <Modal transparent animationType="fade" onRequestClose={() => setShow(false)}>
+          <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={() => setShow(false)}>
+            <TouchableOpacity activeOpacity={1} style={styles.calendarCard} onPress={() => {}}>
+              <DateTimePicker
+                value={value ? fromIsoDate(value) : new Date()}
+                mode="date"
+                display="inline"
+                minimumDate={minimumDate}
+                maximumDate={maximumDate}
+                onValueChange={onValueChange}
+                onDismiss={() => setShow(false)}
+              />
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
+      ) : (
+        show && (
+          <DateTimePicker
+            value={value ? fromIsoDate(value) : new Date()}
+            mode="date"
+            display="calendar"
+            minimumDate={minimumDate}
+            maximumDate={maximumDate}
+            onValueChange={onValueChange}
+            onDismiss={() => setShow(false)}
+          />
+        )
       )}
     </View>
   );
@@ -77,4 +95,16 @@ const styles = StyleSheet.create({
   },
   value: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre },
   placeholder: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.corps, color: traitementColors.texteLabel },
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  calendarCard: {
+    backgroundColor: '#fff',
+    borderRadius: traitementRadii.chip,
+    padding: 8,
+    overflow: 'hidden',
+  },
 });
