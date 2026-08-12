@@ -74,6 +74,11 @@
     "check:schema-drift": "node scripts/check-schema-drift.js"
   },
   "private": true,
+  "overrides": {
+    "openapi-typescript": {
+      "typescript": "$typescript"
+    }
+  },
   "expo": {
     "slug": "ifvm-mobile",
     "name": "IFVM Mobile"
