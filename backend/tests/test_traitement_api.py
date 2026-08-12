@@ -1,6 +1,6 @@
 import copy
 import uuid
-from datetime import date
+from datetime import date, datetime, timedelta
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -1161,3 +1161,174 @@ async def test_modifier_fiche_terrestre_validee_rejetee_sur_tous_les_writes_403(
         f"/traitements/{traitement_id}/produits/{produit_id}", headers=auth_headers
     )
     assert resp_delete.status_code == 403
+
+
+# ==========================================
+# POST /traitements/sync — synchronisation offline (ADR-002 / décision #60)
+# ==========================================
+
+
+def _payload_sync(fiche_id, prospection_id, base_updated_at, **overrides):
+    payload = {
+        "id": str(fiche_id),
+        "base_updated_at": base_updated_at.isoformat(),
+        "prospection_id": str(prospection_id),
+        "date_traitement": "2026-08-11",
+        "date_validation": "2026-08-12",
+        "localite": "Betioky",
+        "terrestre": {
+            "heure_debut": "06:00:00",
+            "heure_fin": "09:00:00",
+            "vitesse_vent_ms": 1.5,
+            "temperature_c": 24.0,
+            "chef_equipe_id": None,  # injecté par l'appelant
+        },
+    }
+    payload.update({k: v for k, v in overrides.items() if k != "terrestre"})
+    if "terrestre" in overrides:
+        payload["terrestre"].update(overrides["terrestre"])
+    return payload
+
+
+@pytest.mark.asyncio
+async def test_sync_push_cree_fiche_inconnue_201(
+    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe
+):
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    fiche_id = uuid.uuid4()
+    payload = _payload_sync(
+        fiche_id,
+        prospection_id,
+        base_updated_at=datetime.utcnow(),
+        terrestre={"chef_equipe_id": str(chef_equipe.id)},
+    )
+    resp = await client.post("/traitements/sync", json=payload, headers=auth_headers)
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["id"] == str(fiche_id)
+    assert body["statut_sync"] == "synced"
+
+
+@pytest.mark.asyncio
+async def test_sync_deux_appareils_meme_id_contenu_divergent_rejette_409_conflict(
+    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe
+):
+    """Critère d'acceptation : deux appareils créant la même fiche hors-ligne (même id)
+    avec un contenu divergent -> la seconde synchronisation est rejetée (409), marquée
+    `conflict`, sans écraser la première."""
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    fiche_id = uuid.uuid4()
+    t0 = datetime.utcnow()
+
+    premier = await client.post(
+        "/traitements/sync",
+        json=_payload_sync(
+            fiche_id,
+            prospection_id,
+            base_updated_at=t0,
+            terrestre={"chef_equipe_id": str(chef_equipe.id)},
+        ),
+        headers=auth_headers,
+    )
+    assert premier.status_code == 201, premier.text
+
+    second = await client.post(
+        "/traitements/sync",
+        json=_payload_sync(
+            fiche_id,
+            prospection_id,
+            base_updated_at=t0 - timedelta(minutes=5),  # jamais lu la version serveur
+            localite="Ampanihy",  # contenu divergent
+            terrestre={"chef_equipe_id": str(chef_equipe.id)},
+        ),
+        headers=auth_headers,
+    )
+    assert second.status_code == 409, second.text
+    body_conflit = second.json()
+    assert body_conflit["statut_sync"] == "conflict"
+    assert body_conflit["localite"] == "Betioky"  # la première version n'est pas écrasée
+
+    verification = await client.get(f"/traitements/{fiche_id}", headers=auth_headers)
+    assert verification.json()["localite"] == "Betioky"
+    assert verification.json()["statut_sync"] == "conflict"
+
+
+@pytest.mark.asyncio
+async def test_sync_fiche_validee_rejette_systematiquement_sans_jamais_passer_par_conflict(
+    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe
+):
+    """Critère d'acceptation : une fiche serveur déjà `validee` rejette systématiquement
+    toute divergence entrante, sans jamais passer par `conflict`."""
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    fiche_id = uuid.uuid4()
+    t0 = datetime.utcnow()
+
+    cree = await client.post(
+        "/traitements/sync",
+        json=_payload_sync(
+            fiche_id,
+            prospection_id,
+            base_updated_at=t0,
+            terrestre={"chef_equipe_id": str(chef_equipe.id)},
+        ),
+        headers=auth_headers,
+    )
+    assert cree.status_code == 201, cree.text
+
+    validee = await client.post(
+        f"/traitements/{fiche_id}/valider",
+        json={
+            "date_validation": "2026-08-13",
+            "signatures": [{"role": "CHEF_EQUIPE", "signataire_nom": "Hery"}],
+        },
+        headers=auth_headers,
+    )
+    assert validee.status_code == 200, validee.text
+    updated_at_apres_validation = validee.json()["updated_at"]
+
+    resync = await client.post(
+        "/traitements/sync",
+        json=_payload_sync(
+            fiche_id,
+            prospection_id,
+            base_updated_at=t0,
+            localite="Ampanihy",
+            terrestre={"chef_equipe_id": str(chef_equipe.id)},
+        ),
+        headers=auth_headers,
+    )
+    assert resync.status_code == 409, resync.text
+    assert resync.json()["localite"] == "Betioky"
+
+    verification = await client.get(f"/traitements/{fiche_id}", headers=auth_headers)
+    # jamais 'conflict' sur une fiche verrouillée
+    assert verification.json()["statut_sync"] == "synced"
+    assert verification.json()["updated_at"] == updated_at_apres_validation
+
+
+@pytest.mark.asyncio
+async def test_sync_renvoi_reseau_contenu_identique_traite_synced_sans_conflit(
+    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe
+):
+    """Critère d'acceptation : un renvoi réseau (même id, contenu identique) est traité
+    `synced` sans conflit."""
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    fiche_id = uuid.uuid4()
+    t0 = datetime.utcnow()
+    payload = _payload_sync(
+        fiche_id,
+        prospection_id,
+        base_updated_at=t0,
+        terrestre={"chef_equipe_id": str(chef_equipe.id)},
+    )
+
+    premier = await client.post("/traitements/sync", json=payload, headers=auth_headers)
+    assert premier.status_code == 201, premier.text
+    updated_at_serveur = premier.json()["updated_at"]
+
+    renvoi = payload.copy()
+    renvoi["base_updated_at"] = updated_at_serveur
+    resp = await client.post("/traitements/sync", json=renvoi, headers=auth_headers)
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["statut_sync"] == "synced"

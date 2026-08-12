@@ -1,5 +1,6 @@
+import copy
 import uuid
-from datetime import date, time
+from datetime import date, datetime, time
 
 import pytest
 
@@ -10,6 +11,7 @@ from app.application.traitement_use_cases import (
     CreateTraitementTerrestre,
     RemoveProduitUtilise,
     RemoveRotation,
+    SyncPushTraitementTerrestre,
     UpdateRotation,
     ValiderTraitement,
 )
@@ -30,9 +32,12 @@ from app.domain.traitement import (
     TraitementIntrouvableError,
     TraitementOrigineDejaUtiliseeError,
     TraitementOrigineIntrouvableError,
+    TraitementSyncConflitError,
     TraitementTerrestre,
+    TraitementValideeSyncRejeteError,
     TraitementVerrouilleError,
     construire_cible,
+    contenu_diverge,
     generer_numero_fiche,
 )
 from app.domain.utilisateur import UtilisateurRef
@@ -1150,3 +1155,313 @@ async def test_valider_traitement_use_case_introuvable():
         await use_case.execute(
             traitement_id=uuid.uuid4(), date_validation=date(2026, 8, 12), signatures=[]
         )
+
+
+# ==========================================
+# contenu_diverge (synchronisation — décision #60)
+# ==========================================
+
+
+def _traitement_terrestre_sync(**overrides) -> Traitement:
+    """Traitement TERRESTRE avec tous les champs de contenu explicites, pour tests
+    de comparaison à deux versions (existant/entrant) — chaque champ doit être fixé
+    pour éviter que default_factory(uuid4) crée une divergence artificielle."""
+    args = dict(
+        id=uuid.uuid4(),
+        prospection_id=uuid.uuid4(),
+        numero_fiche="Hery-Terrestre-2026-08-11",
+        mode_traitement=None,
+        date_traitement=date(2026, 8, 11),
+        date_validation=date(2026, 8, 12),
+        localite="Betioky",
+        region=None,
+        district=None,
+        commune=None,
+        latitude=None,
+        longitude=None,
+        altitude=None,
+        kit_combinaison=False,
+        kit_gants=False,
+        kit_lunettes=False,
+        kit_masques=False,
+        kit_boite=False,
+        zones_exposees=None,
+        hauteur_strate_herbeuse_m=None,
+        hauteur_strate_arboree_m=None,
+        recouvrement_percent=None,
+        empoisonnement=False,
+        empoisonnement_type=None,
+        empoisonnement_mode=None,
+        empoisonnement_autre=None,
+        evaluation_risque=None,
+        comportement_anormal=False,
+        comportement_non_cibles=None,
+        mortalite=False,
+        mortalite_familles=None,
+        statut="brouillon",
+        statut_sync="local",
+        created_at=datetime(2026, 8, 11, 7, 0),
+        updated_at=datetime(2026, 8, 11, 7, 0),
+    )
+    terrestre_args = dict(
+        heure_debut=time(6, 0),
+        heure_fin=time(9, 0),
+        vitesse_vent_ms=1.5,
+        direction_vent=None,
+        temperature_c=24.0,
+        reprise_traitement=False,
+        traitement_origine_id=None,
+        chef_equipe_id=uuid.uuid4(),
+        agent_encadreur_id=None,
+        consultant_international=None,
+        surface_atomiseur_ha=10.0,
+        surface_disque_rotatif_ha=None,
+        surface_ulvamast_ha=None,
+        surface_restante_abandonnee=None,
+        motif_surface_restante_abandonnee=None,
+        essence_litres=None,
+        nb_piles=None,
+    )
+    for cle, valeur in overrides.items():
+        if cle in terrestre_args:
+            terrestre_args[cle] = valeur
+        elif cle in args:
+            args[cle] = valeur
+    return Traitement(
+        type_traitement="TERRESTRE", terrestre=TraitementTerrestre(**terrestre_args), **args
+    )
+
+
+def test_contenu_diverge_identique_renvoi_reseau():
+    existant = _traitement_terrestre_sync()
+    entrant = copy.deepcopy(existant)
+    assert contenu_diverge(existant, entrant) is False
+
+
+def test_contenu_diverge_champ_commun_different():
+    existant = _traitement_terrestre_sync()
+    entrant = _traitement_terrestre_sync(localite="Ampanihy")
+    assert contenu_diverge(existant, entrant) is True
+
+
+def test_contenu_diverge_champ_terrestre_different():
+    existant = _traitement_terrestre_sync()
+    entrant = _traitement_terrestre_sync(surface_atomiseur_ha=99.0)
+    assert contenu_diverge(existant, entrant) is True
+
+
+def test_contenu_diverge_champ_aerien_different():
+    existant = _traitement_aerien_valide(pilote="J. Dupont")
+    entrant = _traitement_aerien_valide(pilote="Autre Pilote")
+    assert contenu_diverge(existant, entrant) is True
+
+
+def test_contenu_diverge_ignore_statut_sync_et_updated_at():
+    existant = _traitement_terrestre_sync(statut_sync="local")
+    entrant = copy.deepcopy(existant)
+    entrant.statut_sync = "synced"
+    entrant.updated_at = existant.updated_at.replace(year=existant.updated_at.year + 1)
+    assert contenu_diverge(existant, entrant) is False
+
+
+# ==========================================
+# SyncPushTraitementTerrestre (synchronisation offline — décision #60)
+# ==========================================
+
+
+class FakeTraitementRepoSync:
+    def __init__(self, existant: Traitement | None = None):
+        self.existant = existant
+        self.crees: list[Traitement] = []
+        self.synced: list[Traitement] = []
+        self.conflicts_marques: list[uuid.UUID] = []
+
+    async def get_by_id(self, traitement_id):
+        if self.existant is not None and traitement_id == self.existant.id:
+            return self.existant
+        return None
+
+    async def create(self, traitement: Traitement) -> Traitement:
+        self.crees.append(traitement)
+        return traitement
+
+    async def list_by_filters(self, **kwargs):
+        return []
+
+    async def origine_deja_utilisee(self, traitement_origine_id, exclude_traitement_id=None):
+        return False
+
+    async def update_sync(self, traitement: Traitement) -> Traitement:
+        traitement.statut_sync = "synced"
+        self.synced.append(traitement)
+        return traitement
+
+    async def marquer_conflict(self, traitement_id):
+        self.conflicts_marques.append(traitement_id)
+        self.existant.statut_sync = "conflict"
+        return self.existant
+
+
+_CHEF_EQUIPE = UtilisateurRef(id=uuid.uuid4(), prenom="Hery", role="chef_equipe")
+_PROSPECTION_ID_SYNC = uuid.uuid4()
+
+
+def _sync_terrestre_args(fiche_id, base_updated_at, **overrides):
+    args = dict(
+        traitement_id=fiche_id,
+        base_updated_at=base_updated_at,
+        prospection_id=_PROSPECTION_ID_SYNC,
+        date_traitement=date(2026, 8, 11),
+        date_validation=date(2026, 8, 12),
+        localite="Betioky",
+        heure_debut=time(6, 0),
+        heure_fin=time(9, 0),
+        vitesse_vent_ms=1.5,
+        temperature_c=24.0,
+        chef_equipe_id=_CHEF_EQUIPE.id,
+        surface_atomiseur_ha=10.0,
+        surface_restante_abandonnee=False,
+        numero_fiche="Hery-Terrestre-2026-08-11",
+    )
+    args.update(overrides)
+    return args
+
+
+def _sync_use_case(existant: Traitement | None = None):
+    repo = FakeTraitementRepoSync(existant=existant)
+    return (
+        SyncPushTraitementTerrestre(
+            traitement_repository=repo,
+            prospection_repository=FakeProspectionRepo(
+                _prospection(id=_PROSPECTION_ID_SYNC, surf_infestee=100.0)
+            ),
+            utilisateur_repository=FakeUtilisateurRepo(_CHEF_EQUIPE),
+        ),
+        repo,
+    )
+
+
+@pytest.mark.asyncio
+async def test_sync_push_terrestre_creation_id_inconnu():
+    fiche_id = uuid.uuid4()
+    use_case, repo = _sync_use_case(existant=None)
+
+    traitement, cree = await use_case.execute(
+        **_sync_terrestre_args(fiche_id, base_updated_at=datetime.utcnow())
+    )
+
+    assert cree is True
+    assert traitement.statut_sync == "synced"
+    assert repo.crees == [traitement]
+
+
+@pytest.mark.asyncio
+async def test_sync_push_terrestre_resync_sans_numero_fiche_regenere_a_l_identique():
+    """Une resync sans `numero_fiche` fourni le régénère de façon déterministe
+    (prénom+date+type, sans suffixe) — ne doit jamais provoquer un faux conflit tant que
+    chef_equipe_id/date_traitement n'ont pas changé."""
+    fiche_id = uuid.uuid4()
+    ancien_updated_at = datetime(2026, 8, 11, 8, 0)
+    updated_at_serveur = datetime(2026, 8, 11, 9, 0)
+    args = _sync_terrestre_args(fiche_id, base_updated_at=ancien_updated_at)
+    args.pop("numero_fiche")
+
+    existant = _traitement_terrestre_sync(
+        id=fiche_id,
+        prospection_id=args["prospection_id"],
+        numero_fiche="Hery-Terrestre-2026-08-11",
+        localite=args["localite"],
+        chef_equipe_id=args["chef_equipe_id"],
+        surface_atomiseur_ha=args["surface_atomiseur_ha"],
+        surface_restante_abandonnee=args["surface_restante_abandonnee"],
+        statut_sync="synced",
+        updated_at=updated_at_serveur,
+    )
+    use_case, repo = _sync_use_case(existant=existant)
+
+    traitement, cree = await use_case.execute(**args)
+
+    assert cree is False
+    assert traitement.statut_sync == "synced"
+    assert repo.conflicts_marques == []
+
+
+@pytest.mark.asyncio
+async def test_sync_push_terrestre_renvoi_reseau_sans_conflit():
+    """Contenu identique, updated_at serveur postérieur au updated_at connu du client :
+    simple renvoi réseau (décision #60), traité `synced` sans conflit."""
+    fiche_id = uuid.uuid4()
+    ancien_updated_at = datetime(2026, 8, 11, 8, 0)
+    updated_at_serveur = datetime(2026, 8, 11, 9, 0)
+    args = _sync_terrestre_args(fiche_id, base_updated_at=ancien_updated_at)
+
+    existant = _traitement_terrestre_sync(
+        id=fiche_id,
+        prospection_id=args["prospection_id"],
+        numero_fiche=args["numero_fiche"],
+        localite=args["localite"],
+        chef_equipe_id=args["chef_equipe_id"],
+        surface_atomiseur_ha=args["surface_atomiseur_ha"],
+        surface_restante_abandonnee=args["surface_restante_abandonnee"],
+        statut_sync="synced",
+        updated_at=updated_at_serveur,
+    )
+    use_case, repo = _sync_use_case(existant=existant)
+
+    traitement, cree = await use_case.execute(**args)
+
+    assert cree is False
+    assert traitement.statut_sync == "synced"
+    assert repo.conflicts_marques == []
+
+
+@pytest.mark.asyncio
+async def test_sync_push_terrestre_conflit_contenu_divergent():
+    """updated_at serveur postérieur ET contenu divergent -> 409, statut_sync=conflict."""
+    fiche_id = uuid.uuid4()
+    ancien_updated_at = datetime(2026, 8, 11, 8, 0)
+    updated_at_serveur = datetime(2026, 8, 11, 9, 0)
+    args = _sync_terrestre_args(fiche_id, base_updated_at=ancien_updated_at)
+
+    existant = _traitement_terrestre_sync(
+        id=fiche_id,
+        prospection_id=args["prospection_id"],
+        numero_fiche=args["numero_fiche"],
+        localite="Modifiee par le superviseur",
+        chef_equipe_id=args["chef_equipe_id"],
+        surface_atomiseur_ha=args["surface_atomiseur_ha"],
+        statut_sync="synced",
+        updated_at=updated_at_serveur,
+    )
+    use_case, repo = _sync_use_case(existant=existant)
+
+    with pytest.raises(TraitementSyncConflitError) as exc_info:
+        await use_case.execute(**args)
+
+    assert repo.conflicts_marques == [fiche_id]
+    assert exc_info.value.traitement_serveur.statut_sync == "conflict"
+
+
+@pytest.mark.asyncio
+async def test_sync_push_terrestre_fiche_validee_rejetee_sans_comparaison():
+    """Une fiche déjà `validee` rejette systématiquement, sans jamais passer par conflict."""
+    fiche_id = uuid.uuid4()
+    args = _sync_terrestre_args(fiche_id, base_updated_at=datetime.utcnow())
+
+    existant = _traitement_terrestre_sync(
+        id=fiche_id,
+        prospection_id=args["prospection_id"],
+        numero_fiche=args["numero_fiche"],
+        localite="Autre chose",
+        chef_equipe_id=args["chef_equipe_id"],
+        statut="validee",
+        statut_sync="synced",
+        updated_at=datetime(2026, 8, 11, 9, 0),
+    )
+    use_case, repo = _sync_use_case(existant=existant)
+
+    with pytest.raises(TraitementValideeSyncRejeteError):
+        await use_case.execute(**args)
+
+    assert repo.conflicts_marques == []
+    assert existant.statut_sync == "synced"

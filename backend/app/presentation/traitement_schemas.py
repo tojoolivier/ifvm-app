@@ -126,6 +126,15 @@ class TraitementCreate(BaseModel):
         return self
 
 
+class TraitementSyncPush(TraitementCreate):
+    """Payload de push offline (ADR-002 / décision #60) : l'`id` est généré côté client au
+    moment de la création hors-ligne ; `base_updated_at` porte le `updated_at` connu du
+    client au moment de sa dernière lecture, utilisé pour la détection de conflit."""
+
+    id: uuid.UUID
+    base_updated_at: datetime
+
+
 class CibleRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

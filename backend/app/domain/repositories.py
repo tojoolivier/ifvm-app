@@ -88,8 +88,13 @@ class TraitementRepository(ABC):
         pass
 
     @abstractmethod
-    async def origine_deja_utilisee(self, traitement_origine_id: uuid.UUID) -> bool:
-        """True si une fiche terrestre désigne déjà `traitement_origine_id` comme origine."""
+    async def origine_deja_utilisee(
+        self, traitement_origine_id: uuid.UUID, exclude_traitement_id: uuid.UUID | None = None
+    ) -> bool:
+        """True si une fiche terrestre (autre que `exclude_traitement_id`) désigne déjà
+        `traitement_origine_id` comme origine. `exclude_traitement_id` permet à la
+        synchronisation de revalider une fiche déjà persistée sans se heurter à sa propre
+        désignation d'origine."""
         pass
 
     @abstractmethod
@@ -147,6 +152,18 @@ class TraitementRepository(ABC):
         date_validation: date,
         signatures: list[TraitementSignature],
     ) -> Traitement:
+        pass
+
+    @abstractmethod
+    async def update_sync(self, traitement: Traitement) -> Traitement:
+        """Écrase le contenu métier d'une fiche existante (hors rotations/produits/
+        signatures, gérés par leurs propres endpoints) et marque `statut_sync = 'synced'`."""
+        pass
+
+    @abstractmethod
+    async def marquer_conflict(self, traitement_id: uuid.UUID) -> Traitement:
+        """Flague `statut_sync = 'conflict'` sans modifier le contenu — la version serveur
+        fait foi (décision #60), rien n'est écrasé."""
         pass
 
 

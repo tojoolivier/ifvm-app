@@ -22,8 +22,11 @@ from app.domain.traitement import (
     TraitementIntrouvableError,
     TraitementOrigineDejaUtiliseeError,
     TraitementOrigineIntrouvableError,
+    TraitementSyncConflitError,
     TraitementTerrestre,
+    TraitementValideeSyncRejeteError,
     construire_cible,
+    contenu_diverge,
     generer_numero_fiche,
 )
 
@@ -79,6 +82,7 @@ def _construire_traitement_base(
     *,
     prospection: Prospection,
     base_numero: str,
+    traitement_id: uuid.UUID | None = None,
     type_traitement: str,
     mode_traitement: str | None,
     date_traitement: date,
@@ -112,6 +116,7 @@ def _construire_traitement_base(
     """Construit le `Traitement` brouillon + snapshot `Cible`, commun aux deux spécialisations."""
     now = datetime.utcnow()
     traitement = Traitement(
+        id=traitement_id if traitement_id is not None else uuid.uuid4(),
         prospection_id=prospection.id,
         numero_fiche=base_numero,
         type_traitement=type_traitement,
@@ -679,3 +684,349 @@ class ValiderTraitement:
         return await self.repository.valider(
             traitement_id, traitement.date_validation, signature_objs
         )
+
+
+class SyncPushTraitementAerien:
+    """Synchronisation offline (ADR-002 / décision #60) d'une fiche AERIEN créée hors-ligne.
+
+    Retourne `(traitement, cree)` — `cree=True` pour un push initial (id inconnu du
+    serveur), `cree=False` pour une mise à jour synchronisée sans conflit.
+    """
+
+    def __init__(
+        self,
+        traitement_repository: TraitementRepository,
+        prospection_repository: ProspectionRepository,
+        utilisateur_repository: UtilisateurRepository,
+    ):
+        self.traitement_repository = traitement_repository
+        self.prospection_repository = prospection_repository
+        self.utilisateur_repository = utilisateur_repository
+
+    async def execute(
+        self,
+        traitement_id: uuid.UUID,
+        base_updated_at: datetime,
+        prospection_id: uuid.UUID,
+        date_traitement: date,
+        date_validation: date,
+        localite: str,
+        pilote: str,
+        mecanicien: str,
+        chef_de_base_id: uuid.UUID,
+        consultant_international: str | None = None,
+        numero_fiche: str | None = None,
+        mode_traitement: str | None = None,
+        region: str | None = None,
+        district: str | None = None,
+        commune: str | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
+        altitude: float | None = None,
+        kit_combinaison: bool = False,
+        kit_gants: bool = False,
+        kit_lunettes: bool = False,
+        kit_masques: bool = False,
+        kit_boite: bool = False,
+        zones_exposees: dict[str, Any] | None = None,
+        hauteur_strate_herbeuse_m: float | None = None,
+        hauteur_strate_arboree_m: float | None = None,
+        recouvrement_percent: int | None = None,
+        empoisonnement: bool = False,
+        empoisonnement_type: str | None = None,
+        empoisonnement_mode: str | None = None,
+        empoisonnement_autre: str | None = None,
+        evaluation_risque: dict[str, Any] | None = None,
+        comportement_anormal: bool = False,
+        comportement_non_cibles: dict[str, Any] | None = None,
+        mortalite: bool = False,
+        mortalite_familles: dict[str, Any] | None = None,
+    ) -> tuple[Traitement, bool]:
+        _valider_dates(date_traitement, date_validation)
+
+        existant = await self.traitement_repository.get_by_id(traitement_id)
+        if existant is not None and existant.statut != "brouillon":
+            raise TraitementValideeSyncRejeteError(existant)
+
+        prospection = await self.prospection_repository.get_by_id(prospection_id)
+        if prospection is None:
+            raise ProspectionIntrouvableError(
+                f"Prospection {prospection_id} introuvable — impossible de synchroniser"
+            )
+
+        chef = await self.utilisateur_repository.get_by_id(chef_de_base_id)
+        if chef is None or chef.role != "chef_de_base":
+            raise ChefDeBaseInvalideError(
+                f"chef_de_base_id {chef_de_base_id} ne référence pas un utilisateur "
+                "avec le rôle 'chef_de_base'"
+            )
+
+        base_numero = _generer_et_valider_numero_fiche(
+            numero_fiche, chef.prenom, date_traitement, "Aerien"
+        )
+
+        candidat = _construire_traitement_base(
+            traitement_id=traitement_id,
+            prospection=prospection,
+            base_numero=base_numero,
+            type_traitement="AERIEN",
+            mode_traitement=mode_traitement,
+            date_traitement=date_traitement,
+            date_validation=date_validation,
+            localite=localite,
+            region=region,
+            district=district,
+            commune=commune,
+            latitude=latitude,
+            longitude=longitude,
+            altitude=altitude,
+            kit_combinaison=kit_combinaison,
+            kit_gants=kit_gants,
+            kit_lunettes=kit_lunettes,
+            kit_masques=kit_masques,
+            kit_boite=kit_boite,
+            zones_exposees=zones_exposees,
+            hauteur_strate_herbeuse_m=hauteur_strate_herbeuse_m,
+            hauteur_strate_arboree_m=hauteur_strate_arboree_m,
+            recouvrement_percent=recouvrement_percent,
+            empoisonnement=empoisonnement,
+            empoisonnement_type=empoisonnement_type,
+            empoisonnement_mode=empoisonnement_mode,
+            empoisonnement_autre=empoisonnement_autre,
+            evaluation_risque=evaluation_risque,
+            comportement_anormal=comportement_anormal,
+            comportement_non_cibles=comportement_non_cibles,
+            mortalite=mortalite,
+            mortalite_familles=mortalite_familles,
+        )
+        candidat.aerien = TraitementAerien(
+            traitement_id=traitement_id,
+            pilote=pilote,
+            mecanicien=mecanicien,
+            chef_de_base_id=chef_de_base_id,
+            consultant_international=consultant_international,
+        )
+
+        if existant is None:
+            candidat.statut_sync = "synced"
+            cree = await _persister_avec_numero_fiche_unique(
+                self.traitement_repository,
+                candidat,
+                base_numero,
+                chef.prenom,
+                date_traitement,
+                "Aerien",
+            )
+            return cree, True
+
+        if existant.updated_at > base_updated_at and contenu_diverge(existant, candidat):
+            marque = await self.traitement_repository.marquer_conflict(traitement_id)
+            raise TraitementSyncConflitError(marque)
+
+        candidat.created_at = existant.created_at
+        synced = await self.traitement_repository.update_sync(candidat)
+        return synced, False
+
+
+class SyncPushTraitementTerrestre:
+    """Synchronisation offline (ADR-002 / décision #60) d'une fiche TERRESTRE créée
+    hors-ligne. Retourne `(traitement, cree)`, voir `SyncPushTraitementAerien`."""
+
+    def __init__(
+        self,
+        traitement_repository: TraitementRepository,
+        prospection_repository: ProspectionRepository,
+        utilisateur_repository: UtilisateurRepository,
+    ):
+        self.traitement_repository = traitement_repository
+        self.prospection_repository = prospection_repository
+        self.utilisateur_repository = utilisateur_repository
+
+    async def execute(
+        self,
+        traitement_id: uuid.UUID,
+        base_updated_at: datetime,
+        prospection_id: uuid.UUID,
+        date_traitement: date,
+        date_validation: date,
+        localite: str,
+        heure_debut: time,
+        heure_fin: time,
+        vitesse_vent_ms: float,
+        temperature_c: float,
+        chef_equipe_id: uuid.UUID,
+        direction_vent: str | None = None,
+        agent_encadreur_id: uuid.UUID | None = None,
+        consultant_international: str | None = None,
+        surface_atomiseur_ha: float | None = None,
+        surface_disque_rotatif_ha: float | None = None,
+        surface_ulvamast_ha: float | None = None,
+        surface_restante_abandonnee: bool | None = None,
+        motif_surface_restante_abandonnee: str | None = None,
+        essence_litres: float | None = None,
+        nb_piles: int | None = None,
+        reprise_traitement: bool = False,
+        traitement_origine_id: uuid.UUID | None = None,
+        numero_fiche: str | None = None,
+        mode_traitement: str | None = None,
+        region: str | None = None,
+        district: str | None = None,
+        commune: str | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
+        altitude: float | None = None,
+        kit_combinaison: bool = False,
+        kit_gants: bool = False,
+        kit_lunettes: bool = False,
+        kit_masques: bool = False,
+        kit_boite: bool = False,
+        zones_exposees: dict[str, Any] | None = None,
+        hauteur_strate_herbeuse_m: float | None = None,
+        hauteur_strate_arboree_m: float | None = None,
+        recouvrement_percent: int | None = None,
+        empoisonnement: bool = False,
+        empoisonnement_type: str | None = None,
+        empoisonnement_mode: str | None = None,
+        empoisonnement_autre: str | None = None,
+        evaluation_risque: dict[str, Any] | None = None,
+        comportement_anormal: bool = False,
+        comportement_non_cibles: dict[str, Any] | None = None,
+        mortalite: bool = False,
+        mortalite_familles: dict[str, Any] | None = None,
+    ) -> tuple[Traitement, bool]:
+        _valider_dates(date_traitement, date_validation)
+        if heure_fin <= heure_debut:
+            raise ValueError("heure_fin doit être postérieure à heure_debut")
+
+        existant = await self.traitement_repository.get_by_id(traitement_id)
+        if existant is not None and existant.statut != "brouillon":
+            raise TraitementValideeSyncRejeteError(existant)
+
+        surface_cumulee_precedente = 0.0
+        if reprise_traitement:
+            if traitement_origine_id is None:
+                raise ValueError(
+                    "traitement_origine_id est obligatoire lorsque reprise_traitement=True"
+                )
+            origine = await self.traitement_repository.get_by_id(traitement_origine_id)
+            if origine is None or origine.terrestre is None:
+                raise TraitementOrigineIntrouvableError(
+                    f"Fiche d'origine {traitement_origine_id} introuvable ou non terrestre"
+                )
+            if await self.traitement_repository.origine_deja_utilisee(
+                traitement_origine_id, exclude_traitement_id=traitement_id
+            ):
+                raise TraitementOrigineDejaUtiliseeError(
+                    f"La fiche {traitement_origine_id} est déjà désignée comme origine "
+                    "par une autre fiche"
+                )
+            surface_cumulee_precedente = origine.terrestre.surface_cumulee_ha or 0.0
+        elif traitement_origine_id is not None:
+            raise ValueError(
+                "traitement_origine_id ne peut être renseigné que si reprise_traitement=True"
+            )
+
+        prospection = await self.prospection_repository.get_by_id(prospection_id)
+        if prospection is None:
+            raise ProspectionIntrouvableError(
+                f"Prospection {prospection_id} introuvable — impossible de synchroniser"
+            )
+
+        chef = await self.utilisateur_repository.get_by_id(chef_equipe_id)
+        if chef is None or chef.role != "chef_equipe":
+            raise ChefEquipeInvalideError(
+                f"chef_equipe_id {chef_equipe_id} ne référence pas un utilisateur "
+                "avec le rôle 'chef_equipe'"
+            )
+
+        base_numero = _generer_et_valider_numero_fiche(
+            numero_fiche, chef.prenom, date_traitement, "Terrestre"
+        )
+
+        candidat = _construire_traitement_base(
+            traitement_id=traitement_id,
+            prospection=prospection,
+            base_numero=base_numero,
+            type_traitement="TERRESTRE",
+            mode_traitement=mode_traitement,
+            date_traitement=date_traitement,
+            date_validation=date_validation,
+            localite=localite,
+            region=region,
+            district=district,
+            commune=commune,
+            latitude=latitude,
+            longitude=longitude,
+            altitude=altitude,
+            kit_combinaison=kit_combinaison,
+            kit_gants=kit_gants,
+            kit_lunettes=kit_lunettes,
+            kit_masques=kit_masques,
+            kit_boite=kit_boite,
+            zones_exposees=zones_exposees,
+            hauteur_strate_herbeuse_m=hauteur_strate_herbeuse_m,
+            hauteur_strate_arboree_m=hauteur_strate_arboree_m,
+            recouvrement_percent=recouvrement_percent,
+            empoisonnement=empoisonnement,
+            empoisonnement_type=empoisonnement_type,
+            empoisonnement_mode=empoisonnement_mode,
+            empoisonnement_autre=empoisonnement_autre,
+            evaluation_risque=evaluation_risque,
+            comportement_anormal=comportement_anormal,
+            comportement_non_cibles=comportement_non_cibles,
+            mortalite=mortalite,
+            mortalite_familles=mortalite_familles,
+        )
+        cible = candidat.cible
+
+        terrestre = TraitementTerrestre(
+            traitement_id=traitement_id,
+            heure_debut=heure_debut,
+            heure_fin=heure_fin,
+            vitesse_vent_ms=vitesse_vent_ms,
+            direction_vent=direction_vent,
+            temperature_c=temperature_c,
+            reprise_traitement=reprise_traitement,
+            traitement_origine_id=traitement_origine_id,
+            chef_equipe_id=chef_equipe_id,
+            agent_encadreur_id=agent_encadreur_id,
+            consultant_international=consultant_international,
+            surface_atomiseur_ha=surface_atomiseur_ha,
+            surface_disque_rotatif_ha=surface_disque_rotatif_ha,
+            surface_ulvamast_ha=surface_ulvamast_ha,
+            surface_restante_abandonnee=surface_restante_abandonnee,
+            motif_surface_restante_abandonnee=motif_surface_restante_abandonnee,
+            essence_litres=essence_litres,
+            nb_piles=nb_piles,
+        )
+        terrestre.recalculer_surfaces(cible.surface_infestee_ha, surface_cumulee_precedente)
+        if (
+            terrestre.surface_restante_ha
+            and terrestre.surface_restante_ha > 0
+            and (terrestre.surface_restante_abandonnee is None)
+        ):
+            raise ValueError(
+                "surface_restante_abandonnee doit être renseigné (true/false) lorsque "
+                "surface_restante_ha > 0"
+            )
+        candidat.terrestre = terrestre
+
+        if existant is None:
+            candidat.statut_sync = "synced"
+            cree = await _persister_avec_numero_fiche_unique(
+                self.traitement_repository,
+                candidat,
+                base_numero,
+                chef.prenom,
+                date_traitement,
+                "Terrestre",
+            )
+            return cree, True
+
+        if existant.updated_at > base_updated_at and contenu_diverge(existant, candidat):
+            marque = await self.traitement_repository.marquer_conflict(traitement_id)
+            raise TraitementSyncConflitError(marque)
+
+        candidat.created_at = existant.created_at
+        synced = await self.traitement_repository.update_sync(candidat)
+        return synced, False
