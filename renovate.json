@@ -1,0 +1,41 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "timezone": "Indian/Antananarivo",
+  "schedule": ["before 6am on monday"],
+  "labels": ["dependencies"],
+  "prConcurrentLimit": 5,
+  "packageRules": [
+    {
+      "matchFileNames": ["backend/**"],
+      "groupName": "backend dependencies",
+      "commitMessagePrefix": "chore(backend):"
+    },
+    {
+      "matchFileNames": ["frontend/**"],
+      "groupName": "frontend dependencies",
+      "commitMessagePrefix": "chore(frontend):"
+    },
+    {
+      "matchFileNames": ["mobile/**"],
+      "groupName": "mobile dependencies",
+      "commitMessagePrefix": "chore(mobile):",
+      "description": "Expo fige les versions natives entre elles: on regroupe pour éviter des PRs qui cassent expo-doctor"
+    },
+    {
+      "matchFileNames": ["mobile/**"],
+      "matchPackageNames": ["expo", "expo-*", "@expo/*", "react-native", "react-native-*", "react", "react-dom"],
+      "groupName": "expo SDK",
+      "description": "Ces paquets doivent bouger ensemble avec le SDK Expo, jamais isolément"
+    },
+    {
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true
+    }
+  ],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on monday"]
+  }
+}
