@@ -35,6 +35,8 @@ function population(overrides: Partial<PopulationRead> = {}): PopulationRead {
     densite_groupee: null,
     captures_nombre: null,
     temps_capture: null,
+    methode: null,
+    phase: null,
     accouplement: null,
     ponte: null,
     ...overrides,

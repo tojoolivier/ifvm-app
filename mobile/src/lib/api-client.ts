@@ -79,6 +79,8 @@ export interface ProspectionPopulationInput {
   densite_groupee?: number | null;
   captures_nombre?: number | null;
   temps_capture?: number | null;
+  methode?: string | null;
+  phase?: string | null;
   accouplement?: string | null;
   ponte?: string | null;
   // ========== Extensif Imagos (B) ==========
@@ -183,6 +185,8 @@ export interface PopulationRead {
   densite_groupee: number | null;
   captures_nombre: number | null;
   temps_capture: number | null;
+  methode: string | null;
+  phase: string | null;
   accouplement: string | null;
   ponte: string | null;
 }

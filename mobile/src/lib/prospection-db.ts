@@ -79,6 +79,9 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
       prospection_id TEXT NOT NULL REFERENCES prospection(id) ON DELETE CASCADE,
       espece TEXT NOT NULL,
       categorie TEXT NOT NULL,
+      phase TEXT,
+      captures_nombre INTEGER,
+      temps_capture INTEGER,
       densite_diffuse REAL,
       densite_groupee REAL,
       methode TEXT,
@@ -357,6 +360,9 @@ async function migratePopulationTable(db: SQLite.SQLiteDatabase): Promise<void> 
   const columnNames = tableInfo.map(row => row.name);
 
   const columnsToAdd = [
+    { name: 'phase', type: 'TEXT' },
+    { name: 'captures_nombre', type: 'INTEGER' },
+    { name: 'temps_capture', type: 'INTEGER' },
     { name: 'captures_sol', type: 'INTEGER' },
     { name: 'captures_trans', type: 'INTEGER' },
     { name: 'captures_greg', type: 'INTEGER' },

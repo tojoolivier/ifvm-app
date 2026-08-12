@@ -161,6 +161,8 @@ class ProspectionPopulationModel(Base):
     densite_groupee: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
     captures_nombre: Mapped[int | None] = mapped_column(Integer(), nullable=True)
     temps_capture: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    methode: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    phase: Mapped[str | None] = mapped_column(Text(), nullable=True)
     accouplement: Mapped[str | None] = mapped_column(Text(), nullable=True)
     ponte: Mapped[str | None] = mapped_column(Text(), nullable=True)
 
@@ -196,6 +198,10 @@ class ProspectionPopulationModel(Base):
         CheckConstraint(
             "ponte IN ('neant','rare','peu','beaucoup','dominant')",
             name="ck_prospection_population_ponte",
+        ),
+        CheckConstraint(
+            "methode IN ('visuel','comptage_direct')",
+            name="ck_prospection_population_methode",
         ),
         CheckConstraint(
             "stade_imago IN ('A1','A2','A3','A4','A5')",
@@ -275,6 +281,9 @@ class ProspectionInfestationModel(Base):
     # ==========================================
     nb_taches_bandes: Mapped[int | None] = mapped_column(Integer(), nullable=True)
     interdistance_m: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
+    interdistance_min: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
+    interdistance_max: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
+    interdistance_moy: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
     surface_contaminee_ha: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
     surf_infestee_pourcent: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
     type_larve: Mapped[str | None] = mapped_column(Text(), nullable=True)

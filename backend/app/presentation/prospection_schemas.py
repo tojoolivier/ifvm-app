@@ -45,6 +45,8 @@ class PopulationRead(BaseModel):
     densite_groupee: float | None
     captures_nombre: int | None
     temps_capture: int | None
+    methode: str | None = None
+    phase: str | None = None
     accouplement: str | None
     ponte: str | None
 
@@ -113,6 +115,9 @@ class InfestationRead(BaseModel):
     # ==========================================
     nb_taches_bandes: int | None = None
     interdistance_m: float | None = None
+    interdistance_min: float | None = None
+    interdistance_max: float | None = None
+    interdistance_moy: float | None = None
     surface_contaminee_ha: float | None = None
     type_larve: str | None = None
     surf_infestee_pourcent: float | None = None
@@ -125,6 +130,8 @@ class PopulationCreate(BaseModel):
     densite_groupee: float | None = Field(None, ge=0, allow_inf_nan=False)
     captures_nombre: int | None = None
     temps_capture: int | None = None
+    methode: str | None = None
+    phase: str | None = None
     accouplement: str | None = None
     ponte: str | None = None
 
@@ -189,6 +196,9 @@ class InfestationCreate(BaseModel):
     # ==========================================
     nb_taches_bandes: int | None = Field(None, ge=0)
     interdistance_m: float | None = Field(None, ge=0)
+    interdistance_min: float | None = Field(None, ge=0)
+    interdistance_max: float | None = Field(None, ge=0)
+    interdistance_moy: float | None = Field(None, ge=0)
     surface_contaminee_ha: float | None = Field(None, ge=0)
     type_larve: TypeLarve | None = None
     surf_infestee_pourcent: float | None = Field(None, ge=0, le=100)
