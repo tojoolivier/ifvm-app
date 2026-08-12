@@ -8,6 +8,7 @@ import {
   Dimensions,
   Animated,
   AppState,
+  Modal,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -51,6 +52,7 @@ export default function DashboardScreen() {
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [showSyncBanner, setShowSyncBanner] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
+  const [fabMenuVisible, setFabMenuVisible] = useState(false);
 
   // Animations
   const fadeAnim = useMemo(() => new Animated.Value(0), []);
@@ -311,6 +313,15 @@ export default function DashboardScreen() {
               <ThemedText style={styles.quickTileText}>Carte de zone</ThemedText>
             </TouchableOpacity>
 
+            <TouchableOpacity
+              style={styles.quickTile}
+              onPress={() => navigateTo('/(traitement)/select')}
+              activeOpacity={0.85}
+            >
+              <ThemedText style={styles.quickTileIcon}>🚁</ThemedText>
+              <ThemedText style={styles.quickTileText}>Nouveau traitement</ThemedText>
+            </TouchableOpacity>
+
             <View style={[styles.quickTile, styles.quickTileDisabled]}>
               <ThemedText style={styles.quickTileIcon}>🔔</ThemedText>
               <ThemedText style={styles.quickTileText}>Alertes</ThemedText>
@@ -328,11 +339,50 @@ export default function DashboardScreen() {
       {/* FAB */}
       <TouchableOpacity
         style={styles.fab}
-        onPress={() => navigateTo('/(app)/prospection')}
+        onPress={() => setFabMenuVisible(true)}
         activeOpacity={0.85}
       >
         <ThemedText style={styles.fabIcon}>+</ThemedText>
       </TouchableOpacity>
+
+      <Modal
+        animationType="slide"
+        transparent
+        visible={fabMenuVisible}
+        onRequestClose={() => setFabMenuVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.fabMenuOverlay}
+          activeOpacity={1}
+          onPress={() => setFabMenuVisible(false)}
+        >
+          <View style={styles.fabMenuSheet}>
+            <View style={styles.fabMenuHandle} />
+            <TouchableOpacity
+              style={styles.fabMenuItem}
+              activeOpacity={0.7}
+              onPress={() => {
+                setFabMenuVisible(false);
+                navigateTo('/(app)/prospection');
+              }}
+            >
+              <ThemedText style={styles.fabMenuItemIcon}>✚</ThemedText>
+              <ThemedText style={styles.fabMenuItemText}>Nouvelle prospection</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.fabMenuItem, styles.fabMenuItemLast]}
+              activeOpacity={0.7}
+              onPress={() => {
+                setFabMenuVisible(false);
+                navigateTo('/(traitement)/select');
+              }}
+            >
+              <ThemedText style={styles.fabMenuItemIcon}>🚁</ThemedText>
+              <ThemedText style={styles.fabMenuItemText}>Nouveau traitement</ThemedText>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -698,5 +748,45 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     lineHeight: 30,
+  },
+  fabMenuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  fabMenuSheet: {
+    backgroundColor: CARD_BG,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 32,
+  },
+  fabMenuHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E0E0E0',
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  fabMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  fabMenuItemLast: {
+    borderBottomWidth: 0,
+  },
+  fabMenuItemIcon: {
+    fontSize: 20,
+    width: 32,
+  },
+  fabMenuItemText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: TEXT_DARK,
   },
 });
