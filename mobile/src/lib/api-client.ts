@@ -384,6 +384,77 @@ export const apiClient = {
     return makeRequest<void>(`/prospections/${id}`, { method: 'DELETE' }, token, onUnauthorized);
   },
 
+  addRotation: async (
+    token: string,
+    traitementId: string,
+    body: components['schemas']['RotationCreate'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<unknown> => {
+    return makeRequest<unknown>(
+      `/traitements/${traitementId}/rotations`,
+      { method: 'POST', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
+  updateRotation: async (
+    token: string,
+    traitementId: string,
+    rotationId: string,
+    body: components['schemas']['RotationCreate'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<unknown> => {
+    return makeRequest<unknown>(
+      `/traitements/${traitementId}/rotations/${rotationId}`,
+      { method: 'PUT', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
+  removeRotation: async (
+    token: string,
+    traitementId: string,
+    rotationId: string,
+    onUnauthorized?: OnUnauthorized
+  ): Promise<unknown> => {
+    return makeRequest<unknown>(
+      `/traitements/${traitementId}/rotations/${rotationId}`,
+      { method: 'DELETE' },
+      token,
+      onUnauthorized
+    );
+  },
+
+  addProduitUtilise: async (
+    token: string,
+    traitementId: string,
+    body: components['schemas']['ProduitUtiliseCreate'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<unknown> => {
+    return makeRequest<unknown>(
+      `/traitements/${traitementId}/produits`,
+      { method: 'POST', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
+  removeProduitUtilise: async (
+    token: string,
+    traitementId: string,
+    produitUtiliseId: string,
+    onUnauthorized?: OnUnauthorized
+  ): Promise<unknown> => {
+    return makeRequest<unknown>(
+      `/traitements/${traitementId}/produits/${produitUtiliseId}`,
+      { method: 'DELETE' },
+      token,
+      onUnauthorized
+    );
+  },
+
   /**
    * POST /traitements/sync — contrairement à makeRequest(), ne jette pas sur un
    * 409 (conflit ou fiche verrouillée) : l'appelant a besoin du corps
