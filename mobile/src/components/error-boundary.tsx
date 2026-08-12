@@ -39,7 +39,7 @@ export class ErrorBoundary extends Component<Props, State> {
     return (
       <View style={styles.root}>
         <Text style={styles.title}>Une erreur est survenue</Text>
-        <Text style={styles.subtitle}>L'écran n'a pas pu s'afficher correctement.</Text>
+        <Text style={styles.subtitle}>L&apos;écran n&apos;a pas pu s&apos;afficher correctement.</Text>
         <TouchableOpacity style={styles.button} onPress={this.reset} activeOpacity={0.85}>
           <Text style={styles.buttonText}>Réessayer</Text>
         </TouchableOpacity>
