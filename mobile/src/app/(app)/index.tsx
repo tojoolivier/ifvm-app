@@ -159,7 +159,7 @@ export default function DashboardScreen() {
         setFabMenuVisible(false);
         const draft = await startNewProspection({ token, prospecteurId: user.id, typeProspection });
         await hydrateFromDraft(draft.id);
-        router.replace({ pathname: PROSPECTION_DESTINATIONS[typeProspection] as any, params: { draftId: draft.id } });
+        router.push({ pathname: PROSPECTION_DESTINATIONS[typeProspection] as any, params: { draftId: draft.id } });
       },
       {
         screen: 'DashboardScreen.fabMenu',
