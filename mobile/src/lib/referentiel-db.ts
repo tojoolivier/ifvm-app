@@ -53,6 +53,35 @@ export async function listStationsByPoste(paId: string): Promise<StationFixe[]> 
   );
 }
 
+export interface Pesticide {
+  id: string;
+  code: string;
+  nom: string;
+}
+
+/** Pesticides actifs, triés par nom — alimente les chips "Produit" des rotations/produits utilisés. */
+export async function listPesticides(): Promise<Pesticide[]> {
+  const db = await getReferentielDb();
+  return db.getAllAsync<Pesticide>('SELECT id, code, nom FROM pesticide WHERE actif = 1 ORDER BY nom');
+}
+
+export interface UtilisateurEquipe {
+  id: string;
+  nom: string;
+  prenom: string;
+}
+
+export type RoleUtilisateurEquipe = 'chef_de_base' | 'chef_equipe' | 'agent_encadreur';
+
+/** Utilisateurs actifs d'un rôle donné, triés par nom — alimente les chips de sélection des écrans traitement. */
+export async function listUtilisateursByRole(role: RoleUtilisateurEquipe): Promise<UtilisateurEquipe[]> {
+  const db = await getReferentielDb();
+  return db.getAllAsync<UtilisateurEquipe>(
+    'SELECT id, nom, prenom FROM utilisateur_equipe WHERE actif = 1 AND role = ? ORDER BY nom',
+    [role]
+  );
+}
+
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const toRad = (deg: number) => (deg * Math.PI) / 180;
   const R = 6371;

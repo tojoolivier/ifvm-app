@@ -1,5 +1,10 @@
 import { resetDbForTests } from '../src/lib/prospection-db';
-import { getReferentielDb, resetReferentielDbForTests } from '../src/lib/referentiel-db';
+import {
+  getReferentielDb,
+  resetReferentielDbForTests,
+  listPesticides,
+  listUtilisateursByRole,
+} from '../src/lib/referentiel-db';
 
 const execAsync = jest.fn().mockResolvedValue(undefined);
 const getAllAsync = jest.fn().mockResolvedValue([]);
@@ -58,5 +63,42 @@ describe('referentiel-db', () => {
 
     expect(openDatabaseAsync).toHaveBeenCalledTimes(1);
     expect(openDatabaseAsync).toHaveBeenCalledWith('ifvm.db');
+  });
+});
+
+describe('listPesticides', () => {
+  it('lists active pesticides ordered by name, without a matière active column', async () => {
+    // getDb() runs its own PRAGMA table_info(...) migration queries against the same
+    // mocked getAllAsync — match on SQL content rather than call order.
+    getAllAsync.mockImplementation((sql: string) =>
+      sql.includes('FROM pesticide')
+        ? Promise.resolve([{ id: 'p-1', code: 'DELTA', nom: 'Deltaméthrine' }])
+        : Promise.resolve([])
+    );
+
+    const result = await listPesticides();
+
+    expect(getAllAsync).toHaveBeenCalledWith(
+      'SELECT id, code, nom FROM pesticide WHERE actif = 1 ORDER BY nom'
+    );
+    expect(result).toEqual([{ id: 'p-1', code: 'DELTA', nom: 'Deltaméthrine' }]);
+  });
+});
+
+describe('listUtilisateursByRole', () => {
+  it('lists active users filtered by role, ordered by name', async () => {
+    getAllAsync.mockImplementation((sql: string) =>
+      sql.includes('FROM utilisateur_equipe')
+        ? Promise.resolve([{ id: 'u-1', nom: 'Rakoto', prenom: 'Jean' }])
+        : Promise.resolve([])
+    );
+
+    const result = await listUtilisateursByRole('chef_de_base');
+
+    expect(getAllAsync).toHaveBeenCalledWith(
+      'SELECT id, nom, prenom FROM utilisateur_equipe WHERE actif = 1 AND role = ? ORDER BY nom',
+      ['chef_de_base']
+    );
+    expect(result).toEqual([{ id: 'u-1', nom: 'Rakoto', prenom: 'Jean' }]);
   });
 });
