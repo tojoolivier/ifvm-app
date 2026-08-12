@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { File, Paths } from 'expo-file-system';
+import { shareAsync } from 'expo-sharing';
 import { useRequestLogStore, RequestLogEntry } from '@/lib/request-log-store';
+import { useErrorLogStore, ErrorLogEntry } from '@/lib/error-log-store';
 import { useDebugStore } from '@/lib/debug-store';
 
 const IFVM_GREEN_DARK = '#163F16';
@@ -48,17 +51,67 @@ function LogRow({ entry }: { entry: RequestLogEntry }) {
   );
 }
 
+function ErrorRow({ entry }: { entry: ErrorLogEntry }) {
+  const [expanded, setExpanded] = useState(false);
+  const time = new Date(entry.occurredAt).toLocaleTimeString('fr-FR');
+
+  return (
+    <TouchableOpacity style={styles.row} onPress={() => setExpanded((e) => !e)} activeOpacity={0.7}>
+      <View style={styles.rowHeader}>
+        <View style={[styles.statusDot, { backgroundColor: '#DC2626' }]} />
+        <Text style={styles.url} numberOfLines={expanded ? undefined : 1}>{entry.message}</Text>
+      </View>
+      <View style={styles.rowMeta}>
+        <Text style={styles.metaText}>{entry.screen ?? '—'} · {time}</Text>
+      </View>
+      {expanded && (
+        <View style={styles.detail}>
+          {entry.context && (
+            <>
+              <Text style={styles.detailLabel}>Contexte</Text>
+              <Text style={styles.detailBody}>{JSON.stringify(entry.context, null, 2)}</Text>
+            </>
+          )}
+          {entry.stack && (
+            <>
+              <Text style={styles.detailLabel}>Pile d'appel</Text>
+              <Text style={styles.detailBody}>{entry.stack}</Text>
+            </>
+          )}
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
 export default function DebugLogsScreen() {
   const router = useRouter();
   const entries = useRequestLogStore((s) => s.entries);
   const clear = useRequestLogStore((s) => s.clear);
+  const errorEntries = useErrorLogStore((s) => s.entries);
+  const clearErrors = useErrorLogStore((s) => s.clear);
   const debugEnabled = useDebugStore((s) => s.enabled);
 
   const handleClear = () => {
-    Alert.alert('Vider le journal ?', 'Toutes les requêtes enregistrées seront effacées.', [
+    Alert.alert('Vider le journal ?', 'Toutes les requêtes et erreurs enregistrées seront effacées.', [
       { text: 'Annuler', style: 'cancel' },
-      { text: 'Vider', style: 'destructive', onPress: clear },
+      { text: 'Vider', style: 'destructive', onPress: () => { clear(); clearErrors(); } },
     ]);
+  };
+
+  const handleExport = async () => {
+    const report = {
+      generatedAt: new Date().toISOString(),
+      requests: entries,
+      errors: errorEntries,
+    };
+    try {
+      const file = new File(Paths.cache, `ifvm-debug-${Date.now()}.json`);
+      await file.write(JSON.stringify(report, null, 2));
+      await shareAsync(file.uri, { mimeType: 'application/json', dialogTitle: 'Rapport de debug IFVM' });
+    } catch {
+      Alert.alert('Export impossible', "Le rapport n'a pas pu être partagé.");
+    }
   };
 
   return (
@@ -70,9 +123,14 @@ export default function DebugLogsScreen() {
               <Text style={styles.backIcon}>‹</Text>
             </TouchableOpacity>
             <View style={styles.headerTextContainer}>
-              <Text style={styles.headerTitle}>Journal des requêtes</Text>
-              <Text style={styles.headerSub}>{entries.length} requête{entries.length > 1 ? 's' : ''}</Text>
+              <Text style={styles.headerTitle}>Journal de debug</Text>
+              <Text style={styles.headerSub}>
+                {entries.length} requête{entries.length > 1 ? 's' : ''} · {errorEntries.length} erreur{errorEntries.length > 1 ? 's' : ''}
+              </Text>
             </View>
+            <TouchableOpacity style={styles.clearBtn} onPress={handleExport} activeOpacity={0.7}>
+              <Text style={styles.clearBtnText}>Exporter</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.clearBtn} onPress={handleClear} activeOpacity={0.7}>
               <Text style={styles.clearBtnText}>Vider</Text>
             </TouchableOpacity>
@@ -88,6 +146,14 @@ export default function DebugLogsScreen() {
             </Text>
           </View>
         )}
+        {errorEntries.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>Erreurs applicatives</Text>
+            {errorEntries.map((entry) => <ErrorRow key={entry.id} entry={entry} />)}
+          </>
+        )}
+
+        <Text style={styles.sectionTitle}>Requêtes réseau</Text>
         {entries.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>📭</Text>
@@ -121,6 +187,7 @@ const styles = StyleSheet.create({
   clearBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
   container: { flex: 1 },
   contentContainer: { padding: 16, paddingBottom: 40 },
+  sectionTitle: { fontSize: 11, fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 4 },
   notice: {
     backgroundColor: '#FEF3C7',
     borderWidth: 1,

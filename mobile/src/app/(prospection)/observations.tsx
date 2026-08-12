@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm } from '@tanstack/react-form';
+import { useAsyncAction } from '@/hooks/use-async-action';
 import { DEGATS_OPTIONS } from '@/lib/prospection-fiche-lecture';
 import { ENNEMIS_OPTIONS, parseEnnemis, serializeEnnemis } from '@/lib/prospection-observations';
-import { ObservationsFormValues, observationsSchema } from '@/lib/prospection-observations-schema';
+import { ObservationsFormValues } from '@/lib/prospection-observations-schema';
 import { updateProspectionObservations } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 
@@ -20,9 +21,9 @@ export default function ObservationsScreen() {
   const router = useRouter();
   const { draftId } = useLocalSearchParams<{ draftId: string }>();
   const setDraft = useProspectionWizardStore((s) => s.setDraft);
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [isSaving, setIsSaving] = useState(false);
+  const { run, isRunning: isSaving } = useAsyncAction();
   const [showAutre, setShowAutre] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
   const initialEnnemis = parseEnnemis(null);
 
   const form = useForm({
@@ -32,31 +33,27 @@ export default function ObservationsScreen() {
       ennemisAutre: initialEnnemis.autre,
       observation: '',
     } as ObservationsFormValues,
+    onSubmitInvalid: () => {
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+    },
     onSubmit: async ({ value }) => {
-      if (!draftId) return;
-      try {
-        await observationsSchema.validate(value, { abortEarly: false });
-      } catch (validationError: any) {
-        const errors: Record<string, string> = {};
-        for (const err of validationError.inner ?? []) {
-          if (err.path) errors[err.path] = err.message;
+      run(
+        async () => {
+          const updated = await updateProspectionObservations(draftId, {
+            degatsCultures: value.degatsCultures,
+            ennemisNaturels: serializeEnnemis(value.ennemisSelected, value.ennemisAutre),
+            observations: value.observation || null,
+          });
+          setDraft(updated);
+          router.push({ pathname: '/(prospection)/review' as any, params: { draftId } });
+        },
+        {
+          screen: 'observations',
+          precondition: !!draftId,
+          preconditionMessage: 'Session de saisie perdue — revenez à l’écran précédent et réessayez.',
+          context: { draftId },
         }
-        setFormErrors(errors);
-        return;
-      }
-      setFormErrors({});
-      setIsSaving(true);
-      try {
-        const updated = await updateProspectionObservations(draftId, {
-          degatsCultures: value.degatsCultures,
-          ennemisNaturels: serializeEnnemis(value.ennemisSelected, value.ennemisAutre),
-          observations: value.observation || null,
-        });
-        setDraft(updated);
-        router.push({ pathname: '/(prospection)/review' as any, params: { draftId } });
-      } finally {
-        setIsSaving(false);
-      }
+      );
     },
   });
 
@@ -70,27 +67,40 @@ export default function ObservationsScreen() {
           <Text style={styles.title}>Observations</Text>
         </View>
 
-        <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16 }}>
-          <form.Field name="degatsCultures">
-            {(field) => (
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Dégâts sur culture</Text>
-                <View style={styles.chipsRow}>
-                  {DEGATS_OPTIONS.map((option) => {
-                    const active = option.value === field.state.value;
-                    return (
-                      <TouchableOpacity
-                        key={option.value}
-                        style={[styles.chip, styles.chipFlex, active && styles.chipActive]}
-                        onPress={() => field.handleChange(option.value)}
-                      >
-                        <Text style={[styles.chipText, active && styles.chipTextActive]}>{option.label}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+        <ScrollView ref={scrollRef} style={styles.scroll} contentContainerStyle={{ padding: 16 }}>
+          <form.Field
+            name="degatsCultures"
+            validators={{
+              onChange: ({ value }) => (value ? undefined : 'Dégâts sur culture requis'),
+              onBlur: ({ value }) => (value ? undefined : 'Dégâts sur culture requis'),
+            }}
+          >
+            {(field) => {
+              const showError = field.state.meta.isTouched && !field.state.meta.isValid;
+              return (
+                <View style={[styles.card, showError && styles.cardError]}>
+                  <Text style={styles.cardTitle}>Dégâts sur culture</Text>
+                  <View style={styles.chipsRow}>
+                    {DEGATS_OPTIONS.map((option) => {
+                      const active = option.value === field.state.value;
+                      return (
+                        <TouchableOpacity
+                          key={option.value}
+                          style={[styles.chip, styles.chipFlex, active && styles.chipActive]}
+                          onPress={() => {
+                            field.handleChange(option.value);
+                            field.handleBlur();
+                          }}
+                        >
+                          <Text style={[styles.chipText, active && styles.chipTextActive]}>{option.label}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                  {showError && <Text style={styles.errorText}>{field.state.meta.errors[0]}</Text>}
                 </View>
-              </View>
-            )}
+              );
+            }}
           </form.Field>
 
           <form.Field name="ennemisSelected">
@@ -159,12 +169,6 @@ export default function ObservationsScreen() {
               <Text style={styles.photoSlotText}>+ Photo</Text>
             </TouchableOpacity>
           </View>
-
-          {Object.values(formErrors).map((message) => (
-            <Text key={message} style={styles.errorText}>
-              {message}
-            </Text>
-          ))}
         </ScrollView>
 
         <View style={styles.footer}>
@@ -185,6 +189,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 15, fontWeight: '700', color: TEXT },
   scroll: { flex: 1 },
   card: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 12, padding: 14, marginBottom: 11 },
+  cardError: { borderColor: '#c0412b', borderWidth: 1.5 },
   cardTitle: { fontSize: 12.5, fontWeight: '700', color: TEXT, marginBottom: 11 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },
   chip: { paddingHorizontal: 12, paddingVertical: 9, borderRadius: 8, backgroundColor: INACTIVE_BG },

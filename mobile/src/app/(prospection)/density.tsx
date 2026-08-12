@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAsyncAction } from '@/hooks/use-async-action';
 import {
   PopulationRow,
   getProspectionPopulation,
@@ -38,7 +39,7 @@ export default function DensityScreen() {
   const grille = store.grilleOrder[requestedIndex];
 
   const [population, setPopulation] = useState<PopulationRow | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const { run, isRunning: isSaving } = useAsyncAction();
 
   useEffect(() => {
     if (!draftId || !grille) return;
@@ -70,17 +71,20 @@ export default function DensityScreen() {
     }
   };
 
-  const handleContinue = async () => {
-    if (!draftId || isSaving) return;
-    setIsSaving(true);
-    try {
-      await saveProspectionPopulation(draftId, population);
-      // CORRECTION: Utiliser le chemin correct avec les paramètres dans l'URL
-      router.replace(`/(prospection)/accouplement?draftId=${draftId}&grilleIndex=${requestedIndex}`);
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const handleContinue = () =>
+    run(
+      async () => {
+        await saveProspectionPopulation(draftId, population);
+        // CORRECTION: Utiliser le chemin correct avec les paramètres dans l'URL
+        router.replace(`/(prospection)/accouplement?draftId=${draftId}&grilleIndex=${requestedIndex}`);
+      },
+      {
+        screen: 'density',
+        precondition: !!draftId,
+        preconditionMessage: 'Session de saisie perdue — revenez à l’écran précédent et réessayez.',
+        context: { draftId, espece: grille.espece, grilleIndex: requestedIndex },
+      }
+    );
 
   return (
     <View style={styles.root}>

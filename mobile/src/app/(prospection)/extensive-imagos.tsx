@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAsyncAction } from '@/hooks/use-async-action';
 import { Espece } from '@/lib/prospection-especes-stades';
 import { getProspectionPopulation, saveProspectionPopulation } from '@/lib/prospection-repository';
 import {
@@ -29,7 +30,7 @@ export default function ExtensiveImagosScreen() {
     LMC: emptyExtensiveImagoState(),
     NSE: emptyExtensiveImagoState(),
   });
-  const [isSaving, setIsSaving] = useState(false);
+  const { run, isRunning: isSaving } = useAsyncAction();
 
   useEffect(() => {
     if (!draftId) return;
@@ -47,19 +48,22 @@ export default function ExtensiveImagosScreen() {
     setStates((prev) => ({ ...prev, [species]: { ...prev[species], ...patch } }));
   };
 
-  const handleContinue = async () => {
-    if (!draftId || isSaving) return;
-    setIsSaving(true);
-    try {
-      await Promise.all([
-        saveProspectionPopulation(draftId, imagoStateToPopulationRow('LMC', states.LMC)),
-        saveProspectionPopulation(draftId, imagoStateToPopulationRow('NSE', states.NSE)),
-      ]);
-      router.push({ pathname: '/(prospection)/extensive-larves' as any, params: { draftId } });
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const handleContinue = () =>
+    run(
+      async () => {
+        await Promise.all([
+          saveProspectionPopulation(draftId, imagoStateToPopulationRow('LMC', states.LMC)),
+          saveProspectionPopulation(draftId, imagoStateToPopulationRow('NSE', states.NSE)),
+        ]);
+        router.push({ pathname: '/(prospection)/extensive-larves' as any, params: { draftId } });
+      },
+      {
+        screen: 'extensive-imagos',
+        precondition: !!draftId,
+        preconditionMessage: 'Session de saisie perdue — revenez à l’écran précédent et réessayez.',
+        context: { draftId, species },
+      }
+    );
 
   return (
     <View style={styles.root}>

@@ -276,5 +276,6 @@ npx tsc --noEmit   # Vérification TypeScript
 | `docs/adr/ADR-003-mobile.md` | React Native vs PWA |
 | `docs/adr/ADR-006-prospection-unifiee.md` | Table unique discriminée pour les 3 types de prospection |
 | `docs/adr/ADR-004-mobile-scaffolding.md` | Choix techniques du scaffolding mobile |
+| `docs/adr/ADR-008-gestion-erreurs-mobile.md` | Hook centralisé obligatoire pour toute erreur/précondition sur écran mobile |
 | `docs/services/mobile-app/overview.md` | Vue d'ensemble du service mobile |
 | `docs/services/mobile-app/runbooks/development.md` | Procédures de développement mobile |
