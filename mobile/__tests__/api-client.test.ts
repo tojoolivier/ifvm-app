@@ -271,4 +271,87 @@ describe('API Client', () => {
       );
     });
   });
+
+  describe('syncTraitement', () => {
+    it('POSTs to /traitements/sync with the token and body', async () => {
+      mockFetch.mockResolvedValueOnce(mockJsonResponse({
+        ok: true,
+        status: 201,
+        json: async () => ({ id: 'traitement-1' }),
+      }));
+
+      await apiClient.syncTraitement('token', { id: 'traitement-1', type_traitement: 'AERIEN' });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://test-api.com/traitements/sync',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({ 'Authorization': 'Bearer token' }),
+          body: JSON.stringify({ id: 'traitement-1', type_traitement: 'AERIEN' }),
+        })
+      );
+    });
+
+    it('resolves with {status, body} on 201 (created)', async () => {
+      mockFetch.mockResolvedValueOnce(mockJsonResponse({
+        ok: true,
+        status: 201,
+        json: async () => ({ id: 'traitement-1', statut: 'brouillon' }),
+      }));
+
+      const result = await apiClient.syncTraitement('token', { id: 'traitement-1' });
+
+      expect(result).toEqual({ status: 201, body: { id: 'traitement-1', statut: 'brouillon' } });
+    });
+
+    it('resolves with {status, body} on 200 (updated)', async () => {
+      mockFetch.mockResolvedValueOnce(mockJsonResponse({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: 'traitement-1' }),
+      }));
+
+      const result = await apiClient.syncTraitement('token', { id: 'traitement-1' });
+
+      expect(result).toEqual({ status: 200, body: { id: 'traitement-1' } });
+    });
+
+    it('resolves (does not throw) with {status: 409, body} on conflict', async () => {
+      mockFetch.mockResolvedValueOnce(mockJsonResponse({
+        ok: false,
+        status: 409,
+        json: async () => ({ id: 'traitement-1', statut: 'validee' }),
+      }));
+
+      const result = await apiClient.syncTraitement('token', { id: 'traitement-1' });
+
+      expect(result).toEqual({ status: 409, body: { id: 'traitement-1', statut: 'validee' } });
+    });
+
+    it('throws on a genuine 4xx error other than 409', async () => {
+      mockFetch.mockResolvedValueOnce(mockJsonResponse({
+        ok: false,
+        status: 422,
+        json: async () => ({ detail: 'Champ invalide' }),
+      }));
+
+      await expect(apiClient.syncTraitement('token', { id: 'traitement-1' })).rejects.toThrow('Champ invalide');
+    });
+
+    it('throws on a 5xx error', async () => {
+      mockFetch.mockResolvedValueOnce(mockJsonResponse({
+        ok: false,
+        status: 500,
+        json: async () => ({ detail: 'Erreur serveur' }),
+      }));
+
+      await expect(apiClient.syncTraitement('token', { id: 'traitement-1' })).rejects.toThrow();
+    });
+
+    it('throws on network failure', async () => {
+      mockFetch.mockRejectedValueOnce(new Error('Network request failed'));
+
+      await expect(apiClient.syncTraitement('token', { id: 'traitement-1' })).rejects.toThrow('Network request failed');
+    });
+  });
 });
