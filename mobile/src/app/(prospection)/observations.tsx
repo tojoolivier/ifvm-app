@@ -17,6 +17,16 @@ const TEXT_SECONDARY = '#6f6a59';
 const BORDER = '#e7e0cd';
 const INACTIVE_BG = '#efeada';
 
+// ==========================================
+// OPTIONS INTENSITE PLUIE
+// ==========================================
+
+const INTENSITE_PLUIE_OPTIONS = [
+  { value: 'faible', label: 'Faible' },
+  { value: 'moyenne', label: 'Moyenne' },
+  { value: 'forte', label: 'Forte' },
+] as const;
+
 export default function ObservationsScreen() {
   const router = useRouter();
   const { draftId } = useLocalSearchParams<{ draftId: string }>();
@@ -28,21 +38,31 @@ export default function ObservationsScreen() {
 
   const form = useForm({
     defaultValues: {
+      dernierePluieDate: '',
+      intensitePluie: null,
       degatsCultures: null,
       ennemisSelected: initialEnnemis.selected,
       ennemisAutre: initialEnnemis.autre,
       observation: '',
-    } as ObservationsFormValues,
+    } as ObservationsFormValues & {
+      dernierePluieDate: string;
+      intensitePluie: string | null;
+    },
     onSubmitInvalid: () => {
       scrollRef.current?.scrollTo({ y: 0, animated: true });
     },
     onSubmit: async ({ value }) => {
       run(
         async () => {
+          // Mettre à jour la prospection avec les champs de pluie
+          // Note: ces champs doivent être ajoutés dans la table prospection
+          // et dans updateProspectionObservations
           const updated = await updateProspectionObservations(draftId, {
             degatsCultures: value.degatsCultures,
             ennemisNaturels: serializeEnnemis(value.ennemisSelected, value.ennemisAutre),
             observations: value.observation || null,
+            dernierePluie: value.dernierePluieDate || null,
+            intensitePluie: value.intensitePluie || null,
           });
           setDraft(updated);
           router.push({ pathname: '/(prospection)/review' as any, params: { draftId } });
@@ -68,6 +88,60 @@ export default function ObservationsScreen() {
         </View>
 
         <ScrollView ref={scrollRef} style={styles.scroll} contentContainerStyle={{ padding: 16 }}>
+          {/* ==========================================
+              SECTION : DERNIERE PLUIE
+              ========================================== */}
+
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>🌧️ Dernière pluie</Text>
+
+            <form.Field name="dernierePluieDate">
+              {(field) => (
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>Date</Text>
+                  <TextInput
+                    value={field.state.value}
+                    onChangeText={field.handleChange}
+                    placeholder="JJ/MM/AAAA"
+                    style={styles.textInput}
+                    keyboardType="default"
+                  />
+                </View>
+              )}
+            </form.Field>
+
+            <form.Field name="intensitePluie">
+              {(field) => (
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>Intensité</Text>
+                  <View style={styles.chipsRow}>
+                    {INTENSITE_PLUIE_OPTIONS.map((option) => {
+                      const active = option.value === field.state.value;
+                      return (
+                        <TouchableOpacity
+                          key={option.value}
+                          style={[styles.chip, styles.chipFlex, active && styles.chipActive]}
+                          onPress={() => {
+                            field.handleChange(option.value);
+                            field.handleBlur();
+                          }}
+                        >
+                          <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                            {option.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+            </form.Field>
+          </View>
+
+          {/* ==========================================
+              SECTION : DEGATS SUR CULTURE
+              ========================================== */}
+
           <form.Field
             name="degatsCultures"
             validators={{
@@ -102,6 +176,10 @@ export default function ObservationsScreen() {
               );
             }}
           </form.Field>
+
+          {/* ==========================================
+              SECTION : ENNEMIS NATURELS
+              ========================================== */}
 
           <form.Field name="ennemisSelected">
             {(field) => (
@@ -147,6 +225,10 @@ export default function ObservationsScreen() {
             )}
           </form.Field>
 
+          {/* ==========================================
+              SECTION : OBSERVATION LIBRE
+              ========================================== */}
+
           <form.Field name="observation">
             {(field) => (
               <View style={styles.card}>
@@ -162,6 +244,10 @@ export default function ObservationsScreen() {
               </View>
             )}
           </form.Field>
+
+          {/* ==========================================
+              SECTION : PHOTO
+              ========================================== */}
 
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Photo</Text>
@@ -199,6 +285,8 @@ const styles = StyleSheet.create({
   chipTextActive: { fontWeight: '700', color: '#fff' },
   textInput: { backgroundColor: '#f6f3e9', borderRadius: 7, padding: 8, fontSize: 12, fontWeight: '500', color: TEXT, marginTop: 4 },
   textArea: { minHeight: 70, textAlignVertical: 'top' },
+  fieldGroup: { marginBottom: 8 },
+  fieldLabel: { fontSize: 10, fontWeight: '600', color: TEXT_SECONDARY, marginBottom: 4 },
   photoSlot: {
     width: 84,
     height: 84,

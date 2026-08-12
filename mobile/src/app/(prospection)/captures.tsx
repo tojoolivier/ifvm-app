@@ -1,14 +1,39 @@
-import { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { useEffect, useState, useRef } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Alert,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { parseEspeceSelection, buildGrilles } from '@/lib/prospection-especes';
-import { capturesMaxFor, grilleKeyToString } from '@/lib/prospection-especes-stades';
-import { chronoSeconds, formatChrono } from '@/lib/prospection-review';
-import { markGrilleCompleted, saveProspectionCaptures, startCaptureTimer } from '@/lib/prospection-repository';
+import { TextInput } from 'react-native-gesture-handler';
+
+import {
+  parseEspeceSelection,
+  buildGrilles,
+} from '@/lib/prospection-especes';
+
+import {
+  capturesMaxFor,
+  grilleKeyToString,
+} from '@/lib/prospection-especes-stades';
+
+import {
+  chronoSeconds,
+  formatChrono,
+} from '@/lib/prospection-review';
+
+import {
+  markGrilleCompleted,
+  saveProspectionCaptures,
+  startCaptureTimer,
+} from '@/lib/prospection-repository';
+
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
-import { TextInput } from 'react-native-gesture-handler';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -17,12 +42,16 @@ const TEXT_SECONDARY = '#6f6a59';
 const BORDER = '#e7e0cd';
 const INACTIVE_BG = '#efeada';
 
-const ESPECE_LABEL = { LMC: 'Locusta', NSE: 'Nomadacris' } as const;
-const CATEGORIE_LABEL = { imago: 'Imagos', larve: 'Larves' } as const;
+const ESPECE_LABEL = {
+  LMC: 'Locusta',
+  NSE: 'Nomadacris',
+} as const;
 
-// ==========================================
-// CONFIGURATION DES STADES PAR ESPÈCE ET SEXE
-// ==========================================
+const CATEGORIE_LABEL = {
+  imago: 'Imagos',
+  larve: 'Larves',
+} as const;
+
 const STADES_CONFIG = {
   imago: {
     LMC: {
@@ -38,33 +67,20 @@ const STADES_CONFIG = {
     LMC: ['L1', 'L2', 'L3', 'L4', 'L5'],
     NSE: ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'],
   },
-};
+} as const;
 
-// ==========================================
-// CONFIGURATION DES PHASES PAR ESPÈCE ET CATÉGORIE
-// ==========================================
 const PHASES_CONFIG = {
   LMC: {
-    imago: {
-      F: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
-      M: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
-    },
-    larve: {
-      F: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
-      M: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
-    },
+    imago: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
+    larve: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
   },
   NSE: {
-    imago: {
-      F: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
-      M: ['solitaire', 'transiens', 'gregaire'],
-    },
-    larve: {
-      F: ['solitaire', 'transiens', 'gregaire'],
-      M: ['solitaire', 'transiens', 'gregaire'],
-    },
+    imago: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
+    larve: ['solitaire', 'transiens', 'gregaire'],
   },
-};
+} as const;
+
+type Sexe = 'F' | 'M';
 
 function parseGrillesCompletees(raw: string | null): string[] {
   if (!raw) return [];
@@ -78,7 +94,11 @@ function parseGrillesCompletees(raw: string | null): string[] {
 
 export default function CapturesScreen() {
   const router = useRouter();
-  const { draftId, grilleIndex } = useLocalSearchParams<{ draftId: string; grilleIndex: string }>();
+  const { draftId, grilleIndex } = useLocalSearchParams<{
+    draftId: string;
+    grilleIndex: string;
+  }>();
+
   const draft = useProspectionWizardStore((s) => s.draft);
   const captures = useProspectionWizardStore((s) => s.captures);
   const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
@@ -86,80 +106,123 @@ export default function CapturesScreen() {
   const refreshCaptures = useProspectionWizardStore((s) => s.refreshCaptures);
 
   const store = useProspectionCaptureStore();
+  const { grilleOrder, currentGrilleIndex, currentSexe, phasesData, stadesDataF, stadesDataM } = store;
+
   const [tick, setTick] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
+  const [totalCapturesInput, setTotalCapturesInput] = useState('');
+  
+  // Ref pour éviter les boucles infinies
+  const isInitialized = useRef(false);
+  const isHydrated = useRef(false);
 
   const requestedIndex = Number(grilleIndex ?? '0');
-  const grille = store.grilleOrder[store.currentGrilleIndex];
+  const grille = grilleOrder[currentGrilleIndex];
   const isImago = grille?.categorie === 'imago';
   const isLarve = grille?.categorie === 'larve';
 
-  // Récupérer les données du store
-  const currentSexe = store.currentSexe;
-  const stadesData = store.stadesData;
-  const phasesData = store.phasesData;
-  const totalStades = Object.values(stadesData).reduce((a, b) => a + b, 0);
-  const totalPhases = Object.values(phasesData).reduce((a, b) => a + b, 0);
-  const totalCapturesCount = totalPhases;
-  const isConsistent = totalStades === totalPhases;
+  const totalCaptures = Number.parseInt(totalCapturesInput, 10) || 0;
 
-  // Obtenir les listes pour l'affichage
-  const getStadesList = () => {
-    if (!grille) return [];
-    if (grille.categorie === 'imago') {
-      return STADES_CONFIG.imago[grille.espece]?.[currentSexe] || [];
-    } else {
-      return STADES_CONFIG.larve[grille.espece] || [];
-    }
+  const totalPhases = Object.values(phasesData).reduce(
+    (sum, value) => sum + (Number(value) || 0), 0
+  );
+
+  const getStadesFList = () => {
+    if (!grille || grille.categorie !== 'imago') return [];
+    return [...STADES_CONFIG.imago[grille.espece].F];
+  };
+
+  const getStadesMList = () => {
+    if (!grille || grille.categorie !== 'imago') return [];
+    return [...STADES_CONFIG.imago[grille.espece].M];
+  };
+
+  const getLarvesList = () => {
+    if (!grille || grille.categorie !== 'larve') return [];
+    return [...STADES_CONFIG.larve[grille.espece]];
   };
 
   const getPhasesList = () => {
     if (!grille) return [];
-    const category = grille.categorie as 'imago' | 'larve';
-    const sexeKey = grille.categorie === 'imago' ? currentSexe : 'F';
-    return PHASES_CONFIG[grille.espece]?.[category]?.[sexeKey] || [];
+    return [...PHASES_CONFIG[grille.espece][grille.categorie]];
   };
 
-  const stadesList = getStadesList();
+  const stadesFList = getStadesFList();
+  const stadesMList = getStadesMList();
+  const larvesList = getLarvesList();
   const phasesList = getPhasesList();
 
-  // ==========================================
-  // EFFETS
-  // ==========================================
+  const totalStadesF = stadesFList.reduce(
+    (sum, stade) => sum + (Number(stadesDataF[stade]) || 0), 0
+  );
+
+  const totalStadesM = stadesMList.reduce(
+    (sum, stade) => sum + (Number(stadesDataM[stade]) || 0), 0
+  );
+
+  const totalStadesImago = totalStadesF + totalStadesM;
+
+  const totalStadesLarve = larvesList.reduce(
+    (sum, stade) => sum + (Number(store.stadesData[stade]) || 0), 0
+  );
+
+  const totalStades = isImago ? totalStadesImago : totalStadesLarve;
+
+  const isPhasesConsistent = totalPhases === totalCaptures;
+  const isStadesConsistent = totalStades === totalCaptures;
+  const isConsistent = totalCaptures > 0 && isPhasesConsistent && isStadesConsistent;
+
+  // Effet 1: Hydratation initiale - une seule fois
   useEffect(() => {
-    if (!draftId) return;
+    if (!draftId || isHydrated.current) return;
+    
     (async () => {
       if (draft?.id !== draftId) {
         await hydrateFromDraft(draftId);
       }
+      isHydrated.current = true;
     })();
   }, [draftId, draft?.id, hydrateFromDraft]);
 
+  // Effet 2: Initialisation des grilles - une seule fois
   useEffect(() => {
-    if (!draft || draft.id !== draftId) return;
+    if (!draft || draft.id !== draftId || isInitialized.current) return;
     if (store.grilleOrder.length === 0) {
       const selection = parseEspeceSelection(draft.especes);
       const grilles = buildGrilles(selection);
       const completed = parseGrillesCompletees(draft.grilles_completees);
       store.initGrilles(grilles, completed, captures);
+      isInitialized.current = true;
     }
   }, [draft, draftId, captures, store]);
 
+  // Effet 3: Navigation vers la grille demandée - une seule fois
   useEffect(() => {
     if (store.grilleOrder.length > 0 && requestedIndex !== store.currentGrilleIndex) {
       store.goToGrille(requestedIndex, captures);
     }
-  }, [requestedIndex, store.grilleOrder.length, store, captures]);
+  }, [requestedIndex, store.grilleOrder.length]);
 
+  // Effet 4: Timer de capture - une seule fois
   useEffect(() => {
     if (!draftId || draft?.capture_started_at) return;
     startCaptureTimer(draftId).then(setDraft);
   }, [draftId, draft?.capture_started_at, setDraft]);
 
+  // Effet 5: Chronomètre
   useEffect(() => {
     const interval = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleTotalCapturesChange = (text: string) => {
+    setTotalCapturesInput(text);
+  };
+
+  const handleSexeChange = (sexe: Sexe) => {
+    if (sexe === currentSexe) return;
+    store.setSexe(sexe);
+  };
 
   if (!grille) {
     return (
@@ -170,66 +233,182 @@ export default function CapturesScreen() {
   }
 
   const max = capturesMaxFor(grille.espece, grille.categorie);
-  const isLastGrille = store.currentGrilleIndex === store.grilleOrder.length - 1;
+  const isLastGrille = currentGrilleIndex === grilleOrder.length - 1;
   const seconds = chronoSeconds(draft?.capture_started_at ?? null);
   void tick;
 
   const handleBack = () => {
-    if (store.currentGrilleIndex > 0) {
+    if (currentGrilleIndex > 0) {
       router.replace({
         pathname: '/(prospection)/captures' as any,
-        params: { draftId, grilleIndex: String(store.currentGrilleIndex - 1) },
+        params: { draftId, grilleIndex: String(currentGrilleIndex - 1) },
       });
     } else {
-      router.replace({ pathname: '/(prospection)/species' as any, params: { draftId } });
+      router.replace({
+        pathname: '/(prospection)/species' as any,
+        params: { draftId },
+      });
     }
   };
 
   const handleContinue = async () => {
     if (!draftId || isSaving) return;
 
-    if (!isConsistent) {
-      alert(
-        `⚠️ Incohérence des données :\n` +
-        `Somme des stades = ${totalStades}\n` +
-        `Somme des phases = ${totalPhases}\n` +
-        `Les deux sommes doivent être égales.`
+    if (totalCaptures <= 0) {
+      Alert.alert('Nombre de captures', 'Veuillez saisir un nombre de captures supérieur à 0.');
+      return;
+    }
+
+    if (!isPhasesConsistent) {
+      Alert.alert(
+        'Incohérence des phases',
+        `Captures : ${totalCaptures}\nPhases : ${totalPhases}\n\nLa somme des phases doit être exactement égale au nombre de captures.`
       );
       return;
     }
 
+    if (isImago && !isStadesConsistent) {
+      Alert.alert(
+        'Incohérence des stades',
+        `Captures : ${totalCaptures}\nStades femelles : ${totalStadesF}\nStades mâles : ${totalStadesM}\nTotal stades : ${totalStadesF} + ${totalStadesM} = ${totalStadesImago}\n\nLa règle est :\nCaptures = Phases = Stades ♀ + Stades ♂`
+      );
+      return;
+    }
+
+    if (isLarve && !isStadesConsistent) {
+      Alert.alert(
+        'Incohérence des stades larvaires',
+        `Captures : ${totalCaptures}\nPhases : ${totalPhases}\nStades larvaires : ${totalStadesLarve}\n\nLa règle est :\nCaptures = Phases = Stades larvaires`
+      );
+      return;
+    }
+
+    if (!isConsistent) {
+      Alert.alert('Incohérence', `Captures : ${totalCaptures}\nPhases : ${totalPhases}\nStades : ${totalStades}`);
+      return;
+    }
+
     setIsSaving(true);
+
     try {
-      const rows = [];
+      const rows: any[] = [];
 
       if (isImago) {
-        for (const phase of phasesList) {
-          const count = phasesData[phase] || 0;
-          if (count > 0) {
-            rows.push({
-              espece: grille.espece,
-              categorie: grille.categorie,
-              sexe: currentSexe,
-              phase: phase,
-              stade: 'A1',
-              effectif: count,
-            });
+        // Récupérer les phases avec leurs effectifs
+        const phasesWithCounts = phasesList
+          .map(phase => ({ phase, count: Number(phasesData[phase]) || 0 }))
+          .filter(p => p.count > 0);
+
+        if (phasesWithCounts.length === 0) {
+          Alert.alert('Erreur', 'Aucune phase n\'a été renseignée.');
+          setIsSaving(false);
+          return;
+        }
+
+        const totalPhaseCount = phasesWithCounts.reduce((sum, p) => sum + p.count, 0);
+
+        // Fonction pour créer les rows avec répartition des phases
+        const createRowsForStade = (stade: string, count: number, sexe: 'F' | 'M') => {
+          if (count === 0) return;
+          
+          let remaining = count;
+          for (let i = 0; i < phasesWithCounts.length; i++) {
+            const phase = phasesWithCounts[i];
+            if (i === phasesWithCounts.length - 1) {
+              if (remaining > 0) {
+                rows.push({
+                  espece: grille.espece,
+                  categorie: grille.categorie,
+                  sexe: sexe,
+                  phase: phase.phase,
+                  stade: stade,
+                  effectif: remaining,
+                });
+              }
+            } else {
+              const proportion = phase.count / totalPhaseCount;
+              const allocated = Math.round(count * proportion);
+              if (allocated > 0) {
+                rows.push({
+                  espece: grille.espece,
+                  categorie: grille.categorie,
+                  sexe: sexe,
+                  phase: phase.phase,
+                  stade: stade,
+                  effectif: allocated,
+                });
+                remaining -= allocated;
+              }
+            }
           }
+        };
+
+        // Stades femelles
+        for (const stade of stadesFList) {
+          const count = Number(stadesDataF[stade]) || 0;
+          createRowsForStade(stade, count, 'F');
+        }
+
+        // Stades mâles
+        for (const stade of stadesMList) {
+          const count = Number(stadesDataM[stade]) || 0;
+          createRowsForStade(stade, count, 'M');
         }
       } else {
-        for (const phase of phasesList) {
-          const count = phasesData[phase] || 0;
-          if (count > 0) {
-            rows.push({
-              espece: grille.espece,
-              categorie: grille.categorie,
-              sexe: null,
-              phase: phase,
-              stade: 'L1',
-              effectif: count,
-            });
+        // Larves
+        const phasesWithCounts = phasesList
+          .map(phase => ({ phase, count: Number(phasesData[phase]) || 0 }))
+          .filter(p => p.count > 0);
+
+        if (phasesWithCounts.length === 0) {
+          Alert.alert('Erreur', 'Aucune phase n\'a été renseignée.');
+          setIsSaving(false);
+          return;
+        }
+
+        const totalPhaseCount = phasesWithCounts.reduce((sum, p) => sum + p.count, 0);
+
+        for (const stade of larvesList) {
+          const count = Number(store.stadesData[stade]) || 0;
+          if (count === 0) continue;
+
+          let remaining = count;
+          for (let i = 0; i < phasesWithCounts.length; i++) {
+            const phase = phasesWithCounts[i];
+            if (i === phasesWithCounts.length - 1) {
+              if (remaining > 0) {
+                rows.push({
+                  espece: grille.espece,
+                  categorie: grille.categorie,
+                  sexe: null,
+                  phase: phase.phase,
+                  stade: stade,
+                  effectif: remaining,
+                });
+              }
+            } else {
+              const proportion = phase.count / totalPhaseCount;
+              const allocated = Math.round(count * proportion);
+              if (allocated > 0) {
+                rows.push({
+                  espece: grille.espece,
+                  categorie: grille.categorie,
+                  sexe: null,
+                  phase: phase.phase,
+                  stade: stade,
+                  effectif: allocated,
+                });
+                remaining -= allocated;
+              }
+            }
           }
         }
+      }
+
+      if (rows.length === 0) {
+        Alert.alert('Aucune capture', 'Veuillez saisir au moins une capture avant de continuer.');
+        setIsSaving(false);
+        return;
       }
 
       await saveProspectionCaptures(draftId, grille.espece, grille.categorie, rows);
@@ -238,15 +417,21 @@ export default function CapturesScreen() {
       await refreshCaptures();
 
       if (isLastGrille) {
-        router.push({ pathname: '/(prospection)/infestation' as any, params: { draftId } });
+        router.push({
+          pathname: '/(prospection)/infestation' as any,
+          params: { draftId },
+        });
       } else {
-        const nextGrille = store.grilleOrder[store.currentGrilleIndex + 1];
+        const nextGrille = grilleOrder[currentGrilleIndex + 1];
         const nextScreen = nextGrille.categorie === 'imago' ? 'density' : 'captures';
-        router.replace({
+        router.push({
           pathname: `/(prospection)/${nextScreen}` as any,
-          params: { draftId, grilleIndex: String(store.currentGrilleIndex + 1) },
+          params: { draftId, grilleIndex: String(currentGrilleIndex + 1) },
         });
       }
+    } catch (error) {
+      console.error('Erreur sauvegarde captures:', error);
+      Alert.alert('Erreur', 'Une erreur est survenue lors de la sauvegarde des captures.');
     } finally {
       setIsSaving(false);
     }
@@ -254,42 +439,72 @@ export default function CapturesScreen() {
 
   const renderSexeToggle = () => {
     if (!isImago) return null;
-
     return (
       <>
         <View style={styles.sexeRow}>
           <TouchableOpacity
             style={[styles.sexeToggle, currentSexe === 'F' && styles.sexeToggleActive]}
-            onPress={() => store.setSexe('F')}
-            activeOpacity={0.8}
-          >
+            onPress={() => handleSexeChange('F')}>
             <Text style={[styles.sexeText, currentSexe === 'F' && styles.sexeTextActive]}>♀ Femelles</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.sexeToggle, currentSexe === 'M' && styles.sexeToggleActive]}
-            onPress={() => store.setSexe('M')}
-            activeOpacity={0.8}
-          >
+            onPress={() => handleSexeChange('M')}>
             <Text style={[styles.sexeText, currentSexe === 'M' && styles.sexeTextActive]}>♂ Mâles</Text>
           </TouchableOpacity>
         </View>
         <Text style={styles.sexeHint}>
           {currentSexe === 'F'
-            ? '♀ Stades: A1, A2, A3, A3-1/4, A3-1/2, A3-3/4, A3-4/4, A4, A5'
-            : '♂ Stades: A1, A123, A5'}
+            ? '♀ Stades : A1, A2, A3, A3-1/4, A3-1/2, A3-3/4, A3-4/4, A4, A5'
+            : '♂ Stades : A1, A123, A5'}
         </Text>
       </>
     );
   };
 
-  const renderPhases = () => {
-    if (phasesList.length === 0) return null;
-
-    const label = isImago ? 'Phases imagos' : 'Phases larves';
-
+  const renderTotalCaptures = () => {
     return (
-      <View style={[styles.tableSection, { marginTop: 16 }]}>
-        <Text style={styles.sectionLabel}>📊 {label}</Text>
+      <View style={styles.totalCaptureSection}>
+        <Text style={styles.sectionLabel}>📝 1. Nombre total de captures</Text>
+        <View style={styles.totalCaptureInputContainer}>
+          <TextInput
+            value={totalCapturesInput}
+            onChangeText={handleTotalCapturesChange}
+            keyboardType="number-pad"
+            style={styles.totalCaptureInput}
+            placeholder="Saisir le nombre de captures"
+            placeholderTextColor={TEXT_SECONDARY}
+          />
+          <Text style={styles.totalCaptureMax}>/ {max}</Text>
+        </View>
+        {totalCaptures > 0 && (
+          <Text style={styles.totalCaptureInfo}>
+            {totalCaptures} capture{totalCaptures > 1 ? 's' : ''} à répartir
+          </Text>
+        )}
+      </View>
+    );
+  };
+
+  const renderPhases = () => {
+    if (phasesList.length === 0 || totalCaptures === 0) return null;
+    const remaining = totalCaptures - totalPhases;
+    return (
+      <View style={[styles.tableSection, { marginTop: 0 }]}>
+        <Text style={styles.sectionLabel}>📊 2. Phases</Text>
+        <View style={styles.summaryBar}>
+          <Text style={styles.summaryBarText}>
+            Somme des phases :{' '}
+            <Text style={[styles.summaryBarValue, totalPhases === totalCaptures ? styles.validValue : styles.invalidValue]}>
+              {totalPhases}
+            </Text>
+            {totalPhases !== totalCaptures && (
+              <Text style={styles.summaryBarWarning}>
+                {' '}({remaining > 0 ? `reste ${remaining}` : `dépasse de ${Math.abs(remaining)}`})
+              </Text>
+            )}
+          </Text>
+        </View>
         <View style={styles.tableHeader}>
           <Text style={[styles.tableHeaderCell, styles.tableCellStade]}>Phase</Text>
           <Text style={[styles.tableHeaderCell, styles.tableCellValue]}>Effectif</Text>
@@ -303,8 +518,14 @@ export default function CapturesScreen() {
             <TextInput
               value={String(phasesData[phase] || 0)}
               onChangeText={(text) => {
-                const val = parseInt(text) || 0;
-                store.updatePhase(phase, val);
+                const val = Number.parseInt(text, 10) || 0;
+                const current = phasesData[phase] || 0;
+                const newTotal = totalPhases - current + val;
+                if (newTotal <= totalCaptures) {
+                  store.updatePhase(phase, val);
+                } else {
+                  Alert.alert('Limite atteinte', `Le total des phases ne peut pas dépasser ${totalCaptures} captures.`);
+                }
               }}
               keyboardType="number-pad"
               style={[styles.tableCell, styles.tableCellValue, styles.tableInput]}
@@ -312,14 +533,21 @@ export default function CapturesScreen() {
             <View style={[styles.tableCell, styles.tableCellActions, styles.tableActionsRow]}>
               <TouchableOpacity
                 style={styles.smallCounterButton}
-                onPress={() => store.decrementPhase(phase)}
-              >
+                onPress={() => {
+                  const current = phasesData[phase] || 0;
+                  if (current > 0) store.decrementPhase(phase);
+                }}>
                 <Text style={styles.smallCounterText}>−</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.smallCounterButton, styles.smallCounterButtonAdd]}
-                onPress={() => store.incrementPhase(phase)}
-              >
+                onPress={() => {
+                  if (totalPhases < totalCaptures) {
+                    store.incrementPhase(phase);
+                  } else {
+                    Alert.alert('Limite atteinte', `La somme des phases a déjà atteint ${totalCaptures}.`);
+                  }
+                }}>
                 <Text style={[styles.smallCounterText, styles.smallCounterTextAdd]}>+</Text>
               </TouchableOpacity>
             </View>
@@ -327,22 +555,34 @@ export default function CapturesScreen() {
         ))}
         <View style={styles.tableFooter}>
           <Text style={styles.tableFooterText}>
-            Total phases : <Text style={styles.tableFooterValue}>{totalPhases}</Text>
+            Total phases :{' '}
+            <Text style={[styles.tableFooterValue, totalPhases !== totalCaptures && styles.tableFooterValueError]}>
+              {totalPhases}
+            </Text>
           </Text>
         </View>
       </View>
     );
   };
 
-  const renderStades = () => {
-    if (stadesList.length === 0) return null;
-
-    const label = isImago ? 'Par stade' : 'Par stade larvaire';
-    const isLarveSection = isLarve;
+  const renderImagoStades = () => {
+    if (!isImago || totalCaptures === 0) return null;
+    const isFemale = currentSexe === 'F';
+    const stadesList = isFemale ? stadesFList : stadesMList;
+    const data = isFemale ? stadesDataF : stadesDataM;
+    const currentTotal = isFemale ? totalStadesF : totalStadesM;
 
     return (
       <View style={styles.tableSection}>
-        <Text style={styles.sectionLabel}>📊 {label}</Text>
+        <Text style={styles.sectionLabel}>📊 3. Stades {isFemale ? '♀ Femelles' : '♂ Mâles'}</Text>
+        <View style={styles.summaryBar}>
+          <Text style={styles.summaryBarText}>
+            Total {isFemale ? '♀' : '♂'} : <Text style={styles.summaryBarValue}>{currentTotal}</Text>
+          </Text>
+          <Text style={styles.summaryBarSub}>
+            Total stades : {totalStadesF} + {totalStadesM} = {totalStadesImago} / {totalCaptures}
+          </Text>
+        </View>
         <View style={styles.tableHeader}>
           <Text style={[styles.tableHeaderCell, styles.tableCellStade]}>Stade</Text>
           <Text style={[styles.tableHeaderCell, styles.tableCellValue]}>Effectif</Text>
@@ -350,14 +590,18 @@ export default function CapturesScreen() {
         </View>
         {stadesList.map((stade) => (
           <View key={stade} style={styles.tableRow}>
-            <Text style={[styles.tableCell, styles.tableCellStade, styles.tableCellText]}>
-              {stade}
-            </Text>
+            <Text style={[styles.tableCell, styles.tableCellStade, styles.tableCellText]}>{stade}</Text>
             <TextInput
-              value={String(stadesData[stade] || 0)}
+              value={String(data[stade] || 0)}
               onChangeText={(text) => {
-                const val = parseInt(text) || 0;
-                store.updateStade(stade, val);
+                const val = Number.parseInt(text, 10) || 0;
+                const current = data[stade] || 0;
+                const newTotal = currentTotal - current + val;
+                if (newTotal <= totalCaptures) {
+                  store.updateStadeBySex(currentSexe, stade, val);
+                } else {
+                  Alert.alert('Limite atteinte', `Le total des stades ${currentSexe === 'F' ? 'féminins' : 'masculins'} ne peut pas dépasser ${totalCaptures}.`);
+                }
               }}
               keyboardType="number-pad"
               style={[styles.tableCell, styles.tableCellValue, styles.tableInput]}
@@ -365,14 +609,21 @@ export default function CapturesScreen() {
             <View style={[styles.tableCell, styles.tableCellActions, styles.tableActionsRow]}>
               <TouchableOpacity
                 style={styles.smallCounterButton}
-                onPress={() => store.decrementStade(stade)}
-              >
+                onPress={() => {
+                  const current = data[stade] || 0;
+                  if (current > 0) store.decrementStadeBySex(currentSexe, stade);
+                }}>
                 <Text style={styles.smallCounterText}>−</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.smallCounterButton, styles.smallCounterButtonAdd]}
-                onPress={() => store.incrementStade(stade)}
-              >
+                onPress={() => {
+                  if (currentTotal < totalCaptures) {
+                    store.incrementStadeBySex(currentSexe, stade);
+                  } else {
+                    Alert.alert('Limite atteinte', `Le total des stades ${currentSexe === 'F' ? 'féminins' : 'masculins'} a déjà atteint ${totalCaptures}.`);
+                  }
+                }}>
                 <Text style={[styles.smallCounterText, styles.smallCounterTextAdd]}>+</Text>
               </TouchableOpacity>
             </View>
@@ -380,10 +631,184 @@ export default function CapturesScreen() {
         ))}
         <View style={styles.tableFooter}>
           <Text style={styles.tableFooterText}>
-            Total {isLarveSection ? 'larves' : 'stades'} :{' '}
-            <Text style={styles.tableFooterValue}>{totalStades}</Text>
+            Total {isFemale ? '♀' : '♂'} : <Text style={styles.tableFooterValue}>{currentTotal}</Text>
           </Text>
         </View>
+      </View>
+    );
+  };
+
+  const renderLarveStades = () => {
+    if (!isLarve || totalCaptures === 0) return null;
+    const remaining = totalCaptures - totalStadesLarve;
+    return (
+      <View style={styles.tableSection}>
+        <Text style={styles.sectionLabel}>📊 3. Stades larvaires</Text>
+        <View style={styles.summaryBar}>
+          <Text style={styles.summaryBarText}>
+            Somme des stades :{' '}
+            <Text style={[styles.summaryBarValue, totalStadesLarve === totalCaptures ? styles.validValue : styles.invalidValue]}>
+              {totalStadesLarve}
+            </Text>
+            {remaining !== 0 && (
+              <Text style={styles.summaryBarWarning}>
+                {' '}({remaining > 0 ? `reste ${remaining}` : `dépasse de ${Math.abs(remaining)}`})
+              </Text>
+            )}
+          </Text>
+        </View>
+        <View style={styles.tableHeader}>
+          <Text style={[styles.tableHeaderCell, styles.tableCellStade]}>Stade</Text>
+          <Text style={[styles.tableHeaderCell, styles.tableCellValue]}>Effectif</Text>
+          <Text style={[styles.tableHeaderCell, styles.tableCellActions]}>Actions</Text>
+        </View>
+        {larvesList.map((stade) => (
+          <View key={stade} style={styles.tableRow}>
+            <Text style={[styles.tableCell, styles.tableCellStade, styles.tableCellText]}>{stade}</Text>
+            <TextInput
+              value={String(store.stadesData[stade] || 0)}
+              onChangeText={(text) => {
+                const val = Number.parseInt(text, 10) || 0;
+                const current = store.stadesData[stade] || 0;
+                const newTotal = totalStadesLarve - current + val;
+                if (newTotal <= totalCaptures) {
+                  store.updateStade(stade, val);
+                } else {
+                  Alert.alert('Limite atteinte', `Le total des stades larvaires ne peut pas dépasser ${totalCaptures}.`);
+                }
+              }}
+              keyboardType="number-pad"
+              style={[styles.tableCell, styles.tableCellValue, styles.tableInput]}
+            />
+            <View style={[styles.tableCell, styles.tableCellActions, styles.tableActionsRow]}>
+              <TouchableOpacity
+                style={styles.smallCounterButton}
+                onPress={() => {
+                  const current = store.stadesData[stade] || 0;
+                  if (current > 0) store.decrementStade(stade);
+                }}>
+                <Text style={styles.smallCounterText}>−</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.smallCounterButton, styles.smallCounterButtonAdd]}
+                onPress={() => {
+                  if (totalStadesLarve < totalCaptures) {
+                    store.incrementStade(stade);
+                  } else {
+                    Alert.alert('Limite atteinte', `Le total des stades larvaires a déjà atteint ${totalCaptures}.`);
+                  }
+                }}>
+                <Text style={[styles.smallCounterText, styles.smallCounterTextAdd]}>+</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
+        <View style={styles.tableFooter}>
+          <Text style={styles.tableFooterText}>
+            Total larves :{' '}
+            <Text style={[styles.tableFooterValue, totalStadesLarve !== totalCaptures && styles.tableFooterValueError]}>
+              {totalStadesLarve}
+            </Text>
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
+  const renderSummary = () => {
+    if (totalCaptures <= 0) return null;
+    return (
+      <View style={styles.summaryContainer}>
+        <Text style={styles.summaryTitle}>📋 Récapitulatif</Text>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>1. Nombre de captures :</Text>
+          <Text style={[styles.summaryValue, styles.summaryValueValid]}>{totalCaptures}</Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>2. Somme des phases :</Text>
+          <Text style={[styles.summaryValue, isPhasesConsistent ? styles.summaryValueValid : styles.summaryValueInvalid]}>
+            {totalPhases}{isPhasesConsistent ? ' ✅' : ' ❌'}
+          </Text>
+        </View>
+        <View style={styles.summaryDivider} />
+        {isImago ? (
+          <>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>3a. Stades ♀ :</Text>
+              <Text style={styles.summaryValue}>{totalStadesF}</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>3b. Stades ♂ :</Text>
+              <Text style={styles.summaryValue}>{totalStadesM}</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Total stades :</Text>
+              <Text style={[styles.summaryValue, isStadesConsistent ? styles.summaryValueValid : styles.summaryValueInvalid]}>
+                {totalStadesF} + {totalStadesM} = {totalStadesImago}{isStadesConsistent ? ' ✅' : ' ❌'}
+              </Text>
+            </View>
+            <View style={styles.ruleBox}>
+              <Text style={styles.ruleText}>Règle : Captures = Phases = Stades ♀ + ♂</Text>
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>3. Stades larvaires :</Text>
+              <Text style={[styles.summaryValue, isStadesConsistent ? styles.summaryValueValid : styles.summaryValueInvalid]}>
+                {totalStadesLarve}{isStadesConsistent ? ' ✅' : ' ❌'}
+              </Text>
+            </View>
+            <View style={styles.ruleBox}>
+              <Text style={styles.ruleText}>Règle : Captures = Phases = Stades larvaires</Text>
+            </View>
+          </>
+        )}
+      </View>
+    );
+  };
+
+  const renderValidationMessage = () => {
+    if (totalCaptures <= 0) return null;
+    if (isConsistent) {
+      return (
+        <View style={styles.successContainer}>
+          <Text style={styles.successText}>✅ COHÉRENT</Text>
+          {isImago ? (
+            <Text style={styles.successDetail}>
+              {totalCaptures} captures = {totalPhases} phases = {totalStadesF} ♀ + {totalStadesM} ♂ = {totalStadesImago} stades
+            </Text>
+          ) : (
+            <Text style={styles.successDetail}>
+              {totalCaptures} captures = {totalPhases} phases = {totalStadesLarve} stades larvaires
+            </Text>
+          )}
+        </View>
+      );
+    }
+    return (
+      <View style={styles.warningContainer}>
+        <Text style={styles.warningText}>⚠️ INCOHÉRENCE</Text>
+        {isImago ? (
+          <Text style={styles.warningDetail}>
+            Captures : {totalCaptures}
+            {'\n'}Phases : {totalPhases}
+            {'\n'}Stades ♀ : {totalStadesF}
+            {'\n'}Stades ♂ : {totalStadesM}
+            {'\n'}Total stades : {totalStadesF} + {totalStadesM} = {totalStadesImago}
+          </Text>
+        ) : (
+          <Text style={styles.warningDetail}>
+            Captures : {totalCaptures}
+            {'\n'}Phases : {totalPhases}
+            {'\n'}Stades larvaires : {totalStadesLarve}
+          </Text>
+        )}
+        <Text style={styles.warningHint}>
+          {isImago
+            ? 'La règle est : Captures = Phases = Stades ♀ + Stades ♂'
+            : 'La règle est : Captures = Phases = Stades larvaires'}
+        </Text>
       </View>
     );
   };
@@ -399,12 +824,11 @@ export default function CapturesScreen() {
             Captures · {ESPECE_LABEL[grille.espece]} — {CATEGORIE_LABEL[grille.categorie]}
           </Text>
         </View>
-
         <View style={styles.statsRow}>
           <View style={styles.statCardPrimary}>
             <Text style={styles.statLabelPrimary}>Total capturé</Text>
             <Text style={styles.statValuePrimary}>
-              {totalCapturesCount}
+              {totalCaptures}
               <Text style={styles.statValueMax}> / {max}</Text>
             </Text>
           </View>
@@ -416,46 +840,21 @@ export default function CapturesScreen() {
             </Text>
           </View>
         </View>
-
-        <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16 }}>
-          {renderSexeToggle()}
-          {renderStades()}
+        <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
+          {renderTotalCaptures()}
           {renderPhases()}
-
-          <View style={styles.totalCaptureContainer}>
-            <Text style={styles.totalCaptureLabel}>📋 Nombre de captures</Text>
-            <View style={styles.totalCaptureValueContainer}>
-              <Text style={styles.totalCaptureValue}>{totalCapturesCount}</Text>
-            </View>
-          </View>
-
-          {!isConsistent && (
-            <View style={styles.warningContainer}>
-              <Text style={styles.warningText}>
-                ⚠️ Incohérence : les totaux ne correspondent pas !
-              </Text>
-              <Text style={styles.warningDetail}>
-                Stades: {totalStades}  |  Phases: {totalPhases}
-              </Text>
-            </View>
-          )}
-
-          {isConsistent && totalCapturesCount > 0 && (
-            <View style={styles.successContainer}>
-              <Text style={styles.successText}>
-                ✅ Cohérent : {totalCapturesCount} captures
-              </Text>
-            </View>
-          )}
+          {renderSexeToggle()}
+          {renderImagoStades()}
+          {renderLarveStades()}
+          {renderSummary()}
+          {renderValidationMessage()}
         </ScrollView>
-
         <View style={styles.footer}>
           <TouchableOpacity
-            style={[styles.continueButton, !isConsistent && styles.continueButtonDisabled]}
+            style={[styles.continueButton, (!isConsistent || totalCaptures === 0) && styles.continueButtonDisabled]}
             onPress={handleContinue}
-            disabled={isSaving || !isConsistent}
-            activeOpacity={0.85}
-          >
+            disabled={isSaving || !isConsistent || totalCaptures === 0}
+            activeOpacity={0.85}>
             <Text style={styles.continueButtonText}>
               {isLastGrille ? 'Infestation  ›' : 'Grille suivante  ›'}
             </Text>
@@ -469,14 +868,7 @@ export default function CapturesScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
-  headerRow: {
-    paddingHorizontal: 16,
-    paddingTop: 6,
-    paddingBottom: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
+  headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 10 },
   back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
   title: { fontSize: 14, fontWeight: '700', color: TEXT },
   statsRow: { marginHorizontal: 16, marginBottom: 10, flexDirection: 'row', gap: 9 },
@@ -489,172 +881,63 @@ const styles = StyleSheet.create({
   statValueMax: { fontSize: 12, color: '#ffffffb3' },
   statValueMaxDim: { fontSize: 11, color: '#bdb6a2' },
   scroll: { flex: 1 },
-  sexeRow: {
-    flexDirection: 'row',
-    gap: 7,
-    backgroundColor: INACTIVE_BG,
-    borderRadius: 11,
-    padding: 4,
-    marginBottom: 11,
-  },
+  sexeRow: { flexDirection: 'row', gap: 7, backgroundColor: INACTIVE_BG, borderRadius: 11, padding: 4, marginBottom: 11 },
   sexeToggle: { flex: 1, borderRadius: 8, padding: 9, alignItems: 'center' },
   sexeToggleActive: { backgroundColor: '#fff' },
   sexeText: { fontWeight: '700', fontSize: 13, color: '#9a9484' },
   sexeTextActive: { color: TEXT },
   sexeHint: { fontSize: 10, color: '#9a9484', marginBottom: 9 },
-  sectionLabel: {
-    fontSize: 9.5,
-    fontWeight: '600',
-    color: '#9a9484',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 7,
-  },
-  tableSection: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: BORDER,
-    padding: 10,
-    marginBottom: 8,
-  },
-  tableHeader: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-    paddingBottom: 6,
-    marginBottom: 6,
-  },
-  tableHeaderCell: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: TEXT_SECONDARY,
-    textTransform: 'uppercase',
-  },
-  tableRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0eee8',
-  },
-  tableCell: {
-    fontSize: 14,
-    paddingVertical: 4,
-  },
+  sectionLabel: { fontSize: 9.5, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  totalCaptureSection: { backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
+  totalCaptureInputContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  totalCaptureInput: { flex: 1, backgroundColor: '#f8f6f0', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 10, fontSize: 18, fontWeight: '700', color: TEXT },
+  totalCaptureMax: { fontSize: 14, fontWeight: '600', color: TEXT_SECONDARY },
+  totalCaptureInfo: { marginTop: 6, fontSize: 12, color: TEXT_SECONDARY, textAlign: 'center' },
+  tableSection: { backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 10, marginBottom: 8 },
+  summaryBar: { backgroundColor: '#f8f6f0', borderRadius: 6, padding: 8, marginBottom: 10, alignItems: 'center' },
+  summaryBarText: { fontSize: 13, color: TEXT_SECONDARY, textAlign: 'center' },
+  summaryBarSub: { fontSize: 11, color: TEXT_SECONDARY, marginTop: 3 },
+  summaryBarValue: { fontWeight: '700', fontSize: 15 },
+  validValue: { color: GREEN },
+  invalidValue: { color: '#dc2626' },
+  summaryBarWarning: { color: '#dc2626', fontSize: 12 },
+  tableHeader: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, paddingBottom: 6, marginBottom: 6 },
+  tableHeaderCell: { fontSize: 10, fontWeight: '700', color: TEXT_SECONDARY, textTransform: 'uppercase' },
+  tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: '#f0eee8' },
+  tableCell: { fontSize: 14, paddingVertical: 4 },
   tableCellStade: { flex: 1.2 },
   tableCellValue: { flex: 1, textAlign: 'center' },
   tableCellActions: { flex: 1.2, alignItems: 'center' },
   tableCellText: { fontWeight: '600', color: TEXT },
-  tableInput: {
-    backgroundColor: '#f8f6f0',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    textAlign: 'center',
-    fontSize: 16,
-    fontWeight: '700',
-    color: TEXT,
-  },
-  tableActionsRow: {
-    flexDirection: 'row',
-    gap: 6,
-    justifyContent: 'center',
-  },
-  tableFooter: {
-    marginTop: 6,
-    paddingTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: BORDER,
-    alignItems: 'center',
-  },
-  tableFooterText: {
-    fontSize: 12,
-    color: TEXT_SECONDARY,
-  },
-  tableFooterValue: {
-    fontWeight: '700',
-    color: GREEN,
-    fontSize: 14,
-  },
-  smallCounterButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 6,
-    backgroundColor: INACTIVE_BG,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  tableInput: { backgroundColor: '#f8f6f0', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, textAlign: 'center', fontSize: 16, fontWeight: '700', color: TEXT },
+  tableActionsRow: { flexDirection: 'row', gap: 6, justifyContent: 'center' },
+  tableFooter: { marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: BORDER, alignItems: 'center' },
+  tableFooterText: { fontSize: 12, color: TEXT_SECONDARY },
+  tableFooterValue: { fontWeight: '700', color: GREEN, fontSize: 14 },
+  tableFooterValueError: { color: '#dc2626' },
+  smallCounterButton: { width: 28, height: 28, borderRadius: 6, backgroundColor: INACTIVE_BG, alignItems: 'center', justifyContent: 'center' },
   smallCounterButtonAdd: { backgroundColor: GREEN },
   smallCounterText: { fontSize: 14, fontWeight: '700', color: TEXT_SECONDARY },
   smallCounterTextAdd: { color: '#fff' },
-  totalCaptureContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    padding: 14,
-    marginTop: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: BORDER,
-  },
-  totalCaptureLabel: {
-    color: TEXT_SECONDARY,
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  totalCaptureValueContainer: {
-    marginTop: 4,
-  },
-  totalCaptureValue: {
-    color: TEXT,
-    fontSize: 32,
-    fontWeight: '800',
-  },
-  warningContainer: {
-    backgroundColor: '#fef2f2',
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: '#fca5a5',
-  },
-  warningText: {
-    color: '#dc2626',
-    fontWeight: '700',
-    fontSize: 13,
-    textAlign: 'center',
-  },
-  warningDetail: {
-    color: '#dc2626',
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 2,
-  },
-  successContainer: {
-    backgroundColor: '#dcfce7',
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: '#86efac',
-  },
-  successText: {
-    color: '#15803d',
-    fontWeight: '700',
-    fontSize: 13,
-    textAlign: 'center',
-  },
+  summaryContainer: { backgroundColor: '#FFFFFF', borderRadius: 10, padding: 14, marginTop: 12, borderWidth: 1, borderColor: BORDER },
+  summaryTitle: { fontSize: 12, fontWeight: '700', color: TEXT, marginBottom: 8, textAlign: 'center' },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: '#f0eee8' },
+  summaryDivider: { height: 1, backgroundColor: '#f0eee8', marginVertical: 4 },
+  summaryLabel: { fontSize: 13, color: TEXT_SECONDARY },
+  summaryValue: { fontSize: 13, fontWeight: '700', color: TEXT },
+  summaryValueValid: { color: GREEN },
+  summaryValueInvalid: { color: '#dc2626' },
+  ruleBox: { marginTop: 10, backgroundColor: '#f8f6f0', borderRadius: 7, padding: 8 },
+  ruleText: { fontSize: 11, color: TEXT_SECONDARY, textAlign: 'center', fontWeight: '600' },
+  warningContainer: { backgroundColor: '#fef2f2', borderRadius: 8, padding: 10, marginTop: 8, borderWidth: 1, borderColor: '#fca5a5' },
+  warningText: { color: '#dc2626', fontWeight: '700', fontSize: 13, textAlign: 'center' },
+  warningDetail: { color: '#dc2626', fontSize: 12, textAlign: 'center', marginTop: 5, lineHeight: 18 },
+  warningHint: { color: '#dc2626', fontSize: 11, textAlign: 'center', marginTop: 5, fontStyle: 'italic' },
+  successContainer: { backgroundColor: '#dcfce7', borderRadius: 8, padding: 10, marginTop: 8, borderWidth: 1, borderColor: '#86efac' },
+  successText: { color: '#15803d', fontWeight: '700', fontSize: 13, textAlign: 'center' },
+  successDetail: { color: '#15803d', fontSize: 12, textAlign: 'center', marginTop: 3, lineHeight: 18 },
   footer: { padding: 16 },
-  continueButton: {
-    backgroundColor: GREEN,
-    borderRadius: 13,
-    padding: 14,
-    alignItems: 'center',
-  },
-  continueButtonDisabled: {
-    opacity: 0.5,
-  },
+  continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 14, alignItems: 'center' },
+  continueButtonDisabled: { opacity: 0.5 },
   continueButtonText: { color: '#fff', fontWeight: '800', fontSize: 14 },
 });
