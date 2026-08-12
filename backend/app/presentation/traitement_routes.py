@@ -14,6 +14,7 @@ from app.application.traitement_use_cases import (
     RemoveProduitUtilise,
     RemoveRotation,
     UpdateRotation,
+    ValiderTraitement,
 )
 from app.auth import get_current_user
 from app.database import get_db
@@ -27,6 +28,7 @@ from app.domain.traitement import (
     TraitementIntrouvableError,
     TraitementOrigineDejaUtiliseeError,
     TraitementOrigineIntrouvableError,
+    TraitementVerrouilleError,
 )
 from app.infrastructure.prospection_repository import ProspectionRepositoryImpl
 from app.infrastructure.traitement_repository import TraitementRepositoryImpl
@@ -37,6 +39,7 @@ from app.presentation.traitement_schemas import (
     RotationCreate,
     TraitementCreate,
     TraitementRead,
+    ValiderTraitementRequest,
 )
 
 router = APIRouter()
@@ -142,6 +145,7 @@ async def create_traitement(
             surface_disque_rotatif_ha=body.terrestre.surface_disque_rotatif_ha,
             surface_ulvamast_ha=body.terrestre.surface_ulvamast_ha,
             surface_restante_abandonnee=body.terrestre.surface_restante_abandonnee,
+            motif_surface_restante_abandonnee=body.terrestre.motif_surface_restante_abandonnee,
             essence_litres=body.terrestre.essence_litres,
             nb_piles=body.terrestre.nb_piles,
             reprise_traitement=body.terrestre.reprise_traitement,
@@ -192,6 +196,8 @@ async def add_rotation(
         )
     except TraitementIntrouvableError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TraitementVerrouilleError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
 
 @router.put("/{traitement_id}/rotations/{rotation_id}", response_model=TraitementRead)
@@ -217,6 +223,8 @@ async def update_rotation(
         )
     except (TraitementIntrouvableError, RotationIntrouvableError) as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TraitementVerrouilleError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
 
 @router.delete("/{traitement_id}/rotations/{rotation_id}", response_model=TraitementRead)
@@ -231,6 +239,8 @@ async def remove_rotation(
         return await use_case.execute(traitement_id=traitement_id, rotation_id=rotation_id)
     except (TraitementIntrouvableError, RotationIntrouvableError) as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TraitementVerrouilleError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
 
 @router.post("/{traitement_id}/produits", response_model=TraitementRead, status_code=201)
@@ -249,6 +259,8 @@ async def add_produit(
         )
     except TraitementIntrouvableError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TraitementVerrouilleError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
 
 @router.delete("/{traitement_id}/produits/{produit_utilise_id}", response_model=TraitementRead)
@@ -265,3 +277,27 @@ async def remove_produit(
         )
     except (TraitementIntrouvableError, ProduitUtiliseIntrouvableError) as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TraitementVerrouilleError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
+@router.post("/{traitement_id}/valider", response_model=TraitementRead)
+async def valider_traitement(
+    traitement_id: uuid.UUID,
+    body: ValiderTraitementRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = ValiderTraitement(get_repository(db))
+    try:
+        return await use_case.execute(
+            traitement_id=traitement_id,
+            date_validation=body.date_validation,
+            signatures=[s.model_dump(mode="json") for s in body.signatures],
+        )
+    except TraitementIntrouvableError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TraitementVerrouilleError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))

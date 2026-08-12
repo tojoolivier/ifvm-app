@@ -912,3 +912,252 @@ async def test_get_traitement_terrestre(
     assert terrestre["heure_fin"] == "09:00:00"
     assert terrestre["surface_traitee_ha"] == 0.0
     assert terrestre["surface_restante_ha"] == 50.0
+
+
+# ==========================================
+# POST /traitements/{id}/valider — matrice de signatures + verrouillage (CDG §9)
+# ==========================================
+
+
+@pytest.mark.asyncio
+async def test_valider_cycle_aerien_complet(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_rotation
+):
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    await client.post(
+        f"/traitements/{traitement_id}/rotations", json=payload_rotation(), headers=auth_headers
+    )
+
+    resp = await client.post(
+        f"/traitements/{traitement_id}/valider",
+        json={
+            "date_validation": "2026-08-13",
+            "signatures": [
+                {"role": "PILOTE", "signataire_nom": "J. Dupont"},
+                {"role": "MECANICIEN", "signataire_nom": "M. Rabe"},
+                {"role": "CHEF_DE_BASE", "signataire_nom": "Hery Andria"},
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["statut"] == "validee"
+    assert body["date_validation"] == "2026-08-13"
+    assert {s["role"] for s in body["signatures"]} == {"PILOTE", "MECANICIEN", "CHEF_DE_BASE"}
+
+
+@pytest.mark.asyncio
+async def test_valider_cycle_terrestre_complet_sans_agent_encadreur(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+):
+    """Critère CDG §9 : un CRT terrestre sans agent encadreur reste validable."""
+    traitement_id = await _creer_traitement_terrestre(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+    )
+
+    resp = await client.post(
+        f"/traitements/{traitement_id}/valider",
+        json={
+            "date_validation": "2026-08-13",
+            "signatures": [{"role": "CHEF_EQUIPE", "signataire_nom": "Hery"}],
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["statut"] == "validee"
+    assert {s["role"] for s in body["signatures"]} == {"CHEF_EQUIPE"}
+
+
+@pytest.mark.asyncio
+async def test_valider_aerien_consultant_renseigne_sans_signature_422(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+):
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    payload = payload_traitement(prospection_id)
+    payload["aerien"]["consultant_international"] = "Dr. Smith"
+    created = await client.post("/traitements", json=payload, headers=auth_headers)
+    traitement_id = created.json()["id"]
+
+    resp = await client.post(
+        f"/traitements/{traitement_id}/valider",
+        json={
+            "date_validation": "2026-08-13",
+            "signatures": [
+                {"role": "PILOTE", "signataire_nom": "J. Dupont"},
+                {"role": "MECANICIEN", "signataire_nom": "M. Rabe"},
+                {"role": "CHEF_DE_BASE", "signataire_nom": "Hery"},
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_valider_terrestre_surface_restante_abandonnee_sans_motif_422(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+):
+    """Critère CDG §9 : surface_restante_abandonnee=Oui sans motif en Observations bloque."""
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surf_infestee=100.0
+    )
+    payload = payload_traitement_terrestre(prospection_id)
+    payload["terrestre"]["surface_atomiseur_ha"] = 10.0
+    payload["terrestre"]["surface_restante_abandonnee"] = True
+    created = await client.post("/traitements", json=payload, headers=auth_headers)
+    assert created.status_code == 201, created.text
+    traitement_id = created.json()["id"]
+
+    resp = await client.post(
+        f"/traitements/{traitement_id}/valider",
+        json={
+            "date_validation": "2026-08-13",
+            "signatures": [{"role": "CHEF_EQUIPE", "signataire_nom": "Hery"}],
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_valider_terrestre_surface_restante_abandonnee_avec_motif_ok(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+):
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surf_infestee=100.0
+    )
+    payload = payload_traitement_terrestre(prospection_id)
+    payload["terrestre"]["surface_atomiseur_ha"] = 10.0
+    payload["terrestre"]["surface_restante_abandonnee"] = True
+    payload["terrestre"]["motif_surface_restante_abandonnee"] = "Zone inaccessible (crue)"
+    created = await client.post("/traitements", json=payload, headers=auth_headers)
+    traitement_id = created.json()["id"]
+
+    resp = await client.post(
+        f"/traitements/{traitement_id}/valider",
+        json={
+            "date_validation": "2026-08-13",
+            "signatures": [{"role": "CHEF_EQUIPE", "signataire_nom": "Hery"}],
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["statut"] == "validee"
+
+
+@pytest.mark.asyncio
+async def test_valider_traitement_inexistant_404(client, auth_headers, db_engine):
+    resp = await client.post(
+        f"/traitements/{uuid.uuid4()}/valider",
+        json={"date_validation": "2026-08-13", "signatures": []},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_valider_fiche_deja_validee_403(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+):
+    traitement_id = await _creer_traitement_terrestre(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+    )
+    body = {
+        "date_validation": "2026-08-13",
+        "signatures": [{"role": "CHEF_EQUIPE", "signataire_nom": "Hery"}],
+    }
+    first = await client.post(
+        f"/traitements/{traitement_id}/valider", json=body, headers=auth_headers
+    )
+    assert first.status_code == 200
+
+    second = await client.post(
+        f"/traitements/{traitement_id}/valider", json=body, headers=auth_headers
+    )
+    assert second.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_modifier_fiche_aerien_validee_rejetee_sur_tous_les_writes_403(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_rotation
+):
+    """Tentative de modification post-verrouillage : rotations rejetées sur une fiche validée."""
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    added = await client.post(
+        f"/traitements/{traitement_id}/rotations", json=payload_rotation(), headers=auth_headers
+    )
+    rotation_id = added.json()["aerien"]["rotations"][0]["id"]
+
+    await client.post(
+        f"/traitements/{traitement_id}/valider",
+        json={
+            "date_validation": "2026-08-13",
+            "signatures": [
+                {"role": "PILOTE", "signataire_nom": "J. Dupont"},
+                {"role": "MECANICIEN", "signataire_nom": "M. Rabe"},
+                {"role": "CHEF_DE_BASE", "signataire_nom": "Hery"},
+            ],
+        },
+        headers=auth_headers,
+    )
+
+    resp_add = await client.post(
+        f"/traitements/{traitement_id}/rotations", json=payload_rotation(), headers=auth_headers
+    )
+    assert resp_add.status_code == 403
+
+    resp_update = await client.put(
+        f"/traitements/{traitement_id}/rotations/{rotation_id}",
+        json=payload_rotation(),
+        headers=auth_headers,
+    )
+    assert resp_update.status_code == 403
+
+    resp_delete = await client.delete(
+        f"/traitements/{traitement_id}/rotations/{rotation_id}", headers=auth_headers
+    )
+    assert resp_delete.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_modifier_fiche_terrestre_validee_rejetee_sur_tous_les_writes_403(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement_terrestre,
+    payload_produit,
+):
+    traitement_id = await _creer_traitement_terrestre(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+    )
+    added = await client.post(
+        f"/traitements/{traitement_id}/produits", json=payload_produit(), headers=auth_headers
+    )
+    produit_id = added.json()["terrestre"]["produits"][0]["id"]
+
+    await client.post(
+        f"/traitements/{traitement_id}/valider",
+        json={
+            "date_validation": "2026-08-13",
+            "signatures": [{"role": "CHEF_EQUIPE", "signataire_nom": "Hery"}],
+        },
+        headers=auth_headers,
+    )
+
+    resp_add = await client.post(
+        f"/traitements/{traitement_id}/produits", json=payload_produit(), headers=auth_headers
+    )
+    assert resp_add.status_code == 403
+
+    resp_delete = await client.delete(
+        f"/traitements/{traitement_id}/produits/{produit_id}", headers=auth_headers
+    )
+    assert resp_delete.status_code == 403

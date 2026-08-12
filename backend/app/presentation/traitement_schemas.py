@@ -26,6 +26,14 @@ class EmpoisonnementMode(str, Enum):
     AUTRE = "AUTRE"
 
 
+class RoleSignature(str, Enum):
+    PILOTE = "PILOTE"
+    MECANICIEN = "MECANICIEN"
+    CHEF_DE_BASE = "CHEF_DE_BASE"
+    CHEF_EQUIPE = "CHEF_EQUIPE"
+    CONSULTANT_INTERNATIONAL = "CONSULTANT_INTERNATIONAL"
+
+
 class DirectionVent(str, Enum):
     N = "N"
     NE = "NE"
@@ -57,6 +65,7 @@ class TraitementTerrestreCreate(BaseModel):
     surface_disque_rotatif_ha: float | None = Field(None, ge=0)
     surface_ulvamast_ha: float | None = Field(None, ge=0)
     surface_restante_abandonnee: bool | None = None
+    motif_surface_restante_abandonnee: str | None = None
     essence_litres: float | None = Field(None, ge=0)
     nb_piles: int | None = Field(None, ge=0)
     reprise_traitement: bool = False
@@ -177,6 +186,25 @@ class ProduitUtiliseRead(BaseModel):
     quantite_l: float
 
 
+class SignatureCreate(BaseModel):
+    role: RoleSignature
+    signataire_nom: str = Field(..., min_length=1, max_length=255)
+
+
+class ValiderTraitementRequest(BaseModel):
+    date_validation: date
+    signatures: list[SignatureCreate] = []
+
+
+class SignatureRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    role: str
+    signataire_nom: str
+    horodatage: datetime
+
+
 class TraitementAerienRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -209,6 +237,7 @@ class TraitementTerrestreRead(BaseModel):
     surface_cumulee_ha: float | None
     surface_restante_ha: float | None
     surface_restante_abandonnee: bool | None
+    motif_surface_restante_abandonnee: str | None
     essence_litres: float | None
     nb_piles: int | None
     total_pesticide_l: float | None
@@ -258,3 +287,4 @@ class TraitementRead(BaseModel):
     cible: CibleRead | None
     aerien: TraitementAerienRead | None
     terrestre: TraitementTerrestreRead | None
+    signatures: list[SignatureRead] = []

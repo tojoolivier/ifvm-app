@@ -1,6 +1,6 @@
 import uuid
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import date, datetime
 
 from app.domain.campagne import Campagne
 from app.domain.prospection import AuditLog, Prospection
@@ -12,7 +12,7 @@ from app.domain.referentiel import (
     StationFixe,
     UtilisateurEquipe,
 )
-from app.domain.traitement import ProduitUtilise, Rotation, Traitement
+from app.domain.traitement import ProduitUtilise, Rotation, Traitement, TraitementSignature
 from app.domain.utilisateur import UtilisateurRef
 
 
@@ -137,6 +137,15 @@ class TraitementRepository(ABC):
         traitement_id: uuid.UUID,
         produit_utilise_id: uuid.UUID,
         total_pesticide_l: float | None,
+    ) -> Traitement:
+        pass
+
+    @abstractmethod
+    async def valider(
+        self,
+        traitement_id: uuid.UUID,
+        date_validation: date,
+        signatures: list[TraitementSignature],
     ) -> Traitement:
         pass
 

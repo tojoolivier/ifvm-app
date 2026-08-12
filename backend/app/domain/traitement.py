@@ -5,6 +5,24 @@ from typing import Any
 
 from app.domain.prospection import Prospection
 
+# Matrice de signatures (CDG section 3) : rôle de signature -> champ de saisie dont le
+# renseignement rend la signature obligatoire, par type de traitement. L'agent encadreur
+# est volontairement absent des deux branches : il ne signe jamais, même renseigné — déjà
+# garanti structurellement par la contrainte CHECK sur traitement_signature.role (migration
+# 0010), qui n'énumère pas AGENT_ENCADREUR.
+_MATRICE_SIGNATURES: dict[str, dict[str, str]] = {
+    "AERIEN": {
+        "PILOTE": "pilote",
+        "MECANICIEN": "mecanicien",
+        "CHEF_DE_BASE": "chef_de_base_id",
+        "CONSULTANT_INTERNATIONAL": "consultant_international",
+    },
+    "TERRESTRE": {
+        "CHEF_EQUIPE": "chef_equipe_id",
+        "CONSULTANT_INTERNATIONAL": "consultant_international",
+    },
+}
+
 
 class ProspectionIntrouvableError(LookupError):
     """La prospection liée au traitement n'existe pas."""
@@ -40,6 +58,18 @@ class TraitementOrigineIntrouvableError(LookupError):
 
 class TraitementOrigineDejaUtiliseeError(Exception):
     """La fiche d'origine est déjà désignée comme origine par une autre fiche (chaîne linéaire)."""
+
+
+class TraitementVerrouilleError(PermissionError):
+    """La fiche n'est plus `brouillon` — verrouillage post-validation."""
+
+
+class SignaturesManquantesError(ValueError):
+    """Un ou plusieurs rôles renseignés n'ont pas de signature correspondante (CDG §9)."""
+
+
+class MotifAbandonManquantError(ValueError):
+    """surface_restante_abandonnee=True sans motif renseigné (CDG §9)."""
 
 
 @dataclass
@@ -115,6 +145,7 @@ class TraitementTerrestre:
     surface_cumulee_ha: float | None = None
     surface_restante_ha: float | None = None
     surface_restante_abandonnee: bool | None = None
+    motif_surface_restante_abandonnee: str | None = None
     essence_litres: float | None = None
     nb_piles: int | None = None
     total_pesticide_l: float | None = None
@@ -142,6 +173,15 @@ class TraitementTerrestre:
             if surface_infestee_ha is not None
             else None
         )
+
+
+@dataclass
+class TraitementSignature:
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    traitement_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    role: str = ""
+    signataire_nom: str = ""
+    horodatage: datetime = field(default_factory=datetime.utcnow)
 
 
 @dataclass
@@ -186,6 +226,74 @@ class Traitement:
     cible: Cible | None = None
     aerien: TraitementAerien | None = None
     terrestre: TraitementTerrestre | None = None
+    signatures: list[TraitementSignature] = field(default_factory=list)
+
+    def verifier_modifiable(self) -> None:
+        """Garde commune, réutilisée par tous les writes (rotations, produits, validation).
+
+        Un seul point de vérité pour le verrouillage post-validation (décision #64).
+        """
+        if self.statut != "brouillon":
+            raise TraitementVerrouilleError("Seules les fiches en brouillon peuvent être modifiées")
+
+    def valider(
+        self, date_validation: date, signatures: list[dict[str, str]]
+    ) -> list[TraitementSignature]:
+        """Applique la matrice de signatures puis transitionne vers `validee` (CDG §9).
+
+        Dernier verrou avant verrouillage définitif — appelé juste avant la transition de
+        statut et avant l'écriture des lignes `traitement_signature`, jamais après.
+        """
+        self.verifier_modifiable()
+
+        if date_validation < self.date_traitement:
+            raise ValueError("date_validation doit être postérieure ou égale à date_traitement")
+
+        specialisation = self.aerien if self.type_traitement == "AERIEN" else self.terrestre
+        matrice = _MATRICE_SIGNATURES[self.type_traitement]
+
+        fournies = {s["role"]: s["signataire_nom"] for s in signatures}
+
+        roles_invalides = set(fournies) - set(matrice)
+        if roles_invalides:
+            raise ValueError(
+                "Rôle(s) de signature invalide(s) pour ce type de traitement : "
+                + ", ".join(sorted(roles_invalides))
+            )
+
+        manquants = [
+            role
+            for role, champ in matrice.items()
+            if getattr(specialisation, champ) and role not in fournies
+        ]
+        if manquants:
+            raise SignaturesManquantesError(
+                "Signature(s) manquante(s) pour le(s) rôle(s) renseigné(s) : "
+                + ", ".join(manquants)
+            )
+
+        if (
+            self.type_traitement == "TERRESTRE"
+            and self.terrestre.surface_restante_abandonnee
+            and not self.terrestre.motif_surface_restante_abandonnee
+        ):
+            raise MotifAbandonManquantError(
+                "motif_surface_restante_abandonnee est obligatoire lorsque "
+                "surface_restante_abandonnee=True"
+            )
+
+        now = datetime.utcnow()
+        signature_objs = [
+            TraitementSignature(
+                traitement_id=self.id, role=role, signataire_nom=nom, horodatage=now
+            )
+            for role, nom in fournies.items()
+        ]
+
+        self.date_validation = date_validation
+        self.statut = "validee"
+        self.signatures = signature_objs
+        return signature_objs
 
 
 def generer_numero_fiche(

@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
@@ -14,6 +15,7 @@ from app.domain.traitement import (
     Traitement,
     TraitementAerien,
     TraitementOrigineDejaUtiliseeError,
+    TraitementSignature,
     TraitementTerrestre,
 )
 from app.infrastructure.traitement_model import (
@@ -22,6 +24,7 @@ from app.infrastructure.traitement_model import (
     RotationModel,
     TraitementAerienModel,
     TraitementModel,
+    TraitementSignatureModel,
     TraitementTerrestreModel,
 )
 
@@ -40,6 +43,7 @@ class TraitementRepositoryImpl(TraitementRepository):
                 selectinload(TraitementModel.terrestre).selectinload(
                     TraitementTerrestreModel.produits
                 ),
+                selectinload(TraitementModel.signatures),
             )
         )
         model = result.scalar_one_or_none()
@@ -58,6 +62,7 @@ class TraitementRepositoryImpl(TraitementRepository):
             selectinload(TraitementModel.cible),
             selectinload(TraitementModel.aerien).selectinload(TraitementAerienModel.rotations),
             selectinload(TraitementModel.terrestre).selectinload(TraitementTerrestreModel.produits),
+            selectinload(TraitementModel.signatures),
         )
         if type_traitement is not None:
             stmt = stmt.where(TraitementModel.type_traitement == type_traitement)
@@ -173,6 +178,9 @@ class TraitementRepositoryImpl(TraitementRepository):
                 surface_cumulee_ha=traitement.terrestre.surface_cumulee_ha,
                 surface_restante_ha=traitement.terrestre.surface_restante_ha,
                 surface_restante_abandonnee=traitement.terrestre.surface_restante_abandonnee,
+                motif_surface_restante_abandonnee=(
+                    traitement.terrestre.motif_surface_restante_abandonnee
+                ),
                 essence_litres=traitement.terrestre.essence_litres,
                 nb_piles=traitement.terrestre.nb_piles,
                 total_pesticide_l=traitement.terrestre.total_pesticide_l,
@@ -284,6 +292,29 @@ class TraitementRepositoryImpl(TraitementRepository):
         await self.session.delete(produit_model)
 
         await self._persister_total_pesticide(traitement_id, total_pesticide_l)
+        return await self.get_by_id(traitement_id)
+
+    async def valider(
+        self,
+        traitement_id: uuid.UUID,
+        date_validation: date,
+        signatures: list[TraitementSignature],
+    ) -> Traitement:
+        model = await self.session.get(TraitementModel, traitement_id)
+        model.date_validation = date_validation
+        model.statut = "validee"
+        for signature in signatures:
+            self.session.add(
+                TraitementSignatureModel(
+                    id=signature.id,
+                    traitement_id=traitement_id,
+                    role=signature.role,
+                    signataire_nom=signature.signataire_nom,
+                    horodatage=signature.horodatage,
+                )
+            )
+        await self.session.commit()
+        self.session.expire(model, ["signatures"])
         return await self.get_by_id(traitement_id)
 
     async def _persister_total_pesticide(
@@ -422,6 +453,9 @@ class TraitementRepositoryImpl(TraitementRepository):
                 if model.terrestre.surface_restante_ha is not None
                 else None,
                 surface_restante_abandonnee=model.terrestre.surface_restante_abandonnee,
+                motif_surface_restante_abandonnee=(
+                    model.terrestre.motif_surface_restante_abandonnee
+                ),
                 essence_litres=float(model.terrestre.essence_litres)
                 if model.terrestre.essence_litres is not None
                 else None,
@@ -442,4 +476,14 @@ class TraitementRepositoryImpl(TraitementRepository):
             )
             if model.terrestre is not None
             else None,
+            signatures=[
+                TraitementSignature(
+                    id=s.id,
+                    traitement_id=s.traitement_id,
+                    role=s.role,
+                    signataire_nom=s.signataire_nom,
+                    horodatage=s.horodatage,
+                )
+                for s in model.signatures
+            ],
         )
