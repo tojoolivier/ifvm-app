@@ -32,15 +32,18 @@ export function SegmentedControl<T extends string>({ options, value, onChange, d
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: 6, backgroundColor: traitementColors.chipInactiveAlt, borderRadius: traitementRadii.chip, padding: 3 },
+  row: { flexDirection: 'row', gap: 8 },
   segment: {
     flex: 1,
     minHeight: 44,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: traitementRadii.chip - 1,
+    borderRadius: traitementRadii.chip,
+    borderWidth: 1,
+    borderColor: traitementColors.bordure,
+    backgroundColor: traitementColors.carte,
   },
-  segmentSelected: { backgroundColor: traitementColors.vertPrincipal },
+  segmentSelected: { backgroundColor: traitementColors.vertPrincipal, borderColor: traitementColors.vertPrincipal },
   label: {
     fontFamily: traitementFonts.uiSemiBold,
     fontSize: traitementTypeSizes.corps,
