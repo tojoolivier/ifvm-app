@@ -115,6 +115,7 @@ class TraitementCreate(BaseModel):
     comportement_non_cibles: dict[str, Any] | None = None
     mortalite: bool = False
     mortalite_familles: dict[str, Any] | None = None
+    observations: str | None = None
 
     aerien: TraitementAerienCreate | None = None
     terrestre: TraitementTerrestreCreate | None = None
@@ -288,6 +289,7 @@ class TraitementRead(BaseModel):
     comportement_non_cibles: dict[str, Any] | None
     mortalite: bool
     mortalite_familles: dict[str, Any] | None
+    observations: str | None
     statut: str
     statut_sync: str
     created_at: datetime

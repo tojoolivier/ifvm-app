@@ -74,6 +74,26 @@ async def test_create_traitement_aerien_brouillon(
     assert body["cible"]["espece"] == "LMC"
     assert body["cible"]["surface_infestee_ha"] == 120.5
     assert body["aerien"]["pilote"] == "J. Dupont"
+    assert body["observations"] is None
+
+
+@pytest.mark.asyncio
+async def test_create_traitement_avec_observations(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+):
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    resp = await client.post(
+        "/traitements",
+        json=payload_traitement(prospection_id, observations="RAS, vent calme toute la matinée"),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["observations"] == "RAS, vent calme toute la matinée"
+
+    get_resp = await client.get(f"/traitements/{body['id']}", headers=auth_headers)
+    assert get_resp.status_code == 200
+    assert get_resp.json()["observations"] == "RAS, vent calme toute la matinée"
 
 
 @pytest.mark.asyncio

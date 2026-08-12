@@ -136,6 +136,7 @@ class TraitementRepositoryImpl(TraitementRepository):
             comportement_non_cibles=traitement.comportement_non_cibles,
             mortalite=traitement.mortalite,
             mortalite_familles=traitement.mortalite_familles,
+            observations=traitement.observations,
             statut=traitement.statut,
             statut_sync=traitement.statut_sync,
             created_at=traitement.created_at,
@@ -352,6 +353,7 @@ class TraitementRepositoryImpl(TraitementRepository):
         model.comportement_non_cibles = traitement.comportement_non_cibles
         model.mortalite = traitement.mortalite
         model.mortalite_familles = traitement.mortalite_familles
+        model.observations = traitement.observations
         model.statut_sync = "synced"
         model.updated_at = traitement.updated_at
 
@@ -477,6 +479,7 @@ class TraitementRepositoryImpl(TraitementRepository):
             comportement_non_cibles=model.comportement_non_cibles,
             mortalite=model.mortalite,
             mortalite_familles=model.mortalite_familles,
+            observations=model.observations,
             statut=model.statut,
             statut_sync=model.statut_sync,
             created_at=model.created_at,
