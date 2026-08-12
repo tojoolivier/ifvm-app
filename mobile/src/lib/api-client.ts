@@ -356,8 +356,6 @@ const getBaseUrl = (): string => {
   return process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 };
 
-const API_URL = getBaseUrl();
-
 interface FastApiValidationError {
   loc: (string | number)[];
   msg: string;
@@ -577,11 +575,70 @@ export const apiClient = {
     return makeRequest<void>(`/prospections/${id}`, { method: 'DELETE' }, token, onUnauthorized);
   },
 
+  /**
+   * POST /traitements/sync — contrairement à makeRequest(), ne jette pas sur un
+   * 409 (conflit ou fiche verrouillée) : l'appelant a besoin du corps
+   * `TraitementRead` renvoyé par le serveur pour le mettre en cache localement
+   * (statut_sync = 'conflict'). Jette bien sur toute autre erreur (réseau,
+   * 4xx ≠ 409, 5xx), comme changePassword ci-dessous.
+   */
+  syncTraitement: async (
+    token: string,
+    body: unknown
+  ): Promise<{ status: number; body: unknown }> => {
+    const url = `${getBaseUrl()}/traitements/sync`;
+    const startedAt = new Date();
+    const startTime = Date.now();
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      });
+    } catch (error) {
+      logRequest({
+        method: 'POST',
+        url,
+        status: null,
+        ok: false,
+        durationMs: Date.now() - startTime,
+        startedAt: startedAt.toISOString(),
+        requestBody: JSON.stringify(body),
+        error: error instanceof Error ? error.message : 'Erreur réseau',
+      });
+      throw error;
+    }
+
+    const responseBody = await response.json().catch(() => ({}));
+
+    logRequest({
+      method: 'POST',
+      url,
+      status: response.status,
+      ok: response.ok,
+      durationMs: Date.now() - startTime,
+      startedAt: startedAt.toISOString(),
+      requestBody: JSON.stringify(body),
+      responseBody: JSON.stringify(responseBody),
+    });
+
+    if (!response.ok && response.status !== 409) {
+      throw new Error(extractErrorMessage(responseBody) || `HTTP error! status: ${response.status}`);
+    }
+
+    return { status: response.status, body: responseBody };
+  },
+
   changePassword: async (
     data: { currentPassword: string; newPassword: string },
     token: string | null
   ): Promise<void> => {
-    const url = `${API_URL}/auth/change-password`;
+    const url = `${getBaseUrl()}/auth/change-password`;
     const startedAt = new Date();
     const startTime = Date.now();
     try {
