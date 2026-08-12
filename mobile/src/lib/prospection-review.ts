@@ -4,6 +4,7 @@ import {
   ProspectionCaptureInput,
   ProspectionInfestationInput,
   ProspectionPopulationInput,
+  ProspectionCreateInput,
 } from './api-client';
 import {
   CaptureRow,
@@ -183,7 +184,7 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
   }
   
   return {
-    type_prospection: draft.type_prospection,
+    type_prospection: draft.type_prospection as ProspectionCreateInput['type_prospection'],
     campagne_id: draft.campagne_id,
     station_id: stationId || null,
     n_releve: draft.n_releve || null,
@@ -193,11 +194,11 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
     latitude: draft.latitude ? Number(draft.latitude) : null,
     longitude: draft.longitude ? Number(draft.longitude) : null,
     altitude: draft.altitude ? Number(draft.altitude) : null,
-    biotope: draft.biotope || null,
+    biotope: (draft.biotope || null) as ProspectionCreateInput['biotope'],
     surf_station: draft.surf_station ? Number(draft.surf_station) : null,
     surf_prospectee: draft.surf_prospectee ? Number(draft.surf_prospectee) : null,
     surf_infestee: draft.surf_infestee ? Number(draft.surf_infestee) : null,
-    degats_cultures: draft.degats_cultures || null,
+    degats_cultures: (draft.degats_cultures || null) as ProspectionCreateInput['degats_cultures'],
     derniere_pluie: draft.derniere_pluie || null,
     intensite_pluie: draft.intensite_pluie || null,
     vegetation: draft.vegetation ? JSON.parse(draft.vegetation) : null,
@@ -273,14 +274,14 @@ function buildInfestationsPayload(rows: InfestationRow[]): ProspectionInfestatio
     taille_epaisseur: row.taille_epaisseur ? Number(row.taille_epaisseur) : null,
     essaim_en_vol: row.essaim_en_vol != null ? Boolean(row.essaim_en_vol) : null,
     essaim_pose: row.essaim_pose != null ? Boolean(row.essaim_pose) : null,
-    type_essaim: row.type_essaim || null,
+    type_essaim: (row.type_essaim || null) as ProspectionInfestationInput['type_essaim'],
     nb_taches_bandes: row.nb_taches_bandes ? Number(row.nb_taches_bandes) : null,
     interdistance_m: row.interdistance_m ? Number(row.interdistance_m) : null,
     interdistance_min: row.interdistance_min ? Number(row.interdistance_min) : null,
     interdistance_max: row.interdistance_max ? Number(row.interdistance_max) : null,
     interdistance_moy: row.interdistance_moy ? Number(row.interdistance_moy) : null,
     surface_contaminee_ha: row.surface_contaminee_ha ? Number(row.surface_contaminee_ha) : null,
-    type_larve: row.type_larve || null,
+    type_larve: (row.type_larve || null) as ProspectionInfestationInput['type_larve'],
     surf_infestee_pourcent: row.surf_infestee_pourcent ? Number(row.surf_infestee_pourcent) : null,
   }));
 }

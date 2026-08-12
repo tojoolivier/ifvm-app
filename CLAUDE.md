@@ -22,3 +22,12 @@ After every frontend modification (new component, style change, token update), r
 npx @google/design.md lint DESIGN.md
 ```
 Fix all warnings before considering the task done.
+
+### Contrat API mobile ↔ backend
+
+Le mobile ne doit jamais recopier à la main les colonnes/schémas du backend (ORM SQLAlchemy, Pydantic). Utiliser le contrat OpenAPI exposé par FastAPI (`/openapi.json`) comme source de vérité :
+
+- Types TypeScript : `mobile/src/lib/api-schema.generated.ts`, régénéré via `npm run generate:api-types` (backend démarré localement, `API_URL` pointe dessus par défaut sur `http://localhost:8000`).
+- `mobile/src/lib/api-client.ts` doit utiliser les types de `api-schema.generated.ts` (`components['schemas'][...]`) pour tout ce qui correspond à un schéma Pydantic — ne pas redéfinir ces interfaces à la main.
+- Après toute migration Alembic touchant un champ envoyé/reçu par le mobile (population, capture, infestation, traitement, ...), régénérer `api-schema.generated.ts` et lancer `npm run check:schema-drift` pour vérifier que le schéma SQLite local (`prospection-db.ts`, `traitement-db.ts`) suit.
+- Le schéma SQLite local reste écrit à la main (c'est un cache offline, pas un miroir 1:1 obligatoire), mais toute divergence détectée par `check:schema-drift` doit être traitée avant de merger — c'est exactement ce type de dérive qui a causé un écran blanc silencieux (colonne `phase` ajoutée côté backend, jamais répercutée côté mobile).

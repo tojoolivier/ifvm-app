@@ -9,6 +9,7 @@ const MIGRATED_COLUMNS = [
   'surface_contaminee_ha', 'type_larve', 'surf_infestee_pourcent',
   'station_libre', 'type_station', 'verdure_strate',
   'signalement_source', 'signalement_date', 'signalement_description', 'conclusion_validation',
+  'phase', 'captures_nombre', 'temps_capture',
   'captures_sol', 'captures_trans', 'captures_greg', 'stade_imago', 'essaim_observe',
   'densites_larve', 'tache_larvaire', 'bande_larvaire', 'interdistance', 'deplacement',
 ].map((name) => ({ name }));

@@ -1,4 +1,5 @@
 import { useRequestLogStore, RequestLogEntry } from './request-log-store';
+import type { components } from './api-schema.generated';
 
 const REDACTED = '[redacted]';
 
@@ -63,217 +64,21 @@ export interface User {
   created_at: string;
 }
 
-export interface ProspectionCaptureInput {
-  espece: string;
-  categorie: string;
-  sexe: string | null;
-  phase: string;
-  stade: string;
-  effectif: number;
-}
-
-export interface ProspectionPopulationInput {
-  espece: string;
-  categorie: string;
-  densite_diffuse?: number | null;
-  densite_groupee?: number | null;
-  captures_nombre?: number | null;
-  temps_capture?: number | null;
-  methode?: string | null;
-  phase?: string | null;
-  accouplement?: string | null;
-  ponte?: string | null;
-  // ========== Extensif Imagos (B) ==========
-  captures_sol?: number | null;
-  captures_trans?: number | null;
-  captures_greg?: number | null;
-  stade_imago?: string | null;
-  essaim_observe?: boolean | null;
-  // ========== Extensif Larves (C) ==========
-  densites_larve?: Record<string, number> | null;
-  tache_larvaire?: boolean | null;
-  bande_larvaire?: boolean | null;
-  interdistance?: number | null;
-  deplacement?: string | null;
-}
-
-export interface ProspectionInfestationInput {
-  espece?: string | null;
-  type_cible: string;
-  taille_min?: number | null;
-  taille_max?: number | null;
-  taille_moy?: number | null;
-  surface_tot?: number | null;
-  densite_min?: number | null;
-  densite_max?: number | null;
-  densite_moy?: number | null;
-  interdistance?: number | null;
-  comportement?: string | null;
-  direction_de?: string | null;
-  direction_vers?: string | null;
-  vent_de?: string | null;
-  vent_vitesse?: number | null;
-  pullulation_nb?: number | null;
-  taille_long?: number | null;
-  taille_large?: number | null;
-  taille_epaisseur?: number | null;
-  essaim_en_vol?: boolean | null;
-  essaim_pose?: boolean | null;
-  type_essaim?: string | null;
-  nb_taches_bandes?: number | null;
-  interdistance_m?: number | null;
-  interdistance_min?: number | null;
-  interdistance_max?: number | null;
-  interdistance_moy?: number | null;
-  surface_contaminee_ha?: number | null;
-  type_larve?: string | null;
-  surf_infestee_pourcent?: number | null;
-}
-
-export interface ProspectionCreateInput {
-  type_prospection: string;
-  campagne_id: string;
-  station_id?: string | null;
-  n_releve?: string | null;
-  n_fiche?: string | null;
-  date_prospection: string;
-  latitude?: number | null;
-  longitude?: number | null;
-  altitude?: number | null;
-  surf_station?: number | null;
-  surf_prospectee?: number | null;
-  surf_infestee?: number | null;
-  degats_cultures?: string | null;
-  derniere_pluie?: string | null;
-  intensite_pluie?: string | null;
-  vegetation?: Record<string, unknown> | null;
-  sol?: Record<string, unknown> | null;
-  ennemis_naturels?: string | null;
-  observations?: string | null;
-  statut?: string;
-  captures?: ProspectionCaptureInput[];
-  populations?: ProspectionPopulationInput[];
-  infestations?: ProspectionInfestationInput[];
-  // ========== NOUVEAUX CHAMPS ==========
-  region?: string | null;
-  district?: string | null;
-  commune?: string | null;
-  za?: string | null;
-  pa_code?: string | null;
-  degats_cultures_pourcent?: number | null;
-  verdissement_pourcent?: number | null;
-  hauteur_herbe_cm?: number | null;
-  // ========== Extensif & Validation ==========
-  station_libre?: string | null;
-  type_station?: string | null;
-  verdure_strate?: string | null;
-  signalement_source?: string | null;
-  signalement_date?: string | null;
-  signalement_description?: string | null;
-  conclusion_validation?: string | null;
-}
+// Types alignés sur le contrat OpenAPI backend (mobile/src/lib/api-schema.generated.ts),
+// pour ne plus recopier les champs à la main (voir CLAUDE.md "Contrat API mobile ↔ backend").
+export type ProspectionCaptureInput = components['schemas']['CaptureCreate'];
+export type ProspectionPopulationInput = components['schemas']['PopulationCreate'];
+export type ProspectionInfestationInput = components['schemas']['InfestationCreate'];
+export type ProspectionCreateInput = components['schemas']['ProspectionCreate'];
 
 export interface ProspectionCreateResponse {
   id: string;
 }
 
-export interface PopulationRead {
-  id: string;
-  espece: string;
-  categorie: string;
-  densite_diffuse: number | null;
-  densite_groupee: number | null;
-  captures_nombre: number | null;
-  temps_capture: number | null;
-  methode: string | null;
-  phase: string | null;
-  accouplement: string | null;
-  ponte: string | null;
-}
-
-export interface CaptureRead {
-  id: string;
-  espece: string;
-  categorie: string;
-  sexe: string | null;
-  phase: string;
-  stade: string;
-  effectif: number;
-}
-
-export interface InfestationRead {
-  id: string;
-  espece: string | null;
-  type_cible: string;
-  taille_min: number | null;
-  taille_max: number | null;
-  taille_moy: number | null;
-  surface_tot: number | null;
-  densite_min: number | null;
-  densite_max: number | null;
-  densite_moy: number | null;
-  interdistance: number | null;
-  comportement: string | null;
-  direction_de: string | null;
-  direction_vers: string | null;
-  vent_de: string | null;
-  vent_vitesse: number | null;
-  // ========== NOUVEAUX CHAMPS ==========
-  pullulation_nb: number | null;
-  taille_long: number | null;
-  taille_large: number | null;
-  taille_epaisseur: number | null;
-  essaim_en_vol: boolean | null;
-  essaim_pose: boolean | null;
-  type_essaim: string | null;
-  nb_taches_bandes: number | null;
-  interdistance_m: number | null;
-  surface_contaminee_ha: number | null;
-  type_larve: string | null;
-  surf_infestee_pourcent: number | null;
-}
-
-export interface ProspectionRead {
-  id: string;
-  type_prospection: string;
-  campagne_id: string;
-  prospecteur_id: string;
-  station_id: string | null;
-  n_releve: string | null;
-  n_fiche: string | null;
-  n_message: string | null;
-  date_prospection: string;
-  latitude: number | null;
-  longitude: number | null;
-  altitude: number | null;
-  biotope: string | null;
-  surf_station: number | null;
-  surf_prospectee: number | null;
-  surf_infestee: number | null;
-  degats_cultures: string | null;
-  derniere_pluie: string | null;
-  intensite_pluie: string | null;
-  vegetation: Record<string, unknown> | null;
-  sol: Record<string, unknown> | null;
-  ennemis_naturels: string | null;
-  observations: string | null;
-  statut: string;
-  statut_sync: string;
-  created_at: string;
-  updated_at: string;
-  populations: PopulationRead[];
-  captures: CaptureRead[];
-  infestations: InfestationRead[];
-  // ========== NOUVEAUX CHAMPS ==========
-  region: string | null;
-  district: string | null;
-  commune: string | null;
-  za: string | null;
-  pa_code: string | null;
-  degats_cultures_pourcent: number | null;
-  verdissement_pourcent: number | null;
-  hauteur_herbe_cm: number | null;
-}
+export type PopulationRead = components['schemas']['PopulationRead'];
+export type CaptureRead = components['schemas']['CaptureRead'];
+export type InfestationRead = components['schemas']['InfestationRead'];
+export type ProspectionRead = components['schemas']['ProspectionRead'];
 
 export interface ListProspectionsParams {
   statut?: string;

@@ -66,6 +66,8 @@ function prospection(overrides: Partial<ProspectionRead> = {}): ProspectionRead 
     intensite_pluie: null,
     vegetation: null,
     sol: null,
+    verdissement: null,
+    hauteur_strate: null,
     ennemis_naturels: null,
     observations: null,
     statut: STATUT_VALIDE,
