@@ -81,12 +81,18 @@ export function larveTotalFromRow(row: PopulationRow | null): number {
   return Object.values(densites).reduce((acc, v) => acc + (v || 0), 0);
 }
 
+export function parseDensite(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const parsed = parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export function imagoStateToPopulationRow(espece: Espece, state: ExtensiveImagoState): PopulationRow {
   return {
     espece,
     categorie: 'imago',
-    densite_diffuse: state.popDiff ? parseFloat(state.popDiff) : null,
-    densite_groupee: state.popGroup ? parseFloat(state.popGroup) : null,
+    densite_diffuse: parseDensite(state.popDiff),
+    densite_groupee: parseDensite(state.popGroup),
     methode: null,
     accouplement: null,
     ponte: null,
