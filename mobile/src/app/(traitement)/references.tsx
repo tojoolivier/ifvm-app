@@ -15,6 +15,7 @@ import { generateId } from '@/lib/id';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import { validateReferences } from '@/lib/traitement-validation';
 import { Card } from '@/components/traitement/Card';
+import { DateField } from '@/components/traitement/DateField';
 import { ProgressBar } from '@/components/traitement/ProgressBar';
 import { SegmentedControl } from '@/components/traitement/SegmentedControl';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
@@ -220,23 +221,15 @@ export default function ReferencesScreen() {
         <View style={styles.row}>
           <View style={[styles.field, styles.flex1]}>
             <Text style={styles.label}>Date de traitement *</Text>
-            <TextInput
+            <DateField
               editable={!readOnly}
-              style={styles.input}
-              placeholder="AAAA-MM-JJ"
-              value={store.ref.dateTraitement ?? ''}
-              onChangeText={(v) => store.updateRef({ dateTraitement: v })}
+              value={store.ref.dateTraitement ?? null}
+              onChange={(v) => store.updateRef({ dateTraitement: v })}
             />
           </View>
           <View style={[styles.field, styles.flex1]}>
             <Text style={styles.label}>Date de validation *</Text>
-            <TextInput
-              editable={!readOnly}
-              style={styles.input}
-              placeholder="AAAA-MM-JJ"
-              value={dateValidation ?? ''}
-              onChangeText={setDateValidation}
-            />
+            <DateField editable={!readOnly} value={dateValidation} onChange={setDateValidation} />
           </View>
         </View>
         {errors.dateTraitement && <Text style={styles.error}>{errors.dateTraitement}</Text>}
