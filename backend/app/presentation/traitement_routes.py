@@ -2,6 +2,8 @@ import uuid
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.traitement_use_cases import (
@@ -13,6 +15,8 @@ from app.application.traitement_use_cases import (
     ListTraitements,
     RemoveProduitUtilise,
     RemoveRotation,
+    SyncPushTraitementAerien,
+    SyncPushTraitementTerrestre,
     UpdateRotation,
     ValiderTraitement,
 )
@@ -28,6 +32,8 @@ from app.domain.traitement import (
     TraitementIntrouvableError,
     TraitementOrigineDejaUtiliseeError,
     TraitementOrigineIntrouvableError,
+    TraitementSyncConflitError,
+    TraitementValideeSyncRejeteError,
     TraitementVerrouilleError,
 )
 from app.infrastructure.prospection_repository import ProspectionRepositoryImpl
@@ -39,6 +45,7 @@ from app.presentation.traitement_schemas import (
     RotationCreate,
     TraitementCreate,
     TraitementRead,
+    TraitementSyncPush,
     ValiderTraitementRequest,
 )
 
@@ -157,6 +164,85 @@ async def create_traitement(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except (NumeroFicheConflitError, TraitementOrigineDejaUtiliseeError) as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+
+
+@router.post("/sync")
+async def sync_traitement(
+    body: TraitementSyncPush,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    """Push de synchronisation offline (ADR-002 / décision #60).
+
+    201 si la fiche n'existait pas encore côté serveur, 200 si mise à jour synchronisée
+    sans conflit, 409 (avec la version serveur complète) si la fiche est verrouillée
+    (`validee`) ou en conflit (`updated_at` serveur postérieur + contenu divergent).
+    """
+    repository = get_repository(db)
+    prospection_repository = ProspectionRepositoryImpl(db)
+    utilisateur_repository = UtilisateurRepositoryImpl(db)
+    try:
+        if body.aerien is not None:
+            use_case = SyncPushTraitementAerien(
+                traitement_repository=repository,
+                prospection_repository=prospection_repository,
+                utilisateur_repository=utilisateur_repository,
+            )
+            traitement, cree = await use_case.execute(
+                traitement_id=body.id,
+                base_updated_at=body.base_updated_at,
+                **_champs_communs(body),
+                pilote=body.aerien.pilote,
+                mecanicien=body.aerien.mecanicien,
+                chef_de_base_id=body.aerien.chef_de_base_id,
+                consultant_international=body.aerien.consultant_international,
+            )
+        else:
+            use_case_terrestre = SyncPushTraitementTerrestre(
+                traitement_repository=repository,
+                prospection_repository=prospection_repository,
+                utilisateur_repository=utilisateur_repository,
+            )
+            traitement, cree = await use_case_terrestre.execute(
+                traitement_id=body.id,
+                base_updated_at=body.base_updated_at,
+                **_champs_communs(body),
+                heure_debut=body.terrestre.heure_debut,
+                heure_fin=body.terrestre.heure_fin,
+                vitesse_vent_ms=body.terrestre.vitesse_vent_ms,
+                direction_vent=body.terrestre.direction_vent,
+                temperature_c=body.terrestre.temperature_c,
+                chef_equipe_id=body.terrestre.chef_equipe_id,
+                agent_encadreur_id=body.terrestre.agent_encadreur_id,
+                consultant_international=body.terrestre.consultant_international,
+                surface_atomiseur_ha=body.terrestre.surface_atomiseur_ha,
+                surface_disque_rotatif_ha=body.terrestre.surface_disque_rotatif_ha,
+                surface_ulvamast_ha=body.terrestre.surface_ulvamast_ha,
+                surface_restante_abandonnee=body.terrestre.surface_restante_abandonnee,
+                motif_surface_restante_abandonnee=body.terrestre.motif_surface_restante_abandonnee,
+                essence_litres=body.terrestre.essence_litres,
+                nb_piles=body.terrestre.nb_piles,
+                reprise_traitement=body.terrestre.reprise_traitement,
+                traitement_origine_id=body.terrestre.traitement_origine_id,
+            )
+        status_code = status.HTTP_201_CREATED if cree else status.HTTP_200_OK
+        return JSONResponse(
+            status_code=status_code,
+            content=jsonable_encoder(TraitementRead.model_validate(traitement)),
+        )
+    except (ChefDeBaseInvalideError, ChefEquipeInvalideError) as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except (ProspectionIntrouvableError, TraitementOrigineIntrouvableError) as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except (NumeroFicheConflitError, TraitementOrigineDejaUtiliseeError) as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except (TraitementValideeSyncRejeteError, TraitementSyncConflitError) as e:
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content=jsonable_encoder(TraitementRead.model_validate(e.traitement_serveur)),
+        )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 

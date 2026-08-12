@@ -91,12 +91,15 @@ class TraitementRepositoryImpl(TraitementRepository):
         result = await self.session.execute(stmt)
         return [self._to_domain(m) for m in result.scalars().all()]
 
-    async def origine_deja_utilisee(self, traitement_origine_id: uuid.UUID) -> bool:
-        result = await self.session.execute(
-            select(TraitementTerrestreModel.traitement_id).where(
-                TraitementTerrestreModel.traitement_origine_id == traitement_origine_id
-            )
+    async def origine_deja_utilisee(
+        self, traitement_origine_id: uuid.UUID, exclude_traitement_id: uuid.UUID | None = None
+    ) -> bool:
+        stmt = select(TraitementTerrestreModel.traitement_id).where(
+            TraitementTerrestreModel.traitement_origine_id == traitement_origine_id
         )
+        if exclude_traitement_id is not None:
+            stmt = stmt.where(TraitementTerrestreModel.traitement_id != exclude_traitement_id)
+        result = await self.session.execute(stmt)
         return result.scalar_one_or_none() is not None
 
     async def create(self, traitement: Traitement) -> Traitement:
@@ -315,6 +318,103 @@ class TraitementRepositoryImpl(TraitementRepository):
             )
         await self.session.commit()
         self.session.expire(model, ["signatures"])
+        return await self.get_by_id(traitement_id)
+
+    async def update_sync(self, traitement: Traitement) -> Traitement:
+        model = await self.session.get(TraitementModel, traitement.id)
+        model.prospection_id = traitement.prospection_id
+        model.numero_fiche = traitement.numero_fiche
+        model.mode_traitement = traitement.mode_traitement
+        model.date_traitement = traitement.date_traitement
+        model.date_validation = traitement.date_validation
+        model.localite = traitement.localite
+        model.region = traitement.region
+        model.district = traitement.district
+        model.commune = traitement.commune
+        model.latitude = traitement.latitude
+        model.longitude = traitement.longitude
+        model.altitude = traitement.altitude
+        model.kit_combinaison = traitement.kit_combinaison
+        model.kit_gants = traitement.kit_gants
+        model.kit_lunettes = traitement.kit_lunettes
+        model.kit_masques = traitement.kit_masques
+        model.kit_boite = traitement.kit_boite
+        model.zones_exposees = traitement.zones_exposees
+        model.hauteur_strate_herbeuse_m = traitement.hauteur_strate_herbeuse_m
+        model.hauteur_strate_arboree_m = traitement.hauteur_strate_arboree_m
+        model.recouvrement_percent = traitement.recouvrement_percent
+        model.empoisonnement = traitement.empoisonnement
+        model.empoisonnement_type = traitement.empoisonnement_type
+        model.empoisonnement_mode = traitement.empoisonnement_mode
+        model.empoisonnement_autre = traitement.empoisonnement_autre
+        model.evaluation_risque = traitement.evaluation_risque
+        model.comportement_anormal = traitement.comportement_anormal
+        model.comportement_non_cibles = traitement.comportement_non_cibles
+        model.mortalite = traitement.mortalite
+        model.mortalite_familles = traitement.mortalite_familles
+        model.statut_sync = "synced"
+        model.updated_at = traitement.updated_at
+
+        if traitement.cible is not None and model.cible is not None:
+            model.cible.espece = traitement.cible.espece
+            model.cible.petites_larves = traitement.cible.petites_larves
+            model.cible.grandes_larves = traitement.cible.grandes_larves
+            model.cible.vols_clairs_essaims = traitement.cible.vols_clairs_essaims
+            model.cible.repartition_population = traitement.cible.repartition_population
+            model.cible.surface_infestee_ha = traitement.cible.surface_infestee_ha
+
+        if traitement.aerien is not None and model.aerien is not None:
+            model.aerien.pilote = traitement.aerien.pilote
+            model.aerien.mecanicien = traitement.aerien.mecanicien
+            model.aerien.chef_de_base_id = traitement.aerien.chef_de_base_id
+            model.aerien.consultant_international = traitement.aerien.consultant_international
+
+        if traitement.terrestre is not None and model.terrestre is not None:
+            t, src = model.terrestre, traitement.terrestre
+            t.heure_debut = src.heure_debut
+            t.heure_fin = src.heure_fin
+            t.vitesse_vent_ms = src.vitesse_vent_ms
+            t.direction_vent = src.direction_vent
+            t.temperature_c = src.temperature_c
+            t.reprise_traitement = src.reprise_traitement
+            t.traitement_origine_id = src.traitement_origine_id
+            t.chef_equipe_id = src.chef_equipe_id
+            t.agent_encadreur_id = src.agent_encadreur_id
+            t.consultant_international = src.consultant_international
+            t.surface_atomiseur_ha = src.surface_atomiseur_ha
+            t.surface_disque_rotatif_ha = src.surface_disque_rotatif_ha
+            t.surface_ulvamast_ha = src.surface_ulvamast_ha
+            t.surface_traitee_ha = src.surface_traitee_ha
+            t.surface_cumulee_ha = src.surface_cumulee_ha
+            t.surface_restante_ha = src.surface_restante_ha
+            t.surface_restante_abandonnee = src.surface_restante_abandonnee
+            t.motif_surface_restante_abandonnee = src.motif_surface_restante_abandonnee
+            t.essence_litres = src.essence_litres
+            t.nb_piles = src.nb_piles
+
+        try:
+            await self.session.commit()
+        except IntegrityError as e:
+            await self.session.rollback()
+            constraint_name = getattr(e.orig, "constraint_name", None) or getattr(
+                e.orig.__cause__, "constraint_name", None
+            )
+            if constraint_name == "traitement_numero_fiche_key":
+                raise NumeroFicheConflitError(
+                    f"numero_fiche '{traitement.numero_fiche}' déjà utilisé"
+                ) from e
+            if constraint_name == "uq_traitement_terrestre_origine_id":
+                raise TraitementOrigineDejaUtiliseeError(
+                    f"La fiche {traitement.terrestre.traitement_origine_id} est déjà "
+                    "désignée comme origine par une autre fiche"
+                ) from e
+            raise
+        return await self.get_by_id(traitement.id)
+
+    async def marquer_conflict(self, traitement_id: uuid.UUID) -> Traitement:
+        model = await self.session.get(TraitementModel, traitement_id)
+        model.statut_sync = "conflict"
+        await self.session.commit()
         return await self.get_by_id(traitement_id)
 
     async def _persister_total_pesticide(
