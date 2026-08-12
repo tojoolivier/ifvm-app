@@ -303,6 +303,7 @@ class CreateTraitementTerrestre:
         surface_disque_rotatif_ha: float | None = None,
         surface_ulvamast_ha: float | None = None,
         surface_restante_abandonnee: bool | None = None,
+        motif_surface_restante_abandonnee: str | None = None,
         essence_litres: float | None = None,
         nb_piles: int | None = None,
         reprise_traitement: bool = False,
@@ -428,6 +429,7 @@ class CreateTraitementTerrestre:
             surface_disque_rotatif_ha=surface_disque_rotatif_ha,
             surface_ulvamast_ha=surface_ulvamast_ha,
             surface_restante_abandonnee=surface_restante_abandonnee,
+            motif_surface_restante_abandonnee=motif_surface_restante_abandonnee,
             essence_litres=essence_litres,
             nb_piles=nb_piles,
         )
@@ -514,6 +516,7 @@ class AddRotation:
         vent_fin_ms: float,
     ) -> Traitement:
         traitement = await _get_traitement_aerien(self.repository, traitement_id)
+        traitement.verifier_modifiable()
         aerien = traitement.aerien
 
         prochain_numero = max((r.numero for r in aerien.rotations), default=0) + 1
@@ -553,6 +556,7 @@ class UpdateRotation:
         vent_fin_ms: float,
     ) -> Traitement:
         traitement = await _get_traitement_aerien(self.repository, traitement_id)
+        traitement.verifier_modifiable()
         aerien = traitement.aerien
         rotation = _trouver_rotation(aerien, rotation_id)
 
@@ -576,6 +580,7 @@ class RemoveRotation:
 
     async def execute(self, traitement_id: uuid.UUID, rotation_id: uuid.UUID) -> Traitement:
         traitement = await _get_traitement_aerien(self.repository, traitement_id)
+        traitement.verifier_modifiable()
         aerien = traitement.aerien
         rotation = _trouver_rotation(aerien, rotation_id)
 
@@ -619,6 +624,7 @@ class AddProduitUtilise:
         quantite_l: float,
     ) -> Traitement:
         traitement = await _get_traitement_terrestre(self.repository, traitement_id)
+        traitement.verifier_modifiable()
         terrestre = traitement.terrestre
 
         prochain_numero = max((p.numero for p in terrestre.produits), default=0) + 1
@@ -642,6 +648,7 @@ class RemoveProduitUtilise:
 
     async def execute(self, traitement_id: uuid.UUID, produit_utilise_id: uuid.UUID) -> Traitement:
         traitement = await _get_traitement_terrestre(self.repository, traitement_id)
+        traitement.verifier_modifiable()
         terrestre = traitement.terrestre
         produit = _trouver_produit(terrestre, produit_utilise_id)
 
@@ -650,4 +657,25 @@ class RemoveProduitUtilise:
 
         return await self.repository.remove_produit(
             traitement_id, produit_utilise_id, terrestre.total_pesticide_l
+        )
+
+
+class ValiderTraitement:
+    def __init__(self, repository: TraitementRepository):
+        self.repository = repository
+
+    async def execute(
+        self,
+        traitement_id: uuid.UUID,
+        date_validation: date,
+        signatures: list[dict[str, str]],
+    ) -> Traitement:
+        traitement = await self.repository.get_by_id(traitement_id)
+        if traitement is None:
+            raise TraitementIntrouvableError(f"Traitement {traitement_id} introuvable")
+
+        signature_objs = traitement.valider(date_validation, signatures)
+
+        return await self.repository.valider(
+            traitement_id, traitement.date_validation, signature_objs
         )

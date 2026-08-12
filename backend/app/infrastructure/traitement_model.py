@@ -80,6 +80,9 @@ class TraitementModel(Base):
         uselist=False,
         foreign_keys="TraitementTerrestreModel.traitement_id",
     )
+    signatures: Mapped[list["TraitementSignatureModel"]] = relationship(
+        back_populates="traitement", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         CheckConstraint("type_traitement IN ('AERIEN','TERRESTRE')", name="ck_traitement_type"),
@@ -189,6 +192,7 @@ class TraitementTerrestreModel(Base):
     surface_cumulee_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     surface_restante_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     surface_restante_abandonnee: Mapped[bool | None] = mapped_column(Boolean(), nullable=True)
+    motif_surface_restante_abandonnee: Mapped[str | None] = mapped_column(Text(), nullable=True)
     essence_litres: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     nb_piles: Mapped[int | None] = mapped_column(Integer(), nullable=True)
     total_pesticide_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
@@ -243,4 +247,29 @@ class ProduitUtiliseModel(Base):
         UniqueConstraint(
             "traitement_terrestre_id", "numero", name="uq_traitement_produit_utilise_numero"
         ),
+    )
+
+
+class TraitementSignatureModel(Base):
+    __tablename__ = "traitement_signature"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    traitement_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("traitement.id", ondelete="CASCADE"), nullable=False
+    )
+    role: Mapped[str] = mapped_column(String(30), nullable=False)
+    signataire_nom: Mapped[str] = mapped_column(String(255), nullable=False)
+    horodatage: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    traitement: Mapped[TraitementModel] = relationship(back_populates="signatures")
+
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('PILOTE','MECANICIEN','CHEF_DE_BASE','CHEF_EQUIPE',"
+            "'CONSULTANT_INTERNATIONAL')",
+            name="ck_traitement_signature_role",
+        ),
+        UniqueConstraint("traitement_id", "role", name="uq_traitement_signature"),
     )

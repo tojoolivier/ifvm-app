@@ -11,23 +11,27 @@ from app.application.traitement_use_cases import (
     RemoveProduitUtilise,
     RemoveRotation,
     UpdateRotation,
+    ValiderTraitement,
 )
 from app.domain.prospection import Prospection, ProspectionPopulation
 from app.domain.traitement import (
     ChefDeBaseInvalideError,
     ChefEquipeInvalideError,
+    MotifAbandonManquantError,
     NumeroFicheConflitError,
     ProduitUtilise,
     ProduitUtiliseIntrouvableError,
     ProspectionIntrouvableError,
     Rotation,
     RotationIntrouvableError,
+    SignaturesManquantesError,
     Traitement,
     TraitementAerien,
     TraitementIntrouvableError,
     TraitementOrigineDejaUtiliseeError,
     TraitementOrigineIntrouvableError,
     TraitementTerrestre,
+    TraitementVerrouilleError,
     construire_cible,
     generer_numero_fiche,
 )
@@ -900,3 +904,249 @@ async def test_remove_produit_introuvable():
     use_case = RemoveProduitUtilise(repo)
     with pytest.raises(ProduitUtiliseIntrouvableError):
         await use_case.execute(traitement_id=traitement.id, produit_utilise_id=uuid.uuid4())
+
+
+# ==========================================
+# Traitement.verifier_modifiable — verrouillage post-validation (garde commune, #64)
+# ==========================================
+
+
+def test_verifier_modifiable_brouillon_ne_leve_pas():
+    Traitement(statut="brouillon").verifier_modifiable()
+
+
+def test_verifier_modifiable_validee_leve_verrouille():
+    with pytest.raises(TraitementVerrouilleError):
+        Traitement(statut="validee").verifier_modifiable()
+
+
+@pytest.mark.asyncio
+async def test_add_rotation_sur_traitement_verrouille_leve_verrouille():
+    aerien = TraitementAerien()
+    traitement = Traitement(statut="validee", aerien=aerien)
+    repo = FakeTraitementRepoRotations(traitement)
+    use_case = AddRotation(repo)
+    with pytest.raises(TraitementVerrouilleError):
+        await use_case.execute(traitement_id=traitement.id, **_rotation_args())
+
+
+@pytest.mark.asyncio
+async def test_add_produit_sur_traitement_verrouille_leve_verrouille():
+    traitement = Traitement(statut="validee", terrestre=TraitementTerrestre())
+    repo = FakeTraitementRepoProduits(traitement)
+    use_case = AddProduitUtilise(repo)
+    with pytest.raises(TraitementVerrouilleError):
+        await use_case.execute(traitement_id=traitement.id, **_produit_args())
+
+
+# ==========================================
+# Traitement.valider — matrice de signatures (CDG §9)
+# ==========================================
+
+
+def _traitement_aerien_valide(**overrides) -> Traitement:
+    args = dict(
+        pilote="J. Dupont",
+        mecanicien="M. Rabe",
+        chef_de_base_id=uuid.uuid4(),
+        consultant_international=None,
+    )
+    args.update({k: v for k, v in overrides.items() if k in args})
+    aerien = TraitementAerien(**args)
+    return Traitement(
+        type_traitement="AERIEN",
+        statut="brouillon",
+        date_traitement=date(2026, 8, 11),
+        aerien=aerien,
+    )
+
+
+def _traitement_terrestre_valide(**overrides) -> Traitement:
+    args = dict(
+        chef_equipe_id=uuid.uuid4(),
+        agent_encadreur_id=None,
+        consultant_international=None,
+        surface_restante_abandonnee=None,
+        motif_surface_restante_abandonnee=None,
+    )
+    args.update({k: v for k, v in overrides.items() if k in args})
+    terrestre = TraitementTerrestre(**args)
+    return Traitement(
+        type_traitement="TERRESTRE",
+        statut="brouillon",
+        date_traitement=date(2026, 8, 11),
+        terrestre=terrestre,
+    )
+
+
+def test_valider_aerien_toutes_signatures_presentes_transitionne_validee():
+    traitement = _traitement_aerien_valide()
+    signatures = traitement.valider(
+        date(2026, 8, 12),
+        [
+            {"role": "PILOTE", "signataire_nom": "J. Dupont"},
+            {"role": "MECANICIEN", "signataire_nom": "M. Rabe"},
+            {"role": "CHEF_DE_BASE", "signataire_nom": "Hery"},
+        ],
+    )
+    assert traitement.statut == "validee"
+    assert traitement.date_validation == date(2026, 8, 12)
+    assert {s.role for s in signatures} == {"PILOTE", "MECANICIEN", "CHEF_DE_BASE"}
+    assert traitement.signatures == signatures
+
+
+def test_valider_aerien_signature_manquante_pilote_bloque():
+    traitement = _traitement_aerien_valide()
+    with pytest.raises(SignaturesManquantesError):
+        traitement.valider(
+            date(2026, 8, 12),
+            [
+                {"role": "MECANICIEN", "signataire_nom": "M. Rabe"},
+                {"role": "CHEF_DE_BASE", "signataire_nom": "Hery"},
+            ],
+        )
+
+
+def test_valider_aerien_consultant_renseigne_sans_signature_bloque():
+    traitement = _traitement_aerien_valide(consultant_international="Dr. Smith")
+    with pytest.raises(SignaturesManquantesError):
+        traitement.valider(
+            date(2026, 8, 12),
+            [
+                {"role": "PILOTE", "signataire_nom": "J. Dupont"},
+                {"role": "MECANICIEN", "signataire_nom": "M. Rabe"},
+                {"role": "CHEF_DE_BASE", "signataire_nom": "Hery"},
+            ],
+        )
+
+
+def test_valider_aerien_consultant_absent_aucune_signature_requise():
+    traitement = _traitement_aerien_valide(consultant_international=None)
+    traitement.valider(
+        date(2026, 8, 12),
+        [
+            {"role": "PILOTE", "signataire_nom": "J. Dupont"},
+            {"role": "MECANICIEN", "signataire_nom": "M. Rabe"},
+            {"role": "CHEF_DE_BASE", "signataire_nom": "Hery"},
+        ],
+    )
+    assert traitement.statut == "validee"
+
+
+def test_valider_terrestre_sans_agent_encadreur_reste_validable():
+    traitement = _traitement_terrestre_valide(agent_encadreur_id=None)
+    traitement.valider(date(2026, 8, 12), [{"role": "CHEF_EQUIPE", "signataire_nom": "Hery"}])
+    assert traitement.statut == "validee"
+
+
+def test_valider_terrestre_agent_encadreur_renseigne_ne_signe_jamais():
+    traitement = _traitement_terrestre_valide(agent_encadreur_id=uuid.uuid4())
+    traitement.valider(date(2026, 8, 12), [{"role": "CHEF_EQUIPE", "signataire_nom": "Hery"}])
+    assert traitement.statut == "validee"
+    assert {s.role for s in traitement.signatures} == {"CHEF_EQUIPE"}
+
+
+def test_valider_terrestre_consultant_renseigne_sans_signature_bloque():
+    traitement = _traitement_terrestre_valide(consultant_international="Dr. Smith")
+    with pytest.raises(SignaturesManquantesError):
+        traitement.valider(date(2026, 8, 12), [{"role": "CHEF_EQUIPE", "signataire_nom": "Hery"}])
+
+
+def test_valider_terrestre_surface_restante_abandonnee_sans_motif_bloque():
+    traitement = _traitement_terrestre_valide(
+        surface_restante_abandonnee=True, motif_surface_restante_abandonnee=None
+    )
+    with pytest.raises(MotifAbandonManquantError):
+        traitement.valider(date(2026, 8, 12), [{"role": "CHEF_EQUIPE", "signataire_nom": "Hery"}])
+
+
+def test_valider_terrestre_surface_restante_abandonnee_avec_motif_ok():
+    traitement = _traitement_terrestre_valide(
+        surface_restante_abandonnee=True,
+        motif_surface_restante_abandonnee="Zone inaccessible (crue)",
+    )
+    traitement.valider(date(2026, 8, 12), [{"role": "CHEF_EQUIPE", "signataire_nom": "Hery"}])
+    assert traitement.statut == "validee"
+
+
+def test_valider_role_signature_invalide_pour_type_traitement():
+    traitement = _traitement_terrestre_valide()
+    with pytest.raises(ValueError):
+        traitement.valider(
+            date(2026, 8, 12),
+            [
+                {"role": "CHEF_EQUIPE", "signataire_nom": "Hery"},
+                {"role": "PILOTE", "signataire_nom": "J. Dupont"},
+            ],
+        )
+
+
+def test_valider_date_validation_anterieure_bloque():
+    traitement = _traitement_aerien_valide()
+    with pytest.raises(ValueError):
+        traitement.valider(
+            date(2026, 8, 10),
+            [
+                {"role": "PILOTE", "signataire_nom": "J. Dupont"},
+                {"role": "MECANICIEN", "signataire_nom": "M. Rabe"},
+                {"role": "CHEF_DE_BASE", "signataire_nom": "Hery"},
+            ],
+        )
+
+
+def test_valider_fiche_deja_validee_leve_verrouille():
+    traitement = _traitement_aerien_valide()
+    traitement.statut = "validee"
+    with pytest.raises(TraitementVerrouilleError):
+        traitement.valider(date(2026, 8, 12), [])
+
+
+# ==========================================
+# ValiderTraitement (use case, fake repo)
+# ==========================================
+
+
+class FakeTraitementRepoValidation:
+    def __init__(self, traitement: Traitement | None):
+        self.traitement = traitement
+        self.appels_valider: list[tuple] = []
+
+    async def get_by_id(self, traitement_id):
+        return self.traitement
+
+    async def valider(self, traitement_id, date_validation, signatures):
+        self.appels_valider.append((traitement_id, date_validation, signatures))
+        self.traitement.date_validation = date_validation
+        self.traitement.statut = "validee"
+        self.traitement.signatures = signatures
+        return self.traitement
+
+
+@pytest.mark.asyncio
+async def test_valider_traitement_use_case_persiste_et_retourne():
+    traitement = _traitement_aerien_valide()
+    repo = FakeTraitementRepoValidation(traitement)
+    use_case = ValiderTraitement(repo)
+
+    resultat = await use_case.execute(
+        traitement_id=traitement.id,
+        date_validation=date(2026, 8, 12),
+        signatures=[
+            {"role": "PILOTE", "signataire_nom": "J. Dupont"},
+            {"role": "MECANICIEN", "signataire_nom": "M. Rabe"},
+            {"role": "CHEF_DE_BASE", "signataire_nom": "Hery"},
+        ],
+    )
+
+    assert resultat.statut == "validee"
+    assert len(repo.appels_valider) == 1
+
+
+@pytest.mark.asyncio
+async def test_valider_traitement_use_case_introuvable():
+    repo = FakeTraitementRepoValidation(None)
+    use_case = ValiderTraitement(repo)
+    with pytest.raises(TraitementIntrouvableError):
+        await use_case.execute(
+            traitement_id=uuid.uuid4(), date_validation=date(2026, 8, 12), signatures=[]
+        )
