@@ -147,6 +147,9 @@ export interface PopulationRow {
 
   phase?: string | null;
 
+  captures_nombre?: number | null;
+  temps_capture?: number | null;
+
   densite_diffuse: number | null;
   densite_groupee: number | null;
 

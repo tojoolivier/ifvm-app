@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { useDebugStore } from './debug-store';
 
 const MAX_ENTRIES = 100;
 
@@ -25,7 +24,10 @@ export const useErrorLogStore = create<ErrorLogState & ErrorLogActions>((set) =>
   entries: [],
 
   addEntry: (entry) => {
-    if (!useDebugStore.getState().enabled) return;
+    // Toujours capturer, même si le mode debug n'est pas (encore) activé —
+    // sinon les erreurs survenant avant l'hydratation de useDebugStore (ou
+    // avant que l'utilisateur n'active le debug) disparaissent sans trace.
+    // Le flag debug ne contrôle que l'affichage de l'écran de log, pas la capture.
     set((state) => ({
       entries: [
         { ...entry, id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, occurredAt: new Date().toISOString() },

@@ -3,13 +3,28 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAsyncAction } from '@/hooks/use-async-action';
+import { useErrorStore } from '@/lib/error-store';
+import { useErrorLogStore } from '@/lib/error-log-store';
+import { toFriendlyError } from '@/lib/friendly-error';
 import {
   PopulationRow,
   getProspectionPopulation,
   saveProspectionPopulation,
 } from '@/lib/prospection-repository';
 import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
+import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
+import { parseEspeceSelection, buildGrilles } from '@/lib/prospection-especes';
 import { parseDensite } from '@/lib/prospection-extensive';
+
+function parseGrillesCompletees(raw: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -36,18 +51,53 @@ export default function DensityScreen() {
   const router = useRouter();
   const { draftId, grilleIndex } = useLocalSearchParams<{ draftId: string; grilleIndex: string }>();
   const store = useProspectionCaptureStore();
+  const draft = useProspectionWizardStore((s) => s.draft);
+  const captures = useProspectionWizardStore((s) => s.captures);
+  const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
   const requestedIndex = Number(grilleIndex ?? '0');
   const grille = store.grilleOrder[requestedIndex];
 
   const [population, setPopulation] = useState<PopulationRow | null>(null);
   const { run, isRunning: isSaving } = useAsyncAction();
+  const showError = useErrorStore((s) => s.showError);
+  const logError = useErrorLogStore((s) => s.addEntry);
+
+  // Reconstruit le store si l'app Android a été tuée en arrière-plan puis
+  // restaurée directement sur cet écran (le store zustand n'est pas persisté).
+  useEffect(() => {
+    if (!draftId) return;
+    if (draft?.id !== draftId) {
+      hydrateFromDraft(draftId);
+    }
+  }, [draftId, draft?.id, hydrateFromDraft]);
+
+  useEffect(() => {
+    if (!draft || draft.id !== draftId) return;
+    if (store.grilleOrder.length === 0) {
+      const selection = parseEspeceSelection(draft.especes);
+      const grilles = buildGrilles(selection);
+      const completed = parseGrillesCompletees(draft.grilles_completees);
+      store.initGrilles(grilles, completed, captures);
+    }
+  }, [draft, draftId, captures, store]);
 
   useEffect(() => {
     if (!draftId || !grille) return;
-    getProspectionPopulation(draftId, grille.espece, grille.categorie).then((row) => {
-      setPopulation(row ?? emptyPopulation(grille.espece));
-    });
-  }, [draftId, grille]);
+    getProspectionPopulation(draftId, grille.espece, grille.categorie)
+      .then((row) => {
+        setPopulation(row ?? emptyPopulation(grille.espece));
+      })
+      .catch((error) => {
+        const { message, detail } = toFriendlyError(error);
+        showError({ message, detail });
+        logError({
+          message,
+          stack: error instanceof Error ? error.stack ?? null : null,
+          screen: 'density',
+          context: { draftId, espece: grille.espece, categorie: grille.categorie },
+        });
+      });
+  }, [draftId, grille, showError, logError]);
 
   if (!grille || !population) {
     return (
