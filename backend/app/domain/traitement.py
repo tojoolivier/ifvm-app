@@ -72,6 +72,27 @@ class MotifAbandonManquantError(ValueError):
     """surface_restante_abandonnee=True sans motif renseigné (CDG §9)."""
 
 
+class TraitementValideeSyncRejeteError(Exception):
+    """Fiche serveur déjà `validee` : rejet systématique de toute synchronisation entrante,
+    avant même toute comparaison de contenu (ADR-002 / décision #60) — `statut_sync` reste
+    `synced`, jamais `conflict`, sur une fiche verrouillée."""
+
+    def __init__(self, traitement_serveur: "Traitement"):
+        self.traitement_serveur = traitement_serveur
+        super().__init__("La fiche est verrouillée (validée) — synchronisation rejetée")
+
+
+class TraitementSyncConflitError(Exception):
+    """Conflit de synchronisation (décision #60) : `updated_at` serveur postérieur au
+    `base_updated_at` connu du client, et contenu divergent. La fiche entrante est
+    rejetée, `statut_sync` passe à `conflict` côté serveur, jamais de résolution
+    automatique."""
+
+    def __init__(self, traitement_serveur: "Traitement"):
+        self.traitement_serveur = traitement_serveur
+        super().__init__("Conflit de synchronisation — la version serveur fait foi")
+
+
 @dataclass
 class Cible:
     traitement_id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -294,6 +315,86 @@ class Traitement:
         self.statut = "validee"
         self.signatures = signature_objs
         return signature_objs
+
+
+_CHAMPS_CONTENU_COMMUNS = (
+    "prospection_id",
+    "numero_fiche",
+    "mode_traitement",
+    "date_traitement",
+    "date_validation",
+    "localite",
+    "region",
+    "district",
+    "commune",
+    "latitude",
+    "longitude",
+    "altitude",
+    "kit_combinaison",
+    "kit_gants",
+    "kit_lunettes",
+    "kit_masques",
+    "kit_boite",
+    "zones_exposees",
+    "hauteur_strate_herbeuse_m",
+    "hauteur_strate_arboree_m",
+    "recouvrement_percent",
+    "empoisonnement",
+    "empoisonnement_type",
+    "empoisonnement_mode",
+    "empoisonnement_autre",
+    "evaluation_risque",
+    "comportement_anormal",
+    "comportement_non_cibles",
+    "mortalite",
+    "mortalite_familles",
+)
+
+_CHAMPS_CONTENU_AERIEN = ("pilote", "mecanicien", "chef_de_base_id", "consultant_international")
+
+_CHAMPS_CONTENU_TERRESTRE = (
+    "heure_debut",
+    "heure_fin",
+    "vitesse_vent_ms",
+    "direction_vent",
+    "temperature_c",
+    "reprise_traitement",
+    "traitement_origine_id",
+    "chef_equipe_id",
+    "agent_encadreur_id",
+    "consultant_international",
+    "surface_atomiseur_ha",
+    "surface_disque_rotatif_ha",
+    "surface_ulvamast_ha",
+    "surface_restante_abandonnee",
+    "motif_surface_restante_abandonnee",
+    "essence_litres",
+    "nb_piles",
+)
+
+
+def contenu_diverge(existant: "Traitement", entrant: "Traitement") -> bool:
+    """Compare le contenu métier de deux fiches, hors champs techniques (`statut`,
+    `statut_sync`, `created_at`, `updated_at`) et hors champs dérivés en lecture seule
+    (`cible`, surfaces calculées, rotations/produits/signatures — gérés par leurs propres
+    endpoints, absents du payload de synchronisation).
+
+    Un renvoi réseau (même contenu) doit être traité `synced` sans jamais être vu comme un
+    conflit (décision #60) — cette fonction est le point de vérité unique pour "diverge".
+    """
+    if any(
+        getattr(existant, champ) != getattr(entrant, champ) for champ in _CHAMPS_CONTENU_COMMUNS
+    ):
+        return True
+    if existant.type_traitement == "AERIEN":
+        return any(
+            getattr(existant.aerien, champ) != getattr(entrant.aerien, champ)
+            for champ in _CHAMPS_CONTENU_AERIEN
+        )
+    return any(
+        getattr(existant.terrestre, champ) != getattr(entrant.terrestre, champ)
+        for champ in _CHAMPS_CONTENU_TERRESTRE
+    )
 
 
 def generer_numero_fiche(
