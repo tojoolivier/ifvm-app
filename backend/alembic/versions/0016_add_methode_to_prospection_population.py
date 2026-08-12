@@ -1,7 +1,7 @@
 """add methode to prospection_population
 
-Revision ID: 0015
-Revises: 0014
+Revision ID: 0016
+Revises: 0015
 Create Date: 2026-08-12
 
 """
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0015"
-down_revision = "0014"
+revision = "0016"
+down_revision = "0015"
 branch_labels = None
 depends_on = None
 
