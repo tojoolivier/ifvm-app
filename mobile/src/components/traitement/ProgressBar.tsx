@@ -1,5 +1,5 @@
-import { View, Text, StyleSheet } from 'react-native';
-import { traitementColors, traitementFonts, traitementTypeSizes } from './tokens';
+import { View, StyleSheet } from 'react-native';
+import { traitementColors } from './tokens';
 
 export const PROGRESS_SEGMENTS = ['Références', 'Cibles', 'Traitement', 'Moyens', 'Impacts', 'Signatures'] as const;
 
@@ -11,14 +11,9 @@ interface ProgressBarProps {
 /** Barre de progression à 6 segments — n'apparaît que sur les écrans A à F. */
 export function ProgressBar({ currentIndex }: ProgressBarProps) {
   return (
-    <View style={styles.row}>
+    <View style={styles.row} accessibilityLabel={`Étape ${currentIndex + 1} sur ${PROGRESS_SEGMENTS.length} : ${PROGRESS_SEGMENTS[currentIndex] ?? ''}`}>
       {PROGRESS_SEGMENTS.map((label, index) => (
-        <View key={label} style={styles.segmentWrapper}>
-          <View style={[styles.segment, index <= currentIndex && styles.segmentActive]} />
-          <Text style={[styles.label, index === currentIndex && styles.labelActive]} numberOfLines={1}>
-            {label}
-          </Text>
-        </View>
+        <View key={label} style={[styles.segment, index <= currentIndex && styles.segmentActive]} />
       ))}
     </View>
   );
@@ -26,16 +21,6 @@ export function ProgressBar({ currentIndex }: ProgressBarProps) {
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 5 },
-  segmentWrapper: { flex: 1, alignItems: 'center', gap: 4 },
-  segment: { height: 3, width: '100%', borderRadius: 2, backgroundColor: traitementColors.segmentInactif },
+  segment: { flex: 1, height: 4, borderRadius: 2, backgroundColor: traitementColors.segmentInactif },
   segmentActive: { backgroundColor: traitementColors.vertPrincipal },
-  label: {
-    fontFamily: traitementFonts.ui,
-    fontSize: traitementTypeSizes.label,
-    color: traitementColors.texteLabel,
-  },
-  labelActive: {
-    fontFamily: traitementFonts.uiSemiBold,
-    color: traitementColors.vertPrincipal,
-  },
 });
