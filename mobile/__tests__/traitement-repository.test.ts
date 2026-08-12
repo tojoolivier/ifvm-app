@@ -2,6 +2,10 @@ import {
   createDraftTraitementAerien,
   createDraftTraitementTerrestre,
   updateTraitementReference,
+  updateTraitementAerien,
+  updateTraitementTerrestre,
+  updateTraitementMoyens,
+  updateTraitementImpacts,
   addRotation,
   updateRotation,
   deleteRotation,
@@ -167,6 +171,93 @@ describe('createDraftTraitementTerrestre', () => {
   });
 });
 
+describe('updateTraitementAerien', () => {
+  it('updates the aerien specialisation fields', async () => {
+    getFirstAsync.mockResolvedValueOnce(STORED_TRAITEMENT_ROW).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+
+    await updateTraitementAerien(AERIEN_INPUT.id, {
+      pilote: 'Jean Dupont',
+      mecanicien: 'Marc Rakoto',
+      chefDeBaseId: AERIEN_INPUT.chefDeBaseId,
+      consultantInternational: null,
+    });
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE traitement_aerien SET'),
+      expect.arrayContaining(['Jean Dupont', 'Marc Rakoto', AERIEN_INPUT.chefDeBaseId])
+    );
+  });
+});
+
+describe('updateTraitementTerrestre', () => {
+  it('updates the terrestre specialisation fields', async () => {
+    getFirstAsync
+      .mockResolvedValueOnce({ ...STORED_TRAITEMENT_ROW, type_traitement: 'TERRESTRE' })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce([]);
+
+    await updateTraitementTerrestre(TERRESTRE_INPUT.id, {
+      chefEquipeId: TERRESTRE_INPUT.chefEquipeId,
+      heureDebut: '08:00',
+      heureFin: '10:00',
+      surface_atomiseur_ha: 2,
+    });
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE traitement_terrestre SET'),
+      expect.arrayContaining([TERRESTRE_INPUT.chefEquipeId, '08:00', '10:00'])
+    );
+  });
+});
+
+describe('updateTraitementMoyens', () => {
+  it('persists the EPI kit, exposed zones and vegetation fields', async () => {
+    getFirstAsync.mockResolvedValueOnce(STORED_TRAITEMENT_ROW).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+
+    await updateTraitementMoyens(AERIEN_INPUT.id, {
+      kit_combinaison: true,
+      kit_gants: true,
+      kit_lunettes: false,
+      kit_masques: false,
+      kit_boite: true,
+      zones_exposees: { habitations: true },
+      hauteur_strate_herbeuse_m: 1.2,
+      hauteur_strate_arboree_m: 5,
+      recouvrement_percent: 40,
+    });
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE traitement SET'),
+      expect.arrayContaining([true, true, JSON.stringify({ habitations: true }), 1.2, 5, 40])
+    );
+  });
+});
+
+describe('updateTraitementImpacts', () => {
+  it('persists the empoisonnement, risk evaluation and observations fields', async () => {
+    getFirstAsync.mockResolvedValueOnce(STORED_TRAITEMENT_ROW).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+
+    await updateTraitementImpacts(AERIEN_INPUT.id, {
+      empoisonnement: true,
+      empoisonnement_type: 'AGENT',
+      empoisonnement_mode: 'INGESTION',
+      empoisonnement_autre: null,
+      evaluation_risque: { sol: 'FAIBLE' },
+      comportement_anormal: false,
+      comportement_non_cibles: [],
+      mortalite: false,
+      mortalite_familles: [],
+      observations: 'RAS',
+    });
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE traitement SET'),
+      expect.arrayContaining(['AGENT', 'INGESTION', JSON.stringify({ sol: 'FAIBLE' }), 'RAS'])
+    );
+  });
+});
+
 describe('updateTraitementReference', () => {
   it('updates the common reference fields and touches updated_at', async () => {
     getFirstAsync
@@ -183,12 +274,38 @@ describe('updateTraitementReference', () => {
       longitude: 47.2,
       altitude: 1200,
       dateTraitement: '2026-08-12',
+      dateValidation: null,
       numeroFiche: 'TR-20260812-1',
     });
 
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE traitement SET'),
       expect.arrayContaining(['Ambositra', -20.5, 47.2])
+    );
+  });
+
+  it('persists the validation date alongside the other reference fields', async () => {
+    getFirstAsync
+      .mockResolvedValueOnce({ ...STORED_TRAITEMENT_ROW, date_validation: '2026-08-13' })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+
+    await updateTraitementReference(AERIEN_INPUT.id, {
+      localite: 'Ambositra',
+      region: null,
+      district: null,
+      commune: null,
+      latitude: null,
+      longitude: null,
+      altitude: null,
+      dateTraitement: '2026-08-12',
+      dateValidation: '2026-08-13',
+      numeroFiche: null,
+    });
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('date_validation'),
+      expect.arrayContaining(['2026-08-13'])
     );
   });
 
@@ -205,6 +322,7 @@ describe('updateTraitementReference', () => {
         longitude: null,
         altitude: null,
         dateTraitement: null,
+        dateValidation: null,
         numeroFiche: null,
       })
     ).rejects.toThrow('Échec de la mise à jour de la fiche brouillon locale');
