@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TYPE_CIBLE_OPTIONS } from '@/lib/prospection-fiche-lecture';
@@ -18,6 +18,12 @@ const TEXT_SECONDARY = '#6f6a59';
 const BORDER = '#e7e0cd';
 const INACTIVE_BG = '#f6f3e9';
 const TARGET_ACTIVE = '#c0412b';
+
+// Groupes incompatibles
+const INCOMPATIBLE_GROUPS = {
+  larve: ['tache_larvaire', 'bande_larvaire'],
+  imago: ['vol_clair', 'essaim'],
+};
 
 interface FormationForm {
   tailleMin: string;
@@ -79,13 +85,6 @@ function numOrNull(value: string): number | null {
   return value === '' ? null : Number(value);
 }
 
-/**
- * Le PDF ne demande qu'une seule paire "Direction du vent (de / vers)" + vitesse, mais le schéma
- * back-end porte ce concept sur deux paires de colonnes distinctes (`vent_de` seul, et
- * `direction_de`/`direction_vers` — normalement la direction de déplacement de l'essaim). Faute
- * d'un champ dédié pour la saisie de la direction de déplacement dans ce handoff, on duplique la
- * valeur "de" sur les deux colonnes pour ne perdre aucune saisie utilisateur.
- */
 function rowFromForm(typeCible: string, form: FormationForm): InfestationRow {
   return {
     espece: null,
@@ -121,7 +120,6 @@ function rowFromForm(typeCible: string, form: FormationForm): InfestationRow {
   };
 }
 
-/** Une formation est considérée renseignée si sa surface totale ou sa densité moyenne est saisie. */
 function isFilled(form: FormationForm): boolean {
   return form.surfTot !== '' || form.densMoy !== '';
 }
@@ -132,7 +130,7 @@ export default function InfestationScreen() {
   const router = useRouter();
   const { draftId } = useLocalSearchParams<{ draftId: string }>();
   const [forms, setForms] = useState<Record<string, FormationForm> | null>(null);
-  const [target, setTarget] = useState<string>(TYPE_CIBLE_OPTIONS[0].value);
+  const [selectedTargets, setSelectedTargets] = useState<string[]>([]);
   const [tab, setTab] = useState<Tab>('desc');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -141,10 +139,15 @@ export default function InfestationScreen() {
     listAllProspectionInfestations(draftId).then((rows) => {
       const byType = new Map(rows.map((row) => [row.type_cible, row]));
       const next: Record<string, FormationForm> = {};
+      const selected: string[] = [];
       for (const option of TYPE_CIBLE_OPTIONS) {
         next[option.value] = formFromRow(byType.get(option.value));
+        if (byType.has(option.value)) {
+          selected.push(option.value);
+        }
       }
       setForms(next);
+      setSelectedTargets(selected);
     });
   }, [draftId]);
 
@@ -156,10 +159,12 @@ export default function InfestationScreen() {
     );
   }
 
-  const form = forms[target];
-  const targetLabel = TYPE_CIBLE_OPTIONS.find((o) => o.value === target)?.label ?? target;
+  const currentTarget = selectedTargets.length > 0 ? selectedTargets[0] : TYPE_CIBLE_OPTIONS[0].value;
+  const form = forms[currentTarget];
+  const targetLabel = TYPE_CIBLE_OPTIONS.find((o) => o.value === currentTarget)?.label ?? currentTarget;
+
   const setField = <K extends keyof FormationForm>(field: K, value: FormationForm[K]) => {
-    setForms((current) => (current ? { ...current, [target]: { ...current[target], [field]: value } } : current));
+    setForms((current) => (current ? { ...current, [currentTarget]: { ...current[currentTarget], [field]: value } } : current));
   };
 
   const descInsight = densityInsight(numOrNull(form.densMoy));
@@ -168,17 +173,73 @@ export default function InfestationScreen() {
   const windAngle = windTarget ? windTarget.deg : 0;
   const windLabel = form.ventDe && form.ventVers ? `${form.ventDe} → ${form.ventVers}` : '—';
 
+  // ==========================================
+  // LOGIQUE DE SELECTION
+  // ==========================================
+
+  const handleTargetSelect = (value: string) => {
+    const isSelected = selectedTargets.includes(value);
+
+    // Si déjà sélectionné, on le désélectionne
+    if (isSelected) {
+      setSelectedTargets(selectedTargets.filter((t) => t !== value));
+      return;
+    }
+
+    // Si on a déjà 2 types sélectionnés, on ne peut pas en ajouter un 3ème
+    if (selectedTargets.length >= 2) {
+      Alert.alert('Limite atteinte', 'Vous ne pouvez sélectionner que 2 types de cible maximum.');
+      return;
+    }
+
+    // Vérifier les incompatibilités
+    let incompatibleFound = false;
+    let incompatibleTarget = '';
+
+    // Vérifier si le nouveau type est incompatible avec un type déjà sélectionné
+    for (const group of Object.values(INCOMPATIBLE_GROUPS)) {
+      if (group.includes(value)) {
+        // Vérifier si un autre type du même groupe est déjà sélectionné
+        for (const selected of selectedTargets) {
+          if (group.includes(selected) && selected !== value) {
+            incompatibleFound = true;
+            incompatibleTarget = selected;
+            break;
+          }
+        }
+        break;
+      }
+    }
+
+    if (incompatibleFound) {
+      // Remplacer l'ancien par le nouveau
+      setSelectedTargets(
+        selectedTargets.map((t) => (t === incompatibleTarget ? value : t))
+      );
+      // Réinitialiser le formulaire de l'ancien type
+      setForms((current) => current ? { ...current, [incompatibleTarget]: emptyFormation() } : current);
+    } else {
+      // Ajouter le nouveau type
+      setSelectedTargets([...selectedTargets, value]);
+    }
+  };
+
   const persistAll = async () => {
     if (!draftId) return;
-    for (const option of TYPE_CIBLE_OPTIONS) {
-      const f = forms[option.value];
+    // Ne sauvegarder que les types sélectionnés
+    for (const target of selectedTargets) {
+      const f = forms[target];
       if (!isFilled(f)) continue;
-      await saveProspectionInfestation(draftId, option.value, rowFromForm(option.value, f));
+      await saveProspectionInfestation(draftId, target, rowFromForm(target, f));
     }
   };
 
   const handleFooterPress = async () => {
     if (isSaving) return;
+    if (selectedTargets.length === 0) {
+      Alert.alert('Sélection requise', 'Veuillez sélectionner au moins un type de cible.');
+      return;
+    }
     if (tab === 'desc') {
       setTab('comport');
       return;
@@ -190,6 +251,44 @@ export default function InfestationScreen() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const renderTargetChips = () => {
+    return TYPE_CIBLE_OPTIONS.map((option) => {
+      const isSelected = selectedTargets.includes(option.value);
+      // Vérifier si ce type est incompatible avec un autre sélectionné
+      let isIncompatible = false;
+      for (const group of Object.values(INCOMPATIBLE_GROUPS)) {
+        if (group.includes(option.value)) {
+          for (const selected of selectedTargets) {
+            if (group.includes(selected) && selected !== option.value) {
+              isIncompatible = true;
+              break;
+            }
+          }
+          break;
+        }
+      }
+
+      return (
+        <TouchableOpacity
+          key={option.value}
+          onPress={() => handleTargetSelect(option.value)}
+          style={[
+            styles.targetChip,
+            isSelected && styles.targetChipActive,
+            isIncompatible && styles.targetChipIncompatible,
+          ]}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.targetChipText, isSelected && styles.targetChipTextActive]}>
+            {option.label}
+          </Text>
+          {isSelected && <Text style={styles.targetChipCheck}>✓</Text>}
+          {isIncompatible && <Text style={styles.targetChipIncompatibleText}>⛔</Text>}
+        </TouchableOpacity>
+      );
+    });
   };
 
   return (
@@ -217,29 +316,27 @@ export default function InfestationScreen() {
               </View>
 
               <Text style={styles.sectionLabel}>Type de cible</Text>
+              
               <View style={styles.targetRow}>
-                {TYPE_CIBLE_OPTIONS.map((option) => {
-                  const active = option.value === target;
-                  return (
-                    <TouchableOpacity
-                      key={option.value}
-                      onPress={() => setTarget(option.value)}
-                      style={[styles.targetChip, active && styles.targetChipActive]}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[styles.targetChipText, active && styles.targetChipTextActive]}>{option.label}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
+                {renderTargetChips()}
+              </View>
+
+              <View style={styles.selectionInfo}>
+                <Text style={styles.selectionInfoText}>
+                  {selectedTargets.length === 0 
+                    ? 'Aucun type sélectionné' 
+                    : `${selectedTargets.length} type${selectedTargets.length > 1 ? 's' : ''} sélectionné${selectedTargets.length > 1 ? 's' : ''}`
+                  }
+                </Text>
               </View>
             </>
           )}
 
-          {tab === 'desc' && (
+          {tab === 'desc' && selectedTargets.length > 0 && (
             <View style={styles.card}>
               <View style={styles.row2NoMargin}>
                 <View style={styles.infoBox}>
-                  <Text style={styles.infoBoxLabel}>Taille</Text>
+                  <Text style={styles.infoBoxLabel}>Taille (en m)</Text>
                   <TextInput
                     value={form.tailleMoy}
                     onChangeText={(v) => setField('tailleMoy', v)}
@@ -330,7 +427,7 @@ export default function InfestationScreen() {
             </View>
           )}
 
-          {tab === 'comport' && (
+          {tab === 'comport' && selectedTargets.length > 0 && (
             <View style={styles.card}>
               <Text style={styles.fieldGroupLabel}>État</Text>
               <View style={styles.row2}>
@@ -413,8 +510,15 @@ export default function InfestationScreen() {
         </ScrollView>
 
         <View style={styles.footer}>
-          <TouchableOpacity style={styles.continueButton} onPress={handleFooterPress} disabled={isSaving} activeOpacity={0.85}>
-            <Text style={styles.continueButtonText}>{tab === 'desc' ? 'Comportement  ›' : 'Continuer  ›'}</Text>
+          <TouchableOpacity 
+            style={[styles.continueButton, selectedTargets.length === 0 && styles.continueButtonDisabled]} 
+            onPress={handleFooterPress} 
+            disabled={isSaving || selectedTargets.length === 0}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.continueButtonText}>
+              {tab === 'desc' ? 'Comportement  ›' : 'Continuer  ›'}
+            </Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -430,21 +534,30 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: '800', color: TEXT },
   scroll: { flex: 1 },
   sectionLabel: { fontSize: 10, fontWeight: '700', color: '#9a9484', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 12, marginBottom: 7 },
+  hintText: { fontSize: 11, color: TEXT_SECONDARY, fontStyle: 'italic', marginBottom: 10 },
   targetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
   targetChip: {
     flexBasis: '47%',
     flexGrow: 1,
-    paddingVertical: 13,
+    paddingVertical: 12,
     paddingHorizontal: 10,
     borderRadius: 11,
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: BORDER,
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
   },
   targetChipActive: { backgroundColor: TARGET_ACTIVE, borderColor: TARGET_ACTIVE },
+  targetChipIncompatible: { backgroundColor: '#fef2f2', borderColor: '#fca5a5', opacity: 0.6 },
+  targetChipIncompatibleText: { fontSize: 12 },
   targetChipText: { fontSize: 13, fontWeight: '700', color: TEXT },
   targetChipTextActive: { fontWeight: '800', color: '#fff' },
+  targetChipCheck: { fontSize: 14, color: '#fff', fontWeight: '700' },
+  selectionInfo: { alignItems: 'center', marginBottom: 12 },
+  selectionInfoText: { fontSize: 12, color: TEXT_SECONDARY, fontWeight: '600' },
   toggleTrack: { flexDirection: 'row', backgroundColor: INACTIVE_BG, borderRadius: 11, padding: 3, gap: 3, marginBottom: 14 },
   toggleSegmentTouchable: { flex: 1 },
   toggleSegment: {
@@ -474,6 +587,7 @@ const styles = StyleSheet.create({
   chipTextActive: { fontWeight: '800', color: '#fff' },
   footer: { padding: 16 },
   continueButton: { backgroundColor: GREEN, borderRadius: 15, paddingVertical: 15, alignItems: 'center' },
+  continueButtonDisabled: { opacity: 0.5 },
   continueButtonText: { color: '#fff', fontWeight: '800', fontSize: 15 },
   insightCallout: { backgroundColor: '#fbeae6', borderRadius: 10, padding: 11, marginTop: 10 },
   insightText: { fontSize: 11.5, lineHeight: 16, fontWeight: '500', color: '#a8422c' },

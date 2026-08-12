@@ -201,8 +201,8 @@ export default function ReferencesScreen() {
           <SegmentedControl
             deselectable
             options={[
-              { value: 'TOTAL', label: 'Total' },
-              { value: 'BARRIERE', label: 'Barrière' },
+              { value: 'TOTAL', label: 'Couvertures totales' },
+              { value: 'BARRIERE', label: 'Barrières' },
               { value: 'IRREGULIER', label: 'Irrégulier' },
             ]}
             value={store.ref.modeTraitement ?? null}

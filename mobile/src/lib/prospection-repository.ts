@@ -117,6 +117,8 @@ export interface ExtensiveObservationsUpdateInput {
 export interface ObservationsUpdateInput {
   degatsCultures: string | null;
   ennemisNaturels: string | null;
+  dernierePluie?: string | null;
+  intensitePluie?: string | null;
   observations: string | null;
 }
 
@@ -132,7 +134,7 @@ export interface CaptureRow {
   espece: 'LMC' | 'NSE';
   categorie: 'imago' | 'larve';
   sexe: 'F' | 'M' | null;
-  phase: string;
+  phase: string | null;
   stade: string;
   effectif: number;
 }
@@ -707,25 +709,25 @@ export async function updateProspectionObservations(
       degats_cultures = ?,
       ennemis_naturels = ?,
       observations = ?,
+      derniere_pluie = ?,
+      intensite_pluie = ?,
       updated_at = ?
      WHERE id = ?`,
     [
       input.degatsCultures,
       input.ennemisNaturels,
       input.observations,
+      input.dernierePluie ?? null,
+      input.intensitePluie ?? null,
       now,
       id,
     ]
   );
 
   const updated = await getProspection(id);
-
   if (!updated) {
-    throw new Error(
-      'Échec de la mise à jour de la fiche brouillon locale'
-    );
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
   }
-
   return updated;
 }
 
@@ -783,6 +785,7 @@ export async function saveProspectionCaptures(
 ): Promise<void> {
   const db = await getDb();
 
+  // Supprimer les anciennes captures
   await db.runAsync(
     `DELETE FROM prospection_capture
      WHERE prospection_id = ?
@@ -791,6 +794,7 @@ export async function saveProspectionCaptures(
     [prospectionId, espece, categorie]
   );
 
+  // Insérer les nouvelles captures
   for (const row of rows) {
     await db.runAsync(
       `INSERT INTO prospection_capture (
@@ -807,10 +811,10 @@ export async function saveProspectionCaptures(
       [
         generateId(),
         prospectionId,
-        espece,
-        categorie,
-        row.sexe,
-        row.phase,
+        row.espece,
+        row.categorie,
+        row.sexe ?? null,
+        row.phase ?? null,
         row.stade,
         row.effectif,
       ]

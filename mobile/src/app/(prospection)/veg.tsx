@@ -24,6 +24,18 @@ const TEXT_SECONDARY = '#6f6a59';
 const BORDER = '#e7e0cd';
 const INACTIVE_BG = '#efeada';
 
+// ==========================================
+// HELPER : Arrondir au multiple de 5 le plus proche
+// ==========================================
+
+function roundTo5(value: number): number {
+  return Math.round(value / 5) * 5;
+}
+
+function clampTo5(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, roundTo5(value)));
+}
+
 function emptyStrateForm(): StrateFormValues {
   return defaultStrateDetail();
 }
@@ -42,6 +54,18 @@ export default function VegetationScreen() {
     }, {} as Record<StrateKey, StrateFormValues>)
   );
 
+  // ==========================================
+  // TEXTURE : sélection multiple
+  // ==========================================
+
+  const [selectedTextures, setSelectedTextures] = useState<string[]>([]);
+
+  const toggleTexture = (value: string) => {
+    setSelectedTextures((current) =>
+      current.includes(value) ? current.filter((t) => t !== value) : [...current, value]
+    );
+  };
+
   const form = useForm({
     defaultValues: {
       humidite: null,
@@ -55,7 +79,10 @@ export default function VegetationScreen() {
         async () => {
           const updated = await updateProspectionVegetation(draftId, {
             vegetation: JSON.stringify({ strates }),
-            sol: JSON.stringify({ humidite: value.humidite, texture: value.texture }),
+            sol: JSON.stringify({
+              humidite: value.humidite,
+              texture: selectedTextures.length > 0 ? selectedTextures : null,
+            }),
           });
           setDraft(updated);
           router.push({ pathname: '/(prospection)/observations' as any, params: { draftId } });
@@ -71,13 +98,30 @@ export default function VegetationScreen() {
   });
 
   const setStrateField = <K extends keyof StrateFormValues>(key: StrateKey, field: K, value: StrateFormValues[K]) => {
-    setStrates((current) => ({ ...current, [key]: { ...current[key], [field]: value } }));
+    // Arrondir les pourcentages à 5
+    let processedValue = value;
+    if (typeof value === 'number' && ['recouvrement', 'surfRel', 'verdissement', 'repousse', 'solNu'].includes(field)) {
+      const min = field === 'recouvrement' ? 0 : 0;
+      const max = field === 'recouvrement' ? 100 : 100;
+      processedValue = clampTo5(value, min, max) as StrateFormValues[K];
+    }
+    setStrates((current) => ({ ...current, [key]: { ...current[key], [field]: processedValue } }));
   };
 
   const toggleOrpad = (key: StrateKey, stage: string) => {
     const current = strates[key].orpad;
     const next = current.includes(stage) ? current.filter((s) => s !== stage) : [...current, stage];
     setStrateField(key, 'orpad', next);
+  };
+
+  // ==========================================
+  // STEPPER : incrément/décrément par pas de 5
+  // ==========================================
+
+  const handleRecouvrementChange = (key: StrateKey, delta: number) => {
+    const current = strates[key].recouvrement;
+    const newValue = clampTo5(current + delta, 0, 100);
+    setStrateField(key, 'recouvrement', newValue);
   };
 
   return (
@@ -118,10 +162,18 @@ export default function VegetationScreen() {
                         <Text style={styles.fieldLabel}>Surf. rel. %</Text>
                         <TextInput
                           value={strate.surfRel != null ? String(strate.surfRel) : ''}
-                          onChangeText={(v) => setStrateField(key, 'surfRel', v === '' ? null : Number(v))}
+                          onChangeText={(v) => {
+                            const val = v === '' ? null : Number(v);
+                            if (val !== null && !isNaN(val)) {
+                              setStrateField(key, 'surfRel', clampTo5(val, 0, 100));
+                            } else {
+                              setStrateField(key, 'surfRel', null);
+                            }
+                          }}
                           keyboardType="decimal-pad"
                           style={styles.fieldInput}
                         />
+                        <Text style={styles.stepHint}>par pas de 5%</Text>
                       </View>
                       <View style={styles.field}>
                         <Text style={styles.fieldLabel}>H. moy (m)</Text>
@@ -141,7 +193,7 @@ export default function VegetationScreen() {
                     <View style={styles.stepperRow}>
                       <TouchableOpacity
                         style={styles.stepperButton}
-                        onPress={() => setStrateField(key, 'recouvrement', Math.max(0, strate.recouvrement - 10))}
+                        onPress={() => handleRecouvrementChange(key, -5)}
                       >
                         <Text style={styles.stepperButtonText}>−</Text>
                       </TouchableOpacity>
@@ -150,30 +202,47 @@ export default function VegetationScreen() {
                       </View>
                       <TouchableOpacity
                         style={[styles.stepperButton, styles.stepperButtonAdd]}
-                        onPress={() => setStrateField(key, 'recouvrement', Math.min(100, strate.recouvrement + 10))}
+                        onPress={() => handleRecouvrementChange(key, 5)}
                       >
                         <Text style={[styles.stepperButtonText, styles.stepperButtonAddText]}>+</Text>
                       </TouchableOpacity>
                     </View>
+                    <Text style={styles.stepHint}>par pas de 5%</Text>
 
                     <View style={styles.fieldsRow}>
                       <View style={styles.field}>
                         <Text style={styles.fieldLabel}>% Verdissement</Text>
                         <TextInput
                           value={strate.verdissement != null ? String(strate.verdissement) : ''}
-                          onChangeText={(v) => setStrateField(key, 'verdissement', v === '' ? null : Number(v))}
+                          onChangeText={(v) => {
+                            const val = v === '' ? null : Number(v);
+                            if (val !== null && !isNaN(val)) {
+                              setStrateField(key, 'verdissement', clampTo5(val, 0, 100));
+                            } else {
+                              setStrateField(key, 'verdissement', null);
+                            }
+                          }}
                           keyboardType="decimal-pad"
                           style={styles.fieldInput}
                         />
+                        <Text style={styles.stepHint}>par pas de 5%</Text>
                       </View>
                       <View style={styles.field}>
                         <Text style={styles.fieldLabel}>% Repousse</Text>
                         <TextInput
                           value={strate.repousse != null ? String(strate.repousse) : ''}
-                          onChangeText={(v) => setStrateField(key, 'repousse', v === '' ? null : Number(v))}
+                          onChangeText={(v) => {
+                            const val = v === '' ? null : Number(v);
+                            if (val !== null && !isNaN(val)) {
+                              setStrateField(key, 'repousse', clampTo5(val, 0, 100));
+                            } else {
+                              setStrateField(key, 'repousse', null);
+                            }
+                          }}
                           keyboardType="decimal-pad"
                           style={styles.fieldInput}
                         />
+                        <Text style={styles.stepHint}>par pas de 5%</Text>
                       </View>
                     </View>
 
@@ -197,10 +266,18 @@ export default function VegetationScreen() {
                     <Text style={styles.fieldLabel}>Sol nu %</Text>
                     <TextInput
                       value={strate.solNu != null ? String(strate.solNu) : ''}
-                      onChangeText={(v) => setStrateField(key, 'solNu', v === '' ? null : Number(v))}
+                      onChangeText={(v) => {
+                        const val = v === '' ? null : Number(v);
+                        if (val !== null && !isNaN(val)) {
+                          setStrateField(key, 'solNu', clampTo5(val, 0, 100));
+                        } else {
+                          setStrateField(key, 'solNu', null);
+                        }
+                      }}
                       keyboardType="decimal-pad"
                       style={styles.fieldInput}
                     />
+                    <Text style={styles.stepHint}>par pas de 5%</Text>
                   </View>
                 )}
               </View>
@@ -245,33 +322,42 @@ export default function VegetationScreen() {
           <form.Field
             name="texture"
             validators={{
-              onChange: ({ value }) => (value ? undefined : 'Texture du sol requise'),
-              onBlur: ({ value }) => (value ? undefined : 'Texture du sol requise'),
+              onChange: ({ value }) => (selectedTextures.length > 0 ? undefined : 'Texture du sol requise'),
+              onBlur: ({ value }) => (selectedTextures.length > 0 ? undefined : 'Texture du sol requise'),
             }}
           >
             {(field) => {
-              const showError = field.state.meta.isTouched && !field.state.meta.isValid;
+              const showError = field.state.meta.isTouched && selectedTextures.length === 0;
               return (
                 <View style={[styles.card, showError && styles.cardError]}>
-                  <Text style={styles.cardTitle}>Texture du sol</Text>
+                  <Text style={styles.cardTitle}>Texture du sol (sélection multiple)</Text>
+                  <Text style={styles.hintSmall}>Touchez pour sélectionner/désélectionner</Text>
                   <View style={styles.chipsRow}>
                     {TEXTURE_OPTIONS.map((option) => {
-                      const active = option.value === field.state.value;
+                      const active = selectedTextures.includes(option.value);
                       return (
                         <TouchableOpacity
                           key={option.value}
                           style={[styles.smallChip, active && styles.smallChipActive]}
                           onPress={() => {
-                            field.handleChange(option.value);
+                            toggleTexture(option.value);
                             field.handleBlur();
                           }}
                         >
-                          <Text style={[styles.smallChipText, active && styles.smallChipTextActive]}>{option.label}</Text>
+                          <Text style={[styles.smallChipText, active && styles.smallChipTextActive]}>
+                            {option.label}
+                            {active && ' ✓'}
+                          </Text>
                         </TouchableOpacity>
                       );
                     })}
                   </View>
-                  {showError && <Text style={styles.errorText}>{field.state.meta.errors[0]}</Text>}
+                  {selectedTextures.length > 0 && (
+                    <Text style={styles.selectionInfo}>
+                      {selectedTextures.length} texture{selectedTextures.length > 1 ? 's' : ''} sélectionnée{selectedTextures.length > 1 ? 's' : ''}
+                    </Text>
+                  )}
+                  {showError && <Text style={styles.errorText}>Veuillez sélectionner au moins une texture</Text>}
                 </View>
               );
             }}
@@ -300,6 +386,9 @@ const styles = StyleSheet.create({
   title: { fontSize: 15, fontWeight: '700', color: TEXT },
   scroll: { flex: 1 },
   hint: { fontSize: 10.5, lineHeight: 15, color: '#9a9484', marginBottom: 14 },
+  hintSmall: { fontSize: 9.5, color: '#9a9484', marginBottom: 8, fontStyle: 'italic' },
+  stepHint: { fontSize: 8.5, color: '#9a9484', marginTop: 2, fontStyle: 'italic' },
+  selectionInfo: { fontSize: 11, color: GREEN, fontWeight: '600', textAlign: 'center', marginTop: 4 },
   strateCard: { marginBottom: 8, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 11, padding: 13 },
   strateCardExpanded: { borderWidth: 2, borderColor: GREEN },
   strateHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
@@ -319,7 +408,7 @@ const styles = StyleSheet.create({
   recouvrementRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   recouvrementLabel: { fontSize: 10.5, color: '#5c5848' },
   recouvrementValue: { fontSize: 12, fontWeight: '700', color: GREEN, fontFamily: 'monospace' },
-  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 9 },
+  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 2 },
   stepperButton: { width: 32, height: 32, borderRadius: 8, backgroundColor: INACTIVE_BG, alignItems: 'center', justifyContent: 'center' },
   stepperButtonAdd: { backgroundColor: GREEN },
   stepperButtonText: { fontSize: 17, fontWeight: '700', color: TEXT_SECONDARY },

@@ -14,9 +14,6 @@ import { CaptureRow } from './prospection-repository';
 
 export type CaptureCounts = Record<string, number>;
 
-// ==========================================
-// CONFIGURATION IMPORTÉE DU COMPOSANT
-// ==========================================
 const STADES_CONFIG = {
   imago: {
     LMC: {
@@ -32,30 +29,18 @@ const STADES_CONFIG = {
     LMC: ['L1', 'L2', 'L3', 'L4', 'L5'],
     NSE: ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'],
   },
-};
+} as const;
 
 const PHASES_CONFIG = {
   LMC: {
-    imago: {
-      F: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
-      M: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
-    },
-    larve: {
-      F: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
-      M: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
-    },
+    imago: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
+    larve: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
   },
   NSE: {
-    imago: {
-      F: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
-      M: ['solitaire', 'transiens', 'gregaire'],
-    },
-    larve: {
-      F: ['solitaire', 'transiens', 'gregaire'],
-      M: ['solitaire', 'transiens', 'gregaire'],
-    },
+    imago: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
+    larve: ['solitaire', 'transiens', 'gregaire'],
   },
-};
+} as const;
 
 export function captureKey(sexe: Sexe | null, phenotype: Phenotype, stade: string): string {
   return sexe ? `${sexe}|${phenotype}|${stade}` : `${phenotype}|${stade}`;
@@ -92,7 +77,8 @@ export function dominantPhenotype(counts: CaptureCounts): Phenotype | null {
 export function rowsToCounts(rows: CaptureRow[]): CaptureCounts {
   const counts: CaptureCounts = {};
   for (const row of rows) {
-    counts[captureKey(row.sexe as Sexe | null, row.phase as Phenotype, row.stade)] = row.effectif;
+    const key = row.sexe ? `${row.sexe}|${row.stade}` : row.stade;
+    counts[key] = (counts[key] || 0) + row.effectif;
   }
   return counts;
 }
@@ -102,16 +88,20 @@ export function countsToRows(espece: Espece, categorie: Categorie, counts: Captu
   for (const [key, effectif] of Object.entries(counts)) {
     if (effectif <= 0) continue;
     const parts = key.split('|');
-    const [sexe, phenotype, stade] = parts.length === 3 ? (parts as [Sexe, Phenotype, string]) : [null, parts[0] as Phenotype, parts[1]];
-    rows.push({ espece, categorie, sexe: sexe ?? null, phase: phenotype, stade, effectif });
+    const [sexe, stade] = parts.length === 2 ? (parts as [Sexe, string]) : [null, parts[0]];
+    rows.push({
+      espece,
+      categorie,
+      sexe: sexe ?? null,
+      phase: null,
+      stade,
+      effectif,
+    });
   }
   return rows;
 }
 
-// ==========================================
-// FONCTIONS D'INITIALISATION DES STADES/PHASES
-// ==========================================
-function getInitialStades(stadesList: string[]): Record<string, number> {
+function getInitialStades(stadesList: readonly string[]): Record<string, number> {
   const newStades: Record<string, number> = {};
   for (const stade of stadesList) {
     newStades[stade] = 0;
@@ -119,7 +109,7 @@ function getInitialStades(stadesList: string[]): Record<string, number> {
   return newStades;
 }
 
-function getInitialPhases(phasesList: string[]): Record<string, number> {
+function getInitialPhases(phasesList: readonly string[]): Record<string, number> {
   const newPhases: Record<string, number> = {};
   for (const phase of phasesList) {
     newPhases[phase] = 0;
@@ -127,10 +117,7 @@ function getInitialPhases(phasesList: string[]): Record<string, number> {
   return newPhases;
 }
 
-// ==========================================
-// INTERFACE DU STORE
-// ==========================================
-interface CaptureLoopState {
+export interface CaptureLoopState {
   grilleOrder: GrilleKey[];
   currentGrilleIndex: number;
   completedGrilleKeys: string[];
@@ -138,11 +125,11 @@ interface CaptureLoopState {
   currentStade: string | null;
   currentPhenotype: Phenotype | null;
   counts: CaptureCounts;
-  // NOUVEAUX CHAMPS POUR STADES/PHASES
   stadesData: Record<string, number>;
+  stadesDataF: Record<string, number>;
+  stadesDataM: Record<string, number>;
   phasesData: Record<string, number>;
   currentSexe: Sexe;
-
   initGrilles: (order: GrilleKey[], completed: string[], allCaptures: CaptureRow[]) => void;
   goToGrille: (index: number, allCaptures: CaptureRow[]) => void;
   markCurrentGrilleCompleted: () => void;
@@ -151,14 +138,16 @@ interface CaptureLoopState {
   setPhenotype: (phenotype: Phenotype) => void;
   increment: () => void;
   decrement: () => void;
-  reset: () => void;
-  // NOUVELLES FONCTIONS
   updateStade: (stade: string, value: number) => void;
-  updatePhase: (phase: string, value: number) => void;
   incrementStade: (stade: string) => void;
   decrementStade: (stade: string) => void;
+  updateStadeBySex: (sexe: Sexe, stade: string, value: number) => void;
+  incrementStadeBySex: (sexe: Sexe, stade: string) => void;
+  decrementStadeBySex: (sexe: Sexe, stade: string) => void;
+  updatePhase: (phase: string, value: number) => void;
   incrementPhase: (phase: string) => void;
   decrementPhase: (phase: string) => void;
+  reset: () => void;
 }
 
 function firstIncompleteIndex(order: GrilleKey[], completed: string[]): number {
@@ -170,22 +159,72 @@ function countsForGrille(grille: GrilleKey, allCaptures: CaptureRow[]): CaptureC
   return rowsToCounts(allCaptures.filter((row) => row.espece === grille.espece && row.categorie === grille.categorie));
 }
 
-// ==========================================
-// INITIALISATION DES DONNÉES STADES/PHASES
-// ==========================================
-function initStadesPhases(grille: GrilleKey, sexe: Sexe): { stades: Record<string, number>; phases: Record<string, number> } {
+function stadesFemellesFromCaptures(grille: GrilleKey, allCaptures: CaptureRow[]): Record<string, number> {
+  const stades = getInitialStades(grille.categorie === 'imago' ? STADES_CONFIG.imago[grille.espece].F : []);
+  for (const row of allCaptures) {
+    if (row.espece !== grille.espece || row.categorie !== grille.categorie) continue;
+    if (grille.categorie !== 'imago') continue;
+    if (row.sexe !== 'F') continue;
+    if (Object.prototype.hasOwnProperty.call(stades, row.stade)) {
+      stades[row.stade] = row.effectif;
+    }
+  }
+  return stades;
+}
+
+function stadesMalesFromCaptures(grille: GrilleKey, allCaptures: CaptureRow[]): Record<string, number> {
+  const stades = getInitialStades(grille.categorie === 'imago' ? STADES_CONFIG.imago[grille.espece].M : []);
+  for (const row of allCaptures) {
+    if (row.espece !== grille.espece || row.categorie !== grille.categorie) continue;
+    if (grille.categorie !== 'imago') continue;
+    if (row.sexe !== 'M') continue;
+    if (Object.prototype.hasOwnProperty.call(stades, row.stade)) {
+      stades[row.stade] = row.effectif;
+    }
+  }
+  return stades;
+}
+
+function stadesLarvesFromCaptures(grille: GrilleKey, allCaptures: CaptureRow[]): Record<string, number> {
+  const stades = getInitialStades(grille.categorie === 'larve' ? STADES_CONFIG.larve[grille.espece] : []);
+  for (const row of allCaptures) {
+    if (row.espece !== grille.espece || row.categorie !== grille.categorie) continue;
+    if (grille.categorie !== 'larve') continue;
+    if (Object.prototype.hasOwnProperty.call(stades, row.stade)) {
+      stades[row.stade] = row.effectif;
+    }
+  }
+  return stades;
+}
+
+function phasesFromCaptures(grille: GrilleKey, allCaptures: CaptureRow[]): Record<string, number> {
   const category = grille.categorie as 'imago' | 'larve';
-  const sexeKey = grille.categorie === 'imago' ? sexe : 'F';
-  
-  const stadesList = grille.categorie === 'imago'
-    ? STADES_CONFIG.imago[grille.espece]?.[sexe] || []
-    : STADES_CONFIG.larve[grille.espece] || [];
-  
-  const phasesList = PHASES_CONFIG[grille.espece]?.[category]?.[sexeKey] || [];
-  
+  const phasesList = PHASES_CONFIG[grille.espece][category];
+  const phases = getInitialPhases(phasesList);
+  for (const row of allCaptures) {
+    if (row.espece !== grille.espece || row.categorie !== grille.categorie) continue;
+    const phase = row.phase;
+    if (!phase || !Object.prototype.hasOwnProperty.call(phases, phase)) continue;
+    phases[phase] += row.effectif;
+  }
+  return phases;
+}
+
+function buildGrilleData(grille: GrilleKey, allCaptures: CaptureRow[]) {
+  const currentSexe: Sexe = grille.categorie === 'imago' ? 'F' : 'F';
+  const stadesDataF = grille.categorie === 'imago' ? stadesFemellesFromCaptures(grille, allCaptures) : {};
+  const stadesDataM = grille.categorie === 'imago' ? stadesMalesFromCaptures(grille, allCaptures) : {};
+  const stadesData = grille.categorie === 'larve' ? stadesLarvesFromCaptures(grille, allCaptures) : {};
+  const phasesData = phasesFromCaptures(grille, allCaptures);
   return {
-    stades: getInitialStades(stadesList),
-    phases: getInitialPhases(phasesList),
+    currentSexe,
+    currentStade: stadesFor(grille.espece, grille.categorie, grille.categorie === 'imago' ? currentSexe : 'F')[0] ?? null,
+    currentPhenotype: 'transiens' as Phenotype,
+    counts: countsForGrille(grille, allCaptures),
+    stadesData,
+    stadesDataF,
+    stadesDataM,
+    phasesData,
   };
 }
 
@@ -198,72 +237,82 @@ export const useProspectionCaptureStore = create<CaptureLoopState>((set, get) =>
   currentPhenotype: null,
   counts: {},
   stadesData: {},
+  stadesDataF: {},
+  stadesDataM: {},
   phasesData: {},
   currentSexe: 'F',
 
   initGrilles: (order, completed, allCaptures) => {
     const index = firstIncompleteIndex(order, completed);
     const grille = order[index];
-    const sexe = grille?.categorie === 'imago' ? 'F' : null;
-    const stadesPhases = grille ? initStadesPhases(grille, 'F') : { stades: {}, phases: {} };
-    
+    if (!grille) {
+      set({
+        grilleOrder: order,
+        completedGrilleKeys: completed,
+        currentGrilleIndex: index,
+        sexe: null,
+        currentSexe: 'F',
+        currentStade: null,
+        currentPhenotype: null,
+        counts: {},
+        stadesData: {},
+        stadesDataF: {},
+        stadesDataM: {},
+        phasesData: {},
+      });
+      return;
+    }
+    const data = buildGrilleData(grille, allCaptures);
     set({
       grilleOrder: order,
       completedGrilleKeys: completed,
       currentGrilleIndex: index,
-      sexe: sexe,
-      currentSexe: 'F',
-      currentPhenotype: 'transiens',
-      currentStade: grille ? stadesFor(grille.espece, grille.categorie, 'F')[0] : null,
-      counts: grille ? countsForGrille(grille, allCaptures) : {},
-      stadesData: stadesPhases.stades,
-      phasesData: stadesPhases.phases,
+      sexe: grille.categorie === 'imago' ? 'F' : null,
+      currentSexe: data.currentSexe,
+      currentStade: data.currentStade,
+      currentPhenotype: data.currentPhenotype,
+      counts: data.counts,
+      stadesData: data.stadesData,
+      stadesDataF: data.stadesDataF,
+      stadesDataM: data.stadesDataM,
+      phasesData: data.phasesData,
     });
   },
 
   goToGrille: (index, allCaptures) => {
     const grille = get().grilleOrder[index];
     if (!grille) return;
-    const sexe = grille.categorie === 'imago' ? 'F' : null;
-    const stadesPhases = initStadesPhases(grille, 'F');
-    
+    const data = buildGrilleData(grille, allCaptures);
     set({
       currentGrilleIndex: index,
-      sexe,
-      currentSexe: 'F',
-      currentPhenotype: 'transiens',
-      currentStade: stadesFor(grille.espece, grille.categorie, sexe)[0],
-      counts: countsForGrille(grille, allCaptures),
-      stadesData: stadesPhases.stades,
-      phasesData: stadesPhases.phases,
+      sexe: grille.categorie === 'imago' ? 'F' : null,
+      currentSexe: data.currentSexe,
+      currentStade: data.currentStade,
+      currentPhenotype: data.currentPhenotype,
+      counts: data.counts,
+      stadesData: data.stadesData,
+      stadesDataF: data.stadesDataF,
+      stadesDataM: data.stadesDataM,
+      phasesData: data.phasesData,
     });
   },
 
   markCurrentGrilleCompleted: () => {
-    const grille = get().grilleOrder[get().currentGrilleIndex];
+    const state = get();
+    const grille = state.grilleOrder[state.currentGrilleIndex];
     if (!grille) return;
     const key = grilleKeyToString(grille);
     set((state) => ({
-      completedGrilleKeys: state.completedGrilleKeys.includes(key)
-        ? state.completedGrilleKeys
-        : [...state.completedGrilleKeys, key],
+      completedGrilleKeys: state.completedGrilleKeys.includes(key) ? state.completedGrilleKeys : [...state.completedGrilleKeys, key],
     }));
   },
 
   setSexe: (sexe) => {
     const grille = get().grilleOrder[get().currentGrilleIndex];
     if (!grille) return;
-    
-    // Mettre à jour sexe et stades/phases
-    const stadesPhases = initStadesPhases(grille, sexe);
-    
-    set((state) => ({
-      sexe,
-      currentSexe: sexe,
-      currentStade: remapStadeForSexeChange(state.currentStade, sexe),
-      stadesData: stadesPhases.stades,
-      phasesData: stadesPhases.phases,
-    }));
+    if (grille.categorie !== 'imago') return;
+    const currentStade = remapStadeForSexeChange(get().currentStade, sexe);
+    set({ sexe, currentSexe: sexe, currentStade });
   },
 
   setStade: (stade) => set({ currentStade: stade }),
@@ -287,40 +336,65 @@ export const useProspectionCaptureStore = create<CaptureLoopState>((set, get) =>
     set({ counts: { ...state.counts, [key]: current - 1 } });
   },
 
-  // ==========================================
-  // NOUVELLES FONCTIONS POUR STADES/PHASES
-  // ==========================================
-  updateStade: (stade: string, value: number) => {
+  updateStade: (stade, value) => {
     set((state) => ({
-      stadesData: { ...state.stadesData, [stade]: Math.max(0, value) },
+      stadesData: { ...state.stadesData, [stade]: Math.max(0, Number(value) || 0) },
     }));
   },
 
-  updatePhase: (phase: string, value: number) => {
-    set((state) => ({
-      phasesData: { ...state.phasesData, [phase]: Math.max(0, value) },
-    }));
-  },
-
-  incrementStade: (stade: string) => {
+  incrementStade: (stade) => {
     set((state) => ({
       stadesData: { ...state.stadesData, [stade]: (state.stadesData[stade] || 0) + 1 },
     }));
   },
 
-  decrementStade: (stade: string) => {
+  decrementStade: (stade) => {
     set((state) => ({
       stadesData: { ...state.stadesData, [stade]: Math.max(0, (state.stadesData[stade] || 0) - 1) },
     }));
   },
 
-  incrementPhase: (phase: string) => {
+  updateStadeBySex: (sexe, stade, value) => {
+    const safeValue = Math.max(0, Number(value) || 0);
+    set((state) => {
+      if (sexe === 'F') {
+        return { stadesDataF: { ...state.stadesDataF, [stade]: safeValue } };
+      }
+      return { stadesDataM: { ...state.stadesDataM, [stade]: safeValue } };
+    });
+  },
+
+  incrementStadeBySex: (sexe, stade) => {
+    set((state) => {
+      if (sexe === 'F') {
+        return { stadesDataF: { ...state.stadesDataF, [stade]: (state.stadesDataF[stade] || 0) + 1 } };
+      }
+      return { stadesDataM: { ...state.stadesDataM, [stade]: (state.stadesDataM[stade] || 0) + 1 } };
+    });
+  },
+
+  decrementStadeBySex: (sexe, stade) => {
+    set((state) => {
+      if (sexe === 'F') {
+        return { stadesDataF: { ...state.stadesDataF, [stade]: Math.max(0, (state.stadesDataF[stade] || 0) - 1) } };
+      }
+      return { stadesDataM: { ...state.stadesDataM, [stade]: Math.max(0, (state.stadesDataM[stade] || 0) - 1) } };
+    });
+  },
+
+  updatePhase: (phase, value) => {
+    set((state) => ({
+      phasesData: { ...state.phasesData, [phase]: Math.max(0, Number(value) || 0) },
+    }));
+  },
+
+  incrementPhase: (phase) => {
     set((state) => ({
       phasesData: { ...state.phasesData, [phase]: (state.phasesData[phase] || 0) + 1 },
     }));
   },
 
-  decrementPhase: (phase: string) => {
+  decrementPhase: (phase) => {
     set((state) => ({
       phasesData: { ...state.phasesData, [phase]: Math.max(0, (state.phasesData[phase] || 0) - 1) },
     }));
@@ -336,6 +410,8 @@ export const useProspectionCaptureStore = create<CaptureLoopState>((set, get) =>
       currentPhenotype: null,
       counts: {},
       stadesData: {},
+      stadesDataF: {},
+      stadesDataM: {},
       phasesData: {},
       currentSexe: 'F',
     });
