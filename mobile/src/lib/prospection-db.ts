@@ -120,6 +120,132 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
 
     CREATE INDEX IF NOT EXISTS ix_prospection_infestation_prospection_id
       ON prospection_infestation(prospection_id);
+
+    CREATE TABLE IF NOT EXISTS traitement (
+      id TEXT PRIMARY KEY NOT NULL,
+      prospection_id TEXT NOT NULL,
+      numero_fiche TEXT,
+      type_traitement TEXT NOT NULL,
+      mode_traitement TEXT,
+      date_traitement TEXT,
+      date_validation TEXT,
+      localite TEXT,
+      region TEXT,
+      district TEXT,
+      commune TEXT,
+      latitude REAL,
+      longitude REAL,
+      altitude REAL,
+      kit_combinaison INTEGER,
+      kit_gants INTEGER,
+      kit_lunettes INTEGER,
+      kit_masques INTEGER,
+      kit_boite INTEGER,
+      zones_exposees TEXT,
+      hauteur_strate_herbeuse_m REAL,
+      hauteur_strate_arboree_m REAL,
+      recouvrement_percent REAL,
+      empoisonnement INTEGER,
+      empoisonnement_type TEXT,
+      empoisonnement_mode TEXT,
+      empoisonnement_autre TEXT,
+      evaluation_risque TEXT,
+      comportement_anormal INTEGER,
+      comportement_non_cibles TEXT,
+      mortalite INTEGER,
+      mortalite_familles TEXT,
+      observations TEXT,
+      statut TEXT NOT NULL DEFAULT 'brouillon',
+      statut_sync TEXT NOT NULL DEFAULT 'local',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_traitement_prospection_id
+      ON traitement(prospection_id);
+
+    CREATE TABLE IF NOT EXISTS cible (
+      traitement_id TEXT PRIMARY KEY NOT NULL REFERENCES traitement(id) ON DELETE CASCADE,
+      espece TEXT,
+      petites_larves REAL,
+      grandes_larves REAL,
+      vols_clairs_essaims REAL,
+      repartition_population TEXT,
+      surface_infestee_ha REAL
+    );
+
+    CREATE TABLE IF NOT EXISTS traitement_aerien (
+      traitement_id TEXT PRIMARY KEY NOT NULL REFERENCES traitement(id) ON DELETE CASCADE,
+      pilote TEXT,
+      mecanicien TEXT,
+      chef_de_base_id TEXT,
+      consultant_international TEXT,
+      nb_rotations INTEGER,
+      total_pesticide_l REAL
+    );
+
+    CREATE TABLE IF NOT EXISTS rotation (
+      id TEXT PRIMARY KEY NOT NULL,
+      traitement_aerien_id TEXT NOT NULL REFERENCES traitement_aerien(traitement_id) ON DELETE CASCADE,
+      numero INTEGER,
+      numero_cuve TEXT,
+      produit_id TEXT,
+      quantite_l REAL,
+      temperature_debut_c REAL,
+      temperature_fin_c REAL,
+      vent_debut_ms REAL,
+      vent_fin_ms REAL
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_rotation_traitement_aerien_id
+      ON rotation(traitement_aerien_id);
+
+    CREATE TABLE IF NOT EXISTS traitement_terrestre (
+      traitement_id TEXT PRIMARY KEY NOT NULL REFERENCES traitement(id) ON DELETE CASCADE,
+      heure_debut TEXT,
+      heure_fin TEXT,
+      vitesse_vent_ms REAL,
+      direction_vent TEXT,
+      temperature_c REAL,
+      reprise_traitement INTEGER,
+      traitement_origine_id TEXT,
+      chef_equipe_id TEXT,
+      agent_encadreur_id TEXT,
+      consultant_international TEXT,
+      surface_atomiseur_ha REAL,
+      surface_disque_rotatif_ha REAL,
+      surface_ulvamast_ha REAL,
+      surface_restante_abandonnee INTEGER,
+      motif_surface_restante_abandonnee TEXT,
+      essence_litres REAL,
+      nb_piles INTEGER,
+      surface_traitee_ha REAL,
+      surface_cumulee_ha REAL,
+      surface_restante_ha REAL,
+      total_pesticide_l REAL
+    );
+
+    CREATE TABLE IF NOT EXISTS produit_utilise (
+      id TEXT PRIMARY KEY NOT NULL,
+      traitement_terrestre_id TEXT NOT NULL REFERENCES traitement_terrestre(traitement_id) ON DELETE CASCADE,
+      numero INTEGER,
+      produit_id TEXT,
+      quantite_l REAL
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_produit_utilise_traitement_terrestre_id
+      ON produit_utilise(traitement_terrestre_id);
+
+    CREATE TABLE IF NOT EXISTS traitement_signature (
+      id TEXT PRIMARY KEY NOT NULL,
+      traitement_id TEXT NOT NULL REFERENCES traitement(id) ON DELETE CASCADE,
+      role TEXT NOT NULL,
+      signataire_nom TEXT,
+      horodatage TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_traitement_signature_traitement_id
+      ON traitement_signature(traitement_id);
   `);
 
   // ==========================================
@@ -128,6 +254,7 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
   await migrateProspectionTable(db);
   await migrateInfestationTable(db);
   await migratePopulationTable(db);
+  await migrateTraitementTable(db);
 
   return db;
 }
@@ -248,6 +375,33 @@ async function migratePopulationTable(db: SQLite.SQLiteDatabase): Promise<void> 
         await db.execAsync(`ALTER TABLE prospection_population ADD COLUMN ${col.name} ${col.type};`);
       } catch (error) {
         console.warn(`[Migration] ⚠️ Impossible d'ajouter ${col.name} sur prospection_population:`, error);
+      }
+    }
+  }
+}
+
+// ==========================================
+// MIGRATION POUR LA TABLE TRAITEMENT
+// ==========================================
+/**
+ * Aucune colonne n'a été ajoutée depuis la création de la table `traitement`
+ * (le champ `observations` fait déjà partie du schéma de base). Cette fonction
+ * existe malgré tout, en parité avec les autres tables, pour que le prochain
+ * ajout de colonne suive le même patron ALTER-TABLE tolérant plutôt que
+ * d'inventer une nouvelle convention.
+ */
+async function migrateTraitementTable(db: SQLite.SQLiteDatabase): Promise<void> {
+  const tableInfo = await db.getAllAsync<{ name: string }>('PRAGMA table_info(traitement)');
+  const columnNames = tableInfo.map(row => row.name);
+
+  const columnsToAdd: { name: string; type: string }[] = [];
+
+  for (const col of columnsToAdd) {
+    if (!columnNames.includes(col.name)) {
+      try {
+        await db.execAsync(`ALTER TABLE traitement ADD COLUMN ${col.name} ${col.type};`);
+      } catch (error) {
+        console.warn(`[Migration] ⚠️ Impossible d'ajouter ${col.name} sur traitement:`, error);
       }
     }
   }
