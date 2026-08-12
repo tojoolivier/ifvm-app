@@ -35,7 +35,7 @@ export function DateField({ value, onChange, editable = true, placeholder = 'JJ/
   const [show, setShow] = useState(false);
 
   const onValueChange = (_event: DateTimePickerChangeEvent, selectedDate: Date) => {
-    if (Platform.OS === 'android') setShow(false);
+    setShow(false);
     onChange(toIsoDate(selectedDate));
   };
 
