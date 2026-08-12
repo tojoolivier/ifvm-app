@@ -112,6 +112,7 @@ def _construire_traitement_base(
     comportement_non_cibles: dict[str, Any] | None,
     mortalite: bool,
     mortalite_familles: dict[str, Any] | None,
+    observations: str | None,
 ) -> Traitement:
     """Construit le `Traitement` brouillon + snapshot `Cible`, commun aux deux spécialisations."""
     now = datetime.utcnow()
@@ -148,6 +149,7 @@ def _construire_traitement_base(
         comportement_non_cibles=comportement_non_cibles,
         mortalite=mortalite,
         mortalite_familles=mortalite_familles,
+        observations=observations,
         statut="brouillon",
         created_at=now,
         updated_at=now,
@@ -207,6 +209,7 @@ class CreateTraitementAerien:
         comportement_non_cibles: dict[str, Any] | None = None,
         mortalite: bool = False,
         mortalite_familles: dict[str, Any] | None = None,
+        observations: str | None = None,
     ) -> Traitement:
         _valider_dates(date_traitement, date_validation)
 
@@ -259,6 +262,7 @@ class CreateTraitementAerien:
             comportement_non_cibles=comportement_non_cibles,
             mortalite=mortalite,
             mortalite_familles=mortalite_familles,
+            observations=observations,
         )
 
         traitement.aerien = TraitementAerien(
@@ -339,6 +343,7 @@ class CreateTraitementTerrestre:
         comportement_non_cibles: dict[str, Any] | None = None,
         mortalite: bool = False,
         mortalite_familles: dict[str, Any] | None = None,
+        observations: str | None = None,
     ) -> Traitement:
         _valider_dates(date_traitement, date_validation)
         if heure_fin <= heure_debut:
@@ -415,6 +420,7 @@ class CreateTraitementTerrestre:
             comportement_non_cibles=comportement_non_cibles,
             mortalite=mortalite,
             mortalite_familles=mortalite_familles,
+            observations=observations,
         )
         cible = traitement.cible
 
@@ -741,6 +747,7 @@ class SyncPushTraitementAerien:
         comportement_non_cibles: dict[str, Any] | None = None,
         mortalite: bool = False,
         mortalite_familles: dict[str, Any] | None = None,
+        observations: str | None = None,
     ) -> tuple[Traitement, bool]:
         _valider_dates(date_traitement, date_validation)
 
@@ -798,6 +805,7 @@ class SyncPushTraitementAerien:
             comportement_non_cibles=comportement_non_cibles,
             mortalite=mortalite,
             mortalite_familles=mortalite_familles,
+            observations=observations,
         )
         candidat.aerien = TraitementAerien(
             traitement_id=traitement_id,
@@ -893,6 +901,7 @@ class SyncPushTraitementTerrestre:
         comportement_non_cibles: dict[str, Any] | None = None,
         mortalite: bool = False,
         mortalite_familles: dict[str, Any] | None = None,
+        observations: str | None = None,
     ) -> tuple[Traitement, bool]:
         _valider_dates(date_traitement, date_validation)
         if heure_fin <= heure_debut:
@@ -976,6 +985,7 @@ class SyncPushTraitementTerrestre:
             comportement_non_cibles=comportement_non_cibles,
             mortalite=mortalite,
             mortalite_familles=mortalite_familles,
+            observations=observations,
         )
         cible = candidat.cible
 

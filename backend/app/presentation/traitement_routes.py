@@ -107,6 +107,7 @@ def _champs_communs(body: TraitementCreate) -> dict[str, Any]:
         comportement_non_cibles=body.comportement_non_cibles,
         mortalite=body.mortalite,
         mortalite_familles=body.mortalite_familles,
+        observations=body.observations,
     )
 
 

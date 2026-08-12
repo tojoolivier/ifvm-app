@@ -239,6 +239,7 @@ class Traitement:
     comportement_non_cibles: dict[str, Any] | None = None
     mortalite: bool = False
     mortalite_familles: dict[str, Any] | None = None
+    observations: str | None = None
     statut: str = "brouillon"
     statut_sync: str = "local"
     created_at: datetime = field(default_factory=datetime.utcnow)

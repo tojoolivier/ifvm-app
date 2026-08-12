@@ -59,6 +59,7 @@ class TraitementModel(Base):
     comportement_non_cibles: Mapped[dict | None] = mapped_column(JSONB(), nullable=True)
     mortalite: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=False)
     mortalite_familles: Mapped[dict | None] = mapped_column(JSONB(), nullable=True)
+    observations: Mapped[str | None] = mapped_column(Text(), nullable=True)
     statut: Mapped[str] = mapped_column(String(30), nullable=False, default="brouillon")
     statut_sync: Mapped[str] = mapped_column(String(30), nullable=False, default="local")
     created_at: Mapped[datetime] = mapped_column(
