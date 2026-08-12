@@ -253,14 +253,14 @@ export function buildInfestationSynthese(infestations: InfestationRead[]): Infes
   return {
     hasInfestation: true,
     typeLabel: TYPE_CIBLE_OPTIONS.find((o) => o.value === infestation.type_cible)?.label ?? infestation.type_cible,
-    surfaceTot: infestation.surface_tot,
+    surfaceTot: infestation.surface_tot ?? null,
     comportementLabel: infestation.comportement === 'deplacement' ? 'Déplacement' : infestation.comportement === 'repos' ? 'Repos' : '—',
-    pullulationNb: infestation.pullulation_nb,
+    pullulationNb: infestation.pullulation_nb ?? null,
     tailleEssaim: tailleParts.length > 0 ? tailleParts.join(' ') : '—',
-    typeEssaim: infestation.type_essaim,
-    typeLarve: infestation.type_larve,
-    surfaceContamineeHa: infestation.surface_contaminee_ha,
-    surfInfesteePourcent: infestation.surf_infestee_pourcent,
+    typeEssaim: infestation.type_essaim ?? null,
+    typeLarve: infestation.type_larve ?? null,
+    surfaceContamineeHa: infestation.surface_contaminee_ha ?? null,
+    surfInfesteePourcent: infestation.surf_infestee_pourcent ?? null,
   };
 }
 
@@ -298,14 +298,14 @@ export function buildFicheLecture(prospection: ProspectionRead): FicheLectureVie
         prospection.degats_cultures
       )
     ),
-    region: prospection.region,
-    district: prospection.district,
-    commune: prospection.commune,
-    za: prospection.za,
-    pa_code: prospection.pa_code,
-    degatsCulturesPourcent: prospection.degats_cultures_pourcent,
-    verdissementPourcent: prospection.verdissement_pourcent,
-    hauteurHerbeCm: prospection.hauteur_herbe_cm,
+    region: prospection.region ?? null,
+    district: prospection.district ?? null,
+    commune: prospection.commune ?? null,
+    za: prospection.za ?? null,
+    pa_code: prospection.pa_code ?? null,
+    degatsCulturesPourcent: prospection.degats_cultures_pourcent ?? null,
+    verdissementPourcent: prospection.verdissement_pourcent ?? null,
+    hauteurHerbeCm: prospection.hauteur_herbe_cm ?? null,
   };
 }
 
