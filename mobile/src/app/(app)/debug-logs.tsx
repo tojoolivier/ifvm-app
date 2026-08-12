@@ -74,7 +74,7 @@ function ErrorRow({ entry }: { entry: ErrorLogEntry }) {
           )}
           {entry.stack && (
             <>
-              <Text style={styles.detailLabel}>Pile d'appel</Text>
+              <Text style={styles.detailLabel}>Pile d&apos;appel</Text>
               <Text style={styles.detailBody}>{entry.stack}</Text>
             </>
           )}
