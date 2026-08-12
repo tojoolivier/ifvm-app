@@ -77,7 +77,7 @@ export function dominantPhenotype(counts: CaptureCounts): Phenotype | null {
 export function rowsToCounts(rows: CaptureRow[]): CaptureCounts {
   const counts: CaptureCounts = {};
   for (const row of rows) {
-    const key = row.sexe ? `${row.sexe}|${row.stade}` : row.stade;
+    const key = captureKey(row.sexe, row.phase as Phenotype, row.stade);
     counts[key] = (counts[key] || 0) + row.effectif;
   }
   return counts;
@@ -88,12 +88,13 @@ export function countsToRows(espece: Espece, categorie: Categorie, counts: Captu
   for (const [key, effectif] of Object.entries(counts)) {
     if (effectif <= 0) continue;
     const parts = key.split('|');
-    const [sexe, stade] = parts.length === 2 ? (parts as [Sexe, string]) : [null, parts[0]];
+    const [sexe, phase, stade] =
+      parts.length === 3 ? (parts as [Sexe, string, string]) : [null, parts[0], parts[1]];
     rows.push({
       espece,
       categorie,
       sexe: sexe ?? null,
-      phase: null,
+      phase: phase ?? null,
       stade,
       effectif,
     });

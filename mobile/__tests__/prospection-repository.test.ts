@@ -300,7 +300,7 @@ describe('updateProspectionObservations', () => {
     observations: 'RAS',
   };
 
-  it('updates only degats_cultures/ennemis_naturels/observations columns', async () => {
+  it('updates degats_cultures/ennemis_naturels/observations/derniere_pluie/intensite_pluie columns', async () => {
     getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW, ...OBSERVATIONS_INPUT });
 
     await updateProspectionObservations(BASE_INPUT.id, OBSERVATIONS_INPUT);
@@ -311,6 +311,28 @@ describe('updateProspectionObservations', () => {
         OBSERVATIONS_INPUT.degatsCultures,
         OBSERVATIONS_INPUT.ennemisNaturels,
         OBSERVATIONS_INPUT.observations,
+        null,
+        null,
+        expect.any(String),
+        BASE_INPUT.id,
+      ]
+    );
+  });
+
+  it('passes derniere_pluie/intensite_pluie through when provided', async () => {
+    const input = { ...OBSERVATIONS_INPUT, dernierePluie: '2026-08-01', intensitePluie: 'forte' };
+    getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW, ...input });
+
+    await updateProspectionObservations(BASE_INPUT.id, input);
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE prospection SET'),
+      [
+        input.degatsCultures,
+        input.ennemisNaturels,
+        input.observations,
+        input.dernierePluie,
+        input.intensitePluie,
         expect.any(String),
         BASE_INPUT.id,
       ]
