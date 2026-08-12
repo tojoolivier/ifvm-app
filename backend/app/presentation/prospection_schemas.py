@@ -121,8 +121,8 @@ class InfestationRead(BaseModel):
 class PopulationCreate(BaseModel):
     espece: str
     categorie: str
-    densite_diffuse: float | None = None
-    densite_groupee: float | None = None
+    densite_diffuse: float | None = Field(None, ge=0, allow_inf_nan=False)
+    densite_groupee: float | None = Field(None, ge=0, allow_inf_nan=False)
     captures_nombre: int | None = None
     temps_capture: int | None = None
     accouplement: str | None = None
@@ -163,9 +163,9 @@ class InfestationCreate(BaseModel):
     taille_max: float | None = None
     taille_moy: float | None = None
     surface_tot: float | None = None
-    densite_min: float | None = None
-    densite_max: float | None = None
-    densite_moy: float | None = None
+    densite_min: float | None = Field(None, ge=0, allow_inf_nan=False)
+    densite_max: float | None = Field(None, ge=0, allow_inf_nan=False)
+    densite_moy: float | None = Field(None, ge=0, allow_inf_nan=False)
     interdistance: float | None = None
     comportement: str | None = None
     direction_de: str | None = None

@@ -9,6 +9,7 @@ import {
   saveProspectionPopulation,
 } from '@/lib/prospection-repository';
 import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
+import { parseDensite } from '@/lib/prospection-extensive';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -102,7 +103,7 @@ export default function DensityScreen() {
               <Text style={styles.fieldLabel}>Densité diffuse (/ha)</Text>
               <TextInput
                 value={population.densite_diffuse != null ? String(population.densite_diffuse) : ''}
-                onChangeText={(text) => setField('densite_diffuse', text === '' ? null : Number(text))}
+                onChangeText={(text) => setField('densite_diffuse', parseDensite(text))}
                 keyboardType="decimal-pad"
                 style={styles.fieldInput}
               />
@@ -111,7 +112,7 @@ export default function DensityScreen() {
               <Text style={styles.fieldLabel}>Densité groupée (/m²)</Text>
               <TextInput
                 value={population.densite_groupee != null ? String(population.densite_groupee) : ''}
-                onChangeText={(text) => setField('densite_groupee', text === '' ? null : Number(text))}
+                onChangeText={(text) => setField('densite_groupee', parseDensite(text))}
                 keyboardType="decimal-pad"
                 style={styles.fieldInput}
               />
