@@ -183,6 +183,12 @@ export interface ReferenceUpdateInput {
   longitude: number | null;
   altitude: number | null;
   dateTraitement: string | null;
+  /**
+   * Ajout minimal Lot 2 : le formulaire "Références" (écran A) doit pouvoir saisir
+   * la date de validation, mais Lot 1 ne l'exposait que côté conflit serveur
+   * (markTraitementConflict). Ajouté ici plutôt que de contourner le repository.
+   */
+  dateValidation: string | null;
   numeroFiche: string | null;
 }
 
@@ -305,6 +311,7 @@ export async function updateTraitementReference(
       longitude = ?,
       altitude = ?,
       date_traitement = ?,
+      date_validation = ?,
       numero_fiche = ?,
       updated_at = ?
      WHERE id = ?`,
@@ -317,6 +324,7 @@ export async function updateTraitementReference(
       input.longitude,
       input.altitude,
       input.dateTraitement,
+      input.dateValidation,
       input.numeroFiche,
       now,
       id,
@@ -324,6 +332,230 @@ export async function updateTraitementReference(
   );
 
   const updated = await getTraitement(id);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
+/**
+ * Ajouts minimaux Lot 2 : Lot 1 ne fournissait que la création des spécialisations
+ * (createDraftTraitementAerien/Terrestre) et aucun moyen de les modifier ensuite,
+ * ni d'écrire les colonnes communes "moyens & protection" / "impacts" de la table
+ * `traitement`. Sans ces fonctions, les écrans C/D/E ne peuvent rien persister.
+ * Suivent le même patron que updateTraitementReference (UPDATE + relecture).
+ */
+
+export interface AerienUpdateInput {
+  pilote: string;
+  mecanicien: string;
+  chefDeBaseId: string;
+  consultantInternational?: string | null;
+}
+
+export async function updateTraitementAerien(
+  traitementId: string,
+  input: AerienUpdateInput
+): Promise<DraftTraitement> {
+  const db = await getDb();
+
+  await db.runAsync(
+    `UPDATE traitement_aerien SET
+      pilote = ?,
+      mecanicien = ?,
+      chef_de_base_id = ?,
+      consultant_international = ?
+     WHERE traitement_id = ?`,
+    [input.pilote, input.mecanicien, input.chefDeBaseId, input.consultantInternational ?? null, traitementId]
+  );
+
+  const updated = await getTraitement(traitementId);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
+export interface TerrestreUpdateInput {
+  chefEquipeId: string;
+  agentEncadreurId?: string | null;
+  consultantInternational?: string | null;
+  heureDebut?: string | null;
+  heureFin?: string | null;
+  vitesse_vent_ms?: number | null;
+  direction_vent?: string | null;
+  temperature_c?: number | null;
+  repriseTraitement?: boolean | null;
+  traitementOrigineId?: string | null;
+  surface_atomiseur_ha?: number | null;
+  surface_disque_rotatif_ha?: number | null;
+  surface_ulvamast_ha?: number | null;
+  surfaceRestanteAbandonnee?: boolean | null;
+  motifSurfaceRestanteAbandonnee?: string | null;
+  essence_litres?: number | null;
+  nb_piles?: number | null;
+}
+
+export async function updateTraitementTerrestre(
+  traitementId: string,
+  input: TerrestreUpdateInput
+): Promise<DraftTraitement> {
+  const db = await getDb();
+
+  await db.runAsync(
+    `UPDATE traitement_terrestre SET
+      chef_equipe_id = ?,
+      agent_encadreur_id = ?,
+      consultant_international = ?,
+      heure_debut = ?,
+      heure_fin = ?,
+      vitesse_vent_ms = ?,
+      direction_vent = ?,
+      temperature_c = ?,
+      reprise_traitement = ?,
+      traitement_origine_id = ?,
+      surface_atomiseur_ha = ?,
+      surface_disque_rotatif_ha = ?,
+      surface_ulvamast_ha = ?,
+      surface_restante_abandonnee = ?,
+      motif_surface_restante_abandonnee = ?,
+      essence_litres = ?,
+      nb_piles = ?
+     WHERE traitement_id = ?`,
+    [
+      input.chefEquipeId,
+      input.agentEncadreurId ?? null,
+      input.consultantInternational ?? null,
+      input.heureDebut ?? null,
+      input.heureFin ?? null,
+      input.vitesse_vent_ms ?? null,
+      input.direction_vent ?? null,
+      input.temperature_c ?? null,
+      input.repriseTraitement ?? null,
+      input.traitementOrigineId ?? null,
+      input.surface_atomiseur_ha ?? null,
+      input.surface_disque_rotatif_ha ?? null,
+      input.surface_ulvamast_ha ?? null,
+      input.surfaceRestanteAbandonnee ?? null,
+      input.motifSurfaceRestanteAbandonnee ?? null,
+      input.essence_litres ?? null,
+      input.nb_piles ?? null,
+      traitementId,
+    ]
+  );
+
+  const updated = await getTraitement(traitementId);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
+export interface MoyensUpdateInput {
+  kit_combinaison: boolean;
+  kit_gants: boolean;
+  kit_lunettes: boolean;
+  kit_masques: boolean;
+  kit_boite: boolean;
+  zones_exposees: Record<string, boolean>;
+  hauteur_strate_herbeuse_m: number | null;
+  hauteur_strate_arboree_m: number | null;
+  recouvrement_percent: number | null;
+}
+
+export async function updateTraitementMoyens(
+  traitementId: string,
+  input: MoyensUpdateInput
+): Promise<DraftTraitement> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    `UPDATE traitement SET
+      kit_combinaison = ?,
+      kit_gants = ?,
+      kit_lunettes = ?,
+      kit_masques = ?,
+      kit_boite = ?,
+      zones_exposees = ?,
+      hauteur_strate_herbeuse_m = ?,
+      hauteur_strate_arboree_m = ?,
+      recouvrement_percent = ?,
+      updated_at = ?
+     WHERE id = ?`,
+    [
+      input.kit_combinaison,
+      input.kit_gants,
+      input.kit_lunettes,
+      input.kit_masques,
+      input.kit_boite,
+      JSON.stringify(input.zones_exposees),
+      input.hauteur_strate_herbeuse_m,
+      input.hauteur_strate_arboree_m,
+      input.recouvrement_percent,
+      now,
+      traitementId,
+    ]
+  );
+
+  const updated = await getTraitement(traitementId);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
+export interface ImpactsUpdateInput {
+  empoisonnement: boolean;
+  empoisonnement_type: string | null;
+  empoisonnement_mode: string | null;
+  empoisonnement_autre: string | null;
+  evaluation_risque: Record<string, string>;
+  comportement_anormal: boolean;
+  comportement_non_cibles: string[];
+  mortalite: boolean;
+  mortalite_familles: string[];
+  observations: string | null;
+}
+
+export async function updateTraitementImpacts(
+  traitementId: string,
+  input: ImpactsUpdateInput
+): Promise<DraftTraitement> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    `UPDATE traitement SET
+      empoisonnement = ?,
+      empoisonnement_type = ?,
+      empoisonnement_mode = ?,
+      empoisonnement_autre = ?,
+      evaluation_risque = ?,
+      comportement_anormal = ?,
+      comportement_non_cibles = ?,
+      mortalite = ?,
+      mortalite_familles = ?,
+      observations = ?,
+      updated_at = ?
+     WHERE id = ?`,
+    [
+      input.empoisonnement,
+      input.empoisonnement_type,
+      input.empoisonnement_mode,
+      input.empoisonnement_autre,
+      JSON.stringify(input.evaluation_risque),
+      input.comportement_anormal,
+      JSON.stringify(input.comportement_non_cibles),
+      input.mortalite,
+      JSON.stringify(input.mortalite_familles),
+      input.observations,
+      now,
+      traitementId,
+    ]
+  );
+
+  const updated = await getTraitement(traitementId);
   if (!updated) {
     throw new Error('Échec de la mise à jour de la fiche brouillon locale');
   }
