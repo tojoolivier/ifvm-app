@@ -287,6 +287,12 @@ class ProspectionInfestationModel(Base):
     surface_contaminee_ha: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
     surf_infestee_pourcent: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
     type_larve: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    stade_dominant: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    taille_groupe_m2: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
+    front_longueur_m: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
+    front_largeur_m: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
+    densite_max_front: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
+    densite_moy_arriere_front: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
 
     prospection: Mapped["ProspectionModel"] = relationship(back_populates="infestations")
 

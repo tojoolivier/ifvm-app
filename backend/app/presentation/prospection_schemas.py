@@ -29,6 +29,11 @@ class TypeLarve(str, Enum):
     BANDE_LARVAIRE = "bande_larvaire"
 
 
+class StadeDominant(str, Enum):
+    L1_L3 = "l1_l3"
+    L4_L5 = "l4_l5"
+
+
 class DegatsCultures(str, Enum):
     NULS = "nuls"
     FAIBLES = "faibles"
@@ -121,6 +126,12 @@ class InfestationRead(BaseModel):
     surface_contaminee_ha: float | None = None
     type_larve: str | None = None
     surf_infestee_pourcent: float | None = None
+    stade_dominant: str | None = None
+    taille_groupe_m2: float | None = None
+    front_longueur_m: float | None = None
+    front_largeur_m: float | None = None
+    densite_max_front: float | None = None
+    densite_moy_arriere_front: float | None = None
 
 
 class PopulationCreate(BaseModel):
@@ -202,6 +213,12 @@ class InfestationCreate(BaseModel):
     surface_contaminee_ha: float | None = Field(None, ge=0)
     type_larve: TypeLarve | None = None
     surf_infestee_pourcent: float | None = Field(None, ge=0, le=100)
+    stade_dominant: StadeDominant | None = None
+    taille_groupe_m2: float | None = Field(None, ge=0)
+    front_longueur_m: float | None = Field(None, ge=0)
+    front_largeur_m: float | None = Field(None, ge=0)
+    densite_max_front: float | None = Field(None, ge=0)
+    densite_moy_arriere_front: float | None = Field(None, ge=0)
 
 
 class ProspectionCreate(BaseModel):

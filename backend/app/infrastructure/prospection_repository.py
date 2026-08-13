@@ -208,6 +208,12 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                 interdistance_moy=i.interdistance_moy,
                 surface_contaminee_ha=i.surface_contaminee_ha,
                 type_larve=i.type_larve,
+                stade_dominant=i.stade_dominant,
+                taille_groupe_m2=i.taille_groupe_m2,
+                front_longueur_m=i.front_longueur_m,
+                front_largeur_m=i.front_largeur_m,
+                densite_max_front=i.densite_max_front,
+                densite_moy_arriere_front=i.densite_moy_arriere_front,
             )
             for i in prospection.infestations
         ]
@@ -320,6 +326,12 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                 interdistance_m=i.interdistance_m,
                 surface_contaminee_ha=i.surface_contaminee_ha,
                 type_larve=i.type_larve,
+                stade_dominant=i.stade_dominant,
+                taille_groupe_m2=i.taille_groupe_m2,
+                front_longueur_m=i.front_longueur_m,
+                front_largeur_m=i.front_largeur_m,
+                densite_max_front=i.densite_max_front,
+                densite_moy_arriere_front=i.densite_moy_arriere_front,
             )
             self.session.add(new_infestation)
 
@@ -499,6 +511,22 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                     if i.surface_contaminee_ha is not None
                     else None,
                     type_larve=i.type_larve,
+                    stade_dominant=i.stade_dominant,
+                    taille_groupe_m2=float(i.taille_groupe_m2)
+                    if i.taille_groupe_m2 is not None
+                    else None,
+                    front_longueur_m=float(i.front_longueur_m)
+                    if i.front_longueur_m is not None
+                    else None,
+                    front_largeur_m=float(i.front_largeur_m)
+                    if i.front_largeur_m is not None
+                    else None,
+                    densite_max_front=float(i.densite_max_front)
+                    if i.densite_max_front is not None
+                    else None,
+                    densite_moy_arriere_front=float(i.densite_moy_arriere_front)
+                    if i.densite_moy_arriere_front is not None
+                    else None,
                 )
                 for i in model.infestations
             ],
