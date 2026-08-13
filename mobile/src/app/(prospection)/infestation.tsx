@@ -11,6 +11,7 @@ import {
   oppositeDirection,
 } from '@/lib/prospection-infestation-insights';
 import { useAsyncAction } from '@/hooks/use-async-action';
+import { validateInfestationFormation } from '@/lib/prospection-validation';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -243,6 +244,28 @@ export default function InfestationScreen() {
       setTab('comport');
       return;
     }
+
+    const blocages: string[] = [];
+    const avertissements: string[] = [];
+    for (const target of selectedTargets) {
+      const f = forms[target];
+      if (!isFilled(f)) continue;
+      const result = validateInfestationFormation({
+        densMin: numOrNull(f.densMin),
+        densMax: numOrNull(f.densMax),
+        ventVitesse: numOrNull(f.ventVitesse),
+      });
+      blocages.push(...result.blocages);
+      avertissements.push(...result.avertissements);
+    }
+    if (blocages.length > 0) {
+      Alert.alert('Saisie incohérente', blocages.join('\n'));
+      return;
+    }
+    if (avertissements.length > 0) {
+      Alert.alert('À vérifier', avertissements.join('\n'));
+    }
+
     run(
       async () => {
         await persistAll();
