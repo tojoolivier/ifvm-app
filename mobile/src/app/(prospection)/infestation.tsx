@@ -11,7 +11,7 @@ import {
   oppositeDirection,
 } from '@/lib/prospection-infestation-insights';
 import { useAsyncAction } from '@/hooks/use-async-action';
-import { validateInfestationFormation } from '@/lib/prospection-validation';
+import { validateComportementDirection, validateInfestationFormation } from '@/lib/prospection-validation';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -257,6 +257,14 @@ export default function InfestationScreen() {
       });
       blocages.push(...result.blocages);
       avertissements.push(...result.avertissements);
+
+      const directionResult = validateComportementDirection({
+        typeCible: target,
+        comportement: f.comportement,
+        directionRenseignee: !!(f.ventDe && f.ventVers),
+      });
+      blocages.push(...directionResult.blocages);
+      avertissements.push(...directionResult.avertissements);
     }
     if (blocages.length > 0) {
       Alert.alert('Saisie incohérente', blocages.join('\n'));

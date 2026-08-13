@@ -97,3 +97,35 @@ export function validateInfestationFormation(input: InfestationValidationInput):
 
   return { blocages, avertissements };
 }
+
+export interface ComportementDirectionValidationInput {
+  typeCible: string;
+  comportement: 'repos' | 'deplacement' | null;
+  directionRenseignee: boolean;
+}
+
+/**
+ * Types de cible pour lesquels le déplacement commun est définitoire (§2.2
+ * point 15 du manuel) : la direction devient obligatoire. Absente/non requise
+ * pour une tache larvaire isolée.
+ */
+const TYPES_DIRECTION_OBLIGATOIRE = ['bande_larvaire', 'vol_clair', 'essaim'];
+
+export function validateComportementDirection(input: ComportementDirectionValidationInput): ValidationResult {
+  const blocages: string[] = [];
+  const avertissements: string[] = [];
+
+  if (TYPES_DIRECTION_OBLIGATOIRE.includes(input.typeCible) && !input.directionRenseignee) {
+    blocages.push(
+      'Direction de déplacement obligatoire pour ce type de cible (bande, vol clair ou essaim).'
+    );
+  }
+
+  if (input.comportement === 'repos' && input.directionRenseignee) {
+    avertissements.push(
+      'Population déclarée au repos alors qu’une direction de déplacement est renseignée — à vérifier.'
+    );
+  }
+
+  return { blocages, avertissements };
+}
