@@ -12,7 +12,8 @@
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleDebug"
-      }
+      },
+      "channel": "preview"
     },
     "production": {
       "env": {
@@ -23,7 +24,8 @@
       },
       "android": {
         "autoIncrement": "versionCode"
-      }
+      },
+      "channel": "production"
     }
   }
 }

@@ -56,7 +56,10 @@
         "expo-build-properties",
         {
           "android": {
-            "reactNativeArchitectures": ["arm64-v8a", "x86_64"]
+            "reactNativeArchitectures": [
+              "arm64-v8a",
+              "x86_64"
+            ]
           }
         }
       ]
@@ -71,6 +74,12 @@
         "projectId": "f7c2eb8f-bf2f-40bd-a46a-bf6d602f11d9"
       }
     },
-    "owner": "olivier_winkler"
+    "owner": "olivier_winkler",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/f7c2eb8f-bf2f-40bd-a46a-bf6d602f11d9"
+    }
   }
 }

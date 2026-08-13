@@ -16,6 +16,24 @@ defaults:
     working-directory: mobile
 
 jobs:
+  # Detecte si le push touche du natif (deps, config Expo) ou seulement du JS/TS.
+  # JS/TS seul -> update OTA (secondes) ; natif -> build APK complet sur le runner self-hoste.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      native: ${{ steps.filter.outputs.native }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            native:
+              - "mobile/package.json"
+              - "mobile/package-lock.json"
+              - "mobile/app.json"
+              - "mobile/eas.json"
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -31,8 +49,41 @@ jobs:
 
       - run: npm test
 
+  # Publication OTA (expo-updates) pour les changements JS/TS purs : les apps installees
+  # recuperent la mise a jour au prochain lancement, sans rebuild natif ni re-installation.
+  # runtimeVersion "fingerprint" garantit qu'une update n'atteint que les binaires compatibles.
+  ota-update:
+    needs: [changes, test]
+    if: github.event_name == 'push' && needs.changes.outputs.native != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - run: npm ci
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+          packager: npm
+
+      - name: Publish OTA update (channel preview)
+        env:
+          # Via env var et non interpole dans le script : un message de commit contenant
+          # des guillemets/backticks serait sinon execute par le shell (script injection).
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: eas update --channel preview --message "$COMMIT_MSG" --non-interactive
+
   build:
-    needs: test
+    needs: [changes, test]
+    # Build natif complet uniquement si necessaire (changement natif ou declenchement manuel)
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.native == 'true'
     # Runner self-hoste (ARC) : JDK 17 + Android SDK/NDK deja preinstalles dans l'image,
     # voir infra-k8s/clusters/production/infrastructure/actions-runner-controller.
     # Remplace le detour "EAS local build sur ubuntu-latest" (workaround quota EAS Build
