@@ -709,6 +709,12 @@ describe('saveProspectionInfestation', () => {
     surface_contaminee_ha: null,
     type_larve: null,
     surf_infestee_pourcent: null,
+    stade_dominant: null,
+    taille_groupe_m2: null,
+    front_longueur_m: null,
+    front_largeur_m: null,
+    densite_max_front: null,
+    densite_moy_arriere_front: null,
   };
 
   it('inserts a new row when none exists for this prospection + type_cible', async () => {
@@ -734,6 +740,7 @@ describe('saveProspectionInfestation', () => {
         null, 'essaim', 1, 2, 1.5, 5, 1, 3, 2, 1, 'repos',
         null, 'N', 'S', 10,
         null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+        null, null, null, null, null, null,
         'existing-id',
       ]
     );

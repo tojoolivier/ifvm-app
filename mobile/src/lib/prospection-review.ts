@@ -283,6 +283,12 @@ function buildInfestationsPayload(rows: InfestationRow[]): ProspectionInfestatio
     surface_contaminee_ha: row.surface_contaminee_ha ? Number(row.surface_contaminee_ha) : null,
     type_larve: (row.type_larve || null) as ProspectionInfestationInput['type_larve'],
     surf_infestee_pourcent: row.surf_infestee_pourcent ? Number(row.surf_infestee_pourcent) : null,
+    stade_dominant: (row.stade_dominant || null) as ProspectionInfestationInput['stade_dominant'],
+    taille_groupe_m2: row.taille_groupe_m2 ? Number(row.taille_groupe_m2) : null,
+    front_longueur_m: row.front_longueur_m ? Number(row.front_longueur_m) : null,
+    front_largeur_m: row.front_largeur_m ? Number(row.front_largeur_m) : null,
+    densite_max_front: row.densite_max_front ? Number(row.densite_max_front) : null,
+    densite_moy_arriere_front: row.densite_moy_arriere_front ? Number(row.densite_moy_arriere_front) : null,
   }));
 }
 
