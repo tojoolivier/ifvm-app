@@ -33,7 +33,11 @@ jobs:
 
   build:
     needs: test
-    runs-on: ubuntu-latest
+    # Runner self-hoste (ARC) : JDK 17 + Android SDK/NDK deja preinstalles dans l'image,
+    # voir infra-k8s/clusters/production/infrastructure/actions-runner-controller.
+    # Remplace le detour "EAS local build sur ubuntu-latest" (workaround quota EAS Build
+    # cloud, cf. commentaire plus bas) par une solution permanente qui ne consomme aucun quota.
+    runs-on: android-build
     steps:
       - uses: actions/checkout@v4
 
@@ -45,20 +49,22 @@ jobs:
 
       - run: npm ci
 
-      - uses: actions/setup-java@v4
+      - uses: actions/cache@v4
         with:
-          distribution: temurin
-          java-version: "17"
-
-      - uses: android-actions/setup-android@v3
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('mobile/package-lock.json') }}
+          restore-keys: |
+            gradle-
 
       - uses: expo/expo-github-action@v8
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      # Build local en attendant le renouvellement du quota EAS Build cloud (reset 2026-09-01).
-      # Revenir à `eas build --platform android --profile preview --non-interactive --no-wait` ensuite.
+      # Build local sur le runner self-hoste : ne consomme plus le quota EAS Build cloud,
+      # remplace le workaround temporaire precedent (reset de quota prevu le 2026-09-01).
       - name: Build Android preview locally (EAS local build)
         run: eas build --platform android --profile preview --local --non-interactive --output ./ifvm-preview.apk
 
