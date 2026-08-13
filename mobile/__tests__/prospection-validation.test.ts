@@ -1,4 +1,4 @@
-import { validateInfestationFormation, validateGpsPosition } from '../src/lib/prospection-validation';
+import { validateInfestationFormation, validateGpsPosition, validateComportementDirection } from '../src/lib/prospection-validation';
 
 describe('validateInfestationFormation — densité min < max', () => {
   it('bloque quand la densité minimale est supérieure à la maximale', () => {
@@ -97,5 +97,69 @@ describe('validateGpsPosition — précision GPS', () => {
   it('cumule le blocage hors-Madagascar et le blocage de précision', () => {
     const { blocages } = validateGpsPosition({ latitude: 48.85, longitude: 2.35, accuracy: 100 });
     expect(blocages.length).toBe(2);
+  });
+});
+
+describe('validateComportementDirection — direction obligatoire', () => {
+  it.each(['bande_larvaire', 'vol_clair', 'essaim'])(
+    'bloque quand la direction est absente pour %s',
+    (typeCible) => {
+      const { blocages } = validateComportementDirection({
+        typeCible,
+        comportement: null,
+        directionRenseignee: false,
+      });
+      expect(blocages.length).toBe(1);
+    }
+  );
+
+  it.each(['bande_larvaire', 'vol_clair', 'essaim'])(
+    'ne bloque pas quand la direction est renseignée pour %s',
+    (typeCible) => {
+      const { blocages } = validateComportementDirection({
+        typeCible,
+        comportement: null,
+        directionRenseignee: true,
+      });
+      expect(blocages).toEqual([]);
+    }
+  );
+
+  it('n’exige pas de direction pour une tache larvaire isolée', () => {
+    const { blocages } = validateComportementDirection({
+      typeCible: 'tache_larvaire',
+      comportement: null,
+      directionRenseignee: false,
+    });
+    expect(blocages).toEqual([]);
+  });
+});
+
+describe('validateComportementDirection — cohérence repos/déplacement', () => {
+  it('avertit si la population est au repos et une direction est renseignée', () => {
+    const { avertissements } = validateComportementDirection({
+      typeCible: 'tache_larvaire',
+      comportement: 'repos',
+      directionRenseignee: true,
+    });
+    expect(avertissements.length).toBe(1);
+  });
+
+  it('n’avertit pas si la population est au repos sans direction', () => {
+    const { avertissements } = validateComportementDirection({
+      typeCible: 'tache_larvaire',
+      comportement: 'repos',
+      directionRenseignee: false,
+    });
+    expect(avertissements).toEqual([]);
+  });
+
+  it('n’avertit pas si la population est en déplacement avec direction', () => {
+    const { avertissements } = validateComportementDirection({
+      typeCible: 'bande_larvaire',
+      comportement: 'deplacement',
+      directionRenseignee: true,
+    });
+    expect(avertissements).toEqual([]);
   });
 });
