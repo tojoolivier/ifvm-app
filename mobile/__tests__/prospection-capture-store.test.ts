@@ -133,4 +133,40 @@ describe('useProspectionCaptureStore', () => {
     useProspectionCaptureStore.getState().markCurrentGrilleCompleted();
     expect(useProspectionCaptureStore.getState().completedGrilleKeys).toEqual(['LMC:imago']);
   });
+
+  describe('cohérence des stades ♀/♂ au basculement (#99)', () => {
+    beforeEach(() => {
+      useProspectionCaptureStore.getState().initGrilles([{ espece: 'LMC', categorie: 'imago' }], [], []);
+    });
+
+    it('saisir un stade femelle puis basculer sur mâles ne perd pas la valeur femelle', () => {
+      useProspectionCaptureStore.getState().updateStadeBySex('F', 'A1', 4);
+      useProspectionCaptureStore.getState().setSexe('M');
+      expect(useProspectionCaptureStore.getState().stadesDataF['A1']).toBe(4);
+    });
+
+    it('saisir un stade mâle puis revenir sur femelles ne perd pas la valeur mâle', () => {
+      useProspectionCaptureStore.getState().setSexe('M');
+      useProspectionCaptureStore.getState().updateStadeBySex('M', 'A1', 3);
+      useProspectionCaptureStore.getState().setSexe('F');
+      expect(useProspectionCaptureStore.getState().stadesDataM['A1']).toBe(3);
+    });
+
+    it('aller-retour F -> M -> F conserve les deux valeurs simultanément', () => {
+      useProspectionCaptureStore.getState().updateStadeBySex('F', 'A2', 5);
+      useProspectionCaptureStore.getState().setSexe('M');
+      useProspectionCaptureStore.getState().updateStadeBySex('M', 'A1', 2);
+      useProspectionCaptureStore.getState().setSexe('F');
+      const state = useProspectionCaptureStore.getState();
+      expect(state.stadesDataF['A2']).toBe(5);
+      expect(state.stadesDataM['A1']).toBe(2);
+    });
+
+    it('updateStadeBySex ne modifie jamais les clés de stades du sexe opposé', () => {
+      useProspectionCaptureStore.getState().updateStadeBySex('F', 'A1', 1);
+      const stadesMAvant = useProspectionCaptureStore.getState().stadesDataM;
+      useProspectionCaptureStore.getState().updateStadeBySex('F', 'A2', 7);
+      expect(useProspectionCaptureStore.getState().stadesDataM).toEqual(stadesMAvant);
+    });
+  });
 });
