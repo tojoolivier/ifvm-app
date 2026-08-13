@@ -227,15 +227,39 @@ describe('enregistrerEtSynchroniser', () => {
     expect(result).toEqual({ synced: false });
   });
 
-  it('échec réseau silencieux si le serveur est injoignable malgré la connectivité', async () => {
+  it("remonte l'erreur de synchronisation au lieu de l'avaler, la fiche restant enregistrée localement (#98)", async () => {
     mockCompleteProspection.mockResolvedValue(draft({ statut: 'en_attente' }));
     mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
     mockCreateProspection.mockRejectedValue(new Error('network error'));
 
     const result = await enregistrerEtSynchroniser(draft(), [], 'token-1');
 
-    expect(result).toEqual({ synced: false });
+    expect(mockCompleteProspection).toHaveBeenCalledWith('draft-1');
+    expect(result).toEqual({ synced: false, syncError: 'network error' });
     expect(mockMarkSynced).not.toHaveBeenCalled();
+  });
+
+  it('enregistre normalement une 3e, 4e, 5e fiche à la suite, même si le serveur rejette une des synchronisations (#98)', async () => {
+    mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
+    mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
+
+    for (let i = 1; i <= 5; i += 1) {
+      mockCompleteProspection.mockResolvedValueOnce(draft({ id: `draft-${i}`, statut: 'en_attente' }));
+      if (i === 3) {
+        mockCreateProspection.mockRejectedValueOnce(new Error(`Erreur serveur sur la fiche ${i}`));
+      } else {
+        mockCreateProspection.mockResolvedValueOnce({ id: `remote-${i}` });
+      }
+
+      const result = await enregistrerEtSynchroniser(draft({ id: `draft-${i}` }), [], 'token-1');
+
+      expect(mockCompleteProspection).toHaveBeenCalledWith(`draft-${i}`);
+      if (i === 3) {
+        expect(result).toEqual({ synced: false, syncError: 'Erreur serveur sur la fiche 3' });
+      } else {
+        expect(result).toEqual({ synced: true });
+      }
+    }
   });
 });
 

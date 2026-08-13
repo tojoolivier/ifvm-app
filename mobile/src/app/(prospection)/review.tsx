@@ -53,10 +53,13 @@ export default function ReviewScreen() {
     setIsSaving(true);
     setError(null);
     try {
-      await enregistrerEtSynchroniser(draft, captures, token);
+      const result = await enregistrerEtSynchroniser(draft, captures, token);
       resetWizard();
       resetCaptureLoop();
-      router.replace({ pathname: '/(app)/prospection' as any, params: { justSaved: '1' } });
+      router.replace({
+        pathname: '/(app)/prospection' as any,
+        params: result.syncError ? { syncWarning: result.syncError } : { justSaved: '1' },
+      });
     } catch {
       setError("Impossible d'enregistrer la fiche pour le moment.");
     } finally {
