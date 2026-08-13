@@ -129,3 +129,34 @@ export function validateComportementDirection(input: ComportementDirectionValida
 
   return { blocages, avertissements };
 }
+
+export type LarvalPopulationType = 'tache_larvaire' | 'bande_larvaire';
+
+export interface LarvalPopulationClassificationInput {
+  /** Taille du groupe larvaire en m². */
+  tailleGroupeM2: number | null;
+  /** Direction de déplacement commune renseignée (oui/non). */
+  directionRenseignee: boolean;
+  /** Nombre de taches par bande, quand connu. */
+  nbTaches: number | null;
+}
+
+/** Seuil de taille (§3.1 du manuel) au-delà duquel une population groupée devient une bande. */
+export const TAILLE_GROUPE_SEUIL_BANDE_M2 = 1000;
+
+/**
+ * Classification automatique tache vs bande larvaire (§3.1 du manuel de
+ * terrain, #103) : bande si une direction de déplacement commune est
+ * renseignée ET (taille ≥ 1000 m² OU au moins 2 taches) ; tache sinon.
+ * Fonction pure en lecture seule — la classe n'est jamais saisissable
+ * directement (garde-fou §2.1 point 11 / #103 AC).
+ */
+export function classifyLarvalPopulation(
+  input: LarvalPopulationClassificationInput
+): LarvalPopulationType {
+  const estBande =
+    input.directionRenseignee &&
+    ((input.tailleGroupeM2 ?? 0) >= TAILLE_GROUPE_SEUIL_BANDE_M2 || (input.nbTaches ?? 0) >= 2);
+
+  return estBande ? 'bande_larvaire' : 'tache_larvaire';
+}
