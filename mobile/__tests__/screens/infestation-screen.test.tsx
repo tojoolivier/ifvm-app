@@ -55,4 +55,16 @@ describe('InfestationScreen', () => {
 
     expect(await screen.findByText('Réessayer')).toBeVisible();
   });
+
+  it('bascule automatiquement "Tache larvaire" vers "Bande larvaire" dès que la taille du groupe atteint 1000 m² (#103)', async () => {
+    jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
+      { type_cible: 'tache_larvaire', surface_tot: 12, taille_groupe_m2: 1500 } as any,
+    ]);
+
+    await render(<InfestationScreen />);
+
+    fireEvent.press(await screen.findByText('Comportement  ›'));
+
+    expect(await screen.findByText('Comportement · Bande larvaire')).toBeVisible();
+  });
 });

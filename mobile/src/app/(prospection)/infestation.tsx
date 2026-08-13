@@ -11,7 +11,11 @@ import {
   oppositeDirection,
 } from '@/lib/prospection-infestation-insights';
 import { useAsyncAction } from '@/hooks/use-async-action';
-import { validateComportementDirection, validateInfestationFormation } from '@/lib/prospection-validation';
+import {
+  TAILLE_GROUPE_SEUIL_BANDE_M2,
+  validateComportementDirection,
+  validateInfestationFormation,
+} from '@/lib/prospection-validation';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -172,6 +176,13 @@ export default function InfestationScreen() {
           selected.push(option.value);
         }
       }
+      // Taille du groupe ≥ 1000 m² déjà en base : "tache" n'est plus une cible valide.
+      const size = numOrNull(next.tache_larvaire?.tailleGroupeM2 ?? '') ?? 0;
+      if (size >= TAILLE_GROUPE_SEUIL_BANDE_M2 && selected.includes('tache_larvaire') && !selected.includes('bande_larvaire')) {
+        next.bande_larvaire = next.tache_larvaire;
+        next.tache_larvaire = emptyFormation();
+        selected[selected.indexOf('tache_larvaire')] = 'bande_larvaire';
+      }
       setForms(next);
       setSelectedTargets(selected);
     });
@@ -189,8 +200,26 @@ export default function InfestationScreen() {
   const form = forms[currentTarget];
   const targetLabel = TYPE_CIBLE_OPTIONS.find((o) => o.value === currentTarget)?.label ?? currentTarget;
 
+  // Taille du groupe ≥ 1000 m² : "tache" n'est plus une cible valide, seul "bande" reste sélectionnable
+  const tacheDisabledBySize =
+    (numOrNull(forms.tache_larvaire?.tailleGroupeM2 ?? '') ?? 0) >= TAILLE_GROUPE_SEUIL_BANDE_M2;
+
   const setField = <K extends keyof FormationForm>(field: K, value: FormationForm[K]) => {
     setForms((current) => (current ? { ...current, [currentTarget]: { ...current[currentTarget], [field]: value } } : current));
+
+    if (
+      field === 'tailleGroupeM2' &&
+      currentTarget === 'tache_larvaire' &&
+      (numOrNull(value as string) ?? 0) >= TAILLE_GROUPE_SEUIL_BANDE_M2 &&
+      !selectedTargets.includes('bande_larvaire')
+    ) {
+      setSelectedTargets((current) => current.map((t) => (t === 'tache_larvaire' ? 'bande_larvaire' : t)));
+      setForms((current) =>
+        current
+          ? { ...current, bande_larvaire: { ...current.tache_larvaire, tailleGroupeM2: value as string }, tache_larvaire: emptyFormation() }
+          : current
+      );
+    }
   };
 
   const descInsight = densityInsight(numOrNull(form.densMoy));
@@ -205,6 +234,14 @@ export default function InfestationScreen() {
 
   const handleTargetSelect = (value: string) => {
     const isSelected = selectedTargets.includes(value);
+
+    if (value === 'tache_larvaire' && !isSelected && tacheDisabledBySize) {
+      Alert.alert(
+        'Taille ≥ 1000 m²',
+        'Un groupe de cette taille est une bande, pas une tache. Sélectionnez "Bande larvaire".'
+      );
+      return;
+    }
 
     // Si déjà sélectionné, on le désélectionne
     if (isSelected) {
@@ -328,15 +365,18 @@ export default function InfestationScreen() {
           break;
         }
       }
+      const isDisabled = option.value === 'tache_larvaire' && !isSelected && tacheDisabledBySize;
 
       return (
         <TouchableOpacity
           key={option.value}
           onPress={() => handleTargetSelect(option.value)}
+          disabled={isDisabled}
           style={[
             styles.targetChip,
             isSelected && styles.targetChipActive,
             isIncompatible && styles.targetChipIncompatible,
+            isDisabled && styles.targetChipIncompatible,
           ]}
           activeOpacity={0.8}
         >
