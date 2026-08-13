@@ -21,6 +21,51 @@ export interface InfestationValidationInput {
   ventVitesse: number | null;
 }
 
+export interface GpsPositionValidationInput {
+  latitude: number;
+  longitude: number;
+  accuracy: number | null;
+}
+
+/**
+ * Emprise géographique de Madagascar (bounding box large, §2.1 point du manuel).
+ * Volontairement généreuse pour ne pas rejeter une position valide proche des côtes.
+ */
+const MADAGASCAR_BBOX = {
+  latMin: -25.7,
+  latMax: -11.8,
+  lonMin: 43.1,
+  lonMax: 50.5,
+};
+
+/** Précision GPS au-delà de laquelle la position est jugée inexploitable sur le terrain. */
+const GPS_ACCURACY_SEUIL_BLOQUANT_M = 50;
+
+export function validateGpsPosition(input: GpsPositionValidationInput): ValidationResult {
+  const blocages: string[] = [];
+  const avertissements: string[] = [];
+
+  const horsMadagascar =
+    input.latitude < MADAGASCAR_BBOX.latMin ||
+    input.latitude > MADAGASCAR_BBOX.latMax ||
+    input.longitude < MADAGASCAR_BBOX.lonMin ||
+    input.longitude > MADAGASCAR_BBOX.lonMax;
+
+  if (horsMadagascar) {
+    blocages.push(
+      'Position GPS hors de Madagascar. Veuillez recapturer la position.'
+    );
+  }
+
+  if (input.accuracy != null && input.accuracy > GPS_ACCURACY_SEUIL_BLOQUANT_M) {
+    blocages.push(
+      `Précision GPS insuffisante (${Math.round(input.accuracy)} m, seuil ${GPS_ACCURACY_SEUIL_BLOQUANT_M} m). Veuillez recapturer la position.`
+    );
+  }
+
+  return { blocages, avertissements };
+}
+
 /** Vitesse de vent extrême mais physiquement plausible (rafale de tempête) — avertissement. */
 const VENT_VITESSE_SEUIL_AVERTISSEMENT_KMH = 80;
 /** Au-delà, la valeur est jugée invalide pour une observation de terrain — bloquant. */

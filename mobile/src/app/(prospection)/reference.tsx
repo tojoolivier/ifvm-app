@@ -14,6 +14,7 @@ import {
 import { updateProspectionReference } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { referenceSchema, ReferenceFormValues } from '@/lib/prospection-reference-schema';
+import { validateGpsPosition } from '@/lib/prospection-validation';
 
 const INACTIVE_BG = '#efeada';
 const INACTIVE_TEXT = '#9a9484';
@@ -211,6 +212,16 @@ export default function ReferenceScreen() {
           '⚠️ Position GPS manquante',
           'La position GPS n\'a pas pu être capturée. Veuillez réessayer ou vérifier la localisation.'
         );
+        return;
+      }
+
+      const { blocages: gpsBlocages } = validateGpsPosition({
+        latitude: position.latitude,
+        longitude: position.longitude,
+        accuracy: position.accuracy,
+      });
+      if (gpsBlocages.length > 0) {
+        Alert.alert('⚠️ Position GPS invalide', gpsBlocages.join('\n'));
         return;
       }
 
