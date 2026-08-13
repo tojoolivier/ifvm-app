@@ -109,6 +109,12 @@ class ProspectionInfestation:
     interdistance_moy: float | None = None
     surface_contaminee_ha: float | None = None
     type_larve: str | None = None
+    stade_dominant: str | None = None
+    taille_groupe_m2: float | None = None
+    front_longueur_m: float | None = None
+    front_largeur_m: float | None = None
+    densite_max_front: float | None = None
+    densite_moy_arriere_front: float | None = None
 
 
 @dataclass

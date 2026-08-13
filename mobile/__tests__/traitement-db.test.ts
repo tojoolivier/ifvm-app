@@ -7,6 +7,8 @@ const MIGRATED_COLUMNS = [
   'taille_epaisseur', 'essaim_en_vol', 'essaim_pose', 'type_essaim',
   'nb_taches_bandes', 'interdistance_m', 'interdistance_min', 'interdistance_max', 'interdistance_moy',
   'surface_contaminee_ha', 'type_larve', 'surf_infestee_pourcent',
+  'stade_dominant', 'taille_groupe_m2', 'front_longueur_m', 'front_largeur_m',
+  'densite_max_front', 'densite_moy_arriere_front',
   'station_libre', 'type_station', 'verdure_strate',
   'signalement_source', 'signalement_date', 'signalement_description', 'conclusion_validation',
   'phase', 'captures_nombre', 'temps_capture',

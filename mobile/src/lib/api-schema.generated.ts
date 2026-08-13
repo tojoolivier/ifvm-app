@@ -791,6 +791,17 @@ export interface components {
             type_larve?: components["schemas"]["TypeLarve"] | null;
             /** Surf Infestee Pourcent */
             surf_infestee_pourcent?: number | null;
+            stade_dominant?: components["schemas"]["StadeDominant"] | null;
+            /** Taille Groupe M2 */
+            taille_groupe_m2?: number | null;
+            /** Front Longueur M */
+            front_longueur_m?: number | null;
+            /** Front Largeur M */
+            front_largeur_m?: number | null;
+            /** Densite Max Front */
+            densite_max_front?: number | null;
+            /** Densite Moy Arriere Front */
+            densite_moy_arriere_front?: number | null;
         };
         /** InfestationRead */
         InfestationRead: {
@@ -859,6 +870,18 @@ export interface components {
             type_larve?: string | null;
             /** Surf Infestee Pourcent */
             surf_infestee_pourcent?: number | null;
+            /** Stade Dominant */
+            stade_dominant?: string | null;
+            /** Taille Groupe M2 */
+            taille_groupe_m2?: number | null;
+            /** Front Longueur M */
+            front_longueur_m?: number | null;
+            /** Front Largeur M */
+            front_largeur_m?: number | null;
+            /** Densite Max Front */
+            densite_max_front?: number | null;
+            /** Densite Moy Arriere Front */
+            densite_moy_arriere_front?: number | null;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -1457,6 +1480,11 @@ export interface components {
              */
             horodatage: string;
         };
+        /**
+         * StadeDominant
+         * @enum {string}
+         */
+        StadeDominant: "l1_l3" | "l4_l5";
         /** StationFixeRead */
         StationFixeRead: {
             /**
