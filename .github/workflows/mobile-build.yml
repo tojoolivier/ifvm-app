@@ -49,14 +49,8 @@ jobs:
 
       - run: npm ci
 
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ hashFiles('mobile/package-lock.json') }}
-          restore-keys: |
-            gradle-
+      # Cache Gradle : volume Longhorn monte directement sur le runner (pas de
+      # actions/cache — evite l'aller-retour reseau, voir infra-k8s/.../gradle-cache-pvc.yaml)
 
       - uses: expo/expo-github-action@v8
         with:
