@@ -835,7 +835,14 @@ export function NouvelleProspectionPage() {
                       className="col-span-2"
                       fieldId="campagne"
                     >
-                      <Select value={campagneId} onValueChange={(v) => setCampagneId(v ?? '')}>
+                      <Select
+                        value={campagneId}
+                        onValueChange={(v) => setCampagneId(v ?? '')}
+                        items={campagnes.map((c) => ({
+                          value: c.id,
+                          label: `${c.name}${campagnesEnCours.some((e) => e.id === c.id) ? ' (en cours)' : ''}`,
+                        }))}
+                      >
                         <SelectTrigger
                           id="campagne"
                           aria-describedby={fieldErrors.campagne_id ? 'campagne-error' : undefined}
@@ -899,6 +906,10 @@ export function NouvelleProspectionPage() {
                             setAltitude(station.altitude != null ? String(station.altitude) : '')
                           }
                         }}
+                        items={[
+                          { value: '', label: '— Choisir une station —' },
+                          ...stations.map((s) => ({ value: s.id, label: `${s.code} — ${s.nom} (${s.pa_code})` })),
+                        ]}
                       >
                         <SelectTrigger
                           id="station"
