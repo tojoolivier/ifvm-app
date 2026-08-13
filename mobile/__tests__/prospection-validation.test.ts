@@ -1,4 +1,9 @@
-import { validateInfestationFormation, validateGpsPosition, validateComportementDirection } from '../src/lib/prospection-validation';
+import {
+  validateInfestationFormation,
+  validateGpsPosition,
+  validateComportementDirection,
+  classifyLarvalPopulation,
+} from '../src/lib/prospection-validation';
 
 describe('validateInfestationFormation — densité min < max', () => {
   it('bloque quand la densité minimale est supérieure à la maximale', () => {
@@ -161,5 +166,49 @@ describe('validateComportementDirection — cohérence repos/déplacement', () =
       directionRenseignee: true,
     });
     expect(avertissements).toEqual([]);
+  });
+});
+
+describe('classifyLarvalPopulation — tache vs bande (#103)', () => {
+  it('classe en tache quand la direction n’est pas renseignée et la taille < 1000 m²', () => {
+    expect(
+      classifyLarvalPopulation({ tailleGroupeM2: 500, directionRenseignee: false, nbTaches: null })
+    ).toBe('tache_larvaire');
+  });
+
+  it('classe en bande quand la direction est renseignée et la taille ≥ 1000 m²', () => {
+    expect(
+      classifyLarvalPopulation({ tailleGroupeM2: 1500, directionRenseignee: true, nbTaches: null })
+    ).toBe('bande_larvaire');
+  });
+
+  it('classe en bande quand la direction est renseignée et au moins 2 taches, même sous 1000 m²', () => {
+    expect(
+      classifyLarvalPopulation({ tailleGroupeM2: 200, directionRenseignee: true, nbTaches: 3 })
+    ).toBe('bande_larvaire');
+  });
+
+  it('classe en tache quand la direction est renseignée mais taille < 1000 m² et moins de 2 taches', () => {
+    expect(
+      classifyLarvalPopulation({ tailleGroupeM2: 200, directionRenseignee: true, nbTaches: 1 })
+    ).toBe('tache_larvaire');
+  });
+
+  it('cas limite : taille exactement 1000 m² avec direction renseignée classe en bande', () => {
+    expect(
+      classifyLarvalPopulation({ tailleGroupeM2: 1000, directionRenseignee: true, nbTaches: null })
+    ).toBe('bande_larvaire');
+  });
+
+  it('cas limite : taille juste sous 1000 m² avec direction renseignée classe en tache', () => {
+    expect(
+      classifyLarvalPopulation({ tailleGroupeM2: 999, directionRenseignee: true, nbTaches: null })
+    ).toBe('tache_larvaire');
+  });
+
+  it('classe en tache sans direction même si la taille est très grande', () => {
+    expect(
+      classifyLarvalPopulation({ tailleGroupeM2: 5000, directionRenseignee: false, nbTaches: null })
+    ).toBe('tache_larvaire');
   });
 });
