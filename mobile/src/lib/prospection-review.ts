@@ -290,7 +290,7 @@ export async function enregistrerEtSynchroniser(
   draft: DraftProspection,
   captures: CaptureRow[],
   token: string
-): Promise<{ synced: boolean }> {
+): Promise<{ synced: boolean; syncError?: string }> {
   const completed = await completeProspection(draft.id);
 
   const network = await Network.getNetworkStateAsync();
@@ -310,8 +310,13 @@ export async function enregistrerEtSynchroniser(
     });
     await markProspectionSynced(completed.id);
     return { synced: true };
-  } catch {
-    return { synced: false };
+  } catch (error) {
+    // ADR-008 : la fiche reste enregistrée localement (completeProspection ci-dessus a
+    // déjà réussi), mais l'échec de synchronisation ne doit jamais rester invisible —
+    // il est remonté à l'appelant plutôt qu'avalé (cf. #98 : symptôme "blocage silencieux").
+    console.error(`❌ Échec de synchronisation pour ${completed.id}:`, error);
+    const syncError = error instanceof Error ? error.message : 'Erreur de synchronisation inconnue';
+    return { synced: false, syncError };
   }
 }
 

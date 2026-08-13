@@ -35,7 +35,7 @@ const BADGE_LABEL: Record<BadgeKind, string> = {
 
 export default function ProspectionScreen() {
   const router = useRouter();
-  const { justSaved } = useLocalSearchParams<{ justSaved?: string }>();
+  const { justSaved, syncWarning } = useLocalSearchParams<{ justSaved?: string; syncWarning?: string }>();
   const user = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.token);
   const [data, setData] = useState<AccueilViewModel>(EMPTY_DATA);
@@ -68,6 +68,24 @@ export default function ProspectionScreen() {
       clearTimeout(hideTimeout);
     };
   }, [justSaved, router]);
+
+  useEffect(() => {
+    if (!syncWarning) return;
+    router.setParams({ syncWarning: undefined });
+    const showTimeout = setTimeout(
+      () =>
+        setSyncToast({
+          type: 'error',
+          message: `Fiche enregistrée localement — échec de synchronisation : ${syncWarning}`,
+        }),
+      0
+    );
+    const hideTimeout = setTimeout(() => setSyncToast(null), 6000);
+    return () => {
+      clearTimeout(showTimeout);
+      clearTimeout(hideTimeout);
+    };
+  }, [syncWarning, router]);
 
   const resumeDraft = (draft: DraftProspection) => {
     router.push({ pathname: '/(prospection)/reference' as any, params: { draftId: draft.id } });
