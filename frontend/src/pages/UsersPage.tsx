@@ -38,10 +38,11 @@ export function UsersPage() {
   const [role, setRole] = useState(ROLES[0])
   const [createError, setCreateError] = useState('')
 
-  const { data: users = [], isLoading } = useQuery<Utilisateur[]>({
+  const { data: usersData = [], isLoading } = useQuery<Utilisateur[]>({
     queryKey: ['users'],
     queryFn: () => api.get('/users/').then((r) => r.data),
   })
+  const users = Array.isArray(usersData) ? usersData : []
 
   const createMutation = useMutation({
     mutationFn: (data: { nom: string; prenom: string; email: string; password: string; role: string }) =>
