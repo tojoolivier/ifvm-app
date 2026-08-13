@@ -102,6 +102,20 @@ jobs:
 
       # Cache Gradle : volume Longhorn monte directement sur le runner (pas de
       # actions/cache — evite l'aller-retour reseau, voir infra-k8s/.../gradle-cache-pvc.yaml)
+      #
+      # Le volume ne cachait jusqu'ici que modules-2 (telechargement des dependances).
+      # org.gradle.caching active en plus le cache de SORTIES de taches (build-cache-1,
+      # lui aussi sur le volume) : classes compilees, dex, etc. sont reutilisees d'un run
+      # a l'autre au lieu d'etre recalculees. Ecrit dans GRADLE_USER_HOME, qui a la
+      # priorite sur le android/gradle.properties genere par prebuild.
+      #
+      # org.gradle.parallel volontairement NON active : le build a deja atteint 8.1Gi
+      # sur une limite de 9Gi, et paralleliser les modules augmente le pic memoire —
+      # on a deja subi un OOM kill silencieux a 6Gi. A reconsiderer si la limite monte.
+      - name: Enable Gradle task-output cache (persisted on the runner volume)
+        run: |
+          mkdir -p "$HOME/.gradle"
+          printf 'org.gradle.caching=true\n' > "$HOME/.gradle/gradle.properties"
 
       - uses: expo/expo-github-action@v8
         with:
