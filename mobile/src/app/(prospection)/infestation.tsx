@@ -10,6 +10,7 @@ import {
   densityInsight,
   oppositeDirection,
 } from '@/lib/prospection-infestation-insights';
+import { useAsyncAction } from '@/hooks/use-async-action';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -132,7 +133,7 @@ export default function InfestationScreen() {
   const [forms, setForms] = useState<Record<string, FormationForm> | null>(null);
   const [selectedTargets, setSelectedTargets] = useState<string[]>([]);
   const [tab, setTab] = useState<Tab>('desc');
-  const [isSaving, setIsSaving] = useState(false);
+  const { run, isRunning: isSaving } = useAsyncAction();
 
   useEffect(() => {
     if (!draftId) return;
@@ -225,7 +226,6 @@ export default function InfestationScreen() {
   };
 
   const persistAll = async () => {
-    if (!draftId) return;
     // Ne sauvegarder que les types sélectionnés
     for (const target of selectedTargets) {
       const f = forms[target];
@@ -234,8 +234,7 @@ export default function InfestationScreen() {
     }
   };
 
-  const handleFooterPress = async () => {
-    if (isSaving) return;
+  const handleFooterPress = () => {
     if (selectedTargets.length === 0) {
       Alert.alert('Sélection requise', 'Veuillez sélectionner au moins un type de cible.');
       return;
@@ -244,13 +243,18 @@ export default function InfestationScreen() {
       setTab('comport');
       return;
     }
-    setIsSaving(true);
-    try {
-      await persistAll();
-      router.push({ pathname: '/(prospection)/veg' as any, params: { draftId } });
-    } finally {
-      setIsSaving(false);
-    }
+    run(
+      async () => {
+        await persistAll();
+        router.push({ pathname: '/(prospection)/veg' as any, params: { draftId } });
+      },
+      {
+        screen: 'infestation',
+        precondition: !!draftId,
+        preconditionMessage: 'Session de saisie perdue — revenez à l’écran précédent et réessayez.',
+        context: { draftId },
+      }
+    );
   };
 
   const renderTargetChips = () => {
