@@ -48,6 +48,7 @@ interface FormationForm {
   ventVitesse: string;
   stadeDominant: 'l1_l3' | 'l4_l5' | null;
   tailleGroupeM2: string;
+  nbTachesBandes: string;
   frontLongueurM: string;
   frontLargeurM: string;
   densiteMaxFront: string;
@@ -72,6 +73,7 @@ function emptyFormation(): FormationForm {
     ventVitesse: '',
     stadeDominant: null,
     tailleGroupeM2: '',
+    nbTachesBandes: '',
     frontLongueurM: '',
     frontLargeurM: '',
     densiteMaxFront: '',
@@ -98,6 +100,7 @@ function formFromRow(row: InfestationRow | undefined): FormationForm {
     ventVitesse: row.vent_vitesse != null ? String(row.vent_vitesse) : '',
     stadeDominant: (row.stade_dominant as 'l1_l3' | 'l4_l5' | null) ?? null,
     tailleGroupeM2: row.taille_groupe_m2 != null ? String(row.taille_groupe_m2) : '',
+    nbTachesBandes: row.nb_taches_bandes != null ? String(row.nb_taches_bandes) : '',
     frontLongueurM: row.front_longueur_m != null ? String(row.front_longueur_m) : '',
     frontLargeurM: row.front_largeur_m != null ? String(row.front_largeur_m) : '',
     densiteMaxFront: row.densite_max_front != null ? String(row.densite_max_front) : '',
@@ -136,7 +139,7 @@ function rowFromForm(typeCible: string, form: FormationForm): InfestationRow {
     essaim_en_vol: null,
     essaim_pose: null,
     type_essaim: null,
-    nb_taches_bandes: null,
+    nb_taches_bandes: typeCible === 'bande_larvaire' ? numOrNull(form.nbTachesBandes) : null,
     interdistance_m: null,
     surface_contaminee_ha: null,
     type_larve: null,
@@ -559,6 +562,20 @@ export default function InfestationScreen() {
 
               {currentTarget === 'bande_larvaire' && (
                 <>
+                  <View style={styles.row2NoMargin}>
+                    <View style={styles.infoBox}>
+                      <Text style={styles.infoBoxLabel}>Nombre de taches</Text>
+                      <View style={styles.infoBoxInputRow}>
+                        <TextInput
+                          value={form.nbTachesBandes}
+                          onChangeText={(v) => setField('nbTachesBandes', v)}
+                          keyboardType="number-pad"
+                          style={styles.infoBoxInput}
+                        />
+                      </View>
+                    </View>
+                  </View>
+
                   <Text style={styles.sectionLabel}>Dimensions du front (m)</Text>
                   <View style={styles.row3}>
                     <View style={styles.box}>
