@@ -62,6 +62,7 @@ jobs:
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
+          packager: npm # l'action installe eas-cli avec yarn par defaut ; absent de l'image runner, et le repo n'utilise pas yarn (package-lock.json)
 
       # Build local sur le runner self-hoste : ne consomme plus le quota EAS Build cloud,
       # remplace le workaround temporaire precedent (reset de quota prevu le 2026-09-01).
