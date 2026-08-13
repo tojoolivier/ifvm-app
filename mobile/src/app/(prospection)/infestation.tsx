@@ -375,6 +375,7 @@ export default function InfestationScreen() {
                   <TextInput
                     value={form.tailleMoy}
                     onChangeText={(v) => setField('tailleMoy', v)}
+                    keyboardType="decimal-pad"
                     style={styles.infoBoxInput}
                   />
                 </View>
