@@ -10,8 +10,11 @@
  * directement les hooks `expo-router` évite l'incompatibilité et suffit pour
  * un test d'écran isolé.
  */
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import InfestationScreen from '@/app/(prospection)/infestation';
+import { ErrorBanner } from '@/components/error-banner';
+import { useErrorStore } from '@/lib/error-store';
+import * as prospectionRepository from '@/lib/prospection-repository';
 
 jest.mock('expo-router', () =>
   require('../test-utils/mock-expo-router').expoRouterMock({ params: { draftId: 'draft-123' } })
@@ -23,9 +26,33 @@ jest.mock('@/lib/prospection-repository', () => ({
 }));
 
 describe('InfestationScreen', () => {
+  beforeEach(() => {
+    useErrorStore.setState({ current: null });
+  });
+
   it('monte sans crash avec expo-router mocké', async () => {
     await render(<InfestationScreen />);
 
     expect(await screen.findByText('Infestation')).toBeVisible();
+  });
+
+  it('affiche une bannière d’erreur, sans navigation, quand la sauvegarde échoue', async () => {
+    jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
+      { type_cible: 'tache_larvaire', surface_tot: 12 } as any,
+    ]);
+    jest.mocked(prospectionRepository.saveProspectionInfestation).mockRejectedValueOnce(new Error('boom'));
+
+    await render(
+      <>
+        <ErrorBanner />
+        <InfestationScreen />
+      </>
+    );
+
+    // La ligne mockée pré-remplit "Tache larvaire" comme cible déjà sélectionnée.
+    fireEvent.press(await screen.findByText('Comportement  ›'));
+    fireEvent.press(await screen.findByText('Continuer  ›'));
+
+    expect(await screen.findByText('Réessayer')).toBeVisible();
   });
 });
