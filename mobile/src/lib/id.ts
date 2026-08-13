@@ -1,4 +1,12 @@
-/** Génère un id local v4-like, sans dépendance native (pas de crypto.randomUUID sur toutes les cibles Expo). */
+/**
+ * Génère un id local v4-like, sans dépendance native.
+ * `globalThis.crypto.randomUUID` n'est PAS fourni par Hermes sur Android/iOS
+ * (vérifié sur les sources Expo SDK 56 : expo-crypto/android/.../CryptoModule.kt
+ * expose `randomUUID` en module natif précisément parce que Hermes ne
+ * l'implémente pas globalement). Seul `expo-crypto`'s `randomUUID()` le
+ * fournirait, mais ce package n'est pas une dépendance du projet — l'ajouter
+ * pour ce seul usage introduirait une dépendance native hors périmètre.
+ */
 export function generateId(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
