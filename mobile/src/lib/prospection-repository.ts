@@ -217,6 +217,12 @@ export interface InfestationRow {
   surface_contaminee_ha: number | null;
   type_larve: string | null;
   surf_infestee_pourcent: number | null;
+  stade_dominant: string | null;
+  taille_groupe_m2: number | null;
+  front_longueur_m: number | null;
+  front_largeur_m: number | null;
+  densite_max_front: number | null;
+  densite_moy_arriere_front: number | null;
 }
 
 // ==========================================
@@ -274,7 +280,13 @@ const INFESTATION_COLUMNS = `
   interdistance_moy,
   surface_contaminee_ha,
   type_larve,
-  surf_infestee_pourcent
+  surf_infestee_pourcent,
+  stade_dominant,
+  taille_groupe_m2,
+  front_longueur_m,
+  front_largeur_m,
+  densite_max_front,
+  densite_moy_arriere_front
 `;
 
 // ==========================================
@@ -1100,6 +1112,12 @@ export async function saveProspectionInfestation(
     row.surface_contaminee_ha,
     row.type_larve,
     row.surf_infestee_pourcent,
+    row.stade_dominant,
+    row.taille_groupe_m2,
+    row.front_longueur_m,
+    row.front_largeur_m,
+    row.densite_max_front,
+    row.densite_moy_arriere_front,
   ];
 
   if (existing) {
@@ -1134,7 +1152,13 @@ export async function saveProspectionInfestation(
         interdistance_moy = ?,
         surface_contaminee_ha = ?,
         type_larve = ?,
-        surf_infestee_pourcent = ?
+        surf_infestee_pourcent = ?,
+        stade_dominant = ?,
+        taille_groupe_m2 = ?,
+        front_longueur_m = ?,
+        front_largeur_m = ?,
+        densite_max_front = ?,
+        densite_moy_arriere_front = ?
        WHERE id = ?`,
       [...values, existing.id]
     );
@@ -1175,12 +1199,19 @@ export async function saveProspectionInfestation(
       interdistance_moy,
       surface_contaminee_ha,
       type_larve,
-      surf_infestee_pourcent
+      surf_infestee_pourcent,
+      stade_dominant,
+      taille_groupe_m2,
+      front_longueur_m,
+      front_largeur_m,
+      densite_max_front,
+      densite_moy_arriere_front
     )
     VALUES (
       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?
     )`,
     [
       generateId(),

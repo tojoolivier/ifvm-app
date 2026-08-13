@@ -42,6 +42,12 @@ interface FormationForm {
   ventDe: string;
   ventVers: string;
   ventVitesse: string;
+  stadeDominant: 'l1_l3' | 'l4_l5' | null;
+  tailleGroupeM2: string;
+  frontLongueurM: string;
+  frontLargeurM: string;
+  densiteMaxFront: string;
+  densiteMoyArriereFront: string;
 }
 
 function emptyFormation(): FormationForm {
@@ -60,6 +66,12 @@ function emptyFormation(): FormationForm {
     ventDe: '',
     ventVers: '',
     ventVitesse: '',
+    stadeDominant: null,
+    tailleGroupeM2: '',
+    frontLongueurM: '',
+    frontLargeurM: '',
+    densiteMaxFront: '',
+    densiteMoyArriereFront: '',
   };
 }
 
@@ -80,6 +92,12 @@ function formFromRow(row: InfestationRow | undefined): FormationForm {
     ventDe: row.vent_de ?? row.direction_de ?? '',
     ventVers: row.direction_vers ?? '',
     ventVitesse: row.vent_vitesse != null ? String(row.vent_vitesse) : '',
+    stadeDominant: (row.stade_dominant as 'l1_l3' | 'l4_l5' | null) ?? null,
+    tailleGroupeM2: row.taille_groupe_m2 != null ? String(row.taille_groupe_m2) : '',
+    frontLongueurM: row.front_longueur_m != null ? String(row.front_longueur_m) : '',
+    frontLargeurM: row.front_largeur_m != null ? String(row.front_largeur_m) : '',
+    densiteMaxFront: row.densite_max_front != null ? String(row.densite_max_front) : '',
+    densiteMoyArriereFront: row.densite_moy_arriere_front != null ? String(row.densite_moy_arriere_front) : '',
   };
 }
 
@@ -119,6 +137,12 @@ function rowFromForm(typeCible: string, form: FormationForm): InfestationRow {
     surface_contaminee_ha: null,
     type_larve: null,
     surf_infestee_pourcent: null,
+    stade_dominant: form.stadeDominant,
+    taille_groupe_m2: numOrNull(form.tailleGroupeM2),
+    front_longueur_m: numOrNull(form.frontLongueurM),
+    front_largeur_m: numOrNull(form.frontLargeurM),
+    densite_max_front: numOrNull(form.densiteMaxFront),
+    densite_moy_arriere_front: numOrNull(form.densiteMoyArriereFront),
   };
 }
 
@@ -454,6 +478,92 @@ export default function InfestationScreen() {
                   />
                 </View>
               </View>
+
+              {(currentTarget === 'tache_larvaire' || currentTarget === 'bande_larvaire') && (
+                <>
+                  <Text style={styles.fieldGroupLabel}>Stade dominant</Text>
+                  <View style={styles.row2}>
+                    {(['l1_l3', 'l4_l5'] as const).map((value) => {
+                      const active = form.stadeDominant === value;
+                      return (
+                        <TouchableOpacity
+                          key={value}
+                          onPress={() => setField('stadeDominant', value)}
+                          style={[styles.chip, active && styles.chipActive]}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                            {value === 'l1_l3' ? 'L1-L3' : 'L4-L5'}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  <View style={styles.row2NoMargin}>
+                    <View style={styles.infoBox}>
+                      <Text style={styles.infoBoxLabel}>Taille du groupe</Text>
+                      <View style={styles.infoBoxInputRow}>
+                        <TextInput
+                          value={form.tailleGroupeM2}
+                          onChangeText={(v) => setField('tailleGroupeM2', v)}
+                          keyboardType="decimal-pad"
+                          style={styles.infoBoxInput}
+                        />
+                        <Text style={styles.infoBoxUnit}>m²</Text>
+                      </View>
+                    </View>
+                  </View>
+                </>
+              )}
+
+              {currentTarget === 'bande_larvaire' && (
+                <>
+                  <Text style={styles.sectionLabel}>Dimensions du front (m)</Text>
+                  <View style={styles.row3}>
+                    <View style={styles.box}>
+                      <Text style={styles.boxCaption}>longueur</Text>
+                      <TextInput
+                        value={form.frontLongueurM}
+                        onChangeText={(v) => setField('frontLongueurM', v)}
+                        keyboardType="decimal-pad"
+                        style={styles.boxValue}
+                      />
+                    </View>
+                    <View style={styles.box}>
+                      <Text style={styles.boxCaption}>largeur</Text>
+                      <TextInput
+                        value={form.frontLargeurM}
+                        onChangeText={(v) => setField('frontLargeurM', v)}
+                        keyboardType="decimal-pad"
+                        style={styles.boxValue}
+                      />
+                    </View>
+                  </View>
+
+                  <Text style={styles.sectionLabel}>Densité au front (/m²)</Text>
+                  <View style={styles.row3}>
+                    <View style={styles.box}>
+                      <Text style={styles.boxCaption}>max</Text>
+                      <TextInput
+                        value={form.densiteMaxFront}
+                        onChangeText={(v) => setField('densiteMaxFront', v)}
+                        keyboardType="decimal-pad"
+                        style={styles.boxValue}
+                      />
+                    </View>
+                    <View style={styles.box}>
+                      <Text style={styles.boxCaption}>moy arrière</Text>
+                      <TextInput
+                        value={form.densiteMoyArriereFront}
+                        onChangeText={(v) => setField('densiteMoyArriereFront', v)}
+                        keyboardType="decimal-pad"
+                        style={styles.boxValue}
+                      />
+                    </View>
+                  </View>
+                </>
+              )}
 
               {descInsight && (
                 <View style={styles.insightCallout}>
