@@ -125,8 +125,19 @@ jobs:
 
       # Build local sur le runner self-hoste : ne consomme plus le quota EAS Build cloud,
       # remplace le workaround temporaire precedent (reset de quota prevu le 2026-09-01).
+      #
+      # EAS_LOCAL_BUILD_WORKINGDIR place le workspace de build sur LE MEME systeme de
+      # fichiers que le cache Gradle (le volume Longhorn). Par defaut il atterrit dans
+      # /tmp (overlayfs du conteneur) : les hard links vers les .so prefab du cache
+      # echouent alors entre systemes de fichiers et AGP retombe sur une copie complete
+      # ("Hard link ... failed. Doing a slower copy instead" dans les logs), pour chaque
+      # libreactnative.so, par ABI et par module natif — depuis un volume replique reseau.
       - name: Build Android preview locally (EAS local build)
-        run: eas build --platform android --profile preview --local --non-interactive --output ./ifvm-preview.apk
+        env:
+          EAS_LOCAL_BUILD_WORKINGDIR: /home/runner/.gradle/easwork
+        run: |
+          mkdir -p "$EAS_LOCAL_BUILD_WORKINGDIR"
+          eas build --platform android --profile preview --local --non-interactive --output ./ifvm-preview.apk
 
       - uses: actions/upload-artifact@v4
         with:
