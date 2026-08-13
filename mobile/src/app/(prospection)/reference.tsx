@@ -227,11 +227,13 @@ export default function ReferenceScreen() {
         errors.surfStation = 'La surface de la station est obligatoire';
       }
 
-      // Pour le type extensif : prospectée et infestée sont obligatoires
+      // Surface prospectée TOUJOURS obligatoire (intensif et extensif)
+      if (!value.surfProspectee || Number(value.surfProspectee) <= 0) {
+        errors.surfProspectee = 'La surface prospectée est obligatoire';
+      }
+
+      // Pour le type extensif : infestée est également obligatoire
       if (!isIntensive) {
-        if (!value.surfProspectee || Number(value.surfProspectee) <= 0) {
-          errors.surfProspectee = 'La surface prospectée est obligatoire';
-        }
         if (!value.surfInfestee || Number(value.surfInfestee) <= 0) {
           errors.surfInfestee = 'La surface infestée est obligatoire';
         }
@@ -449,7 +451,7 @@ export default function ReferenceScreen() {
           <Text style={styles.sectionLabel}>Surfaces (ha) — saisie</Text>
           {isIntensive && (
             <Text style={styles.infoText}>
-              ℹ️ Mode intensif : les surfaces prospectée et infestée ne sont pas obligatoires
+              ℹ️ Mode intensif : la surface infestée n&apos;est pas obligatoire
             </Text>
           )}
           <View style={styles.surfacesRow}>
@@ -470,11 +472,8 @@ export default function ReferenceScreen() {
             <form.Field name="surfProspectee">
               {(field) => (
                 <View style={styles.surfaceField}>
-                  <Text style={[
-                    styles.surfaceLabel,
-                    !isIntensive && styles.requiredLabel
-                  ]}>
-                    Prospectée {!isIntensive && '*'}
+                  <Text style={[styles.surfaceLabel, styles.requiredLabel]}>
+                    Prospectée *
                   </Text>
                   <TextInput
                     value={field.state.value ?? ''}
