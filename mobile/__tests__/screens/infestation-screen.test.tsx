@@ -10,7 +10,7 @@
  * directement les hooks `expo-router` évite l'incompatibilité et suffit pour
  * un test d'écran isolé.
  */
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import InfestationScreen from '@/app/(prospection)/infestation';
 import { ErrorBanner } from '@/components/error-banner';
 import { useErrorStore } from '@/lib/error-store';
@@ -66,5 +66,31 @@ describe('InfestationScreen', () => {
     fireEvent.press(await screen.findByText('Comportement  ›'));
 
     expect(await screen.findByText('Comportement · Bande larvaire')).toBeVisible();
+  });
+
+  it('conserve "nb_taches_bandes" à la sauvegarde d’une bande larvaire (#103)', async () => {
+    jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
+      {
+        type_cible: 'bande_larvaire',
+        surface_tot: 12,
+        nb_taches_bandes: 3,
+        comportement: 'deplacement',
+        vent_de: 'N',
+        direction_vers: 'S',
+      } as any,
+    ]);
+
+    await render(<InfestationScreen />);
+
+    fireEvent.press(await screen.findByText('Comportement  ›'));
+    fireEvent.press(await screen.findByText('Continuer  ›'));
+
+    await waitFor(() =>
+      expect(prospectionRepository.saveProspectionInfestation).toHaveBeenCalledWith(
+        'draft-123',
+        'bande_larvaire',
+        expect.objectContaining({ nb_taches_bandes: 3 })
+      )
+    );
   });
 });
