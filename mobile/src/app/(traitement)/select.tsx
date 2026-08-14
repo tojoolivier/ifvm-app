@@ -50,6 +50,14 @@ export default function TraitementSelectScreen() {
         <Text style={styles.secondaryCardText}>Consulter une fiche validée</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity
+        style={styles.secondaryCard}
+        onPress={() => router.push('/(traitement)/mes-fiches' as any)}
+        accessibilityRole="button"
+      >
+        <Text style={styles.secondaryCardText}>Mes fiches</Text>
+      </TouchableOpacity>
+
       {showList && (
         <FlatList
           style={styles.list}
