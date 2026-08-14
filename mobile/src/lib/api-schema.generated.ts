@@ -778,6 +778,8 @@ export interface components {
             type_essaim?: components["schemas"]["TypeEssaim"] | null;
             /** Heure Observation */
             heure_observation?: string | null;
+            /** Densite En Vol */
+            densite_en_vol?: number | null;
             /** Nb Taches Bandes */
             nb_taches_bandes?: number | null;
             /** Interdistance M */
@@ -858,6 +860,8 @@ export interface components {
             type_essaim?: string | null;
             /** Heure Observation */
             heure_observation?: string | null;
+            /** Densite En Vol */
+            densite_en_vol?: number | null;
             /** Nb Taches Bandes */
             nb_taches_bandes?: number | null;
             /** Interdistance M */

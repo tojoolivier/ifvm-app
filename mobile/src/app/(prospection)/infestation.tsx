@@ -56,6 +56,7 @@ interface FormationForm {
   densiteMoyArriereFront: string;
   essaimComportement: 'vol' | 'pose' | null;
   heureObservation: string;
+  densiteEnVol: string;
 }
 
 function emptyFormation(): FormationForm {
@@ -83,6 +84,7 @@ function emptyFormation(): FormationForm {
     densiteMoyArriereFront: '',
     essaimComportement: null,
     heureObservation: '',
+    densiteEnVol: '',
   };
 }
 
@@ -112,6 +114,7 @@ function formFromRow(row: InfestationRow | undefined): FormationForm {
     densiteMoyArriereFront: row.densite_moy_arriere_front != null ? String(row.densite_moy_arriere_front) : '',
     essaimComportement: row.essaim_en_vol ? 'vol' : row.essaim_pose ? 'pose' : null,
     heureObservation: row.heure_observation ?? '',
+    densiteEnVol: row.densite_en_vol != null ? String(row.densite_en_vol) : '',
   };
 }
 
@@ -161,6 +164,7 @@ function rowFromForm(typeCible: string, form: FormationForm): InfestationRow {
     densite_moy_arriere_front: numOrNull(form.densiteMoyArriereFront),
     heure_observation:
       typeCible === 'vol_clair' || typeCible === 'essaim' ? form.heureObservation || null : null,
+    densite_en_vol: typeCible === 'essaim' ? numOrNull(form.densiteEnVol) : null,
   };
 }
 
@@ -705,6 +709,22 @@ export default function InfestationScreen() {
                       style={styles.infoBoxInput}
                     />
                   </View>
+
+                  {currentTarget === 'essaim' && (
+                    <>
+                      <Text style={styles.fieldGroupLabel}>Densité en vol (ind./m²)</Text>
+                      <View style={styles.infoBox}>
+                        <Text style={styles.infoBoxLabel}>ind./m²</Text>
+                        <TextInput
+                          value={form.densiteEnVol}
+                          onChangeText={(value) => setField('densiteEnVol', value)}
+                          placeholder="Si mesurable"
+                          keyboardType="decimal-pad"
+                          style={styles.infoBoxInput}
+                        />
+                      </View>
+                    </>
+                  )}
                 </>
               )}
 
