@@ -31,7 +31,7 @@ export function buildFicheLecturePdfHtml(recap: FicheLectureViewModel, prospecte
     recap.infestation.typeEssaim ? `<tr><td class="label">Type essaim</td><td class="value">${escapeHtml(recap.infestation.typeEssaim)}</td></tr>` : '',
     recap.infestation.typeLarve ? `<tr><td class="label">Type larve</td><td class="value">${escapeHtml(recap.infestation.typeLarve)}</td></tr>` : '',
     recap.infestation.surfaceContamineeHa != null ? `<tr><td class="label">Surface contaminée</td><td class="value">${recap.infestation.surfaceContamineeHa} ha</td></tr>` : '',
-    recap.infestation.surfInfesteePourcent != null ? `<tr><td class="label">Surface infestée (%)</td><td class="value">${recap.infestation.surfInfesteePourcent}%</td></tr>` : '',
+    recap.infestation.surfaceInfesteePourcent != null ? `<tr><td class="label">Surface infestée (%)</td><td class="value">${recap.infestation.surfaceInfesteePourcent}%</td></tr>` : '',
   ].filter(Boolean).join('');
 
   // Construction des lignes d'observations
@@ -158,10 +158,10 @@ export function buildFicheLecturePdfHtml(recap: FicheLectureViewModel, prospecte
           <td class="label">Type</td>
           <td class="value">${escapeHtml(recap.infestation.typeLabel)}</td>
         </tr>
-        ${recap.infestation.surfaceTot != null ? `
+        ${recap.infestation.surfaceTotale != null ? `
         <tr>
           <td class="label">Surface infestée</td>
-          <td class="value">${recap.infestation.surfaceTot} ha</td>
+          <td class="value">${recap.infestation.surfaceTotale} ha</td>
         </tr>` : ''}
         ${recap.infestation.comportementLabel !== '—' ? `
         <tr>

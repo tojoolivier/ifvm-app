@@ -38,7 +38,7 @@ interface FormationForm {
   tailleMin: string;
   tailleMax: string;
   tailleMoy: string;
-  surfTot: string;
+  surfaceTotale: string;
   densMin: string;
   densMax: string;
   densMoy: string;
@@ -61,7 +61,7 @@ interface FormationForm {
   densiteEnVol: string;
   dimensionHa: string;
   surfaceContamineeHa: string;
-  surfInfesteePourcent: string;
+  surfaceInfesteePourcent: string;
   aerialVolSpontane: boolean | null;
   aerialVisibleDePres: boolean | null;
   aerialMasseSombre: boolean | null;
@@ -94,7 +94,7 @@ function emptyFormation(): FormationForm {
     tailleMin: '',
     tailleMax: '',
     tailleMoy: '',
-    surfTot: '',
+    surfaceTotale: '',
     densMin: '',
     densMax: '',
     densMoy: '',
@@ -117,7 +117,7 @@ function emptyFormation(): FormationForm {
     densiteEnVol: '',
     dimensionHa: '',
     surfaceContamineeHa: '',
-    surfInfesteePourcent: '',
+    surfaceInfesteePourcent: '',
     aerialVolSpontane: null,
     aerialVisibleDePres: null,
     aerialMasseSombre: null,
@@ -132,7 +132,7 @@ function formFromRow(row: InfestationRow | undefined): FormationForm {
     tailleMin: row.taille_min != null ? String(row.taille_min) : '',
     tailleMax: row.taille_max != null ? String(row.taille_max) : '',
     tailleMoy: row.taille_moy != null ? String(row.taille_moy) : '',
-    surfTot: row.surface_tot != null ? String(row.surface_tot) : '',
+    surfaceTotale: row.surface_totale != null ? String(row.surface_totale) : '',
     densMin: row.densite_min != null ? String(row.densite_min) : '',
     densMax: row.densite_max != null ? String(row.densite_max) : '',
     densMoy: row.densite_moy != null ? String(row.densite_moy) : '',
@@ -155,7 +155,7 @@ function formFromRow(row: InfestationRow | undefined): FormationForm {
     densiteEnVol: row.densite_en_vol != null ? String(row.densite_en_vol) : '',
     dimensionHa: row.dimension_ha != null ? String(row.dimension_ha) : '',
     surfaceContamineeHa: row.surface_contaminee_ha != null ? String(row.surface_contaminee_ha) : '',
-    surfInfesteePourcent: row.surf_infestee_pourcent != null ? String(row.surf_infestee_pourcent) : '',
+    surfaceInfesteePourcent: row.surface_infestee_pourcent != null ? String(row.surface_infestee_pourcent) : '',
     aerialVolSpontane: null,
     aerialVisibleDePres: null,
     aerialMasseSombre: null,
@@ -175,7 +175,7 @@ function rowFromForm(typeCible: string, form: FormationForm): InfestationRow {
     taille_min: numOrNull(form.tailleMin),
     taille_max: numOrNull(form.tailleMax),
     taille_moy: numOrNull(form.tailleMoy),
-    surface_tot: numOrNull(form.surfTot),
+    surface_totale: numOrNull(form.surfaceTotale),
     densite_min: numOrNull(form.densMin),
     densite_max: numOrNull(form.densMax),
     densite_moy: numOrNull(form.densMoy),
@@ -202,7 +202,7 @@ function rowFromForm(typeCible: string, form: FormationForm): InfestationRow {
     interdistance_m: null,
     surface_contaminee_ha: typeCible === 'essaim' ? numOrNull(form.surfaceContamineeHa) : null,
     type_larve: null,
-    surf_infestee_pourcent: typeCible === 'essaim' ? numOrNull(form.surfInfesteePourcent) : null,
+    surface_infestee_pourcent: typeCible === 'essaim' ? numOrNull(form.surfaceInfesteePourcent) : null,
     stade_dominant: form.stadeDominant,
     taille_groupe_m2: numOrNull(form.tailleGroupeM2),
     front_longueur_m: numOrNull(form.frontLongueurM),
@@ -218,7 +218,7 @@ function rowFromForm(typeCible: string, form: FormationForm): InfestationRow {
 }
 
 function isFilled(form: FormationForm): boolean {
-  return form.surfTot !== '' || form.densMoy !== '';
+  return form.surfaceTotale !== '' || form.densMoy !== '';
 }
 
 type Tab = 'desc' | 'comport';
@@ -524,8 +524,8 @@ export default function InfestationScreen() {
                   <Text style={styles.infoBoxLabel}>Surface totale</Text>
                   <View style={styles.infoBoxInputRow}>
                     <TextInput
-                      value={form.surfTot}
-                      onChangeText={(v) => setField('surfTot', v)}
+                      value={form.surfaceTotale}
+                      onChangeText={(v) => setField('surfaceTotale', v)}
                       keyboardType="decimal-pad"
                       style={styles.infoBoxInput}
                     />
@@ -910,8 +910,8 @@ export default function InfestationScreen() {
                       <View style={styles.infoBox}>
                         <Text style={styles.infoBoxLabel}>%</Text>
                         <TextInput
-                          value={form.surfInfesteePourcent}
-                          onChangeText={(value) => setField('surfInfesteePourcent', value)}
+                          value={form.surfaceInfesteePourcent}
+                          onChangeText={(value) => setField('surfaceInfesteePourcent', value)}
                           placeholder="Part infestée"
                           keyboardType="decimal-pad"
                           style={styles.infoBoxInput}

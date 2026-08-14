@@ -130,7 +130,7 @@ def test_cible_essaim_observe():
 
 
 def test_cible_surface_infestee_reprise():
-    p = _prospection(surf_infestee=42.5)
+    p = _prospection(surface_infestee=42.5)
     assert construire_cible(p).surface_infestee_ha == 42.5
 
 
@@ -220,7 +220,7 @@ def _args(**overrides):
 @pytest.mark.asyncio
 async def test_creation_genere_numero_fiche_et_snapshot():
     prospection = _prospection(
-        surf_infestee=100.0,
+        surface_infestee=100.0,
         populations=[ProspectionPopulation(espece="LMC", categorie="imago")],
     )
     use_case, repo = _use_case(prospection=prospection, chef=_CHEF)
@@ -586,7 +586,7 @@ def _args_terrestre(**overrides):
 
 @pytest.mark.asyncio
 async def test_creation_terrestre_genere_numero_fiche_et_recalcule_surfaces():
-    prospection = _prospection(surf_infestee=100.0)
+    prospection = _prospection(surface_infestee=100.0)
     use_case, repo = _use_case_terrestre(prospection=prospection, chef=_CHEF_EQUIPE)
     traitement = await use_case.execute(
         **_args_terrestre(
@@ -654,7 +654,7 @@ async def test_terrestre_rejette_date_validation_anterieure():
 @pytest.mark.asyncio
 async def test_terrestre_rejette_surface_restante_positive_sans_abandonnee():
     """surface_restante_abandonnee obligatoire dès que surface_restante_ha > 0 (contrainte DB)."""
-    prospection = _prospection(surf_infestee=100.0)
+    prospection = _prospection(surface_infestee=100.0)
     use_case, _ = _use_case_terrestre(prospection=prospection, chef=_CHEF_EQUIPE)
     with pytest.raises(ValueError):
         await use_case.execute(**_args_terrestre(surface_atomiseur_ha=10.0))
@@ -662,7 +662,7 @@ async def test_terrestre_rejette_surface_restante_positive_sans_abandonnee():
 
 @pytest.mark.asyncio
 async def test_terrestre_accepte_surface_restante_nulle_sans_abandonnee():
-    prospection = _prospection(surf_infestee=10.0)
+    prospection = _prospection(surface_infestee=10.0)
     use_case, _ = _use_case_terrestre(prospection=prospection, chef=_CHEF_EQUIPE)
     traitement = await use_case.execute(**_args_terrestre(surface_atomiseur_ha=25.0))
     assert traitement.terrestre.surface_restante_ha == 0.0
@@ -684,7 +684,7 @@ def _fiche_origine(surface_cumulee_ha: float = 40.0) -> Traitement:
 async def test_reprise_lit_surface_cumulee_de_la_fiche_origine_un_seul_niveau():
     """CDG §9 : reprend surface_cumulee_ha déjà consolidé de l'origine, sans récursion."""
     origine = _fiche_origine(surface_cumulee_ha=40.0)
-    prospection = _prospection(surf_infestee=100.0)
+    prospection = _prospection(surface_infestee=100.0)
     use_case, _ = _use_case_terrestre(
         prospection=prospection,
         chef=_CHEF_EQUIPE,
@@ -749,7 +749,7 @@ async def test_reprise_origine_deja_utilisee_rejetee():
     """Préserve le modèle 'chaîne linéaire' : une fiche ne peut être origine qu'une fois."""
     origine = _fiche_origine()
     use_case, _ = _use_case_terrestre(
-        prospection=_prospection(surf_infestee=100.0),
+        prospection=_prospection(surface_infestee=100.0),
         chef=_CHEF_EQUIPE,
         traitements_par_id={origine.id: origine},
         origines_deja_utilisees={origine.id},
@@ -1333,7 +1333,7 @@ def _sync_use_case(existant: Traitement | None = None):
         SyncPushTraitementTerrestre(
             traitement_repository=repo,
             prospection_repository=FakeProspectionRepo(
-                _prospection(id=_PROSPECTION_ID_SYNC, surf_infestee=100.0)
+                _prospection(id=_PROSPECTION_ID_SYNC, surface_infestee=100.0)
             ),
             utilisateur_repository=FakeUtilisateurRepo(_CHEF_EQUIPE),
         ),

@@ -129,8 +129,8 @@ export default function ReviewScreen() {
               PA <Text style={styles.paragraphStrong}>{recap.pa}</Text> · Station{' '}
               <Text style={styles.paragraphStrong}>{recap.station}</Text>
               {'\n'}
-              Surf. prospectée <Text style={styles.paragraphStrong}>{recap.surfProspectee ?? '—'} ha</Text> · station{' '}
-              <Text style={styles.paragraphStrong}>{recap.surfStation ?? '—'} ha</Text> · GPS{' '}
+              Surf. prospectée <Text style={styles.paragraphStrong}>{recap.surfaceProspectee ?? '—'} ha</Text> · station{' '}
+              <Text style={styles.paragraphStrong}>{recap.surfaceStation ?? '—'} ha</Text> · GPS{' '}
               <Text style={styles.mono}>
                 {recap.latitude?.toFixed(4) ?? '—'}, {recap.longitude?.toFixed(4) ?? '—'}
               </Text>

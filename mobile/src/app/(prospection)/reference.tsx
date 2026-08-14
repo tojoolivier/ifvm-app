@@ -199,9 +199,9 @@ export default function ReferenceScreen() {
 
   const form = useForm({
     defaultValues: {
-      surfStation: draft?.surf_station != null ? String(draft.surf_station) : '',
-      surfProspectee: draft?.surf_prospectee != null ? String(draft.surf_prospectee) : '',
-      surfInfestee: draft?.surf_infestee != null ? String(draft.surf_infestee) : '',
+      surfaceStation: draft?.surface_station != null ? String(draft.surface_station) : '',
+      surfaceProspectee: draft?.surface_prospectee != null ? String(draft.surface_prospectee) : '',
+      surfaceInfestee: draft?.surface_infestee != null ? String(draft.surface_infestee) : '',
       biotope: draft?.biotope ?? null,
     } as ReferenceFormValues & { biotope: string | null },
     onSubmit: async ({ value }) => {
@@ -234,19 +234,19 @@ export default function ReferenceScreen() {
       }
 
       // Surface station TOUJOURS obligatoire
-      if (!value.surfStation || Number(value.surfStation) <= 0) {
-        errors.surfStation = 'La surface de la station est obligatoire';
+      if (!value.surfaceStation || Number(value.surfaceStation) <= 0) {
+        errors.surfaceStation = 'La surface de la station est obligatoire';
       }
 
       // Surface prospectée TOUJOURS obligatoire (intensif et extensif)
-      if (!value.surfProspectee || Number(value.surfProspectee) <= 0) {
-        errors.surfProspectee = 'La surface prospectée est obligatoire';
+      if (!value.surfaceProspectee || Number(value.surfaceProspectee) <= 0) {
+        errors.surfaceProspectee = 'La surface prospectée est obligatoire';
       }
 
       // Pour le type extensif : infestée est également obligatoire
       if (!isIntensive) {
-        if (!value.surfInfestee || Number(value.surfInfestee) <= 0) {
-          errors.surfInfestee = 'La surface infestée est obligatoire';
+        if (!value.surfaceInfestee || Number(value.surfaceInfestee) <= 0) {
+          errors.surfaceInfestee = 'La surface infestée est obligatoire';
         }
       }
 
@@ -265,16 +265,16 @@ export default function ReferenceScreen() {
         const nReleve = generateNumeroReleve(station?.id ?? null, dateProspection);
 
         // Préparer les données avec des valeurs par défaut (0 pour intensif)
-        const surfProspecteeValue = value.surfProspectee ? Number(value.surfProspectee) : 0;
-        const surfInfesteeValue = value.surfInfestee ? Number(value.surfInfestee) : 0;
+        const surfaceProspecteeValue = value.surfaceProspectee ? Number(value.surfaceProspectee) : 0;
+        const surfaceInfesteeValue = value.surfaceInfestee ? Number(value.surfaceInfestee) : 0;
 
         const updated = await updateProspectionReference(draftId, {
           latitude: position.latitude,
           longitude: position.longitude,
           altitude: position.altitude ?? null,
-          surfStation: Number(value.surfStation),
-          surfProspectee: surfProspecteeValue,
-          surfInfestee: surfInfesteeValue,
+          surfaceStation: Number(value.surfaceStation),
+          surfaceProspectee: surfaceProspecteeValue,
+          surfaceInfestee: surfaceInfesteeValue,
           biotope: value.biotope ?? null,
           nFiche,
           nReleve,
@@ -466,7 +466,7 @@ export default function ReferenceScreen() {
             </Text>
           )}
           <View style={styles.surfacesRow}>
-            <form.Field name="surfStation">
+            <form.Field name="surfaceStation">
               {(field) => (
                 <View style={styles.surfaceField}>
                   <Text style={[styles.surfaceLabel, styles.requiredLabel]}>Station *</Text>
@@ -480,7 +480,7 @@ export default function ReferenceScreen() {
                 </View>
               )}
             </form.Field>
-            <form.Field name="surfProspectee">
+            <form.Field name="surfaceProspectee">
               {(field) => (
                 <View style={styles.surfaceField}>
                   <Text style={[styles.surfaceLabel, styles.requiredLabel]}>
@@ -496,7 +496,7 @@ export default function ReferenceScreen() {
                 </View>
               )}
             </form.Field>
-            <form.Field name="surfInfestee">
+            <form.Field name="surfaceInfestee">
               {(field) => (
                 <View style={styles.surfaceField}>
                   <Text style={[

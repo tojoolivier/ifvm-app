@@ -45,9 +45,9 @@ interface ProspectionDetail {
   created_at: string
   latitude: number | null
   longitude: number | null
-  surf_station: number | null
-  surf_prospectee: number | null
-  surf_infestee: number | null
+  surface_station: number | null
+  surface_prospectee: number | null
+  surface_infestee: number | null
   vegetation: Record<string, unknown> | null
   sol: Record<string, unknown> | null
   degats_cultures: string | null
@@ -516,7 +516,7 @@ export function ProspectionDetailPage() {
                 {prospection.infestations.map((inf) => (
                   <tr key={inf.id} className="border-b last:border-0">
                     <td className="px-4 py-2">{inf.type_cible}</td>
-                    <td className="px-4 py-2 text-right">{inf.surface_tot ?? '—'}</td>
+                    <td className="px-4 py-2 text-right">{inf.surface_totale ?? '—'}</td>
                     <td className="px-4 py-2 text-muted-foreground">{inf.comportement ?? '—'}</td>
                   </tr>
                 ))}
@@ -631,7 +631,7 @@ function FicheImprimable({
         <Field label="Position GPS" value={synthese.positionGps} />
         <Field
           label="Surfaces (station / prospectée / infestée, ha)"
-          value={`${synthese.surfStation ?? '—'} / ${synthese.surfProspectee ?? '—'} / ${synthese.surfInfestee ?? '—'}`}
+          value={`${synthese.surfaceStation ?? '—'} / ${synthese.surfaceProspectee ?? '—'} / ${synthese.surfaceInfestee ?? '—'}`}
         />
       </dl>
 
@@ -670,7 +670,7 @@ function FicheImprimable({
       <h3 className="text-sm font-semibold mt-4 mb-2">Synthèse infestation</h3>
       <p className="text-sm">
         {synthese.infestation.hasInfestation
-          ? `${synthese.infestation.typeLabel} — surface ${synthese.infestation.surfaceTot ?? '—'} ha — ${synthese.infestation.comportementLabel}`
+          ? `${synthese.infestation.typeLabel} — surface ${synthese.infestation.surfaceTotale ?? '—'} ha — ${synthese.infestation.comportementLabel}`
           : 'Aucune infestation renseignée.'}
       </p>
 

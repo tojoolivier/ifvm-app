@@ -35,7 +35,7 @@ export default function ExtensiveReferenceScreen() {
   const [longitude, setLongitude] = useState<string>(draft?.longitude != null ? String(draft.longitude) : '');
   const [stationLibre, setStationLibre] = useState(draft?.station_libre ?? '');
   const [typeStation, setTypeStation] = useState(draft?.type_station ?? '');
-  const [surfStation, setSurfStation] = useState(draft?.surf_station != null ? String(draft.surf_station) : '');
+  const [surfaceStation, setSurfaceStation] = useState(draft?.surface_station != null ? String(draft.surface_station) : '');
   const [nMessage, setNMessage] = useState(
     draft?.n_message ?? (draftId && draft ? generateNumeroMessage(draftId, draft.date_prospection) : '')
   );
@@ -61,7 +61,7 @@ export default function ExtensiveReferenceScreen() {
         longitude: longitude ? parseFloat(longitude) : null,
         stationLibre: stationLibre || null,
         typeStation: typeStation || null,
-        surfStation: surfStation ? parseFloat(surfStation) : null,
+        surfaceStation: surfaceStation ? parseFloat(surfaceStation) : null,
         nMessage: nMessage || null,
       });
       setDraft(updated);
@@ -155,8 +155,8 @@ export default function ExtensiveReferenceScreen() {
           <View style={[styles.card, { marginTop: 10 }]}>
             <Text style={styles.label}>Surf. (ha)</Text>
             <TextInput
-              value={surfStation}
-              onChangeText={setSurfStation}
+              value={surfaceStation}
+              onChangeText={setSurfaceStation}
               keyboardType="decimal-pad"
               style={styles.input}
             />

@@ -38,7 +38,7 @@ describe('InfestationScreen', () => {
 
   it('affiche une bannière d’erreur, sans navigation, quand la sauvegarde échoue', async () => {
     jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
-      { type_cible: 'tache_larvaire', surface_tot: 12, interdistance_moy: 250 } as any,
+      { type_cible: 'tache_larvaire', surface_totale: 12, interdistance_moy: 250 } as any,
     ]);
     jest.mocked(prospectionRepository.saveProspectionInfestation).mockRejectedValueOnce(new Error('boom'));
 
@@ -58,7 +58,7 @@ describe('InfestationScreen', () => {
 
   it('bascule automatiquement "Tache larvaire" vers "Bande larvaire" dès que la taille du groupe atteint 1000 m² (#103)', async () => {
     jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
-      { type_cible: 'tache_larvaire', surface_tot: 12, taille_groupe_m2: 1500 } as any,
+      { type_cible: 'tache_larvaire', surface_totale: 12, taille_groupe_m2: 1500 } as any,
     ]);
 
     await render(<InfestationScreen />);
@@ -72,7 +72,7 @@ describe('InfestationScreen', () => {
     jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
       {
         type_cible: 'bande_larvaire',
-        surface_tot: 12,
+        surface_totale: 12,
         nb_taches_bandes: 3,
         interdistance_moy: 250,
         comportement: 'deplacement',
@@ -99,7 +99,7 @@ describe('InfestationScreen', () => {
     jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
       {
         type_cible: 'vol_clair',
-        surface_tot: 12,
+        surface_totale: 12,
         essaim_en_vol: 1,
         essaim_pose: 0,
         vent_de: 'N',
@@ -125,9 +125,9 @@ describe('InfestationScreen', () => {
     jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
       {
         type_cible: 'essaim',
-        surface_tot: 12,
+        surface_totale: 12,
         surface_contaminee_ha: 40,
-        surf_infestee_pourcent: 25,
+        surface_infestee_pourcent: 25,
         vent_de: 'N',
         direction_vers: 'S',
       } as any,
@@ -142,14 +142,14 @@ describe('InfestationScreen', () => {
       expect(prospectionRepository.saveProspectionInfestation).toHaveBeenCalledWith(
         'draft-123',
         'essaim',
-        expect.objectContaining({ surface_contaminee_ha: 40, surf_infestee_pourcent: 25 })
+        expect.objectContaining({ surface_contaminee_ha: 40, surface_infestee_pourcent: 25 })
       )
     );
   });
 
   it('classe "vol clair" via le questionnaire séquentiel et bloque la densité en saisie libre (#104)', async () => {
     jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
-      { type_cible: 'vol_clair', surface_tot: 12, vent_de: 'N', direction_vers: 'S' } as any,
+      { type_cible: 'vol_clair', surface_totale: 12, vent_de: 'N', direction_vers: 'S' } as any,
     ]);
 
     await render(<InfestationScreen />);

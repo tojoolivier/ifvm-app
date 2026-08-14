@@ -460,5 +460,5 @@ def construire_cible(prospection: Prospection) -> Cible:
         grandes_larves=str(grandes_total) if larves_renseignees else None,
         vols_clairs_essaims=vols_clairs_essaims,
         repartition_population=repartition,
-        surface_infestee_ha=prospection.surf_infestee,
+        surface_infestee_ha=prospection.surface_infestee,
     )

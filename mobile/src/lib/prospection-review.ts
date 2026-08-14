@@ -42,9 +42,9 @@ export interface RecapitulatifViewModel {
   dureeSession: string;
   pa: string;
   station: string;
-  surfStation: number | null;
-  surfProspectee: number | null;
-  surfInfestee: number | null;
+  surfaceStation: number | null;
+  surfaceProspectee: number | null;
+  surfaceInfestee: number | null;
   latitude: number | null;
   longitude: number | null;
   vegetationSummary: string;
@@ -72,7 +72,7 @@ function buildReviewGroups(draft: DraftProspection, captures: CaptureRow[]): Rev
 }
 
 function buildInfestationSummary(infestations: InfestationRow[]): string {
-  const filled = infestations.filter((row) => row.surface_tot != null || row.densite_moy != null);
+  const filled = infestations.filter((row) => row.surface_totale != null || row.densite_moy != null);
   if (filled.length === 0) return 'Aucune formation renseignée.';
   const labels = filled.map((row) => TYPE_CIBLE_OPTIONS.find((o) => o.value === row.type_cible)?.label ?? row.type_cible);
   return `${labels.join(', ')} renseignée${filled.length > 1 ? 's' : ''}.`;
@@ -110,9 +110,9 @@ export function buildRecapitulatif(
     dureeSession: formatChrono(chronoSeconds(draft.capture_started_at)),
     pa: draft.pa_nom ?? '—',
     station: draft.station_nom ?? '—',
-    surfStation: draft.surf_station,
-    surfProspectee: draft.surf_prospectee,
-    surfInfestee: draft.surf_infestee,
+    surfaceStation: draft.surface_station,
+    surfaceProspectee: draft.surface_prospectee,
+    surfaceInfestee: draft.surface_infestee,
     latitude: draft.latitude,
     longitude: draft.longitude,
     vegetationSummary,
@@ -195,9 +195,9 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
     longitude: draft.longitude ? Number(draft.longitude) : null,
     altitude: draft.altitude ? Number(draft.altitude) : null,
     biotope: (draft.biotope || null) as ProspectionCreateInput['biotope'],
-    surf_station: draft.surf_station ? Number(draft.surf_station) : null,
-    surf_prospectee: draft.surf_prospectee ? Number(draft.surf_prospectee) : null,
-    surf_infestee: draft.surf_infestee ? Number(draft.surf_infestee) : null,
+    surface_station: draft.surface_station ? Number(draft.surface_station) : null,
+    surface_prospectee: draft.surface_prospectee ? Number(draft.surface_prospectee) : null,
+    surface_infestee: draft.surface_infestee ? Number(draft.surface_infestee) : null,
     degats_cultures: (draft.degats_cultures || null) as ProspectionCreateInput['degats_cultures'],
     derniere_pluie: draft.derniere_pluie || null,
     intensite_pluie: draft.intensite_pluie || null,
@@ -258,7 +258,7 @@ function buildInfestationsPayload(rows: InfestationRow[]): ProspectionInfestatio
     taille_min: row.taille_min ? Number(row.taille_min) : null,
     taille_max: row.taille_max ? Number(row.taille_max) : null,
     taille_moy: row.taille_moy ? Number(row.taille_moy) : null,
-    surface_tot: row.surface_tot ? Number(row.surface_tot) : null,
+    surface_totale: row.surface_totale ? Number(row.surface_totale) : null,
     densite_min: row.densite_min ? Number(row.densite_min) : null,
     densite_max: row.densite_max ? Number(row.densite_max) : null,
     densite_moy: row.densite_moy ? Number(row.densite_moy) : null,
@@ -285,7 +285,7 @@ function buildInfestationsPayload(rows: InfestationRow[]): ProspectionInfestatio
     interdistance_moy: row.interdistance_moy ? Number(row.interdistance_moy) : null,
     surface_contaminee_ha: row.surface_contaminee_ha ? Number(row.surface_contaminee_ha) : null,
     type_larve: (row.type_larve || null) as ProspectionInfestationInput['type_larve'],
-    surf_infestee_pourcent: row.surf_infestee_pourcent ? Number(row.surf_infestee_pourcent) : null,
+    surface_infestee_pourcent: row.surface_infestee_pourcent ? Number(row.surface_infestee_pourcent) : null,
     stade_dominant: (row.stade_dominant || null) as ProspectionInfestationInput['stade_dominant'],
     taille_groupe_m2: row.taille_groupe_m2 ? Number(row.taille_groupe_m2) : null,
     front_longueur_m: row.front_longueur_m ? Number(row.front_longueur_m) : null,

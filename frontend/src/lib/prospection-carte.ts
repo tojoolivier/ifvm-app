@@ -48,7 +48,7 @@ const SEUIL_MOYENNE_DENSITE = 5
 /** Sévérité dérivée de la surface infestée totale (ha), à défaut de la densité moyenne. */
 export function computeSeverite(infestations: InfestationRead[]): SeveriteNiveau {
   const surface = infestations.reduce<number | null>(
-    (acc, i) => (i.surface_tot != null ? (acc ?? 0) + i.surface_tot : acc),
+    (acc, i) => (i.surface_totale != null ? (acc ?? 0) + i.surface_totale : acc),
     null,
   )
   if (surface != null) {

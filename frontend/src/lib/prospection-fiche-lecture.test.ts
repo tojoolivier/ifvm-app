@@ -58,19 +58,19 @@ describe('buildInfestationSynthese', () => {
     expect(buildInfestationSynthese([])).toEqual({
       hasInfestation: false,
       typeLabel: '—',
-      surfaceTot: null,
+      surfaceTotale: null,
       comportementLabel: '—',
     })
   })
 
   it('résout les labels de type de cible et comportement', () => {
     const infestations: InfestationRead[] = [
-      { id: 'i1', type_cible: 'essaim', surface_tot: 12.5, densite_moy: null, comportement: 'deplacement' },
+      { id: 'i1', type_cible: 'essaim', surface_totale: 12.5, densite_moy: null, comportement: 'deplacement' },
     ]
     expect(buildInfestationSynthese(infestations)).toEqual({
       hasInfestation: true,
       typeLabel: 'Essaim',
-      surfaceTot: 12.5,
+      surfaceTotale: 12.5,
       comportementLabel: 'Déplacement',
     })
   })
@@ -100,15 +100,15 @@ describe('buildFicheImprimable', () => {
       date_prospection: '2026-07-10',
       latitude: -18.5,
       longitude: 47.2,
-      surf_station: 100,
-      surf_prospectee: 80,
-      surf_infestee: 10,
+      surface_station: 100,
+      surface_prospectee: 80,
+      surface_infestee: 10,
       vegetation: { strates: { herbeuse: { recouvrement: 100 } } },
       sol: { humidite: 'surface', texture: 'sable_fin' },
       degats_cultures: 'nuls',
       captures: [{ id: '1', espece: 'LMC', categorie: 'imago', phase: 'gregaire', stade: 'A1', effectif: 5 }],
       populations: [],
-      infestations: [{ id: 'i1', type_cible: 'essaim', surface_tot: 10, densite_moy: null, comportement: 'repos' }],
+      infestations: [{ id: 'i1', type_cible: 'essaim', surface_totale: 10, densite_moy: null, comportement: 'repos' }],
     })
 
     expect(vm.nFiche).toBe('F-042')
@@ -124,9 +124,9 @@ describe('buildFicheImprimable', () => {
       date_prospection: '2026-07-10',
       latitude: null,
       longitude: null,
-      surf_station: null,
-      surf_prospectee: null,
-      surf_infestee: null,
+      surface_station: null,
+      surface_prospectee: null,
+      surface_infestee: null,
       vegetation: null,
       sol: null,
       degats_cultures: null,

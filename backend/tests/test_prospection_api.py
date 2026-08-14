@@ -55,7 +55,9 @@ async def test_create_prospection_intensive_avec_sections(
                     "accouplement": "rare",
                 }
             ],
-            "infestations": [{"espece": "NSE", "type_cible": "tache_larvaire", "surface_tot": 2.0}],
+            "infestations": [
+                {"espece": "NSE", "type_cible": "tache_larvaire", "surface_totale": 2.0}
+            ],
         },
         headers=auth_headers,
     )
@@ -94,7 +96,7 @@ async def test_create_prospection_avec_nouveaux_champs(
                 {
                     "espece": "LMC",
                     "type_cible": "essaim",
-                    "surface_tot": 5.0,
+                    "surface_totale": 5.0,
                     "pullulation_nb": 3,
                     "taille_long": 100.0,
                     "taille_large": 50.0,
@@ -142,7 +144,7 @@ async def test_create_prospection_avec_nouveaux_champs(
 async def test_create_prospection_population_methode_phase(
     client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
 ):
-    """Régression: methode/phase (population) et surf_infestee_pourcent (infestation)
+    """Régression: methode/phase (population) et surface_infestee_pourcent (infestation)
     existent côté ORM/Pydantic mais avaient été oubliés dans le mapping du domaine
     (ProspectionPopulation / ProspectionInfestation), ce qui faisait planter la
     création avec un TypeError silencieux hors tests (aucun test n'envoyait ces
@@ -167,8 +169,8 @@ async def test_create_prospection_population_methode_phase(
                 {
                     "espece": "NSE",
                     "type_cible": "tache_larvaire",
-                    "surface_tot": 2.0,
-                    "surf_infestee_pourcent": 45.0,
+                    "surface_totale": 2.0,
+                    "surface_infestee_pourcent": 45.0,
                 }
             ],
         },
@@ -184,7 +186,7 @@ async def test_create_prospection_population_methode_phase(
 
     assert len(data["infestations"]) == 1
     infestation = data["infestations"][0]
-    assert infestation["surf_infestee_pourcent"] == 45.0
+    assert infestation["surface_infestee_pourcent"] == 45.0
 
 
 @pytest.mark.asyncio
@@ -206,7 +208,7 @@ async def test_create_prospection_avec_infestation_complete(
                     "taille_min": 10.0,
                     "taille_max": 25.0,
                     "taille_moy": 17.5,
-                    "surface_tot": 10.0,
+                    "surface_totale": 10.0,
                     "densite_min": 2.0,
                     "densite_max": 8.0,
                     "densite_moy": 5.0,
@@ -555,7 +557,7 @@ async def test_create_prospection_avec_type_essaim_enum(
                     {
                         "espece": "LMC",
                         "type_cible": "essaim",
-                        "surface_tot": 3.0,
+                        "surface_totale": 3.0,
                         "type_essaim": type_essaim,
                         "essaim_en_vol": True,
                         "essaim_pose": False,
@@ -586,7 +588,7 @@ async def test_create_prospection_avec_type_larve_enum(
                     {
                         "espece": "NSE",
                         "type_cible": type_larve,
-                        "surface_tot": 2.0,
+                        "surface_totale": 2.0,
                         "type_larve": type_larve,
                     }
                 ],

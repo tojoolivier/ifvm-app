@@ -76,7 +76,7 @@ class ProspectionInfestation:
     taille_min: float | None = None
     taille_max: float | None = None
     taille_moy: float | None = None
-    surface_tot: float | None = None
+    surface_totale: float | None = None
     densite_min: float | None = None
     densite_max: float | None = None
     densite_moy: float | None = None
@@ -86,7 +86,7 @@ class ProspectionInfestation:
     direction_vers: str | None = None
     vent_de: str | None = None
     vent_vitesse: float | None = None
-    surf_infestee_pourcent: float | None = None
+    surface_infestee_pourcent: float | None = None
 
     # ==========================================
     # NOUVEAUX CHAMPS - Imagos (B)
@@ -135,9 +135,9 @@ class Prospection:
     longitude: float | None = None
     altitude: float | None = None
     biotope: str | None = None
-    surf_station: float | None = None
-    surf_prospectee: float | None = None
-    surf_infestee: float | None = None
+    surface_station: float | None = None
+    surface_prospectee: float | None = None
+    surface_infestee: float | None = None
     degats_cultures: str | None = None
     derniere_pluie: date | None = None
     intensite_pluie: str | None = None

@@ -32,7 +32,7 @@ async def _creer_prospection(
     db_session: AsyncSession,
     campagne_id,
     utilisateur,
-    surf_infestee=None,
+    surface_infestee=None,
     populations=(),
 ) -> uuid.UUID:
     p = ProspectionModel(
@@ -41,7 +41,7 @@ async def _creer_prospection(
         campagne_id=campagne_id,
         prospecteur_id=utilisateur.id,
         date_prospection=date(2026, 8, 1),
-        surf_infestee=surf_infestee,
+        surface_infestee=surface_infestee,
         statut="brouillon",
         statut_sync="local",
     )
@@ -60,7 +60,7 @@ async def test_create_traitement_aerien_brouillon(
         db_session,
         campagne_id,
         utilisateur,
-        surf_infestee=120.5,
+        surface_infestee=120.5,
         populations=[{"espece": "LMC", "categorie": "imago"}],
     )
     resp = await client.post(
@@ -399,7 +399,7 @@ async def test_create_traitement_terrestre_brouillon(
         db_session,
         campagne_id,
         utilisateur,
-        surf_infestee=100.0,
+        surface_infestee=100.0,
         populations=[{"espece": "LMC", "categorie": "imago"}],
     )
     payload = payload_traitement_terrestre(prospection_id)
@@ -425,7 +425,7 @@ async def test_create_traitement_terrestre_surface_restante_plancher_zero(
 ):
     """Critère d'acceptation CDG §9: surface_restante_ha ne descend jamais sous 0."""
     prospection_id = await _creer_prospection(
-        db_session, campagne_id, utilisateur, surf_infestee=10.0
+        db_session, campagne_id, utilisateur, surface_infestee=10.0
     )
     payload = payload_traitement_terrestre(prospection_id)
     payload["terrestre"]["surface_atomiseur_ha"] = 25.0
@@ -442,7 +442,7 @@ async def test_create_traitement_terrestre_surface_restante_positive_sans_abando
     client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
 ):
     prospection_id = await _creer_prospection(
-        db_session, campagne_id, utilisateur, surf_infestee=100.0
+        db_session, campagne_id, utilisateur, surface_infestee=100.0
     )
     payload = payload_traitement_terrestre(prospection_id)
     payload["terrestre"]["surface_atomiseur_ha"] = 10.0
@@ -750,7 +750,7 @@ async def test_reprise_chaine_a_plusieurs_maillons(
 ):
     """CDG §9 : chaque maillon reprend surface_cumulee_ha du précédent, sur un seul niveau."""
     prospection_id = await _creer_prospection(
-        db_session, campagne_id, utilisateur, surf_infestee=200.0
+        db_session, campagne_id, utilisateur, surface_infestee=200.0
     )
     base_payload = payload_traitement_terrestre(prospection_id)
 
@@ -789,7 +789,7 @@ async def test_reprise_origine_deja_utilisee_409(
     client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
 ):
     prospection_id = await _creer_prospection(
-        db_session, campagne_id, utilisateur, surf_infestee=200.0
+        db_session, campagne_id, utilisateur, surface_infestee=200.0
     )
     base_payload = payload_traitement_terrestre(prospection_id)
 
@@ -844,7 +844,7 @@ async def test_list_traitements_reprenable_exclut_origine_deja_utilisee_et_surfa
     client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
 ):
     prospection_id = await _creer_prospection(
-        db_session, campagne_id, utilisateur, surf_infestee=100.0
+        db_session, campagne_id, utilisateur, surface_infestee=100.0
     )
     base_payload = payload_traitement_terrestre(prospection_id)
 
@@ -918,7 +918,7 @@ async def test_get_traitement_terrestre(
     client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
 ):
     prospection_id = await _creer_prospection(
-        db_session, campagne_id, utilisateur, surf_infestee=50.0
+        db_session, campagne_id, utilisateur, surface_infestee=50.0
     )
     payload = payload_traitement_terrestre(prospection_id)
     payload["terrestre"]["surface_restante_abandonnee"] = True
@@ -1023,7 +1023,7 @@ async def test_valider_terrestre_surface_restante_abandonnee_sans_motif_422(
 ):
     """Critère CDG §9 : surface_restante_abandonnee=Oui sans motif en Observations bloque."""
     prospection_id = await _creer_prospection(
-        db_session, campagne_id, utilisateur, surf_infestee=100.0
+        db_session, campagne_id, utilisateur, surface_infestee=100.0
     )
     payload = payload_traitement_terrestre(prospection_id)
     payload["terrestre"]["surface_atomiseur_ha"] = 10.0
@@ -1048,7 +1048,7 @@ async def test_valider_terrestre_surface_restante_abandonnee_avec_motif_ok(
     client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
 ):
     prospection_id = await _creer_prospection(
-        db_session, campagne_id, utilisateur, surf_infestee=100.0
+        db_session, campagne_id, utilisateur, surface_infestee=100.0
     )
     payload = payload_traitement_terrestre(prospection_id)
     payload["terrestre"]["surface_atomiseur_ha"] = 10.0

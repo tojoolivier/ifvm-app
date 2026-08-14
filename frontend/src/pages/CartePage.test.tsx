@@ -48,7 +48,7 @@ const prospections = [
     n_fiche: 'F-001',
     latitude: null,
     longitude: null,
-    infestations: [{ id: 'i1', type_cible: 'essaim', surface_tot: 60, densite_moy: null, comportement: null }],
+    infestations: [{ id: 'i1', type_cible: 'essaim', surface_totale: 60, densite_moy: null, comportement: null }],
   },
   {
     id: 'p2',

@@ -152,7 +152,7 @@ interface InfestationRow {
   taille_min: string
   taille_max: string
   taille_moy: string
-  surface_tot: string
+  surface_totale: string
   densite_min: string
   densite_max: string
   densite_moy: string
@@ -182,7 +182,7 @@ function emptyInfestation(id: number): InfestationRow {
   return {
     id, espece: 'LMC', type_cible: 'tache_larvaire',
     taille_min: '', taille_max: '', taille_moy: '',
-    surface_tot: '', densite_min: '', densite_max: '', densite_moy: '',
+    surface_totale: '', densite_min: '', densite_max: '', densite_moy: '',
     interdistance: '', comportement: '', direction_de: '', direction_vers: '',
     vent_de: '', vent_vitesse: '',
   }
@@ -230,9 +230,9 @@ interface ProspectionDraftData {
   latitude: string
   longitude: string
   altitude: string
-  surfStation: string
-  surfProspectee: string
-  surfInfestee: string
+  surfaceStation: string
+  surfaceProspectee: string
+  surfaceInfestee: string
   degats: string
   dernieresPluies: string
   intensitePluie: string
@@ -288,9 +288,9 @@ export function NouvelleProspectionPage() {
   const [latitude, setLatitude] = useState('')
   const [longitude, setLongitude] = useState('')
   const [altitude, setAltitude] = useState('')
-  const [surfStation, setSurfStation] = useState('')
-  const [surfProspectee, setSurfProspectee] = useState('')
-  const [surfInfestee, setSurfInfestee] = useState('')
+  const [surfaceStation, setSurfaceStation] = useState('')
+  const [surfaceProspectee, setSurfaceProspectee] = useState('')
+  const [surfaceInfestee, setSurfaceInfestee] = useState('')
   const [degats, setDegats] = useState('')
   const [dernieresPluies, setDernieresPluies] = useState('')
   const [intensitePluie, setIntensitePluie] = useState('')
@@ -395,9 +395,9 @@ export function NouvelleProspectionPage() {
         latitude: parseNum(latitude),
         longitude: parseNum(longitude),
         altitude: parseNum(altitude),
-        surf_station: parseNum(surfStation),
-        surf_prospectee: parseNum(surfProspectee),
-        surf_infestee: parseNum(surfInfestee),
+        surface_station: parseNum(surfaceStation),
+        surface_prospectee: parseNum(surfaceProspectee),
+        surface_infestee: parseNum(surfaceInfestee),
         degats_cultures: degats || null,
         derniere_pluie: dernieresPluies || null,
         intensite_pluie: intensitePluie || null,
@@ -481,7 +481,7 @@ export function NouvelleProspectionPage() {
       taille_min: parseNum(r.taille_min),
       taille_max: parseNum(r.taille_max),
       taille_moy: parseNum(r.taille_moy),
-      surface_tot: parseNum(r.surface_tot),
+      surface_totale: parseNum(r.surface_totale),
       densite_min: parseNum(r.densite_min),
       densite_max: parseNum(r.densite_max),
       densite_moy: parseNum(r.densite_moy),
@@ -503,9 +503,9 @@ export function NouvelleProspectionPage() {
       latitude,
       longitude,
       altitude,
-      surf_station: surfStation,
-      surf_prospectee: surfProspectee,
-      surf_infestee: surfInfestee,
+      surface_station: surfaceStation,
+      surface_prospectee: surfaceProspectee,
+      surface_infestee: surfaceInfestee,
       captures,
     }
 
@@ -566,13 +566,13 @@ export function NouvelleProspectionPage() {
         const alt = parseFloat(altitude)
         if (isNaN(alt) || alt < 0) errs.altitude = "L'altitude doit être un nombre positif."
       }
-      const sp = surfProspectee ? parseFloat(surfProspectee) : null
-      const ss = surfStation ? parseFloat(surfStation) : null
-      const si = surfInfestee ? parseFloat(surfInfestee) : null
+      const sp = surfaceProspectee ? parseFloat(surfaceProspectee) : null
+      const ss = surfaceStation ? parseFloat(surfaceStation) : null
+      const si = surfaceInfestee ? parseFloat(surfaceInfestee) : null
       if (sp !== null && ss !== null && sp > ss)
-        errs.surf_prospectee = 'La surface prospectée ne peut pas dépasser la surface de la station.'
+        errs.surface_prospectee = 'La surface prospectée ne peut pas dépasser la surface de la station.'
       if (si !== null && sp !== null && si > sp)
-        errs.surf_infestee = 'La surface infestée ne peut pas dépasser la surface prospectée.'
+        errs.surface_infestee = 'La surface infestée ne peut pas dépasser la surface prospectée.'
     } else if (step === 2) {
       const hasCapture = captures.some((c) => parseInt(c.effectif, 10) > 0)
       if (!hasCapture) errs.captures = 'Au moins une capture avec un effectif supérieur à 0 est requise.'
@@ -612,9 +612,9 @@ export function NouvelleProspectionPage() {
     setLatitude(draft.latitude)
     setLongitude(draft.longitude)
     setAltitude(draft.altitude)
-    setSurfStation(draft.surfStation)
-    setSurfProspectee(draft.surfProspectee)
-    setSurfInfestee(draft.surfInfestee)
+    setSurfaceStation(draft.surfaceStation)
+    setSurfaceProspectee(draft.surfaceProspectee)
+    setSurfaceInfestee(draft.surfaceInfestee)
     setDegats(draft.degats)
     setDernieresPluies(draft.dernieresPluies)
     setIntensitePluie(draft.intensitePluie)
@@ -687,7 +687,7 @@ export function NouvelleProspectionPage() {
   // Keep formRef fresh every render so the auto-save interval always reads latest state.
   formRef.current = {
     campagneId, stationId, stationSearch, dateProspection, nReleve, nFiche,
-    latitude, longitude, altitude, surfStation, surfProspectee, surfInfestee,
+    latitude, longitude, altitude, surfaceStation, surfaceProspectee, surfaceInfestee,
     degats, dernieresPluies, intensitePluie, ennemis, observations,
     nextId, captures, populations, infestations, vegetation, sol,
   }
@@ -969,33 +969,33 @@ export function NouvelleProspectionPage() {
                         aria-describedby={fieldErrors.altitude ? 'alt-error' : undefined}
                       />
                     </FormField>
-                    <FormField label="Surface station (ha)" error={fieldErrors.surf_station}>
+                    <FormField label="Surface station (ha)" error={fieldErrors.surface_station}>
                       <Input
                         id="surf-station"
                         type="number"
                         step="any"
-                        value={surfStation}
-                        onChange={(e) => setSurfStation(e.target.value)}
+                        value={surfaceStation}
+                        onChange={(e) => setSurfaceStation(e.target.value)}
                       />
                     </FormField>
-                    <FormField label="Surface prospectée (ha)" error={fieldErrors.surf_prospectee}>
+                    <FormField label="Surface prospectée (ha)" error={fieldErrors.surface_prospectee}>
                       <Input
                         id="surf-prospectee"
                         type="number"
                         step="any"
-                        value={surfProspectee}
-                        onChange={(e) => setSurfProspectee(e.target.value)}
-                        aria-describedby={fieldErrors.surf_prospectee ? 'surf-prospectee-error' : undefined}
+                        value={surfaceProspectee}
+                        onChange={(e) => setSurfaceProspectee(e.target.value)}
+                        aria-describedby={fieldErrors.surface_prospectee ? 'surf-prospectee-error' : undefined}
                       />
                     </FormField>
-                    <FormField label="Surface infestée (ha)" error={fieldErrors.surf_infestee}>
+                    <FormField label="Surface infestée (ha)" error={fieldErrors.surface_infestee}>
                       <Input
                         id="surf-infestee"
                         type="number"
                         step="any"
-                        value={surfInfestee}
-                        onChange={(e) => setSurfInfestee(e.target.value)}
-                        aria-describedby={fieldErrors.surf_infestee ? 'surf-infestee-error' : undefined}
+                        value={surfaceInfestee}
+                        onChange={(e) => setSurfaceInfestee(e.target.value)}
+                        aria-describedby={fieldErrors.surface_infestee ? 'surf-infestee-error' : undefined}
                       />
                     </FormField>
                   </div>
@@ -1232,7 +1232,7 @@ export function NouvelleProspectionPage() {
                           </div>
                           <div className="flex flex-col gap-2">
                             <Label>Surface tot. (ha)</Label>
-                            <Input type="number" step="any" value={row.surface_tot} onChange={(e) => updateInfestation(row.id, 'surface_tot', e.target.value)} />
+                            <Input type="number" step="any" value={row.surface_totale} onChange={(e) => updateInfestation(row.id, 'surface_totale', e.target.value)} />
                           </div>
                           <div className="flex flex-col gap-2">
                             <Label>Densité min</Label>
@@ -1419,13 +1419,13 @@ export function NouvelleProspectionPage() {
                             <dd>{latitude}, {longitude}{altitude ? `, alt. ${altitude} m` : ''}</dd>
                           </>
                         )}
-                        {surfStation && (
+                        {surfaceStation && (
                           <>
                             <dt className="text-muted-foreground">Surfaces (ha)</dt>
                             <dd>
-                              Station : {surfStation}
-                              {surfProspectee ? ` · Prospectée : ${surfProspectee}` : ''}
-                              {surfInfestee ? ` · Infestée : ${surfInfestee}` : ''}
+                              Station : {surfaceStation}
+                              {surfaceProspectee ? ` · Prospectée : ${surfaceProspectee}` : ''}
+                              {surfaceInfestee ? ` · Infestée : ${surfaceInfestee}` : ''}
                             </dd>
                           </>
                         )}

@@ -12,7 +12,7 @@ function infestation(overrides: Partial<InfestationRead> = {}): InfestationRead 
   return {
     id: 'inf-1',
     type_cible: 'tache_larvaire',
-    surface_tot: null,
+    surface_totale: null,
     densite_moy: null,
     comportement: null,
     ...overrides,
@@ -50,13 +50,13 @@ describe('filterProspectionsForCarte', () => {
 
 describe('computeSeverite', () => {
   it('priorise la surface infestée sur la densité', () => {
-    expect(computeSeverite([infestation({ surface_tot: 60 })])).toBe('forte')
-    expect(computeSeverite([infestation({ surface_tot: 20 })])).toBe('moyenne')
-    expect(computeSeverite([infestation({ surface_tot: 2 })])).toBe('faible')
+    expect(computeSeverite([infestation({ surface_totale: 60 })])).toBe('forte')
+    expect(computeSeverite([infestation({ surface_totale: 20 })])).toBe('moyenne')
+    expect(computeSeverite([infestation({ surface_totale: 2 })])).toBe('faible')
   })
 
   it("somme les surfaces de plusieurs infestations", () => {
-    expect(computeSeverite([infestation({ surface_tot: 30 }), infestation({ surface_tot: 25 })])).toBe('forte')
+    expect(computeSeverite([infestation({ surface_totale: 30 }), infestation({ surface_totale: 25 })])).toBe('forte')
   })
 
   it('retombe sur la densité moyenne si aucune surface', () => {
@@ -80,7 +80,7 @@ describe('buildCarteMarkers', () => {
 
   it('utilise la position ponctuelle si présente', () => {
     const markers = buildCarteMarkers(
-      [prospection({ latitude: -19.1, longitude: 47.2, infestations: [infestation({ surface_tot: 5 })] })],
+      [prospection({ latitude: -19.1, longitude: 47.2, infestations: [infestation({ surface_totale: 5 })] })],
       stations,
     )
     expect(markers).toEqual([
@@ -90,7 +90,7 @@ describe('buildCarteMarkers', () => {
 
   it('retombe sur la position de la station à défaut de coordonnées ponctuelles', () => {
     const markers = buildCarteMarkers(
-      [prospection({ station_id: 's1', infestations: [infestation({ surface_tot: 60 })] })],
+      [prospection({ station_id: 's1', infestations: [infestation({ surface_totale: 60 })] })],
       stations,
     )
     expect(markers).toEqual([
@@ -100,7 +100,7 @@ describe('buildCarteMarkers', () => {
 
   it('ignore les fiches sans aucune position exploitable', () => {
     const markers = buildCarteMarkers(
-      [prospection({ station_id: 's-inconnue', infestations: [infestation({ surface_tot: 5 })] })],
+      [prospection({ station_id: 's-inconnue', infestations: [infestation({ surface_totale: 5 })] })],
       stations,
     )
     expect(markers).toEqual([])
