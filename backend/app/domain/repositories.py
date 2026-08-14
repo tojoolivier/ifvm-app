@@ -37,6 +37,10 @@ class CampagneRepository(ABC):
     async def delete(self, campagne_id: uuid.UUID) -> bool:
         pass
 
+    @abstractmethod
+    async def list_since(self, since: datetime | None) -> list[Campagne]:
+        pass
+
 
 class ProspectionRepository(ABC):
     @abstractmethod

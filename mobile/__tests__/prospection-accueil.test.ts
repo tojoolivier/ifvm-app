@@ -7,6 +7,7 @@ import {
   deleteProspection,
   DraftProspection,
 } from '../src/lib/prospection-repository';
+import { listCampagnesLocal } from '../src/lib/referentiel-db';
 
 import {
   loadAccueilData,
@@ -18,7 +19,6 @@ import {
 
 jest.mock('../src/lib/api-client', () => ({
   apiClient: {
-    getCampagnes: jest.fn(),
     listProspections: jest.fn(),
   },
 }));
@@ -31,12 +31,17 @@ jest.mock('../src/lib/prospection-repository', () => ({
   deleteProspection: jest.fn(),
 }));
 
+jest.mock('../src/lib/referentiel-db', () => ({
+  listCampagnesLocal: jest.fn(),
+}));
+
 const mockApiClient = jest.mocked(apiClient);
 const mockCreateDraft = jest.mocked(createDraftProspection);
 const mockCountUnsynced = jest.mocked(countUnsyncedProspections);
 const mockListDrafts = jest.mocked(listDraftProspections);
 const mockListRecent = jest.mocked(listRecentProspections);
 const mockDeleteLocal = jest.mocked(deleteProspection);
+const mockListCampagnesLocal = jest.mocked(listCampagnesLocal);
 
 const STORED_ROW: DraftProspection = {
   id: '11111111-1111-1111-1111-111111111111',
@@ -144,8 +149,8 @@ describe('pickCurrentCampagneId', () => {
 });
 
 describe('startNewProspection', () => {
-  it('creates a local draft attached to the current campagne', async () => {
-    mockApiClient.getCampagnes.mockResolvedValueOnce([
+  it('creates a local draft attached to the current campagne, read from the local référentiel', async () => {
+    mockListCampagnesLocal.mockResolvedValueOnce([
       { id: 'current', name: 'En cours', start_date: '2020-01-01', end_date: null },
     ]);
     mockCreateDraft.mockResolvedValueOnce(STORED_ROW);
@@ -165,8 +170,19 @@ describe('startNewProspection', () => {
     );
   });
 
-  it('throws when no campagne is available', async () => {
-    mockApiClient.getCampagnes.mockResolvedValueOnce([]);
+  it('does not call the network — reads only from the local référentiel cache', async () => {
+    mockListCampagnesLocal.mockResolvedValueOnce([
+      { id: 'current', name: 'En cours', start_date: '2020-01-01', end_date: null },
+    ]);
+    mockCreateDraft.mockResolvedValueOnce(STORED_ROW);
+
+    await startNewProspection({ token: 'tok', prospecteurId: 'p1' });
+
+    expect(mockApiClient.listProspections).not.toHaveBeenCalled();
+  });
+
+  it('throws when no campagne is available locally (référentiel jamais synchronisé)', async () => {
+    mockListCampagnesLocal.mockResolvedValueOnce([]);
 
     await expect(
       startNewProspection({ token: 'tok', prospecteurId: 'p1' })
@@ -175,7 +191,7 @@ describe('startNewProspection', () => {
   });
 
   it('throws when the selected campagne has not started yet (#105)', async () => {
-    mockApiClient.getCampagnes.mockResolvedValueOnce([
+    mockListCampagnesLocal.mockResolvedValueOnce([
       { id: 'future', name: 'Future', start_date: '2099-01-01', end_date: null },
     ]);
 

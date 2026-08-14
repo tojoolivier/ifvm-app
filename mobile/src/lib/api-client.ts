@@ -147,6 +147,14 @@ export interface CodeStadeSync {
   updated_at: string;
 }
 
+export interface CampagneSync {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string | null;
+  updated_at: string;
+}
+
 export interface ReferentielPullResponse {
   postes_acridiens: EntityPull<PosteAcridienSync>;
   stations_fixes: EntityPull<StationFixeSync>;
@@ -154,6 +162,7 @@ export interface ReferentielPullResponse {
   pesticides: EntityPull<PesticideSync>;
   cultures: EntityPull<CultureSync>;
   codes_stades: EntityPull<CodeStadeSync>;
+  campagnes: EntityPull<CampagneSync>;
 }
 
 /** Curseur `since` propre à chaque type d'entité référentiel (ADR-007 : rafraîchissement indépendant par table). */
@@ -313,6 +322,7 @@ export const apiClient = {
     if (cursors.pesticides) query.set('since_pesticides', cursors.pesticides);
     if (cursors.cultures) query.set('since_cultures', cursors.cultures);
     if (cursors.codes_stades) query.set('since_codes_stades', cursors.codes_stades);
+    if (cursors.campagnes) query.set('since_campagnes', cursors.campagnes);
     const qs = query.toString();
     return makeRequest<ReferentielPullResponse>(
       `/referentiel/pull${qs ? `?${qs}` : ''}`,

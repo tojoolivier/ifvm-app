@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict
@@ -92,6 +92,15 @@ class CodeStadeSyncRead(BaseModel):
     updated_at: datetime
 
 
+class CampagneSyncRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    name: str
+    start_date: date
+    end_date: date | None
+    updated_at: datetime
+
+
 T = TypeVar("T")
 
 
@@ -107,3 +116,4 @@ class ReferentielPullResponse(BaseModel):
     pesticides: EntityPull[PesticideSyncRead]
     cultures: EntityPull[CultureSyncRead]
     codes_stades: EntityPull[CodeStadeSyncRead]
+    campagnes: EntityPull[CampagneSyncRead]

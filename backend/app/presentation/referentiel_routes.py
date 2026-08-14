@@ -14,6 +14,7 @@ from app.application.referentiel_use_cases import (
 )
 from app.auth import get_current_user
 from app.database import get_db
+from app.infrastructure.campagne_repository import CampagneRepositoryImpl
 from app.infrastructure.referentiel_repository import (
     PosteAcridienRepositoryImpl,
     StationFixeRepositoryImpl,
@@ -82,6 +83,7 @@ async def pull_referentiel(
     since_pesticides: datetime | None = Query(default=None),
     since_cultures: datetime | None = Query(default=None),
     since_codes_stades: datetime | None = Query(default=None),
+    since_campagnes: datetime | None = Query(default=None),
 ):
     use_case = PullReferentiel(
         poste_repository=PosteAcridienRepositoryImpl(db),
@@ -90,6 +92,7 @@ async def pull_referentiel(
         pesticide_repository=PesticideRepositoryImpl(db),
         culture_repository=CultureRepositoryImpl(db),
         code_stade_repository=CodeStadeRepositoryImpl(db),
+        campagne_repository=CampagneRepositoryImpl(db),
     )
     cursors = ReferentielSinceCursors(
         postes_acridiens=since_postes_acridiens,
@@ -98,6 +101,7 @@ async def pull_referentiel(
         pesticides=since_pesticides,
         cultures=since_cultures,
         codes_stades=since_codes_stades,
+        campagnes=since_campagnes,
     )
     result = await use_case.execute(cursors=cursors)
 
@@ -112,4 +116,5 @@ async def pull_referentiel(
         pesticides=EntityPull(upserts=result.pesticides, server_time=result.server_time),
         cultures=EntityPull(upserts=result.cultures, server_time=result.server_time),
         codes_stades=EntityPull(upserts=result.codes_stades, server_time=result.server_time),
+        campagnes=EntityPull(upserts=result.campagnes, server_time=result.server_time),
     )

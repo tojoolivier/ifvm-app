@@ -1,6 +1,7 @@
 import { apiClient, Campagne, ProspectionRead } from './api-client';
 import { generateId } from './id';
 import { STATUT_VALIDE } from './prospection-fiche-lecture';
+import { listCampagnesLocal } from './referentiel-db';
 import {
   createDraftProspection,
   countUnsyncedProspections,
@@ -95,14 +96,15 @@ export async function startNewProspection(params: {
   console.log('[startNewProspection] typeProspection:', params.typeProspection);
 
   try {
-    console.log('[startNewProspection] Appel à apiClient.getCampagnes()...');
-    const campagnes = await apiClient.getCampagnes(params.token);
-    console.log('[startNewProspection] Campagnes récupérées:', campagnes.length);
-    console.log('[startNewProspection] Campagnes:', JSON.stringify(campagnes, null, 2));
+    console.log('[startNewProspection] Lecture des campagnes du référentiel local...');
+    const campagnes: Campagne[] = await listCampagnesLocal();
+    console.log('[startNewProspection] Campagnes locales:', campagnes.length);
 
     if (campagnes.length === 0) {
-      console.error('[startNewProspection] ❌ Aucune campagne trouvée dans la base !');
-      throw new Error('Aucune campagne disponible. Veuillez contacter l\'administrateur.');
+      console.error('[startNewProspection] ❌ Aucune campagne dans le référentiel local !');
+      throw new Error(
+        'Aucune campagne disponible hors-ligne. Synchronisez le référentiel avant de partir sur le terrain.'
+      );
     }
 
     const campagneId = pickCurrentCampagneId(campagnes);

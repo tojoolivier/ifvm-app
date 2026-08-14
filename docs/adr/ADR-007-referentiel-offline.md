@@ -26,10 +26,12 @@ Exactement la liste Niveau 1 + Niveau 2 de CONTEXT.md :
 - Pesticides disponibles
 - Types de cultures / zones cibles
 - Codes stades d'espèces (LMC : A1-A5, NSE : L1-L7)
+- Campagne en cours (id, name, start_date, end_date) — ajouté après coup (cf. Addendum
+  ci-dessous) : `startNewProspection()` en dépendait via un appel réseau direct
+  (`GET /campagnes`), rendant la création d'une fiche impossible hors-ligne.
 
-Hors périmètre pour cette décision (à traiter séparément si besoin) : stations météo,
-campagne en cours — ces éléments suivent des cycles de vie différents et n'ont pas été
-grillés ici.
+Hors périmètre pour cette décision (à traiter séparément si besoin) : stations météo — cet
+élément suit un cycle de vie différent et n'a pas été grillé ici.
 
 ## Décision 1 — Déclenchement du rafraîchissement
 
@@ -111,6 +113,7 @@ GET /referentiel/pull?since_postes_acridiens={timestamp|absent}
                       &since_pesticides={timestamp|absent}
                       &since_cultures={timestamp|absent}
                       &since_codes_stades={timestamp|absent}
+                      &since_campagnes={timestamp|absent}
 ```
 
 Un paramètre `since_<entity_type>` indépendant par type d'entité, plutôt qu'un `since`
@@ -121,12 +124,17 @@ Paramètre absent = premier pull pour cette entité, renvoie l'intégralité du 
 de l'agent pour cette seule entité.
 
 Réponse : un objet par type d'entité du périmètre (`postes_acridiens`, `stations_fixes`,
-`utilisateurs_equipe`, `pesticides`, `cultures`, `codes_stades`), chacun sous la forme
-`{ upserts: [...], server_time: timestamp }`. Un `actif=false` dans `upserts` vaut
+`utilisateurs_equipe`, `pesticides`, `cultures`, `codes_stades`, `campagnes`), chacun sous
+la forme `{ upserts: [...], server_time: timestamp }`. Un `actif=false` dans `upserts` vaut
 soft-delete côté client. `server_time` est capturé côté serveur avant l'exécution des
 requêtes (et non après), pour qu'une entité modifiée pendant le traitement de la requête
 reste au-dessus du curseur écrit localement et soit reprise au pull suivant plutôt que
 sautée silencieusement.
+
+`campagnes` déroge à la règle `actif` ci-dessus : `Campagne` ne porte pas de flag
+soft-delete côté backend (`CampagneRepository.delete()` reste un hard delete, hors périmètre
+de cet ADR — cf. Addendum). Le curseur `updated_at` suffit pour la sync incrémentale ; il n'y
+a simplement pas de mécanisme de masquage soft-delete pour cette entité pour l'instant.
 
 ### Schéma SQLite (tablette)
 
@@ -150,3 +158,35 @@ chaque table référentiel indépendamment plutôt qu'en bloc.
   (`updated_at`) et un flag `actif` pour le soft-delete (déjà présent sur `station_fixe`, à
   généraliser aux autres tables référentiel du périmètre).
 - `expo-secure-store` devient une dépendance mobile pour le stockage du refresh token.
+
+## Addendum (2026-08-14) — Extension à `campagne`
+
+`campagne` était explicitement hors périmètre à la rédaction initiale de cet ADR. En
+pratique, `startNewProspection()` (mobile/src/lib/prospection-accueil.ts) appelait
+`GET /campagnes` en direct à chaque création de brouillon, sans aucun cache local — un agent
+sans réseau au moment de démarrer une fiche ne pouvait tout simplement pas le faire, ce que
+la contrainte « 1 semaine offline » d'ADR-002 est censée couvrir pour les fiches elles-mêmes.
+
+**Décision** : `campagne` suit désormais exactement le même mécanisme que le reste du
+périmètre (Décision 1 et 2 ci-dessus) — miroir en lecture seule, sync incrémentale par
+curseur `since_campagnes`, upsert idempotent par id. `startNewProspection()` lit la campagne
+active depuis le référentiel local (`listCampagnesLocal()`) au lieu d'appeler l'API.
+
+**Sélection de la campagne active** : `pickCurrentCampagneId()` reste une fonction pure sans
+état — elle ne mémorise jamais « la campagne active », elle la recalcule à chaque appel à
+partir de la date du jour et de la liste de campagnes reçue. Deux conséquences :
+- Un changement de date bascule la sélection immédiatement et localement, sans réseau, dès
+  que le référentiel local contient déjà la campagne à activer.
+- Une nouvelle campagne créée côté serveur pendant que l'agent est hors-ligne n'apparaît
+  qu'après le prochain `pullReferentiel()` (auto à la reconnexion ou manuel) — même
+  compromis de fraîcheur que le reste du référentiel, pas un cas particulier.
+
+**`campagne_id` d'un brouillon n'est jamais réévalué après création** : une fois un brouillon
+créé, son `campagne_id` reste celui de la campagne active au moment de la création (ADR-006).
+Si la campagne active bascule pendant qu'un brouillon est encore en cours de saisie
+hors-ligne, ce brouillon garde son ancienne campagne — seule la création d'un *nouveau*
+brouillon relit la campagne active courante.
+
+**Hors périmètre de cet addendum** : le hard delete de `DELETE /campagnes/{id}`
+(`backend/app/infrastructure/campagne_repository.py`) reste incohérent avec la règle
+soft-delete de Décision 2 — non traité ici, à corriger séparément si un cas d'usage l'exige.

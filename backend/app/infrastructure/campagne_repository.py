@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -62,6 +63,13 @@ class CampagneRepositoryImpl(CampagneRepository):
         )
         await self.session.commit()
         return result.rowcount > 0
+
+    async def list_since(self, since: datetime | None) -> list[Campagne]:
+        stmt = select(CampagneModel).order_by(CampagneModel.start_date.desc())
+        if since is not None:
+            stmt = stmt.where(CampagneModel.updated_at > since)
+        result = await self.session.execute(stmt)
+        return [self._to_domain(m) for m in result.scalars().all()]
 
     def _to_domain(self, model: CampagneModel) -> Campagne:
         return Campagne(

@@ -153,6 +153,28 @@ async def test_pull_since_null_returns_full_referentiel_unscoped(
 
 
 @pytest.mark.asyncio
+async def test_pull_since_null_returns_campagnes(client: AsyncClient, auth_headers, campagne_id):
+    response = await client.get("/referentiel/pull", headers=auth_headers)
+    assert response.status_code == 200
+    body = response.json()
+    campagne_ids = {c["id"] for c in body["campagnes"]["upserts"]}
+    assert campagne_ids == {str(campagne_id)}
+
+
+@pytest.mark.asyncio
+async def test_pull_campagnes_respects_since_cursor(client: AsyncClient, auth_headers, campagne_id):
+    future = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+    response = await client.get(
+        "/referentiel/pull",
+        params={"since_campagnes": future},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["campagnes"]["upserts"] == []
+
+
+@pytest.mark.asyncio
 async def test_pull_since_timestamp_returns_only_recent_upserts(
     client: AsyncClient, auth_headers, poste_acridien
 ):
