@@ -120,4 +120,32 @@ describe('InfestationScreen', () => {
       )
     );
   });
+
+  it('classe "vol clair" via le questionnaire séquentiel et bloque la densité en saisie libre (#104)', async () => {
+    jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
+      { type_cible: 'vol_clair', surface_tot: 12, vent_de: 'N', direction_vers: 'S' } as any,
+    ]);
+
+    await render(<InfestationScreen />);
+
+    expect(screen.queryByText('Densité (/m²)')).toBeNull();
+
+    fireEvent.press(await screen.findByText('Oui')); // Q1 : vol spontané non provoqué
+    await screen.findByText('Visible seulement de près ?');
+
+    fireEvent.press((await screen.findAllByText('Oui'))[1]); // Q2 : visible seulement de près
+
+    expect(await screen.findByText('Classification : Vol clair')).toBeVisible();
+
+    fireEvent.press(await screen.findByText('Comportement  ›'));
+    fireEvent.press(await screen.findByText('Continuer  ›'));
+
+    await waitFor(() =>
+      expect(prospectionRepository.saveProspectionInfestation).toHaveBeenCalledWith(
+        'draft-123',
+        'vol_clair',
+        expect.objectContaining({ type_essaim: 'vol_clair' })
+      )
+    );
+  });
 });
