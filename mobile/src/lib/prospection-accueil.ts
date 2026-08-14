@@ -10,6 +10,7 @@ import {
   DraftProspection,
   TypeProspection,
 } from './prospection-repository';
+import { validateProspectionDate } from './prospection-validation';
 
 export interface AccueilViewModel {
   unsyncedCount: number;
@@ -121,12 +122,24 @@ export async function startNewProspection(params: {
 
     console.log('[startNewProspection] ✅ Campagne sélectionnée:', selectedCampagneId);
 
+    const dateProspection = new Date().toISOString().slice(0, 10);
+    const campagneSelectionnee = campagnes.find((c) => c.id === selectedCampagneId);
+    if (campagneSelectionnee) {
+      const { blocages } = validateProspectionDate({
+        dateProspection,
+        campagneStartDate: campagneSelectionnee.start_date,
+      });
+      if (blocages.length > 0) {
+        throw new Error(blocages[0]);
+      }
+    }
+
     const draft = await createDraftProspection({
       id: generateId(),
       typeProspection: params.typeProspection ?? 'intensive',
       campagneId: selectedCampagneId,
       prospecteurId: params.prospecteurId,
-      dateProspection: new Date().toISOString().slice(0, 10),
+      dateProspection,
       region: null,
       district: null,
       commune: null,

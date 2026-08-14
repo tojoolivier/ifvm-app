@@ -41,6 +41,25 @@ const MADAGASCAR_BBOX = {
 /** Précision GPS au-delà de laquelle la position est jugée inexploitable sur le terrain. */
 const GPS_ACCURACY_SEUIL_BLOQUANT_M = 50;
 
+export interface ProspectionDateValidationInput {
+  dateProspection: string;
+  campagneStartDate: string;
+}
+
+/** Rejette une fiche dont la date est antérieure au début de la mission (§2.1 point 3 du manuel). */
+export function validateProspectionDate(input: ProspectionDateValidationInput): ValidationResult {
+  const blocages: string[] = [];
+  const avertissements: string[] = [];
+
+  if (input.dateProspection < input.campagneStartDate) {
+    blocages.push(
+      `Date de prospection (${input.dateProspection}) antérieure au début de la mission (${input.campagneStartDate}).`
+    );
+  }
+
+  return { blocages, avertissements };
+}
+
 export function validateGpsPosition(input: GpsPositionValidationInput): ValidationResult {
   const blocages: string[] = [];
   const avertissements: string[] = [];

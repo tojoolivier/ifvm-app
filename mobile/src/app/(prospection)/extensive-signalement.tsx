@@ -43,8 +43,12 @@ export default function ExtensiveSignalementScreen() {
       });
       await hydrateFromDraft(draft.id);
       router.replace({ pathname: '/(prospection)/extensive-reference' as any, params: { draftId: draft.id } });
-    } catch {
-      setError('Impossible de démarrer la vérification (campagne introuvable ou hors-ligne).');
+    } catch (e) {
+      setError(
+        e instanceof Error && e.message
+          ? e.message
+          : 'Impossible de démarrer la vérification (campagne introuvable ou hors-ligne).'
+      );
     } finally {
       setIsCreating(false);
     }
