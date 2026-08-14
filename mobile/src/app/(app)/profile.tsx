@@ -9,6 +9,7 @@ import { storage } from '@/lib/storage';
 import { apiClient } from '@/lib/api-client';
 import { pullReferentiel, resetReferentielSyncCursors } from '@/lib/referentiel-sync';
 import { useDebugStore } from '@/lib/debug-store';
+import { useErrorLogStore } from '@/lib/error-log-store';
 
 const IFVM_GREEN = '#1B5E1B';
 const IFVM_GREEN_BG = '#E8F5E9';
@@ -28,6 +29,7 @@ export default function ProfileScreen() {
   const token = useAuthStore((s) => s.token);
   const debugEnabled = useDebugStore((s) => s.enabled);
   const setDebugEnabled = useDebugStore((s) => s.setEnabled);
+  const logError = useErrorLogStore((s) => s.addEntry);
 
   const [locationEnabled, setLocationEnabled] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
@@ -74,7 +76,12 @@ export default function ProfileScreen() {
       await resetReferentielSyncCursors();
       await pullReferentiel(token);
       Alert.alert('Succès', 'Référentiel synchronisé.');
-    } catch {
+    } catch (error) {
+      logError({
+        message: error instanceof Error ? error.message : 'Erreur inconnue lors de la synchronisation du référentiel',
+        stack: error instanceof Error ? error.stack ?? null : null,
+        screen: 'ProfileScreen.handleForcePull',
+      });
       Alert.alert('Erreur', 'Impossible de synchroniser le référentiel pour le moment.');
     } finally {
       setIsSyncing(false);
