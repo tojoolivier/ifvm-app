@@ -15,6 +15,8 @@ from app.domain.referentiel import StationNotFoundError
 from app.domain.repositories import ProspectionRepository
 from app.infrastructure.prospection_model import (
     ProspectionCaptureModel,
+    ProspectionInfestationImagoModel,
+    ProspectionInfestationLarveModel,
     ProspectionInfestationModel,
     ProspectionModel,
     ProspectionPopulationModel,
@@ -32,7 +34,12 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             .options(
                 selectinload(ProspectionModel.populations),
                 selectinload(ProspectionModel.captures),
-                selectinload(ProspectionModel.infestations),
+                selectinload(ProspectionModel.infestations).selectinload(
+                    ProspectionInfestationModel.imago
+                ),
+                selectinload(ProspectionModel.infestations).selectinload(
+                    ProspectionInfestationModel.larve
+                ),
             )
         )
         model = result.scalar_one_or_none()
@@ -51,7 +58,12 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         stmt = select(ProspectionModel).options(
             selectinload(ProspectionModel.populations),
             selectinload(ProspectionModel.captures),
-            selectinload(ProspectionModel.infestations),
+            selectinload(ProspectionModel.infestations).selectinload(
+                ProspectionInfestationModel.imago
+            ),
+            selectinload(ProspectionModel.infestations).selectinload(
+                ProspectionInfestationModel.larve
+            ),
         )
         if type_prospection is not None:
             stmt = stmt.where(ProspectionModel.type_prospection == type_prospection)
@@ -169,56 +181,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         ]
 
         model.infestations = [
-            ProspectionInfestationModel(
-                id=i.id,
-                prospection_id=prospection.id,
-                espece=i.espece,
-                type_cible=i.type_cible,
-                taille_min=i.taille_min,
-                taille_max=i.taille_max,
-                taille_moy=i.taille_moy,
-                surface_tot=i.surface_tot,
-                densite_min=i.densite_min,
-                densite_max=i.densite_max,
-                densite_moy=i.densite_moy,
-                interdistance=i.interdistance,
-                comportement=i.comportement,
-                direction_de=i.direction_de,
-                direction_vers=i.direction_vers,
-                vent_de=i.vent_de,
-                vent_vitesse=i.vent_vitesse,
-                surf_infestee_pourcent=i.surf_infestee_pourcent,
-                # ==========================================
-                # NOUVEAUX CHAMPS - Imagos (B)
-                # ==========================================
-                pullulation_nb=i.pullulation_nb,
-                taille_long=i.taille_long,
-                taille_large=i.taille_large,
-                taille_epaisseur=i.taille_epaisseur,
-                essaim_en_vol=i.essaim_en_vol,
-                essaim_pose=i.essaim_pose,
-                type_essaim=i.type_essaim,
-                heure_observation=i.heure_observation,
-                densite_en_vol=i.densite_en_vol,
-                dimension_ha=i.dimension_ha,
-                # ==========================================
-                # NOUVEAUX CHAMPS - Larves (C)
-                # ==========================================
-                nb_taches_bandes=i.nb_taches_bandes,
-                interdistance_m=i.interdistance_m,
-                interdistance_min=i.interdistance_min,
-                interdistance_max=i.interdistance_max,
-                interdistance_moy=i.interdistance_moy,
-                surface_contaminee_ha=i.surface_contaminee_ha,
-                type_larve=i.type_larve,
-                stade_dominant=i.stade_dominant,
-                taille_groupe_m2=i.taille_groupe_m2,
-                front_longueur_m=i.front_longueur_m,
-                front_largeur_m=i.front_largeur_m,
-                densite_max_front=i.densite_max_front,
-                densite_moy_arriere_front=i.densite_moy_arriere_front,
-            )
-            for i in prospection.infestations
+            self._infestation_to_model(i, prospection.id) for i in prospection.infestations
         ]
 
         self.session.add(model)
@@ -294,52 +257,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         )
 
         for i in prospection.infestations:
-            new_infestation = ProspectionInfestationModel(
-                id=i.id,
-                prospection_id=prospection.id,
-                espece=i.espece,
-                type_cible=i.type_cible,
-                taille_min=i.taille_min,
-                taille_max=i.taille_max,
-                taille_moy=i.taille_moy,
-                surface_tot=i.surface_tot,
-                densite_min=i.densite_min,
-                densite_max=i.densite_max,
-                densite_moy=i.densite_moy,
-                interdistance=i.interdistance,
-                comportement=i.comportement,
-                direction_de=i.direction_de,
-                direction_vers=i.direction_vers,
-                vent_de=i.vent_de,
-                vent_vitesse=i.vent_vitesse,
-                # ==========================================
-                # NOUVEAUX CHAMPS - Imagos (B)
-                # ==========================================
-                pullulation_nb=i.pullulation_nb,
-                taille_long=i.taille_long,
-                taille_large=i.taille_large,
-                taille_epaisseur=i.taille_epaisseur,
-                essaim_en_vol=i.essaim_en_vol,
-                essaim_pose=i.essaim_pose,
-                type_essaim=i.type_essaim,
-                heure_observation=i.heure_observation,
-                densite_en_vol=i.densite_en_vol,
-                dimension_ha=i.dimension_ha,
-                # ==========================================
-                # NOUVEAUX CHAMPS - Larves (C)
-                # ==========================================
-                nb_taches_bandes=i.nb_taches_bandes,
-                interdistance_m=i.interdistance_m,
-                surface_contaminee_ha=i.surface_contaminee_ha,
-                type_larve=i.type_larve,
-                stade_dominant=i.stade_dominant,
-                taille_groupe_m2=i.taille_groupe_m2,
-                front_longueur_m=i.front_longueur_m,
-                front_largeur_m=i.front_largeur_m,
-                densite_max_front=i.densite_max_front,
-                densite_moy_arriere_front=i.densite_moy_arriere_front,
-            )
-            self.session.add(new_infestation)
+            self.session.add(self._infestation_to_model(i, prospection.id))
 
         await self.session.commit()
         return await self.get_by_id(model.id)
@@ -350,6 +268,178 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         )
         await self.session.commit()
         return result.rowcount > 0
+
+    def _infestation_to_model(
+        self, i: ProspectionInfestation, prospection_id: uuid.UUID
+    ) -> ProspectionInfestationModel:
+        model = ProspectionInfestationModel(
+            id=i.id,
+            prospection_id=prospection_id,
+            espece=i.espece,
+            type_cible=i.type_cible,
+            taille_min=i.taille_min,
+            taille_max=i.taille_max,
+            taille_moy=i.taille_moy,
+            surface_tot=i.surface_tot,
+            densite_min=i.densite_min,
+            densite_max=i.densite_max,
+            densite_moy=i.densite_moy,
+            interdistance=i.interdistance,
+            comportement=i.comportement,
+            direction_de=i.direction_de,
+            direction_vers=i.direction_vers,
+            vent_de=i.vent_de,
+            vent_vitesse=i.vent_vitesse,
+        )
+
+        imago_fields = (
+            i.pullulation_nb,
+            i.taille_long,
+            i.taille_large,
+            i.taille_epaisseur,
+            i.essaim_en_vol,
+            i.essaim_pose,
+            i.type_essaim,
+            i.heure_observation,
+            i.densite_en_vol,
+            i.dimension_ha,
+        )
+        if any(v is not None for v in imago_fields):
+            model.imago = ProspectionInfestationImagoModel(
+                infestation_id=i.id,
+                pullulation_nb=i.pullulation_nb,
+                taille_long=i.taille_long,
+                taille_large=i.taille_large,
+                taille_epaisseur=i.taille_epaisseur,
+                essaim_en_vol=i.essaim_en_vol,
+                essaim_pose=i.essaim_pose,
+                type_essaim=i.type_essaim,
+                heure_observation=i.heure_observation,
+                densite_en_vol=i.densite_en_vol,
+                dimension_ha=i.dimension_ha,
+            )
+
+        larve_fields = (
+            i.nb_taches_bandes,
+            i.interdistance_m,
+            i.interdistance_min,
+            i.interdistance_max,
+            i.interdistance_moy,
+            i.surface_contaminee_ha,
+            i.surf_infestee_pourcent,
+            i.type_larve,
+            i.stade_dominant,
+            i.taille_groupe_m2,
+            i.front_longueur_m,
+            i.front_largeur_m,
+            i.densite_max_front,
+            i.densite_moy_arriere_front,
+        )
+        if any(v is not None for v in larve_fields):
+            model.larve = ProspectionInfestationLarveModel(
+                infestation_id=i.id,
+                nb_taches_bandes=i.nb_taches_bandes,
+                interdistance_m=i.interdistance_m,
+                interdistance_min=i.interdistance_min,
+                interdistance_max=i.interdistance_max,
+                interdistance_moy=i.interdistance_moy,
+                surface_contaminee_ha=i.surface_contaminee_ha,
+                surf_infestee_pourcent=i.surf_infestee_pourcent,
+                type_larve=i.type_larve,
+                stade_dominant=i.stade_dominant,
+                taille_groupe_m2=i.taille_groupe_m2,
+                front_longueur_m=i.front_longueur_m,
+                front_largeur_m=i.front_largeur_m,
+                densite_max_front=i.densite_max_front,
+                densite_moy_arriere_front=i.densite_moy_arriere_front,
+            )
+
+        return model
+
+    def _infestation_to_domain(self, i: ProspectionInfestationModel) -> ProspectionInfestation:
+        imago = i.imago
+        larve = i.larve
+        return ProspectionInfestation(
+            id=i.id,
+            prospection_id=i.prospection_id,
+            espece=i.espece,
+            type_cible=i.type_cible,
+            taille_min=float(i.taille_min) if i.taille_min is not None else None,
+            taille_max=float(i.taille_max) if i.taille_max is not None else None,
+            taille_moy=float(i.taille_moy) if i.taille_moy is not None else None,
+            surface_tot=float(i.surface_tot) if i.surface_tot is not None else None,
+            densite_min=float(i.densite_min) if i.densite_min is not None else None,
+            densite_max=float(i.densite_max) if i.densite_max is not None else None,
+            densite_moy=float(i.densite_moy) if i.densite_moy is not None else None,
+            interdistance=float(i.interdistance) if i.interdistance is not None else None,
+            comportement=i.comportement,
+            direction_de=i.direction_de,
+            direction_vers=i.direction_vers,
+            vent_de=i.vent_de,
+            vent_vitesse=float(i.vent_vitesse) if i.vent_vitesse is not None else None,
+            surf_infestee_pourcent=float(larve.surf_infestee_pourcent)
+            if larve is not None and larve.surf_infestee_pourcent is not None
+            else None,
+            # ==========================================
+            # NOUVEAUX CHAMPS - Imagos (B)
+            # ==========================================
+            pullulation_nb=imago.pullulation_nb if imago is not None else None,
+            taille_long=float(imago.taille_long)
+            if imago is not None and imago.taille_long is not None
+            else None,
+            taille_large=float(imago.taille_large)
+            if imago is not None and imago.taille_large is not None
+            else None,
+            taille_epaisseur=float(imago.taille_epaisseur)
+            if imago is not None and imago.taille_epaisseur is not None
+            else None,
+            essaim_en_vol=imago.essaim_en_vol if imago is not None else None,
+            essaim_pose=imago.essaim_pose if imago is not None else None,
+            type_essaim=imago.type_essaim if imago is not None else None,
+            heure_observation=imago.heure_observation if imago is not None else None,
+            densite_en_vol=float(imago.densite_en_vol)
+            if imago is not None and imago.densite_en_vol is not None
+            else None,
+            dimension_ha=float(imago.dimension_ha)
+            if imago is not None and imago.dimension_ha is not None
+            else None,
+            # ==========================================
+            # NOUVEAUX CHAMPS - Larves (C)
+            # ==========================================
+            nb_taches_bandes=larve.nb_taches_bandes if larve is not None else None,
+            interdistance_m=float(larve.interdistance_m)
+            if larve is not None and larve.interdistance_m is not None
+            else None,
+            interdistance_min=float(larve.interdistance_min)
+            if larve is not None and larve.interdistance_min is not None
+            else None,
+            interdistance_max=float(larve.interdistance_max)
+            if larve is not None and larve.interdistance_max is not None
+            else None,
+            interdistance_moy=float(larve.interdistance_moy)
+            if larve is not None and larve.interdistance_moy is not None
+            else None,
+            surface_contaminee_ha=float(larve.surface_contaminee_ha)
+            if larve is not None and larve.surface_contaminee_ha is not None
+            else None,
+            type_larve=larve.type_larve if larve is not None else None,
+            stade_dominant=larve.stade_dominant if larve is not None else None,
+            taille_groupe_m2=float(larve.taille_groupe_m2)
+            if larve is not None and larve.taille_groupe_m2 is not None
+            else None,
+            front_longueur_m=float(larve.front_longueur_m)
+            if larve is not None and larve.front_longueur_m is not None
+            else None,
+            front_largeur_m=float(larve.front_largeur_m)
+            if larve is not None and larve.front_largeur_m is not None
+            else None,
+            densite_max_front=float(larve.densite_max_front)
+            if larve is not None and larve.densite_max_front is not None
+            else None,
+            densite_moy_arriere_front=float(larve.densite_moy_arriere_front)
+            if larve is not None and larve.densite_moy_arriere_front is not None
+            else None,
+        )
 
     def _to_domain(self, model: ProspectionModel) -> Prospection:
         return Prospection(
@@ -463,82 +553,5 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                 )
                 for c in model.captures
             ],
-            infestations=[
-                ProspectionInfestation(
-                    id=i.id,
-                    prospection_id=i.prospection_id,
-                    espece=i.espece,
-                    type_cible=i.type_cible,
-                    taille_min=float(i.taille_min) if i.taille_min is not None else None,
-                    taille_max=float(i.taille_max) if i.taille_max is not None else None,
-                    taille_moy=float(i.taille_moy) if i.taille_moy is not None else None,
-                    surface_tot=float(i.surface_tot) if i.surface_tot is not None else None,
-                    densite_min=float(i.densite_min) if i.densite_min is not None else None,
-                    densite_max=float(i.densite_max) if i.densite_max is not None else None,
-                    densite_moy=float(i.densite_moy) if i.densite_moy is not None else None,
-                    interdistance=float(i.interdistance) if i.interdistance is not None else None,
-                    comportement=i.comportement,
-                    direction_de=i.direction_de,
-                    direction_vers=i.direction_vers,
-                    vent_de=i.vent_de,
-                    vent_vitesse=float(i.vent_vitesse) if i.vent_vitesse is not None else None,
-                    surf_infestee_pourcent=float(i.surf_infestee_pourcent)
-                    if i.surf_infestee_pourcent is not None
-                    else None,
-                    # ==========================================
-                    # NOUVEAUX CHAMPS - Imagos (B)
-                    # ==========================================
-                    pullulation_nb=i.pullulation_nb,
-                    taille_long=float(i.taille_long) if i.taille_long is not None else None,
-                    taille_large=float(i.taille_large) if i.taille_large is not None else None,
-                    taille_epaisseur=float(i.taille_epaisseur)
-                    if i.taille_epaisseur is not None
-                    else None,
-                    essaim_en_vol=i.essaim_en_vol,
-                    essaim_pose=i.essaim_pose,
-                    type_essaim=i.type_essaim,
-                    heure_observation=i.heure_observation,
-                    densite_en_vol=float(i.densite_en_vol)
-                    if i.densite_en_vol is not None
-                    else None,
-                    dimension_ha=float(i.dimension_ha) if i.dimension_ha is not None else None,
-                    # ==========================================
-                    # NOUVEAUX CHAMPS - Larves (C)
-                    # ==========================================
-                    nb_taches_bandes=i.nb_taches_bandes,
-                    interdistance_m=float(i.interdistance_m)
-                    if i.interdistance_m is not None
-                    else None,
-                    interdistance_min=float(i.interdistance_min)
-                    if i.interdistance_min is not None
-                    else None,
-                    interdistance_max=float(i.interdistance_max)
-                    if i.interdistance_max is not None
-                    else None,
-                    interdistance_moy=float(i.interdistance_moy)
-                    if i.interdistance_moy is not None
-                    else None,
-                    surface_contaminee_ha=float(i.surface_contaminee_ha)
-                    if i.surface_contaminee_ha is not None
-                    else None,
-                    type_larve=i.type_larve,
-                    stade_dominant=i.stade_dominant,
-                    taille_groupe_m2=float(i.taille_groupe_m2)
-                    if i.taille_groupe_m2 is not None
-                    else None,
-                    front_longueur_m=float(i.front_longueur_m)
-                    if i.front_longueur_m is not None
-                    else None,
-                    front_largeur_m=float(i.front_largeur_m)
-                    if i.front_largeur_m is not None
-                    else None,
-                    densite_max_front=float(i.densite_max_front)
-                    if i.densite_max_front is not None
-                    else None,
-                    densite_moy_arriere_front=float(i.densite_moy_arriere_front)
-                    if i.densite_moy_arriere_front is not None
-                    else None,
-                )
-                for i in model.infestations
-            ],
+            infestations=[self._infestation_to_domain(i) for i in model.infestations],
         )
