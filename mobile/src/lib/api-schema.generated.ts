@@ -780,6 +780,8 @@ export interface components {
             heure_observation?: string | null;
             /** Densite En Vol */
             densite_en_vol?: number | null;
+            /** Dimension Ha */
+            dimension_ha?: number | null;
             /** Nb Taches Bandes */
             nb_taches_bandes?: number | null;
             /** Interdistance M */
@@ -862,6 +864,8 @@ export interface components {
             heure_observation?: string | null;
             /** Densite En Vol */
             densite_en_vol?: number | null;
+            /** Dimension Ha */
+            dimension_ha?: number | null;
             /** Nb Taches Bandes */
             nb_taches_bandes?: number | null;
             /** Interdistance M */

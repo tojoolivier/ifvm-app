@@ -277,6 +277,7 @@ class ProspectionInfestationModel(Base):
     type_essaim: Mapped[str | None] = mapped_column(Text(), nullable=True)
     heure_observation: Mapped[str | None] = mapped_column(Text(), nullable=True)
     densite_en_vol: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
+    dimension_ha: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
 
     # ==========================================
     # NOUVEAUX CHAMPS - Larves (C)
