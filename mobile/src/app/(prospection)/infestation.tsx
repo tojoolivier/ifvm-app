@@ -59,6 +59,7 @@ interface FormationForm {
   essaimComportement: 'vol' | 'pose' | null;
   heureObservation: string;
   densiteEnVol: string;
+  dimensionHa: string;
   aerialVolSpontane: boolean | null;
   aerialVisibleDePres: boolean | null;
   aerialMasseSombre: boolean | null;
@@ -112,6 +113,7 @@ function emptyFormation(): FormationForm {
     essaimComportement: null,
     heureObservation: '',
     densiteEnVol: '',
+    dimensionHa: '',
     aerialVolSpontane: null,
     aerialVisibleDePres: null,
     aerialMasseSombre: null,
@@ -147,6 +149,7 @@ function formFromRow(row: InfestationRow | undefined): FormationForm {
     essaimComportement: row.essaim_en_vol ? 'vol' : row.essaim_pose ? 'pose' : null,
     heureObservation: row.heure_observation ?? '',
     densiteEnVol: row.densite_en_vol != null ? String(row.densite_en_vol) : '',
+    dimensionHa: row.dimension_ha != null ? String(row.dimension_ha) : '',
     aerialVolSpontane: null,
     aerialVisibleDePres: null,
     aerialMasseSombre: null,
@@ -203,6 +206,8 @@ function rowFromForm(typeCible: string, form: FormationForm): InfestationRow {
     heure_observation:
       typeCible === 'vol_clair' || typeCible === 'essaim' ? form.heureObservation || null : null,
     densite_en_vol: typeCible === 'essaim' ? numOrNull(form.densiteEnVol) : null,
+    dimension_ha:
+      typeCible === 'vol_clair' || typeCible === 'essaim' ? numOrNull(form.dimensionHa) : null,
   };
 }
 
@@ -853,6 +858,18 @@ export default function InfestationScreen() {
                       placeholder="hh:mm"
                       keyboardType="numbers-and-punctuation"
                       maxLength={5}
+                      style={styles.infoBoxInput}
+                    />
+                  </View>
+
+                  <Text style={styles.fieldGroupLabel}>Dimensions de la formation (ha)</Text>
+                  <View style={styles.infoBox}>
+                    <Text style={styles.infoBoxLabel}>ha</Text>
+                    <TextInput
+                      value={form.dimensionHa}
+                      onChangeText={(value) => setField('dimensionHa', value)}
+                      placeholder="Surface estimée"
+                      keyboardType="decimal-pad"
                       style={styles.infoBoxInput}
                     />
                   </View>

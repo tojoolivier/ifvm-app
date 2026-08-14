@@ -225,6 +225,7 @@ export interface InfestationRow {
   densite_moy_arriere_front: number | null;
   heure_observation: string | null;
   densite_en_vol: number | null;
+  dimension_ha: number | null;
 }
 
 // ==========================================
@@ -290,7 +291,8 @@ const INFESTATION_COLUMNS = `
   densite_max_front,
   densite_moy_arriere_front,
   heure_observation,
-  densite_en_vol
+  densite_en_vol,
+  dimension_ha
 `;
 
 // ==========================================
@@ -1124,6 +1126,7 @@ export async function saveProspectionInfestation(
     row.densite_moy_arriere_front,
     row.heure_observation,
     row.densite_en_vol,
+    row.dimension_ha,
   ];
 
   if (existing) {
@@ -1166,7 +1169,8 @@ export async function saveProspectionInfestation(
         densite_max_front = ?,
         densite_moy_arriere_front = ?,
         heure_observation = ?,
-        densite_en_vol = ?
+        densite_en_vol = ?,
+        dimension_ha = ?
        WHERE id = ?`,
       [...values, existing.id]
     );
@@ -1215,13 +1219,14 @@ export async function saveProspectionInfestation(
       densite_max_front,
       densite_moy_arriere_front,
       heure_observation,
-      densite_en_vol
+      densite_en_vol,
+      dimension_ha
     )
     VALUES (
       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?, ?, ?
+      ?, ?, ?, ?, ?, ?, ?, ?, ?
     )`,
     [
       generateId(),

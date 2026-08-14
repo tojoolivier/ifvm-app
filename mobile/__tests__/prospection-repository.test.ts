@@ -717,6 +717,7 @@ describe('saveProspectionInfestation', () => {
     densite_moy_arriere_front: null,
     heure_observation: null,
     densite_en_vol: null,
+    dimension_ha: null,
   };
 
   it('inserts a new row when none exists for this prospection + type_cible', async () => {
@@ -743,6 +744,7 @@ describe('saveProspectionInfestation', () => {
         null, 'N', 'S', 10,
         null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
         null, null, null, null, null, null,
+        null,
         null,
         null,
         'existing-id',

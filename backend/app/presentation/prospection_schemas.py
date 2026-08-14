@@ -116,6 +116,7 @@ class InfestationRead(BaseModel):
     type_essaim: str | None = None
     heure_observation: str | None = None
     densite_en_vol: float | None = None
+    dimension_ha: float | None = None
 
     # ==========================================
     # NOUVEAUX CHAMPS - Larves (C)
@@ -205,6 +206,7 @@ class InfestationCreate(BaseModel):
     type_essaim: TypeEssaim | None = None
     heure_observation: str | None = None
     densite_en_vol: float | None = Field(None, ge=0)
+    dimension_ha: float | None = Field(None, ge=0)
 
     # ==========================================
     # NOUVEAUX CHAMPS - Larves (C)

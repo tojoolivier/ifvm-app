@@ -200,6 +200,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                 type_essaim=i.type_essaim,
                 heure_observation=i.heure_observation,
                 densite_en_vol=i.densite_en_vol,
+                dimension_ha=i.dimension_ha,
                 # ==========================================
                 # NOUVEAUX CHAMPS - Larves (C)
                 # ==========================================
@@ -323,6 +324,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                 type_essaim=i.type_essaim,
                 heure_observation=i.heure_observation,
                 densite_en_vol=i.densite_en_vol,
+                dimension_ha=i.dimension_ha,
                 # ==========================================
                 # NOUVEAUX CHAMPS - Larves (C)
                 # ==========================================
@@ -499,6 +501,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                     densite_en_vol=float(i.densite_en_vol)
                     if i.densite_en_vol is not None
                     else None,
+                    dimension_ha=float(i.dimension_ha) if i.dimension_ha is not None else None,
                     # ==========================================
                     # NOUVEAUX CHAMPS - Larves (C)
                     # ==========================================
