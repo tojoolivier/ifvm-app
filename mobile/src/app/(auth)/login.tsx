@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
+import { ApiError } from '@/lib/api-client';
+import { useErrorStore } from '@/lib/error-store';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isSmallScreen = SCREEN_WIDTH < 380;
@@ -27,6 +29,7 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const login = useAuthStore((s) => s.login);
+  const showError = useErrorStore((s) => s.showError);
 
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim()) {
@@ -39,7 +42,20 @@ export default function LoginScreen() {
       await login(email.trim(), password);
     } catch (e) {
       console.error('[login] login() threw:', e);
-      setError('Identifiants incorrects. Veuillez réessayer.');
+      if (e instanceof ApiError && e.status === 401) {
+        // Identifiants refusés par le backend : erreur de saisie, affichée inline dans le formulaire.
+        setError(e.message || 'Identifiants incorrects. Veuillez réessayer.');
+      } else {
+        // Panne réseau/serveur : ce n'est pas la faute de l'utilisateur, on le signale via la
+        // bannière globale avec un bouton "Réessayer" plutôt que de l'accuser d'une mauvaise saisie.
+        showError({
+          message:
+            e instanceof ApiError
+              ? e.message
+              : 'Impossible de contacter le serveur. Vérifiez votre connexion.',
+          retry: handleSubmit,
+        });
+      }
     } finally {
       setIsLoading(false);
     }

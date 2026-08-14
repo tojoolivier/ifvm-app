@@ -206,6 +206,17 @@ function extractErrorMessage(errorData: unknown): string | null {
   return null;
 }
 
+/** Erreur HTTP typée — porte le status pour que les appelants distinguent 401 (identifiants) d'une autre erreur (réseau/serveur). */
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
 const makeRequest = async <T>(
   endpoint: string,
   options: RequestInit = {},
@@ -264,7 +275,10 @@ const makeRequest = async <T>(
       requestBody: typeof options.body === 'string' ? options.body : null,
       responseBody: await responseClone.text().catch(() => null),
     });
-    throw new Error(extractErrorMessage(errorData) || `HTTP error! status: ${response.status}`);
+    throw new ApiError(
+      extractErrorMessage(errorData) || `HTTP error! status: ${response.status}`,
+      response.status
+    );
   }
 
   if (response.status === 204) {
