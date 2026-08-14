@@ -60,6 +60,8 @@ interface FormationForm {
   heureObservation: string;
   densiteEnVol: string;
   dimensionHa: string;
+  surfaceContamineeHa: string;
+  surfInfesteePourcent: string;
   aerialVolSpontane: boolean | null;
   aerialVisibleDePres: boolean | null;
   aerialMasseSombre: boolean | null;
@@ -114,6 +116,8 @@ function emptyFormation(): FormationForm {
     heureObservation: '',
     densiteEnVol: '',
     dimensionHa: '',
+    surfaceContamineeHa: '',
+    surfInfesteePourcent: '',
     aerialVolSpontane: null,
     aerialVisibleDePres: null,
     aerialMasseSombre: null,
@@ -150,6 +154,8 @@ function formFromRow(row: InfestationRow | undefined): FormationForm {
     heureObservation: row.heure_observation ?? '',
     densiteEnVol: row.densite_en_vol != null ? String(row.densite_en_vol) : '',
     dimensionHa: row.dimension_ha != null ? String(row.dimension_ha) : '',
+    surfaceContamineeHa: row.surface_contaminee_ha != null ? String(row.surface_contaminee_ha) : '',
+    surfInfesteePourcent: row.surf_infestee_pourcent != null ? String(row.surf_infestee_pourcent) : '',
     aerialVolSpontane: null,
     aerialVisibleDePres: null,
     aerialMasseSombre: null,
@@ -194,9 +200,9 @@ function rowFromForm(typeCible: string, form: FormationForm): InfestationRow {
       typeCible === 'vol_clair' || typeCible === 'essaim' ? computeAerialClassification(form) : null,
     nb_taches_bandes: typeCible === 'bande_larvaire' ? numOrNull(form.nbTachesBandes) : null,
     interdistance_m: null,
-    surface_contaminee_ha: null,
+    surface_contaminee_ha: typeCible === 'essaim' ? numOrNull(form.surfaceContamineeHa) : null,
     type_larve: null,
-    surf_infestee_pourcent: null,
+    surf_infestee_pourcent: typeCible === 'essaim' ? numOrNull(form.surfInfesteePourcent) : null,
     stade_dominant: form.stadeDominant,
     taille_groupe_m2: numOrNull(form.tailleGroupeM2),
     front_longueur_m: numOrNull(form.frontLongueurM),
@@ -883,6 +889,30 @@ export default function InfestationScreen() {
                           value={form.densiteEnVol}
                           onChangeText={(value) => setField('densiteEnVol', value)}
                           placeholder="Si mesurable"
+                          keyboardType="decimal-pad"
+                          style={styles.infoBoxInput}
+                        />
+                      </View>
+
+                      <Text style={styles.fieldGroupLabel}>Surface contaminée (ha)</Text>
+                      <View style={styles.infoBox}>
+                        <Text style={styles.infoBoxLabel}>ha</Text>
+                        <TextInput
+                          value={form.surfaceContamineeHa}
+                          onChangeText={(value) => setField('surfaceContamineeHa', value)}
+                          placeholder="Surface contaminée"
+                          keyboardType="decimal-pad"
+                          style={styles.infoBoxInput}
+                        />
+                      </View>
+
+                      <Text style={styles.fieldGroupLabel}>Dont infestée (%)</Text>
+                      <View style={styles.infoBox}>
+                        <Text style={styles.infoBoxLabel}>%</Text>
+                        <TextInput
+                          value={form.surfInfesteePourcent}
+                          onChangeText={(value) => setField('surfInfesteePourcent', value)}
+                          placeholder="Part infestée"
                           keyboardType="decimal-pad"
                           style={styles.infoBoxInput}
                         />
