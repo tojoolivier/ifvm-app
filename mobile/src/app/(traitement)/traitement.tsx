@@ -32,7 +32,8 @@ const DIRECTIONS_VENT = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
 
 export default function TraitementScreen() {
   const router = useRouter();
-  const { traitementId, isValidationView } = useLocalSearchParams<{ traitementId: string; isValidationView?: string }>();
+  const { traitementId, isValidationView, origineId } =
+    useLocalSearchParams<{ traitementId: string; isValidationView?: string; origineId?: string }>();
   const store = useTraitementCaptureStore();
   const readOnly = isValidationView === '1';
 
@@ -101,6 +102,12 @@ export default function TraitementScreen() {
           essence_litres: draft.terrestre.essence_litres,
           nb_piles: draft.terrestre.nb_piles,
         });
+        // Présélection reprise : uniquement sur une fiche fraîchement amorcée
+        // depuis "Zones à reprendre" (draft.terrestre.reprise_traitement pas
+        // encore renseigné) — n'écrase jamais un choix déjà enregistré.
+        if (origineId && !draft.terrestre.reprise_traitement && !draft.terrestre.traitement_origine_id) {
+          store.updateTerrestre({ repriseTraitement: true, traitementOrigineId: origineId });
+        }
         if (produits.length === 0) {
           setProduits(
             draft.terrestre.produits.length > 0

@@ -9,9 +9,8 @@ import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes
  * Écran "Zones à reprendre" (Lot 3) — fiches terrestres validées dont la
  * surface restante est encore positive (`listReprenableTraitements`,
  * jusqu'ici inutilisée). Amorce une nouvelle fiche sur la même prospection
- * d'origine ; la présélection automatique de la reprise dans l'écran C
- * (`traitement.tsx`) reste manuelle pour l'instant (hors périmètre de cette
- * tranche).
+ * d'origine, avec `origineId` propagé jusqu'à l'écran C (`traitement.tsx`)
+ * pour présélectionner automatiquement la reprise sur cette fiche.
  */
 export default function TraitementZonesAReprendreScreen() {
   const router = useRouter();
@@ -28,7 +27,7 @@ export default function TraitementZonesAReprendreScreen() {
   const openFiche = (fiche: DraftTraitementRow) => {
     router.push({
       pathname: '/(traitement)/references' as any,
-      params: { prospectionId: fiche.prospection_id },
+      params: { prospectionId: fiche.prospection_id, origineId: fiche.id },
     });
   };
 

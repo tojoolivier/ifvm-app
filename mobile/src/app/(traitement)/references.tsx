@@ -43,8 +43,8 @@ function formatDateFr(iso: string | null | undefined): string | null {
 
 export default function ReferencesScreen() {
   const router = useRouter();
-  const { prospectionId: routeProspectionId, traitementId: routeTraitementId, isValidationView } =
-    useLocalSearchParams<{ prospectionId?: string; traitementId?: string; isValidationView?: string }>();
+  const { prospectionId: routeProspectionId, traitementId: routeTraitementId, isValidationView, origineId } =
+    useLocalSearchParams<{ prospectionId?: string; traitementId?: string; isValidationView?: string; origineId?: string }>();
 
   const store = useTraitementCaptureStore();
   const [typeTraitement, setTypeTraitement] = useState<'AERIEN' | 'TERRESTRE' | null>(null);
@@ -164,7 +164,7 @@ export default function ReferencesScreen() {
         numeroFiche: null,
       });
 
-      router.push({ pathname: '/(traitement)/cibles' as any, params: { traitementId: id, isValidationView } });
+      router.push({ pathname: '/(traitement)/cibles' as any, params: { traitementId: id, isValidationView, origineId } });
     } finally {
       setIsSaving(false);
     }
