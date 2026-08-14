@@ -31,6 +31,7 @@ function emptyResponse(serverTime: string) {
     pesticides: { upserts: [], server_time: serverTime },
     cultures: { upserts: [], server_time: serverTime },
     codes_stades: { upserts: [], server_time: serverTime },
+    campagnes: { upserts: [], server_time: serverTime },
   };
 }
 
@@ -49,6 +50,7 @@ describe('pullReferentiel', () => {
         pesticides: null,
         cultures: null,
         codes_stades: null,
+        campagnes: null,
       },
       undefined
     );
@@ -72,6 +74,7 @@ describe('pullReferentiel', () => {
         pesticides: null,
         cultures: null,
         codes_stades: null,
+        campagnes: null,
       },
       undefined
     );
@@ -125,6 +128,31 @@ describe('pullReferentiel', () => {
     );
   });
 
+  it('upserts each campagne idempotently by id', async () => {
+    mockPullReferentiel.mockResolvedValue({
+      ...emptyResponse('2026-08-02T00:00:00Z'),
+      campagnes: {
+        upserts: [
+          {
+            id: 'camp-1',
+            name: 'Campagne 2026',
+            start_date: '2026-01-01',
+            end_date: null,
+            updated_at: '2026-08-01T00:00:00Z',
+          },
+        ],
+        server_time: '2026-08-02T00:00:00Z',
+      },
+    });
+
+    await pullReferentiel('token-1');
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO campagne'),
+      ['camp-1', 'Campagne 2026', '2026-01-01', null, '2026-08-01T00:00:00Z']
+    );
+  });
+
   it('updates the sync cursor for every entity type to its own response server_time', async () => {
     mockPullReferentiel.mockResolvedValue(emptyResponse('2026-08-02T00:00:00Z'));
 
@@ -137,6 +165,10 @@ describe('pullReferentiel', () => {
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO referentiel_sync_meta'),
       ['codes_stades', '2026-08-02T00:00:00Z']
+    );
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO referentiel_sync_meta'),
+      ['campagnes', '2026-08-02T00:00:00Z']
     );
   });
 

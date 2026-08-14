@@ -2,6 +2,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+from app.domain.campagne import Campagne
 from app.domain.referentiel import (
     CodeStade,
     Culture,
@@ -11,6 +12,7 @@ from app.domain.referentiel import (
     UtilisateurEquipe,
 )
 from app.domain.repositories import (
+    CampagneRepository,
     CodeStadeRepository,
     CultureRepository,
     PesticideRepository,
@@ -57,6 +59,7 @@ class ReferentielSinceCursors:
     pesticides: datetime | None = None
     cultures: datetime | None = None
     codes_stades: datetime | None = None
+    campagnes: datetime | None = None
 
 
 @dataclass
@@ -67,6 +70,7 @@ class ReferentielPullResult:
     pesticides: list[Pesticide]
     cultures: list[Culture]
     codes_stades: list[CodeStade]
+    campagnes: list[Campagne]
     server_time: datetime
 
 
@@ -79,6 +83,7 @@ class PullReferentiel:
         pesticide_repository: PesticideRepository,
         culture_repository: CultureRepository,
         code_stade_repository: CodeStadeRepository,
+        campagne_repository: CampagneRepository,
     ):
         self.poste_repository = poste_repository
         self.station_repository = station_repository
@@ -86,6 +91,7 @@ class PullReferentiel:
         self.pesticide_repository = pesticide_repository
         self.culture_repository = culture_repository
         self.code_stade_repository = code_stade_repository
+        self.campagne_repository = campagne_repository
 
     async def execute(self, cursors: ReferentielSinceCursors) -> ReferentielPullResult:
         # Capturé avant les requêtes : une entité modifiée pendant leur exécution doit
@@ -100,5 +106,6 @@ class PullReferentiel:
             pesticides=await self.pesticide_repository.list_since(cursors.pesticides),
             cultures=await self.culture_repository.list_since(cursors.cultures),
             codes_stades=await self.code_stade_repository.list_since(cursors.codes_stades),
+            campagnes=await self.campagne_repository.list_since(cursors.campagnes),
             server_time=server_time,
         )

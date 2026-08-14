@@ -4,6 +4,7 @@ import {
   resetReferentielDbForTests,
   listPesticides,
   listUtilisateursByRole,
+  listCampagnesLocal,
 } from '../src/lib/referentiel-db';
 
 const execAsync = jest.fn().mockResolvedValue(undefined);
@@ -33,6 +34,7 @@ describe('referentiel-db', () => {
     expect(sqlCalls).toContain('CREATE TABLE IF NOT EXISTS pesticide');
     expect(sqlCalls).toContain('CREATE TABLE IF NOT EXISTS culture');
     expect(sqlCalls).toContain('CREATE TABLE IF NOT EXISTS code_stade');
+    expect(sqlCalls).toContain('CREATE TABLE IF NOT EXISTS campagne');
     expect(sqlCalls).toContain(
       'CREATE TABLE IF NOT EXISTS referentiel_sync_meta (\n      entity_type TEXT PRIMARY KEY NOT NULL,\n      last_pull_at TEXT'
     );
@@ -82,6 +84,27 @@ describe('listPesticides', () => {
       'SELECT id, code, nom FROM pesticide WHERE actif = 1 ORDER BY nom'
     );
     expect(result).toEqual([{ id: 'p-1', code: 'DELTA', nom: 'Deltaméthrine' }]);
+  });
+});
+
+describe('listCampagnesLocal', () => {
+  it('lists campagnes from the local référentiel mirror, most recent start_date first', async () => {
+    getAllAsync.mockImplementation((sql: string) =>
+      sql.includes('FROM campagne')
+        ? Promise.resolve([
+            { id: 'camp-1', name: 'Campagne 2026', start_date: '2026-01-01', end_date: null },
+          ])
+        : Promise.resolve([])
+    );
+
+    const result = await listCampagnesLocal();
+
+    expect(getAllAsync).toHaveBeenCalledWith(
+      'SELECT id, name, start_date, end_date FROM campagne ORDER BY start_date DESC'
+    );
+    expect(result).toEqual([
+      { id: 'camp-1', name: 'Campagne 2026', start_date: '2026-01-01', end_date: null },
+    ]);
   });
 });
 

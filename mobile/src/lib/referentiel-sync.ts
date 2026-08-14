@@ -1,5 +1,6 @@
 import {
   apiClient,
+  CampagneSync,
   CodeStadeSync,
   CultureSync,
   PesticideSync,
@@ -20,6 +21,7 @@ const ENTITY_TYPES: EntityType[] = [
   'pesticides',
   'cultures',
   'codes_stades',
+  'campagnes',
 ];
 
 /** ADR-007 : chaque table référentiel se rafraîchit indépendamment — un curseur par type d'entité. */
@@ -38,6 +40,7 @@ async function getPerEntityCursors(
     pesticides: stored.get('pesticides') ?? null,
     cultures: stored.get('cultures') ?? null,
     codes_stades: stored.get('codes_stades') ?? null,
+    campagnes: stored.get('campagnes') ?? null,
   };
 }
 
@@ -146,6 +149,22 @@ async function upsertCodesStades(
   }
 }
 
+async function upsertCampagnes(
+  db: Awaited<ReturnType<typeof getReferentielDb>>,
+  upserts: CampagneSync[]
+): Promise<void> {
+  for (const campagne of upserts) {
+    await db.runAsync(
+      `INSERT INTO campagne (id, name, start_date, end_date, updated_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         name = excluded.name, start_date = excluded.start_date, end_date = excluded.end_date,
+         updated_at = excluded.updated_at`,
+      [campagne.id, campagne.name, campagne.start_date, campagne.end_date, campagne.updated_at]
+    );
+  }
+}
+
 async function updateSyncCursor(
   db: Awaited<ReturnType<typeof getReferentielDb>>,
   entityType: EntityType,
@@ -182,6 +201,7 @@ export async function pullReferentiel(token: string, onUnauthorized?: () => void
   await upsertPesticides(db, response.pesticides.upserts);
   await upsertCultures(db, response.cultures.upserts);
   await upsertCodesStades(db, response.codes_stades.upserts);
+  await upsertCampagnes(db, response.campagnes.upserts);
 
   for (const entityType of ENTITY_TYPES) {
     await updateSyncCursor(db, entityType, response[entityType].server_time);

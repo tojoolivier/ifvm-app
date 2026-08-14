@@ -82,6 +82,21 @@ export async function listUtilisateursByRole(role: RoleUtilisateurEquipe): Promi
   );
 }
 
+export interface CampagneLocal {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string | null;
+}
+
+/** Campagnes connues du référentiel local — alimente `pickCurrentCampagneId` hors-ligne (ADR-007). */
+export async function listCampagnesLocal(): Promise<CampagneLocal[]> {
+  const db = await getReferentielDb();
+  return db.getAllAsync<CampagneLocal>(
+    'SELECT id, name, start_date, end_date FROM campagne ORDER BY start_date DESC'
+  );
+}
+
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const toRad = (deg: number) => (deg * Math.PI) / 180;
   const R = 6371;
@@ -170,6 +185,14 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
       espece TEXT NOT NULL,
       libelle TEXT NOT NULL,
       actif INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS campagne (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL,
+      start_date TEXT NOT NULL,
+      end_date TEXT,
       updated_at TEXT NOT NULL
     );
 
