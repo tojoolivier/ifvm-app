@@ -12,7 +12,9 @@ import {
 } from '@/lib/prospection-infestation-insights';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import {
+  AerialPopulationClassification,
   TAILLE_GROUPE_SEUIL_BANDE_M2,
+  classifyAerialPopulation,
   validateComportementDirection,
   validateGroupementLarvaire,
   validateInfestationFormation,
@@ -57,6 +59,31 @@ interface FormationForm {
   essaimComportement: 'vol' | 'pose' | null;
   heureObservation: string;
   densiteEnVol: string;
+  aerialVolSpontane: boolean | null;
+  aerialVisibleDePres: boolean | null;
+  aerialMasseSombre: boolean | null;
+  aerialMasquePaysage: 'partiellement' | 'entierement' | null;
+  aerialStoredClassification: AerialPopulationClassification | null;
+}
+
+const AERIAL_CLASSIFICATION_LABELS: Record<AerialPopulationClassification, string> = {
+  non_classe: 'Non classé (vol non spontané)',
+  vol_clair: 'Vol clair',
+  essaim_densite_moyenne: 'Essaim — densité moyenne',
+  essaim_densite_forte: 'Essaim — densité forte',
+  essaim_densite_tres_forte: 'Essaim — densité très forte',
+};
+
+function computeAerialClassification(form: FormationForm): AerialPopulationClassification | null {
+  if (form.aerialVolSpontane === null) {
+    return form.aerialStoredClassification;
+  }
+  return classifyAerialPopulation({
+    volSpontaneNonProvoque: form.aerialVolSpontane,
+    visibleSeulementDePres: form.aerialVisibleDePres,
+    masseSombreSansMasquerPaysage: form.aerialMasseSombre,
+    masquePaysage: form.aerialMasquePaysage,
+  });
 }
 
 function emptyFormation(): FormationForm {
@@ -85,6 +112,11 @@ function emptyFormation(): FormationForm {
     essaimComportement: null,
     heureObservation: '',
     densiteEnVol: '',
+    aerialVolSpontane: null,
+    aerialVisibleDePres: null,
+    aerialMasseSombre: null,
+    aerialMasquePaysage: null,
+    aerialStoredClassification: null,
   };
 }
 
@@ -115,6 +147,11 @@ function formFromRow(row: InfestationRow | undefined): FormationForm {
     essaimComportement: row.essaim_en_vol ? 'vol' : row.essaim_pose ? 'pose' : null,
     heureObservation: row.heure_observation ?? '',
     densiteEnVol: row.densite_en_vol != null ? String(row.densite_en_vol) : '',
+    aerialVolSpontane: null,
+    aerialVisibleDePres: null,
+    aerialMasseSombre: null,
+    aerialMasquePaysage: null,
+    aerialStoredClassification: (row.type_essaim as AerialPopulationClassification | null) ?? null,
   };
 }
 
@@ -150,7 +187,8 @@ function rowFromForm(typeCible: string, form: FormationForm): InfestationRow {
       typeCible === 'vol_clair' || typeCible === 'essaim' ? (form.essaimComportement === 'vol' ? 1 : 0) : null,
     essaim_pose:
       typeCible === 'vol_clair' || typeCible === 'essaim' ? (form.essaimComportement === 'pose' ? 1 : 0) : null,
-    type_essaim: null,
+    type_essaim:
+      typeCible === 'vol_clair' || typeCible === 'essaim' ? computeAerialClassification(form) : null,
     nb_taches_bandes: typeCible === 'bande_larvaire' ? numOrNull(form.nbTachesBandes) : null,
     interdistance_m: null,
     surface_contaminee_ha: null,
@@ -485,36 +523,145 @@ export default function InfestationScreen() {
                 </View>
               </View>
 
-              <Text style={styles.sectionLabel}>Densité (/m²)</Text>
-              <View style={styles.row3}>
-                <View style={styles.box}>
-                  <Text style={styles.boxCaption}>min</Text>
-                  <TextInput
-                    value={form.densMin}
-                    onChangeText={(v) => setField('densMin', v)}
-                    keyboardType="decimal-pad"
-                    style={styles.boxValue}
-                  />
-                </View>
-                <View style={styles.box}>
-                  <Text style={styles.boxCaption}>max</Text>
-                  <TextInput
-                    value={form.densMax}
-                    onChangeText={(v) => setField('densMax', v)}
-                    keyboardType="decimal-pad"
-                    style={styles.boxValue}
-                  />
-                </View>
-                <View style={[styles.box, styles.boxEmphasis]}>
-                  <Text style={[styles.boxCaption, styles.boxCaptionEmphasis]}>moy</Text>
-                  <TextInput
-                    value={form.densMoy}
-                    onChangeText={(v) => setField('densMoy', v)}
-                    keyboardType="decimal-pad"
-                    style={[styles.boxValue, styles.boxValueEmphasis]}
-                  />
-                </View>
-              </View>
+              {currentTarget === 'vol_clair' || currentTarget === 'essaim' ? (
+                <>
+                  <Text style={styles.sectionLabel}>Classification (questionnaire séquentiel)</Text>
+                  <Text style={styles.fieldGroupLabel}>Vol spontané, non provoqué ?</Text>
+                  <View style={styles.row2}>
+                    {([true, false] as const).map((value) => {
+                      const active = form.aerialVolSpontane === value;
+                      return (
+                        <TouchableOpacity
+                          key={String(value)}
+                          onPress={() => setField('aerialVolSpontane', value)}
+                          style={[styles.chip, active && styles.chipActive]}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                            {value ? 'Oui' : 'Non'}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  {form.aerialVolSpontane === true && (
+                    <>
+                      <Text style={styles.fieldGroupLabel}>Visible seulement de près ?</Text>
+                      <View style={styles.row2}>
+                        {([true, false] as const).map((value) => {
+                          const active = form.aerialVisibleDePres === value;
+                          return (
+                            <TouchableOpacity
+                              key={String(value)}
+                              onPress={() => setField('aerialVisibleDePres', value)}
+                              style={[styles.chip, active && styles.chipActive]}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                                {value ? 'Oui' : 'Non'}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </>
+                  )}
+
+                  {form.aerialVolSpontane === true && form.aerialVisibleDePres === false && (
+                    <>
+                      <Text style={styles.fieldGroupLabel}>Masse sombre qui ne masque pas le paysage ?</Text>
+                      <View style={styles.row2}>
+                        {([true, false] as const).map((value) => {
+                          const active = form.aerialMasseSombre === value;
+                          return (
+                            <TouchableOpacity
+                              key={String(value)}
+                              onPress={() => setField('aerialMasseSombre', value)}
+                              style={[styles.chip, active && styles.chipActive]}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                                {value ? 'Oui' : 'Non'}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </>
+                  )}
+
+                  {form.aerialVolSpontane === true &&
+                    form.aerialVisibleDePres === false &&
+                    form.aerialMasseSombre === false && (
+                      <>
+                        <Text style={styles.fieldGroupLabel}>La formation masque le paysage à l&apos;arrière-plan</Text>
+                        <View style={styles.row2}>
+                          {(['partiellement', 'entierement'] as const).map((value) => {
+                            const active = form.aerialMasquePaysage === value;
+                            return (
+                              <TouchableOpacity
+                                key={value}
+                                onPress={() => setField('aerialMasquePaysage', value)}
+                                style={[styles.chip, active && styles.chipActive]}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                                  {value === 'partiellement' ? 'Partiellement' : 'Entièrement'}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      </>
+                    )}
+
+                  {(() => {
+                    const classification = computeAerialClassification(form);
+                    return (
+                      <View style={styles.insightCallout}>
+                        <Text style={styles.insightText}>
+                          Classification :{' '}
+                          {classification ? AERIAL_CLASSIFICATION_LABELS[classification] : 'en attente de réponses'}
+                        </Text>
+                      </View>
+                    );
+                  })()}
+                </>
+              ) : (
+                <>
+                  <Text style={styles.sectionLabel}>Densité (/m²)</Text>
+                  <View style={styles.row3}>
+                    <View style={styles.box}>
+                      <Text style={styles.boxCaption}>min</Text>
+                      <TextInput
+                        value={form.densMin}
+                        onChangeText={(v) => setField('densMin', v)}
+                        keyboardType="decimal-pad"
+                        style={styles.boxValue}
+                      />
+                    </View>
+                    <View style={styles.box}>
+                      <Text style={styles.boxCaption}>max</Text>
+                      <TextInput
+                        value={form.densMax}
+                        onChangeText={(v) => setField('densMax', v)}
+                        keyboardType="decimal-pad"
+                        style={styles.boxValue}
+                      />
+                    </View>
+                    <View style={[styles.box, styles.boxEmphasis]}>
+                      <Text style={[styles.boxCaption, styles.boxCaptionEmphasis]}>moy</Text>
+                      <TextInput
+                        value={form.densMoy}
+                        onChangeText={(v) => setField('densMoy', v)}
+                        keyboardType="decimal-pad"
+                        style={[styles.boxValue, styles.boxValueEmphasis]}
+                      />
+                    </View>
+                  </View>
+                </>
+              )}
 
               <Text style={styles.sectionLabel}>Interdistance (m)</Text>
               <View style={styles.row3}>
