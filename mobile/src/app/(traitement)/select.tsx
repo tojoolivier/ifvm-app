@@ -58,6 +58,14 @@ export default function TraitementSelectScreen() {
         <Text style={styles.secondaryCardText}>Mes fiches</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity
+        style={styles.secondaryCard}
+        onPress={() => router.push('/(traitement)/zones-a-reprendre' as any)}
+        accessibilityRole="button"
+      >
+        <Text style={styles.secondaryCardText}>Zones à reprendre</Text>
+      </TouchableOpacity>
+
       {showList && (
         <FlatList
           style={styles.list}
