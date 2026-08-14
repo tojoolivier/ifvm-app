@@ -1,5 +1,9 @@
 ## Agent skills
 
+### Modélisation & schéma de base de données
+
+À chaque modification touchant la base de données (nouvelle table, nouvelle colonne, migration Alembic, contraintes, clés étrangères, dénormalisation), utiliser le skill `relational-and-schema-design` avant d'écrire la migration — pour valider le modèle ER, les cardinalités et la normalisation (FD, formes normales) plutôt que d'empiler des colonnes nullables sur une table existante.
+
 ### Issue tracker
 
 Issues live as GitHub Issues in `tojoolivier/ifvm-app` (via `gh`). External PRs are not treated as a triage surface. See `docs/agents/issue-tracker.md`.

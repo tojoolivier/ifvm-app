@@ -265,9 +265,37 @@ class ProspectionInfestationModel(Base):
     vent_de: Mapped[str | None] = mapped_column(Text(), nullable=True)
     vent_vitesse: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
 
-    # ==========================================
-    # NOUVEAUX CHAMPS - Imagos (B)
-    # ==========================================
+    prospection: Mapped["ProspectionModel"] = relationship(back_populates="infestations")
+    imago: Mapped["ProspectionInfestationImagoModel | None"] = relationship(
+        back_populates="infestation", uselist=False, cascade="all, delete-orphan"
+    )
+    larve: Mapped["ProspectionInfestationLarveModel | None"] = relationship(
+        back_populates="infestation", uselist=False, cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        CheckConstraint("espece IN ('LMC','NSE')", name="ck_prospection_infestation_espece"),
+        CheckConstraint(
+            "type_cible IN ('tache_larvaire','bande_larvaire','vol_clair','essaim')",
+            name="ck_prospection_infestation_type_cible",
+        ),
+        CheckConstraint(
+            "comportement IN ('repos','deplacement')",
+            name="ck_prospection_infestation_comportement",
+        ),
+    )
+
+
+class ProspectionInfestationImagoModel(Base):
+    """Sous-type Imagos (vol clair / essaim) de ProspectionInfestationModel."""
+
+    __tablename__ = "prospection_infestation_imago"
+
+    infestation_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("prospection_infestation.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
     pullulation_nb: Mapped[int | None] = mapped_column(Integer(), nullable=True)
     taille_long: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
     taille_large: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
@@ -279,9 +307,26 @@ class ProspectionInfestationModel(Base):
     densite_en_vol: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
     dimension_ha: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
 
-    # ==========================================
-    # NOUVEAUX CHAMPS - Larves (C)
-    # ==========================================
+    infestation: Mapped["ProspectionInfestationModel"] = relationship(back_populates="imago")
+
+    __table_args__ = (
+        CheckConstraint(
+            "type_essaim IN ('vol_clair', 'dense', 'tres_dense')",
+            name="ck_prospection_infestation_imago_type_essaim",
+        ),
+    )
+
+
+class ProspectionInfestationLarveModel(Base):
+    """Sous-type Larves (tache / bande larvaire) de ProspectionInfestationModel."""
+
+    __tablename__ = "prospection_infestation_larve"
+
+    infestation_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("prospection_infestation.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
     nb_taches_bandes: Mapped[int | None] = mapped_column(Integer(), nullable=True)
     interdistance_m: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
     interdistance_min: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
@@ -297,25 +342,12 @@ class ProspectionInfestationModel(Base):
     densite_max_front: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
     densite_moy_arriere_front: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
 
-    prospection: Mapped["ProspectionModel"] = relationship(back_populates="infestations")
+    infestation: Mapped["ProspectionInfestationModel"] = relationship(back_populates="larve")
 
     __table_args__ = (
-        CheckConstraint("espece IN ('LMC','NSE')", name="ck_prospection_infestation_espece"),
-        CheckConstraint(
-            "type_cible IN ('tache_larvaire','bande_larvaire','vol_clair','essaim')",
-            name="ck_prospection_infestation_type_cible",
-        ),
-        CheckConstraint(
-            "comportement IN ('repos','deplacement')",
-            name="ck_prospection_infestation_comportement",
-        ),
-        CheckConstraint(
-            "type_essaim IN ('vol_clair', 'dense', 'tres_dense')",
-            name="ck_prospection_infestation_type_essaim",
-        ),
         CheckConstraint(
             "type_larve IN ('tache_larvaire', 'bande_larvaire')",
-            name="ck_prospection_infestation_type_larve",
+            name="ck_prospection_infestation_larve_type_larve",
         ),
     )
 
