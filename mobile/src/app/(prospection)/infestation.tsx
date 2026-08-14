@@ -54,6 +54,7 @@ interface FormationForm {
   frontLargeurM: string;
   densiteMaxFront: string;
   densiteMoyArriereFront: string;
+  essaimComportement: 'vol' | 'pose' | null;
 }
 
 function emptyFormation(): FormationForm {
@@ -79,6 +80,7 @@ function emptyFormation(): FormationForm {
     frontLargeurM: '',
     densiteMaxFront: '',
     densiteMoyArriereFront: '',
+    essaimComportement: null,
   };
 }
 
@@ -106,6 +108,7 @@ function formFromRow(row: InfestationRow | undefined): FormationForm {
     frontLargeurM: row.front_largeur_m != null ? String(row.front_largeur_m) : '',
     densiteMaxFront: row.densite_max_front != null ? String(row.densite_max_front) : '',
     densiteMoyArriereFront: row.densite_moy_arriere_front != null ? String(row.densite_moy_arriere_front) : '',
+    essaimComportement: row.essaim_en_vol ? 'vol' : row.essaim_pose ? 'pose' : null,
   };
 }
 
@@ -137,8 +140,10 @@ function rowFromForm(typeCible: string, form: FormationForm): InfestationRow {
     taille_long: null,
     taille_large: null,
     taille_epaisseur: null,
-    essaim_en_vol: null,
-    essaim_pose: null,
+    essaim_en_vol:
+      typeCible === 'vol_clair' || typeCible === 'essaim' ? (form.essaimComportement === 'vol' ? 1 : 0) : null,
+    essaim_pose:
+      typeCible === 'vol_clair' || typeCible === 'essaim' ? (form.essaimComportement === 'pose' ? 1 : 0) : null,
     type_essaim: null,
     nb_taches_bandes: typeCible === 'bande_larvaire' ? numOrNull(form.nbTachesBandes) : null,
     interdistance_m: null,
@@ -661,6 +666,29 @@ export default function InfestationScreen() {
                   );
                 })}
               </View>
+
+              {(currentTarget === 'vol_clair' || currentTarget === 'essaim') && (
+                <>
+                  <Text style={styles.fieldGroupLabel}>Comportement de l&apos;essaim</Text>
+                  <View style={styles.row2}>
+                    {(['vol', 'pose'] as const).map((value) => {
+                      const active = form.essaimComportement === value;
+                      return (
+                        <TouchableOpacity
+                          key={value}
+                          onPress={() => setField('essaimComportement', value)}
+                          style={[styles.chip, active && styles.chipActive]}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                            {value === 'vol' ? 'En vol' : 'Posé'}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
 
               <Text style={styles.fieldGroupLabel}>Direction du déplacement</Text>
               <View style={styles.compassCard}>

@@ -94,4 +94,30 @@ describe('InfestationScreen', () => {
       )
     );
   });
+
+  it('conserve le comportement "en vol" à la sauvegarde d’un vol clair (#104)', async () => {
+    jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
+      {
+        type_cible: 'vol_clair',
+        surface_tot: 12,
+        essaim_en_vol: 1,
+        essaim_pose: 0,
+        vent_de: 'N',
+        direction_vers: 'S',
+      } as any,
+    ]);
+
+    await render(<InfestationScreen />);
+
+    fireEvent.press(await screen.findByText('Comportement  ›'));
+    fireEvent.press(await screen.findByText('Continuer  ›'));
+
+    await waitFor(() =>
+      expect(prospectionRepository.saveProspectionInfestation).toHaveBeenCalledWith(
+        'draft-123',
+        'vol_clair',
+        expect.objectContaining({ essaim_en_vol: 1, essaim_pose: 0 })
+      )
+    );
+  });
 });
