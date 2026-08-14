@@ -276,6 +276,7 @@ function buildInfestationsPayload(rows: InfestationRow[]): ProspectionInfestatio
     essaim_pose: row.essaim_pose != null ? Boolean(row.essaim_pose) : null,
     type_essaim: (row.type_essaim || null) as ProspectionInfestationInput['type_essaim'],
     heure_observation: row.heure_observation || null,
+    densite_en_vol: row.densite_en_vol ? Number(row.densite_en_vol) : null,
     nb_taches_bandes: row.nb_taches_bandes ? Number(row.nb_taches_bandes) : null,
     interdistance_m: row.interdistance_m ? Number(row.interdistance_m) : null,
     interdistance_min: row.interdistance_min ? Number(row.interdistance_min) : null,
