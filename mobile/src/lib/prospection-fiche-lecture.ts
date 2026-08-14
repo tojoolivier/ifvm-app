@@ -217,14 +217,14 @@ export function buildEspecesSynthese(
 export interface InfestationSyntheseViewModel {
   hasInfestation: boolean;
   typeLabel: string;
-  surfaceTot: number | null;
+  surfaceTotale: number | null;
   comportementLabel: string;
   pullulationNb: number | null;
   tailleEssaim: string;
   typeEssaim: string | null;
   typeLarve: string | null;
   surfaceContamineeHa: number | null;
-  surfInfesteePourcent: number | null;
+  surfaceInfesteePourcent: number | null;
 }
 
 /** Bandeau niveau d'infestation : type de cible, surface, comportement — dérivé de la ligne prospection_infestation. */
@@ -234,14 +234,14 @@ export function buildInfestationSynthese(infestations: InfestationRead[]): Infes
     return {
       hasInfestation: false,
       typeLabel: '—',
-      surfaceTot: null,
+      surfaceTotale: null,
       comportementLabel: '—',
       pullulationNb: null,
       tailleEssaim: '—',
       typeEssaim: null,
       typeLarve: null,
       surfaceContamineeHa: null,
-      surfInfesteePourcent: null,
+      surfaceInfesteePourcent: null,
     };
   }
 
@@ -253,14 +253,14 @@ export function buildInfestationSynthese(infestations: InfestationRead[]): Infes
   return {
     hasInfestation: true,
     typeLabel: TYPE_CIBLE_OPTIONS.find((o) => o.value === infestation.type_cible)?.label ?? infestation.type_cible,
-    surfaceTot: infestation.surface_tot ?? null,
+    surfaceTotale: infestation.surface_totale ?? null,
     comportementLabel: infestation.comportement === 'deplacement' ? 'Déplacement' : infestation.comportement === 'repos' ? 'Repos' : '—',
     pullulationNb: infestation.pullulation_nb ?? null,
     tailleEssaim: tailleParts.length > 0 ? tailleParts.join(' ') : '—',
     typeEssaim: infestation.type_essaim ?? null,
     typeLarve: infestation.type_larve ?? null,
     surfaceContamineeHa: infestation.surface_contaminee_ha ?? null,
-    surfInfesteePourcent: infestation.surf_infestee_pourcent ?? null,
+    surfaceInfesteePourcent: infestation.surface_infestee_pourcent ?? null,
   };
 }
 

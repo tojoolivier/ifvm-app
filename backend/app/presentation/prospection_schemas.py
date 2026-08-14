@@ -93,7 +93,7 @@ class InfestationRead(BaseModel):
     taille_min: float | None
     taille_max: float | None
     taille_moy: float | None
-    surface_tot: float | None
+    surface_totale: float | None
     densite_min: float | None
     densite_max: float | None
     densite_moy: float | None
@@ -128,7 +128,7 @@ class InfestationRead(BaseModel):
     interdistance_moy: float | None = None
     surface_contaminee_ha: float | None = None
     type_larve: str | None = None
-    surf_infestee_pourcent: float | None = None
+    surface_infestee_pourcent: float | None = None
     stade_dominant: str | None = None
     taille_groupe_m2: float | None = None
     front_longueur_m: float | None = None
@@ -183,7 +183,7 @@ class InfestationCreate(BaseModel):
     taille_min: float | None = None
     taille_max: float | None = None
     taille_moy: float | None = None
-    surface_tot: float | None = None
+    surface_totale: float | None = None
     densite_min: float | None = Field(None, ge=0, allow_inf_nan=False)
     densite_max: float | None = Field(None, ge=0, allow_inf_nan=False)
     densite_moy: float | None = Field(None, ge=0, allow_inf_nan=False)
@@ -218,7 +218,7 @@ class InfestationCreate(BaseModel):
     interdistance_moy: float | None = Field(None, ge=0)
     surface_contaminee_ha: float | None = Field(None, ge=0)
     type_larve: TypeLarve | None = None
-    surf_infestee_pourcent: float | None = Field(None, ge=0, le=100)
+    surface_infestee_pourcent: float | None = Field(None, ge=0, le=100)
     stade_dominant: StadeDominant | None = None
     taille_groupe_m2: float | None = Field(None, ge=0)
     front_longueur_m: float | None = Field(None, ge=0)
@@ -239,9 +239,9 @@ class ProspectionCreate(BaseModel):
     longitude: float | None = None
     altitude: float | None = None
     biotope: Biotope | None = None
-    surf_station: float | None = Field(None, ge=0)
-    surf_prospectee: float | None = Field(None, ge=0)
-    surf_infestee: float | None = Field(None, ge=0)
+    surface_station: float | None = Field(None, ge=0)
+    surface_prospectee: float | None = Field(None, ge=0)
+    surface_infestee: float | None = Field(None, ge=0)
     degats_cultures: DegatsCultures | None = None
     derniere_pluie: date | None = None
     intensite_pluie: str | None = None
@@ -283,7 +283,7 @@ class ProspectionCreate(BaseModel):
     populations: list[PopulationCreate] = []
     captures: list[CaptureCreate] = []
     infestations: list[InfestationCreate] = []
-    surf_infestee_pourcent: float | None = Field(None, ge=0, le=100)
+    surface_infestee_pourcent: float | None = Field(None, ge=0, le=100)
 
 
 class ProspectionUpdate(BaseModel):
@@ -296,9 +296,9 @@ class ProspectionUpdate(BaseModel):
     longitude: float | None = None
     altitude: float | None = None
     biotope: Biotope | None = None
-    surf_station: float | None = Field(None, ge=0)
-    surf_prospectee: float | None = Field(None, ge=0)
-    surf_infestee: float | None = Field(None, ge=0)
+    surface_station: float | None = Field(None, ge=0)
+    surface_prospectee: float | None = Field(None, ge=0)
+    surface_infestee: float | None = Field(None, ge=0)
     degats_cultures: DegatsCultures | None = None
     derniere_pluie: date | None = None
     intensite_pluie: str | None = None
@@ -374,9 +374,9 @@ class ProspectionRead(BaseModel):
     longitude: float | None
     altitude: float | None
     biotope: str | None
-    surf_station: float | None
-    surf_prospectee: float | None
-    surf_infestee: float | None
+    surface_station: float | None
+    surface_prospectee: float | None
+    surface_infestee: float | None
     degats_cultures: str | None
     derniere_pluie: date | None
     intensite_pluie: str | None

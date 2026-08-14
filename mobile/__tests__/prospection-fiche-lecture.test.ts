@@ -58,9 +58,9 @@ function prospection(overrides: Partial<ProspectionRead> = {}): ProspectionRead 
     longitude: null,
     altitude: null,
     biotope: null,
-    surf_station: null,
-    surf_prospectee: null,
-    surf_infestee: null,
+    surface_station: null,
+    surface_prospectee: null,
+    surface_infestee: null,
     degats_cultures: null,
     derniere_pluie: null,
     intensite_pluie: null,
@@ -127,14 +127,14 @@ describe('buildInfestationSynthese', () => {
     expect(buildInfestationSynthese([])).toEqual({
       hasInfestation: false,
       typeLabel: '—',
-      surfaceTot: null,
+      surfaceTotale: null,
       comportementLabel: '—',
       pullulationNb: null,
       tailleEssaim: '—',
       typeEssaim: null,
       typeLarve: null,
       surfaceContamineeHa: null,
-      surfInfesteePourcent: null,
+      surfaceInfesteePourcent: null,
     });
   });
 
@@ -146,7 +146,7 @@ describe('buildInfestationSynthese', () => {
       taille_min: null,
       taille_max: null,
       taille_moy: null,
-      surface_tot: 3.5,
+      surface_totale: 3.5,
       densite_min: null,
       densite_max: null,
       densite_moy: null,
@@ -167,20 +167,20 @@ describe('buildInfestationSynthese', () => {
       interdistance_m: null,
       surface_contaminee_ha: null,
       type_larve: null,
-      surf_infestee_pourcent: null,
+      surface_infestee_pourcent: null,
     };
 
     expect(buildInfestationSynthese([infestation])).toEqual({
       hasInfestation: true,
       typeLabel: 'Essaim',
-      surfaceTot: 3.5,
+      surfaceTotale: 3.5,
       comportementLabel: 'Déplacement',
       pullulationNb: null,
       tailleEssaim: '—',
       typeEssaim: null,
       typeLarve: null,
       surfaceContamineeHa: null,
-      surfInfesteePourcent: null,
+      surfaceInfesteePourcent: null,
     });
   });
 });

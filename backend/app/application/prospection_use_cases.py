@@ -30,9 +30,9 @@ class CreateProspection:
         longitude: float | None = None,
         altitude: float | None = None,
         biotope: str | None = None,
-        surf_station: float | None = None,
-        surf_prospectee: float | None = None,
-        surf_infestee: float | None = None,
+        surface_station: float | None = None,
+        surface_prospectee: float | None = None,
+        surface_infestee: float | None = None,
         degats_cultures: str | None = None,
         derniere_pluie: date | None = None,
         intensite_pluie: str | None = None,
@@ -88,9 +88,9 @@ class CreateProspection:
             longitude=longitude,
             altitude=altitude,
             biotope=biotope,
-            surf_station=surf_station,
-            surf_prospectee=surf_prospectee,
-            surf_infestee=surf_infestee,
+            surface_station=surface_station,
+            surface_prospectee=surface_prospectee,
+            surface_infestee=surface_infestee,
             degats_cultures=degats_cultures,
             derniere_pluie=derniere_pluie,
             intensite_pluie=intensite_pluie,
@@ -187,9 +187,9 @@ class UpdateProspection:
         longitude: float | None = None,
         altitude: float | None = None,
         biotope: str | None = None,
-        surf_station: float | None = None,
-        surf_prospectee: float | None = None,
-        surf_infestee: float | None = None,
+        surface_station: float | None = None,
+        surface_prospectee: float | None = None,
+        surface_infestee: float | None = None,
         degats_cultures: str | None = None,
         derniere_pluie: date | None = None,
         intensite_pluie: str | None = None,
@@ -250,12 +250,12 @@ class UpdateProspection:
             prospection.altitude = altitude
         if biotope is not None:
             prospection.biotope = biotope
-        if surf_station is not None:
-            prospection.surf_station = surf_station
-        if surf_prospectee is not None:
-            prospection.surf_prospectee = surf_prospectee
-        if surf_infestee is not None:
-            prospection.surf_infestee = surf_infestee
+        if surface_station is not None:
+            prospection.surface_station = surface_station
+        if surface_prospectee is not None:
+            prospection.surface_prospectee = surface_prospectee
+        if surface_infestee is not None:
+            prospection.surface_infestee = surface_infestee
         if degats_cultures is not None:
             prospection.degats_cultures = degats_cultures
         if derniere_pluie is not None:

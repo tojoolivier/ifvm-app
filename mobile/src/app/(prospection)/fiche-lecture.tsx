@@ -100,7 +100,7 @@ export default function FicheLectureScreen() {
           <View style={styles.card}>
             <Text style={styles.cardLabel}>Infestation</Text>
             <Row label="Type" value={recap.infestation.typeLabel} />
-            <Row label="Surface" value={recap.infestation.surfaceTot != null ? `${recap.infestation.surfaceTot} ha` : '—'} />
+            <Row label="Surface" value={recap.infestation.surfaceTotale != null ? `${recap.infestation.surfaceTotale} ha` : '—'} />
             <Row label="Comportement" value={recap.infestation.comportementLabel} />
           </View>
         )}

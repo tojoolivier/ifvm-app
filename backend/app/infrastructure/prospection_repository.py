@@ -94,9 +94,9 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             longitude=prospection.longitude,
             altitude=prospection.altitude,
             biotope=prospection.biotope,
-            surf_station=prospection.surf_station,
-            surf_prospectee=prospection.surf_prospectee,
-            surf_infestee=prospection.surf_infestee,
+            surface_station=prospection.surface_station,
+            surface_prospectee=prospection.surface_prospectee,
+            surface_infestee=prospection.surface_infestee,
             degats_cultures=prospection.degats_cultures,
             derniere_pluie=prospection.derniere_pluie,
             intensite_pluie=prospection.intensite_pluie,
@@ -207,9 +207,9 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         model.longitude = prospection.longitude
         model.altitude = prospection.altitude
         model.biotope = prospection.biotope
-        model.surf_station = prospection.surf_station
-        model.surf_prospectee = prospection.surf_prospectee
-        model.surf_infestee = prospection.surf_infestee
+        model.surface_station = prospection.surface_station
+        model.surface_prospectee = prospection.surface_prospectee
+        model.surface_infestee = prospection.surface_infestee
         model.degats_cultures = prospection.degats_cultures
         model.derniere_pluie = prospection.derniere_pluie
         model.intensite_pluie = prospection.intensite_pluie
@@ -280,7 +280,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             taille_min=i.taille_min,
             taille_max=i.taille_max,
             taille_moy=i.taille_moy,
-            surface_tot=i.surface_tot,
+            surface_totale=i.surface_totale,
             densite_min=i.densite_min,
             densite_max=i.densite_max,
             densite_moy=i.densite_moy,
@@ -326,7 +326,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             i.interdistance_max,
             i.interdistance_moy,
             i.surface_contaminee_ha,
-            i.surf_infestee_pourcent,
+            i.surface_infestee_pourcent,
             i.type_larve,
             i.stade_dominant,
             i.taille_groupe_m2,
@@ -344,7 +344,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                 interdistance_max=i.interdistance_max,
                 interdistance_moy=i.interdistance_moy,
                 surface_contaminee_ha=i.surface_contaminee_ha,
-                surf_infestee_pourcent=i.surf_infestee_pourcent,
+                surface_infestee_pourcent=i.surface_infestee_pourcent,
                 type_larve=i.type_larve,
                 stade_dominant=i.stade_dominant,
                 taille_groupe_m2=i.taille_groupe_m2,
@@ -367,7 +367,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             taille_min=float(i.taille_min) if i.taille_min is not None else None,
             taille_max=float(i.taille_max) if i.taille_max is not None else None,
             taille_moy=float(i.taille_moy) if i.taille_moy is not None else None,
-            surface_tot=float(i.surface_tot) if i.surface_tot is not None else None,
+            surface_totale=float(i.surface_totale) if i.surface_totale is not None else None,
             densite_min=float(i.densite_min) if i.densite_min is not None else None,
             densite_max=float(i.densite_max) if i.densite_max is not None else None,
             densite_moy=float(i.densite_moy) if i.densite_moy is not None else None,
@@ -377,8 +377,8 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             direction_vers=i.direction_vers,
             vent_de=i.vent_de,
             vent_vitesse=float(i.vent_vitesse) if i.vent_vitesse is not None else None,
-            surf_infestee_pourcent=float(larve.surf_infestee_pourcent)
-            if larve is not None and larve.surf_infestee_pourcent is not None
+            surface_infestee_pourcent=float(larve.surface_infestee_pourcent)
+            if larve is not None and larve.surface_infestee_pourcent is not None
             else None,
             # ==========================================
             # NOUVEAUX CHAMPS - Imagos (B)
@@ -456,11 +456,15 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             longitude=float(model.longitude) if model.longitude is not None else None,
             altitude=float(model.altitude) if model.altitude is not None else None,
             biotope=model.biotope,
-            surf_station=float(model.surf_station) if model.surf_station is not None else None,
-            surf_prospectee=float(model.surf_prospectee)
-            if model.surf_prospectee is not None
+            surface_station=float(model.surface_station)
+            if model.surface_station is not None
             else None,
-            surf_infestee=float(model.surf_infestee) if model.surf_infestee is not None else None,
+            surface_prospectee=float(model.surface_prospectee)
+            if model.surface_prospectee is not None
+            else None,
+            surface_infestee=float(model.surface_infestee)
+            if model.surface_infestee is not None
+            else None,
             degats_cultures=model.degats_cultures,
             derniere_pluie=model.derniere_pluie,
             intensite_pluie=model.intensite_pluie,

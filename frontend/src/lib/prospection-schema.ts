@@ -17,9 +17,9 @@ export const prospectionFormSchema = z.object({
   latitude: z.string().optional(),
   longitude: z.string().optional(),
   altitude: z.string().optional(),
-  surf_station: z.string().optional(),
-  surf_prospectee: z.string().optional(),
-  surf_infestee: z.string().optional(),
+  surface_station: z.string().optional(),
+  surface_prospectee: z.string().optional(),
+  surface_infestee: z.string().optional(),
   captures: z.array(captureSchema),
 })
 
@@ -69,15 +69,15 @@ export function validateProspectionCrossFields(
     }
   }
 
-  const surfStation = data.surf_station ? parseFloat(data.surf_station) : null
-  const surfProspectee = data.surf_prospectee ? parseFloat(data.surf_prospectee) : null
-  const surfInfestee = data.surf_infestee ? parseFloat(data.surf_infestee) : null
+  const surfaceStation = data.surface_station ? parseFloat(data.surface_station) : null
+  const surfaceProspectee = data.surface_prospectee ? parseFloat(data.surface_prospectee) : null
+  const surfaceInfestee = data.surface_infestee ? parseFloat(data.surface_infestee) : null
 
-  if (surfProspectee !== null && surfStation !== null && surfProspectee > surfStation) {
-    errs.surf_prospectee = 'La surface prospectée ne peut pas dépasser la surface de la station.'
+  if (surfaceProspectee !== null && surfaceStation !== null && surfaceProspectee > surfaceStation) {
+    errs.surface_prospectee = 'La surface prospectée ne peut pas dépasser la surface de la station.'
   }
-  if (surfInfestee !== null && surfProspectee !== null && surfInfestee > surfProspectee) {
-    errs.surf_infestee = 'La surface infestée ne peut pas dépasser la surface prospectée.'
+  if (surfaceInfestee !== null && surfaceProspectee !== null && surfaceInfestee > surfaceProspectee) {
+    errs.surface_infestee = 'La surface infestée ne peut pas dépasser la surface prospectée.'
   }
 
   const hasCapture = data.captures.some((c) => parseInt(c.effectif, 10) > 0)

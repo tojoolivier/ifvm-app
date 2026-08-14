@@ -539,6 +539,28 @@ export interface components {
              */
             updated_at: string;
         };
+        /** CampagneSyncRead */
+        CampagneSyncRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /** End Date */
+            end_date: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
         /** CampagneUpdate */
         CampagneUpdate: {
             /** Name */
@@ -666,6 +688,16 @@ export interface components {
          * @enum {string}
          */
         EmpoisonnementType: "AGENT" | "POPULATION";
+        /** EntityPull[CampagneSyncRead] */
+        EntityPull_CampagneSyncRead_: {
+            /** Upserts */
+            upserts: components["schemas"]["CampagneSyncRead"][];
+            /**
+             * Server Time
+             * Format: date-time
+             */
+            server_time: string;
+        };
         /** EntityPull[CodeStadeSyncRead] */
         EntityPull_CodeStadeSyncRead_: {
             /** Upserts */
@@ -743,8 +775,8 @@ export interface components {
             taille_max?: number | null;
             /** Taille Moy */
             taille_moy?: number | null;
-            /** Surface Tot */
-            surface_tot?: number | null;
+            /** Surface Totale */
+            surface_totale?: number | null;
             /** Densite Min */
             densite_min?: number | null;
             /** Densite Max */
@@ -795,8 +827,8 @@ export interface components {
             /** Surface Contaminee Ha */
             surface_contaminee_ha?: number | null;
             type_larve?: components["schemas"]["TypeLarve"] | null;
-            /** Surf Infestee Pourcent */
-            surf_infestee_pourcent?: number | null;
+            /** Surface Infestee Pourcent */
+            surface_infestee_pourcent?: number | null;
             stade_dominant?: components["schemas"]["StadeDominant"] | null;
             /** Taille Groupe M2 */
             taille_groupe_m2?: number | null;
@@ -826,8 +858,8 @@ export interface components {
             taille_max: number | null;
             /** Taille Moy */
             taille_moy: number | null;
-            /** Surface Tot */
-            surface_tot: number | null;
+            /** Surface Totale */
+            surface_totale: number | null;
             /** Densite Min */
             densite_min: number | null;
             /** Densite Max */
@@ -880,8 +912,8 @@ export interface components {
             surface_contaminee_ha?: number | null;
             /** Type Larve */
             type_larve?: string | null;
-            /** Surf Infestee Pourcent */
-            surf_infestee_pourcent?: number | null;
+            /** Surface Infestee Pourcent */
+            surface_infestee_pourcent?: number | null;
             /** Stade Dominant */
             stade_dominant?: string | null;
             /** Taille Groupe M2 */
@@ -1116,12 +1148,12 @@ export interface components {
             /** Altitude */
             altitude?: number | null;
             biotope?: components["schemas"]["Biotope"] | null;
-            /** Surf Station */
-            surf_station?: number | null;
-            /** Surf Prospectee */
-            surf_prospectee?: number | null;
-            /** Surf Infestee */
-            surf_infestee?: number | null;
+            /** Surface Station */
+            surface_station?: number | null;
+            /** Surface Prospectee */
+            surface_prospectee?: number | null;
+            /** Surface Infestee */
+            surface_infestee?: number | null;
             degats_cultures?: components["schemas"]["DegatsCultures"] | null;
             /** Derniere Pluie */
             derniere_pluie?: string | null;
@@ -1193,8 +1225,8 @@ export interface components {
              * @default []
              */
             infestations: components["schemas"]["InfestationCreate"][];
-            /** Surf Infestee Pourcent */
-            surf_infestee_pourcent?: number | null;
+            /** Surface Infestee Pourcent */
+            surface_infestee_pourcent?: number | null;
         };
         /** ProspectionRead */
         ProspectionRead: {
@@ -1236,12 +1268,12 @@ export interface components {
             altitude: number | null;
             /** Biotope */
             biotope: string | null;
-            /** Surf Station */
-            surf_station: number | null;
-            /** Surf Prospectee */
-            surf_prospectee: number | null;
-            /** Surf Infestee */
-            surf_infestee: number | null;
+            /** Surface Station */
+            surface_station: number | null;
+            /** Surface Prospectee */
+            surface_prospectee: number | null;
+            /** Surface Infestee */
+            surface_infestee: number | null;
             /** Degats Cultures */
             degats_cultures: string | null;
             /** Derniere Pluie */
@@ -1343,12 +1375,12 @@ export interface components {
             /** Altitude */
             altitude?: number | null;
             biotope?: components["schemas"]["Biotope"] | null;
-            /** Surf Station */
-            surf_station?: number | null;
-            /** Surf Prospectee */
-            surf_prospectee?: number | null;
-            /** Surf Infestee */
-            surf_infestee?: number | null;
+            /** Surface Station */
+            surface_station?: number | null;
+            /** Surface Prospectee */
+            surface_prospectee?: number | null;
+            /** Surface Infestee */
+            surface_infestee?: number | null;
             degats_cultures?: components["schemas"]["DegatsCultures"] | null;
             /** Derniere Pluie */
             derniere_pluie?: string | null;
@@ -1411,6 +1443,7 @@ export interface components {
             pesticides: components["schemas"]["EntityPull_PesticideSyncRead_"];
             cultures: components["schemas"]["EntityPull_CultureSyncRead_"];
             codes_stades: components["schemas"]["EntityPull_CodeStadeSyncRead_"];
+            campagnes: components["schemas"]["EntityPull_CampagneSyncRead_"];
         };
         /** RefreshRequest */
         RefreshRequest: {
@@ -2593,6 +2626,7 @@ export interface operations {
                 since_pesticides?: string | null;
                 since_cultures?: string | null;
                 since_codes_stades?: string | null;
+                since_campagnes?: string | null;
             };
             header?: never;
             path?: never;

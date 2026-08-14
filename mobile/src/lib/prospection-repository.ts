@@ -19,9 +19,9 @@ export interface DraftProspectionInput {
   commune?: string | null;
   za?: string | null;
   pa_code?: string | null;
-  surfStation?: number | null;
-  surfProspectee?: number | null;
-  surfInfestee?: number | null;
+  surfaceStation?: number | null;
+  surfaceProspectee?: number | null;
+  surfaceInfestee?: number | null;
   signalementSource?: string | null;
   signalementDate?: string | null;
   signalementDescription?: string | null;
@@ -61,9 +61,9 @@ export interface DraftProspection {
   latitude: number | null;
   longitude: number | null;
   altitude: number | null;
-  surf_station: number | null;
-  surf_prospectee: number | null;
-  surf_infestee: number | null;
+  surface_station: number | null;
+  surface_prospectee: number | null;
+  surface_infestee: number | null;
   degats_cultures: string | null;
   derniere_pluie: string | null;
   intensite_pluie: string | null;
@@ -81,9 +81,9 @@ export interface ReferenceUpdateInput {
   latitude: number;
   longitude: number;
   altitude: number | null;
-  surfStation: number;
-  surfProspectee: number;
-  surfInfestee: number;
+  surfaceStation: number;
+  surfaceProspectee: number;
+  surfaceInfestee: number;
   biotope?: string | null;
   nFiche: string;
   nReleve?: string | null;
@@ -102,7 +102,7 @@ export interface ExtensiveReferenceUpdateInput {
   longitude: number | null;
   stationLibre: string | null;
   typeStation: string | null;
-  surfStation: number | null;
+  surfaceStation: number | null;
   nMessage: string | null;
 }
 
@@ -192,7 +192,7 @@ export interface InfestationRow {
   taille_min: number | null;
   taille_max: number | null;
   taille_moy: number | null;
-  surface_tot: number | null;
+  surface_totale: number | null;
   densite_min: number | null;
   densite_max: number | null;
   densite_moy: number | null;
@@ -216,7 +216,7 @@ export interface InfestationRow {
   interdistance_moy: number | null;
   surface_contaminee_ha: number | null;
   type_larve: string | null;
-  surf_infestee_pourcent: number | null;
+  surface_infestee_pourcent: number | null;
   stade_dominant: string | null;
   taille_groupe_m2: number | null;
   front_longueur_m: number | null;
@@ -259,7 +259,7 @@ const INFESTATION_COLUMNS = `
   taille_min,
   taille_max,
   taille_moy,
-  surface_tot,
+  surface_totale,
   densite_min,
   densite_max,
   densite_moy,
@@ -283,7 +283,7 @@ const INFESTATION_COLUMNS = `
   interdistance_moy,
   surface_contaminee_ha,
   type_larve,
-  surf_infestee_pourcent,
+  surface_infestee_pourcent,
   stade_dominant,
   taille_groupe_m2,
   front_longueur_m,
@@ -362,9 +362,9 @@ export async function createDraftProspection(
       latitude,
       longitude,
       altitude,
-      surf_station,
-      surf_prospectee,
-      surf_infestee,
+      surface_station,
+      surface_prospectee,
+      surface_infestee,
       signalement_source,
       signalement_date,
       signalement_description,
@@ -396,9 +396,9 @@ export async function createDraftProspection(
       input.latitude ?? null,
       input.longitude ?? null,
       input.altitude ?? null,
-      input.surfStation ?? null,
-      input.surfProspectee ?? null,
-      input.surfInfestee ?? null,
+      input.surfaceStation ?? null,
+      input.surfaceProspectee ?? null,
+      input.surfaceInfestee ?? null,
       input.signalementSource ?? null,
       input.signalementDate ?? null,
       input.signalementDescription ?? null,
@@ -434,9 +434,9 @@ export async function updateProspectionReference(
       latitude = ?,
       longitude = ?,
       altitude = ?,
-      surf_station = ?,
-      surf_prospectee = ?,
-      surf_infestee = ?,
+      surface_station = ?,
+      surface_prospectee = ?,
+      surface_infestee = ?,
       biotope = ?,
       n_fiche = ?,
       n_releve = ?,
@@ -454,9 +454,9 @@ export async function updateProspectionReference(
       input.latitude,
       input.longitude,
       input.altitude,
-      input.surfStation,
-      input.surfProspectee,
-      input.surfInfestee,
+      input.surfaceStation,
+      input.surfaceProspectee,
+      input.surfaceInfestee,
       input.biotope ?? null,
       input.nFiche,
       input.nReleve ?? null,
@@ -528,7 +528,7 @@ export async function updateProspectionExtensiveReference(
       longitude = ?,
       station_libre = ?,
       type_station = ?,
-      surf_station = ?,
+      surface_station = ?,
       n_message = ?,
       updated_at = ?
      WHERE id = ?`,
@@ -537,7 +537,7 @@ export async function updateProspectionExtensiveReference(
       input.longitude,
       input.stationLibre,
       input.typeStation,
-      input.surfStation,
+      input.surfaceStation,
       input.nMessage,
       now,
       id,
@@ -1093,7 +1093,7 @@ export async function saveProspectionInfestation(
     row.taille_min,
     row.taille_max,
     row.taille_moy,
-    row.surface_tot,
+    row.surface_totale,
     row.densite_min,
     row.densite_max,
     row.densite_moy,
@@ -1117,7 +1117,7 @@ export async function saveProspectionInfestation(
     row.interdistance_moy,
     row.surface_contaminee_ha,
     row.type_larve,
-    row.surf_infestee_pourcent,
+    row.surface_infestee_pourcent,
     row.stade_dominant,
     row.taille_groupe_m2,
     row.front_longueur_m,
@@ -1137,7 +1137,7 @@ export async function saveProspectionInfestation(
         taille_min = ?,
         taille_max = ?,
         taille_moy = ?,
-        surface_tot = ?,
+        surface_totale = ?,
         densite_min = ?,
         densite_max = ?,
         densite_moy = ?,
@@ -1161,7 +1161,7 @@ export async function saveProspectionInfestation(
         interdistance_moy = ?,
         surface_contaminee_ha = ?,
         type_larve = ?,
-        surf_infestee_pourcent = ?,
+        surface_infestee_pourcent = ?,
         stade_dominant = ?,
         taille_groupe_m2 = ?,
         front_longueur_m = ?,
@@ -1187,7 +1187,7 @@ export async function saveProspectionInfestation(
       taille_min,
       taille_max,
       taille_moy,
-      surface_tot,
+      surface_totale,
       densite_min,
       densite_max,
       densite_moy,
@@ -1211,7 +1211,7 @@ export async function saveProspectionInfestation(
       interdistance_moy,
       surface_contaminee_ha,
       type_larve,
-      surf_infestee_pourcent,
+      surface_infestee_pourcent,
       stade_dominant,
       taille_groupe_m2,
       front_longueur_m,

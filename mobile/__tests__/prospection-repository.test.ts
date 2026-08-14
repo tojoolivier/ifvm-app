@@ -57,9 +57,9 @@ const STORED_ROW = {
   latitude: null,
   longitude: null,
   altitude: null,
-  surf_station: null,
-  surf_prospectee: null,
-  surf_infestee: null,
+  surface_station: null,
+  surface_prospectee: null,
+  surface_infestee: null,
   statut: 'brouillon',
   statut_sync: 'local',
   created_at: '2026-07-11T00:00:00.000Z',
@@ -168,9 +168,9 @@ describe('updateProspectionReference', () => {
     latitude: -18.9,
     longitude: 47.5,
     altitude: 1280,
-    surfStation: 10,
-    surfProspectee: 8,
-    surfInfestee: 2,
+    surfaceStation: 10,
+    surfaceProspectee: 8,
+    surfaceInfestee: 2,
     nFiche: 'FI-20260711-111111',
   };
 
@@ -185,9 +185,9 @@ describe('updateProspectionReference', () => {
         REFERENCE_INPUT.latitude,
         REFERENCE_INPUT.longitude,
         REFERENCE_INPUT.altitude,
-        REFERENCE_INPUT.surfStation,
-        REFERENCE_INPUT.surfProspectee,
-        REFERENCE_INPUT.surfInfestee,
+        REFERENCE_INPUT.surfaceStation,
+        REFERENCE_INPUT.surfaceProspectee,
+        REFERENCE_INPUT.surfaceInfestee,
         REFERENCE_INPUT.nFiche,
       ])
     );
@@ -363,11 +363,11 @@ describe('updateProspectionExtensiveReference', () => {
     longitude: 47.5079,
     stationLibre: 'Ambohimanga',
     typeStation: 'riziere_bordure',
-    surfStation: 2.1,
+    surfaceStation: 2.1,
     nMessage: '2026-0301',
   };
 
-  it('writes station_libre/type_station/surf_station/n_message, not station_id lookup fields', async () => {
+  it('writes station_libre/type_station/surface_station/n_message, not station_id lookup fields', async () => {
     getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW });
 
     await updateProspectionExtensiveReference(BASE_INPUT.id, REF_INPUT);
@@ -379,7 +379,7 @@ describe('updateProspectionExtensiveReference', () => {
         REF_INPUT.longitude,
         REF_INPUT.stationLibre,
         REF_INPUT.typeStation,
-        REF_INPUT.surfStation,
+        REF_INPUT.surfaceStation,
         REF_INPUT.nMessage,
         expect.any(String),
         BASE_INPUT.id,
@@ -647,7 +647,7 @@ describe('getProspectionInfestation', () => {
       taille_min: 1,
       taille_max: 2,
       taille_moy: 1.5,
-      surface_tot: 5,
+      surface_totale: 5,
       densite_min: 1,
       densite_max: 3,
       densite_moy: 2,
@@ -684,7 +684,7 @@ describe('saveProspectionInfestation', () => {
     taille_min: 1,
     taille_max: 2,
     taille_moy: 1.5,
-    surface_tot: 5,
+    surface_totale: 5,
     densite_min: 1,
     densite_max: 3,
     densite_moy: 2,
@@ -708,7 +708,7 @@ describe('saveProspectionInfestation', () => {
     interdistance_moy: null,
     surface_contaminee_ha: null,
     type_larve: null,
-    surf_infestee_pourcent: null,
+    surface_infestee_pourcent: null,
     stade_dominant: null,
     taille_groupe_m2: null,
     front_longueur_m: null,

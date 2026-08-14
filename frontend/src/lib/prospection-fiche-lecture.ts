@@ -24,7 +24,7 @@ export interface CaptureRead {
 export interface InfestationRead {
   id: string
   type_cible: string
-  surface_tot: number | null
+  surface_totale: number | null
   densite_moy: number | null
   comportement: string | null
 }
@@ -103,7 +103,7 @@ export function buildEspecesSynthese(
 export interface InfestationSyntheseViewModel {
   hasInfestation: boolean
   typeLabel: string
-  surfaceTot: number | null
+  surfaceTotale: number | null
   comportementLabel: string
 }
 
@@ -111,12 +111,12 @@ export interface InfestationSyntheseViewModel {
 export function buildInfestationSynthese(infestations: InfestationRead[]): InfestationSyntheseViewModel {
   const infestation = infestations[0]
   if (!infestation) {
-    return { hasInfestation: false, typeLabel: '—', surfaceTot: null, comportementLabel: '—' }
+    return { hasInfestation: false, typeLabel: '—', surfaceTotale: null, comportementLabel: '—' }
   }
   return {
     hasInfestation: true,
     typeLabel: TYPE_CIBLE_OPTIONS.find((o) => o.value === infestation.type_cible)?.label ?? infestation.type_cible,
-    surfaceTot: infestation.surface_tot,
+    surfaceTotale: infestation.surface_totale,
     comportementLabel:
       infestation.comportement === 'deplacement' ? 'Déplacement' : infestation.comportement === 'repos' ? 'Repos' : '—',
   }
@@ -184,9 +184,9 @@ export interface FicheImprimableInput {
   date_prospection: string
   latitude: number | null
   longitude: number | null
-  surf_station: number | null
-  surf_prospectee: number | null
-  surf_infestee: number | null
+  surface_station: number | null
+  surface_prospectee: number | null
+  surface_infestee: number | null
   vegetation: Record<string, unknown> | null
   sol: Record<string, unknown> | null
   degats_cultures: string | null
@@ -199,9 +199,9 @@ export interface FicheImprimableViewModel {
   nFiche: string
   dateProspection: string
   positionGps: string
-  surfStation: number | null
-  surfProspectee: number | null
-  surfInfestee: number | null
+  surfaceStation: number | null
+  surfaceProspectee: number | null
+  surfaceInfestee: number | null
   especes: EspeceSyntheseViewModel[]
   infestation: InfestationSyntheseViewModel
   vegetationSummary: string
@@ -213,9 +213,9 @@ export function buildFicheImprimable(prospection: FicheImprimableInput): FicheIm
     nFiche: prospection.n_fiche ?? '—',
     dateProspection: prospection.date_prospection,
     positionGps: formatCoordinates(prospection.latitude, prospection.longitude),
-    surfStation: prospection.surf_station,
-    surfProspectee: prospection.surf_prospectee,
-    surfInfestee: prospection.surf_infestee,
+    surfaceStation: prospection.surface_station,
+    surfaceProspectee: prospection.surface_prospectee,
+    surfaceInfestee: prospection.surface_infestee,
     especes: buildEspecesSynthese(prospection.captures, prospection.populations),
     infestation: buildInfestationSynthese(prospection.infestations),
     vegetationSummary: buildVegetationSummary(prospection.vegetation, prospection.sol, prospection.degats_cultures),
