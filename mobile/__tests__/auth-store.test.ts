@@ -95,7 +95,7 @@ describe('useAuthStore', () => {
 
       await expect(
         useAuthStore.getState().login('alice@test.com', 'wrong')
-      ).rejects.toThrow('Login failed');
+      ).rejects.toThrow('Invalid credentials');
 
       const state = useAuthStore.getState();
       expect(state.token).toBeNull();
