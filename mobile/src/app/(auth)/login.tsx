@@ -46,13 +46,16 @@ export default function LoginScreen() {
         // Identifiants refusés par le backend : erreur de saisie, affichée inline dans le formulaire.
         setError(e.message || 'Identifiants incorrects. Veuillez réessayer.');
       } else {
-        // Panne réseau/serveur : ce n'est pas la faute de l'utilisateur, on le signale via la
-        // bannière globale avec un bouton "Réessayer" plutôt que de l'accuser d'une mauvaise saisie.
+        // Panne réseau/serveur (ou toute erreur JS locale post-login, ex: écriture du token en
+        // storage) : ce n'est pas la faute de l'utilisateur, on le signale via la bannière globale
+        // avec un bouton "Réessayer". Le détail technique est ajouté pour ne pas mélanger un vrai
+        // problème réseau avec une erreur locale sous le même message générique trompeur.
+        const detail = e instanceof Error ? e.message : String(e);
         showError({
           message:
             e instanceof ApiError
               ? e.message
-              : 'Impossible de contacter le serveur. Vérifiez votre connexion.',
+              : `Impossible de contacter le serveur. Vérifiez votre connexion. (${detail})`,
           retry: handleSubmit,
         });
       }
