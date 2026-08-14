@@ -3,9 +3,36 @@ import {
   validateGpsPosition,
   validateComportementDirection,
   validateGroupementLarvaire,
+  validateProspectionDate,
   classifyLarvalPopulation,
   classifyAerialPopulation,
 } from '../src/lib/prospection-validation';
+
+describe('validateProspectionDate — antériorité au début de mission (#105)', () => {
+  it('bloque quand la date de prospection précède le début de la campagne', () => {
+    const { blocages } = validateProspectionDate({
+      dateProspection: '2026-05-01',
+      campagneStartDate: '2026-06-01',
+    });
+    expect(blocages).toEqual([expect.stringContaining('antérieure au début de la mission')]);
+  });
+
+  it('ne bloque pas quand la date de prospection est exactement le début de la campagne', () => {
+    const { blocages } = validateProspectionDate({
+      dateProspection: '2026-06-01',
+      campagneStartDate: '2026-06-01',
+    });
+    expect(blocages).toEqual([]);
+  });
+
+  it('ne bloque pas quand la date de prospection est postérieure au début de la campagne', () => {
+    const { blocages } = validateProspectionDate({
+      dateProspection: '2026-07-11',
+      campagneStartDate: '2026-06-01',
+    });
+    expect(blocages).toEqual([]);
+  });
+});
 
 describe('validateInfestationFormation — densité min < max', () => {
   it('bloque quand la densité minimale est supérieure à la maximale', () => {

@@ -28,8 +28,12 @@ export default function TypeChooserScreen() {
       const draft = await startNewProspection({ token, prospecteurId: user.id, typeProspection: 'intensive' });
       await hydrateFromDraft(draft.id);
       router.replace({ pathname: '/(prospection)/reference' as any, params: { draftId: draft.id } });
-    } catch {
-      setError('Impossible de démarrer une nouvelle fiche (campagne introuvable ou hors-ligne).');
+    } catch (e) {
+      setError(
+        e instanceof Error && e.message
+          ? e.message
+          : 'Impossible de démarrer une nouvelle fiche (campagne introuvable ou hors-ligne).'
+      );
     } finally {
       setIsCreating(false);
     }
@@ -43,8 +47,12 @@ export default function TypeChooserScreen() {
       const draft = await startNewProspection({ token, prospecteurId: user.id, typeProspection: 'extensive' });
       await hydrateFromDraft(draft.id);
       router.replace({ pathname: '/(prospection)/extensive-reference' as any, params: { draftId: draft.id } });
-    } catch {
-      setError('Impossible de démarrer une nouvelle fiche (campagne introuvable ou hors-ligne).');
+    } catch (e) {
+      setError(
+        e instanceof Error && e.message
+          ? e.message
+          : 'Impossible de démarrer une nouvelle fiche (campagne introuvable ou hors-ligne).'
+      );
     } finally {
       setIsCreating(false);
     }

@@ -173,6 +173,17 @@ describe('startNewProspection', () => {
     ).rejects.toThrow('Aucune campagne disponible');
     expect(mockCreateDraft).not.toHaveBeenCalled();
   });
+
+  it('throws when the selected campagne has not started yet (#105)', async () => {
+    mockApiClient.getCampagnes.mockResolvedValueOnce([
+      { id: 'future', name: 'Future', start_date: '2099-01-01', end_date: null },
+    ]);
+
+    await expect(
+      startNewProspection({ token: 'tok', prospecteurId: 'p1' })
+    ).rejects.toThrow('antérieure au début de la mission');
+    expect(mockCreateDraft).not.toHaveBeenCalled();
+  });
 });
 
 describe('loadValidatedProspections', () => {
