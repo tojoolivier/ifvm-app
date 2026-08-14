@@ -2,6 +2,7 @@ import {
   validateInfestationFormation,
   validateGpsPosition,
   validateComportementDirection,
+  validateGroupementLarvaire,
   classifyLarvalPopulation,
 } from '../src/lib/prospection-validation';
 
@@ -210,5 +211,67 @@ describe('classifyLarvalPopulation — tache vs bande (#103)', () => {
     expect(
       classifyLarvalPopulation({ tailleGroupeM2: 5000, directionRenseignee: false, nbTaches: null })
     ).toBe('tache_larvaire');
+  });
+});
+
+describe('validateGroupementLarvaire — nb taches par bande + distance intergroupes (#103)', () => {
+  it('bloque une bande sans nombre de taches renseigné', () => {
+    const { blocages } = validateGroupementLarvaire({
+      typeCible: 'bande_larvaire',
+      nbTachesBandes: null,
+      interdistanceMoy: 250,
+    });
+    expect(blocages.length).toBe(1);
+  });
+
+  it('bloque une bande avec un nombre de taches à 0', () => {
+    const { blocages } = validateGroupementLarvaire({
+      typeCible: 'bande_larvaire',
+      nbTachesBandes: 0,
+      interdistanceMoy: 250,
+    });
+    expect(blocages.length).toBe(1);
+  });
+
+  it("n'exige pas de nombre de taches pour une tache isolée", () => {
+    const { blocages } = validateGroupementLarvaire({
+      typeCible: 'tache_larvaire',
+      nbTachesBandes: null,
+      interdistanceMoy: 250,
+    });
+    expect(blocages).toEqual([]);
+  });
+
+  it.each(['tache_larvaire', 'bande_larvaire'])(
+    'bloque %s sans distance intergroupes renseignée',
+    (typeCible) => {
+      const { blocages } = validateGroupementLarvaire({
+        typeCible,
+        nbTachesBandes: 3,
+        interdistanceMoy: null,
+      });
+      expect(blocages.length).toBe(1);
+    }
+  );
+
+  it.each(['tache_larvaire', 'bande_larvaire'])(
+    'bloque %s avec une distance intergroupes à 0',
+    (typeCible) => {
+      const { blocages } = validateGroupementLarvaire({
+        typeCible,
+        nbTachesBandes: 3,
+        interdistanceMoy: 0,
+      });
+      expect(blocages.length).toBe(1);
+    }
+  );
+
+  it('ne bloque pas une bande complète (taches et distance renseignées)', () => {
+    const { blocages } = validateGroupementLarvaire({
+      typeCible: 'bande_larvaire',
+      nbTachesBandes: 3,
+      interdistanceMoy: 250,
+    });
+    expect(blocages).toEqual([]);
   });
 });

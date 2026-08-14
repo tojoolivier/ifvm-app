@@ -130,6 +130,39 @@ export function validateComportementDirection(input: ComportementDirectionValida
   return { blocages, avertissements };
 }
 
+export interface GroupementLarvaireValidationInput {
+  typeCible: string;
+  nbTachesBandes: number | null;
+  interdistanceMoy: number | null;
+}
+
+/** Types de cible larvaire groupée (§1.1 du manuel) — la distance intergroupes devient obligatoire. */
+const TYPES_GROUPEMENT_LARVAIRE = ['tache_larvaire', 'bande_larvaire'];
+
+/**
+ * Nombre de taches par bande (≥1) et distance moyenne intergroupes (>0), §2.1
+ * points 45-46 du manuel. Le nombre de taches n'a de sens que pour une bande ;
+ * la distance intergroupes est exigée dès que la population est groupée
+ * (tache ou bande).
+ */
+export function validateGroupementLarvaire(input: GroupementLarvaireValidationInput): ValidationResult {
+  const blocages: string[] = [];
+  const avertissements: string[] = [];
+
+  if (input.typeCible === 'bande_larvaire' && (input.nbTachesBandes == null || input.nbTachesBandes < 1)) {
+    blocages.push('Nombre de taches par bande obligatoire (au moins 1) pour une bande larvaire.');
+  }
+
+  if (
+    TYPES_GROUPEMENT_LARVAIRE.includes(input.typeCible) &&
+    (input.interdistanceMoy == null || input.interdistanceMoy <= 0)
+  ) {
+    blocages.push('Distance moyenne intergroupes obligatoire (supérieure à 0) pour une population groupée.');
+  }
+
+  return { blocages, avertissements };
+}
+
 export type LarvalPopulationType = 'tache_larvaire' | 'bande_larvaire';
 
 export interface LarvalPopulationClassificationInput {

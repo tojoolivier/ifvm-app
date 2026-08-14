@@ -14,6 +14,7 @@ import { useAsyncAction } from '@/hooks/use-async-action';
 import {
   TAILLE_GROUPE_SEUIL_BANDE_M2,
   validateComportementDirection,
+  validateGroupementLarvaire,
   validateInfestationFormation,
 } from '@/lib/prospection-validation';
 
@@ -329,6 +330,16 @@ export default function InfestationScreen() {
       });
       blocages.push(...directionResult.blocages);
       avertissements.push(...directionResult.avertissements);
+
+      if (target === 'tache_larvaire' || target === 'bande_larvaire') {
+        const groupementResult = validateGroupementLarvaire({
+          typeCible: target,
+          nbTachesBandes: numOrNull(f.nbTachesBandes),
+          interdistanceMoy: numOrNull(f.interdistanceMoy),
+        });
+        blocages.push(...groupementResult.blocages);
+        avertissements.push(...groupementResult.avertissements);
+      }
     }
     if (blocages.length > 0) {
       Alert.alert('Saisie incohérente', blocages.join('\n'));

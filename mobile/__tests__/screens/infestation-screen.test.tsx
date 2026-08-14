@@ -38,7 +38,7 @@ describe('InfestationScreen', () => {
 
   it('affiche une bannière d’erreur, sans navigation, quand la sauvegarde échoue', async () => {
     jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
-      { type_cible: 'tache_larvaire', surface_tot: 12 } as any,
+      { type_cible: 'tache_larvaire', surface_tot: 12, interdistance_moy: 250 } as any,
     ]);
     jest.mocked(prospectionRepository.saveProspectionInfestation).mockRejectedValueOnce(new Error('boom'));
 
@@ -74,6 +74,7 @@ describe('InfestationScreen', () => {
         type_cible: 'bande_larvaire',
         surface_tot: 12,
         nb_taches_bandes: 3,
+        interdistance_moy: 250,
         comportement: 'deplacement',
         vent_de: 'N',
         direction_vers: 'S',
