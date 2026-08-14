@@ -121,6 +121,32 @@ describe('InfestationScreen', () => {
     );
   });
 
+  it('conserve la surface contaminée et la part infestée à la sauvegarde d’un essaim (#104)', async () => {
+    jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
+      {
+        type_cible: 'essaim',
+        surface_tot: 12,
+        surface_contaminee_ha: 40,
+        surf_infestee_pourcent: 25,
+        vent_de: 'N',
+        direction_vers: 'S',
+      } as any,
+    ]);
+
+    await render(<InfestationScreen />);
+
+    fireEvent.press(await screen.findByText('Comportement  ›'));
+    fireEvent.press(await screen.findByText('Continuer  ›'));
+
+    await waitFor(() =>
+      expect(prospectionRepository.saveProspectionInfestation).toHaveBeenCalledWith(
+        'draft-123',
+        'essaim',
+        expect.objectContaining({ surface_contaminee_ha: 40, surf_infestee_pourcent: 25 })
+      )
+    );
+  });
+
   it('classe "vol clair" via le questionnaire séquentiel et bloque la densité en saisie libre (#104)', async () => {
     jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
       { type_cible: 'vol_clair', surface_tot: 12, vent_de: 'N', direction_vers: 'S' } as any,
