@@ -193,3 +193,55 @@ export function classifyLarvalPopulation(
 
   return estBande ? 'bande_larvaire' : 'tache_larvaire';
 }
+
+export type AerialPopulationClassification =
+  | 'non_classe'
+  | 'vol_clair'
+  | 'essaim_densite_moyenne'
+  | 'essaim_densite_forte'
+  | 'essaim_densite_tres_forte';
+
+export interface AerialPopulationClassificationInput {
+  /** Q1 — le vol est-il spontané, non provoqué par le prospecteur ? */
+  volSpontaneNonProvoque: boolean;
+  /** Q2 — la formation n'est visible que de près. */
+  visibleSeulementDePres: boolean | null;
+  /** Q3 — masse sombre qui ne masque pas le paysage à l'arrière-plan. */
+  masseSombreSansMasquerPaysage: boolean | null;
+  /** Q4 — dans quelle mesure la formation masque le paysage à l'arrière-plan. */
+  masquePaysage: 'partiellement' | 'entierement' | null;
+}
+
+/**
+ * Classification automatique vol clair / essaim (§3.2 du manuel de terrain,
+ * #104) via le questionnaire séquentiel fermé à 4 questions : un vol non
+ * spontané (provoqué, ex. par le passage d'un véhicule) n'est pas classable.
+ * Sinon, chaque question ferme une branche du questionnaire dès qu'elle
+ * répond « oui » ; la classe de densité n'est donc jamais saisissable
+ * directement (garde-fou §2.1 point 47 / #104 AC).
+ */
+export function classifyAerialPopulation(
+  input: AerialPopulationClassificationInput
+): AerialPopulationClassification {
+  if (!input.volSpontaneNonProvoque) {
+    return 'non_classe';
+  }
+
+  if (input.visibleSeulementDePres) {
+    return 'vol_clair';
+  }
+
+  if (input.masseSombreSansMasquerPaysage) {
+    return 'essaim_densite_moyenne';
+  }
+
+  if (input.masquePaysage === 'partiellement') {
+    return 'essaim_densite_forte';
+  }
+
+  if (input.masquePaysage === 'entierement') {
+    return 'essaim_densite_tres_forte';
+  }
+
+  return 'non_classe';
+}

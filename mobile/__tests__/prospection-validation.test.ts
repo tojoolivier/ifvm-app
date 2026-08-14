@@ -4,6 +4,7 @@ import {
   validateComportementDirection,
   validateGroupementLarvaire,
   classifyLarvalPopulation,
+  classifyAerialPopulation,
 } from '../src/lib/prospection-validation';
 
 describe('validateInfestationFormation — densité min < max', () => {
@@ -273,5 +274,67 @@ describe('validateGroupementLarvaire — nb taches par bande + distance intergro
       interdistanceMoy: 250,
     });
     expect(blocages).toEqual([]);
+  });
+});
+
+describe('classifyAerialPopulation — vol clair vs essaim (#104)', () => {
+  const base = {
+    volSpontaneNonProvoque: true,
+    visibleSeulementDePres: null as boolean | null,
+    masseSombreSansMasquerPaysage: null as boolean | null,
+    masquePaysage: null as 'partiellement' | 'entierement' | null,
+  };
+
+  it("classe non_classe quand le vol n'est pas spontané (provoqué)", () => {
+    expect(
+      classifyAerialPopulation({ ...base, volSpontaneNonProvoque: false, visibleSeulementDePres: true })
+    ).toBe('non_classe');
+  });
+
+  it('classe vol_clair quand la formation n’est visible que de près', () => {
+    expect(classifyAerialPopulation({ ...base, visibleSeulementDePres: true })).toBe('vol_clair');
+  });
+
+  it('classe essaim_densite_moyenne pour une masse sombre qui ne masque pas le paysage', () => {
+    expect(
+      classifyAerialPopulation({
+        ...base,
+        visibleSeulementDePres: false,
+        masseSombreSansMasquerPaysage: true,
+      })
+    ).toBe('essaim_densite_moyenne');
+  });
+
+  it('classe essaim_densite_forte quand le paysage est masqué partiellement', () => {
+    expect(
+      classifyAerialPopulation({
+        ...base,
+        visibleSeulementDePres: false,
+        masseSombreSansMasquerPaysage: false,
+        masquePaysage: 'partiellement',
+      })
+    ).toBe('essaim_densite_forte');
+  });
+
+  it('classe essaim_densite_tres_forte quand le paysage est masqué entièrement', () => {
+    expect(
+      classifyAerialPopulation({
+        ...base,
+        visibleSeulementDePres: false,
+        masseSombreSansMasquerPaysage: false,
+        masquePaysage: 'entierement',
+      })
+    ).toBe('essaim_densite_tres_forte');
+  });
+
+  it('classe non_classe quand le questionnaire est incomplet (aucune réponse positive)', () => {
+    expect(
+      classifyAerialPopulation({
+        ...base,
+        visibleSeulementDePres: false,
+        masseSombreSansMasquerPaysage: false,
+        masquePaysage: null,
+      })
+    ).toBe('non_classe');
   });
 });
