@@ -776,6 +776,8 @@ export interface components {
             /** Essaim Pose */
             essaim_pose?: boolean | null;
             type_essaim?: components["schemas"]["TypeEssaim"] | null;
+            /** Heure Observation */
+            heure_observation?: string | null;
             /** Nb Taches Bandes */
             nb_taches_bandes?: number | null;
             /** Interdistance M */
@@ -854,6 +856,8 @@ export interface components {
             essaim_pose?: boolean | null;
             /** Type Essaim */
             type_essaim?: string | null;
+            /** Heure Observation */
+            heure_observation?: string | null;
             /** Nb Taches Bandes */
             nb_taches_bandes?: number | null;
             /** Interdistance M */

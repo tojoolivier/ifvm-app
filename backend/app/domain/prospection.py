@@ -98,6 +98,7 @@ class ProspectionInfestation:
     essaim_en_vol: bool | None = None
     essaim_pose: bool | None = None
     type_essaim: str | None = None
+    heure_observation: str | None = None
 
     # ==========================================
     # NOUVEAUX CHAMPS - Larves (C)
