@@ -23,7 +23,8 @@ function display(value: string | number | null | undefined): string {
  */
 export default function CiblesScreen() {
   const router = useRouter();
-  const { traitementId, isValidationView } = useLocalSearchParams<{ traitementId: string; isValidationView?: string }>();
+  const { traitementId, isValidationView, origineId } =
+    useLocalSearchParams<{ traitementId: string; isValidationView?: string; origineId?: string }>();
   const [cible, setCible] = useState<Cible | null>(null);
 
   useEffect(() => {
@@ -71,7 +72,7 @@ export default function CiblesScreen() {
         <TouchableOpacity
           style={styles.continueButton}
           onPress={() =>
-            router.push({ pathname: '/(traitement)/traitement' as any, params: { traitementId, isValidationView } })
+            router.push({ pathname: '/(traitement)/traitement' as any, params: { traitementId, isValidationView, origineId } })
           }
         >
           <Text style={styles.continueButtonText}>Continuer  ›</Text>
