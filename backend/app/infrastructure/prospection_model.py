@@ -275,6 +275,7 @@ class ProspectionInfestationModel(Base):
     essaim_en_vol: Mapped[bool | None] = mapped_column(Boolean(), nullable=True)
     essaim_pose: Mapped[bool | None] = mapped_column(Boolean(), nullable=True)
     type_essaim: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    heure_observation: Mapped[str | None] = mapped_column(Text(), nullable=True)
 
     # ==========================================
     # NOUVEAUX CHAMPS - Larves (C)

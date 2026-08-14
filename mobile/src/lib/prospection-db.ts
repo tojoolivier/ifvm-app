@@ -341,6 +341,7 @@ async function migrateInfestationTable(db: SQLite.SQLiteDatabase): Promise<void>
     { name: 'front_largeur_m', type: 'REAL' },
     { name: 'densite_max_front', type: 'REAL' },
     { name: 'densite_moy_arriere_front', type: 'REAL' },
+    { name: 'heure_observation', type: 'TEXT' },
   ];
 
   for (const col of columnsToAdd) {

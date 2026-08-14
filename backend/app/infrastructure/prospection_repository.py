@@ -198,6 +198,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                 essaim_en_vol=i.essaim_en_vol,
                 essaim_pose=i.essaim_pose,
                 type_essaim=i.type_essaim,
+                heure_observation=i.heure_observation,
                 # ==========================================
                 # NOUVEAUX CHAMPS - Larves (C)
                 # ==========================================
@@ -319,6 +320,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                 essaim_en_vol=i.essaim_en_vol,
                 essaim_pose=i.essaim_pose,
                 type_essaim=i.type_essaim,
+                heure_observation=i.heure_observation,
                 # ==========================================
                 # NOUVEAUX CHAMPS - Larves (C)
                 # ==========================================
@@ -491,6 +493,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                     essaim_en_vol=i.essaim_en_vol,
                     essaim_pose=i.essaim_pose,
                     type_essaim=i.type_essaim,
+                    heure_observation=i.heure_observation,
                     # ==========================================
                     # NOUVEAUX CHAMPS - Larves (C)
                     # ==========================================
