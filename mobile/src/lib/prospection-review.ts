@@ -194,7 +194,9 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
     latitude: draft.latitude ? Number(draft.latitude) : null,
     longitude: draft.longitude ? Number(draft.longitude) : null,
     altitude: draft.altitude ? Number(draft.altitude) : null,
-    biotope: (draft.biotope || null) as ProspectionCreateInput['biotope'],
+    // toLowerCase() : rattrape les brouillons locaux enregistrés avant la correction du picker
+    // (qui stockait 'Xerophyle'/'Mesophyle'/'Hydrophyle' en PascalCase, rejeté par l'enum backend).
+    biotope: (draft.biotope ? draft.biotope.toLowerCase() : null) as ProspectionCreateInput['biotope'],
     surface_station: draft.surface_station ? Number(draft.surface_station) : null,
     surface_prospectee: draft.surface_prospectee ? Number(draft.surface_prospectee) : null,
     surface_infestee: draft.surface_infestee ? Number(draft.surface_infestee) : null,
