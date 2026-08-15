@@ -22,7 +22,7 @@ function toIsoDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}/;
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}($|T)/;
 
 function fromIsoDate(iso: string): Date {
   if (!ISO_DATE_RE.test(iso)) return new Date();
