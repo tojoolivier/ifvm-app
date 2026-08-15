@@ -788,5 +788,6 @@ async def test_create_prospection_conclusion_invalide_echoue(
         },
         headers=auth_headers,
     )
-    # Le check constraint SQL rejette la valeur ; la route mappe l'IntegrityError résultante en 409.
-    assert response.status_code == 409
+    # conclusion_validation est un Enum Pydantic (issue #117) : la valeur invalide est
+    # rejetée à la validation du payload, avant toute requête SQL.
+    assert response.status_code == 422

@@ -41,19 +41,131 @@ class DegatsCultures(str, Enum):
     FORTS = "forts"
 
 
+class StatutProspection(str, Enum):
+    BROUILLON = "brouillon"
+    EN_ATTENTE = "en_attente"
+    VERIFIEE = "verifiee"
+    VALIDEE = "validee"
+    REJETEE = "rejetee"
+
+
+class StatutSync(str, Enum):
+    LOCAL = "local"
+    SYNCED = "synced"
+    CONFLICT = "conflict"
+
+
+class TypeStation(str, Enum):
+    RIZIERE_BORDURE = "riziere_bordure"
+    BAS_FOND = "bas_fond"
+    PLATEAU = "plateau"
+    JACHERE = "jachere"
+    CULTURE = "culture"
+
+
+class VerdureStrate(str, Enum):
+    FAIBLE = "faible"
+    MOYENNE = "moyenne"
+    FORTE = "forte"
+
+
+class ConclusionValidation(str, Enum):
+    CONFIRMEE = "confirmee"
+    INFIRMEE = "infirmee"
+
+
+class EspeceAcridienne(str, Enum):
+    LMC = "LMC"
+    NSE = "NSE"
+
+
+class CategorieCapture(str, Enum):
+    IMAGO = "imago"
+    LARVE = "larve"
+
+
+class NiveauPopulation(str, Enum):
+    NEANT = "neant"
+    RARE = "rare"
+    PEU = "peu"
+    BEAUCOUP = "beaucoup"
+    DOMINANT = "dominant"
+
+
+class MethodePopulation(str, Enum):
+    VISUEL = "visuel"
+    COMPTAGE_DIRECT = "comptage_direct"
+
+
+class StadeImago(str, Enum):
+    A1 = "A1"
+    A2 = "A2"
+    A3 = "A3"
+    A4 = "A4"
+    A5 = "A5"
+
+
+class Deplacement(str, Enum):
+    REPOS = "repos"
+    PERCHEE = "perchee"
+
+
+class Sexe(str, Enum):
+    F = "F"
+    M = "M"
+
+
+class PhaseAcridienne(str, Enum):
+    SOLITAIRE = "solitaire"
+    SOLITARO_TRANS = "solitaro_trans"
+    TRANSIENS = "transiens"
+    GREGAIRE = "gregaire"
+
+
+class TypeCible(str, Enum):
+    TACHE_LARVAIRE = "tache_larvaire"
+    BANDE_LARVAIRE = "bande_larvaire"
+    VOL_CLAIR = "vol_clair"
+    ESSAIM = "essaim"
+
+
+class ComportementInfestation(str, Enum):
+    REPOS = "repos"
+    DEPLACEMENT = "deplacement"
+
+
+class FicheType(str, Enum):
+    INTENSIVE = "intensive"
+    EXTENSIVE = "extensive"
+    VALIDATION = "validation"
+    CRT = "crt"
+    VOL = "vol"
+    METEO = "meteo"
+
+
+class ActionAudit(str, Enum):
+    CREATION = "creation"
+    MODIFICATION = "modification"
+    SOUMISSION = "soumission"
+    VERIFICATION = "verification"
+    VALIDATION = "validation"
+    REJET = "rejet"
+    COMMENTAIRE = "commentaire"
+
+
 class PopulationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
-    espece: str
-    categorie: str
+    espece: EspeceAcridienne
+    categorie: CategorieCapture
     densite_diffuse: float | None
     densite_groupee: float | None
     captures_nombre: int | None
     temps_capture: int | None
-    methode: str | None = None
+    methode: MethodePopulation | None = None
     phase: str | None = None
-    accouplement: str | None
-    ponte: str | None
+    accouplement: NiveauPopulation | None
+    ponte: NiveauPopulation | None
 
     # ==========================================
     # NOUVEAUX CHAMPS - Extensif Imagos (B)
@@ -61,7 +173,7 @@ class PopulationRead(BaseModel):
     captures_sol: int | None = None
     captures_trans: int | None = None
     captures_greg: int | None = None
-    stade_imago: str | None = None
+    stade_imago: StadeImago | None = None
     essaim_observe: bool | None = None
 
     # ==========================================
@@ -71,16 +183,16 @@ class PopulationRead(BaseModel):
     tache_larvaire: bool | None = None
     bande_larvaire: bool | None = None
     interdistance: float | None = None
-    deplacement: str | None = None
+    deplacement: Deplacement | None = None
 
 
 class CaptureRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
-    espece: str
-    categorie: str
-    sexe: str | None
-    phase: str
+    espece: EspeceAcridienne
+    categorie: CategorieCapture
+    sexe: Sexe | None
+    phase: PhaseAcridienne
     stade: str
     effectif: int
 
@@ -88,8 +200,8 @@ class CaptureRead(BaseModel):
 class InfestationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
-    espece: str | None
-    type_cible: str
+    espece: EspeceAcridienne | None
+    type_cible: TypeCible
     taille_min: float | None
     taille_max: float | None
     taille_moy: float | None
@@ -98,7 +210,7 @@ class InfestationRead(BaseModel):
     densite_max: float | None
     densite_moy: float | None
     interdistance: float | None
-    comportement: str | None
+    comportement: ComportementInfestation | None
     direction_de: str | None
     direction_vers: str | None
     vent_de: str | None
@@ -113,7 +225,7 @@ class InfestationRead(BaseModel):
     taille_epaisseur: float | None = None
     essaim_en_vol: bool | None = None
     essaim_pose: bool | None = None
-    type_essaim: str | None = None
+    type_essaim: TypeEssaim | None = None
     heure_observation: str | None = None
     densite_en_vol: float | None = None
     dimension_ha: float | None = None
@@ -127,9 +239,9 @@ class InfestationRead(BaseModel):
     interdistance_max: float | None = None
     interdistance_moy: float | None = None
     surface_contaminee_ha: float | None = None
-    type_larve: str | None = None
+    type_larve: TypeLarve | None = None
     surface_infestee_pourcent: float | None = None
-    stade_dominant: str | None = None
+    stade_dominant: StadeDominant | None = None
     taille_groupe_m2: float | None = None
     front_longueur_m: float | None = None
     front_largeur_m: float | None = None
@@ -138,16 +250,16 @@ class InfestationRead(BaseModel):
 
 
 class PopulationCreate(BaseModel):
-    espece: str
-    categorie: str
+    espece: EspeceAcridienne
+    categorie: CategorieCapture
     densite_diffuse: float | None = Field(None, ge=0, allow_inf_nan=False)
     densite_groupee: float | None = Field(None, ge=0, allow_inf_nan=False)
     captures_nombre: int | None = None
     temps_capture: int | None = None
-    methode: str | None = None
+    methode: MethodePopulation | None = None
     phase: str | None = None
-    accouplement: str | None = None
-    ponte: str | None = None
+    accouplement: NiveauPopulation | None = None
+    ponte: NiveauPopulation | None = None
 
     # ==========================================
     # NOUVEAUX CHAMPS - Extensif Imagos (B)
@@ -155,7 +267,7 @@ class PopulationCreate(BaseModel):
     captures_sol: int | None = Field(None, ge=0)
     captures_trans: int | None = Field(None, ge=0)
     captures_greg: int | None = Field(None, ge=0)
-    stade_imago: str | None = None
+    stade_imago: StadeImago | None = None
     essaim_observe: bool | None = None
 
     # ==========================================
@@ -165,21 +277,21 @@ class PopulationCreate(BaseModel):
     tache_larvaire: bool | None = None
     bande_larvaire: bool | None = None
     interdistance: float | None = Field(None, ge=0)
-    deplacement: str | None = None
+    deplacement: Deplacement | None = None
 
 
 class CaptureCreate(BaseModel):
-    espece: str
-    categorie: str
-    sexe: str | None = None
-    phase: str
+    espece: EspeceAcridienne
+    categorie: CategorieCapture
+    sexe: Sexe | None = None
+    phase: PhaseAcridienne
     stade: str
     effectif: int = 0
 
 
 class InfestationCreate(BaseModel):
-    espece: str | None = None
-    type_cible: str
+    espece: EspeceAcridienne | None = None
+    type_cible: TypeCible
     taille_min: float | None = None
     taille_max: float | None = None
     taille_moy: float | None = None
@@ -188,7 +300,7 @@ class InfestationCreate(BaseModel):
     densite_max: float | None = Field(None, ge=0, allow_inf_nan=False)
     densite_moy: float | None = Field(None, ge=0, allow_inf_nan=False)
     interdistance: float | None = None
-    comportement: str | None = None
+    comportement: ComportementInfestation | None = None
     direction_de: str | None = None
     direction_vers: str | None = None
     vent_de: str | None = None
@@ -251,7 +363,7 @@ class ProspectionCreate(BaseModel):
     hauteur_strate: float | None = Field(None, ge=0)
     ennemis_naturels: str | None = None
     observations: str | None = None
-    statut: str = "brouillon"
+    statut: StatutProspection = StatutProspection.BROUILLON
 
     # ==========================================
     # NOUVEAUX CHAMPS - Références (A)
@@ -273,12 +385,12 @@ class ProspectionCreate(BaseModel):
     # NOUVEAUX CHAMPS - Extensif & Validation
     # ==========================================
     station_libre: str | None = None
-    type_station: str | None = None
-    verdure_strate: str | None = None
+    type_station: TypeStation | None = None
+    verdure_strate: VerdureStrate | None = None
     signalement_source: str | None = None
     signalement_date: str | None = None
     signalement_description: str | None = None
-    conclusion_validation: str | None = None
+    conclusion_validation: ConclusionValidation | None = None
     avertissements: list[str] = []
 
     populations: list[PopulationCreate] = []
@@ -309,7 +421,7 @@ class ProspectionUpdate(BaseModel):
     hauteur_strate: float | None = Field(None, ge=0)
     ennemis_naturels: str | None = None
     observations: str | None = None
-    statut: str | None = None
+    statut: StatutProspection | None = None
 
     # ==========================================
     # NOUVEAUX CHAMPS - Références (A)
@@ -331,17 +443,17 @@ class ProspectionUpdate(BaseModel):
     # NOUVEAUX CHAMPS - Extensif & Validation
     # ==========================================
     station_libre: str | None = None
-    type_station: str | None = None
-    verdure_strate: str | None = None
+    type_station: TypeStation | None = None
+    verdure_strate: VerdureStrate | None = None
     signalement_source: str | None = None
     signalement_date: str | None = None
     signalement_description: str | None = None
-    conclusion_validation: str | None = None
+    conclusion_validation: ConclusionValidation | None = None
     avertissements: list[str] | None = None
 
 
 class StatutChange(BaseModel):
-    statut: str
+    statut: StatutProspection
     commentaire: str | None = None
 
 
@@ -352,10 +464,10 @@ class CommentaireCreate(BaseModel):
 class AuditLogRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
-    fiche_type: str
+    fiche_type: FicheType
     fiche_id: uuid.UUID
     auteur_id: uuid.UUID
-    action: str
+    action: ActionAudit
     details: dict[str, Any] | None
     created_at: datetime
 
@@ -364,7 +476,7 @@ class ProspectionRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    type_prospection: str
+    type_prospection: TypeProspection
     campagne_id: uuid.UUID
     prospecteur_id: uuid.UUID
     station_id: uuid.UUID | None
@@ -375,11 +487,11 @@ class ProspectionRead(BaseModel):
     latitude: float | None
     longitude: float | None
     altitude: float | None
-    biotope: str | None
+    biotope: Biotope | None
     surface_station: float | None
     surface_prospectee: float | None
     surface_infestee: float | None
-    degats_cultures: str | None
+    degats_cultures: DegatsCultures | None
     derniere_pluie: date | None
     intensite_pluie: str | None
     vegetation: dict[str, Any] | None
@@ -388,8 +500,8 @@ class ProspectionRead(BaseModel):
     hauteur_strate: float | None
     ennemis_naturels: str | None
     observations: str | None
-    statut: str
-    statut_sync: str
+    statut: StatutProspection
+    statut_sync: StatutSync
     created_at: datetime
     updated_at: datetime
 
@@ -413,12 +525,12 @@ class ProspectionRead(BaseModel):
     # NOUVEAUX CHAMPS - Extensif & Validation
     # ==========================================
     station_libre: str | None = None
-    type_station: str | None = None
-    verdure_strate: str | None = None
+    type_station: TypeStation | None = None
+    verdure_strate: VerdureStrate | None = None
     signalement_source: str | None = None
     signalement_date: str | None = None
     signalement_description: str | None = None
-    conclusion_validation: str | None = None
+    conclusion_validation: ConclusionValidation | None = None
     avertissements: list[str] = []
 
     populations: list[PopulationRead] = []
