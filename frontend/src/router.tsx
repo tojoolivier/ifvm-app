@@ -12,6 +12,8 @@ import { CartePage } from './pages/CartePage'
 import { DesignSystemPage } from './pages/DesignSystemPage'
 import { UsersPage } from './pages/UsersPage'
 import { StationPage } from './pages/StationPage'
+import { ValidationFinalePage } from './pages/ValidationFinalePage'
+import { NotFoundPage } from './pages/NotFoundPage'
 
 export const routes: RouteObject[] = [
   // Route publique
@@ -41,6 +43,9 @@ export const routes: RouteObject[] = [
           // Gestion des stations
           { path: '/stations', element: <StationPage /> },
 
+          // Validation finale
+          { path: '/validation-finale', element: <ValidationFinalePage /> },
+
           // Autres pages
           { path: '/syntheses', element: <SynthesesPage /> },
           { path: '/carte', element: <CartePage /> },
@@ -50,8 +55,8 @@ export const routes: RouteObject[] = [
     ],
   },
 
-  // Redirection par défaut
-  { path: '*', element: <LoginPage /> },
+  // Route inconnue : vraie page 404, pas de renvoi silencieux vers LoginPage
+  { path: '*', element: <NotFoundPage /> },
 ]
 
 export function AppRouter() {
