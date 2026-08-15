@@ -32,7 +32,7 @@ function baseProspection(statut: string) {
     vegetation: null,
     sol: null,
     degats_cultures: null,
-    avertissements: [],
+    avertissements: [] as string[],
     populations: [],
     captures: [],
     infestations: [],
