@@ -213,6 +213,46 @@ export function classifyLarvalPopulation(
   return estBande ? 'bande_larvaire' : 'tache_larvaire';
 }
 
+export interface EssaimNocturneValidationInput {
+  typeCible: string;
+  heureObservation: string;
+}
+
+const TYPES_AILES_GROUPES = ['vol_clair', 'essaim'];
+
+/** Bornes horaires (heure locale) au-delà/en-deçà desquelles une observation est jugée nocturne. */
+const NUIT_HEURE_DEBUT = 18;
+const NUIT_HEURE_FIN = 6;
+
+/** Heure au format "hh:mm" jugée nocturne (§2.2 point 14 du manuel). */
+export function isHeureNocturne(heureObservation: string): boolean {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(heureObservation.trim());
+  if (!match) {
+    return false;
+  }
+  const heure = Number(match[1]);
+  return heure >= NUIT_HEURE_DEBUT || heure < NUIT_HEURE_FIN;
+}
+
+/**
+ * Plausibilité horaire des essaims/vols clairs (§2.2 point 14 du manuel) :
+ * une formation ailée groupée signalée de nuit est implausible en vol — les
+ * essaims ne se déplacent pas de nuit. Avertissement non bloquant ; le
+ * comportement forcé sur « posé » est appliqué par l'appelant (écran).
+ */
+export function validateEssaimNocturne(input: EssaimNocturneValidationInput): ValidationResult {
+  const blocages: string[] = [];
+  const avertissements: string[] = [];
+
+  if (TYPES_AILES_GROUPES.includes(input.typeCible) && isHeureNocturne(input.heureObservation)) {
+    avertissements.push(
+      'Essaim/vol clair signalé de nuit : comportement forcé sur « posé » (les essaims ne se déplacent pas de nuit).'
+    );
+  }
+
+  return { blocages, avertissements };
+}
+
 export type AerialPopulationClassification =
   | 'non_classe'
   | 'vol_clair'
