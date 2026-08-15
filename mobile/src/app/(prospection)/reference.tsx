@@ -13,7 +13,7 @@ import {
 } from '@/lib/referentiel-db';
 import { updateProspectionReference, listProspectionsRecentesAutresProspecteurs } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
-import { referenceSchema, ReferenceFormValues } from '@/lib/prospection-reference-schema';
+import { ReferenceFormValues } from '@/lib/prospection-reference-schema';
 import { validateGpsPosition, validateAntiDoublon, DOUBLON_DELAI_SEUIL_H } from '@/lib/prospection-validation';
 
 const INACTIVE_BG = '#efeada';

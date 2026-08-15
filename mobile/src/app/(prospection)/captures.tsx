@@ -201,6 +201,7 @@ export default function CapturesScreen() {
     if (store.grilleOrder.length > 0 && requestedIndex !== store.currentGrilleIndex) {
       store.goToGrille(requestedIndex, captures);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestedIndex, store.grilleOrder.length]);
 
   // Effet 4: Timer de capture - une seule fois
