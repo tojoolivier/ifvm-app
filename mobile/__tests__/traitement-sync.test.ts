@@ -63,6 +63,7 @@ function draft(overrides: Partial<DraftTraitement> = {}): DraftTraitement {
     statut_sync: 'local',
     created_at: '2026-08-12T00:00:00.000Z',
     updated_at: '2026-08-12T00:00:00.000Z',
+    server_updated_at: null,
     aerien: {
       traitement_id: 'traitement-1',
       pilote: 'Jean Dupont',
@@ -96,7 +97,7 @@ describe('enregistrerEtSynchroniserTraitement', () => {
 
   it('synchronise et marque la fiche synced sur 201 (création)', async () => {
     mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
-    mockSyncTraitement.mockResolvedValue({ status: 201, body: { id: 'traitement-1' } });
+    mockSyncTraitement.mockResolvedValue({ status: 201, body: { id: 'traitement-1', updated_at: '2026-08-13T00:00:00.000Z' } });
     mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
 
     const result = await enregistrerEtSynchroniserTraitement(draft(), 'token-1');
@@ -110,8 +111,24 @@ describe('enregistrerEtSynchroniserTraitement', () => {
         aerien: expect.objectContaining({ pilote: 'Jean Dupont', mecanicien: 'Marc Rakoto', chef_de_base_id: 'chef-1' }),
       })
     );
-    expect(mockMarkSynced).toHaveBeenCalledWith('traitement-1');
-    expect(result).toEqual({ synced: true });
+    expect(mockMarkSynced).toHaveBeenCalledWith('traitement-1', '2026-08-13T00:00:00.000Z');
+    expect(result).toEqual({ synced: true, serverVersion: { id: 'traitement-1', updated_at: '2026-08-13T00:00:00.000Z' } });
+  });
+
+  it('utilise server_updated_at comme base_updated_at quand la fiche a déjà été synchronisée', async () => {
+    mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
+    mockSyncTraitement.mockResolvedValue({ status: 200, body: { id: 'traitement-1' } });
+    mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
+
+    await enregistrerEtSynchroniserTraitement(
+      draft({ server_updated_at: '2026-08-13T05:00:00.000Z', updated_at: '2026-08-14T09:00:00.000Z' }),
+      'token-1'
+    );
+
+    expect(apiClient.syncTraitement).toHaveBeenCalledWith(
+      'token-1',
+      expect.objectContaining({ base_updated_at: '2026-08-13T05:00:00.000Z' })
+    );
   });
 
   it('synchronise et marque la fiche synced sur 200 (mise à jour)', async () => {
@@ -121,8 +138,8 @@ describe('enregistrerEtSynchroniserTraitement', () => {
 
     const result = await enregistrerEtSynchroniserTraitement(draft(), 'token-1');
 
-    expect(mockMarkSynced).toHaveBeenCalledWith('traitement-1');
-    expect(result).toEqual({ synced: true });
+    expect(mockMarkSynced).toHaveBeenCalledWith('traitement-1', undefined);
+    expect(result).toEqual({ synced: true, serverVersion: { id: 'traitement-1' } });
   });
 
   it('persiste le conflit et ne synchronise pas sur 409', async () => {
@@ -203,7 +220,7 @@ describe('retrySyncTraitement', () => {
 
     await retrySyncTraitement(draft(), 'token-1');
 
-    expect(mockMarkSynced).toHaveBeenCalledWith('traitement-1');
+    expect(mockMarkSynced).toHaveBeenCalledWith('traitement-1', undefined);
   });
 
   it('persiste le conflit puis jette pour signaler l\'échec au retry-queue', async () => {

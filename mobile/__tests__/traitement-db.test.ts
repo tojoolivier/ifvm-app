@@ -14,7 +14,7 @@ const MIGRATED_COLUMNS = [
   'phase', 'captures_nombre', 'temps_capture',
   'captures_sol', 'captures_trans', 'captures_greg', 'stade_imago', 'essaim_observe',
   'densites_larve', 'tache_larvaire', 'bande_larvaire', 'interdistance', 'deplacement',
-  'id',
+  'id', 'server_updated_at',
 ].map((name) => ({ name }));
 
 const execAsync = jest.fn().mockResolvedValue(undefined);
@@ -69,6 +69,20 @@ describe('traitement local schema', () => {
     await getDb();
 
     expect(getAllAsync).toHaveBeenCalledWith('PRAGMA table_info(traitement)');
+  });
+
+  it('adds server_updated_at to an existing traitement table missing it (upgrade path)', async () => {
+    getAllAsync.mockImplementation(async (sql: string) =>
+      sql === 'PRAGMA table_info(traitement)'
+        ? MIGRATED_COLUMNS.filter((c) => c.name !== 'server_updated_at')
+        : MIGRATED_COLUMNS
+    );
+
+    await getDb();
+
+    expect(execAsync).toHaveBeenCalledWith(
+      expect.stringContaining('ALTER TABLE traitement ADD COLUMN server_updated_at TEXT')
+    );
   });
 
   it('still creates the prospection tables alongside the traitement ones (shared ifvm.db)', async () => {

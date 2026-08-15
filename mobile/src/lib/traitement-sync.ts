@@ -36,16 +36,17 @@ function especesArrayToDict(value: string | null | undefined): Record<string, bo
 
 /**
  * Construit le corps commun de POST /traitements/sync. `base_updated_at` est le
- * dernier `updated_at` serveur connu du client : comme le schéma local ne
- * distingue pas un `server_updated_at` d'un `updated_at` local, on s'appuie sur
- * le fait que markTraitementSynced/markTraitementConflict réécrivent tous deux
- * `updated_at` avec la valeur issue de la réponse serveur — draft.updated_at
- * est donc, par construction, le dernier point de synchronisation connu.
+ * dernier `updated_at` serveur connu du client, tenu dans la colonne dédiée
+ * `server_updated_at` (distincte de `updated_at`, que toute écriture locale
+ * modifie). Pour une fiche jamais encore synchronisée, on retombe sur
+ * `created_at` : plus ancien que tout `updated_at` serveur réel, ce qui ne
+ * peut que déclencher un conflit détecté trop tôt — jamais un écrasement
+ * silencieux d'une version serveur plus récente.
  */
 function buildTraitementSyncPayload(draft: DraftTraitement): components['schemas']['TraitementSyncPush'] {
   const common = {
     id: draft.id,
-    base_updated_at: draft.updated_at,
+    base_updated_at: draft.server_updated_at ?? draft.created_at,
     prospection_id: draft.prospection_id,
     numero_fiche: draft.numero_fiche,
     type_traitement: draft.type_traitement,
@@ -167,8 +168,9 @@ async function pushTraitement(
 
   await pushRotationsEtProduits(draft, token);
 
-  await markTraitementSynced(draft.id);
-  return { synced: true };
+  const serverVersion = body as ServerTraitement;
+  await markTraitementSynced(draft.id, serverVersion?.updated_at);
+  return { synced: true, serverVersion };
 }
 
 export async function enregistrerEtSynchroniserTraitement(

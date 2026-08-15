@@ -126,6 +126,7 @@ export interface ImpactDraft {
 interface TraitementCaptureState {
   screen: TraitementScreen;
   isValidationView: boolean;
+  typeTraitement: 'AERIEN' | 'TERRESTRE' | null;
   ref: ReferenceDraft;
   aerien: AerienDraft;
   terrestre: TerrestreDraft;
@@ -137,6 +138,7 @@ interface TraitementCaptureState {
 
   setScreen: (screen: TraitementScreen) => void;
   setValidationView: (isValidationView: boolean) => void;
+  setTypeTraitement: (typeTraitement: 'AERIEN' | 'TERRESTRE' | null) => void;
   updateRef: (patch: Partial<ReferenceDraft>) => void;
   updateAerien: (patch: Partial<Omit<AerienDraft, 'rotations'>>) => void;
   addRotation: (input: RotationInput) => void;
@@ -155,11 +157,22 @@ interface TraitementCaptureState {
 
 function initialState(): Pick<
   TraitementCaptureState,
-  'screen' | 'isValidationView' | 'ref' | 'aerien' | 'terrestre' | 'env' | 'imp' | 'observations' | 'signed' | 'stamps'
+  | 'screen'
+  | 'isValidationView'
+  | 'typeTraitement'
+  | 'ref'
+  | 'aerien'
+  | 'terrestre'
+  | 'env'
+  | 'imp'
+  | 'observations'
+  | 'signed'
+  | 'stamps'
 > {
   return {
     screen: 'reference',
     isValidationView: false,
+    typeTraitement: null,
     ref: {},
     aerien: { rotations: [] },
     terrestre: { produits: [] },
@@ -176,6 +189,7 @@ export const useTraitementCaptureStore = create<TraitementCaptureState>((set) =>
 
   setScreen: (screen) => set({ screen }),
   setValidationView: (isValidationView) => set({ isValidationView }),
+  setTypeTraitement: (typeTraitement) => set({ typeTraitement }),
 
   updateRef: (patch) => set((state) => ({ ref: { ...state.ref, ...patch } })),
 
