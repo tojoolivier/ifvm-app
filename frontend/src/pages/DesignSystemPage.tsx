@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { STATUTS, StatusBadge } from '@/components/ui/status-badge'
 import {
   Table,
   TableHeader,
@@ -196,6 +197,17 @@ export function DesignSystemPage() {
               <Button disabled>Disabled</Button>
             </div>
           </div>
+        </div>
+      </Section>
+
+      <Separator />
+
+      {/* ── StatusBadge ── */}
+      <Section title="StatusBadge">
+        <div className="flex flex-wrap gap-2">
+          {STATUTS.map((s) => (
+            <StatusBadge key={s} statut={s} />
+          ))}
         </div>
       </Section>
 
