@@ -11,6 +11,8 @@ import {
   validateAntiDoublon,
   DOUBLON_DISTANCE_SEUIL_M,
   DOUBLON_DELAI_SEUIL_H,
+  validateEcartHistorique,
+  ECART_HISTORIQUE_SEUIL_RATIO,
 } from '../src/lib/prospection-validation';
 
 describe('validateProspectionDate — antériorité au début de mission (#105)', () => {
@@ -495,6 +497,57 @@ describe('validateAntiDoublon — proximité temps/espace entre prospecteurs (#1
       fichesProches: [
         { prospecteurId: 'autre', latitude: base.latitude, longitude: base.longitude, timestamp: base.timestamp },
       ],
+    });
+    expect(blocages).toEqual([]);
+  });
+});
+
+describe('validateEcartHistorique — écart vs dernière observation au même site (#106, §2.2 point 15)', () => {
+  it('avertit quand la densité actuelle est au moins ECART_HISTORIQUE_SEUIL_RATIO fois supérieure à la précédente', () => {
+    const { blocages, avertissements } = validateEcartHistorique({
+      densiteMoyActuelle: 10 * ECART_HISTORIQUE_SEUIL_RATIO,
+      derniereDensiteMoyConnue: 10,
+    });
+    expect(blocages).toEqual([]);
+    expect(avertissements).toHaveLength(1);
+  });
+
+  it('avertit quand la densité actuelle est au moins ECART_HISTORIQUE_SEUIL_RATIO fois inférieure à la précédente', () => {
+    const { avertissements } = validateEcartHistorique({
+      densiteMoyActuelle: 10,
+      derniereDensiteMoyConnue: 10 * ECART_HISTORIQUE_SEUIL_RATIO,
+    });
+    expect(avertissements).toHaveLength(1);
+  });
+
+  it('n\'avertit pas pour un écart en dessous du seuil', () => {
+    const { avertissements } = validateEcartHistorique({
+      densiteMoyActuelle: 12,
+      derniereDensiteMoyConnue: 10,
+    });
+    expect(avertissements).toEqual([]);
+  });
+
+  it('n\'avertit pas en l\'absence d\'observation antérieure connue (aucun point de suivi)', () => {
+    const { avertissements } = validateEcartHistorique({
+      densiteMoyActuelle: 1000,
+      derniereDensiteMoyConnue: null,
+    });
+    expect(avertissements).toEqual([]);
+  });
+
+  it('n\'avertit pas en l\'absence de densité actuelle renseignée', () => {
+    const { avertissements } = validateEcartHistorique({
+      densiteMoyActuelle: null,
+      derniereDensiteMoyConnue: 10,
+    });
+    expect(avertissements).toEqual([]);
+  });
+
+  it('ne bloque jamais l\'enregistrement', () => {
+    const { blocages } = validateEcartHistorique({
+      densiteMoyActuelle: 1000,
+      derniereDensiteMoyConnue: 1,
     });
     expect(blocages).toEqual([]);
   });

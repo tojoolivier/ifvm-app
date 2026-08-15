@@ -1374,6 +1374,36 @@ export async function listProspectionsRecentesAutresProspecteurs(
   );
 }
 
+/**
+ * Dernière densité moyenne connue pour le même type de cible sur le même
+ * point de suivi (station fixe), pour l'avertissement d'écart important
+ * (#106, §2.2 point 15). Ignore la fiche en cours d'édition et les fiches
+ * sans densité moyenne renseignée. Retourne null si aucun point de suivi
+ * n'existe encore pour cette prospection.
+ */
+export async function getDerniereDensiteMemeSite(
+  stationId: string,
+  typeCible: string,
+  excludeProspectionId: string
+): Promise<number | null> {
+  const db = await getDb();
+
+  const row = await db.getFirstAsync<{ densite_moy: number | null }>(
+    `SELECT pi.densite_moy as densite_moy
+     FROM prospection_infestation pi
+     JOIN prospection p ON p.id = pi.prospection_id
+     WHERE p.station_id = ?
+       AND pi.type_cible = ?
+       AND p.id != ?
+       AND pi.densite_moy IS NOT NULL
+     ORDER BY p.updated_at DESC
+     LIMIT 1`,
+    [stationId, typeCible, excludeProspectionId]
+  );
+
+  return row?.densite_moy ?? null;
+}
+
 export async function countUnsyncedProspections(): Promise<number> {
   const db = await getDb();
 
