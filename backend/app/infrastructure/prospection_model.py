@@ -102,6 +102,13 @@ class ProspectionModel(Base):
     signalement_description: Mapped[str | None] = mapped_column(Text(), nullable=True)
     conclusion_validation: Mapped[str | None] = mapped_column(Text(), nullable=True)
 
+    # ==========================================
+    # NOUVEAUX CHAMPS - Avertissements non bloquants (#106)
+    # ==========================================
+    avertissements: Mapped[list[str]] = mapped_column(
+        JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb")
+    )
+
     populations: Mapped[list["ProspectionPopulationModel"]] = relationship(
         back_populates="prospection", cascade="all, delete-orphan"
     )

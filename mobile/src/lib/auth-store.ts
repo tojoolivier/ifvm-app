@@ -103,7 +103,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
     } catch (e) {
       console.error('[auth] login FAILED:', e);
       set({ token: null, user: null, isAuthenticated: false });
-      throw new Error('Login failed');
+      throw e;
     }
   },
 

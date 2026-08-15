@@ -124,6 +124,7 @@ async def create_prospection(
             signalement_date=body.signalement_date,
             signalement_description=body.signalement_description,
             conclusion_validation=body.conclusion_validation,
+            avertissements=body.avertissements,
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
@@ -203,6 +204,7 @@ async def update_prospection(
             signalement_date=body.signalement_date,
             signalement_description=body.signalement_description,
             conclusion_validation=body.conclusion_validation,
+            avertissements=body.avertissements,
         )
     except PermissionError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))

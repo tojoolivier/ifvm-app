@@ -314,9 +314,7 @@ function isTokenExpired(token: string): boolean {
 
     const payload = JSON.parse(atob(parts[1]));
 
-    if (
-      typeof payload.exp !== 'number'
-    ) {
+    if (typeof payload.exp !== 'number') {
       return true;
     }
 
@@ -339,9 +337,7 @@ function isTokenExpired(token: string): boolean {
 async function refreshAccessToken(): Promise<string | null> {
   try {
     const refreshToken =
-      await AsyncStorage.getItem(
-        REFRESH_TOKEN_KEY
-      );
+      await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
 
     if (!refreshToken) {
       console.warn(
@@ -422,12 +418,13 @@ const makeRequest = async <T>(
 
   let currentToken = token;
 
-  /*
-   * ---------------------------------------------------------
-   * 1. Vérification locale de l'expiration du token
-   * ---------------------------------------------------------
+  /**
+   * 1. Vérification locale de l'expiration du token.
    */
-  if (currentToken && isTokenExpired(currentToken)) {
+  if (
+    currentToken &&
+    isTokenExpired(currentToken)
+  ) {
     console.log(
       '[api-client] Token expiré, tentative de rafraîchissement...'
     );
@@ -469,10 +466,8 @@ const makeRequest = async <T>(
 
   let response: Response;
 
-  /*
-   * ---------------------------------------------------------
-   * 2. Première requête
-   * ---------------------------------------------------------
+  /**
+   * 2. Première requête.
    */
   try {
     response = await fetch(url, {
@@ -500,12 +495,14 @@ const makeRequest = async <T>(
     throw error;
   }
 
-  /*
-   * ---------------------------------------------------------
-   * 3. Gestion du 401 + refresh + retry
-   * ---------------------------------------------------------
+  /**
+   * 3. Gestion du 401 :
+   * refresh + retry une seule fois.
    */
-  if (response.status === 401 && currentToken) {
+  if (
+    response.status === 401 &&
+    currentToken
+  ) {
     console.log(
       '[api-client] 401 Unauthorized, tentative de rafraîchissement...'
     );
@@ -532,9 +529,11 @@ const makeRequest = async <T>(
         if (retryResponse.ok) {
           if (retryResponse.status === 204) {
             logRequest({
-              method: options.method || 'GET',
+              method:
+                options.method || 'GET',
               url,
-              status: retryResponse.status,
+              status:
+                retryResponse.status,
               ok: true,
               durationMs:
                 Date.now() - startTime,
@@ -557,7 +556,8 @@ const makeRequest = async <T>(
             method:
               options.method || 'GET',
             url,
-            status: retryResponse.status,
+            status:
+              retryResponse.status,
             ok: true,
             durationMs:
               Date.now() - startTime,
@@ -583,7 +583,8 @@ const makeRequest = async <T>(
           method:
             options.method || 'GET',
           url,
-          status: retryResponse.status,
+          status:
+            retryResponse.status,
           ok: false,
           durationMs:
             Date.now() - startTime,
@@ -599,7 +600,7 @@ const makeRequest = async <T>(
               .catch(() => null),
         });
 
-        /*
+        /**
          * Le nouveau token existe mais le backend
          * retourne encore une erreur.
          *
@@ -626,7 +627,7 @@ const makeRequest = async <T>(
       }
     }
 
-    /*
+    /**
      * Refresh impossible :
      * la session n'est plus valide.
      */
@@ -642,17 +643,17 @@ const makeRequest = async <T>(
     );
   }
 
-  /*
-   * ---------------------------------------------------------
-   * 4. Erreurs HTTP hors 401
-   * ---------------------------------------------------------
+  /**
+   * 4. Erreurs HTTP hors 401.
    */
   if (!response.ok) {
     const responseClone =
       response.clone();
 
     const errorData =
-      await response.json().catch(() => ({}));
+      await response
+        .json()
+        .catch(() => ({}));
 
     logRequest({
       method:
@@ -681,10 +682,8 @@ const makeRequest = async <T>(
     );
   }
 
-  /*
-   * ---------------------------------------------------------
-   * 5. 204 No Content
-   * ---------------------------------------------------------
+  /**
+   * 5. 204 No Content.
    */
   if (response.status === 204) {
     logRequest({
@@ -707,10 +706,8 @@ const makeRequest = async <T>(
     return undefined as T;
   }
 
-  /*
-   * ---------------------------------------------------------
-   * 6. Réponse normale
-   * ---------------------------------------------------------
+  /**
+   * 6. Réponse normale.
    */
   const responseData =
     await response.json();

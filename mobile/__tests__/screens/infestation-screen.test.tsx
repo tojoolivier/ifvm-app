@@ -10,6 +10,7 @@
  * directement les hooks `expo-router` évite l'incompatibilité et suffit pour
  * un test d'écran isolé.
  */
+import { Alert } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import InfestationScreen from '@/app/(prospection)/infestation';
 import { ErrorBanner } from '@/components/error-banner';
@@ -23,11 +24,15 @@ jest.mock('expo-router', () =>
 jest.mock('@/lib/prospection-repository', () => ({
   listAllProspectionInfestations: jest.fn().mockResolvedValue([]),
   saveProspectionInfestation: jest.fn().mockResolvedValue(undefined),
+  getProspection: jest.fn().mockResolvedValue(null),
+  getDerniereDensiteMemeSite: jest.fn().mockResolvedValue(null),
+  updateProspectionAvertissements: jest.fn().mockResolvedValue(undefined),
 }));
 
 describe('InfestationScreen', () => {
   beforeEach(() => {
     useErrorStore.setState({ current: null });
+    jest.mocked(prospectionRepository.getDerniereDensiteMemeSite).mockClear();
   });
 
   it('monte sans crash avec expo-router mocké', async () => {
@@ -121,6 +126,33 @@ describe('InfestationScreen', () => {
     );
   });
 
+  it('force le comportement sur "posé" pour un essaim signalé de nuit (#106)', async () => {
+    jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
+      {
+        type_cible: 'essaim',
+        surface_totale: 12,
+        essaim_en_vol: 1,
+        essaim_pose: 0,
+        heure_observation: '23:00',
+        vent_de: 'N',
+        direction_vers: 'S',
+      } as any,
+    ]);
+
+    await render(<InfestationScreen />);
+
+    fireEvent.press(await screen.findByText('Comportement  ›'));
+    fireEvent.press(await screen.findByText('Continuer  ›'));
+
+    await waitFor(() =>
+      expect(prospectionRepository.saveProspectionInfestation).toHaveBeenCalledWith(
+        'draft-123',
+        'essaim',
+        expect.objectContaining({ essaim_en_vol: 0, essaim_pose: 1 })
+      )
+    );
+  });
+
   it('conserve la surface contaminée et la part infestée à la sauvegarde d’un essaim (#104)', async () => {
     jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
       {
@@ -173,5 +205,68 @@ describe('InfestationScreen', () => {
         expect.objectContaining({ type_essaim: 'vol_clair' })
       )
     );
+  });
+
+  it('avertit d’un écart important vs la dernière observation connue sur le même point de suivi (#106)', async () => {
+    jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
+      {
+        type_cible: 'tache_larvaire',
+        surface_totale: 12,
+        interdistance_moy: 250,
+        densite_moy: 100,
+      } as any,
+    ]);
+    jest.mocked(prospectionRepository.getProspection).mockResolvedValueOnce({
+      id: 'draft-123',
+      station_id: 'station-1',
+    } as any);
+    jest.mocked(prospectionRepository.getDerniereDensiteMemeSite).mockResolvedValueOnce(10);
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+
+    await render(<InfestationScreen />);
+
+    fireEvent.press(await screen.findByText('Comportement  ›'));
+    fireEvent.press(await screen.findByText('Continuer  ›'));
+
+    await waitFor(() =>
+      expect(prospectionRepository.getDerniereDensiteMemeSite).toHaveBeenCalledWith(
+        'station-1',
+        'tache_larvaire',
+        'draft-123'
+      )
+    );
+    await waitFor(() =>
+      expect(alertSpy).toHaveBeenCalledWith('À vérifier', expect.stringContaining('Écart important'))
+    );
+
+    alertSpy.mockRestore();
+  });
+
+  it('n’avertit pas d’écart quand aucun point de suivi n’est associé à la fiche (#106)', async () => {
+    jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
+      {
+        type_cible: 'tache_larvaire',
+        surface_totale: 12,
+        interdistance_moy: 250,
+        densite_moy: 100,
+      } as any,
+    ]);
+    jest.mocked(prospectionRepository.getProspection).mockResolvedValueOnce({
+      id: 'draft-123',
+      station_id: null,
+    } as any);
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+
+    await render(<InfestationScreen />);
+
+    fireEvent.press(await screen.findByText('Comportement  ›'));
+    fireEvent.press(await screen.findByText('Continuer  ›'));
+
+    await waitFor(() => expect(prospectionRepository.saveProspectionInfestation).toHaveBeenCalled());
+
+    expect(prospectionRepository.getDerniereDensiteMemeSite).not.toHaveBeenCalled();
+    expect(alertSpy).not.toHaveBeenCalledWith('À vérifier', expect.stringContaining('Écart important'));
+
+    alertSpy.mockRestore();
   });
 });

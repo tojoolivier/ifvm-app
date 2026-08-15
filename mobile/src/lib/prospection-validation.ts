@@ -213,6 +213,46 @@ export function classifyLarvalPopulation(
   return estBande ? 'bande_larvaire' : 'tache_larvaire';
 }
 
+export interface EssaimNocturneValidationInput {
+  typeCible: string;
+  heureObservation: string;
+}
+
+const TYPES_AILES_GROUPES = ['vol_clair', 'essaim'];
+
+/** Bornes horaires (heure locale) au-delà/en-deçà desquelles une observation est jugée nocturne. */
+const NUIT_HEURE_DEBUT = 18;
+const NUIT_HEURE_FIN = 6;
+
+/** Heure au format "hh:mm" jugée nocturne (§2.2 point 14 du manuel). */
+export function isHeureNocturne(heureObservation: string): boolean {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(heureObservation.trim());
+  if (!match) {
+    return false;
+  }
+  const heure = Number(match[1]);
+  return heure >= NUIT_HEURE_DEBUT || heure < NUIT_HEURE_FIN;
+}
+
+/**
+ * Plausibilité horaire des essaims/vols clairs (§2.2 point 14 du manuel) :
+ * une formation ailée groupée signalée de nuit est implausible en vol — les
+ * essaims ne se déplacent pas de nuit. Avertissement non bloquant ; le
+ * comportement forcé sur « posé » est appliqué par l'appelant (écran).
+ */
+export function validateEssaimNocturne(input: EssaimNocturneValidationInput): ValidationResult {
+  const blocages: string[] = [];
+  const avertissements: string[] = [];
+
+  if (TYPES_AILES_GROUPES.includes(input.typeCible) && isHeureNocturne(input.heureObservation)) {
+    avertissements.push(
+      'Essaim/vol clair signalé de nuit : comportement forcé sur « posé » (les essaims ne se déplacent pas de nuit).'
+    );
+  }
+
+  return { blocages, avertissements };
+}
+
 export type AerialPopulationClassification =
   | 'non_classe'
   | 'vol_clair'
@@ -263,4 +303,107 @@ export function classifyAerialPopulation(
   }
 
   return 'non_classe';
+}
+
+/** Fenêtre de proximité anti-doublon (#107, §2.2 point 16 du manuel) — valeurs par défaut à confirmer avec le référent métier. */
+export const DOUBLON_DISTANCE_SEUIL_M = 200;
+export const DOUBLON_DELAI_SEUIL_H = 2;
+
+export interface FicheProspectionProche {
+  prospecteurId: string;
+  latitude: number;
+  longitude: number;
+  /** Horodatage de soumission de la fiche (ISO 8601). */
+  timestamp: string;
+}
+
+export interface AntiDoublonValidationInput {
+  prospecteurId: string;
+  latitude: number;
+  longitude: number;
+  /** Horodatage de soumission de la fiche en cours (ISO 8601). */
+  timestamp: string;
+  /** Fiches déjà soumises à comparer (locales et/ou serveur, toute source disponible offline). */
+  fichesProches: FicheProspectionProche[];
+}
+
+/** Distance orthodromique (Haversine) en mètres entre deux positions GPS. */
+function distanceMetres(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const RAYON_TERRE_M = 6371000;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return RAYON_TERRE_M * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/**
+ * Avertissement anti-doublon (#107, §2.2 point 16 du manuel) : une fiche
+ * soumise à moins de DOUBLON_DISTANCE_SEUIL_M mètres et
+ * DOUBLON_DELAI_SEUIL_H heures d'une fiche déjà soumise par un AUTRE
+ * prospecteur est signalée, sans bloquer l'enregistrement. Une fiche du
+ * même prospecteur (suivi normal d'un site) est toujours exclue.
+ */
+export function validateAntiDoublon(input: AntiDoublonValidationInput): ValidationResult {
+  const blocages: string[] = [];
+  const avertissements: string[] = [];
+
+  const tsCourant = new Date(input.timestamp).getTime();
+
+  const doublon = input.fichesProches.find((fiche) => {
+    if (fiche.prospecteurId === input.prospecteurId) {
+      return false;
+    }
+    const ecartHeures = Math.abs(tsCourant - new Date(fiche.timestamp).getTime()) / 3_600_000;
+    if (ecartHeures > DOUBLON_DELAI_SEUIL_H) {
+      return false;
+    }
+    const distance = distanceMetres(input.latitude, input.longitude, fiche.latitude, fiche.longitude);
+    return distance <= DOUBLON_DISTANCE_SEUIL_M;
+  });
+
+  if (doublon) {
+    avertissements.push(
+      `Doublon possible : une fiche a déjà été soumise par un autre prospecteur à moins de ${DOUBLON_DISTANCE_SEUIL_M} m et ${DOUBLON_DELAI_SEUIL_H} h de cette position.`
+    );
+  }
+
+  return { blocages, avertissements };
+}
+
+/** Seuil d'écart (ratio, dans un sens ou l'autre) déclenchant l'alerte (#106, §2.2 point 15 du manuel) — valeur par défaut à confirmer avec le référent métier. */
+export const ECART_HISTORIQUE_SEUIL_RATIO = 2;
+
+export interface EcartHistoriqueValidationInput {
+  densiteMoyActuelle: number | null;
+  /** Densité moyenne de la dernière observation connue sur le même point de suivi, si elle existe. */
+  derniereDensiteMoyConnue: number | null;
+}
+
+/**
+ * Avertissement "écart important vs dernière observation connue au même
+ * site" (#106, §2.2 point 15 du manuel) : quand un point de suivi (station
+ * fixe) a déjà une observation antérieure pour ce type de cible, un écart de
+ * densité moyenne d'au moins ECART_HISTORIQUE_SEUIL_RATIO fois (à la hausse
+ * ou à la baisse) déclenche une alerte "confirmer avant envoi", sans
+ * bloquer l'enregistrement. Sans observation antérieure connue, aucune
+ * alerte n'est déclenchée.
+ */
+export function validateEcartHistorique(input: EcartHistoriqueValidationInput): ValidationResult {
+  const blocages: string[] = [];
+  const avertissements: string[] = [];
+
+  const { densiteMoyActuelle, derniereDensiteMoyConnue } = input;
+  if (densiteMoyActuelle != null && derniereDensiteMoyConnue != null && derniereDensiteMoyConnue > 0) {
+    const ratio = densiteMoyActuelle / derniereDensiteMoyConnue;
+    if (ratio >= ECART_HISTORIQUE_SEUIL_RATIO || ratio <= 1 / ECART_HISTORIQUE_SEUIL_RATIO) {
+      avertissements.push(
+        `Écart important par rapport à la dernière observation connue sur ce point de suivi (densité moyenne précédente : ${derniereDensiteMoyConnue}). Confirmer avant envoi.`
+      );
+    }
+  }
+
+  return { blocages, avertissements };
 }

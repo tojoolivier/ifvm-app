@@ -47,7 +47,7 @@ export default function ReferencesScreen() {
     useLocalSearchParams<{ prospectionId?: string; traitementId?: string; isValidationView?: string; origineId?: string }>();
 
   const store = useTraitementCaptureStore();
-  const [typeTraitement, setTypeTraitement] = useState<'AERIEN' | 'TERRESTRE' | null>(null);
+  const typeTraitement = store.typeTraitement;
   const [traitementId, setTraitementId] = useState<string | null>(routeTraitementId ?? null);
   const [prospectionId, setProspectionId] = useState<string | null>(routeProspectionId ?? null);
   // ReferenceDraft (traitement-capture-store.ts) n'a pas de champ dateValidation
@@ -67,7 +67,7 @@ export default function ReferencesScreen() {
       store.setValidationView(readOnly);
       getTraitement(routeTraitementId).then((draft) => {
         if (!draft) return;
-        setTypeTraitement(draft.type_traitement);
+        store.setTypeTraitement(draft.type_traitement);
         setProspectionId(draft.prospection_id);
         setDateValidation(draft.date_validation);
         store.updateRef({
@@ -83,6 +83,12 @@ export default function ReferencesScreen() {
           modeTraitement: (draft.mode_traitement as 'TOTAL' | 'BARRIERE' | 'IRREGULIER' | null) ?? null,
         });
       });
+    } else {
+      // Nouvelle fiche : la capture-store est un singleton global qui ne se
+      // réinitialise pas tout seul entre deux fiches (pas de démontage entre
+      // écrans wizard) — sans ce reset, type/ref/aerien/terrestre d'une fiche
+      // précédente fuiteraient dans la nouvelle saisie.
+      store.reset();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeTraitementId]);
@@ -191,7 +197,7 @@ export default function ReferencesScreen() {
               { value: 'TERRESTRE', label: 'Terrestre' },
             ]}
             value={typeTraitement}
-            onChange={(v) => !readOnly && !traitementId && setTypeTraitement(v as any)}
+            onChange={(v) => !readOnly && !traitementId && store.setTypeTraitement(v as any)}
           />
           {errors.typeTraitement && <Text style={styles.error}>{errors.typeTraitement}</Text>}
         </View>
@@ -237,15 +243,28 @@ export default function ReferencesScreen() {
 
         <View style={styles.field}>
           <Text style={styles.label}>Fiche de prospection liée *</Text>
-          <Card variant="default" style={styles.prospectionCard}>
-            <Text style={styles.label}>N° fiche de prospection</Text>
-            <Text style={styles.prospectionText}>{prospectionId ?? '—'}</Text>
-            <Text style={styles.note}>
-              {prospectionStatut === STATUT_VALIDE && prospectionUpdatedAt
-                ? `Validée le ${formatDateFr(prospectionUpdatedAt)} · lecture seule`
-                : 'Lecture seule'}
-            </Text>
-          </Card>
+          {prospectionId ? (
+            <Card variant="default" style={styles.prospectionCard}>
+              <Text style={styles.label}>N° fiche de prospection</Text>
+              <Text style={styles.prospectionText}>{prospectionId}</Text>
+              <Text style={styles.note}>
+                {prospectionStatut === STATUT_VALIDE && prospectionUpdatedAt
+                  ? `Validée le ${formatDateFr(prospectionUpdatedAt)} · lecture seule`
+                  : 'Lecture seule'}
+              </Text>
+            </Card>
+          ) : readOnly ? (
+            <Card variant="default" style={styles.prospectionCard}>
+              <Text style={styles.prospectionText}>—</Text>
+            </Card>
+          ) : (
+            <TouchableOpacity
+              style={styles.prospectionPickerLink}
+              onPress={() => router.push('/(traitement)/prospection-picker' as any)}
+            >
+              <Text style={styles.prospectionPickerLinkText}>Choisir une fiche de prospection ›</Text>
+            </TouchableOpacity>
+          )}
           {errors.prospectionId && <Text style={styles.error}>{errors.prospectionId}</Text>}
         </View>
 
@@ -328,6 +347,15 @@ const styles = StyleSheet.create({
   ficheCard: { gap: 4 },
   prospectionCard: { borderWidth: 2, borderColor: traitementColors.vertPrincipal, gap: 4 },
   prospectionText: { fontFamily: traitementFonts.monoBold, fontSize: traitementTypeSizes.valeurDerivee, color: traitementColors.texteTitre },
+  prospectionPickerLink: {
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: traitementColors.vertPrincipal,
+    borderRadius: traitementRadii.chip,
+  },
+  prospectionPickerLinkText: { fontFamily: traitementFonts.uiBold, color: traitementColors.vertPrincipal, fontSize: traitementTypeSizes.corps },
   gpsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 32 },
   gpsRowText: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.corps, color: traitementColors.texteSecondaire },
   gpsStatus: { fontFamily: traitementFonts.uiSemiBold, fontSize: traitementTypeSizes.corps, color: traitementColors.texteLabel },

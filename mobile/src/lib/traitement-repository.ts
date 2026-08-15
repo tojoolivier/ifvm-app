@@ -62,6 +62,8 @@ export interface DraftTraitementRow {
   statut_sync: string;
   created_at: string;
   updated_at: string;
+  /** Dernier `updated_at` serveur connu (distinct de `updated_at`, modifié par toute écriture locale). */
+  server_updated_at: string | null;
 }
 
 export interface Cible {
@@ -784,11 +786,19 @@ export async function listTraitementsByChefEquipe(
 
 /**
  * Décision : pas de cache séparé du dernier pull `reprenable=true` pour ce lot.
- * On interroge directement la copie locale des fiches déjà validées et dont la
- * surface restante (mise en cache depuis la dernière réponse serveur) est
- * encore positive. Si un vrai cache de pull s'avère nécessaire plus tard
- * (ex: filtrage cross-session), il pourra remplacer cette requête passthrough
- * sans changer la signature.
+ * On interroge directement la copie locale des fiches déjà validées, en
+ * reproduisant les deux conditions serveur (`TraitementRepository.list_by_filters`,
+ * backend/app/infrastructure/traitement_repository.py) au lieu du seul filtre
+ * `surface_restante_ha > 0` :
+ *   - une surface restante NULL est reprenable (jamais recalculée localement,
+ *     donc toujours NULL tant qu'aucune synchronisation ne rapatrie
+ *     `surface_restante_ha` depuis le serveur — cf. #91, l'exclure aurait rendu
+ *     cet écran vide en permanence) ;
+ *   - une fiche déjà utilisée comme origine d'une reprise ne doit plus être
+ *     proposée (exclusion `traitement_origine_id`).
+ * Si un vrai cache de pull s'avère nécessaire plus tard (ex: filtrage
+ * cross-session, surface restante tenue à jour), il pourra remplacer cette
+ * requête passthrough sans changer la signature.
  */
 export async function listReprenableTraitements(): Promise<DraftTraitementRow[]> {
   const db = await getDb();
@@ -798,7 +808,10 @@ export async function listReprenableTraitements(): Promise<DraftTraitementRow[]>
      FROM traitement
      JOIN traitement_terrestre ON traitement_terrestre.traitement_id = traitement.id
      WHERE traitement.statut = 'validee'
-       AND traitement_terrestre.surface_restante_ha > 0
+       AND (traitement_terrestre.surface_restante_ha IS NULL OR traitement_terrestre.surface_restante_ha > 0)
+       AND traitement.id NOT IN (
+         SELECT traitement_origine_id FROM traitement_terrestre WHERE traitement_origine_id IS NOT NULL
+       )
      ORDER BY traitement.updated_at DESC`
   );
 }
@@ -807,16 +820,20 @@ export async function listReprenableTraitements(): Promise<DraftTraitementRow[]>
 // SYNCHRONISATION
 // ==========================================
 
-export async function markTraitementSynced(id: string): Promise<DraftTraitement> {
+export async function markTraitementSynced(
+  id: string,
+  serverUpdatedAt?: string | null
+): Promise<DraftTraitement> {
   const db = await getDb();
   const now = new Date().toISOString();
 
   await db.runAsync(
     `UPDATE traitement
      SET statut_sync = 'synced',
-         updated_at = ?
+         updated_at = ?,
+         server_updated_at = ?
      WHERE id = ?`,
-    [now, id]
+    [now, serverUpdatedAt ?? now, id]
   );
 
   const updated = await getTraitement(id);
@@ -870,7 +887,8 @@ export async function markTraitementConflict(
       altitude = ?,
       statut = ?,
       statut_sync = 'conflict',
-      updated_at = ?
+      updated_at = ?,
+      server_updated_at = ?
      WHERE id = ?`,
     [
       serverTraitement.numero_fiche ?? null,
@@ -886,6 +904,7 @@ export async function markTraitementConflict(
       serverTraitement.altitude ?? null,
       serverTraitement.statut ?? 'brouillon',
       now,
+      serverTraitement.updated_at ?? now,
       id,
     ]
   );

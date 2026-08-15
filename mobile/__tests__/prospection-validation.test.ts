@@ -4,8 +4,15 @@ import {
   validateComportementDirection,
   validateGroupementLarvaire,
   validateProspectionDate,
+  validateEssaimNocturne,
+  isHeureNocturne,
   classifyLarvalPopulation,
   classifyAerialPopulation,
+  validateAntiDoublon,
+  DOUBLON_DISTANCE_SEUIL_M,
+  DOUBLON_DELAI_SEUIL_H,
+  validateEcartHistorique,
+  ECART_HISTORIQUE_SEUIL_RATIO,
 } from '../src/lib/prospection-validation';
 
 describe('validateProspectionDate — antériorité au début de mission (#105)', () => {
@@ -198,6 +205,60 @@ describe('validateComportementDirection — cohérence repos/déplacement', () =
   });
 });
 
+describe('isHeureNocturne — bornes jour/nuit', () => {
+  it('considère 22:00 comme nocturne', () => {
+    expect(isHeureNocturne('22:00')).toBe(true);
+  });
+
+  it('considère 03:30 comme nocturne', () => {
+    expect(isHeureNocturne('03:30')).toBe(true);
+  });
+
+  it('considère 18:00 (borne de début) comme nocturne', () => {
+    expect(isHeureNocturne('18:00')).toBe(true);
+  });
+
+  it('considère 06:00 (borne de fin) comme diurne', () => {
+    expect(isHeureNocturne('06:00')).toBe(false);
+  });
+
+  it('considère 14:00 comme diurne', () => {
+    expect(isHeureNocturne('14:00')).toBe(false);
+  });
+
+  it('traite une heure invalide/vide comme non-nocturne', () => {
+    expect(isHeureNocturne('')).toBe(false);
+    expect(isHeureNocturne('abc')).toBe(false);
+  });
+});
+
+describe('validateEssaimNocturne — plausibilité horaire (§2.2 point 14 du manuel)', () => {
+  it('avertit quand un essaim est signalé de nuit', () => {
+    const { avertissements } = validateEssaimNocturne({ typeCible: 'essaim', heureObservation: '23:15' });
+    expect(avertissements).toEqual([expect.stringContaining('forcé sur « posé »')]);
+  });
+
+  it('avertit quand un vol clair est signalé de nuit', () => {
+    const { avertissements } = validateEssaimNocturne({ typeCible: 'vol_clair', heureObservation: '05:00' });
+    expect(avertissements.length).toBe(1);
+  });
+
+  it('n’avertit pas de jour', () => {
+    const { avertissements } = validateEssaimNocturne({ typeCible: 'essaim', heureObservation: '10:00' });
+    expect(avertissements).toEqual([]);
+  });
+
+  it('n’avertit pas pour un type de cible non ailé groupé, même de nuit', () => {
+    const { avertissements } = validateEssaimNocturne({ typeCible: 'tache_larvaire', heureObservation: '23:00' });
+    expect(avertissements).toEqual([]);
+  });
+
+  it('ne bloque jamais (avertissement non bloquant)', () => {
+    const { blocages } = validateEssaimNocturne({ typeCible: 'essaim', heureObservation: '23:00' });
+    expect(blocages).toEqual([]);
+  });
+});
+
 describe('classifyLarvalPopulation — tache vs bande (#103)', () => {
   it('classe en tache quand la direction n’est pas renseignée et la taille < 1000 m²', () => {
     expect(
@@ -363,5 +424,131 @@ describe('classifyAerialPopulation — vol clair vs essaim (#104)', () => {
         masquePaysage: null,
       })
     ).toBe('non_classe');
+  });
+});
+
+describe('validateAntiDoublon — proximité temps/espace entre prospecteurs (#107)', () => {
+  const base = {
+    prospecteurId: 'moi',
+    latitude: -18.9,
+    longitude: 47.5,
+    timestamp: '2026-08-15T10:00:00.000Z',
+  };
+
+  it('avertit quand une fiche proche (distance et délai) existe pour un autre prospecteur', () => {
+    const { blocages, avertissements } = validateAntiDoublon({
+      ...base,
+      fichesProches: [
+        {
+          prospecteurId: 'autre',
+          latitude: -18.9005,
+          longitude: 47.5005,
+          timestamp: '2026-08-15T09:30:00.000Z',
+        },
+      ],
+    });
+    expect(blocages).toEqual([]);
+    expect(avertissements).toHaveLength(1);
+  });
+
+  it('n\'avertit pas pour une fiche du même prospecteur (auto-comparaison exclue)', () => {
+    const { avertissements } = validateAntiDoublon({
+      ...base,
+      fichesProches: [
+        { prospecteurId: 'moi', latitude: -18.9005, longitude: 47.5005, timestamp: '2026-08-15T09:30:00.000Z' },
+      ],
+    });
+    expect(avertissements).toEqual([]);
+  });
+
+  it('n\'avertit pas hors du rayon de distance', () => {
+    const { avertissements } = validateAntiDoublon({
+      ...base,
+      fichesProches: [
+        {
+          prospecteurId: 'autre',
+          latitude: base.latitude,
+          longitude: base.longitude + (DOUBLON_DISTANCE_SEUIL_M / 111000) * 3,
+          timestamp: '2026-08-15T09:30:00.000Z',
+        },
+      ],
+    });
+    expect(avertissements).toEqual([]);
+  });
+
+  it('n\'avertit pas hors de la fenêtre temporelle', () => {
+    const { avertissements } = validateAntiDoublon({
+      ...base,
+      fichesProches: [
+        {
+          prospecteurId: 'autre',
+          latitude: -18.9005,
+          longitude: 47.5005,
+          timestamp: `2026-08-15T${String(10 - DOUBLON_DELAI_SEUIL_H - 1).padStart(2, '0')}:00:00.000Z`,
+        },
+      ],
+    });
+    expect(avertissements).toEqual([]);
+  });
+
+  it('ne bloque jamais l\'enregistrement', () => {
+    const { blocages } = validateAntiDoublon({
+      ...base,
+      fichesProches: [
+        { prospecteurId: 'autre', latitude: base.latitude, longitude: base.longitude, timestamp: base.timestamp },
+      ],
+    });
+    expect(blocages).toEqual([]);
+  });
+});
+
+describe('validateEcartHistorique — écart vs dernière observation au même site (#106, §2.2 point 15)', () => {
+  it('avertit quand la densité actuelle est au moins ECART_HISTORIQUE_SEUIL_RATIO fois supérieure à la précédente', () => {
+    const { blocages, avertissements } = validateEcartHistorique({
+      densiteMoyActuelle: 10 * ECART_HISTORIQUE_SEUIL_RATIO,
+      derniereDensiteMoyConnue: 10,
+    });
+    expect(blocages).toEqual([]);
+    expect(avertissements).toHaveLength(1);
+  });
+
+  it('avertit quand la densité actuelle est au moins ECART_HISTORIQUE_SEUIL_RATIO fois inférieure à la précédente', () => {
+    const { avertissements } = validateEcartHistorique({
+      densiteMoyActuelle: 10,
+      derniereDensiteMoyConnue: 10 * ECART_HISTORIQUE_SEUIL_RATIO,
+    });
+    expect(avertissements).toHaveLength(1);
+  });
+
+  it('n\'avertit pas pour un écart en dessous du seuil', () => {
+    const { avertissements } = validateEcartHistorique({
+      densiteMoyActuelle: 12,
+      derniereDensiteMoyConnue: 10,
+    });
+    expect(avertissements).toEqual([]);
+  });
+
+  it('n\'avertit pas en l\'absence d\'observation antérieure connue (aucun point de suivi)', () => {
+    const { avertissements } = validateEcartHistorique({
+      densiteMoyActuelle: 1000,
+      derniereDensiteMoyConnue: null,
+    });
+    expect(avertissements).toEqual([]);
+  });
+
+  it('n\'avertit pas en l\'absence de densité actuelle renseignée', () => {
+    const { avertissements } = validateEcartHistorique({
+      densiteMoyActuelle: null,
+      derniereDensiteMoyConnue: 10,
+    });
+    expect(avertissements).toEqual([]);
+  });
+
+  it('ne bloque jamais l\'enregistrement', () => {
+    const { blocages } = validateEcartHistorique({
+      densiteMoyActuelle: 1000,
+      derniereDensiteMoyConnue: 1,
+    });
+    expect(blocages).toEqual([]);
   });
 });

@@ -54,6 +54,7 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
       sol TEXT,
       ennemis_naturels TEXT,
       observations TEXT,
+      avertissements TEXT,
       statut TEXT NOT NULL DEFAULT 'brouillon',
       statut_sync TEXT NOT NULL DEFAULT 'local',
       created_at TEXT NOT NULL,
@@ -161,7 +162,8 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
       statut TEXT NOT NULL DEFAULT 'brouillon',
       statut_sync TEXT NOT NULL DEFAULT 'local',
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      server_updated_at TEXT
     );
 
     CREATE INDEX IF NOT EXISTS ix_traitement_prospection_id
@@ -290,6 +292,7 @@ async function migrateProspectionTable(db: SQLite.SQLiteDatabase): Promise<void>
     { name: 'signalement_date', type: 'TEXT' },
     { name: 'signalement_description', type: 'TEXT' },
     { name: 'conclusion_validation', type: 'TEXT' },
+    { name: 'avertissements', type: 'TEXT' },
   ];
 
   for (const col of columnsToAdd) {
@@ -409,7 +412,9 @@ async function migrateTraitementTable(db: SQLite.SQLiteDatabase): Promise<void> 
   const tableInfo = await db.getAllAsync<{ name: string }>('PRAGMA table_info(traitement)');
   const columnNames = tableInfo.map(row => row.name);
 
-  const columnsToAdd: { name: string; type: string }[] = [];
+  const columnsToAdd: { name: string; type: string }[] = [
+    { name: 'server_updated_at', type: 'TEXT' },
+  ];
 
   for (const col of columnsToAdd) {
     if (!columnNames.includes(col.name)) {

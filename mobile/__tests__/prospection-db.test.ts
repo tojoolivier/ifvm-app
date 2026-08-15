@@ -10,10 +10,11 @@ const MIGRATED_COLUMNS = [
   'stade_dominant', 'taille_groupe_m2', 'front_longueur_m', 'front_largeur_m',
   'densite_max_front', 'densite_moy_arriere_front', 'heure_observation', 'densite_en_vol', 'dimension_ha',
   'station_libre', 'type_station', 'verdure_strate',
-  'signalement_source', 'signalement_date', 'signalement_description', 'conclusion_validation',
+  'signalement_source', 'signalement_date', 'signalement_description', 'conclusion_validation', 'avertissements',
   'phase', 'captures_nombre', 'temps_capture',
   'captures_sol', 'captures_trans', 'captures_greg', 'stade_imago', 'essaim_observe',
   'densites_larve', 'tache_larvaire', 'bande_larvaire', 'interdistance', 'deplacement',
+  'server_updated_at',
 ].map((name) => ({ name }));
 
 const execAsync = jest.fn().mockResolvedValue(undefined);

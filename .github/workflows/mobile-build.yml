@@ -78,6 +78,11 @@ jobs:
           # Via env var et non interpole dans le script : un message de commit contenant
           # des guillemets/backticks serait sinon execute par le shell (script injection).
           COMMIT_MSG: ${{ github.event.head_commit.message }}
+          # eas.json "env" ne s'applique qu'aux builds natifs (eas build), pas aux OTA
+          # (eas update) : sans cette variable ici, le bundle JS republie est fige avec
+          # EXPO_PUBLIC_API_URL=undefined et l'app retombe sur le fallback localhost:8000
+          # (mobile/src/lib/api-client.ts) pour tous les utilisateurs du canal preview.
+          EXPO_PUBLIC_API_URL: https://ifvm.orakotondravao.com/api
         run: eas update --channel preview --message "$COMMIT_MSG" --non-interactive
 
   build:

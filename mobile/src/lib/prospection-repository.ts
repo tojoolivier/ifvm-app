@@ -71,6 +71,8 @@ export interface DraftProspection {
   sol: string | null;
   ennemis_naturels: string | null;
   observations: string | null;
+  /** Avertissements non bloquants déclenchés à la saisie (#106), JSON stringifié. */
+  avertissements: string | null;
   statut: string;
   statut_sync: string;
   created_at: string;
@@ -749,6 +751,31 @@ export async function updateProspectionObservations(
   return updated;
 }
 
+/**
+ * Marque la fiche « à vérifier » avec les avertissements non bloquants
+ * déclenchés à la saisie (#106 : plausibilité horaire essaim nocturne, écart
+ * historique de densité). Remplace la liste précédente : reflète l'état
+ * courant de la fiche, pas un historique cumulatif.
+ */
+export async function updateProspectionAvertissements(
+  id: string,
+  avertissements: string[]
+): Promise<DraftProspection> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    `UPDATE prospection SET avertissements = ?, updated_at = ? WHERE id = ?`,
+    [JSON.stringify(avertissements), now, id]
+  );
+
+  const updated = await getProspection(id);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
 // ==========================================
 // VÉGÉTATION
 // ==========================================
@@ -1347,6 +1374,76 @@ export async function listRecentProspections(
      LIMIT ?`,
     [limit]
   );
+}
+
+/**
+ * Fiches de prospection validées, éligibles au rattachement d'une fiche de
+ * traitement (sélecteur écran Références, Lot 3 — #91).
+ */
+export async function listValidatedProspections(): Promise<DraftProspection[]> {
+  const db = await getDb();
+
+  return db.getAllAsync<DraftProspection>(
+    `SELECT *
+     FROM prospection
+     WHERE statut = 'validee'
+     ORDER BY updated_at DESC`
+  );
+}
+
+/**
+ * Fiches soumises par d'autres prospecteurs dans la fenêtre récente, pour
+ * l'avertissement anti-doublon (#107). Filtre sur les données locales
+ * synchronisées et/ou déjà créées sur cet appareil — pas d'appel réseau ici,
+ * cohérent avec le comportement dégradé hors ligne exigé par l'issue (aucune
+ * comparaison bloquée si rien n'est encore synchronisé, la liste est
+ * simplement vide).
+ */
+export async function listProspectionsRecentesAutresProspecteurs(
+  prospecteurId: string,
+  sinceIso: string
+): Promise<{ prospecteur_id: string; latitude: number; longitude: number; updated_at: string }[]> {
+  const db = await getDb();
+
+  return db.getAllAsync<{ prospecteur_id: string; latitude: number; longitude: number; updated_at: string }>(
+    `SELECT prospecteur_id, latitude, longitude, updated_at
+     FROM prospection
+     WHERE prospecteur_id != ?
+       AND updated_at >= ?
+       AND latitude IS NOT NULL
+       AND longitude IS NOT NULL`,
+    [prospecteurId, sinceIso]
+  );
+}
+
+/**
+ * Dernière densité moyenne connue pour le même type de cible sur le même
+ * point de suivi (station fixe), pour l'avertissement d'écart important
+ * (#106, §2.2 point 15). Ignore la fiche en cours d'édition et les fiches
+ * sans densité moyenne renseignée. Retourne null si aucun point de suivi
+ * n'existe encore pour cette prospection.
+ */
+export async function getDerniereDensiteMemeSite(
+  stationId: string,
+  typeCible: string,
+  excludeProspectionId: string
+): Promise<number | null> {
+  const db = await getDb();
+
+  const row = await db.getFirstAsync<{ densite_moy: number | null }>(
+    `SELECT pi.densite_moy as densite_moy
+     FROM prospection_infestation pi
+     JOIN prospection p ON p.id = pi.prospection_id
+     WHERE p.station_id = ?
+       AND pi.type_cible = ?
+       AND p.id != ?
+       AND pi.densite_moy IS NOT NULL
+     ORDER BY p.updated_at DESC
+     LIMIT 1`,
+    [stationId, typeCible, excludeProspectionId]
+  );
+
+  return row?.densite_moy ?? null;
 }
 
 export async function countUnsyncedProspections(): Promise<number> {

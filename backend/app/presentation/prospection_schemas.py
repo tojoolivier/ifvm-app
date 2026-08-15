@@ -279,6 +279,7 @@ class ProspectionCreate(BaseModel):
     signalement_date: str | None = None
     signalement_description: str | None = None
     conclusion_validation: str | None = None
+    avertissements: list[str] = []
 
     populations: list[PopulationCreate] = []
     captures: list[CaptureCreate] = []
@@ -336,6 +337,7 @@ class ProspectionUpdate(BaseModel):
     signalement_date: str | None = None
     signalement_description: str | None = None
     conclusion_validation: str | None = None
+    avertissements: list[str] | None = None
 
 
 class StatutChange(BaseModel):
@@ -417,6 +419,7 @@ class ProspectionRead(BaseModel):
     signalement_date: str | None = None
     signalement_description: str | None = None
     conclusion_validation: str | None = None
+    avertissements: list[str] = []
 
     populations: list[PopulationRead] = []
     captures: list[CaptureRead] = []

@@ -107,6 +107,7 @@ function draft(overrides: Partial<DraftProspection> = {}): DraftProspection {
     sol: null,
     ennemis_naturels: null,
     observations: null,
+    avertissements: null,
     statut: 'brouillon',
     statut_sync: 'local',
     created_at: '2026-08-02T00:00:00Z',

@@ -1,6 +1,6 @@
 COMPOSE = docker compose
 
-.PHONY: up down build logs migrate seed shell-db shell-backend lint format
+.PHONY: up down build logs migrate makemigrations seed shell-db shell-backend lint format
 
 up:
 	$(COMPOSE) up -d
@@ -14,10 +14,10 @@ build:
 logs:
 	$(COMPOSE) logs -f
 
-migrate:
+makemigrations:
 	$(COMPOSE) exec backend alembic revision --autogenerate -m "$(msg)"
 
-upgrade:
+migrate:
 	$(COMPOSE) exec backend alembic upgrade head
 
 downgrade:

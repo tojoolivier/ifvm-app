@@ -10,11 +10,11 @@ const MIGRATED_COLUMNS = [
   'stade_dominant', 'taille_groupe_m2', 'front_longueur_m', 'front_largeur_m',
   'densite_max_front', 'densite_moy_arriere_front', 'heure_observation', 'densite_en_vol', 'dimension_ha',
   'station_libre', 'type_station', 'verdure_strate',
-  'signalement_source', 'signalement_date', 'signalement_description', 'conclusion_validation',
+  'signalement_source', 'signalement_date', 'signalement_description', 'conclusion_validation', 'avertissements',
   'phase', 'captures_nombre', 'temps_capture',
   'captures_sol', 'captures_trans', 'captures_greg', 'stade_imago', 'essaim_observe',
   'densites_larve', 'tache_larvaire', 'bande_larvaire', 'interdistance', 'deplacement',
-  'id',
+  'id', 'server_updated_at',
 ].map((name) => ({ name }));
 
 const execAsync = jest.fn().mockResolvedValue(undefined);
@@ -69,6 +69,20 @@ describe('traitement local schema', () => {
     await getDb();
 
     expect(getAllAsync).toHaveBeenCalledWith('PRAGMA table_info(traitement)');
+  });
+
+  it('adds server_updated_at to an existing traitement table missing it (upgrade path)', async () => {
+    getAllAsync.mockImplementation(async (sql: string) =>
+      sql === 'PRAGMA table_info(traitement)'
+        ? MIGRATED_COLUMNS.filter((c) => c.name !== 'server_updated_at')
+        : MIGRATED_COLUMNS
+    );
+
+    await getDb();
+
+    expect(execAsync).toHaveBeenCalledWith(
+      expect.stringContaining('ALTER TABLE traitement ADD COLUMN server_updated_at TEXT')
+    );
   });
 
   it('still creates the prospection tables alongside the traitement ones (shared ifvm.db)', async () => {

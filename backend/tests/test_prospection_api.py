@@ -141,6 +141,54 @@ async def test_create_prospection_avec_nouveaux_champs(
 
 
 @pytest.mark.asyncio
+async def test_create_prospection_avec_avertissements(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+):
+    """#106 : la fiche « à vérifier » côté mobile transmet ses avertissements non
+    bloquants (plausibilité horaire, écart historique) au backend, qui les
+    persiste tels quels pour être visibles en revue."""
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "extensive",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-07-29",
+            "avertissements": [
+                "Essaim/vol clair signalé de nuit : comportement forcé sur « posé ».",
+                "Écart important par rapport à la dernière observation connue sur ce point.",
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    data = response.json()
+
+    assert data["avertissements"] == [
+        "Essaim/vol clair signalé de nuit : comportement forcé sur « posé ».",
+        "Écart important par rapport à la dernière observation connue sur ce point.",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_create_prospection_sans_avertissements_est_vide(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+):
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "extensive",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-07-29",
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    assert response.json()["avertissements"] == []
+
+
+@pytest.mark.asyncio
 async def test_create_prospection_population_methode_phase(
     client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
 ):
@@ -348,6 +396,34 @@ async def test_update_prospection_brouillon(
     )
     assert response.status_code == 200
     assert response.json()["observations"] == "Mise à jour OK"
+
+
+@pytest.mark.asyncio
+async def test_update_prospection_efface_avertissements_une_fois_corriges(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+):
+    """#106 : quand le prospecteur corrige la saisie et que plus aucun avertissement
+    ne se déclenche, la fiche n'est plus « à vérifier » (liste vidée, pas conservée)."""
+    create_resp = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "extensive",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-07-29",
+            "avertissements": ["Écart important par rapport à la dernière observation connue."],
+        },
+        headers=auth_headers,
+    )
+    prospection_id = create_resp.json()["id"]
+
+    response = await client.put(
+        f"/prospections/{prospection_id}",
+        json={"avertissements": []},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["avertissements"] == []
 
 
 @pytest.mark.asyncio
