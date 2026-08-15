@@ -1,7 +1,10 @@
 import { useRequestLogStore, RequestLogEntry } from './request-log-store';
 import type { components } from './api-schema.generated';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const REDACTED = '[redacted]';
+const TOKEN_KEY = 'auth_token';
+const REFRESH_TOKEN_KEY = 'refresh_token';
 
 /** Ne jamais logger de secrets : mots de passe en clair dans le body des routes auth. */
 function redactBody(url: string, body: string | null | undefined): string | null | undefined {
@@ -64,8 +67,7 @@ export interface User {
   created_at: string;
 }
 
-// Types alignés sur le contrat OpenAPI backend (mobile/src/lib/api-schema.generated.ts),
-// pour ne plus recopier les champs à la main (voir CLAUDE.md "Contrat API mobile ↔ backend").
+// Types alignés sur le contrat OpenAPI backend
 export type ProspectionCaptureInput = components['schemas']['CaptureCreate'];
 export type ProspectionPopulationInput = components['schemas']['PopulationCreate'];
 export type ProspectionInfestationInput = components['schemas']['InfestationCreate'];
@@ -181,8 +183,7 @@ interface FastApiValidationError {
 
 /**
  * FastAPI renvoie les erreurs sous `detail` — une chaîne pour les HTTPException
- * métier, ou un tableau d'erreurs Pydantic pour les 422 de validation. Sans ceci,
- * l'appelant ne voit qu'un générique "HTTP error! status: 422" inexploitable.
+ * métier, ou un tableau d'erreurs Pydantic pour les 422 de validation.
  */
 function extractErrorMessage(errorData: unknown): string | null {
   if (typeof errorData !== 'object' || errorData === null) return null;
@@ -206,6 +207,56 @@ function extractErrorMessage(errorData: unknown): string | null {
   return null;
 }
 
+/**
+ * Vérifie si un token JWT est expiré
+ */
+async function isTokenExpired(token: string): Promise<boolean> {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const exp = payload.exp * 1000; // Convertir en millisecondes
+    return Date.now() >= exp;
+  } catch {
+    return true; // Si on ne peut pas décoder, considérer comme expiré
+  }
+}
+
+/**
+ * Rafraîchit le token d'accès en utilisant le refresh token
+ */
+async function refreshAccessToken(): Promise<string | null> {
+  try {
+    const refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
+    if (!refreshToken) {
+      console.warn('[api-client] Pas de refresh token disponible');
+      return null;
+    }
+
+    const baseUrl = getBaseUrl();
+    const response = await fetch(`${baseUrl}/auth/refresh`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+
+    if (!response.ok) {
+      console.warn('[api-client] Échec du rafraîchissement du token:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    if (data.access_token) {
+      await AsyncStorage.setItem(TOKEN_KEY, data.access_token);
+      return data.access_token;
+    }
+    return null;
+  } catch (error) {
+    console.error('[api-client] Erreur lors du rafraîchissement du token:', error);
+    return null;
+  }
+}
+
 const makeRequest = async <T>(
   endpoint: string,
   options: RequestInit = {},
@@ -215,13 +266,33 @@ const makeRequest = async <T>(
   const baseUrl = getBaseUrl();
   const url = `${baseUrl}${endpoint}`;
 
+  // Si un token est fourni, vérifier s'il est expiré
+  let currentToken = token;
+  if (currentToken) {
+    const expired = await isTokenExpired(currentToken);
+    if (expired) {
+      console.log('[api-client] Token expiré, tentative de rafraîchissement...');
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        currentToken = newToken;
+        console.log('[api-client] Token rafraîchi avec succès');
+      } else {
+        console.warn('[api-client] Échec du rafraîchissement du token');
+        if (onUnauthorized) {
+          onUnauthorized();
+        }
+        throw new Error('Token invalide. Veuillez vous reconnecter.');
+      }
+    }
+  }
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> || {}),
   };
 
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+  if (currentToken) {
+    headers['Authorization'] = `Bearer ${currentToken}`;
   }
 
   const startedAt = new Date();
@@ -248,8 +319,49 @@ const makeRequest = async <T>(
 
   const responseClone = response.clone();
 
-  if (response.status === 401 && onUnauthorized) {
-    onUnauthorized();
+  // Si 401, essayer de rafraîchir une fois
+  if (response.status === 401) {
+    console.log('[api-client] 401 Unauthorized, tentative de rafraîchissement...');
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      // Mettre à jour le token dans le store via onUnauthorized
+      // Le store sera mis à jour par l'appelant
+      if (onUnauthorized) {
+        onUnauthorized();
+      }
+      
+      // Réessayer la requête avec le nouveau token
+      const newHeaders = { ...headers, 'Authorization': `Bearer ${newToken}` };
+      try {
+        const retryResponse = await fetch(url, {
+          ...options,
+          headers: newHeaders,
+        });
+        
+        if (retryResponse.ok) {
+          const responseData = await retryResponse.json();
+          logRequest({
+            method: options.method || 'GET',
+            url,
+            status: retryResponse.status,
+            ok: true,
+            durationMs: Date.now() - startTime,
+            startedAt: startedAt.toISOString(),
+            requestBody: typeof options.body === 'string' ? options.body : null,
+            responseBody: JSON.stringify(responseData),
+          });
+          return responseData;
+        }
+      } catch (retryError) {
+        console.error('[api-client] Erreur lors de la retry:', retryError);
+      }
+    }
+    
+    // Si le rafraîchissement échoue, appeler onUnauthorized
+    if (onUnauthorized) {
+      onUnauthorized();
+    }
+    throw new Error('Token invalide. Veuillez vous reconnecter.');
   }
 
   if (!response.ok) {
@@ -281,6 +393,7 @@ const makeRequest = async <T>(
     return undefined as T;
   }
 
+  const responseData = await response.json();
   logRequest({
     method: options.method || 'GET',
     url,
@@ -289,10 +402,10 @@ const makeRequest = async <T>(
     durationMs: Date.now() - startTime,
     startedAt: startedAt.toISOString(),
     requestBody: typeof options.body === 'string' ? options.body : null,
-    responseBody: await responseClone.text().catch(() => null),
+    responseBody: JSON.stringify(responseData),
   });
 
-  return response.json();
+  return responseData;
 };
 
 export const apiClient = {
