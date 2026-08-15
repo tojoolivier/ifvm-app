@@ -304,3 +304,71 @@ export function classifyAerialPopulation(
 
   return 'non_classe';
 }
+
+/** Fenêtre de proximité anti-doublon (#107, §2.2 point 16 du manuel) — valeurs par défaut à confirmer avec le référent métier. */
+export const DOUBLON_DISTANCE_SEUIL_M = 200;
+export const DOUBLON_DELAI_SEUIL_H = 2;
+
+export interface FicheProspectionProche {
+  prospecteurId: string;
+  latitude: number;
+  longitude: number;
+  /** Horodatage de soumission de la fiche (ISO 8601). */
+  timestamp: string;
+}
+
+export interface AntiDoublonValidationInput {
+  prospecteurId: string;
+  latitude: number;
+  longitude: number;
+  /** Horodatage de soumission de la fiche en cours (ISO 8601). */
+  timestamp: string;
+  /** Fiches déjà soumises à comparer (locales et/ou serveur, toute source disponible offline). */
+  fichesProches: FicheProspectionProche[];
+}
+
+/** Distance orthodromique (Haversine) en mètres entre deux positions GPS. */
+function distanceMetres(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const RAYON_TERRE_M = 6371000;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return RAYON_TERRE_M * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/**
+ * Avertissement anti-doublon (#107, §2.2 point 16 du manuel) : une fiche
+ * soumise à moins de DOUBLON_DISTANCE_SEUIL_M mètres et
+ * DOUBLON_DELAI_SEUIL_H heures d'une fiche déjà soumise par un AUTRE
+ * prospecteur est signalée, sans bloquer l'enregistrement. Une fiche du
+ * même prospecteur (suivi normal d'un site) est toujours exclue.
+ */
+export function validateAntiDoublon(input: AntiDoublonValidationInput): ValidationResult {
+  const blocages: string[] = [];
+  const avertissements: string[] = [];
+
+  const tsCourant = new Date(input.timestamp).getTime();
+
+  const doublon = input.fichesProches.find((fiche) => {
+    if (fiche.prospecteurId === input.prospecteurId) {
+      return false;
+    }
+    const ecartHeures = Math.abs(tsCourant - new Date(fiche.timestamp).getTime()) / 3_600_000;
+    if (ecartHeures > DOUBLON_DELAI_SEUIL_H) {
+      return false;
+    }
+    const distance = distanceMetres(input.latitude, input.longitude, fiche.latitude, fiche.longitude);
+    return distance <= DOUBLON_DISTANCE_SEUIL_M;
+  });
+
+  if (doublon) {
+    avertissements.push(
+      `Doublon possible : une fiche a déjà été soumise par un autre prospecteur à moins de ${DOUBLON_DISTANCE_SEUIL_M} m et ${DOUBLON_DELAI_SEUIL_H} h de cette position.`
+    );
+  }
+
+  return { blocages, avertissements };
+}

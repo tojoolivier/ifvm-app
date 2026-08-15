@@ -11,10 +11,10 @@ import {
   PosteAcridien,
   StationFixe,
 } from '@/lib/referentiel-db';
-import { updateProspectionReference } from '@/lib/prospection-repository';
+import { updateProspectionReference, listProspectionsRecentesAutresProspecteurs } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { referenceSchema, ReferenceFormValues } from '@/lib/prospection-reference-schema';
-import { validateGpsPosition } from '@/lib/prospection-validation';
+import { validateGpsPosition, validateAntiDoublon, DOUBLON_DELAI_SEUIL_H } from '@/lib/prospection-validation';
 
 const INACTIVE_BG = '#efeada';
 const INACTIVE_TEXT = '#9a9484';
@@ -223,6 +223,26 @@ export default function ReferenceScreen() {
       if (gpsBlocages.length > 0) {
         Alert.alert('⚠️ Position GPS invalide', gpsBlocages.join('\n'));
         return;
+      }
+
+      if (draft?.prospecteur_id) {
+        const sinceIso = new Date(Date.now() - DOUBLON_DELAI_SEUIL_H * 3_600_000).toISOString();
+        const fichesProches = await listProspectionsRecentesAutresProspecteurs(draft.prospecteur_id, sinceIso);
+        const { avertissements: avertissementsDoublon } = validateAntiDoublon({
+          prospecteurId: draft.prospecteur_id,
+          latitude: position.latitude,
+          longitude: position.longitude,
+          timestamp: new Date().toISOString(),
+          fichesProches: fichesProches.map((f) => ({
+            prospecteurId: f.prospecteur_id,
+            latitude: f.latitude,
+            longitude: f.longitude,
+            timestamp: f.updated_at,
+          })),
+        });
+        if (avertissementsDoublon.length > 0) {
+          Alert.alert('⚠️ À vérifier', avertissementsDoublon.join('\n'));
+        }
       }
 
       // VALIDATION PERSONNALISÉE
