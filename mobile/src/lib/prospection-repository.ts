@@ -71,6 +71,8 @@ export interface DraftProspection {
   sol: string | null;
   ennemis_naturels: string | null;
   observations: string | null;
+  /** Avertissements non bloquants déclenchés à la saisie (#106), JSON stringifié. */
+  avertissements: string | null;
   statut: string;
   statut_sync: string;
   created_at: string;
@@ -740,6 +742,31 @@ export async function updateProspectionObservations(
       now,
       id,
     ]
+  );
+
+  const updated = await getProspection(id);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
+/**
+ * Marque la fiche « à vérifier » avec les avertissements non bloquants
+ * déclenchés à la saisie (#106 : plausibilité horaire essaim nocturne, écart
+ * historique de densité). Remplace la liste précédente : reflète l'état
+ * courant de la fiche, pas un historique cumulatif.
+ */
+export async function updateProspectionAvertissements(
+  id: string,
+  avertissements: string[]
+): Promise<DraftProspection> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    `UPDATE prospection SET avertissements = ?, updated_at = ? WHERE id = ?`,
+    [JSON.stringify(avertissements), now, id]
   );
 
   const updated = await getProspection(id);

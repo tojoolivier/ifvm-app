@@ -51,6 +51,7 @@ interface ProspectionDetail {
   vegetation: Record<string, unknown> | null
   sol: Record<string, unknown> | null
   degats_cultures: string | null
+  avertissements: string[]
   populations: Population[]
   captures: Capture[]
   infestations: Infestation[]
@@ -389,6 +390,24 @@ export function ProspectionDetailPage() {
                 </>
               )}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Avertissements — fiche à vérifier (#106) */}
+      {prospection.avertissements.length > 0 && (
+        <Card className="mb-4 border-amber-200 bg-amber-50">
+          <CardHeader>
+            <CardTitle className="text-base text-amber-800">
+              À vérifier ({prospection.avertissements.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="list-disc pl-5 space-y-1 text-sm text-amber-800">
+              {prospection.avertissements.map((avertissement, index) => (
+                <li key={index}>{avertissement}</li>
+              ))}
+            </ul>
           </CardContent>
         </Card>
       )}

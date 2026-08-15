@@ -223,6 +223,7 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
     signalement_date: draft.signalement_date || null,
     signalement_description: draft.signalement_description || null,
     conclusion_validation: draft.conclusion_validation || null,
+    avertissements: draft.avertissements ? JSON.parse(draft.avertissements) : [],
   };
 }
 

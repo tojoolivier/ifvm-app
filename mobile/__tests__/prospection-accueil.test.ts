@@ -87,6 +87,7 @@ const STORED_ROW: DraftProspection = {
   sol: null,
   ennemis_naturels: null,
   observations: null,
+  avertissements: null,
   statut: 'brouillon',
   statut_sync: 'local',
   created_at: '2026-07-11T00:00:00.000Z',

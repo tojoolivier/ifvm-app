@@ -183,6 +183,11 @@ class Prospection:
     signalement_description: str | None = None
     conclusion_validation: str | None = None
 
+    # ==========================================
+    # NOUVEAUX CHAMPS - Avertissements non bloquants (#106)
+    # ==========================================
+    avertissements: list[str] = field(default_factory=list)
+
     populations: list[ProspectionPopulation] = field(default_factory=list)
     captures: list[ProspectionCapture] = field(default_factory=list)
     infestations: list[ProspectionInfestation] = field(default_factory=list)

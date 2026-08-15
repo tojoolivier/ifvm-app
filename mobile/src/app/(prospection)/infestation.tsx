@@ -9,6 +9,7 @@ import {
   getProspection,
   listAllProspectionInfestations,
   saveProspectionInfestation,
+  updateProspectionAvertissements,
 } from '@/lib/prospection-repository';
 import {
   COMPASS_DIRECTIONS,
@@ -410,6 +411,8 @@ export default function InfestationScreen() {
 
     const blocages: string[] = [];
     const avertissements: string[] = [];
+    /** Sous-ensemble des avertissements relevant de #106 (plausibilité horaire, écart historique) : marque la fiche « à vérifier », visible en revue. */
+    const avertissementsAVerifier: string[] = [];
     for (const target of selectedTargets) {
       const f = forms[target];
       if (!isFilled(f)) continue;
@@ -439,21 +442,22 @@ export default function InfestationScreen() {
         avertissements.push(...groupementResult.avertissements);
       }
 
+      const pushAVerifier = (result: { avertissements: string[] }) => {
+        avertissements.push(...result.avertissements);
+        avertissementsAVerifier.push(...result.avertissements);
+      };
+
       if (target === 'vol_clair' || target === 'essaim') {
-        const nocturneResult = validateEssaimNocturne({
-          typeCible: target,
-          heureObservation: f.heureObservation,
-        });
-        avertissements.push(...nocturneResult.avertissements);
+        pushAVerifier(
+          validateEssaimNocturne({ typeCible: target, heureObservation: f.heureObservation })
+        );
       }
 
       if (draft?.station_id) {
         const derniereDensiteMoyConnue = await getDerniereDensiteMemeSite(draft.station_id, target, draft.id);
-        const ecartResult = validateEcartHistorique({
-          densiteMoyActuelle: numOrNull(f.densMoy),
-          derniereDensiteMoyConnue,
-        });
-        avertissements.push(...ecartResult.avertissements);
+        pushAVerifier(
+          validateEcartHistorique({ densiteMoyActuelle: numOrNull(f.densMoy), derniereDensiteMoyConnue })
+        );
       }
     }
     if (blocages.length > 0) {
@@ -462,6 +466,9 @@ export default function InfestationScreen() {
     }
     if (avertissements.length > 0) {
       Alert.alert('À vérifier', avertissements.join('\n'));
+    }
+    if (draftId) {
+      await updateProspectionAvertissements(draftId, avertissementsAVerifier);
     }
 
     run(

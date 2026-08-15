@@ -26,6 +26,7 @@ jest.mock('@/lib/prospection-repository', () => ({
   saveProspectionInfestation: jest.fn().mockResolvedValue(undefined),
   getProspection: jest.fn().mockResolvedValue(null),
   getDerniereDensiteMemeSite: jest.fn().mockResolvedValue(null),
+  updateProspectionAvertissements: jest.fn().mockResolvedValue(undefined),
 }));
 
 describe('InfestationScreen', () => {
