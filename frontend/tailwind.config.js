@@ -45,6 +45,28 @@ export default {
           "4": "hsl(var(--chart-4))",
           "5": "hsl(var(--chart-5))",
         },
+        // Palette IFVM — docs/design_handoff_web/README.md §Design tokens
+        ifvm: {
+          "bg-outer": "#efeada",
+          "text-tertiary": "#6f6a59",
+          "text-weak": "#9a9484",
+          "amber": "#e89b2b",
+          "amber-text": "#8a6d2f",
+          "amber-bg": "#fdf6e7",
+          "amber-border": "#f0e2bf",
+          "danger-text": "#a5341c",
+          "danger-bg": "#fbe9e5",
+          "danger-border": "#f0c4b9",
+          "blue-text": "#31567f",
+          "blue-bg": "#eaf0f7",
+          "blue-border": "#cdddef",
+          "green-bg": "#eaf2ec",
+          "green-border": "#cfe0d4",
+        },
+      },
+      fontFamily: {
+        sans: ["Archivo", "sans-serif"],
+        mono: ["IBM Plex Mono", "monospace"],
       },
       borderRadius: {
         lg: "var(--radius)",
