@@ -33,11 +33,11 @@ const STADES_CONFIG = {
 
 const PHASES_CONFIG = {
   LMC: {
-    imago: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
-    larve: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
+    imago: ['solitaire', 'transiens', 'solitaro_trans', 'gregaire'],
+    larve: ['solitaire', 'transiens', 'solitaro_trans', 'gregaire'],
   },
   NSE: {
-    imago: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
+    imago: ['solitaire', 'transiens', 'solitaro_trans', 'gregaire'],
     larve: ['solitaire', 'transiens', 'gregaire'],
   },
 } as const;
