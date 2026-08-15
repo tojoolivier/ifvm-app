@@ -1,4 +1,4 @@
-import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import { createBrowserRouter, RouterProvider, type RouteObject } from 'react-router-dom'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
@@ -13,10 +13,10 @@ import { DesignSystemPage } from './pages/DesignSystemPage'
 import { UsersPage } from './pages/UsersPage'
 import { StationPage } from './pages/StationPage'
 
-const router = createBrowserRouter([
+export const routes: RouteObject[] = [
   // Route publique
   { path: '/login', element: <LoginPage /> },
-  
+
   // Routes protégées
   {
     element: <ProtectedRoute />,
@@ -26,21 +26,21 @@ const router = createBrowserRouter([
         children: [
           // Dashboard principal
           { path: '/', element: <DashboardPage /> },
-          
+
           // Gestion des campagnes
           { path: '/campagnes', element: <CampagnesPage /> },
-          
+
           // Gestion des prospections
           { path: '/prospections', element: <ProspectionsPage /> },
           { path: '/prospections/new', element: <NouvelleProspectionPage /> },
           { path: '/prospections/:id', element: <ProspectionDetailPage /> },
-          
+
           // Gestion des utilisateurs
           { path: '/users', element: <UsersPage /> },
-          
+
           // Gestion des stations
           { path: '/stations', element: <StationPage /> },
-          
+
           // Autres pages
           { path: '/syntheses', element: <SynthesesPage /> },
           { path: '/carte', element: <CartePage /> },
@@ -49,11 +49,12 @@ const router = createBrowserRouter([
       },
     ],
   },
-  
+
   // Redirection par défaut
   { path: '*', element: <LoginPage /> },
-])
+]
 
 export function AppRouter() {
+  const router = createBrowserRouter(routes)
   return <RouterProvider router={router} />
 }
