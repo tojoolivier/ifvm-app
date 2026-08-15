@@ -513,14 +513,26 @@ describe('listTraitementsByChefEquipe', () => {
 });
 
 describe('listReprenableTraitements', () => {
-  it('queries locally cached validated traitements with a remaining surface', async () => {
+  it('queries locally cached validated traitements with a remaining or unknown surface', async () => {
     getAllAsync.mockResolvedValueOnce([]);
 
     await listReprenableTraitements();
 
-    expect(getAllAsync).toHaveBeenCalledWith(
-      expect.stringContaining("statut = 'validee'")
+    const [sql] = getAllAsync.mock.calls[0];
+    expect(sql).toEqual(expect.stringContaining("statut = 'validee'"));
+    expect(sql).toEqual(
+      expect.stringContaining('surface_restante_ha IS NULL OR traitement_terrestre.surface_restante_ha > 0')
     );
+  });
+
+  it('excludes fiches already used as the origin of another reprise', async () => {
+    getAllAsync.mockResolvedValueOnce([]);
+
+    await listReprenableTraitements();
+
+    const [sql] = getAllAsync.mock.calls[0];
+    expect(sql).toEqual(expect.stringContaining('NOT IN'));
+    expect(sql).toEqual(expect.stringContaining('traitement_origine_id'));
   });
 });
 
@@ -539,6 +551,23 @@ describe('markTraitementSynced', () => {
       expect.stringContaining("statut_sync = 'synced'"),
       expect.arrayContaining([AERIEN_INPUT.id])
     );
+  });
+
+  it('writes the server updated_at into the dedicated server_updated_at column, distinct from local updated_at', async () => {
+    getFirstAsync
+      .mockResolvedValueOnce({ ...STORED_TRAITEMENT_ROW, statut_sync: 'synced' })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    getAllAsync.mockResolvedValueOnce([]);
+
+    await markTraitementSynced(AERIEN_INPUT.id, '2026-08-14T12:00:00.000Z');
+
+    const [sql, params] = runAsync.mock.calls[0];
+    expect(sql).toEqual(expect.stringContaining('server_updated_at'));
+    expect(params).toContain('2026-08-14T12:00:00.000Z');
+    // updated_at (local write clock) stays distinct from server_updated_at.
+    expect(params.filter((p: unknown) => p === '2026-08-14T12:00:00.000Z')).toHaveLength(1);
   });
 });
 
@@ -560,6 +589,24 @@ describe('markTraitementConflict', () => {
       expect.stringContaining("statut_sync = 'conflict'"),
       expect.arrayContaining(['ServerLocalite'])
     );
+  });
+
+  it('writes the server updated_at into server_updated_at', async () => {
+    getFirstAsync
+      .mockResolvedValueOnce({ ...STORED_TRAITEMENT_ROW, statut_sync: 'conflict' })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    getAllAsync.mockResolvedValueOnce([]);
+
+    await markTraitementConflict(AERIEN_INPUT.id, {
+      ...STORED_TRAITEMENT_ROW,
+      updated_at: '2026-08-14T09:00:00.000Z',
+    });
+
+    const [sql, params] = runAsync.mock.calls[0];
+    expect(sql).toEqual(expect.stringContaining('server_updated_at'));
+    expect(params).toContain('2026-08-14T09:00:00.000Z');
   });
 });
 

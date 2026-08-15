@@ -23,7 +23,7 @@ export default function SignaturesScreen() {
   const store = useTraitementCaptureStore();
   const readOnly = isValidationView === '1';
 
-  const [typeTraitement, setTypeTraitement] = useState<'AERIEN' | 'TERRESTRE' | null>(null);
+  const typeTraitement = store.typeTraitement;
   const [agentEncadreurRenseigne, setAgentEncadreurRenseigne] = useState(false);
   const [draftNames, setDraftNames] = useState<Partial<Record<SignatureRole, string>>>({});
 
@@ -31,9 +31,10 @@ export default function SignaturesScreen() {
     if (!traitementId) return;
     getTraitement(traitementId).then((draft) => {
       if (!draft) return;
-      setTypeTraitement(draft.type_traitement);
+      store.setTypeTraitement(draft.type_traitement);
       setAgentEncadreurRenseigne(draft.type_traitement === 'TERRESTRE' && !!draft.terrestre?.agent_encadreur_id);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [traitementId]);
 
   const matrix =

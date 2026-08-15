@@ -14,6 +14,7 @@ const MIGRATED_COLUMNS = [
   'phase', 'captures_nombre', 'temps_capture',
   'captures_sol', 'captures_trans', 'captures_greg', 'stade_imago', 'essaim_observe',
   'densites_larve', 'tache_larvaire', 'bande_larvaire', 'interdistance', 'deplacement',
+  'server_updated_at',
 ].map((name) => ({ name }));
 
 const execAsync = jest.fn().mockResolvedValue(undefined);

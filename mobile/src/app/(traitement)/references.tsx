@@ -47,7 +47,7 @@ export default function ReferencesScreen() {
     useLocalSearchParams<{ prospectionId?: string; traitementId?: string; isValidationView?: string; origineId?: string }>();
 
   const store = useTraitementCaptureStore();
-  const [typeTraitement, setTypeTraitement] = useState<'AERIEN' | 'TERRESTRE' | null>(null);
+  const typeTraitement = store.typeTraitement;
   const [traitementId, setTraitementId] = useState<string | null>(routeTraitementId ?? null);
   const [prospectionId, setProspectionId] = useState<string | null>(routeProspectionId ?? null);
   // ReferenceDraft (traitement-capture-store.ts) n'a pas de champ dateValidation
@@ -67,7 +67,7 @@ export default function ReferencesScreen() {
       store.setValidationView(readOnly);
       getTraitement(routeTraitementId).then((draft) => {
         if (!draft) return;
-        setTypeTraitement(draft.type_traitement);
+        store.setTypeTraitement(draft.type_traitement);
         setProspectionId(draft.prospection_id);
         setDateValidation(draft.date_validation);
         store.updateRef({
@@ -83,6 +83,12 @@ export default function ReferencesScreen() {
           modeTraitement: (draft.mode_traitement as 'TOTAL' | 'BARRIERE' | 'IRREGULIER' | null) ?? null,
         });
       });
+    } else {
+      // Nouvelle fiche : la capture-store est un singleton global qui ne se
+      // réinitialise pas tout seul entre deux fiches (pas de démontage entre
+      // écrans wizard) — sans ce reset, type/ref/aerien/terrestre d'une fiche
+      // précédente fuiteraient dans la nouvelle saisie.
+      store.reset();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeTraitementId]);
@@ -191,7 +197,7 @@ export default function ReferencesScreen() {
               { value: 'TERRESTRE', label: 'Terrestre' },
             ]}
             value={typeTraitement}
-            onChange={(v) => !readOnly && !traitementId && setTypeTraitement(v as any)}
+            onChange={(v) => !readOnly && !traitementId && store.setTypeTraitement(v as any)}
           />
           {errors.typeTraitement && <Text style={styles.error}>{errors.typeTraitement}</Text>}
         </View>

@@ -37,7 +37,7 @@ export default function TraitementScreen() {
   const store = useTraitementCaptureStore();
   const readOnly = isValidationView === '1';
 
-  const [typeTraitement, setTypeTraitement] = useState<'AERIEN' | 'TERRESTRE' | null>(null);
+  const typeTraitement = store.typeTraitement;
   const [chefsDeBase, setChefsDeBase] = useState<UtilisateurEquipe[]>([]);
   const [chefsEquipe, setChefsEquipe] = useState<UtilisateurEquipe[]>([]);
   const [agentsEncadreurs, setAgentsEncadreurs] = useState<UtilisateurEquipe[]>([]);
@@ -56,7 +56,7 @@ export default function TraitementScreen() {
     if (!traitementId) return;
     getTraitement(traitementId).then((draft) => {
       if (!draft) return;
-      setTypeTraitement(draft.type_traitement);
+      store.setTypeTraitement(draft.type_traitement);
       setSurfaceInfesteeHa(draft.cible?.surface_infestee_ha ?? null);
       if (draft.type_traitement === 'AERIEN' && draft.aerien) {
         store.updateAerien({

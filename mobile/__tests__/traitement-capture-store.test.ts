@@ -13,6 +13,10 @@ describe('useTraitementCaptureStore — état initial', () => {
     expect(state.isValidationView).toBe(false);
   });
 
+  it('démarre sans type de traitement choisi', () => {
+    expect(useTraitementCaptureStore.getState().typeTraitement).toBeNull();
+  });
+
   it('démarre avec des sections vides', () => {
     const state = useTraitementCaptureStore.getState();
     expect(state.ref).toEqual({});
@@ -163,5 +167,14 @@ describe('reset', () => {
     expect(state.screen).toBe('reference');
     expect(state.ref).toEqual({});
     expect(state.aerien.rotations).toHaveLength(0);
+  });
+
+  it('efface le type de traitement choisi, pour éviter qu\'il ne fuite vers la fiche suivante', () => {
+    const store = useTraitementCaptureStore.getState();
+    store.setTypeTraitement('AERIEN');
+
+    store.reset();
+
+    expect(useTraitementCaptureStore.getState().typeTraitement).toBeNull();
   });
 });
