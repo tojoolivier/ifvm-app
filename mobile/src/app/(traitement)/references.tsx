@@ -237,15 +237,28 @@ export default function ReferencesScreen() {
 
         <View style={styles.field}>
           <Text style={styles.label}>Fiche de prospection liée *</Text>
-          <Card variant="default" style={styles.prospectionCard}>
-            <Text style={styles.label}>N° fiche de prospection</Text>
-            <Text style={styles.prospectionText}>{prospectionId ?? '—'}</Text>
-            <Text style={styles.note}>
-              {prospectionStatut === STATUT_VALIDE && prospectionUpdatedAt
-                ? `Validée le ${formatDateFr(prospectionUpdatedAt)} · lecture seule`
-                : 'Lecture seule'}
-            </Text>
-          </Card>
+          {prospectionId ? (
+            <Card variant="default" style={styles.prospectionCard}>
+              <Text style={styles.label}>N° fiche de prospection</Text>
+              <Text style={styles.prospectionText}>{prospectionId}</Text>
+              <Text style={styles.note}>
+                {prospectionStatut === STATUT_VALIDE && prospectionUpdatedAt
+                  ? `Validée le ${formatDateFr(prospectionUpdatedAt)} · lecture seule`
+                  : 'Lecture seule'}
+              </Text>
+            </Card>
+          ) : readOnly ? (
+            <Card variant="default" style={styles.prospectionCard}>
+              <Text style={styles.prospectionText}>—</Text>
+            </Card>
+          ) : (
+            <TouchableOpacity
+              style={styles.prospectionPickerLink}
+              onPress={() => router.push('/(traitement)/prospection-picker' as any)}
+            >
+              <Text style={styles.prospectionPickerLinkText}>Choisir une fiche de prospection ›</Text>
+            </TouchableOpacity>
+          )}
           {errors.prospectionId && <Text style={styles.error}>{errors.prospectionId}</Text>}
         </View>
 
@@ -328,6 +341,15 @@ const styles = StyleSheet.create({
   ficheCard: { gap: 4 },
   prospectionCard: { borderWidth: 2, borderColor: traitementColors.vertPrincipal, gap: 4 },
   prospectionText: { fontFamily: traitementFonts.monoBold, fontSize: traitementTypeSizes.valeurDerivee, color: traitementColors.texteTitre },
+  prospectionPickerLink: {
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: traitementColors.vertPrincipal,
+    borderRadius: traitementRadii.chip,
+  },
+  prospectionPickerLinkText: { fontFamily: traitementFonts.uiBold, color: traitementColors.vertPrincipal, fontSize: traitementTypeSizes.corps },
   gpsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 32 },
   gpsRowText: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.corps, color: traitementColors.texteSecondaire },
   gpsStatus: { fontFamily: traitementFonts.uiSemiBold, fontSize: traitementTypeSizes.corps, color: traitementColors.texteLabel },

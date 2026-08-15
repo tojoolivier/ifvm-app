@@ -3,6 +3,7 @@ import {
   getProspection,
   listDraftProspections,
   listRecentProspections,
+  listValidatedProspections,
   countUnsyncedProspections,
   updateProspectionReference,
   updateProspectionEspeces,
@@ -160,6 +161,20 @@ describe('listRecentProspections', () => {
     await listRecentProspections();
 
     expect(getAllAsync).toHaveBeenCalledWith(expect.any(String), [20]);
+  });
+});
+
+describe('listValidatedProspections', () => {
+  it('lists only validee rows ordered by most recently updated', async () => {
+    const validatedRow = { ...STORED_ROW, statut: 'validee' };
+    getAllAsync.mockResolvedValueOnce([validatedRow]);
+
+    const result = await listValidatedProspections();
+
+    expect(result).toEqual([validatedRow]);
+    expect(getAllAsync).toHaveBeenCalledWith(
+      expect.stringContaining("WHERE statut = 'validee'")
+    );
   });
 });
 
