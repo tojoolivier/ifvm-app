@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RouterProvider, createMemoryRouter } from 'react-router-dom'
 import { api } from './api/client'
-import { routes } from './router'
+import { routes } from './routes'
 
 vi.mock('./api/client', () => ({
   api: { get: vi.fn(), post: vi.fn() },
