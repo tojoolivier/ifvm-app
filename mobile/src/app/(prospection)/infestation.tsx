@@ -3,7 +3,13 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TYPE_CIBLE_OPTIONS } from '@/lib/prospection-fiche-lecture';
-import { InfestationRow, listAllProspectionInfestations, saveProspectionInfestation } from '@/lib/prospection-repository';
+import {
+  InfestationRow,
+  getDerniereDensiteMemeSite,
+  getProspection,
+  listAllProspectionInfestations,
+  saveProspectionInfestation,
+} from '@/lib/prospection-repository';
 import {
   COMPASS_DIRECTIONS,
   comportementInsight,
@@ -17,6 +23,7 @@ import {
   classifyAerialPopulation,
   isHeureNocturne,
   validateComportementDirection,
+  validateEcartHistorique,
   validateEssaimNocturne,
   validateGroupementLarvaire,
   validateInfestationFormation,
@@ -389,7 +396,7 @@ export default function InfestationScreen() {
     }
   };
 
-  const handleFooterPress = () => {
+  const handleFooterPress = async () => {
     if (selectedTargets.length === 0) {
       Alert.alert('Sélection requise', 'Veuillez sélectionner au moins un type de cible.');
       return;
@@ -398,6 +405,8 @@ export default function InfestationScreen() {
       setTab('comport');
       return;
     }
+
+    const draft = draftId ? await getProspection(draftId) : null;
 
     const blocages: string[] = [];
     const avertissements: string[] = [];
@@ -436,6 +445,15 @@ export default function InfestationScreen() {
           heureObservation: f.heureObservation,
         });
         avertissements.push(...nocturneResult.avertissements);
+      }
+
+      if (draft?.station_id) {
+        const derniereDensiteMoyConnue = await getDerniereDensiteMemeSite(draft.station_id, target, draft.id);
+        const ecartResult = validateEcartHistorique({
+          densiteMoyActuelle: numOrNull(f.densMoy),
+          derniereDensiteMoyConnue,
+        });
+        avertissements.push(...ecartResult.avertissements);
       }
     }
     if (blocages.length > 0) {

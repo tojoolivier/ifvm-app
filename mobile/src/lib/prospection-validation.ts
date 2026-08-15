@@ -372,3 +372,38 @@ export function validateAntiDoublon(input: AntiDoublonValidationInput): Validati
 
   return { blocages, avertissements };
 }
+
+/** Seuil d'écart (ratio, dans un sens ou l'autre) déclenchant l'alerte (#106, §2.2 point 15 du manuel) — valeur par défaut à confirmer avec le référent métier. */
+export const ECART_HISTORIQUE_SEUIL_RATIO = 2;
+
+export interface EcartHistoriqueValidationInput {
+  densiteMoyActuelle: number | null;
+  /** Densité moyenne de la dernière observation connue sur le même point de suivi, si elle existe. */
+  derniereDensiteMoyConnue: number | null;
+}
+
+/**
+ * Avertissement "écart important vs dernière observation connue au même
+ * site" (#106, §2.2 point 15 du manuel) : quand un point de suivi (station
+ * fixe) a déjà une observation antérieure pour ce type de cible, un écart de
+ * densité moyenne d'au moins ECART_HISTORIQUE_SEUIL_RATIO fois (à la hausse
+ * ou à la baisse) déclenche une alerte "confirmer avant envoi", sans
+ * bloquer l'enregistrement. Sans observation antérieure connue, aucune
+ * alerte n'est déclenchée.
+ */
+export function validateEcartHistorique(input: EcartHistoriqueValidationInput): ValidationResult {
+  const blocages: string[] = [];
+  const avertissements: string[] = [];
+
+  const { densiteMoyActuelle, derniereDensiteMoyConnue } = input;
+  if (densiteMoyActuelle != null && derniereDensiteMoyConnue != null && derniereDensiteMoyConnue > 0) {
+    const ratio = densiteMoyActuelle / derniereDensiteMoyConnue;
+    if (ratio >= ECART_HISTORIQUE_SEUIL_RATIO || ratio <= 1 / ECART_HISTORIQUE_SEUIL_RATIO) {
+      avertissements.push(
+        `Écart important par rapport à la dernière observation connue sur ce point de suivi (densité moyenne précédente : ${derniereDensiteMoyConnue}). Confirmer avant envoi.`
+      );
+    }
+  }
+
+  return { blocages, avertissements };
+}
