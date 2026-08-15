@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { updateProspectionExtensiveObservations } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { NIVEAU_OPTIONS } from '@/lib/prospection-extensive';
+import { DateField } from '@/components/DateField';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -103,12 +104,13 @@ export default function ExtensiveObservationsScreen() {
           <View style={styles.row}>
             <View style={[styles.card, styles.flex1]}>
               <Text style={styles.label}>Dernière pluie le</Text>
-              <TextInput
-                value={dernierePluie}
-                onChangeText={setDernierePluie}
-                style={styles.input}
-                placeholder="AAAA-MM-JJ"
-                placeholderTextColor={TEXT_SECONDARY}
+              <DateField
+                value={dernierePluie || null}
+                onChange={setDernierePluie}
+                maximumDate={new Date()}
+                style={styles.dateFieldBox}
+                textStyle={styles.input}
+                placeholderStyle={[styles.input, { fontWeight: '500', color: TEXT_SECONDARY }]}
               />
             </View>
             <View style={[styles.flex1, { gap: 5 }]}>
@@ -154,6 +156,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 11, marginBottom: 9 },
   label: { fontSize: 9, fontWeight: '500', color: '#9a9484', textTransform: 'uppercase', marginBottom: 5 },
   input: { fontSize: 13, fontWeight: '700', color: TEXT, fontFamily: 'monospace', padding: 0 },
+  dateFieldBox: { minHeight: 0, borderWidth: 0, padding: 0, backgroundColor: 'transparent' },
   stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   stepperButton: { width: 32, height: 32, borderRadius: 9, backgroundColor: INACTIVE_BG, alignItems: 'center', justifyContent: 'center' },
   stepperButtonAdd: { backgroundColor: '#c0412b' },
