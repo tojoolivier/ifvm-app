@@ -459,6 +459,11 @@ export interface components {
              */
             token_type: string;
         };
+        /**
+         * ActionAudit
+         * @enum {string}
+         */
+        ActionAudit: "creation" | "modification" | "soumission" | "verification" | "validation" | "rejet" | "commentaire";
         /** AuditLogRead */
         AuditLogRead: {
             /**
@@ -466,8 +471,7 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            /** Fiche Type */
-            fiche_type: string;
+            fiche_type: components["schemas"]["FicheType"];
             /**
              * Fiche Id
              * Format: uuid
@@ -478,8 +482,7 @@ export interface components {
              * Format: uuid
              */
             auteur_id: string;
-            /** Action */
-            action: string;
+            action: components["schemas"]["ActionAudit"];
             /** Details */
             details: {
                 [key: string]: unknown;
@@ -572,14 +575,10 @@ export interface components {
         };
         /** CaptureCreate */
         CaptureCreate: {
-            /** Espece */
-            espece: string;
-            /** Categorie */
-            categorie: string;
-            /** Sexe */
-            sexe?: string | null;
-            /** Phase */
-            phase: string;
+            espece: components["schemas"]["EspeceAcridienne"];
+            categorie: components["schemas"]["CategorieCapture"];
+            sexe?: components["schemas"]["Sexe"] | null;
+            phase: components["schemas"]["PhaseAcridienne"];
             /** Stade */
             stade: string;
             /**
@@ -595,22 +594,22 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            /** Espece */
-            espece: string;
-            /** Categorie */
-            categorie: string;
-            /** Sexe */
-            sexe: string | null;
-            /** Phase */
-            phase: string;
+            espece: components["schemas"]["EspeceAcridienne"];
+            categorie: components["schemas"]["CategorieCapture"];
+            sexe: components["schemas"]["Sexe"] | null;
+            phase: components["schemas"]["PhaseAcridienne"];
             /** Stade */
             stade: string;
             /** Effectif */
             effectif: number;
         };
+        /**
+         * CategorieCapture
+         * @enum {string}
+         */
+        CategorieCapture: "imago" | "larve";
         /** CibleRead */
         CibleRead: {
-            /** Espece */
             espece: string | number;
             /** Petites Larves */
             petites_larves: string | number;
@@ -618,7 +617,6 @@ export interface components {
             grandes_larves: string | number;
             /** Vols Clairs Essaims */
             vols_clairs_essaims: string | number;
-            /** Repartition Population */
             repartition_population: string | number;
             /** Surface Infestee Ha */
             surface_infestee_ha: string | number;
@@ -649,6 +647,16 @@ export interface components {
             /** Texte */
             texte: string;
         };
+        /**
+         * ComportementInfestation
+         * @enum {string}
+         */
+        ComportementInfestation: "repos" | "deplacement";
+        /**
+         * ConclusionValidation
+         * @enum {string}
+         */
+        ConclusionValidation: "confirmee" | "infirmee";
         /** CultureSyncRead */
         CultureSyncRead: {
             /**
@@ -673,6 +681,11 @@ export interface components {
          * @enum {string}
          */
         DegatsCultures: "nuls" | "faibles" | "moyens" | "forts";
+        /**
+         * Deplacement
+         * @enum {string}
+         */
+        Deplacement: "repos" | "perchee";
         /**
          * DirectionVent
          * @enum {string}
@@ -758,6 +771,21 @@ export interface components {
              */
             server_time: string;
         };
+        /**
+         * EspeceAcridienne
+         * @enum {string}
+         */
+        EspeceAcridienne: "LMC" | "NSE";
+        /**
+         * EspeceCible
+         * @enum {string}
+         */
+        EspeceCible: "LMC" | "NSE" | "MELANGE";
+        /**
+         * FicheType
+         * @enum {string}
+         */
+        FicheType: "intensive" | "extensive" | "validation" | "crt" | "vol" | "meteo";
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -765,10 +793,8 @@ export interface components {
         };
         /** InfestationCreate */
         InfestationCreate: {
-            /** Espece */
-            espece?: string | null;
-            /** Type Cible */
-            type_cible: string;
+            espece?: components["schemas"]["EspeceAcridienne"] | null;
+            type_cible: components["schemas"]["TypeCible"];
             /** Taille Min */
             taille_min?: number | null;
             /** Taille Max */
@@ -785,8 +811,7 @@ export interface components {
             densite_moy?: number | null;
             /** Interdistance */
             interdistance?: number | null;
-            /** Comportement */
-            comportement?: string | null;
+            comportement?: components["schemas"]["ComportementInfestation"] | null;
             /** Direction De */
             direction_de?: string | null;
             /** Direction Vers */
@@ -848,10 +873,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            /** Espece */
-            espece: string | null;
-            /** Type Cible */
-            type_cible: string;
+            espece: components["schemas"]["EspeceAcridienne"] | null;
+            type_cible: components["schemas"]["TypeCible"];
             /** Taille Min */
             taille_min: number | null;
             /** Taille Max */
@@ -868,8 +891,7 @@ export interface components {
             densite_moy: number | null;
             /** Interdistance */
             interdistance: number | null;
-            /** Comportement */
-            comportement: string | null;
+            comportement: components["schemas"]["ComportementInfestation"] | null;
             /** Direction De */
             direction_de: string | null;
             /** Direction Vers */
@@ -890,8 +912,7 @@ export interface components {
             essaim_en_vol?: boolean | null;
             /** Essaim Pose */
             essaim_pose?: boolean | null;
-            /** Type Essaim */
-            type_essaim?: string | null;
+            type_essaim?: components["schemas"]["TypeEssaim"] | null;
             /** Heure Observation */
             heure_observation?: string | null;
             /** Densite En Vol */
@@ -910,12 +931,10 @@ export interface components {
             interdistance_moy?: number | null;
             /** Surface Contaminee Ha */
             surface_contaminee_ha?: number | null;
-            /** Type Larve */
-            type_larve?: string | null;
+            type_larve?: components["schemas"]["TypeLarve"] | null;
             /** Surface Infestee Pourcent */
             surface_infestee_pourcent?: number | null;
-            /** Stade Dominant */
-            stade_dominant?: string | null;
+            stade_dominant?: components["schemas"]["StadeDominant"] | null;
             /** Taille Groupe M2 */
             taille_groupe_m2?: number | null;
             /** Front Longueur M */
@@ -935,10 +954,20 @@ export interface components {
             password: string;
         };
         /**
+         * MethodePopulation
+         * @enum {string}
+         */
+        MethodePopulation: "visuel" | "comptage_direct";
+        /**
          * ModeTraitement
          * @enum {string}
          */
         ModeTraitement: "TOTAL" | "BARRIERE" | "IRREGULIER";
+        /**
+         * NiveauPopulation
+         * @enum {string}
+         */
+        NiveauPopulation: "neant" | "rare" | "peu" | "beaucoup" | "dominant";
         /** PesticideSyncRead */
         PesticideSyncRead: {
             /**
@@ -958,12 +987,15 @@ export interface components {
              */
             updated_at: string;
         };
+        /**
+         * PhaseAcridienne
+         * @enum {string}
+         */
+        PhaseAcridienne: "solitaire" | "solitaro_trans" | "transiens" | "gregaire";
         /** PopulationCreate */
         PopulationCreate: {
-            /** Espece */
-            espece: string;
-            /** Categorie */
-            categorie: string;
+            espece: components["schemas"]["EspeceAcridienne"];
+            categorie: components["schemas"]["CategorieCapture"];
             /** Densite Diffuse */
             densite_diffuse?: number | null;
             /** Densite Groupee */
@@ -972,22 +1004,18 @@ export interface components {
             captures_nombre?: number | null;
             /** Temps Capture */
             temps_capture?: number | null;
-            /** Methode */
-            methode?: string | null;
+            methode?: components["schemas"]["MethodePopulation"] | null;
             /** Phase */
             phase?: string | null;
-            /** Accouplement */
-            accouplement?: string | null;
-            /** Ponte */
-            ponte?: string | null;
+            accouplement?: components["schemas"]["NiveauPopulation"] | null;
+            ponte?: components["schemas"]["NiveauPopulation"] | null;
             /** Captures Sol */
             captures_sol?: number | null;
             /** Captures Trans */
             captures_trans?: number | null;
             /** Captures Greg */
             captures_greg?: number | null;
-            /** Stade Imago */
-            stade_imago?: string | null;
+            stade_imago?: components["schemas"]["StadeImago"] | null;
             /** Essaim Observe */
             essaim_observe?: boolean | null;
             /** Densites Larve */
@@ -1000,8 +1028,7 @@ export interface components {
             bande_larvaire?: boolean | null;
             /** Interdistance */
             interdistance?: number | null;
-            /** Deplacement */
-            deplacement?: string | null;
+            deplacement?: components["schemas"]["Deplacement"] | null;
         };
         /** PopulationRead */
         PopulationRead: {
@@ -1010,10 +1037,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            /** Espece */
-            espece: string;
-            /** Categorie */
-            categorie: string;
+            espece: components["schemas"]["EspeceAcridienne"];
+            categorie: components["schemas"]["CategorieCapture"];
             /** Densite Diffuse */
             densite_diffuse: number | null;
             /** Densite Groupee */
@@ -1022,22 +1047,18 @@ export interface components {
             captures_nombre: number | null;
             /** Temps Capture */
             temps_capture: number | null;
-            /** Methode */
-            methode?: string | null;
+            methode?: components["schemas"]["MethodePopulation"] | null;
             /** Phase */
             phase?: string | null;
-            /** Accouplement */
-            accouplement: string | null;
-            /** Ponte */
-            ponte: string | null;
+            accouplement: components["schemas"]["NiveauPopulation"] | null;
+            ponte: components["schemas"]["NiveauPopulation"] | null;
             /** Captures Sol */
             captures_sol?: number | null;
             /** Captures Trans */
             captures_trans?: number | null;
             /** Captures Greg */
             captures_greg?: number | null;
-            /** Stade Imago */
-            stade_imago?: string | null;
+            stade_imago?: components["schemas"]["StadeImago"] | null;
             /** Essaim Observe */
             essaim_observe?: boolean | null;
             /** Densites Larve */
@@ -1050,8 +1071,7 @@ export interface components {
             bande_larvaire?: boolean | null;
             /** Interdistance */
             interdistance?: number | null;
-            /** Deplacement */
-            deplacement?: string | null;
+            deplacement?: components["schemas"]["Deplacement"] | null;
         };
         /** PosteAcridienRead */
         PosteAcridienRead: {
@@ -1175,11 +1195,8 @@ export interface components {
             ennemis_naturels?: string | null;
             /** Observations */
             observations?: string | null;
-            /**
-             * Statut
-             * @default brouillon
-             */
-            statut: string;
+            /** @default brouillon */
+            statut: components["schemas"]["StatutProspection"];
             /** Region */
             region?: string | null;
             /** District */
@@ -1198,18 +1215,15 @@ export interface components {
             hauteur_herbe_cm?: number | null;
             /** Station Libre */
             station_libre?: string | null;
-            /** Type Station */
-            type_station?: string | null;
-            /** Verdure Strate */
-            verdure_strate?: string | null;
+            type_station?: components["schemas"]["TypeStation"] | null;
+            verdure_strate?: components["schemas"]["VerdureStrate"] | null;
             /** Signalement Source */
             signalement_source?: string | null;
             /** Signalement Date */
             signalement_date?: string | null;
             /** Signalement Description */
             signalement_description?: string | null;
-            /** Conclusion Validation */
-            conclusion_validation?: string | null;
+            conclusion_validation?: components["schemas"]["ConclusionValidation"] | null;
             /**
              * Avertissements
              * @default []
@@ -1240,8 +1254,7 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            /** Type Prospection */
-            type_prospection: string;
+            type_prospection: components["schemas"]["TypeProspection"];
             /**
              * Campagne Id
              * Format: uuid
@@ -1271,16 +1284,14 @@ export interface components {
             longitude: number | null;
             /** Altitude */
             altitude: number | null;
-            /** Biotope */
-            biotope: string | null;
+            biotope: components["schemas"]["Biotope"] | null;
             /** Surface Station */
             surface_station: number | null;
             /** Surface Prospectee */
             surface_prospectee: number | null;
             /** Surface Infestee */
             surface_infestee: number | null;
-            /** Degats Cultures */
-            degats_cultures: string | null;
+            degats_cultures: components["schemas"]["DegatsCultures"] | null;
             /** Derniere Pluie */
             derniere_pluie: string | null;
             /** Intensite Pluie */
@@ -1301,10 +1312,8 @@ export interface components {
             ennemis_naturels: string | null;
             /** Observations */
             observations: string | null;
-            /** Statut */
-            statut: string;
-            /** Statut Sync */
-            statut_sync: string;
+            statut: components["schemas"]["StatutProspection"];
+            statut_sync: components["schemas"]["StatutSync"];
             /**
              * Created At
              * Format: date-time
@@ -1333,18 +1342,15 @@ export interface components {
             hauteur_herbe_cm?: number | null;
             /** Station Libre */
             station_libre?: string | null;
-            /** Type Station */
-            type_station?: string | null;
-            /** Verdure Strate */
-            verdure_strate?: string | null;
+            type_station?: components["schemas"]["TypeStation"] | null;
+            verdure_strate?: components["schemas"]["VerdureStrate"] | null;
             /** Signalement Source */
             signalement_source?: string | null;
             /** Signalement Date */
             signalement_date?: string | null;
             /** Signalement Description */
             signalement_description?: string | null;
-            /** Conclusion Validation */
-            conclusion_validation?: string | null;
+            conclusion_validation?: components["schemas"]["ConclusionValidation"] | null;
             /**
              * Avertissements
              * @default []
@@ -1412,8 +1418,7 @@ export interface components {
             ennemis_naturels?: string | null;
             /** Observations */
             observations?: string | null;
-            /** Statut */
-            statut?: string | null;
+            statut?: components["schemas"]["StatutProspection"] | null;
             /** Region */
             region?: string | null;
             /** District */
@@ -1432,18 +1437,15 @@ export interface components {
             hauteur_herbe_cm?: number | null;
             /** Station Libre */
             station_libre?: string | null;
-            /** Type Station */
-            type_station?: string | null;
-            /** Verdure Strate */
-            verdure_strate?: string | null;
+            type_station?: components["schemas"]["TypeStation"] | null;
+            verdure_strate?: components["schemas"]["VerdureStrate"] | null;
             /** Signalement Source */
             signalement_source?: string | null;
             /** Signalement Date */
             signalement_date?: string | null;
             /** Signalement Description */
             signalement_description?: string | null;
-            /** Conclusion Validation */
-            conclusion_validation?: string | null;
+            conclusion_validation?: components["schemas"]["ConclusionValidation"] | null;
             /** Avertissements */
             avertissements?: string[] | null;
         };
@@ -1462,6 +1464,11 @@ export interface components {
             /** Refresh Token */
             refresh_token: string;
         };
+        /**
+         * RepartitionPopulation
+         * @enum {string}
+         */
+        RepartitionPopulation: "GROUPEE" | "DIFFUSE";
         /**
          * RoleSignature
          * @enum {string}
@@ -1514,6 +1521,11 @@ export interface components {
             /** Vent Fin Ms */
             vent_fin_ms: number;
         };
+        /**
+         * Sexe
+         * @enum {string}
+         */
+        Sexe: "F" | "M";
         /** SignatureCreate */
         SignatureCreate: {
             role: components["schemas"]["RoleSignature"];
@@ -1527,8 +1539,7 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            /** Role */
-            role: string;
+            role: components["schemas"]["RoleSignature"];
             /** Signataire Nom */
             signataire_nom: string;
             /**
@@ -1542,6 +1553,11 @@ export interface components {
          * @enum {string}
          */
         StadeDominant: "l1_l3" | "l4_l5";
+        /**
+         * StadeImago
+         * @enum {string}
+         */
+        StadeImago: "A1" | "A2" | "A3" | "A4" | "A5";
         /** StationFixeRead */
         StationFixeRead: {
             /**
@@ -1608,11 +1624,25 @@ export interface components {
         };
         /** StatutChange */
         StatutChange: {
-            /** Statut */
-            statut: string;
+            statut: components["schemas"]["StatutProspection"];
             /** Commentaire */
             commentaire?: string | null;
         };
+        /**
+         * StatutProspection
+         * @enum {string}
+         */
+        StatutProspection: "brouillon" | "en_attente" | "verifiee" | "validee" | "rejetee";
+        /**
+         * StatutSync
+         * @enum {string}
+         */
+        StatutSync: "local" | "synced" | "conflict";
+        /**
+         * StatutTraitement
+         * @enum {string}
+         */
+        StatutTraitement: "brouillon" | "validee";
         /** TokenResponse */
         TokenResponse: {
             /** Access Token */
@@ -1781,10 +1811,8 @@ export interface components {
             prospection_id: string;
             /** Numero Fiche */
             numero_fiche: string;
-            /** Type Traitement */
-            type_traitement: string;
-            /** Mode Traitement */
-            mode_traitement: string | null;
+            type_traitement: components["schemas"]["TypeTraitement"];
+            mode_traitement: components["schemas"]["ModeTraitement"] | null;
             /**
              * Date Traitement
              * Format: date
@@ -1831,10 +1859,8 @@ export interface components {
             recouvrement_percent: number | null;
             /** Empoisonnement */
             empoisonnement: boolean;
-            /** Empoisonnement Type */
-            empoisonnement_type: string | null;
-            /** Empoisonnement Mode */
-            empoisonnement_mode: string | null;
+            empoisonnement_type: components["schemas"]["EmpoisonnementType"] | null;
+            empoisonnement_mode: components["schemas"]["EmpoisonnementMode"] | null;
             /** Empoisonnement Autre */
             empoisonnement_autre: string | null;
             /** Evaluation Risque */
@@ -1855,8 +1881,7 @@ export interface components {
             } | null;
             /** Observations */
             observations: string | null;
-            /** Statut */
-            statut: string;
+            statut: components["schemas"]["StatutTraitement"];
             /** Statut Sync */
             statut_sync: string;
             /**
@@ -2060,8 +2085,7 @@ export interface components {
             heure_fin: string;
             /** Vitesse Vent Ms */
             vitesse_vent_ms: number;
-            /** Direction Vent */
-            direction_vent: string | null;
+            direction_vent: components["schemas"]["DirectionVent"] | null;
             /** Temperature C */
             temperature_c: number;
             /** Reprise Traitement */
@@ -2106,6 +2130,11 @@ export interface components {
             produits: components["schemas"]["ProduitUtiliseRead"][];
         };
         /**
+         * TypeCible
+         * @enum {string}
+         */
+        TypeCible: "tache_larvaire" | "bande_larvaire" | "vol_clair" | "essaim";
+        /**
          * TypeEssaim
          * @enum {string}
          */
@@ -2120,6 +2149,16 @@ export interface components {
          * @enum {string}
          */
         TypeProspection: "intensive" | "extensive" | "validation";
+        /**
+         * TypeStation
+         * @enum {string}
+         */
+        TypeStation: "riziere_bordure" | "bas_fond" | "plateau" | "jachere" | "culture";
+        /**
+         * TypeTraitement
+         * @enum {string}
+         */
+        TypeTraitement: "AERIEN" | "TERRESTRE";
         /** UtilisateurCreate */
         UtilisateurCreate: {
             /** Nom */
@@ -2214,6 +2253,11 @@ export interface components {
              */
             signatures: components["schemas"]["SignatureCreate"][];
         };
+        /**
+         * VerdureStrate
+         * @enum {string}
+         */
+        VerdureStrate: "faible" | "moyenne" | "forte";
     };
     responses: never;
     parameters: never;
