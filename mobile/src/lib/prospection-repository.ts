@@ -1377,6 +1377,21 @@ export async function listRecentProspections(
 }
 
 /**
+ * Fiches de prospection validées, éligibles au rattachement d'une fiche de
+ * traitement (sélecteur écran Références, Lot 3 — #91).
+ */
+export async function listValidatedProspections(): Promise<DraftProspection[]> {
+  const db = await getDb();
+
+  return db.getAllAsync<DraftProspection>(
+    `SELECT *
+     FROM prospection
+     WHERE statut = 'validee'
+     ORDER BY updated_at DESC`
+  );
+}
+
+/**
  * Fiches soumises par d'autres prospecteurs dans la fenêtre récente, pour
  * l'avertissement anti-doublon (#107). Filtre sur les données locales
  * synchronisées et/ou déjà créées sur cet appareil — pas d'appel réseau ici,

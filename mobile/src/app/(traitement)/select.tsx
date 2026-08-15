@@ -6,10 +6,10 @@ import { listDraftTraitements, DraftTraitementRow } from '@/lib/traitement-repos
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
 
 /**
- * Écran 0 — point d'entrée du module traitement. La sélection d'une fiche de
- * prospection à lier (Lot 3, "Zones à reprendre"/"Mes fiches") n'existe pas
- * encore : on accepte `prospectionId` en paramètre de route, injecté par
- * l'écran qui renvoie ici (hors périmètre de ce lot).
+ * Écran 0 — point d'entrée du module traitement. `prospectionId` reste accepté
+ * en paramètre de route pour les entrées directes (ex. "Zones à reprendre") ;
+ * sans ce paramètre, "Nouvelle fiche de traitement" passe par le sélecteur de
+ * fiche de prospection (#91) avant l'écran Références.
  */
 export default function TraitementSelectScreen() {
   const router = useRouter();
@@ -24,7 +24,11 @@ export default function TraitementSelectScreen() {
   }, [showList]);
 
   const handleNouvelleFiche = () => {
-    router.push({ pathname: '/(traitement)/references' as any, params: { prospectionId: prospectionId ?? '' } });
+    if (prospectionId) {
+      router.push({ pathname: '/(traitement)/references' as any, params: { prospectionId } });
+      return;
+    }
+    router.push('/(traitement)/prospection-picker' as any);
   };
 
   const openFiche = (draft: DraftTraitementRow) => {
