@@ -4,6 +4,8 @@ import {
   validateComportementDirection,
   validateGroupementLarvaire,
   validateProspectionDate,
+  validateEssaimNocturne,
+  isHeureNocturne,
   classifyLarvalPopulation,
   classifyAerialPopulation,
 } from '../src/lib/prospection-validation';
@@ -195,6 +197,60 @@ describe('validateComportementDirection — cohérence repos/déplacement', () =
       directionRenseignee: true,
     });
     expect(avertissements).toEqual([]);
+  });
+});
+
+describe('isHeureNocturne — bornes jour/nuit', () => {
+  it('considère 22:00 comme nocturne', () => {
+    expect(isHeureNocturne('22:00')).toBe(true);
+  });
+
+  it('considère 03:30 comme nocturne', () => {
+    expect(isHeureNocturne('03:30')).toBe(true);
+  });
+
+  it('considère 18:00 (borne de début) comme nocturne', () => {
+    expect(isHeureNocturne('18:00')).toBe(true);
+  });
+
+  it('considère 06:00 (borne de fin) comme diurne', () => {
+    expect(isHeureNocturne('06:00')).toBe(false);
+  });
+
+  it('considère 14:00 comme diurne', () => {
+    expect(isHeureNocturne('14:00')).toBe(false);
+  });
+
+  it('traite une heure invalide/vide comme non-nocturne', () => {
+    expect(isHeureNocturne('')).toBe(false);
+    expect(isHeureNocturne('abc')).toBe(false);
+  });
+});
+
+describe('validateEssaimNocturne — plausibilité horaire (§2.2 point 14 du manuel)', () => {
+  it('avertit quand un essaim est signalé de nuit', () => {
+    const { avertissements } = validateEssaimNocturne({ typeCible: 'essaim', heureObservation: '23:15' });
+    expect(avertissements).toEqual([expect.stringContaining('forcé sur « posé »')]);
+  });
+
+  it('avertit quand un vol clair est signalé de nuit', () => {
+    const { avertissements } = validateEssaimNocturne({ typeCible: 'vol_clair', heureObservation: '05:00' });
+    expect(avertissements.length).toBe(1);
+  });
+
+  it('n’avertit pas de jour', () => {
+    const { avertissements } = validateEssaimNocturne({ typeCible: 'essaim', heureObservation: '10:00' });
+    expect(avertissements).toEqual([]);
+  });
+
+  it('n’avertit pas pour un type de cible non ailé groupé, même de nuit', () => {
+    const { avertissements } = validateEssaimNocturne({ typeCible: 'tache_larvaire', heureObservation: '23:00' });
+    expect(avertissements).toEqual([]);
+  });
+
+  it('ne bloque jamais (avertissement non bloquant)', () => {
+    const { blocages } = validateEssaimNocturne({ typeCible: 'essaim', heureObservation: '23:00' });
+    expect(blocages).toEqual([]);
   });
 });
 

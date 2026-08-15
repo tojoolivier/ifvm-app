@@ -121,6 +121,33 @@ describe('InfestationScreen', () => {
     );
   });
 
+  it('force le comportement sur "posé" pour un essaim signalé de nuit (#106)', async () => {
+    jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
+      {
+        type_cible: 'essaim',
+        surface_totale: 12,
+        essaim_en_vol: 1,
+        essaim_pose: 0,
+        heure_observation: '23:00',
+        vent_de: 'N',
+        direction_vers: 'S',
+      } as any,
+    ]);
+
+    await render(<InfestationScreen />);
+
+    fireEvent.press(await screen.findByText('Comportement  ›'));
+    fireEvent.press(await screen.findByText('Continuer  ›'));
+
+    await waitFor(() =>
+      expect(prospectionRepository.saveProspectionInfestation).toHaveBeenCalledWith(
+        'draft-123',
+        'essaim',
+        expect.objectContaining({ essaim_en_vol: 0, essaim_pose: 1 })
+      )
+    );
+  });
+
   it('conserve la surface contaminée et la part infestée à la sauvegarde d’un essaim (#104)', async () => {
     jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
       {

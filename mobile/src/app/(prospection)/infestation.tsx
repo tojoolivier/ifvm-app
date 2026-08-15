@@ -15,7 +15,9 @@ import {
   AerialPopulationClassification,
   TAILLE_GROUPE_SEUIL_BANDE_M2,
   classifyAerialPopulation,
+  isHeureNocturne,
   validateComportementDirection,
+  validateEssaimNocturne,
   validateGroupementLarvaire,
   validateInfestationFormation,
 } from '@/lib/prospection-validation';
@@ -193,9 +195,21 @@ function rowFromForm(typeCible: string, form: FormationForm): InfestationRow {
     taille_large: null,
     taille_epaisseur: null,
     essaim_en_vol:
-      typeCible === 'vol_clair' || typeCible === 'essaim' ? (form.essaimComportement === 'vol' ? 1 : 0) : null,
+      typeCible === 'vol_clair' || typeCible === 'essaim'
+        ? isHeureNocturne(form.heureObservation)
+          ? 0
+          : form.essaimComportement === 'vol'
+            ? 1
+            : 0
+        : null,
     essaim_pose:
-      typeCible === 'vol_clair' || typeCible === 'essaim' ? (form.essaimComportement === 'pose' ? 1 : 0) : null,
+      typeCible === 'vol_clair' || typeCible === 'essaim'
+        ? isHeureNocturne(form.heureObservation)
+          ? 1
+          : form.essaimComportement === 'pose'
+            ? 1
+            : 0
+        : null,
     type_essaim:
       typeCible === 'vol_clair' || typeCible === 'essaim' ? computeAerialClassification(form) : null,
     nb_taches_bandes: typeCible === 'bande_larvaire' ? numOrNull(form.nbTachesBandes) : null,
@@ -273,6 +287,18 @@ export default function InfestationScreen() {
 
   const setField = <K extends keyof FormationForm>(field: K, value: FormationForm[K]) => {
     setForms((current) => (current ? { ...current, [currentTarget]: { ...current[currentTarget], [field]: value } } : current));
+
+    if (
+      field === 'heureObservation' &&
+      (currentTarget === 'vol_clair' || currentTarget === 'essaim') &&
+      isHeureNocturne(value as string)
+    ) {
+      setForms((current) =>
+        current
+          ? { ...current, [currentTarget]: { ...current[currentTarget], essaimComportement: 'pose' } }
+          : current
+      );
+    }
 
     if (
       field === 'tailleGroupeM2' &&
@@ -402,6 +428,14 @@ export default function InfestationScreen() {
         });
         blocages.push(...groupementResult.blocages);
         avertissements.push(...groupementResult.avertissements);
+      }
+
+      if (target === 'vol_clair' || target === 'essaim') {
+        const nocturneResult = validateEssaimNocturne({
+          typeCible: target,
+          heureObservation: f.heureObservation,
+        });
+        avertissements.push(...nocturneResult.avertissements);
       }
     }
     if (blocages.length > 0) {
