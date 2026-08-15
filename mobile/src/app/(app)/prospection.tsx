@@ -9,6 +9,11 @@ import { loadAccueilData, loadValidatedProspections, deleteDraftProspection, Acc
 import { retrySyncProspection } from '@/lib/prospection-review';
 import { DraftProspection } from '@/lib/prospection-repository';
 import { ProspectionRead } from '@/lib/api-client';
+import { navigateToProspectionConsult, navigateToProspectionDraft } from '@/lib/fiche-routing';
+import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
+import { FicheCard } from '@/components/fiches/FicheCard';
+import { SearchAndFilterBar, FilterOption } from '@/components/fiches/SearchAndFilterBar';
+import { PROSPECTION_SUBTYPE_BADGE_CONFIG, STATUT_BADGE_CONFIG } from '@/components/fiches/tokens';
 
 const IFVM_GREEN_DARK = '#163F16';
 const IFVM_ORANGE = '#E67E22';
@@ -16,6 +21,14 @@ const IFVM_ORANGE = '#E67E22';
 const EMPTY_DATA: AccueilViewModel = { unsyncedCount: 0, activeDraft: null, recent: [], validated: [] };
 
 type BadgeKind = 'a_synchro' | 'synchro' | 'validee';
+type FilterKey = 'TOUS' | 'a_synchro' | 'synchro' | 'validee';
+
+const FILTERS: FilterOption<FilterKey>[] = [
+  { value: 'TOUS', label: 'Toutes' },
+  { value: 'a_synchro', label: 'À synchro' },
+  { value: 'synchro', label: 'Synchronisées' },
+  { value: 'validee', label: 'Validées' },
+];
 
 interface FicheListItem {
   id: string;
@@ -23,15 +36,10 @@ interface FicheListItem {
   nFiche: string | null;
   date: string;
   badge: BadgeKind;
+  typeProspection: string;
   onPress?: () => void;
   draft: DraftProspection | null;
 }
-
-const BADGE_LABEL: Record<BadgeKind, string> = {
-  a_synchro: 'À SYNCHRO',
-  synchro: 'SYNCHRO ✓',
-  validee: 'VALIDÉE ✓',
-};
 
 export default function ProspectionScreen() {
   const router = useRouter();
@@ -43,6 +51,9 @@ export default function ProspectionScreen() {
   const [isOffline, setIsOffline] = useState(false);
   const [isSyncingAll, setIsSyncingAll] = useState(false);
   const [syncToast, setSyncToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterKey, setFilterKey] = useState<FilterKey>('TOUS');
+  const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
 
   const refresh = useCallback(() => {
     loadAccueilData().then(setData);
@@ -88,11 +99,11 @@ export default function ProspectionScreen() {
   }, [syncWarning, router]);
 
   const resumeDraft = (draft: DraftProspection) => {
-    router.push({ pathname: '/(prospection)/reference' as any, params: { draftId: draft.id } });
+    navigateToProspectionDraft(router, hydrateFromDraft, draft);
   };
 
   const openFicheLecture = (prospection: ProspectionRead) => {
-    router.push({ pathname: '/(prospection)/fiche-lecture', params: { id: prospection.id } });
+    navigateToProspectionConsult(router, prospection);
   };
 
   const items = useMemo<FicheListItem[]>(() => {
@@ -105,6 +116,7 @@ export default function ProspectionScreen() {
       nFiche: item.n_fiche,
       date: item.date_prospection,
       badge: item.statut_sync === 'synced' ? 'synchro' : 'a_synchro',
+      typeProspection: item.type_prospection,
       onPress: () => resumeDraft(item),
       draft: item.statut === 'brouillon' ? item : null,
     }));
@@ -114,11 +126,23 @@ export default function ProspectionScreen() {
       nFiche: item.n_fiche,
       date: item.date_prospection,
       badge: 'validee',
+      typeProspection: item.type_prospection,
       onPress: () => openFicheLecture(item),
       draft: null,
     }));
     return [...draftItems, ...validatedItems].sort((a, b) => b.date.localeCompare(a.date));
   }, [data.recent, data.validated]);
+
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      const matchSearch =
+        searchQuery === '' ||
+        item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item.nFiche && item.nFiche.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchFilter = filterKey === 'TOUS' || item.badge === filterKey;
+      return matchSearch && matchFilter;
+    });
+  }, [items, searchQuery, filterKey]);
 
   const pendingSync = useMemo(
     () => data.recent.filter((item) => item.statut === 'en_attente' && item.statut_sync !== 'synced'),
@@ -202,6 +226,15 @@ export default function ProspectionScreen() {
         </SafeAreaView>
       </View>
 
+      <SearchAndFilterBar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Rechercher une prospection..."
+        filters={FILTERS}
+        activeFilter={filterKey}
+        onFilterChange={setFilterKey}
+      />
+
       <ScrollView style={styles.content} contentContainerStyle={{ padding: 16, paddingBottom: 24 }}>
         {showSavedToast && (
           <View style={styles.toast}>
@@ -253,28 +286,22 @@ export default function ProspectionScreen() {
         )}
 
         <View style={styles.list}>
-          {items.length === 0 ? (
-            <Text style={styles.emptyText}>Aucune fiche de prospection pour le moment.</Text>
+          {filteredItems.length === 0 ? (
+            <Text style={styles.emptyText}>
+              {searchQuery || filterKey !== 'TOUS'
+                ? 'Aucune fiche ne correspond à votre recherche.'
+                : 'Aucune fiche de prospection pour le moment.'}
+            </Text>
           ) : (
-            items.map((item) => {
+            filteredItems.map((item) => {
               const card = (
-                <TouchableOpacity
-                  style={styles.card}
-                  onPress={item.onPress}
-                  activeOpacity={0.85}
-                >
-                  <View style={styles.cardMain}>
-                    <Text style={styles.cardTitle}>{item.title}</Text>
-                    <Text style={styles.cardMeta}>
-                      N°{item.nFiche ?? '—'} · {item.date}
-                    </Text>
-                  </View>
-                  <View style={[styles.badge, item.badge === 'a_synchro' ? styles.badgeAmber : styles.badgeGreen]}>
-                    <Text style={[styles.badgeText, item.badge === 'a_synchro' ? styles.badgeTextAmber : styles.badgeTextGreen]}>
-                      {BADGE_LABEL[item.badge]}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
+                <FicheCard
+                  code={`N°${item.nFiche ?? '—'}`}
+                  typeBadge={PROSPECTION_SUBTYPE_BADGE_CONFIG[item.typeProspection] ?? PROSPECTION_SUBTYPE_BADGE_CONFIG.intensive}
+                  statutBadge={STATUT_BADGE_CONFIG[item.badge]}
+                  meta={`${item.title} · ${item.date}`}
+                  onPress={item.onPress ?? (() => {})}
+                />
               );
 
               if (!item.draft) {
@@ -367,15 +394,6 @@ const styles = StyleSheet.create({
   draftTitle: { color: '#111827', fontSize: 14, fontWeight: '600' },
   list: { gap: 8, marginBottom: 20 },
   emptyText: { color: '#6B7280', fontSize: 13, textAlign: 'center', paddingVertical: 24 },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  cardMain: { flex: 1, marginRight: 12 },
   deleteAction: {
     backgroundColor: '#DC2626',
     justifyContent: 'center',
@@ -385,14 +403,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   deleteActionText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
-  cardTitle: { fontSize: 15, fontWeight: '700', color: '#111827' },
-  cardMeta: { fontSize: 12, color: '#6B7280', marginTop: 2 },
-  badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
-  badgeAmber: { backgroundColor: '#FEF3C7' },
-  badgeGreen: { backgroundColor: '#DCFCE7' },
-  badgeText: { fontSize: 11, fontWeight: '700' },
-  badgeTextAmber: { color: '#92400E' },
-  badgeTextGreen: { color: '#15803d' },
   errorText: { color: '#dc2626', fontSize: 13, marginBottom: 12, textAlign: 'center' },
   footer: {
     backgroundColor: '#F3F4F6',

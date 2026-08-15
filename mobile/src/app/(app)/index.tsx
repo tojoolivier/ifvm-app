@@ -8,7 +8,6 @@ import {
   Dimensions,
   Animated,
   AppState,
-  Modal,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,15 +15,8 @@ import { useAuthStore } from '@/lib/auth-store';
 import { ThemedText } from '@/components/themed-text';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { listRecentProspections, countUnsyncedProspections, DraftProspection } from '@/lib/prospection-repository';
-import { startNewProspection } from '@/lib/prospection-accueil';
-import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
-import { useAsyncAction } from '@/hooks/use-async-action';
+import { NewFicheFab } from '@/components/fiches/NewFicheFab';
 import * as Network from 'expo-network';
-
-const PROSPECTION_DESTINATIONS = {
-  intensive: '/(prospection)/reference',
-  extensive: '/(prospection)/extensive-reference',
-} as const;
 
 // ============================================
 // CONSTANTES - PALETTE CLAIRE
@@ -60,10 +52,6 @@ export default function DashboardScreen() {
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [showSyncBanner, setShowSyncBanner] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
-  const [fabMenuVisible, setFabMenuVisible] = useState(false);
-  const token = useAuthStore((s) => s.token);
-  const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
-  const { run: runQuickStart, isRunning: isStartingProspection } = useAsyncAction();
 
   // Animations
   const fadeAnim = useMemo(() => new Animated.Value(0), []);
@@ -150,24 +138,6 @@ export default function DashboardScreen() {
 
   const navigateTo = (path: string) => {
     router.push(path as any);
-  };
-
-  const startQuickProspection = (typeProspection: 'intensive' | 'extensive') => {
-    runQuickStart(
-      async () => {
-        if (!user || !token) return;
-        setFabMenuVisible(false);
-        const draft = await startNewProspection({ token, prospecteurId: user.id, typeProspection });
-        await hydrateFromDraft(draft.id);
-        router.push({ pathname: PROSPECTION_DESTINATIONS[typeProspection] as any, params: { draftId: draft.id } });
-      },
-      {
-        screen: 'DashboardScreen.fabMenu',
-        precondition: !!user && !!token,
-        preconditionMessage: 'Connexion requise pour créer une fiche.',
-        context: { typeProspection },
-      }
-    );
   };
 
   // Fiches par jour sur la semaine en cours (L -> D)
@@ -365,74 +335,7 @@ export default function DashboardScreen() {
         </View>
       </ScrollView>
 
-      {/* FAB */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => setFabMenuVisible(true)}
-        activeOpacity={0.85}
-      >
-        <ThemedText style={styles.fabIcon}>+</ThemedText>
-      </TouchableOpacity>
-
-      <Modal
-        animationType="slide"
-        transparent
-        visible={fabMenuVisible}
-        onRequestClose={() => setFabMenuVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.fabMenuOverlay}
-          activeOpacity={1}
-          onPress={() => setFabMenuVisible(false)}
-        >
-          <View style={styles.fabMenuSheet}>
-            <View style={styles.fabMenuHandle} />
-            <ThemedText style={styles.fabMenuTitle}>Nouvelle fiche</ThemedText>
-            <ThemedText style={styles.fabMenuSubtitle}>Choisissez le type de fiche à remplir.</ThemedText>
-
-            <TouchableOpacity
-              style={styles.fabMenuCard}
-              activeOpacity={0.85}
-              disabled={isStartingProspection}
-              onPress={() => startQuickProspection('intensive')}
-            >
-              <ThemedText style={styles.fabMenuCardIcon}>🌿</ThemedText>
-              <View style={styles.fabMenuCardTextWrap}>
-                <ThemedText style={styles.fabMenuCardTitle}>Prospection intensive</ThemedText>
-                <ThemedText style={styles.fabMenuCardSubtitle}>Captures détaillées — Locusta / Nomadacris</ThemedText>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.fabMenuCard}
-              activeOpacity={0.85}
-              disabled={isStartingProspection}
-              onPress={() => startQuickProspection('extensive')}
-            >
-              <ThemedText style={styles.fabMenuCardIcon}>🗒️</ThemedText>
-              <View style={styles.fabMenuCardTextWrap}>
-                <ThemedText style={styles.fabMenuCardTitle}>Prospection extensive</ThemedText>
-                <ThemedText style={styles.fabMenuCardSubtitle}>Densités agrégées par phase</ThemedText>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.fabMenuCard, styles.fabMenuCardLast]}
-              activeOpacity={0.85}
-              onPress={() => {
-                setFabMenuVisible(false);
-                navigateTo('/(traitement)/select');
-              }}
-            >
-              <ThemedText style={styles.fabMenuCardIcon}>🧪</ThemedText>
-              <View style={styles.fabMenuCardTextWrap}>
-                <ThemedText style={styles.fabMenuCardTitle}>Compte-rendu de traitement (CRT)</ThemedText>
-                <ThemedText style={styles.fabMenuCardSubtitle}>Évaluation rapide après traitement</ThemedText>
-              </View>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+      <NewFicheFab />
     </View>
   );
 }
@@ -776,91 +679,5 @@ const styles = StyleSheet.create({
   footerText: {
     color: '#BDBDBD',
     fontSize: 12,
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 28,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: IFVM_ORANGE,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  fabIcon: {
-    color: '#FFFFFF',
-    fontSize: 28,
-    fontWeight: '700',
-    lineHeight: 30,
-  },
-  fabMenuOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  fabMenuSheet: {
-    backgroundColor: CARD_BG,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 32,
-  },
-  fabMenuHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#E0E0E0',
-    alignSelf: 'center',
-    marginBottom: 14,
-  },
-  fabMenuTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: TEXT_DARK,
-  },
-  fabMenuSubtitle: {
-    fontSize: 14,
-    color: TEXT_SECONDARY,
-    marginTop: 4,
-    marginBottom: 18,
-  },
-  fabMenuCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#EDEDED',
-    backgroundColor: CARD_BG,
-    marginBottom: 12,
-  },
-  fabMenuCardLast: {
-    marginBottom: 0,
-  },
-  fabMenuCardIcon: {
-    fontSize: 24,
-    width: 32,
-    textAlign: 'center',
-  },
-  fabMenuCardTextWrap: {
-    flex: 1,
-  },
-  fabMenuCardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: TEXT_DARK,
-  },
-  fabMenuCardSubtitle: {
-    fontSize: 12.5,
-    color: TEXT_SECONDARY,
-    marginTop: 2,
   },
 });
