@@ -13,10 +13,12 @@ import { navigateToProspectionConsult, navigateToProspectionDraft } from '@/lib/
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { FicheCard } from '@/components/fiches/FicheCard';
 import { SearchAndFilterBar, FilterOption } from '@/components/fiches/SearchAndFilterBar';
-import { PROSPECTION_SUBTYPE_BADGE_CONFIG, STATUT_BADGE_CONFIG } from '@/components/fiches/tokens';
-
-const IFVM_GREEN_DARK = '#163F16';
-const IFVM_ORANGE = '#E67E22';
+import {
+  FICHES_GREEN_DARK,
+  FICHES_ORANGE,
+  PROSPECTION_SUBTYPE_BADGE_CONFIG,
+  STATUT_BADGE_CONFIG,
+} from '@/components/fiches/tokens';
 
 const EMPTY_DATA: AccueilViewModel = { unsyncedCount: 0, activeDraft: null, recent: [], validated: [] };
 
@@ -346,7 +348,7 @@ export default function ProspectionScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#F3F4F6' },
-  header: { backgroundColor: IFVM_GREEN_DARK, paddingHorizontal: 16, paddingBottom: 22 },
+  header: { backgroundColor: FICHES_GREEN_DARK, paddingHorizontal: 16, paddingBottom: 22 },
   offlineRow: { paddingTop: 8 },
   offlineText: { color: '#FFD27A', fontSize: 12, fontWeight: '700' },
   headerContent: { flexDirection: 'row', alignItems: 'center', paddingTop: 8 },
@@ -412,7 +414,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#E5E7EB',
   },
   btnNouvelle: {
-    backgroundColor: IFVM_ORANGE,
+    backgroundColor: FICHES_ORANGE,
     borderRadius: 10,
     paddingVertical: 16,
     alignItems: 'center',

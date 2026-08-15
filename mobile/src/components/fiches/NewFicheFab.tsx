@@ -5,11 +5,7 @@ import { useAuthStore } from '@/lib/auth-store';
 import { startNewProspection } from '@/lib/prospection-accueil';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useAsyncAction } from '@/hooks/use-async-action';
-
-const CARD_BG = '#FFFFFF';
-const IFVM_ORANGE = '#E67E22';
-const TEXT_DARK = '#1A1A1A';
-const TEXT_SECONDARY = '#757575';
+import { FICHES_CARD_BG, FICHES_ORANGE, FICHES_TEXT_DARK, FICHES_TEXT_SECONDARY } from './tokens';
 
 const PROSPECTION_DESTINATIONS = {
   intensive: '/(prospection)/reference',
@@ -115,7 +111,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: IFVM_ORANGE,
+    backgroundColor: FICHES_ORANGE,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -136,7 +132,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: CARD_BG,
+    backgroundColor: FICHES_CARD_BG,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingHorizontal: 20,
@@ -154,11 +150,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '700',
-    color: TEXT_DARK,
+    color: FICHES_TEXT_DARK,
   },
   subtitle: {
     fontSize: 14,
-    color: TEXT_SECONDARY,
+    color: FICHES_TEXT_SECONDARY,
     marginTop: 4,
     marginBottom: 18,
   },
@@ -170,7 +166,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#EDEDED',
-    backgroundColor: CARD_BG,
+    backgroundColor: FICHES_CARD_BG,
     marginBottom: 12,
   },
   cardLast: {
@@ -187,11 +183,11 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: TEXT_DARK,
+    color: FICHES_TEXT_DARK,
   },
   cardSubtitle: {
     fontSize: 12.5,
-    color: TEXT_SECONDARY,
+    color: FICHES_TEXT_SECONDARY,
     marginTop: 2,
   },
 });
