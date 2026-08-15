@@ -8,6 +8,9 @@ import {
   isHeureNocturne,
   classifyLarvalPopulation,
   classifyAerialPopulation,
+  validateAntiDoublon,
+  DOUBLON_DISTANCE_SEUIL_M,
+  DOUBLON_DELAI_SEUIL_H,
 } from '../src/lib/prospection-validation';
 
 describe('validateProspectionDate — antériorité au début de mission (#105)', () => {
@@ -419,5 +422,80 @@ describe('classifyAerialPopulation — vol clair vs essaim (#104)', () => {
         masquePaysage: null,
       })
     ).toBe('non_classe');
+  });
+});
+
+describe('validateAntiDoublon — proximité temps/espace entre prospecteurs (#107)', () => {
+  const base = {
+    prospecteurId: 'moi',
+    latitude: -18.9,
+    longitude: 47.5,
+    timestamp: '2026-08-15T10:00:00.000Z',
+  };
+
+  it('avertit quand une fiche proche (distance et délai) existe pour un autre prospecteur', () => {
+    const { blocages, avertissements } = validateAntiDoublon({
+      ...base,
+      fichesProches: [
+        {
+          prospecteurId: 'autre',
+          latitude: -18.9005,
+          longitude: 47.5005,
+          timestamp: '2026-08-15T09:30:00.000Z',
+        },
+      ],
+    });
+    expect(blocages).toEqual([]);
+    expect(avertissements).toHaveLength(1);
+  });
+
+  it('n\'avertit pas pour une fiche du même prospecteur (auto-comparaison exclue)', () => {
+    const { avertissements } = validateAntiDoublon({
+      ...base,
+      fichesProches: [
+        { prospecteurId: 'moi', latitude: -18.9005, longitude: 47.5005, timestamp: '2026-08-15T09:30:00.000Z' },
+      ],
+    });
+    expect(avertissements).toEqual([]);
+  });
+
+  it('n\'avertit pas hors du rayon de distance', () => {
+    const { avertissements } = validateAntiDoublon({
+      ...base,
+      fichesProches: [
+        {
+          prospecteurId: 'autre',
+          latitude: base.latitude,
+          longitude: base.longitude + (DOUBLON_DISTANCE_SEUIL_M / 111000) * 3,
+          timestamp: '2026-08-15T09:30:00.000Z',
+        },
+      ],
+    });
+    expect(avertissements).toEqual([]);
+  });
+
+  it('n\'avertit pas hors de la fenêtre temporelle', () => {
+    const { avertissements } = validateAntiDoublon({
+      ...base,
+      fichesProches: [
+        {
+          prospecteurId: 'autre',
+          latitude: -18.9005,
+          longitude: 47.5005,
+          timestamp: `2026-08-15T${String(10 - DOUBLON_DELAI_SEUIL_H - 1).padStart(2, '0')}:00:00.000Z`,
+        },
+      ],
+    });
+    expect(avertissements).toEqual([]);
+  });
+
+  it('ne bloque jamais l\'enregistrement', () => {
+    const { blocages } = validateAntiDoublon({
+      ...base,
+      fichesProches: [
+        { prospecteurId: 'autre', latitude: base.latitude, longitude: base.longitude, timestamp: base.timestamp },
+      ],
+    });
+    expect(blocages).toEqual([]);
   });
 });
