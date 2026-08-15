@@ -70,6 +70,7 @@ class CreateProspection:
         signalement_date: str | None = None,
         signalement_description: str | None = None,
         conclusion_validation: str | None = None,
+        avertissements: list[str] | None = None,
     ) -> Prospection:
         if type_prospection == "intensive" and station_id is None:
             raise ValueError("station_id est obligatoire pour une prospection intensive")
@@ -130,6 +131,7 @@ class CreateProspection:
             signalement_date=signalement_date,
             signalement_description=signalement_description,
             conclusion_validation=conclusion_validation,
+            avertissements=avertissements or [],
         )
 
         for child in prospection.populations:
@@ -224,6 +226,7 @@ class UpdateProspection:
         signalement_date: str | None = None,
         signalement_description: str | None = None,
         conclusion_validation: str | None = None,
+        avertissements: list[str] | None = None,
     ) -> Prospection | None:
         prospection = await self.repository.get_by_id(prospection_id)
         if prospection is None:
@@ -318,6 +321,8 @@ class UpdateProspection:
             prospection.signalement_description = signalement_description
         if conclusion_validation is not None:
             prospection.conclusion_validation = conclusion_validation
+        if avertissements is not None:
+            prospection.avertissements = avertissements
 
         prospection.updated_at = datetime.utcnow()
 

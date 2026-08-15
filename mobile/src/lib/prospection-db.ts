@@ -54,6 +54,7 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
       sol TEXT,
       ennemis_naturels TEXT,
       observations TEXT,
+      avertissements TEXT,
       statut TEXT NOT NULL DEFAULT 'brouillon',
       statut_sync TEXT NOT NULL DEFAULT 'local',
       created_at TEXT NOT NULL,
@@ -290,6 +291,7 @@ async function migrateProspectionTable(db: SQLite.SQLiteDatabase): Promise<void>
     { name: 'signalement_date', type: 'TEXT' },
     { name: 'signalement_description', type: 'TEXT' },
     { name: 'conclusion_validation', type: 'TEXT' },
+    { name: 'avertissements', type: 'TEXT' },
   ];
 
   for (const col of columnsToAdd) {

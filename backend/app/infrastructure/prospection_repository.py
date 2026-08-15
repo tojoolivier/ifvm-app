@@ -138,6 +138,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             signalement_date=prospection.signalement_date,
             signalement_description=prospection.signalement_description,
             conclusion_validation=prospection.conclusion_validation,
+            avertissements=prospection.avertissements,
         )
 
         model.populations = [
@@ -248,6 +249,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         model.signalement_date = prospection.signalement_date
         model.signalement_description = prospection.signalement_description
         model.conclusion_validation = prospection.conclusion_validation
+        model.avertissements = prospection.avertissements
 
         # Mise à jour des infestations
         await self.session.execute(
@@ -510,6 +512,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             signalement_date=model.signalement_date,
             signalement_description=model.signalement_description,
             conclusion_validation=model.conclusion_validation,
+            avertissements=list(model.avertissements or []),
             # ==========================================
             # RELATIONSHIPS
             # ==========================================

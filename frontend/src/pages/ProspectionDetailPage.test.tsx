@@ -32,15 +32,17 @@ function baseProspection(statut: string) {
     vegetation: null,
     sol: null,
     degats_cultures: null,
+    avertissements: [],
     populations: [],
     captures: [],
     infestations: [],
   }
 }
 
-function renderPage(statut: string) {
+function renderPage(statut: string, overrides: Partial<ReturnType<typeof baseProspection>> = {}) {
   mockedGet.mockImplementation((url: string) => {
-    if (url === '/prospections/p1') return Promise.resolve({ data: baseProspection(statut) })
+    if (url === '/prospections/p1')
+      return Promise.resolve({ data: { ...baseProspection(statut), ...overrides } })
     if (url === '/prospections/p1/audit-log') return Promise.resolve({ data: [] })
     if (url === '/users/me') return Promise.resolve({ data: { id: 'u1', nom: 'Test', role: 'validation_finale' } })
     if (url === '/campagnes') return Promise.resolve({ data: [] })
@@ -88,5 +90,36 @@ describe('ProspectionDetailPage — export PDF (#19)', () => {
     expect(window.print).toHaveBeenCalledTimes(1)
     expect(screen.getByText('Fiche n° F-001')).toBeInTheDocument()
     expect(screen.getByText(/Validé ✓/)).toBeInTheDocument()
+  })
+})
+
+describe('ProspectionDetailPage — avertissements « à vérifier » (#106)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("n'affiche pas de bandeau quand la fiche n'a aucun avertissement", async () => {
+    renderPage('en_attente', { avertissements: [] })
+    await waitFor(() => expect(screen.getByText(/Fiche intensive/)).toBeInTheDocument())
+
+    expect(screen.queryByText(/À vérifier/)).not.toBeInTheDocument()
+  })
+
+  it('affiche chaque avertissement déclenché à la saisie, visible en revue', async () => {
+    renderPage('en_attente', {
+      avertissements: [
+        'Essaim/vol clair signalé de nuit : comportement forcé sur « posé ».',
+        'Écart important par rapport à la dernière observation connue sur ce point de suivi.',
+      ],
+    })
+    await waitFor(() => expect(screen.getByText(/Fiche intensive/)).toBeInTheDocument())
+
+    expect(screen.getByText('À vérifier (2)')).toBeInTheDocument()
+    expect(
+      screen.getByText('Essaim/vol clair signalé de nuit : comportement forcé sur « posé ».')
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Écart important par rapport à la dernière observation connue sur ce point de suivi.')
+    ).toBeInTheDocument()
   })
 })

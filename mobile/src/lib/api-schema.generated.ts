@@ -1211,6 +1211,11 @@ export interface components {
             /** Conclusion Validation */
             conclusion_validation?: string | null;
             /**
+             * Avertissements
+             * @default []
+             */
+            avertissements: string[];
+            /**
              * Populations
              * @default []
              */
@@ -1341,6 +1346,11 @@ export interface components {
             /** Conclusion Validation */
             conclusion_validation?: string | null;
             /**
+             * Avertissements
+             * @default []
+             */
+            avertissements: string[];
+            /**
              * Populations
              * @default []
              */
@@ -1434,6 +1444,8 @@ export interface components {
             signalement_description?: string | null;
             /** Conclusion Validation */
             conclusion_validation?: string | null;
+            /** Avertissements */
+            avertissements?: string[] | null;
         };
         /** ReferentielPullResponse */
         ReferentielPullResponse: {
