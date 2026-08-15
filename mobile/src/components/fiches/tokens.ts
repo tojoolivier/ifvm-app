@@ -9,6 +9,9 @@ export const FICHES_GREEN_DARK = '#163F16';
 export const FICHES_GREEN_LIGHT = '#E8F3E8';
 export const FICHES_ORANGE = '#E67E22';
 export const FICHES_BG = '#F3F4F6';
+export const FICHES_CARD_BG = '#FFFFFF';
+export const FICHES_TEXT_DARK = '#1A1A1A';
+export const FICHES_TEXT_SECONDARY = '#757575';
 
 export interface BadgeStyle {
   label: string;
