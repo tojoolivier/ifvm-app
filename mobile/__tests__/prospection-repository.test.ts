@@ -165,16 +165,18 @@ describe('listRecentProspections', () => {
 });
 
 describe('listValidatedProspections', () => {
-  it('lists only validee rows ordered by most recently updated', async () => {
-    const validatedRow = { ...STORED_ROW, statut: 'validee' };
-    getAllAsync.mockResolvedValueOnce([validatedRow]);
+  it('lists only extensive/validation rows synced with the server, ordered by most recently updated', async () => {
+    const eligibleRow = { ...STORED_ROW, type_prospection: 'extensive', statut_sync: 'synced' };
+    getAllAsync.mockResolvedValueOnce([eligibleRow]);
 
     const result = await listValidatedProspections();
 
-    expect(result).toEqual([validatedRow]);
+    expect(result).toEqual([eligibleRow]);
     expect(getAllAsync).toHaveBeenCalledWith(
-      expect.stringContaining("WHERE statut = 'validee'")
+      expect.stringContaining("WHERE type_prospection IN ('extensive', 'validation')")
     );
+    expect(getAllAsync).toHaveBeenCalledWith(expect.stringContaining("AND statut_sync = 'synced'"));
+    expect(getAllAsync).toHaveBeenCalledWith(expect.stringContaining('ORDER BY updated_at DESC'));
   });
 });
 

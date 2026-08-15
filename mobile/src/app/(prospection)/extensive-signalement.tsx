@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
 import { startNewProspection } from '@/lib/prospection-accueil';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
+import { DateField } from '@/components/DateField';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -82,12 +83,13 @@ export default function ExtensiveSignalementScreen() {
 
           <View style={styles.card}>
             <Text style={styles.label}>Date du signalement</Text>
-            <TextInput
-              value={date}
-              onChangeText={setDate}
-              placeholder="Ex. 25/06"
-              placeholderTextColor={TEXT_SECONDARY}
-              style={styles.input}
+            <DateField
+              value={date || null}
+              onChange={setDate}
+              maximumDate={new Date()}
+              style={styles.dateFieldBox}
+              textStyle={styles.input}
+              placeholderStyle={[styles.input, { color: TEXT_SECONDARY }]}
             />
           </View>
 
@@ -132,6 +134,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 11, marginBottom: 10 },
   label: { fontSize: 9, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase', marginBottom: 4 },
   input: { fontSize: 13, fontWeight: '600', color: TEXT, padding: 0 },
+  dateFieldBox: { minHeight: 0, borderWidth: 0, padding: 0, backgroundColor: 'transparent' },
   multiline: { minHeight: 60, textAlignVertical: 'top' },
   errorText: { color: '#c0412b', fontSize: 12, marginTop: 4, textAlign: 'center' },
   footer: { padding: 16 },

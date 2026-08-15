@@ -6,6 +6,7 @@ import { ProduitDraft, useTraitementCaptureStore } from '@/lib/traitement-captur
 import { generateId } from '@/lib/id';
 import { Card } from '@/components/traitement/Card';
 import { Chip } from '@/components/traitement/Chip';
+import { TimeField } from '@/components/traitement/TimeField';
 import { formStyles as styles } from '@/components/traitement/TraitementFormStyles';
 
 const DIRECTIONS_VENT = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
@@ -84,20 +85,22 @@ export function TerrestreForm({
       />
 
       <View style={styles.row}>
-        <TextInput
-          editable={!readOnly}
-          style={[styles.input, styles.flex1]}
-          placeholder="Heure début*"
-          value={store.terrestre.heureDebut ?? ''}
-          onChangeText={(v) => store.updateTerrestre({ heureDebut: v })}
-        />
-        <TextInput
-          editable={!readOnly}
-          style={[styles.input, styles.flex1]}
-          placeholder="Heure fin*"
-          value={store.terrestre.heureFin ?? ''}
-          onChangeText={(v) => store.updateTerrestre({ heureFin: v })}
-        />
+        <View style={styles.flex1}>
+          <Text style={styles.label}>Heure début*</Text>
+          <TimeField
+            editable={!readOnly}
+            value={store.terrestre.heureDebut ?? null}
+            onChange={(v) => store.updateTerrestre({ heureDebut: v })}
+          />
+        </View>
+        <View style={styles.flex1}>
+          <Text style={styles.label}>Heure fin*</Text>
+          <TimeField
+            editable={!readOnly}
+            value={store.terrestre.heureFin ?? null}
+            onChange={(v) => store.updateTerrestre({ heureFin: v })}
+          />
+        </View>
       </View>
       {errors.heureFin && <Text style={styles.error}>{errors.heureFin}</Text>}
 

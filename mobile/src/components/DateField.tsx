@@ -1,16 +1,18 @@
 import { useState } from 'react';
-import { Text, TouchableOpacity, View, StyleSheet, Platform, Modal } from 'react-native';
+import { Text, TouchableOpacity, View, StyleSheet, Platform, Modal, StyleProp, ViewStyle, TextStyle } from 'react-native';
 import DateTimePicker, { DateTimePickerChangeEvent } from '@react-native-community/datetimepicker';
-import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from './tokens';
 
 interface DateFieldProps {
-  /** Date au format ISO "AAAA-MM-JJ", ou null si non renseignée. */
+  /** Date au format ISO "AAAA-MM-JJ", ou null/vide si non renseignée. */
   value: string | null;
   onChange: (iso: string) => void;
   editable?: boolean;
   placeholder?: string;
   minimumDate?: Date;
   maximumDate?: Date;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
+  placeholderStyle?: StyleProp<TextStyle>;
 }
 
 function toIsoDate(date: Date): string {
@@ -25,7 +27,7 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}/;
 function fromIsoDate(iso: string): Date {
   if (!ISO_DATE_RE.test(iso)) return new Date();
   const [year, month, day] = iso.split('T')[0].split('-').map(Number);
-  return new Date(year, (month || 1) - 1, day || 1);
+  return new Date(year || new Date().getFullYear(), (month || 1) - 1, day || 1);
 }
 
 /** Anciens brouillons pré-datant ce composant : valeur non-ISO affichée telle quelle plutôt que corrompue. */
@@ -35,9 +37,24 @@ function formatDateFr(iso: string): string {
   return `${day}/${month}/${year}`;
 }
 
-/** Champ de saisie de date avec sélecteur calendrier natif (iOS inline / Android dialog). */
-export function DateField({ value, onChange, editable = true, placeholder = 'JJ/MM/AAAA', minimumDate, maximumDate }: DateFieldProps) {
+/**
+ * Champ de saisie de date avec sélecteur calendrier natif (iOS inline / Android dialog).
+ * Version générique (hors module traitement) — accepte des styles pour s'intégrer aux
+ * écrans de prospection, qui n'ont pas de tokens de design centralisés.
+ */
+export function DateField({
+  value,
+  onChange,
+  editable = true,
+  placeholder = 'JJ/MM/AAAA',
+  minimumDate,
+  maximumDate,
+  style,
+  textStyle,
+  placeholderStyle,
+}: DateFieldProps) {
   const [show, setShow] = useState(false);
+  const isoValue = value && value.trim().length > 0 ? value : null;
 
   const onValueChange = (_event: DateTimePickerChangeEvent, selectedDate: Date) => {
     setShow(false);
@@ -47,20 +64,22 @@ export function DateField({ value, onChange, editable = true, placeholder = 'JJ/
   return (
     <View>
       <TouchableOpacity
-        style={styles.input}
+        style={[defaultStyles.input, style]}
         onPress={() => editable && setShow(true)}
         disabled={!editable}
         accessibilityRole="button"
-        accessibilityLabel={value ? formatDateFr(value) : placeholder}
+        accessibilityLabel={isoValue ? formatDateFr(isoValue) : placeholder}
       >
-        <Text style={value ? styles.value : styles.placeholder}>{value ? formatDateFr(value) : placeholder}</Text>
+        <Text style={isoValue ? [defaultStyles.value, textStyle] : [defaultStyles.placeholder, placeholderStyle]}>
+          {isoValue ? formatDateFr(isoValue) : placeholder}
+        </Text>
       </TouchableOpacity>
       {show && Platform.OS === 'ios' ? (
         <Modal transparent animationType="fade" onRequestClose={() => setShow(false)}>
-          <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={() => setShow(false)}>
-            <TouchableOpacity activeOpacity={1} style={styles.calendarCard} onPress={() => {}}>
+          <TouchableOpacity style={defaultStyles.backdrop} activeOpacity={1} onPress={() => setShow(false)}>
+            <TouchableOpacity activeOpacity={1} style={defaultStyles.calendarCard} onPress={() => {}}>
               <DateTimePicker
-                value={value ? fromIsoDate(value) : new Date()}
+                value={isoValue ? fromIsoDate(isoValue) : new Date()}
                 mode="date"
                 display="inline"
                 minimumDate={minimumDate}
@@ -74,7 +93,7 @@ export function DateField({ value, onChange, editable = true, placeholder = 'JJ/
       ) : (
         show && (
           <DateTimePicker
-            value={value ? fromIsoDate(value) : new Date()}
+            value={isoValue ? fromIsoDate(isoValue) : new Date()}
             mode="date"
             display="calendar"
             minimumDate={minimumDate}
@@ -88,18 +107,18 @@ export function DateField({ value, onChange, editable = true, placeholder = 'JJ/
   );
 }
 
-const styles = StyleSheet.create({
+const defaultStyles = StyleSheet.create({
   input: {
     minHeight: 44,
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: traitementColors.bordure,
-    borderRadius: traitementRadii.chip,
+    borderColor: '#e7e0cd',
+    borderRadius: 8,
     paddingHorizontal: 10,
     backgroundColor: '#fff',
   },
-  value: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre },
-  placeholder: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.corps, color: traitementColors.texteLabel },
+  value: { fontSize: 13, fontWeight: '600', color: '#16201a' },
+  placeholder: { fontSize: 13, fontWeight: '600', color: '#6f6a59' },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
@@ -108,7 +127,7 @@ const styles = StyleSheet.create({
   },
   calendarCard: {
     backgroundColor: '#fff',
-    borderRadius: traitementRadii.chip,
+    borderRadius: 8,
     padding: 8,
     overflow: 'hidden',
   },
