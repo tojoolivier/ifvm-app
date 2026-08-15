@@ -28,6 +28,7 @@ import {
   filterProspectionsForSynthese,
   type SyntheseProspection,
 } from '@/lib/prospection-syntheses'
+import { STATUTS, STATUT_LABELS } from '@/components/ui/status-badge'
 
 interface Campagne {
   id: string
@@ -40,16 +41,6 @@ interface Station {
   nom: string
   pa_code: string
   pa_nom: string
-}
-
-const STATUTS = ['brouillon', 'en_attente', 'verifiee', 'validee', 'rejetee'] as const
-
-const STATUT_LABELS: Record<string, string> = {
-  brouillon: 'Brouillon',
-  en_attente: 'En attente',
-  verifiee: 'Vérifiée',
-  validee: 'Validée',
-  rejetee: 'Rejetée',
 }
 
 function shortId(id: string | null): string {

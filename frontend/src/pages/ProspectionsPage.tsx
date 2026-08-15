@@ -21,7 +21,7 @@ import {
   SelectContent,
   SelectItem,
 } from '@/components/ui/select'
-import { cn } from '@/lib/utils'
+import { STATUTS, STATUT_LABELS, StatusBadge } from '@/components/ui/status-badge'
 
 interface Campagne {
   id: string
@@ -50,38 +50,7 @@ interface Prospection {
   created_at: string
 }
 
-const STATUTS = ['brouillon', 'en_attente', 'verifiee', 'validee', 'rejetee'] as const
-
-const STATUT_LABELS: Record<string, string> = {
-  brouillon: 'Brouillon',
-  en_attente: 'En attente',
-  verifiee: 'Vérifiée',
-  validee: 'Validée',
-  rejetee: 'Rejetée',
-}
-
-const STATUT_CLASSES: Record<string, string> = {
-  brouillon: 'bg-gray-100 text-gray-700',
-  en_attente: 'bg-orange-100 text-orange-700',
-  verifiee: 'bg-blue-100 text-blue-700',
-  validee: 'bg-green-100 text-green-700',
-  rejetee: 'bg-red-100 text-red-700',
-}
-
 const PAGE_SIZE = 20
-
-function StatutBadge({ statut }: { statut: string }) {
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium',
-        STATUT_CLASSES[statut] ?? 'bg-gray-100 text-gray-700',
-      )}
-    >
-      {STATUT_LABELS[statut] ?? statut}
-    </span>
-  )
-}
 
 function shortId(id: string | null): string {
   if (!id) return '—'
@@ -287,7 +256,7 @@ export function ProspectionsPage() {
                           {shortId(p.prospecteur_id)}
                         </TableCell>
                         <TableCell>
-                          <StatutBadge statut={p.statut} />
+                          <StatusBadge statut={p.statut} />
                         </TableCell>
                         <TableCell>
                           {campagneMap[p.campagne_id] ?? shortId(p.campagne_id)}

@@ -60,8 +60,12 @@ export default {
           "blue-text": "#31567f",
           "blue-bg": "#eaf0f7",
           "blue-border": "#cdddef",
+          "green-text": "#235a36",
           "green-bg": "#eaf2ec",
           "green-border": "#cfe0d4",
+          "brouillon-text": "#6f6a59",
+          "brouillon-bg": "#f4efe2",
+          "brouillon-border": "#e0d9c4",
         },
       },
       fontFamily: {
