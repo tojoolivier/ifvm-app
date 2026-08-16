@@ -10,6 +10,16 @@ const TYPE_LABELS: Record<string, string> = {
   TERRESTRE: 'Terrestre',
 }
 
+const ROLE_LABELS: Record<string, string> = {
+  PILOTE: 'Pilote',
+  MECANICIEN: 'Mécanicien',
+  CHEF_DE_BASE: 'Chef de base',
+  CHEF_EQUIPE: "Chef d'équipe",
+  CONSULTANT_INTERNATIONAL: 'Consultant international',
+}
+
+const SIGNATURE_ROLES = Object.keys(ROLE_LABELS)
+
 interface TraitementDetail {
   id: string
   prospection_id: string
@@ -309,18 +319,24 @@ export function TraitementDetailPage() {
           <CardTitle>Signatures</CardTitle>
         </CardHeader>
         <CardContent className="text-sm">
-          {traitement.signatures.length === 0 ? (
-            <p className="text-muted-foreground">Aucune signature.</p>
-          ) : (
-            <ul className="space-y-1">
-              {traitement.signatures.map((s) => (
-                <li key={s.id}>
-                  <span className="font-semibold">{s.role}</span> — {s.signataire_nom}{' '}
-                  <span className="text-muted-foreground font-mono">({s.horodatage})</span>
+          <ul className="space-y-1">
+            {SIGNATURE_ROLES.map((role) => {
+              const signature = traitement.signatures.find((s) => s.role === role)
+              return (
+                <li key={role}>
+                  <span className="font-semibold">{ROLE_LABELS[role]}</span> —{' '}
+                  {signature ? (
+                    <>
+                      {signature.signataire_nom}{' '}
+                      <span className="text-muted-foreground font-mono">({signature.horodatage})</span>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">ne signe pas</span>
+                  )}
                 </li>
-              ))}
-            </ul>
-          )}
+              )
+            })}
+          </ul>
         </CardContent>
       </Card>
     </div>
