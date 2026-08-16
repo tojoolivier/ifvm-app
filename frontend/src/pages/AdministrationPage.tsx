@@ -9,7 +9,7 @@ import { StationPage } from './StationPage'
 const chipClass =
   'rounded-full border px-5 py-2.5 font-sans text-[13px] font-bold transition-colors ' +
   'border-ifvm-brouillon-border bg-background text-ifvm-text-tertiary ' +
-  'data-active:border-ifvm-green-text data-active:bg-ifvm-green-text data-active:text-white'
+  'data-[active]:border-ifvm-green-text data-[active]:bg-ifvm-green-text data-[active]:text-white'
 
 type Tab = 'utilisateurs' | 'stations'
 
