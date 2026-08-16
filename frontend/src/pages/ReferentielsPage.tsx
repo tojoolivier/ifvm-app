@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import { Card, CardContent } from '@/components/ui/card'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
@@ -19,7 +18,6 @@ interface ReferentielPullResponse {
   pesticides: EntityPull
   cultures: EntityPull
   codes_stades: EntityPull
-  campagnes: EntityPull
 }
 
 const ENTITES: { key: keyof ReferentielPullResponse; label: string }[] = [
@@ -29,7 +27,6 @@ const ENTITES: { key: keyof ReferentielPullResponse; label: string }[] = [
   { key: 'pesticides', label: 'Pesticides' },
   { key: 'cultures', label: 'Cultures' },
   { key: 'codes_stades', label: 'Codes stades' },
-  { key: 'campagnes', label: 'Campagnes' },
 ]
 
 function formatDate(value: unknown): string {
@@ -136,15 +133,6 @@ export function ReferentielsPage() {
 
           {ENTITES.map(({ key, label }) => (
             <TabsContent key={key} value={key} className="min-w-0 flex-1">
-              {key === 'campagnes' && (
-                <p className="text-sm text-muted-foreground mb-3">
-                  Gestion complète (création/suppression) sur la page{' '}
-                  <Link to="/campagnes" className="underline">
-                    Campagnes
-                  </Link>
-                  . Lecture seule ici.
-                </p>
-              )}
               <Card>
                 <CardContent className="p-0">
                   <DataTable

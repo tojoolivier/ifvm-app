@@ -11,9 +11,10 @@ const baseNavItems = [
   { to: '/', label: 'Tableau de bord' },
 ]
 
-// Nombre d'entités du référentiel admin (docs/design_handoff_web/README.md §11) —
-// fixe (types d'entités), pas un total d'enregistrements côté API.
-const NB_REFERENTIELS = 7
+// Nombre d'entités du référentiel admin — fixe (types d'entités), pas un total
+// d'enregistrements côté API. Campagnes exclue : gestion complète déjà sur sa
+// propre page (/campagnes), pas un référentiel en lecture seule.
+const NB_REFERENTIELS = 6
 
 // Campagne n'a pas de champ `active` côté backend (#121) : dérivée par date tant
 // que le backend n'expose pas ce concept. En cas de chevauchement, la plus récente gagne.
