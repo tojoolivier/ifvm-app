@@ -1,6 +1,7 @@
 import uuid
 
 import pytest
+import pytest_asyncio
 from httpx import AsyncClient
 
 
@@ -43,6 +44,51 @@ async def test_list_stations_recherche_textuelle(
     data = response.json()
     assert len(data) >= 1
     assert any(s["nom"] == "Station Test" for s in data)
+
+
+@pytest_asyncio.fixture
+async def station_inactive(db_session, poste_acridien):
+    from app.infrastructure.referentiel_model import StationFixeModel
+
+    station = StationFixeModel(
+        id=uuid.uuid4(),
+        code="ST-TEST-INACTIVE",
+        nom="Station Fermée",
+        pa_id=poste_acridien.id,
+        latitude=-21.0,
+        longitude=44.0,
+        altitude=300,
+        actif=False,
+    )
+    db_session.add(station)
+    await db_session.commit()
+    return station
+
+
+@pytest.mark.asyncio
+async def test_list_stations_masque_les_inactives_par_defaut(
+    client: AsyncClient, auth_headers: dict, station_fixe, station_inactive
+):
+    """Le sélecteur de station d'une prospection ne doit proposer que l'actif."""
+    response = await client.get("/stations", headers=auth_headers)
+
+    assert response.status_code == 200
+    codes = [s["code"] for s in response.json()]
+    assert "ST-TEST-001" in codes
+    assert "ST-TEST-INACTIVE" not in codes
+
+
+@pytest.mark.asyncio
+async def test_list_stations_inclure_inactifs_retourne_les_deux_etats(
+    client: AsyncClient, auth_headers: dict, station_fixe, station_inactive
+):
+    """L'écran d'administration affiche un badge « État » : il lui faut les deux."""
+    response = await client.get("/stations?inclure_inactifs=true", headers=auth_headers)
+
+    assert response.status_code == 200
+    codes = [s["code"] for s in response.json()]
+    assert "ST-TEST-001" in codes
+    assert "ST-TEST-INACTIVE" in codes
 
 
 @pytest.mark.asyncio
