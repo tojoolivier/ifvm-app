@@ -7,18 +7,13 @@ import { Label } from '@/components/ui/label'
 import { FilterChip } from '@/components/ui/filter-chip'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { STATUTS, STATUT_LABELS, StatusBadge, type Statut } from '@/components/ui/status-badge'
+import { shortId, useAnnuaire } from '@/lib/use-annuaire'
 
 interface Station {
   id: string
   code: string
   nom: string
   pa_code: string
-}
-
-interface Utilisateur {
-  id: string
-  nom: string
-  role: string
 }
 
 interface Prospection {
@@ -43,11 +38,6 @@ const TYPE_LABELS: Record<string, string> = {
 
 const PAGE_SIZE = 20
 const TOUS = 'Tous'
-
-function shortId(id: string | null): string {
-  if (!id) return '—'
-  return id.slice(0, 8) + '…'
-}
 
 export function ProspectionsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -95,13 +85,7 @@ export function ProspectionsPage() {
     queryFn: () => api.get('/stations').then((r) => r.data),
   })
 
-  // `/users/` est réservé aux admins : la page doit rester lisible pour les
-  // autres rôles, on retombe alors sur l'identifiant court du prospecteur.
-  const { data: utilisateurs = [] } = useQuery<Utilisateur[]>({
-    queryKey: ['users'],
-    queryFn: () => api.get('/users/').then((r) => r.data),
-    retry: false,
-  })
+  const { nomAgent } = useAnnuaire()
 
   const stationMap = useMemo(() => {
     const m: Record<string, Station> = {}
@@ -109,23 +93,18 @@ export function ProspectionsPage() {
     return m
   }, [stations])
 
-  const utilisateurMap = useMemo(() => {
-    const m: Record<string, Utilisateur> = {}
-    for (const u of utilisateurs) m[u.id] = u
-    return m
-  }, [utilisateurs])
-
   const stationLabel = (p: Prospection) => {
     const station = p.station_id ? stationMap[p.station_id] : null
     return station ? `${station.code} ${station.nom}` : shortId(p.station_id)
   }
 
-  const agentLabel = (p: Prospection) =>
-    utilisateurMap[p.prospecteur_id]?.nom ?? shortId(p.prospecteur_id)
+  const agentLabel = (p: Prospection) => nomAgent(p.prospecteur_id)
 
   const ficheLabel = (p: Prospection) => p.n_fiche ?? p.n_releve ?? shortId(p.id)
 
-  const filtered = useMemo(() => {
+  // Recalculé à chaque rendu : les libellés dépendent de trois requêtes et le
+  // volume est déjà borné par la pagination.
+  const filtered = (() => {
     const q = recherche.trim().toLowerCase()
     return prospections.filter((p) => {
       if (filtreType && p.type_prospection !== filtreType) return false
@@ -138,8 +117,7 @@ export function ProspectionsPage() {
         .toLowerCase()
         .includes(q)
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prospections, recherche, filtreType, filtreStatut, stationMap, utilisateurMap])
+  })()
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)

@@ -48,7 +48,7 @@ describe('buildReferenceRows — bloc A de la maquette', () => {
       'Coordonnées',
       'Altitude',
       'Région / District',
-      'Station',
+      'Localité',
     ])
   })
 
@@ -57,9 +57,13 @@ describe('buildReferenceRows — bloc A de la maquette', () => {
     expect(valeur(rows, 'Coordonnées')).toBe('-22,4021 · 44,1873')
   })
 
-  it('retombe sur la station libre quand aucune station du référentiel n’est liée', () => {
-    const rows = buildReferenceRows({ ...PROSPECTION, station_libre: 'Zone hors station' }, null)
-    expect(valeur(rows, 'Station')).toBe('Zone hors station')
+  it('rend la commune comme localité, et retombe sur la station libre', () => {
+    expect(valeur(buildReferenceRows(PROSPECTION, null), 'Localité')).toBe('Ambatolahy')
+    const sansCommune = buildReferenceRows(
+      { ...PROSPECTION, commune: null, station_libre: 'Zone hors station' },
+      null,
+    )
+    expect(valeur(sansCommune, 'Localité')).toBe('Zone hors station')
   })
 
   it('marque les valeurs absentes comme grisées plutôt que de les masquer', () => {
@@ -113,7 +117,7 @@ describe('spécialisation larve / imago', () => {
     densite_moy: null,
     comportement: null,
     type_larve: 'bande_larvaire',
-    stade_dominant: 'l4',
+    stade_dominant: 'l4_l5',
     taille_groupe_m2: 45,
     nb_taches_bandes: 8,
     interdistance_min: 2,
@@ -152,7 +156,7 @@ describe('spécialisation larve / imago', () => {
     const rows = buildLarveRows(larve)
     expect(rows).toHaveLength(8)
     expect(valeur(rows, 'Type de larve')).toBe('Bande larvaire')
-    expect(valeur(rows, 'Stade dominant')).toBe('L4')
+    expect(valeur(rows, 'Stade dominant')).toBe('L4-L5')
     expect(valeur(rows, 'Interdistance min/max/moy (m)')).toBe('2 / 15 / 7')
     expect(valeur(rows, 'Front longueur × largeur (m)')).toBe('180 × 25')
     expect(valeur(rows, 'Densité max front / arrière')).toBe('620 / 210')
@@ -177,9 +181,9 @@ describe('spécialisation larve / imago', () => {
 
 describe('buildCapturesSynthese — bloc B de la maquette', () => {
   const captures: CaptureFiche[] = [
-    { id: 'c1', espece: 'LMC', categorie: 'imago', sexe: 'male', phase: 'solitaire', stade: 'imago', effectif: 18 },
-    { id: 'c2', espece: 'LMC', categorie: 'imago', sexe: 'femelle', phase: 'solitaire', stade: 'imago', effectif: 22 },
-    { id: 'c3', espece: 'LMC', categorie: 'imago', sexe: 'male', phase: 'gregaire', stade: 'imago', effectif: 44 },
+    { id: 'c1', espece: 'LMC', categorie: 'imago', sexe: 'M', phase: 'solitaire', stade: 'imago', effectif: 18 },
+    { id: 'c2', espece: 'LMC', categorie: 'imago', sexe: 'F', phase: 'solitaire', stade: 'imago', effectif: 22 },
+    { id: 'c3', espece: 'LMC', categorie: 'imago', sexe: 'M', phase: 'gregaire', stade: 'imago', effectif: 44 },
   ]
   const populations: PopulationFiche[] = [
     {
@@ -207,6 +211,16 @@ describe('buildCapturesSynthese — bloc B de la maquette', () => {
     expect(lignes[0].methode).toBe('Comptage direct')
     expect(lignes[0].densite).toBe('320')
     expect(lignes[1].methode).toBe(TIRET)
+  })
+
+  it('ignore les valeurs de sexe hors enum backend plutôt que de les compter', () => {
+    // Régression : la première version comparait à 'male'/'femelle', alors que
+    // l'enum backend `Sexe` vaut "M"/"F" — les deux colonnes restaient vides.
+    const { lignes } = buildCapturesSynthese(
+      [{ ...captures[0], sexe: 'male' }],
+      [],
+    )
+    expect(lignes[0].males).toBe(TIRET)
   })
 
   it('totalise tous les effectifs capturés', () => {

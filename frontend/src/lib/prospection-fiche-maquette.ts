@@ -148,7 +148,7 @@ export function buildReferenceRows(
     ligne('Coordonnées', coord),
     ligne('Altitude', p.altitude == null ? TIRET : `${formatNombre(p.altitude)} m`),
     ligne('Région / District', regionDistrict),
-    ligne('Station', station ? `${station.code} ${station.nom}` : p.station_libre || TIRET),
+    ligne('Localité', p.commune || p.station_libre || (station ? `${station.code} ${station.nom}` : TIRET)),
   ]
 }
 
@@ -175,15 +175,15 @@ export function buildInfestationRows(
       'Surface infestée',
       p.surface_infestee == null ? TIRET : `${formatNombre(p.surface_infestee)} ha`,
     ),
-    // La maquette porte ici « Niveau d'alerte », qu'aucune colonne backend ne
-    // fournit : remplacé par la surface prospectée, disponible et de même nature.
+    ligne('Répartition', repartition),
+    ligne('Vols clairs', String(compte('vol_clair'))),
+    ligne('Essaims', String(compte('essaim'))),
+    // Dernière ligne de la maquette : « Niveau d'alerte », qu'aucune colonne
+    // backend ne fournit — remplacée par la surface prospectée, de même nature.
     ligne(
       'Surface prospectée',
       p.surface_prospectee == null ? TIRET : `${formatNombre(p.surface_prospectee)} ha`,
     ),
-    ligne('Répartition', repartition),
-    ligne('Vols clairs', String(compte('vol_clair'))),
-    ligne('Essaims', String(compte('essaim'))),
   ]
 }
 
@@ -199,6 +199,12 @@ export function findImago(infestations: InfestationFiche[]): InfestationFiche | 
   return infestations.find((i) => CIBLES_IMAGO.includes(i.type_cible)) ?? null
 }
 
+/** `StadeDominant` backend (`l4_l5`) → notation de la maquette (`L4-L5`). */
+export function formatStade(value: string | null | undefined): string {
+  if (!value) return TIRET
+  return value.toUpperCase().replace(/_/g, '-')
+}
+
 export function buildLarveRows(inf: InfestationFiche | null): LigneFiche[] {
   const triple = (a?: number | null, b?: number | null, c?: number | null) =>
     a == null && b == null && c == null
@@ -210,7 +216,7 @@ export function buildLarveRows(inf: InfestationFiche | null): LigneFiche[] {
 
   return [
     ligne('Type de larve', humaniser(inf?.type_larve)),
-    ligne('Stade dominant', inf?.stade_dominant?.toUpperCase() ?? TIRET),
+    ligne('Stade dominant', formatStade(inf?.stade_dominant)),
     ligne('Taille du groupe (m²)', formatNombre(inf?.taille_groupe_m2)),
     ligne('Nb taches / bandes', formatNombre(inf?.nb_taches_bandes)),
     ligne(
@@ -281,11 +287,12 @@ export function buildCapturesSynthese(
 
   const lignes = phases.map((phase) => {
     const ofPhase = captures.filter((c) => c.phase === phase)
+    // `Sexe` est un enum backend à deux valeurs : "M" et "F".
     const somme = (sexe: string) =>
       ofPhase.filter((c) => c.sexe === sexe).reduce((s, c) => s + c.effectif, 0)
 
-    const males = somme('male')
-    const femelles = somme('femelle')
+    const males = somme('M')
+    const femelles = somme('F')
 
     // Stade dominant : celui qui porte le plus gros effectif dans la phase.
     const parStade = new Map<string, number>()
@@ -302,7 +309,7 @@ export function buildCapturesSynthese(
       phaseLabel: humaniser(phase),
       males: males > 0 ? formatNombre(males) : TIRET,
       femelles: femelles > 0 ? formatNombre(femelles) : TIRET,
-      stade: stade === TIRET ? TIRET : stade.toUpperCase(),
+      stade: formatStade(stade === TIRET ? null : stade),
       methode: humaniser(pop?.methode),
       densite,
     }

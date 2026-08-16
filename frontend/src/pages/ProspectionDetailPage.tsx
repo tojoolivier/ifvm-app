@@ -39,6 +39,7 @@ import {
   type LigneCapture,
   type LigneFiche,
 } from '@/lib/prospection-fiche-maquette'
+import { shortId, useAnnuaire } from '@/lib/use-annuaire'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -47,6 +48,7 @@ import {
 type Population = PopulationRead & {
   phase?: string | null
   methode?: string | null
+  temps_capture?: number | null
 }
 type Capture = CaptureRead & { sexe?: string | null }
 /** La fiche de lecture exploite la spécialisation larve/imago, plus riche que `InfestationRead`. */
@@ -75,6 +77,7 @@ interface ProspectionDetail {
   surface_prospectee: number | null
   surface_infestee: number | null
   hauteur_herbe_cm: number | null
+  hauteur_strate: number | null
   verdissement_pourcent: number | null
   vegetation: Record<string, unknown> | null
   sol: Record<string, unknown> | null
@@ -110,10 +113,6 @@ interface CurrentUser {
   nom: string
   role: string
 }
-
-// ---------------------------------------------------------------------------
-// Constantes
-// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // Composants utilitaires
@@ -227,11 +226,6 @@ const captureColumns: DataTableColumn<LigneCapture>[] = [
     render: (l) => <span className="text-ifvm-green-text">{l.densite}</span>,
   },
 ]
-
-function shortId(id: string | null | undefined): string {
-  if (!id) return '—'
-  return id.slice(0, 8) + '…'
-}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString('fr-FR', {
@@ -355,17 +349,9 @@ export function ProspectionDetailPage() {
     queryFn: () => api.get('/campagnes').then((r) => r.data),
   })
 
-  // `/users/` est réservé aux admins : la piste de validation et l'en-tête
-  // retombent sur l'identifiant court quand la route est refusée.
-  const { data: utilisateurs = [] } = useQuery<CurrentUser[]>({
-    queryKey: ['users'],
-    queryFn: () => api.get('/users/').then((r) => r.data),
-    retry: false,
-  })
+  const { nomAgent } = useAnnuaire()
 
   const campagneName = campagnes.find((c) => c.id === prospection?.campagne_id)?.name
-  const nomAuteur = (auteurId: string) =>
-    utilisateurs.find((u) => u.id === auteurId)?.nom ?? shortId(auteurId)
 
   const mutation = useMutation({
     mutationFn: ({ statut, commentaire }: { statut: string; commentaire?: string }) =>
@@ -438,19 +424,25 @@ export function ProspectionDetailPage() {
   const larveRows = buildLarveRows(findLarve(prospection.infestations))
   const imagoRows = buildImagoRows(findImago(prospection.infestations))
   const capturesSynthese = buildCapturesSynthese(prospection.captures, prospection.populations)
-  const piste = buildPisteValidation(auditLog, prospection.statut, nomAuteur)
+  const piste = buildPisteValidation(auditLog, prospection.statut, nomAgent)
 
   // Bloc E : recouvrement total des strates du JSONB `vegetation` (ADR-006).
   const strates =
     (prospection.vegetation?.strates as Record<string, { recouvrement?: number }> | undefined) ?? {}
   const recouvrement = Object.values(strates).reduce((s, d) => s + (d?.recouvrement ?? 0), 0)
 
+  // Durée de comptage : `temps_capture` est saisi par population, en minutes.
+  const tempsCaptures = prospection.populations
+    .map((p) => p.temps_capture)
+    .filter((t): t is number => t != null)
+  const dureeComptage = tempsCaptures.length > 0 ? Math.max(...tempsCaptures) : null
+
   const sousTitre = [
     humaniser(prospection.type_prospection),
     prospection.commune,
     station ? `${station.code} ${station.nom}` : prospection.station_libre,
     prospection.date_prospection,
-    nomAuteur(prospection.prospecteur_id),
+    nomAgent(prospection.prospecteur_id),
   ]
     .filter(Boolean)
     .join(' · ')
@@ -564,11 +556,10 @@ export function ProspectionDetailPage() {
         {/* B · Captures agrégées par phase */}
         <Carte className="overflow-hidden">
           <div className="flex flex-wrap items-baseline gap-3 border-b border-[#f1ecdd] px-5 py-4">
-            <h2 className="font-sans text-[14px] font-bold">B · Captures par phase</h2>
+            <h2 className="font-sans text-[14px] font-bold">B · Captures — synthèse par phase</h2>
             <span className="font-sans text-[11px] font-medium text-ifvm-text-weak">
-              {capturesSynthese.lignes.length} phase
-              {capturesSynthese.lignes.length > 1 ? 's' : ''} relevée
-              {capturesSynthese.lignes.length > 1 ? 's' : ''}
+              Grille de comptage repliée en synthèse
+              {dureeComptage != null ? ` · durée ${formatNombre(dureeComptage)} min` : ''}
             </span>
             <span className="flex-1" />
             <span className="font-mono text-[12px] font-semibold text-ifvm-green-text">
@@ -598,16 +589,16 @@ export function ProspectionDetailPage() {
               }
             />
             <Tuile
-              label="Recouvrement"
-              value={recouvrement > 0 ? `${formatNombre(recouvrement)} %` : TIRET}
+              label="Strate arborée"
+              value={
+                prospection.hauteur_strate == null
+                  ? TIRET
+                  : `${formatNombre(prospection.hauteur_strate)} m`
+              }
             />
             <Tuile
-              label="Verdissement"
-              value={
-                prospection.verdissement_pourcent == null
-                  ? TIRET
-                  : `${formatNombre(prospection.verdissement_pourcent)} %`
-              }
+              label="Recouvrement"
+              value={recouvrement > 0 ? `${formatNombre(recouvrement)} %` : TIRET}
             />
             <Tuile
               label="Type de sol"
