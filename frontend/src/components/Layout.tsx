@@ -5,6 +5,20 @@ const baseNavItems = [
   { to: '/', label: 'Tableau de bord' },
 ]
 
+const ROLE_LABELS: Record<string, string> = {
+  admin: 'Admin',
+  chef: 'Chef',
+  verificateur: 'Vérificateur',
+  prospecteur: 'Prospecteur',
+  validation_finale: 'Validation finale',
+}
+
+function initiales(nom?: string, prenom?: string) {
+  const a = prenom?.trim()?.[0] ?? ''
+  const b = nom?.trim()?.[0] ?? ''
+  return (a + b).toUpperCase() || '?'
+}
+
 export function Layout() {
   const navigate = useNavigate()
   const { data: currentUser } = useCurrentUser()
@@ -48,30 +62,62 @@ export function Layout() {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <aside className="w-56 bg-green-800 text-white flex flex-col">
-        <div className="px-4 py-4 border-b border-green-700 flex justify-center">
-          <img src="/logo.png" alt="FVM Logo" className="h-20 w-20 rounded-full" />
+      <aside className="w-[236px] shrink-0 bg-[#235a36] text-white flex flex-col">
+        <div className="px-4 py-4 flex items-center gap-2.5">
+          <div className="h-[38px] w-[38px] shrink-0 rounded-[10px] bg-white flex items-center justify-center text-[#235a36] font-extrabold text-xs">
+            IFVM
+          </div>
+          <div className="min-w-0">
+            <p className="font-extrabold text-sm leading-tight truncate">IFVM · Supervision</p>
+            <p className="text-[10.5px] font-medium text-white/62 leading-tight truncate">
+              Lutte antiacridienne
+            </p>
+          </div>
         </div>
-        <nav className="flex-1 py-4 space-y-1 px-2">
+        <nav className="flex-1 py-2 space-y-1 px-2.5">
           {navItems.map(({ to, label }) => (
             <NavLink
               key={to}
               to={to}
               end={to === '/'}
               className={({ isActive }) =>
-                `block px-3 py-2 rounded text-sm ${isActive ? 'bg-green-600 font-semibold' : 'hover:bg-green-700'}`
+                `flex items-center gap-2.5 rounded-[8px] px-[11px] py-[9px] text-sm ${
+                  isActive
+                    ? 'bg-white/[.14] font-bold text-white'
+                    : 'font-medium text-white/72 hover:bg-white/10'
+                }`
               }
             >
-              {label}
+              {({ isActive }) => (
+                <>
+                  <span
+                    className={`h-[5px] w-[5px] shrink-0 rounded-full ${isActive ? 'bg-white' : 'bg-white/40'}`}
+                  />
+                  {label}
+                </>
+              )}
             </NavLink>
           ))}
         </nav>
-        <button
-          onClick={logout}
-          className="m-3 text-sm text-green-200 hover:text-white text-left px-3 py-2"
-        >
-          Déconnexion
-        </button>
+        <div className="m-3 flex items-center gap-2.5 border-t border-white/15 pt-3">
+          <div className="h-[26px] w-[26px] shrink-0 rounded-full bg-white/15 flex items-center justify-center text-[11px] font-bold">
+            {initiales(currentUser?.nom, currentUser?.prenom)}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold truncate">
+              {currentUser ? `${currentUser.prenom} ${currentUser.nom}` : '—'}
+            </p>
+            <p className="text-[10.5px] text-white/62 truncate">
+              {role ? ROLE_LABELS[role] ?? role : '—'}
+            </p>
+          </div>
+          <button
+            onClick={logout}
+            className="text-[10.5px] font-semibold text-white/72 hover:text-white shrink-0"
+          >
+            Quitter
+          </button>
+        </div>
       </aside>
       <main className="flex-1 overflow-auto">
         <Outlet />
