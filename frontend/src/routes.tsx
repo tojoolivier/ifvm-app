@@ -6,6 +6,7 @@ import { DashboardPage } from './pages/DashboardPage'
 import { CampagnesPage } from './pages/CampagnesPage'
 import { ProspectionsPage } from './pages/ProspectionsPage'
 import { TraitementsPage } from './pages/TraitementsPage'
+import { TraitementDetailPage } from './pages/TraitementDetailPage'
 import { NouvelleProspectionPage } from './pages/NouvelleProspectionPage'
 import { ProspectionDetailPage } from './pages/ProspectionDetailPage'
 import { SynthesesPage } from './pages/SynthesesPage'
@@ -52,6 +53,11 @@ export const routes: RouteObject[] = [
 
           // Gestion des traitements
           { path: '/traitements', element: <TraitementsPage />, handle: { title: 'Traitements' } },
+          {
+            path: '/traitements/:id',
+            element: <TraitementDetailPage />,
+            handle: { title: 'Fiche de traitement', parent: 'Traitements' },
+          },
 
           // Gestion des utilisateurs
           { path: '/users', element: <UsersPage />, handle: { title: 'Utilisateurs' } },
