@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import {
   buildFicheImprimable,
   isFicheValidee,
@@ -212,6 +213,22 @@ function ConfirmDialog({ action, onClose, onConfirm, isPending }: ConfirmDialogP
     </Dialog>
   )
 }
+
+const infestationColumns: DataTableColumn<Infestation>[] = [
+  { key: 'type_cible', header: 'Type de cible', render: (inf) => inf.type_cible },
+  {
+    key: 'surface_totale',
+    header: 'Surface totale (ha)',
+    align: 'right',
+    mono: true,
+    render: (inf) => inf.surface_totale ?? '—',
+  },
+  {
+    key: 'comportement',
+    header: 'Comportement',
+    render: (inf) => <span className="text-muted-foreground">{inf.comportement ?? '—'}</span>,
+  },
+]
 
 // ---------------------------------------------------------------------------
 // Page principale
@@ -495,24 +512,11 @@ export function ProspectionDetailPage() {
             <CardTitle className="text-base">Infestations ({prospection.infestations.length})</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <table className="w-full text-sm">
-              <thead className="border-b bg-muted/50">
-                <tr>
-                  <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Type de cible</th>
-                  <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground">Surface totale (ha)</th>
-                  <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Comportement</th>
-                </tr>
-              </thead>
-              <tbody>
-                {prospection.infestations.map((inf) => (
-                  <tr key={inf.id} className="border-b last:border-0">
-                    <td className="px-4 py-2">{inf.type_cible}</td>
-                    <td className="px-4 py-2 text-right">{inf.surface_totale ?? '—'}</td>
-                    <td className="px-4 py-2 text-muted-foreground">{inf.comportement ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              columns={infestationColumns}
+              rows={prospection.infestations}
+              getRowKey={(inf) => inf.id}
+            />
           </CardContent>
         </Card>
       )}
