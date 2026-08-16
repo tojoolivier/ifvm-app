@@ -37,6 +37,7 @@ export function TraitementsPage() {
 
   const filtreType = searchParams.get('type_traitement') ?? ''
   const filtreReprenable = searchParams.get('reprenable') ?? ''
+  const filtreProspectionId = searchParams.get('prospection_id') ?? ''
 
   function setFiltre(key: string, value: string) {
     setSearchParams((prev) => {
@@ -52,19 +53,20 @@ export function TraitementsPage() {
   }
 
   const { data: traitements = [], isLoading } = useQuery<Traitement[]>({
-    queryKey: ['traitements', filtreType, filtreReprenable],
+    queryKey: ['traitements', filtreType, filtreReprenable, filtreProspectionId],
     queryFn: () =>
       api
         .get('/traitements', {
           params: {
             type_traitement: filtreType || undefined,
             reprenable: filtreReprenable || undefined,
+            prospection_id: filtreProspectionId || undefined,
           },
         })
         .then((r) => r.data),
   })
 
-  const hasFiltres = filtreType || filtreReprenable
+  const hasFiltres = filtreType || filtreReprenable || filtreProspectionId
 
   const columns: DataTableColumn<Traitement>[] = useMemo(
     () => [
@@ -130,6 +132,15 @@ export function TraitementsPage() {
               </SelectContent>
             </Select>
           </div>
+
+          {filtreProspectionId && (
+            <div className="flex flex-col gap-2">
+              <Label>Prospection</Label>
+              <span className="inline-flex items-center h-9 px-3 rounded-md bg-muted text-sm font-mono">
+                {filtreProspectionId}
+              </span>
+            </div>
+          )}
 
           {hasFiltres && (
             <Button variant="ghost" size="sm" className="self-end" onClick={resetFiltres}>
