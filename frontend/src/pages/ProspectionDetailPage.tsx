@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import {
@@ -14,7 +13,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
-import { StatusBadge } from '@/components/ui/status-badge'
+import { STATUT_LABELS, type Statut } from '@/components/ui/status-badge'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import {
   buildFicheImprimable,
@@ -23,14 +22,35 @@ import {
   type InfestationRead,
   type PopulationRead,
 } from '@/lib/prospection-fiche-lecture'
+import {
+  buildCapturesSynthese,
+  buildImagoRows,
+  buildInfestationRows,
+  buildLarveRows,
+  buildPisteValidation,
+  buildReferenceRows,
+  findImago,
+  findLarve,
+  formatNombre,
+  humaniser,
+  NUMERO_FICHE,
+  TIRET,
+  type InfestationFiche,
+  type LigneCapture,
+  type LigneFiche,
+} from '@/lib/prospection-fiche-maquette'
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type Population = PopulationRead
-type Capture = CaptureRead
-type Infestation = InfestationRead
+type Population = PopulationRead & {
+  phase?: string | null
+  methode?: string | null
+}
+type Capture = CaptureRead & { sexe?: string | null }
+/** La fiche de lecture exploite la spécialisation larve/imago, plus riche que `InfestationRead`. */
+type Infestation = InfestationRead & InfestationFiche
 
 interface ProspectionDetail {
   id: string
@@ -46,9 +66,16 @@ interface ProspectionDetail {
   created_at: string
   latitude: number | null
   longitude: number | null
+  altitude: number | null
+  region: string | null
+  district: string | null
+  commune: string | null
+  station_libre: string | null
   surface_station: number | null
   surface_prospectee: number | null
   surface_infestee: number | null
+  hauteur_herbe_cm: number | null
+  verdissement_pourcent: number | null
   vegetation: Record<string, unknown> | null
   sol: Record<string, unknown> | null
   degats_cultures: string | null
@@ -88,31 +115,15 @@ interface CurrentUser {
 // Constantes
 // ---------------------------------------------------------------------------
 
-const ACTION_LABELS: Record<string, string> = {
-  creation: 'Création',
-  soumission: 'Soumission',
-  verification: 'Vérification',
-  validation: 'Validation',
-  rejet: 'Rejet',
-  modification: 'Modification',
-  commentaire: 'Commentaire',
-}
-
 // ---------------------------------------------------------------------------
 // Composants utilitaires
 // ---------------------------------------------------------------------------
 
-function SyncBadge({ statut_sync }: { statut_sync: string }) {
-  const synced = statut_sync === 'synced'
+/** Pilule de l'en-tête vert (maquette : `rgba(255,255,255,.16)` sur fond `#235a36`). */
+function HeaderPill({ children }: { children: React.ReactNode }) {
   return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium',
-        synced ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700',
-      )}
-    >
-      <span className={cn('w-1.5 h-1.5 rounded-full', synced ? 'bg-green-500' : 'bg-amber-500')} />
-      {synced ? 'Synchronisé' : 'Non synchronisé'}
+    <span className="rounded-full bg-white/[.16] px-3 py-[6px] font-sans text-[11px] font-bold">
+      {children}
     </span>
   )
 }
@@ -125,6 +136,97 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
     </div>
   )
 }
+
+/** Carte blanche du handoff : rayon 11px, bordure `#e7e0cd`. */
+function Carte({ className, children }: { className?: string; children: React.ReactNode }) {
+  return (
+    <section className={cn('rounded-[11px] border border-[#e7e0cd] bg-card', className)}>
+      {children}
+    </section>
+  )
+}
+
+/** Sur-titre de bloc : `600 9.5px` uppercase, interlettrage 1px. */
+function BlocLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[1px] text-ifvm-text-weak">
+      {children}
+    </span>
+  )
+}
+
+/** Ligne clé/valeur des blocs A et D : libellé sur 132px, valeur en mono. */
+function LigneCle({ ligne }: { ligne: LigneFiche }) {
+  return (
+    <div className="flex items-baseline gap-[10px]">
+      <span className="w-[132px] shrink-0 font-sans text-[11.5px] font-medium text-ifvm-text-tertiary">
+        {ligne.k}
+      </span>
+      <span
+        className={cn(
+          'font-mono text-[12px] font-semibold',
+          ligne.muted ? 'text-[#bdb6a2]' : 'text-foreground',
+        )}
+      >
+        {ligne.v}
+      </span>
+    </div>
+  )
+}
+
+/** Cellule des cartes larve / imago : libellé fin au-dessus, valeur mono en gras. */
+function CelluleSpecialisation({ ligne }: { ligne: LigneFiche }) {
+  return (
+    <div>
+      <div className="font-sans text-[10px] font-medium text-ifvm-text-weak">{ligne.k}</div>
+      <div
+        className={cn(
+          'font-mono text-[12.5px] font-bold',
+          ligne.muted ? 'text-[#bdb6a2]' : 'text-foreground',
+        )}
+      >
+        {ligne.v}
+      </div>
+    </div>
+  )
+}
+
+/** Tuile de statistique du bloc E (fond `#faf7ef`, rayon 9px). */
+function Tuile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[9px] bg-background px-[14px] py-3">
+      <div className="font-sans text-[10.5px] font-medium text-ifvm-text-weak">{label}</div>
+      <div className="font-mono text-[17px] font-bold text-foreground">{value}</div>
+    </div>
+  )
+}
+
+const captureColumns: DataTableColumn<LigneCapture>[] = [
+  {
+    key: 'phase',
+    header: 'Phase',
+    render: (l) => <span className="font-semibold">{l.phaseLabel}</span>,
+  },
+  { key: 'males', header: 'Mâles', align: 'right', mono: true, render: (l) => l.males },
+  { key: 'femelles', header: 'Femelles', align: 'right', mono: true, render: (l) => l.femelles },
+  {
+    key: 'stade',
+    header: 'Stade dominant',
+    render: (l) => <span className="text-ifvm-text-tertiary">{l.stade}</span>,
+  },
+  {
+    key: 'methode',
+    header: 'Méthode',
+    render: (l) => <span className="text-ifvm-text-tertiary">{l.methode}</span>,
+  },
+  {
+    key: 'densite',
+    header: 'Densité (ind/ha)',
+    align: 'right',
+    mono: true,
+    render: (l) => <span className="text-ifvm-green-text">{l.densite}</span>,
+  },
+]
 
 function shortId(id: string | null | undefined): string {
   if (!id) return '—'
@@ -213,47 +315,6 @@ function ConfirmDialog({ action, onClose, onConfirm, isPending }: ConfirmDialogP
   )
 }
 
-const infestationColumns: DataTableColumn<Infestation>[] = [
-  { key: 'type_cible', header: 'Type de cible', render: (inf) => inf.type_cible },
-  {
-    key: 'surface_totale',
-    header: 'Surface totale (ha)',
-    align: 'right',
-    mono: true,
-    render: (inf) => inf.surface_totale ?? '—',
-  },
-  {
-    key: 'comportement',
-    header: 'Comportement',
-    render: (inf) => <span className="text-muted-foreground">{inf.comportement ?? '—'}</span>,
-  },
-]
-
-const populationColumns: DataTableColumn<Population>[] = [
-  { key: 'espece', header: 'Espèce', render: (pop) => <span className="font-medium">{pop.espece}</span> },
-  { key: 'categorie', header: 'Catégorie', render: (pop) => <span className="capitalize">{pop.categorie}</span> },
-  {
-    key: 'densite_diffuse',
-    header: 'Densité diffuse /ha',
-    align: 'right',
-    render: (pop) => pop.densite_diffuse ?? '—',
-  },
-  {
-    key: 'densite_groupee',
-    header: 'Densité groupée /ha',
-    align: 'right',
-    render: (pop) => pop.densite_groupee ?? '—',
-  },
-]
-
-const captureColumns: DataTableColumn<Capture>[] = [
-  { key: 'espece', header: 'Espèce', render: (cap) => <span className="font-medium">{cap.espece}</span> },
-  { key: 'categorie', header: 'Catégorie', render: (cap) => <span className="capitalize">{cap.categorie}</span> },
-  { key: 'stade', header: 'Stade', render: (cap) => cap.stade },
-  { key: 'phase', header: 'Phase', render: (cap) => cap.phase },
-  { key: 'effectif', header: 'Effectif', align: 'right', render: (cap) => cap.effectif },
-]
-
 // ---------------------------------------------------------------------------
 // Page principale
 // ---------------------------------------------------------------------------
@@ -294,7 +355,17 @@ export function ProspectionDetailPage() {
     queryFn: () => api.get('/campagnes').then((r) => r.data),
   })
 
+  // `/users/` est réservé aux admins : la piste de validation et l'en-tête
+  // retombent sur l'identifiant court quand la route est refusée.
+  const { data: utilisateurs = [] } = useQuery<CurrentUser[]>({
+    queryKey: ['users'],
+    queryFn: () => api.get('/users/').then((r) => r.data),
+    retry: false,
+  })
+
   const campagneName = campagnes.find((c) => c.id === prospection?.campagne_id)?.name
+  const nomAuteur = (auteurId: string) =>
+    utilisateurs.find((u) => u.id === auteurId)?.nom ?? shortId(auteurId)
 
   const mutation = useMutation({
     mutationFn: ({ statut, commentaire }: { statut: string; commentaire?: string }) =>
@@ -355,228 +426,275 @@ export function ProspectionDetailPage() {
     )
   }
 
+  const referenceRows = buildReferenceRows(
+    prospection,
+    station ? { code: station.code, nom: station.nom } : null,
+  )
+  const infestationRows = buildInfestationRows(
+    prospection,
+    prospection.infestations,
+    prospection.populations,
+  )
+  const larveRows = buildLarveRows(findLarve(prospection.infestations))
+  const imagoRows = buildImagoRows(findImago(prospection.infestations))
+  const capturesSynthese = buildCapturesSynthese(prospection.captures, prospection.populations)
+  const piste = buildPisteValidation(auditLog, prospection.statut, nomAuteur)
+
+  // Bloc E : recouvrement total des strates du JSONB `vegetation` (ADR-006).
+  const strates =
+    (prospection.vegetation?.strates as Record<string, { recouvrement?: number }> | undefined) ?? {}
+  const recouvrement = Object.values(strates).reduce((s, d) => s + (d?.recouvrement ?? 0), 0)
+
+  const sousTitre = [
+    humaniser(prospection.type_prospection),
+    prospection.commune,
+    station ? `${station.code} ${station.nom}` : prospection.station_libre,
+    prospection.date_prospection,
+    nomAuteur(prospection.prospecteur_id),
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
   return (
-    <div className="px-8 py-6 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="mb-2 -ml-2 text-muted-foreground"
-            onClick={() => navigate('/prospections')}
-          >
-            ← Retour
-          </Button>
-          <h1 className="text-2xl font-bold">
-            Fiche intensive{prospection.n_fiche ? ` n° ${prospection.n_fiche}` : ''}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Créée le {formatDate(prospection.created_at)}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 mt-1">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate(`/traitements?prospection_id=${prospection.id}`)}
-          >
-            Voir les traitements
-          </Button>
+    // Grille de la maquette : 1fr (fiche) / 316px (piste de validation + actions).
+    <div className="grid grid-cols-1 items-start gap-5 px-7 pb-10 pt-[26px] lg:grid-cols-[1fr_316px]">
+      <div className="flex min-w-0 flex-col gap-4">
+        {/* En-tête vert de la maquette */}
+        <header className="flex items-center gap-5 rounded-[12px] bg-ifvm-green-text px-[22px] py-5 text-white">
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate font-mono text-[17px] font-bold tracking-[.4px]">
+              {NUMERO_FICHE(prospection)}
+            </h1>
+            <p className="mt-1 font-sans text-[12px] font-medium text-white/75">{sousTitre}</p>
+          </div>
+          <HeaderPill>{STATUT_LABELS[prospection.statut as Statut] ?? prospection.statut}</HeaderPill>
+          {prospection.statut_sync !== 'synced' && <HeaderPill>Non synchronisée</HeaderPill>}
           {ficheValidee && (
-            <Button variant="outline" size="sm" onClick={() => setShowPrintView(true)}>
-              Exporter en PDF
-            </Button>
+            <button
+              type="button"
+              onClick={() => setShowPrintView(true)}
+              className="shrink-0 rounded-[9px] bg-white px-[14px] py-[9px] font-sans text-[11.5px] font-bold text-ifvm-green-text"
+            >
+              Imprimer A4
+            </button>
           )}
-          <SyncBadge statut_sync={prospection.statut_sync} />
-          <StatusBadge statut={prospection.statut} />
+        </header>
+
+        {/* Bandeau ambre — avertissements de la fiche (#106) */}
+        {prospection.avertissements.length > 0 && (
+          <div className="flex flex-col gap-[7px] rounded-[10px] border border-ifvm-amber-border bg-ifvm-amber-bg px-4 py-[13px]">
+            <p className="font-sans text-[11.5px] font-bold text-ifvm-amber-text">
+              Avertissements de la fiche · {prospection.avertissements.length}
+            </p>
+            <ul className="flex flex-col gap-[7px]">
+              {prospection.avertissements.map((avertissement, index) => (
+                <li
+                  key={index}
+                  className="font-sans text-[11.5px] font-medium leading-[1.45] text-ifvm-amber-text"
+                >
+                  {avertissement}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* D · Infestation — spécialisation larve / imago (tables distinctes) */}
+        <Carte className="px-5 py-[18px]">
+          <div className="mb-3 flex items-baseline gap-[10px]">
+            <BlocLabel>D · Infestation — spécialisation</BlocLabel>
+            <span className="font-sans text-[10.5px] font-medium text-ifvm-text-weak">
+              tables imago / larve distinctes
+            </span>
+          </div>
+          <div className="grid grid-cols-1 gap-[14px] md:grid-cols-2">
+            <div className="overflow-hidden rounded-[10px] border border-ifvm-danger-border">
+              <div className="bg-ifvm-danger-bg px-3 py-2 font-sans text-[11px] font-bold text-ifvm-danger-text">
+                Larve · bande larvaire
+              </div>
+              <div className="grid grid-cols-2 gap-x-[14px] gap-y-[9px] p-3">
+                {larveRows.map((l) => (
+                  <CelluleSpecialisation key={l.k} ligne={l} />
+                ))}
+              </div>
+            </div>
+            <div className="overflow-hidden rounded-[10px] border border-[#e7e0cd]">
+              <div className="bg-background px-3 py-2 font-sans text-[11px] font-bold text-ifvm-text-tertiary">
+                Imago · vol clair
+              </div>
+              <div className="grid grid-cols-2 gap-x-[14px] gap-y-[9px] p-3">
+                {imagoRows.map((l) => (
+                  <CelluleSpecialisation key={l.k} ligne={l} />
+                ))}
+              </div>
+            </div>
+          </div>
+        </Carte>
+
+        {/* A · Référence & localisation | D · Infestation */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Carte className="px-5 py-[18px]">
+            <div className="mb-3">
+              <BlocLabel>A · Référence &amp; localisation</BlocLabel>
+            </div>
+            <div className="flex flex-col gap-[9px]">
+              {referenceRows.map((l) => (
+                <LigneCle key={l.k} ligne={l} />
+              ))}
+              <LigneCle
+                ligne={{
+                  k: 'Campagne',
+                  v: campagneName ?? shortId(prospection.campagne_id),
+                }}
+              />
+            </div>
+          </Carte>
+          <Carte className="px-5 py-[18px]">
+            <div className="mb-3">
+              <BlocLabel>D · Infestation</BlocLabel>
+            </div>
+            <div className="flex flex-col gap-[9px]">
+              {infestationRows.map((l) => (
+                <LigneCle key={l.k} ligne={l} />
+              ))}
+            </div>
+          </Carte>
         </div>
+
+        {/* B · Captures agrégées par phase */}
+        <Carte className="overflow-hidden">
+          <div className="flex flex-wrap items-baseline gap-3 border-b border-[#f1ecdd] px-5 py-4">
+            <h2 className="font-sans text-[14px] font-bold">B · Captures par phase</h2>
+            <span className="font-sans text-[11px] font-medium text-ifvm-text-weak">
+              {capturesSynthese.lignes.length} phase
+              {capturesSynthese.lignes.length > 1 ? 's' : ''} relevée
+              {capturesSynthese.lignes.length > 1 ? 's' : ''}
+            </span>
+            <span className="flex-1" />
+            <span className="font-mono text-[12px] font-semibold text-ifvm-green-text">
+              Total {formatNombre(capturesSynthese.total)}
+            </span>
+          </div>
+          <DataTable
+            columns={captureColumns}
+            rows={capturesSynthese.lignes}
+            getRowKey={(l) => l.phase}
+            emptyMessage="Aucune capture enregistrée."
+          />
+        </Carte>
+
+        {/* E · Végétation & sol */}
+        <Carte className="px-5 py-[18px]">
+          <div className="mb-3">
+            <BlocLabel>E · Végétation &amp; sol</BlocLabel>
+          </div>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <Tuile
+              label="Strate herbeuse"
+              value={
+                prospection.hauteur_herbe_cm == null
+                  ? TIRET
+                  : `${formatNombre(prospection.hauteur_herbe_cm / 100)} m`
+              }
+            />
+            <Tuile
+              label="Recouvrement"
+              value={recouvrement > 0 ? `${formatNombre(recouvrement)} %` : TIRET}
+            />
+            <Tuile
+              label="Verdissement"
+              value={
+                prospection.verdissement_pourcent == null
+                  ? TIRET
+                  : `${formatNombre(prospection.verdissement_pourcent)} %`
+              }
+            />
+            <Tuile
+              label="Type de sol"
+              value={humaniser(prospection.sol?.texture as string | undefined)}
+            />
+          </div>
+        </Carte>
       </div>
 
-      {/* Grille fiche de lecture : 1fr (contenu) / 316px (piste de validation + actions) */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_316px] gap-4 items-start">
-        <div className="min-w-0">
-          {/* Avertissements — fiche à vérifier (#106) */}
-          {prospection.avertissements.length > 0 && (
-            <Card className="mb-4 border-amber-200 bg-amber-50">
-              <CardHeader>
-                <CardTitle className="text-base text-amber-800">
-                  À vérifier ({prospection.avertissements.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="list-disc pl-5 space-y-1 text-sm text-amber-800">
-                  {prospection.avertissements.map((avertissement, index) => (
-                    <li key={index}>{avertissement}</li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
+      <aside className="flex min-w-0 flex-col gap-[14px]">
+        {/* Piste de validation — chronologie du plus ancien au plus récent */}
+        <Carte className="px-5 py-[18px]">
+          <h2 className="mb-3 font-sans text-[13px] font-bold">Piste de validation</h2>
+          {piste.length === 0 ? (
+            <p className="font-sans text-[11.5px] text-ifvm-text-weak">
+              Aucun historique disponible.
+            </p>
+          ) : (
+            <ol className="flex flex-col">
+              {piste.map((etape, i) => (
+                <li key={etape.id} className="flex gap-[11px]">
+                  <div className="flex w-[14px] flex-col items-center">
+                    <span
+                      className="mt-[3px] h-[10px] w-[10px] shrink-0 rounded-full"
+                      style={{ background: etape.dot }}
+                    />
+                    {i < piste.length - 1 && <span className="w-[2px] flex-1 bg-[#f1ecdd]" />}
+                  </div>
+                  <div className="min-w-0 pb-[14px]">
+                    <div className="font-sans text-[12px] font-bold text-foreground">
+                      {etape.label}
+                    </div>
+                    <div className="font-sans text-[11px] font-medium text-ifvm-text-tertiary">
+                      {etape.who}
+                    </div>
+                    <div className="font-mono text-[10.5px] font-medium text-ifvm-text-weak">
+                      {etape.when === TIRET ? TIRET : formatDate(etape.when)}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ol>
           )}
+        </Carte>
 
-          {/* Informations générales */}
-          <Card className="mb-4">
-            <CardHeader>
-              <CardTitle className="text-base">Informations générales</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                <Field label="Date de prospection" value={prospection.date_prospection} />
-                <Field label="Campagne" value={campagneName ?? shortId(prospection.campagne_id)} />
-                <Field label="Prospecteur" value={shortId(prospection.prospecteur_id)} />
-                {prospection.n_fiche && <Field label="N° fiche" value={prospection.n_fiche} />}
-                {prospection.n_releve && <Field label="N° relevé" value={prospection.n_releve} />}
-              </dl>
-            </CardContent>
-          </Card>
-
-          {/* Station */}
-          <Card className="mb-4">
-            <CardHeader>
-              <CardTitle className="text-base">Station</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {station ? (
-                <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  <Field label="Nom" value={station.nom} />
-                  <Field label="Point d'appui" value={station.pa_nom} />
-                  <Field label="Latitude" value={station.latitude?.toFixed(6)} />
-                  <Field label="Longitude" value={station.longitude?.toFixed(6)} />
-                  {station.altitude != null && (
-                    <Field label="Altitude (m)" value={station.altitude} />
-                  )}
-                </dl>
-              ) : prospection.station_id ? (
-                <p className="text-sm text-muted-foreground">Chargement de la station…</p>
-              ) : (
-                <p className="text-sm text-muted-foreground">Aucune station associée.</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Populations */}
-          {prospection.populations.length > 0 && (
-            <Card className="mb-4">
-              <CardHeader>
-                <CardTitle className="text-base">Populations ({prospection.populations.length})</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <DataTable
-                  columns={populationColumns}
-                  rows={prospection.populations}
-                  getRowKey={(pop) => pop.id}
-                />
-              </CardContent>
-            </Card>
+        {/* Actions — gating de rôle inchangé */}
+        <Carte className="flex flex-col gap-[9px] px-5 py-[18px]">
+          <h2 className="font-sans text-[13px] font-bold">Actions</h2>
+          {canVerifier && (
+            <button
+              type="button"
+              onClick={() => setActiveAction('verifier')}
+              className="rounded-[9px] bg-ifvm-green-text py-[11px] text-center font-sans text-[12px] font-bold text-white"
+            >
+              Vérifier la fiche
+            </button>
           )}
-
-          {/* Captures */}
-          {prospection.captures.length > 0 && (
-            <Card className="mb-4">
-              <CardHeader>
-                <CardTitle className="text-base">Captures ({prospection.captures.length})</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <DataTable
-                  columns={captureColumns}
-                  rows={prospection.captures}
-                  getRowKey={(cap) => cap.id}
-                />
-              </CardContent>
-            </Card>
+          {canValiderOuRejeter && (
+            <>
+              <button
+                type="button"
+                onClick={() => setActiveAction('valider')}
+                className="rounded-[9px] bg-ifvm-green-text py-[11px] text-center font-sans text-[12px] font-bold text-white"
+              >
+                Valider la fiche
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveAction('rejeter')}
+                className="rounded-[9px] border border-ifvm-danger-border bg-ifvm-danger-bg py-[11px] text-center font-sans text-[12px] font-bold text-ifvm-danger-text"
+              >
+                Rejeter avec motif
+              </button>
+            </>
           )}
-
-          {/* Infestations */}
-          {prospection.infestations.length > 0 && (
-            <Card className="mb-4">
-              <CardHeader>
-                <CardTitle className="text-base">Infestations ({prospection.infestations.length})</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <DataTable
-                  columns={infestationColumns}
-                  rows={prospection.infestations}
-                  getRowKey={(inf) => inf.id}
-                />
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        <div className="min-w-0">
-          {/* Actions — piste de validation */}
-          {(canVerifier || canValiderOuRejeter) && (
-            <Card className="mb-4 border-primary/20 bg-primary/5">
-              <CardContent className="p-4 space-y-2">
-                <p className="text-sm font-medium">
-                  {canVerifier ? 'Cette fiche est en attente de vérification.' : 'Cette fiche est en attente de validation.'}
-                </p>
-                <div className="flex flex-col gap-2">
-                  {canVerifier && (
-                    <Button onClick={() => setActiveAction('verifier')}>Vérifier</Button>
-                  )}
-                  {canValiderOuRejeter && (
-                    <>
-                      <Button onClick={() => setActiveAction('valider')}>Valider</Button>
-                      <Button variant="outline" onClick={() => setActiveAction('rejeter')}>
-                        Rejeter
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Audit log */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Historique</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {auditLogSorted.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Aucun historique disponible.</p>
-              ) : (
-                <ol className="space-y-4">
-                  {auditLogSorted.map((entry, i) => (
-                    <li key={entry.id} className="flex gap-3">
-                      <div className="flex flex-col items-center">
-                        <div className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />
-                        {i < auditLogSorted.length - 1 && (
-                          <div className="w-px flex-1 bg-border mt-1" />
-                        )}
-                      </div>
-                      <div className="pb-4 min-w-0">
-                        <div className="flex items-baseline gap-2 flex-wrap">
-                          <span className="text-sm font-medium">
-                            {ACTION_LABELS[entry.action] ?? entry.action}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {formatDate(entry.created_at)}
-                          </span>
-                          <span className="font-mono text-xs text-muted-foreground">
-                            par {shortId(entry.auteur_id)}
-                          </span>
-                        </div>
-                        {entry.details && Object.keys(entry.details).length > 0 && (
-                          <dl className="mt-1 space-y-0.5">
-                            {Object.entries(entry.details).map(([k, v]) => (
-                              <div key={k} className="text-xs text-muted-foreground">
-                                <span className="font-medium">{k} :</span>{' '}
-                                {typeof v === 'object' ? JSON.stringify(v) : String(v)}
-                              </div>
-                            ))}
-                          </dl>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+          <button
+            type="button"
+            onClick={() => navigate(`/traitements?prospection_id=${prospection.id}`)}
+            className="rounded-[9px] border border-[#e0d9c4] bg-card py-[11px] text-center font-sans text-[12px] font-semibold text-[#3a3a30]"
+          >
+            Créer une fiche de traitement
+          </button>
+          <p className="mt-[2px] font-sans text-[10.5px] font-medium leading-[1.5] text-ifvm-text-weak">
+            La création de traitement fige un <b>snapshot des cibles</b> depuis cette fiche.
+          </p>
+        </Carte>
+      </aside>
 
       {/* Modale de confirmation */}
       {activeAction && (
