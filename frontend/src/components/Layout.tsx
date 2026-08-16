@@ -1,11 +1,42 @@
 import { Outlet, NavLink, useNavigate, useMatches } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useCurrentUser } from '../hooks/useCurrentUser'
+import { api } from '../api/client'
 
 type RouteHandle = { title?: string; parent?: string }
+
+type Campagne = { id: string; name: string; start_date: string; end_date: string | null }
 
 const baseNavItems = [
   { to: '/', label: 'Tableau de bord' },
 ]
+
+// Nombre d'entités du référentiel admin (docs/design_handoff_web/README.md §11) —
+// fixe (types d'entités), pas un total d'enregistrements côté API.
+const NB_REFERENTIELS = 7
+
+// Campagne n'a pas de champ `active` côté backend (#121) : dérivée par date tant
+// que le backend n'expose pas ce concept. En cas de chevauchement, la plus récente gagne.
+function campagneActive(campagnes: Campagne[]): Campagne | undefined {
+  const today = new Date().toISOString().slice(0, 10)
+  return campagnes
+    .filter((c) => c.start_date <= today && (!c.end_date || c.end_date >= today))
+    .sort((a, b) => (a.start_date < b.start_date ? 1 : -1))[0]
+}
+
+function useCount(
+  key: (string | undefined)[],
+  url: string,
+  params: Record<string, string> | undefined,
+  enabled: boolean,
+) {
+  const { data = [] } = useQuery<unknown[]>({
+    queryKey: key,
+    queryFn: () => api.get(url, { params }).then((r) => r.data),
+    enabled,
+  })
+  return data.length
+}
 
 const ROLE_LABELS: Record<string, string> = {
   admin: 'Admin',
@@ -39,32 +70,50 @@ export function Layout() {
 
   const role = currentUser?.role || localStorage.getItem('user_role')
 
-  const navItems = [
+  const canAdminChef = role === 'admin' || role === 'chef'
+  const canProspections = canAdminChef || role === 'verificateur' || role === 'prospecteur'
+  const canTraitements = canAdminChef || role === 'verificateur'
+  const canValidationFinale = role === 'validation_finale'
+
+  const { data: campagnes = [] } = useQuery<Campagne[]>({
+    queryKey: ['campagnes'],
+    queryFn: () => api.get('/campagnes').then((r) => r.data),
+    enabled: canAdminChef,
+  })
+  const nbProspections = useCount(['prospections', 'intensive'], '/prospections', { type: 'intensive' }, canProspections)
+  const nbVerifiees = useCount(['prospections', 'verifiee'], '/prospections', { statut: 'verifiee' }, canValidationFinale)
+  const nbEnAttente = useCount(['prospections', 'en_attente'], '/prospections', { statut: 'en_attente' }, !!role)
+  const nbTraitements = useCount(['traitements'], '/traitements', undefined, canTraitements)
+  const nbUsers = useCount(['users'], '/users/', undefined, role === 'admin')
+
+  const campagne = campagneActive(campagnes)
+
+  const navItems: { to: string; label: string; count?: number }[] = [
     ...baseNavItems,
-    ...(role === 'admin' || role === 'chef'
+    ...(canAdminChef
       ? [
-          { to: '/campagnes', label: 'Campagnes' },
-          { to: '/prospections', label: 'Prospections' },
+          { to: '/campagnes', label: 'Campagnes', count: campagnes.length },
+          { to: '/prospections', label: 'Prospections', count: nbProspections },
           { to: '/carte', label: 'Carte des infestations' },
           { to: '/syntheses', label: 'Synthèses & export' },
-          { to: '/administration', label: 'Administration' },
-          { to: '/referentiels', label: 'Référentiels' },
+          { to: '/administration', label: 'Administration', count: role === 'admin' ? nbUsers : undefined },
+          { to: '/referentiels', label: 'Référentiels', count: NB_REFERENTIELS },
         ]
       : []),
     ...(role === 'verificateur' || role === 'prospecteur'
       ? [
-          { to: '/prospections', label: 'Prospections' },
+          { to: '/prospections', label: 'Prospections', count: nbProspections },
           { to: '/carte', label: 'Carte des infestations' },
         ]
       : []),
     ...(role === 'validation_finale'
       ? [
-          { to: '/validation-finale', label: 'Validation finale' },
+          { to: '/validation-finale', label: 'Validation finale', count: nbVerifiees },
           { to: '/carte', label: 'Carte des infestations' },
         ]
       : []),
-    ...(role === 'admin' || role === 'chef' || role === 'verificateur'
-      ? [{ to: '/traitements', label: 'Traitements' }]
+    ...(canTraitements
+      ? [{ to: '/traitements', label: 'Traitements', count: nbTraitements }]
       : []),
   ]
 
@@ -72,8 +121,8 @@ export function Layout() {
     <div className="flex h-screen bg-gray-50">
       <aside className="w-[236px] shrink-0 bg-[#235a36] text-white flex flex-col">
         <div className="px-4 py-4 flex items-center gap-2.5">
-          <div className="h-[38px] w-[38px] shrink-0 rounded-[10px] bg-white flex items-center justify-center text-[#235a36] font-extrabold text-xs">
-            IFVM
+          <div className="h-[38px] w-[38px] shrink-0 rounded-[10px] bg-white flex items-center justify-center overflow-hidden">
+            <img src="/logo.png" alt="IFVM" className="h-full w-full object-cover" />
           </div>
           <div className="min-w-0">
             <p className="font-extrabold text-sm leading-tight truncate">IFVM · Supervision</p>
@@ -83,7 +132,7 @@ export function Layout() {
           </div>
         </div>
         <nav className="flex-1 py-2 space-y-1 px-2.5">
-          {navItems.map(({ to, label }) => (
+          {navItems.map(({ to, label, count }) => (
             <NavLink
               key={to}
               to={to}
@@ -101,7 +150,12 @@ export function Layout() {
                   <span
                     className={`h-[5px] w-[5px] shrink-0 rounded-full ${isActive ? 'bg-white' : 'bg-white/40'}`}
                   />
-                  {label}
+                  <span className="flex-1 truncate">{label}</span>
+                  {count !== undefined && (
+                    <span className="font-mono text-[10px] font-semibold text-white/72">
+                      {count}
+                    </span>
+                  )}
                 </>
               )}
             </NavLink>
@@ -128,12 +182,25 @@ export function Layout() {
         </div>
       </aside>
       <main className="flex-1 overflow-auto flex flex-col">
-        <header className="h-[66px] shrink-0 flex items-center px-6 bg-[#fffdf8] border-b border-[#e7e0cd]">
+        <header className="h-[66px] shrink-0 flex items-center justify-between gap-4 px-6 bg-[#fffdf8] border-b border-[#e7e0cd]">
           <div className="min-w-0">
             <p className="text-[10.5px] font-semibold text-gray-500 truncate">
               {handle?.parent ? `${handle.parent} / ${title}` : title || 'IFVM'}
             </p>
             <p className="text-base font-bold text-gray-900 truncate">{title}</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {campagne && (
+              <span className="rounded-[20px] bg-ifvm-green-bg border border-ifvm-green-border px-[9px] py-[3px] text-[10.5px] font-semibold text-ifvm-green-text truncate max-w-[220px]">
+                {campagne.name}
+              </span>
+            )}
+            {nbEnAttente > 0 && (
+              <span className="flex items-center gap-1.5 rounded-[20px] bg-ifvm-amber-bg border border-ifvm-amber-border px-[9px] py-[3px] text-[10.5px] font-semibold text-ifvm-amber-text">
+                <span className="h-[6px] w-[6px] shrink-0 rounded-full bg-ifvm-amber" />
+                {nbEnAttente} fiches en attente
+              </span>
+            )}
           </div>
         </header>
         <div className="flex-1 overflow-auto">
