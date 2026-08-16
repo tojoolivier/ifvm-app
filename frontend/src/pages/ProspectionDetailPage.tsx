@@ -302,7 +302,10 @@ export function ProspectionDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['prospection', id] })
       queryClient.invalidateQueries({ queryKey: ['prospection-audit', id] })
-      queryClient.invalidateQueries({ queryKey: ['prospections', 'intensive'] })
+      // Préfixe volontairement court : invalide à la fois la liste complète
+      // (`['prospections']`, écran Prospections) et les vues filtrées
+      // `['prospections', 'intensive']` du dashboard, de la carte et des synthèses.
+      queryClient.invalidateQueries({ queryKey: ['prospections'] })
       setActiveAction(null)
     },
   })
