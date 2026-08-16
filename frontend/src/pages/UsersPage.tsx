@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AxiosError } from 'axios'
 import { api } from '../api/client'
 import { Utilisateur } from '../types'
+import { DataTable, DataTableColumn } from '../components/ui/data-table'
 
 const ROLES = [
   'prospecteur',
@@ -83,6 +84,61 @@ export function UsersPage() {
     createMutation.mutate({ nom, prenom, email, password, role })
   }
 
+  const columns: DataTableColumn<Utilisateur>[] = [
+    {
+      key: 'nom',
+      header: 'Nom',
+      render: (u) => `${u.prenom} ${u.nom}`,
+    },
+    {
+      key: 'email',
+      header: 'Email',
+      render: (u) => <span className="text-gray-600">{u.email}</span>,
+    },
+    {
+      key: 'role',
+      header: 'Rôle',
+      render: (u) => (
+        <select
+          value={u.role}
+          disabled={updateMutation.isPending}
+          onChange={(e) => updateMutation.mutate({ id: u.id, role: e.target.value })}
+          className="border border-gray-200 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+        >
+          {ROLES.map((r) => (
+            <option key={r} value={r}>
+              {ROLE_LABELS[r]}
+            </option>
+          ))}
+        </select>
+      ),
+    },
+    {
+      key: 'statut',
+      header: 'Statut',
+      render: (u) => (
+        <button
+          disabled={updateMutation.isPending}
+          onClick={() => updateMutation.mutate({ id: u.id, actif: !u.actif })}
+          className={`px-2 py-1 rounded text-xs font-medium transition disabled:opacity-50 ${
+            u.actif
+              ? 'bg-green-100 text-green-800 hover:bg-green-200'
+              : 'bg-red-100 text-red-800 hover:bg-red-200'
+          }`}
+        >
+          {u.actif ? 'Actif' : 'Inactif'}
+        </button>
+      ),
+    },
+    {
+      key: 'created_at',
+      header: 'Créé le',
+      render: (u) => (
+        <span className="text-gray-500">{new Date(u.created_at).toLocaleDateString('fr-FR')}</span>
+      ),
+    },
+  ]
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
@@ -97,61 +153,14 @@ export function UsersPage() {
 
       {isLoading ? (
         <p className="text-gray-400">Chargement…</p>
-      ) : users.length === 0 ? (
-        <p className="text-gray-400">Aucun utilisateur enregistré.</p>
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-gray-500 border-b bg-gray-50">
-                <th className="px-4 py-3">Nom</th>
-                <th className="px-4 py-3">Email</th>
-                <th className="px-4 py-3">Rôle</th>
-                <th className="px-4 py-3">Statut</th>
-                <th className="px-4 py-3">Créé le</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((u) => (
-                <tr key={u.id} className="border-b last:border-0 hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium">
-                    {u.prenom} {u.nom}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">{u.email}</td>
-                  <td className="px-4 py-3">
-                    <select
-                      value={u.role}
-                      disabled={updateMutation.isPending}
-                      onChange={(e) => updateMutation.mutate({ id: u.id, role: e.target.value })}
-                      className="border border-gray-200 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
-                    >
-                      {ROLES.map((r) => (
-                        <option key={r} value={r}>
-                          {ROLE_LABELS[r]}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-4 py-3">
-                    <button
-                      disabled={updateMutation.isPending}
-                      onClick={() => updateMutation.mutate({ id: u.id, actif: !u.actif })}
-                      className={`px-2 py-1 rounded text-xs font-medium transition disabled:opacity-50 ${
-                        u.actif
-                          ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                          : 'bg-red-100 text-red-800 hover:bg-red-200'
-                      }`}
-                    >
-                      {u.actif ? 'Actif' : 'Inactif'}
-                    </button>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500">
-                    {new Date(u.created_at).toLocaleDateString('fr-FR')}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            columns={columns}
+            rows={users}
+            getRowKey={(u) => u.id}
+            emptyMessage="Aucun utilisateur enregistré."
+          />
         </div>
       )}
 
