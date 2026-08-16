@@ -29,34 +29,38 @@ export const routes: RouteObject[] = [
         element: <Layout />,
         children: [
           // Dashboard principal
-          { path: '/', element: <DashboardPage />, handle: { title: 'Tableau de bord' } },
+          { path: '/', element: <DashboardPage />, handle: { crumb: 'Supervision', title: 'Tableau de bord' } },
 
           // Gestion des campagnes
-          { path: '/campagnes', element: <CampagnesPage />, handle: { title: 'Campagnes' } },
+          { path: '/campagnes', element: <CampagnesPage />, handle: { crumb: 'Référentiel', title: 'Campagnes' } },
 
           // Gestion des prospections
           {
             path: '/prospections',
             element: <ProspectionsPage />,
-            handle: { title: 'Prospections' },
+            handle: { crumb: 'Fiches terrain', title: 'Prospections' },
           },
           {
             path: '/prospections/new',
             element: <NouvelleProspectionPage />,
-            handle: { title: 'Nouvelle prospection', parent: 'Prospections' },
+            handle: { crumb: 'Fiches terrain', title: 'Nouvelle prospection' },
           },
           {
             path: '/prospections/:id',
             element: <ProspectionDetailPage />,
-            handle: { title: 'Fiche de prospection', parent: 'Prospections' },
+            handle: { crumb: 'Fiches terrain', title: 'Fiche de prospection' },
           },
 
           // Gestion des traitements
-          { path: '/traitements', element: <TraitementsPage />, handle: { title: 'Traitements' } },
+          {
+            path: '/traitements',
+            element: <TraitementsPage />,
+            handle: { crumb: 'Lutte', title: 'Fiches de traitement' },
+          },
           {
             path: '/traitements/:id',
             element: <TraitementDetailPage />,
-            handle: { title: 'Fiche de traitement', parent: 'Traitements' },
+            handle: { crumb: 'Lutte', title: 'Fiche de traitement' },
           },
 
           // Administration (utilisateurs + stations, écran à onglets)
@@ -77,17 +81,25 @@ export const routes: RouteObject[] = [
           },
 
           // Référentiels (lecture seule)
-          { path: '/referentiels', element: <ReferentielsPage />, handle: { title: 'Référentiels' } },
+          {
+            path: '/referentiels',
+            element: <ReferentielsPage />,
+            handle: { crumb: 'Administration', title: 'Référentiels' },
+          },
 
           // Validation finale
           {
             path: '/validation-finale',
             element: <ValidationFinalePage />,
-            handle: { title: 'Validation finale' },
+            handle: { crumb: 'Contrôle', title: 'Validation finale' },
           },
 
           // Autres pages
-          { path: '/syntheses', element: <SynthesesPage />, handle: { title: 'Synthèses & export' } },
+          {
+            path: '/syntheses',
+            element: <SynthesesPage />,
+            handle: { crumb: 'Analyse', title: 'Synthèses & export' },
+          },
           { path: '/carte', element: <CartePage />, handle: { title: 'Carte des infestations' } },
           {
             path: '/design-system',

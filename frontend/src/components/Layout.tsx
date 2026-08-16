@@ -121,7 +121,7 @@ export function Layout() {
   return (
     <div className="flex h-screen bg-gray-50">
       <aside className="w-[236px] shrink-0 bg-[#235a36] text-white flex flex-col">
-        <div className="px-4 py-4 flex items-center gap-2.5">
+        <div className="px-[18px] py-5 flex items-center gap-2.5 border-b border-white/[.14]">
           <div className="h-[38px] w-[38px] shrink-0 rounded-[10px] bg-white flex items-center justify-center overflow-hidden">
             <img src="/logo.png" alt="IFVM" className="h-full w-full object-cover" />
           </div>
@@ -132,7 +132,7 @@ export function Layout() {
             </p>
           </div>
         </div>
-        <nav className="flex-1 py-2 space-y-1 px-2.5">
+        <nav className="flex-1 py-3 space-y-[3px] px-2.5">
           {navItems.map(({ to, label, count }) => (
             <NavLink
               key={to}
@@ -183,12 +183,14 @@ export function Layout() {
         </div>
       </aside>
       <main className="flex-1 overflow-auto flex flex-col">
-        <header className="h-[66px] shrink-0 flex items-center justify-between gap-4 px-6 bg-[#fffdf8] border-b border-[#e7e0cd]">
+        <header className="h-[66px] shrink-0 flex items-center justify-between gap-[18px] px-[28px] bg-[#fffdf8] border-b border-[#e7e0cd]">
           <div className="min-w-0">
-            <p className="text-[10.5px] font-semibold text-gray-500 truncate">
+            <p className="text-[9.5px] font-semibold uppercase tracking-[1px] text-ifvm-text-weak truncate">
               {handle?.crumb ?? (handle?.parent ? `${handle.parent} / ${title}` : title || 'IFVM')}
             </p>
-            <p className="text-base font-bold text-gray-900 truncate">{title}</p>
+            <p className="text-[19px] leading-[1.2] font-extrabold tracking-[-.3px] text-[#16201a] truncate">
+              {title}
+            </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {campagne && (
