@@ -15,6 +15,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { StatusBadge } from '@/components/ui/status-badge'
 import {
   buildFicheImprimable,
   isFicheValidee,
@@ -87,22 +88,6 @@ interface CurrentUser {
 // Constantes
 // ---------------------------------------------------------------------------
 
-const STATUT_LABELS: Record<string, string> = {
-  brouillon: 'Brouillon',
-  en_attente: 'En attente',
-  verifiee: 'Vérifiée',
-  validee: 'Validée',
-  rejetee: 'Rejetée',
-}
-
-const STATUT_CLASSES: Record<string, string> = {
-  brouillon: 'bg-gray-100 text-gray-700',
-  en_attente: 'bg-orange-100 text-orange-700',
-  verifiee: 'bg-blue-100 text-blue-700',
-  validee: 'bg-green-100 text-green-700',
-  rejetee: 'bg-red-100 text-red-700',
-}
-
 const ACTION_LABELS: Record<string, string> = {
   creation: 'Création',
   soumission: 'Soumission',
@@ -116,19 +101,6 @@ const ACTION_LABELS: Record<string, string> = {
 // ---------------------------------------------------------------------------
 // Composants utilitaires
 // ---------------------------------------------------------------------------
-
-function StatutBadge({ statut }: { statut: string }) {
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium',
-        STATUT_CLASSES[statut] ?? 'bg-gray-100 text-gray-700',
-      )}
-    >
-      {STATUT_LABELS[statut] ?? statut}
-    </span>
-  )
-}
 
 function SyncBadge({ statut_sync }: { statut_sync: string }) {
   const synced = statut_sync === 'synced'
@@ -366,7 +338,7 @@ export function ProspectionDetailPage() {
             </Button>
           )}
           <SyncBadge statut_sync={prospection.statut_sync} />
-          <StatutBadge statut={prospection.statut} />
+          <StatusBadge statut={prospection.statut} />
         </div>
       </div>
 
