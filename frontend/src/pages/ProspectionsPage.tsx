@@ -1,27 +1,12 @@
-import { useState, useMemo } from 'react'
+import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
-import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
+import { FilterChip } from '@/components/ui/filter-chip'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from '@/components/ui/select'
-import { STATUTS, STATUT_LABELS, StatusBadge } from '@/components/ui/status-badge'
-
-interface Campagne {
-  id: string
-  name: string
-  start_date: string
-  end_date: string | null
-}
+import { STATUTS, STATUT_LABELS, StatusBadge, type Statut } from '@/components/ui/status-badge'
 
 interface Station {
   id: string
@@ -30,20 +15,34 @@ interface Station {
   pa_code: string
 }
 
+interface Utilisateur {
+  id: string
+  nom: string
+  role: string
+}
+
 interface Prospection {
   id: string
   type_prospection: string
-  campagne_id: string
+  campagne_id?: string
   prospecteur_id: string
   station_id: string | null
   date_prospection: string
   statut: string
   n_fiche: string | null
   n_releve: string | null
-  created_at: string
+  surface_infestee: number | null
+}
+
+/** Pastilles « Type » de la maquette (prototype, ligne 1337). */
+const TYPES = ['intensive', 'extensive'] as const
+const TYPE_LABELS: Record<string, string> = {
+  intensive: 'Intensive',
+  extensive: 'Extensive',
 }
 
 const PAGE_SIZE = 20
+const TOUS = 'Tous'
 
 function shortId(id: string | null): string {
   if (!id) return '—'
@@ -52,39 +51,43 @@ function shortId(id: string | null): string {
 
 export function ProspectionsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const [stationSearch, setStationSearch] = useState('')
-  const [page, setPage] = useState(1)
   const navigate = useNavigate()
 
+  const recherche = searchParams.get('q') ?? ''
+  const filtreType = searchParams.get('type') ?? ''
   const filtreStatut = searchParams.get('statut') ?? ''
-  const filtreCampagne = searchParams.get('campagne') ?? ''
-  const filtreStationId = searchParams.get('station') ?? ''
-  const filtreDate = searchParams.get('date') ?? ''
+  const page = Math.max(1, Number(searchParams.get('page') ?? '1') || 1)
 
   function setFiltre(key: string, value: string) {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev)
-      if (value) next.set(key, value)
-      else next.delete(key)
-      return next
-    }, { replace: true })
-    setPage(1)
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (value) next.set(key, value)
+        else next.delete(key)
+        // Tout changement de filtre ramène à la première page : sinon on
+        // atterrit sur une page vide quand le filtre réduit la liste.
+        next.delete('page')
+        return next
+      },
+      { replace: true },
+    )
   }
 
-  function resetFiltres() {
-    setSearchParams({}, { replace: true })
-    setStationSearch('')
-    setPage(1)
+  function setPage(next: number) {
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev)
+        if (next > 1) params.set('page', String(next))
+        else params.delete('page')
+        return params
+      },
+      { replace: true },
+    )
   }
 
   const { data: prospections = [], isLoading } = useQuery<Prospection[]>({
-    queryKey: ['prospections', 'intensive'],
-    queryFn: () => api.get('/prospections', { params: { type: 'intensive' } }).then((r) => r.data),
-  })
-
-  const { data: campagnes = [] } = useQuery<Campagne[]>({
-    queryKey: ['campagnes'],
-    queryFn: () => api.get('/campagnes').then((r) => r.data),
+    queryKey: ['prospections'],
+    queryFn: () => api.get('/prospections').then((r) => r.data),
   })
 
   const { data: stations = [] } = useQuery<Station[]>({
@@ -92,11 +95,13 @@ export function ProspectionsPage() {
     queryFn: () => api.get('/stations').then((r) => r.data),
   })
 
-  const campagneMap = useMemo(() => {
-    const m: Record<string, string> = {}
-    for (const c of campagnes) m[c.id] = c.name
-    return m
-  }, [campagnes])
+  // `/users/` est réservé aux admins : la page doit rester lisible pour les
+  // autres rôles, on retombe alors sur l'identifiant court du prospecteur.
+  const { data: utilisateurs = [] } = useQuery<Utilisateur[]>({
+    queryKey: ['users'],
+    queryFn: () => api.get('/users/').then((r) => r.data),
+    retry: false,
+  })
 
   const stationMap = useMemo(() => {
     const m: Record<string, Station> = {}
@@ -104,196 +109,212 @@ export function ProspectionsPage() {
     return m
   }, [stations])
 
-  const filteredStations = useMemo(() => {
-    if (!stationSearch) return stations
-    const q = stationSearch.toLowerCase()
-    return stations.filter(
-      (s) => s.code.toLowerCase().includes(q) || s.nom.toLowerCase().includes(q)
-    )
-  }, [stations, stationSearch])
+  const utilisateurMap = useMemo(() => {
+    const m: Record<string, Utilisateur> = {}
+    for (const u of utilisateurs) m[u.id] = u
+    return m
+  }, [utilisateurs])
+
+  const stationLabel = (p: Prospection) => {
+    const station = p.station_id ? stationMap[p.station_id] : null
+    return station ? `${station.code} ${station.nom}` : shortId(p.station_id)
+  }
+
+  const agentLabel = (p: Prospection) =>
+    utilisateurMap[p.prospecteur_id]?.nom ?? shortId(p.prospecteur_id)
+
+  const ficheLabel = (p: Prospection) => p.n_fiche ?? p.n_releve ?? shortId(p.id)
 
   const filtered = useMemo(() => {
-    let result = prospections
-    if (filtreStatut) result = result.filter((p) => p.statut === filtreStatut)
-    if (filtreCampagne) result = result.filter((p) => p.campagne_id === filtreCampagne)
-    if (filtreStationId) result = result.filter((p) => p.station_id === filtreStationId)
-    if (filtreDate) result = result.filter((p) => p.date_prospection >= filtreDate)
-    return result
-  }, [prospections, filtreStatut, filtreCampagne, filtreStationId, filtreDate])
+    const q = recherche.trim().toLowerCase()
+    return prospections.filter((p) => {
+      if (filtreType && p.type_prospection !== filtreType) return false
+      if (filtreStatut && p.statut !== filtreStatut) return false
+      if (!q) return true
+      // La maquette n'expose qu'un champ « N° de fiche, agent… » : il couvre
+      // aussi la station, qui remplace l'ancien filtre dédié.
+      return [ficheLabel(p), agentLabel(p), stationLabel(p)]
+        .join(' ')
+        .toLowerCase()
+        .includes(q)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prospections, recherche, filtreType, filtreStatut, stationMap, utilisateurMap])
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
-  const hasFiltres = filtreStatut || filtreCampagne || filtreStationId || filtreDate
+  const filterSummary = `${filtreType ? TYPE_LABELS[filtreType] : 'tous types'} · ${
+    filtreStatut ? STATUT_LABELS[filtreStatut as Statut] : 'tous statuts'
+  }`
 
   const columns: DataTableColumn<Prospection>[] = [
     {
+      key: 'fiche',
+      header: 'N° de fiche',
+      render: (p) => (
+        <span className="font-mono text-[11.5px] font-semibold text-ifvm-green-text">
+          {ficheLabel(p)}
+        </span>
+      ),
+    },
+    {
+      key: 'type',
+      header: 'Type',
+      render: (p) => TYPE_LABELS[p.type_prospection] ?? p.type_prospection,
+    },
+    { key: 'date', header: 'Date', mono: true, render: (p) => p.date_prospection },
+    { key: 'prospecteur', header: 'Prospecteur', render: (p) => agentLabel(p) },
+    {
       key: 'station',
       header: 'Station',
-      render: (p) => {
-        const station = p.station_id ? stationMap[p.station_id] : null
-        return station ? `${station.code} — ${station.nom}` : shortId(p.station_id)
-      },
+      render: (p) => <span className="text-ifvm-text-tertiary">{stationLabel(p)}</span>,
     },
-    { key: 'date', header: 'Date', render: (p) => p.date_prospection },
-    { key: 'prospecteur', header: 'Prospecteur', mono: true, render: (p) => shortId(p.prospecteur_id) },
-    { key: 'statut', header: 'Statut', render: (p) => <StatusBadge statut={p.statut} /> },
-    { key: 'campagne', header: 'Campagne', render: (p) => campagneMap[p.campagne_id] ?? shortId(p.campagne_id) },
     {
-      key: 'actions',
-      header: 'Actions',
+      key: 'surface',
+      header: 'Surf. inf. (ha)',
       align: 'right',
-      render: (p) => (
-        <Button
-          variant="ghost"
-          size="xs"
-          onClick={(e) => {
-            e.stopPropagation()
-            navigate(`/prospections/${p.id}`)
-          }}
-        >
-          Voir
-        </Button>
+      mono: true,
+      render: (p) =>
+        p.surface_infestee == null ? (
+          <span className="text-[#bdb6a2]">—</span>
+        ) : (
+          p.surface_infestee.toLocaleString('fr-FR')
+        ),
+    },
+    { key: 'statut', header: 'Statut', render: (p) => <StatusBadge statut={p.statut} /> },
+    {
+      key: 'ouvrir',
+      header: '',
+      align: 'right',
+      render: () => (
+        <span className="font-sans text-[11px] font-semibold text-ifvm-green-text">Ouvrir ›</span>
       ),
     },
   ]
 
   return (
-    <div className="px-8 py-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Prospections intensives</h1>
-        <Link to="/prospections/new" className={buttonVariants()}>
-          Nouvelle fiche
+    // 28px latéraux : aligne le contenu sur le fil d'Ariane du header (Layout).
+    <div className="flex flex-col gap-4 px-7 pb-10 pt-[26px]">
+      {/* Barre de filtres — maquette : carte blanche, items alignés en bas */}
+      <div className="flex flex-wrap items-end gap-[14px] rounded-[11px] border border-[#e7e0cd] bg-card px-[18px] py-4">
+        <div className="flex min-w-[180px] flex-col gap-[6px]">
+          <Label
+            htmlFor="prospections-recherche"
+            className="font-sans text-[9.5px] font-semibold uppercase tracking-[.8px] text-ifvm-text-weak"
+          >
+            Recherche
+          </Label>
+          <Input
+            id="prospections-recherche"
+            type="search"
+            value={recherche}
+            onChange={(e) => setFiltre('q', e.target.value)}
+            placeholder="N° de fiche, agent…"
+            className="h-9 rounded-[8px] border-[#e0d9c4] bg-[#fffdf8] text-[12px]"
+          />
+        </div>
+
+        <fieldset className="flex flex-col gap-[6px]">
+          <legend className="mb-[6px] font-sans text-[9.5px] font-semibold uppercase tracking-[.8px] text-ifvm-text-weak">
+            Type
+          </legend>
+          <div className="flex gap-[5px]">
+            <FilterChip
+              label={TOUS}
+              active={!filtreType}
+              onClick={() => setFiltre('type', '')}
+            />
+            {TYPES.map((t) => (
+              <FilterChip
+                key={t}
+                label={TYPE_LABELS[t]}
+                active={filtreType === t}
+                onClick={() => setFiltre('type', t)}
+              />
+            ))}
+          </div>
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-[6px]">
+          <legend className="mb-[6px] font-sans text-[9.5px] font-semibold uppercase tracking-[.8px] text-ifvm-text-weak">
+            Statut
+          </legend>
+          <div className="flex flex-wrap gap-[5px]">
+            <FilterChip
+              label={TOUS}
+              active={!filtreStatut}
+              onClick={() => setFiltre('statut', '')}
+            />
+            {STATUTS.map((s) => (
+              <FilterChip
+                key={s}
+                label={STATUT_LABELS[s]}
+                active={filtreStatut === s}
+                onClick={() => setFiltre('statut', s)}
+              />
+            ))}
+          </div>
+        </fieldset>
+
+        <div className="flex-1" />
+
+        <Link
+          to="/prospections/new"
+          className="rounded-[9px] bg-ifvm-green-text px-4 py-[10px] font-sans text-[12px] font-bold text-white"
+        >
+          + Nouvelle prospection
         </Link>
       </div>
 
-      {/* Filtres */}
-      <Card className="mb-4">
-        <CardContent className="p-4 flex flex-wrap items-end gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="filtre-statut">Statut</Label>
-            <Select value={filtreStatut} onValueChange={(v) => setFiltre('statut', v ?? '')}>
-              <SelectTrigger id="filtre-statut" className="w-40">
-                <SelectValue placeholder="Tous" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">Tous</SelectItem>
-                {STATUTS.map((s) => (
-                  <SelectItem key={s} value={s}>{STATUT_LABELS[s]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+      {/* Ligne de contexte — compteur + résumé du filtre actif */}
+      <div className="flex items-center gap-[10px]">
+        <span className="font-sans text-[12px] font-semibold text-ifvm-text-tertiary">
+          {filtered.length} {filtered.length > 1 ? 'fiches' : 'fiche'}
+        </span>
+        <span className="h-[14px] w-px bg-[#e0d9c4]" />
+        <span className="font-sans text-[12px] font-medium text-ifvm-text-weak">
+          Filtre : {filterSummary}
+        </span>
+      </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="filtre-campagne">Campagne</Label>
-            <Select value={filtreCampagne} onValueChange={(v) => setFiltre('campagne', v ?? '')}>
-              <SelectTrigger id="filtre-campagne" className="w-48">
-                <SelectValue placeholder="Toutes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">Toutes</SelectItem>
-                {campagnes.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+      <div className="overflow-hidden rounded-[11px] border border-[#e7e0cd] bg-card">
+        <DataTable
+          columns={columns}
+          rows={paginated}
+          getRowKey={(p) => p.id}
+          onRowClick={(p) => navigate(`/prospections/${p.id}`)}
+          emptyMessage={isLoading ? 'Chargement…' : 'Aucune fiche trouvée.'}
+          // Zébrure de la maquette : `#fff` / `#fffdf8` une ligne sur deux.
+          rowClassName={(_, index) => (index % 2 ? 'bg-[#fffdf8]' : 'bg-card')}
+        />
+      </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="filtre-station-search">Station</Label>
-            <Input
-              id="filtre-station-search"
-              type="text"
-              value={stationSearch}
-              onChange={(e) => setStationSearch(e.target.value)}
-              placeholder="Rechercher par nom ou code…"
-              className="w-48"
-            />
-            <select
-              id="filtre-station"
-              value={filtreStationId}
-              onChange={(e) => setFiltre('station', e.target.value)}
-              className="flex h-8 w-48 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <span className="font-sans text-[11.5px] font-medium text-ifvm-text-weak">
+            Page {currentPage} / {totalPages}
+          </span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setPage(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="rounded-[8px] border border-[#e0d9c4] bg-card px-3 py-2 font-sans text-[11.5px] font-semibold text-ifvm-text-tertiary disabled:opacity-50"
             >
-              <option value="">Toutes les stations</option>
-              {filteredStations.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.code} — {s.nom}
-                </option>
-              ))}
-            </select>
+              ← Précédent
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="rounded-[8px] border border-[#e0d9c4] bg-card px-3 py-2 font-sans text-[11.5px] font-semibold text-ifvm-text-tertiary disabled:opacity-50"
+            >
+              Suivant →
+            </button>
           </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="filtre-date">À partir du</Label>
-            <Input
-              id="filtre-date"
-              type="date"
-              value={filtreDate}
-              onChange={(e) => setFiltre('date', e.target.value)}
-              className="w-40"
-            />
-          </div>
-
-          {hasFiltres && (
-            <Button variant="ghost" size="sm" className="self-end" onClick={resetFiltres}>
-              Effacer les filtres
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Contenu */}
-      {isLoading ? (
-        <p className="text-muted-foreground">Chargement…</p>
-      ) : filtered.length === 0 ? (
-        <p className="text-muted-foreground">Aucune fiche trouvée.</p>
-      ) : (
-        <>
-          <p className="text-sm text-muted-foreground mb-3">
-            {filtered.length} prospection{filtered.length > 1 ? 's' : ''}
-          </p>
-
-          <Card>
-            <CardContent className="p-0">
-              <DataTable
-                columns={columns}
-                rows={paginated}
-                getRowKey={(p) => p.id}
-                onRowClick={(p) => navigate(`/prospections/${p.id}`)}
-                emptyMessage="Aucune fiche trouvée."
-              />
-            </CardContent>
-          </Card>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4">
-              <p className="text-sm text-muted-foreground">
-                Page {page} / {totalPages}
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                >
-                  ← Précédent
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                >
-                  Suivant →
-                </Button>
-              </div>
-            </div>
-          )}
-        </>
+        </div>
       )}
     </div>
   )
