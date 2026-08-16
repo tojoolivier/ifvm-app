@@ -100,17 +100,22 @@ export function TraitementDetailPage() {
 
   if (isError || !traitement) {
     const status = (error as { response?: { status?: number; data?: { detail?: string } } })?.response?.status
-    const message =
-      (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
-      "Impossible de charger ce traitement."
+    const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+    const STATUS_LABELS: Record<number, string> = {
+      403: 'Accès refusé',
+      404: 'Traitement introuvable',
+      409: 'Conflit',
+      422: 'Données invalides',
+    }
+    const label = status ? STATUS_LABELS[status] ?? `Erreur ${status}` : 'Erreur'
+    const message = detail ?? "Impossible de charger ce traitement."
     return (
       <div className="px-8 py-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/traitements')} className="mb-4">
           ← Retour aux traitements
         </Button>
         <p className="text-destructive">
-          {status ? `Erreur ${status} — ` : ''}
-          {message}
+          {label} — {message}
         </p>
       </div>
     )
