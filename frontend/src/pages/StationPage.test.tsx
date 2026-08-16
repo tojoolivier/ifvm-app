@@ -27,6 +27,14 @@ function stationFixe() {
   }
 }
 
+function mockApi({ prospections = [] }: { prospections?: { station_id: string | null }[] } = {}) {
+  mockedGet.mockImplementation((url: string) => {
+    if (url === '/stations') return Promise.resolve({ data: [stationFixe()] })
+    if (url === '/prospections') return Promise.resolve({ data: prospections })
+    return Promise.resolve({ data: [] })
+  })
+}
+
 function renderPage() {
   const queryClient = new QueryClient()
   return render(
@@ -44,7 +52,7 @@ describe('StationPage — colonnes maquette (README §10, onglet Stations)', () 
   })
 
   it('affiche code (mono vert), station, coordonnées (mono) et état (badge)', async () => {
-    mockedGet.mockResolvedValue({ data: [stationFixe()] })
+    mockApi()
     renderPage()
 
     await waitFor(() => expect(screen.getByText('Beroroha')).toBeInTheDocument())
@@ -52,28 +60,36 @@ describe('StationPage — colonnes maquette (README §10, onglet Stations)', () 
     const code = screen.getByText('ST-014')
     expect(code.className).toMatch(/ifvm-green-text/)
 
-    expect(screen.getByText('-21.66, 45.17')).toBeInTheDocument()
+    expect(screen.getByText('-21.6600, 45.1700')).toBeInTheDocument()
     expect(screen.getByText('Active')).toBeInTheDocument()
   })
 
-  it("n'affiche aucun formulaire de création — l'API ne porte pas les écritures sur station_fixe", async () => {
-    mockedGet.mockResolvedValue({ data: [stationFixe()] })
+  it("n'affiche aucun dialogue de création — l'API ne porte pas les écritures sur station_fixe", async () => {
+    mockApi()
     renderPage()
 
     await waitFor(() => expect(screen.getByText('Beroroha')).toBeInTheDocument())
 
-    expect(screen.queryByText(/Nouvelle station/i)).not.toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it("n'affiche pas de colonne aire protégée ni prospections — absentes de l'API (StationFixeRead) — et le signale", async () => {
-    mockedGet.mockResolvedValue({ data: [stationFixe()] })
+  it('affiche la colonne Prospections avec le compte réel dérivé de GET /prospections (pas fabriqué)', async () => {
+    mockApi({ prospections: [{ station_id: 's1' }, { station_id: 's1' }, { station_id: 'autre' }] })
     renderPage()
 
     await waitFor(() => expect(screen.getByText('Beroroha')).toBeInTheDocument())
 
-    expect(screen.queryByText(/^Aire protégée$/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/^Prospections$/)).not.toBeInTheDocument()
-    expect(screen.getByText(/aire protégée.*prospections|prospections.*aire protégée/is)).toBeInTheDocument()
+    const row = screen.getByText('Beroroha').closest('tr')!
+    expect(row).toHaveTextContent('2')
+  })
+
+  it("affiche la colonne Aire protégée vide et signale qu'elle n'est pas exposée par l'API (StationFixeRead)", async () => {
+    mockApi()
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Beroroha')).toBeInTheDocument())
+
+    expect(screen.getByRole('columnheader', { name: 'Aire protégée' })).toBeInTheDocument()
+    expect(screen.getByText(/aire protégée.*n'est pas exposée par l'API/is)).toBeInTheDocument()
   })
 })
