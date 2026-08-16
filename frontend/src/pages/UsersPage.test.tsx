@@ -13,7 +13,7 @@ vi.mock('../api/client', () => ({
 const mockedGet = api.get as unknown as ReturnType<typeof vi.fn>
 const mockedPatch = api.patch as unknown as ReturnType<typeof vi.fn>
 
-function utilisateur() {
+function utilisateur(overrides: Record<string, unknown> = {}) {
   return {
     id: 'u1',
     nom: 'Rakoto',
@@ -22,7 +22,25 @@ function utilisateur() {
     role: 'admin',
     actif: true,
     created_at: '2026-08-01T00:00:00Z',
+    pa_id: 'pa1',
+    pa_code: 'PA-04',
+    pa_nom: 'Poste Beroroha',
+    ...overrides,
   }
+}
+
+function mockApi({
+  users = [utilisateur()],
+  prospections = [],
+}: {
+  users?: ReturnType<typeof utilisateur>[]
+  prospections?: { prospecteur_id: string | null }[]
+} = {}) {
+  mockedGet.mockImplementation((url: string) => {
+    if (url === '/users/') return Promise.resolve({ data: users })
+    if (url === '/prospections') return Promise.resolve({ data: prospections })
+    return Promise.resolve({ data: [] })
+  })
 }
 
 function Wrapper() {
@@ -31,7 +49,8 @@ function Wrapper() {
 }
 
 function renderPage() {
-  const queryClient = new QueryClient()
+  // `retry: false` : sans ça, les tests d'erreur attendent les 3 tentatives par défaut.
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={['/administration']}>
@@ -47,7 +66,7 @@ describe('UsersPage — colonnes maquette (README §10, onglet Utilisateurs)', (
   })
 
   it('affiche nom, email en mono, rôle en badge et un interrupteur actif', async () => {
-    mockedGet.mockResolvedValue({ data: [utilisateur()] })
+    mockApi()
     renderPage()
 
     await waitFor(() => expect(screen.getByText('Jean Rakoto')).toBeInTheDocument())
@@ -62,19 +81,79 @@ describe('UsersPage — colonnes maquette (README §10, onglet Utilisateurs)', (
     expect(toggle).toHaveAttribute('data-checked')
   })
 
-  it("n'affiche pas de colonne station ni fiches — absentes de l'API (UtilisateurRead) — et le signale", async () => {
-    mockedGet.mockResolvedValue({ data: [utilisateur()] })
+  it('affiche les 6 colonnes de la maquette, dont Station et Fiches', async () => {
+    mockApi()
     renderPage()
 
     await waitFor(() => expect(screen.getByText('Jean Rakoto')).toBeInTheDocument())
 
-    expect(screen.queryByText(/^Station$/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/^Fiches$/)).not.toBeInTheDocument()
-    expect(screen.getByText(/station.*fiches.*API|API.*station.*fiches/is)).toBeInTheDocument()
+    for (const entete of ['Nom', 'Email', 'Rôle', 'Station', 'Fiches', 'Actif']) {
+      expect(screen.getByRole('columnheader', { name: entete })).toBeInTheDocument()
+    }
+    // Plus d'encart d'excuse : la donnée existe désormais côté API.
+    expect(screen.queryByText(/ne sont pas exposés par l'API/i)).not.toBeInTheDocument()
+  })
+
+  it('remplit Station avec le poste acridien de rattachement, et « — » sans rattachement', async () => {
+    mockApi({
+      users: [
+        utilisateur(),
+        utilisateur({ id: 'u2', nom: 'Soa', prenom: 'Lalao', email: 'l.soa@ifvm.mg', pa_id: null, pa_code: null, pa_nom: null }),
+      ],
+    })
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Jean Rakoto')).toBeInTheDocument())
+
+    expect(screen.getByText('Jean Rakoto').closest('tr')).toHaveTextContent('PA-04 Poste Beroroha')
+    expect(screen.getByText('Lalao Soa').closest('tr')).toHaveTextContent('—')
+  })
+
+  it('compte les fiches par prospecteur à partir de GET /prospections', async () => {
+    mockApi({
+      prospections: [
+        { prospecteur_id: 'u1' },
+        { prospecteur_id: 'u1' },
+        { prospecteur_id: 'u1' },
+        { prospecteur_id: 'autre' },
+      ],
+    })
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Jean Rakoto')).toBeInTheDocument())
+
+    const row = screen.getByText('Jean Rakoto').closest('tr')!
+    expect(row).toHaveTextContent('3')
+  })
+
+  it('affiche un bandeau si GET /users/ échoue, au lieu d’un tableau vide muet', async () => {
+    mockedGet.mockImplementation((url: string) =>
+      url === '/users/'
+        ? Promise.reject({ response: { status: 403, data: { detail: 'Accès réservé aux admins' } } })
+        : Promise.resolve({ data: [] }),
+    )
+    renderPage()
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Erreur 403'))
+    expect(screen.getByRole('alert')).toHaveTextContent('Accès réservé aux admins')
+  })
+
+  it('affiche « ? » et non 0 quand le comptage des fiches est indisponible', async () => {
+    mockedGet.mockImplementation((url: string) =>
+      url === '/users/'
+        ? Promise.resolve({ data: [utilisateur()] })
+        : Promise.reject({ response: { status: 500 } }),
+    )
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Jean Rakoto')).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByText('Jean Rakoto').closest('tr')).toHaveTextContent('?'),
+    )
   })
 
   it("l'interrupteur actif appelle PATCH /users/{id} avec le nouvel état", async () => {
-    mockedGet.mockResolvedValue({ data: [utilisateur()] })
+    mockApi()
     mockedPatch.mockResolvedValue({ data: {} })
     const { container } = renderPage()
 
