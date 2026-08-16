@@ -64,6 +64,12 @@ interface EntitySpec {
   addRoute?: string
   /** `campagne` n'a pas de colonne `actif` en base. */
   hasActif: boolean
+  /**
+   * Identifiant lisible de la ligne sélectionnée, affiché sous « Modifier ».
+   * La maquette y met la valeur de la première colonne — ce n'est donc pas
+   * toujours `code` (utilisateur et campagne n'en ont pas).
+   */
+  rowLabel: (row: Row) => string
   columns: DataTableColumn<Row>[]
   fields: FieldSpec[]
 }
@@ -139,6 +145,7 @@ const ENTITES: EntitySpec[] = [
     desc: 'Alimente les chips « Produit » des rotations aériennes et des produits utilisés en terrestre.',
     note: "La matière active affichée sur la fiche de traitement n'existe pas en base : la table pesticide ne porte que code, nom et actif. À ajouter comme colonne ou à retirer de l'UI.",
     hasActif: true,
+    rowLabel: (row) => text(row, 'code'),
     columns: [
       codeColumn(),
       { key: 'nom', header: 'Nom commercial', render: (row) => text(row, 'nom') },
@@ -169,6 +176,7 @@ const ENTITES: EntitySpec[] = [
     desc: "Doit alimenter les dégâts sur culture (prospection) et les zones exposées (traitement), aujourd'hui codés en dur.",
     note: "Synchronisée dans le SQLite du terrain mais aucune fonction de lecture : listCultures() n'existe pas dans referentiel-db.ts.",
     hasActif: true,
+    rowLabel: (row) => text(row, 'code'),
     columns: [codeColumn(), { key: 'nom', header: 'Nom', render: (row) => text(row, 'nom') }],
     fields: [
       { label: 'Code *', mono: true, value: (row) => text(row, 'code') },
@@ -186,6 +194,7 @@ const ENTITES: EntitySpec[] = [
     desc: 'Doit alimenter le stade dominant (infestation larvaire) et les phases du compteur de captures.',
     note: 'Synchronisée dans le SQLite du terrain mais aucune fonction de lecture : les phases et stades restent des constantes dans le code mobile.',
     hasActif: true,
+    rowLabel: (row) => text(row, 'code'),
     columns: [
       codeColumn(),
       {
@@ -211,6 +220,7 @@ const ENTITES: EntitySpec[] = [
     apiLabel: 'GET /postes-acridiens — écriture à créer',
     desc: 'Niveau supérieur de la hiérarchie géographique : chaque station fixe et chaque agent y sont rattachés.',
     hasActif: true,
+    rowLabel: (row) => text(row, 'code'),
     columns: [
       codeColumn(),
       { key: 'nom', header: 'Nom', render: (row) => text(row, 'nom') },
@@ -238,6 +248,7 @@ const ENTITES: EntitySpec[] = [
     note: 'Écart bloquant : StationPage.tsx appelle POST /stations, PUT /stations/{id} et DELETE /stations/{id}, qui ne sont pas exposés par referentiel_routes.py. Préférer une désactivation (actif=false) à la suppression, une station étant référencée par des prospections.',
     addRoute: '/stations',
     hasActif: true,
+    rowLabel: (row) => text(row, 'code'),
     columns: [
       codeColumn(),
       { key: 'nom', header: 'Nom', render: (row) => text(row, 'nom') },
@@ -281,6 +292,7 @@ const ENTITES: EntitySpec[] = [
     note: "Le pull expose ces comptes sous utilisateurs_equipe : tout utilisateur authentifié reçoit la liste complète des agents. Une règle de rôle reste à poser avant d'ouvrir les écritures du référentiel.",
     addRoute: '/users',
     hasActif: true,
+    rowLabel: (row) => `${text(row, 'prenom')} ${text(row, 'nom')}`.trim(),
     columns: [
       {
         key: 'nom',
@@ -312,6 +324,7 @@ const ENTITES: EntitySpec[] = [
     desc: 'Seul référentiel administrable de bout en bout. Cadre les prospections et les traitements sur une période.',
     addRoute: '/campagnes',
     hasActif: false,
+    rowLabel: (row) => text(row, 'name'),
     columns: [
       { key: 'name', header: 'Nom', render: (row) => text(row, 'name') },
       { key: 'start_date', header: 'Début', mono: true, render: (row) => formatDate(row.start_date) },
@@ -388,7 +401,10 @@ export function ReferentielsPage() {
   }
 
   return (
-    <div className="grid grid-cols-[216px_1fr] items-start gap-5">
+    // Padding de contenu du handoff (README §Design tokens, « contenu 26px 28px 40px ») :
+    // les 28px latéraux alignent la colonne de gauche sur le fil d'Ariane du header,
+    // lui aussi à px-[28px] dans Layout.
+    <div className="grid grid-cols-[216px_1fr] items-start gap-5 px-7 pb-10 pt-[26px]">
       {/* Colonne gauche — 7 cartes de navigation */}
       <nav aria-label="Référentiels" className="flex flex-col gap-[7px]">
         <SectionLabel>{`${ENTITES.length} référentiels`}</SectionLabel>
@@ -523,7 +539,7 @@ export function ReferentielsPage() {
             <div>
               <h3 className="font-sans text-[13px] font-bold">Modifier</h3>
               <p className="mt-0.5 font-mono text-[11px] font-medium text-ifvm-text-weak">
-                {selectedRow ? text(selectedRow, 'code') : '—'}
+                {selectedRow ? entity.rowLabel(selectedRow) : '—'}
               </p>
             </div>
 
