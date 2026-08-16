@@ -52,7 +52,7 @@ export function TraitementsPage() {
     setSearchParams({}, { replace: true })
   }
 
-  const { data: traitements = [], isLoading } = useQuery<Traitement[]>({
+  const { data: traitements = [], isLoading, isError, error } = useQuery<Traitement[]>({
     queryKey: ['traitements', filtreType, filtreReprenable, filtreProspectionId],
     queryFn: () =>
       api
@@ -67,6 +67,17 @@ export function TraitementsPage() {
   })
 
   const hasFiltres = filtreType || filtreReprenable || filtreProspectionId
+
+  const STATUS_LABELS: Record<number, string> = {
+    403: 'Accès refusé',
+    404: 'Ressource introuvable',
+    409: 'Conflit',
+    422: 'Données invalides',
+  }
+  const errorStatus = (error as { response?: { status?: number } })?.response?.status
+  const errorDetail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+  const errorLabel = errorStatus ? STATUS_LABELS[errorStatus] ?? `Erreur ${errorStatus}` : 'Erreur'
+  const errorMessage = errorDetail ?? 'Impossible de charger les traitements.'
 
   const columns: DataTableColumn<Traitement>[] = useMemo(
     () => [
@@ -152,6 +163,13 @@ export function TraitementsPage() {
 
       {isLoading ? (
         <p className="text-muted-foreground">Chargement…</p>
+      ) : isError ? (
+        <Card>
+          <CardContent className="p-4">
+            <p className="font-medium text-destructive">{errorLabel}</p>
+            <p className="text-sm text-muted-foreground">{errorMessage}</p>
+          </CardContent>
+        </Card>
       ) : traitements.length === 0 ? (
         <p className="text-muted-foreground">Aucun traitement trouvé.</p>
       ) : (
