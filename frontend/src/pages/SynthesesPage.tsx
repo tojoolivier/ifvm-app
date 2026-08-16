@@ -6,14 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableHead,
-  TableRow,
-  TableCell,
-} from '@/components/ui/table'
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import {
   Select,
   SelectTrigger,
@@ -26,6 +19,7 @@ import {
   buildAgregatsParGroupe,
   buildProspectionsCsv,
   filterProspectionsForSynthese,
+  type AgregatEspece,
   type SyntheseProspection,
 } from '@/lib/prospection-syntheses'
 import { STATUTS, STATUT_LABELS } from '@/components/ui/status-badge'
@@ -157,6 +151,38 @@ export function SynthesesPage() {
 
   const hasFiltres = filtreStatut || filtreCampagne || filtreStationId
 
+  const parEspeceColumns: DataTableColumn<AgregatEspece>[] = [
+    { key: 'espece', header: 'Espèce', render: (a) => a.espece },
+    {
+      key: 'densiteDiffuseMoyenne',
+      header: 'Densité diffuse moy.',
+      align: 'right',
+      mono: true,
+      render: (a) => fmt(a.densiteDiffuseMoyenne),
+    },
+    {
+      key: 'densiteGroupeeMoyenne',
+      header: 'Densité groupée moy.',
+      align: 'right',
+      mono: true,
+      render: (a) => fmt(a.densiteGroupeeMoyenne),
+    },
+    {
+      key: 'capturesTotales',
+      header: 'Captures totales',
+      align: 'right',
+      mono: true,
+      render: (a) => a.capturesTotales,
+    },
+    {
+      key: 'nbFiches',
+      header: 'Fiches',
+      align: 'right',
+      mono: true,
+      render: (a) => a.nbFiches,
+    },
+  ]
+
   function handleExportCsv() {
     const csv = buildProspectionsCsv(filtered)
     downloadCsv(csv, `syntheses-prospections-${new Date().toISOString().slice(0, 10)}.csv`)
@@ -252,28 +278,11 @@ export function SynthesesPage() {
               <CardTitle className="text-base">Par espèce</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Espèce</TableHead>
-                    <TableHead className="text-right">Densité diffuse moy.</TableHead>
-                    <TableHead className="text-right">Densité groupée moy.</TableHead>
-                    <TableHead className="text-right">Captures totales</TableHead>
-                    <TableHead className="text-right">Fiches</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {parEspece.map((a) => (
-                    <TableRow key={a.espece}>
-                      <TableCell className="font-medium">{a.espece}</TableCell>
-                      <TableCell className="text-right tabular-nums">{fmt(a.densiteDiffuseMoyenne)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{fmt(a.densiteGroupeeMoyenne)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{a.capturesTotales}</TableCell>
-                      <TableCell className="text-right tabular-nums">{a.nbFiches}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <DataTable
+                columns={parEspeceColumns}
+                rows={parEspece}
+                getRowKey={(a) => a.espece}
+              />
             </CardContent>
           </Card>
 
