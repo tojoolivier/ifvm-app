@@ -61,23 +61,12 @@ export function StationPage() {
     },
     { key: 'station', header: 'Station', render: (s) => s.nom },
     {
-      key: 'aire_protegee',
-      header: 'Aire protégée',
-      render: () => <span className="text-ifvm-text-weak">—</span>,
-    },
-    {
       key: 'coordonnees',
       header: 'Coordonnées',
       align: 'right',
       mono: true,
       render: (s) =>
         s.latitude != null && s.longitude != null ? `${s.latitude}, ${s.longitude}` : '—',
-    },
-    {
-      key: 'prospections',
-      header: 'Prospections',
-      align: 'right',
-      render: () => <span className="text-ifvm-text-weak">—</span>,
     },
     { key: 'etat', header: 'État', render: (s) => <EtatBadge actif={s.actif} /> },
   ]

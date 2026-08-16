@@ -66,12 +66,14 @@ describe('StationPage — colonnes maquette (README §10, onglet Stations)', () 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it("signale que aire protégée et prospections ne sont pas exposées par l'API", async () => {
+  it("n'affiche pas de colonne aire protégée ni prospections — absentes de l'API (StationFixeRead) — et le signale", async () => {
     mockedGet.mockResolvedValue({ data: [stationFixe()] })
     renderPage()
 
     await waitFor(() => expect(screen.getByText('Beroroha')).toBeInTheDocument())
 
+    expect(screen.queryByText(/^Aire protégée$/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Prospections$/)).not.toBeInTheDocument()
     expect(screen.getByText(/aire protégée.*prospections|prospections.*aire protégée/is)).toBeInTheDocument()
   })
 })
