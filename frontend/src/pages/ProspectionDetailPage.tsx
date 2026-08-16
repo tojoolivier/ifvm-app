@@ -230,6 +230,23 @@ const infestationColumns: DataTableColumn<Infestation>[] = [
   },
 ]
 
+const populationColumns: DataTableColumn<Population>[] = [
+  { key: 'espece', header: 'Espèce', render: (pop) => <span className="font-medium">{pop.espece}</span> },
+  { key: 'categorie', header: 'Catégorie', render: (pop) => <span className="capitalize">{pop.categorie}</span> },
+  {
+    key: 'densite_diffuse',
+    header: 'Densité diffuse /ha',
+    align: 'right',
+    render: (pop) => pop.densite_diffuse ?? '—',
+  },
+  {
+    key: 'densite_groupee',
+    header: 'Densité groupée /ha',
+    align: 'right',
+    render: (pop) => pop.densite_groupee ?? '—',
+  },
+]
+
 // ---------------------------------------------------------------------------
 // Page principale
 // ---------------------------------------------------------------------------
@@ -448,26 +465,11 @@ export function ProspectionDetailPage() {
             <CardTitle className="text-base">Populations ({prospection.populations.length})</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <table className="w-full text-sm">
-              <thead className="border-b bg-muted/50">
-                <tr>
-                  <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Espèce</th>
-                  <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Catégorie</th>
-                  <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground">Densité diffuse /ha</th>
-                  <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground">Densité groupée /ha</th>
-                </tr>
-              </thead>
-              <tbody>
-                {prospection.populations.map((pop) => (
-                  <tr key={pop.id} className="border-b last:border-0">
-                    <td className="px-4 py-2 font-medium">{pop.espece}</td>
-                    <td className="px-4 py-2 capitalize">{pop.categorie}</td>
-                    <td className="px-4 py-2 text-right">{pop.densite_diffuse ?? '—'}</td>
-                    <td className="px-4 py-2 text-right">{pop.densite_groupee ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              columns={populationColumns}
+              rows={prospection.populations}
+              getRowKey={(pop) => pop.id}
+            />
           </CardContent>
         </Card>
       )}
