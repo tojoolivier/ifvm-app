@@ -374,6 +374,13 @@ export function ProspectionDetailPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 mt-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(`/traitements?prospection_id=${prospection.id}`)}
+          >
+            Voir les traitements
+          </Button>
           {ficheValidee && (
             <Button variant="outline" size="sm" onClick={() => setShowPrintView(true)}>
               Exporter en PDF
