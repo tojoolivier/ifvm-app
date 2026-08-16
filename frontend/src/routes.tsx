@@ -63,7 +63,7 @@ export const routes: RouteObject[] = [
           {
             path: '/administration',
             element: <AdministrationPage />,
-            handle: { title: 'Administration' },
+            handle: { crumb: 'Administration', title: 'Utilisateurs & stations' },
           },
           // Anciennes routes, conservées en redirection — l'onglet ouvert doit
           // correspondre à l'ancienne route, pas retomber sur Utilisateurs par défaut.

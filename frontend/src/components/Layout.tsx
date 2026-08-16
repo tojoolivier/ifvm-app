@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { api } from '../api/client'
 
-type RouteHandle = { title?: string; parent?: string }
+type RouteHandle = { title?: string; parent?: string; crumb?: string }
 
 type Campagne = { id: string; name: string; start_date: string; end_date: string | null }
 
@@ -96,7 +96,7 @@ export function Layout() {
           { to: '/prospections', label: 'Prospections', count: nbProspections },
           { to: '/carte', label: 'Carte des infestations' },
           { to: '/syntheses', label: 'Synthèses & export' },
-          { to: '/administration', label: 'Administration', count: role === 'admin' ? nbUsers : undefined },
+          { to: '/administration', label: 'Utilisateurs & stations', count: role === 'admin' ? nbUsers : undefined },
           { to: '/referentiels', label: 'Référentiels', count: NB_REFERENTIELS },
         ]
       : []),
@@ -185,7 +185,7 @@ export function Layout() {
         <header className="h-[66px] shrink-0 flex items-center justify-between gap-4 px-6 bg-[#fffdf8] border-b border-[#e7e0cd]">
           <div className="min-w-0">
             <p className="text-[10.5px] font-semibold text-gray-500 truncate">
-              {handle?.parent ? `${handle.parent} / ${title}` : title || 'IFVM'}
+              {handle?.crumb ?? (handle?.parent ? `${handle.parent} / ${title}` : title || 'IFVM')}
             </p>
             <p className="text-base font-bold text-gray-900 truncate">{title}</p>
           </div>
