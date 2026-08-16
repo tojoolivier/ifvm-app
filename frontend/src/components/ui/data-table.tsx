@@ -39,15 +39,20 @@ export function DataTable<T>({
   emptyMessage = 'Aucune donnée.',
   rowClassName,
 }: DataTableProps<T>) {
+  // Padding de cellule du handoff (README §Design tokens) : 12px, porté à 20px
+  // en première et dernière colonne pour aligner le contenu sur le bord de carte.
+  const paddingX = (index: number) => (index === 0 || index === columns.length - 1 ? 'px-5' : 'px-3')
+
   return (
     <Table>
       <TableHeader>
         <TableRow className="border-b-0 hover:bg-transparent">
-          {columns.map((column) => (
+          {columns.map((column, index) => (
             <TableHead
               key={column.key}
               className={cn(
-                'bg-background font-sans text-[9.5px] font-semibold uppercase tracking-[.8px] text-ifvm-text-weak',
+                'h-auto bg-background py-[9px] font-sans text-[9.5px] font-semibold uppercase tracking-[.8px] text-ifvm-text-weak',
+                paddingX(index),
                 column.align === 'right' && 'text-right',
               )}
             >
@@ -74,11 +79,12 @@ export function DataTable<T>({
                 rowClassName?.(row, index),
               )}
             >
-              {columns.map((column) => (
+              {columns.map((column, index) => (
                 <TableCell
                   key={column.key}
                   className={cn(
                     'py-3 text-[12px]',
+                    paddingX(index),
                     column.align === 'right' && 'text-right',
                     column.mono ? 'font-mono font-semibold' : 'font-sans font-medium',
                   )}
