@@ -23,6 +23,8 @@ interface TraitementDetail {
   district: string | null
   commune: string | null
   statut: string
+  reprise_traitement: boolean
+  traitement_origine_id: string | null
   aerien: { pilote: string; mecanicien: string; nb_rotations: number; total_pesticide_l: number | null } | null
   terrestre: {
     heure_debut: string
@@ -197,12 +199,36 @@ export function TraitementDetailPage() {
               <p className="font-mono">{traitement.terrestre.surface_traitee_ha ?? '—'} ha</p>
             </div>
             <div>
+              <p className="text-muted-foreground">Surface cumulée</p>
+              <p className="font-mono">{traitement.terrestre.surface_cumulee_ha ?? '—'} ha</p>
+            </div>
+            <div>
               <p className="text-muted-foreground">Surface restante</p>
               <p className="font-mono">{traitement.terrestre.surface_restante_ha ?? '—'} ha</p>
             </div>
           </CardContent>
         </Card>
       )}
+
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle>Chaîne de reprise</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <p className="text-muted-foreground">Reprise d'un traitement</p>
+            <OuiNon value={traitement.reprise_traitement} />
+          </div>
+          {traitement.reprise_traitement && traitement.traitement_origine_id && (
+            <div>
+              <p className="text-muted-foreground">Traitement d'origine</p>
+              <Link to={`/traitements/${traitement.traitement_origine_id}`} className="text-primary underline">
+                Voir la fiche d'origine
+              </Link>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="mb-4">
         <CardHeader>
