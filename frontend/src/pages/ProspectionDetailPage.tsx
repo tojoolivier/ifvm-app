@@ -247,6 +247,14 @@ const populationColumns: DataTableColumn<Population>[] = [
   },
 ]
 
+const captureColumns: DataTableColumn<Capture>[] = [
+  { key: 'espece', header: 'Espèce', render: (cap) => <span className="font-medium">{cap.espece}</span> },
+  { key: 'categorie', header: 'Catégorie', render: (cap) => <span className="capitalize">{cap.categorie}</span> },
+  { key: 'stade', header: 'Stade', render: (cap) => cap.stade },
+  { key: 'phase', header: 'Phase', render: (cap) => cap.phase },
+  { key: 'effectif', header: 'Effectif', align: 'right', render: (cap) => cap.effectif },
+]
+
 // ---------------------------------------------------------------------------
 // Page principale
 // ---------------------------------------------------------------------------
@@ -481,28 +489,11 @@ export function ProspectionDetailPage() {
             <CardTitle className="text-base">Captures ({prospection.captures.length})</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <table className="w-full text-sm">
-              <thead className="border-b bg-muted/50">
-                <tr>
-                  <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Espèce</th>
-                  <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Catégorie</th>
-                  <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Stade</th>
-                  <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Phase</th>
-                  <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground">Effectif</th>
-                </tr>
-              </thead>
-              <tbody>
-                {prospection.captures.map((cap) => (
-                  <tr key={cap.id} className="border-b last:border-0">
-                    <td className="px-4 py-2 font-medium">{cap.espece}</td>
-                    <td className="px-4 py-2 capitalize">{cap.categorie}</td>
-                    <td className="px-4 py-2">{cap.stade}</td>
-                    <td className="px-4 py-2">{cap.phase}</td>
-                    <td className="px-4 py-2 text-right">{cap.effectif}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              columns={captureColumns}
+              rows={prospection.captures}
+              getRowKey={(cap) => cap.id}
+            />
           </CardContent>
         </Card>
       )}
