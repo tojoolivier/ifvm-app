@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -14,21 +15,42 @@ import {
   SelectItem,
 } from '@/components/ui/select'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { MODE_LABELS, SIGNATURE_ROLES, STATUS_LABELS, TYPE_LABELS } from '@/lib/traitement-labels'
 
 const TYPES_TRAITEMENT = ['AERIEN', 'TERRESTRE'] as const
-
-const TYPE_LABELS: Record<string, string> = {
-  AERIEN: 'Aérien',
-  TERRESTRE: 'Terrestre',
-}
 
 interface Traitement {
   id: string
   numero_fiche: string
   type_traitement: string
+  mode_traitement: string | null
   date_traitement: string
   localite: string
   statut: string
+  aerien: { pilote: string } | null
+  terrestre: { surface_traitee_ha: number | null; surface_restante_ha: number | null } | null
+  signatures: { role: string; signataire_nom: string }[]
+}
+
+function TypeBadge({ type }: { type: string }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full border px-[9px] py-[3px] font-sans text-[10px] font-bold',
+        type === 'AERIEN'
+          ? 'bg-ifvm-green-bg text-ifvm-green-text border-ifvm-green-border'
+          : 'bg-ifvm-blue-bg text-ifvm-blue-text border-ifvm-blue-border',
+      )}
+    >
+      {TYPE_LABELS[type] ?? type}
+    </span>
+  )
+}
+
+function responsable(t: Traitement): string {
+  if (t.aerien) return t.aerien.pilote
+  const chefEquipe = t.signatures.find((s) => s.role === 'CHEF_EQUIPE')
+  return chefEquipe ? chefEquipe.signataire_nom : '—'
 }
 
 export function TraitementsPage() {
@@ -68,12 +90,6 @@ export function TraitementsPage() {
 
   const hasFiltres = filtreType || filtreReprenable || filtreProspectionId
 
-  const STATUS_LABELS: Record<number, string> = {
-    403: 'Accès refusé',
-    404: 'Ressource introuvable',
-    409: 'Conflit',
-    422: 'Données invalides',
-  }
   const errorStatus = (error as { response?: { status?: number } })?.response?.status
   const errorDetail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
   const errorLabel = errorStatus ? STATUS_LABELS[errorStatus] ?? `Erreur ${errorStatus}` : 'Erreur'
@@ -81,10 +97,41 @@ export function TraitementsPage() {
 
   const columns: DataTableColumn<Traitement>[] = useMemo(
     () => [
-      { key: 'numero_fiche', header: 'N° fiche', mono: true, render: (t) => t.numero_fiche },
-      { key: 'type', header: 'Type', render: (t) => TYPE_LABELS[t.type_traitement] ?? t.type_traitement },
-      { key: 'date', header: 'Date', render: (t) => t.date_traitement },
-      { key: 'localite', header: 'Localité', render: (t) => t.localite },
+      {
+        key: 'numero_fiche',
+        header: 'N° fiche',
+        mono: true,
+        render: (t) => <span className="text-ifvm-green-text">{t.numero_fiche}</span>,
+      },
+      { key: 'type', header: 'Type', render: (t) => <TypeBadge type={t.type_traitement} /> },
+      { key: 'mode', header: 'Mode', render: (t) => (t.mode_traitement ? MODE_LABELS[t.mode_traitement] ?? t.mode_traitement : '—') },
+      { key: 'date', header: 'Date', mono: true, render: (t) => t.date_traitement },
+      { key: 'responsable', header: 'Responsable', render: responsable },
+      {
+        key: 'traitee',
+        header: 'Traitée (ha)',
+        align: 'right',
+        mono: true,
+        render: (t) => (t.terrestre?.surface_traitee_ha != null ? `${t.terrestre.surface_traitee_ha} ha` : '—'),
+      },
+      {
+        key: 'restante',
+        header: 'Restante (ha)',
+        align: 'right',
+        mono: true,
+        render: (t) => {
+          const restante = t.terrestre?.surface_restante_ha
+          if (restante == null) return '—'
+          return <span className={restante > 0 ? 'text-ifvm-amber-text font-semibold' : undefined}>{restante} ha</span>
+        },
+      },
+      {
+        key: 'signatures',
+        header: 'Signatures',
+        align: 'right',
+        mono: true,
+        render: (t) => `${t.signatures.length}/${SIGNATURE_ROLES.length}`,
+      },
       { key: 'statut', header: 'Statut', render: (t) => <StatusBadge statut={t.statut} /> },
       {
         key: 'actions',
@@ -99,7 +146,7 @@ export function TraitementsPage() {
               navigate(`/traitements/${t.id}`)
             }}
           >
-            Voir
+            Ouvrir ›
           </Button>
         ),
       },
@@ -111,6 +158,9 @@ export function TraitementsPage() {
     <div className="px-8 py-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Traitements</h1>
+        <p className="text-sm text-ifvm-text-tertiary">
+          Chaque fiche est rattachée à une prospection validée.
+        </p>
       </div>
 
       <Card className="mb-4">
