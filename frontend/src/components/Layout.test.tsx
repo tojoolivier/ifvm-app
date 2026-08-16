@@ -91,4 +91,14 @@ describe('Layout (#121)', () => {
     renderLayout()
     await waitFor(() => expect(screen.getByText('3 fiches en attente')).toBeInTheDocument())
   })
+
+  it('affiche l\'entrée de nav "Utilisateurs & stations" (README §10) et pas "Administration"', async () => {
+    renderLayout()
+    await waitFor(() => {
+      const item = screen.getByText('Utilisateurs & stations').closest('a')
+      expect(item).toHaveAttribute('href', '/administration')
+      expect(item).toHaveTextContent('2')
+    })
+    expect(screen.queryByText('Administration')).not.toBeInTheDocument()
+  })
 })
