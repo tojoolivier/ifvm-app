@@ -63,6 +63,9 @@ export function Layout() {
           { to: '/carte', label: 'Carte des infestations' },
         ]
       : []),
+    ...(role === 'admin' || role === 'chef' || role === 'verificateur'
+      ? [{ to: '/traitements', label: 'Traitements' }]
+      : []),
   ]
 
   return (

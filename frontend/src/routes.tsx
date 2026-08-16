@@ -5,6 +5,7 @@ import { LoginPage } from './pages/LoginPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { CampagnesPage } from './pages/CampagnesPage'
 import { ProspectionsPage } from './pages/ProspectionsPage'
+import { TraitementsPage } from './pages/TraitementsPage'
 import { NouvelleProspectionPage } from './pages/NouvelleProspectionPage'
 import { ProspectionDetailPage } from './pages/ProspectionDetailPage'
 import { SynthesesPage } from './pages/SynthesesPage'
@@ -48,6 +49,9 @@ export const routes: RouteObject[] = [
             element: <ProspectionDetailPage />,
             handle: { title: 'Fiche de prospection', parent: 'Prospections' },
           },
+
+          // Gestion des traitements
+          { path: '/traitements', element: <TraitementsPage />, handle: { title: 'Traitements' } },
 
           // Gestion des utilisateurs
           { path: '/users', element: <UsersPage />, handle: { title: 'Utilisateurs' } },
