@@ -48,8 +48,80 @@ const POSTES_ACRIDIENS_COLUMNS: DataTableColumn<Record<string, unknown>>[] = [
   { key: 'updated_at', header: 'Mis à jour le', render: (row) => formatDate(row.updated_at) },
 ]
 
+// StationFixeSyncRead : id, code, nom, pa_id, latitude, longitude, altitude, actif, updated_at.
+const STATIONS_FIXES_COLUMNS: DataTableColumn<Record<string, unknown>>[] = [
+  { key: 'code', header: 'Code', mono: true, render: (row) => String(row.code ?? '—') },
+  { key: 'nom', header: 'Nom', render: (row) => String(row.nom ?? '—') },
+  {
+    key: 'latitude',
+    header: 'Latitude',
+    mono: true,
+    align: 'right',
+    render: (row) => (typeof row.latitude === 'number' ? row.latitude.toFixed(5) : '—'),
+  },
+  {
+    key: 'longitude',
+    header: 'Longitude',
+    mono: true,
+    align: 'right',
+    render: (row) => (typeof row.longitude === 'number' ? row.longitude.toFixed(5) : '—'),
+  },
+  {
+    key: 'altitude',
+    header: 'Altitude',
+    mono: true,
+    align: 'right',
+    render: (row) => (typeof row.altitude === 'number' ? `${row.altitude} m` : '—'),
+  },
+  { key: 'actif', header: 'Actif', render: (row) => formatBoolean(row.actif) },
+  { key: 'updated_at', header: 'Mis à jour le', render: (row) => formatDate(row.updated_at) },
+]
+
+// UtilisateurEquipeSyncRead : id, nom, prenom, email, role, pa_id, actif, updated_at.
+// pa_id (poste de rattachement) volontairement omis : c'est un UUID brut, le payload de sync ne
+// porte pas de code/nom de poste lisible (contrairement à StationFixeRead côté lecture non-sync) —
+// l'afficher n'apporterait rien tant qu'aucune route ne le résout en libellé.
+const UTILISATEURS_EQUIPE_COLUMNS: DataTableColumn<Record<string, unknown>>[] = [
+  { key: 'prenom', header: 'Prénom', render: (row) => String(row.prenom ?? '—') },
+  { key: 'nom', header: 'Nom', render: (row) => String(row.nom ?? '—') },
+  { key: 'email', header: 'Email', render: (row) => String(row.email ?? '—') },
+  { key: 'role', header: 'Rôle', render: (row) => String(row.role ?? '—') },
+  { key: 'actif', header: 'Actif', render: (row) => formatBoolean(row.actif) },
+  { key: 'updated_at', header: 'Mis à jour le', render: (row) => formatDate(row.updated_at) },
+]
+
+// PesticideSyncRead : id, code, nom, actif, updated_at (pas de matière active ni dose — voir ADR-010).
+const PESTICIDES_COLUMNS: DataTableColumn<Record<string, unknown>>[] = [
+  { key: 'code', header: 'Code', mono: true, render: (row) => String(row.code ?? '—') },
+  { key: 'nom', header: 'Nom', render: (row) => String(row.nom ?? '—') },
+  { key: 'actif', header: 'Actif', render: (row) => formatBoolean(row.actif) },
+  { key: 'updated_at', header: 'Mis à jour le', render: (row) => formatDate(row.updated_at) },
+]
+
+// CultureSyncRead : id, code, nom, actif, updated_at.
+const CULTURES_COLUMNS: DataTableColumn<Record<string, unknown>>[] = [
+  { key: 'code', header: 'Code', mono: true, render: (row) => String(row.code ?? '—') },
+  { key: 'nom', header: 'Nom', render: (row) => String(row.nom ?? '—') },
+  { key: 'actif', header: 'Actif', render: (row) => formatBoolean(row.actif) },
+  { key: 'updated_at', header: 'Mis à jour le', render: (row) => formatDate(row.updated_at) },
+]
+
+// CodeStadeSyncRead : id, code, espece, libelle, actif, updated_at.
+const CODES_STADES_COLUMNS: DataTableColumn<Record<string, unknown>>[] = [
+  { key: 'code', header: 'Code', mono: true, render: (row) => String(row.code ?? '—') },
+  { key: 'espece', header: 'Espèce', render: (row) => String(row.espece ?? '—') },
+  { key: 'libelle', header: 'Libellé', render: (row) => String(row.libelle ?? '—') },
+  { key: 'actif', header: 'Actif', render: (row) => formatBoolean(row.actif) },
+  { key: 'updated_at', header: 'Mis à jour le', render: (row) => formatDate(row.updated_at) },
+]
+
 const DEDICATED_COLUMNS: Partial<Record<keyof ReferentielPullResponse, DataTableColumn<Record<string, unknown>>[]>> = {
   postes_acridiens: POSTES_ACRIDIENS_COLUMNS,
+  stations_fixes: STATIONS_FIXES_COLUMNS,
+  utilisateurs_equipe: UTILISATEURS_EQUIPE_COLUMNS,
+  pesticides: PESTICIDES_COLUMNS,
+  cultures: CULTURES_COLUMNS,
+  codes_stades: CODES_STADES_COLUMNS,
 }
 
 function buildColumns(
