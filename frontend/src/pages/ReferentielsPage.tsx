@@ -32,7 +32,36 @@ const ENTITES: { key: keyof ReferentielPullResponse; label: string }[] = [
   { key: 'campagnes', label: 'Campagnes' },
 ]
 
-function buildColumns(rows: Record<string, unknown>[]): DataTableColumn<Record<string, unknown>>[] {
+function formatDate(value: unknown): string {
+  if (typeof value !== 'string') return '—'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('fr-FR')
+}
+
+function formatBoolean(value: unknown): string {
+  return value ? 'Oui' : 'Non'
+}
+
+// PosteAcridienSyncRead (backend/app/presentation/referentiel_schemas.py) : id, code, nom, region, actif, updated_at.
+const POSTES_ACRIDIENS_COLUMNS: DataTableColumn<Record<string, unknown>>[] = [
+  { key: 'code', header: 'Code', mono: true, render: (row) => String(row.code ?? '—') },
+  { key: 'nom', header: 'Nom', render: (row) => String(row.nom ?? '—') },
+  { key: 'region', header: 'Région', render: (row) => (row.region ? String(row.region) : '—') },
+  { key: 'actif', header: 'Actif', render: (row) => formatBoolean(row.actif) },
+  { key: 'updated_at', header: 'Mis à jour le', render: (row) => formatDate(row.updated_at) },
+]
+
+const DEDICATED_COLUMNS: Partial<Record<keyof ReferentielPullResponse, DataTableColumn<Record<string, unknown>>[]>> = {
+  postes_acridiens: POSTES_ACRIDIENS_COLUMNS,
+}
+
+function buildColumns(
+  entity: keyof ReferentielPullResponse,
+  rows: Record<string, unknown>[],
+): DataTableColumn<Record<string, unknown>>[] {
+  const dedicated = DEDICATED_COLUMNS[entity]
+  if (dedicated) return dedicated
+
   const keys = rows.length > 0 ? Object.keys(rows[0]) : []
   return keys.map((key) => ({
     key,
@@ -57,7 +86,7 @@ export function ReferentielsPage() {
   })
 
   const rows = useMemo(() => data?.[selected]?.upserts ?? [], [data, selected])
-  const columns = useMemo(() => buildColumns(rows), [rows])
+  const columns = useMemo(() => buildColumns(selected, rows), [selected, rows])
   const serverTime = data?.[selected]?.server_time
 
   return (
