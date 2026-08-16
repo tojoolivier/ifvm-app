@@ -4,6 +4,8 @@ import { AxiosError } from 'axios'
 import { api } from '../api/client'
 import { Utilisateur } from '../types'
 import { DataTable, DataTableColumn } from '../components/ui/data-table'
+import { Switch } from '../components/ui/switch'
+import { Card, CardContent } from '../components/ui/card'
 
 const ROLES = [
   'prospecteur',
@@ -93,7 +95,8 @@ export function UsersPage() {
     {
       key: 'email',
       header: 'Email',
-      render: (u) => <span className="text-gray-600">{u.email}</span>,
+      mono: true,
+      render: (u) => <span className="font-mono text-ifvm-text-tertiary">{u.email}</span>,
     },
     {
       key: 'role',
@@ -103,7 +106,7 @@ export function UsersPage() {
           value={u.role}
           disabled={updateMutation.isPending}
           onChange={(e) => updateMutation.mutate({ id: u.id, role: e.target.value })}
-          className="border border-gray-200 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+          className="inline-flex items-center rounded-full border border-ifvm-green-border bg-ifvm-green-bg px-[9px] py-[3px] font-sans text-[10px] font-bold text-ifvm-green-text disabled:opacity-50"
         >
           {ROLES.map((r) => (
             <option key={r} value={r}>
@@ -114,54 +117,50 @@ export function UsersPage() {
       ),
     },
     {
-      key: 'statut',
-      header: 'Statut',
+      key: 'actif',
+      header: 'Actif',
+      align: 'right',
       render: (u) => (
-        <button
+        <Switch
+          checked={u.actif}
           disabled={updateMutation.isPending}
-          onClick={() => updateMutation.mutate({ id: u.id, actif: !u.actif })}
-          className={`px-2 py-1 rounded text-xs font-medium transition disabled:opacity-50 ${
-            u.actif
-              ? 'bg-green-100 text-green-800 hover:bg-green-200'
-              : 'bg-red-100 text-red-800 hover:bg-red-200'
-          }`}
-        >
-          {u.actif ? 'Actif' : 'Inactif'}
-        </button>
-      ),
-    },
-    {
-      key: 'created_at',
-      header: 'Créé le',
-      render: (u) => (
-        <span className="text-gray-500">{new Date(u.created_at).toLocaleDateString('fr-FR')}</span>
+          onCheckedChange={(checked) => updateMutation.mutate({ id: u.id, actif: checked })}
+        />
       ),
     },
   ]
 
   return (
-    <div className="p-6">
+    <div className="px-8 py-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Gestion des utilisateurs</h1>
+        <h1 className="text-2xl font-bold text-ifvm-text-tertiary">Gestion des utilisateurs</h1>
         <button
           onClick={() => setShowCreate(true)}
-          className="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800 transition"
+          className="rounded-[8px] bg-ifvm-green-text px-4 py-2 font-sans text-sm font-bold text-white transition hover:bg-[#1a4429]"
         >
           Nouvel utilisateur
         </button>
       </div>
 
+      <div className="mb-4 rounded-[9px] border border-ifvm-amber-border bg-ifvm-amber-bg px-4 py-3 text-sm text-ifvm-amber-text">
+        Station et nombre de fiches par utilisateur ne sont pas exposés par l'API (le schéma
+        <code className="mx-1 font-mono">UtilisateurRead</code>
+        ne porte pas ces champs) : ces deux colonnes de la maquette sont provisoirement masquées.
+      </div>
+
       {isLoading ? (
-        <p className="text-gray-400">Chargement…</p>
+        <p className="text-ifvm-text-weak">Chargement…</p>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <DataTable
-            columns={columns}
-            rows={users}
-            getRowKey={(u) => u.id}
-            emptyMessage="Aucun utilisateur enregistré."
-          />
-        </div>
+        <Card>
+          <CardContent className="p-0">
+            <DataTable
+              columns={columns}
+              rows={users}
+              getRowKey={(u) => u.id}
+              emptyMessage="Aucun utilisateur enregistré."
+            />
+          </CardContent>
+        </Card>
       )}
 
       {showCreate && (
