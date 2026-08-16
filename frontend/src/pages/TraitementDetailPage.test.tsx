@@ -36,8 +36,6 @@ function traitementAerien(overrides: Record<string, unknown> = {}) {
     district: 'Beroroha',
     commune: 'Beroroha',
     statut: 'validee',
-    reprise_traitement: false,
-    traitement_origine_id: null,
     cible: {
       espece: 'LMC',
       repartition_population: 'GROUPEE',
@@ -191,5 +189,36 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
     await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
 
     expect(screen.getAllByText('ne signe pas')).toHaveLength(2)
+  })
+
+  it("affiche la reprise et le lien d'origine à partir de terrestre.reprise_traitement (pas d'un champ racine)", async () => {
+    renderPage(
+      traitementAerien({
+        type_traitement: 'TERRESTRE',
+        aerien: null,
+        terrestre: {
+          heure_debut: '06:00:00',
+          heure_fin: '08:30:00',
+          vitesse_vent_ms: 1.2,
+          surface_traitee_ha: 3,
+          surface_cumulee_ha: 8,
+          surface_restante_ha: 0,
+          surface_restante_abandonnee: null,
+          motif_surface_restante_abandonnee: null,
+          reprise_traitement: true,
+          traitement_origine_id: 'origine-1',
+          produits: [],
+        },
+      }),
+    )
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+
+    expect(screen.getByText(/Reprise d'un traitement :/).parentElement).toHaveTextContent(
+      "Reprise d'un traitement : Oui",
+    )
+    expect(screen.getByRole('link', { name: "Voir la fiche d'origine" })).toHaveAttribute(
+      'href',
+      '/traitements/origine-1',
+    )
   })
 })
