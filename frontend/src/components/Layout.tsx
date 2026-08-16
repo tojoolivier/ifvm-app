@@ -49,6 +49,7 @@ export function Layout() {
           { to: '/syntheses', label: 'Synthèses & export' },
           { to: '/users', label: 'Utilisateurs' },
           { to: '/stations', label: 'Stations' }, // ✅ Ajout de la page Stations
+          { to: '/referentiels', label: 'Référentiels' },
         ]
       : []),
     ...(role === 'verificateur' || role === 'prospecteur'

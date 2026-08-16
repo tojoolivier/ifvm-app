@@ -14,6 +14,7 @@ import { CartePage } from './pages/CartePage'
 import { DesignSystemPage } from './pages/DesignSystemPage'
 import { UsersPage } from './pages/UsersPage'
 import { StationPage } from './pages/StationPage'
+import { ReferentielsPage } from './pages/ReferentielsPage'
 import { ValidationFinalePage } from './pages/ValidationFinalePage'
 import { NotFoundPage } from './pages/NotFoundPage'
 
@@ -64,6 +65,9 @@ export const routes: RouteObject[] = [
 
           // Gestion des stations
           { path: '/stations', element: <StationPage />, handle: { title: 'Stations' } },
+
+          // Référentiels (lecture seule)
+          { path: '/referentiels', element: <ReferentielsPage />, handle: { title: 'Référentiels' } },
 
           // Validation finale
           {
