@@ -31,9 +31,13 @@ const ROLE_LABELS: Record<string, string> = {
   admin: 'Administrateur',
 }
 
-export function UsersPage() {
+interface UsersPageProps {
+  showCreate: boolean
+  onShowCreateChange: (showCreate: boolean) => void
+}
+
+export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
   const queryClient = useQueryClient()
-  const [showCreate, setShowCreate] = useState(false)
   const [nom, setNom] = useState('')
   const [prenom, setPrenom] = useState('')
   const [email, setEmail] = useState('')
@@ -52,7 +56,7 @@ export function UsersPage() {
       api.post('/users/', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
-      setShowCreate(false)
+      onShowCreateChange(false)
       resetForm()
     },
     onError: (err: AxiosError<{ detail?: string }>) => {
@@ -131,17 +135,7 @@ export function UsersPage() {
   ]
 
   return (
-    <div className="px-8 py-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-ifvm-text-tertiary">Gestion des utilisateurs</h1>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="rounded-[8px] bg-ifvm-green-text px-4 py-2 font-sans text-sm font-bold text-white transition hover:bg-[#1a4429]"
-        >
-          Nouvel utilisateur
-        </button>
-      </div>
-
+    <div>
       <div className="mb-4 rounded-[9px] border border-ifvm-amber-border bg-ifvm-amber-bg px-4 py-3 text-sm text-ifvm-amber-text">
         Station et nombre de fiches par utilisateur ne sont pas exposés par l'API (le schéma
         <code className="mx-1 font-mono">UtilisateurRead</code>
@@ -242,7 +236,7 @@ export function UsersPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    setShowCreate(false)
+                    onShowCreateChange(false)
                     resetForm()
                   }}
                   className="border border-gray-300 px-4 py-2 rounded hover:bg-gray-50 transition"

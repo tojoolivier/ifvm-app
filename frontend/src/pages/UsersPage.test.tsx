@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
@@ -24,12 +25,17 @@ function utilisateur() {
   }
 }
 
+function Wrapper() {
+  const [showCreate, setShowCreate] = useState(false)
+  return <UsersPage showCreate={showCreate} onShowCreateChange={setShowCreate} />
+}
+
 function renderPage() {
   const queryClient = new QueryClient()
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={['/administration']}>
-        <UsersPage />
+        <Wrapper />
       </MemoryRouter>
     </QueryClientProvider>,
   )

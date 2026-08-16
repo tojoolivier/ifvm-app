@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { cn } from '@/lib/utils'
@@ -35,19 +34,23 @@ function EtatBadge({ actif }: { actif: boolean }) {
 }
 
 export function StationPage() {
-  const [search, setSearch] = useState('')
-
   const { data: stationsData = [], isLoading, isError, error } = useQuery<StationFixe[]>({
     queryKey: ['stations'],
     queryFn: () => api.get('/stations').then((r) => r.data),
   })
   const stations = Array.isArray(stationsData) ? stationsData : []
 
-  const filtered = stations.filter(
-    (s) =>
-      s.nom.toLowerCase().includes(search.toLowerCase()) ||
-      s.code.toLowerCase().includes(search.toLowerCase()),
-  )
+  // GET /prospections filtre par station_id mais n'expose pas de compteur agrégé :
+  // un seul fetch de la liste complète, comptée côté client par station.
+  const { data: prospectionsData = [] } = useQuery<{ station_id: string | null }[]>({
+    queryKey: ['prospections', 'all'],
+    queryFn: () => api.get('/prospections').then((r) => r.data),
+  })
+  const prospectionsParStation = new Map<string, number>()
+  for (const p of prospectionsData) {
+    if (!p.station_id) continue
+    prospectionsParStation.set(p.station_id, (prospectionsParStation.get(p.station_id) ?? 0) + 1)
+  }
 
   const errorStatus = (error as { response?: { status?: number } })?.response?.status
   const errorDetail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
@@ -61,35 +64,38 @@ export function StationPage() {
     },
     { key: 'station', header: 'Station', render: (s) => s.nom },
     {
+      key: 'aire_protegee',
+      header: 'Aire protégée',
+      render: () => <span className="text-ifvm-text-weak">—</span>,
+    },
+    {
       key: 'coordonnees',
       header: 'Coordonnées',
       align: 'right',
       mono: true,
       render: (s) =>
-        s.latitude != null && s.longitude != null ? `${s.latitude}, ${s.longitude}` : '—',
+        s.latitude != null && s.longitude != null
+          ? `${s.latitude.toFixed(4)}, ${s.longitude.toFixed(4)}`
+          : '—',
+    },
+    {
+      key: 'prospections',
+      header: 'Prospections',
+      align: 'right',
+      mono: true,
+      render: (s) => prospectionsParStation.get(s.id) ?? 0,
     },
     { key: 'etat', header: 'État', render: (s) => <EtatBadge actif={s.actif} /> },
   ]
 
   return (
-    <div className="px-8 py-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-ifvm-text-tertiary">Stations</h1>
-        <input
-          type="text"
-          placeholder="Rechercher une station…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-64 rounded-[8px] border border-ifvm-text-weak/40 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ifvm-green-text/40"
-        />
-      </div>
-
+    <div>
       <div className="mb-4 rounded-[9px] border border-ifvm-amber-border bg-ifvm-amber-bg px-4 py-3 text-sm text-ifvm-amber-text">
-        Aire protégée et nombre de prospections par station ne sont pas exposés par l'API
+        Aire protégée n'est pas exposée par l'API
         (<code className="mx-1 font-mono">StationFixeRead</code>
-        ne porte pas ces champs) : ces deux colonnes restent vides tant que le backend n'est pas
-        étendu. Les écritures (créer/modifier/supprimer une station) ne sont pas non plus
-        disponibles côté API — cet écran est en lecture seule.
+        ne porte pas ce champ) : cette colonne de la maquette reste vide tant que le backend n'est
+        pas étendu. Les écritures (créer/modifier/supprimer une station) ne sont pas non plus
+        disponibles côté API — le bouton « Nouvelle station » ne peut pas être fonctionnel.
       </div>
 
       {isLoading ? (
@@ -110,7 +116,7 @@ export function StationPage() {
           <CardContent className="p-0">
             <DataTable
               columns={columns}
-              rows={filtered}
+              rows={stations}
               getRowKey={(s) => s.id}
               emptyMessage="Aucune station trouvée."
             />
