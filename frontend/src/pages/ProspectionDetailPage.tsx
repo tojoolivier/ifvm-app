@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
 import {
   Dialog,
   DialogContent,
@@ -354,7 +353,7 @@ export function ProspectionDetailPage() {
   }
 
   return (
-    <div className="px-8 py-6 max-w-4xl mx-auto">
+    <div className="px-8 py-6 max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
@@ -391,185 +390,190 @@ export function ProspectionDetailPage() {
         </div>
       </div>
 
-      {/* Actions */}
-      {(canVerifier || canValiderOuRejeter) && (
-        <Card className="mb-6 border-primary/20 bg-primary/5">
-          <CardContent className="p-4 flex items-center justify-between">
-            <p className="text-sm font-medium">
-              {canVerifier ? 'Cette fiche est en attente de vérification.' : 'Cette fiche est en attente de validation.'}
-            </p>
-            <div className="flex gap-2">
-              {canVerifier && (
-                <Button onClick={() => setActiveAction('verifier')}>Vérifier</Button>
-              )}
-              {canValiderOuRejeter && (
-                <>
-                  <Button variant="outline" onClick={() => setActiveAction('rejeter')}>
-                    Rejeter
-                  </Button>
-                  <Button onClick={() => setActiveAction('valider')}>Valider</Button>
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Avertissements — fiche à vérifier (#106) */}
-      {prospection.avertissements.length > 0 && (
-        <Card className="mb-4 border-amber-200 bg-amber-50">
-          <CardHeader>
-            <CardTitle className="text-base text-amber-800">
-              À vérifier ({prospection.avertissements.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="list-disc pl-5 space-y-1 text-sm text-amber-800">
-              {prospection.avertissements.map((avertissement, index) => (
-                <li key={index}>{avertissement}</li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Informations générales */}
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle className="text-base">Informations générales</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            <Field label="Date de prospection" value={prospection.date_prospection} />
-            <Field label="Campagne" value={campagneName ?? shortId(prospection.campagne_id)} />
-            <Field label="Prospecteur" value={shortId(prospection.prospecteur_id)} />
-            {prospection.n_fiche && <Field label="N° fiche" value={prospection.n_fiche} />}
-            {prospection.n_releve && <Field label="N° relevé" value={prospection.n_releve} />}
-          </dl>
-        </CardContent>
-      </Card>
-
-      {/* Station */}
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle className="text-base">Station</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {station ? (
-            <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              <Field label="Nom" value={station.nom} />
-              <Field label="Point d'appui" value={station.pa_nom} />
-              <Field label="Latitude" value={station.latitude?.toFixed(6)} />
-              <Field label="Longitude" value={station.longitude?.toFixed(6)} />
-              {station.altitude != null && (
-                <Field label="Altitude (m)" value={station.altitude} />
-              )}
-            </dl>
-          ) : prospection.station_id ? (
-            <p className="text-sm text-muted-foreground">Chargement de la station…</p>
-          ) : (
-            <p className="text-sm text-muted-foreground">Aucune station associée.</p>
+      {/* Grille fiche de lecture : 1fr (contenu) / 316px (piste de validation + actions) */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_316px] gap-4 items-start">
+        <div className="min-w-0">
+          {/* Avertissements — fiche à vérifier (#106) */}
+          {prospection.avertissements.length > 0 && (
+            <Card className="mb-4 border-amber-200 bg-amber-50">
+              <CardHeader>
+                <CardTitle className="text-base text-amber-800">
+                  À vérifier ({prospection.avertissements.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="list-disc pl-5 space-y-1 text-sm text-amber-800">
+                  {prospection.avertissements.map((avertissement, index) => (
+                    <li key={index}>{avertissement}</li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
           )}
-        </CardContent>
-      </Card>
 
-      {/* Populations */}
-      {prospection.populations.length > 0 && (
-        <Card className="mb-4">
-          <CardHeader>
-            <CardTitle className="text-base">Populations ({prospection.populations.length})</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <DataTable
-              columns={populationColumns}
-              rows={prospection.populations}
-              getRowKey={(pop) => pop.id}
-            />
-          </CardContent>
-        </Card>
-      )}
+          {/* Informations générales */}
+          <Card className="mb-4">
+            <CardHeader>
+              <CardTitle className="text-base">Informations générales</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <Field label="Date de prospection" value={prospection.date_prospection} />
+                <Field label="Campagne" value={campagneName ?? shortId(prospection.campagne_id)} />
+                <Field label="Prospecteur" value={shortId(prospection.prospecteur_id)} />
+                {prospection.n_fiche && <Field label="N° fiche" value={prospection.n_fiche} />}
+                {prospection.n_releve && <Field label="N° relevé" value={prospection.n_releve} />}
+              </dl>
+            </CardContent>
+          </Card>
 
-      {/* Captures */}
-      {prospection.captures.length > 0 && (
-        <Card className="mb-4">
-          <CardHeader>
-            <CardTitle className="text-base">Captures ({prospection.captures.length})</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <DataTable
-              columns={captureColumns}
-              rows={prospection.captures}
-              getRowKey={(cap) => cap.id}
-            />
-          </CardContent>
-        </Card>
-      )}
+          {/* Station */}
+          <Card className="mb-4">
+            <CardHeader>
+              <CardTitle className="text-base">Station</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {station ? (
+                <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  <Field label="Nom" value={station.nom} />
+                  <Field label="Point d'appui" value={station.pa_nom} />
+                  <Field label="Latitude" value={station.latitude?.toFixed(6)} />
+                  <Field label="Longitude" value={station.longitude?.toFixed(6)} />
+                  {station.altitude != null && (
+                    <Field label="Altitude (m)" value={station.altitude} />
+                  )}
+                </dl>
+              ) : prospection.station_id ? (
+                <p className="text-sm text-muted-foreground">Chargement de la station…</p>
+              ) : (
+                <p className="text-sm text-muted-foreground">Aucune station associée.</p>
+              )}
+            </CardContent>
+          </Card>
 
-      {/* Infestations */}
-      {prospection.infestations.length > 0 && (
-        <Card className="mb-4">
-          <CardHeader>
-            <CardTitle className="text-base">Infestations ({prospection.infestations.length})</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <DataTable
-              columns={infestationColumns}
-              rows={prospection.infestations}
-              getRowKey={(inf) => inf.id}
-            />
-          </CardContent>
-        </Card>
-      )}
-
-      <Separator className="my-6" />
-
-      {/* Audit log */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Historique</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {auditLogSorted.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Aucun historique disponible.</p>
-          ) : (
-            <ol className="space-y-4">
-              {auditLogSorted.map((entry, i) => (
-                <li key={entry.id} className="flex gap-3">
-                  <div className="flex flex-col items-center">
-                    <div className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />
-                    {i < auditLogSorted.length - 1 && (
-                      <div className="w-px flex-1 bg-border mt-1" />
-                    )}
-                  </div>
-                  <div className="pb-4 min-w-0">
-                    <div className="flex items-baseline gap-2 flex-wrap">
-                      <span className="text-sm font-medium">
-                        {ACTION_LABELS[entry.action] ?? entry.action}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {formatDate(entry.created_at)}
-                      </span>
-                      <span className="font-mono text-xs text-muted-foreground">
-                        par {shortId(entry.auteur_id)}
-                      </span>
-                    </div>
-                    {entry.details && Object.keys(entry.details).length > 0 && (
-                      <dl className="mt-1 space-y-0.5">
-                        {Object.entries(entry.details).map(([k, v]) => (
-                          <div key={k} className="text-xs text-muted-foreground">
-                            <span className="font-medium">{k} :</span>{' '}
-                            {typeof v === 'object' ? JSON.stringify(v) : String(v)}
-                          </div>
-                        ))}
-                      </dl>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ol>
+          {/* Populations */}
+          {prospection.populations.length > 0 && (
+            <Card className="mb-4">
+              <CardHeader>
+                <CardTitle className="text-base">Populations ({prospection.populations.length})</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <DataTable
+                  columns={populationColumns}
+                  rows={prospection.populations}
+                  getRowKey={(pop) => pop.id}
+                />
+              </CardContent>
+            </Card>
           )}
-        </CardContent>
-      </Card>
+
+          {/* Captures */}
+          {prospection.captures.length > 0 && (
+            <Card className="mb-4">
+              <CardHeader>
+                <CardTitle className="text-base">Captures ({prospection.captures.length})</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <DataTable
+                  columns={captureColumns}
+                  rows={prospection.captures}
+                  getRowKey={(cap) => cap.id}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Infestations */}
+          {prospection.infestations.length > 0 && (
+            <Card className="mb-4">
+              <CardHeader>
+                <CardTitle className="text-base">Infestations ({prospection.infestations.length})</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <DataTable
+                  columns={infestationColumns}
+                  rows={prospection.infestations}
+                  getRowKey={(inf) => inf.id}
+                />
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        <div className="min-w-0">
+          {/* Actions — piste de validation */}
+          {(canVerifier || canValiderOuRejeter) && (
+            <Card className="mb-4 border-primary/20 bg-primary/5">
+              <CardContent className="p-4 space-y-2">
+                <p className="text-sm font-medium">
+                  {canVerifier ? 'Cette fiche est en attente de vérification.' : 'Cette fiche est en attente de validation.'}
+                </p>
+                <div className="flex flex-col gap-2">
+                  {canVerifier && (
+                    <Button onClick={() => setActiveAction('verifier')}>Vérifier</Button>
+                  )}
+                  {canValiderOuRejeter && (
+                    <>
+                      <Button onClick={() => setActiveAction('valider')}>Valider</Button>
+                      <Button variant="outline" onClick={() => setActiveAction('rejeter')}>
+                        Rejeter
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Audit log */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Historique</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {auditLogSorted.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Aucun historique disponible.</p>
+              ) : (
+                <ol className="space-y-4">
+                  {auditLogSorted.map((entry, i) => (
+                    <li key={entry.id} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <div className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />
+                        {i < auditLogSorted.length - 1 && (
+                          <div className="w-px flex-1 bg-border mt-1" />
+                        )}
+                      </div>
+                      <div className="pb-4 min-w-0">
+                        <div className="flex items-baseline gap-2 flex-wrap">
+                          <span className="text-sm font-medium">
+                            {ACTION_LABELS[entry.action] ?? entry.action}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {formatDate(entry.created_at)}
+                          </span>
+                          <span className="font-mono text-xs text-muted-foreground">
+                            par {shortId(entry.auteur_id)}
+                          </span>
+                        </div>
+                        {entry.details && Object.keys(entry.details).length > 0 && (
+                          <dl className="mt-1 space-y-0.5">
+                            {Object.entries(entry.details).map(([k, v]) => (
+                              <div key={k} className="text-xs text-muted-foreground">
+                                <span className="font-medium">{k} :</span>{' '}
+                                {typeof v === 'object' ? JSON.stringify(v) : String(v)}
+                              </div>
+                            ))}
+                          </dl>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       {/* Modale de confirmation */}
       {activeAction && (
