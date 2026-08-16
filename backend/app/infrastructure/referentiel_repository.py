@@ -55,17 +55,17 @@ class StationFixeRepositoryImpl(StationFixeRepository):
         self,
         pa_id: uuid.UUID | None = None,
         q: str | None = None,
-        actif: bool = True,
+        actif: bool | None = True,
     ) -> list[StationFixe]:
-        stmt = (
-            select(
-                StationFixeModel,
-                PosteAcridienModel.code.label("pa_code"),
-                PosteAcridienModel.nom.label("pa_nom"),
-            )
-            .join(PosteAcridienModel, StationFixeModel.pa_id == PosteAcridienModel.id)
-            .where(StationFixeModel.actif == actif)
-        )
+        stmt = select(
+            StationFixeModel,
+            PosteAcridienModel.code.label("pa_code"),
+            PosteAcridienModel.nom.label("pa_nom"),
+        ).join(PosteAcridienModel, StationFixeModel.pa_id == PosteAcridienModel.id)
+
+        # `actif=None` = pas de filtre : l'administration a besoin des deux états.
+        if actif is not None:
+            stmt = stmt.where(StationFixeModel.actif == actif)
 
         if pa_id is not None:
             stmt = stmt.where(StationFixeModel.pa_id == pa_id)

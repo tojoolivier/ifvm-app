@@ -2219,6 +2219,12 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Pa Id */
+            pa_id?: string | null;
+            /** Pa Code */
+            pa_code?: string | null;
+            /** Pa Nom */
+            pa_nom?: string | null;
         };
         /** UtilisateurUpdate */
         UtilisateurUpdate: {
@@ -2615,6 +2621,8 @@ export interface operations {
                 pa_id?: string | null;
                 q?: string | null;
                 actif?: boolean;
+                /** @description Renvoie les stations des deux états — écran d'administration. */
+                inclure_inactifs?: boolean;
             };
             header?: never;
             path?: never;
