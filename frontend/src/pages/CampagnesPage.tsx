@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 
 interface Campagne {
   id: string
@@ -60,6 +61,33 @@ export function CampagnesPage() {
     })
   }
 
+  const columns: DataTableColumn<Campagne>[] = [
+    { key: 'name', header: 'Nom', render: (c) => c.name },
+    { key: 'start_date', header: 'Date début', render: (c) => c.start_date },
+    { key: 'end_date', header: 'Date fin', render: (c) => c.end_date || '—' },
+    {
+      key: 'created_at',
+      header: 'Créé le',
+      render: (c) => new Date(c.created_at).toLocaleDateString('fr-FR'),
+    },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right',
+      render: (c) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            setDeleteId(c.id)
+          }}
+          className="text-red-600 hover:text-red-800 text-sm"
+        >
+          Supprimer
+        </button>
+      ),
+    },
+  ]
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
@@ -78,37 +106,7 @@ export function CampagnesPage() {
         <p className="text-gray-400">Aucune campagne enregistrée.</p>
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-gray-500 border-b bg-gray-50">
-                <th className="px-4 py-3">Nom</th>
-                <th className="px-4 py-3">Date début</th>
-                <th className="px-4 py-3">Date fin</th>
-                <th className="px-4 py-3">Créé le</th>
-                <th className="px-4 py-3 w-20"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {campagnes.map((c) => (
-                <tr key={c.id} className="border-b last:border-0 hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium">{c.name}</td>
-                  <td className="px-4 py-3">{c.start_date}</td>
-                  <td className="px-4 py-3">{c.end_date || '—'}</td>
-                  <td className="px-4 py-3 text-gray-500">
-                    {new Date(c.created_at).toLocaleDateString('fr-FR')}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => setDeleteId(c.id)}
-                      className="text-red-600 hover:text-red-800 text-sm"
-                    >
-                      Supprimer
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable columns={columns} rows={campagnes} getRowKey={(c) => c.id} />
         </div>
       )}
 
