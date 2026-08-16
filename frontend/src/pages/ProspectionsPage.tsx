@@ -6,14 +6,7 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableHead,
-  TableRow,
-  TableCell,
-} from '@/components/ui/table'
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import {
   Select,
   SelectTrigger,
@@ -133,6 +126,38 @@ export function ProspectionsPage() {
 
   const hasFiltres = filtreStatut || filtreCampagne || filtreStationId || filtreDate
 
+  const columns: DataTableColumn<Prospection>[] = [
+    {
+      key: 'station',
+      header: 'Station',
+      render: (p) => {
+        const station = p.station_id ? stationMap[p.station_id] : null
+        return station ? `${station.code} — ${station.nom}` : shortId(p.station_id)
+      },
+    },
+    { key: 'date', header: 'Date', render: (p) => p.date_prospection },
+    { key: 'prospecteur', header: 'Prospecteur', mono: true, render: (p) => shortId(p.prospecteur_id) },
+    { key: 'statut', header: 'Statut', render: (p) => <StatusBadge statut={p.statut} /> },
+    { key: 'campagne', header: 'Campagne', render: (p) => campagneMap[p.campagne_id] ?? shortId(p.campagne_id) },
+    {
+      key: 'actions',
+      header: 'Actions',
+      align: 'right',
+      render: (p) => (
+        <Button
+          variant="ghost"
+          size="xs"
+          onClick={(e) => {
+            e.stopPropagation()
+            navigate(`/prospections/${p.id}`)
+          }}
+        >
+          Voir
+        </Button>
+      ),
+    },
+  ]
+
   return (
     <div className="px-8 py-6">
       <div className="flex justify-between items-center mb-6">
@@ -232,49 +257,13 @@ export function ProspectionsPage() {
 
           <Card>
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Station</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Prospecteur</TableHead>
-                    <TableHead>Statut</TableHead>
-                    <TableHead>Campagne</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginated.map((p) => {
-                    const station = p.station_id ? stationMap[p.station_id] : null
-                    return (
-                      <TableRow key={p.id}>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {station ? `${station.code} — ${station.nom}` : shortId(p.station_id)}
-                        </TableCell>
-                        <TableCell>{p.date_prospection}</TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">
-                          {shortId(p.prospecteur_id)}
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge statut={p.statut} />
-                        </TableCell>
-                        <TableCell>
-                          {campagneMap[p.campagne_id] ?? shortId(p.campagne_id)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="xs"
-                            onClick={() => navigate(`/prospections/${p.id}`)}
-                          >
-                            Voir
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
+              <DataTable
+                columns={columns}
+                rows={paginated}
+                getRowKey={(p) => p.id}
+                onRowClick={(p) => navigate(`/prospections/${p.id}`)}
+                emptyMessage="Aucune fiche trouvée."
+              />
             </CardContent>
           </Card>
 
