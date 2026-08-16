@@ -47,8 +47,7 @@ export function Layout() {
           { to: '/prospections', label: 'Prospections' },
           { to: '/carte', label: 'Carte des infestations' },
           { to: '/syntheses', label: 'Synthèses & export' },
-          { to: '/users', label: 'Utilisateurs' },
-          { to: '/stations', label: 'Stations' }, // ✅ Ajout de la page Stations
+          { to: '/administration', label: 'Administration' },
           { to: '/referentiels', label: 'Référentiels' },
         ]
       : []),

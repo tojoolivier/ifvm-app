@@ -1,4 +1,4 @@
-import type { RouteObject } from 'react-router-dom'
+import { Navigate, type RouteObject } from 'react-router-dom'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
@@ -12,8 +12,7 @@ import { ProspectionDetailPage } from './pages/ProspectionDetailPage'
 import { SynthesesPage } from './pages/SynthesesPage'
 import { CartePage } from './pages/CartePage'
 import { DesignSystemPage } from './pages/DesignSystemPage'
-import { UsersPage } from './pages/UsersPage'
-import { StationPage } from './pages/StationPage'
+import { AdministrationPage } from './pages/AdministrationPage'
 import { ReferentielsPage } from './pages/ReferentielsPage'
 import { ValidationFinalePage } from './pages/ValidationFinalePage'
 import { NotFoundPage } from './pages/NotFoundPage'
@@ -60,11 +59,15 @@ export const routes: RouteObject[] = [
             handle: { title: 'Fiche de traitement', parent: 'Traitements' },
           },
 
-          // Gestion des utilisateurs
-          { path: '/users', element: <UsersPage />, handle: { title: 'Utilisateurs' } },
-
-          // Gestion des stations
-          { path: '/stations', element: <StationPage />, handle: { title: 'Stations' } },
+          // Administration (utilisateurs + stations, écran à onglets)
+          {
+            path: '/administration',
+            element: <AdministrationPage />,
+            handle: { title: 'Administration' },
+          },
+          // Anciennes routes, conservées en redirection
+          { path: '/users', element: <Navigate to="/administration" replace /> },
+          { path: '/stations', element: <Navigate to="/administration" replace /> },
 
           // Référentiels (lecture seule)
           { path: '/referentiels', element: <ReferentielsPage />, handle: { title: 'Référentiels' } },
