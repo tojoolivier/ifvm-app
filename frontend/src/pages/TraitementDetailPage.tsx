@@ -46,8 +46,6 @@ interface TraitementDetail {
   district: string | null
   commune: string | null
   statut: string
-  reprise_traitement: boolean
-  traitement_origine_id: string | null
   cible: Cible | null
   aerien: {
     pilote: string
@@ -60,6 +58,8 @@ interface TraitementDetail {
     heure_debut: string
     heure_fin: string
     vitesse_vent_ms: number
+    reprise_traitement: boolean
+    traitement_origine_id: string | null
     surface_traitee_ha: number | null
     surface_cumulee_ha: number | null
     surface_restante_ha: number | null
@@ -461,17 +461,22 @@ export function TraitementDetailPage() {
             </ul>
           </Panel>
 
-          <Panel title="Chaîne de reprise" className="mb-0">
-            <p>
-              <span className="text-muted-foreground">Reprise d'un traitement : </span>
-              {traitement.reprise_traitement ? 'Oui' : 'Non'}
-            </p>
-            {traitement.reprise_traitement && traitement.traitement_origine_id && (
-              <Link to={`/traitements/${traitement.traitement_origine_id}`} className="text-primary underline">
-                Voir la fiche d'origine
-              </Link>
-            )}
-          </Panel>
+          {traitement.terrestre && (
+            <Panel title="Chaîne de reprise" className="mb-0">
+              <p>
+                <span className="text-muted-foreground">Reprise d'un traitement : </span>
+                {traitement.terrestre.reprise_traitement ? 'Oui' : 'Non'}
+              </p>
+              {traitement.terrestre.reprise_traitement && traitement.terrestre.traitement_origine_id && (
+                <Link
+                  to={`/traitements/${traitement.terrestre.traitement_origine_id}`}
+                  className="text-primary underline"
+                >
+                  Voir la fiche d'origine
+                </Link>
+              )}
+            </Panel>
+          )}
         </div>
       </div>
     </div>
