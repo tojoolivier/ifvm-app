@@ -32,7 +32,40 @@ interface TraitementDetail {
     surface_cumulee_ha: number | null
     surface_restante_ha: number | null
   } | null
+  kit_combinaison: boolean
+  kit_gants: boolean
+  kit_lunettes: boolean
+  kit_masques: boolean
+  kit_boite: boolean
+  empoisonnement: boolean
+  empoisonnement_type: string | null
+  empoisonnement_mode: string | null
+  empoisonnement_autre: string | null
+  evaluation_risque: Record<string, unknown> | null
+  comportement_anormal: boolean
+  comportement_non_cibles: Record<string, unknown> | null
+  mortalite: boolean
+  mortalite_familles: Record<string, unknown> | null
   signatures: { id: string; role: string; signataire_nom: string; horodatage: string }[]
+}
+
+function OuiNon({ value }: { value: boolean }) {
+  return <p>{value ? 'Oui' : 'Non'}</p>
+}
+
+function DictSummary({ value }: { value: Record<string, unknown> | null }) {
+  if (!value || Object.keys(value).length === 0) {
+    return <p className="text-muted-foreground">—</p>
+  }
+  return (
+    <ul className="space-y-0.5">
+      {Object.entries(value).map(([key, val]) => (
+        <li key={key}>
+          <span className="text-muted-foreground">{key} :</span> {String(val)}
+        </li>
+      ))}
+    </ul>
+  )
 }
 
 export function TraitementDetailPage() {
@@ -170,6 +203,80 @@ export function TraitementDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle>Moyens & protection</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <p className="text-muted-foreground">Combinaison</p>
+            <OuiNon value={traitement.kit_combinaison} />
+          </div>
+          <div>
+            <p className="text-muted-foreground">Gants</p>
+            <OuiNon value={traitement.kit_gants} />
+          </div>
+          <div>
+            <p className="text-muted-foreground">Lunettes</p>
+            <OuiNon value={traitement.kit_lunettes} />
+          </div>
+          <div>
+            <p className="text-muted-foreground">Masques</p>
+            <OuiNon value={traitement.kit_masques} />
+          </div>
+          <div>
+            <p className="text-muted-foreground">Boîte de protection</p>
+            <OuiNon value={traitement.kit_boite} />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle>Impacts & évaluation du risque</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <p className="text-muted-foreground">Empoisonnement</p>
+            <OuiNon value={traitement.empoisonnement} />
+          </div>
+          {traitement.empoisonnement && (
+            <div>
+              <p className="text-muted-foreground">Type / mode</p>
+              <p>
+                {[traitement.empoisonnement_type, traitement.empoisonnement_mode, traitement.empoisonnement_autre]
+                  .filter(Boolean)
+                  .join(' / ') || '—'}
+              </p>
+            </div>
+          )}
+          <div>
+            <p className="text-muted-foreground">Comportement anormal</p>
+            <OuiNon value={traitement.comportement_anormal} />
+          </div>
+          {traitement.comportement_anormal && (
+            <div>
+              <p className="text-muted-foreground">Comportement — non-cibles</p>
+              <DictSummary value={traitement.comportement_non_cibles} />
+            </div>
+          )}
+          <div>
+            <p className="text-muted-foreground">Mortalité</p>
+            <OuiNon value={traitement.mortalite} />
+          </div>
+          {traitement.mortalite && (
+            <div>
+              <p className="text-muted-foreground">Mortalité — familles</p>
+              <DictSummary value={traitement.mortalite_familles} />
+            </div>
+          )}
+          <div className="col-span-2">
+            <p className="text-muted-foreground">Évaluation du risque</p>
+            <DictSummary value={traitement.evaluation_risque} />
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
