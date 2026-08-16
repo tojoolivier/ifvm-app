@@ -1,12 +1,24 @@
 import { useMemo } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { ErrorBanner } from '@/components/ui/error-banner'
+import { NavTabs } from '@/components/ui/nav-tabs'
+import { PILL_TONES, Pill } from '@/components/ui/pill'
 import { MODE_LABELS, ROLE_LABELS, SIGNATURE_ROLES, STATUS_LABELS, TYPE_LABELS } from '@/lib/traitement-labels'
+import {
+  KITS_EPI,
+  axesRisque,
+  especesListees,
+  formatHeure,
+  formatHorodatage,
+  formatSurface,
+  libelleImpact,
+  resumeEspeces,
+  zonesExposeesLabels,
+} from '@/lib/traitement-fiche'
 
 interface Rotation {
   id: string
@@ -72,6 +84,7 @@ interface TraitementDetail {
   kit_lunettes: boolean
   kit_masques: boolean
   kit_boite: boolean
+  zones_exposees: Record<string, unknown> | null
   empoisonnement: boolean
   empoisonnement_type: string | null
   empoisonnement_mode: string | null
@@ -93,52 +106,80 @@ interface ReferentielPullResponse {
   pesticides: { upserts: PesticideSync[] }
 }
 
-function OuiNon({ value }: { value: boolean }) {
-  return <p>{value ? 'Oui' : 'Non'}</p>
-}
-
-function DictSummary({ value }: { value: Record<string, unknown> | null }) {
-  if (!value || Object.keys(value).length === 0) {
-    return <p className="text-muted-foreground">—</p>
-  }
+/** Carte blanche de la maquette : `#fff`, bordure `#e7e0cd`, rayon `11px`. */
+function Carte({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <ul className="space-y-0.5">
-      {Object.entries(value).map(([key, val]) => (
-        <li key={key}>
-          <span className="text-muted-foreground">{key} :</span> {String(val)}
-        </li>
-      ))}
-    </ul>
+    <section className={cn('rounded-[11px] border border-[#e7e0cd] bg-card', className)}>
+      {children}
+    </section>
   )
 }
 
-function Pastille({ actif }: { actif: boolean }) {
+/** Titre de section en capitales — `600 9.5px`, interlettrage `1px`. */
+function TitreSection({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="mb-3 font-sans text-[9.5px] font-semibold uppercase tracking-[1px] text-ifvm-text-weak">
+      {children}
+    </h2>
+  )
+}
+
+/** Pastille EPI : `16px`, rayon `4px`, verte cochée / rouge décochée. */
+function PastilleEpi({ actif }: { actif: boolean }) {
   return (
     <span
+      aria-hidden
       className={cn(
-        'inline-flex items-center justify-center w-4 h-4 rounded-[4px] text-white text-[9px] font-bold mr-2',
-        actif ? 'bg-ifvm-green-text' : 'bg-ifvm-text-weak',
+        'flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] font-sans text-[9px] font-bold text-white',
+        actif ? 'bg-ifvm-green-text' : 'bg-[#c0412b]',
       )}
     >
-      {actif ? '✓' : '–'}
+      {actif ? '✓' : '✕'}
     </span>
   )
 }
 
-function Panel({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
+/** Ligne « libellé / valeur » du panneau Surfaces. */
+function LigneSurface({
+  label,
+  valeur,
+  alerte,
+  detache,
+}: {
+  label: string
+  valeur: string
+  alerte?: boolean
+  detache?: boolean
+}) {
   return (
-    <Card className={cn('bg-ifvm-green-bg border-ifvm-green-border mb-4', className)}>
-      <CardHeader>
-        <CardTitle className="text-[13px]">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="text-sm space-y-2">{children}</CardContent>
-    </Card>
+    <div
+      className={cn(
+        'flex items-baseline justify-between gap-3',
+        detache && 'border-t border-ifvm-green-border pt-2',
+      )}
+    >
+      <span
+        className={cn(
+          'font-sans text-[11.5px]',
+          alerte ? 'font-semibold text-ifvm-amber-text' : 'font-medium text-[#3a5c43]',
+        )}
+      >
+        {label}
+      </span>
+      <span
+        className={cn(
+          'font-mono text-[15px] font-bold',
+          alerte ? 'text-ifvm-amber-text' : 'text-[#16201a]',
+        )}
+      >
+        {valeur}
+      </span>
+    </div>
   )
 }
 
 export function TraitementDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
 
   const { data: traitement, isLoading, isError, error } = useQuery<TraitementDetail>({
     queryKey: ['traitement', id],
@@ -157,17 +198,34 @@ export function TraitementDetailPage() {
     return map
   }, [pesticidePull])
 
+  // La maquette affiche « produit · matière active ». La colonne matière
+  // active n'existe pas encore sur `pesticide` (issue #129, arbitrage produit
+  // en attente) : on rend le nom seul plutôt qu'un séparateur orphelin.
   const rotationColumns: DataTableColumn<Rotation>[] = useMemo(
     () => [
-      { key: 'numero_cuve', header: 'N° cuve', mono: true, render: (r) => r.numero_cuve },
+      {
+        key: 'numero_cuve',
+        header: 'N° cuve',
+        render: (r) => (
+          <span className="font-mono text-[12px] font-semibold text-ifvm-green-text">
+            {r.numero_cuve}
+          </span>
+        ),
+      },
       { key: 'produit', header: 'Produit', render: (r) => pesticideNoms.get(r.produit_id) ?? '—' },
-      { key: 'quantite', header: 'Quantité (l)', align: 'right', mono: true, render: (r) => r.quantite_l },
+      {
+        key: 'quantite',
+        header: 'Quantité (l)',
+        align: 'right',
+        mono: true,
+        render: (r) => r.quantite_l,
+      },
       {
         key: 'temperature',
         header: 'T° début → fin',
         align: 'right',
         mono: true,
-        render: (r) => `${r.temperature_debut_c}°C → ${r.temperature_fin_c}°C`,
+        render: (r) => `${r.temperature_debut_c} → ${r.temperature_fin_c} °C`,
       },
       {
         key: 'vent',
@@ -183,15 +241,21 @@ export function TraitementDetailPage() {
   const produitColumns: DataTableColumn<ProduitUtilise>[] = useMemo(
     () => [
       { key: 'produit', header: 'Produit', render: (p) => pesticideNoms.get(p.produit_id) ?? '—' },
-      { key: 'quantite', header: 'Quantité (l)', align: 'right', mono: true, render: (p) => p.quantite_l },
+      {
+        key: 'quantite',
+        header: 'Quantité (l)',
+        align: 'right',
+        mono: true,
+        render: (p) => p.quantite_l,
+      },
     ],
     [pesticideNoms],
   )
 
   if (isLoading) {
     return (
-      <div className="px-8 py-6">
-        <p className="text-muted-foreground">Chargement…</p>
+      <div className="px-7 pb-10 pt-[26px]">
+        <p className="font-sans text-[12px] text-ifvm-text-tertiary">Chargement…</p>
       </div>
     )
   }
@@ -200,21 +264,22 @@ export function TraitementDetailPage() {
     const status = (error as { response?: { status?: number } })?.response?.status
     const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
     const label = status ? STATUS_LABELS[status] ?? `Erreur ${status}` : 'Erreur'
-    const message = detail ?? "Impossible de charger ce traitement."
+    const message = detail ?? 'Impossible de charger ce traitement.'
     return (
-      <div className="px-8 py-6">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/traitements')} className="mb-4">
-          ← Retour aux traitements
-        </Button>
-        <p className="text-destructive">
-          {label} — {message}
-        </p>
+      <div className="flex flex-col gap-4 px-7 pb-10 pt-[26px]">
+        <NavTabs
+          ariaLabel="Vues des traitements"
+          items={[{ label: 'Liste des fiches', to: '/traitements', active: false }]}
+        />
+        <ErrorBanner label={label} message={message} />
       </div>
     )
   }
 
   const lectureSeule = traitement.statut === 'validee'
-  const modeLabel = traitement.mode_traitement ? MODE_LABELS[traitement.mode_traitement] ?? traitement.mode_traitement : null
+  const modeLabel = traitement.mode_traitement
+    ? MODE_LABELS[traitement.mode_traitement] ?? traitement.mode_traitement
+    : null
   const sousTitre = [
     TYPE_LABELS[traitement.type_traitement] ?? traitement.type_traitement,
     modeLabel ? `mode ${modeLabel}` : null,
@@ -224,259 +289,277 @@ export function TraitementDetailPage() {
     .filter(Boolean)
     .join(' · ')
 
+  const zones = zonesExposeesLabels(traitement.zones_exposees)
+  const axes = axesRisque(traitement.evaluation_risque)
+  const nonCibles = especesListees(traitement.comportement_non_cibles)
+  const familles = especesListees(traitement.mortalite_familles)
+  const comportementLabel = libelleImpact(
+    traitement.comportement_anormal,
+    resumeEspeces(nonCibles, 'espèce non cible', 'espèces non cibles'),
+  )
+  const mortaliteLabel = libelleImpact(
+    traitement.mortalite,
+    resumeEspeces(familles, 'famille', 'familles'),
+  )
+  // « Oui — Ingestion / Contact » : la maquette accroche le détail à la
+  // réponse plutôt que d'ouvrir une ligne séparée.
+  const empoisonnementDetail = [
+    traitement.empoisonnement_type,
+    traitement.empoisonnement_mode,
+    traitement.empoisonnement_autre,
+  ]
+    .filter(Boolean)
+    .join(' / ')
+  const empoisonnementLabel = libelleImpact(traitement.empoisonnement, empoisonnementDetail)
+  const surfaceInfestee = traitement.cible?.surface_infestee_ha
+  const restante = traitement.terrestre?.surface_restante_ha
+  const totalRotations = traitement.aerien
+    ? [
+        `${traitement.aerien.nb_rotations} rotation${traitement.aerien.nb_rotations > 1 ? 's' : ''}`,
+        traitement.aerien.total_pesticide_l != null
+          ? `${formatSurface(traitement.aerien.total_pesticide_l)} l`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : null
+
   return (
-    <div className="px-8 py-6">
-      <Button variant="ghost" size="sm" onClick={() => navigate('/traitements')} className="mb-4">
-        ← Retour aux traitements
-      </Button>
+    <div className="flex flex-col gap-4 px-7 pb-10 pt-[26px]">
+      <NavTabs
+        ariaLabel="Vues des traitements"
+        items={[
+          { label: 'Liste des fiches', to: '/traitements', active: false },
+          {
+            label: `Détail · ${traitement.numero_fiche}`,
+            to: `/traitements/${traitement.id}`,
+            active: true,
+          },
+        ]}
+      />
 
-      <div data-testid="traitement-header" className="bg-[#235a36] text-white rounded-[12px] px-[22px] py-5 mb-4">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-extrabold">{traitement.numero_fiche}</h1>
-          {lectureSeule && (
-            <span className="inline-flex items-center rounded-full bg-white/[.16] px-[9px] py-[3px] text-[10px] font-bold">
-              🔒 Lecture seule
-            </span>
-          )}
+      {/* En-tête vert de la maquette — `#235a36`, rayon 12px, padding 20/22 */}
+      <header
+        data-testid="traitement-header"
+        className="flex items-center gap-[18px] rounded-[12px] bg-ifvm-green-text px-[22px] py-5 text-white"
+      >
+        <div className="min-w-0 flex-1">
+          <h1 className="font-mono text-[17px] font-bold">{traitement.numero_fiche}</h1>
+          <p className="mt-1 font-sans text-[12px] font-medium text-white/75">{sousTitre}</p>
         </div>
-        <p className="text-sm text-white/80 mt-1">{sousTitre}</p>
-      </div>
+        {lectureSeule && (
+          <span className="shrink-0 rounded-full bg-white/[.16] px-3 py-[6px] font-sans text-[11px] font-bold">
+            🔒 Lecture seule
+          </span>
+        )}
+      </header>
 
+      {/* Bandeau ambre : le snapshot des cibles est figé à la création */}
       {traitement.cible && (
-        <Card className="mb-4 bg-ifvm-amber-bg border-ifvm-amber-border">
-          <CardContent className="text-sm space-y-1">
-            <p className="font-semibold text-ifvm-amber-text">Cibles — snapshot figé à la création</p>
-            <p>
-              Espèce {traitement.cible.espece ?? '—'} · répartition {traitement.cible.repartition_population ?? '—'} ·
-              surface infestée de référence {traitement.cible.surface_infestee_ha ?? '—'} ha
-            </p>
-            <Link to={`/prospections/${traitement.prospection_id}`} className="text-primary underline">
-              Voir la fiche de prospection
-            </Link>
-          </CardContent>
-        </Card>
+        <p className="rounded-[10px] border border-ifvm-amber-border bg-ifvm-amber-bg px-4 py-3 font-sans text-[12px] font-medium text-ifvm-amber-text">
+          Cibles : snapshot figé à la création — issu de{' '}
+          <Link to={`/prospections/${traitement.prospection_id}`} className="underline">
+            la fiche de prospection
+          </Link>
+          . Surface infestée de référence : <b>{formatSurface(surfaceInfestee)} ha</b>.
+        </p>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 items-start">
-        <div className="min-w-0">
-          <Card className="mb-4">
-            <CardHeader>
-              <CardTitle>Informations générales</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-muted-foreground">Type</p>
-                <p>{TYPE_LABELS[traitement.type_traitement] ?? traitement.type_traitement}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Date de traitement</p>
-                <p>{traitement.date_traitement}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Localité</p>
-                <p>{traitement.localite}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Région / District / Commune</p>
-                <p>{[traitement.region, traitement.district, traitement.commune].filter(Boolean).join(' / ') || '—'}</p>
-              </div>
-            </CardContent>
-          </Card>
-
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1fr_320px]">
+        <div className="flex min-w-0 flex-col gap-4">
           {traitement.aerien && (
-            <Card className="mb-4">
-              <CardHeader>
-                <CardTitle>
-                  Rotations — rapprochement fiche de vol par n° de cuve
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm">
-                <p className="text-muted-foreground mb-2">
-                  {traitement.aerien.nb_rotations} rotation{traitement.aerien.nb_rotations > 1 ? 's' : ''}
-                  {traitement.aerien.total_pesticide_l != null ? ` · ${traitement.aerien.total_pesticide_l} l` : ''}
+            <Carte className="overflow-hidden">
+              <div className="flex items-baseline gap-3 border-b border-[#f1ecdd] px-5 py-[15px]">
+                <h2 className="font-sans text-[14px] font-bold">Rotations</h2>
+                <p className="font-sans text-[11px] font-medium text-ifvm-text-weak">
+                  rapprochement fiche de vol par n° de cuve
                 </p>
-                <div className="grid grid-cols-2 gap-4 mb-3">
-                  <div>
-                    <p className="text-muted-foreground">Pilote</p>
-                    <p>{traitement.aerien.pilote}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Mécanicien</p>
-                    <p>{traitement.aerien.mecanicien}</p>
-                  </div>
-                </div>
-                <DataTable
-                  columns={rotationColumns}
-                  rows={traitement.aerien.rotations}
-                  getRowKey={(r) => r.id}
-                  emptyMessage="Aucune rotation."
-                />
-              </CardContent>
-            </Card>
+                <div className="flex-1" />
+                <p className="font-mono text-[12px] font-semibold text-ifvm-green-text">
+                  {totalRotations}
+                </p>
+              </div>
+              <DataTable
+                columns={rotationColumns}
+                rows={traitement.aerien.rotations}
+                getRowKey={(r) => r.id}
+                emptyMessage="Aucune rotation."
+              />
+            </Carte>
           )}
 
           {traitement.terrestre && (
-            <Card className="mb-4">
-              <CardHeader>
-                <CardTitle>Produits utilisés</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm">
-                <div className="grid grid-cols-2 gap-4 mb-3">
-                  <div>
-                    <p className="text-muted-foreground">Horaire</p>
-                    <p className="font-mono">
-                      {traitement.terrestre.heure_debut} – {traitement.terrestre.heure_fin}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Vitesse du vent</p>
-                    <p className="font-mono">{traitement.terrestre.vitesse_vent_ms} m/s</p>
-                  </div>
-                </div>
-                <DataTable
-                  columns={produitColumns}
-                  rows={traitement.terrestre.produits}
-                  getRowKey={(p) => p.id}
-                  emptyMessage="Aucun produit utilisé."
-                />
-              </CardContent>
-            </Card>
+            <Carte className="overflow-hidden">
+              <div className="flex items-baseline gap-3 border-b border-[#f1ecdd] px-5 py-[15px]">
+                <h2 className="font-sans text-[14px] font-bold">Produits utilisés</h2>
+                <div className="flex-1" />
+                <p className="font-mono text-[12px] font-semibold text-ifvm-green-text">
+                  {formatHeure(traitement.terrestre.heure_debut)} –{' '}
+                  {formatHeure(traitement.terrestre.heure_fin)} ·{' '}
+                  {traitement.terrestre.vitesse_vent_ms} m/s
+                </p>
+              </div>
+              <DataTable
+                columns={produitColumns}
+                rows={traitement.terrestre.produits}
+                getRowKey={(p) => p.id}
+                emptyMessage="Aucun produit utilisé."
+              />
+            </Carte>
           )}
 
-          <Card className="mb-4">
-            <CardHeader>
-              <CardTitle>Moyens & protection</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-3 text-sm">
-              <p><Pastille actif={traitement.kit_combinaison} />Combinaison</p>
-              <p><Pastille actif={traitement.kit_gants} />Gants</p>
-              <p><Pastille actif={traitement.kit_lunettes} />Lunettes</p>
-              <p><Pastille actif={traitement.kit_masques} />Masques</p>
-              <p><Pastille actif={traitement.kit_boite} />Boîte de protection</p>
-            </CardContent>
-          </Card>
+          {/* Deux cartes côte à côte — grille `1fr 1fr` de la maquette */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Carte className="px-5 py-[18px]">
+              <TitreSection>Moyens &amp; protection</TitreSection>
+              <ul className="flex flex-col gap-2">
+                {KITS_EPI.map((kit) => {
+                  const actif = traitement[kit.key]
+                  return (
+                    <li key={kit.key} className="flex items-center gap-[9px]">
+                      <PastilleEpi actif={actif} />
+                      <span className="font-sans text-[12px] font-medium text-[#3a3a30]">
+                        {kit.label}
+                      </span>
+                      <span className="sr-only">{actif ? 'présent' : 'absent'}</span>
+                    </li>
+                  )
+                })}
+              </ul>
+              <p className="mt-3 border-t border-[#f1ecdd] pt-3 font-sans text-[11.5px] font-medium leading-[1.5] text-ifvm-text-tertiary">
+                Zones exposées :{' '}
+                <b className="text-[#16201a]">{zones.length > 0 ? zones.join(', ') : 'aucune'}</b>
+              </p>
+            </Carte>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Impacts & évaluation du risque</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-muted-foreground">Empoisonnement</p>
-                <OuiNon value={traitement.empoisonnement} />
-              </div>
-              {traitement.empoisonnement && (
-                <div>
-                  <p className="text-muted-foreground">Type / mode</p>
-                  <p>
-                    {[traitement.empoisonnement_type, traitement.empoisonnement_mode, traitement.empoisonnement_autre]
-                      .filter(Boolean)
-                      .join(' / ') || '—'}
-                  </p>
-                </div>
+            <Carte className="px-5 py-[18px]">
+              <TitreSection>Impacts &amp; évaluation du risque</TitreSection>
+              {axes.length > 0 ? (
+                <ul className="flex flex-col gap-2">
+                  {axes.map((axe) => (
+                    <li key={axe.key} className="flex items-center gap-[9px]">
+                      <span className="flex-1 font-sans text-[12px] font-medium text-[#3a3a30]">
+                        {axe.label}
+                      </span>
+                      <Pill tone={axe.className}>{axe.niveau}</Pill>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="font-sans text-[11.5px] font-medium text-ifvm-text-weak">
+                  Aucun axe de risque évalué.
+                </p>
               )}
-              <div>
-                <p className="text-muted-foreground">Comportement anormal</p>
-                <OuiNon value={traitement.comportement_anormal} />
+              <div className="mt-3 flex flex-col gap-[5px] border-t border-[#f1ecdd] pt-3 font-sans text-[11.5px] font-medium text-ifvm-text-tertiary">
+                <p>
+                  Empoisonnement :{' '}
+                  <b className={traitement.empoisonnement ? 'text-ifvm-amber-text' : 'text-ifvm-green-text'}>
+                    {empoisonnementLabel}
+                  </b>
+                </p>
+                <p>
+                  Comportement anormal :{' '}
+                  <b
+                    className={
+                      traitement.comportement_anormal ? 'text-ifvm-amber-text' : 'text-ifvm-green-text'
+                    }
+                  >
+                    {comportementLabel}
+                  </b>
+                </p>
+                <p>
+                  Mortalité :{' '}
+                  <b className={traitement.mortalite ? 'text-ifvm-amber-text' : 'text-ifvm-green-text'}>
+                    {mortaliteLabel}
+                  </b>
+                </p>
               </div>
-              {traitement.comportement_anormal && (
-                <div>
-                  <p className="text-muted-foreground">Comportement — non-cibles</p>
-                  <DictSummary value={traitement.comportement_non_cibles} />
-                </div>
-              )}
-              <div>
-                <p className="text-muted-foreground">Mortalité</p>
-                <OuiNon value={traitement.mortalite} />
-              </div>
-              {traitement.mortalite && (
-                <div>
-                  <p className="text-muted-foreground">Mortalité — familles</p>
-                  <DictSummary value={traitement.mortalite_familles} />
-                </div>
-              )}
-              <div className="col-span-2">
-                <p className="text-muted-foreground">Évaluation du risque</p>
-                <DictSummary value={traitement.evaluation_risque} />
-              </div>
-            </CardContent>
-          </Card>
+            </Carte>
+          </div>
         </div>
 
-        <div>
-          {traitement.terrestre && (
-            <Panel title="Surfaces">
-              {traitement.cible?.surface_infestee_ha != null && (
-                <p>
-                  <span className="text-muted-foreground">Infestée (snapshot) : </span>
-                  <span className="font-mono">{traitement.cible.surface_infestee_ha} ha</span>
-                </p>
-              )}
-              <p>
-                <span className="text-muted-foreground">Traitée : </span>
-                <span className="font-mono">{traitement.terrestre.surface_traitee_ha ?? '—'} ha</span>
-              </p>
-              <p>
-                <span className="text-muted-foreground">Cumulée : </span>
-                <span className="font-mono">{traitement.terrestre.surface_cumulee_ha ?? '—'} ha</span>
-              </p>
-              <p className="pt-2 border-t border-ifvm-amber-border">
-                <span className="text-muted-foreground">Restante : </span>
-                <span
-                  className={cn(
-                    'font-mono',
-                    (traitement.terrestre.surface_restante_ha ?? 0) > 0 && 'text-ifvm-amber-text font-semibold',
-                  )}
-                >
-                  {traitement.terrestre.surface_restante_ha ?? '—'} ha
+        {/* Colonne latérale 320px */}
+        <div className="flex flex-col gap-[14px]">
+          <section className="flex flex-col gap-[10px] rounded-[11px] border border-ifvm-green-border bg-ifvm-green-bg px-[18px] py-4">
+            <h2 className="font-sans text-[12.5px] font-bold text-ifvm-green-text">Surfaces (ha)</h2>
+            <LigneSurface label="Infestée (snapshot)" valeur={formatSurface(surfaceInfestee)} />
+            <LigneSurface
+              label="Traitée"
+              valeur={formatSurface(traitement.terrestre?.surface_traitee_ha)}
+            />
+            <LigneSurface
+              label="Cumulée (reprises)"
+              valeur={formatSurface(traitement.terrestre?.surface_cumulee_ha)}
+            />
+            <LigneSurface
+              label="Restante"
+              valeur={formatSurface(restante)}
+              alerte={restante != null && Number(restante) > 0}
+              detache
+            />
+            {traitement.terrestre?.surface_restante_abandonnee && (
+              <p className="rounded-[8px] border border-ifvm-amber-border bg-ifvm-amber-bg px-[10px] py-2 font-sans text-[10.5px] font-medium leading-[1.5] text-ifvm-amber-text">
+                Surface restante <b>abandonnée</b> — motif :{' '}
+                <span className="italic">
+                  {traitement.terrestre.motif_surface_restante_abandonnee ?? 'non précisé'}
                 </span>
               </p>
-              {traitement.terrestre.surface_restante_abandonnee && (
-                <div className="bg-ifvm-amber-bg border border-ifvm-amber-border rounded-[9px] p-3 text-ifvm-amber-text">
-                  <p className="font-semibold">Surface restante abandonnée</p>
-                  <p>{traitement.terrestre.motif_surface_restante_abandonnee ?? '—'}</p>
-                </div>
-              )}
-            </Panel>
-          )}
+            )}
+          </section>
 
-          <Panel title="Signatures">
-            <ul className="space-y-1">
+          <Carte className="px-5 py-[18px]">
+            <h2 className="mb-3 font-sans text-[13px] font-bold">Signatures</h2>
+            <ul className="flex flex-col gap-[10px]">
               {SIGNATURE_ROLES.map((role) => {
                 const signature = traitement.signatures.find((s) => s.role === role)
                 return (
-                  <li key={role} className="flex items-center justify-between gap-2">
-                    <span className="font-semibold">{ROLE_LABELS[role]}</span>
-                    {signature ? (
-                      <span className="text-right">
-                        {signature.signataire_nom}{' '}
-                        <span className="text-muted-foreground font-mono block">{signature.horodatage}</span>
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">ne signe pas</span>
-                    )}
+                  <li key={role} className="flex items-center gap-[10px]">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-sans text-[11.5px] font-semibold text-[#16201a]">
+                        {ROLE_LABELS[role] ?? role}
+                      </p>
+                      <p className="font-sans text-[11px] font-medium text-ifvm-text-tertiary">
+                        {signature ? signature.signataire_nom : '—'}
+                      </p>
+                      {signature && (
+                        <p className="font-mono text-[10px] font-medium text-ifvm-text-weak">
+                          {formatHorodatage(signature.horodatage)}
+                        </p>
+                      )}
+                    </div>
+                    <Pill
+                      tone={signature ? PILL_TONES.signe : PILL_TONES.neutre}
+                      className="shrink-0"
+                    >
+                      {signature ? '✓ Signé' : 'ne signe pas'}
+                    </Pill>
                   </li>
                 )
               })}
             </ul>
-          </Panel>
+          </Carte>
 
-          {traitement.terrestre && (
-            <Panel title="Chaîne de reprise" className="mb-0">
-              <p>
-                <span className="text-muted-foreground">Reprise d'un traitement : </span>
-                {traitement.terrestre.reprise_traitement ? 'Oui' : 'Non'}
-              </p>
-              {traitement.terrestre.reprise_traitement && traitement.terrestre.traitement_origine_id && (
-                <Link
-                  to={`/traitements/${traitement.terrestre.traitement_origine_id}`}
-                  className="text-primary underline"
-                >
-                  Voir la fiche d'origine
-                </Link>
+          <Carte className="px-[18px] py-4">
+            <h2 className="mb-2 font-sans text-[12.5px] font-bold">Chaîne de reprise</h2>
+            <p className="font-sans text-[11.5px] font-medium leading-[1.6] text-ifvm-text-tertiary">
+              {traitement.terrestre?.reprise_traitement &&
+              traitement.terrestre.traitement_origine_id ? (
+                <>
+                  Origine :{' '}
+                  <Link
+                    to={`/traitements/${traitement.terrestre.traitement_origine_id}`}
+                    className="underline"
+                  >
+                    fiche d'origine
+                  </Link>{' '}
+                  → cette fiche.{' '}
+                </>
+              ) : (
+                <>Cette fiche n'est pas une reprise. </>
               )}
-            </Panel>
-          )}
+              Une seule reprise possible par fiche d'origine.
+            </p>
+          </Carte>
         </div>
       </div>
     </div>
