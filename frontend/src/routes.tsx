@@ -65,9 +65,16 @@ export const routes: RouteObject[] = [
             element: <AdministrationPage />,
             handle: { title: 'Administration' },
           },
-          // Anciennes routes, conservées en redirection
-          { path: '/users', element: <Navigate to="/administration" replace /> },
-          { path: '/stations', element: <Navigate to="/administration" replace /> },
+          // Anciennes routes, conservées en redirection — l'onglet ouvert doit
+          // correspondre à l'ancienne route, pas retomber sur Utilisateurs par défaut.
+          {
+            path: '/users',
+            element: <Navigate to="/administration" replace state={{ tab: 'utilisateurs' }} />,
+          },
+          {
+            path: '/stations',
+            element: <Navigate to="/administration" replace state={{ tab: 'stations' }} />,
+          },
 
           // Référentiels (lecture seule)
           { path: '/referentiels', element: <ReferentielsPage />, handle: { title: 'Référentiels' } },

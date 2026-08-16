@@ -56,3 +56,41 @@ describe('routage (#120)', () => {
     expect(screen.queryByLabelText(/mot de passe/i)).not.toBeInTheDocument()
   })
 })
+
+describe('redirections /users et /stations vers /administration (#123)', () => {
+  beforeEach(() => {
+    localStorage.setItem('access_token', 'fake-token')
+  })
+
+  afterEach(() => {
+    localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  it("le lien historique /stations retombe sur l'onglet Stations, pas Utilisateurs par défaut", async () => {
+    mockedGet.mockImplementation((url: string) => {
+      if (url === '/users/me') {
+        return Promise.resolve({ data: { id: 'u1', role: 'admin', nom: 'Admin', email: 'a@a.com' } })
+      }
+      if (url === '/stations') return Promise.resolve({ data: [] })
+      return Promise.resolve({ data: [] })
+    })
+    renderAt('/stations')
+
+    await waitFor(() => expect(screen.getByText('Aucune station trouvée.')).toBeInTheDocument())
+    expect(screen.queryByText('Gestion des utilisateurs')).not.toBeInTheDocument()
+  })
+
+  it("le lien historique /users retombe bien sur l'onglet Utilisateurs", async () => {
+    mockedGet.mockImplementation((url: string) => {
+      if (url === '/users/me') {
+        return Promise.resolve({ data: { id: 'u1', role: 'admin', nom: 'Admin', email: 'a@a.com' } })
+      }
+      if (url === '/users/') return Promise.resolve({ data: [] })
+      return Promise.resolve({ data: [] })
+    })
+    renderAt('/users')
+
+    await waitFor(() => expect(screen.getByText('Gestion des utilisateurs')).toBeInTheDocument())
+  })
+})
