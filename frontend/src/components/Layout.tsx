@@ -1,5 +1,7 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate, useMatches } from 'react-router-dom'
 import { useCurrentUser } from '../hooks/useCurrentUser'
+
+type RouteHandle = { title?: string; parent?: string }
 
 const baseNavItems = [
   { to: '/', label: 'Tableau de bord' },
@@ -22,6 +24,9 @@ function initiales(nom?: string, prenom?: string) {
 export function Layout() {
   const navigate = useNavigate()
   const { data: currentUser } = useCurrentUser()
+  const matches = useMatches()
+  const handle = matches[matches.length - 1]?.handle as RouteHandle | undefined
+  const title = handle?.title ?? ''
 
   function logout() {
     localStorage.removeItem('access_token')
@@ -119,8 +124,18 @@ export function Layout() {
           </button>
         </div>
       </aside>
-      <main className="flex-1 overflow-auto">
-        <Outlet />
+      <main className="flex-1 overflow-auto flex flex-col">
+        <header className="h-[66px] shrink-0 flex items-center px-6 bg-[#fffdf8] border-b border-[#e7e0cd]">
+          <div className="min-w-0">
+            <p className="text-[10.5px] font-semibold text-gray-500 truncate">
+              {handle?.parent ? `${handle.parent} / ${title}` : title || 'IFVM'}
+            </p>
+            <p className="text-base font-bold text-gray-900 truncate">{title}</p>
+          </div>
+        </header>
+        <div className="flex-1 overflow-auto">
+          <Outlet />
+        </div>
       </main>
     </div>
   )
