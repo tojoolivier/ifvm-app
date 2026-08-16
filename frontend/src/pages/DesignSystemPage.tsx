@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { STATUTS, StatusBadge } from '@/components/ui/status-badge'
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import {
   Table,
   TableHeader,
@@ -45,6 +46,31 @@ const appColors = [
   { label: 'Green (validée)', tw: 'bg-green-100', text: 'text-green-700', hex: '#dcfce7' },
   { label: 'Red (rejetée)', tw: 'bg-red-100', text: 'text-red-700', hex: '#fee2e2' },
   { label: 'Gray (brouillon)', tw: 'bg-gray-100', text: 'text-gray-700', hex: '#f3f4f6' },
+]
+
+// ── DataTable demo ──────────────────────────────────────────────────────────
+
+interface DataTableDemoRow {
+  id: string
+  ficheNum: string
+  station: string
+  date: string
+  surfaceHa: number
+  statut: (typeof STATUTS)[number]
+}
+
+const dataTableDemoRows: DataTableDemoRow[] = [
+  { id: '1', ficheNum: 'F-1042', station: 'Antsirabe', date: '2025-06-25', surfaceHa: 12.4, statut: 'validee' },
+  { id: '2', ficheNum: 'F-1043', station: 'Ambatondrazaka', date: '2025-06-26', surfaceHa: 3.1, statut: 'en_attente' },
+  { id: '3', ficheNum: 'F-1044', station: 'Tuléar', date: '2025-06-27', surfaceHa: 0, statut: 'brouillon' },
+]
+
+const dataTableDemoColumns: DataTableColumn<DataTableDemoRow>[] = [
+  { key: 'ficheNum', header: 'N° fiche', mono: true, render: (row) => row.ficheNum },
+  { key: 'station', header: 'Station', render: (row) => row.station },
+  { key: 'date', header: 'Date', mono: true, render: (row) => row.date },
+  { key: 'surfaceHa', header: 'Surface (ha)', align: 'right', mono: true, render: (row) => row.surfaceHa.toFixed(1) },
+  { key: 'statut', header: 'Statut', render: (row) => <StatusBadge statut={row.statut} /> },
 ]
 
 // ── Statut badge ────────────────────────────────────────────────────────────
@@ -338,6 +364,22 @@ export function DesignSystemPage() {
                 ))}
               </TableBody>
             </Table>
+          </CardContent>
+        </Card>
+      </Section>
+
+      <Separator />
+
+      {/* ── DataTable ── */}
+      <Section title="DataTable">
+        <Card>
+          <CardContent className="p-0">
+            <DataTable
+              columns={dataTableDemoColumns}
+              rows={dataTableDemoRows}
+              getRowKey={(row) => row.id}
+              onRowClick={() => {}}
+            />
           </CardContent>
         </Card>
       </Section>
