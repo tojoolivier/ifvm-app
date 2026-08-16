@@ -70,6 +70,25 @@ interface EntitySpec {
 
 const GREEN_CODE = 'text-[#235a36]'
 
+/**
+ * Les interrupteurs de cet écran affichent `actif` sans le piloter (aucune route
+ * d'écriture). On neutralise l'estompage `disabled` du composant : actif/inactif
+ * est une information métier qui doit rester lisible, comme dans la maquette.
+ */
+const READONLY_SWITCH = 'pointer-events-none data-[disabled]:opacity-100'
+
+/**
+ * Affordance d'écriture présente dans la maquette mais sans route backend.
+ * `aria-disabled` plutôt que `disabled` : l'état reste annoncé et le bouton
+ * atteignable au clavier, sans délaver les couleurs pleines de la maquette —
+ * l'indisponibilité est déjà portée par la pastille « à créer » et le `title`.
+ */
+const UNAVAILABLE = 'cursor-not-allowed'
+
+function noop(event: React.MouseEvent) {
+  event.preventDefault()
+}
+
 function text(row: Row, key: string): string {
   const value = row[key]
   return value === null || value === undefined || value === '' ? '—' : String(value)
@@ -345,6 +364,7 @@ export function ReferentielsPage() {
           <Switch
             checked={Boolean(row.actif)}
             disabled
+            className={READONLY_SWITCH}
             aria-label={row.actif ? 'Actif' : 'Inactif'}
           />
         ),
@@ -449,14 +469,17 @@ export function ReferentielsPage() {
             <h3 className="flex-1 font-sans text-[13px] font-bold">Enregistrements</h3>
             <button
               type="button"
-              disabled={!entity.addRoute}
-              onClick={entity.addRoute ? () => navigate(entity.addRoute!) : undefined}
+              aria-disabled={entity.addRoute ? undefined : true}
+              onClick={entity.addRoute ? () => navigate(entity.addRoute!) : noop}
               title={
                 entity.addRoute
                   ? `Gestion complète sur ${entity.addRoute}`
                   : `${entity.apiLabel} — aucune route d'écriture exposée par le backend`
               }
-              className="rounded-lg bg-[#235a36] px-[14px] py-2 font-sans text-[11.5px] font-bold text-white transition-colors duration-[120ms] hover:bg-[#1a4429] disabled:cursor-not-allowed disabled:opacity-45"
+              className={cn(
+                'rounded-lg bg-[#235a36] px-[14px] py-2 font-sans text-[11.5px] font-bold text-white transition-colors duration-[120ms]',
+                entity.addRoute ? 'hover:bg-[#1a4429]' : UNAVAILABLE,
+              )}
             >
               {entity.addLabel}
             </button>
@@ -530,23 +553,36 @@ export function ReferentielsPage() {
             {entity.hasActif && (
               <div className="flex items-center justify-between pt-0.5">
                 <span className="font-sans text-[11.5px] font-semibold text-[#3a3a30]">Actif</span>
-                <Switch checked={Boolean(selectedRow?.actif)} disabled aria-label="Actif" />
+                <Switch
+                  checked={Boolean(selectedRow?.actif)}
+                  disabled
+                  className={READONLY_SWITCH}
+                  aria-label="Actif"
+                />
               </div>
             )}
 
             <div className="flex gap-2">
               <button
                 type="button"
-                disabled
+                aria-disabled
+                onClick={noop}
                 title={`${entity.apiLabel} — enregistrement impossible tant que la route d'écriture n'existe pas`}
-                className="flex-1 rounded-[9px] bg-[#235a36] py-[11px] font-sans text-[12px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-45"
+                className={cn(
+                  'flex-1 rounded-[9px] bg-[#235a36] py-[11px] font-sans text-[12px] font-bold text-white',
+                  UNAVAILABLE,
+                )}
               >
                 Enregistrer
               </button>
               <button
                 type="button"
-                disabled
-                className="rounded-[9px] border border-[#e0d9c4] bg-white px-4 py-[11px] font-sans text-[12px] font-semibold text-ifvm-text-tertiary disabled:cursor-not-allowed disabled:opacity-45"
+                aria-disabled
+                onClick={noop}
+                className={cn(
+                  'rounded-[9px] border border-[#e0d9c4] bg-white px-4 py-[11px] font-sans text-[12px] font-semibold text-ifvm-text-tertiary',
+                  UNAVAILABLE,
+                )}
               >
                 Annuler
               </button>
@@ -566,9 +602,13 @@ export function ReferentielsPage() {
             </p>
             <button
               type="button"
-              disabled
+              aria-disabled
+              onClick={noop}
               title="Le suivi par agent n'est pas exposé par GET /referentiel/pull"
-              className="mt-[10px] w-full rounded-lg border border-ifvm-green-border bg-white px-3 py-[9px] font-sans text-[11.5px] font-bold text-ifvm-green-text disabled:cursor-not-allowed disabled:opacity-45"
+              className={cn(
+                'mt-[10px] w-full rounded-lg border border-ifvm-green-border bg-white px-3 py-[9px] font-sans text-[11.5px] font-bold text-ifvm-green-text',
+                UNAVAILABLE,
+              )}
             >
               Voir les agents en retard
             </button>

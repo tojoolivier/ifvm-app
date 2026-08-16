@@ -112,8 +112,16 @@ describe('ReferentielsPage — maquette §11 du handoff', () => {
     await waitFor(() => expect(nav().getByText('7 référentiels')).toBeInTheDocument())
 
     // Pesticides est sélectionné par défaut — aucune écriture exposée.
-    expect(screen.getByRole('button', { name: '+ Nouveau pesticide' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeDisabled()
+    // `aria-disabled` plutôt que `disabled` : couleurs pleines de la maquette
+    // conservées, état tout de même annoncé et bouton atteignable au clavier.
+    expect(screen.getByRole('button', { name: '+ Nouveau pesticide' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    )
+    expect(screen.getByRole('button', { name: 'Enregistrer' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    )
   })
 
   it('renvoie vers le CRUD existant pour les entités déjà administrables', async () => {
@@ -123,7 +131,9 @@ describe('ReferentielsPage — maquette §11 du handoff', () => {
     await waitFor(() => expect(nav().getByText('campagne')).toBeInTheDocument())
     fireEvent.click(nav().getByText('campagne'))
 
-    expect(screen.getByRole('button', { name: '+ Nouvelle campagne' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '+ Nouvelle campagne' })).not.toHaveAttribute(
+      'aria-disabled',
+    )
   })
 
   it('change de référentiel et affiche ses colonnes dédiées', async () => {

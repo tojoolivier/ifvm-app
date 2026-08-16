@@ -12,9 +12,9 @@ const baseNavItems = [
 ]
 
 // Nombre d'entités du référentiel admin — fixe (types d'entités), pas un total
-// d'enregistrements côté API. Campagnes exclue : gestion complète déjà sur sa
-// propre page (/campagnes), pas un référentiel en lecture seule.
-const NB_REFERENTIELS = 6
+// d'enregistrements côté API. 7 comme la maquette (README §11, « 7 référentiels ») :
+// campagne y figure aussi, la carte renvoyant vers /campagnes pour son CRUD complet.
+const NB_REFERENTIELS = 7
 
 // Campagne n'a pas de champ `active` côté backend (#121) : dérivée par date tant
 // que le backend n'expose pas ce concept. En cas de chevauchement, la plus récente gagne.
