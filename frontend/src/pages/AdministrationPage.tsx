@@ -6,10 +6,19 @@ import { api } from '../api/client'
 import { UsersPage } from './UsersPage'
 import { StationPage } from './StationPage'
 
+/**
+ * Onglets de la maquette §10 (prototype ligne 891) : `padding 9px 16px`,
+ * rayon `9px`, `700 12px` — le même gabarit que `NavTabs`, en état local ici
+ * puisque l'écran n'a qu'une route (`/administration`).
+ */
 const chipClass =
-  'rounded-full border px-5 py-2.5 font-sans text-[13px] font-bold transition-colors ' +
-  'border-ifvm-brouillon-border bg-background text-ifvm-text-tertiary ' +
+  'rounded-[9px] border px-4 py-[9px] font-sans text-[12px] font-bold transition-colors ' +
+  'border-ifvm-brouillon-border bg-background text-ifvm-text-tertiary hover:bg-ifvm-brouillon-bg ' +
   'data-[active]:border-ifvm-green-text data-[active]:bg-ifvm-green-text data-[active]:text-white'
+
+/** Bouton d'ajout contextuel : `padding 10px 16px`, rayon `9px`, `700 12px`. */
+const addButtonClass =
+  'rounded-[9px] bg-ifvm-green-text px-4 py-[10px] font-sans text-[12px] font-bold text-white'
 
 type Tab = 'utilisateurs' | 'stations'
 
@@ -25,15 +34,18 @@ export function AdministrationPage() {
     queryKey: ['users'],
     queryFn: () => api.get('/users/').then((r) => r.data),
   })
+  // Même clé et mêmes paramètres que StationPage : le compteur d'onglet et le
+  // tableau partagent une seule requête.
   const { data: stations = [] } = useQuery<unknown[]>({
-    queryKey: ['stations'],
-    queryFn: () => api.get('/stations').then((r) => r.data),
+    queryKey: ['stations', 'administration'],
+    queryFn: () => api.get('/stations', { params: { inclure_inactifs: true } }).then((r) => r.data),
   })
 
   return (
-    <div className="px-6 pt-6">
+    // 28px latéraux : aligne le contenu sur le fil d'Ariane du header (Layout).
+    <div className="flex flex-col gap-4 px-7 pb-10 pt-[26px]">
       <TabsPrimitive.Root value={tab} onValueChange={(v) => setTab(v as Tab)}>
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between">
           <TabsPrimitive.List className="flex w-fit gap-2">
             <TabsPrimitive.Tab value="utilisateurs" className={chipClass}>
               Utilisateurs · {users.length}
@@ -46,7 +58,7 @@ export function AdministrationPage() {
           {tab === 'utilisateurs' ? (
             <button
               onClick={() => setShowCreateUser(true)}
-              className="rounded-[8px] bg-ifvm-green-text px-4 py-2 font-sans text-sm font-bold text-white transition hover:bg-[#1a4429]"
+              className={`${addButtonClass} transition hover:bg-[#1a4429]`}
             >
               + Nouvel utilisateur
             </button>
@@ -54,7 +66,7 @@ export function AdministrationPage() {
             <button
               disabled
               title="Indisponible : l'API n'expose aucune écriture sur station_fixe (lecture seule)."
-              className="cursor-not-allowed rounded-[8px] bg-ifvm-green-text px-4 py-2 font-sans text-sm font-bold text-white opacity-50"
+              className={`${addButtonClass} cursor-not-allowed opacity-50`}
             >
               + Nouvelle station
             </button>

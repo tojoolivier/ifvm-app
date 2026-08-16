@@ -78,7 +78,7 @@ describe('redirections /users et /stations vers /administration (#123)', () => {
     renderAt('/stations')
 
     await waitFor(() => expect(screen.getByText('Aucune station trouvée.')).toBeInTheDocument())
-    expect(screen.queryByText(/UtilisateurRead/)).not.toBeInTheDocument()
+    expect(screen.queryByText('Aucun utilisateur enregistré.')).not.toBeInTheDocument()
   })
 
   it("le lien historique /users retombe bien sur l'onglet Utilisateurs", async () => {
@@ -91,6 +91,8 @@ describe('redirections /users et /stations vers /administration (#123)', () => {
     })
     renderAt('/users')
 
-    await waitFor(() => expect(screen.getByText(/UtilisateurRead/)).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByText('Aucun utilisateur enregistré.')).toBeInTheDocument(),
+    )
   })
 })

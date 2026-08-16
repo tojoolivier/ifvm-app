@@ -5,7 +5,8 @@ import { api } from '../api/client'
 import { Utilisateur } from '../types'
 import { DataTable, DataTableColumn } from '../components/ui/data-table'
 import { Switch } from '../components/ui/switch'
-import { Card, CardContent } from '../components/ui/card'
+import { ErrorBanner } from '@/components/ui/error-banner'
+import { cn } from '@/lib/utils'
 
 const ROLES = [
   'prospecteur',
@@ -18,6 +19,24 @@ const ROLES = [
   'chef_de_base',
   'admin',
 ]
+
+/**
+ * Ton de badge par rôle — prototype ligne 1521 : la maquette colore le rôle
+ * avec la palette des statuts (`map={Admin:'verifiee', Chef:'validee', …}`).
+ * On garde la même logique : encadrement en vert, contrôle en ambre,
+ * validation finale en rouge, terrain en gris, administration en bleu.
+ */
+const ROLE_TONES: Record<string, string> = {
+  prospecteur: 'bg-ifvm-brouillon-bg text-ifvm-brouillon-text border-ifvm-brouillon-border',
+  pilote: 'bg-ifvm-brouillon-bg text-ifvm-brouillon-text border-ifvm-brouillon-border',
+  mecanicien: 'bg-ifvm-brouillon-bg text-ifvm-brouillon-text border-ifvm-brouillon-border',
+  verificateur: 'bg-ifvm-amber-bg text-ifvm-amber-text border-ifvm-amber-border',
+  validation_finale: 'bg-ifvm-danger-bg text-ifvm-danger-text border-ifvm-danger-border',
+  chef_equipe: 'bg-ifvm-green-bg text-ifvm-green-text border-ifvm-green-border',
+  chef_de_base: 'bg-ifvm-green-bg text-ifvm-green-text border-ifvm-green-border',
+  agent_encadreur: 'bg-ifvm-green-bg text-ifvm-green-text border-ifvm-green-border',
+  admin: 'bg-ifvm-blue-bg text-ifvm-blue-text border-ifvm-blue-border',
+}
 
 const ROLE_LABELS: Record<string, string> = {
   prospecteur: 'Prospecteur',
@@ -45,11 +64,32 @@ export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
   const [role, setRole] = useState(ROLES[0])
   const [createError, setCreateError] = useState('')
 
-  const { data: usersData = [], isLoading } = useQuery<Utilisateur[]>({
+  const { data: usersData = [], isLoading, isError, error } = useQuery<Utilisateur[]>({
     queryKey: ['users'],
     queryFn: () => api.get('/users/').then((r) => r.data),
   })
   const users = Array.isArray(usersData) ? usersData : []
+
+  const errorStatus = (error as AxiosError)?.response?.status
+  const errorDetail = (error as AxiosError<{ detail?: string }>)?.response?.data?.detail
+
+  // Colonne « Fiches » de la maquette : `GET /prospections` n'expose pas de
+  // compteur agrégé par prospecteur — on compte côté client, comme le fait déjà
+  // StationPage pour ses prospections par station. Provisoire : la liste
+  // complète transite à chaque affichage, ce qui ne tiendra pas à l'échelle
+  // d'une base de plusieurs milliers de fiches. Un agrégat côté API
+  // (`GET /prospections?group_by=prospecteur_id`) est la vraie réponse.
+  const { data: prospectionsData = [], isError: fichesIndisponibles } = useQuery<
+    { prospecteur_id: string | null }[]
+  >({
+    queryKey: ['prospections', 'all'],
+    queryFn: () => api.get('/prospections').then((r) => r.data),
+  })
+  const fichesParProspecteur = new Map<string, number>()
+  for (const p of Array.isArray(prospectionsData) ? prospectionsData : []) {
+    if (!p.prospecteur_id) continue
+    fichesParProspecteur.set(p.prospecteur_id, (fichesParProspecteur.get(p.prospecteur_id) ?? 0) + 1)
+  }
 
   const createMutation = useMutation({
     mutationFn: (data: { nom: string; prenom: string; email: string; password: string; role: string }) =>
@@ -94,23 +134,36 @@ export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
     {
       key: 'nom',
       header: 'Nom',
-      render: (u) => `${u.prenom} ${u.nom}`,
+      render: (u) => (
+        <span className="text-[12.5px] font-semibold">{`${u.prenom} ${u.nom}`}</span>
+      ),
     },
     {
       key: 'email',
       header: 'Email',
       mono: true,
-      render: (u) => <span className="font-mono text-ifvm-text-tertiary">{u.email}</span>,
+      render: (u) => (
+        <span className="font-mono text-[11.5px] font-medium text-ifvm-text-tertiary">
+          {u.email}
+        </span>
+      ),
     },
     {
       key: 'role',
       header: 'Rôle',
       render: (u) => (
+        // La maquette dessine un badge ; le rôle reste modifiable, on garde donc
+        // un `select` habillé aux couleurs du badge plutôt qu'un texte inerte.
         <select
           value={u.role}
+          aria-label={`Rôle de ${u.prenom} ${u.nom}`}
           disabled={updateMutation.isPending}
           onChange={(e) => updateMutation.mutate({ id: u.id, role: e.target.value })}
-          className="inline-flex items-center rounded-full border border-ifvm-green-border bg-ifvm-green-bg px-[9px] py-[3px] font-sans text-[10px] font-bold text-ifvm-green-text disabled:opacity-50"
+          className={cn(
+            'inline-flex items-center rounded-full border px-[9px] py-[3px] font-sans text-[10px] font-bold disabled:opacity-50',
+            ROLE_TONES[u.role] ??
+              'bg-ifvm-brouillon-bg text-ifvm-brouillon-text border-ifvm-brouillon-border',
+          )}
         >
           {ROLES.map((r) => (
             <option key={r} value={r}>
@@ -121,9 +174,33 @@ export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
       ),
     },
     {
+      key: 'station',
+      header: 'Station',
+      render: (u) =>
+        u.pa_nom ? (
+          <span className="text-[#3a3a30]">
+            {u.pa_code ? `${u.pa_code} ${u.pa_nom}` : u.pa_nom}
+          </span>
+        ) : (
+          <span className="text-ifvm-text-weak">—</span>
+        ),
+    },
+    {
+      key: 'fiches',
+      header: 'Fiches',
+      align: 'right',
+      mono: true,
+      // Un « ? » plutôt qu'un 0 trompeur si le comptage n'a pas pu être chargé.
+      render: (u) =>
+        fichesIndisponibles ? (
+          <span className="text-ifvm-text-weak">?</span>
+        ) : (
+          (fichesParProspecteur.get(u.id) ?? 0)
+        ),
+    },
+    {
       key: 'actif',
       header: 'Actif',
-      align: 'right',
       render: (u) => (
         <Switch
           checked={u.actif}
@@ -136,25 +213,20 @@ export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
 
   return (
     <div>
-      <div className="mb-4 rounded-[9px] border border-ifvm-amber-border bg-ifvm-amber-bg px-4 py-3 text-sm text-ifvm-amber-text">
-        Station et nombre de fiches par utilisateur ne sont pas exposés par l'API (le schéma
-        <code className="mx-1 font-mono">UtilisateurRead</code>
-        ne porte pas ces champs) : ces deux colonnes de la maquette sont provisoirement masquées.
-      </div>
-
-      {isLoading ? (
-        <p className="text-ifvm-text-weak">Chargement…</p>
+      {isError ? (
+        <ErrorBanner
+          label={errorStatus ? `Erreur ${errorStatus}` : 'Erreur'}
+          message={errorDetail ?? 'Impossible de charger les utilisateurs.'}
+        />
       ) : (
-        <Card>
-          <CardContent className="p-0">
-            <DataTable
-              columns={columns}
-              rows={users}
-              getRowKey={(u) => u.id}
-              emptyMessage="Aucun utilisateur enregistré."
-            />
-          </CardContent>
-        </Card>
+        <div className="overflow-hidden rounded-[11px] border border-[#e7e0cd] bg-card">
+          <DataTable
+            columns={columns}
+            rows={users}
+            getRowKey={(u) => u.id}
+            emptyMessage={isLoading ? 'Chargement…' : 'Aucun utilisateur enregistré.'}
+          />
+        </div>
       )}
 
       {showCreate && (
