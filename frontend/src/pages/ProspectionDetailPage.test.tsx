@@ -150,7 +150,7 @@ describe('ProspectionDetailPage — maquette §5 du handoff', () => {
 
     expect(screen.getByText('D · Infestation — spécialisation')).toBeInTheDocument()
     expect(screen.getByText('A · Référence & localisation')).toBeInTheDocument()
-    expect(screen.getByText('B · Captures par phase')).toBeInTheDocument()
+    expect(screen.getByText('B · Captures — synthèse par phase')).toBeInTheDocument()
     expect(screen.getByText('E · Végétation & sol')).toBeInTheDocument()
   })
 

@@ -3,6 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { FilterChip } from '@/components/ui/filter-chip'
+import { useAnnuaire, type Utilisateur } from '@/lib/use-annuaire'
 
 /**
  * Maquette §4 du handoff (`data-screen-label="Nouvelle prospection"`).
@@ -26,12 +31,6 @@ interface Station {
   pa_code: string
 }
 
-interface Utilisateur {
-  id: string
-  nom: string
-  role: string
-}
-
 interface ProspectionBrouillon {
   id: string
   prospecteur_id: string
@@ -51,18 +50,21 @@ const SECTIONS_TERRAIN = [
   'E · Végétation & sol',
 ]
 
-/** Sur-titre de champ : `600 9.5px` uppercase, interlettrage .8px. */
+/** Sur-titre de champ du handoff : `600 9.5px` uppercase, interlettrage .8px. */
 function ChampLabel({ htmlFor, children }: { htmlFor?: string; children: React.ReactNode }) {
   return (
-    <label
+    <Label
       htmlFor={htmlFor}
       className="font-sans text-[9.5px] font-semibold uppercase tracking-[.8px] text-ifvm-text-weak"
     >
       {children}
-    </label>
+    </Label>
   )
 }
 
+// `Select` de shadcn est un composant Radix sans élément natif : il ne se prête
+// pas au `<label for>` ni au `fireEvent.change` des tests. Les deux listes de
+// cet écran restent donc des `<select>` natifs, stylés sur les tokens du handoff.
 const CHAMP_CLASSES =
   'h-[38px] rounded-[8px] border border-[#e0d9c4] bg-[#fffdf8] px-3 font-sans text-[12.5px] font-semibold text-foreground'
 
@@ -92,13 +94,7 @@ export function NouvelleProspectionPage() {
     queryFn: () => api.get('/users/me').then((r) => r.data),
   })
 
-  // `/users/` est réservé aux admins : la liste sert seulement à montrer les
-  // autres agents du référentiel, la page reste utilisable sans elle.
-  const { data: utilisateurs = [] } = useQuery<Utilisateur[]>({
-    queryKey: ['users'],
-    queryFn: () => api.get('/users/').then((r) => r.data),
-    retry: false,
-  })
+  const { utilisateurs } = useAnnuaire()
 
   const { data: prospections = [] } = useQuery<ProspectionBrouillon[]>({
     queryKey: ['prospections'],
@@ -205,7 +201,7 @@ export function NouvelleProspectionPage() {
 
             <div className="flex flex-col gap-[6px]">
               <ChampLabel htmlFor="np-date">Date de prospection *</ChampLabel>
-              <input
+              <Input
                 id="np-date"
                 type="date"
                 value={dateProspection}
@@ -216,7 +212,7 @@ export function NouvelleProspectionPage() {
 
             <div className="flex flex-col gap-[6px]">
               <ChampLabel>N° de fiche (auto)</ChampLabel>
-              <div className="flex h-[38px] items-center rounded-[8px] border border-dashed border-[#d8cfb6] bg-background px-3 font-mono text-[12.5px] font-semibold text-ifvm-text-weak">
+              <div className="flex h-[38px] items-center rounded-[8px] border border-dashed border-[#e0d9c4] bg-background px-3 font-mono text-[12.5px] font-semibold text-ifvm-text-weak">
                 généré à l’enregistrement
               </div>
             </div>
@@ -228,26 +224,20 @@ export function NouvelleProspectionPage() {
           <div className="flex flex-col gap-2">
             <ChampLabel>Prospecteur * — référentiel utilisateurs</ChampLabel>
             <div className="flex flex-wrap gap-[6px]">
-              {agents.map((a) => {
-                const actif = a.id === moi?.id
-                return (
+              {agents.map((a) =>
+                a.id === moi?.id ? (
+                  <FilterChip key={a.id} label={a.nom} active onClick={() => {}} />
+                ) : (
                   <button
                     key={a.id}
                     type="button"
-                    aria-pressed={actif}
-                    aria-disabled={actif ? undefined : true}
-                    onClick={actif ? undefined : (e) => e.preventDefault()}
-                    className={cn(
-                      'rounded-[8px] border px-[13px] py-2 font-sans text-[11.5px] font-semibold',
-                      actif
-                        ? 'border-ifvm-green-text bg-ifvm-green-text text-white'
-                        : 'cursor-not-allowed border-[#e0d9c4] bg-background text-ifvm-text-weak',
-                    )}
+                    aria-disabled
+                    className="cursor-not-allowed rounded-[8px] border border-[#e0d9c4] bg-background px-[13px] py-2 font-sans text-[11.5px] font-semibold text-ifvm-text-weak"
                   >
                     {a.nom}
                   </button>
-                )
-              })}
+                ),
+              )}
             </div>
             <p className="font-sans text-[10.5px] font-medium leading-[1.5] text-ifvm-text-weak">
               L’affectation à un autre agent demande une évolution backend :{' '}
@@ -275,7 +265,7 @@ export function NouvelleProspectionPage() {
             </div>
             <div className="flex flex-col gap-[6px]">
               <ChampLabel htmlFor="np-localite">Localité</ChampLabel>
-              <input
+              <Input
                 id="np-localite"
                 type="text"
                 value={localite}
@@ -292,21 +282,22 @@ export function NouvelleProspectionPage() {
           )}
 
           <div className="flex items-center gap-[10px] pt-1">
-            <button
+            <Button
               type="button"
               onClick={handleCreate}
               disabled={mutation.isPending}
-              className="rounded-[9px] bg-ifvm-green-text px-5 py-[11px] font-sans text-[12.5px] font-bold text-white disabled:opacity-60"
+              className="h-auto rounded-[9px] bg-ifvm-green-text px-5 py-[11px] font-sans text-[12.5px] font-bold text-white"
             >
               {mutation.isPending ? 'Création…' : 'Créer et assigner'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="outline"
               onClick={() => navigate('/prospections')}
-              className="rounded-[9px] border border-[#e0d9c4] bg-card px-[18px] py-[11px] font-sans text-[12.5px] font-semibold text-ifvm-text-tertiary"
+              className="h-auto rounded-[9px] border-[#e0d9c4] px-[18px] py-[11px] font-sans text-[12.5px] font-semibold text-ifvm-text-tertiary"
             >
               Annuler
-            </button>
+            </Button>
           </div>
         </section>
       </div>
