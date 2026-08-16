@@ -126,7 +126,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
     renderPage(traitementAerien())
     await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
 
-    expect(screen.getByTestId('traitement-header')).toHaveClass('bg-[#235a36]')
+    expect(screen.getByTestId('traitement-header')).toHaveClass('bg-ifvm-green-text')
     expect(screen.getByText(/Aérien · mode Barrière · Beroroha · validée le 2026-08-13/)).toBeInTheDocument()
     expect(screen.getByText('🔒 Lecture seule')).toBeInTheDocument()
   })
@@ -141,8 +141,8 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
     renderPage(traitementAerien())
     await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
 
-    expect(screen.getByText(/3.2 ha/)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Voir la fiche de prospection/ })).toHaveAttribute(
+    expect(screen.getByText(/3,2 ha/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /la fiche de prospection/ })).toHaveAttribute(
       'href',
       '/prospections/p1',
     )
@@ -184,6 +184,101 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
     expect(screen.getByText('Panne matériel')).toBeInTheDocument()
   })
 
+  it('marque les EPI absents d’une pastille rouge et liste les zones exposées', async () => {
+    renderPage(
+      traitementAerien({
+        zones_exposees: { habitations: true, ruchers: true, cultures: false },
+      }),
+    )
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+
+    // `kit_boite: false` dans la fixture, les quatre autres à true : c'est
+    // l'état lu par un lecteur d'écran qui compte, pas la teinte de la pastille.
+    expect(screen.getByText('Boîte à pharmacie').parentElement).toHaveTextContent('absent')
+    expect(screen.getByText('Combinaison').parentElement).toHaveTextContent('présent')
+    expect(screen.getByText('Habitations, Ruchers')).toBeInTheDocument()
+  })
+
+  it('affiche les axes de risque avec un badge de niveau teinté', async () => {
+    renderPage(
+      traitementAerien({
+        evaluation_risque: { sol: 'FAIBLE', abeilles: 'ELEVE' },
+      }),
+    )
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+
+    expect(screen.getByText('Sol')).toBeInTheDocument()
+    expect(screen.getByText('Faible').className).toMatch(/ifvm-green-bg/)
+    expect(screen.getByText('Élevé').className).toMatch(/ifvm-danger-bg/)
+  })
+
+  it('affiche le panneau Surfaces avec la restante détachée en ambre', async () => {
+    renderPage(
+      traitementAerien({
+        type_traitement: 'TERRESTRE',
+        aerien: null,
+        terrestre: {
+          heure_debut: '06:00:00',
+          heure_fin: '10:00:00',
+          vitesse_vent_ms: 1.8,
+          surface_traitee_ha: 860,
+          surface_cumulee_ha: 1040,
+          surface_restante_ha: 160,
+          surface_restante_abandonnee: false,
+          motif_surface_restante_abandonnee: null,
+          reprise_traitement: false,
+          traitement_origine_id: null,
+          produits: [],
+        },
+      }),
+    )
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+
+    expect(screen.getByText('Surfaces (ha)')).toBeInTheDocument()
+    // `toLocaleString('fr-FR')` sépare les milliers par une espace insécable
+    // que la normalisation de Testing Library ne ramène pas à un espace simple.
+    expect(screen.getByText('Cumulée (reprises)').parentElement?.textContent).toMatch(/1.040/)
+    expect(screen.getByText('Restante').className).toMatch(/ifvm-amber-text/)
+  })
+
+  it('garde les panneaux Surfaces et Chaîne de reprise sur une fiche aérienne', async () => {
+    // La fiche détaillée de la maquette est aérienne et porte pourtant les deux
+    // panneaux : ils ne doivent pas être conditionnés au bloc terrestre.
+    renderPage(traitementAerien())
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+
+    expect(screen.getByText('Surfaces (ha)')).toBeInTheDocument()
+    expect(screen.getByText('Chaîne de reprise')).toBeInTheDocument()
+    // Le snapshot de cible reste lisible même sans bloc terrestre.
+    expect(screen.getByText('Infestée (snapshot)').parentElement?.textContent).toMatch(/3,2/)
+  })
+
+  it('formate l’horodatage de signature comme la maquette (sans secondes)', async () => {
+    renderPage(
+      traitementAerien({
+        signatures: [
+          { id: 's1', role: 'PILOTE', signataire_nom: 'Jean Rakoto', horodatage: '2026-08-12T17:04:33' },
+        ],
+      }),
+    )
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+
+    expect(screen.getByText('2026-08-12 17:04')).toBeInTheDocument()
+  })
+
+  it('propose un onglet de retour vers la liste des fiches', async () => {
+    renderPage(traitementAerien())
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+
+    expect(screen.getByRole('link', { name: 'Liste des fiches' })).toHaveAttribute(
+      'href',
+      '/traitements',
+    )
+    expect(
+      screen.getByRole('link', { name: 'Détail · Jean-AERIEN-2026-08-12' }),
+    ).toHaveAttribute('aria-current', 'page')
+  })
+
   it('la matrice de signatures affiche « ne signe pas » pour les rôles non renseignés', async () => {
     renderPage(traitementAerien())
     await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
@@ -213,10 +308,12 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
     )
     await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
 
-    expect(screen.getByText(/Reprise d'un traitement :/).parentElement).toHaveTextContent(
-      "Reprise d'un traitement : Oui",
+    // Maquette : « Origine : <lien> → cette fiche. Une seule reprise possible
+    // par fiche d'origine. »
+    expect(screen.getByText(/Une seule reprise possible par fiche d'origine/)).toHaveTextContent(
+      'Origine :',
     )
-    expect(screen.getByRole('link', { name: "Voir la fiche d'origine" })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: "fiche d'origine" })).toHaveAttribute(
       'href',
       '/traitements/origine-1',
     )
