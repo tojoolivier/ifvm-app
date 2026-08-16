@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { api } from '../api/client'
@@ -11,8 +11,30 @@ vi.mock('../api/client', () => ({
 
 const mockedGet = api.get as unknown as ReturnType<typeof vi.fn>
 
+const SERVER_TIME = '2026-08-14T12:10:00Z'
+
+function pull(overrides: Record<string, unknown> = {}) {
+  const empty = { upserts: [], server_time: SERVER_TIME }
+  return {
+    data: {
+      postes_acridiens: empty,
+      stations_fixes: empty,
+      utilisateurs_equipe: empty,
+      pesticides: empty,
+      cultures: empty,
+      codes_stades: empty,
+      campagnes: empty,
+      ...overrides,
+    },
+  }
+}
+
+function nav() {
+  return within(screen.getByRole('navigation', { name: 'Référentiels' }))
+}
+
 function renderPage() {
-  const queryClient = new QueryClient()
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={['/referentiels']}>
@@ -22,117 +44,121 @@ function renderPage() {
   )
 }
 
-describe('ReferentielsPage — 6 entités, campagnes exclue (gestion complète sur /campagnes)', () => {
+describe('ReferentielsPage — maquette §11 du handoff', () => {
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  it("n'affiche pas d'onglet Campagnes", async () => {
-    mockedGet.mockResolvedValue({
-      data: {
-        postes_acridiens: { upserts: [], server_time: '2026-08-16T00:00:00Z' },
-        stations_fixes: { upserts: [], server_time: '2026-08-16T00:00:00Z' },
-        utilisateurs_equipe: { upserts: [], server_time: '2026-08-16T00:00:00Z' },
-        pesticides: { upserts: [], server_time: '2026-08-16T00:00:00Z' },
-        cultures: { upserts: [], server_time: '2026-08-16T00:00:00Z' },
-        codes_stades: { upserts: [], server_time: '2026-08-16T00:00:00Z' },
-      },
-    })
+  it('liste les 7 référentiels de la maquette dans la colonne de navigation', async () => {
+    mockedGet.mockResolvedValue(pull())
     renderPage()
 
-    await waitFor(() => expect(screen.getByRole('tab', { name: /Postes acridiens/ })).toBeInTheDocument())
+    await waitFor(() => expect(nav().getByText('7 référentiels')).toBeInTheDocument())
 
-    expect(screen.queryByRole('tab', { name: /Campagnes/ })).not.toBeInTheDocument()
-    expect(screen.getAllByRole('tab')).toHaveLength(6)
+    for (const table of [
+      'pesticide',
+      'culture',
+      'code_stade',
+      'poste_acridien',
+      'station_fixe',
+      'utilisateur',
+      'campagne',
+    ]) {
+      expect(nav().getByText(table)).toBeInTheDocument()
+    }
   })
 
-  it('affiche des colonnes labellisées FR (pas les clés brutes) pour stations_fixes', async () => {
-    mockedGet.mockResolvedValue({
-      data: {
-        postes_acridiens: { upserts: [], server_time: '2026-08-16T00:00:00Z' },
-        stations_fixes: {
+  it("affiche l'état API réel par entité (pastille « API » ou « à créer »)", async () => {
+    mockedGet.mockResolvedValue(pull())
+    renderPage()
+
+    await waitFor(() => expect(nav().getByText('7 référentiels')).toBeInTheDocument())
+
+    // 4 entités sans écriture backend : pesticide, culture, code_stade, station_fixe.
+    expect(nav().getAllByText('à créer')).toHaveLength(4)
+    // 3 entités avec au moins une lecture/écriture exposée : poste_acridien, utilisateur, campagne.
+    expect(nav().getAllByText('API')).toHaveLength(3)
+  })
+
+  it("signale l'écart matière active / dose de référence sur les pesticides", async () => {
+    mockedGet.mockResolvedValue(
+      pull({
+        pesticides: {
+          upserts: [
+            { id: 'p1', code: 'PST-ADO4', nom: 'Adonis 4 UL', actif: true, updated_at: SERVER_TIME },
+          ],
+          server_time: SERVER_TIME,
+        },
+      }),
+    )
+    renderPage()
+
+    // Le code apparaît dans la ligne du tableau et dans le panneau Modifier.
+    await waitFor(() => expect(screen.getAllByText('PST-ADO4').length).toBeGreaterThan(0))
+
+    // En-tête de colonne + libellé du champ dans le panneau Modifier.
+    expect(screen.getAllByText('Matière active').length).toBeGreaterThan(0)
+    expect(screen.getByRole('columnheader', { name: 'Dose de référence' })).toBeInTheDocument()
+    expect(
+      screen.getByText(/la table pesticide ne porte que code, nom et actif/),
+    ).toBeInTheDocument()
+    expect(screen.getAllByText('colonne absente en base')).toHaveLength(2)
+  })
+
+  it("désactive l'ajout quand aucune route d'écriture n'existe côté backend", async () => {
+    mockedGet.mockResolvedValue(pull())
+    renderPage()
+
+    await waitFor(() => expect(nav().getByText('7 référentiels')).toBeInTheDocument())
+
+    // Pesticides est sélectionné par défaut — aucune écriture exposée.
+    expect(screen.getByRole('button', { name: '+ Nouveau pesticide' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeDisabled()
+  })
+
+  it('renvoie vers le CRUD existant pour les entités déjà administrables', async () => {
+    mockedGet.mockResolvedValue(pull())
+    renderPage()
+
+    await waitFor(() => expect(nav().getByText('campagne')).toBeInTheDocument())
+    fireEvent.click(nav().getByText('campagne'))
+
+    expect(screen.getByRole('button', { name: '+ Nouvelle campagne' })).toBeEnabled()
+  })
+
+  it('change de référentiel et affiche ses colonnes dédiées', async () => {
+    mockedGet.mockResolvedValue(
+      pull({
+        codes_stades: {
           upserts: [
             {
-              id: 's1',
-              code: 'STA-01',
-              nom: 'Station Nord',
-              pa_id: 'p1',
-              latitude: -18.9,
-              longitude: 47.5,
-              altitude: 1200,
+              id: 'cs1',
+              code: 'LM-L1',
+              espece: 'Locusta migratoria',
+              libelle: 'Larve stade 1',
               actif: true,
-              updated_at: '2026-08-16T00:00:00Z',
+              updated_at: SERVER_TIME,
             },
           ],
-          server_time: '2026-08-16T00:00:00Z',
+          server_time: SERVER_TIME,
         },
-        utilisateurs_equipe: { upserts: [], server_time: '2026-08-16T00:00:00Z' },
-        pesticides: { upserts: [], server_time: '2026-08-16T00:00:00Z' },
-        cultures: { upserts: [], server_time: '2026-08-16T00:00:00Z' },
-        codes_stades: { upserts: [], server_time: '2026-08-16T00:00:00Z' },
-      },
-    })
+      }),
+    )
     renderPage()
 
-    await waitFor(() => screen.getByRole('tab', { name: /Stations fixes/ }))
-    screen.getByRole('tab', { name: /Stations fixes/ }).click()
+    await waitFor(() => expect(nav().getByText('code_stade')).toBeInTheDocument())
+    fireEvent.click(nav().getByText('code_stade'))
 
-    await waitFor(() => expect(screen.getByText('Latitude')).toBeInTheDocument())
-    expect(screen.getByText('Altitude')).toBeInTheDocument()
-    expect(screen.queryByText('pa_id')).not.toBeInTheDocument()
+    expect(screen.getByText('Espèce')).toBeInTheDocument()
+    expect(screen.getByText('Libellé')).toBeInTheDocument()
+    expect(screen.getAllByText('Larve stade 1').length).toBeGreaterThan(0)
   })
 
-  const emptyEntities = {
-    postes_acridiens: { upserts: [], server_time: '2026-08-16T00:00:00Z' },
-    stations_fixes: { upserts: [], server_time: '2026-08-16T00:00:00Z' },
-    utilisateurs_equipe: { upserts: [], server_time: '2026-08-16T00:00:00Z' },
-    pesticides: { upserts: [], server_time: '2026-08-16T00:00:00Z' },
-    cultures: { upserts: [], server_time: '2026-08-16T00:00:00Z' },
-    codes_stades: { upserts: [], server_time: '2026-08-16T00:00:00Z' },
-  }
-
-  it.each([
-    {
-      tabName: /Utilisateurs équipe/,
-      entity: 'utilisateurs_equipe',
-      row: { id: 'u1', nom: 'Rakoto', prenom: 'Jean', email: 'jean@ifvm.mg', role: 'chef', pa_id: 'p1', actif: true, updated_at: '2026-08-16T00:00:00Z' },
-      expectedHeaders: ['Prénom', 'Rôle'],
-      rawKeyNotShown: 'pa_id',
-    },
-    {
-      tabName: /Pesticides/,
-      entity: 'pesticides',
-      row: { id: 'pe1', code: 'PES-01', nom: 'Deltaméthrine', actif: true, updated_at: '2026-08-16T00:00:00Z' },
-      expectedHeaders: ['Code', 'Nom'],
-      rawKeyNotShown: 'updated_at',
-    },
-    {
-      tabName: /Cultures/,
-      entity: 'cultures',
-      row: { id: 'c1', code: 'CUL-01', nom: 'Riz', actif: true, updated_at: '2026-08-16T00:00:00Z' },
-      expectedHeaders: ['Code', 'Nom'],
-      rawKeyNotShown: 'updated_at',
-    },
-    {
-      tabName: /Codes stades/,
-      entity: 'codes_stades',
-      row: { id: 'cs1', code: 'CS-01', espece: 'Locusta migratoria', libelle: 'Larve L1', actif: true, updated_at: '2026-08-16T00:00:00Z' },
-      expectedHeaders: ['Espèce', 'Libellé'],
-      rawKeyNotShown: 'espece',
-    },
-  ])('affiche des colonnes labellisées FR (pas les clés brutes) pour $entity', async ({ tabName, entity, row, expectedHeaders, rawKeyNotShown }) => {
-    mockedGet.mockResolvedValue({
-      data: { ...emptyEntities, [entity]: { upserts: [row], server_time: '2026-08-16T00:00:00Z' } },
-    })
+  it('affiche le panneau « fraîcheur terrain » sur le server_time du pull', async () => {
+    mockedGet.mockResolvedValue(pull())
     renderPage()
 
-    await waitFor(() => screen.getByRole('tab', { name: tabName }))
-    screen.getByRole('tab', { name: tabName }).click()
-
-    await waitFor(() => expect(screen.getByText(expectedHeaders[0])).toBeInTheDocument())
-    for (const header of expectedHeaders) {
-      expect(screen.getByText(header)).toBeInTheDocument()
-    }
-    expect(screen.queryByText(rawKeyNotShown)).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText(/Dernier pull terrain/)).toBeInTheDocument())
+    expect(screen.getByText('Fraîcheur terrain')).toBeInTheDocument()
   })
 })
