@@ -27,6 +27,8 @@ interface DataTableProps<T> {
   getRowKey: (row: T) => string | number
   onRowClick?: (row: T) => void
   emptyMessage?: string
+  /** Classes par ligne — sert au marqueur de ligne sélectionnée de la maquette (`inset 3px 0 0`). */
+  rowClassName?: (row: T, index: number) => string | undefined
 }
 
 export function DataTable<T>({
@@ -35,6 +37,7 @@ export function DataTable<T>({
   getRowKey,
   onRowClick,
   emptyMessage = 'Aucune donnée.',
+  rowClassName,
 }: DataTableProps<T>) {
   return (
     <Table>
@@ -61,11 +64,15 @@ export function DataTable<T>({
             </TableCell>
           </TableRow>
         ) : (
-          rows.map((row) => (
+          rows.map((row, index) => (
             <TableRow
               key={getRowKey(row)}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
-              className={cn('border-t border-[#f4efe2]', onRowClick && 'cursor-pointer')}
+              className={cn(
+                'border-t border-[#f4efe2]',
+                onRowClick && 'cursor-pointer',
+                rowClassName?.(row, index),
+              )}
             >
               {columns.map((column) => (
                 <TableCell
