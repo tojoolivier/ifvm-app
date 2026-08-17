@@ -120,7 +120,8 @@ export function Layout() {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <aside className="w-[236px] shrink-0 bg-[#235a36] text-white flex flex-col">
+      {/* `print:hidden` : la navigation n'a pas de sens sur un rapport imprimé. */}
+      <aside className="w-[236px] shrink-0 bg-[#235a36] text-white flex flex-col print:hidden">
         <div className="px-[18px] py-5 flex items-center gap-2.5 border-b border-white/[.14]">
           <div className="h-[38px] w-[38px] shrink-0 rounded-[10px] bg-white flex items-center justify-center overflow-hidden">
             <img src="/logo.png" alt="IFVM" className="h-full w-full object-cover" />
