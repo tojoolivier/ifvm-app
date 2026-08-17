@@ -54,6 +54,7 @@ export default {
           "amber-text": "#8a6d2f",
           "amber-bg": "#fdf6e7",
           "amber-border": "#f0e2bf",
+          "danger": "#c0412b",
           "danger-text": "#a5341c",
           "danger-bg": "#fbe9e5",
           "danger-border": "#f0c4b9",
