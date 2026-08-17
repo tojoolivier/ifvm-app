@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 
@@ -27,8 +28,13 @@ export function useAnnuaire() {
     retry: false,
   })
 
-  const nomAgent = (id: string | null | undefined): string =>
-    utilisateurs.find((u) => u.id === id)?.nom ?? shortId(id)
+  // Identité stable : sans `useCallback`, `nomAgent` est une nouvelle fonction
+  // à chaque rendu et invalide toute mémoïsation qui en dépend côté écran.
+  const nomAgent = useCallback(
+    (id: string | null | undefined): string =>
+      utilisateurs.find((u) => u.id === id)?.nom ?? shortId(id),
+    [utilisateurs],
+  )
 
   return { utilisateurs, nomAgent }
 }
