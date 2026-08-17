@@ -2,10 +2,11 @@ import { Outlet, NavLink, useNavigate, useMatches } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { api } from '../api/client'
+import { campagneActive, type CampagneDatee } from '../lib/campagne-active'
 
 type RouteHandle = { title?: string; parent?: string; crumb?: string }
 
-type Campagne = { id: string; name: string; start_date: string; end_date: string | null }
+type Campagne = CampagneDatee
 
 const baseNavItems = [
   { to: '/', label: 'Tableau de bord' },
@@ -15,15 +16,6 @@ const baseNavItems = [
 // d'enregistrements côté API. 7 comme la maquette (README §11, « 7 référentiels ») :
 // campagne y figure aussi, la carte renvoyant vers /campagnes pour son CRUD complet.
 const NB_REFERENTIELS = 7
-
-// Campagne n'a pas de champ `active` côté backend (#121) : dérivée par date tant
-// que le backend n'expose pas ce concept. En cas de chevauchement, la plus récente gagne.
-function campagneActive(campagnes: Campagne[]): Campagne | undefined {
-  const today = new Date().toISOString().slice(0, 10)
-  return campagnes
-    .filter((c) => c.start_date <= today && (!c.end_date || c.end_date >= today))
-    .sort((a, b) => (a.start_date < b.start_date ? 1 : -1))[0]
-}
 
 function useCount(
   key: (string | undefined)[],
