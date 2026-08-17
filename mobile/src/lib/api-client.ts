@@ -1,4 +1,7 @@
-import { useRequestLogStore, RequestLogEntry } from './request-log-store';
+import {
+  useRequestLogStore,
+  RequestLogEntry,
+} from './request-log-store';
 import type { components } from './api-schema.generated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -14,7 +17,6 @@ const REFRESH_TOKEN_KEY = 'refresh_token';
  * - 409 : conflit métier
  * - 422 : erreur de validation
  * - 5xx : erreur serveur
- * - etc.
  */
 export class ApiError extends Error {
   status: number;
@@ -36,7 +38,9 @@ function redactBody(
   url: string,
   body: string | null | undefined
 ): string | null | undefined {
-  if (body == null) return body;
+  if (body == null) {
+    return body;
+  }
 
   if (
     url.includes('/auth/login') ||
@@ -49,10 +53,15 @@ function redactBody(
   return body;
 }
 
-function logRequest(entry: Omit<RequestLogEntry, 'id'>): void {
+function logRequest(
+  entry: Omit<RequestLogEntry, 'id'>
+): void {
   useRequestLogStore.getState().addEntry({
     ...entry,
-    requestBody: redactBody(entry.url, entry.requestBody),
+    requestBody: redactBody(
+      entry.url,
+      entry.requestBody
+    ),
   });
 }
 
@@ -248,13 +257,10 @@ interface FastApiValidationError {
 
 /**
  * Extrait un message exploitable depuis une réponse FastAPI.
- *
- * FastAPI peut renvoyer :
- * - {"message": "..."}
- * - {"detail": "..."}
- * - {"detail": [{loc: ..., msg: ...}]}
  */
-function extractErrorMessage(errorData: unknown): string | null {
+function extractErrorMessage(
+  errorData: unknown
+): string | null {
   if (
     typeof errorData !== 'object' ||
     errorData === null
@@ -262,7 +268,8 @@ function extractErrorMessage(errorData: unknown): string | null {
     return null;
   }
 
-  const data = errorData as Record<string, unknown>;
+  const data =
+    errorData as Record<string, unknown>;
 
   if (typeof data.message === 'string') {
     return data.message;
@@ -277,7 +284,9 @@ function extractErrorMessage(errorData: unknown): string | null {
   if (Array.isArray(detail)) {
     const messages = detail
       .filter(
-        (item): item is FastApiValidationError =>
+        (
+          item
+        ): item is FastApiValidationError =>
           typeof item?.msg === 'string'
       )
       .map((item) => {
@@ -304,7 +313,9 @@ function extractErrorMessage(errorData: unknown): string | null {
  *
  * Retourne true également si le token est mal formé.
  */
-function isTokenExpired(token: string): boolean {
+export function isTokenExpired(
+  token: string
+): boolean {
   try {
     const parts = token.split('.');
 
@@ -312,7 +323,9 @@ function isTokenExpired(token: string): boolean {
       return true;
     }
 
-    const payload = JSON.parse(atob(parts[1]));
+    const payload = JSON.parse(
+      atob(parts[1])
+    );
 
     if (typeof payload.exp !== 'number') {
       return true;
@@ -327,17 +340,20 @@ function isTokenExpired(token: string): boolean {
 }
 
 /**
- * Rafraîchit le token d'accès avec le refresh token stocké localement.
+ * Rafraîchit réellement le token d'accès.
  *
- * Important :
- * - ne log jamais le refresh token ;
- * - sauvegarde le nouveau access token ;
- * - retourne null si le refresh échoue.
+ * IMPORTANT :
+ * Cette fonction ne doit pas être appelée directement
+ * par les différentes fonctionnalités de l'application.
+ *
+ * Utiliser refreshAccessTokenSingleFlight().
  */
 async function refreshAccessToken(): Promise<string | null> {
   try {
     const refreshToken =
-      await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
+      await AsyncStorage.getItem(
+        REFRESH_TOKEN_KEY
+      );
 
     if (!refreshToken) {
       console.warn(
@@ -399,14 +415,46 @@ async function refreshAccessToken(): Promise<string | null> {
 }
 
 /**
- * Effectue une requête HTTP avec :
+ * Promise globale de refresh en cours.
  *
- * 1. Vérification préalable du JWT.
- * 2. Refresh automatique si le JWT est expiré.
- * 3. Retry unique si le backend retourne 401.
- * 4. Gestion typée des erreurs HTTP.
- * 5. Journalisation sécurisée.
+ * Single-flight :
+ *
+ * Si plusieurs appels demandent un refresh au même moment,
+ * un seul appel HTTP /auth/refresh est effectué.
+ *
+ * Tous les autres appels attendent cette même Promise.
  */
+let refreshPromise: Promise<string | null> | null = null;
+
+/**
+ * Refresh du token avec protection single-flight.
+ */
+export async function refreshAccessTokenSingleFlight(): Promise<string | null> {
+  if (refreshPromise) {
+    console.log(
+      '[api-client] Refresh déjà en cours, attente du refresh existant...'
+    );
+
+    return refreshPromise;
+  }
+
+  console.log(
+    '[api-client] Démarrage du refresh single-flight...'
+  );
+
+  refreshPromise = refreshAccessToken();
+
+  try {
+    return await refreshPromise;
+  } finally {
+    refreshPromise = null;
+
+    console.log(
+      '[api-client] Refresh single-flight terminé'
+    );
+  }
+}
+
 const makeRequest = async <T>(
   endpoint: string,
   options: RequestInit = {},
@@ -430,7 +478,7 @@ const makeRequest = async <T>(
     );
 
     const newToken =
-      await refreshAccessToken();
+      await refreshAccessTokenSingleFlight();
 
     if (newToken) {
       currentToken = newToken;
@@ -454,11 +502,13 @@ const makeRequest = async <T>(
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...((options.headers as Record<string, string>) || {}),
+    ...((options.headers as Record<string, string>) ||
+      {}),
   };
 
   if (currentToken) {
-    headers.Authorization = `Bearer ${currentToken}`;
+    headers.Authorization =
+      `Bearer ${currentToken}`;
   }
 
   const startedAt = new Date();
@@ -480,8 +530,10 @@ const makeRequest = async <T>(
       url,
       status: null,
       ok: false,
-      durationMs: Date.now() - startTime,
-      startedAt: startedAt.toISOString(),
+      durationMs:
+        Date.now() - startTime,
+      startedAt:
+        startedAt.toISOString(),
       requestBody:
         typeof options.body === 'string'
           ? options.body
@@ -497,7 +549,10 @@ const makeRequest = async <T>(
 
   /**
    * 3. Gestion du 401 :
+   *
    * refresh + retry une seule fois.
+   *
+   * Le refresh passe par le mécanisme single-flight.
    */
   if (
     response.status === 401 &&
@@ -508,12 +563,13 @@ const makeRequest = async <T>(
     );
 
     const newToken =
-      await refreshAccessToken();
+      await refreshAccessTokenSingleFlight();
 
     if (newToken) {
       const retryHeaders: Record<string, string> = {
         ...headers,
-        Authorization: `Bearer ${newToken}`,
+        Authorization:
+          `Bearer ${newToken}`,
       };
 
       try {
@@ -600,12 +656,6 @@ const makeRequest = async <T>(
               .catch(() => null),
         });
 
-        /**
-         * Le nouveau token existe mais le backend
-         * retourne encore une erreur.
-         *
-         * On ne tente PAS un deuxième refresh.
-         */
         throw new ApiError(
           extractErrorMessage(
             retryErrorData
@@ -614,7 +664,9 @@ const makeRequest = async <T>(
           retryResponse.status
         );
       } catch (retryError) {
-        if (retryError instanceof ApiError) {
+        if (
+          retryError instanceof ApiError
+        ) {
           throw retryError;
         }
 

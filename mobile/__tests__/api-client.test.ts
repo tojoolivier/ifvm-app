@@ -1,26 +1,56 @@
-jest.mock('../src/lib/storage', () => ({
-  storage: {
+jest.mock(
+  '@react-native-async-storage/async-storage',
+  () => ({
     getItem: jest.fn(),
     setItem: jest.fn(),
-    deleteItem: jest.fn(),
-  },
-}));
+    removeItem: jest.fn(),
+  })
+);
 
-import { apiClient } from '../src/lib/api-client';
+jest.mock(
+  '../src/lib/request-log-store',
+  () => ({
+    useRequestLogStore: {
+      getState: () => ({
+        addEntry: jest.fn(),
+      }),
+    },
+  })
+);
 
-// Mock fetch globally
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+import {
+  apiClient,
+  isTokenExpired,
+  refreshAccessTokenSingleFlight,
+} from '../src/lib/api-client';
+
 const mockFetch = jest.fn();
-global.fetch = mockFetch;
 
-// api-client.ts clones the response to log its body, so mocked responses need a working clone().
-function mockJsonResponse(overrides: { ok: boolean; status?: number; json: () => Promise<unknown> }) {
+global.fetch =
+  mockFetch as unknown as typeof fetch;
+
+function mockJsonResponse(
+  overrides: {
+    ok: boolean;
+    status?: number;
+    json: () => Promise<unknown>;
+  }
+) {
   return {
-    ...overrides,
+    ok: overrides.ok,
+    status: overrides.status ?? (
+      overrides.ok ? 200 : 500
+    ),
+    json: overrides.json,
     clone() {
       return {
         text: async () => {
           try {
-            return JSON.stringify(await overrides.json());
+            return JSON.stringify(
+              await overrides.json()
+            );
           } catch {
             return '';
           }
@@ -30,14 +60,65 @@ function mockJsonResponse(overrides: { ok: boolean; status?: number; json: () =>
   };
 }
 
-// Mock environment variable
+/**
+ * Génère un JWT suffisamment réaliste pour les tests.
+ *
+ * On ne vérifie pas la signature ici :
+ * le client ne fait qu'inspecter `exp`.
+ */
+function createJwt(
+  expSeconds: number
+): string {
+  const header = {
+    alg: 'HS256',
+    typ: 'JWT',
+  };
+
+  const payload = {
+    sub: 'test-user',
+    exp: expSeconds,
+  };
+
+  const encode = (
+    value: unknown
+  ) =>
+    Buffer.from(
+      JSON.stringify(value)
+    ).toString('base64url');
+
+  return [
+    encode(header),
+    encode(payload),
+    'test-signature',
+  ].join('.');
+}
+
 const originalEnv = process.env;
 
 beforeEach(() => {
-  jest.resetModules();
-  process.env = { ...originalEnv };
-  process.env.EXPO_PUBLIC_API_URL = 'http://test-api.com';
-  mockFetch.mockClear();
+  jest.clearAllMocks();
+
+  process.env = {
+    ...originalEnv,
+    EXPO_PUBLIC_API_URL:
+      'http://test-api.com',
+  };
+
+  (
+    AsyncStorage.getItem as jest.Mock
+  ).mockResolvedValue(
+    'refresh-token-test'
+  );
+
+  (
+    AsyncStorage.setItem as jest.Mock
+  ).mockResolvedValue(
+    undefined
+  );
+});
+
+afterEach(() => {
+  jest.clearAllMocks();
 });
 
 afterAll(() => {
@@ -45,142 +126,837 @@ afterAll(() => {
 });
 
 describe('API Client', () => {
+  describe('JWT expiration', () => {
+    it('detects a valid non-expired JWT', () => {
+      const token =
+        createJwt(
+          Math.floor(
+            Date.now() / 1000
+          ) + 3600
+        );
+
+      expect(
+        isTokenExpired(token)
+      ).toBe(false);
+    });
+
+    it('detects an expired JWT', () => {
+      const token =
+        createJwt(
+          Math.floor(
+            Date.now() / 1000
+          ) - 60
+        );
+
+      expect(
+        isTokenExpired(token)
+      ).toBe(true);
+    });
+
+    it('treats malformed JWT as expired', () => {
+      expect(
+        isTokenExpired(
+          'invalid-token'
+        )
+      ).toBe(true);
+    });
+  });
+
   describe('Authorization header', () => {
     it('should send Authorization header on authenticated requests', async () => {
-      const token = 'test-token-123';
-      mockFetch.mockResolvedValueOnce(mockJsonResponse({
-        ok: true,
-        json: async () => ({ data: 'test' }),
-      }));
+      const token =
+        createJwt(
+          Math.floor(
+            Date.now() / 1000
+          ) + 3600
+        );
 
-      await apiClient.getProfile(token);
+      mockFetch.mockResolvedValueOnce(
+        mockJsonResponse({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            id: 'user-1',
+            nom: 'Dupont',
+            prenom: 'Alice',
+            email: 'alice@test.com',
+            role: 'prospecteur',
+            actif: true,
+            created_at:
+              '2026-01-01T00:00:00Z',
+          }),
+        })
+      );
 
-      expect(mockFetch).toHaveBeenCalledWith(
+      await apiClient.getProfile(
+        token
+      );
+
+      expect(
+        mockFetch
+      ).toHaveBeenCalledWith(
         'http://test-api.com/users/me',
         expect.objectContaining({
-          headers: expect.objectContaining({
-            'Authorization': `Bearer ${token}`,
-          }),
+          headers:
+            expect.objectContaining({
+              Authorization:
+                `Bearer ${token}`,
+            }),
         })
       );
     });
 
     it('should not send Authorization header on login', async () => {
-      mockFetch.mockResolvedValueOnce(mockJsonResponse({
-        ok: true,
-        json: async () => ({ access_token: 'token' }),
-      }));
+      mockFetch.mockResolvedValueOnce(
+        mockJsonResponse({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            access_token:
+              'token',
+            refresh_token:
+              'refresh-token',
+          }),
+        })
+      );
 
-      await apiClient.login({ email: 'user@test.com', password: 'pass' });
+      await apiClient.login({
+        email: 'user@test.com',
+        password: 'pass',
+      });
 
-      expect(mockFetch).toHaveBeenCalledWith(
+      expect(
+        mockFetch
+      ).toHaveBeenCalledWith(
         'http://test-api.com/auth/login',
         expect.objectContaining({
-          headers: expect.not.objectContaining({
-            'Authorization': expect.any(String),
-          }),
+          headers:
+            expect.not.objectContaining({
+              Authorization:
+                expect.any(String),
+            }),
         })
       );
     });
   });
 
-  describe('401 handling', () => {
-    it('should trigger onUnauthorized callback on 401 response', async () => {
-      const onUnauthorized = jest.fn();
-      const token = 'invalid-token';
+  describe('Expired token handling', () => {
+    it('refreshes an expired token before making the request', async () => {
+      const expiredToken =
+        createJwt(
+          Math.floor(
+            Date.now() / 1000
+          ) - 60
+        );
 
-      mockFetch.mockResolvedValueOnce(mockJsonResponse({
-        ok: false,
-        status: 401,
-        json: async () => ({ detail: 'Unauthorized' }),
-      }));
+      const refreshedToken =
+        createJwt(
+          Math.floor(
+            Date.now() / 1000
+          ) + 3600
+        );
 
-      await expect(apiClient.getProfile(token, onUnauthorized)).rejects.toThrow();
-      expect(onUnauthorized).toHaveBeenCalled();
+      mockFetch
+        .mockResolvedValueOnce(
+          mockJsonResponse({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              access_token:
+                refreshedToken,
+            }),
+          })
+        )
+        .mockResolvedValueOnce(
+          mockJsonResponse({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              id: 'user-1',
+              nom: 'Dupont',
+              prenom: 'Alice',
+              email:
+                'alice@test.com',
+              role: 'prospecteur',
+              actif: true,
+              created_at:
+                '2026-01-01T00:00:00Z',
+            }),
+          })
+        );
+
+      await apiClient.getProfile(
+        expiredToken
+      );
+
+      expect(
+        mockFetch
+      ).toHaveBeenCalledTimes(2);
+
+      expect(
+        mockFetch
+      ).toHaveBeenNthCalledWith(
+        1,
+        'http://test-api.com/auth/refresh',
+        expect.objectContaining({
+          method: 'POST',
+        })
+      );
+
+      expect(
+        mockFetch
+      ).toHaveBeenNthCalledWith(
+        2,
+        'http://test-api.com/users/me',
+        expect.objectContaining({
+          headers:
+            expect.objectContaining({
+              Authorization:
+                `Bearer ${refreshedToken}`,
+            }),
+        })
+      );
     });
 
-    it('should not trigger onUnauthorized callback on non-401 errors', async () => {
-      const onUnauthorized = jest.fn();
-      const token = 'valid-token';
+    it('calls onUnauthorized when refresh fails for an expired token', async () => {
+      const expiredToken =
+        createJwt(
+          Math.floor(
+            Date.now() / 1000
+          ) - 60
+        );
 
-      mockFetch.mockResolvedValueOnce(mockJsonResponse({
-        ok: false,
+      const onUnauthorized =
+        jest.fn();
+
+      mockFetch.mockResolvedValueOnce(
+        mockJsonResponse({
+          ok: false,
+          status: 401,
+          json: async () => ({
+            detail:
+              'Invalid refresh token',
+          }),
+        })
+      );
+
+      await expect(
+        apiClient.getProfile(
+          expiredToken,
+          onUnauthorized
+        )
+      ).rejects.toMatchObject({
+        status: 401,
+      });
+
+      expect(
+        onUnauthorized
+      ).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('401 handling', () => {
+    it('refreshes and retries once after a 401', async () => {
+      const token =
+        createJwt(
+          Math.floor(
+            Date.now() / 1000
+          ) + 3600
+        );
+
+      const refreshedToken =
+        createJwt(
+          Math.floor(
+            Date.now() / 1000
+          ) + 7200
+        );
+
+      mockFetch
+        .mockResolvedValueOnce(
+          mockJsonResponse({
+            ok: false,
+            status: 401,
+            json: async () => ({
+              detail:
+                'Unauthorized',
+            }),
+          })
+        )
+        .mockResolvedValueOnce(
+          mockJsonResponse({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              access_token:
+                refreshedToken,
+            }),
+          })
+        )
+        .mockResolvedValueOnce(
+          mockJsonResponse({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              id: 'user-1',
+              nom: 'Dupont',
+              prenom: 'Alice',
+              email:
+                'alice@test.com',
+              role: 'prospecteur',
+              actif: true,
+              created_at:
+                '2026-01-01T00:00:00Z',
+            }),
+          })
+        );
+
+      await apiClient.getProfile(
+        token
+      );
+
+      expect(
+        mockFetch
+      ).toHaveBeenCalledTimes(3);
+
+      expect(
+        mockFetch
+      ).toHaveBeenNthCalledWith(
+        1,
+        'http://test-api.com/users/me',
+        expect.objectContaining({
+          headers:
+            expect.objectContaining({
+              Authorization:
+                `Bearer ${token}`,
+            }),
+        })
+      );
+
+      expect(
+        mockFetch
+      ).toHaveBeenNthCalledWith(
+        2,
+        'http://test-api.com/auth/refresh',
+        expect.objectContaining({
+          method: 'POST',
+        })
+      );
+
+      expect(
+        mockFetch
+      ).toHaveBeenNthCalledWith(
+        3,
+        'http://test-api.com/users/me',
+        expect.objectContaining({
+          headers:
+            expect.objectContaining({
+              Authorization:
+                `Bearer ${refreshedToken}`,
+            }),
+        })
+      );
+    });
+
+    it('calls onUnauthorized when refresh after 401 fails', async () => {
+      const token =
+        createJwt(
+          Math.floor(
+            Date.now() / 1000
+          ) + 3600
+        );
+
+      const onUnauthorized =
+        jest.fn();
+
+      mockFetch
+        .mockResolvedValueOnce(
+          mockJsonResponse({
+            ok: false,
+            status: 401,
+            json: async () => ({
+              detail:
+                'Unauthorized',
+            }),
+          })
+        )
+        .mockResolvedValueOnce(
+          mockJsonResponse({
+            ok: false,
+            status: 401,
+            json: async () => ({
+              detail:
+                'Invalid refresh token',
+            }),
+          })
+        );
+
+      await expect(
+        apiClient.getProfile(
+          token,
+          onUnauthorized
+        )
+      ).rejects.toMatchObject({
+        status: 401,
+      });
+
+      expect(
+        onUnauthorized
+      ).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not trigger onUnauthorized on non-401 errors', async () => {
+      const onUnauthorized =
+        jest.fn();
+
+      const token =
+        createJwt(
+          Math.floor(
+            Date.now() / 1000
+          ) + 3600
+        );
+
+      mockFetch.mockResolvedValueOnce(
+        mockJsonResponse({
+          ok: false,
+          status: 500,
+          json: async () => ({
+            detail:
+              'Server error',
+          }),
+        })
+      );
+
+      await expect(
+        apiClient.getProfile(
+          token,
+          onUnauthorized
+        )
+      ).rejects.toMatchObject({
         status: 500,
-        json: async () => ({ detail: 'Server error' }),
-      }));
+      });
 
-      await expect(apiClient.getProfile(token, onUnauthorized)).rejects.toThrow();
-      expect(onUnauthorized).not.toHaveBeenCalled();
+      expect(
+        onUnauthorized
+      ).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Refresh single-flight', () => {
+    it('performs only one refresh when two refresh calls happen concurrently', async () => {
+      const refreshedToken =
+        createJwt(
+          Math.floor(
+            Date.now() / 1000
+          ) + 3600
+        );
+
+      let resolveRefresh:
+        (value: Response) => void;
+
+      const refreshResponsePromise =
+        new Promise<Response>(
+          (resolve) => {
+            resolveRefresh =
+              resolve;
+          }
+        );
+
+      mockFetch.mockImplementation(
+        async (
+          url: string
+        ) => {
+          if (
+            url ===
+            'http://test-api.com/auth/refresh'
+          ) {
+            return refreshResponsePromise;
+          }
+
+          return mockJsonResponse({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              access_token:
+                refreshedToken,
+            }),
+          });
+        }
+      );
+
+      const firstRefresh =
+        refreshAccessTokenSingleFlight();
+
+      const secondRefresh =
+        refreshAccessTokenSingleFlight();
+
+      await Promise.resolve();
+
+      expect(
+        mockFetch
+      ).toHaveBeenCalledTimes(1);
+
+      resolveRefresh!(
+        mockJsonResponse({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            access_token:
+              refreshedToken,
+          }),
+        }) as unknown as Response
+      );
+
+      const [
+        firstResult,
+        secondResult,
+      ] = await Promise.all([
+        firstRefresh,
+        secondRefresh,
+      ]);
+
+      expect(
+        firstResult
+      ).toBe(refreshedToken);
+
+      expect(
+        secondResult
+      ).toBe(refreshedToken);
+
+      expect(
+        mockFetch
+      ).toHaveBeenCalledTimes(1);
+    });
+
+    it('performs only one refresh when two requests receive 401 concurrently', async () => {
+      const token =
+        createJwt(
+          Math.floor(
+            Date.now() / 1000
+          ) + 3600
+        );
+
+      const refreshedToken =
+        createJwt(
+          Math.floor(
+            Date.now() / 1000
+          ) + 3600
+        );
+
+      let refreshResolver:
+        | ((value: unknown) => void)
+        | undefined;
+
+      const refreshPromise =
+        new Promise<unknown>(
+          (resolve) => {
+            refreshResolver =
+              resolve;
+          }
+        );
+
+      mockFetch.mockImplementation(
+        async (
+          url: string
+        ) => {
+          if (
+            url ===
+            'http://test-api.com/auth/refresh'
+          ) {
+            return refreshPromise;
+          }
+
+          if (
+            url ===
+            'http://test-api.com/users/me'
+          ) {
+            return mockJsonResponse({
+              ok: false,
+              status: 401,
+              json: async () => ({
+                detail:
+                  'Unauthorized',
+              }),
+            });
+          }
+
+          return mockJsonResponse({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              id: 'user-1',
+            }),
+          });
+        }
+      );
+
+      const request1 =
+        apiClient.getProfile(
+          token
+        );
+
+      const request2 =
+        apiClient.getProfile(
+          token
+        );
+
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(
+        mockFetch.mock.calls.filter(
+          (call) =>
+            call[0] ===
+            'http://test-api.com/auth/refresh'
+        )
+      ).toHaveLength(1);
+
+      refreshResolver!(
+        mockJsonResponse({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            access_token:
+              refreshedToken,
+          }),
+        })
+      );
+
+      /**
+       * Après le refresh, les retries doivent réussir.
+       *
+       * On remplace le comportement du endpoint
+       * /users/me pour les retries.
+       */
+      mockFetch.mockImplementation(
+        async (
+          url: string,
+          options?: RequestInit
+        ) => {
+          if (
+            url ===
+            'http://test-api.com/auth/refresh'
+          ) {
+            return mockJsonResponse({
+              ok: true,
+              status: 200,
+              json: async () => ({
+                access_token:
+                  refreshedToken,
+              }),
+            });
+          }
+
+          const authorization =
+            (
+              options?.headers as Record<
+                string,
+                string
+              >
+            )?.Authorization;
+
+          if (
+            authorization ===
+            `Bearer ${refreshedToken}`
+          ) {
+            return mockJsonResponse({
+              ok: true,
+              status: 200,
+              json: async () => ({
+                id: 'user-1',
+                nom: 'Dupont',
+                prenom: 'Alice',
+                email:
+                  'alice@test.com',
+                role: 'prospecteur',
+                actif: true,
+                created_at:
+                  '2026-01-01T00:00:00Z',
+              }),
+            });
+          }
+
+          return mockJsonResponse({
+            ok: false,
+            status: 401,
+            json: async () => ({
+              detail:
+                'Unauthorized',
+            }),
+          });
+        }
+      );
+
+      await Promise.all([
+        request1,
+        request2,
+      ]);
+
+      const refreshCalls =
+        mockFetch.mock.calls.filter(
+          (call) =>
+            call[0] ===
+            'http://test-api.com/auth/refresh'
+        );
+
+      expect(
+        refreshCalls
+      ).toHaveLength(1);
     });
   });
 
   describe('Error message extraction', () => {
-    it('surfaces a plain string "detail" (FastAPI HTTPException) instead of the generic status text', async () => {
-      mockFetch.mockResolvedValueOnce(mockJsonResponse({
-        ok: false,
-        status: 403,
-        json: async () => ({ detail: 'Seules les fiches brouillon peuvent être supprimées' }),
-      }));
+    it('surfaces a plain string detail', async () => {
+      const token =
+        createJwt(
+          Math.floor(
+            Date.now() / 1000
+          ) + 3600
+        );
 
-      await expect(apiClient.getProfile('token')).rejects.toThrow(
+      mockFetch.mockResolvedValueOnce(
+        mockJsonResponse({
+          ok: false,
+          status: 403,
+          json: async () => ({
+            detail:
+              'Seules les fiches brouillon peuvent être supprimées',
+          }),
+        })
+      );
+
+      await expect(
+        apiClient.getProfile(token)
+      ).rejects.toThrow(
         'Seules les fiches brouillon peuvent être supprimées'
       );
     });
 
-    it('surfaces FastAPI/Pydantic validation errors (422, "detail" as an array) as a readable message', async () => {
-      mockFetch.mockResolvedValueOnce(mockJsonResponse({
-        ok: false,
-        status: 422,
-        json: async () => ({
-          detail: [
-            { loc: ['body', 'campagne_id'], msg: 'field required', type: 'value_error.missing' },
-            { loc: ['body', 'date_prospection'], msg: 'invalid date format', type: 'value_error' },
-          ],
-        }),
-      }));
+    it('surfaces FastAPI validation errors', async () => {
+      const token =
+        createJwt(
+          Math.floor(
+            Date.now() / 1000
+          ) + 3600
+        );
 
-      await expect(apiClient.getProfile('token')).rejects.toThrow(
+      mockFetch.mockResolvedValueOnce(
+        mockJsonResponse({
+          ok: false,
+          status: 422,
+          json: async () => ({
+            detail: [
+              {
+                loc: [
+                  'body',
+                  'campagne_id',
+                ],
+                msg:
+                  'field required',
+                type:
+                  'value_error.missing',
+              },
+              {
+                loc: [
+                  'body',
+                  'date_prospection',
+                ],
+                msg:
+                  'invalid date format',
+                type:
+                  'value_error',
+              },
+            ],
+          }),
+        })
+      );
+
+      await expect(
+        apiClient.getProfile(token)
+      ).rejects.toThrow(
         'campagne_id: field required; date_prospection: invalid date format'
       );
     });
 
-    it('falls back to the HTTP status when the error body has no usable detail', async () => {
-      mockFetch.mockResolvedValueOnce(mockJsonResponse({
-        ok: false,
-        status: 500,
-        json: async () => ({}),
-      }));
+    it('falls back to HTTP status', async () => {
+      const token =
+        createJwt(
+          Math.floor(
+            Date.now() / 1000
+          ) + 3600
+        );
 
-      await expect(apiClient.getProfile('token')).rejects.toThrow('HTTP error! status: 500');
+      mockFetch.mockResolvedValueOnce(
+        mockJsonResponse({
+          ok: false,
+          status: 500,
+          json: async () => ({}),
+        })
+      );
+
+      await expect(
+        apiClient.getProfile(token)
+      ).rejects.toThrow(
+        'HTTP error! status: 500'
+      );
     });
   });
 
   describe('Base URL configuration', () => {
-    it('should use EXPO_PUBLIC_API_URL environment variable', async () => {
-      process.env.EXPO_PUBLIC_API_URL = 'http://custom-api.com';
-      mockFetch.mockResolvedValueOnce(mockJsonResponse({
-        ok: true,
-        json: async () => ({ access_token: 'token' }),
-      }));
+    it('uses EXPO_PUBLIC_API_URL', async () => {
+      process.env.EXPO_PUBLIC_API_URL =
+        'http://custom-api.com';
 
-      await apiClient.login({ email: 'user@test.com', password: 'pass' });
+      mockFetch.mockResolvedValueOnce(
+        mockJsonResponse({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            access_token:
+              'token',
+            refresh_token:
+              'refresh',
+          }),
+        })
+      );
 
-      expect(mockFetch).toHaveBeenCalledWith(
+      await apiClient.login({
+        email: 'user@test.com',
+        password: 'pass',
+      });
+
+      expect(
+        mockFetch
+      ).toHaveBeenCalledWith(
         'http://custom-api.com/auth/login',
         expect.any(Object)
       );
     });
 
-    it('should default to http://localhost:8000 if EXPO_PUBLIC_API_URL is not set', async () => {
-      delete process.env.EXPO_PUBLIC_API_URL;
-      mockFetch.mockResolvedValueOnce(mockJsonResponse({
-        ok: true,
-        json: async () => ({ access_token: 'token' }),
-      }));
+    it('defaults to localhost:8000', async () => {
+      delete process.env
+        .EXPO_PUBLIC_API_URL;
 
-      await apiClient.login({ email: 'user@test.com', password: 'pass' });
+      mockFetch.mockResolvedValueOnce(
+        mockJsonResponse({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            access_token:
+              'token',
+            refresh_token:
+              'refresh',
+          }),
+        })
+      );
 
-      expect(mockFetch).toHaveBeenCalledWith(
+      await apiClient.login({
+        email: 'user@test.com',
+        password: 'pass',
+      });
+
+      expect(
+        mockFetch
+      ).toHaveBeenCalledWith(
         'http://localhost:8000/auth/login',
         expect.any(Object)
       );
@@ -189,31 +965,66 @@ describe('API Client', () => {
 
   describe('Endpoints', () => {
     it('login should POST to /auth/login', async () => {
-      mockFetch.mockResolvedValueOnce(mockJsonResponse({
-        ok: true,
-        json: async () => ({ access_token: 'token' }),
-      }));
+      mockFetch.mockResolvedValueOnce(
+        mockJsonResponse({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            access_token:
+              'token',
+            refresh_token:
+              'refresh',
+          }),
+        })
+      );
 
-      await apiClient.login({ email: 'user@test.com', password: 'pass' });
+      await apiClient.login({
+        email: 'user@test.com',
+        password: 'pass',
+      });
 
-      expect(mockFetch).toHaveBeenCalledWith(
+      expect(
+        mockFetch
+      ).toHaveBeenCalledWith(
         'http://test-api.com/auth/login',
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ email: 'user@test.com', password: 'pass' }),
+          body: JSON.stringify({
+            email: 'user@test.com',
+            password: 'pass',
+          }),
         })
       );
     });
 
-    it('getPostes should GET from /geo/postes', async () => {
-      mockFetch.mockResolvedValueOnce(mockJsonResponse({
-        ok: true,
-        json: async () => [{ id: 1, name: 'Poste 1' }],
-      }));
+    it('getPostes should GET /geo/postes', async () => {
+      const token =
+        createJwt(
+          Math.floor(
+            Date.now() / 1000
+          ) + 3600
+        );
 
-      await apiClient.getPostes('token');
+      mockFetch.mockResolvedValueOnce(
+        mockJsonResponse({
+          ok: true,
+          status: 200,
+          json: async () => [
+            {
+              id: 1,
+              name: 'Poste 1',
+            },
+          ],
+        })
+      );
 
-      expect(mockFetch).toHaveBeenCalledWith(
+      await apiClient.getPostes(
+        token
+      );
+
+      expect(
+        mockFetch
+      ).toHaveBeenCalledWith(
         'http://test-api.com/geo/postes',
         expect.objectContaining({
           method: 'GET',
@@ -221,15 +1032,34 @@ describe('API Client', () => {
       );
     });
 
-    it('getStations should GET from /geo/stations', async () => {
-      mockFetch.mockResolvedValueOnce(mockJsonResponse({
-        ok: true,
-        json: async () => [{ id: 1, name: 'Station 1' }],
-      }));
+    it('getStations should GET /geo/stations', async () => {
+      const token =
+        createJwt(
+          Math.floor(
+            Date.now() / 1000
+          ) + 3600
+        );
 
-      await apiClient.getStations('token');
+      mockFetch.mockResolvedValueOnce(
+        mockJsonResponse({
+          ok: true,
+          status: 200,
+          json: async () => [
+            {
+              id: 1,
+              name: 'Station 1',
+            },
+          ],
+        })
+      );
 
-      expect(mockFetch).toHaveBeenCalledWith(
+      await apiClient.getStations(
+        token
+      );
+
+      expect(
+        mockFetch
+      ).toHaveBeenCalledWith(
         'http://test-api.com/geo/stations',
         expect.objectContaining({
           method: 'GET',
@@ -237,15 +1067,40 @@ describe('API Client', () => {
       );
     });
 
-    it('getProfile should GET from /users/me', async () => {
-      mockFetch.mockResolvedValueOnce(mockJsonResponse({
-        ok: true,
-        json: async () => ({ id: '550e8400-e29b-41d4-a716-446655440000', nom: 'Dupont', prenom: 'Alice', email: 'alice@test.com', role: 'prospecteur', actif: true, created_at: '2026-01-01T00:00:00Z' }),
-      }));
+    it('getProfile should GET /users/me', async () => {
+      const token =
+        createJwt(
+          Math.floor(
+            Date.now() / 1000
+          ) + 3600
+        );
 
-      await apiClient.getProfile('token');
+      mockFetch.mockResolvedValueOnce(
+        mockJsonResponse({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            id:
+              '550e8400-e29b-41d4-a716-446655440000',
+            nom: 'Dupont',
+            prenom: 'Alice',
+            email:
+              'alice@test.com',
+            role: 'prospecteur',
+            actif: true,
+            created_at:
+              '2026-01-01T00:00:00Z',
+          }),
+        })
+      );
 
-      expect(mockFetch).toHaveBeenCalledWith(
+      await apiClient.getProfile(
+        token
+      );
+
+      expect(
+        mockFetch
+      ).toHaveBeenCalledWith(
         'http://test-api.com/users/me',
         expect.objectContaining({
           method: 'GET',
@@ -254,104 +1109,235 @@ describe('API Client', () => {
     });
 
     it('deleteProspection should DELETE /prospections/{id}', async () => {
-      mockFetch.mockResolvedValueOnce(mockJsonResponse({
-        ok: true,
-        status: 204,
-        json: async () => { throw new Error('no body'); },
-      }));
+      const token =
+        createJwt(
+          Math.floor(
+            Date.now() / 1000
+          ) + 3600
+        );
 
-      await apiClient.deleteProspection('token', 'fiche-1');
+      mockFetch.mockResolvedValueOnce(
+        mockJsonResponse({
+          ok: true,
+          status: 204,
+          json: async () => {
+            throw new Error(
+              'no body'
+            );
+          },
+        })
+      );
 
-      expect(mockFetch).toHaveBeenCalledWith(
+      await apiClient.deleteProspection(
+        token,
+        'fiche-1'
+      );
+
+      expect(
+        mockFetch
+      ).toHaveBeenCalledWith(
         'http://test-api.com/prospections/fiche-1',
         expect.objectContaining({
           method: 'DELETE',
-          headers: expect.objectContaining({ 'Authorization': 'Bearer token' }),
+          headers:
+            expect.objectContaining({
+              Authorization:
+                `Bearer ${token}`,
+            }),
         })
       );
     });
   });
 
   describe('syncTraitement', () => {
-    it('POSTs to /traitements/sync with the token and body', async () => {
-      mockFetch.mockResolvedValueOnce(mockJsonResponse({
-        ok: true,
-        status: 201,
-        json: async () => ({ id: 'traitement-1' }),
-      }));
+    it('POSTs to /traitements/sync', async () => {
+      mockFetch.mockResolvedValueOnce(
+        mockJsonResponse({
+          ok: true,
+          status: 201,
+          json: async () => ({
+            id: 'traitement-1',
+          }),
+        })
+      );
 
-      await apiClient.syncTraitement('token', { id: 'traitement-1', type_traitement: 'AERIEN' });
+      await apiClient.syncTraitement(
+        'token',
+        {
+          id: 'traitement-1',
+          type_traitement:
+            'AERIEN',
+        }
+      );
 
-      expect(mockFetch).toHaveBeenCalledWith(
+      expect(
+        mockFetch
+      ).toHaveBeenCalledWith(
         'http://test-api.com/traitements/sync',
         expect.objectContaining({
           method: 'POST',
-          headers: expect.objectContaining({ 'Authorization': 'Bearer token' }),
-          body: JSON.stringify({ id: 'traitement-1', type_traitement: 'AERIEN' }),
+          headers:
+            expect.objectContaining({
+              Authorization:
+                'Bearer token',
+            }),
+          body: JSON.stringify({
+            id: 'traitement-1',
+            type_traitement:
+              'AERIEN',
+          }),
         })
       );
     });
 
-    it('resolves with {status, body} on 201 (created)', async () => {
-      mockFetch.mockResolvedValueOnce(mockJsonResponse({
-        ok: true,
+    it('resolves on 201', async () => {
+      mockFetch.mockResolvedValueOnce(
+        mockJsonResponse({
+          ok: true,
+          status: 201,
+          json: async () => ({
+            id: 'traitement-1',
+            statut: 'brouillon',
+          }),
+        })
+      );
+
+      const result =
+        await apiClient.syncTraitement(
+          'token',
+          {
+            id: 'traitement-1',
+          }
+        );
+
+      expect(result).toEqual({
         status: 201,
-        json: async () => ({ id: 'traitement-1', statut: 'brouillon' }),
-      }));
-
-      const result = await apiClient.syncTraitement('token', { id: 'traitement-1' });
-
-      expect(result).toEqual({ status: 201, body: { id: 'traitement-1', statut: 'brouillon' } });
+        body: {
+          id: 'traitement-1',
+          statut: 'brouillon',
+        },
+      });
     });
 
-    it('resolves with {status, body} on 200 (updated)', async () => {
-      mockFetch.mockResolvedValueOnce(mockJsonResponse({
-        ok: true,
+    it('resolves on 200', async () => {
+      mockFetch.mockResolvedValueOnce(
+        mockJsonResponse({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            id: 'traitement-1',
+          }),
+        })
+      );
+
+      const result =
+        await apiClient.syncTraitement(
+          'token',
+          {
+            id: 'traitement-1',
+          }
+        );
+
+      expect(result).toEqual({
         status: 200,
-        json: async () => ({ id: 'traitement-1' }),
-      }));
-
-      const result = await apiClient.syncTraitement('token', { id: 'traitement-1' });
-
-      expect(result).toEqual({ status: 200, body: { id: 'traitement-1' } });
+        body: {
+          id: 'traitement-1',
+        },
+      });
     });
 
-    it('resolves (does not throw) with {status: 409, body} on conflict', async () => {
-      mockFetch.mockResolvedValueOnce(mockJsonResponse({
-        ok: false,
+    it('resolves on 409 conflict', async () => {
+      mockFetch.mockResolvedValueOnce(
+        mockJsonResponse({
+          ok: false,
+          status: 409,
+          json: async () => ({
+            id: 'traitement-1',
+            statut: 'validee',
+          }),
+        })
+      );
+
+      const result =
+        await apiClient.syncTraitement(
+          'token',
+          {
+            id: 'traitement-1',
+          }
+        );
+
+      expect(result).toEqual({
         status: 409,
-        json: async () => ({ id: 'traitement-1', statut: 'validee' }),
-      }));
-
-      const result = await apiClient.syncTraitement('token', { id: 'traitement-1' });
-
-      expect(result).toEqual({ status: 409, body: { id: 'traitement-1', statut: 'validee' } });
+        body: {
+          id: 'traitement-1',
+          statut: 'validee',
+        },
+      });
     });
 
-    it('throws on a genuine 4xx error other than 409', async () => {
-      mockFetch.mockResolvedValueOnce(mockJsonResponse({
-        ok: false,
-        status: 422,
-        json: async () => ({ detail: 'Champ invalide' }),
-      }));
+    it('throws on 422', async () => {
+      mockFetch.mockResolvedValueOnce(
+        mockJsonResponse({
+          ok: false,
+          status: 422,
+          json: async () => ({
+            detail:
+              'Champ invalide',
+          }),
+        })
+      );
 
-      await expect(apiClient.syncTraitement('token', { id: 'traitement-1' })).rejects.toThrow('Champ invalide');
+      await expect(
+        apiClient.syncTraitement(
+          'token',
+          {
+            id: 'traitement-1',
+          }
+        )
+      ).rejects.toThrow(
+        'Champ invalide'
+      );
     });
 
-    it('throws on a 5xx error', async () => {
-      mockFetch.mockResolvedValueOnce(mockJsonResponse({
-        ok: false,
-        status: 500,
-        json: async () => ({ detail: 'Erreur serveur' }),
-      }));
+    it('throws on 5xx', async () => {
+      mockFetch.mockResolvedValueOnce(
+        mockJsonResponse({
+          ok: false,
+          status: 500,
+          json: async () => ({
+            detail:
+              'Erreur serveur',
+          }),
+        })
+      );
 
-      await expect(apiClient.syncTraitement('token', { id: 'traitement-1' })).rejects.toThrow();
+      await expect(
+        apiClient.syncTraitement(
+          'token',
+          {
+            id: 'traitement-1',
+          }
+        )
+      ).rejects.toThrow();
     });
 
     it('throws on network failure', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network request failed'));
+      mockFetch.mockRejectedValueOnce(
+        new Error(
+          'Network request failed'
+        )
+      );
 
-      await expect(apiClient.syncTraitement('token', { id: 'traitement-1' })).rejects.toThrow('Network request failed');
+      await expect(
+        apiClient.syncTraitement(
+          'token',
+          {
+            id: 'traitement-1',
+          }
+        )
+      ).rejects.toThrow(
+        'Network request failed'
+      );
     });
   });
 });

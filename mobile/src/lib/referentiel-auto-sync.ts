@@ -1,16 +1,34 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, AppStateStatus } from 'react-native';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+
+import {
+  AppState,
+  AppStateStatus,
+} from 'react-native';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import {
   apiClient,
   ReferentielPullResponse,
   ReferentielSinceCursors,
+  refreshAccessTokenSingleFlight,
 } from './api-client';
+
 import { useAuthStore } from './auth-store';
 
-const CURSORS_STORAGE_KEY = 'referentiel_cursors';
-const SYNC_INTERVAL_MS = 5 * 60 * 1000;
-const TOKEN_REFRESH_THRESHOLD_MS = 5 * 60 * 1000;
+const CURSORS_STORAGE_KEY =
+  'referentiel_cursors';
+
+const SYNC_INTERVAL_MS =
+  5 * 60 * 1000;
+
+const TOKEN_REFRESH_THRESHOLD_MS =
+  5 * 60 * 1000;
 
 export interface ConnectivityTransition {
   /** `null` = pas encore observé (démarrage de l'app). */
@@ -48,9 +66,10 @@ function getDefaultCursors(): ReferentielSinceCursors {
 
 async function loadCursors(): Promise<ReferentielSinceCursors> {
   try {
-    const raw = await AsyncStorage.getItem(
-      CURSORS_STORAGE_KEY
-    );
+    const raw =
+      await AsyncStorage.getItem(
+        CURSORS_STORAGE_KEY
+      );
 
     if (raw) {
       const parsed = JSON.parse(raw);
@@ -104,7 +123,10 @@ function updateCursorsFromResponse(
       response.stations_fixes.server_time;
   }
 
-  if (response.utilisateurs_equipe.server_time) {
+  if (
+    response.utilisateurs_equipe
+      .server_time
+  ) {
     newCursors.utilisateurs_equipe =
       response.utilisateurs_equipe.server_time;
   }
@@ -134,8 +156,15 @@ function updateCursorsFromResponse(
 
 /**
  * Vérifie si un token JWT est proche de l'expiration.
+ *
+ * Retourne true si :
+ * - le token est malformé ;
+ * - le payload JWT est invalide ;
+ * - exp est absent ou invalide ;
+ * - le token est déjà expiré ;
+ * - le token expire dans moins de 5 minutes.
  */
-async function isTokenExpiringSoon(
+export async function isTokenExpiringSoon(
   token: string
 ): Promise<boolean> {
   try {
@@ -163,34 +192,66 @@ async function isTokenExpiringSoon(
       TOKEN_REFRESH_THRESHOLD_MS
     );
   } catch {
-    // Si le token ne peut pas être décodé,
-    // on le considère comme expiré.
     return true;
+  }
+}
+
+/**
+ * Rafraîchit le token en utilisant exactement
+ * le même mécanisme single-flight que api-client.
+ *
+ * Il n'existe volontairement aucun mécanisme
+ * de refresh local supplémentaire ici.
+ *
+ * Comportement :
+ *
+ * - refresh réussi :
+ *   retourne le nouveau token ;
+ *
+ * - refresh refusé avec retour null :
+ *   retourne null ;
+ *
+ * - erreur technique/rejet de la Promise :
+ *   l'erreur est propagée à l'appelant.
+ *
+ * Le single-flight est entièrement géré par
+ * refreshAccessTokenSingleFlight().
+ */
+export async function refreshTokenForAutoSync(): Promise<string | null> {
+  try {
+    const refreshedToken =
+      await refreshAccessTokenSingleFlight();
+
+    return refreshedToken ?? null;
+  } catch (error) {
+    console.warn(
+      '[referentiel-auto-sync] Échec du rafraîchissement du token:',
+      error
+    );
+
+    throw error;
   }
 }
 
 export function useReferentielAutoSync(
   token: string | null
 ) {
-  const [isConnected, setIsConnected] =
-    useState(true);
+  const [
+    isConnected,
+    setIsConnected,
+  ] = useState(true);
 
   /**
-   * IMPORTANT :
-   * `syncInProgressRef` sert uniquement à empêcher
-   * deux synchronisations simultanées.
-   *
-   * On ne le lit jamais directement pendant le render.
+   * Sert uniquement à empêcher deux synchronisations
+   * simultanées.
    */
   const syncInProgressRef =
     useRef(false);
 
-  /**
-   * Etat React utilisé pour exposer `isSyncing`
-   * au composant appelant.
-   */
-  const [isSyncing, setIsSyncing] =
-    useState(false);
+  const [
+    isSyncing,
+    setIsSyncing,
+  ] = useState(false);
 
   const intervalRef =
     useRef<ReturnType<typeof setInterval> | null>(
@@ -240,120 +301,124 @@ export function useReferentielAutoSync(
       []
     );
 
-  const performSync = useCallback(
-    async (force = false) => {
-      if (!token) {
-        console.log(
-          '[referentiel-auto-sync] Pas de token, synchronisation ignorée'
-        );
-        return;
-      }
-
-      if (syncInProgressRef.current) {
-        console.log(
-          '[referentiel-auto-sync] Synchronisation déjà en cours'
-        );
-        return;
-      }
-
-      if (!isConnected && !force) {
-        console.log(
-          '[referentiel-auto-sync] Pas de connexion, synchronisation différée'
-        );
-        return;
-      }
-
-      try {
-        syncInProgressRef.current = true;
-        setIsSyncing(true);
-
-        console.log(
-          '[referentiel-auto-sync] Début de la synchronisation...'
-        );
-
-        const tokenExpiring =
-          await isTokenExpiringSoon(
-            token
-          );
-
-        if (tokenExpiring) {
+  const performSync =
+    useCallback(
+      async (force = false) => {
+        if (!token) {
           console.log(
-            '[referentiel-auto-sync] Token proche de l\'expiration, tentative de rafraîchissement...'
-          );
-
-          const refreshed =
-            await useAuthStore
-              .getState()
-              .refreshToken();
-
-          if (!refreshed) {
-            console.warn(
-              '[referentiel-auto-sync] Échec du rafraîchissement du token'
-            );
-            return;
-          }
-
-          const newToken =
-            useAuthStore
-              .getState()
-              .token;
-
-          if (!newToken) {
-            console.warn(
-              '[referentiel-auto-sync] Pas de token après rafraîchissement'
-            );
-            return;
-          }
-
-          await performSyncWithToken(
-            newToken
+            '[referentiel-auto-sync] Pas de token, synchronisation ignorée'
           );
 
           return;
         }
 
-        await performSyncWithToken(
-          token
-        );
-      } catch (error) {
-        console.error(
-          '[referentiel-auto-sync] Erreur lors de la synchronisation:',
-          error
-        );
-
         if (
-          error instanceof Error &&
-          (
-            error.message.includes(
-              'Token invalide'
-            ) ||
-            error.message.includes(
-              '401'
-            ) ||
-            error.message.includes(
-              'Unauthorized'
-            )
-          )
+          syncInProgressRef.current
         ) {
-          console.warn(
-            '[referentiel-auto-sync] Token invalide, déconnexion'
+          console.log(
+            '[referentiel-auto-sync] Synchronisation déjà en cours'
           );
 
-          await useAuthStore
-            .getState()
-            .logout();
+          return;
         }
-      } finally {
-        syncInProgressRef.current = false;
-        setIsSyncing(false);
-      }
-    },
-    [
-      token,
-      isConnected,
-      performSyncWithToken,
-    ]
-  );
+
+        if (
+          !isConnected &&
+          !force
+        ) {
+          console.log(
+            '[referentiel-auto-sync] Pas de connexion, synchronisation différée'
+          );
+
+          return;
+        }
+
+        try {
+          syncInProgressRef.current =
+            true;
+
+          setIsSyncing(true);
+
+          console.log(
+            '[referentiel-auto-sync] Début de la synchronisation...'
+          );
+
+          const tokenExpiring =
+            await isTokenExpiringSoon(
+              token
+            );
+
+          if (tokenExpiring) {
+            console.log(
+              '[referentiel-auto-sync] Token proche de l\'expiration, utilisation du refresh single-flight...'
+            );
+
+            const newToken =
+              await refreshTokenForAutoSync();
+
+            if (!newToken) {
+              console.warn(
+                '[referentiel-auto-sync] Échec du rafraîchissement du token'
+              );
+
+              await useAuthStore
+                .getState()
+                .logout();
+
+              return;
+            }
+
+            await performSyncWithToken(
+              newToken
+            );
+
+            return;
+          }
+
+          await performSyncWithToken(
+            token
+          );
+        } catch (error) {
+          console.error(
+            '[referentiel-auto-sync] Erreur lors de la synchronisation:',
+            error
+          );
+
+          if (
+            error instanceof Error &&
+            (
+              error.message.includes(
+                'Token invalide'
+              ) ||
+              error.message.includes(
+                '401'
+              ) ||
+              error.message.includes(
+                'Unauthorized'
+              )
+            )
+          ) {
+            console.warn(
+              '[referentiel-auto-sync] Token invalide, déconnexion'
+            );
+
+            await useAuthStore
+              .getState()
+              .logout();
+          }
+        } finally {
+          syncInProgressRef.current =
+            false;
+
+          setIsSyncing(false);
+        }
+      },
+      [
+        token,
+        isConnected,
+        performSyncWithToken,
+      ]
+    );
 
   /**
    * Synchronisation périodique.
