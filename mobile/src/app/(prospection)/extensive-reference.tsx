@@ -33,6 +33,8 @@ export default function ExtensiveReferenceScreen() {
 
   const [latitude, setLatitude] = useState<string>(draft?.latitude != null ? String(draft.latitude) : '');
   const [longitude, setLongitude] = useState<string>(draft?.longitude != null ? String(draft.longitude) : '');
+  const [isLoadingGps, setIsLoadingGps] = useState<boolean>(false);
+  const [gpsError, setGpsError] = useState<string>('');
   const [stationLibre, setStationLibre] = useState(draft?.station_libre ?? '');
   const [typeStation, setTypeStation] = useState(draft?.type_station ?? '');
   const [surfaceStation, setSurfaceStation] = useState(draft?.surface_station != null ? String(draft.surface_station) : '');
@@ -41,16 +43,36 @@ export default function ExtensiveReferenceScreen() {
   );
   const [isSaving, setIsSaving] = useState(false);
 
+  // Récupération automatique des coordonnées GPS
   useEffect(() => {
-    if (latitude && longitude) return;
+    // Si les coordonnées existent déjà dans le brouillon, on les utilise
+    if (draft?.latitude && draft?.longitude) {
+      setLatitude(String(draft.latitude));
+      setLongitude(String(draft.longitude));
+      return;
+    }
+
+    // Sinon, on récupère la position GPS
+    setIsLoadingGps(true);
+    setGpsError('');
+    
     getCurrentPosition()
       .then((position) => {
-        setLatitude(String(position.latitude));
-        setLongitude(String(position.longitude));
+        const lat = String(position.latitude);
+        const lon = String(position.longitude);
+        setLatitude(lat);
+        setLongitude(lon);
+        setGpsError('');
       })
-      .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+      .catch((error) => {
+        console.error('Erreur GPS:', error);
+        setGpsError('Impossible de récupérer la position GPS');
+        // Si le GPS échoue, on garde les valeurs existantes ou on laisse vide
+      })
+      .finally(() => {
+        setIsLoadingGps(false);
+      });
+  }, [draft?.latitude, draft?.longitude]);
 
   const handleContinue = async () => {
     if (!draftId || isSaving) return;
@@ -122,21 +144,25 @@ export default function ExtensiveReferenceScreen() {
           <View style={styles.row}>
             <View style={[styles.autoCard, styles.flex1]}>
               <Text style={styles.autoLabel}>Latitude S</Text>
-              <TextInput
-                value={latitude}
-                onChangeText={setLatitude}
-                keyboardType="decimal-pad"
-                style={styles.autoInputMono}
-              />
+              {isLoadingGps ? (
+                <Text style={styles.gpsLoading}>Récupération GPS...</Text>
+              ) : (
+                <Text style={styles.autoValueMono}>{latitude || '—'}</Text>
+              )}
+              {gpsError ? (
+                <Text style={styles.gpsErrorText}>{gpsError}</Text>
+              ) : null}
             </View>
             <View style={[styles.autoCard, styles.flex1]}>
               <Text style={styles.autoLabel}>Longitude E</Text>
-              <TextInput
-                value={longitude}
-                onChangeText={setLongitude}
-                keyboardType="decimal-pad"
-                style={styles.autoInputMono}
-              />
+              {isLoadingGps ? (
+                <Text style={styles.gpsLoading}>Récupération GPS...</Text>
+              ) : (
+                <Text style={styles.autoValueMono}>{longitude || '—'}</Text>
+              )}
+              {gpsError ? (
+                <Text style={styles.gpsErrorText}>{gpsError}</Text>
+              ) : null}
             </View>
           </View>
 
@@ -199,10 +225,34 @@ const styles = StyleSheet.create({
   input: { fontSize: 13, fontWeight: '600', color: TEXT, padding: 0 },
   sectionLabel: { fontSize: 10, fontWeight: '700', color: TEXT_SECONDARY, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 4, marginBottom: 7 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: { fontSize: 11.5, fontWeight: '600', color: TEXT_SECONDARY, backgroundColor: INACTIVE_BG, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, overflow: 'hidden' },
-  chipActive: { backgroundColor: GREEN, color: '#fff', fontWeight: '700' },
+  chip: { 
+    fontSize: 11.5, 
+    fontWeight: '600', 
+    color: TEXT_SECONDARY, 
+    backgroundColor: INACTIVE_BG, 
+    paddingHorizontal: 12, 
+    paddingVertical: 8, 
+    borderRadius: 8, 
+    overflow: 'hidden' 
+  },
+  chipActive: { 
+    backgroundColor: GREEN, 
+    color: '#fff', 
+    fontWeight: '700' 
+  },
   hintText: { fontSize: 10.5, color: '#9a9484', marginTop: 8, marginBottom: 10 },
   footer: { padding: 16 },
   continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
   continueButtonText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  gpsLoading: { 
+    fontSize: 13, 
+    fontWeight: '600', 
+    color: TEXT_SECONDARY,
+    fontStyle: 'italic'
+  },
+  gpsErrorText: { 
+    fontSize: 10, 
+    color: '#d32f2f',
+    marginTop: 2
+  },
 });

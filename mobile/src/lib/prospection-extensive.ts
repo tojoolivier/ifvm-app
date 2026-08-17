@@ -12,7 +12,6 @@ export const PHENOTYPE_ROWS: { key: PhenotypeKey; label: string }[] = [
   { key: 'greg', label: 'Greg.' },
 ];
 
-// Configuration des phases pour le protocole extensif
 export const PHASE_ROWS = [
   { key: 'solitaire', label: 'Solitaire' },
   { key: 'transiens', label: 'Transiens' },
@@ -21,13 +20,19 @@ export const PHASE_ROWS = [
 
 export type PhaseKey = typeof PHASE_ROWS[number]['key'];
 
-export const BIOTOPE_EXTENSIVE_OPTIONS: { value: string; label: string }[] = [
-  { value: 'riziere_bordure', label: 'Rizière en bordure' },
-  { value: 'bas_fond', label: 'Bas-fond' },
-  { value: 'plateau', label: 'Plateau' },
-  { value: 'jachere', label: 'Jachère' },
-  { value: 'culture', label: 'Culture' },
+export const BIOTOPE_EXTENSIVE_OPTIONS = [
+  { value: 'Mesophyle', label: 'Mesophyle' },
+  { value: 'Xerophyle', label: 'Xerophyle' },
+  { value: 'Hydrophyle', label: 'Hydrophyle' },
 ];
+
+export const TYPE_STATION_EXTENSIVE = {
+  MESOPHYLE: 'Mesophyle',
+  XEROPHYLE: 'Xerophyle',
+  HYDROPHYLE: 'Hydrophyle',
+} as const;
+
+export type TypeStationExtensive = typeof TYPE_STATION_EXTENSIVE[keyof typeof TYPE_STATION_EXTENSIVE];
 
 export const NIVEAU_OPTIONS: { value: string; label: string }[] = [
   { value: 'faible', label: 'Faible' },
