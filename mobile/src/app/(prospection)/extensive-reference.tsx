@@ -45,33 +45,48 @@ export default function ExtensiveReferenceScreen() {
 
   // Récupération automatique des coordonnées GPS
   useEffect(() => {
-    // Si les coordonnées existent déjà dans le brouillon, on les utilise
-    if (draft?.latitude && draft?.longitude) {
-      setLatitude(String(draft.latitude));
-      setLongitude(String(draft.longitude));
-      return;
-    }
+    let isMounted = true;
 
-    // Sinon, on récupère la position GPS
-    setIsLoadingGps(true);
-    setGpsError('');
-    
-    getCurrentPosition()
-      .then((position) => {
-        const lat = String(position.latitude);
-        const lon = String(position.longitude);
-        setLatitude(lat);
-        setLongitude(lon);
+    const fetchGpsPosition = async () => {
+      // Si les coordonnées existent déjà dans le brouillon, on les utilise
+      if (draft?.latitude && draft?.longitude) {
+        if (isMounted) {
+          setLatitude(String(draft.latitude));
+          setLongitude(String(draft.longitude));
+        }
+        return;
+      }
+
+      // Sinon, on récupère la position GPS
+      if (isMounted) {
+        setIsLoadingGps(true);
         setGpsError('');
-      })
-      .catch((error) => {
+      }
+
+      try {
+        const position = await getCurrentPosition();
+        if (isMounted) {
+          setLatitude(String(position.latitude));
+          setLongitude(String(position.longitude));
+          setGpsError('');
+        }
+      } catch (error) {
         console.error('Erreur GPS:', error);
-        setGpsError('Impossible de récupérer la position GPS');
-        // Si le GPS échoue, on garde les valeurs existantes ou on laisse vide
-      })
-      .finally(() => {
-        setIsLoadingGps(false);
-      });
+        if (isMounted) {
+          setGpsError('Impossible de récupérer la position GPS');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingGps(false);
+        }
+      }
+    };
+
+    fetchGpsPosition();
+
+    return () => {
+      isMounted = false;
+    };
   }, [draft?.latitude, draft?.longitude]);
 
   const handleContinue = async () => {
