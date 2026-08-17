@@ -59,6 +59,11 @@ export default {
           "danger-bg": "#fbe9e5",
           "danger-border": "#f0c4b9",
           "blue-text": "#31567f",
+          // Teintes de barres du pipeline du tableau de bord (prototype ligne 1306) :
+          // plus claires que les tons de badge, elles ne servent qu'au remplissage.
+          "bar-brouillon": "#bdb6a2",
+          "bar-verifiee": "#5b83b5",
+          "bar-fond": "#f1ecdd",
           "blue-bg": "#eaf0f7",
           "blue-border": "#cdddef",
           "green-text": "#235a36",
