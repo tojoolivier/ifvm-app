@@ -75,7 +75,10 @@
 }
 
 @media print {
-  body * {
+  /* Le masquage général est conditionné à la présence d'une fiche imprimable :
+     sans `:has()`, il s'appliquait à *toutes* les pages et l'impression d'un
+     écran ordinaire (Synthèses & export, §9) rendait une feuille blanche. */
+  body:has(.fiche-imprimable) * {
     visibility: hidden;
   }
 
