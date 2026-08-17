@@ -117,6 +117,13 @@ jobs:
       # org.gradle.parallel volontairement NON active : le build a deja atteint 8.1Gi
       # sur une limite de 9Gi, et paralleliser les modules augmente le pic memoire —
       # on a deja subi un OOM kill silencieux a 6Gi. A reconsiderer si la limite monte.
+      #
+      # Depuis l'ajout de armeabi-v7a a buildArchs (support itel A631L / Unisoc
+      # SC9863A, cf. ADR-004), le build compile 3 ABI au lieu de 2 : la DUREE
+      # augmente d'environ 50%, le pic memoire beaucoup moins (AGP enchaine les
+      # ABI sequentiellement tant que org.gradle.parallel reste desactive).
+      # Si un OOM reapparait, retirer x86_64 (emulateur uniquement) avant de
+      # toucher aux ABI ARM : elles conditionnent l'installabilite sur le terrain.
       - name: Enable Gradle task-output cache (persisted on the runner volume)
         run: |
           mkdir -p "$HOME/.gradle"
