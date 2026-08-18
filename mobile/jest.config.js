@@ -1,4 +1,5 @@
 const roots = ['<rootDir>/__tests__'];
+
 const moduleNameMapper = {
   '^@/(.*)$': '<rootDir>/src/$1',
 };
@@ -26,6 +27,7 @@ module.exports = {
       roots,
       testMatch: ['**/*.test.tsx'],
       moduleNameMapper,
+      setupFiles: ['<rootDir>/jest.setup.js'],
     },
   ],
 };
