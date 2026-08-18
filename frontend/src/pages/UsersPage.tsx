@@ -3,6 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AxiosError } from 'axios'
 import { api } from '../api/client'
 import { Utilisateur } from '../types'
+import { DataTable, DataTableColumn } from '../components/ui/data-table'
+import { Switch } from '../components/ui/switch'
+import { ErrorBanner } from '@/components/ui/error-banner'
+import { cn } from '@/lib/utils'
 
 const ROLES = [
   'prospecteur',
@@ -16,6 +20,24 @@ const ROLES = [
   'admin',
 ]
 
+/**
+ * Ton de badge par rôle — prototype ligne 1521 : la maquette colore le rôle
+ * avec la palette des statuts (`map={Admin:'verifiee', Chef:'validee', …}`).
+ * On garde la même logique : encadrement en vert, contrôle en ambre,
+ * validation finale en rouge, terrain en gris, administration en bleu.
+ */
+const ROLE_TONES: Record<string, string> = {
+  prospecteur: 'bg-ifvm-brouillon-bg text-ifvm-brouillon-text border-ifvm-brouillon-border',
+  pilote: 'bg-ifvm-brouillon-bg text-ifvm-brouillon-text border-ifvm-brouillon-border',
+  mecanicien: 'bg-ifvm-brouillon-bg text-ifvm-brouillon-text border-ifvm-brouillon-border',
+  verificateur: 'bg-ifvm-amber-bg text-ifvm-amber-text border-ifvm-amber-border',
+  validation_finale: 'bg-ifvm-danger-bg text-ifvm-danger-text border-ifvm-danger-border',
+  chef_equipe: 'bg-ifvm-green-bg text-ifvm-green-text border-ifvm-green-border',
+  chef_de_base: 'bg-ifvm-green-bg text-ifvm-green-text border-ifvm-green-border',
+  agent_encadreur: 'bg-ifvm-green-bg text-ifvm-green-text border-ifvm-green-border',
+  admin: 'bg-ifvm-blue-bg text-ifvm-blue-text border-ifvm-blue-border',
+}
+
 const ROLE_LABELS: Record<string, string> = {
   prospecteur: 'Prospecteur',
   verificateur: 'Vérificateur',
@@ -28,9 +50,13 @@ const ROLE_LABELS: Record<string, string> = {
   admin: 'Administrateur',
 }
 
-export function UsersPage() {
+interface UsersPageProps {
+  showCreate: boolean
+  onShowCreateChange: (showCreate: boolean) => void
+}
+
+export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
   const queryClient = useQueryClient()
-  const [showCreate, setShowCreate] = useState(false)
   const [nom, setNom] = useState('')
   const [prenom, setPrenom] = useState('')
   const [email, setEmail] = useState('')
@@ -38,18 +64,39 @@ export function UsersPage() {
   const [role, setRole] = useState(ROLES[0])
   const [createError, setCreateError] = useState('')
 
-  const { data: usersData = [], isLoading } = useQuery<Utilisateur[]>({
+  const { data: usersData = [], isLoading, isError, error } = useQuery<Utilisateur[]>({
     queryKey: ['users'],
     queryFn: () => api.get('/users/').then((r) => r.data),
   })
   const users = Array.isArray(usersData) ? usersData : []
+
+  const errorStatus = (error as AxiosError)?.response?.status
+  const errorDetail = (error as AxiosError<{ detail?: string }>)?.response?.data?.detail
+
+  // Colonne « Fiches » de la maquette : `GET /prospections` n'expose pas de
+  // compteur agrégé par prospecteur — on compte côté client, comme le fait déjà
+  // StationPage pour ses prospections par station. Provisoire : la liste
+  // complète transite à chaque affichage, ce qui ne tiendra pas à l'échelle
+  // d'une base de plusieurs milliers de fiches. Un agrégat côté API
+  // (`GET /prospections?group_by=prospecteur_id`) est la vraie réponse.
+  const { data: prospectionsData = [], isError: fichesIndisponibles } = useQuery<
+    { prospecteur_id: string | null }[]
+  >({
+    queryKey: ['prospections', 'all'],
+    queryFn: () => api.get('/prospections').then((r) => r.data),
+  })
+  const fichesParProspecteur = new Map<string, number>()
+  for (const p of Array.isArray(prospectionsData) ? prospectionsData : []) {
+    if (!p.prospecteur_id) continue
+    fichesParProspecteur.set(p.prospecteur_id, (fichesParProspecteur.get(p.prospecteur_id) ?? 0) + 1)
+  }
 
   const createMutation = useMutation({
     mutationFn: (data: { nom: string; prenom: string; email: string; password: string; role: string }) =>
       api.post('/users/', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
-      setShowCreate(false)
+      onShowCreateChange(false)
       resetForm()
     },
     onError: (err: AxiosError<{ detail?: string }>) => {
@@ -83,75 +130,102 @@ export function UsersPage() {
     createMutation.mutate({ nom, prenom, email, password, role })
   }
 
-  return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Gestion des utilisateurs</h1>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800 transition"
+  const columns: DataTableColumn<Utilisateur>[] = [
+    {
+      key: 'nom',
+      header: 'Nom',
+      render: (u) => (
+        <span className="text-[12.5px] font-semibold">{`${u.prenom} ${u.nom}`}</span>
+      ),
+    },
+    {
+      key: 'email',
+      header: 'Email',
+      mono: true,
+      render: (u) => (
+        <span className="font-mono text-[11.5px] font-medium text-ifvm-text-tertiary">
+          {u.email}
+        </span>
+      ),
+    },
+    {
+      key: 'role',
+      header: 'Rôle',
+      render: (u) => (
+        // La maquette dessine un badge ; le rôle reste modifiable, on garde donc
+        // un `select` habillé aux couleurs du badge plutôt qu'un texte inerte.
+        <select
+          value={u.role}
+          aria-label={`Rôle de ${u.prenom} ${u.nom}`}
+          disabled={updateMutation.isPending}
+          onChange={(e) => updateMutation.mutate({ id: u.id, role: e.target.value })}
+          className={cn(
+            'inline-flex items-center rounded-full border px-[9px] py-[3px] font-sans text-[10px] font-bold disabled:opacity-50',
+            ROLE_TONES[u.role] ??
+              'bg-ifvm-brouillon-bg text-ifvm-brouillon-text border-ifvm-brouillon-border',
+          )}
         >
-          Nouvel utilisateur
-        </button>
-      </div>
+          {ROLES.map((r) => (
+            <option key={r} value={r}>
+              {ROLE_LABELS[r]}
+            </option>
+          ))}
+        </select>
+      ),
+    },
+    {
+      key: 'station',
+      header: 'Station',
+      render: (u) =>
+        u.pa_nom ? (
+          <span className="text-[#3a3a30]">
+            {u.pa_code ? `${u.pa_code} ${u.pa_nom}` : u.pa_nom}
+          </span>
+        ) : (
+          <span className="text-ifvm-text-weak">—</span>
+        ),
+    },
+    {
+      key: 'fiches',
+      header: 'Fiches',
+      align: 'right',
+      mono: true,
+      // Un « ? » plutôt qu'un 0 trompeur si le comptage n'a pas pu être chargé.
+      render: (u) =>
+        fichesIndisponibles ? (
+          <span className="text-ifvm-text-weak">?</span>
+        ) : (
+          (fichesParProspecteur.get(u.id) ?? 0)
+        ),
+    },
+    {
+      key: 'actif',
+      header: 'Actif',
+      render: (u) => (
+        <Switch
+          checked={u.actif}
+          disabled={updateMutation.isPending}
+          onCheckedChange={(checked) => updateMutation.mutate({ id: u.id, actif: checked })}
+        />
+      ),
+    },
+  ]
 
-      {isLoading ? (
-        <p className="text-gray-400">Chargement…</p>
-      ) : users.length === 0 ? (
-        <p className="text-gray-400">Aucun utilisateur enregistré.</p>
+  return (
+    <div>
+      {isError ? (
+        <ErrorBanner
+          label={errorStatus ? `Erreur ${errorStatus}` : 'Erreur'}
+          message={errorDetail ?? 'Impossible de charger les utilisateurs.'}
+        />
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-gray-500 border-b bg-gray-50">
-                <th className="px-4 py-3">Nom</th>
-                <th className="px-4 py-3">Email</th>
-                <th className="px-4 py-3">Rôle</th>
-                <th className="px-4 py-3">Statut</th>
-                <th className="px-4 py-3">Créé le</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((u) => (
-                <tr key={u.id} className="border-b last:border-0 hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium">
-                    {u.prenom} {u.nom}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">{u.email}</td>
-                  <td className="px-4 py-3">
-                    <select
-                      value={u.role}
-                      disabled={updateMutation.isPending}
-                      onChange={(e) => updateMutation.mutate({ id: u.id, role: e.target.value })}
-                      className="border border-gray-200 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
-                    >
-                      {ROLES.map((r) => (
-                        <option key={r} value={r}>
-                          {ROLE_LABELS[r]}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-4 py-3">
-                    <button
-                      disabled={updateMutation.isPending}
-                      onClick={() => updateMutation.mutate({ id: u.id, actif: !u.actif })}
-                      className={`px-2 py-1 rounded text-xs font-medium transition disabled:opacity-50 ${
-                        u.actif
-                          ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                          : 'bg-red-100 text-red-800 hover:bg-red-200'
-                      }`}
-                    >
-                      {u.actif ? 'Actif' : 'Inactif'}
-                    </button>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500">
-                    {new Date(u.created_at).toLocaleDateString('fr-FR')}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="overflow-hidden rounded-[11px] border border-[#e7e0cd] bg-card">
+          <DataTable
+            columns={columns}
+            rows={users}
+            getRowKey={(u) => u.id}
+            emptyMessage={isLoading ? 'Chargement…' : 'Aucun utilisateur enregistré.'}
+          />
         </div>
       )}
 
@@ -234,7 +308,7 @@ export function UsersPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    setShowCreate(false)
+                    onShowCreateChange(false)
                     resetForm()
                   }}
                   className="border border-gray-300 px-4 py-2 rounded hover:bg-gray-50 transition"

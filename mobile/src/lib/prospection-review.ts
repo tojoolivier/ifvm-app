@@ -158,7 +158,7 @@ function buildCapturesPayload(rows: CaptureRow[]): ProspectionCaptureInput[] {
     espece: row.espece,
     categorie: row.categorie,
     sexe: row.sexe || null,
-    phase: row.phase || 'inconnu',
+    phase: (row.phase || 'inconnu') as ProspectionCaptureInput['phase'],
     stade: row.stade || 'inconnu',
     effectif: row.effectif ? Number(row.effectif) : 0,
   }));
@@ -194,7 +194,9 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
     latitude: draft.latitude ? Number(draft.latitude) : null,
     longitude: draft.longitude ? Number(draft.longitude) : null,
     altitude: draft.altitude ? Number(draft.altitude) : null,
-    biotope: (draft.biotope || null) as ProspectionCreateInput['biotope'],
+    // toLowerCase() : rattrape les brouillons locaux enregistrés avant la correction du picker
+    // (qui stockait 'Xerophyle'/'Mesophyle'/'Hydrophyle' en PascalCase, rejeté par l'enum backend).
+    biotope: (draft.biotope ? draft.biotope.toLowerCase() : null) as ProspectionCreateInput['biotope'],
     surface_station: draft.surface_station ? Number(draft.surface_station) : null,
     surface_prospectee: draft.surface_prospectee ? Number(draft.surface_prospectee) : null,
     surface_infestee: draft.surface_infestee ? Number(draft.surface_infestee) : null,
@@ -205,7 +207,7 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
     sol: draft.sol ? JSON.parse(draft.sol) : null,
     ennemis_naturels: draft.ennemis_naturels || null,
     observations: draft.observations || null,
-    statut: draft.statut || 'brouillon',
+    statut: (draft.statut || 'brouillon') as ProspectionCreateInput['statut'],
     region: draft.region || null,
     district: draft.district || null,
     commune: draft.commune || null,
@@ -217,45 +219,68 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
     verdissement_pourcent: draft.verdissement_pourcent ? Number(draft.verdissement_pourcent) : null,
     hauteur_herbe_cm: draft.hauteur_herbe_cm ? Number(draft.hauteur_herbe_cm) : null,
     station_libre: draft.station_libre || null,
-    type_station: draft.type_station || null,
-    verdure_strate: draft.verdure_strate || null,
+    type_station: (draft.type_station || null) as ProspectionCreateInput['type_station'],
+    verdure_strate: (draft.verdure_strate || null) as ProspectionCreateInput['verdure_strate'],
     signalement_source: draft.signalement_source || null,
     signalement_date: draft.signalement_date || null,
     signalement_description: draft.signalement_description || null,
-    conclusion_validation: draft.conclusion_validation || null,
+    conclusion_validation: (draft.conclusion_validation || null) as ProspectionCreateInput['conclusion_validation'],
     avertissements: draft.avertissements ? JSON.parse(draft.avertissements) : [],
   };
+}
+
+/** Le picker affiche 'Néant'/'Rare'/'Peu'/'Beaucoup'/'Dominant' (accouplement.tsx) mais le
+ * backend n'accepte que l'ASCII minuscule ('neant'/'rare'/'peu'/'beaucoup'/'dominant'). */
+const COMBINING_DIACRITICS_RE = new RegExp('[̀-ͯ]', 'g');
+
+function normalizeIntensite(value: string | null): string | null {
+  if (!value) return null;
+  return value.toLowerCase().normalize('NFD').replace(COMBINING_DIACRITICS_RE, '');
 }
 
 function buildPopulationsPayload(rows: PopulationRow[]): ProspectionPopulationInput[] {
   return rows.map((row) => ({
     espece: row.espece,
     categorie: row.categorie,
-    methode: row.methode || null,
+    methode: (row.methode || null) as ProspectionPopulationInput['methode'],
     phase: row.phase || null,
     captures_nombre: row.captures_nombre ? Number(row.captures_nombre) : null,
     temps_capture: row.temps_capture ? Number(row.temps_capture) : null,
     densite_diffuse: row.densite_diffuse ? Number(row.densite_diffuse) : null,
     densite_groupee: row.densite_groupee ? Number(row.densite_groupee) : null,
-    accouplement: row.accouplement || null,
-    ponte: row.ponte || null,
+    accouplement: normalizeIntensite(row.accouplement) as ProspectionPopulationInput['accouplement'],
+    ponte: normalizeIntensite(row.ponte) as ProspectionPopulationInput['ponte'],
     captures_sol: row.captures_sol ? Number(row.captures_sol) : null,
     captures_trans: row.captures_trans ? Number(row.captures_trans) : null,
     captures_greg: row.captures_greg ? Number(row.captures_greg) : null,
-    stade_imago: row.stade_imago || null,
+    stade_imago: (row.stade_imago || null) as ProspectionPopulationInput['stade_imago'],
     essaim_observe: row.essaim_observe != null ? Boolean(row.essaim_observe) : null,
     densites_larve: row.densites_larve ? JSON.parse(row.densites_larve) : null,
     tache_larvaire: row.tache_larvaire != null ? Boolean(row.tache_larvaire) : null,
     bande_larvaire: row.bande_larvaire != null ? Boolean(row.bande_larvaire) : null,
     interdistance: row.interdistance ? Number(row.interdistance) : null,
-    deplacement: row.deplacement || null,
+    deplacement: (row.deplacement || null) as ProspectionPopulationInput['deplacement'],
   }));
 }
 
+/**
+ * Le mobile calcule 5 niveaux de densité aérienne (aide à la décision, cf.
+ * classifyAerialPopulation) mais le backend n'accepte que les 3 catégories
+ * officielles de la fiche PDF (vol_clair/dense/tres_dense). non_classe n'a
+ * pas d'équivalent -> null ; moyenne et forte se regroupent sous 'dense'.
+ */
+const TYPE_ESSAIM_TO_BACKEND: Record<string, 'vol_clair' | 'dense' | 'tres_dense' | null> = {
+  non_classe: null,
+  vol_clair: 'vol_clair',
+  essaim_densite_moyenne: 'dense',
+  essaim_densite_forte: 'dense',
+  essaim_densite_tres_forte: 'tres_dense',
+};
+
 function buildInfestationsPayload(rows: InfestationRow[]): ProspectionInfestationInput[] {
   return rows.map((row) => ({
-    type_cible: row.type_cible,
-    espece: row.espece || null,
+    type_cible: row.type_cible as ProspectionInfestationInput['type_cible'],
+    espece: (row.espece || null) as ProspectionInfestationInput['espece'],
     taille_min: row.taille_min ? Number(row.taille_min) : null,
     taille_max: row.taille_max ? Number(row.taille_max) : null,
     taille_moy: row.taille_moy ? Number(row.taille_moy) : null,
@@ -264,7 +289,7 @@ function buildInfestationsPayload(rows: InfestationRow[]): ProspectionInfestatio
     densite_max: row.densite_max ? Number(row.densite_max) : null,
     densite_moy: row.densite_moy ? Number(row.densite_moy) : null,
     interdistance: row.interdistance ? Number(row.interdistance) : null,
-    comportement: row.comportement || null,
+    comportement: (row.comportement || null) as ProspectionInfestationInput['comportement'],
     direction_de: row.direction_de || null,
     direction_vers: row.direction_vers || null,
     vent_de: row.vent_de || null,
@@ -275,7 +300,7 @@ function buildInfestationsPayload(rows: InfestationRow[]): ProspectionInfestatio
     taille_epaisseur: row.taille_epaisseur ? Number(row.taille_epaisseur) : null,
     essaim_en_vol: row.essaim_en_vol != null ? Boolean(row.essaim_en_vol) : null,
     essaim_pose: row.essaim_pose != null ? Boolean(row.essaim_pose) : null,
-    type_essaim: (row.type_essaim || null) as ProspectionInfestationInput['type_essaim'],
+    type_essaim: (row.type_essaim ? (TYPE_ESSAIM_TO_BACKEND[row.type_essaim] ?? null) : null) as ProspectionInfestationInput['type_essaim'],
     heure_observation: row.heure_observation || null,
     densite_en_vol: row.densite_en_vol ? Number(row.densite_en_vol) : null,
     dimension_ha: row.dimension_ha ? Number(row.dimension_ha) : null,

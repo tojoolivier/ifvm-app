@@ -20,12 +20,17 @@ function toIsoDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}($|T)/;
+
 function fromIsoDate(iso: string): Date {
+  if (!ISO_DATE_RE.test(iso)) return new Date();
   const [year, month, day] = iso.split('T')[0].split('-').map(Number);
   return new Date(year, (month || 1) - 1, day || 1);
 }
 
+/** Anciens brouillons pré-datant ce composant : valeur non-ISO affichée telle quelle plutôt que corrompue. */
 function formatDateFr(iso: string): string {
+  if (!ISO_DATE_RE.test(iso)) return iso;
   const [year, month, day] = iso.split('T')[0].split('-');
   return `${day}/${month}/${year}`;
 }

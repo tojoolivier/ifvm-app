@@ -71,11 +71,11 @@ const STADES_CONFIG = {
 
 const PHASES_CONFIG = {
   LMC: {
-    imago: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
-    larve: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
+    imago: ['solitaire', 'transiens', 'solitaro_trans', 'gregaire'],
+    larve: ['solitaire', 'transiens', 'solitaro_trans', 'gregaire'],
   },
   NSE: {
-    imago: ['solitaire', 'transiens', 'solitario_transiens', 'gregaire'],
+    imago: ['solitaire', 'transiens', 'solitaro_trans', 'gregaire'],
     larve: ['solitaire', 'transiens', 'gregaire'],
   },
 } as const;
@@ -201,6 +201,7 @@ export default function CapturesScreen() {
     if (store.grilleOrder.length > 0 && requestedIndex !== store.currentGrilleIndex) {
       store.goToGrille(requestedIndex, captures);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestedIndex, store.grilleOrder.length]);
 
   // Effet 4: Timer de capture - une seule fois

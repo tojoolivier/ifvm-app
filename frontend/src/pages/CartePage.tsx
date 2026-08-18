@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select'
 import type { InfestationRead } from '@/lib/prospection-fiche-lecture'
 import { buildCarteMarkers, filterProspectionsForCarte, type SeveriteNiveau } from '@/lib/prospection-carte'
+import { STATUTS, STATUT_LABELS } from '@/components/ui/status-badge'
 
 interface Campagne {
   id: string
@@ -39,16 +40,6 @@ interface Prospection {
   latitude: number | null
   longitude: number | null
   infestations: InfestationRead[]
-}
-
-const STATUTS = ['brouillon', 'en_attente', 'verifiee', 'validee', 'rejetee'] as const
-
-const STATUT_LABELS: Record<string, string> = {
-  brouillon: 'Brouillon',
-  en_attente: 'En attente',
-  verifiee: 'Vérifiée',
-  validee: 'Validée',
-  rejetee: 'Rejetée',
 }
 
 const SEVERITE_STYLE: Record<SeveriteNiveau, { color: string; radius: number }> = {

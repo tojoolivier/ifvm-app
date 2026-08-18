@@ -4,31 +4,32 @@
 
 @layer base {
   :root {
-    --background: 0 0% 99%;
-    --foreground: 0 0% 9%;
-    --card: 0 0% 99%;
-    --card-foreground: 0 0% 9%;
-    --popover: 0 0% 99%;
-    --popover-foreground: 0 0% 32%;
-    --primary: 152 65% 70%;
-    --primary-foreground: 140 20% 14%;
-    --secondary: 0 0% 99%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 93%;
-    --muted-foreground: 0 0% 13%;
-    --accent: 0 0% 93%;
-    --accent-foreground: 0 0% 13%;
-    --destructive: 6 80% 46%;
-    --destructive-foreground: 0 0% 99%;
-    --border: 0 0% 87%;
-    --input: 0 0% 96%;
-    --ring: 152 65% 70%;
+    /* Palette IFVM — docs/design_handoff_web/README.md §Design tokens */
+    --background: 44 52% 96%;
+    --foreground: 144 19% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 144 19% 11%;
+    --popover: 43 100% 99%;
+    --popover-foreground: 60 9% 21%;
+    --primary: 141 44% 25%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 43 45% 92%;
+    --secondary-foreground: 144 19% 11%;
+    --muted: 43 45% 92%;
+    --muted-foreground: 46 11% 39%;
+    --accent: 135 24% 93%;
+    --accent-foreground: 141 44% 25%;
+    --destructive: 9 63% 46%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 44 35% 85%;
+    --input: 45 31% 82%;
+    --ring: 141 44% 25%;
     --radius: 0.5rem;
-    --chart-1: 152 65% 70%;
-    --chart-2: 217 91% 60%;
-    --chart-3: 263 70% 58%;
-    --chart-4: 38 92% 50%;
-    --chart-5: 160 84% 39%;
+    --chart-1: 141 44% 25%;
+    --chart-2: 36 80% 54%;
+    --chart-3: 212 44% 35%;
+    --chart-4: 9 63% 46%;
+    --chart-5: 138 22% 85%;
   }
 
   .dark {
@@ -74,7 +75,10 @@
 }
 
 @media print {
-  body * {
+  /* Le masquage général est conditionné à la présence d'une fiche imprimable :
+     sans `:has()`, il s'appliquait à *toutes* les pages et l'impression d'un
+     écran ordinaire (Synthèses & export, §9) rendait une feuille blanche. */
+  body:has(.fiche-imprimable) * {
     visibility: hidden;
   }
 

@@ -207,8 +207,9 @@ class StationFixeRepository(ABC):
         self,
         pa_id: uuid.UUID | None = None,
         q: str | None = None,
-        actif: bool = True,
+        actif: bool | None = True,
     ) -> list[StationFixe]:
+        """`actif=None` : les deux états (écran d'administration)."""
         pass
 
     @abstractmethod
