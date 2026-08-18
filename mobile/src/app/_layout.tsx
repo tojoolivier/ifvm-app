@@ -39,6 +39,8 @@ export default function RootLayout() {
   useAuthGuard();
   const isInitialized = useAuthStore((s) => s.isInitialized);
   const token = useAuthStore((s) => s.token);
+  
+  // Hook de synchronisation automatique du référentiel
   useReferentielAutoSync(token);
 
   useEffect(() => {

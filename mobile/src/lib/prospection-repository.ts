@@ -1482,3 +1482,134 @@ export async function deleteProspection(
 
   return result.changes > 0;
 }
+
+// ==========================================
+// POPULATION EXTENSIVE - DONNÉES SPÉCIFIQUES
+// ==========================================
+
+import { ExtensiveImagoSpeciesData, createEmptySpeciesData } from './prospection-extensive';
+import { Espece } from './prospection-especes-stades';
+
+/**
+ * Sauvegarde des données spécifiques d'une espèce pour le protocole extensif
+ * Ces données sont stockées dans la table prospection_population
+ */
+export async function saveExtensiveImagoSpeciesData(
+  prospectionId: string,
+  espece: Espece,
+  data: ExtensiveImagoSpeciesData
+): Promise<void> {
+  const db = await getDb();
+
+  // Construction de la ligne PopulationRow à partir des données
+  const row: PopulationRow = {
+    espece,
+    categorie: 'imago',
+    densite_diffuse: data.popDiff ? parseFloat(data.popDiff) : null,
+    densite_groupee: data.popGroup ? parseFloat(data.popGroup) : null,
+    methode: null,
+    accouplement: null,
+    ponte: null,
+    captures_sol: data.phases.solitaire,
+    captures_trans: data.phases.transiens,
+    captures_greg: data.phases.gregaire,
+    stade_imago: 'A1', // Valeur par défaut
+    essaim_observe: data.typeCapture === 'essaim',
+  };
+
+  // Utiliser la fonction existante pour sauvegarder
+  await saveProspectionPopulation(prospectionId, row);
+}
+
+/**
+ * Chargement des données spécifiques d'une espèce pour le protocole extensif
+ */
+export async function loadExtensiveImagoSpeciesData(
+  prospectionId: string,
+  espece: Espece
+): Promise<ExtensiveImagoSpeciesData> {
+  const db = await getDb();
+
+  // Récupérer la ligne de population existante
+  const row = await db.getFirstAsync<PopulationRow>(
+    `SELECT 
+      espece,
+      categorie,
+      densite_diffuse,
+      densite_groupee,
+      captures_sol,
+      captures_trans,
+      captures_greg,
+      stade_imago,
+      essaim_observe
+     FROM prospection_population
+     WHERE prospection_id = ?
+       AND espece = ?
+       AND categorie = ?`,
+    [prospectionId, espece, 'imago']
+  );
+
+  if (!row) {
+    return createEmptySpeciesData();
+  }
+
+  // Conversion en ExtensiveImagoSpeciesData
+  return {
+    totalCaptures: (row.captures_sol ?? 0) + (row.captures_trans ?? 0) + (row.captures_greg ?? 0),
+    phases: {
+      solitaire: row.captures_sol ?? 0,
+      transiens: row.captures_trans ?? 0,
+      gregaire: row.captures_greg ?? 0,
+    },
+    stades: {
+      femelleA1: 0,
+      femelleA2: 0,
+      femelleA3: 0,
+      femelleA3_1_4: 0,
+      femelleA3_1_2: 0,
+      femelleA3_3_4: 0,
+      femelleA3_4_4: 0,
+      femelleA4: 0,
+      femelleA5: 0,
+      maleA1: 0,
+      maleA123: 0,
+      maleA5: 0,
+    },
+    popDiff: row.densite_diffuse != null ? String(row.densite_diffuse) : '',
+    popGroup: row.densite_groupee != null ? String(row.densite_groupee) : '',
+    typeCapture: Boolean(row.essaim_observe) ? 'essaim' : 'volClair',
+    activePhase: null,
+  };
+}
+
+/**
+ * Sauvegarde complète des données d'une espèce incluant les stades
+ * (À utiliser quand les stades sont aussi stockés)
+ */
+export async function saveCompleteExtensiveImagoData(
+  prospectionId: string,
+  espece: Espece,
+  data: ExtensiveImagoSpeciesData
+): Promise<void> {
+  // 1. Sauvegarder les données principales
+  await saveExtensiveImagoSpeciesData(prospectionId, espece, data);
+
+  // 2. Si les stades doivent être sauvegardés, les ajouter ici
+  // Note: Actuellement, les stades ne sont pas stockés dans la base
+  // pour le protocole extensif. Cette fonction peut être étendue
+  // si une table de stades est ajoutée.
+}
+
+/**
+ * Chargement complet des données d'une espèce incluant les stades
+ */
+export async function loadCompleteExtensiveImagoData(
+  prospectionId: string,
+  espece: Espece
+): Promise<ExtensiveImagoSpeciesData> {
+  const data = await loadExtensiveImagoSpeciesData(prospectionId, espece);
+  
+  // Les stades ne sont pas encore stockés en base pour l'extensif
+  // On retourne les données avec les stades vides
+  return data;
+}

@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAsyncAction } from '@/hooks/use-async-action';
 import { Espece } from '@/lib/prospection-especes-stades';
 import { getProspectionPopulation, saveProspectionPopulation } from '@/lib/prospection-repository';
 import {
-  EXTENSIVE_IMAGO_PHASES,
-  PHENOTYPE_ROWS,
-  ExtensiveImagoState,
-  emptyExtensiveImagoState,
-  imagoStateToPopulationRow,
-  populationRowToImagoState,
+  PHASE_ROWS,
+  PhaseKey,
+  ExtensiveImagoSpeciesData,
+  createEmptySpeciesData,
+  speciesDataToPopulationRow,
+  populationRowToSpeciesData,
+  extractCommonImagoData,
 } from '@/lib/prospection-extensive';
 
 const GREEN = '#235a36';
@@ -21,17 +21,29 @@ const TEXT_SECONDARY = '#6f6a59';
 const BORDER = '#e7e0cd';
 const INACTIVE_BG = '#efeada';
 
+type Sexe = 'F' | 'M';
+
 export default function ExtensiveImagosScreen() {
   const router = useRouter();
   const { draftId } = useLocalSearchParams<{ draftId: string }>();
 
   const [species, setSpecies] = useState<Espece>('LMC');
-  const [states, setStates] = useState<Record<Espece, ExtensiveImagoState>>({
-    LMC: emptyExtensiveImagoState(),
-    NSE: emptyExtensiveImagoState(),
+  const [currentSexe, setCurrentSexe] = useState<Sexe>('F');
+  
+  // Données par espèce
+  const [speciesData, setSpeciesData] = useState<Record<Espece, ExtensiveImagoSpeciesData>>({
+    LMC: createEmptySpeciesData(),
+    NSE: createEmptySpeciesData(),
   });
-  const { run, isRunning: isSaving } = useAsyncAction();
+  
+  // Données communes (popDiff, popGroup, typeCapture)
+  const [popDiff, setPopDiff] = useState('');
+  const [popGroup, setPopGroup] = useState('');
+  const [typeCapture, setTypeCapture] = useState<'essaim' | 'volClair'>('essaim');
+  
+  const [isSaving, setIsSaving] = useState(false);
 
+  // Chargement des données existantes
   useEffect(() => {
     if (!draftId) return;
     (async () => {
@@ -39,31 +51,165 @@ export default function ExtensiveImagosScreen() {
         getProspectionPopulation(draftId, 'LMC', 'imago'),
         getProspectionPopulation(draftId, 'NSE', 'imago'),
       ]);
-      setStates({ LMC: populationRowToImagoState(lmc), NSE: populationRowToImagoState(nse) });
+      
+      // Conversion des données chargées
+      const lmcData = populationRowToSpeciesData(lmc);
+      const nseData = populationRowToSpeciesData(nse);
+      
+      setSpeciesData({
+        LMC: lmcData,
+        NSE: nseData,
+      });
+
+      // Charger les données communes depuis l'une des espèces
+      const commonData = extractCommonImagoData(lmc || nse);
+      setPopDiff(commonData.popDiff);
+      setPopGroup(commonData.popGroup);
+      setTypeCapture(commonData.typeCapture);
     })();
   }, [draftId]);
 
-  const state = states[species];
-  const updateState = (patch: Partial<ExtensiveImagoState>) => {
-    setStates((prev) => ({ ...prev, [species]: { ...prev[species], ...patch } }));
+  const data = speciesData[species];
+  
+  // Calcul des totaux
+  const totalPhases = data.phases.solitaire + data.phases.transiens + data.phases.gregaire;
+  
+  const totalStadesF = 
+    data.stades.femelleA1 + data.stades.femelleA2 + data.stades.femelleA3 + 
+    data.stades.femelleA3_1_4 + data.stades.femelleA3_1_2 + data.stades.femelleA3_3_4 + 
+    data.stades.femelleA3_4_4 + data.stades.femelleA4 + data.stades.femelleA5;
+  
+  const totalStadesM = 
+    data.stades.maleA1 + data.stades.maleA123 + data.stades.maleA5;
+  
+  const totalStades = totalStadesF + totalStadesM;
+
+  // Validations - MODIFIÉ : accepte 0
+  const isPhasesConsistent = data.totalCaptures === totalPhases;
+  const isStadesConsistent = totalStades === data.totalCaptures;
+  const isConsistent = isPhasesConsistent && isStadesConsistent;
+
+  // Mise à jour des données
+  const updateSpeciesData = (patch: Partial<ExtensiveImagoSpeciesData>) => {
+    setSpeciesData((prev) => ({
+      ...prev,
+      [species]: { ...prev[species], ...patch },
+    }));
   };
 
-  const handleContinue = () =>
-    run(
-      async () => {
-        await Promise.all([
-          saveProspectionPopulation(draftId, imagoStateToPopulationRow('LMC', states.LMC)),
-          saveProspectionPopulation(draftId, imagoStateToPopulationRow('NSE', states.NSE)),
-        ]);
-        router.push({ pathname: '/(prospection)/extensive-larves' as any, params: { draftId } });
+  const updatePhase = (key: PhaseKey, value: number) => {
+    setSpeciesData((prev) => ({
+      ...prev,
+      [species]: {
+        ...prev[species],
+        phases: { ...prev[species].phases, [key]: value },
       },
-      {
-        screen: 'extensive-imagos',
-        precondition: !!draftId,
-        preconditionMessage: 'Session de saisie perdue — revenez à l’écran précédent et réessayez.',
-        context: { draftId, species },
+    }));
+  };
+
+  const updateStade = (key: keyof ExtensiveImagoSpeciesData['stades'], value: number) => {
+    setSpeciesData((prev) => ({
+      ...prev,
+      [species]: {
+        ...prev[species],
+        stades: { ...prev[species].stades, [key]: value },
+      },
+    }));
+  };
+
+  const handleContinue = async () => {
+    if (!draftId || isSaving) return;
+
+    // MODIFIÉ : accepte 0, donc plus de vérification > 0
+    if (!isPhasesConsistent) {
+      Alert.alert(
+        'Incohérence des phases',
+        `Captures : ${data.totalCaptures}\nPhases : ${totalPhases}\n\nLa somme des phases doit être exactement égale au nombre de captures.`
+      );
+      return;
+    }
+
+    if (!isStadesConsistent) {
+      Alert.alert(
+        'Incohérence des stades',
+        `Captures : ${data.totalCaptures}\nStades femelles : ${totalStadesF}\nStades mâles : ${totalStadesM}\nTotal stades : ${totalStadesF} + ${totalStadesM} = ${totalStades}\n\nLa règle est :\nCaptures = Phases = Stades ♀ + Stades ♂`
+      );
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Données communes
+      const commonData = { popDiff, popGroup, typeCapture };
+      
+      // Sauvegarder les données pour LMC et NSE
+      await Promise.all([
+        saveProspectionPopulation(draftId, speciesDataToPopulationRow('LMC', speciesData.LMC, commonData)),
+        saveProspectionPopulation(draftId, speciesDataToPopulationRow('NSE', speciesData.NSE, commonData)),
+      ]);
+      
+      router.push({ pathname: '/(prospection)/extensive-larves' as any, params: { draftId } });
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde:', error);
+      Alert.alert('Erreur', 'Une erreur est survenue lors de la sauvegarde des données.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Rendu des stades selon le sexe
+  const renderStades = () => {
+    const isFemale = currentSexe === 'F';
+    const stadesList = isFemale 
+      ? ['A1', 'A2', 'A3', 'A3-1/4', 'A3-1/2', 'A3-3/4', 'A3-4/4', 'A4', 'A5']
+      : ['A1', 'A123', 'A5'];
+    
+    const getKey = (stade: string): keyof ExtensiveImagoSpeciesData['stades'] => {
+      if (isFemale) {
+        return `femelle${stade.replace(/-/g, '_').replace(/\//g, '_')}` as keyof ExtensiveImagoSpeciesData['stades'];
+      } else {
+        return `male${stade.replace(/-/g, '_').replace(/\//g, '_')}` as keyof ExtensiveImagoSpeciesData['stades'];
       }
-    );
+    };
+
+    const totalSexe = isFemale ? totalStadesF : totalStadesM;
+
+    return stadesList.map((stade) => {
+      const key = getKey(stade);
+      const value = data.stades[key] || 0;
+      
+      return (
+        <View key={stade} style={styles.stadeCounterRow}>
+          <Text style={styles.stadeLabel}>{stade}</Text>
+          <View style={styles.counterButtons}>
+            <TouchableOpacity
+              style={[styles.miniButton, value === 0 && styles.miniButtonDisabled]}
+              onPress={() => {
+                if (value > 0) updateStade(key, value - 1);
+              }}
+              disabled={value === 0}
+            >
+              <Text style={styles.miniButtonText}>−</Text>
+            </TouchableOpacity>
+            <Text style={styles.counterValue}>{value}</Text>
+            <TouchableOpacity
+              style={[styles.miniButton, styles.miniButtonAdd, totalSexe >= data.totalCaptures && styles.miniButtonDisabled]}
+              onPress={() => {
+                if (totalSexe < data.totalCaptures) {
+                  updateStade(key, value + 1);
+                } else {
+                  Alert.alert('Limite atteinte', `Le total des stades ${isFemale ? 'féminins' : 'masculins'} a déjà atteint ${data.totalCaptures}.`);
+                }
+              }}
+              disabled={totalSexe >= data.totalCaptures}
+            >
+              <Text style={[styles.miniButtonText, styles.miniButtonAddText]}>+</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    });
+  };
 
   return (
     <View style={styles.root}>
@@ -99,90 +245,251 @@ export default function ExtensiveImagosScreen() {
         </View>
 
         <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16, paddingTop: 0 }}>
-          <Text style={styles.sectionLabel}>Nbre captures par phénotype</Text>
-          <View style={{ gap: 6, marginBottom: 12 }}>
-            {PHENOTYPE_ROWS.map(({ key, label }) => {
-              const active = state.active === key;
-              const count = state[key];
-              return (
-                <TouchableOpacity
-                  key={key}
-                  style={[styles.phenoRow, active && styles.phenoRowActive]}
-                  onPress={() => updateState({ active: key })}
-                  activeOpacity={0.85}
-                >
-                  <Text style={[styles.phenoLabel, active && styles.phenoLabelActive]}>{label}</Text>
-                  {active ? (
-                    <View style={styles.counterRow}>
-                      <TouchableOpacity
-                        style={styles.counterButton}
-                        onPress={() => updateState({ [key]: Math.max(0, count - 1) } as Partial<ExtensiveImagoState>)}
-                      >
-                        <Text style={styles.counterButtonText}>−</Text>
-                      </TouchableOpacity>
-                      <Text style={styles.counterValue}>{count}</Text>
-                      <TouchableOpacity
-                        style={[styles.counterButton, styles.counterButtonAdd]}
-                        onPress={() => updateState({ [key]: count + 1 } as Partial<ExtensiveImagoState>)}
-                      >
-                        <Text style={[styles.counterButtonText, styles.counterButtonAddText]}>+</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <Text style={styles.phenoStaticCount}>{count}</Text>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <Text style={styles.sectionLabel}>Phase</Text>
-          <View style={[styles.chipsRow, { marginBottom: 12 }]}>
-            {EXTENSIVE_IMAGO_PHASES.map((phase) => {
-              const active = phase === state.phase;
-              return (
-                <TouchableOpacity key={phase} style={{ flex: 1 }} onPress={() => updateState({ phase })} activeOpacity={0.7}>
-                  <Text style={[styles.chip, active && styles.chipActive]}>{phase}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <View style={styles.row}>
-            <View style={[styles.card, styles.flex1]}>
-              <Text style={styles.label}>Pop diff D/ha</Text>
+          {/* 1. Nombre total de captures */}
+          <View style={styles.totalCaptureSection}>
+            <Text style={styles.sectionLabel}>📝 Nombre total de captures</Text>
+            <View style={styles.totalCaptureInputContainer}>
               <TextInput
-                value={state.popDiff}
-                onChangeText={(v) => updateState({ popDiff: v })}
-                keyboardType="decimal-pad"
-                style={styles.inputMono}
+                value={String(data.totalCaptures)}
+                onChangeText={(text) => {
+                  const val = Number.parseInt(text, 10);
+                  // Si la valeur est NaN (champ vide), on met 0
+                  updateSpeciesData({ totalCaptures: isNaN(val) ? 0 : val });
+                }}
+                keyboardType="number-pad"
+                style={styles.totalCaptureInput}
+                placeholder="0"
+                placeholderTextColor={TEXT_SECONDARY}
               />
             </View>
-            <View style={[styles.card, styles.flex1]}>
-              <Text style={styles.label}>Pop group D/m²</Text>
-              <TextInput
-                value={state.popGroup}
-                onChangeText={(v) => updateState({ popGroup: v })}
-                keyboardType="decimal-pad"
-                style={styles.inputMono}
-              />
+            <Text style={styles.totalCaptureInfo}>
+              {data.totalCaptures} capture{data.totalCaptures > 1 ? 's' : ''} à répartir
+            </Text>
+          </View>
+
+          {/* 2. Phases */}
+          <View style={styles.phaseSection}>
+            <Text style={styles.sectionLabel}>📊 Phases</Text>
+            <View style={{ gap: 6, marginBottom: 8 }}>
+              {PHASE_ROWS.map(({ key, label }) => {
+                const active = data.activePhase === key;
+                const count = data.phases[key];
+                return (
+                  <TouchableOpacity
+                    key={key}
+                    style={[styles.phaseRow, active && styles.phaseRowActive]}
+                    onPress={() => updateSpeciesData({ activePhase: key })}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[styles.phaseLabel, active && styles.phaseLabelActive]}>{label}</Text>
+                    {active ? (
+                      <View style={styles.counterRow}>
+                        <TouchableOpacity
+                          style={styles.counterButton}
+                          onPress={() => updatePhase(key, Math.max(0, count - 1))}
+                        >
+                          <Text style={styles.counterButtonText}>−</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.counterValue}>{count}</Text>
+                        <TouchableOpacity
+                          style={[styles.counterButton, styles.counterButtonAdd, totalPhases >= data.totalCaptures && styles.counterButtonDisabled]}
+                          onPress={() => {
+                            if (totalPhases < data.totalCaptures) {
+                              updatePhase(key, count + 1);
+                            } else {
+                              Alert.alert('Limite atteinte', `La somme des phases a déjà atteint ${data.totalCaptures}.`);
+                            }
+                          }}
+                          disabled={totalPhases >= data.totalCaptures}
+                        >
+                          <Text style={[styles.counterButtonText, styles.counterButtonAddText]}>+</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <Text style={styles.phaseStaticCount}>{count}</Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Total phases :</Text>
+              <Text style={[styles.totalValue, !isPhasesConsistent && styles.errorCount]}>
+                {totalPhases} {isPhasesConsistent ? '✅' : ''}
+              </Text>
+            </View>
+            {!isPhasesConsistent && (
+              <Text style={styles.errorText}>
+                La somme des phases doit être égale au nombre de captures ({data.totalCaptures})
+              </Text>
+            )}
+          </View>
+
+          {/* 3. Stades */}
+          <View style={styles.stadesSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionLabel}>📊 Stades</Text>
+              <Text style={[styles.sectionCount, !isStadesConsistent && styles.errorCount]}>
+                {totalStades}
+              </Text>
+            </View>
+            
+            {/* Sélecteur de sexe */}
+            <View style={styles.sexeRow}>
+              <TouchableOpacity
+                style={[styles.sexeToggle, currentSexe === 'F' && styles.sexeToggleActive]}
+                onPress={() => setCurrentSexe('F')}
+              >
+                <Text style={[styles.sexeText, currentSexe === 'F' && styles.sexeTextActive]}>♀ Femelles</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.sexeToggle, currentSexe === 'M' && styles.sexeToggleActive]}
+                onPress={() => setCurrentSexe('M')}
+              >
+                <Text style={[styles.sexeText, currentSexe === 'M' && styles.sexeTextActive]}>♂ Mâles</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.sexeHint}>
+              {currentSexe === 'F'
+                ? '♀ Stades : A1, A2, A3, A3-1/4, A3-1/2, A3-3/4, A3-4/4, A4, A5'
+                : '♂ Stades : A1, A123, A5'}
+            </Text>
+
+            <View style={styles.stadesGrid}>
+              {renderStades()}
+            </View>
+
+            <View style={styles.stadesSummary}>
+              <Text style={styles.summaryText}>
+                Femelles: {totalStadesF} | Males: {totalStadesM} | Total: {totalStadesF} + {totalStadesM} = {totalStades}
+              </Text>
+            </View>
+            
+            {!isStadesConsistent && (
+              <Text style={styles.errorText}>
+                La somme des stades doit être égale au nombre de captures ({data.totalCaptures})
+              </Text>
+            )}
+          </View>
+
+          {/* 4. Densités - Communes */}
+          <View style={styles.densitySection}>
+            <Text style={styles.sectionLabel}>📊 Densités</Text>
+            <View style={styles.row}>
+              <View style={[styles.card, styles.flex1]}>
+                <Text style={styles.label}>Population diffuse D/ha</Text>
+                <TextInput
+                  value={popDiff}
+                  onChangeText={setPopDiff}
+                  keyboardType="decimal-pad"
+                  style={styles.inputMono}
+                  placeholder="0"
+                  placeholderTextColor={TEXT_SECONDARY}
+                />
+              </View>
+              <View style={[styles.card, styles.flex1]}>
+                <Text style={styles.label}>Population groupée D/m²</Text>
+                <TextInput
+                  value={popGroup}
+                  onChangeText={setPopGroup}
+                  keyboardType="decimal-pad"
+                  style={styles.inputMono}
+                  placeholder="0"
+                  placeholderTextColor={TEXT_SECONDARY}
+                />
+              </View>
             </View>
           </View>
 
-          <TouchableOpacity
-            style={styles.essaimRow}
-            onPress={() => updateState({ essaim: !state.essaim })}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.essaimLabel}>Essaim observé</Text>
-            <View style={[styles.toggleTrack, state.essaim && styles.toggleTrackActive]}>
-              <View style={[styles.toggleThumb, state.essaim && styles.toggleThumbActive]} />
+          {/* 5. Type de capture - Commun */}
+          <View style={styles.typeSection}>
+            <Text style={styles.sectionLabel}>📊 Type de capture</Text>
+            <View style={styles.typeRow}>
+              <TouchableOpacity
+                style={[styles.typeButton, typeCapture === 'essaim' && styles.typeButtonActive]}
+                onPress={() => setTypeCapture('essaim')}
+              >
+                <Text style={[styles.typeButtonText, typeCapture === 'essaim' && styles.typeButtonTextActive]}>
+                  Essaim
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.typeButton, typeCapture === 'volClair' && styles.typeButtonActive]}
+                onPress={() => setTypeCapture('volClair')}
+              >
+                <Text style={[styles.typeButtonText, typeCapture === 'volClair' && styles.typeButtonTextActive]}>
+                  Vol clair
+                </Text>
+              </TouchableOpacity>
             </View>
-          </TouchableOpacity>
+          </View>
+
+          {/* Récapitulatif */}
+          <View style={styles.summaryContainer}>
+            <Text style={styles.summaryTitle}>📋 Récapitulatif</Text>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>1. Nombre de captures :</Text>
+              <Text style={[styles.summaryValue, styles.summaryValueValid]}>{data.totalCaptures}</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>2. Phases :</Text>
+              <Text style={[styles.summaryValue, isPhasesConsistent ? styles.summaryValueValid : styles.summaryValueInvalid]}>
+                {totalPhases} {isPhasesConsistent ? '✅' : '❌'}
+              </Text>
+            </View>
+            <View style={styles.summaryDivider} />
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>3a. Stades ♀ :</Text>
+              <Text style={styles.summaryValue}>{totalStadesF}</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>3b. Stades ♂ :</Text>
+              <Text style={styles.summaryValue}>{totalStadesM}</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Total stades :</Text>
+              <Text style={[styles.summaryValue, isStadesConsistent ? styles.summaryValueValid : styles.summaryValueInvalid]}>
+                {totalStadesF} + {totalStadesM} = {totalStades} {isStadesConsistent ? '✅' : '❌'}
+              </Text>
+            </View>
+            <View style={styles.ruleBox}>
+              <Text style={styles.ruleText}>Règle : Captures = Phases = Stades ♀ + ♂</Text>
+            </View>
+          </View>
+
+          {/* Message de validation */}
+          {isConsistent ? (
+            <View style={styles.successContainer}>
+              <Text style={styles.successText}>✅ COHÉRENT</Text>
+              <Text style={styles.successDetail}>
+                {data.totalCaptures} captures = {totalPhases} phases = {totalStadesF} ♀ + {totalStadesM} ♂ = {totalStades} stades
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.warningContainer}>
+              <Text style={styles.warningText}>⚠️ INCOHÉRENCE</Text>
+              <Text style={styles.warningDetail}>
+                Captures : {data.totalCaptures}
+                {'\n'}Phases : {totalPhases}
+                {'\n'}Stades ♀ : {totalStadesF}
+                {'\n'}Stades ♂ : {totalStadesM}
+                {'\n'}Total stades : {totalStadesF} + {totalStadesM} = {totalStades}
+              </Text>
+              <Text style={styles.warningHint}>
+                La règle est : Captures = Phases = Stades ♀ + Stades ♂
+              </Text>
+            </View>
+          )}
         </ScrollView>
 
         <View style={styles.footer}>
-          <TouchableOpacity style={styles.continueButton} onPress={handleContinue} disabled={isSaving} activeOpacity={0.85}>
+          <TouchableOpacity 
+            style={[styles.continueButton, !isConsistent && styles.continueButtonDisabled]} 
+            onPress={handleContinue} 
+            disabled={isSaving || !isConsistent} 
+            activeOpacity={0.85}
+          >
             <Text style={styles.continueButtonText}>Suivant : Larves ›</Text>
           </TouchableOpacity>
         </View>
@@ -206,33 +513,98 @@ const styles = StyleSheet.create({
   speciesButtonText: { fontSize: 13, fontWeight: '800', color: TEXT_SECONDARY },
   speciesButtonTextActive: { color: '#fff' },
   scroll: { flex: 1 },
+  
+  // Section Header
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7, marginTop: 4 },
   sectionLabel: { fontSize: 9.5, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 7, marginTop: 4 },
-  phenoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, paddingVertical: 7, paddingHorizontal: 13 },
-  phenoRowActive: { borderWidth: 2, borderColor: GREEN, paddingVertical: 6, paddingLeft: 13 },
-  phenoLabel: { fontSize: 13, fontWeight: '600', color: TEXT_SECONDARY },
-  phenoLabelActive: { fontWeight: '700', color: TEXT },
-  phenoStaticCount: { fontSize: 13, fontWeight: '600', color: TEXT, fontFamily: 'monospace' },
+  sectionCount: { fontSize: 13, fontWeight: '700', color: GREEN, fontFamily: 'monospace' },
+  errorCount: { color: '#d32f2f' },
+  errorText: { fontSize: 11, color: '#d32f2f', marginTop: 4, marginBottom: 4 },
+  
+  // Total Captures
+  totalCaptureSection: { backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
+  totalCaptureInputContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  totalCaptureInput: { flex: 1, backgroundColor: '#f8f6f0', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 10, fontSize: 18, fontWeight: '700', color: TEXT },
+  totalCaptureInfo: { marginTop: 6, fontSize: 12, color: TEXT_SECONDARY, textAlign: 'center' },
+  
+  // Phases
+  phaseSection: { marginTop: 4, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
+  phaseRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, paddingVertical: 7, paddingHorizontal: 13 },
+  phaseRowActive: { borderWidth: 2, borderColor: GREEN, paddingVertical: 6, paddingLeft: 13 },
+  phaseLabel: { fontSize: 13, fontWeight: '600', color: TEXT_SECONDARY },
+  phaseLabelActive: { fontWeight: '700', color: TEXT },
+  phaseStaticCount: { fontSize: 13, fontWeight: '600', color: TEXT, fontFamily: 'monospace' },
+  totalRow: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 4, paddingTop: 4, borderTopWidth: 1, borderTopColor: BORDER },
+  totalLabel: { fontSize: 12, fontWeight: '600', color: TEXT_SECONDARY, marginRight: 8 },
+  totalValue: { fontSize: 13, fontWeight: '700', color: GREEN, fontFamily: 'monospace' },
   counterRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   counterButton: { width: 32, height: 32, borderRadius: 9, backgroundColor: INACTIVE_BG, alignItems: 'center', justifyContent: 'center' },
   counterButtonAdd: { backgroundColor: GREEN },
+  counterButtonDisabled: { opacity: 0.4 },
   counterButtonText: { fontSize: 17, fontWeight: '700', color: TEXT_SECONDARY },
   counterButtonAddText: { color: '#fff' },
   counterValue: { fontSize: 17, fontWeight: '700', color: TEXT, minWidth: 16, textAlign: 'center', fontFamily: 'monospace' },
-  chipsRow: { flexDirection: 'row', gap: 5 },
-  chip: { fontSize: 11.5, fontWeight: '600', color: TEXT_SECONDARY, backgroundColor: INACTIVE_BG, paddingVertical: 8, textAlign: 'center', borderRadius: 8, overflow: 'hidden' },
-  chipActive: { backgroundColor: GREEN, color: '#fff', fontWeight: '700' },
-  row: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  
+  // Stades
+  stadesSection: { marginTop: 4, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
+  sexeRow: { flexDirection: 'row', gap: 7, backgroundColor: INACTIVE_BG, borderRadius: 11, padding: 4, marginBottom: 11, marginTop: 4 },
+  sexeToggle: { flex: 1, borderRadius: 8, padding: 9, alignItems: 'center' },
+  sexeToggleActive: { backgroundColor: '#fff' },
+  sexeText: { fontWeight: '700', fontSize: 13, color: '#9a9484' },
+  sexeTextActive: { color: TEXT },
+  sexeHint: { fontSize: 10, color: '#9a9484', marginBottom: 9 },
+  stadesGrid: { gap: 6 },
+  stadeCounterRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 3 },
+  stadeLabel: { fontSize: 13, fontWeight: '500', color: TEXT },
+  counterButtons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  miniButton: { width: 28, height: 28, borderRadius: 6, backgroundColor: INACTIVE_BG, alignItems: 'center', justifyContent: 'center' },
+  miniButtonAdd: { backgroundColor: GREEN },
+  miniButtonDisabled: { opacity: 0.4 },
+  miniButtonText: { fontSize: 14, fontWeight: '700', color: TEXT_SECONDARY },
+  miniButtonAddText: { color: '#fff' },
+  stadesSummary: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: BORDER },
+  summaryText: { fontSize: 12, color: TEXT_SECONDARY, textAlign: 'center' },
+  
+  // Densités
+  densitySection: { marginTop: 4, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
+  row: { flexDirection: 'row', gap: 8, marginBottom: 0 },
   flex1: { flex: 1 },
   card: { backgroundColor: '#f6f3e9', borderRadius: 9, padding: 8 },
   label: { fontSize: 9, fontWeight: '600', color: '#9a9484' },
   inputMono: { fontSize: 15, fontWeight: '700', color: TEXT, fontFamily: 'monospace', padding: 0 },
-  essaimRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fdf6e7', borderWidth: 1, borderColor: '#f0e2bf', borderRadius: 10, padding: 12, marginBottom: 16 },
-  essaimLabel: { fontSize: 12.5, fontWeight: '700', color: '#8a6d2f' },
-  toggleTrack: { width: 38, height: 21, borderRadius: 12, backgroundColor: '#e0d8b8', padding: 2, justifyContent: 'center' },
-  toggleTrackActive: { backgroundColor: GREEN, alignItems: 'flex-end' },
-  toggleThumb: { width: 17, height: 17, borderRadius: 9, backgroundColor: '#fff' },
-  toggleThumbActive: {},
+  
+  // Type capture
+  typeSection: { marginTop: 4, marginBottom: 8 },
+  typeRow: { flexDirection: 'row', gap: 8 },
+  typeButton: { flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: INACTIVE_BG, alignItems: 'center' },
+  typeButtonActive: { backgroundColor: GREEN },
+  typeButtonText: { fontSize: 13, fontWeight: '600', color: TEXT_SECONDARY },
+  typeButtonTextActive: { color: '#fff' },
+  
+  // Summary
+  summaryContainer: { backgroundColor: '#FFFFFF', borderRadius: 10, padding: 14, marginTop: 8, borderWidth: 1, borderColor: BORDER },
+  summaryTitle: { fontSize: 12, fontWeight: '700', color: TEXT, marginBottom: 8, textAlign: 'center' },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: '#f0eee8' },
+  summaryDivider: { height: 1, backgroundColor: '#f0eee8', marginVertical: 4 },
+  summaryLabel: { fontSize: 13, color: TEXT_SECONDARY },
+  summaryValue: { fontSize: 13, fontWeight: '700', color: TEXT },
+  summaryValueValid: { color: GREEN },
+  summaryValueInvalid: { color: '#dc2626' },
+  ruleBox: { marginTop: 10, backgroundColor: '#f8f6f0', borderRadius: 7, padding: 8 },
+  ruleText: { fontSize: 11, color: TEXT_SECONDARY, textAlign: 'center', fontWeight: '600' },
+  
+  // Messages de validation
+  warningContainer: { backgroundColor: '#fef2f2', borderRadius: 8, padding: 10, marginTop: 8, borderWidth: 1, borderColor: '#fca5a5' },
+  warningText: { color: '#dc2626', fontWeight: '700', fontSize: 13, textAlign: 'center' },
+  warningDetail: { color: '#dc2626', fontSize: 12, textAlign: 'center', marginTop: 5, lineHeight: 18 },
+  warningHint: { color: '#dc2626', fontSize: 11, textAlign: 'center', marginTop: 5, fontStyle: 'italic' },
+  successContainer: { backgroundColor: '#dcfce7', borderRadius: 8, padding: 10, marginTop: 8, borderWidth: 1, borderColor: '#86efac' },
+  successText: { color: '#15803d', fontWeight: '700', fontSize: 13, textAlign: 'center' },
+  successDetail: { color: '#15803d', fontSize: 12, textAlign: 'center', marginTop: 3, lineHeight: 18 },
+  
+  // Footer
   footer: { padding: 16 },
   continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
+  continueButtonDisabled: { opacity: 0.5 },
   continueButtonText: { color: '#fff', fontWeight: '800', fontSize: 15 },
 });
