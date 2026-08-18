@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user, hash_password
 from app.database import get_db
+from app.infrastructure.referentiel_model import PosteAcridienModel
 from app.models.users import Utilisateur
 from app.schemas.users import UtilisateurCreate, UtilisateurRead, UtilisateurUpdate
 
@@ -31,8 +32,19 @@ async def list_users(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Utilisateur, Depends(require_admin)],
 ):
-    result = await db.execute(select(Utilisateur).order_by(Utilisateur.nom))
-    return result.scalars().all()
+    # Jointure externe : un utilisateur peut ne pas être rattaché à un poste.
+    stmt = (
+        select(Utilisateur, PosteAcridienModel.code, PosteAcridienModel.nom)
+        .outerjoin(PosteAcridienModel, Utilisateur.pa_id == PosteAcridienModel.id)
+        .order_by(Utilisateur.nom)
+    )
+    result = await db.execute(stmt)
+    return [
+        UtilisateurRead.model_validate(user).model_copy(
+            update={"pa_code": pa_code, "pa_nom": pa_nom}
+        )
+        for user, pa_code, pa_nom in result.all()
+    ]
 
 
 @router.post("/", response_model=UtilisateurRead, status_code=201)

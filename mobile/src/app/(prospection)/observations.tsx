@@ -9,6 +9,7 @@ import { ENNEMIS_OPTIONS, parseEnnemis, serializeEnnemis } from '@/lib/prospecti
 import { ObservationsFormValues } from '@/lib/prospection-observations-schema';
 import { updateProspectionObservations } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
+import { DateField } from '@/components/DateField';
 
 const ORANGE = '#e89b2b';
 const BG = '#faf7ef';
@@ -99,12 +100,11 @@ export default function ObservationsScreen() {
               {(field) => (
                 <View style={styles.fieldGroup}>
                   <Text style={styles.fieldLabel}>Date</Text>
-                  <TextInput
-                    value={field.state.value}
-                    onChangeText={field.handleChange}
-                    placeholder="JJ/MM/AAAA"
-                    style={styles.textInput}
-                    keyboardType="default"
+                  <DateField
+                    value={field.state.value || null}
+                    onChange={field.handleChange}
+                    maximumDate={new Date()}
+                    style={styles.dateFieldBox}
                   />
                 </View>
               )}
@@ -284,6 +284,7 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 11.5, fontWeight: '600', color: TEXT_SECONDARY },
   chipTextActive: { fontWeight: '700', color: '#fff' },
   textInput: { backgroundColor: '#f6f3e9', borderRadius: 7, padding: 8, fontSize: 12, fontWeight: '500', color: TEXT, marginTop: 4 },
+  dateFieldBox: { minHeight: 0, borderWidth: 0, borderRadius: 7, backgroundColor: '#f6f3e9', paddingHorizontal: 8, paddingVertical: 8, marginTop: 4 },
   textArea: { minHeight: 70, textAlignVertical: 'top' },
   fieldGroup: { marginBottom: 8 },
   fieldLabel: { fontSize: 10, fontWeight: '600', color: TEXT_SECONDARY, marginBottom: 4 },

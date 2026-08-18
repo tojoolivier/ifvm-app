@@ -120,13 +120,13 @@ describe('validateGpsPosition — emprise Madagascar', () => {
 });
 
 describe('validateGpsPosition — précision GPS', () => {
-  it('ne bloque pas une précision exactement au seuil (50 m)', () => {
-    const { blocages } = validateGpsPosition({ latitude: -18.9, longitude: 47.5, accuracy: 50 });
+  it('ne bloque pas une précision exactement au seuil (100 m)', () => {
+    const { blocages } = validateGpsPosition({ latitude: -18.9, longitude: 47.5, accuracy: 100 });
     expect(blocages).toEqual([]);
   });
 
-  it('bloque une précision au-delà du seuil de 50 m', () => {
-    const { blocages } = validateGpsPosition({ latitude: -18.9, longitude: 47.5, accuracy: 51 });
+  it('bloque une précision au-delà du seuil de 100 m', () => {
+    const { blocages } = validateGpsPosition({ latitude: -18.9, longitude: 47.5, accuracy: 101 });
     expect(blocages).toEqual([expect.stringContaining('Précision GPS insuffisante')]);
   });
 
@@ -136,7 +136,7 @@ describe('validateGpsPosition — précision GPS', () => {
   });
 
   it('cumule le blocage hors-Madagascar et le blocage de précision', () => {
-    const { blocages } = validateGpsPosition({ latitude: 48.85, longitude: 2.35, accuracy: 100 });
+    const { blocages } = validateGpsPosition({ latitude: 48.85, longitude: 2.35, accuracy: 200 });
     expect(blocages.length).toBe(2);
   });
 });

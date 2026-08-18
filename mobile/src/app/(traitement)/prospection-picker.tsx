@@ -7,8 +7,9 @@ import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes
 
 /**
  * Sélecteur de fiche de prospection à lier (point ouvert du Lot 2, fermé au
- * Lot 3 — #91). Seules les fiches validées sont proposées : c'est la seule
- * condition affichée en lecture seule à l'écran Références une fois liée.
+ * Lot 3 — #91). Seules les fiches extensives ou de vérification de
+ * signalement, déjà synchronisées, sont proposées — condition affichée en
+ * lecture seule à l'écran Références une fois liée.
  */
 export default function TraitementProspectionPickerScreen() {
   const router = useRouter();
@@ -40,13 +41,16 @@ export default function TraitementProspectionPickerScreen() {
           style={styles.list}
           data={prospections}
           keyExtractor={(item) => item.id}
-          ListEmptyComponent={<Text style={styles.emptyText}>Aucune fiche de prospection validée pour le moment.</Text>}
+          ListEmptyComponent={<Text style={styles.emptyText}>Aucune fiche de prospection éligible pour le moment.</Text>}
           renderItem={({ item }) => (
             <TouchableOpacity style={styles.row} onPress={() => choisir(item)}>
-              <Text style={styles.rowTitle}>{item.n_fiche ?? item.id}</Text>
+              <Text style={styles.rowTitle}>
+                {item.n_message ?? 'Fiche sans numéro'} · {item.date_prospection?.slice(0, 10) ?? 'date inconnue'}
+              </Text>
               <Text style={styles.rowSubtitle}>
                 {[item.region, item.district, item.commune].filter(Boolean).join(' · ') || 'localisation non renseignée'}
               </Text>
+              <Text style={styles.rowDetail}>{item.id}</Text>
             </TouchableOpacity>
           )}
         />
@@ -79,6 +83,7 @@ const styles = StyleSheet.create({
   },
   rowTitle: { fontFamily: traitementFonts.mono, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre },
   rowSubtitle: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.label, color: traitementColors.texteSecondaire },
+  rowDetail: { fontFamily: traitementFonts.mono, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
   backLink: {
     borderWidth: 1,
     borderStyle: 'dashed',

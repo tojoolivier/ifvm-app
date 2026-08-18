@@ -45,6 +45,27 @@ class DirectionVent(str, Enum):
     NO = "NO"
 
 
+class TypeTraitement(str, Enum):
+    AERIEN = "AERIEN"
+    TERRESTRE = "TERRESTRE"
+
+
+class StatutTraitement(str, Enum):
+    BROUILLON = "brouillon"
+    VALIDEE = "validee"
+
+
+class EspeceCible(str, Enum):
+    LMC = "LMC"
+    NSE = "NSE"
+    MELANGE = "MELANGE"
+
+
+class RepartitionPopulation(str, Enum):
+    GROUPEE = "GROUPEE"
+    DIFFUSE = "DIFFUSE"
+
+
 class TraitementAerienCreate(BaseModel):
     pilote: str = Field(..., min_length=1, max_length=255)
     mecanicien: str = Field(..., min_length=1, max_length=255)
@@ -139,11 +160,11 @@ class TraitementSyncPush(TraitementCreate):
 class CibleRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    espece: str | None
+    espece: EspeceCible | None
     petites_larves: str | None
     grandes_larves: str | None
     vols_clairs_essaims: str | None
-    repartition_population: str | None
+    repartition_population: RepartitionPopulation | None
     surface_infestee_ha: float | None
 
     @field_serializer(
@@ -154,7 +175,9 @@ class CibleRead(BaseModel):
         "repartition_population",
         "surface_infestee_ha",
     )
-    def _remplacer_absent(self, valeur: str | float | None) -> str | float:
+    def _remplacer_absent(
+        self, valeur: EspeceCible | RepartitionPopulation | str | float | None
+    ) -> str | float:
         return valeur if valeur is not None else NON_RENSEIGNE
 
 
@@ -210,7 +233,7 @@ class SignatureRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    role: str
+    role: RoleSignature
     signataire_nom: str
     horodatage: datetime
 
@@ -233,7 +256,7 @@ class TraitementTerrestreRead(BaseModel):
     heure_debut: time
     heure_fin: time
     vitesse_vent_ms: float
-    direction_vent: str | None
+    direction_vent: DirectionVent | None
     temperature_c: float
     reprise_traitement: bool
     traitement_origine_id: uuid.UUID | None
@@ -260,8 +283,8 @@ class TraitementRead(BaseModel):
     id: uuid.UUID
     prospection_id: uuid.UUID
     numero_fiche: str
-    type_traitement: str
-    mode_traitement: str | None
+    type_traitement: TypeTraitement
+    mode_traitement: ModeTraitement | None
     date_traitement: date
     date_validation: date
     localite: str
@@ -281,8 +304,8 @@ class TraitementRead(BaseModel):
     hauteur_strate_arboree_m: float | None
     recouvrement_percent: int | None
     empoisonnement: bool
-    empoisonnement_type: str | None
-    empoisonnement_mode: str | None
+    empoisonnement_type: EmpoisonnementType | None
+    empoisonnement_mode: EmpoisonnementMode | None
     empoisonnement_autre: str | None
     evaluation_risque: dict[str, Any] | None
     comportement_anormal: bool
@@ -290,7 +313,7 @@ class TraitementRead(BaseModel):
     mortalite: bool
     mortalite_familles: dict[str, Any] | None
     observations: str | None
-    statut: str
+    statut: StatutTraitement
     statut_sync: str
     created_at: datetime
     updated_at: datetime

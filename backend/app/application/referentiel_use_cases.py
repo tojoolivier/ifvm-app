@@ -38,7 +38,7 @@ class ListStations:
         self,
         pa_id: uuid.UUID | None = None,
         q: str | None = None,
-        actif: bool = True,
+        actif: bool | None = True,
     ) -> list[StationFixe]:
         return await self.repository.list_by_filters(pa_id=pa_id, q=q, actif=actif)
 

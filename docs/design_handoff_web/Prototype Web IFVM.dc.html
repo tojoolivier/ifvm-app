@@ -1,0 +1,1545 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{ box-sizing:border-box; }
+  body{ margin:0; font-family:'Archivo',system-ui,sans-serif; background:#efeada; }
+  a{ color:#235a36; text-decoration:none; }
+  a:hover{ color:#1a4429; text-decoration:underline; }
+</style>
+</helmet>
+
+<div style="width:1440px;height:920px;margin:0 auto;display:flex;background:#faf7ef;overflow:hidden;font-family:'Archivo',system-ui,sans-serif;color:#16201a">
+
+  <!-- SIDEBAR -->
+  <aside style="width:236px;flex-shrink:0;background:#235a36;color:#fff;display:flex;flex-direction:column">
+    <div style="padding:20px 18px;display:flex;align-items:center;gap:11px;border-bottom:1px solid rgba(255,255,255,.14)">
+      <div style="width:38px;height:38px;border-radius:10px;background:#fff;color:#235a36;display:flex;align-items:center;justify-content:center;font:800 12px 'Archivo';flex-shrink:0">IFVM</div>
+      <div>
+        <div style="font:800 14px 'Archivo';letter-spacing:-.2px">IFVM · Supervision</div>
+        <div style="font:500 10.5px 'Archivo';color:rgba(255,255,255,.62)">Lutte antiacridienne</div>
+      </div>
+    </div>
+
+    <nav style="flex:1;padding:12px 10px;display:flex;flex-direction:column;gap:3px;overflow:auto">
+      <sc-for list="{{ nav }}" as="item" hint-placeholder-count="8">
+        <div onClick="{{ item.go }}" style="display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:8px;cursor:pointer;font-size:12.5px;background:{{ item.bg }};color:{{ item.fg }};font-weight:{{ item.weight }}">
+          <span style="width:5px;height:5px;border-radius:50%;background:{{ item.dot }};flex-shrink:0"></span>
+          <span style="flex:1">{{ item.label }}</span>
+          <span style="font:600 10px 'IBM Plex Mono';color:{{ item.countFg }}">{{ item.count }}</span>
+        </div>
+      </sc-for>
+    </nav>
+
+    <div style="padding:12px 14px;border-top:1px solid rgba(255,255,255,.14);display:flex;flex-direction:column;gap:8px">
+      <div style="font:700 9px 'Archivo';letter-spacing:1.1px;text-transform:uppercase;color:rgba(255,255,255,.5)">Rôle simulé</div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px">
+        <sc-for list="{{ roles }}" as="r" hint-placeholder-count="5">
+          <div onClick="{{ r.pick }}" style="padding:5px 9px;border-radius:7px;cursor:pointer;font-size:10.5px;font-weight:600;background:{{ r.bg }};color:{{ r.fg }};border:1px solid {{ r.bd }}">{{ r.label }}</div>
+        </sc-for>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px;padding-top:10px;border-top:1px solid rgba(255,255,255,.12)">
+        <div style="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;font:700 10px 'Archivo'">RH</div>
+        <div style="flex:1;min-width:0">
+          <div style="font:600 11px 'Archivo';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Rasoa Herizo</div>
+          <div style="font:500 9.5px 'Archivo';color:rgba(255,255,255,.6)">{{ roleLabel }}</div>
+        </div>
+        <div style="font:500 10px 'Archivo';color:rgba(255,255,255,.55);cursor:pointer">Quitter</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main style="flex:1;min-width:0;display:flex;flex-direction:column;background:#faf7ef">
+    <header style="height:66px;flex-shrink:0;border-bottom:1px solid #e7e0cd;background:#fffdf8;display:flex;align-items:center;padding:0 28px;gap:18px">
+      <div style="flex:1;min-width:0">
+        <div style="font:600 9.5px 'Archivo';letter-spacing:1px;text-transform:uppercase;color:#9a9484">{{ crumb }}</div>
+        <div style="font:800 19px/1.2 'Archivo';color:#16201a;letter-spacing:-.3px">{{ title }}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="display:flex;align-items:center;gap:7px;padding:7px 12px;border-radius:8px;background:#eaf2ec;border:1px solid #cfe0d4">
+          <span style="font-size:11px">☁︎</span>
+          <span style="font:600 11px 'Archivo';color:#235a36">Campagne 2025‑2026</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;padding:7px 12px;border-radius:8px;background:#fdf6e7;border:1px solid #f0e2bf">
+          <span style="width:6px;height:6px;border-radius:50%;background:#e89b2b"></span>
+          <span style="font:600 11px 'Archivo';color:#8a6d2f">{{ pendingCount }} fiches en attente</span>
+        </div>
+      </div>
+    </header>
+
+    <div style="flex:1;overflow:auto;padding:26px 28px 40px">
+
+      <!-- ============ TABLEAU DE BORD ============ -->
+      <sc-if value="{{ pDash }}" hint-placeholder-val="{{ true }}">
+      <div data-screen-label="Tableau de bord" style="display:flex;flex-direction:column;gap:18px">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px">
+          <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:16px 18px">
+            <div style="font:600 10px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Prospections</div>
+            <div style="font:700 30px/1.1 'IBM Plex Mono';color:#16201a;margin-top:6px">148</div>
+            <div style="font:500 11px 'Archivo';color:#6f6a59;margin-top:4px">intensives · campagne en cours</div>
+          </div>
+          <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:16px 18px">
+            <div style="font:600 10px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Surface infestée</div>
+            <div style="font:700 30px/1.1 'IBM Plex Mono';color:#16201a;margin-top:6px">4 210 <span style="font-size:14px;color:#6f6a59">ha</span></div>
+            <div style="font:500 11px 'Archivo';color:#6f6a59;margin-top:4px">cumul déclaré</div>
+          </div>
+          <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:16px 18px">
+            <div style="font:600 10px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Surface traitée</div>
+            <div style="font:700 30px/1.1 'IBM Plex Mono';color:#235a36;margin-top:6px">3 065 <span style="font-size:14px;color:#6f6a59">ha</span></div>
+            <div style="font:500 11px 'Archivo';color:#6f6a59;margin-top:4px">72,8 % de la surface infestée</div>
+          </div>
+          <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:16px 18px">
+            <div style="font:600 10px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Taux de validation</div>
+            <div style="font:700 30px/1.1 'IBM Plex Mono';color:#16201a;margin-top:6px">91 <span style="font-size:14px;color:#6f6a59">%</span></div>
+            <div style="font:500 11px 'Archivo';color:#8a6d2f;margin-top:4px">9 % rejetées (motif renseigné)</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1.35fr 1fr;gap:16px">
+          <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:18px 20px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px">
+              <div style="font:700 14px 'Archivo'">Pipeline de validation</div>
+              <div onClick="{{ goProspections }}" style="font:600 11px 'Archivo';color:#235a36;cursor:pointer">Voir les fiches ›</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:11px">
+              <sc-for list="{{ pipeline }}" as="s" hint-placeholder-count="5">
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="width:8px;height:8px;border-radius:3px;background:{{ s.color }}"></span>
+                    <span style="font:600 12px 'Archivo';flex:1">{{ s.label }}</span>
+                    <span style="font:600 13px 'IBM Plex Mono';color:#16201a">{{ s.n }}</span>
+                    <span style="font:500 11px 'IBM Plex Mono';color:#9a9484;width:42px;text-align:right">{{ s.pct }}</span>
+                  </div>
+                  <div style="height:6px;border-radius:4px;background:#f1ecdd;overflow:hidden">
+                    <div style="height:100%;border-radius:4px;width:{{ s.pct }};background:{{ s.color }}"></div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:18px 20px">
+            <div style="font:700 14px 'Archivo';margin-bottom:14px">Top stations</div>
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <sc-for list="{{ topStations }}" as="st" hint-placeholder-count="6">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <span style="font:600 10.5px 'IBM Plex Mono';color:#9a9484;width:52px">{{ st.code }}</span>
+                  <span style="font:500 12px 'Archivo';flex:1;color:#3a3a30">{{ st.nom }}</span>
+                  <div style="width:96px;height:6px;border-radius:4px;background:#f1ecdd;overflow:hidden"><div style="height:100%;background:#235a36;width:{{ st.pct }}"></div></div>
+                  <span style="font:600 11px 'IBM Plex Mono';width:22px;text-align:right">{{ st.n }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;overflow:hidden">
+          <div style="padding:16px 20px;display:flex;align-items:baseline;justify-content:space-between;border-bottom:1px solid #f1ecdd">
+            <div style="font:700 14px 'Archivo'">Activité récente</div>
+            <div style="font:500 11px 'Archivo';color:#9a9484">Dernières 24 h</div>
+          </div>
+          <table style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr style="background:#faf7ef">
+                <th style="text-align:left;padding:9px 20px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">N° de fiche</th>
+                <th style="text-align:left;padding:9px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Type</th>
+                <th style="text-align:left;padding:9px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Agent</th>
+                <th style="text-align:left;padding:9px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Station</th>
+                <th style="text-align:left;padding:9px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Statut</th>
+                <th style="text-align:right;padding:9px 20px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Reçue</th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ recent }}" as="r" hint-placeholder-count="6">
+                <tr onClick="{{ r.open }}" style="border-top:1px solid #f4efe2;cursor:pointer">
+                  <td style="padding:11px 20px;font:600 11.5px 'IBM Plex Mono';color:#235a36">{{ r.num }}</td>
+                  <td style="padding:11px 12px;font:500 12px 'Archivo';color:#3a3a30">{{ r.type }}</td>
+                  <td style="padding:11px 12px;font:500 12px 'Archivo';color:#3a3a30">{{ r.agent }}</td>
+                  <td style="padding:11px 12px;font:500 12px 'Archivo';color:#6f6a59">{{ r.station }}</td>
+                  <td style="padding:11px 12px"><span style="padding:3px 9px;border-radius:20px;font:700 10px 'Archivo';background:{{ r.badgeBg }};color:{{ r.badgeFg }};border:1px solid {{ r.badgeBd }}">{{ r.statut }}</span></td>
+                  <td style="padding:11px 20px;text-align:right;font:500 11px 'IBM Plex Mono';color:#9a9484">{{ r.time }}</td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ CAMPAGNES ============ -->
+      <sc-if value="{{ pCamp }}" hint-placeholder-val="{{ true }}">
+      <div data-screen-label="Campagnes" style="display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div style="font:500 12.5px 'Archivo';color:#6f6a59;max-width:640px">Une campagne cadre les prospections et les traitements sur une période. Une seule campagne est active à la fois ; la clôture verrouille les fiches rattachées.</div>
+          <div style="padding:10px 16px;border-radius:9px;background:#235a36;color:#fff;font:700 12px 'Archivo';cursor:pointer">+ Nouvelle campagne</div>
+        </div>
+        <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;overflow:hidden">
+          <table style="width:100%;border-collapse:collapse">
+            <thead><tr style="background:#faf7ef">
+              <th style="text-align:left;padding:10px 20px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Campagne</th>
+              <th style="text-align:left;padding:10px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Début</th>
+              <th style="text-align:left;padding:10px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Fin</th>
+              <th style="text-align:right;padding:10px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Prospections</th>
+              <th style="text-align:right;padding:10px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Traitements</th>
+              <th style="text-align:left;padding:10px 20px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Statut</th>
+            </tr></thead>
+            <tbody>
+              <sc-for list="{{ campagnes }}" as="c" hint-placeholder-count="4">
+                <tr style="border-top:1px solid #f4efe2">
+                  <td style="padding:12px 20px;font:700 12.5px 'Archivo'">{{ c.nom }}</td>
+                  <td style="padding:12px 12px;font:500 11.5px 'IBM Plex Mono';color:#3a3a30">{{ c.debut }}</td>
+                  <td style="padding:12px 12px;font:500 11.5px 'IBM Plex Mono';color:#3a3a30">{{ c.fin }}</td>
+                  <td style="padding:12px 12px;text-align:right;font:600 12px 'IBM Plex Mono'">{{ c.nbP }}</td>
+                  <td style="padding:12px 12px;text-align:right;font:600 12px 'IBM Plex Mono'">{{ c.nbT }}</td>
+                  <td style="padding:12px 20px"><span style="padding:3px 9px;border-radius:20px;font:700 10px 'Archivo';background:{{ c.badgeBg }};color:{{ c.badgeFg }};border:1px solid {{ c.badgeBd }}">{{ c.statut }}</span></td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ PROSPECTIONS (LISTE) ============ -->
+      <sc-if value="{{ pList }}" hint-placeholder-val="{{ true }}">
+      <div data-screen-label="Prospections" style="display:flex;flex-direction:column;gap:16px">
+        <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:16px 18px;display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">
+          <div style="display:flex;flex-direction:column;gap:6px;min-width:180px">
+            <span style="font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Recherche</span>
+            <div style="height:36px;border:1px solid #e0d9c4;border-radius:8px;background:#fffdf8;display:flex;align-items:center;padding:0 11px;font:500 12px 'Archivo';color:#9a9484">N° de fiche, agent…</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Type</span>
+            <div style="display:flex;gap:5px">
+              <sc-for list="{{ typeChips }}" as="t" hint-placeholder-count="3">
+                <div onClick="{{ t.pick }}" style="padding:8px 13px;border-radius:8px;font:600 11.5px 'Archivo';cursor:pointer;background:{{ t.bg }};color:{{ t.fg }};border:1px solid {{ t.bd }}">{{ t.label }}</div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Statut</span>
+            <div style="display:flex;gap:5px">
+              <sc-for list="{{ statutChips }}" as="s" hint-placeholder-count="6">
+                <div onClick="{{ s.pick }}" style="padding:8px 12px;border-radius:8px;font:600 11.5px 'Archivo';cursor:pointer;background:{{ s.bg }};color:{{ s.fg }};border:1px solid {{ s.bd }}">{{ s.label }}</div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="flex:1"></div>
+          <div onClick="{{ goNouvelle }}" style="padding:10px 16px;border-radius:9px;background:#235a36;color:#fff;font:700 12px 'Archivo';cursor:pointer">+ Nouvelle prospection</div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="font:600 12px 'Archivo';color:#6f6a59">{{ listCount }} fiches</div>
+          <div style="width:1px;height:14px;background:#e0d9c4"></div>
+          <div style="font:500 12px 'Archivo';color:#9a9484">Filtre : {{ filterSummary }}</div>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;overflow:hidden">
+          <table style="width:100%;border-collapse:collapse">
+            <thead><tr style="background:#faf7ef">
+              <th style="text-align:left;padding:10px 20px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">N° de fiche</th>
+              <th style="text-align:left;padding:10px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Type</th>
+              <th style="text-align:left;padding:10px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Date</th>
+              <th style="text-align:left;padding:10px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Prospecteur</th>
+              <th style="text-align:left;padding:10px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Station</th>
+              <th style="text-align:right;padding:10px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Surf. inf. (ha)</th>
+              <th style="text-align:left;padding:10px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Statut</th>
+              <th style="text-align:right;padding:10px 20px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484"></th>
+            </tr></thead>
+            <tbody>
+              <sc-for list="{{ fiches }}" as="f" hint-placeholder-count="8">
+                <tr onClick="{{ f.open }}" style="border-top:1px solid #f4efe2;cursor:pointer;background:{{ f.rowBg }}">
+                  <td style="padding:12px 20px;font:600 11.5px 'IBM Plex Mono';color:#235a36">{{ f.num }}</td>
+                  <td style="padding:12px 12px;font:500 12px 'Archivo';color:#3a3a30">{{ f.type }}</td>
+                  <td style="padding:12px 12px;font:500 11.5px 'IBM Plex Mono';color:#3a3a30">{{ f.date }}</td>
+                  <td style="padding:12px 12px;font:500 12px 'Archivo';color:#3a3a30">{{ f.agent }}</td>
+                  <td style="padding:12px 12px;font:500 12px 'Archivo';color:#6f6a59">{{ f.station }}</td>
+                  <td style="padding:12px 12px;text-align:right;font:600 12px 'IBM Plex Mono'">{{ f.surface }}</td>
+                  <td style="padding:12px 12px"><span style="padding:3px 9px;border-radius:20px;font:700 10px 'Archivo';background:{{ f.badgeBg }};color:{{ f.badgeFg }};border:1px solid {{ f.badgeBd }}">{{ f.statut }}</span></td>
+                  <td style="padding:12px 20px;text-align:right;font:600 11px 'Archivo';color:#235a36">Ouvrir ›</td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ NOUVELLE PROSPECTION ============ -->
+      <sc-if value="{{ pNew }}" hint-placeholder-val="{{ true }}">
+      <div data-screen-label="Nouvelle prospection" style="display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start">
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div style="background:#fdf6e7;border:1px solid #f0e2bf;border-radius:10px;padding:13px 16px;font:500 12px/1.55 'Archivo';color:#8a6d2f">
+            La saisie terrain complète (captures, végétation, GPS) se fait sur mobile hors-ligne. Cette page crée l'<b>en-tête de fiche</b> et l'assigne à un agent : elle apparaît ensuite dans sa file de travail.
+          </div>
+
+          <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:20px 22px;display:flex;flex-direction:column;gap:18px">
+            <div style="font:700 14px 'Archivo'">Références</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <span style="font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Campagne *</span>
+                <div style="height:38px;border:1px solid #e0d9c4;border-radius:8px;background:#fffdf8;display:flex;align-items:center;justify-content:space-between;padding:0 12px;font:600 12.5px 'Archivo'">Campagne 2025‑2026 <span style="color:#9a9484">▾</span></div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <span style="font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Type de prospection *</span>
+                <div style="display:flex;gap:6px">
+                  <div style="flex:1;height:38px;border-radius:8px;background:#235a36;color:#fff;display:flex;align-items:center;justify-content:center;font:700 12px 'Archivo'">Intensive</div>
+                  <div style="flex:1;height:38px;border-radius:8px;background:#faf7ef;border:1px solid #e0d9c4;color:#6f6a59;display:flex;align-items:center;justify-content:center;font:600 12px 'Archivo'">Extensive</div>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <span style="font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Date de prospection *</span>
+                <div style="height:38px;border:1px solid #e0d9c4;border-radius:8px;background:#fffdf8;display:flex;align-items:center;padding:0 12px;font:600 12.5px 'IBM Plex Mono'">2026‑08‑18</div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <span style="font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">N° de fiche (auto)</span>
+                <div style="height:38px;border:1px dashed #d8cfb6;border-radius:8px;background:#faf7ef;display:flex;align-items:center;padding:0 12px;font:600 12.5px 'IBM Plex Mono';color:#9a9484">généré à l'enregistrement</div>
+              </div>
+            </div>
+
+            <div style="height:1px;background:#f1ecdd"></div>
+            <div style="font:700 14px 'Archivo'">Affectation</div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <span style="font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Prospecteur * — référentiel utilisateurs</span>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <sc-for list="{{ agentChips }}" as="a" hint-placeholder-count="5">
+                  <div onClick="{{ a.pick }}" style="padding:8px 13px;border-radius:8px;font:600 11.5px 'Archivo';cursor:pointer;background:{{ a.bg }};color:{{ a.fg }};border:1px solid {{ a.bd }}">{{ a.label }}</div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <span style="font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Station / zone d'appartenance</span>
+                <div style="height:38px;border:1px solid #e0d9c4;border-radius:8px;background:#fffdf8;display:flex;align-items:center;justify-content:space-between;padding:0 12px;font:600 12.5px 'Archivo'">ST‑014 · Ankazoabo <span style="color:#9a9484">▾</span></div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <span style="font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Localité</span>
+                <div style="height:38px;border:1px solid #e0d9c4;border-radius:8px;background:#fffdf8;display:flex;align-items:center;padding:0 12px;font:600 12.5px 'Archivo'">Beroroha</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding-top:4px">
+              <div style="padding:11px 20px;border-radius:9px;background:#235a36;color:#fff;font:700 12.5px 'Archivo';cursor:pointer">Créer et assigner</div>
+              <div onClick="{{ goProspections }}" style="padding:11px 18px;border-radius:9px;background:#fff;border:1px solid #e0d9c4;color:#6f6a59;font:600 12.5px 'Archivo';cursor:pointer">Annuler</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="background:#eaf2ec;border:1px solid #cfe0d4;border-radius:11px;padding:16px 18px">
+            <div style="font:700 12.5px 'Archivo';color:#235a36;margin-bottom:8px">Ce qui est rempli sur le terrain</div>
+            <div style="display:flex;flex-direction:column;gap:7px">
+              <div style="font:500 11.5px/1.4 'Archivo';color:#3a5c43">A · Référence & localisation GPS</div>
+              <div style="font:500 11.5px/1.4 'Archivo';color:#3a5c43">B · Locusta migratoria (compteur)</div>
+              <div style="font:500 11.5px/1.4 'Archivo';color:#3a5c43">C · Nomadacris septemfasciata</div>
+              <div style="font:500 11.5px/1.4 'Archivo';color:#3a5c43">D · Infestation & surface</div>
+              <div style="font:500 11.5px/1.4 'Archivo';color:#3a5c43">E · Végétation & sol</div>
+            </div>
+          </div>
+          <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:16px 18px">
+            <div style="font:700 12.5px 'Archivo';margin-bottom:8px">File de l'agent sélectionné</div>
+            <div style="font:600 22px 'IBM Plex Mono';color:#16201a">3</div>
+            <div style="font:500 11.5px/1.5 'Archivo';color:#6f6a59">fiches ouvertes non synchronisées. Au-delà de 5, prévenir le chef de zone.</div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ DETAIL PROSPECTION / FICHE DE LECTURE ============ -->
+      <sc-if value="{{ pFiche }}" hint-placeholder-val="{{ true }}">
+      <div data-screen-label="Detail prospection" style="display:grid;grid-template-columns:1fr 316px;gap:20px;align-items:start">
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div style="background:#235a36;border-radius:12px;padding:20px 22px;color:#fff;display:flex;align-items:center;gap:20px">
+            <div style="flex:1">
+              <div style="font:700 17px 'IBM Plex Mono';letter-spacing:.4px">PR‑2026‑0148‑INT</div>
+              <div style="font:500 12px 'Archivo';color:rgba(255,255,255,.75);margin-top:4px">Intensive · Beroroha · ST‑014 Ankazoabo · 2026‑08‑14 · Randria Jean</div>
+            </div>
+            <div style="padding:6px 12px;border-radius:20px;background:rgba(255,255,255,.16);font:700 11px 'Archivo'">Vérifiée</div>
+            <div style="padding:9px 14px;border-radius:9px;background:#fff;color:#235a36;font:700 11.5px 'Archivo';cursor:pointer">Imprimer A4</div>
+          </div>
+
+          <div style="background:#fdf6e7;border:1px solid #f0e2bf;border-radius:10px;padding:13px 16px;display:flex;flex-direction:column;gap:7px">
+            <div style="font:700 11.5px 'Archivo';color:#8a6d2f">Avertissements de la fiche · 2</div>
+            <sc-for list="{{ avertissements }}" as="a" hint-placeholder-count="2">
+              <div style="display:flex;align-items:baseline;gap:8px">
+                <span style="font:600 10px 'IBM Plex Mono';color:#8a6d2f;flex-shrink:0">{{ a.code }}</span>
+                <span style="font:500 11.5px/1.45 'Archivo';color:#8a6d2f">{{ a.message }}</span>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:18px 20px">
+            <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px">
+              <div style="font:600 9.5px 'Archivo';letter-spacing:1px;text-transform:uppercase;color:#9a9484">D · Infestation — spécialisation</div>
+              <div style="font:500 10.5px 'Archivo';color:#9a9484">tables imago / larve distinctes</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+              <div style="border:1px solid #f0c4b9;border-radius:10px;overflow:hidden">
+                <div style="background:#fbe9e5;padding:8px 12px;font:700 11px 'Archivo';color:#a5341c">Larve · bande larvaire</div>
+                <div style="padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:9px 14px">
+                  <sc-for list="{{ larve }}" as="row" hint-placeholder-count="8">
+                    <div>
+                      <div style="font:500 10px 'Archivo';color:#9a9484">{{ row.k }}</div>
+                      <div style="font:700 12.5px 'IBM Plex Mono';color:#16201a">{{ row.v }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="border:1px solid #e7e0cd;border-radius:10px;overflow:hidden">
+                <div style="background:#faf7ef;padding:8px 12px;font:700 11px 'Archivo';color:#6f6a59">Imago · vol clair</div>
+                <div style="padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:9px 14px">
+                  <sc-for list="{{ imago }}" as="row" hint-placeholder-count="6">
+                    <div>
+                      <div style="font:500 10px 'Archivo';color:#9a9484">{{ row.k }}</div>
+                      <div style="font:700 12.5px 'IBM Plex Mono';color:{{ row.color }}">{{ row.v }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+            <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:18px 20px">
+              <div style="font:600 9.5px 'Archivo';letter-spacing:1px;text-transform:uppercase;color:#9a9484;margin-bottom:12px">A · Référence & localisation</div>
+              <div style="display:flex;flex-direction:column;gap:9px">
+                <sc-for list="{{ ficheA }}" as="row" hint-placeholder-count="6">
+                  <div style="display:flex;align-items:baseline;gap:10px">
+                    <span style="font:500 11.5px 'Archivo';color:#6f6a59;width:132px;flex-shrink:0">{{ row.k }}</span>
+                    <span style="font:600 12px 'IBM Plex Mono';color:#16201a">{{ row.v }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:18px 20px">
+              <div style="font:600 9.5px 'Archivo';letter-spacing:1px;text-transform:uppercase;color:#9a9484;margin-bottom:12px">D · Infestation</div>
+              <div style="display:flex;flex-direction:column;gap:9px">
+                <sc-for list="{{ ficheD }}" as="row" hint-placeholder-count="5">
+                  <div style="display:flex;align-items:baseline;gap:10px">
+                    <span style="font:500 11.5px 'Archivo';color:#6f6a59;width:132px;flex-shrink:0">{{ row.k }}</span>
+                    <span style="font:600 12px 'IBM Plex Mono';color:#16201a">{{ row.v }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+
+          <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;overflow:hidden">
+            <div style="padding:16px 20px;border-bottom:1px solid #f1ecdd;display:flex;align-items:baseline;gap:12px">
+              <div style="font:700 14px 'Archivo'">B · Locusta migratoria — captures</div>
+              <div style="font:500 11px 'Archivo';color:#9a9484">Grille 72 cases repliée en synthèse · durée 12 min</div>
+              <div style="flex:1"></div>
+              <div style="font:600 12px 'IBM Plex Mono';color:#235a36">Total 214</div>
+            </div>
+            <table style="width:100%;border-collapse:collapse">
+              <thead><tr style="background:#faf7ef">
+                <th style="text-align:left;padding:9px 20px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Phase</th>
+                <th style="text-align:right;padding:9px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Mâles</th>
+                <th style="text-align:right;padding:9px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Femelles</th>
+                <th style="text-align:left;padding:9px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Phénotype dominant</th>
+                <th style="text-align:left;padding:9px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Méthode</th>
+                <th style="text-align:right;padding:9px 20px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Densité (ind/ha)</th>
+              </tr></thead>
+              <tbody>
+                <sc-for list="{{ captures }}" as="c" hint-placeholder-count="5">
+                  <tr style="border-top:1px solid #f4efe2">
+                    <td style="padding:11px 20px;font:600 12px 'Archivo'">{{ c.phase }}</td>
+                    <td style="padding:11px 12px;text-align:right;font:500 12px 'IBM Plex Mono'">{{ c.m }}</td>
+                    <td style="padding:11px 12px;text-align:right;font:500 12px 'IBM Plex Mono'">{{ c.f }}</td>
+                    <td style="padding:11px 12px;font:500 12px 'Archivo';color:#6f6a59">{{ c.pheno }}</td>
+                    <td style="padding:11px 12px;font:500 11.5px 'Archivo';color:#6f6a59">{{ c.methode }}</td>
+                    <td style="padding:11px 20px;text-align:right;font:600 12px 'IBM Plex Mono';color:#235a36">{{ c.dens }}</td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+
+          <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:18px 20px">
+            <div style="font:600 9.5px 'Archivo';letter-spacing:1px;text-transform:uppercase;color:#9a9484;margin-bottom:12px">E · Végétation & sol</div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+              <div style="background:#faf7ef;border-radius:9px;padding:12px 14px"><div style="font:500 10.5px 'Archivo';color:#9a9484">Strate herbeuse</div><div style="font:700 17px 'IBM Plex Mono';color:#16201a">0,45 m</div></div>
+              <div style="background:#faf7ef;border-radius:9px;padding:12px 14px"><div style="font:500 10.5px 'Archivo';color:#9a9484">Strate arborée</div><div style="font:700 17px 'IBM Plex Mono';color:#16201a">3,20 m</div></div>
+              <div style="background:#faf7ef;border-radius:9px;padding:12px 14px"><div style="font:500 10.5px 'Archivo';color:#9a9484">Recouvrement</div><div style="font:700 17px 'IBM Plex Mono';color:#16201a">65 %</div></div>
+              <div style="background:#faf7ef;border-radius:9px;padding:12px 14px"><div style="font:500 10.5px 'Archivo';color:#9a9484">Type de sol</div><div style="font:700 14px 'Archivo';color:#16201a;margin-top:3px">Sablo‑argileux</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:18px 20px">
+            <div style="font:700 13px 'Archivo';margin-bottom:12px">Piste de validation</div>
+            <div style="display:flex;flex-direction:column;gap:0">
+              <sc-for list="{{ trail }}" as="t" hint-placeholder-count="4">
+                <div style="display:flex;gap:11px">
+                  <div style="display:flex;flex-direction:column;align-items:center;width:14px">
+                    <span style="width:10px;height:10px;border-radius:50%;background:{{ t.dot }};margin-top:3px"></span>
+                    <span style="flex:1;width:2px;background:#f1ecdd"></span>
+                  </div>
+                  <div style="padding-bottom:14px">
+                    <div style="font:700 12px 'Archivo';color:#16201a">{{ t.label }}</div>
+                    <div style="font:500 11px 'Archivo';color:#6f6a59">{{ t.who }}</div>
+                    <div style="font:500 10.5px 'IBM Plex Mono';color:#9a9484">{{ t.when }}</div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:18px 20px;display:flex;flex-direction:column;gap:9px">
+            <div style="font:700 13px 'Archivo'">Actions</div>
+            <div style="padding:11px 0;border-radius:9px;background:#235a36;color:#fff;font:700 12px 'Archivo';text-align:center;cursor:pointer">Valider la fiche</div>
+            <div style="padding:11px 0;border-radius:9px;background:#fbe9e5;border:1px solid #f0c4b9;color:#a5341c;font:700 12px 'Archivo';text-align:center;cursor:pointer">Rejeter avec motif</div>
+            <div onClick="{{ goTraitements }}" style="padding:11px 0;border-radius:9px;background:#fff;border:1px solid #e0d9c4;color:#3a3a30;font:600 12px 'Archivo';text-align:center;cursor:pointer">Créer une fiche de traitement</div>
+            <div style="font:500 10.5px/1.5 'Archivo';color:#9a9484;margin-top:2px">La création de traitement fige un <b>snapshot des cibles</b> depuis cette fiche.</div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ VALIDATION FINALE ============ -->
+      <sc-if value="{{ pValid }}" hint-placeholder-val="{{ true }}">
+      <div data-screen-label="Validation finale" style="display:grid;grid-template-columns:300px 1fr;gap:20px;align-items:start">
+        <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;overflow:hidden">
+          <div style="padding:14px 16px;border-bottom:1px solid #f1ecdd;display:flex;align-items:baseline;justify-content:space-between">
+            <div style="font:700 13px 'Archivo'">File de validation</div>
+            <div style="font:600 11px 'IBM Plex Mono';color:#8a6d2f">7</div>
+          </div>
+          <div style="display:flex;flex-direction:column">
+            <sc-for list="{{ queue }}" as="q" hint-placeholder-count="7">
+              <div onClick="{{ q.pick }}" style="padding:13px 16px;border-bottom:1px solid #f4efe2;cursor:pointer;background:{{ q.bg }};border-left:3px solid {{ q.mark }}">
+                <div style="font:600 11.5px 'IBM Plex Mono';color:#235a36">{{ q.num }}</div>
+                <div style="font:500 11.5px 'Archivo';color:#3a3a30;margin-top:2px">{{ q.meta }}</div>
+                <div style="font:500 10.5px 'IBM Plex Mono';color:#9a9484;margin-top:2px">{{ q.age }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div style="background:#fdf6e7;border:1px solid #f0e2bf;border-radius:10px;padding:13px 16px;font:500 12px/1.5 'Archivo';color:#8a6d2f">
+            Contrôle final avant intégration aux synthèses nationales. Un rejet exige un <b>motif</b> ; la fiche repart chez le vérificateur avec l'historique conservé.
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+            <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:18px 20px">
+              <div style="font:600 9.5px 'Archivo';letter-spacing:1px;text-transform:uppercase;color:#9a9484;margin-bottom:12px">Fiche sélectionnée</div>
+              <div style="display:flex;flex-direction:column;gap:9px">
+                <sc-for list="{{ vSelected }}" as="row" hint-placeholder-count="6">
+                  <div style="display:flex;align-items:baseline;gap:10px">
+                    <span style="font:500 11.5px 'Archivo';color:#6f6a59;width:128px;flex-shrink:0">{{ row.k }}</span>
+                    <span style="font:600 12px 'IBM Plex Mono';color:#16201a">{{ row.v }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:18px 20px">
+              <div style="font:600 9.5px 'Archivo';letter-spacing:1px;text-transform:uppercase;color:#9a9484;margin-bottom:12px">Contrôles automatiques</div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <sc-for list="{{ checks }}" as="c" hint-placeholder-count="5">
+                  <div style="display:flex;align-items:center;gap:9px">
+                    <span style="width:18px;height:18px;border-radius:50%;background:{{ c.bg }};color:{{ c.fg }};display:flex;align-items:center;justify-content:center;font:700 10px 'Archivo';flex-shrink:0">{{ c.icon }}</span>
+                    <span style="font:600 12px 'Archivo';flex:1;color:#3a3a30">{{ c.label }}</span>
+                    <span style="font:500 11px 'IBM Plex Mono';color:#6f6a59">{{ c.detail }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+
+          <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:18px 20px;display:flex;flex-direction:column;gap:12px">
+            <div style="font:700 13px 'Archivo'">Décision</div>
+            <div style="display:flex;gap:8px">
+              <sc-for list="{{ decisions }}" as="d" hint-placeholder-count="2">
+                <div onClick="{{ d.pick }}" style="padding:10px 18px;border-radius:9px;cursor:pointer;font:700 12px 'Archivo';background:{{ d.bg }};color:{{ d.fg }};border:1px solid {{ d.bd }}">{{ d.label }}</div>
+              </sc-for>
+            </div>
+            <sc-if value="{{ showMotif }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:7px">
+                <span style="font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Motif de rejet *</span>
+                <div style="display:flex;gap:6px;flex-wrap:wrap">
+                  <sc-for list="{{ motifs }}" as="m" hint-placeholder-count="4">
+                    <div style="padding:8px 12px;border-radius:8px;background:#faf7ef;border:1px solid #e0d9c4;font:600 11.5px 'Archivo';color:#6f6a59;cursor:pointer">{{ m }}</div>
+                  </sc-for>
+                </div>
+                <div style="height:72px;border:1px solid #f0c4b9;border-radius:9px;background:#fffdf8;padding:10px 12px;font:500 12px 'Archivo';color:#9a9484">Précision transmise au vérificateur…</div>
+                <div style="font:600 11px 'Archivo';color:#a5341c">Le motif est obligatoire pour enregistrer un rejet.</div>
+              </div>
+            </sc-if>
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="padding:11px 20px;border-radius:9px;background:{{ decideBg }};color:{{ decideFg }};font:700 12.5px 'Archivo';cursor:pointer">{{ decideLabel }}</div>
+              <div style="font:500 11.5px 'Archivo';color:#9a9484">Fiche suivante automatiquement chargée.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ TRAITEMENTS ============ -->
+      <sc-if value="{{ pTraite }}" hint-placeholder-val="{{ true }}">
+      <div data-screen-label="Traitements" style="display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <sc-for list="{{ traiteTabs }}" as="t" hint-placeholder-count="2">
+            <div onClick="{{ t.pick }}" style="padding:9px 16px;border-radius:9px;cursor:pointer;font:700 12px 'Archivo';background:{{ t.bg }};color:{{ t.fg }};border:1px solid {{ t.bd }}">{{ t.label }}</div>
+          </sc-for>
+          <div style="flex:1"></div>
+          <div style="font:500 11.5px 'Archivo';color:#9a9484">Chaque fiche est rattachée à une prospection validée</div>
+        </div>
+
+        <sc-if value="{{ tListe }}" hint-placeholder-val="{{ true }}">
+        <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;overflow:hidden">
+          <table style="width:100%;border-collapse:collapse">
+            <thead><tr style="background:#faf7ef">
+              <th style="text-align:left;padding:10px 20px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">N° de fiche</th>
+              <th style="text-align:left;padding:10px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Type</th>
+              <th style="text-align:left;padding:10px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Mode</th>
+              <th style="text-align:left;padding:10px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Date</th>
+              <th style="text-align:left;padding:10px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Responsable</th>
+              <th style="text-align:right;padding:10px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Traitée (ha)</th>
+              <th style="text-align:right;padding:10px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Restante</th>
+              <th style="text-align:left;padding:10px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Signatures</th>
+              <th style="text-align:right;padding:10px 20px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484"></th>
+            </tr></thead>
+            <tbody>
+              <sc-for list="{{ traitements }}" as="t" hint-placeholder-count="6">
+                <tr onClick="{{ t.open }}" style="border-top:1px solid #f4efe2;cursor:pointer">
+                  <td style="padding:12px 20px;font:600 11.5px 'IBM Plex Mono';color:#235a36">{{ t.num }}</td>
+                  <td style="padding:12px 12px"><span style="padding:3px 9px;border-radius:20px;font:700 10px 'Archivo';background:{{ t.typeBg }};color:{{ t.typeFg }};border:1px solid {{ t.typeBd }}">{{ t.type }}</span></td>
+                  <td style="padding:12px 12px;font:500 12px 'Archivo';color:#6f6a59">{{ t.mode }}</td>
+                  <td style="padding:12px 12px;font:500 11.5px 'IBM Plex Mono';color:#3a3a30">{{ t.date }}</td>
+                  <td style="padding:12px 12px;font:500 12px 'Archivo';color:#3a3a30">{{ t.resp }}</td>
+                  <td style="padding:12px 12px;text-align:right;font:600 12px 'IBM Plex Mono'">{{ t.traitee }}</td>
+                  <td style="padding:12px 12px;text-align:right;font:600 12px 'IBM Plex Mono';color:{{ t.restColor }}">{{ t.restante }}</td>
+                  <td style="padding:12px 12px;font:600 11.5px 'IBM Plex Mono';color:{{ t.sigColor }}">{{ t.sig }}</td>
+                  <td style="padding:12px 20px;text-align:right;font:600 11px 'Archivo';color:#235a36">Ouvrir ›</td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ tDetail }}" hint-placeholder-val="{{ true }}">
+        <div style="display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start">
+          <div style="display:flex;flex-direction:column;gap:16px">
+            <div style="background:#235a36;border-radius:12px;padding:20px 22px;color:#fff;display:flex;align-items:center;gap:18px">
+              <div style="flex:1">
+                <div style="font:700 17px 'IBM Plex Mono'">Jean-AERIEN-2026-08-12</div>
+                <div style="font:500 12px 'Archivo';color:rgba(255,255,255,.75);margin-top:4px">Aérien · mode Barrière · Beroroha · validée le 2026‑08‑13</div>
+              </div>
+              <div style="padding:6px 12px;border-radius:20px;background:rgba(255,255,255,.16);font:700 11px 'Archivo'">🔒 Lecture seule</div>
+            </div>
+
+            <div style="background:#fdf6e7;border:1px solid #f0e2bf;border-radius:10px;padding:12px 16px;font:500 12px 'Archivo';color:#8a6d2f">Cibles : snapshot figé à la création — issu de <a href="#" onClick="{{ goFiche }}">PR‑2026‑0148‑INT</a>. Surface infestée de référence : <b>1 200 ha</b>.</div>
+
+            <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;overflow:hidden">
+              <div style="padding:15px 20px;border-bottom:1px solid #f1ecdd;display:flex;align-items:baseline;gap:12px">
+                <div style="font:700 14px 'Archivo'">Rotations</div>
+                <div style="font:500 11px 'Archivo';color:#9a9484">rapprochement fiche de vol par n° de cuve</div>
+                <div style="flex:1"></div>
+                <div style="font:600 12px 'IBM Plex Mono';color:#235a36">4 rotations · 1 060 l</div>
+              </div>
+              <table style="width:100%;border-collapse:collapse">
+                <thead><tr style="background:#faf7ef">
+                  <th style="text-align:left;padding:9px 20px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">N° cuve</th>
+                  <th style="text-align:left;padding:9px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Produit</th>
+                  <th style="text-align:right;padding:9px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Quantité (l)</th>
+                  <th style="text-align:right;padding:9px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">T° début → fin</th>
+                  <th style="text-align:right;padding:9px 20px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Vent début → fin</th>
+                </tr></thead>
+                <tbody>
+                  <sc-for list="{{ rotations }}" as="r" hint-placeholder-count="4">
+                    <tr style="border-top:1px solid #f4efe2">
+                      <td style="padding:11px 20px;font:600 12px 'IBM Plex Mono';color:#235a36">{{ r.cuve }}</td>
+                      <td style="padding:11px 12px;font:500 12px 'Archivo'">{{ r.produit }} <span style="color:#9a9484">· {{ r.ma }}</span></td>
+                      <td style="padding:11px 12px;text-align:right;font:600 12px 'IBM Plex Mono'">{{ r.qte }}</td>
+                      <td style="padding:11px 12px;text-align:right;font:500 12px 'IBM Plex Mono';color:#3a3a30">{{ r.temp }}</td>
+                      <td style="padding:11px 20px;text-align:right;font:500 12px 'IBM Plex Mono';color:#3a3a30">{{ r.vent }}</td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+              <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:18px 20px">
+                <div style="font:600 9.5px 'Archivo';letter-spacing:1px;text-transform:uppercase;color:#9a9484;margin-bottom:12px">Moyens & protection</div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <sc-for list="{{ epi }}" as="e" hint-placeholder-count="5">
+                    <div style="display:flex;align-items:center;gap:9px">
+                      <span style="width:16px;height:16px;border-radius:4px;background:{{ e.bg }};color:#fff;display:flex;align-items:center;justify-content:center;font:700 9px 'Archivo'">{{ e.icon }}</span>
+                      <span style="font:500 12px 'Archivo';color:#3a3a30">{{ e.label }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="margin-top:12px;padding-top:12px;border-top:1px solid #f1ecdd;font:500 11.5px/1.5 'Archivo';color:#6f6a59">Zones exposées : <b style="color:#16201a">Habitations, Points d'eau, Ruchers</b></div>
+              </div>
+              <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:18px 20px">
+                <div style="font:600 9.5px 'Archivo';letter-spacing:1px;text-transform:uppercase;color:#9a9484;margin-bottom:12px">Impacts & évaluation du risque</div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <sc-for list="{{ risques }}" as="r" hint-placeholder-count="4">
+                    <div style="display:flex;align-items:center;gap:9px">
+                      <span style="font:500 12px 'Archivo';color:#3a3a30;flex:1">{{ r.axe }}</span>
+                      <span style="padding:3px 9px;border-radius:20px;font:700 10px 'Archivo';background:{{ r.bg }};color:{{ r.fg }};border:1px solid {{ r.bd }}">{{ r.niveau }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="margin-top:12px;padding-top:12px;border-top:1px solid #f1ecdd;display:flex;flex-direction:column;gap:5px">
+                  <div style="font:500 11.5px 'Archivo';color:#6f6a59">Empoisonnement : <b style="color:#235a36">Non</b></div>
+                  <div style="font:500 11.5px 'Archivo';color:#6f6a59">Comportement anormal : <b style="color:#8a6d2f">Oui — 2 espèces non cibles</b></div>
+                  <div style="font:500 11.5px 'Archivo';color:#6f6a59">Mortalité : <b style="color:#235a36">Non</b></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div style="background:#eaf2ec;border:1px solid #cfe0d4;border-radius:11px;padding:16px 18px;display:flex;flex-direction:column;gap:10px">
+              <div style="font:700 12.5px 'Archivo';color:#235a36">Surfaces (ha)</div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:500 11.5px 'Archivo';color:#3a5c43">Infestée (snapshot)</span><span style="font:700 15px 'IBM Plex Mono';color:#16201a">1 200</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:500 11.5px 'Archivo';color:#3a5c43">Traitée</span><span style="font:700 15px 'IBM Plex Mono';color:#16201a">860</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:500 11.5px 'Archivo';color:#3a5c43">Cumulée (reprises)</span><span style="font:700 15px 'IBM Plex Mono';color:#16201a">1 040</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline;padding-top:8px;border-top:1px solid #cfe0d4"><span style="font:600 11.5px 'Archivo';color:#8a6d2f">Restante</span><span style="font:700 15px 'IBM Plex Mono';color:#8a6d2f">160</span></div>
+              <div style="font:500 10.5px/1.5 'Archivo';color:#8a6d2f;background:#fdf6e7;border:1px solid #f0e2bf;border-radius:8px;padding:8px 10px">Surface restante <b>abandonnée</b> — motif : « accès impraticable »</div>
+            </div>
+            <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:18px 20px">
+              <div style="font:700 13px 'Archivo';margin-bottom:12px">Signatures</div>
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <sc-for list="{{ signatures }}" as="s" hint-placeholder-count="4">
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <div style="flex:1;min-width:0">
+                      <div style="font:600 11.5px 'Archivo';color:#16201a">{{ s.role }}</div>
+                      <div style="font:500 11px 'Archivo';color:#6f6a59">{{ s.nom }}</div>
+                      <div style="font:500 10px 'IBM Plex Mono';color:#9a9484">{{ s.stamp }}</div>
+                    </div>
+                    <span style="padding:4px 10px;border-radius:20px;font:700 10px 'Archivo';background:{{ s.bg }};color:{{ s.fg }};border:1px solid {{ s.bd }}">{{ s.state }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:16px 18px">
+              <div style="font:700 12.5px 'Archivo';margin-bottom:8px">Chaîne de reprise</div>
+              <div style="font:500 11.5px/1.6 'Archivo';color:#6f6a59">Origine : <a href="#" onClick="{{ noop }}">Jean-AERIEN-2026-08-09</a> → cette fiche. Une seule reprise possible par fiche d'origine.</div>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+      </div>
+      </sc-if>
+
+      <!-- ============ FICHE DE VOL & METEO ============ -->
+      <sc-if value="{{ pVol }}" hint-placeholder-val="{{ true }}">
+      <div data-screen-label="Fiche de vol et meteo" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;overflow:hidden">
+            <div style="padding:16px 20px;border-bottom:1px solid #f1ecdd">
+              <div style="font:700 14px 'Archivo'">Fiche de vol · VOL‑2026‑0042</div>
+              <div style="font:500 11.5px 'Archivo';color:#6f6a59;margin-top:3px">Aéronef MDG‑A21 · pilote Rakoto A. · base Ihosy · 2026‑08‑12</div>
+            </div>
+            <table style="width:100%;border-collapse:collapse">
+              <thead><tr style="background:#faf7ef">
+                <th style="text-align:left;padding:9px 20px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Vol</th>
+                <th style="text-align:left;padding:9px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Décollage → Atterr.</th>
+                <th style="text-align:right;padding:9px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Durée</th>
+                <th style="text-align:left;padding:9px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">N° cuve</th>
+                <th style="text-align:right;padding:9px 20px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Rappr.</th>
+              </tr></thead>
+              <tbody>
+                <sc-for list="{{ vols }}" as="v" hint-placeholder-count="4">
+                  <tr style="border-top:1px solid #f4efe2">
+                    <td style="padding:11px 20px;font:600 12px 'IBM Plex Mono'">{{ v.n }}</td>
+                    <td style="padding:11px 12px;font:500 12px 'IBM Plex Mono';color:#3a3a30">{{ v.h }}</td>
+                    <td style="padding:11px 12px;text-align:right;font:500 12px 'IBM Plex Mono'">{{ v.duree }}</td>
+                    <td style="padding:11px 12px;font:600 12px 'IBM Plex Mono';color:#235a36">{{ v.cuve }}</td>
+                    <td style="padding:11px 20px;text-align:right"><span style="padding:3px 9px;border-radius:20px;font:700 10px 'Archivo';background:{{ v.bg }};color:{{ v.fg }};border:1px solid {{ v.bd }}">{{ v.state }}</span></td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+            <div style="padding:14px 20px;border-top:1px solid #f1ecdd;display:flex;align-items:center;gap:10px">
+              <div style="font:500 11.5px/1.5 'Archivo';color:#8a6d2f;flex:1">Le vol V4 n'a pas de rotation correspondante dans la fiche de traitement — à arbitrer avec le chef de base.</div>
+              <div onClick="{{ goTraitements }}" style="padding:9px 14px;border-radius:9px;background:#fdf6e7;border:1px solid #f0e2bf;color:#8a6d2f;font:700 11.5px 'Archivo';cursor:pointer">Rapprocher</div>
+            </div>
+          </div>
+          <div style="background:#eaf2ec;border:1px solid #cfe0d4;border-radius:11px;padding:16px 18px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+            <div><div style="font:500 10.5px 'Archivo';color:#3a5c43">Heures de vol</div><div style="font:700 18px 'IBM Plex Mono';color:#16201a">4 h 25</div></div>
+            <div><div style="font:500 10.5px 'Archivo';color:#3a5c43">Pesticide embarqué</div><div style="font:700 18px 'IBM Plex Mono';color:#16201a">1 060 l</div></div>
+            <div><div style="font:500 10.5px 'Archivo';color:#3a5c43">Rotations rapprochées</div><div style="font:700 18px 'IBM Plex Mono';color:#8a6d2f">3 / 4</div></div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;overflow:hidden">
+            <div style="padding:16px 20px;border-bottom:1px solid #f1ecdd">
+              <div style="font:700 14px 'Archivo'">Relevé météo · station ST‑014</div>
+              <div style="font:500 11.5px 'Archivo';color:#6f6a59;margin-top:3px">Saisie quotidienne — conditionne l'autorisation de traitement</div>
+            </div>
+            <table style="width:100%;border-collapse:collapse">
+              <thead><tr style="background:#faf7ef">
+                <th style="text-align:left;padding:9px 20px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Date</th>
+                <th style="text-align:right;padding:9px 10px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">T° min</th>
+                <th style="text-align:right;padding:9px 10px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">T° max</th>
+                <th style="text-align:right;padding:9px 10px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Pluie (mm)</th>
+                <th style="text-align:right;padding:9px 10px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Vent (m/s)</th>
+                <th style="text-align:left;padding:9px 20px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Traitement</th>
+              </tr></thead>
+              <tbody>
+                <sc-for list="{{ meteo }}" as="m" hint-placeholder-count="5">
+                  <tr style="border-top:1px solid #f4efe2">
+                    <td style="padding:11px 20px;font:500 11.5px 'IBM Plex Mono';color:#3a3a30">{{ m.date }}</td>
+                    <td style="padding:11px 10px;text-align:right;font:500 12px 'IBM Plex Mono'">{{ m.tmin }}</td>
+                    <td style="padding:11px 10px;text-align:right;font:500 12px 'IBM Plex Mono'">{{ m.tmax }}</td>
+                    <td style="padding:11px 10px;text-align:right;font:500 12px 'IBM Plex Mono'">{{ m.pluie }}</td>
+                    <td style="padding:11px 10px;text-align:right;font:600 12px 'IBM Plex Mono';color:{{ m.ventColor }}">{{ m.vent }}</td>
+                    <td style="padding:11px 20px"><span style="padding:3px 9px;border-radius:20px;font:700 10px 'Archivo';background:{{ m.bg }};color:{{ m.fg }};border:1px solid {{ m.bd }}">{{ m.state }}</span></td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+          <div style="background:#fdf6e7;border:1px solid #f0e2bf;border-radius:10px;padding:14px 16px;font:500 12px/1.55 'Archivo';color:#8a6d2f">
+            Règle appliquée : au-delà de <b>5 m/s</b> de vent ou en cas de pluie le jour même, le traitement est déconseillé et la fiche porte un avertissement.
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ SYNTHESES & EXPORT ============ -->
+      <sc-if value="{{ pSynth }}" hint-placeholder-val="{{ true }}">
+      <div data-screen-label="Syntheses et export" style="display:flex;flex-direction:column;gap:16px">
+        <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:16px 18px;display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Période</span>
+            <div style="height:36px;border:1px solid #e0d9c4;border-radius:8px;background:#fffdf8;display:flex;align-items:center;padding:0 11px;font:600 12px 'IBM Plex Mono'">2026‑07‑01 → 2026‑08‑15</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Groupement</span>
+            <div style="display:flex;gap:5px">
+              <sc-for list="{{ groupChips }}" as="g" hint-placeholder-count="3">
+                <div onClick="{{ g.pick }}" style="padding:8px 13px;border-radius:8px;font:600 11.5px 'Archivo';cursor:pointer;background:{{ g.bg }};color:{{ g.fg }};border:1px solid {{ g.bd }}">{{ g.label }}</div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="flex:1"></div>
+          <div style="display:flex;gap:8px">
+            <div style="padding:10px 16px;border-radius:9px;background:#fff;border:1px solid #e0d9c4;color:#3a3a30;font:700 12px 'Archivo';cursor:pointer">Export CSV</div>
+            <div style="padding:10px 16px;border-radius:9px;background:#235a36;color:#fff;font:700 12px 'Archivo';cursor:pointer">Export rapport PDF</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:16px;align-items:start">
+          <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;overflow:hidden">
+            <div style="padding:15px 20px;border-bottom:1px solid #f1ecdd;font:700 14px 'Archivo'">Agrégats par espèce · {{ groupLabel }}</div>
+            <table style="width:100%;border-collapse:collapse">
+              <thead><tr style="background:#faf7ef">
+                <th style="text-align:left;padding:9px 20px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Espèce</th>
+                <th style="text-align:right;padding:9px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Fiches</th>
+                <th style="text-align:right;padding:9px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Individus</th>
+                <th style="text-align:right;padding:9px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Densité moy.</th>
+                <th style="text-align:right;padding:9px 20px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Surf. inf. (ha)</th>
+              </tr></thead>
+              <tbody>
+                <sc-for list="{{ agregats }}" as="a" hint-placeholder-count="4">
+                  <tr style="border-top:1px solid #f4efe2">
+                    <td style="padding:11px 20px;font:600 12px 'Archivo';font-style:italic">{{ a.espece }}</td>
+                    <td style="padding:11px 12px;text-align:right;font:500 12px 'IBM Plex Mono'">{{ a.fiches }}</td>
+                    <td style="padding:11px 12px;text-align:right;font:500 12px 'IBM Plex Mono'">{{ a.ind }}</td>
+                    <td style="padding:11px 12px;text-align:right;font:500 12px 'IBM Plex Mono'">{{ a.dens }}</td>
+                    <td style="padding:11px 20px;text-align:right;font:600 12px 'IBM Plex Mono';color:#235a36">{{ a.surf }}</td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:16px">
+            <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:18px 20px">
+              <div style="font:700 13px 'Archivo';margin-bottom:12px">Couverture du traitement</div>
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <sc-for list="{{ couverture }}" as="c" hint-placeholder-count="4">
+                  <div style="display:flex;flex-direction:column;gap:5px">
+                    <div style="display:flex;justify-content:space-between;align-items:baseline">
+                      <span style="font:600 11.5px 'Archivo';color:#3a3a30">{{ c.zone }}</span>
+                      <span style="font:600 11.5px 'IBM Plex Mono';color:#16201a">{{ c.pct }}</span>
+                    </div>
+                    <div style="height:6px;border-radius:4px;background:#f1ecdd;overflow:hidden"><div style="height:100%;background:{{ c.color }};width:{{ c.pct }}"></div></div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="background:#eaf2ec;border:1px solid #cfe0d4;border-radius:11px;padding:16px 18px">
+              <div style="font:700 12.5px 'Archivo';color:#235a36;margin-bottom:8px">Contenu de l'export</div>
+              <div style="font:500 11.5px/1.6 'Archivo';color:#3a5c43">Une ligne par fiche : références, localisation, captures agrégées, surfaces, statut et piste de validation. Encodage UTF‑8 avec BOM, séparateur « ; » pour Excel.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ UTILISATEURS & STATIONS ============ -->
+      <sc-if value="{{ pUsers }}" hint-placeholder-val="{{ true }}">
+      <div data-screen-label="Utilisateurs et stations" style="display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <sc-for list="{{ userTabs }}" as="t" hint-placeholder-count="2">
+            <div onClick="{{ t.pick }}" style="padding:9px 16px;border-radius:9px;cursor:pointer;font:700 12px 'Archivo';background:{{ t.bg }};color:{{ t.fg }};border:1px solid {{ t.bd }}">{{ t.label }}</div>
+          </sc-for>
+          <div style="flex:1"></div>
+          <div style="padding:10px 16px;border-radius:9px;background:#235a36;color:#fff;font:700 12px 'Archivo';cursor:pointer">{{ userAddLabel }}</div>
+        </div>
+
+        <sc-if value="{{ uUsers }}" hint-placeholder-val="{{ true }}">
+        <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;overflow:hidden">
+          <table style="width:100%;border-collapse:collapse">
+            <thead><tr style="background:#faf7ef">
+              <th style="text-align:left;padding:10px 20px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Nom</th>
+              <th style="text-align:left;padding:10px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Email</th>
+              <th style="text-align:left;padding:10px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Rôle</th>
+              <th style="text-align:left;padding:10px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Station</th>
+              <th style="text-align:right;padding:10px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Fiches</th>
+              <th style="text-align:left;padding:10px 20px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Actif</th>
+            </tr></thead>
+            <tbody>
+              <sc-for list="{{ users }}" as="u" hint-placeholder-count="6">
+                <tr style="border-top:1px solid #f4efe2">
+                  <td style="padding:12px 20px;font:600 12.5px 'Archivo'">{{ u.nom }}</td>
+                  <td style="padding:12px 12px;font:500 11.5px 'IBM Plex Mono';color:#6f6a59">{{ u.email }}</td>
+                  <td style="padding:12px 12px"><span style="padding:3px 9px;border-radius:20px;font:700 10px 'Archivo';background:{{ u.bg }};color:{{ u.fg }};border:1px solid {{ u.bd }}">{{ u.role }}</span></td>
+                  <td style="padding:12px 12px;font:500 12px 'Archivo';color:#3a3a30">{{ u.station }}</td>
+                  <td style="padding:12px 12px;text-align:right;font:600 12px 'IBM Plex Mono'">{{ u.n }}</td>
+                  <td style="padding:12px 20px">
+                    <div style="width:34px;height:19px;border-radius:12px;background:{{ u.swBg }};padding:2px;display:flex;justify-content:{{ u.swPos }}"><div style="width:15px;height:15px;border-radius:50%;background:#fff"></div></div>
+                  </td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ uStations }}" hint-placeholder-val="{{ true }}">
+        <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;overflow:hidden">
+          <table style="width:100%;border-collapse:collapse">
+            <thead><tr style="background:#faf7ef">
+              <th style="text-align:left;padding:10px 20px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Code</th>
+              <th style="text-align:left;padding:10px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Station</th>
+              <th style="text-align:left;padding:10px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Aire protégée</th>
+              <th style="text-align:left;padding:10px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Coordonnées</th>
+              <th style="text-align:right;padding:10px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">Prospections</th>
+              <th style="text-align:left;padding:10px 20px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">État</th>
+            </tr></thead>
+            <tbody>
+              <sc-for list="{{ stations }}" as="s" hint-placeholder-count="5">
+                <tr style="border-top:1px solid #f4efe2">
+                  <td style="padding:12px 20px;font:600 12px 'IBM Plex Mono';color:#235a36">{{ s.code }}</td>
+                  <td style="padding:12px 12px;font:600 12.5px 'Archivo'">{{ s.nom }}</td>
+                  <td style="padding:12px 12px;font:500 12px 'Archivo';color:#6f6a59">{{ s.pa }}</td>
+                  <td style="padding:12px 12px;font:500 11.5px 'IBM Plex Mono';color:#3a3a30">{{ s.coord }}</td>
+                  <td style="padding:12px 12px;text-align:right;font:600 12px 'IBM Plex Mono'">{{ s.n }}</td>
+                  <td style="padding:12px 20px"><span style="padding:3px 9px;border-radius:20px;font:700 10px 'Archivo';background:{{ s.bg }};color:{{ s.fg }};border:1px solid {{ s.bd }}">{{ s.etat }}</span></td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+        </sc-if>
+      </div>
+      </sc-if>
+
+      <!-- ============ REFERENTIELS ============ -->
+      <sc-if value="{{ pRef }}" hint-placeholder-val="{{ true }}">
+      <div data-screen-label="Referentiels" style="display:grid;grid-template-columns:216px 1fr;gap:20px;align-items:start">
+
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="font:600 9.5px 'Archivo';letter-spacing:1px;text-transform:uppercase;color:#9a9484;padding:0 2px 3px">7 référentiels</div>
+          <sc-for list="{{ refNav }}" as="e" hint-placeholder-count="7">
+            <div onClick="{{ e.pick }}" style="background:{{ e.bg }};border:1.5px solid {{ e.bd }};border-radius:10px;padding:11px 13px;cursor:pointer;display:flex;align-items:center;gap:9px">
+              <div style="flex:1;min-width:0">
+                <div style="font-size:12.5px;color:{{ e.fg }};font-weight:{{ e.weight }}">{{ e.label }}</div>
+                <div style="font:500 10px 'IBM Plex Mono';color:#9a9484">{{ e.sub }}</div>
+              </div>
+              <span style="padding:2px 7px;border-radius:20px;font:700 9px 'Archivo';background:{{ e.stateBg }};color:{{ e.stateFg }}">{{ e.state }}</span>
+              <span style="font:600 11px 'IBM Plex Mono';color:#9a9484">{{ e.count }}</span>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:16px 20px;display:flex;flex-direction:column;gap:9px">
+              <div style="display:flex;align-items:center;gap:10px">
+                <div style="font:800 17px 'Archivo';flex:1">{{ refTitle }}</div>
+                <span style="font:500 11px 'IBM Plex Mono';color:#9a9484">{{ refTable }}</span>
+                <span style="padding:4px 10px;border-radius:20px;font:700 10px 'Archivo';background:{{ refApiBg }};color:{{ refApiFg }};border:1px solid {{ refApiBd }}">{{ refApi }}</span>
+              </div>
+              <div style="font:500 12.5px/1.55 'Archivo';color:#3a3a30">{{ refDesc }}</div>
+              <sc-if value="{{ refHasNote }}" hint-placeholder-val="{{ true }}">
+                <div style="background:#fdf6e7;border:1px solid #f0e2bf;border-radius:9px;padding:11px 13px;font:500 11.5px/1.55 'Archivo';color:#8a6d2f">{{ refNote }}</div>
+              </sc-if>
+            </div>
+
+            <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;overflow:hidden">
+              <div style="padding:13px 20px;border-bottom:1px solid #f1ecdd;display:flex;align-items:center;gap:10px">
+                <div style="font:700 13px 'Archivo';flex:1">Enregistrements</div>
+                <div style="padding:8px 14px;border-radius:8px;background:#235a36;color:#fff;font:700 11.5px 'Archivo';cursor:pointer">{{ refAddLabel }}</div>
+              </div>
+              <table style="width:100%;border-collapse:collapse">
+                <thead>
+                  <tr style="background:#faf7ef">
+                    <sc-for list="{{ refCols }}" as="c" hint-placeholder-count="4">
+                      <th style="padding:9px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484;text-align:{{ c.a }}">{{ c.l }}</th>
+                    </sc-for>
+                    <th style="padding:9px 12px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484;text-align:left">Actif</th>
+                    <th style="padding:9px 20px;font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484;text-align:right">Mis à jour</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <sc-for list="{{ refRows }}" as="entry" hint-placeholder-count="5">
+                    <tr onClick="{{ entry.pick }}" style="border-top:1px solid #f4efe2;cursor:pointer;background:{{ entry.rowBg }};box-shadow:inset 3px 0 0 {{ entry.mark }}">
+                      <sc-for list="{{ entry.cells }}" as="cell" hint-placeholder-count="4">
+                        <td style="padding:12px;white-space:{{ cell.wrap }};text-align:{{ cell.align }};font:{{ cell.font }};color:{{ cell.color }}">{{ cell.v }}</td>
+                      </sc-for>
+                      <td style="padding:12px">
+                        <div style="width:34px;height:19px;border-radius:12px;background:{{ entry.swBg }};padding:2px;display:flex;justify-content:{{ entry.swPos }}"><div style="width:15px;height:15px;border-radius:50%;background:#fff"></div></div>
+                      </td>
+                      <td style="padding:12px 20px;text-align:right;white-space:nowrap;font:500 11px 'IBM Plex Mono';color:#9a9484">{{ entry.maj }}</td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+              <div style="padding:12px 20px;border-top:1px solid #f1ecdd;font:500 11.5px 'Archivo';color:#9a9484">Désactiver plutôt que supprimer : le pull hors-ligne ne transporte que des <span style="font-family:'IBM Plex Mono'">upserts</span>, une suppression physique resterait sur les téléphones.</div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 320px;gap:16px;align-items:start">
+            <div style="background:#fff;border:1px solid #e7e0cd;border-radius:11px;padding:18px 20px;display:flex;flex-direction:column;gap:13px">
+              <div>
+                <div style="font:700 13px 'Archivo'">Modifier</div>
+                <div style="font:500 11px 'IBM Plex Mono';color:#9a9484;margin-top:2px">{{ refSelected }}</div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 16px">
+                <sc-for list="{{ refForm }}" as="f" hint-placeholder-count="4">
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <span style="font:600 9.5px 'Archivo';letter-spacing:.8px;text-transform:uppercase;color:#9a9484">{{ f.label }}</span>
+                    <div style="min-height:36px;border:1px solid #e0d9c4;border-radius:8px;background:#fffdf8;display:flex;align-items:center;padding:0 11px;font:{{ f.mono }};color:#16201a">{{ f.value }}</div>
+                    <span style="font:500 10px 'Archivo';color:#8a6d2f">{{ f.hint }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding-top:2px">
+                <span style="font:600 11.5px 'Archivo';color:#3a3a30">Actif</span>
+                <div style="width:34px;height:19px;border-radius:12px;background:#235a36;padding:2px;display:flex;justify-content:flex-end"><div style="width:15px;height:15px;border-radius:50%;background:#fff"></div></div>
+              </div>
+              <div style="display:flex;gap:8px">
+                <div style="flex:1;padding:11px 0;border-radius:9px;background:#235a36;color:#fff;font:700 12px 'Archivo';text-align:center;cursor:pointer">Enregistrer</div>
+                <div style="padding:11px 16px;border-radius:9px;background:#fff;border:1px solid #e0d9c4;color:#6f6a59;font:600 12px 'Archivo';cursor:pointer">Annuler</div>
+              </div>
+            </div>
+            <div style="background:#eaf2ec;border:1px solid #cfe0d4;border-radius:11px;padding:16px 18px">
+              <div style="font:700 12.5px 'Archivo';color:#235a36;margin-bottom:7px">Fraîcheur terrain</div>
+              <div style="font:500 11.5px/1.6 'Archivo';color:#3a5c43">{{ refPull }}</div>
+              <div style="margin-top:10px;padding:9px 12px;border-radius:8px;background:#fff;border:1px solid #cfe0d4;font:700 11.5px 'Archivo';color:#235a36;text-align:center;cursor:pointer">Voir les agents en retard</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+    </div>
+  </main>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:920},&quot;startPage&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dashboard&quot;,&quot;campagnes&quot;,&quot;prospections&quot;,&quot;nouvelle&quot;,&quot;fiche&quot;,&quot;validation&quot;,&quot;traitements&quot;,&quot;vol&quot;,&quot;syntheses&quot;,&quot;users&quot;,&quot;referentiels&quot;],&quot;default&quot;:&quot;dashboard&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;role&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Admin&quot;,&quot;Chef&quot;,&quot;Vérificateur&quot;,&quot;Prospecteur&quot;,&quot;Validation finale&quot;],&quot;default&quot;:&quot;Admin&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;}}">
+const GREEN='#235a36', AMBER='#e89b2b', DANGER='#c0412b';
+const BADGE={
+  brouillon:{bg:'#f4efe2',fg:'#6f6a59',bd:'#e0d9c4'},
+  attente:{bg:'#fdf6e7',fg:'#8a6d2f',bd:'#f0e2bf'},
+  verifiee:{bg:'#eaf0f7',fg:'#31567f',bd:'#cdddef'},
+  validee:{bg:'#eaf2ec',fg:'#235a36',bd:'#cfe0d4'},
+  rejetee:{bg:'#fbe9e5',fg:'#a5341c',bd:'#f0c4b9'}
+};
+const ROLES=['Admin','Chef','Vérificateur','Prospecteur','Validation finale'];
+const PAGES={
+  dashboard:{label:'Tableau de bord',crumb:'Supervision',title:'Tableau de bord'},
+  campagnes:{label:'Campagnes',crumb:'Référentiel',title:'Campagnes'},
+  prospections:{label:'Prospections',crumb:'Fiches terrain',title:'Prospections'},
+  nouvelle:{label:'Nouvelle prospection',crumb:'Fiches terrain',title:'Nouvelle prospection'},
+  fiche:{label:'Fiche de lecture',crumb:'Fiches terrain · PR‑2026‑0148‑INT',title:'Fiche de prospection intensive'},
+  validation:{label:'Validation finale',crumb:'Contrôle',title:'Validation finale'},
+  traitements:{label:'Traitements',crumb:'Lutte',title:'Fiches de traitement'},
+  vol:{label:'Fiche de vol & météo',crumb:'Lutte',title:'Fiche de vol & relevé météo'},
+  syntheses:{label:'Synthèses & export',crumb:'Analyse',title:'Synthèses & export'},
+  users:{label:'Utilisateurs & stations',crumb:'Administration',title:'Utilisateurs & stations'},
+  referentiels:{label:'Référentiels',crumb:'Administration',title:'Référentiels'}
+};
+const COUNTS={dashboard:'',campagnes:'4',prospections:'148',nouvelle:'',fiche:'',validation:'7',traitements:'36',vol:'12',syntheses:'',users:'23',referentiels:'7'};
+const ACCESS={
+  'Admin':['dashboard','campagnes','prospections','nouvelle','validation','traitements','vol','syntheses','users','referentiels'],
+  'Chef':['dashboard','campagnes','prospections','nouvelle','traitements','vol','syntheses','referentiels'],
+  'Vérificateur':['dashboard','prospections','traitements','syntheses'],
+  'Prospecteur':['dashboard','prospections','nouvelle'],
+  'Validation finale':['dashboard','validation','prospections','syntheses']
+};
+
+const C=(v,o)=>Object.assign({v}, o||{});
+const REF_ORDER=['pesticide','culture','code_stade','poste_acridien','station_fixe','utilisateur','campagne'];
+const REF={
+  pesticide:{
+    label:'Pesticides', table:'pesticide', add:'Nouveau pesticide', apiOk:false,
+    api:'Écriture à créer — pull hors-ligne seulement',
+    desc:'Alimente les chips « Produit » des rotations aériennes et des produits utilisés en terrestre.',
+    note:'La matière active affichée sur la fiche de traitement n\u2019existe pas en base : la table pesticide ne porte que code, nom et actif. À ajouter comme colonne ou à retirer de l\u2019UI.',
+    pull:'Dernier pull terrain : 14/08 12:10 — 5 agents à jour, 1 en retard',
+    cols:[{l:'Code',a:'left'},{l:'Nom commercial',a:'left'},{l:'Matière active',a:'left'},{l:'Dose de référence',a:'right'}],
+    fields:[{key:'code',label:'Code *',mono:true},{key:'nom',label:'Nom commercial *'},{key:'ma',label:'Matière active',hint:'colonne absente en base'},{key:'dose',label:'Dose de référence (l/ha)',mono:true}],
+    rows:[
+      {cells:[C('PST-ADO4',{mono:true,color:'#235a36'}),C('Adonis 4 UL'),C('Fipronil'),C('0,8',{mono:true,align:'right'})],actif:true,maj:'12/08 09:14',values:{code:'PST-ADO4',nom:'Adonis 4 UL',ma:'Fipronil',dose:'0,8'}},
+      {cells:[C('PST-TEF5',{mono:true,color:'#235a36'}),C('Teflubenzuron 5'),C('Téflubenzuron'),C('1,0',{mono:true,align:'right'})],actif:true,maj:'12/08 09:14',values:{code:'PST-TEF5',nom:'Teflubenzuron 5',ma:'Téflubenzuron',dose:'1,0'}},
+      {cells:[C('PST-FEN96',{mono:true,color:'#235a36'}),C('Fenitrothion 96 UL'),C('Fénitrothion'),C('1,2',{mono:true,align:'right'})],actif:true,maj:'03/07 16:40',values:{code:'PST-FEN96',nom:'Fenitrothion 96 UL',ma:'Fénitrothion',dose:'1,2'}},
+      {cells:[C('PST-MAL50',{mono:true,color:'#235a36'}),C('Malathion 50'),C('Malathion'),C('1,5',{mono:true,align:'right'})],actif:false,maj:'21/05 11:02',values:{code:'PST-MAL50',nom:'Malathion 50',ma:'Malathion',dose:'1,5'}},
+      {cells:[C('PST-MET69',{mono:true,color:'#235a36'}),C('Green Muscle'),C('Metarhizium acridum'),C('0,5',{mono:true,align:'right'})],actif:true,maj:'02/08 08:30',values:{code:'PST-MET69',nom:'Green Muscle',ma:'Metarhizium acridum',dose:'0,5'}}
+    ]
+  },
+  culture:{
+    label:'Cultures', table:'culture', add:'Nouvelle culture', apiOk:false,
+    api:'Écriture à créer — référentiel non lu par le mobile',
+    desc:'Doit alimenter les dégâts sur culture (prospection) et les zones exposées (traitement), aujourd\u2019hui codés en dur.',
+    note:'Synchronisée dans le SQLite du terrain mais aucune fonction de lecture : listCultures() n\u2019existe pas dans referentiel-db.ts.',
+    pull:'Dernier pull terrain : 14/08 12:10 — données inertes tant que l\u2019UI ne les lit pas',
+    cols:[{l:'Code',a:'left'},{l:'Nom',a:'left'},{l:'Saison',a:'left'},{l:'Utilisée par',a:'left'}],
+    fields:[{key:'code',label:'Code *',mono:true},{key:'nom',label:'Nom *'},{key:'saison',label:'Saison'},{key:'usage',label:'Écrans consommateurs'}],
+    rows:[
+      {cells:[C('CUL-RIZ',{mono:true,color:'#235a36'}),C('Riz'),C('Novembre → avril'),C('Dégâts cultures',{color:'#6f6a59'})],actif:true,maj:'12/08 09:14',values:{code:'CUL-RIZ',nom:'Riz',saison:'Novembre → avril',usage:'Dégâts cultures · zones exposées'}},
+      {cells:[C('CUL-MAIS',{mono:true,color:'#235a36'}),C('Maïs'),C('Décembre → mai'),C('Dégâts cultures',{color:'#6f6a59'})],actif:true,maj:'12/08 09:14',values:{code:'CUL-MAIS',nom:'Maïs',saison:'Décembre → mai',usage:'Dégâts cultures · zones exposées'}},
+      {cells:[C('CUL-MANIOC',{mono:true,color:'#235a36'}),C('Manioc'),C('Toute l\u2019année'),C('Dégâts cultures',{color:'#6f6a59'})],actif:true,maj:'12/08 09:14',values:{code:'CUL-MANIOC',nom:'Manioc',saison:'Toute l\u2019année',usage:'Dégâts cultures'}},
+      {cells:[C('CUL-ARACH',{mono:true,color:'#235a36'}),C('Arachide'),C('Novembre → mars'),C('Dégâts cultures',{color:'#6f6a59'})],actif:true,maj:'03/07 16:40',values:{code:'CUL-ARACH',nom:'Arachide',saison:'Novembre → mars',usage:'Dégâts cultures'}},
+      {cells:[C('CUL-COTON',{mono:true,color:'#235a36'}),C('Coton'),C('Octobre → mars'),C('—',{color:'#bdb6a2'})],actif:false,maj:'21/05 11:02',values:{code:'CUL-COTON',nom:'Coton',saison:'Octobre → mars',usage:'—'}}
+    ]
+  },
+  code_stade:{
+    label:'Codes stades', table:'code_stade', add:'Nouveau code stade', apiOk:false,
+    api:'Écriture à créer — référentiel non lu par le mobile',
+    desc:'Doit alimenter le stade dominant (infestation larvaire) et les phases du compteur de captures.',
+    note:'Synchronisée dans le SQLite du terrain mais aucune fonction de lecture : les phases et stades restent des constantes dans le code mobile.',
+    pull:'Dernier pull terrain : 14/08 12:10 — données inertes tant que l\u2019UI ne les lit pas',
+    cols:[{l:'Code',a:'left'},{l:'Espèce',a:'left'},{l:'Libellé',a:'left'},{l:'Ordre',a:'right'}],
+    fields:[{key:'code',label:'Code *',mono:true},{key:'espece',label:'Espèce *'},{key:'libelle',label:'Libellé *'},{key:'ordre',label:'Ordre d\u2019affichage',mono:true}],
+    rows:[
+      {cells:[C('LM-L1',{mono:true,color:'#235a36'}),C('Locusta migratoria',{color:'#6f6a59'}),C('Larve stade 1'),C('1',{mono:true,align:'right'})],actif:true,maj:'12/08 09:14',values:{code:'LM-L1',espece:'Locusta migratoria',libelle:'Larve stade 1',ordre:'1'}},
+      {cells:[C('LM-L4',{mono:true,color:'#235a36'}),C('Locusta migratoria',{color:'#6f6a59'}),C('Larve stade 4'),C('4',{mono:true,align:'right'})],actif:true,maj:'12/08 09:14',values:{code:'LM-L4',espece:'Locusta migratoria',libelle:'Larve stade 4',ordre:'4'}},
+      {cells:[C('LM-IMG',{mono:true,color:'#235a36'}),C('Locusta migratoria',{color:'#6f6a59'}),C('Imago'),C('6',{mono:true,align:'right'})],actif:true,maj:'12/08 09:14',values:{code:'LM-IMG',espece:'Locusta migratoria',libelle:'Imago',ordre:'6'}},
+      {cells:[C('NS-L3',{mono:true,color:'#235a36'}),C('Nomadacris septemfasciata',{color:'#6f6a59'}),C('Larve stade 3'),C('3',{mono:true,align:'right'})],actif:true,maj:'03/07 16:40',values:{code:'NS-L3',espece:'Nomadacris septemfasciata',libelle:'Larve stade 3',ordre:'3'}},
+      {cells:[C('NS-IMG',{mono:true,color:'#235a36'}),C('Nomadacris septemfasciata',{color:'#6f6a59'}),C('Imago'),C('6',{mono:true,align:'right'})],actif:true,maj:'03/07 16:40',values:{code:'NS-IMG',espece:'Nomadacris septemfasciata',libelle:'Imago',ordre:'6'}}
+    ]
+  },
+  poste_acridien:{
+    label:'Postes acridiens', table:'poste_acridien', add:'Nouveau poste acridien', apiOk:true,
+    api:'GET /postes-acridiens — écriture à créer',
+    desc:'Niveau supérieur de la hiérarchie géographique : chaque station fixe et chaque agent y sont rattachés.',
+    note:'',
+    pull:'Dernier pull terrain : 14/08 12:10 — 6 agents à jour',
+    cols:[{l:'Code',a:'left'},{l:'Nom',a:'left'},{l:'Région',a:'left'},{l:'Stations',a:'right'}],
+    fields:[{key:'code',label:'Code *',mono:true},{key:'nom',label:'Nom *'},{key:'region',label:'Région *'},{key:'stations',label:'Stations rattachées',hint:'dérivé',mono:true}],
+    rows:[
+      {cells:[C('PA-ZOM',{mono:true,color:'#235a36'}),C('Zombitse‑Vohibasia'),C('Atsimo‑Andrefana',{color:'#6f6a59'}),C('6',{mono:true,align:'right'})],actif:true,maj:'12/08 09:14',values:{code:'PA-ZOM',nom:'Zombitse‑Vohibasia',region:'Atsimo‑Andrefana',stations:'6'}},
+      {cells:[C('PA-ISA',{mono:true,color:'#235a36'}),C('Isalo'),C('Ihorombe',{color:'#6f6a59'}),C('4',{mono:true,align:'right'})],actif:true,maj:'12/08 09:14',values:{code:'PA-ISA',nom:'Isalo',region:'Ihorombe',stations:'4'}},
+      {cells:[C('PA-AND',{mono:true,color:'#235a36'}),C('Androy'),C('Androy',{color:'#6f6a59'}),C('5',{mono:true,align:'right'})],actif:true,maj:'03/07 16:40',values:{code:'PA-AND',nom:'Androy',region:'Androy',stations:'5'}},
+      {cells:[C('PA-MEN',{mono:true,color:'#235a36'}),C('Menabe'),C('Menabe',{color:'#6f6a59'}),C('3',{mono:true,align:'right'})],actif:false,maj:'21/05 11:02',values:{code:'PA-MEN',nom:'Menabe',region:'Menabe',stations:'3'}}
+    ]
+  },
+  station_fixe:{
+    label:'Stations fixes', table:'station_fixe', add:'Nouvelle station', apiOk:false,
+    api:'GET seulement — POST / PUT / DELETE appelés par le web mais absents du serveur',
+    desc:'Point de référence des prospections : code, nom, poste acridien de rattachement et coordonnées.',
+    note:'Écart bloquant : StationPage.tsx appelle POST /stations, PUT /stations/{id} et DELETE /stations/{id}, qui ne sont pas exposés par referentiel_routes.py. Préférer une désactivation (actif=false) à la suppression, une station étant référencée par des prospections.',
+    pull:'Dernier pull terrain : 14/08 12:10 — 6 agents à jour',
+    cols:[{l:'Code',a:'left'},{l:'Nom',a:'left'},{l:'Poste acridien',a:'left'},{l:'Coordonnées',a:'left'}],
+    fields:[{key:'code',label:'Code *',mono:true},{key:'nom',label:'Nom *'},{key:'pa',label:'Poste acridien *'},{key:'coord',label:'Latitude · longitude',mono:true}],
+    rows:[
+      {cells:[C('ST‑014',{mono:true,color:'#235a36'}),C('Ankazoabo'),C('Zombitse‑Vohibasia',{color:'#6f6a59'}),C('-22,4021 · 44,1873',{mono:true})],actif:true,maj:'12/08 09:14',values:{code:'ST‑014',nom:'Ankazoabo',pa:'Zombitse‑Vohibasia',coord:'-22,4021 · 44,1873'}},
+      {cells:[C('ST‑009',{mono:true,color:'#235a36'}),C('Sakaraha'),C('Zombitse‑Vohibasia',{color:'#6f6a59'}),C('-22,9013 · 44,5321',{mono:true})],actif:true,maj:'12/08 09:14',values:{code:'ST‑009',nom:'Sakaraha',pa:'Zombitse‑Vohibasia',coord:'-22,9013 · 44,5321'}},
+      {cells:[C('ST‑021',{mono:true,color:'#235a36'}),C('Betioky'),C('Androy',{color:'#6f6a59'}),C('-23,7112 · 44,3820',{mono:true})],actif:true,maj:'03/07 16:40',values:{code:'ST‑021',nom:'Betioky',pa:'Androy',coord:'-23,7112 · 44,3820'}},
+      {cells:[C('ST‑006',{mono:true,color:'#235a36'}),C('Ihosy'),C('Isalo',{color:'#6f6a59'}),C('-22,4008 · 46,1204',{mono:true})],actif:true,maj:'03/07 16:40',values:{code:'ST‑006',nom:'Ihosy',pa:'Isalo',coord:'-22,4008 · 46,1204'}},
+      {cells:[C('ST‑003',{mono:true,color:'#235a36'}),C('Bekily'),C('Androy',{color:'#6f6a59'}),C('-24,2130 · 45,3054',{mono:true})],actif:false,maj:'21/05 11:02',values:{code:'ST‑003',nom:'Bekily',pa:'Androy',coord:'-24,2130 · 45,3054'}}
+    ]
+  },
+  utilisateur:{
+    label:'Utilisateurs', table:'utilisateur', add:'Nouvel utilisateur', apiOk:true,
+    api:'GET /users/ · POST /users/ · PATCH /users/{id}',
+    desc:'Agents et encadrants. Le rôle conditionne la navigation web et les rôles signataires des fiches de traitement.',
+    note:'Le pull expose ces comptes sous utilisateurs_equipe : tout utilisateur authentifié reçoit la liste complète des agents. Une règle de rôle reste à poser avant d\u2019ouvrir les écritures du référentiel.',
+    pull:'Dernier pull terrain : 14/08 12:10 — 5 agents à jour, 1 en retard (6 j)',
+    cols:[{l:'Nom',a:'left'},{l:'Email',a:'left'},{l:'Rôle',a:'left'},{l:'Poste acridien',a:'left'}],
+    fields:[{key:'nom',label:'Nom complet *'},{key:'email',label:'Email *'},{key:'role',label:'Rôle *'},{key:'pa',label:'Poste acridien'}],
+    rows:[
+      {cells:[C('Randria Jean'),C('j.randria@ifvm.mg',{mono:true,color:'#6f6a59'}),C('Prospecteur'),C('Zombitse‑Vohibasia',{color:'#6f6a59'})],actif:true,maj:'12/08 09:14',values:{nom:'Randria Jean',email:'j.randria@ifvm.mg',role:'Prospecteur',pa:'Zombitse‑Vohibasia'}},
+      {cells:[C('Rasoa Herizo'),C('h.rasoa@ifvm.mg',{mono:true,color:'#6f6a59'}),C('Chef'),C('Zombitse‑Vohibasia',{color:'#6f6a59'})],actif:true,maj:'12/08 09:14',values:{nom:'Rasoa Herizo',email:'h.rasoa@ifvm.mg',role:'Chef',pa:'Zombitse‑Vohibasia'}},
+      {cells:[C('Naivo Tiana'),C('t.naivo@ifvm.mg',{mono:true,color:'#6f6a59'}),C('Vérificateur'),C('Isalo',{color:'#6f6a59'})],actif:true,maj:'03/07 16:40',values:{nom:'Naivo Tiana',email:'t.naivo@ifvm.mg',role:'Vérificateur',pa:'Isalo'}},
+      {cells:[C('Soa Lalao'),C('l.soa@ifvm.mg',{mono:true,color:'#6f6a59'}),C('Validation finale'),C('Siège',{color:'#6f6a59'})],actif:true,maj:'03/07 16:40',values:{nom:'Soa Lalao',email:'l.soa@ifvm.mg',role:'Validation finale',pa:'Siège'}},
+      {cells:[C('Rakoto Andry'),C('a.rakoto@ifvm.mg',{mono:true,color:'#6f6a59'}),C('Admin'),C('Isalo',{color:'#6f6a59'})],actif:false,maj:'21/05 11:02',values:{nom:'Rakoto Andry',email:'a.rakoto@ifvm.mg',role:'Admin',pa:'Isalo'}}
+    ]
+  },
+  campagne:{
+    label:'Campagnes', table:'campagne', add:'Nouvelle campagne', apiOk:true,
+    api:'GET · POST · PUT · DELETE /campagnes',
+    desc:'Seul référentiel administrable de bout en bout. Cadre les prospections et les traitements sur une période.',
+    note:'',
+    pull:'Dernier pull terrain : 14/08 12:10 — 6 agents à jour',
+    cols:[{l:'Nom',a:'left'},{l:'Début',a:'left'},{l:'Fin',a:'left'},{l:'Fiches',a:'right'}],
+    fields:[{key:'nom',label:'Nom *'},{key:'debut',label:'Date de début *',mono:true},{key:'fin',label:'Date de fin',mono:true},{key:'fiches',label:'Fiches rattachées',hint:'dérivé',mono:true}],
+    rows:[
+      {cells:[C('Campagne 2025‑2026'),C('2025‑10‑01',{mono:true}),C('—',{mono:true,color:'#bdb6a2'}),C('184',{mono:true,align:'right'})],actif:true,maj:'12/08 09:14',values:{nom:'Campagne 2025‑2026',debut:'2025‑10‑01',fin:'',fiches:'184'}},
+      {cells:[C('Riposte Sud 2026'),C('2026‑07‑15',{mono:true}),C('—',{mono:true,color:'#bdb6a2'}),C('35',{mono:true,align:'right'})],actif:true,maj:'03/08 08:12',values:{nom:'Riposte Sud 2026',debut:'2026‑07‑15',fin:'',fiches:'35'}},
+      {cells:[C('Campagne 2024‑2025'),C('2024‑10‑01',{mono:true}),C('2025‑06‑30',{mono:true}),C('509',{mono:true,align:'right'})],actif:false,maj:'01/07 10:00',values:{nom:'Campagne 2024‑2025',debut:'2024‑10‑01',fin:'2025‑06‑30',fiches:'509'}},
+      {cells:[C('Campagne 2023‑2024'),C('2023‑10‑01',{mono:true}),C('2024‑06‑30',{mono:true}),C('469',{mono:true,align:'right'})],actif:false,maj:'01/07 10:00',values:{nom:'Campagne 2023‑2024',debut:'2023‑10‑01',fin:'2024‑06‑30',fiches:'469'}}
+    ]
+  }
+};
+
+class Component extends DCLogic {
+  state={ page:'dashboard', role:'Admin', type:'Tous', statut:'Tous', agent:'Randria Jean',
+    decision:'valider', tTab:'liste', uTab:'users', group:'Espèce', queue:0,
+    refEnt:'pesticide', refRow:0 };
+
+  componentDidMount(){
+    const p=this.props.startPage, r=this.props.role;
+    const next={};
+    if(r&&ROLES.indexOf(r)>=0) next.role=r;
+    const role=next.role||this.state.role;
+    if(p&&PAGES[p]&&ACCESS[role].indexOf(p)>=0) next.page=p;
+    if(Object.keys(next).length) this.setState(next);
+  }
+
+  go(page){ return ()=>this.setState({page}); }
+  pickRole(role){ return ()=>{
+    const allowed=ACCESS[role];
+    this.setState(s=>({role, page: allowed.indexOf(s.page)>=0 ? s.page : 'dashboard'}));
+  };}
+
+  chip(label, active, opts){
+    const o=opts||{};
+    return active
+      ? {label, bg:o.bg||GREEN, fg:'#fff', bd:o.bg||GREEN}
+      : {label, bg:'#faf7ef', fg:'#6f6a59', bd:'#e0d9c4'};
+  }
+
+  renderVals(){
+    const s=this.state, page=s.page, allowed=ACCESS[s.role];
+    const nav=allowed.map(k=>{
+      const on=k===page;
+      return {label:PAGES[k].label, count:COUNTS[k], go:this.go(k),
+        bg:on?'rgba(255,255,255,.16)':'transparent', fg:on?'#fff':'rgba(255,255,255,.78)',
+        weight:on?'700':'500', dot:on?'#fff':'rgba(255,255,255,.32)',
+        countFg:on?'rgba(255,255,255,.85)':'rgba(255,255,255,.42)'};
+    });
+    const roles=ROLES.map(r=>{
+      const on=r===s.role;
+      return {label:r, pick:this.pickRole(r), bg:on?'#fff':'rgba(255,255,255,.08)',
+        fg:on?GREEN:'rgba(255,255,255,.8)', bd:on?'#fff':'rgba(255,255,255,.2)'};
+    });
+
+    const statutRow=(k,l)=>({statut:l, badgeBg:BADGE[k].bg, badgeFg:BADGE[k].fg, badgeBd:BADGE[k].bd});
+    const openFiche=this.go('fiche');
+
+    const fichesRaw=[
+      ['PR‑2026‑0148‑INT','Intensive','2026‑08‑14','Randria Jean','ST‑014 Ankazoabo','1 200','verifiee','Vérifiée'],
+      ['PR‑2026‑0147‑INT','Intensive','2026‑08‑14','Rasoa Herizo','ST‑009 Sakaraha','340','attente','En attente'],
+      ['PR‑2026‑0146‑EXT','Extensive','2026‑08‑13','Andria Paul','ST‑021 Betioky','—','validee','Validée'],
+      ['PR‑2026‑0145‑INT','Intensive','2026‑08‑13','Randria Jean','ST‑014 Ankazoabo','870','validee','Validée'],
+      ['PR‑2026‑0144‑INT','Intensive','2026‑08‑12','Naivo Tiana','ST‑006 Ihosy','120','rejetee','Rejetée'],
+      ['PR‑2026‑0143‑EXT','Extensive','2026‑08‑12','Andria Paul','ST‑021 Betioky','—','validee','Validée'],
+      ['PR‑2026‑0142‑INT','Intensive','2026‑08‑11','Rasoa Herizo','ST‑009 Sakaraha','2 050','validee','Validée'],
+      ['PR‑2026‑0141‑INT','Intensive','2026‑08‑11','Naivo Tiana','ST‑006 Ihosy','—','brouillon','Brouillon']
+    ];
+    const matchType=r=> s.type==='Tous' || r[1]===s.type;
+    const matchStatut=r=> s.statut==='Tous' || r[7]===s.statut;
+    const fiches=fichesRaw.filter(r=>matchType(r)&&matchStatut(r)).map((r,i)=>Object.assign({
+      num:r[0], type:r[1], date:r[2], agent:r[3], station:r[4], surface:r[5],
+      rowBg: i%2 ? '#fffdf8' : '#fff', open:openFiche
+    }, statutRow(r[6], r[7])));
+
+    return {
+      nav, roles, roleLabel:s.role,
+      crumb:PAGES[page].crumb, title:PAGES[page].title, pendingCount:7,
+      goProspections:this.go('prospections'), goNouvelle:this.go('nouvelle'),
+      goTraitements:this.go('traitements'), goFiche:openFiche, noop:()=>{},
+      pDash:page==='dashboard', pCamp:page==='campagnes', pList:page==='prospections',
+      pNew:page==='nouvelle', pFiche:page==='fiche', pValid:page==='validation',
+      pTraite:page==='traitements', pVol:page==='vol', pSynth:page==='syntheses', pUsers:page==='users',
+      pRef:page==='referentiels',
+      refNav:REF_ORDER.map(k=>{
+        const on=k===s.refEnt, e=REF[k];
+        return {label:e.label, count:String(e.rows.length), pick:()=>this.setState({refEnt:k, refRow:0}),
+          bg:on?'#eaf2ec':'#fff', bd:on?'#235a36':'#e7e0cd', fg:on?'#235a36':'#3a3a30',
+          weight:on?'700':'600', sub:e.table,
+          stateBg:e.apiOk?'#eaf2ec':'#fbe9e5', stateFg:e.apiOk?GREEN:'#a5341c', state:e.apiOk?'API':'à créer'};
+      }),
+      refTitle:REF[s.refEnt].label, refTable:REF[s.refEnt].table,
+      refDesc:REF[s.refEnt].desc, refApi:REF[s.refEnt].api,
+      refApiBg:REF[s.refEnt].apiOk?'#eaf2ec':'#fbe9e5',
+      refApiFg:REF[s.refEnt].apiOk?GREEN:'#a5341c',
+      refApiBd:REF[s.refEnt].apiOk?'#cfe0d4':'#f0c4b9',
+      refNote:REF[s.refEnt].note, refHasNote:!!REF[s.refEnt].note,
+      refCols:REF[s.refEnt].cols,
+      refRows:REF[s.refEnt].rows.map((r,i)=>({
+        cells:r.cells.map(c=>({v:c.v, align:c.align||'left', wrap:c.mono?'nowrap':'normal', font:c.mono?'500 11.5px \'IBM Plex Mono\'':'500 12px \'Archivo\'', color:c.color||'#3a3a30'})),
+        actif:r.actif, swBg:r.actif?GREEN:'#ddd6c4', swPos:r.actif?'flex-end':'flex-start',
+        maj:r.maj, pick:()=>this.setState({refRow:i}),
+        rowBg: i===s.refRow ? '#f7f4ea' : (i%2?'#fffdf8':'#fff'),
+        mark: i===s.refRow ? GREEN : 'transparent'
+      })),
+      refForm:REF[s.refEnt].fields.map(f=>{
+        const row=REF[s.refEnt].rows[s.refRow]||REF[s.refEnt].rows[0];
+        return {label:f.label, value:(row.values||{})[f.key] ?? '', hint:f.hint||'', mono:f.mono?'600 12.5px \'IBM Plex Mono\'':'600 12.5px \'Archivo\''};
+      }),
+      refSelected:(REF[s.refEnt].rows[s.refRow]||REF[s.refEnt].rows[0]).cells[0].v,
+      refAddLabel:'+ '+REF[s.refEnt].add,
+      refPull:REF[s.refEnt].pull,
+
+      pipeline:[
+        {label:'Brouillon (mobile, non synchronisé)', n:12, pct:'8%', color:'#bdb6a2'},
+        {label:'En attente de vérification', n:7, pct:'5%', color:AMBER},
+        {label:'Vérifiée — en attente validation finale', n:19, pct:'13%', color:'#5b83b5'},
+        {label:'Validée', n:97, pct:'66%', color:GREEN},
+        {label:'Rejetée', n:13, pct:'9%', color:DANGER}
+      ],
+      topStations:[
+        {code:'ST‑014', nom:'Ankazoabo', n:31, pct:'100%'},
+        {code:'ST‑009', nom:'Sakaraha', n:26, pct:'84%'},
+        {code:'ST‑021', nom:'Betioky', n:22, pct:'71%'},
+        {code:'ST‑006', nom:'Ihosy', n:18, pct:'58%'},
+        {code:'ST‑003', nom:'Bekily', n:14, pct:'45%'},
+        {code:'ST‑017', nom:'Beroroha', n:11, pct:'35%'}
+      ],
+      recent:[
+        Object.assign({num:'PR‑2026‑0148‑INT', type:'Intensive', agent:'Randria Jean', station:'ST‑014 Ankazoabo', time:'il y a 20 min', open:openFiche}, statutRow('verifiee','Vérifiée')),
+        Object.assign({num:'PR‑2026‑0147‑INT', type:'Intensive', agent:'Rasoa Herizo', station:'ST‑009 Sakaraha', time:'il y a 1 h', open:openFiche}, statutRow('attente','En attente')),
+        Object.assign({num:'CRT‑2026‑0036', type:'Traitement aérien', agent:'Rakoto A.', station:'Base Ihosy', time:'il y a 3 h', open:this.go('traitements')}, statutRow('validee','Validée')),
+        Object.assign({num:'PR‑2026‑0146‑EXT', type:'Extensive', agent:'Andria Paul', station:'ST‑021 Betioky', time:'il y a 5 h', open:openFiche}, statutRow('validee','Validée')),
+        Object.assign({num:'PR‑2026‑0144‑INT', type:'Intensive', agent:'Naivo Tiana', station:'ST‑006 Ihosy', time:'hier 18:40', open:openFiche}, statutRow('rejetee','Rejetée')),
+        Object.assign({num:'CRT‑2026‑0035', type:'Traitement terrestre', agent:'Soa Lalao', station:'Zone Sakaraha', time:'hier 16:05', open:this.go('traitements')}, statutRow('attente','En attente'))
+      ],
+
+      campagnes:[
+        Object.assign({nom:'Campagne 2025‑2026', debut:'2025‑10‑01', fin:'—', nbP:148, nbT:36}, statutRow('validee','Active')),
+        Object.assign({nom:'Campagne 2024‑2025', debut:'2024‑10‑01', fin:'2025‑06‑30', nbP:412, nbT:97}, statutRow('brouillon','Clôturée')),
+        Object.assign({nom:'Campagne 2023‑2024', debut:'2023‑10‑01', fin:'2024‑06‑30', nbP:388, nbT:81}, statutRow('brouillon','Clôturée')),
+        Object.assign({nom:'Riposte Sud 2026', debut:'2026‑07‑15', fin:'—', nbP:24, nbT:11}, statutRow('attente','En préparation'))
+      ],
+
+      typeChips:['Tous','Intensive','Extensive'].map(t=>Object.assign(this.chip(t, s.type===t), {pick:()=>this.setState({type:t})})),
+      statutChips:['Tous','Brouillon','En attente','Vérifiée','Validée','Rejetée'].map(t=>Object.assign(this.chip(t, s.statut===t), {pick:()=>this.setState({statut:t})})),
+      fiches, listCount:fiches.length,
+      filterSummary:(s.type==='Tous'?'tous types':s.type)+' · '+(s.statut==='Tous'?'tous statuts':s.statut),
+
+      agentChips:['Randria Jean','Rasoa Herizo','Andria Paul','Naivo Tiana','Soa Lalao'].map(a=>Object.assign(this.chip(a, s.agent===a), {pick:()=>this.setState({agent:a})})),
+
+      ficheA:[
+        {k:'N° de fiche', v:'PR‑2026‑0148‑INT'},
+        {k:'Date · heure', v:'2026‑08‑14 · 07:42'},
+        {k:'Coordonnées', v:'-22,4021 · 44,1873'},
+        {k:'Altitude', v:'612 m'},
+        {k:'Région / District', v:'Atsimo‑Andrefana / Beroroha'},
+        {k:'Localité', v:'Ambatolahy'}
+      ],
+      ficheD:[
+        {k:'Surface infestée', v:'1 200 ha'},
+        {k:'Répartition', v:'Diffuse'},
+        {k:'Vols clairs', v:'2'},
+        {k:'Essaims', v:'0'},
+        {k:'Niveau d\'alerte', v:'Élevé'}
+      ],
+      avertissements:[
+        {code:'MET_ABSENT', message:'Aucun relevé météo enregistré pour la date de prospection sur la station ST‑014.'},
+        {code:'DENS_ECART', message:'Densité moyenne supérieure de 38 % à la médiane de la station sur les 30 derniers jours.'}
+      ],
+      larve:[
+        {k:'Type de larve', v:'Bande larvaire'},
+        {k:'Stade dominant', v:'L4'},
+        {k:'Taille du groupe (m²)', v:'45'},
+        {k:'Nb taches / bandes', v:'8'},
+        {k:'Interdistance min/max/moy (m)', v:'2 / 15 / 7'},
+        {k:'Front longueur × largeur (m)', v:'180 × 25'},
+        {k:'Densité max front / arrière', v:'620 / 210'},
+        {k:'Surface contaminée · infestée', v:'4,2 ha · 38 %'}
+      ],
+      imago:[
+        {k:'Type d\'essaim', v:'Vol clair', color:'#16201a'},
+        {k:'En vol / posé', v:'Oui / Non', color:'#16201a'},
+        {k:'Heure d\'observation', v:'09:15', color:'#16201a'},
+        {k:'Densité en vol (ind/ha)', v:'140', color:'#16201a'},
+        {k:'Dimension (ha)', v:'12', color:'#16201a'},
+        {k:'Pullulation (nb)', v:'—', color:'#bdb6a2'}
+      ],
+      captures:[
+        {phase:'Solitaire', m:18, f:22, pheno:'Verdâtre', methode:'Comptage direct', dens:'320'},
+        {phase:'Transiens congregans', m:31, f:29, pheno:'Ocre', methode:'Comptage direct', dens:'480'},
+        {phase:'Grégaire', m:44, f:38, pheno:'Rose / jaune', methode:'Comptage direct', dens:'660'},
+        {phase:'Larves L3‑L4', m:'—', f:'—', pheno:'Bandes noires', methode:'Visuel', dens:'1 240'},
+        {phase:'Larves L5', m:'—', f:'—', pheno:'Jaune', methode:'Visuel', dens:'880'}
+      ],
+      trail:[
+        {label:'Saisie terrain', who:'Randria Jean · mobile hors-ligne', when:'2026‑08‑14 07:42', dot:'#bdb6a2'},
+        {label:'Synchronisée', who:'file d\'attente vidée', when:'2026‑08‑14 12:10', dot:GREEN},
+        {label:'Vérifiée', who:'Naivo Tiana · vérificateur', when:'2026‑08‑14 15:31', dot:'#5b83b5'},
+        {label:'Validation finale', who:'en attente', when:'—', dot:'#e0d9c4'}
+      ],
+
+      queue:[0,1,2,3,4,5,6].map(i=>{
+        const rows=[
+          ['PR‑2026‑0148‑INT','Intensive · ST‑014 · Randria Jean','en attente depuis 1 j'],
+          ['PR‑2026‑0139‑INT','Intensive · ST‑009 · Rasoa Herizo','en attente depuis 2 j'],
+          ['PR‑2026‑0136‑EXT','Extensive · ST‑021 · Andria Paul','en attente depuis 2 j'],
+          ['PR‑2026‑0134‑INT','Intensive · ST‑006 · Naivo Tiana','en attente depuis 3 j'],
+          ['PR‑2026‑0131‑INT','Intensive · ST‑003 · Soa Lalao','en attente depuis 4 j'],
+          ['PR‑2026‑0129‑EXT','Extensive · ST‑017 · Andria Paul','en attente depuis 5 j'],
+          ['PR‑2026‑0127‑INT','Intensive · ST‑014 · Randria Jean','en attente depuis 6 j']
+        ][i];
+        const on=s.queue===i;
+        return {num:rows[0], meta:rows[1], age:rows[2], pick:()=>this.setState({queue:i}),
+          bg:on?'#eaf2ec':'#fff', mark:on?GREEN:'transparent'};
+      }),
+      vSelected:[
+        {k:'Prospecteur', v:'Randria Jean'},
+        {k:'Vérifiée par', v:'Naivo Tiana'},
+        {k:'Date de prospection', v:'2026‑08‑14'},
+        {k:'Surface infestée', v:'1 200 ha'},
+        {k:'Individus comptés', v:'214'},
+        {k:'Traitement rattaché', v:'CRT‑2026‑0036'}
+      ],
+      checks:[
+        {label:'Champs obligatoires complets', detail:'32 / 32', icon:'✓', bg:'#eaf2ec', fg:GREEN},
+        {label:'Coordonnées dans une zone connue', detail:'ZA IFVM 2026', icon:'✓', bg:'#eaf2ec', fg:GREEN},
+        {label:'Cohérence densité / surface', detail:'écart 4 %', icon:'✓', bg:'#eaf2ec', fg:GREEN},
+        {label:'Relevé météo du jour présent', detail:'manquant', icon:'!', bg:'#fdf6e7', fg:'#8a6d2f'},
+        {label:'Doublon potentiel', detail:'aucun', icon:'✓', bg:'#eaf2ec', fg:GREEN}
+      ],
+      decisions:[
+        Object.assign(this.chip('Valider', s.decision==='valider'), {pick:()=>this.setState({decision:'valider'})}),
+        s.decision==='rejeter'
+          ? {label:'Rejeter', bg:'#fbe9e5', fg:'#a5341c', bd:'#f0c4b9', pick:()=>this.setState({decision:'rejeter'})}
+          : {label:'Rejeter', bg:'#faf7ef', fg:'#6f6a59', bd:'#e0d9c4', pick:()=>this.setState({decision:'rejeter'})}
+      ],
+      showMotif:s.decision==='rejeter',
+      motifs:['Données incohérentes','Localisation erronée','Captures incomplètes','Doublon'],
+      decideBg:s.decision==='rejeter'?'#c0412b':GREEN, decideFg:'#fff',
+      decideLabel:s.decision==='rejeter'?'Enregistrer le rejet':'Enregistrer la validation',
+
+      traiteTabs:[
+        Object.assign(this.chip('Liste des fiches', s.tTab==='liste'), {pick:()=>this.setState({tTab:'liste'})}),
+        Object.assign(this.chip('Détail · Jean-AERIEN-2026-08-12', s.tTab==='detail'), {pick:()=>this.setState({tTab:'detail'})})
+      ],
+      tListe:s.tTab==='liste', tDetail:s.tTab==='detail',
+      traitements:[
+        ['Jean-AERIEN-2026-08-12','Aérien','Barrière','2026‑08‑12','Rakoto A. (chef de base)','860','160','4/4'],
+        ['Soa-TERRESTRE-2026-08-11','Terrestre','Total','2026‑08‑11','Soa Lalao (chef d\'équipe)','240','0','2/2'],
+        ['Jean-AERIEN-2026-08-09','Aérien','Barrière','2026‑08‑09','Rakoto A. (chef de base)','180','340','4/4'],
+        ['Tiana-TERRESTRE-2026-08-08','Terrestre','Irrégulier','2026‑08‑08','Naivo Tiana (chef de zone)','96','0','1/2'],
+        ['Paul-TERRESTRE-2026-08-06','Terrestre','Total','2026‑08‑06','Andria Paul (chef d\'équipe)','310','45','2/2'],
+        ['Jean-AERIEN-2026-08-04','Aérien','Total','2026‑08‑04','Rakoto A. (chef de base)','1 020','0','3/4']
+      ].map(r=>({
+        num:r[0], type:r[1], mode:r[2], date:r[3], resp:r[4], traitee:r[5], restante:r[6], sig:r[7],
+        open:()=>this.setState({tTab:'detail'}),
+        typeBg:r[1]==='Aérien'?'#eaf0f7':'#eaf2ec', typeFg:r[1]==='Aérien'?'#31567f':GREEN,
+        typeBd:r[1]==='Aérien'?'#cdddef':'#cfe0d4',
+        restColor:r[6]==='0'?'#16201a':'#8a6d2f',
+        sigColor:r[7].split('/')[0]===r[7].split('/')[1]?GREEN:'#8a6d2f'
+      })),
+      rotations:[
+        {cuve:'C‑101', produit:'Adonis 4 UL', ma:'Fipronil', qte:'280', temp:'26 → 31 °C', vent:'3,2 → 4,1 m/s'},
+        {cuve:'C‑102', produit:'Adonis 4 UL', ma:'Fipronil', qte:'280', temp:'28 → 33 °C', vent:'3,8 → 4,6 m/s'},
+        {cuve:'C‑103', produit:'Teflubenzuron 5', ma:'Téflubenzuron', qte:'250', temp:'29 → 34 °C', vent:'4,0 → 4,9 m/s'},
+        {cuve:'C‑104', produit:'Teflubenzuron 5', ma:'Téflubenzuron', qte:'250', temp:'30 → 34 °C', vent:'4,4 → 5,2 m/s'}
+      ],
+      epi:[
+        {label:'Combinaison', icon:'✓', bg:GREEN},
+        {label:'Gants', icon:'✓', bg:GREEN},
+        {label:'Lunettes', icon:'✓', bg:GREEN},
+        {label:'Masques', icon:'✓', bg:GREEN},
+        {label:'Boîte à pharmacie', icon:'✕', bg:'#c0412b'}
+      ],
+      risques:[
+        {axe:'Ressources en eau', niveau:'Moyen', bg:'#fdf6e7', fg:'#8a6d2f', bd:'#f0e2bf'},
+        {axe:'Sol', niveau:'Faible', bg:'#eaf2ec', fg:GREEN, bd:'#cfe0d4'},
+        {axe:'Faune non cible', niveau:'Moyen', bg:'#fdf6e7', fg:'#8a6d2f', bd:'#f0e2bf'},
+        {axe:'Abeilles / pollinisateurs', niveau:'Élevé', bg:'#fbe9e5', fg:'#a5341c', bd:'#f0c4b9'}
+      ],
+      signatures:[
+        {role:'Pilote', nom:'Rakoto Andry', stamp:'2026‑08‑12 17:04', state:'✓ Signé', bg:'#eaf2ec', fg:GREEN, bd:'#cfe0d4'},
+        {role:'Mécanicien', nom:'Be Tovo', stamp:'2026‑08‑12 17:06', state:'✓ Signé', bg:'#eaf2ec', fg:GREEN, bd:'#cfe0d4'},
+        {role:'Chef de base', nom:'Rakoto A.', stamp:'2026‑08‑12 17:11', state:'✓ Signé', bg:'#eaf2ec', fg:GREEN, bd:'#cfe0d4'},
+        {role:'Consultant international', nom:'M. Lefèvre', stamp:'2026‑08‑12 17:20', state:'✓ Signé', bg:'#eaf2ec', fg:GREEN, bd:'#cfe0d4'}
+      ],
+
+      vols:[
+        {n:'V1', h:'06:20 → 07:35', duree:'1 h 15', cuve:'C‑101', state:'Rapproché', bg:'#eaf2ec', fg:GREEN, bd:'#cfe0d4'},
+        {n:'V2', h:'08:05 → 09:10', duree:'1 h 05', cuve:'C‑102', state:'Rapproché', bg:'#eaf2ec', fg:GREEN, bd:'#cfe0d4'},
+        {n:'V3', h:'09:40 → 10:45', duree:'1 h 05', cuve:'C‑103', state:'Rapproché', bg:'#eaf2ec', fg:GREEN, bd:'#cfe0d4'},
+        {n:'V4', h:'15:10 → 16:10', duree:'1 h 00', cuve:'C‑105', state:'Sans rotation', bg:'#fdf6e7', fg:'#8a6d2f', bd:'#f0e2bf'}
+      ],
+      meteo:[
+        {date:'2026‑08‑15', tmin:'17,2', tmax:'32,4', pluie:'0,0', vent:'3,1', ventColor:'#16201a', state:'Autorisé', bg:'#eaf2ec', fg:GREEN, bd:'#cfe0d4'},
+        {date:'2026‑08‑14', tmin:'16,8', tmax:'31,0', pluie:'0,0', vent:'4,4', ventColor:'#16201a', state:'Autorisé', bg:'#eaf2ec', fg:GREEN, bd:'#cfe0d4'},
+        {date:'2026‑08‑13', tmin:'18,1', tmax:'33,6', pluie:'2,5', vent:'5,8', ventColor:'#a5341c', state:'Déconseillé', bg:'#fbe9e5', fg:'#a5341c', bd:'#f0c4b9'},
+        {date:'2026‑08‑12', tmin:'17,5', tmax:'34,2', pluie:'0,0', vent:'4,9', ventColor:'#8a6d2f', state:'Limite', bg:'#fdf6e7', fg:'#8a6d2f', bd:'#f0e2bf'},
+        {date:'2026‑08‑11', tmin:'16,2', tmax:'30,8', pluie:'0,0', vent:'2,6', ventColor:'#16201a', state:'Autorisé', bg:'#eaf2ec', fg:GREEN, bd:'#cfe0d4'}
+      ],
+
+      groupChips:['Espèce','Station','Prospecteur'].map(g=>Object.assign(this.chip(g, s.group===g), {pick:()=>this.setState({group:g})})),
+      groupLabel:s.group,
+      agregats:[
+        {espece:'Locusta migratoria', fiches:96, ind:'12 480', dens:'620', surf:'3 140'},
+        {espece:'Nomadacris septemfasciata', fiches:38, ind:'4 210', dens:'380', surf:'820'},
+        {espece:'Oedaleus spp.', fiches:11, ind:'760', dens:'110', surf:'180'},
+        {espece:'Autres acridiens', fiches:3, ind:'95', dens:'40', surf:'70'}
+      ],
+      couverture:[
+        {zone:'Atsimo‑Andrefana', pct:'82%', color:GREEN},
+        {zone:'Ihorombe', pct:'64%', color:GREEN},
+        {zone:'Androy', pct:'41%', color:AMBER},
+        {zone:'Menabe', pct:'23%', color:'#c0412b'}
+      ],
+
+      userTabs:[
+        Object.assign(this.chip('Utilisateurs · 23', s.uTab==='users'), {pick:()=>this.setState({uTab:'users'})}),
+        Object.assign(this.chip('Stations · 18', s.uTab==='stations'), {pick:()=>this.setState({uTab:'stations'})})
+      ],
+      uUsers:s.uTab==='users', uStations:s.uTab==='stations',
+      userAddLabel:s.uTab==='users'?'+ Nouvel utilisateur':'+ Nouvelle station',
+      users:[
+        ['Randria Jean','j.randria@ifvm.mg','Prospecteur','ST‑014 Ankazoabo',31,true],
+        ['Rasoa Herizo','h.rasoa@ifvm.mg','Chef','ST‑009 Sakaraha',26,true],
+        ['Naivo Tiana','t.naivo@ifvm.mg','Vérificateur','ST‑006 Ihosy',18,true],
+        ['Andria Paul','p.andria@ifvm.mg','Prospecteur','ST‑021 Betioky',22,true],
+        ['Soa Lalao','l.soa@ifvm.mg','Validation finale','Siège Antananarivo',0,true],
+        ['Rakoto Andry','a.rakoto@ifvm.mg','Admin','Base Ihosy',0,false]
+      ].map(u=>{
+        const map={Admin:'verifiee', Chef:'validee', 'Vérificateur':'attente', Prospecteur:'brouillon', 'Validation finale':'rejetee'};
+        const b=BADGE[map[u[2]]];
+        return {nom:u[0], email:u[1], role:u[2], station:u[3], n:u[4],
+          bg:b.bg, fg:b.fg, bd:b.bd, swBg:u[5]?GREEN:'#ddd6c4', swPos:u[5]?'flex-end':'flex-start'};
+      }),
+      stations:[
+        ['ST‑014','Ankazoabo','PA Zombitse‑Vohibasia','-22,4021 · 44,1873',31,'Active'],
+        ['ST‑009','Sakaraha','PA Zombitse‑Vohibasia','-22,9013 · 44,5321',26,'Active'],
+        ['ST‑021','Betioky','—','-23,7112 · 44,3820',22,'Active'],
+        ['ST‑006','Ihosy','PA Isalo','-22,4008 · 46,1204',18,'Active'],
+        ['ST‑003','Bekily','—','-24,2130 · 45,3054',14,'Inactive']
+      ].map(st=>{
+        const b=st[5]==='Active'?BADGE.validee:BADGE.brouillon;
+        return {code:st[0], nom:st[1], pa:st[2], coord:st[3], n:st[4], etat:st[5], bg:b.bg, fg:b.fg, bd:b.bd};
+      })
+    };
+  }
+}
+
+</script>
+</body>
+</html>

@@ -1377,8 +1377,14 @@ export async function listRecentProspections(
 }
 
 /**
- * Fiches de prospection validées, éligibles au rattachement d'une fiche de
- * traitement (sélecteur écran Références, Lot 3 — #91).
+ * Fiches de prospection extensives ou de vérification de signalement,
+ * synchronisées, éligibles au rattachement d'une fiche de traitement
+ * (sélecteur écran Références, Lot 3 — #91).
+ *
+ * Remplace le filtre par statut='validee' (temporaire) : le statut de
+ * validation n'est pas encore fiable à ce point du flux, donc on filtre
+ * sur le type de prospection et sur le fait qu'elle a déjà été synchronisée
+ * avec le serveur, plutôt que sur sa validation.
  */
 export async function listValidatedProspections(): Promise<DraftProspection[]> {
   const db = await getDb();
@@ -1386,7 +1392,8 @@ export async function listValidatedProspections(): Promise<DraftProspection[]> {
   return db.getAllAsync<DraftProspection>(
     `SELECT *
      FROM prospection
-     WHERE statut = 'validee'
+     WHERE type_prospection IN ('extensive', 'validation')
+       AND statut_sync = 'synced'
      ORDER BY updated_at DESC`
   );
 }

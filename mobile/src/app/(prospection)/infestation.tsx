@@ -18,6 +18,7 @@ import {
   oppositeDirection,
 } from '@/lib/prospection-infestation-insights';
 import { useAsyncAction } from '@/hooks/use-async-action';
+import { TimeField } from '@/components/TimeField';
 import {
   AerialPopulationClassification,
   TAILLE_GROUPE_SEUIL_BANDE_M2,
@@ -917,13 +918,12 @@ export default function InfestationScreen() {
                   <Text style={styles.fieldGroupLabel}>Heure d&apos;observation</Text>
                   <View style={styles.infoBox}>
                     <Text style={styles.infoBoxLabel}>hh:mm</Text>
-                    <TextInput
-                      value={form.heureObservation}
-                      onChangeText={(value) => setField('heureObservation', value)}
-                      placeholder="hh:mm"
-                      keyboardType="numbers-and-punctuation"
-                      maxLength={5}
-                      style={styles.infoBoxInput}
+                    <TimeField
+                      value={form.heureObservation || null}
+                      onChange={(value) => setField('heureObservation', value)}
+                      style={styles.timeFieldBox}
+                      textStyle={styles.infoBoxInput}
+                      placeholderStyle={styles.infoBoxInput}
                     />
                   </View>
 
@@ -1165,4 +1165,5 @@ const styles = StyleSheet.create({
   infoBoxInputRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
   infoBoxInput: { flex: 1, fontSize: 17, fontWeight: '700', color: TEXT, padding: 0 },
   infoBoxUnit: { fontSize: 10.5, fontWeight: '600', color: '#9a9484' },
+  timeFieldBox: { minHeight: 0, borderWidth: 0, padding: 0, backgroundColor: 'transparent' },
 });

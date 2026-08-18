@@ -82,6 +82,24 @@ Le strict mode inclut `strictNullChecks`, `noImplicitAny`, `strictFunctionTypes`
 
 Le profil `preview` génère un APK installable directement sur les tablettes terrain sans passer par le Play Store.
 
+**ABI natives embarquées (`buildArchs`)**
+
+`expo-build-properties` restreint la liste `reactNativeArchitectures` de Gradle. Chaque ABI absente de cette liste rend l'APK non installable sur les appareils correspondants — avec un message Android générique (« application non installée »), sans trace exploitable.
+
+| ABI | Cible |
+|-----|-------|
+| `armeabi-v7a` | Appareils Android Go en userland 32-bit — itel A631L (A49 Play), Unisoc SC9863A, Android 12 Go |
+| `arm64-v8a` | Tablettes et smartphones terrain 64-bit (majorité du parc) |
+| `x86_64` | Émulateur Android (dev et CI) |
+
+`x86` (émulateur 32-bit) est volontairement exclu : plus aucun émulateur utilisé sur le projet ne l'exige.
+
+Le SoC seul ne détermine pas l'ABI : le SC9863A est un Cortex-A55 ARMv8 (donc 64-bit *capable*), mais les ROM Android Go livrées sur ces appareils d'entrée de gamme tournent en userland 32-bit et n'exposent que `armeabi-v7a`. C'est l'OS installé qui décide, d'où l'inclusion des deux ABI ARM plutôt qu'un pari sur l'une des deux.
+
+Le parc supporté est la spécification exécutable `mobile/__tests__/android-build-config.test.ts` : y ajouter un appareil fait échouer la CI tant que `app.json` ne couvre pas son ABI.
+
+**Conséquence sur les updates OTA** — `runtimeVersion` utilise la policy `fingerprint`, et `app.json` fait partie des sources hachées. Modifier `buildArchs` change donc le fingerprint, ce qui est le comportement voulu : une update OTA ne doit jamais atteindre un binaire dont les ABI diffèrent. En pratique, **un changement d'ABI ne se diffuse pas par OTA** — les appareils déjà équipés restent sur l'ancien runtime et doivent réinstaller l'APK produit par le job `build`. C'est le cas pour l'ajout d'`armeabi-v7a` : l'itel A631L n'ayant de toute façon jamais pu installer l'APK précédent, il part d'une installation neuve.
+
 ### Variables d'environnement
 
 **Fichier `.env` avec `EXPO_PUBLIC_API_URL`**

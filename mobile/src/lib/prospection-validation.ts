@@ -39,7 +39,7 @@ const MADAGASCAR_BBOX = {
 };
 
 /** Précision GPS au-delà de laquelle la position est jugée inexploitable sur le terrain. */
-const GPS_ACCURACY_SEUIL_BLOQUANT_M = 50;
+const GPS_ACCURACY_SEUIL_BLOQUANT_M = 100;
 
 export interface ProspectionDateValidationInput {
   dateProspection: string;

@@ -13,7 +13,7 @@ import {
 } from '@/lib/referentiel-db';
 import { updateProspectionReference, listProspectionsRecentesAutresProspecteurs } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
-import { referenceSchema, ReferenceFormValues } from '@/lib/prospection-reference-schema';
+import { ReferenceFormValues } from '@/lib/prospection-reference-schema';
 import { validateGpsPosition, validateAntiDoublon, DOUBLON_DELAI_SEUIL_H } from '@/lib/prospection-validation';
 
 const INACTIVE_BG = '#efeada';
@@ -29,9 +29,9 @@ const TEXT_SECONDARY = '#6f6a59';
 const BORDER = '#e7e0cd';
 
 const BIOTOPE_OPTIONS = [
-  { label: 'Xérophyle', value: 'Xerophyle' },
-  { label: 'Mésophyle', value: 'Mesophyle' },
-  { label: 'Hydrophyle', value: 'Hydrophyle' },
+  { label: 'Xérophyle', value: 'xerophyle' },
+  { label: 'Mésophyle', value: 'mesophyle' },
+  { label: 'Hydrophyle', value: 'hydrophyle' },
 ];
 
 function generateNumeroFiche(draftId: string, dateProspection: string): string {

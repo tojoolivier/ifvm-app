@@ -53,10 +53,14 @@ async def list_stations(
     pa_id: uuid.UUID | None = Query(default=None),
     q: str | None = Query(default=None),
     actif: bool = Query(default=True),
+    inclure_inactifs: bool = Query(
+        default=False,
+        description="Renvoie les stations des deux états — écran d'administration.",
+    ),
 ):
     repository = StationFixeRepositoryImpl(db)
     use_case = ListStations(repository)
-    return await use_case.execute(pa_id=pa_id, q=q, actif=actif)
+    return await use_case.execute(pa_id=pa_id, q=q, actif=None if inclure_inactifs else actif)
 
 
 @router.get("/stations/{station_id}", response_model=StationFixeRead)
