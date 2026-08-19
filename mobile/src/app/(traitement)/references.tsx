@@ -20,20 +20,6 @@ import { ProgressBar } from '@/components/traitement/ProgressBar';
 import { SegmentedControl } from '@/components/traitement/SegmentedControl';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
 
-/**
- * Écran A — Références.
- *
- * Déviation notée : le type de traitement (Aérien|Terrestre) détermine quelle
- * table de spécialisation créer (traitement_aerien vs traitement_terrestre),
- * mais leurs champs obligatoires (pilote/mécanicien/chef de base, ou chef
- * d'équipe) ne sont saisis qu'à l'écran C. Pour respecter l'ordre de
- * navigation A→B→C du brief (l'écran B a besoin d'un traitementId existant),
- * le brouillon est créé ici avec des valeurs placeholder pour ces champs
- * type-spécifiques ; l'écran C les complète ensuite via updateTraitementAerien/
- * updateTraitementTerrestre (ajoutés à traitement-repository.ts pour ce lot).
- */
-
-/** Formate une date ISO ("2026-07-30" ou "2026-07-30T10:00:00Z") en JJ/MM/AAAA pour l'affichage. */
 function formatDateFr(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const [year, month, day] = iso.split('T')[0].split('-');
@@ -50,8 +36,6 @@ export default function ReferencesScreen() {
   const typeTraitement = store.typeTraitement;
   const [traitementId, setTraitementId] = useState<string | null>(routeTraitementId ?? null);
   const [prospectionId, setProspectionId] = useState<string | null>(routeProspectionId ?? null);
-  // ReferenceDraft (traitement-capture-store.ts) n'a pas de champ dateValidation
-  // (store non modifiable pour ce lot) : suivi en état local d'écran.
   const [dateValidation, setDateValidation] = useState<string | null>(null);
   const [isGpsLoading, setIsGpsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -84,13 +68,8 @@ export default function ReferencesScreen() {
         });
       });
     } else {
-      // Nouvelle fiche : la capture-store est un singleton global qui ne se
-      // réinitialise pas tout seul entre deux fiches (pas de démontage entre
-      // écrans wizard) — sans ce reset, type/ref/aerien/terrestre d'une fiche
-      // précédente fuiteraient dans la nouvelle saisie.
       store.reset();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeTraitementId]);
 
   useEffect(() => {
@@ -107,8 +86,16 @@ export default function ReferencesScreen() {
     try {
       const pos = await getCurrentPosition();
       store.updateRef({ latitude: pos.latitude, longitude: pos.longitude, altitude: pos.altitude });
-      const area = await reverseGeocode(pos.latitude, pos.longitude);
-      store.updateRef({ region: area.region, district: area.district, commune: area.commune });
+      
+      // Géocodage inverse hors-ligne
+      try {
+        const area = await reverseGeocode(pos.latitude, pos.longitude);
+        store.updateRef({ region: area.region, district: area.district, commune: area.commune });
+      } catch (geoError) {
+        // En hors-ligne, on garde les coordonnées mais pas les infos de localisation
+        console.log('Géocodage inverse non disponible hors-ligne');
+        // On ne bloque pas la localisation si le géocodage échoue
+      }
     } catch (error) {
       const message =
         error instanceof LocationPermissionDeniedError
@@ -121,6 +108,19 @@ export default function ReferencesScreen() {
   };
 
   const handleContinuer = async () => {
+    // Vérifier que la date de validation n'est pas antérieure à la date de traitement
+    if (store.ref.dateTraitement && dateValidation) {
+      const traitementDate = new Date(store.ref.dateTraitement);
+      const validationDate = new Date(dateValidation);
+      if (validationDate < traitementDate) {
+        setErrors({
+          ...errors,
+          dateValidation: 'La date de validation ne peut pas être antérieure à la date de traitement'
+        });
+        return;
+      }
+    }
+
     const validationErrors = validateReferences({
       typeTraitement,
       dateTraitement: store.ref.dateTraitement ?? null,
@@ -128,6 +128,7 @@ export default function ReferencesScreen() {
       localite: store.ref.localite ?? null,
       prospectionId,
     });
+    
     const byField: Record<string, string> = {};
     for (const e of validationErrors) byField[e.field] = e.message;
     setErrors(byField);
@@ -185,7 +186,7 @@ export default function ReferencesScreen() {
           <TouchableOpacity onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Retour">
             <Text style={styles.backChevron}>‹</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>A — Type &amp; références</Text>
+          <Text style={styles.title}>Type &amp; références</Text>
         </View>
         <ProgressBar currentIndex={0} />
 
