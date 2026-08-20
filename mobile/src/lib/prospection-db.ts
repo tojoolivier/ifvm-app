@@ -91,6 +91,7 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
       captures_sol INTEGER,
       captures_trans INTEGER,
       captures_greg INTEGER,
+      captures_solitaro_transiens INTEGER,
       stade_imago TEXT,
       essaim_observe INTEGER,
       densites_larve TEXT,
@@ -117,9 +118,34 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
       densite_moy REAL,
       interdistance REAL,
       comportement TEXT,
+      direction_de TEXT,
       direction_vers TEXT,
       vent_de TEXT,
-      vent_vitesse REAL
+      vent_vitesse REAL,
+      pullulation_nb INTEGER,
+      taille_long REAL,
+      taille_large REAL,
+      taille_epaisseur REAL,
+      essaim_en_vol INTEGER,
+      essaim_pose INTEGER,
+      type_essaim TEXT,
+      nb_taches_bandes INTEGER,
+      interdistance_m REAL,
+      interdistance_min REAL,
+      interdistance_max REAL,
+      interdistance_moy REAL,
+      surface_contaminee_ha REAL,
+      type_larve TEXT,
+      surface_infestee_pourcent REAL,
+      stade_dominant TEXT,
+      taille_groupe_m2 REAL,
+      front_longueur_m REAL,
+      front_largeur_m REAL,
+      densite_max_front REAL,
+      densite_moy_arriere_front REAL,
+      heure_observation TEXT,
+      densite_en_vol REAL,
+      dimension_ha REAL
     );
 
     CREATE INDEX IF NOT EXISTS ix_prospection_infestation_prospection_id
@@ -372,8 +398,11 @@ async function migrateInfestationTable(db: SQLite.SQLiteDatabase): Promise<void>
 // MIGRATION POUR LA TABLE PROSPECTION_POPULATION
 // ==========================================
 async function migratePopulationTable(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migration] Vérification des colonnes de prospection_population...');
+  
   const tableInfo = await db.getAllAsync<{ name: string }>('PRAGMA table_info(prospection_population)');
   const columnNames = tableInfo.map(row => row.name);
+  console.log('[Migration] Colonnes existantes:', columnNames);
 
   const columnsToAdd = [
     { name: 'phase', type: 'TEXT' },
@@ -383,6 +412,7 @@ async function migratePopulationTable(db: SQLite.SQLiteDatabase): Promise<void> 
     { name: 'captures_sol', type: 'INTEGER' },
     { name: 'captures_trans', type: 'INTEGER' },
     { name: 'captures_greg', type: 'INTEGER' },
+    { name: 'captures_solitaro_transiens', type: 'INTEGER' },
     { name: 'stade_imago', type: 'TEXT' },
     { name: 'essaim_observe', type: 'INTEGER' },
     { name: 'densites_larve', type: 'TEXT' },
@@ -394,11 +424,15 @@ async function migratePopulationTable(db: SQLite.SQLiteDatabase): Promise<void> 
 
   for (const col of columnsToAdd) {
     if (!columnNames.includes(col.name)) {
+      console.log(`[Migration] Ajout de la colonne ${col.name} sur prospection_population...`);
       try {
         await db.execAsync(`ALTER TABLE prospection_population ADD COLUMN ${col.name} ${col.type};`);
+        console.log(`[Migration] ✅ Colonne ${col.name} ajoutée`);
       } catch (error) {
         console.warn(`[Migration] ⚠️ Impossible d'ajouter ${col.name} sur prospection_population:`, error);
       }
+    } else {
+      console.log(`[Migration] ⏭️ Colonne ${col.name} existe déjà`);
     }
   }
 }
@@ -406,16 +440,12 @@ async function migratePopulationTable(db: SQLite.SQLiteDatabase): Promise<void> 
 // ==========================================
 // MIGRATION POUR LA TABLE TRAITEMENT
 // ==========================================
-/**
- * Aucune colonne n'a été ajoutée depuis la création de la table `traitement`
- * (le champ `observations` fait déjà partie du schéma de base). Cette fonction
- * existe malgré tout, en parité avec les autres tables, pour que le prochain
- * ajout de colonne suive le même patron ALTER-TABLE tolérant plutôt que
- * d'inventer une nouvelle convention.
- */
 async function migrateTraitementTable(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migration] Vérification des colonnes de traitement...');
+  
   const tableInfo = await db.getAllAsync<{ name: string }>('PRAGMA table_info(traitement)');
   const columnNames = tableInfo.map(row => row.name);
+  console.log('[Migration] Colonnes existantes:', columnNames);
 
   const columnsToAdd: { name: string; type: string }[] = [
     { name: 'server_updated_at', type: 'TEXT' },
@@ -423,11 +453,15 @@ async function migrateTraitementTable(db: SQLite.SQLiteDatabase): Promise<void> 
 
   for (const col of columnsToAdd) {
     if (!columnNames.includes(col.name)) {
+      console.log(`[Migration] Ajout de la colonne ${col.name} sur traitement...`);
       try {
         await db.execAsync(`ALTER TABLE traitement ADD COLUMN ${col.name} ${col.type};`);
+        console.log(`[Migration] ✅ Colonne ${col.name} ajoutée`);
       } catch (error) {
         console.warn(`[Migration] ⚠️ Impossible d'ajouter ${col.name} sur traitement:`, error);
       }
+    } else {
+      console.log(`[Migration] ⏭️ Colonne ${col.name} existe déjà`);
     }
   }
 }

@@ -540,6 +540,7 @@ export async function saveProspectionPopulation(prospectionId: string, row: Popu
     [prospectionId, row.espece, row.categorie]
   );
 
+  // Les 11 valeurs extensives
   const extensiveValues = [
     row.captures_sol ?? null,
     row.captures_trans ?? null,
@@ -555,6 +556,7 @@ export async function saveProspectionPopulation(prospectionId: string, row: Popu
   ];
 
   if (existing) {
+    // La requête UPDATE a 20 paramètres (19 SET + 1 WHERE)
     await db.runAsync(
       `UPDATE prospection_population SET
         phase = ?, captures_nombre = ?, temps_capture = ?,
@@ -567,16 +569,27 @@ export async function saveProspectionPopulation(prospectionId: string, row: Popu
         interdistance = ?, deplacement = ?
        WHERE id = ?`,
       [
-        row.phase ?? null, row.captures_nombre ?? null, row.temps_capture ?? null,
-        row.densite_diffuse, row.densite_groupee,
-        row.methode, row.accouplement, row.ponte,
+        // 3 premiers champs
+        row.phase ?? null, 
+        row.captures_nombre ?? null, 
+        row.temps_capture ?? null,
+        // 2 champs suivants
+        row.densite_diffuse, 
+        row.densite_groupee,
+        // 3 champs suivants
+        row.methode, 
+        row.accouplement, 
+        row.ponte,
+        // 11 champs extensives
         ...extensiveValues,
+        // WHERE id
         existing.id,
       ]
     );
     return;
   }
 
+  // La requête INSERT a 24 paramètres (id + prospectionId + 22 autres)
   await db.runAsync(
     `INSERT INTO prospection_population (
       id, prospection_id, espece, categorie, phase,
@@ -590,10 +603,18 @@ export async function saveProspectionPopulation(prospectionId: string, row: Popu
       interdistance, deplacement
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      generateId(), prospectionId, row.espece, row.categorie, row.phase ?? null,
-      row.captures_nombre ?? null, row.temps_capture ?? null,
-      row.densite_diffuse, row.densite_groupee,
-      row.methode, row.accouplement, row.ponte,
+      generateId(), 
+      prospectionId, 
+      row.espece, 
+      row.categorie, 
+      row.phase ?? null,
+      row.captures_nombre ?? null, 
+      row.temps_capture ?? null,
+      row.densite_diffuse, 
+      row.densite_groupee,
+      row.methode, 
+      row.accouplement, 
+      row.ponte,
       ...extensiveValues,
     ]
   );
@@ -601,10 +622,11 @@ export async function saveProspectionPopulation(prospectionId: string, row: Popu
 
 export async function getProspectionInfestation(prospectionId: string, typeCible: string): Promise<InfestationRow | null> {
   const db = await getDb();
-  return db.getFirstAsync<InfestationRow>(
+  const result = await db.getFirstAsync<InfestationRow>(
     `SELECT ${INFESTATION_COLUMNS} FROM prospection_infestation WHERE prospection_id = ? AND type_cible = ?`,
     [prospectionId, typeCible]
   );
+  return result ?? null;
 }
 
 export async function listAllProspectionInfestations(prospectionId: string): Promise<InfestationRow[]> {
@@ -707,7 +729,8 @@ export async function deleteDraftProspection(draft: DraftProspection): Promise<v
 
 export async function getProspection(id: string): Promise<DraftProspection | null> {
   const db = await getDb();
-  return db.getFirstAsync<DraftProspection>(`SELECT * FROM prospection WHERE id = ?`, [id]);
+  const result = await db.getFirstAsync<DraftProspection>(`SELECT * FROM prospection WHERE id = ?`, [id]);
+  return result ?? null;
 }
 
 export async function listDraftProspections(): Promise<DraftProspection[]> {
