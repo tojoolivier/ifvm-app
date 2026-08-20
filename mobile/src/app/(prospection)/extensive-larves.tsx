@@ -2,24 +2,16 @@ import { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Espece, stadesFor } from '@/lib/prospection-especes-stades';
+import { Espece } from '@/lib/prospection-especes-stades';
 import { getProspectionPopulation, saveProspectionPopulation } from '@/lib/prospection-repository';
 import {
-  DEPLACEMENT_OPTIONS,
-  PHASE_ROWS,
+  IMAGO_PHASE_ROWS,
   PhaseKey,
-  ExtensiveLarveState,
-  emptyExtensiveLarveState,
-  larveStateToPopulationRow,
-  populationRowToLarveState,
-  createEmptyLarveSpeciesData,
-  ExtensiveLarveSpeciesData,
-  larveSpeciesDataToPopulationRow,
-  populationRowToLarveSpeciesData,
-  extractCommonLarveData,
-  totalLarvePhases,
-  totalLarveStades,
-  isLarveDataConsistent,
+  ExtensiveImagoSpeciesData,
+  createEmptySpeciesData,
+  speciesDataToPopulationRow,
+  populationRowToSpeciesData,
+  extractCommonImagoData,
 } from '@/lib/prospection-extensive';
 
 const GREEN = '#235a36';
@@ -28,69 +20,69 @@ const TEXT = '#16201a';
 const TEXT_SECONDARY = '#6f6a59';
 const BORDER = '#e7e0cd';
 const INACTIVE_BG = '#efeada';
-const AMBER = '#e89b2b';
 
-export default function ExtensiveLarvesScreen() {
+type Sexe = 'F' | 'M';
+
+export default function ExtensiveImagosScreen() {
   const router = useRouter();
   const { draftId } = useLocalSearchParams<{ draftId: string }>();
 
   const [species, setSpecies] = useState<Espece>('LMC');
+  const [currentSexe, setCurrentSexe] = useState<Sexe>('F');
   
-  // Données par espèce
-  const [speciesData, setSpeciesData] = useState<Record<Espece, ExtensiveLarveSpeciesData>>({
-    LMC: createEmptyLarveSpeciesData('LMC'),
-    NSE: createEmptyLarveSpeciesData('NSE'),
+  const [speciesData, setSpeciesData] = useState<Record<Espece, ExtensiveImagoSpeciesData>>({
+    LMC: createEmptySpeciesData(),
+    NSE: createEmptySpeciesData(),
   });
   
-  // Données communes (TL, BL, interdist, deplacement)
-  const [tl, setTl] = useState(false);
-  const [bl, setBl] = useState(false);
-  const [interdist, setInterdist] = useState('');
-  const [deplacement, setDeplacement] = useState('repos');
+  const [popDiff, setPopDiff] = useState('');
+  const [popGroup, setPopGroup] = useState('');
+  const [typeCapture, setTypeCapture] = useState<'essaim' | 'volClair'>('essaim');
   
   const [isSaving, setIsSaving] = useState(false);
 
-  // Chargement des données existantes
   useEffect(() => {
     if (!draftId) return;
     (async () => {
       const [lmc, nse] = await Promise.all([
-        getProspectionPopulation(draftId, 'LMC', 'larve'),
-        getProspectionPopulation(draftId, 'NSE', 'larve'),
+        getProspectionPopulation(draftId, 'LMC', 'imago'),
+        getProspectionPopulation(draftId, 'NSE', 'imago'),
       ]);
       
-      // Conversion des données chargées
-      const lmcData = populationRowToLarveSpeciesData('LMC', lmc);
-      const nseData = populationRowToLarveSpeciesData('NSE', nse);
+      const lmcData = populationRowToSpeciesData(lmc);
+      const nseData = populationRowToSpeciesData(nse);
       
       setSpeciesData({
         LMC: lmcData,
         NSE: nseData,
       });
 
-      // Charger les données communes depuis l'une des espèces (elles sont identiques)
-      const commonData = extractCommonLarveData(lmc || nse);
-      setTl(commonData.tl);
-      setBl(commonData.bl);
-      setInterdist(commonData.interdist);
-      setDeplacement(commonData.deplacement);
+      const commonData = extractCommonImagoData(lmc || nse);
+      setPopDiff(commonData.popDiff);
+      setPopGroup(commonData.popGroup);
+      setTypeCapture(commonData.typeCapture);
     })();
   }, [draftId]);
 
   const data = speciesData[species];
-  const stadesList = stadesFor(species, 'larve', null);
   
-  // Calcul des totaux
-  const totalPhases = totalLarvePhases(data);
-  const totalStades = totalLarveStades(data);
+  const totalPhases = data.phases.solitaire + data.phases.transiens + data.phases.solitaroTransiens + data.phases.gregaire;
+  
+  const totalStadesF = 
+    data.stades.femelleA1 + data.stades.femelleA2 + data.stades.femelleA3 + 
+    data.stades.femelleA3_1_4 + data.stades.femelleA3_1_2 + data.stades.femelleA3_3_4 + 
+    data.stades.femelleA3_4_4 + data.stades.femelleA4 + data.stades.femelleA5;
+  
+  const totalStadesM = 
+    data.stades.maleA1 + data.stades.maleA123 + data.stades.maleA5;
+  
+  const totalStades = totalStadesF + totalStadesM;
 
-  // Vérification des égalités - MODIFIÉ : accepte 0
   const isPhasesConsistent = data.totalCaptures === totalPhases;
-  const isStadesConsistent = totalStades === data.totalCaptures;
+  const isStadesConsistent = data.totalCaptures === totalStades;
   const isConsistent = isPhasesConsistent && isStadesConsistent;
 
-  // Mise à jour des données par espèce
-  const updateSpeciesData = (patch: Partial<ExtensiveLarveSpeciesData>) => {
+  const updateSpeciesData = (patch: Partial<ExtensiveImagoSpeciesData>) => {
     setSpeciesData((prev) => ({
       ...prev,
       [species]: { ...prev[species], ...patch },
@@ -107,12 +99,12 @@ export default function ExtensiveLarvesScreen() {
     }));
   };
 
-  const updateStade = (stade: string, value: number) => {
+  const updateStade = (key: keyof ExtensiveImagoSpeciesData['stades'], value: number) => {
     setSpeciesData((prev) => ({
       ...prev,
       [species]: {
         ...prev[species],
-        stades: { ...prev[species].stades, [stade]: value },
+        stades: { ...prev[species].stades, [key]: value },
       },
     }));
   };
@@ -120,8 +112,6 @@ export default function ExtensiveLarvesScreen() {
   const handleContinue = async () => {
     if (!draftId || isSaving) return;
 
-    // MODIFIÉ : accepte 0, donc plus de vérification > 0
-    // On vérifie juste la cohérence
     if (!isPhasesConsistent) {
       Alert.alert(
         'Incohérence des phases',
@@ -133,28 +123,80 @@ export default function ExtensiveLarvesScreen() {
     if (!isStadesConsistent) {
       Alert.alert(
         'Incohérence des stades',
-        `Captures : ${data.totalCaptures}\nStades : ${totalStades}\n\nLa somme des stades doit être exactement égale au nombre de captures.`
+        `Captures : ${data.totalCaptures}\nStades femelles : ${totalStadesF}\nStades mâles : ${totalStadesM}\nTotal stades : ${totalStadesF} + ${totalStadesM} = ${totalStades}\n\nLa règle est :\nCaptures = Phases = Stades ♀ + Stades ♂`
       );
       return;
     }
 
     setIsSaving(true);
     try {
-      // Données communes
-      const commonData = { tl, bl, interdist, deplacement };
+      const commonData = { popDiff, popGroup, typeCapture };
       
-      // Sauvegarder les données pour LMC et NSE
       await Promise.all([
-        saveProspectionPopulation(draftId, larveSpeciesDataToPopulationRow('LMC', speciesData.LMC, commonData)),
-        saveProspectionPopulation(draftId, larveSpeciesDataToPopulationRow('NSE', speciesData.NSE, commonData)),
+        saveProspectionPopulation(draftId, speciesDataToPopulationRow('LMC', speciesData.LMC, commonData)),
+        saveProspectionPopulation(draftId, speciesDataToPopulationRow('NSE', speciesData.NSE, commonData)),
       ]);
-      router.push({ pathname: '/(prospection)/extensive-observations' as any, params: { draftId } });
+      
+      router.push({ pathname: '/(prospection)/extensive-larves' as any, params: { draftId } });
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
       Alert.alert('Erreur', 'Une erreur est survenue lors de la sauvegarde des données.');
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const renderStades = () => {
+    const isFemale = currentSexe === 'F';
+    const stadesList = isFemale 
+      ? ['A1', 'A2', 'A3', 'A3-1/4', 'A3-1/2', 'A3-3/4', 'A3-4/4', 'A4', 'A5']
+      : ['A1', 'A123', 'A5'];
+    
+    const getKey = (stade: string): keyof ExtensiveImagoSpeciesData['stades'] => {
+      if (isFemale) {
+        return `femelle${stade.replace(/-/g, '_').replace(/\//g, '_')}` as keyof ExtensiveImagoSpeciesData['stades'];
+      } else {
+        return `male${stade.replace(/-/g, '_').replace(/\//g, '_')}` as keyof ExtensiveImagoSpeciesData['stades'];
+      }
+    };
+
+    const totalSexe = isFemale ? totalStadesF : totalStadesM;
+
+    return stadesList.map((stade) => {
+      const key = getKey(stade);
+      const value = data.stades[key] || 0;
+      
+      return (
+        <View key={stade} style={styles.stadeCounterRow}>
+          <Text style={styles.stadeLabel}>{stade}</Text>
+          <View style={styles.counterButtons}>
+            <TouchableOpacity
+              style={[styles.miniButton, value === 0 && styles.miniButtonDisabled]}
+              onPress={() => {
+                if (value > 0) updateStade(key, value - 1);
+              }}
+              disabled={value === 0}
+            >
+              <Text style={styles.miniButtonText}>−</Text>
+            </TouchableOpacity>
+            <Text style={styles.counterValue}>{value}</Text>
+            <TouchableOpacity
+              style={[styles.miniButton, styles.miniButtonAdd, totalStades >= data.totalCaptures && styles.miniButtonDisabled]}
+              onPress={() => {
+                if (totalStades < data.totalCaptures) {
+                  updateStade(key, value + 1);
+                } else {
+                  Alert.alert('Limite atteinte', `Le total des stades (${totalStadesF} ♀ + ${totalStadesM} ♂ = ${totalStades}) a déjà atteint ${data.totalCaptures}.`);
+                }
+              }}
+              disabled={totalStades >= data.totalCaptures}
+            >
+              <Text style={[styles.miniButtonText, styles.miniButtonAddText]}>+</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    });
   };
 
   return (
@@ -164,12 +206,12 @@ export default function ExtensiveLarvesScreen() {
           <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
             <Text style={styles.back}>‹</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>Larves</Text>
+          <Text style={styles.title}>Imagos</Text>
         </View>
         <View style={styles.progressRow}>
           <View style={[styles.progressBar, styles.progressActive]} />
           <View style={[styles.progressBar, styles.progressActive]} />
-          <View style={[styles.progressBar, styles.progressActive]} />
+          <View style={styles.progressBar} />
           <View style={styles.progressBar} />
           <View style={styles.progressBar} />
         </View>
@@ -191,7 +233,6 @@ export default function ExtensiveLarvesScreen() {
         </View>
 
         <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16, paddingTop: 0 }}>
-          {/* 1. Nombre total de captures */}
           <View style={styles.totalCaptureSection}>
             <Text style={styles.sectionLabel}>📝 Nombre total de captures</Text>
             <View style={styles.totalCaptureInputContainer}>
@@ -199,7 +240,6 @@ export default function ExtensiveLarvesScreen() {
                 value={String(data.totalCaptures)}
                 onChangeText={(text) => {
                   const val = Number.parseInt(text, 10);
-                  // Si la valeur est NaN (champ vide), on met 0
                   updateSpeciesData({ totalCaptures: isNaN(val) ? 0 : val });
                 }}
                 keyboardType="number-pad"
@@ -213,13 +253,13 @@ export default function ExtensiveLarvesScreen() {
             </Text>
           </View>
 
-          {/* 2. Phases - Bloc réutilisé de imagos */}
           <View style={styles.phaseSection}>
             <Text style={styles.sectionLabel}>📊 Phases</Text>
             <View style={{ gap: 6, marginBottom: 8 }}>
-              {PHASE_ROWS.map(({ key, label }) => {
+              {IMAGO_PHASE_ROWS.map(({ key, label }) => {
                 const active = data.activePhase === key;
                 const count = data.phases[key];
+                
                 return (
                   <TouchableOpacity
                     key={key}
@@ -271,54 +311,42 @@ export default function ExtensiveLarvesScreen() {
             )}
           </View>
 
-          {/* 3. Stades larvaires */}
           <View style={styles.stadesSection}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionLabel}>📊 Stades larvaires</Text>
+              <Text style={styles.sectionLabel}>📊 Stades</Text>
               <Text style={[styles.sectionCount, !isStadesConsistent && styles.errorCount]}>
                 {totalStades}
               </Text>
             </View>
             
+            <View style={styles.sexeRow}>
+              <TouchableOpacity
+                style={[styles.sexeToggle, currentSexe === 'F' && styles.sexeToggleActive]}
+                onPress={() => setCurrentSexe('F')}
+              >
+                <Text style={[styles.sexeText, currentSexe === 'F' && styles.sexeTextActive]}>♀ Femelles</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.sexeToggle, currentSexe === 'M' && styles.sexeToggleActive]}
+                onPress={() => setCurrentSexe('M')}
+              >
+                <Text style={[styles.sexeText, currentSexe === 'M' && styles.sexeTextActive]}>♂ Mâles</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.sexeHint}>
+              {currentSexe === 'F'
+                ? '♀ Stades : A1, A2, A3, A3-1/4, A3-1/2, A3-3/4, A3-4/4, A4, A5'
+                : '♂ Stades : A1, A123, A5'}
+            </Text>
+
             <View style={styles.stadesGrid}>
-              {stadesList.map((stade) => {
-                const count = data.stades[stade] || 0;
-                return (
-                  <View key={stade} style={styles.stadeRow}>
-                    <Text style={styles.stadeLabel}>{stade}</Text>
-                    <View style={styles.counterRow}>
-                      <TouchableOpacity
-                        style={styles.counterButton}
-                        onPress={() => {
-                          if (count > 0) updateStade(stade, count - 1);
-                        }}
-                        disabled={count === 0}
-                      >
-                        <Text style={styles.counterButtonText}>−</Text>
-                      </TouchableOpacity>
-                      <Text style={styles.counterValue}>{count}</Text>
-                      <TouchableOpacity
-                        style={[styles.counterButton, styles.counterButtonAdd, totalStades >= data.totalCaptures && styles.counterButtonDisabled]}
-                        onPress={() => {
-                          if (totalStades < data.totalCaptures) {
-                            updateStade(stade, count + 1);
-                          } else {
-                            Alert.alert('Limite atteinte', `Le total des stades a déjà atteint ${data.totalCaptures}.`);
-                          }
-                        }}
-                        disabled={totalStades >= data.totalCaptures}
-                      >
-                        <Text style={[styles.counterButtonText, styles.counterButtonAddText]}>+</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                );
-              })}
+              {renderStades()}
             </View>
 
             <View style={styles.stadesSummary}>
               <Text style={styles.summaryText}>
-                Total stades : {totalStades}
+                Femelles: {totalStadesF} | Males: {totalStadesM} | Total: {totalStadesF} + {totalStadesM} = {totalStades}
               </Text>
             </View>
             
@@ -329,32 +357,25 @@ export default function ExtensiveLarvesScreen() {
             )}
           </View>
 
-          {/* 4. Données communes : TL, BL, Interdist, Déplacement */}
-          <View style={styles.commonSection}>
-            <Text style={styles.sectionLabel}>📊 Observations communes</Text>
-            
+          <View style={styles.densitySection}>
+            <Text style={styles.sectionLabel}>📊 Densités</Text>
             <View style={styles.row}>
-              <TouchableOpacity
-                style={[styles.markCard, tl && styles.markCardActive]}
-                onPress={() => setTl(!tl)}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.markLabel}>TL</Text>
-                <Text style={[styles.markValue, tl && styles.markValueActive]}>{tl ? '✓' : '—'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.markCard, bl && styles.markCardActive]}
-                onPress={() => setBl(!bl)}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.markLabel}>BL</Text>
-                <Text style={[styles.markValue, bl && styles.markValueActive]}>{bl ? '✓' : '—'}</Text>
-              </TouchableOpacity>
-              <View style={[styles.card, { flex: 1.4 }]}>
-                <Text style={styles.label}>Interdist. m</Text>
+              <View style={[styles.card, styles.flex1]}>
+                <Text style={styles.label}>Population diffuse D/ha</Text>
                 <TextInput
-                  value={interdist}
-                  onChangeText={setInterdist}
+                  value={popDiff}
+                  onChangeText={setPopDiff}
+                  keyboardType="decimal-pad"
+                  style={styles.inputMono}
+                  placeholder="0"
+                  placeholderTextColor={TEXT_SECONDARY}
+                />
+              </View>
+              <View style={[styles.card, styles.flex1]}>
+                <Text style={styles.label}>Population groupée D/m²</Text>
+                <TextInput
+                  value={popGroup}
+                  onChangeText={setPopGroup}
                   keyboardType="decimal-pad"
                   style={styles.inputMono}
                   placeholder="0"
@@ -362,26 +383,30 @@ export default function ExtensiveLarvesScreen() {
                 />
               </View>
             </View>
+          </View>
 
-            <Text style={[styles.sectionLabel, { marginTop: 8 }]}>Déplacement</Text>
-            <View style={[styles.chipsRow, { marginBottom: 16 }]}>
-              {DEPLACEMENT_OPTIONS.map((option) => {
-                const active = option.value === deplacement;
-                return (
-                  <TouchableOpacity
-                    key={option.value}
-                    style={{ flex: 1 }}
-                    onPress={() => setDeplacement(option.value)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.chip, active && styles.chipActive]}>{option.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
+          <View style={styles.typeSection}>
+            <Text style={styles.sectionLabel}>📊 Type de capture</Text>
+            <View style={styles.typeRow}>
+              <TouchableOpacity
+                style={[styles.typeButton, typeCapture === 'essaim' && styles.typeButtonActive]}
+                onPress={() => setTypeCapture('essaim')}
+              >
+                <Text style={[styles.typeButtonText, typeCapture === 'essaim' && styles.typeButtonTextActive]}>
+                  Essaim
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.typeButton, typeCapture === 'volClair' && styles.typeButtonActive]}
+                onPress={() => setTypeCapture('volClair')}
+              >
+                <Text style={[styles.typeButtonText, typeCapture === 'volClair' && styles.typeButtonTextActive]}>
+                  Vol clair
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
 
-          {/* Récapitulatif */}
           <View style={styles.summaryContainer}>
             <Text style={styles.summaryTitle}>📋 Récapitulatif</Text>
             <View style={styles.summaryRow}>
@@ -396,22 +421,29 @@ export default function ExtensiveLarvesScreen() {
             </View>
             <View style={styles.summaryDivider} />
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>3. Stades larvaires :</Text>
+              <Text style={styles.summaryLabel}>3a. Stades ♀ :</Text>
+              <Text style={styles.summaryValue}>{totalStadesF}</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>3b. Stades ♂ :</Text>
+              <Text style={styles.summaryValue}>{totalStadesM}</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Total stades :</Text>
               <Text style={[styles.summaryValue, isStadesConsistent ? styles.summaryValueValid : styles.summaryValueInvalid]}>
-                {totalStades} {isStadesConsistent ? '✅' : '❌'}
+                {totalStadesF} + {totalStadesM} = {totalStades} {isStadesConsistent ? '✅' : '❌'}
               </Text>
             </View>
             <View style={styles.ruleBox}>
-              <Text style={styles.ruleText}>Règle : Captures = Phases = Stades</Text>
+              <Text style={styles.ruleText}>Règle : Captures = Phases = Stades ♀ + Stades ♂</Text>
             </View>
           </View>
 
-          {/* Message de validation */}
           {isConsistent ? (
             <View style={styles.successContainer}>
               <Text style={styles.successText}>✅ COHÉRENT</Text>
               <Text style={styles.successDetail}>
-                {data.totalCaptures} captures = {totalPhases} phases = {totalStades} stades
+                {data.totalCaptures} captures = {totalPhases} phases = {totalStadesF} ♀ + {totalStadesM} ♂ = {totalStades} stades
               </Text>
             </View>
           ) : (
@@ -420,10 +452,12 @@ export default function ExtensiveLarvesScreen() {
               <Text style={styles.warningDetail}>
                 Captures : {data.totalCaptures}
                 {'\n'}Phases : {totalPhases}
-                {'\n'}Stades : {totalStades}
+                {'\n'}Stades ♀ : {totalStadesF}
+                {'\n'}Stades ♂ : {totalStadesM}
+                {'\n'}Total stades : {totalStadesF} + {totalStadesM} = {totalStades}
               </Text>
               <Text style={styles.warningHint}>
-                La règle est : Captures = Phases = Stades
+                La règle est : Captures = Phases = Stades ♀ + Stades ♂
               </Text>
             </View>
           )}
@@ -431,12 +465,12 @@ export default function ExtensiveLarvesScreen() {
 
         <View style={styles.footer}>
           <TouchableOpacity 
-            style={[styles.continueButton, (!isConsistent) && styles.continueButtonDisabled]} 
+            style={[styles.continueButton, !isConsistent && styles.continueButtonDisabled]} 
             onPress={handleContinue} 
             disabled={isSaving || !isConsistent} 
             activeOpacity={0.85}
           >
-            <Text style={styles.continueButtonText}>Suivant : Observations ›</Text>
+            <Text style={styles.continueButtonText}>Suivant : Larves ›</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -454,26 +488,23 @@ const styles = StyleSheet.create({
   progressBar: { flex: 1, height: 5, borderRadius: 3, backgroundColor: '#dcd5c2' },
   progressActive: { backgroundColor: GREEN },
   speciesRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 8 },
-  speciesButton: { flex: 1, borderRadius: 10, paddingVertical: 9, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
+  speciesButton: { flex: 1, textAlign: 'center', borderRadius: 10, paddingVertical: 9, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
   speciesButtonActive: { backgroundColor: GREEN, borderWidth: 0 },
   speciesButtonText: { fontSize: 13, fontWeight: '800', color: TEXT_SECONDARY },
   speciesButtonTextActive: { color: '#fff' },
   scroll: { flex: 1 },
   
-  // Section Header
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7, marginTop: 4 },
   sectionLabel: { fontSize: 9.5, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 7, marginTop: 4 },
   sectionCount: { fontSize: 13, fontWeight: '700', color: GREEN, fontFamily: 'monospace' },
   errorCount: { color: '#d32f2f' },
   errorText: { fontSize: 11, color: '#d32f2f', marginTop: 4, marginBottom: 4 },
   
-  // Total Captures
   totalCaptureSection: { backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
   totalCaptureInputContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   totalCaptureInput: { flex: 1, backgroundColor: '#f8f6f0', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 10, fontSize: 18, fontWeight: '700', color: TEXT },
   totalCaptureInfo: { marginTop: 6, fontSize: 12, color: TEXT_SECONDARY, textAlign: 'center' },
   
-  // Phases - Bloc réutilisé de imagos
   phaseSection: { marginTop: 4, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
   phaseRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, paddingVertical: 7, paddingHorizontal: 13 },
   phaseRowActive: { borderWidth: 2, borderColor: GREEN, paddingVertical: 6, paddingLeft: 13 },
@@ -483,31 +514,6 @@ const styles = StyleSheet.create({
   totalRow: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 4, paddingTop: 4, borderTopWidth: 1, borderTopColor: BORDER },
   totalLabel: { fontSize: 12, fontWeight: '600', color: TEXT_SECONDARY, marginRight: 8 },
   totalValue: { fontSize: 13, fontWeight: '700', color: GREEN, fontFamily: 'monospace' },
-  
-  // Stades
-  stadesSection: { marginTop: 4, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
-  stadesGrid: { gap: 6 },
-  stadeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 3 },
-  stadeLabel: { fontSize: 13, fontWeight: '500', color: TEXT },
-  stadesSummary: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: BORDER },
-  summaryText: { fontSize: 12, color: TEXT_SECONDARY, textAlign: 'center' },
-  
-  // Données communes
-  commonSection: { marginTop: 4, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
-  row: { flexDirection: 'row', gap: 8, marginBottom: 10 },
-  markCard: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 9, padding: 8, alignItems: 'center' },
-  markCardActive: { backgroundColor: '#f6f3e9', borderWidth: 0 },
-  markLabel: { fontSize: 9, fontWeight: '500', color: '#9a9484' },
-  markValue: { fontSize: 13, fontWeight: '700', color: '#bdb6a2' },
-  markValueActive: { color: TEXT },
-  card: { backgroundColor: '#f6f3e9', borderRadius: 9, padding: 8 },
-  label: { fontSize: 9, fontWeight: '600', color: '#9a9484' },
-  inputMono: { fontSize: 13, fontWeight: '700', color: TEXT, fontFamily: 'monospace', padding: 0 },
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
-  chip: { fontSize: 12, fontWeight: '600', color: TEXT_SECONDARY, backgroundColor: INACTIVE_BG, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 9, overflow: 'hidden', textAlign: 'center' },
-  chipActive: { backgroundColor: GREEN, color: '#fff', fontWeight: '700' },
-  
-  // Counter
   counterRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   counterButton: { width: 32, height: 32, borderRadius: 9, backgroundColor: INACTIVE_BG, alignItems: 'center', justifyContent: 'center' },
   counterButtonAdd: { backgroundColor: GREEN },
@@ -516,7 +522,39 @@ const styles = StyleSheet.create({
   counterButtonAddText: { color: '#fff' },
   counterValue: { fontSize: 17, fontWeight: '700', color: TEXT, minWidth: 16, textAlign: 'center', fontFamily: 'monospace' },
   
-  // Summary
+  stadesSection: { marginTop: 4, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
+  sexeRow: { flexDirection: 'row', gap: 7, backgroundColor: INACTIVE_BG, borderRadius: 11, padding: 4, marginBottom: 11, marginTop: 4 },
+  sexeToggle: { flex: 1, borderRadius: 8, padding: 9, alignItems: 'center' },
+  sexeToggleActive: { backgroundColor: '#fff' },
+  sexeText: { fontWeight: '700', fontSize: 13, color: '#9a9484' },
+  sexeTextActive: { color: TEXT },
+  sexeHint: { fontSize: 10, color: '#9a9484', marginBottom: 9 },
+  stadesGrid: { gap: 6 },
+  stadeCounterRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 3 },
+  stadeLabel: { fontSize: 13, fontWeight: '500', color: TEXT },
+  counterButtons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  miniButton: { width: 28, height: 28, borderRadius: 6, backgroundColor: INACTIVE_BG, alignItems: 'center', justifyContent: 'center' },
+  miniButtonAdd: { backgroundColor: GREEN },
+  miniButtonDisabled: { opacity: 0.4 },
+  miniButtonText: { fontSize: 14, fontWeight: '700', color: TEXT_SECONDARY },
+  miniButtonAddText: { color: '#fff' },
+  stadesSummary: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: BORDER },
+  summaryText: { fontSize: 12, color: TEXT_SECONDARY, textAlign: 'center' },
+  
+  densitySection: { marginTop: 4, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
+  row: { flexDirection: 'row', gap: 8, marginBottom: 0 },
+  flex1: { flex: 1 },
+  card: { backgroundColor: '#f6f3e9', borderRadius: 9, padding: 8 },
+  label: { fontSize: 9, fontWeight: '600', color: '#9a9484' },
+  inputMono: { fontSize: 15, fontWeight: '700', color: TEXT, fontFamily: 'monospace', padding: 0 },
+  
+  typeSection: { marginTop: 4, marginBottom: 8 },
+  typeRow: { flexDirection: 'row', gap: 8 },
+  typeButton: { flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: INACTIVE_BG, alignItems: 'center' },
+  typeButtonActive: { backgroundColor: GREEN },
+  typeButtonText: { fontSize: 13, fontWeight: '600', color: TEXT_SECONDARY },
+  typeButtonTextActive: { color: '#fff' },
+  
   summaryContainer: { backgroundColor: '#FFFFFF', borderRadius: 10, padding: 14, marginTop: 8, borderWidth: 1, borderColor: BORDER },
   summaryTitle: { fontSize: 12, fontWeight: '700', color: TEXT, marginBottom: 8, textAlign: 'center' },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: '#f0eee8' },
@@ -528,7 +566,6 @@ const styles = StyleSheet.create({
   ruleBox: { marginTop: 10, backgroundColor: '#f8f6f0', borderRadius: 7, padding: 8 },
   ruleText: { fontSize: 11, color: TEXT_SECONDARY, textAlign: 'center', fontWeight: '600' },
   
-  // Messages de validation
   warningContainer: { backgroundColor: '#fef2f2', borderRadius: 8, padding: 10, marginTop: 8, borderWidth: 1, borderColor: '#fca5a5' },
   warningText: { color: '#dc2626', fontWeight: '700', fontSize: 13, textAlign: 'center' },
   warningDetail: { color: '#dc2626', fontSize: 12, textAlign: 'center', marginTop: 5, lineHeight: 18 },
@@ -537,9 +574,8 @@ const styles = StyleSheet.create({
   successText: { color: '#15803d', fontWeight: '700', fontSize: 13, textAlign: 'center' },
   successDetail: { color: '#15803d', fontSize: 12, textAlign: 'center', marginTop: 3, lineHeight: 18 },
   
-  // Footer
   footer: { padding: 16 },
-  continueButton: { backgroundColor: AMBER, borderRadius: 13, padding: 14, alignItems: 'center' },
+  continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
   continueButtonDisabled: { opacity: 0.5 },
-  continueButtonText: { color: TEXT, fontWeight: '800', fontSize: 14 },
+  continueButtonText: { color: '#fff', fontWeight: '800', fontSize: 15 },
 });

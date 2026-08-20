@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Espece } from '@/lib/prospection-especes-stades';
 import { getProspectionPopulation, saveProspectionPopulation } from '@/lib/prospection-repository';
 import {
-  PHASE_ROWS,
+  IMAGO_PHASE_ROWS,
   PhaseKey,
   ExtensiveImagoSpeciesData,
   createEmptySpeciesData,
@@ -30,20 +30,17 @@ export default function ExtensiveImagosScreen() {
   const [species, setSpecies] = useState<Espece>('LMC');
   const [currentSexe, setCurrentSexe] = useState<Sexe>('F');
   
-  // Données par espèce
   const [speciesData, setSpeciesData] = useState<Record<Espece, ExtensiveImagoSpeciesData>>({
     LMC: createEmptySpeciesData(),
     NSE: createEmptySpeciesData(),
   });
   
-  // Données communes (popDiff, popGroup, typeCapture)
   const [popDiff, setPopDiff] = useState('');
   const [popGroup, setPopGroup] = useState('');
   const [typeCapture, setTypeCapture] = useState<'essaim' | 'volClair'>('essaim');
   
   const [isSaving, setIsSaving] = useState(false);
 
-  // Chargement des données existantes
   useEffect(() => {
     if (!draftId) return;
     (async () => {
@@ -52,7 +49,6 @@ export default function ExtensiveImagosScreen() {
         getProspectionPopulation(draftId, 'NSE', 'imago'),
       ]);
       
-      // Conversion des données chargées
       const lmcData = populationRowToSpeciesData(lmc);
       const nseData = populationRowToSpeciesData(nse);
       
@@ -61,7 +57,6 @@ export default function ExtensiveImagosScreen() {
         NSE: nseData,
       });
 
-      // Charger les données communes depuis l'une des espèces
       const commonData = extractCommonImagoData(lmc || nse);
       setPopDiff(commonData.popDiff);
       setPopGroup(commonData.popGroup);
@@ -71,8 +66,7 @@ export default function ExtensiveImagosScreen() {
 
   const data = speciesData[species];
   
-  // Calcul des totaux
-  const totalPhases = data.phases.solitaire + data.phases.transiens + data.phases.gregaire;
+  const totalPhases = data.phases.solitaire + data.phases.transiens + data.phases.solitaroTransiens + data.phases.gregaire;
   
   const totalStadesF = 
     data.stades.femelleA1 + data.stades.femelleA2 + data.stades.femelleA3 + 
@@ -84,12 +78,10 @@ export default function ExtensiveImagosScreen() {
   
   const totalStades = totalStadesF + totalStadesM;
 
-  // Validations - MODIFIÉ : accepte 0
   const isPhasesConsistent = data.totalCaptures === totalPhases;
-  const isStadesConsistent = totalStades === data.totalCaptures;
+  const isStadesConsistent = data.totalCaptures === totalStades;
   const isConsistent = isPhasesConsistent && isStadesConsistent;
 
-  // Mise à jour des données
   const updateSpeciesData = (patch: Partial<ExtensiveImagoSpeciesData>) => {
     setSpeciesData((prev) => ({
       ...prev,
@@ -120,7 +112,6 @@ export default function ExtensiveImagosScreen() {
   const handleContinue = async () => {
     if (!draftId || isSaving) return;
 
-    // MODIFIÉ : accepte 0, donc plus de vérification > 0
     if (!isPhasesConsistent) {
       Alert.alert(
         'Incohérence des phases',
@@ -139,10 +130,8 @@ export default function ExtensiveImagosScreen() {
 
     setIsSaving(true);
     try {
-      // Données communes
       const commonData = { popDiff, popGroup, typeCapture };
       
-      // Sauvegarder les données pour LMC et NSE
       await Promise.all([
         saveProspectionPopulation(draftId, speciesDataToPopulationRow('LMC', speciesData.LMC, commonData)),
         saveProspectionPopulation(draftId, speciesDataToPopulationRow('NSE', speciesData.NSE, commonData)),
@@ -157,7 +146,6 @@ export default function ExtensiveImagosScreen() {
     }
   };
 
-  // Rendu des stades selon le sexe
   const renderStades = () => {
     const isFemale = currentSexe === 'F';
     const stadesList = isFemale 
@@ -193,15 +181,15 @@ export default function ExtensiveImagosScreen() {
             </TouchableOpacity>
             <Text style={styles.counterValue}>{value}</Text>
             <TouchableOpacity
-              style={[styles.miniButton, styles.miniButtonAdd, totalSexe >= data.totalCaptures && styles.miniButtonDisabled]}
+              style={[styles.miniButton, styles.miniButtonAdd, totalStades >= data.totalCaptures && styles.miniButtonDisabled]}
               onPress={() => {
-                if (totalSexe < data.totalCaptures) {
+                if (totalStades < data.totalCaptures) {
                   updateStade(key, value + 1);
                 } else {
-                  Alert.alert('Limite atteinte', `Le total des stades ${isFemale ? 'féminins' : 'masculins'} a déjà atteint ${data.totalCaptures}.`);
+                  Alert.alert('Limite atteinte', `Le total des stades (${totalStadesF} ♀ + ${totalStadesM} ♂ = ${totalStades}) a déjà atteint ${data.totalCaptures}.`);
                 }
               }}
-              disabled={totalSexe >= data.totalCaptures}
+              disabled={totalStades >= data.totalCaptures}
             >
               <Text style={[styles.miniButtonText, styles.miniButtonAddText]}>+</Text>
             </TouchableOpacity>
@@ -245,7 +233,6 @@ export default function ExtensiveImagosScreen() {
         </View>
 
         <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16, paddingTop: 0 }}>
-          {/* 1. Nombre total de captures */}
           <View style={styles.totalCaptureSection}>
             <Text style={styles.sectionLabel}>📝 Nombre total de captures</Text>
             <View style={styles.totalCaptureInputContainer}>
@@ -253,7 +240,6 @@ export default function ExtensiveImagosScreen() {
                 value={String(data.totalCaptures)}
                 onChangeText={(text) => {
                   const val = Number.parseInt(text, 10);
-                  // Si la valeur est NaN (champ vide), on met 0
                   updateSpeciesData({ totalCaptures: isNaN(val) ? 0 : val });
                 }}
                 keyboardType="number-pad"
@@ -267,13 +253,13 @@ export default function ExtensiveImagosScreen() {
             </Text>
           </View>
 
-          {/* 2. Phases */}
           <View style={styles.phaseSection}>
             <Text style={styles.sectionLabel}>📊 Phases</Text>
             <View style={{ gap: 6, marginBottom: 8 }}>
-              {PHASE_ROWS.map(({ key, label }) => {
+              {IMAGO_PHASE_ROWS.map(({ key, label }) => {
                 const active = data.activePhase === key;
                 const count = data.phases[key];
+                
                 return (
                   <TouchableOpacity
                     key={key}
@@ -325,7 +311,6 @@ export default function ExtensiveImagosScreen() {
             )}
           </View>
 
-          {/* 3. Stades */}
           <View style={styles.stadesSection}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionLabel}>📊 Stades</Text>
@@ -334,7 +319,6 @@ export default function ExtensiveImagosScreen() {
               </Text>
             </View>
             
-            {/* Sélecteur de sexe */}
             <View style={styles.sexeRow}>
               <TouchableOpacity
                 style={[styles.sexeToggle, currentSexe === 'F' && styles.sexeToggleActive]}
@@ -373,7 +357,6 @@ export default function ExtensiveImagosScreen() {
             )}
           </View>
 
-          {/* 4. Densités - Communes */}
           <View style={styles.densitySection}>
             <Text style={styles.sectionLabel}>📊 Densités</Text>
             <View style={styles.row}>
@@ -402,7 +385,6 @@ export default function ExtensiveImagosScreen() {
             </View>
           </View>
 
-          {/* 5. Type de capture - Commun */}
           <View style={styles.typeSection}>
             <Text style={styles.sectionLabel}>📊 Type de capture</Text>
             <View style={styles.typeRow}>
@@ -425,7 +407,6 @@ export default function ExtensiveImagosScreen() {
             </View>
           </View>
 
-          {/* Récapitulatif */}
           <View style={styles.summaryContainer}>
             <Text style={styles.summaryTitle}>📋 Récapitulatif</Text>
             <View style={styles.summaryRow}>
@@ -454,11 +435,10 @@ export default function ExtensiveImagosScreen() {
               </Text>
             </View>
             <View style={styles.ruleBox}>
-              <Text style={styles.ruleText}>Règle : Captures = Phases = Stades ♀ + ♂</Text>
+              <Text style={styles.ruleText}>Règle : Captures = Phases = Stades ♀ + Stades ♂</Text>
             </View>
           </View>
 
-          {/* Message de validation */}
           {isConsistent ? (
             <View style={styles.successContainer}>
               <Text style={styles.successText}>✅ COHÉRENT</Text>
@@ -514,20 +494,17 @@ const styles = StyleSheet.create({
   speciesButtonTextActive: { color: '#fff' },
   scroll: { flex: 1 },
   
-  // Section Header
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7, marginTop: 4 },
   sectionLabel: { fontSize: 9.5, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 7, marginTop: 4 },
   sectionCount: { fontSize: 13, fontWeight: '700', color: GREEN, fontFamily: 'monospace' },
   errorCount: { color: '#d32f2f' },
   errorText: { fontSize: 11, color: '#d32f2f', marginTop: 4, marginBottom: 4 },
   
-  // Total Captures
   totalCaptureSection: { backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
   totalCaptureInputContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   totalCaptureInput: { flex: 1, backgroundColor: '#f8f6f0', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 10, fontSize: 18, fontWeight: '700', color: TEXT },
   totalCaptureInfo: { marginTop: 6, fontSize: 12, color: TEXT_SECONDARY, textAlign: 'center' },
   
-  // Phases
   phaseSection: { marginTop: 4, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
   phaseRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, paddingVertical: 7, paddingHorizontal: 13 },
   phaseRowActive: { borderWidth: 2, borderColor: GREEN, paddingVertical: 6, paddingLeft: 13 },
@@ -545,7 +522,6 @@ const styles = StyleSheet.create({
   counterButtonAddText: { color: '#fff' },
   counterValue: { fontSize: 17, fontWeight: '700', color: TEXT, minWidth: 16, textAlign: 'center', fontFamily: 'monospace' },
   
-  // Stades
   stadesSection: { marginTop: 4, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
   sexeRow: { flexDirection: 'row', gap: 7, backgroundColor: INACTIVE_BG, borderRadius: 11, padding: 4, marginBottom: 11, marginTop: 4 },
   sexeToggle: { flex: 1, borderRadius: 8, padding: 9, alignItems: 'center' },
@@ -565,7 +541,6 @@ const styles = StyleSheet.create({
   stadesSummary: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: BORDER },
   summaryText: { fontSize: 12, color: TEXT_SECONDARY, textAlign: 'center' },
   
-  // Densités
   densitySection: { marginTop: 4, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
   row: { flexDirection: 'row', gap: 8, marginBottom: 0 },
   flex1: { flex: 1 },
@@ -573,7 +548,6 @@ const styles = StyleSheet.create({
   label: { fontSize: 9, fontWeight: '600', color: '#9a9484' },
   inputMono: { fontSize: 15, fontWeight: '700', color: TEXT, fontFamily: 'monospace', padding: 0 },
   
-  // Type capture
   typeSection: { marginTop: 4, marginBottom: 8 },
   typeRow: { flexDirection: 'row', gap: 8 },
   typeButton: { flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: INACTIVE_BG, alignItems: 'center' },
@@ -581,7 +555,6 @@ const styles = StyleSheet.create({
   typeButtonText: { fontSize: 13, fontWeight: '600', color: TEXT_SECONDARY },
   typeButtonTextActive: { color: '#fff' },
   
-  // Summary
   summaryContainer: { backgroundColor: '#FFFFFF', borderRadius: 10, padding: 14, marginTop: 8, borderWidth: 1, borderColor: BORDER },
   summaryTitle: { fontSize: 12, fontWeight: '700', color: TEXT, marginBottom: 8, textAlign: 'center' },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: '#f0eee8' },
@@ -593,7 +566,6 @@ const styles = StyleSheet.create({
   ruleBox: { marginTop: 10, backgroundColor: '#f8f6f0', borderRadius: 7, padding: 8 },
   ruleText: { fontSize: 11, color: TEXT_SECONDARY, textAlign: 'center', fontWeight: '600' },
   
-  // Messages de validation
   warningContainer: { backgroundColor: '#fef2f2', borderRadius: 8, padding: 10, marginTop: 8, borderWidth: 1, borderColor: '#fca5a5' },
   warningText: { color: '#dc2626', fontWeight: '700', fontSize: 13, textAlign: 'center' },
   warningDetail: { color: '#dc2626', fontSize: 12, textAlign: 'center', marginTop: 5, lineHeight: 18 },
@@ -602,7 +574,6 @@ const styles = StyleSheet.create({
   successText: { color: '#15803d', fontWeight: '700', fontSize: 13, textAlign: 'center' },
   successDetail: { color: '#15803d', fontSize: 12, textAlign: 'center', marginTop: 3, lineHeight: 18 },
   
-  // Footer
   footer: { padding: 16 },
   continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
   continueButtonDisabled: { opacity: 0.5 },

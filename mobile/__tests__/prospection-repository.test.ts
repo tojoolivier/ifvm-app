@@ -109,7 +109,7 @@ describe('createDraftProspection', () => {
 
 describe('getProspection', () => {
   it('returns null when no row matches the id', async () => {
-    getFirstAsync.mockResolvedValueOnce(undefined);
+    getFirstAsync.mockResolvedValueOnce(null);
 
     const result = await getProspection('does-not-exist');
 
@@ -573,7 +573,7 @@ describe('listProspectionCaptures', () => {
 
 describe('getProspectionPopulation', () => {
   it('returns null when no row matches', async () => {
-    getFirstAsync.mockResolvedValueOnce(undefined);
+    getFirstAsync.mockResolvedValueOnce(null);
 
     const result = await getProspectionPopulation(BASE_INPUT.id, 'LMC', 'imago');
 
@@ -608,6 +608,18 @@ describe('saveProspectionPopulation', () => {
     methode: 'battage',
     accouplement: 'rare',
     ponte: 'peu',
+    // Colonnes extensives ajoutées
+    captures_sol: null,
+    captures_trans: null,
+    captures_greg: null,
+    captures_solitaro_transiens: null,
+    stade_imago: null,
+    essaim_observe: null,
+    densites_larve: null,
+    tache_larvaire: null,
+    bande_larvaire: null,
+    interdistance: null,
+    deplacement: null,
   };
 
   it('inserts a new row when none exists for the espece/categorie', async () => {
@@ -626,9 +638,19 @@ describe('saveProspectionPopulation', () => {
 
     await saveProspectionPopulation(BASE_INPUT.id, ROW);
 
+    // 20 paramètres : 19 champs SET + 1 WHERE id
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE prospection_population SET'),
-      [null, null, null, 10, 2, 'battage', 'rare', 'peu', null, null, null, null, null, null, null, null, null, null, 'existing-id']
+      [
+        null, null, null, // phase, captures_nombre, temps_capture
+        10, 2,             // densite_diffuse, densite_groupee
+        'battage', 'rare', 'peu', // methode, accouplement, ponte
+        null, null, null, null, // captures_sol, captures_trans, captures_greg, captures_solitaro_transiens
+        null, null,        // stade_imago, essaim_observe
+        null, null, null,  // densites_larve, tache_larvaire, bande_larvaire
+        null, null,        // interdistance, deplacement
+        'existing-id'      // WHERE id
+      ]
     );
   });
 });
@@ -649,7 +671,7 @@ describe('listAllProspectionPopulations', () => {
 
 describe('getProspectionInfestation', () => {
   it('returns null when no row matches the type_cible', async () => {
-    getFirstAsync.mockResolvedValueOnce(undefined);
+    getFirstAsync.mockResolvedValueOnce(null);
 
     const result = await getProspectionInfestation(BASE_INPUT.id, 'essaim');
 
