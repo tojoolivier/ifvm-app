@@ -167,6 +167,7 @@ function buildCapturesPayload(rows: CaptureRow[]): ProspectionCaptureInput[] {
 async function buildProspectionPayload(draft: DraftProspection, token: string) {
   let stationId = draft.station_id;
   
+  // Pour l'intensif, si station_id est manquant, on essaie de le récupérer
   if (draft.type_prospection === 'intensive' && !stationId) {
     console.warn(`⚠️ station_id manquant pour ${draft.id}, tentative de récupération...`);
     
@@ -182,11 +183,11 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
     
     console.log(`✅ station_id trouvé: ${stationId}`);
   }
-  
+
   return {
     type_prospection: draft.type_prospection as ProspectionCreateInput['type_prospection'],
     campagne_id: draft.campagne_id,
-    station_id: stationId || null,
+    station_id: (draft.type_prospection === 'extensive' ? null : stationId || null),
     n_releve: draft.n_releve || null,
     n_fiche: draft.n_fiche || null,
     n_message: draft.n_message || null,
@@ -194,8 +195,6 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
     latitude: draft.latitude ? Number(draft.latitude) : null,
     longitude: draft.longitude ? Number(draft.longitude) : null,
     altitude: draft.altitude ? Number(draft.altitude) : null,
-    // toLowerCase() : rattrape les brouillons locaux enregistrés avant la correction du picker
-    // (qui stockait 'Xerophyle'/'Mesophyle'/'Hydrophyle' en PascalCase, rejeté par l'enum backend).
     biotope: (draft.biotope ? draft.biotope.toLowerCase() : null) as ProspectionCreateInput['biotope'],
     surface_station: draft.surface_station ? Number(draft.surface_station) : null,
     surface_prospectee: draft.surface_prospectee ? Number(draft.surface_prospectee) : null,

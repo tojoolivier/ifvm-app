@@ -27,15 +27,15 @@ export const LARVE_PHASE_ROWS = [
 export type PhaseKey = typeof IMAGO_PHASE_ROWS[number]['key'];
 
 export const BIOTOPE_EXTENSIVE_OPTIONS = [
-  { value: 'Mesophyle', label: 'Mesophyle' },
-  { value: 'Xerophyle', label: 'Xerophyle' },
-  { value: 'Hydrophyle', label: 'Hydrophyle' },
+  { value: 'mesophyle', label: 'Mesophyle' },
+  { value: 'xerophyle', label: 'Xerophyle' },
+  { value: 'hydrophyle', label: 'Hydrophyle' },
 ];
 
 export const TYPE_STATION_EXTENSIVE = {
-  MESOPHYLE: 'Mesophyle',
-  XEROPHYLE: 'Xerophyle',
-  HYDROPHYLE: 'Hydrophyle',
+  MESOPHYLE: 'mesophyle',
+  XEROPHYLE: 'xerophyle',
+  HYDROPHYLE: 'hydrophyle',
 } as const;
 
 export type TypeStationExtensive = typeof TYPE_STATION_EXTENSIVE[keyof typeof TYPE_STATION_EXTENSIVE];
