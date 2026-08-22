@@ -689,7 +689,7 @@ async def test_create_prospection_extensive_avec_populations_agregees(
             "station_id": str(station_id),
             "date_prospection": "2026-07-29",
             "station_libre": "Ambohimanga",
-            "type_station": "riziere_bordure",
+            "type_station": "mesophyle",
             "verdure_strate": "moyenne",
             "populations": [
                 {
