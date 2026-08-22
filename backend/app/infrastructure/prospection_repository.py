@@ -197,9 +197,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                 model.station_id = None
                 await self.session.commit()
             else:
-                raise StationNotFoundError(
-                    "station_id ne référence pas une station fixe existante"
-                )
+                raise StationNotFoundError("station_id ne référence pas une station fixe existante")
 
         # Recharger les relations principales
         await self.session.refresh(
