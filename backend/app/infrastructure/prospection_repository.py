@@ -85,8 +85,12 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             type_prospection=prospection.type_prospection,
             campagne_id=prospection.campagne_id,
             prospecteur_id=prospection.prospecteur_id,
-            # 👇 Pour l'extensif, on force station_id à None
-            station_id=(None if prospection.type_prospection == 'extensive' else prospection.station_id),
+            # Pour l'extensif, on force station_id à None
+            station_id=(
+                None
+                if prospection.type_prospection == 'extensive'
+                else prospection.station_id
+            ),
             n_releve=prospection.n_releve,
             n_fiche=prospection.n_fiche,
             n_message=prospection.n_message,
@@ -197,10 +201,14 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                 # On ne doit pas oublier de re-commit après avoir corrigé !
                 await self.session.commit()
             else:
-                raise StationNotFoundError("station_id ne référence pas une station fixe existante")
-        
-        # 👇 LA SOLUTION : Retourner directement model converti en domaine, sans repasser par get_by_id()
+                raise StationNotFoundError(
+                    "station_id ne référence pas une station fixe existante"
+                )
+
+        # Retourner directement model converti en domaine,
+        # sans repasser par get_by_id()
         return self._to_domain(model)
+
     async def update(self, prospection: Prospection) -> Prospection:
         result = await self.session.execute(
             select(ProspectionModel).where(ProspectionModel.id == prospection.id)
