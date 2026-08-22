@@ -532,90 +532,123 @@ export async function listAllProspectionPopulations(prospectionId: string): Prom
   return rows.map(normalizePopulationRow);
 }
 
-export async function saveProspectionPopulation(prospectionId: string, row: PopulationRow): Promise<void> {
+export async function saveProspectionPopulation(
+  prospectionId: string,
+  row: PopulationRow
+): Promise<void> {
   const db = await getDb();
 
   const existing = await db.getFirstAsync<{ id: string }>(
-    `SELECT id FROM prospection_population WHERE prospection_id = ? AND espece = ? AND categorie = ?`,
+    `SELECT id
+     FROM prospection_population
+     WHERE prospection_id = ? AND espece = ? AND categorie = ?`,
     [prospectionId, row.espece, row.categorie]
   );
 
-  // Les 11 valeurs extensives
-  const extensiveValues = [
-    row.captures_sol ?? null,
-    row.captures_trans ?? null,
-    row.captures_greg ?? null,
-    row.captures_solitaro_transiens ?? null,
-    row.stade_imago ?? null,
-    row.essaim_observe ?? null,
-    row.densites_larve ?? null,
-    row.tache_larvaire ?? null,
-    row.bande_larvaire ?? null,
-    row.interdistance ?? null,
-    row.deplacement ?? null,
-  ];
-
   if (existing) {
-    // La requête UPDATE a 20 paramètres (19 SET + 1 WHERE)
     await db.runAsync(
       `UPDATE prospection_population SET
-        phase = ?, captures_nombre = ?, temps_capture = ?,
-        densite_diffuse = ?, densite_groupee = ?,
-        methode = ?, accouplement = ?, ponte = ?,
-        captures_sol = ?, captures_trans = ?, captures_greg = ?,
+        phase = ?,
+        captures_nombre = ?,
+        temps_capture = ?,
+        densite_diffuse = ?,
+        densite_groupee = ?,
+        methode = ?,
+        accouplement = ?,
+        ponte = ?,
+        captures_sol = ?,
+        captures_trans = ?,
+        captures_greg = ?,
         captures_solitaro_transiens = ?,
-        stade_imago = ?, essaim_observe = ?,
-        densites_larve = ?, tache_larvaire = ?, bande_larvaire = ?,
-        interdistance = ?, deplacement = ?
+        stade_imago = ?,
+        essaim_observe = ?,
+        densites_larve = ?,
+        tache_larvaire = ?,
+        bande_larvaire = ?,
+        interdistance = ?,
+        deplacement = ?
        WHERE id = ?`,
       [
-        // 3 premiers champs
-        row.phase ?? null, 
-        row.captures_nombre ?? null, 
+        row.phase ?? null,
+        row.captures_nombre ?? null,
         row.temps_capture ?? null,
-        // 2 champs suivants
-        row.densite_diffuse, 
-        row.densite_groupee,
-        // 3 champs suivants
-        row.methode, 
-        row.accouplement, 
-        row.ponte,
-        // 11 champs extensives
-        ...extensiveValues,
-        // WHERE id
+        row.densite_diffuse ?? null,
+        row.densite_groupee ?? null,
+        row.methode ?? null,
+        row.accouplement ?? null,
+        row.ponte ?? null,
+        row.captures_sol ?? null,
+        row.captures_trans ?? null,
+        row.captures_greg ?? null,
+        row.captures_solitaro_transiens ?? null,
+        row.stade_imago ?? null,
+        normalizeBoolean(row.essaim_observe),
+        row.densites_larve ?? null,
+        normalizeBoolean(row.tache_larvaire),
+        normalizeBoolean(row.bande_larvaire),
+        row.interdistance ?? null,
+        row.deplacement ?? null,
         existing.id,
       ]
     );
+
     return;
   }
 
-  // La requête INSERT a 24 paramètres (id + prospectionId + 22 autres)
   await db.runAsync(
     `INSERT INTO prospection_population (
-      id, prospection_id, espece, categorie, phase,
-      captures_nombre, temps_capture,
-      densite_diffuse, densite_groupee,
-      methode, accouplement, ponte,
-      captures_sol, captures_trans, captures_greg,
+      id,
+      prospection_id,
+      espece,
+      categorie,
+      phase,
+      captures_nombre,
+      temps_capture,
+      densite_diffuse,
+      densite_groupee,
+      methode,
+      accouplement,
+      ponte,
+      captures_sol,
+      captures_trans,
+      captures_greg,
       captures_solitaro_transiens,
-      stade_imago, essaim_observe,
-      densites_larve, tache_larvaire, bande_larvaire,
-      interdistance, deplacement
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      stade_imago,
+      essaim_observe,
+      densites_larve,
+      tache_larvaire,
+      bande_larvaire,
+      interdistance,
+      deplacement
+    )
+    VALUES (
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+    )`,
     [
-      generateId(), 
-      prospectionId, 
-      row.espece, 
-      row.categorie, 
+      generateId(),
+      prospectionId,
+      row.espece,
+      row.categorie,
       row.phase ?? null,
-      row.captures_nombre ?? null, 
+      row.captures_nombre ?? null,
       row.temps_capture ?? null,
-      row.densite_diffuse, 
-      row.densite_groupee,
-      row.methode, 
-      row.accouplement, 
-      row.ponte,
-      ...extensiveValues,
+      row.densite_diffuse ?? null,
+      row.densite_groupee ?? null,
+      row.methode ?? null,
+      row.accouplement ?? null,
+      row.ponte ?? null,
+      row.captures_sol ?? null,
+      row.captures_trans ?? null,
+      row.captures_greg ?? null,
+      row.captures_solitaro_transiens ?? null,
+      row.stade_imago ?? null,
+      normalizeBoolean(row.essaim_observe),
+      row.densites_larve ?? null,
+      normalizeBoolean(row.tache_larvaire),
+      normalizeBoolean(row.bande_larvaire),
+      row.interdistance ?? null,
+      row.deplacement ?? null,
     ]
   );
 }
