@@ -141,7 +141,7 @@ class ProspectionModel(Base):
             name="ck_prospection_biotope",
         ),
         CheckConstraint(
-            "type_station IN ('riziere_bordure','bas_fond','plateau','jachere','culture')",
+            "type_station IN ('xerophyle', 'mesophyle', 'hydrophyle')",
             name="ck_prospection_type_station",
         ),
         CheckConstraint(
