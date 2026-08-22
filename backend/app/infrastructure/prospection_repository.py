@@ -87,9 +87,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             prospecteur_id=prospection.prospecteur_id,
             # Pour l'extensif, on force station_id à None
             station_id=(
-                None
-                if prospection.type_prospection == 'extensive'
-                else prospection.station_id
+                None if prospection.type_prospection == "extensive" else prospection.station_id
             ),
             n_releve=prospection.n_releve,
             n_fiche=prospection.n_fiche,
@@ -196,14 +194,12 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         except IntegrityError:
             await self.session.rollback()
             # Pour l'extensif, on ignore l'erreur de clé étrangère sur station_id
-            if prospection.type_prospection == 'extensive':
+            if prospection.type_prospection == "extensive":
                 model.station_id = None
                 # On ne doit pas oublier de re-commit après avoir corrigé !
                 await self.session.commit()
             else:
-                raise StationNotFoundError(
-                    "station_id ne référence pas une station fixe existante"
-                )
+                raise StationNotFoundError("station_id ne référence pas une station fixe existante")
 
         # Retourner directement model converti en domaine,
         # sans repasser par get_by_id()
