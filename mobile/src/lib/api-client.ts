@@ -29,10 +29,12 @@ export class ApiError extends Error {
 }
 
 /**
- * Ne jamais logger de secrets :
- * - mot de passe login
- * - refresh token
- * - mot de passe changement
+ * Ne jamais logger de secrets. S'applique aux DEUX moitiés de l'échange :
+ * - requête : mot de passe de login, mot de passe de changement, refresh token
+ * - réponse : access_token et refresh_token renvoyés par /auth/login et /auth/refresh
+ *
+ * L'oubli de la moitié « réponse » journalisait les deux jetons en clair
+ * (cf. issue #161).
  */
 function redactBody(
   url: string,
@@ -61,6 +63,10 @@ function logRequest(
     requestBody: redactBody(
       entry.url,
       entry.requestBody
+    ),
+    responseBody: redactBody(
+      entry.url,
+      entry.responseBody
     ),
   });
 }
