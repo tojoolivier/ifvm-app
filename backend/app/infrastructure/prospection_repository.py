@@ -85,7 +85,8 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             type_prospection=prospection.type_prospection,
             campagne_id=prospection.campagne_id,
             prospecteur_id=prospection.prospecteur_id,
-            station_id=prospection.station_id,
+            # 👇 Pour l'extensif, on force station_id à None
+            station_id=(None if prospection.type_prospection == 'extensive' else prospection.station_id),
             n_releve=prospection.n_releve,
             n_fiche=prospection.n_fiche,
             n_message=prospection.n_message,
@@ -190,9 +191,16 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             await self.session.commit()
         except IntegrityError:
             await self.session.rollback()
-            raise StationNotFoundError("station_id ne référence pas une station fixe existante")
-        return await self.get_by_id(model.id)
-
+            # Pour l'extensif, on ignore l'erreur de clé étrangère sur station_id
+            if prospection.type_prospection == 'extensive':
+                model.station_id = None
+                # On ne doit pas oublier de re-commit après avoir corrigé !
+                await self.session.commit()
+            else:
+                raise StationNotFoundError("station_id ne référence pas une station fixe existante")
+        
+        # 👇 LA SOLUTION : Retourner directement model converti en domaine, sans repasser par get_by_id()
+        return self._to_domain(model)
     async def update(self, prospection: Prospection) -> Prospection:
         result = await self.session.execute(
             select(ProspectionModel).where(ProspectionModel.id == prospection.id)

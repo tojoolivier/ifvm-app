@@ -71,7 +71,7 @@ async def create_prospection(
     repository = get_repository(db)
     use_case = CreateProspection(repository)
     try:
-        return await use_case.execute(
+        prospection = await use_case.execute(
             type_prospection=body.type_prospection,
             campagne_id=body.campagne_id,
             prospecteur_id=current_user.id,
@@ -126,11 +126,20 @@ async def create_prospection(
             conclusion_validation=body.conclusion_validation,
             avertissements=body.avertissements,
         )
+        
+        # 👇 AJOUTE CETTE VÉRIFICATION POUR ÉVITER L'ERREUR 500
+        if prospection is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Erreur interne : impossible de récupérer la prospection créée"
+            )
+            
+        return prospection
+        
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     except StationNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
-
 
 @router.get("/{prospection_id}", response_model=ProspectionRead)
 async def get_prospection(
