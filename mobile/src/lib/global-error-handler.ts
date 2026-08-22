@@ -5,7 +5,6 @@ import { toFriendlyError } from './friendly-error';
 
 declare const global: typeof globalThis & {
   ErrorUtils?: RNErrorUtils;
-  addEventListener?: (type: string, listener: (event: { reason?: unknown }) => void) => void;
 };
 
 let installed = false;
@@ -22,10 +21,15 @@ function reportUncaught(error: unknown, screen: string) {
 }
 
 /**
- * Filet de sécurité globale pour le mode debug : capture les exceptions JS et
- * les rejets de promesse qui ne passent jamais par `useAsyncAction` (erreurs
- * de rendu, timers, event handlers hors formulaire...). Sans ça, seule la
- * partie "appel réseau" du mode debug était visible — voir ADR-008.
+ * Filet de sécurité globale : capture les exceptions JS qui ne passent par
+ * aucune des trois frontières d'ADR-012 (erreurs de rendu hors `ErrorBoundary`,
+ * timers, handlers d'événements natifs).
+ *
+ * **Ne couvre PAS les rejets de promesse.** Le `global.addEventListener(
+ * 'unhandledrejection')` qui vivait ici était une branche morte : c'est une API
+ * du DOM, absente de React Native — elle compilait grâce à un `declare` écrit à
+ * la main et ne s'exécutait jamais. Elle donnait une fausse confiance, ce qui
+ * est pire que rien. Le vrai tracker de rejets fait l'objet d'une issue à part.
  */
 export function installGlobalErrorHandlers() {
   if (installed) return;
@@ -37,12 +41,6 @@ export function installGlobalErrorHandlers() {
     errorUtils.setGlobalHandler((error, isFatal) => {
       reportUncaught(error, 'global-js-error');
       previousHandler?.(error, isFatal);
-    });
-  }
-
-  if (typeof global.addEventListener === 'function') {
-    global.addEventListener('unhandledrejection', (event) => {
-      reportUncaught(event?.reason, 'unhandled-promise-rejection');
     });
   }
 }

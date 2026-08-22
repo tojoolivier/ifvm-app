@@ -9,6 +9,7 @@ import { useReferentielAutoSync } from '@/hooks/use-referentiel-auto-sync';
 import { ErrorBanner } from '@/components/error-banner';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { installGlobalErrorHandlers } from '@/lib/global-error-handler';
+import { demarrerApp } from '@/lib/app-startup';
 import '../global.css';
 
 function useAuthGuard() {
@@ -44,9 +45,14 @@ export default function RootLayout() {
   useReferentielAutoSync(token);
 
   useEffect(() => {
-    getDb();
-    useDebugStore.getState().init();
-    installGlobalErrorHandlers();
+    // Ces deux tâches étaient des promesses flottantes : un échec de migration
+    // SQLite n'avait aucun capteur. `demarrerApp` les passe derrière `runTask`
+    // et ne rejette jamais — le `void` dit que c'est délibéré, pas oublié.
+    void demarrerApp({
+      ouvrirBase: getDb,
+      initDebug: () => useDebugStore.getState().init(),
+      installerFiletGlobal: installGlobalErrorHandlers,
+    });
   }, []);
 
   if (!isInitialized) {
