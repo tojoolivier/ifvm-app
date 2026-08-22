@@ -197,17 +197,19 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                 model.station_id = None
                 await self.session.commit()
             else:
-                raise StationNotFoundError("station_id ne référence pas une station fixe existante")
+                raise StationNotFoundError(
+                    "station_id ne référence pas une station fixe existante"
+                )
 
-        # Recharger toutes les relations (populations, captures, infestations, imago, larve)
+        # Recharger les relations principales
         await self.session.refresh(
             model,
-            attribute_names=[
-                "populations",
-                "captures",
-                "infestations",
-            ],
+            attribute_names=["populations", "captures", "infestations"],
         )
+
+        # Recharger les sous-relations des infestations (imago et larve)
+        for infestation in model.infestations:
+            await self.session.refresh(infestation, attribute_names=["imago", "larve"])
 
         # Retourner la fiche convertie en domaine
         return self._to_domain(model)
