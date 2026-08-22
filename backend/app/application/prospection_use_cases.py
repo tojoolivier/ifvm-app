@@ -147,6 +147,7 @@ class CreateProspection:
             raise ValueError("Impossible de récupérer la prospection créée")
         return created
 
+
 class ListProspections:
     def __init__(self, repository: ProspectionRepository):
         self.repository = repository

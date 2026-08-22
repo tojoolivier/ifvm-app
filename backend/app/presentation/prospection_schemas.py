@@ -59,7 +59,7 @@ class TypeStation(str, Enum):
     XEROPHYLE = "xerophyle"
     MESOPHYLE = "mesophyle"
     HYDROPHYLE = "hydrophyle"
-    
+
 
 class VerdureStrate(str, Enum):
     FAIBLE = "faible"
