@@ -56,11 +56,9 @@ class StatutSync(str, Enum):
 
 
 class TypeStation(str, Enum):
-    RIZIERE_BORDURE = "riziere_bordure"
-    BAS_FOND = "bas_fond"
-    PLATEAU = "plateau"
-    JACHERE = "jachere"
-    CULTURE = "culture"
+    XEROPHYLE = "xerophyle"
+    MESOPHYLE = "mesophyle"
+    HYDROPHYLE = "hydrophyle"
 
 
 class VerdureStrate(str, Enum):

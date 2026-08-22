@@ -689,7 +689,7 @@ async def test_create_prospection_extensive_avec_populations_agregees(
             "station_id": str(station_id),
             "date_prospection": "2026-07-29",
             "station_libre": "Ambohimanga",
-            "type_station": "riziere_bordure",
+            "type_station": "mesophyle",
             "verdure_strate": "moyenne",
             "populations": [
                 {
@@ -726,7 +726,7 @@ async def test_create_prospection_extensive_avec_populations_agregees(
     assert response.status_code == 201
     data = response.json()
     assert data["station_libre"] == "Ambohimanga"
-    assert data["type_station"] == "riziere_bordure"
+    assert data["type_station"] == "mesophyle"
     assert data["verdure_strate"] == "moyenne"
 
     imago = next(p for p in data["populations"] if p["categorie"] == "imago")

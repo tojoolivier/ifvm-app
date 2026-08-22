@@ -141,7 +141,11 @@ class CreateProspection:
         for child in prospection.infestations:
             child.prospection_id = prospection.id
 
-        return await self.repository.create(prospection)
+        # 👇 MODIFICATION ICI
+        created = await self.repository.create(prospection)
+        if created is None:
+            raise ValueError("Impossible de récupérer la prospection créée")
+        return created
 
 
 class ListProspections:
