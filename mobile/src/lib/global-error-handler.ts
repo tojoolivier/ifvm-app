@@ -30,6 +30,12 @@ function reportUncaught(error: unknown, screen: string) {
  * du DOM, absente de React Native — elle compilait grâce à un `declare` écrit à
  * la main et ne s'exécutait jamais. Elle donnait une fausse confiance, ce qui
  * est pire que rien. Le vrai tracker de rejets fait l'objet d'une issue à part.
+ *
+ * **Dette assumée** : le corps passe encore par `error-log-store` et
+ * `toFriendlyError`, que la décision 4 d'ADR-012 supprime au profit du logger
+ * unifié et de la frontière `'global'`. La migration se fait avec le reste de
+ * `lib/`, pas ici — la mélanger à la suppression d'une branche morte rendrait
+ * les deux illisibles en revue.
  */
 export function installGlobalErrorHandlers() {
   if (installed) return;

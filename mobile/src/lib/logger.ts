@@ -58,6 +58,12 @@ export function traitementDe(error: unknown, frontiere: Frontiere): Traitement {
       // chose à l'agent — plus rien ne fonctionnera, ou la saisie sera perdue.
       return classe === 'AuthError' || classe === 'LocalWriteError' ? 'BLOQUER' : 'INFORMER';
     }
+    default:
+      // Inatteignable par le typage. Le garde existe quand même : une frontière
+      // inconnue arrivée par un `as` ou du JS non typé retournerait sinon
+      // `undefined`, c'est-à-dire un traitement silencieux — précisément ce que
+      // cet ADR éradique. En cas de doute, on montre.
+      return 'BLOQUER';
   }
 }
 
