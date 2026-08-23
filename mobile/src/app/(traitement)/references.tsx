@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getCurrentPosition, reverseGeocode, LocationPermissionDeniedError } from '@/lib/location';
@@ -181,143 +181,150 @@ export default function ReferencesScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Retour">
-            <Text style={styles.backChevron}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>Type &amp; références</Text>
-        </View>
-        <ProgressBar currentIndex={0} />
-
-        <View style={styles.field}>
-          <Text style={styles.label}>Type de traitement *</Text>
-          <SegmentedControl
-            options={[
-              { value: 'AERIEN', label: 'Aérien' },
-              { value: 'TERRESTRE', label: 'Terrestre' },
-            ]}
-            value={typeTraitement}
-            onChange={(v) => !readOnly && !traitementId && store.setTypeTraitement(v as any)}
-          />
-          {errors.typeTraitement && <Text style={styles.error}>{errors.typeTraitement}</Text>}
-        </View>
-
-        <View style={styles.field}>
-          <Text style={styles.label}>Mode de traitement</Text>
-          <SegmentedControl
-            deselectable
-            options={[
-              { value: 'TOTAL', label: 'Couvertures totales' },
-              { value: 'BARRIERE', label: 'Barrières' },
-              { value: 'IRREGULIER', label: 'Irrégulier' },
-            ]}
-            value={store.ref.modeTraitement ?? null}
-            onChange={(v) => !readOnly && store.updateRef({ modeTraitement: v as any })}
-          />
-        </View>
-
-        <View style={styles.field}>
-          <Text style={styles.label}>N° de fiche (auto)</Text>
-          <Card variant="default" style={styles.ficheCard}>
-            <Text style={styles.monoReadonly}>{store.ref.numeroFiche ?? '(généré à la saisie)'}</Text>
-            <Text style={styles.note}>Prénom du chef — Type — Date ISO, suffixe en cas de collision.</Text>
-          </Card>
-        </View>
-
-        <View style={styles.row}>
-          <View style={[styles.field, styles.flex1]}>
-            <Text style={styles.label}>Date de traitement *</Text>
-            <DateField
-              editable={!readOnly}
-              value={store.ref.dateTraitement ?? null}
-              onChange={(v) => store.updateRef({ dateTraitement: v })}
-            />
-          </View>
-          <View style={[styles.field, styles.flex1]}>
-            <Text style={styles.label}>Date de validation *</Text>
-            <DateField editable={!readOnly} value={dateValidation} onChange={setDateValidation} />
-          </View>
-        </View>
-        {errors.dateTraitement && <Text style={styles.error}>{errors.dateTraitement}</Text>}
-        {errors.dateValidation && <Text style={styles.error}>{errors.dateValidation}</Text>}
-
-        <View style={styles.field}>
-          <Text style={styles.label}>Fiche de prospection liée *</Text>
-          {prospectionId ? (
-            <Card variant="default" style={styles.prospectionCard}>
-              <Text style={styles.label}>N° fiche de prospection</Text>
-              <Text style={styles.prospectionText}>{prospectionId}</Text>
-              <Text style={styles.note}>
-                {prospectionStatut === STATUT_VALIDE && prospectionUpdatedAt
-                  ? `Validée le ${formatDateFr(prospectionUpdatedAt)} · lecture seule`
-                  : 'Lecture seule'}
-              </Text>
-            </Card>
-          ) : readOnly ? (
-            <Card variant="default" style={styles.prospectionCard}>
-              <Text style={styles.prospectionText}>—</Text>
-            </Card>
-          ) : (
-            <TouchableOpacity
-              style={styles.prospectionPickerLink}
-              onPress={() => router.push('/(traitement)/prospection-picker' as any)}
-            >
-              <Text style={styles.prospectionPickerLinkText}>Choisir une fiche de prospection ›</Text>
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoidingView} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
+        <ScrollView contentContainerStyle={styles.content}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Retour">
+              <Text style={styles.backChevron}>‹</Text>
             </TouchableOpacity>
-          )}
-          {errors.prospectionId && <Text style={styles.error}>{errors.prospectionId}</Text>}
-        </View>
-
-        <View style={styles.field}>
-          <Text style={styles.label}>Localisation</Text>
-          <TouchableOpacity style={styles.gpsRow} onPress={captureGps} disabled={readOnly || isGpsLoading}>
-            <Text style={styles.gpsRowText}>GPS &amp; géocodage inverse</Text>
-            <Text style={[styles.gpsStatus, hasGps && styles.gpsStatusActive]}>
-              {isGpsLoading ? 'Localisation…' : hasGps ? '📍 Localisé' : 'Localiser'}
-            </Text>
-          </TouchableOpacity>
-
-          <Card variant="info" style={styles.coordCard}>
-            <Text style={styles.label}>Coord. (auto) · altitude</Text>
-            <Text style={styles.coordValue}>
-              {hasGps
-                ? `${store.ref.latitude!.toFixed(4)}, ${store.ref.longitude!.toFixed(4)} · ${store.ref.altitude ?? '—'} m`
-                : 'Position non capturée'}
-            </Text>
-          </Card>
-
-          <Card variant="default" style={styles.regionCard}>
-            <Text style={styles.label}>Région · district · commune (auto, hors-ligne)</Text>
-            <Text style={styles.coordValue}>{regionDistrictCommune || '—'}</Text>
-          </Card>
+            <Text style={styles.title}>Type &amp; références</Text>
+          </View>
+          <ProgressBar currentIndex={0} />
 
           <View style={styles.field}>
-            <Text style={styles.label}>Localité * (saisie manuelle)</Text>
-            <TextInput
-              editable={!readOnly}
-              style={styles.input}
-              placeholder="Localité"
-              value={store.ref.localite ?? ''}
-              onChangeText={(v) => store.updateRef({ localite: v })}
+            <Text style={styles.label}>Type de traitement *</Text>
+            <SegmentedControl
+              options={[
+                { value: 'AERIEN', label: 'Aérien' },
+                { value: 'TERRESTRE', label: 'Terrestre' },
+              ]}
+              value={typeTraitement}
+              onChange={(v) => !readOnly && !traitementId && store.setTypeTraitement(v as any)}
+            />
+            {errors.typeTraitement && <Text style={styles.error}>{errors.typeTraitement}</Text>}
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Mode de traitement</Text>
+            <SegmentedControl
+              deselectable
+              options={[
+                { value: 'TOTAL', label: 'Couvertures totales' },
+                { value: 'BARRIERE', label: 'Barrières' },
+                { value: 'IRREGULIER', label: 'Irrégulier' },
+              ]}
+              value={store.ref.modeTraitement ?? null}
+              onChange={(v) => !readOnly && store.updateRef({ modeTraitement: v as any })}
             />
           </View>
-          {errors.localite && <Text style={styles.error}>{errors.localite}</Text>}
-        </View>
 
-        {!readOnly && (
-          <TouchableOpacity style={styles.continueButton} onPress={handleContinuer} disabled={isSaving}>
-            <Text style={styles.continueButtonText}>{isSaving ? 'Enregistrement…' : 'Continuer — Cibles ›'}</Text>
-          </TouchableOpacity>
-        )}
-      </ScrollView>
+          <View style={styles.field}>
+            <Text style={styles.label}>N° de fiche (auto)</Text>
+            <Card variant="default" style={styles.ficheCard}>
+              <Text style={styles.monoReadonly}>{store.ref.numeroFiche ?? '(généré à la saisie)'}</Text>
+              <Text style={styles.note}>Prénom du chef — Type — Date ISO, suffixe en cas de collision.</Text>
+            </Card>
+          </View>
+
+          <View style={styles.row}>
+            <View style={[styles.field, styles.flex1]}>
+              <Text style={styles.label}>Date de traitement *</Text>
+              <DateField
+                editable={!readOnly}
+                value={store.ref.dateTraitement ?? null}
+                onChange={(v) => store.updateRef({ dateTraitement: v })}
+              />
+            </View>
+            <View style={[styles.field, styles.flex1]}>
+              <Text style={styles.label}>Date de validation *</Text>
+              <DateField editable={!readOnly} value={dateValidation} onChange={setDateValidation} />
+            </View>
+          </View>
+          {errors.dateTraitement && <Text style={styles.error}>{errors.dateTraitement}</Text>}
+          {errors.dateValidation && <Text style={styles.error}>{errors.dateValidation}</Text>}
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Fiche de prospection liée *</Text>
+            {prospectionId ? (
+              <Card variant="default" style={styles.prospectionCard}>
+                <Text style={styles.label}>N° fiche de prospection</Text>
+                <Text style={styles.prospectionText}>{prospectionId}</Text>
+                <Text style={styles.note}>
+                  {prospectionStatut === STATUT_VALIDE && prospectionUpdatedAt
+                    ? `Validée le ${formatDateFr(prospectionUpdatedAt)} · lecture seule`
+                    : 'Lecture seule'}
+                </Text>
+              </Card>
+            ) : readOnly ? (
+              <Card variant="default" style={styles.prospectionCard}>
+                <Text style={styles.prospectionText}>—</Text>
+              </Card>
+            ) : (
+              <TouchableOpacity
+                style={styles.prospectionPickerLink}
+                onPress={() => router.push('/(traitement)/prospection-picker' as any)}
+              >
+                <Text style={styles.prospectionPickerLinkText}>Choisir une fiche de prospection ›</Text>
+              </TouchableOpacity>
+            )}
+            {errors.prospectionId && <Text style={styles.error}>{errors.prospectionId}</Text>}
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Localisation</Text>
+            <TouchableOpacity style={styles.gpsRow} onPress={captureGps} disabled={readOnly || isGpsLoading}>
+              <Text style={styles.gpsRowText}>GPS &amp; géocodage inverse</Text>
+              <Text style={[styles.gpsStatus, hasGps && styles.gpsStatusActive]}>
+                {isGpsLoading ? 'Localisation…' : hasGps ? '📍 Localisé' : 'Localiser'}
+              </Text>
+            </TouchableOpacity>
+
+            <Card variant="info" style={styles.coordCard}>
+              <Text style={styles.label}>Coord. (auto) · altitude</Text>
+              <Text style={styles.coordValue}>
+                {hasGps
+                  ? `${store.ref.latitude!.toFixed(4)}, ${store.ref.longitude!.toFixed(4)} · ${store.ref.altitude ?? '—'} m`
+                  : 'Position non capturée'}
+              </Text>
+            </Card>
+
+            <Card variant="default" style={styles.regionCard}>
+              <Text style={styles.label}>Région · district · commune (auto, hors-ligne)</Text>
+              <Text style={styles.coordValue}>{regionDistrictCommune || '—'}</Text>
+            </Card>
+
+            <View style={styles.field}>
+              <Text style={styles.label}>Localité * (saisie manuelle)</Text>
+              <TextInput
+                editable={!readOnly}
+                style={styles.input}
+                placeholder="Localité"
+                value={store.ref.localite ?? ''}
+                onChangeText={(v) => store.updateRef({ localite: v })}
+              />
+            </View>
+            {errors.localite && <Text style={styles.error}>{errors.localite}</Text>}
+          </View>
+
+          {!readOnly && (
+            <TouchableOpacity style={styles.continueButton} onPress={handleContinuer} disabled={isSaving}>
+              <Text style={styles.continueButtonText}>{isSaving ? 'Enregistrement…' : 'Continuer — Cibles ›'}</Text>
+            </TouchableOpacity>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: traitementColors.fondApp },
-  content: { padding: 16, gap: 14 },
+  keyboardAvoidingView: { flex: 1 },
+  content: { padding: 16, gap: 14, paddingBottom: 30 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   backChevron: { fontFamily: traitementFonts.uiExtraBold, fontSize: traitementTypeSizes.titreEcran + 6, color: traitementColors.texteTitre },
   title: { fontFamily: traitementFonts.uiExtraBold, fontSize: traitementTypeSizes.titreEcran, color: traitementColors.texteTitre },

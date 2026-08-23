@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm } from '@tanstack/react-form';
@@ -324,272 +324,278 @@ export default function ReferenceScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.safe}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
-            <Text style={styles.back}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>Nouvelle prospection</Text>
-        </View>
-        <View style={styles.progressRow}>
-          <View style={[styles.progressBar, styles.progressActive]} />
-          <View style={styles.progressBar} />
-          <View style={styles.progressBar} />
-          <View style={styles.progressBar} />
-        </View>
+        <KeyboardAvoidingView 
+          style={styles.keyboardAvoidingView} 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          <View style={styles.headerRow}>
+            <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
+              <Text style={styles.back}>‹</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>Nouvelle prospection</Text>
+          </View>
+          <View style={styles.progressRow}>
+            <View style={[styles.progressBar, styles.progressActive]} />
+            <View style={styles.progressBar} />
+            <View style={styles.progressBar} />
+            <View style={styles.progressBar} />
+          </View>
 
-        <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16 }}>
-          {/* ===== GPS ===== */}
-          <View style={styles.gpsCard}>
-            <View style={styles.gpsHeaderRow}>
-              <Text style={styles.gpsTitle}>
-                📍 {isGpsLoading ? 'Capture GPS en cours...' : 'Position acquise'}
-              </Text>
-              <View style={styles.accuracyBadge}>
-                <Text style={styles.accuracyText}>
-                  {position?.accuracy != null ? `± ${Math.round(position.accuracy)} m` : '…'}
+          <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
+            {/* ===== GPS ===== */}
+            <View style={styles.gpsCard}>
+              <View style={styles.gpsHeaderRow}>
+                <Text style={styles.gpsTitle}>
+                  📍 {isGpsLoading ? 'Capture GPS en cours...' : 'Position acquise'}
                 </Text>
-              </View>
-            </View>
-
-            {isGpsLoading ? (
-              <View style={styles.gpsLoadingContainer}>
-                <Text style={styles.gpsLoadingText}>⏳ Récupération de la position GPS...</Text>
-              </View>
-            ) : (
-              <>
-                <View style={styles.gpsFieldsRow}>
-                  <View style={styles.gpsField}>
-                    <Text style={styles.gpsFieldLabel}>Latitude</Text>
-                    <Text style={styles.gpsFieldValue}>
-                      {position ? position.latitude.toFixed(6) : '—'}
-                    </Text>
-                  </View>
-                  <View style={styles.gpsField}>
-                    <Text style={styles.gpsFieldLabel}>Longitude</Text>
-                    <Text style={styles.gpsFieldValue}>
-                      {position ? position.longitude.toFixed(6) : '—'}
-                    </Text>
-                  </View>
-                  <View style={[styles.gpsField, { flex: 0.75 }]}>
-                    <Text style={styles.gpsFieldLabel}>Altitude</Text>
-                    <Text style={styles.gpsFieldValue}>
-                      {position?.altitude != null ? `${Math.round(position.altitude)} m` : '—'}
-                    </Text>
-                  </View>
-                </View>
-                <Text style={styles.gpsAdminText}>
-                  {locationError ??
-                    ([adminArea.region, adminArea.district, adminArea.commune].filter(Boolean).join(' · ') ||
-                      'Localisation en cours…')}
-                </Text>
-              </>
-            )}
-          </View>
-
-          {/* ===== PA ===== */}
-          <View style={styles.refCard}>
-            <View style={styles.refHeaderRow}>
-              <Text style={styles.refLabel}>2. Poste acridien (PA)</Text>
-              <View style={styles.toggleTrack}>
-                <TouchableOpacity onPress={setPaAuto} activeOpacity={0.7}>
-                  <Text style={[styles.toggleSegment, paMode === 'auto' && styles.toggleSegmentActive]}>
-                    Auto
+                <View style={styles.accuracyBadge}>
+                  <Text style={styles.accuracyText}>
+                    {position?.accuracy != null ? `± ${Math.round(position.accuracy)} m` : '…'}
                   </Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={setPaManuel} activeOpacity={0.7}>
-                  <Text style={[styles.toggleSegment, paMode === 'manuel' && styles.toggleSegmentActive]}>
-                    Manuel
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-            {paMode === 'auto' ? (
-              <View style={styles.autoValueRow}>
-                <Text style={styles.autoValueText}>{pa?.nom ?? '…'}</Text>
-                <View style={styles.gpsBadge}>
-                  <Text style={styles.gpsBadgeText}>📡 via GPS</Text>
                 </View>
               </View>
-            ) : (
-              <View style={styles.chipsRow}>
-                {postes.map((poste) => {
-                  const active = poste.id === pa?.id;
-                  return (
-                    <TouchableOpacity key={poste.id} onPress={() => selectPa(poste)} activeOpacity={0.7}>
-                      <Text style={[styles.chip, active && styles.chipActive]}>{poste.nom}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-          </View>
 
-          {/* ===== Station ===== */}
-          <View style={styles.refCard}>
-            <View style={styles.refHeaderRow}>
-              <Text style={styles.refLabel}>5. Station</Text>
-              <View style={styles.toggleTrack}>
-                <TouchableOpacity onPress={setStationAuto} activeOpacity={0.7}>
-                  <Text style={[styles.toggleSegment, stationMode === 'auto' && styles.toggleSegmentActive]}>
-                    Auto
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={setStationManuel} activeOpacity={0.7}>
-                  <Text style={[styles.toggleSegment, stationMode === 'manuel' && styles.toggleSegmentActive]}>
-                    Manuel
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-            {stationMode === 'auto' ? (
-              <View style={styles.autoValueRow}>
-                <Text style={styles.autoValueText}>{station?.nom ?? '…'}</Text>
-                <View style={styles.gpsBadge}>
-                  <Text style={styles.gpsBadgeText}>📡 via GPS</Text>
+              {isGpsLoading ? (
+                <View style={styles.gpsLoadingContainer}>
+                  <Text style={styles.gpsLoadingText}>⏳ Récupération de la position GPS...</Text>
                 </View>
-              </View>
-            ) : (
-              <View style={styles.chipsRow}>
-                {stationsForPa.map((s) => {
-                  const active = s.id === station?.id;
-                  return (
-                    <TouchableOpacity key={s.id} onPress={() => selectStation(s)} activeOpacity={0.7}>
-                      <Text style={[styles.chip, active && styles.chipActive]}>{s.nom}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-          </View>
-
-          {/* ===== Métadonnées ===== */}
-          <View style={styles.metaRow}>
-            <View style={styles.metaField}>
-              <Text style={styles.metaLabel}>N° Fiche ⟳</Text>
-              <Text style={styles.metaValue}>{nFichePreview}</Text>
-            </View>
-            <View style={styles.metaField}>
-              <Text style={styles.metaLabel}>N° relevé ⟳</Text>
-              <Text style={styles.metaValue}>{nRelevePreview}</Text>
-            </View>
-            <View style={styles.metaField}>
-              <Text style={styles.metaLabel}>Date/heure ⟳</Text>
-              <Text style={styles.metaValue}>{formatDateHeure(new Date())}</Text>
-            </View>
-          </View>
-
-          {/* ===== Surfaces ===== */}
-          <Text style={styles.sectionLabel}>Surfaces (ha) — saisie</Text>
-          {isIntensive && (
-            <Text style={styles.infoText}>
-              ℹ️ Mode intensif : la surface infestée n&apos;est pas obligatoire
-            </Text>
-          )}
-          <View style={styles.surfacesRow}>
-            <form.Field name="surfaceStation">
-              {(field) => (
-                <View style={styles.surfaceField}>
-                  <Text style={[styles.surfaceLabel, styles.requiredLabel]}>Station *</Text>
-                  <TextInput
-                    value={field.state.value ?? ''}
-                    onChangeText={field.handleChange}
-                    keyboardType="decimal-pad"
-                    style={styles.surfaceInput}
-                    placeholder="0"
-                  />
-                </View>
-              )}
-            </form.Field>
-            <form.Field name="surfaceProspectee">
-              {(field) => (
-                <View style={styles.surfaceField}>
-                  <Text style={[styles.surfaceLabel, styles.requiredLabel]}>
-                    Prospectée *
-                  </Text>
-                  <TextInput
-                    value={field.state.value ?? ''}
-                    onChangeText={field.handleChange}
-                    keyboardType="decimal-pad"
-                    style={styles.surfaceInput}
-                    placeholder={isIntensive ? '0' : '0'}
-                  />
-                </View>
-              )}
-            </form.Field>
-            <form.Field name="surfaceInfestee">
-              {(field) => (
-                <View style={styles.surfaceField}>
-                  <Text style={[
-                    styles.surfaceLabel,
-                    !isIntensive && styles.requiredLabel
-                  ]}>
-                    Infestée {!isIntensive && '*'}
-                  </Text>
-                  <TextInput
-                    value={field.state.value ?? ''}
-                    onChangeText={field.handleChange}
-                    keyboardType="decimal-pad"
-                    style={styles.surfaceInput}
-                    placeholder={isIntensive ? '0' : '0'}
-                  />
-                </View>
-              )}
-            </form.Field>
-          </View>
-
-          {/* ===== Biotope ===== */}
-          <form.Field name="biotope">
-            {(field) => (
-              <View style={styles.biotopeContainer}>
-                <Text style={[styles.sectionLabel, styles.requiredLabel]}>Type de biotope *</Text>
-                <View style={styles.biotopeOptions}>
-                  {BIOTOPE_OPTIONS.map((option) => (
-                    <TouchableOpacity
-                      key={option.value}
-                      style={[
-                        styles.biotopeChip,
-                        field.state.value === option.value && styles.biotopeChipActive,
-                      ]}
-                      onPress={() => field.handleChange(option.value)}
-                      activeOpacity={0.7}
-                    >
-                      <Text
-                        style={[
-                          styles.biotopeChipText,
-                          field.state.value === option.value && styles.biotopeChipTextActive,
-                        ]}
-                      >
-                        {option.label}
+              ) : (
+                <>
+                  <View style={styles.gpsFieldsRow}>
+                    <View style={styles.gpsField}>
+                      <Text style={styles.gpsFieldLabel}>Latitude</Text>
+                      <Text style={styles.gpsFieldValue}>
+                        {position ? position.latitude.toFixed(6) : '—'}
                       </Text>
-                    </TouchableOpacity>
-                  ))}
+                    </View>
+                    <View style={styles.gpsField}>
+                      <Text style={styles.gpsFieldLabel}>Longitude</Text>
+                      <Text style={styles.gpsFieldValue}>
+                        {position ? position.longitude.toFixed(6) : '—'}
+                      </Text>
+                    </View>
+                    <View style={[styles.gpsField, { flex: 0.75 }]}>
+                      <Text style={styles.gpsFieldLabel}>Altitude</Text>
+                      <Text style={styles.gpsFieldValue}>
+                        {position?.altitude != null ? `${Math.round(position.altitude)} m` : '—'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.gpsAdminText}>
+                    {locationError ??
+                      ([adminArea.region, adminArea.district, adminArea.commune].filter(Boolean).join(' · ') ||
+                        'Localisation en cours…')}
+                  </Text>
+                </>
+              )}
+            </View>
+
+            {/* ===== PA ===== */}
+            <View style={styles.refCard}>
+              <View style={styles.refHeaderRow}>
+                <Text style={styles.refLabel}>2. Poste acridien (PA)</Text>
+                <View style={styles.toggleTrack}>
+                  <TouchableOpacity onPress={setPaAuto} activeOpacity={0.7}>
+                    <Text style={[styles.toggleSegment, paMode === 'auto' && styles.toggleSegmentActive]}>
+                      Auto
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={setPaManuel} activeOpacity={0.7}>
+                    <Text style={[styles.toggleSegment, paMode === 'manuel' && styles.toggleSegmentActive]}>
+                      Manuel
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </View>
+              {paMode === 'auto' ? (
+                <View style={styles.autoValueRow}>
+                  <Text style={styles.autoValueText}>{pa?.nom ?? '…'}</Text>
+                  <View style={styles.gpsBadge}>
+                    <Text style={styles.gpsBadgeText}>📡 via GPS</Text>
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.chipsRow}>
+                  {postes.map((poste) => {
+                    const active = poste.id === pa?.id;
+                    return (
+                      <TouchableOpacity key={poste.id} onPress={() => selectPa(poste)} activeOpacity={0.7}>
+                        <Text style={[styles.chip, active && styles.chipActive]}>{poste.nom}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+
+            {/* ===== Station ===== */}
+            <View style={styles.refCard}>
+              <View style={styles.refHeaderRow}>
+                <Text style={styles.refLabel}>5. Station</Text>
+                <View style={styles.toggleTrack}>
+                  <TouchableOpacity onPress={setStationAuto} activeOpacity={0.7}>
+                    <Text style={[styles.toggleSegment, stationMode === 'auto' && styles.toggleSegmentActive]}>
+                      Auto
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={setStationManuel} activeOpacity={0.7}>
+                    <Text style={[styles.toggleSegment, stationMode === 'manuel' && styles.toggleSegmentActive]}>
+                      Manuel
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              {stationMode === 'auto' ? (
+                <View style={styles.autoValueRow}>
+                  <Text style={styles.autoValueText}>{station?.nom ?? '…'}</Text>
+                  <View style={styles.gpsBadge}>
+                    <Text style={styles.gpsBadgeText}>📡 via GPS</Text>
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.chipsRow}>
+                  {stationsForPa.map((s) => {
+                    const active = s.id === station?.id;
+                    return (
+                      <TouchableOpacity key={s.id} onPress={() => selectStation(s)} activeOpacity={0.7}>
+                        <Text style={[styles.chip, active && styles.chipActive]}>{s.nom}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+
+            {/* ===== Métadonnées ===== */}
+            <View style={styles.metaRow}>
+              <View style={styles.metaField}>
+                <Text style={styles.metaLabel}>N° Fiche ⟳</Text>
+                <Text style={styles.metaValue}>{nFichePreview}</Text>
+              </View>
+              <View style={styles.metaField}>
+                <Text style={styles.metaLabel}>N° relevé ⟳</Text>
+                <Text style={styles.metaValue}>{nRelevePreview}</Text>
+              </View>
+              <View style={styles.metaField}>
+                <Text style={styles.metaLabel}>Date/heure ⟳</Text>
+                <Text style={styles.metaValue}>{formatDateHeure(new Date())}</Text>
+              </View>
+            </View>
+
+            {/* ===== Surfaces ===== */}
+            <Text style={styles.sectionLabel}>Surfaces (ha) — saisie</Text>
+            {isIntensive && (
+              <Text style={styles.infoText}>
+                ℹ️ Mode intensif : la surface infestée n&apos;est pas obligatoire
+              </Text>
             )}
-          </form.Field>
+            <View style={styles.surfacesRow}>
+              <form.Field name="surfaceStation">
+                {(field) => (
+                  <View style={styles.surfaceField}>
+                    <Text style={[styles.surfaceLabel, styles.requiredLabel]}>Station *</Text>
+                    <TextInput
+                      value={field.state.value ?? ''}
+                      onChangeText={field.handleChange}
+                      keyboardType="decimal-pad"
+                      style={styles.surfaceInput}
+                      placeholder="0"
+                    />
+                  </View>
+                )}
+              </form.Field>
+              <form.Field name="surfaceProspectee">
+                {(field) => (
+                  <View style={styles.surfaceField}>
+                    <Text style={[styles.surfaceLabel, styles.requiredLabel]}>
+                      Prospectée *
+                    </Text>
+                    <TextInput
+                      value={field.state.value ?? ''}
+                      onChangeText={field.handleChange}
+                      keyboardType="decimal-pad"
+                      style={styles.surfaceInput}
+                      placeholder={isIntensive ? '0' : '0'}
+                    />
+                  </View>
+                )}
+              </form.Field>
+              <form.Field name="surfaceInfestee">
+                {(field) => (
+                  <View style={styles.surfaceField}>
+                    <Text style={[
+                      styles.surfaceLabel,
+                      !isIntensive && styles.requiredLabel
+                    ]}>
+                      Infestée {!isIntensive && '*'}
+                    </Text>
+                    <TextInput
+                      value={field.state.value ?? ''}
+                      onChangeText={field.handleChange}
+                      keyboardType="decimal-pad"
+                      style={styles.surfaceInput}
+                      placeholder={isIntensive ? '0' : '0'}
+                    />
+                  </View>
+                )}
+              </form.Field>
+            </View>
 
-          {Object.values(formErrors).map((message) => (
-            <Text key={message} style={styles.errorText}>
-              {message}
-            </Text>
-          ))}
-          <Text style={styles.hintText}>
-            Tapez une valeur — les autres champs se calculent ensuite automatiquement.
-          </Text>
-        </ScrollView>
+            {/* ===== Biotope ===== */}
+            <form.Field name="biotope">
+              {(field) => (
+                <View style={styles.biotopeContainer}>
+                  <Text style={[styles.sectionLabel, styles.requiredLabel]}>Type de biotope *</Text>
+                  <View style={styles.biotopeOptions}>
+                    {BIOTOPE_OPTIONS.map((option) => (
+                      <TouchableOpacity
+                        key={option.value}
+                        style={[
+                          styles.biotopeChip,
+                          field.state.value === option.value && styles.biotopeChipActive,
+                        ]}
+                        onPress={() => field.handleChange(option.value)}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.biotopeChipText,
+                            field.state.value === option.value && styles.biotopeChipTextActive,
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+            </form.Field>
 
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.continueButton, (isSaving || isGpsLoading) && styles.continueButtonDisabled]}
-            onPress={form.handleSubmit}
-            disabled={isSaving || isGpsLoading}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.continueButtonText}>
-              {isGpsLoading ? '⏳ GPS en cours...' : isSaving ? 'Enregistrement…' : 'Continuer  ›'}
+            {Object.values(formErrors).map((message) => (
+              <Text key={message} style={styles.errorText}>
+                {message}
+              </Text>
+            ))}
+            <Text style={styles.hintText}>
+              Tapez une valeur — les autres champs se calculent ensuite automatiquement.
             </Text>
-          </TouchableOpacity>
-        </View>
+          </ScrollView>
+
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={[styles.continueButton, (isSaving || isGpsLoading) && styles.continueButtonDisabled]}
+              onPress={form.handleSubmit}
+              disabled={isSaving || isGpsLoading}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.continueButtonText}>
+                {isGpsLoading ? '⏳ GPS en cours...' : isSaving ? 'Enregistrement…' : 'Continuer  ›'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
   );
@@ -598,6 +604,7 @@ export default function ReferenceScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
+  keyboardAvoidingView: { flex: 1 },
   headerRow: {
     paddingHorizontal: 16,
     paddingTop: 6,

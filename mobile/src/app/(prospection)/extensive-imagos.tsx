@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Espece } from '@/lib/prospection-especes-stades';
@@ -202,277 +202,283 @@ export default function ExtensiveImagosScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.safe}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
-            <Text style={styles.back}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>Imagos</Text>
-        </View>
-        <View style={styles.progressRow}>
-          <View style={[styles.progressBar, styles.progressActive]} />
-          <View style={[styles.progressBar, styles.progressActive]} />
-          <View style={styles.progressBar} />
-          <View style={styles.progressBar} />
-          <View style={styles.progressBar} />
-        </View>
-
-        <View style={styles.speciesRow}>
-          {(['LMC', 'NSE'] as Espece[]).map((sp) => {
-            const active = sp === species;
-            return (
-              <TouchableOpacity
-                key={sp}
-                style={[styles.speciesButton, active && styles.speciesButtonActive]}
-                onPress={() => setSpecies(sp)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.speciesButtonText, active && styles.speciesButtonTextActive]}>{sp}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16, paddingTop: 0 }}>
-          <View style={styles.totalCaptureSection}>
-            <Text style={styles.sectionLabel}>📝 Nombre total de captures</Text>
-            <View style={styles.totalCaptureInputContainer}>
-              <TextInput
-                value={String(data.totalCaptures)}
-                onChangeText={(text) => {
-                  const val = Number.parseInt(text, 10);
-                  updateSpeciesData({ totalCaptures: isNaN(val) ? 0 : val });
-                }}
-                keyboardType="number-pad"
-                style={styles.totalCaptureInput}
-                placeholder="0"
-                placeholderTextColor={TEXT_SECONDARY}
-              />
-            </View>
-            <Text style={styles.totalCaptureInfo}>
-              {data.totalCaptures} capture{data.totalCaptures > 1 ? 's' : ''} à répartir
-            </Text>
+        <KeyboardAvoidingView 
+          style={styles.keyboardAvoidingView} 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          <View style={styles.headerRow}>
+            <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
+              <Text style={styles.back}>‹</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>Imagos</Text>
+          </View>
+          <View style={styles.progressRow}>
+            <View style={[styles.progressBar, styles.progressActive]} />
+            <View style={[styles.progressBar, styles.progressActive]} />
+            <View style={styles.progressBar} />
+            <View style={styles.progressBar} />
+            <View style={styles.progressBar} />
           </View>
 
-          <View style={styles.phaseSection}>
-            <Text style={styles.sectionLabel}>📊 Phases</Text>
-            <View style={{ gap: 6, marginBottom: 8 }}>
-              {IMAGO_PHASE_ROWS.map(({ key, label }) => {
-                const active = data.activePhase === key;
-                const count = data.phases[key];
-                
-                return (
-                  <TouchableOpacity
-                    key={key}
-                    style={[styles.phaseRow, active && styles.phaseRowActive]}
-                    onPress={() => updateSpeciesData({ activePhase: key })}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={[styles.phaseLabel, active && styles.phaseLabelActive]}>{label}</Text>
-                    {active ? (
-                      <View style={styles.counterRow}>
-                        <TouchableOpacity
-                          style={styles.counterButton}
-                          onPress={() => updatePhase(key, Math.max(0, count - 1))}
-                        >
-                          <Text style={styles.counterButtonText}>−</Text>
-                        </TouchableOpacity>
-                        <Text style={styles.counterValue}>{count}</Text>
-                        <TouchableOpacity
-                          style={[styles.counterButton, styles.counterButtonAdd, totalPhases >= data.totalCaptures && styles.counterButtonDisabled]}
-                          onPress={() => {
-                            if (totalPhases < data.totalCaptures) {
-                              updatePhase(key, count + 1);
-                            } else {
-                              Alert.alert('Limite atteinte', `La somme des phases a déjà atteint ${data.totalCaptures}.`);
-                            }
-                          }}
-                          disabled={totalPhases >= data.totalCaptures}
-                        >
-                          <Text style={[styles.counterButtonText, styles.counterButtonAddText]}>+</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ) : (
-                      <Text style={styles.phaseStaticCount}>{count}</Text>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Total phases :</Text>
-              <Text style={[styles.totalValue, !isPhasesConsistent && styles.errorCount]}>
-                {totalPhases} {isPhasesConsistent ? '✅' : ''}
-              </Text>
-            </View>
-            {!isPhasesConsistent && (
-              <Text style={styles.errorText}>
-                La somme des phases doit être égale au nombre de captures ({data.totalCaptures})
-              </Text>
-            )}
+          <View style={styles.speciesRow}>
+            {(['LMC', 'NSE'] as Espece[]).map((sp) => {
+              const active = sp === species;
+              return (
+                <TouchableOpacity
+                  key={sp}
+                  style={[styles.speciesButton, active && styles.speciesButtonActive]}
+                  onPress={() => setSpecies(sp)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.speciesButtonText, active && styles.speciesButtonTextActive]}>{sp}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
-          <View style={styles.stadesSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionLabel}>📊 Stades</Text>
-              <Text style={[styles.sectionCount, !isStadesConsistent && styles.errorCount]}>
-                {totalStades}
-              </Text>
-            </View>
-            
-            <View style={styles.sexeRow}>
-              <TouchableOpacity
-                style={[styles.sexeToggle, currentSexe === 'F' && styles.sexeToggleActive]}
-                onPress={() => setCurrentSexe('F')}
-              >
-                <Text style={[styles.sexeText, currentSexe === 'F' && styles.sexeTextActive]}>♀ Femelles</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.sexeToggle, currentSexe === 'M' && styles.sexeToggleActive]}
-                onPress={() => setCurrentSexe('M')}
-              >
-                <Text style={[styles.sexeText, currentSexe === 'M' && styles.sexeTextActive]}>♂ Mâles</Text>
-              </TouchableOpacity>
-            </View>
-            
-            <Text style={styles.sexeHint}>
-              {currentSexe === 'F'
-                ? '♀ Stades : A1, A2, A3, A3-1/4, A3-1/2, A3-3/4, A3-4/4, A4, A5'
-                : '♂ Stades : A1, A123, A5'}
-            </Text>
-
-            <View style={styles.stadesGrid}>
-              {renderStades()}
-            </View>
-
-            <View style={styles.stadesSummary}>
-              <Text style={styles.summaryText}>
-                Femelles: {totalStadesF} | Males: {totalStadesM} | Total: {totalStadesF} + {totalStadesM} = {totalStades}
-              </Text>
-            </View>
-            
-            {!isStadesConsistent && (
-              <Text style={styles.errorText}>
-                La somme des stades doit être égale au nombre de captures ({data.totalCaptures})
-              </Text>
-            )}
-          </View>
-
-          <View style={styles.densitySection}>
-            <Text style={styles.sectionLabel}>📊 Densités</Text>
-            <View style={styles.row}>
-              <View style={[styles.card, styles.flex1]}>
-                <Text style={styles.label}>Population diffuse D/ha</Text>
+          <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16, paddingTop: 0, paddingBottom: 30 }}>
+            <View style={styles.totalCaptureSection}>
+              <Text style={styles.sectionLabel}>📝 Nombre total de captures</Text>
+              <View style={styles.totalCaptureInputContainer}>
                 <TextInput
-                  value={popDiff}
-                  onChangeText={setPopDiff}
-                  keyboardType="decimal-pad"
-                  style={styles.inputMono}
+                  value={String(data.totalCaptures)}
+                  onChangeText={(text) => {
+                    const val = Number.parseInt(text, 10);
+                    updateSpeciesData({ totalCaptures: isNaN(val) ? 0 : val });
+                  }}
+                  keyboardType="number-pad"
+                  style={styles.totalCaptureInput}
                   placeholder="0"
                   placeholderTextColor={TEXT_SECONDARY}
                 />
               </View>
-              <View style={[styles.card, styles.flex1]}>
-                <Text style={styles.label}>Population groupée D/m²</Text>
-                <TextInput
-                  value={popGroup}
-                  onChangeText={setPopGroup}
-                  keyboardType="decimal-pad"
-                  style={styles.inputMono}
-                  placeholder="0"
-                  placeholderTextColor={TEXT_SECONDARY}
-                />
+              <Text style={styles.totalCaptureInfo}>
+                {data.totalCaptures} capture{data.totalCaptures > 1 ? 's' : ''} à répartir
+              </Text>
+            </View>
+
+            <View style={styles.phaseSection}>
+              <Text style={styles.sectionLabel}>📊 Phases</Text>
+              <View style={{ gap: 6, marginBottom: 8 }}>
+                {IMAGO_PHASE_ROWS.map(({ key, label }) => {
+                  const active = data.activePhase === key;
+                  const count = data.phases[key];
+                  
+                  return (
+                    <TouchableOpacity
+                      key={key}
+                      style={[styles.phaseRow, active && styles.phaseRowActive]}
+                      onPress={() => updateSpeciesData({ activePhase: key })}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={[styles.phaseLabel, active && styles.phaseLabelActive]}>{label}</Text>
+                      {active ? (
+                        <View style={styles.counterRow}>
+                          <TouchableOpacity
+                            style={styles.counterButton}
+                            onPress={() => updatePhase(key, Math.max(0, count - 1))}
+                          >
+                            <Text style={styles.counterButtonText}>−</Text>
+                          </TouchableOpacity>
+                          <Text style={styles.counterValue}>{count}</Text>
+                          <TouchableOpacity
+                            style={[styles.counterButton, styles.counterButtonAdd, totalPhases >= data.totalCaptures && styles.counterButtonDisabled]}
+                            onPress={() => {
+                              if (totalPhases < data.totalCaptures) {
+                                updatePhase(key, count + 1);
+                              } else {
+                                Alert.alert('Limite atteinte', `La somme des phases a déjà atteint ${data.totalCaptures}.`);
+                              }
+                            }}
+                            disabled={totalPhases >= data.totalCaptures}
+                          >
+                            <Text style={[styles.counterButtonText, styles.counterButtonAddText]}>+</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <Text style={styles.phaseStaticCount}>{count}</Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Total phases :</Text>
+                <Text style={[styles.totalValue, !isPhasesConsistent && styles.errorCount]}>
+                  {totalPhases} {isPhasesConsistent ? '✅' : ''}
+                </Text>
+              </View>
+              {!isPhasesConsistent && (
+                <Text style={styles.errorText}>
+                  La somme des phases doit être égale au nombre de captures ({data.totalCaptures})
+                </Text>
+              )}
+            </View>
+
+            <View style={styles.stadesSection}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionLabel}>📊 Stades</Text>
+                <Text style={[styles.sectionCount, !isStadesConsistent && styles.errorCount]}>
+                  {totalStades}
+                </Text>
+              </View>
+              
+              <View style={styles.sexeRow}>
+                <TouchableOpacity
+                  style={[styles.sexeToggle, currentSexe === 'F' && styles.sexeToggleActive]}
+                  onPress={() => setCurrentSexe('F')}
+                >
+                  <Text style={[styles.sexeText, currentSexe === 'F' && styles.sexeTextActive]}>♀ Femelles</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.sexeToggle, currentSexe === 'M' && styles.sexeToggleActive]}
+                  onPress={() => setCurrentSexe('M')}
+                >
+                  <Text style={[styles.sexeText, currentSexe === 'M' && styles.sexeTextActive]}>♂ Mâles</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <Text style={styles.sexeHint}>
+                {currentSexe === 'F'
+                  ? '♀ Stades : A1, A2, A3, A3-1/4, A3-1/2, A3-3/4, A3-4/4, A4, A5'
+                  : '♂ Stades : A1, A123, A5'}
+              </Text>
+
+              <View style={styles.stadesGrid}>
+                {renderStades()}
+              </View>
+
+              <View style={styles.stadesSummary}>
+                <Text style={styles.summaryText}>
+                  Femelles: {totalStadesF} | Males: {totalStadesM} | Total: {totalStadesF} + {totalStadesM} = {totalStades}
+                </Text>
+              </View>
+              
+              {!isStadesConsistent && (
+                <Text style={styles.errorText}>
+                  La somme des stades doit être égale au nombre de captures ({data.totalCaptures})
+                </Text>
+              )}
+            </View>
+
+            <View style={styles.densitySection}>
+              <Text style={styles.sectionLabel}>📊 Densités</Text>
+              <View style={styles.row}>
+                <View style={[styles.card, styles.flex1]}>
+                  <Text style={styles.label}>Population diffuse D/ha</Text>
+                  <TextInput
+                    value={popDiff}
+                    onChangeText={setPopDiff}
+                    keyboardType="decimal-pad"
+                    style={styles.inputMono}
+                    placeholder="0"
+                    placeholderTextColor={TEXT_SECONDARY}
+                  />
+                </View>
+                <View style={[styles.card, styles.flex1]}>
+                  <Text style={styles.label}>Population groupée D/m²</Text>
+                  <TextInput
+                    value={popGroup}
+                    onChangeText={setPopGroup}
+                    keyboardType="decimal-pad"
+                    style={styles.inputMono}
+                    placeholder="0"
+                    placeholderTextColor={TEXT_SECONDARY}
+                  />
+                </View>
               </View>
             </View>
-          </View>
 
-          <View style={styles.typeSection}>
-            <Text style={styles.sectionLabel}>📊 Type de capture</Text>
-            <View style={styles.typeRow}>
-              <TouchableOpacity
-                style={[styles.typeButton, typeCapture === 'essaim' && styles.typeButtonActive]}
-                onPress={() => setTypeCapture('essaim')}
-              >
-                <Text style={[styles.typeButtonText, typeCapture === 'essaim' && styles.typeButtonTextActive]}>
-                  Essaim
+            <View style={styles.typeSection}>
+              <Text style={styles.sectionLabel}>📊 Type de capture</Text>
+              <View style={styles.typeRow}>
+                <TouchableOpacity
+                  style={[styles.typeButton, typeCapture === 'essaim' && styles.typeButtonActive]}
+                  onPress={() => setTypeCapture('essaim')}
+                >
+                  <Text style={[styles.typeButtonText, typeCapture === 'essaim' && styles.typeButtonTextActive]}>
+                    Essaim
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.typeButton, typeCapture === 'volClair' && styles.typeButtonActive]}
+                  onPress={() => setTypeCapture('volClair')}
+                >
+                  <Text style={[styles.typeButtonText, typeCapture === 'volClair' && styles.typeButtonTextActive]}>
+                    Vol clair
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.summaryContainer}>
+              <Text style={styles.summaryTitle}>📋 Récapitulatif</Text>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>1. Nombre de captures :</Text>
+                <Text style={[styles.summaryValue, styles.summaryValueValid]}>{data.totalCaptures}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>2. Phases :</Text>
+                <Text style={[styles.summaryValue, isPhasesConsistent ? styles.summaryValueValid : styles.summaryValueInvalid]}>
+                  {totalPhases} {isPhasesConsistent ? '✅' : '❌'}
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.typeButton, typeCapture === 'volClair' && styles.typeButtonActive]}
-                onPress={() => setTypeCapture('volClair')}
-              >
-                <Text style={[styles.typeButtonText, typeCapture === 'volClair' && styles.typeButtonTextActive]}>
-                  Vol clair
+              </View>
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>3a. Stades ♀ :</Text>
+                <Text style={styles.summaryValue}>{totalStadesF}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>3b. Stades ♂ :</Text>
+                <Text style={styles.summaryValue}>{totalStadesM}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Total stades :</Text>
+                <Text style={[styles.summaryValue, isStadesConsistent ? styles.summaryValueValid : styles.summaryValueInvalid]}>
+                  {totalStadesF} + {totalStadesM} = {totalStades} {isStadesConsistent ? '✅' : '❌'}
                 </Text>
-              </TouchableOpacity>
+              </View>
+              <View style={styles.ruleBox}>
+                <Text style={styles.ruleText}>Règle : Captures = Phases = Stades ♀ + Stades ♂</Text>
+              </View>
             </View>
+
+            {isConsistent ? (
+              <View style={styles.successContainer}>
+                <Text style={styles.successText}>✅ COHÉRENT</Text>
+                <Text style={styles.successDetail}>
+                  {data.totalCaptures} captures = {totalPhases} phases = {totalStadesF} ♀ + {totalStadesM} ♂ = {totalStades} stades
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.warningContainer}>
+                <Text style={styles.warningText}>⚠️ INCOHÉRENCE</Text>
+                <Text style={styles.warningDetail}>
+                  Captures : {data.totalCaptures}
+                  {'\n'}Phases : {totalPhases}
+                  {'\n'}Stades ♀ : {totalStadesF}
+                  {'\n'}Stades ♂ : {totalStadesM}
+                  {'\n'}Total stades : {totalStadesF} + {totalStadesM} = {totalStades}
+                </Text>
+                <Text style={styles.warningHint}>
+                  La règle est : Captures = Phases = Stades ♀ + Stades ♂
+                </Text>
+              </View>
+            )}
+          </ScrollView>
+
+          <View style={styles.footer}>
+            <TouchableOpacity 
+              style={[styles.continueButton, !isConsistent && styles.continueButtonDisabled]} 
+              onPress={handleContinue} 
+              disabled={isSaving || !isConsistent} 
+              activeOpacity={0.85}
+            >
+              <Text style={styles.continueButtonText}>Suivant : Larves ›</Text>
+            </TouchableOpacity>
           </View>
-
-          <View style={styles.summaryContainer}>
-            <Text style={styles.summaryTitle}>📋 Récapitulatif</Text>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>1. Nombre de captures :</Text>
-              <Text style={[styles.summaryValue, styles.summaryValueValid]}>{data.totalCaptures}</Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>2. Phases :</Text>
-              <Text style={[styles.summaryValue, isPhasesConsistent ? styles.summaryValueValid : styles.summaryValueInvalid]}>
-                {totalPhases} {isPhasesConsistent ? '✅' : '❌'}
-              </Text>
-            </View>
-            <View style={styles.summaryDivider} />
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>3a. Stades ♀ :</Text>
-              <Text style={styles.summaryValue}>{totalStadesF}</Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>3b. Stades ♂ :</Text>
-              <Text style={styles.summaryValue}>{totalStadesM}</Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Total stades :</Text>
-              <Text style={[styles.summaryValue, isStadesConsistent ? styles.summaryValueValid : styles.summaryValueInvalid]}>
-                {totalStadesF} + {totalStadesM} = {totalStades} {isStadesConsistent ? '✅' : '❌'}
-              </Text>
-            </View>
-            <View style={styles.ruleBox}>
-              <Text style={styles.ruleText}>Règle : Captures = Phases = Stades ♀ + Stades ♂</Text>
-            </View>
-          </View>
-
-          {isConsistent ? (
-            <View style={styles.successContainer}>
-              <Text style={styles.successText}>✅ COHÉRENT</Text>
-              <Text style={styles.successDetail}>
-                {data.totalCaptures} captures = {totalPhases} phases = {totalStadesF} ♀ + {totalStadesM} ♂ = {totalStades} stades
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.warningContainer}>
-              <Text style={styles.warningText}>⚠️ INCOHÉRENCE</Text>
-              <Text style={styles.warningDetail}>
-                Captures : {data.totalCaptures}
-                {'\n'}Phases : {totalPhases}
-                {'\n'}Stades ♀ : {totalStadesF}
-                {'\n'}Stades ♂ : {totalStadesM}
-                {'\n'}Total stades : {totalStadesF} + {totalStadesM} = {totalStades}
-              </Text>
-              <Text style={styles.warningHint}>
-                La règle est : Captures = Phases = Stades ♀ + Stades ♂
-              </Text>
-            </View>
-          )}
-        </ScrollView>
-
-        <View style={styles.footer}>
-          <TouchableOpacity 
-            style={[styles.continueButton, !isConsistent && styles.continueButtonDisabled]} 
-            onPress={handleContinue} 
-            disabled={isSaving || !isConsistent} 
-            activeOpacity={0.85}
-          >
-            <Text style={styles.continueButtonText}>Suivant : Larves ›</Text>
-          </TouchableOpacity>
-        </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
   );
@@ -481,6 +487,7 @@ export default function ExtensiveImagosScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
+  keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
   back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
   title: { fontSize: 15, fontWeight: '700', color: TEXT },
