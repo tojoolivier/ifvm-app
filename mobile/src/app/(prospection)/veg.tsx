@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm } from '@tanstack/react-form';
@@ -127,252 +127,258 @@ export default function VegetationScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.safe}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
-            <Text style={styles.back}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>Strates</Text>
-        </View>
+        <KeyboardAvoidingView 
+          style={styles.keyboardAvoidingView} 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          <View style={styles.headerRow}>
+            <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
+              <Text style={styles.back}>‹</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>Strates</Text>
+          </View>
 
-        <ScrollView ref={scrollRef} style={styles.scroll} contentContainerStyle={{ padding: 16 }}>
-          <Text style={styles.hint}>Recouvrement total ≥ 100%. Touchez une strate pour la détailler.</Text>
+          <ScrollView ref={scrollRef} style={styles.scroll} contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
+            <Text style={styles.hint}>Recouvrement total ≥ 100%. Touchez une strate pour la détailler.</Text>
 
-          {STRATE_KEYS.map((key) => {
-            const strate = strates[key];
-            const expanded = key === expandedStrate;
-            return (
-              <View key={key} style={[styles.strateCard, expanded && styles.strateCardExpanded]}>
-                <TouchableOpacity onPress={() => setExpandedStrate(expanded ? null : key)} activeOpacity={0.7}>
-                  <View style={styles.strateHeaderRow}>
-                    <Text style={[styles.strateLabel, expanded && styles.strateLabelExpanded]}>
-                      {STRATE_LABELS[key]}
-                      {expanded ? ' ▾' : ''}
-                    </Text>
-                    <Text style={styles.stratePct}>{strate.recouvrement}%</Text>
-                  </View>
-                  <View style={styles.recBarTrack}>
-                    <View style={[styles.recBarFill, { width: `${strate.recouvrement}%` as const }]} />
-                  </View>
-                </TouchableOpacity>
-
-                {expanded && (
-                  <View style={styles.strateDetail}>
-                    <View style={styles.fieldsRow}>
-                      <View style={styles.field}>
-                        <Text style={styles.fieldLabel}>Surf. rel. %</Text>
-                        <TextInput
-                          value={strate.surfRel != null ? String(strate.surfRel) : ''}
-                          onChangeText={(v) => {
-                            const val = v === '' ? null : Number(v);
-                            if (val !== null && !isNaN(val)) {
-                              setStrateField(key, 'surfRel', clampTo5(val, 0, 100));
-                            } else {
-                              setStrateField(key, 'surfRel', null);
-                            }
-                          }}
-                          keyboardType="decimal-pad"
-                          style={styles.fieldInput}
-                        />
-                        <Text style={styles.stepHint}>par pas de 5%</Text>
-                      </View>
-                      <View style={styles.field}>
-                        <Text style={styles.fieldLabel}>H. moy (m)</Text>
-                        <TextInput
-                          value={strate.hMoy != null ? String(strate.hMoy) : ''}
-                          onChangeText={(v) => setStrateField(key, 'hMoy', v === '' ? null : Number(v))}
-                          keyboardType="decimal-pad"
-                          style={styles.fieldInput}
-                        />
-                      </View>
+            {STRATE_KEYS.map((key) => {
+              const strate = strates[key];
+              const expanded = key === expandedStrate;
+              return (
+                <View key={key} style={[styles.strateCard, expanded && styles.strateCardExpanded]}>
+                  <TouchableOpacity onPress={() => setExpandedStrate(expanded ? null : key)} activeOpacity={0.7}>
+                    <View style={styles.strateHeaderRow}>
+                      <Text style={[styles.strateLabel, expanded && styles.strateLabelExpanded]}>
+                        {STRATE_LABELS[key]}
+                        {expanded ? ' ▾' : ''}
+                      </Text>
+                      <Text style={styles.stratePct}>{strate.recouvrement}%</Text>
                     </View>
-
-                    <View style={styles.recouvrementRow}>
-                      <Text style={styles.recouvrementLabel}>Recouvrement</Text>
-                      <Text style={styles.recouvrementValue}>{strate.recouvrement}%</Text>
+                    <View style={styles.recBarTrack}>
+                      <View style={[styles.recBarFill, { width: `${strate.recouvrement}%` as const }]} />
                     </View>
-                    <View style={styles.stepperRow}>
-                      <TouchableOpacity
-                        style={styles.stepperButton}
-                        onPress={() => handleRecouvrementChange(key, -5)}
-                      >
-                        <Text style={styles.stepperButtonText}>−</Text>
-                      </TouchableOpacity>
-                      <View style={styles.recBarTrack}>
-                        <View style={[styles.recBarFill, { width: `${strate.recouvrement}%` as const }]} />
-                      </View>
-                      <TouchableOpacity
-                        style={[styles.stepperButton, styles.stepperButtonAdd]}
-                        onPress={() => handleRecouvrementChange(key, 5)}
-                      >
-                        <Text style={[styles.stepperButtonText, styles.stepperButtonAddText]}>+</Text>
-                      </TouchableOpacity>
-                    </View>
-                    <Text style={styles.stepHint}>par pas de 5%</Text>
+                  </TouchableOpacity>
 
-                    <View style={styles.fieldsRow}>
-                      <View style={styles.field}>
-                        <Text style={styles.fieldLabel}>% Verdissement</Text>
-                        <TextInput
-                          value={strate.verdissement != null ? String(strate.verdissement) : ''}
-                          onChangeText={(v) => {
-                            const val = v === '' ? null : Number(v);
-                            if (val !== null && !isNaN(val)) {
-                              setStrateField(key, 'verdissement', clampTo5(val, 0, 100));
-                            } else {
-                              setStrateField(key, 'verdissement', null);
-                            }
-                          }}
-                          keyboardType="decimal-pad"
-                          style={styles.fieldInput}
-                        />
-                        <Text style={styles.stepHint}>par pas de 5%</Text>
+                  {expanded && (
+                    <View style={styles.strateDetail}>
+                      <View style={styles.fieldsRow}>
+                        <View style={styles.field}>
+                          <Text style={styles.fieldLabel}>Surf. rel. %</Text>
+                          <TextInput
+                            value={strate.surfRel != null ? String(strate.surfRel) : ''}
+                            onChangeText={(v) => {
+                              const val = v === '' ? null : Number(v);
+                              if (val !== null && !isNaN(val)) {
+                                setStrateField(key, 'surfRel', clampTo5(val, 0, 100));
+                              } else {
+                                setStrateField(key, 'surfRel', null);
+                              }
+                            }}
+                            keyboardType="decimal-pad"
+                            style={styles.fieldInput}
+                          />
+                          <Text style={styles.stepHint}>par pas de 5%</Text>
+                        </View>
+                        <View style={styles.field}>
+                          <Text style={styles.fieldLabel}>H. moy (m)</Text>
+                          <TextInput
+                            value={strate.hMoy != null ? String(strate.hMoy) : ''}
+                            onChangeText={(v) => setStrateField(key, 'hMoy', v === '' ? null : Number(v))}
+                            keyboardType="decimal-pad"
+                            style={styles.fieldInput}
+                          />
+                        </View>
                       </View>
-                      <View style={styles.field}>
-                        <Text style={styles.fieldLabel}>% Repousse</Text>
-                        <TextInput
-                          value={strate.repousse != null ? String(strate.repousse) : ''}
-                          onChangeText={(v) => {
-                            const val = v === '' ? null : Number(v);
-                            if (val !== null && !isNaN(val)) {
-                              setStrateField(key, 'repousse', clampTo5(val, 0, 100));
-                            } else {
-                              setStrateField(key, 'repousse', null);
-                            }
-                          }}
-                          keyboardType="decimal-pad"
-                          style={styles.fieldInput}
-                        />
-                        <Text style={styles.stepHint}>par pas de 5%</Text>
-                      </View>
-                    </View>
 
-                    <Text style={styles.smallLabel}>Stade ORPAD</Text>
+                      <View style={styles.recouvrementRow}>
+                        <Text style={styles.recouvrementLabel}>Recouvrement</Text>
+                        <Text style={styles.recouvrementValue}>{strate.recouvrement}%</Text>
+                      </View>
+                      <View style={styles.stepperRow}>
+                        <TouchableOpacity
+                          style={styles.stepperButton}
+                          onPress={() => handleRecouvrementChange(key, -5)}
+                        >
+                          <Text style={styles.stepperButtonText}>−</Text>
+                        </TouchableOpacity>
+                        <View style={styles.recBarTrack}>
+                          <View style={[styles.recBarFill, { width: `${strate.recouvrement}%` as const }]} />
+                        </View>
+                        <TouchableOpacity
+                          style={[styles.stepperButton, styles.stepperButtonAdd]}
+                          onPress={() => handleRecouvrementChange(key, 5)}
+                        >
+                          <Text style={[styles.stepperButtonText, styles.stepperButtonAddText]}>+</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <Text style={styles.stepHint}>par pas de 5%</Text>
+
+                      <View style={styles.fieldsRow}>
+                        <View style={styles.field}>
+                          <Text style={styles.fieldLabel}>% Verdissement</Text>
+                          <TextInput
+                            value={strate.verdissement != null ? String(strate.verdissement) : ''}
+                            onChangeText={(v) => {
+                              const val = v === '' ? null : Number(v);
+                              if (val !== null && !isNaN(val)) {
+                                setStrateField(key, 'verdissement', clampTo5(val, 0, 100));
+                              } else {
+                                setStrateField(key, 'verdissement', null);
+                              }
+                            }}
+                            keyboardType="decimal-pad"
+                            style={styles.fieldInput}
+                          />
+                          <Text style={styles.stepHint}>par pas de 5%</Text>
+                        </View>
+                        <View style={styles.field}>
+                          <Text style={styles.fieldLabel}>% Repousse</Text>
+                          <TextInput
+                            value={strate.repousse != null ? String(strate.repousse) : ''}
+                            onChangeText={(v) => {
+                              const val = v === '' ? null : Number(v);
+                              if (val !== null && !isNaN(val)) {
+                                setStrateField(key, 'repousse', clampTo5(val, 0, 100));
+                              } else {
+                                setStrateField(key, 'repousse', null);
+                              }
+                            }}
+                            keyboardType="decimal-pad"
+                            style={styles.fieldInput}
+                          />
+                          <Text style={styles.stepHint}>par pas de 5%</Text>
+                        </View>
+                      </View>
+
+                      <Text style={styles.smallLabel}>Stade ORPAD</Text>
+                      <View style={styles.chipsRow}>
+                        {ORPAD_STAGES.map((stage) => {
+                          const active = strate.orpad.includes(stage);
+                          return (
+                            <TouchableOpacity
+                              key={stage}
+                              onPress={() => toggleOrpad(key, stage)}
+                              style={[styles.smallChip, active && styles.smallChipActive]}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={[styles.smallChipText, active && styles.smallChipTextActive]}>{stage}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+
+                      <Text style={styles.fieldLabel}>Sol nu %</Text>
+                      <TextInput
+                        value={strate.solNu != null ? String(strate.solNu) : ''}
+                        onChangeText={(v) => {
+                          const val = v === '' ? null : Number(v);
+                          if (val !== null && !isNaN(val)) {
+                            setStrateField(key, 'solNu', clampTo5(val, 0, 100));
+                          } else {
+                            setStrateField(key, 'solNu', null);
+                          }
+                        }}
+                        keyboardType="decimal-pad"
+                        style={styles.fieldInput}
+                      />
+                      <Text style={styles.stepHint}>par pas de 5%</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+
+            <form.Field
+              name="humidite"
+              validators={{
+                onChange: ({ value }) => (value ? undefined : 'Humidité du sol requise'),
+                onBlur: ({ value }) => (value ? undefined : 'Humidité du sol requise'),
+              }}
+            >
+              {(field) => {
+                const showError = field.state.meta.isTouched && !field.state.meta.isValid;
+                return (
+                  <View style={[styles.card, showError && styles.cardError]}>
+                    <Text style={styles.cardTitle}>Humidité du sol</Text>
                     <View style={styles.chipsRow}>
-                      {ORPAD_STAGES.map((stage) => {
-                        const active = strate.orpad.includes(stage);
+                      {HUMIDITE_OPTIONS.map((option) => {
+                        const active = option.value === field.state.value;
                         return (
                           <TouchableOpacity
-                            key={stage}
-                            onPress={() => toggleOrpad(key, stage)}
+                            key={option.value}
                             style={[styles.smallChip, active && styles.smallChipActive]}
-                            activeOpacity={0.8}
+                            onPress={() => {
+                              field.handleChange(option.value);
+                              field.handleBlur();
+                            }}
                           >
-                            <Text style={[styles.smallChipText, active && styles.smallChipTextActive]}>{stage}</Text>
+                            <Text style={[styles.smallChipText, active && styles.smallChipTextActive]}>{option.label}</Text>
                           </TouchableOpacity>
                         );
                       })}
                     </View>
-
-                    <Text style={styles.fieldLabel}>Sol nu %</Text>
-                    <TextInput
-                      value={strate.solNu != null ? String(strate.solNu) : ''}
-                      onChangeText={(v) => {
-                        const val = v === '' ? null : Number(v);
-                        if (val !== null && !isNaN(val)) {
-                          setStrateField(key, 'solNu', clampTo5(val, 0, 100));
-                        } else {
-                          setStrateField(key, 'solNu', null);
-                        }
-                      }}
-                      keyboardType="decimal-pad"
-                      style={styles.fieldInput}
-                    />
-                    <Text style={styles.stepHint}>par pas de 5%</Text>
+                    {showError && <Text style={styles.errorText}>{field.state.meta.errors[0]}</Text>}
                   </View>
-                )}
-              </View>
-            );
-          })}
+                );
+              }}
+            </form.Field>
 
-          <form.Field
-            name="humidite"
-            validators={{
-              onChange: ({ value }) => (value ? undefined : 'Humidité du sol requise'),
-              onBlur: ({ value }) => (value ? undefined : 'Humidité du sol requise'),
-            }}
-          >
-            {(field) => {
-              const showError = field.state.meta.isTouched && !field.state.meta.isValid;
-              return (
-                <View style={[styles.card, showError && styles.cardError]}>
-                  <Text style={styles.cardTitle}>Humidité du sol</Text>
-                  <View style={styles.chipsRow}>
-                    {HUMIDITE_OPTIONS.map((option) => {
-                      const active = option.value === field.state.value;
-                      return (
-                        <TouchableOpacity
-                          key={option.value}
-                          style={[styles.smallChip, active && styles.smallChipActive]}
-                          onPress={() => {
-                            field.handleChange(option.value);
-                            field.handleBlur();
-                          }}
-                        >
-                          <Text style={[styles.smallChipText, active && styles.smallChipTextActive]}>{option.label}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
+            <form.Field
+              name="texture"
+              validators={{
+                onChange: ({ value }) => (selectedTextures.length > 0 ? undefined : 'Texture du sol requise'),
+                onBlur: ({ value }) => (selectedTextures.length > 0 ? undefined : 'Texture du sol requise'),
+              }}
+            >
+              {(field) => {
+                const showError = field.state.meta.isTouched && selectedTextures.length === 0;
+                return (
+                  <View style={[styles.card, showError && styles.cardError]}>
+                    <Text style={styles.cardTitle}>Texture du sol (sélection multiple)</Text>
+                    <Text style={styles.hintSmall}>Touchez pour sélectionner/désélectionner</Text>
+                    <View style={styles.chipsRow}>
+                      {TEXTURE_OPTIONS.map((option) => {
+                        const active = selectedTextures.includes(option.value);
+                        return (
+                          <TouchableOpacity
+                            key={option.value}
+                            style={[styles.smallChip, active && styles.smallChipActive]}
+                            onPress={() => {
+                              toggleTexture(option.value);
+                              field.handleBlur();
+                            }}
+                          >
+                            <Text style={[styles.smallChipText, active && styles.smallChipTextActive]}>
+                              {option.label}
+                              {active && ' ✓'}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                    {selectedTextures.length > 0 && (
+                      <Text style={styles.selectionInfo}>
+                        {selectedTextures.length} texture{selectedTextures.length > 1 ? 's' : ''} sélectionnée{selectedTextures.length > 1 ? 's' : ''}
+                      </Text>
+                    )}
+                    {showError && <Text style={styles.errorText}>Veuillez sélectionner au moins une texture</Text>}
                   </View>
-                  {showError && <Text style={styles.errorText}>{field.state.meta.errors[0]}</Text>}
-                </View>
-              );
-            }}
-          </form.Field>
+                );
+              }}
+            </form.Field>
+          </ScrollView>
 
-          <form.Field
-            name="texture"
-            validators={{
-              onChange: ({ value }) => (selectedTextures.length > 0 ? undefined : 'Texture du sol requise'),
-              onBlur: ({ value }) => (selectedTextures.length > 0 ? undefined : 'Texture du sol requise'),
-            }}
-          >
-            {(field) => {
-              const showError = field.state.meta.isTouched && selectedTextures.length === 0;
-              return (
-                <View style={[styles.card, showError && styles.cardError]}>
-                  <Text style={styles.cardTitle}>Texture du sol (sélection multiple)</Text>
-                  <Text style={styles.hintSmall}>Touchez pour sélectionner/désélectionner</Text>
-                  <View style={styles.chipsRow}>
-                    {TEXTURE_OPTIONS.map((option) => {
-                      const active = selectedTextures.includes(option.value);
-                      return (
-                        <TouchableOpacity
-                          key={option.value}
-                          style={[styles.smallChip, active && styles.smallChipActive]}
-                          onPress={() => {
-                            toggleTexture(option.value);
-                            field.handleBlur();
-                          }}
-                        >
-                          <Text style={[styles.smallChipText, active && styles.smallChipTextActive]}>
-                            {option.label}
-                            {active && ' ✓'}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                  {selectedTextures.length > 0 && (
-                    <Text style={styles.selectionInfo}>
-                      {selectedTextures.length} texture{selectedTextures.length > 1 ? 's' : ''} sélectionnée{selectedTextures.length > 1 ? 's' : ''}
-                    </Text>
-                  )}
-                  {showError && <Text style={styles.errorText}>Veuillez sélectionner au moins une texture</Text>}
-                </View>
-              );
-            }}
-          </form.Field>
-        </ScrollView>
+          <Text style={styles.totalRec}>
+            Total recouvrement : {STRATE_KEYS.reduce((sum, key) => sum + strates[key].recouvrement, 0)}%
+          </Text>
 
-        <Text style={styles.totalRec}>
-          Total recouvrement : {STRATE_KEYS.reduce((sum, key) => sum + strates[key].recouvrement, 0)}%
-        </Text>
-
-        <View style={styles.footer}>
-          <TouchableOpacity style={styles.continueButton} onPress={form.handleSubmit} disabled={isSaving} activeOpacity={0.85}>
-            <Text style={styles.continueButtonText}>{isSaving ? 'Enregistrement…' : 'Continuer  ›'}</Text>
-          </TouchableOpacity>
-        </View>
+          <View style={styles.footer}>
+            <TouchableOpacity style={styles.continueButton} onPress={form.handleSubmit} disabled={isSaving} activeOpacity={0.85}>
+              <Text style={styles.continueButtonText}>{isSaving ? 'Enregistrement…' : 'Continuer  ›'}</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
   );
@@ -381,6 +387,7 @@ export default function VegetationScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
+  keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
   back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
   title: { fontSize: 15, fontWeight: '700', color: TEXT },

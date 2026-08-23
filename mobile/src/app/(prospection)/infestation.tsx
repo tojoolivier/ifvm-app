@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TYPE_CIBLE_OPTIONS } from '@/lib/prospection-fiche-lecture';
@@ -530,155 +530,112 @@ export default function InfestationScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.safe}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => (tab === 'comport' ? setTab('desc') : router.back())} activeOpacity={0.7}>
-            <Text style={styles.back}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>
-            {tab === 'desc' ? 'Infestation' : `Comportement · ${targetLabel}`}
-          </Text>
-        </View>
+        <KeyboardAvoidingView 
+          style={styles.keyboardAvoidingView} 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          <View style={styles.headerRow}>
+            <TouchableOpacity onPress={() => (tab === 'comport' ? setTab('desc') : router.back())} activeOpacity={0.7}>
+              <Text style={styles.back}>‹</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>
+              {tab === 'desc' ? 'Infestation' : `Comportement · ${targetLabel}`}
+            </Text>
+          </View>
 
-        <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16 }}>
-          {tab === 'desc' && (
-            <>
-              <View style={styles.toggleTrack}>
-                <TouchableOpacity onPress={() => setTab('desc')} activeOpacity={0.7} style={styles.toggleSegmentTouchable}>
-                  <Text style={[styles.toggleSegment, tab === 'desc' && styles.toggleSegmentActive]}>Description</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setTab('comport')} activeOpacity={0.7} style={styles.toggleSegmentTouchable}>
-                  <Text style={styles.toggleSegment}>Comportement</Text>
-                </TouchableOpacity>
-              </View>
-
-              <Text style={styles.sectionLabel}>Type de cible</Text>
-              
-              <View style={styles.targetRow}>
-                {renderTargetChips()}
-              </View>
-
-              <View style={styles.selectionInfo}>
-                <Text style={styles.selectionInfoText}>
-                  {selectedTargets.length === 0 
-                    ? 'Aucun type sélectionné' 
-                    : `${selectedTargets.length} type${selectedTargets.length > 1 ? 's' : ''} sélectionné${selectedTargets.length > 1 ? 's' : ''}`
-                  }
-                </Text>
-              </View>
-            </>
-          )}
-
-          {tab === 'desc' && selectedTargets.length > 0 && (
-            <View style={styles.card}>
-              <View style={styles.row2NoMargin}>
-                <View style={styles.infoBox}>
-                  <Text style={styles.infoBoxLabel}>Taille (en m)</Text>
-                  <TextInput
-                    value={form.tailleMoy}
-                    onChangeText={(v) => setField('tailleMoy', v)}
-                    keyboardType="decimal-pad"
-                    style={styles.infoBoxInput}
-                  />
+          <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
+            {tab === 'desc' && (
+              <>
+                <View style={styles.toggleTrack}>
+                  <TouchableOpacity onPress={() => setTab('desc')} activeOpacity={0.7} style={styles.toggleSegmentTouchable}>
+                    <Text style={[styles.toggleSegment, tab === 'desc' && styles.toggleSegmentActive]}>Description</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setTab('comport')} activeOpacity={0.7} style={styles.toggleSegmentTouchable}>
+                    <Text style={styles.toggleSegment}>Comportement</Text>
+                  </TouchableOpacity>
                 </View>
-                <View style={[styles.infoBox, styles.infoBoxHighlighted]}>
-                  <Text style={styles.infoBoxLabel}>Surface totale</Text>
-                  <View style={styles.infoBoxInputRow}>
+
+                <Text style={styles.sectionLabel}>Type de cible</Text>
+                
+                <View style={styles.targetRow}>
+                  {renderTargetChips()}
+                </View>
+
+                <View style={styles.selectionInfo}>
+                  <Text style={styles.selectionInfoText}>
+                    {selectedTargets.length === 0 
+                      ? 'Aucun type sélectionné' 
+                      : `${selectedTargets.length} type${selectedTargets.length > 1 ? 's' : ''} sélectionné${selectedTargets.length > 1 ? 's' : ''}`
+                    }
+                  </Text>
+                </View>
+              </>
+            )}
+
+            {tab === 'desc' && selectedTargets.length > 0 && (
+              <View style={styles.card}>
+                <View style={styles.row2NoMargin}>
+                  <View style={styles.infoBox}>
+                    <Text style={styles.infoBoxLabel}>Taille (en m)</Text>
                     <TextInput
-                      value={form.surfaceTotale}
-                      onChangeText={(v) => setField('surfaceTotale', v)}
+                      value={form.tailleMoy}
+                      onChangeText={(v) => setField('tailleMoy', v)}
                       keyboardType="decimal-pad"
                       style={styles.infoBoxInput}
                     />
-                    <Text style={styles.infoBoxUnit}>ha</Text>
+                  </View>
+                  <View style={[styles.infoBox, styles.infoBoxHighlighted]}>
+                    <Text style={styles.infoBoxLabel}>Surface totale</Text>
+                    <View style={styles.infoBoxInputRow}>
+                      <TextInput
+                        value={form.surfaceTotale}
+                        onChangeText={(v) => setField('surfaceTotale', v)}
+                        keyboardType="decimal-pad"
+                        style={styles.infoBoxInput}
+                      />
+                      <Text style={styles.infoBoxUnit}>ha</Text>
+                    </View>
                   </View>
                 </View>
-              </View>
 
-              {currentTarget === 'vol_clair' || currentTarget === 'essaim' ? (
-                <>
-                  <Text style={styles.sectionLabel}>Classification (questionnaire séquentiel)</Text>
-                  <Text style={styles.fieldGroupLabel}>Vol spontané, non provoqué ?</Text>
-                  <View style={styles.row2}>
-                    {([true, false] as const).map((value) => {
-                      const active = form.aerialVolSpontane === value;
-                      return (
-                        <TouchableOpacity
-                          key={String(value)}
-                          onPress={() => setField('aerialVolSpontane', value)}
-                          style={[styles.chip, active && styles.chipActive]}
-                          activeOpacity={0.8}
-                        >
-                          <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                            {value ? 'Oui' : 'Non'}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
+                {currentTarget === 'vol_clair' || currentTarget === 'essaim' ? (
+                  <>
+                    <Text style={styles.sectionLabel}>Classification (questionnaire séquentiel)</Text>
+                    <Text style={styles.fieldGroupLabel}>Vol spontané, non provoqué ?</Text>
+                    <View style={styles.row2}>
+                      {([true, false] as const).map((value) => {
+                        const active = form.aerialVolSpontane === value;
+                        return (
+                          <TouchableOpacity
+                            key={String(value)}
+                            onPress={() => setField('aerialVolSpontane', value)}
+                            style={[styles.chip, active && styles.chipActive]}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                              {value ? 'Oui' : 'Non'}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
 
-                  {form.aerialVolSpontane === true && (
-                    <>
-                      <Text style={styles.fieldGroupLabel}>Visible seulement de près ?</Text>
-                      <View style={styles.row2}>
-                        {([true, false] as const).map((value) => {
-                          const active = form.aerialVisibleDePres === value;
-                          return (
-                            <TouchableOpacity
-                              key={String(value)}
-                              onPress={() => setField('aerialVisibleDePres', value)}
-                              style={[styles.chip, active && styles.chipActive]}
-                              activeOpacity={0.8}
-                            >
-                              <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                                {value ? 'Oui' : 'Non'}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    </>
-                  )}
-
-                  {form.aerialVolSpontane === true && form.aerialVisibleDePres === false && (
-                    <>
-                      <Text style={styles.fieldGroupLabel}>Masse sombre qui ne masque pas le paysage ?</Text>
-                      <View style={styles.row2}>
-                        {([true, false] as const).map((value) => {
-                          const active = form.aerialMasseSombre === value;
-                          return (
-                            <TouchableOpacity
-                              key={String(value)}
-                              onPress={() => setField('aerialMasseSombre', value)}
-                              style={[styles.chip, active && styles.chipActive]}
-                              activeOpacity={0.8}
-                            >
-                              <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                                {value ? 'Oui' : 'Non'}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    </>
-                  )}
-
-                  {form.aerialVolSpontane === true &&
-                    form.aerialVisibleDePres === false &&
-                    form.aerialMasseSombre === false && (
+                    {form.aerialVolSpontane === true && (
                       <>
-                        <Text style={styles.fieldGroupLabel}>La formation masque le paysage à l&apos;arrière-plan</Text>
+                        <Text style={styles.fieldGroupLabel}>Visible seulement de près ?</Text>
                         <View style={styles.row2}>
-                          {(['partiellement', 'entierement'] as const).map((value) => {
-                            const active = form.aerialMasquePaysage === value;
+                          {([true, false] as const).map((value) => {
+                            const active = form.aerialVisibleDePres === value;
                             return (
                               <TouchableOpacity
-                                key={value}
-                                onPress={() => setField('aerialMasquePaysage', value)}
+                                key={String(value)}
+                                onPress={() => setField('aerialVisibleDePres', value)}
                                 style={[styles.chip, active && styles.chipActive]}
                                 activeOpacity={0.8}
                               >
                                 <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                                  {value === 'partiellement' ? 'Partiellement' : 'Entièrement'}
+                                  {value ? 'Oui' : 'Non'}
                                 </Text>
                               </TouchableOpacity>
                             );
@@ -687,373 +644,422 @@ export default function InfestationScreen() {
                       </>
                     )}
 
-                  {(() => {
-                    const classification = computeAerialClassification(form);
-                    return (
-                      <View style={styles.insightCallout}>
-                        <Text style={styles.insightText}>
-                          Classification :{' '}
-                          {classification ? AERIAL_CLASSIFICATION_LABELS[classification] : 'en attente de réponses'}
-                        </Text>
-                      </View>
-                    );
-                  })()}
-                </>
-              ) : (
-                <>
-                  <Text style={styles.sectionLabel}>Densité (/m²)</Text>
-                  <View style={styles.row3}>
-                    <View style={styles.box}>
-                      <Text style={styles.boxCaption}>min</Text>
-                      <TextInput
-                        value={form.densMin}
-                        onChangeText={(v) => setField('densMin', v)}
-                        keyboardType="decimal-pad"
-                        style={styles.boxValue}
-                      />
-                    </View>
-                    <View style={styles.box}>
-                      <Text style={styles.boxCaption}>max</Text>
-                      <TextInput
-                        value={form.densMax}
-                        onChangeText={(v) => setField('densMax', v)}
-                        keyboardType="decimal-pad"
-                        style={styles.boxValue}
-                      />
-                    </View>
-                    <View style={[styles.box, styles.boxEmphasis]}>
-                      <Text style={[styles.boxCaption, styles.boxCaptionEmphasis]}>moy</Text>
-                      <TextInput
-                        value={form.densMoy}
-                        onChangeText={(v) => setField('densMoy', v)}
-                        keyboardType="decimal-pad"
-                        style={[styles.boxValue, styles.boxValueEmphasis]}
-                      />
-                    </View>
-                  </View>
-                </>
-              )}
+                    {form.aerialVolSpontane === true && form.aerialVisibleDePres === false && (
+                      <>
+                        <Text style={styles.fieldGroupLabel}>Masse sombre qui ne masque pas le paysage ?</Text>
+                        <View style={styles.row2}>
+                          {([true, false] as const).map((value) => {
+                            const active = form.aerialMasseSombre === value;
+                            return (
+                              <TouchableOpacity
+                                key={String(value)}
+                                onPress={() => setField('aerialMasseSombre', value)}
+                                style={[styles.chip, active && styles.chipActive]}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                                  {value ? 'Oui' : 'Non'}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      </>
+                    )}
 
-              <Text style={styles.sectionLabel}>Interdistance (m)</Text>
-              <View style={styles.row3}>
-                <View style={styles.box}>
-                  <Text style={styles.boxCaption}>min</Text>
-                  <TextInput
-                    value={form.interdistanceMin}
-                    onChangeText={(v) => setField('interdistanceMin', v)}
-                    keyboardType="decimal-pad"
-                    style={styles.boxValue}
-                  />
-                </View>
-                <View style={styles.box}>
-                  <Text style={styles.boxCaption}>max</Text>
-                  <TextInput
-                    value={form.interdistanceMax}
-                    onChangeText={(v) => setField('interdistanceMax', v)}
-                    keyboardType="decimal-pad"
-                    style={styles.boxValue}
-                  />
-                </View>
-                <View style={styles.box}>
-                  <Text style={styles.boxCaption}>moy</Text>
-                  <TextInput
-                    value={form.interdistanceMoy}
-                    onChangeText={(v) => setField('interdistanceMoy', v)}
-                    keyboardType="decimal-pad"
-                    style={styles.boxValue}
-                  />
-                </View>
-              </View>
+                    {form.aerialVolSpontane === true &&
+                      form.aerialVisibleDePres === false &&
+                      form.aerialMasseSombre === false && (
+                        <>
+                          <Text style={styles.fieldGroupLabel}>La formation masque le paysage à l&apos;arrière-plan</Text>
+                          <View style={styles.row2}>
+                            {(['partiellement', 'entierement'] as const).map((value) => {
+                              const active = form.aerialMasquePaysage === value;
+                              return (
+                                <TouchableOpacity
+                                  key={value}
+                                  onPress={() => setField('aerialMasquePaysage', value)}
+                                  style={[styles.chip, active && styles.chipActive]}
+                                  activeOpacity={0.8}
+                                >
+                                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                                    {value === 'partiellement' ? 'Partiellement' : 'Entièrement'}
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+                        </>
+                      )}
 
-              {(currentTarget === 'tache_larvaire' || currentTarget === 'bande_larvaire') && (
-                <>
-                  <Text style={styles.fieldGroupLabel}>Stade dominant</Text>
-                  <View style={styles.row2}>
-                    {(['l1_l3', 'l4_l5'] as const).map((value) => {
-                      const active = form.stadeDominant === value;
+                    {(() => {
+                      const classification = computeAerialClassification(form);
                       return (
-                        <TouchableOpacity
-                          key={value}
-                          onPress={() => setField('stadeDominant', value)}
-                          style={[styles.chip, active && styles.chipActive]}
-                          activeOpacity={0.8}
-                        >
-                          <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                            {value === 'l1_l3' ? 'L1-L3' : 'L4-L5'}
+                        <View style={styles.insightCallout}>
+                          <Text style={styles.insightText}>
+                            Classification :{' '}
+                            {classification ? AERIAL_CLASSIFICATION_LABELS[classification] : 'en attente de réponses'}
                           </Text>
-                        </TouchableOpacity>
+                        </View>
                       );
-                    })}
-                  </View>
-
-                  <View style={styles.row2NoMargin}>
-                    <View style={styles.infoBox}>
-                      <Text style={styles.infoBoxLabel}>Taille du groupe</Text>
-                      <View style={styles.infoBoxInputRow}>
+                    })()}
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.sectionLabel}>Densité (/m²)</Text>
+                    <View style={styles.row3}>
+                      <View style={styles.box}>
+                        <Text style={styles.boxCaption}>min</Text>
                         <TextInput
-                          value={form.tailleGroupeM2}
-                          onChangeText={(v) => setField('tailleGroupeM2', v)}
+                          value={form.densMin}
+                          onChangeText={(v) => setField('densMin', v)}
                           keyboardType="decimal-pad"
-                          style={styles.infoBoxInput}
+                          style={styles.boxValue}
                         />
-                        <Text style={styles.infoBoxUnit}>m²</Text>
                       </View>
-                    </View>
-                  </View>
-                </>
-              )}
-
-              {currentTarget === 'bande_larvaire' && (
-                <>
-                  <View style={styles.row2NoMargin}>
-                    <View style={styles.infoBox}>
-                      <Text style={styles.infoBoxLabel}>Nombre de taches</Text>
-                      <View style={styles.infoBoxInputRow}>
+                      <View style={styles.box}>
+                        <Text style={styles.boxCaption}>max</Text>
                         <TextInput
-                          value={form.nbTachesBandes}
-                          onChangeText={(v) => setField('nbTachesBandes', v)}
-                          keyboardType="number-pad"
-                          style={styles.infoBoxInput}
+                          value={form.densMax}
+                          onChangeText={(v) => setField('densMax', v)}
+                          keyboardType="decimal-pad"
+                          style={styles.boxValue}
+                        />
+                      </View>
+                      <View style={[styles.box, styles.boxEmphasis]}>
+                        <Text style={[styles.boxCaption, styles.boxCaptionEmphasis]}>moy</Text>
+                        <TextInput
+                          value={form.densMoy}
+                          onChangeText={(v) => setField('densMoy', v)}
+                          keyboardType="decimal-pad"
+                          style={[styles.boxValue, styles.boxValueEmphasis]}
                         />
                       </View>
                     </View>
-                  </View>
+                  </>
+                )}
 
-                  <Text style={styles.sectionLabel}>Dimensions du front (m)</Text>
-                  <View style={styles.row3}>
-                    <View style={styles.box}>
-                      <Text style={styles.boxCaption}>longueur</Text>
-                      <TextInput
-                        value={form.frontLongueurM}
-                        onChangeText={(v) => setField('frontLongueurM', v)}
-                        keyboardType="decimal-pad"
-                        style={styles.boxValue}
-                      />
-                    </View>
-                    <View style={styles.box}>
-                      <Text style={styles.boxCaption}>largeur</Text>
-                      <TextInput
-                        value={form.frontLargeurM}
-                        onChangeText={(v) => setField('frontLargeurM', v)}
-                        keyboardType="decimal-pad"
-                        style={styles.boxValue}
-                      />
-                    </View>
-                  </View>
-
-                  <Text style={styles.sectionLabel}>Densité au front (/m²)</Text>
-                  <View style={styles.row3}>
-                    <View style={styles.box}>
-                      <Text style={styles.boxCaption}>max</Text>
-                      <TextInput
-                        value={form.densiteMaxFront}
-                        onChangeText={(v) => setField('densiteMaxFront', v)}
-                        keyboardType="decimal-pad"
-                        style={styles.boxValue}
-                      />
-                    </View>
-                    <View style={styles.box}>
-                      <Text style={styles.boxCaption}>moy arrière</Text>
-                      <TextInput
-                        value={form.densiteMoyArriereFront}
-                        onChangeText={(v) => setField('densiteMoyArriereFront', v)}
-                        keyboardType="decimal-pad"
-                        style={styles.boxValue}
-                      />
-                    </View>
-                  </View>
-                </>
-              )}
-
-              {descInsight && (
-                <View style={styles.insightCallout}>
-                  <Text style={styles.insightText}>{descInsight}</Text>
-                </View>
-              )}
-            </View>
-          )}
-
-          {tab === 'comport' && selectedTargets.length > 0 && (
-            <View style={styles.card}>
-              <Text style={styles.fieldGroupLabel}>État</Text>
-              <View style={styles.row2}>
-                {(['repos', 'deplacement'] as const).map((value) => {
-                  const active = form.comportement === value;
-                  return (
-                    <TouchableOpacity
-                      key={value}
-                      onPress={() => setField('comportement', value)}
-                      style={[styles.chip, active && styles.chipActive]}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                        {value === 'repos' ? 'Repos' : 'Déplacement'}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {(currentTarget === 'vol_clair' || currentTarget === 'essaim') && (
-                <>
-                  <Text style={styles.fieldGroupLabel}>Comportement de l&apos;essaim</Text>
-                  <View style={styles.row2}>
-                    {(['vol', 'pose'] as const).map((value) => {
-                      const active = form.essaimComportement === value;
-                      return (
-                        <TouchableOpacity
-                          key={value}
-                          onPress={() => setField('essaimComportement', value)}
-                          style={[styles.chip, active && styles.chipActive]}
-                          activeOpacity={0.8}
-                        >
-                          <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                            {value === 'vol' ? 'En vol' : 'Posé'}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-
-                  <Text style={styles.fieldGroupLabel}>Heure d&apos;observation</Text>
-                  <View style={styles.infoBox}>
-                    <Text style={styles.infoBoxLabel}>hh:mm</Text>
-                    <TimeField
-                      value={form.heureObservation || null}
-                      onChange={(value) => setField('heureObservation', value)}
-                      style={styles.timeFieldBox}
-                      textStyle={styles.infoBoxInput}
-                      placeholderStyle={styles.infoBoxInput}
-                    />
-                  </View>
-
-                  <Text style={styles.fieldGroupLabel}>Dimensions de la formation (ha)</Text>
-                  <View style={styles.infoBox}>
-                    <Text style={styles.infoBoxLabel}>ha</Text>
+                <Text style={styles.sectionLabel}>Interdistance (m)</Text>
+                <View style={styles.row3}>
+                  <View style={styles.box}>
+                    <Text style={styles.boxCaption}>min</Text>
                     <TextInput
-                      value={form.dimensionHa}
-                      onChangeText={(value) => setField('dimensionHa', value)}
-                      placeholder="Surface estimée"
+                      value={form.interdistanceMin}
+                      onChangeText={(v) => setField('interdistanceMin', v)}
                       keyboardType="decimal-pad"
-                      style={styles.infoBoxInput}
+                      style={styles.boxValue}
                     />
                   </View>
-
-                  {currentTarget === 'essaim' && (
-                    <>
-                      <Text style={styles.fieldGroupLabel}>Densité en vol (ind./m²)</Text>
-                      <View style={styles.infoBox}>
-                        <Text style={styles.infoBoxLabel}>ind./m²</Text>
-                        <TextInput
-                          value={form.densiteEnVol}
-                          onChangeText={(value) => setField('densiteEnVol', value)}
-                          placeholder="Si mesurable"
-                          keyboardType="decimal-pad"
-                          style={styles.infoBoxInput}
-                        />
-                      </View>
-
-                      <Text style={styles.fieldGroupLabel}>Surface contaminée (ha)</Text>
-                      <View style={styles.infoBox}>
-                        <Text style={styles.infoBoxLabel}>ha</Text>
-                        <TextInput
-                          value={form.surfaceContamineeHa}
-                          onChangeText={(value) => setField('surfaceContamineeHa', value)}
-                          placeholder="Surface contaminée"
-                          keyboardType="decimal-pad"
-                          style={styles.infoBoxInput}
-                        />
-                      </View>
-
-                      <Text style={styles.fieldGroupLabel}>Dont infestée (%)</Text>
-                      <View style={styles.infoBox}>
-                        <Text style={styles.infoBoxLabel}>%</Text>
-                        <TextInput
-                          value={form.surfaceInfesteePourcent}
-                          onChangeText={(value) => setField('surfaceInfesteePourcent', value)}
-                          placeholder="Part infestée"
-                          keyboardType="decimal-pad"
-                          style={styles.infoBoxInput}
-                        />
-                      </View>
-                    </>
-                  )}
-                </>
-              )}
-
-              <Text style={styles.fieldGroupLabel}>Direction du déplacement</Text>
-              <View style={styles.compassCard}>
-                <View style={styles.compassCircle}>
-                  <Text style={[styles.compassCardinal, styles.compassCardinalN]}>N</Text>
-                  <Text style={[styles.compassCardinal, styles.compassCardinalS]}>S</Text>
-                  <Text style={[styles.compassCardinal, styles.compassCardinalO]}>O</Text>
-                  <Text style={[styles.compassCardinal, styles.compassCardinalE]}>E</Text>
-                  <View style={[styles.compassArrow, { transform: [{ rotate: `${windAngle}deg` }] }]} />
-                  <View style={styles.compassArrowDot} />
+                  <View style={styles.box}>
+                    <Text style={styles.boxCaption}>max</Text>
+                    <TextInput
+                      value={form.interdistanceMax}
+                      onChangeText={(v) => setField('interdistanceMax', v)}
+                      keyboardType="decimal-pad"
+                      style={styles.boxValue}
+                    />
+                  </View>
+                  <View style={styles.box}>
+                    <Text style={styles.boxCaption}>moy</Text>
+                    <TextInput
+                      value={form.interdistanceMoy}
+                      onChangeText={(v) => setField('interdistanceMoy', v)}
+                      keyboardType="decimal-pad"
+                      style={styles.boxValue}
+                    />
+                  </View>
                 </View>
-                <View style={styles.compassChips}>
-                  {COMPASS_DIRECTIONS.map((dir) => {
-                    const active = dir.label === form.ventDe;
+
+                {(currentTarget === 'tache_larvaire' || currentTarget === 'bande_larvaire') && (
+                  <>
+                    <Text style={styles.fieldGroupLabel}>Stade dominant</Text>
+                    <View style={styles.row2}>
+                      {(['l1_l3', 'l4_l5'] as const).map((value) => {
+                        const active = form.stadeDominant === value;
+                        return (
+                          <TouchableOpacity
+                            key={value}
+                            onPress={() => setField('stadeDominant', value)}
+                            style={[styles.chip, active && styles.chipActive]}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                              {value === 'l1_l3' ? 'L1-L3' : 'L4-L5'}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+
+                    <View style={styles.row2NoMargin}>
+                      <View style={styles.infoBox}>
+                        <Text style={styles.infoBoxLabel}>Taille du groupe</Text>
+                        <View style={styles.infoBoxInputRow}>
+                          <TextInput
+                            value={form.tailleGroupeM2}
+                            onChangeText={(v) => setField('tailleGroupeM2', v)}
+                            keyboardType="decimal-pad"
+                            style={styles.infoBoxInput}
+                          />
+                          <Text style={styles.infoBoxUnit}>m²</Text>
+                        </View>
+                      </View>
+                    </View>
+                  </>
+                )}
+
+                {currentTarget === 'bande_larvaire' && (
+                  <>
+                    <View style={styles.row2NoMargin}>
+                      <View style={styles.infoBox}>
+                        <Text style={styles.infoBoxLabel}>Nombre de taches</Text>
+                        <View style={styles.infoBoxInputRow}>
+                          <TextInput
+                            value={form.nbTachesBandes}
+                            onChangeText={(v) => setField('nbTachesBandes', v)}
+                            keyboardType="number-pad"
+                            style={styles.infoBoxInput}
+                          />
+                        </View>
+                      </View>
+                    </View>
+
+                    <Text style={styles.sectionLabel}>Dimensions du front (m)</Text>
+                    <View style={styles.row3}>
+                      <View style={styles.box}>
+                        <Text style={styles.boxCaption}>longueur</Text>
+                        <TextInput
+                          value={form.frontLongueurM}
+                          onChangeText={(v) => setField('frontLongueurM', v)}
+                          keyboardType="decimal-pad"
+                          style={styles.boxValue}
+                        />
+                      </View>
+                      <View style={styles.box}>
+                        <Text style={styles.boxCaption}>largeur</Text>
+                        <TextInput
+                          value={form.frontLargeurM}
+                          onChangeText={(v) => setField('frontLargeurM', v)}
+                          keyboardType="decimal-pad"
+                          style={styles.boxValue}
+                        />
+                      </View>
+                    </View>
+
+                    <Text style={styles.sectionLabel}>Densité au front (/m²)</Text>
+                    <View style={styles.row3}>
+                      <View style={styles.box}>
+                        <Text style={styles.boxCaption}>max</Text>
+                        <TextInput
+                          value={form.densiteMaxFront}
+                          onChangeText={(v) => setField('densiteMaxFront', v)}
+                          keyboardType="decimal-pad"
+                          style={styles.boxValue}
+                        />
+                      </View>
+                      <View style={styles.box}>
+                        <Text style={styles.boxCaption}>moy arrière</Text>
+                        <TextInput
+                          value={form.densiteMoyArriereFront}
+                          onChangeText={(v) => setField('densiteMoyArriereFront', v)}
+                          keyboardType="decimal-pad"
+                          style={styles.boxValue}
+                        />
+                      </View>
+                    </View>
+                  </>
+                )}
+
+                {descInsight && (
+                  <View style={styles.insightCallout}>
+                    <Text style={styles.insightText}>{descInsight}</Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {tab === 'comport' && selectedTargets.length > 0 && (
+              <View style={styles.card}>
+                <Text style={styles.fieldGroupLabel}>État</Text>
+                <View style={styles.row2}>
+                  {(['repos', 'deplacement'] as const).map((value) => {
+                    const active = form.comportement === value;
                     return (
                       <TouchableOpacity
-                        key={dir.label}
-                        onPress={() => {
-                          setField('ventDe', dir.label);
-                          setField('ventVers', oppositeDirection(dir.label));
-                        }}
-                        style={[styles.compassChip, active && styles.compassChipActive]}
+                        key={value}
+                        onPress={() => setField('comportement', value)}
+                        style={[styles.chip, active && styles.chipActive]}
                         activeOpacity={0.8}
                       >
-                        <Text style={[styles.compassChipText, active && styles.compassChipTextActive]}>{dir.label}</Text>
+                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                          {value === 'repos' ? 'Repos' : 'Déplacement'}
+                        </Text>
                       </TouchableOpacity>
                     );
                   })}
                 </View>
-              </View>
 
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Vent</Text>
-                <View style={styles.row2NoMargin}>
-                  <View style={styles.infoBox}>
-                    <Text style={styles.infoBoxLabel}>Direction</Text>
-                    <Text style={styles.infoBoxValue}>{windLabel}</Text>
-                  </View>
-                  <View style={styles.infoBox}>
-                    <Text style={styles.infoBoxLabel}>Vitesse</Text>
-                    <View style={styles.infoBoxInputRow}>
+                {(currentTarget === 'vol_clair' || currentTarget === 'essaim') && (
+                  <>
+                    <Text style={styles.fieldGroupLabel}>Comportement de l&apos;essaim</Text>
+                    <View style={styles.row2}>
+                      {(['vol', 'pose'] as const).map((value) => {
+                        const active = form.essaimComportement === value;
+                        return (
+                          <TouchableOpacity
+                            key={value}
+                            onPress={() => setField('essaimComportement', value)}
+                            style={[styles.chip, active && styles.chipActive]}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                              {value === 'vol' ? 'En vol' : 'Posé'}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+
+                    <Text style={styles.fieldGroupLabel}>Heure d&apos;observation</Text>
+                    <View style={styles.infoBox}>
+                      <Text style={styles.infoBoxLabel}>hh:mm</Text>
+                      <TimeField
+                        value={form.heureObservation || null}
+                        onChange={(value) => setField('heureObservation', value)}
+                        style={styles.timeFieldBox}
+                        textStyle={styles.infoBoxInput}
+                        placeholderStyle={styles.infoBoxInput}
+                      />
+                    </View>
+
+                    <Text style={styles.fieldGroupLabel}>Dimensions de la formation (ha)</Text>
+                    <View style={styles.infoBox}>
+                      <Text style={styles.infoBoxLabel}>ha</Text>
                       <TextInput
-                        value={form.ventVitesse}
-                        onChangeText={(v) => setField('ventVitesse', v)}
+                        value={form.dimensionHa}
+                        onChangeText={(value) => setField('dimensionHa', value)}
+                        placeholder="Surface estimée"
                         keyboardType="decimal-pad"
                         style={styles.infoBoxInput}
                       />
-                      <Text style={styles.infoBoxUnit}>km/h</Text>
+                    </View>
+
+                    {currentTarget === 'essaim' && (
+                      <>
+                        <Text style={styles.fieldGroupLabel}>Densité en vol (ind./m²)</Text>
+                        <View style={styles.infoBox}>
+                          <Text style={styles.infoBoxLabel}>ind./m²</Text>
+                          <TextInput
+                            value={form.densiteEnVol}
+                            onChangeText={(value) => setField('densiteEnVol', value)}
+                            placeholder="Si mesurable"
+                            keyboardType="decimal-pad"
+                            style={styles.infoBoxInput}
+                          />
+                        </View>
+
+                        <Text style={styles.fieldGroupLabel}>Surface contaminée (ha)</Text>
+                        <View style={styles.infoBox}>
+                          <Text style={styles.infoBoxLabel}>ha</Text>
+                          <TextInput
+                            value={form.surfaceContamineeHa}
+                            onChangeText={(value) => setField('surfaceContamineeHa', value)}
+                            placeholder="Surface contaminée"
+                            keyboardType="decimal-pad"
+                            style={styles.infoBoxInput}
+                          />
+                        </View>
+
+                        <Text style={styles.fieldGroupLabel}>Dont infestée (%)</Text>
+                        <View style={styles.infoBox}>
+                          <Text style={styles.infoBoxLabel}>%</Text>
+                          <TextInput
+                            value={form.surfaceInfesteePourcent}
+                            onChangeText={(value) => setField('surfaceInfesteePourcent', value)}
+                            placeholder="Part infestée"
+                            keyboardType="decimal-pad"
+                            style={styles.infoBoxInput}
+                          />
+                        </View>
+                      </>
+                    )}
+                  </>
+                )}
+
+                <Text style={styles.fieldGroupLabel}>Direction du déplacement</Text>
+                <View style={styles.compassCard}>
+                  <View style={styles.compassCircle}>
+                    <Text style={[styles.compassCardinal, styles.compassCardinalN]}>N</Text>
+                    <Text style={[styles.compassCardinal, styles.compassCardinalS]}>S</Text>
+                    <Text style={[styles.compassCardinal, styles.compassCardinalO]}>O</Text>
+                    <Text style={[styles.compassCardinal, styles.compassCardinalE]}>E</Text>
+                    <View style={[styles.compassArrow, { transform: [{ rotate: `${windAngle}deg` }] }]} />
+                    <View style={styles.compassArrowDot} />
+                  </View>
+                  <View style={styles.compassChips}>
+                    {COMPASS_DIRECTIONS.map((dir) => {
+                      const active = dir.label === form.ventDe;
+                      return (
+                        <TouchableOpacity
+                          key={dir.label}
+                          onPress={() => {
+                            setField('ventDe', dir.label);
+                            setField('ventVers', oppositeDirection(dir.label));
+                          }}
+                          style={[styles.compassChip, active && styles.compassChipActive]}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.compassChipText, active && styles.compassChipTextActive]}>{dir.label}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                <View style={styles.card}>
+                  <Text style={styles.cardTitle}>Vent</Text>
+                  <View style={styles.row2NoMargin}>
+                    <View style={styles.infoBox}>
+                      <Text style={styles.infoBoxLabel}>Direction</Text>
+                      <Text style={styles.infoBoxValue}>{windLabel}</Text>
+                    </View>
+                    <View style={styles.infoBox}>
+                      <Text style={styles.infoBoxLabel}>Vitesse</Text>
+                      <View style={styles.infoBoxInputRow}>
+                        <TextInput
+                          value={form.ventVitesse}
+                          onChangeText={(v) => setField('ventVitesse', v)}
+                          keyboardType="decimal-pad"
+                          style={styles.infoBoxInput}
+                        />
+                        <Text style={styles.infoBoxUnit}>km/h</Text>
+                      </View>
                     </View>
                   </View>
                 </View>
+
+                {comportInsight && (
+                  <View style={styles.insightCallout}>
+                    <Text style={styles.insightText}>{comportInsight}</Text>
+                  </View>
+                )}
               </View>
+            )}
+          </ScrollView>
 
-              {comportInsight && (
-                <View style={styles.insightCallout}>
-                  <Text style={styles.insightText}>{comportInsight}</Text>
-                </View>
-              )}
-            </View>
-          )}
-        </ScrollView>
-
-        <View style={styles.footer}>
-          <TouchableOpacity 
-            style={[styles.continueButton, selectedTargets.length === 0 && styles.continueButtonDisabled]} 
-            onPress={handleFooterPress} 
-            disabled={isSaving || selectedTargets.length === 0}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.continueButtonText}>
-              {tab === 'desc' ? 'Comportement  ›' : 'Continuer  ›'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+          <View style={styles.footer}>
+            <TouchableOpacity 
+              style={[styles.continueButton, selectedTargets.length === 0 && styles.continueButtonDisabled]} 
+              onPress={handleFooterPress} 
+              disabled={isSaving || selectedTargets.length === 0}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.continueButtonText}>
+                {tab === 'desc' ? 'Comportement  ›' : 'Continuer  ›'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
   );
@@ -1062,6 +1068,7 @@ export default function InfestationScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
+  keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
   back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
   title: { fontSize: 16, fontWeight: '800', color: TEXT },

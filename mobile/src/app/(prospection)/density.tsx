@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAsyncAction } from '@/hooks/use-async-action';
@@ -115,7 +115,6 @@ export default function DensityScreen() {
 
   const handleBack = () => {
     if (isFirstGrille) {
-      // CORRECTION: Utiliser le chemin correct avec les paramètres dans l'URL
       router.replace(`/(prospection)/species?draftId=${draftId}`);
     } else {
       router.replace(`/(prospection)/captures?draftId=${draftId}&grilleIndex=${requestedIndex - 1}`);
@@ -126,7 +125,6 @@ export default function DensityScreen() {
     run(
       async () => {
         await saveProspectionPopulation(draftId, population);
-        // CORRECTION: Utiliser le chemin correct avec les paramètres dans l'URL
         router.replace(`/(prospection)/accouplement?draftId=${draftId}&grilleIndex=${requestedIndex}`);
       },
       {
@@ -140,60 +138,66 @@ export default function DensityScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.safe}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={handleBack} activeOpacity={0.7}>
-            <Text style={styles.back}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>{ESPECE_LABEL[grille.espece]} · densités</Text>
-        </View>
-
-        <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16 }}>
-          <View style={styles.fieldsRow}>
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>Densité diffuse (/ha)</Text>
-              <TextInput
-                value={population.densite_diffuse != null ? String(population.densite_diffuse) : ''}
-                onChangeText={(text) => setField('densite_diffuse', parseDensite(text))}
-                keyboardType="decimal-pad"
-                style={styles.fieldInput}
-              />
-            </View>
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>Densité groupée (/m²)</Text>
-              <TextInput
-                value={population.densite_groupee != null ? String(population.densite_groupee) : ''}
-                onChangeText={(text) => setField('densite_groupee', parseDensite(text))}
-                keyboardType="decimal-pad"
-                style={styles.fieldInput}
-              />
-            </View>
+        <KeyboardAvoidingView 
+          style={styles.keyboardAvoidingView} 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          <View style={styles.headerRow}>
+            <TouchableOpacity onPress={handleBack} activeOpacity={0.7}>
+              <Text style={styles.back}>‹</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>{ESPECE_LABEL[grille.espece]} · densités</Text>
           </View>
 
-          <Text style={styles.sectionLabel}>Méthode</Text>
-          <View style={styles.chipsRow}>
-            {(['visuel', 'comptage_direct'] as const).map((option) => {
-              const active = option === population.methode;
-              return (
-                <TouchableOpacity
-                  key={option}
-                  onPress={() => setField('methode', option)}
-                  style={[styles.chip, active && styles.chipActive]}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                    {option === 'visuel' ? 'Visuel' : 'Comptage direct'}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </ScrollView>
+          <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
+            <View style={styles.fieldsRow}>
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Densité diffuse (/ha)</Text>
+                <TextInput
+                  value={population.densite_diffuse != null ? String(population.densite_diffuse) : ''}
+                  onChangeText={(text) => setField('densite_diffuse', parseDensite(text))}
+                  keyboardType="decimal-pad"
+                  style={styles.fieldInput}
+                />
+              </View>
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Densité groupée (/m²)</Text>
+                <TextInput
+                  value={population.densite_groupee != null ? String(population.densite_groupee) : ''}
+                  onChangeText={(text) => setField('densite_groupee', parseDensite(text))}
+                  keyboardType="decimal-pad"
+                  style={styles.fieldInput}
+                />
+              </View>
+            </View>
 
-        <View style={styles.footer}>
-          <TouchableOpacity style={styles.continueButton} onPress={handleContinue} disabled={isSaving} activeOpacity={0.85}>
-            <Text style={styles.continueButtonText}>Accouplement  ›</Text>
-          </TouchableOpacity>
-        </View>
+            <Text style={styles.sectionLabel}>Méthode</Text>
+            <View style={styles.chipsRow}>
+              {(['visuel', 'comptage_direct'] as const).map((option) => {
+                const active = option === population.methode;
+                return (
+                  <TouchableOpacity
+                    key={option}
+                    onPress={() => setField('methode', option)}
+                    style={[styles.chip, active && styles.chipActive]}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                      {option === 'visuel' ? 'Visuel' : 'Comptage direct'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </ScrollView>
+
+          <View style={styles.footer}>
+            <TouchableOpacity style={styles.continueButton} onPress={handleContinue} disabled={isSaving} activeOpacity={0.85}>
+              <Text style={styles.continueButtonText}>Accouplement  ›</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
   );
@@ -202,6 +206,7 @@ export default function DensityScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
+  keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 10 },
   back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
   title: { fontSize: 14, fontWeight: '700', color: TEXT },

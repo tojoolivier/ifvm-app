@@ -6,6 +6,8 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -817,50 +819,56 @@ export default function CapturesScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.safe}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={handleBack} activeOpacity={0.7}>
-            <Text style={styles.back}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>
-            Captures · {ESPECE_LABEL[grille.espece]} — {CATEGORIE_LABEL[grille.categorie]}
-          </Text>
-        </View>
-        <View style={styles.statsRow}>
-          <View style={styles.statCardPrimary}>
-            <Text style={styles.statLabelPrimary}>Total capturé</Text>
-            <Text style={styles.statValuePrimary}>
-              {totalCaptures}
-              <Text style={styles.statValueMax}> / {max}</Text>
+        <KeyboardAvoidingView 
+          style={styles.keyboardAvoidingView} 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          <View style={styles.headerRow}>
+            <TouchableOpacity onPress={handleBack} activeOpacity={0.7}>
+              <Text style={styles.back}>‹</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>
+              Captures · {ESPECE_LABEL[grille.espece]} — {CATEGORIE_LABEL[grille.categorie]}
             </Text>
           </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Chrono</Text>
-            <Text style={styles.statValue}>
-              {formatChrono(seconds)}
-              <Text style={styles.statValueMaxDim}>/30</Text>
-            </Text>
+          <View style={styles.statsRow}>
+            <View style={styles.statCardPrimary}>
+              <Text style={styles.statLabelPrimary}>Total capturé</Text>
+              <Text style={styles.statValuePrimary}>
+                {totalCaptures}
+                <Text style={styles.statValueMax}> / {max}</Text>
+              </Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Chrono</Text>
+              <Text style={styles.statValue}>
+                {formatChrono(seconds)}
+                <Text style={styles.statValueMaxDim}>/30</Text>
+              </Text>
+            </View>
           </View>
-        </View>
-        <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
-          {renderTotalCaptures()}
-          {renderPhases()}
-          {renderSexeToggle()}
-          {renderImagoStades()}
-          {renderLarveStades()}
-          {renderSummary()}
-          {renderValidationMessage()}
-        </ScrollView>
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.continueButton, (!isConsistent || totalCaptures === 0) && styles.continueButtonDisabled]}
-            onPress={handleContinue}
-            disabled={isSaving || !isConsistent || totalCaptures === 0}
-            activeOpacity={0.85}>
-            <Text style={styles.continueButtonText}>
-              {isLastGrille ? 'Infestation  ›' : 'Grille suivante  ›'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+          <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
+            {renderTotalCaptures()}
+            {renderPhases()}
+            {renderSexeToggle()}
+            {renderImagoStades()}
+            {renderLarveStades()}
+            {renderSummary()}
+            {renderValidationMessage()}
+          </ScrollView>
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={[styles.continueButton, (!isConsistent || totalCaptures === 0) && styles.continueButtonDisabled]}
+              onPress={handleContinue}
+              disabled={isSaving || !isConsistent || totalCaptures === 0}
+              activeOpacity={0.85}>
+              <Text style={styles.continueButtonText}>
+                {isLastGrille ? 'Infestation  ›' : 'Grille suivante  ›'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
   );
@@ -869,6 +877,7 @@ export default function CapturesScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
+  keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 10 },
   back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
   title: { fontSize: 14, fontWeight: '700', color: TEXT },

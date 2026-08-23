@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { updateProspectionExtensiveObservations } from '@/lib/prospection-repository';
@@ -48,96 +48,102 @@ export default function ExtensiveObservationsScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.safe}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
-            <Text style={styles.back}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>Observations</Text>
-        </View>
-        <View style={styles.progressRow}>
-          {[0, 1, 2, 3].map((i) => (
-            <View key={i} style={[styles.progressBar, styles.progressActive]} />
-          ))}
-          <View style={styles.progressBar} />
-        </View>
-
-        <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16 }}>
-          <View style={styles.card}>
-            <Text style={styles.label}>Dégâts sur les cultures</Text>
-            <View style={styles.stepperRow}>
-              <TouchableOpacity style={styles.stepperButton} onPress={() => setDegats(Math.max(0, degats - 5))}>
-                <Text style={styles.stepperButtonText}>−</Text>
-              </TouchableOpacity>
-              <TextInput
-                value={String(degats)}
-                onChangeText={(v) => {
-                  const parsed = parseInt(v, 10);
-                  setDegats(Number.isNaN(parsed) ? 0 : Math.max(0, Math.min(100, parsed)));
-                }}
-                keyboardType="number-pad"
-                style={styles.stepperInput}
-              />
-              <Text style={styles.stepperUnit}>%</Text>
-              <TouchableOpacity style={[styles.stepperButton, styles.stepperButtonAdd]} onPress={() => setDegats(Math.min(100, degats + 5))}>
-                <Text style={[styles.stepperButtonText, styles.stepperButtonAddText]}>+</Text>
-              </TouchableOpacity>
-            </View>
+        <KeyboardAvoidingView 
+          style={styles.keyboardAvoidingView} 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          <View style={styles.headerRow}>
+            <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
+              <Text style={styles.back}>‹</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>Observations</Text>
+          </View>
+          <View style={styles.progressRow}>
+            {[0, 1, 2, 3].map((i) => (
+              <View key={i} style={[styles.progressBar, styles.progressActive]} />
+            ))}
+            <View style={styles.progressBar} />
           </View>
 
-          <Text style={styles.sectionLabel}>Verdure strate herbeuse</Text>
-          <View style={[styles.chipsRow, { marginBottom: 10 }]}>
-            {NIVEAU_OPTIONS.map((option) => {
-              const active = option.value === verdure;
-              return (
-                <TouchableOpacity key={option.value} style={{ flex: 1 }} onPress={() => setVerdure(option.value)} activeOpacity={0.7}>
-                  <Text style={[styles.chip, active && styles.chipActive]}>{option.label}</Text>
+          <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
+            <View style={styles.card}>
+              <Text style={styles.label}>Dégâts sur les cultures</Text>
+              <View style={styles.stepperRow}>
+                <TouchableOpacity style={styles.stepperButton} onPress={() => setDegats(Math.max(0, degats - 5))}>
+                  <Text style={styles.stepperButtonText}>−</Text>
                 </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <View style={[styles.card, { marginBottom: 9 }]}>
-            <Text style={styles.label}>H Str Herb (cm)</Text>
-            <TextInput value={hauteur} onChangeText={setHauteur} keyboardType="decimal-pad" style={styles.input} />
-          </View>
-
-          <View style={styles.row}>
-            <View style={[styles.card, styles.flex1]}>
-              <Text style={styles.label}>Dernière pluie le</Text>
-              <DateField
-                value={dernierePluie || null}
-                onChange={setDernierePluie}
-                maximumDate={new Date()}
-                style={styles.dateFieldBox}
-                textStyle={styles.input}
-                placeholderStyle={[styles.input, { fontWeight: '500', color: TEXT_SECONDARY }]}
-              />
-            </View>
-            <View style={[styles.flex1, { gap: 5 }]}>
-              <Text style={styles.label}>Intensité</Text>
-              <View style={styles.chipsRow}>
-                {NIVEAU_OPTIONS.map((option) => {
-                  const active = option.value === intensite;
-                  return (
-                    <TouchableOpacity key={option.value} style={{ flex: 1 }} onPress={() => setIntensite(option.value)} activeOpacity={0.7}>
-                      <Text style={[styles.chip, styles.chipCompact, active && styles.chipActive]}>{option.label}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
+                <TextInput
+                  value={String(degats)}
+                  onChangeText={(v) => {
+                    const parsed = parseInt(v, 10);
+                    setDegats(Number.isNaN(parsed) ? 0 : Math.max(0, Math.min(100, parsed)));
+                  }}
+                  keyboardType="number-pad"
+                  style={styles.stepperInput}
+                />
+                <Text style={styles.stepperUnit}>%</Text>
+                <TouchableOpacity style={[styles.stepperButton, styles.stepperButtonAdd]} onPress={() => setDegats(Math.min(100, degats + 5))}>
+                  <Text style={[styles.stepperButtonText, styles.stepperButtonAddText]}>+</Text>
+                </TouchableOpacity>
               </View>
             </View>
-          </View>
 
-          <View style={styles.footerNote}>
-            <Text style={styles.footerNoteText}>Dernier écran de saisie — données culture/climat, communes aux deux espèces.</Text>
-          </View>
-        </ScrollView>
+            <Text style={styles.sectionLabel}>Verdure strate herbeuse</Text>
+            <View style={[styles.chipsRow, { marginBottom: 10 }]}>
+              {NIVEAU_OPTIONS.map((option) => {
+                const active = option.value === verdure;
+                return (
+                  <TouchableOpacity key={option.value} style={{ flex: 1 }} onPress={() => setVerdure(option.value)} activeOpacity={0.7}>
+                    <Text style={[styles.chip, active && styles.chipActive]}>{option.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
 
-        <View style={styles.footer}>
-          <TouchableOpacity style={styles.continueButton} onPress={handleContinue} disabled={isSaving} activeOpacity={0.85}>
-            <Text style={styles.continueButtonText}>Suivant : Récapitulatif ›</Text>
-          </TouchableOpacity>
-        </View>
+            <View style={[styles.card, { marginBottom: 9 }]}>
+              <Text style={styles.label}>H Str Herb (cm)</Text>
+              <TextInput value={hauteur} onChangeText={setHauteur} keyboardType="decimal-pad" style={styles.input} />
+            </View>
+
+            <View style={styles.row}>
+              <View style={[styles.card, styles.flex1]}>
+                <Text style={styles.label}>Dernière pluie le</Text>
+                <DateField
+                  value={dernierePluie || null}
+                  onChange={setDernierePluie}
+                  maximumDate={new Date()}
+                  style={styles.dateFieldBox}
+                  textStyle={styles.input}
+                  placeholderStyle={[styles.input, { fontWeight: '500', color: TEXT_SECONDARY }]}
+                />
+              </View>
+              <View style={[styles.flex1, { gap: 5 }]}>
+                <Text style={styles.label}>Intensité</Text>
+                <View style={styles.chipsRow}>
+                  {NIVEAU_OPTIONS.map((option) => {
+                    const active = option.value === intensite;
+                    return (
+                      <TouchableOpacity key={option.value} style={{ flex: 1 }} onPress={() => setIntensite(option.value)} activeOpacity={0.7}>
+                        <Text style={[styles.chip, styles.chipCompact, active && styles.chipActive]}>{option.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.footerNote}>
+              <Text style={styles.footerNoteText}>Dernier écran de saisie — données culture/climat, communes aux deux espèces.</Text>
+            </View>
+          </ScrollView>
+
+          <View style={styles.footer}>
+            <TouchableOpacity style={styles.continueButton} onPress={handleContinue} disabled={isSaving} activeOpacity={0.85}>
+              <Text style={styles.continueButtonText}>Suivant : Récapitulatif ›</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
   );
@@ -146,6 +152,7 @@ export default function ExtensiveObservationsScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
+  keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
   back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
   title: { fontSize: 15, fontWeight: '700', color: TEXT },

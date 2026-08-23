@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
@@ -58,66 +58,72 @@ export default function ExtensiveSignalementScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
-            <Text style={styles.back}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>Vérifier un signalement</Text>
-        </View>
-
-        <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16 }}>
-          <Text style={styles.hint}>
-            Renseignez le signalement reçu (SMS, appel, agent local) avant de vous rendre sur place.
-          </Text>
-
-          <View style={styles.card}>
-            <Text style={styles.label}>Source</Text>
-            <TextInput
-              value={source}
-              onChangeText={setSource}
-              placeholder="Ex. Rasoanaivo (habitant)"
-              placeholderTextColor={TEXT_SECONDARY}
-              style={styles.input}
-            />
+        <KeyboardAvoidingView 
+          style={styles.keyboardAvoidingView} 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          <View style={styles.headerRow}>
+            <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
+              <Text style={styles.back}>‹</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>Vérifier un signalement</Text>
           </View>
 
-          <View style={styles.card}>
-            <Text style={styles.label}>Date du signalement</Text>
-            <DateField
-              value={date || null}
-              onChange={setDate}
-              maximumDate={new Date()}
-              style={styles.dateFieldBox}
-              textStyle={styles.input}
-              placeholderStyle={[styles.input, { color: TEXT_SECONDARY }]}
-            />
+          <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
+            <Text style={styles.hint}>
+              Renseignez le signalement reçu (SMS, appel, agent local) avant de vous rendre sur place.
+            </Text>
+
+            <View style={styles.card}>
+              <Text style={styles.label}>Source</Text>
+              <TextInput
+                value={source}
+                onChangeText={setSource}
+                placeholder="Ex. Rasoanaivo (habitant)"
+                placeholderTextColor={TEXT_SECONDARY}
+                style={styles.input}
+              />
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.label}>Date du signalement</Text>
+              <DateField
+                value={date || null}
+                onChange={setDate}
+                maximumDate={new Date()}
+                style={styles.dateFieldBox}
+                textStyle={styles.input}
+                placeholderStyle={[styles.input, { color: TEXT_SECONDARY }]}
+              />
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.label}>Description</Text>
+              <TextInput
+                value={description}
+                onChangeText={setDescription}
+                placeholder="Ce qui a été signalé"
+                placeholderTextColor={TEXT_SECONDARY}
+                style={[styles.input, styles.multiline]}
+                multiline
+              />
+            </View>
+
+            {error && <Text style={styles.errorText}>{error}</Text>}
+          </ScrollView>
+
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={[styles.continueButton, !canContinue && styles.continueButtonDisabled]}
+              onPress={startValidation}
+              disabled={!canContinue || isCreating}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.continueButtonText}>{isCreating ? 'Création…' : 'Continuer : Références ›'}</Text>
+            </TouchableOpacity>
           </View>
-
-          <View style={styles.card}>
-            <Text style={styles.label}>Description</Text>
-            <TextInput
-              value={description}
-              onChangeText={setDescription}
-              placeholder="Ce qui a été signalé"
-              placeholderTextColor={TEXT_SECONDARY}
-              style={[styles.input, styles.multiline]}
-              multiline
-            />
-          </View>
-
-          {error && <Text style={styles.errorText}>{error}</Text>}
-        </ScrollView>
-
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.continueButton, !canContinue && styles.continueButtonDisabled]}
-            onPress={startValidation}
-            disabled={!canContinue || isCreating}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.continueButtonText}>{isCreating ? 'Création…' : 'Continuer : Références ›'}</Text>
-          </TouchableOpacity>
-        </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
   );
@@ -126,6 +132,7 @@ export default function ExtensiveSignalementScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
+  keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
   back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
   title: { fontSize: 15, fontWeight: '700', color: TEXT },

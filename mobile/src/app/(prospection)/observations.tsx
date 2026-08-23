@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm } from '@tanstack/react-form';
@@ -81,187 +81,193 @@ export default function ObservationsScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.safe}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
-            <Text style={styles.back}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>Observations</Text>
-        </View>
+        <KeyboardAvoidingView 
+          style={styles.keyboardAvoidingView} 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          <View style={styles.headerRow}>
+            <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
+              <Text style={styles.back}>‹</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>Observations</Text>
+          </View>
 
-        <ScrollView ref={scrollRef} style={styles.scroll} contentContainerStyle={{ padding: 16 }}>
-          {/* ==========================================
-              SECTION : DERNIERE PLUIE
-              ========================================== */}
+          <ScrollView ref={scrollRef} style={styles.scroll} contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
+            {/* ==========================================
+                SECTION : DERNIERE PLUIE
+                ========================================== */}
 
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>🌧️ Dernière pluie</Text>
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>🌧️ Dernière pluie</Text>
 
-            <form.Field name="dernierePluieDate">
+              <form.Field name="dernierePluieDate">
+                {(field) => (
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.fieldLabel}>Date</Text>
+                    <DateField
+                      value={field.state.value || null}
+                      onChange={field.handleChange}
+                      maximumDate={new Date()}
+                      style={styles.dateFieldBox}
+                    />
+                  </View>
+                )}
+              </form.Field>
+
+              <form.Field name="intensitePluie">
+                {(field) => (
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.fieldLabel}>Intensité</Text>
+                    <View style={styles.chipsRow}>
+                      {INTENSITE_PLUIE_OPTIONS.map((option) => {
+                        const active = option.value === field.state.value;
+                        return (
+                          <TouchableOpacity
+                            key={option.value}
+                            style={[styles.chip, styles.chipFlex, active && styles.chipActive]}
+                            onPress={() => {
+                              field.handleChange(option.value);
+                              field.handleBlur();
+                            }}
+                          >
+                            <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                              {option.label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+              </form.Field>
+            </View>
+
+            {/* ==========================================
+                SECTION : DEGATS SUR CULTURE
+                ========================================== */}
+
+            <form.Field
+              name="degatsCultures"
+              validators={{
+                onChange: ({ value }) => (value ? undefined : 'Dégâts sur culture requis'),
+                onBlur: ({ value }) => (value ? undefined : 'Dégâts sur culture requis'),
+              }}
+            >
+              {(field) => {
+                const showError = field.state.meta.isTouched && !field.state.meta.isValid;
+                return (
+                  <View style={[styles.card, showError && styles.cardError]}>
+                    <Text style={styles.cardTitle}>Dégâts sur culture</Text>
+                    <View style={styles.chipsRow}>
+                      {DEGATS_OPTIONS.map((option) => {
+                        const active = option.value === field.state.value;
+                        return (
+                          <TouchableOpacity
+                            key={option.value}
+                            style={[styles.chip, styles.chipFlex, active && styles.chipActive]}
+                            onPress={() => {
+                              field.handleChange(option.value);
+                              field.handleBlur();
+                            }}
+                          >
+                            <Text style={[styles.chipText, active && styles.chipTextActive]}>{option.label}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                    {showError && <Text style={styles.errorText}>{field.state.meta.errors[0]}</Text>}
+                  </View>
+                );
+              }}
+            </form.Field>
+
+            {/* ==========================================
+                SECTION : ENNEMIS NATURELS
+                ========================================== */}
+
+            <form.Field name="ennemisSelected">
               {(field) => (
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>Date</Text>
-                  <DateField
-                    value={field.state.value || null}
-                    onChange={field.handleChange}
-                    maximumDate={new Date()}
-                    style={styles.dateFieldBox}
+                <View style={styles.card}>
+                  <Text style={styles.cardTitle}>Ennemis naturels observés</Text>
+                  <View style={styles.chipsRow}>
+                    {ENNEMIS_OPTIONS.map((option) => {
+                      const active = field.state.value.includes(option);
+                      return (
+                        <TouchableOpacity
+                          key={option}
+                          style={[styles.chip, active && styles.chipActive]}
+                          onPress={() =>
+                            field.handleChange(
+                              active ? field.state.value.filter((v) => v !== option) : [...field.state.value, option]
+                            )
+                          }
+                        >
+                          <Text style={[styles.chipText, active && styles.chipTextActive]}>{option}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                    <TouchableOpacity
+                      style={[styles.chip, showAutre && styles.chipActive]}
+                      onPress={() => setShowAutre((current) => !current)}
+                    >
+                      <Text style={[styles.chipText, showAutre && styles.chipTextActive]}>+ Autre</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {showAutre && (
+                    <form.Field name="ennemisAutre">
+                      {(autreField) => (
+                        <TextInput
+                          value={autreField.state.value}
+                          onChangeText={autreField.handleChange}
+                          placeholder="préciser…"
+                          style={styles.textInput}
+                        />
+                      )}
+                    </form.Field>
+                  )}
+                </View>
+              )}
+            </form.Field>
+
+            {/* ==========================================
+                SECTION : OBSERVATION LIBRE
+                ========================================== */}
+
+            <form.Field name="observation">
+              {(field) => (
+                <View style={styles.card}>
+                  <Text style={styles.cardTitle}>Observation libre</Text>
+                  <TextInput
+                    value={field.state.value}
+                    onChangeText={field.handleChange}
+                    placeholder="Tout évènement susceptible de compléter les observations…"
+                    multiline
+                    numberOfLines={3}
+                    style={[styles.textInput, styles.textArea]}
                   />
                 </View>
               )}
             </form.Field>
 
-            <form.Field name="intensitePluie">
-              {(field) => (
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>Intensité</Text>
-                  <View style={styles.chipsRow}>
-                    {INTENSITE_PLUIE_OPTIONS.map((option) => {
-                      const active = option.value === field.state.value;
-                      return (
-                        <TouchableOpacity
-                          key={option.value}
-                          style={[styles.chip, styles.chipFlex, active && styles.chipActive]}
-                          onPress={() => {
-                            field.handleChange(option.value);
-                            field.handleBlur();
-                          }}
-                        >
-                          <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                            {option.label}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-              )}
-            </form.Field>
-          </View>
+            {/* ==========================================
+                SECTION : PHOTO
+                ========================================== */}
 
-          {/* ==========================================
-              SECTION : DEGATS SUR CULTURE
-              ========================================== */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Photo</Text>
+              <TouchableOpacity style={styles.photoSlot} activeOpacity={0.7}>
+                <Text style={styles.photoSlotText}>+ Photo</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
 
-          <form.Field
-            name="degatsCultures"
-            validators={{
-              onChange: ({ value }) => (value ? undefined : 'Dégâts sur culture requis'),
-              onBlur: ({ value }) => (value ? undefined : 'Dégâts sur culture requis'),
-            }}
-          >
-            {(field) => {
-              const showError = field.state.meta.isTouched && !field.state.meta.isValid;
-              return (
-                <View style={[styles.card, showError && styles.cardError]}>
-                  <Text style={styles.cardTitle}>Dégâts sur culture</Text>
-                  <View style={styles.chipsRow}>
-                    {DEGATS_OPTIONS.map((option) => {
-                      const active = option.value === field.state.value;
-                      return (
-                        <TouchableOpacity
-                          key={option.value}
-                          style={[styles.chip, styles.chipFlex, active && styles.chipActive]}
-                          onPress={() => {
-                            field.handleChange(option.value);
-                            field.handleBlur();
-                          }}
-                        >
-                          <Text style={[styles.chipText, active && styles.chipTextActive]}>{option.label}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                  {showError && <Text style={styles.errorText}>{field.state.meta.errors[0]}</Text>}
-                </View>
-              );
-            }}
-          </form.Field>
-
-          {/* ==========================================
-              SECTION : ENNEMIS NATURELS
-              ========================================== */}
-
-          <form.Field name="ennemisSelected">
-            {(field) => (
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Ennemis naturels observés</Text>
-                <View style={styles.chipsRow}>
-                  {ENNEMIS_OPTIONS.map((option) => {
-                    const active = field.state.value.includes(option);
-                    return (
-                      <TouchableOpacity
-                        key={option}
-                        style={[styles.chip, active && styles.chipActive]}
-                        onPress={() =>
-                          field.handleChange(
-                            active ? field.state.value.filter((v) => v !== option) : [...field.state.value, option]
-                          )
-                        }
-                      >
-                        <Text style={[styles.chipText, active && styles.chipTextActive]}>{option}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                  <TouchableOpacity
-                    style={[styles.chip, showAutre && styles.chipActive]}
-                    onPress={() => setShowAutre((current) => !current)}
-                  >
-                    <Text style={[styles.chipText, showAutre && styles.chipTextActive]}>+ Autre</Text>
-                  </TouchableOpacity>
-                </View>
-                {showAutre && (
-                  <form.Field name="ennemisAutre">
-                    {(autreField) => (
-                      <TextInput
-                        value={autreField.state.value}
-                        onChangeText={autreField.handleChange}
-                        placeholder="préciser…"
-                        style={styles.textInput}
-                      />
-                    )}
-                  </form.Field>
-                )}
-              </View>
-            )}
-          </form.Field>
-
-          {/* ==========================================
-              SECTION : OBSERVATION LIBRE
-              ========================================== */}
-
-          <form.Field name="observation">
-            {(field) => (
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Observation libre</Text>
-                <TextInput
-                  value={field.state.value}
-                  onChangeText={field.handleChange}
-                  placeholder="Tout évènement susceptible de compléter les observations…"
-                  multiline
-                  numberOfLines={3}
-                  style={[styles.textInput, styles.textArea]}
-                />
-              </View>
-            )}
-          </form.Field>
-
-          {/* ==========================================
-              SECTION : PHOTO
-              ========================================== */}
-
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Photo</Text>
-            <TouchableOpacity style={styles.photoSlot} activeOpacity={0.7}>
-              <Text style={styles.photoSlotText}>+ Photo</Text>
+          <View style={styles.footer}>
+            <TouchableOpacity style={styles.continueButton} onPress={form.handleSubmit} disabled={isSaving} activeOpacity={0.85}>
+              <Text style={styles.continueButtonText}>{isSaving ? 'Enregistrement…' : 'Vérifier & enregistrer ✓'}</Text>
             </TouchableOpacity>
           </View>
-        </ScrollView>
-
-        <View style={styles.footer}>
-          <TouchableOpacity style={styles.continueButton} onPress={form.handleSubmit} disabled={isSaving} activeOpacity={0.85}>
-            <Text style={styles.continueButtonText}>{isSaving ? 'Enregistrement…' : 'Vérifier & enregistrer ✓'}</Text>
-          </TouchableOpacity>
-        </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
   );
@@ -270,6 +276,7 @@ export default function ObservationsScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
+  keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
   back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
   title: { fontSize: 15, fontWeight: '700', color: TEXT },

@@ -246,7 +246,7 @@ type OnUnauthorized = () => void;
 const getBaseUrl = (): string => {
   return (
     process.env.EXPO_PUBLIC_API_URL ||
-    'http://localhost:8000'
+    'http://172.31.84.254:8000'
   );
 };
 

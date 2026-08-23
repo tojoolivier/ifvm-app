@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
@@ -88,65 +88,71 @@ export default function ExtensiveRecapScreen() {
     return (
       <View style={styles.root}>
         <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
-          <View style={styles.headerGreen}>
-            <View style={styles.headerRowGreen}>
-              <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
-                <Text style={styles.backWhite}>‹</Text>
-              </TouchableOpacity>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.titleWhite}>Vérification du signalement</Text>
-                <Text style={styles.subtitleWhite}>
-                  Signalé par {draft.signalement_source ?? '—'} · {draft.signalement_date ?? '—'}
+          <KeyboardAvoidingView 
+            style={styles.keyboardAvoidingView} 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          >
+            <View style={styles.headerGreen}>
+              <View style={styles.headerRowGreen}>
+                <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
+                  <Text style={styles.backWhite}>‹</Text>
+                </TouchableOpacity>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.titleWhite}>Vérification du signalement</Text>
+                  <Text style={styles.subtitleWhite}>
+                    Signalé par {draft.signalement_source ?? '—'} · {draft.signalement_date ?? '—'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
+              <View style={styles.quoteBanner}>
+                <Text style={styles.quoteText}>« {draft.signalement_description ?? '—'} » — signalement reçu, lieu approximatif.</Text>
+              </View>
+
+              <View style={styles.row}>
+                <View style={[styles.figureCard, styles.flex1]}>
+                  <Text style={styles.figureLabel}>LMC · Trans.</Text>
+                  <Text style={styles.figureValue}>{totals.imagoLMCTrans}</Text>
+                </View>
+                <View style={[styles.figureCard, styles.flex1]}>
+                  <Text style={styles.figureLabel}>NSE · Densité L</Text>
+                  <Text style={styles.figureValue}>{totals.larveNSE}</Text>
+                </View>
+              </View>
+
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryText}>
+                  Fiche A→D remplie sur place, comme pour l&apos;extensif — Pop diff D/ha {totals.imagoLMCPopDiff ?? '—'} · dégâts{' '}
+                  {draft.degats_cultures_pourcent ?? 0} %.
                 </Text>
               </View>
+
+              <Text style={styles.conclusionLabel}>Conclusion de la vérification</Text>
+              {error && <Text style={styles.errorText}>{error}</Text>}
+            </ScrollView>
+
+            <View style={styles.footerRow}>
+              <TouchableOpacity
+                style={styles.infirmeeButton}
+                onPress={() => handleConclude('infirmee')}
+                disabled={isSaving}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.infirmeeButtonText}>✗ Infirmée</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmeeButton}
+                onPress={() => handleConclude('confirmee')}
+                disabled={isSaving}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.confirmeeButtonText}>✓ Confirmée</Text>
+              </TouchableOpacity>
             </View>
-          </View>
-
-          <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16 }}>
-            <View style={styles.quoteBanner}>
-              <Text style={styles.quoteText}>« {draft.signalement_description ?? '—'} » — signalement reçu, lieu approximatif.</Text>
-            </View>
-
-            <View style={styles.row}>
-              <View style={[styles.figureCard, styles.flex1]}>
-                <Text style={styles.figureLabel}>LMC · Trans.</Text>
-                <Text style={styles.figureValue}>{totals.imagoLMCTrans}</Text>
-              </View>
-              <View style={[styles.figureCard, styles.flex1]}>
-                <Text style={styles.figureLabel}>NSE · Densité L</Text>
-                <Text style={styles.figureValue}>{totals.larveNSE}</Text>
-              </View>
-            </View>
-
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryText}>
-                Fiche A→D remplie sur place, comme pour l&apos;extensif — Pop diff D/ha {totals.imagoLMCPopDiff ?? '—'} · dégâts{' '}
-                {draft.degats_cultures_pourcent ?? 0} %.
-              </Text>
-            </View>
-
-            <Text style={styles.conclusionLabel}>Conclusion de la vérification</Text>
-            {error && <Text style={styles.errorText}>{error}</Text>}
-          </ScrollView>
-
-          <View style={styles.footerRow}>
-            <TouchableOpacity
-              style={styles.infirmeeButton}
-              onPress={() => handleConclude('infirmee')}
-              disabled={isSaving}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.infirmeeButtonText}>✗ Infirmée</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.confirmeeButton}
-              onPress={() => handleConclude('confirmee')}
-              disabled={isSaving}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.confirmeeButtonText}>✓ Confirmée</Text>
-            </TouchableOpacity>
-          </View>
+          </KeyboardAvoidingView>
         </SafeAreaView>
       </View>
     );
@@ -155,57 +161,63 @@ export default function ExtensiveRecapScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
-        <View style={styles.headerGreen}>
-          <View style={styles.headerRowGreen}>
-            <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
-              <Text style={styles.backWhite}>‹</Text>
+        <KeyboardAvoidingView 
+          style={styles.keyboardAvoidingView} 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          <View style={styles.headerGreen}>
+            <View style={styles.headerRowGreen}>
+              <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
+                <Text style={styles.backWhite}>‹</Text>
+              </TouchableOpacity>
+              <View>
+                <Text style={styles.titleWhite}>Récapitulatif</Text>
+                <Text style={styles.subtitleWhite}>
+                  {draft.station_libre ?? '—'} · N°{draft.n_message ?? '—'}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16, paddingBottom: 30, gap: 8 }}>
+            <View style={styles.checkRow}>
+              <View style={styles.checkBadge}>
+                <Text style={styles.checkBadgeText}>✓</Text>
+              </View>
+              <Text style={styles.checkLabel}>A · Références</Text>
+            </View>
+            <View style={styles.checkRow}>
+              <View style={styles.checkBadge}>
+                <Text style={styles.checkBadgeText}>✓</Text>
+              </View>
+              <Text style={styles.checkLabel}>B · Imagos — LMC {totals.imagoLMC} · NSE {totals.imagoNSE}</Text>
+            </View>
+            <View style={styles.checkRow}>
+              <View style={styles.checkBadge}>
+                <Text style={styles.checkBadgeText}>✓</Text>
+              </View>
+              <Text style={styles.checkLabel}>C · Larves — LMC {totals.larveLMC} · NSE {totals.larveNSE}</Text>
+            </View>
+            <View style={styles.checkRow}>
+              <View style={styles.checkBadge}>
+                <Text style={styles.checkBadgeText}>✓</Text>
+              </View>
+              <Text style={styles.checkLabel}>D · Observations — dégâts {draft.degats_cultures_pourcent ?? 0} %</Text>
+            </View>
+
+            <View style={styles.offlineBanner}>
+              <Text style={styles.offlineText}>☁︎ Pas de réseau ici — la fiche part en file de synchronisation.</Text>
+            </View>
+            {error && <Text style={styles.errorText}>{error}</Text>}
+          </ScrollView>
+
+          <View style={styles.footer}>
+            <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={isSaving} activeOpacity={0.85}>
+              <Text style={styles.saveButtonText}>Enregistrer (hors-ligne) ✓</Text>
             </TouchableOpacity>
-            <View>
-              <Text style={styles.titleWhite}>Récapitulatif</Text>
-              <Text style={styles.subtitleWhite}>
-                {draft.station_libre ?? '—'} · N°{draft.n_message ?? '—'}
-              </Text>
-            </View>
           </View>
-        </View>
-
-        <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16, gap: 8 }}>
-          <View style={styles.checkRow}>
-            <View style={styles.checkBadge}>
-              <Text style={styles.checkBadgeText}>✓</Text>
-            </View>
-            <Text style={styles.checkLabel}>A · Références</Text>
-          </View>
-          <View style={styles.checkRow}>
-            <View style={styles.checkBadge}>
-              <Text style={styles.checkBadgeText}>✓</Text>
-            </View>
-            <Text style={styles.checkLabel}>B · Imagos — LMC {totals.imagoLMC} · NSE {totals.imagoNSE}</Text>
-          </View>
-          <View style={styles.checkRow}>
-            <View style={styles.checkBadge}>
-              <Text style={styles.checkBadgeText}>✓</Text>
-            </View>
-            <Text style={styles.checkLabel}>C · Larves — LMC {totals.larveLMC} · NSE {totals.larveNSE}</Text>
-          </View>
-          <View style={styles.checkRow}>
-            <View style={styles.checkBadge}>
-              <Text style={styles.checkBadgeText}>✓</Text>
-            </View>
-            <Text style={styles.checkLabel}>D · Observations — dégâts {draft.degats_cultures_pourcent ?? 0} %</Text>
-          </View>
-
-          <View style={styles.offlineBanner}>
-            <Text style={styles.offlineText}>☁︎ Pas de réseau ici — la fiche part en file de synchronisation.</Text>
-          </View>
-          {error && <Text style={styles.errorText}>{error}</Text>}
-        </ScrollView>
-
-        <View style={styles.footer}>
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={isSaving} activeOpacity={0.85}>
-            <Text style={styles.saveButtonText}>Enregistrer (hors-ligne) ✓</Text>
-          </TouchableOpacity>
-        </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
   );
@@ -214,6 +226,7 @@ export default function ExtensiveRecapScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
+  keyboardAvoidingView: { flex: 1 },
   headerGreen: { backgroundColor: GREEN, paddingHorizontal: 18, paddingTop: 8, paddingBottom: 16 },
   headerRowGreen: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   backWhite: { fontSize: 20, fontWeight: '700', color: '#fff' },

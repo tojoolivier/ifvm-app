@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getCurrentPosition } from '@/lib/location';
@@ -111,106 +111,112 @@ export default function ExtensiveReferenceScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.safe}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
-            <Text style={styles.back}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>Références</Text>
-        </View>
-        <View style={styles.progressRow}>
-          <View style={[styles.progressBar, styles.progressActive]} />
-          <View style={styles.progressBar} />
-          <View style={styles.progressBar} />
-          <View style={styles.progressBar} />
-          <View style={styles.progressBar} />
-        </View>
+        <KeyboardAvoidingView 
+          style={styles.keyboardAvoidingView} 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          <View style={styles.headerRow}>
+            <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
+              <Text style={styles.back}>‹</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>Références</Text>
+          </View>
+          <View style={styles.progressRow}>
+            <View style={[styles.progressBar, styles.progressActive]} />
+            <View style={styles.progressBar} />
+            <View style={styles.progressBar} />
+            <View style={styles.progressBar} />
+            <View style={styles.progressBar} />
+          </View>
 
-        <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16 }}>
-          {isValidation && draft?.signalement_description && (
-            <View style={styles.quoteBanner}>
-              <Text style={styles.quoteText}>
-                « {draft.signalement_description} » — signalé par {draft.signalement_source}
-                {draft.signalement_date ? `, ${draft.signalement_date}` : ''}.
-              </Text>
+          <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
+            {isValidation && draft?.signalement_description && (
+              <View style={styles.quoteBanner}>
+                <Text style={styles.quoteText}>
+                  « {draft.signalement_description} » — signalé par {draft.signalement_source}
+                  {draft.signalement_date ? `, ${draft.signalement_date}` : ''}.
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.autoCard}>
+              <Text style={styles.autoLabel}>Prospecteur (connecté)</Text>
+              <Text style={styles.autoValue}>{user ? `${user.prenom} ${user.nom}` : '—'}</Text>
             </View>
-          )}
 
-          <View style={styles.autoCard}>
-            <Text style={styles.autoLabel}>Prospecteur (connecté)</Text>
-            <Text style={styles.autoValue}>{user ? `${user.prenom} ${user.nom}` : '—'}</Text>
-          </View>
-
-          <View style={styles.row}>
-            <View style={[styles.autoCard, styles.flex1]}>
-              <Text style={styles.autoLabel}>Date</Text>
-              <Text style={styles.autoValueMono}>{draft?.date_prospection ?? '—'}</Text>
+            <View style={styles.row}>
+              <View style={[styles.autoCard, styles.flex1]}>
+                <Text style={styles.autoLabel}>Date</Text>
+                <Text style={styles.autoValueMono}>{draft?.date_prospection ?? '—'}</Text>
+              </View>
+              <View style={[styles.autoCard, styles.flex1]}>
+                <Text style={styles.autoLabel}>N° message</Text>
+                <TextInput value={nMessage} onChangeText={setNMessage} style={styles.autoInputMono} />
+              </View>
             </View>
-            <View style={[styles.autoCard, styles.flex1]}>
-              <Text style={styles.autoLabel}>N° message</Text>
-              <TextInput value={nMessage} onChangeText={setNMessage} style={styles.autoInputMono} />
+
+            <View style={styles.card}>
+              <Text style={styles.label}>Station</Text>
+              <TextInput value={stationLibre} onChangeText={setStationLibre} style={styles.input} />
             </View>
-          </View>
 
-          <View style={styles.card}>
-            <Text style={styles.label}>Station</Text>
-            <TextInput value={stationLibre} onChangeText={setStationLibre} style={styles.input} />
-          </View>
-
-          <View style={styles.row}>
-            <View style={[styles.autoCard, styles.flex1]}>
-              <Text style={styles.autoLabel}>Latitude S</Text>
-              {isLoadingGps ? (
-                <Text style={styles.gpsLoading}>Récupération GPS...</Text>
-              ) : (
-                <Text style={styles.autoValueMono}>{latitude || '—'}</Text>
-              )}
-              {gpsError ? (
-                <Text style={styles.gpsErrorText}>{gpsError}</Text>
-              ) : null}
+            <View style={styles.row}>
+              <View style={[styles.autoCard, styles.flex1]}>
+                <Text style={styles.autoLabel}>Latitude S</Text>
+                {isLoadingGps ? (
+                  <Text style={styles.gpsLoading}>Récupération GPS...</Text>
+                ) : (
+                  <Text style={styles.autoValueMono}>{latitude || '—'}</Text>
+                )}
+                {gpsError ? (
+                  <Text style={styles.gpsErrorText}>{gpsError}</Text>
+                ) : null}
+              </View>
+              <View style={[styles.autoCard, styles.flex1]}>
+                <Text style={styles.autoLabel}>Longitude E</Text>
+                {isLoadingGps ? (
+                  <Text style={styles.gpsLoading}>Récupération GPS...</Text>
+                ) : (
+                  <Text style={styles.autoValueMono}>{longitude || '—'}</Text>
+                )}
+                {gpsError ? (
+                  <Text style={styles.gpsErrorText}>{gpsError}</Text>
+                ) : null}
+              </View>
             </View>
-            <View style={[styles.autoCard, styles.flex1]}>
-              <Text style={styles.autoLabel}>Longitude E</Text>
-              {isLoadingGps ? (
-                <Text style={styles.gpsLoading}>Récupération GPS...</Text>
-              ) : (
-                <Text style={styles.autoValueMono}>{longitude || '—'}</Text>
-              )}
-              {gpsError ? (
-                <Text style={styles.gpsErrorText}>{gpsError}</Text>
-              ) : null}
+
+            <Text style={styles.sectionLabel}>Type de station (biotope)</Text>
+            <View style={styles.chipsRow}>
+              {BIOTOPE_EXTENSIVE_OPTIONS.map((option) => {
+                const active = option.value === typeStation;
+                return (
+                  <TouchableOpacity key={option.value} onPress={() => setTypeStation(option.value)} activeOpacity={0.7}>
+                    <Text style={[styles.chip, active && styles.chipActive]}>{option.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
+
+            <View style={[styles.card, { marginTop: 10 }]}>
+              <Text style={styles.label}>Surf. (ha)</Text>
+              <TextInput
+                value={surfaceStation}
+                onChangeText={setSurfaceStation}
+                keyboardType="decimal-pad"
+                style={styles.input}
+              />
+            </View>
+
+            <Text style={styles.hintText}>Vert = auto-rempli par GPS/session ; blanc = à confirmer ou saisir.</Text>
+          </ScrollView>
+
+          <View style={styles.footer}>
+            <TouchableOpacity style={styles.continueButton} onPress={handleContinue} disabled={isSaving} activeOpacity={0.85}>
+              <Text style={styles.continueButtonText}>Suivant : Imagos ›</Text>
+            </TouchableOpacity>
           </View>
-
-          <Text style={styles.sectionLabel}>Type de station (biotope)</Text>
-          <View style={styles.chipsRow}>
-            {BIOTOPE_EXTENSIVE_OPTIONS.map((option) => {
-              const active = option.value === typeStation;
-              return (
-                <TouchableOpacity key={option.value} onPress={() => setTypeStation(option.value)} activeOpacity={0.7}>
-                  <Text style={[styles.chip, active && styles.chipActive]}>{option.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <View style={[styles.card, { marginTop: 10 }]}>
-            <Text style={styles.label}>Surf. (ha)</Text>
-            <TextInput
-              value={surfaceStation}
-              onChangeText={setSurfaceStation}
-              keyboardType="decimal-pad"
-              style={styles.input}
-            />
-          </View>
-
-          <Text style={styles.hintText}>Vert = auto-rempli par GPS/session ; blanc = à confirmer ou saisir.</Text>
-        </ScrollView>
-
-        <View style={styles.footer}>
-          <TouchableOpacity style={styles.continueButton} onPress={handleContinue} disabled={isSaving} activeOpacity={0.85}>
-            <Text style={styles.continueButtonText}>Suivant : Imagos ›</Text>
-          </TouchableOpacity>
-        </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
   );
@@ -219,6 +225,7 @@ export default function ExtensiveReferenceScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
+  keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
   back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
   title: { fontSize: 15, fontWeight: '700', color: TEXT },

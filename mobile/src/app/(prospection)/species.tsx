@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -51,84 +51,90 @@ export default function SpeciesScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.safe}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
-            <Text style={styles.back}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>Qu&apos;avez-vous observé ?</Text>
-        </View>
-        <View style={styles.progressRow}>
-          <View style={[styles.progressBar, styles.progressActive]} />
-          <View style={[styles.progressBar, styles.progressActive]} />
-          <View style={styles.progressBar} />
-          <View style={styles.progressBar} />
-        </View>
+        <KeyboardAvoidingView 
+          style={styles.keyboardAvoidingView} 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          <View style={styles.headerRow}>
+            <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
+              <Text style={styles.back}>‹</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>Qu&apos;avez-vous observé ?</Text>
+          </View>
+          <View style={styles.progressRow}>
+            <View style={[styles.progressBar, styles.progressActive]} />
+            <View style={[styles.progressBar, styles.progressActive]} />
+            <View style={styles.progressBar} />
+            <View style={styles.progressBar} />
+          </View>
 
-        <View style={styles.content}>
-          <Text style={styles.hint}>Touchez les stades présents. Seules les grilles cochées apparaîtront.</Text>
+          <View style={styles.content}>
+            <Text style={styles.hint}>Touchez les stades présents. Seules les grilles cochées apparaîtront.</Text>
 
-          <View style={[styles.card, styles.cardActive]}>
-            <Text style={styles.cardTitle}>
-              Locusta migratoria <Text style={styles.italic}>capito</Text>
-            </Text>
-            <View style={styles.toggleRow}>
-              <TouchableOpacity
-                style={[styles.toggle, selection.lmcImago && styles.toggleActive]}
-                onPress={() => toggle('lmcImago')}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.toggleText, selection.lmcImago && styles.toggleTextActive]}>Imagos</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.toggle, selection.lmcLarve && styles.toggleActive]}
-                onPress={() => toggle('lmcLarve')}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.toggleText, selection.lmcLarve && styles.toggleTextActive]}>Larves</Text>
-              </TouchableOpacity>
+            <View style={[styles.card, styles.cardActive]}>
+              <Text style={styles.cardTitle}>
+                Locusta migratoria <Text style={styles.italic}>capito</Text>
+              </Text>
+              <View style={styles.toggleRow}>
+                <TouchableOpacity
+                  style={[styles.toggle, selection.lmcImago && styles.toggleActive]}
+                  onPress={() => toggle('lmcImago')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.toggleText, selection.lmcImago && styles.toggleTextActive]}>Imagos</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.toggle, selection.lmcLarve && styles.toggleActive]}
+                  onPress={() => toggle('lmcLarve')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.toggleText, selection.lmcLarve && styles.toggleTextActive]}>Larves</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>
+                Nomadacris <Text style={styles.italic}>septemfasciata</Text>
+              </Text>
+              <View style={styles.toggleRow}>
+                <TouchableOpacity
+                  style={[styles.toggle, selection.nseImago && styles.toggleActive]}
+                  onPress={() => toggle('nseImago')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.toggleText, selection.nseImago && styles.toggleTextActive]}>Imagos</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.toggle, selection.nseLarve && styles.toggleActive]}
+                  onPress={() => toggle('nseLarve')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.toggleText, selection.nseLarve && styles.toggleTextActive]}>Larves</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.stepsHint}>
+              <Text style={styles.stepsHintIcon}>⚡</Text>
+              <Text style={styles.stepsHintText}>
+                <Text style={styles.stepsHintStrong}>{stepsCount} grille(s)</Text> à remplir selon votre sélection.
+              </Text>
             </View>
           </View>
 
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>
-              Nomadacris <Text style={styles.italic}>septemfasciata</Text>
-            </Text>
-            <View style={styles.toggleRow}>
-              <TouchableOpacity
-                style={[styles.toggle, selection.nseImago && styles.toggleActive]}
-                onPress={() => toggle('nseImago')}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.toggleText, selection.nseImago && styles.toggleTextActive]}>Imagos</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.toggle, selection.nseLarve && styles.toggleActive]}
-                onPress={() => toggle('nseLarve')}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.toggleText, selection.nseLarve && styles.toggleTextActive]}>Larves</Text>
-              </TouchableOpacity>
-            </View>
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={[styles.continueButton, stepsCount === 0 && styles.continueButtonDisabled]}
+              onPress={handleContinue}
+              disabled={stepsCount === 0 || isSaving}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.continueButtonText}>Captures  ›</Text>
+            </TouchableOpacity>
           </View>
-
-          <View style={styles.stepsHint}>
-            <Text style={styles.stepsHintIcon}>⚡</Text>
-            <Text style={styles.stepsHintText}>
-              <Text style={styles.stepsHintStrong}>{stepsCount} grille(s)</Text> à remplir selon votre sélection.
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.continueButton, stepsCount === 0 && styles.continueButtonDisabled]}
-            onPress={handleContinue}
-            disabled={stepsCount === 0 || isSaving}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.continueButtonText}>Captures  ›</Text>
-          </TouchableOpacity>
-        </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
   );
@@ -137,6 +143,7 @@ export default function SpeciesScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
+  keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
   back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
   title: { fontSize: 15, fontWeight: '700', color: TEXT },

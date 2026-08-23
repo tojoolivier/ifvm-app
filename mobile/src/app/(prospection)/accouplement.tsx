@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAsyncAction } from '@/hooks/use-async-action';
@@ -100,62 +100,68 @@ export default function AccouplementScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.safe}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={handleBack} activeOpacity={0.7}>
-            <Text style={styles.back}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>{ESPECE_LABEL[grille.espece]} · accouplement & ponte</Text>
-        </View>
-
-        <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16 }}>
-          <Text style={styles.hint}>Intensité pour {ESPECE_LABEL[grille.espece]}</Text>
-
-          <Text style={styles.sectionLabel}>Accouplement</Text>
-          <View style={styles.chipsRow}>
-            {accouplementOpts.map((option) => {
-              const active = option === population.accouplement;
-              return (
-                <TouchableOpacity
-                  key={option}
-                  onPress={() => setField('accouplement', option)}
-                  style={[styles.chip, active && styles.chipActive]}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{option}</Text>
-                </TouchableOpacity>
-              );
-            })}
+        <KeyboardAvoidingView 
+          style={styles.keyboardAvoidingView} 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          <View style={styles.headerRow}>
+            <TouchableOpacity onPress={handleBack} activeOpacity={0.7}>
+              <Text style={styles.back}>‹</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>{ESPECE_LABEL[grille.espece]} · accouplement & ponte</Text>
           </View>
 
-          <Text style={styles.sectionLabel}>Ponte</Text>
-          <View style={styles.chipsRow}>
-            {accouplementOpts.map((option) => {
-              const active = option === population.ponte;
-              return (
-                <TouchableOpacity
-                  key={option}
-                  onPress={() => setField('ponte', option)}
-                  style={[styles.chip, active && styles.chipActive]}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{option}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+          <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
+            <Text style={styles.hint}>Intensité pour {ESPECE_LABEL[grille.espece]}</Text>
 
-          {insight && (
-            <View style={styles.insightCallout}>
-              <Text style={styles.insightText}>{insight}</Text>
+            <Text style={styles.sectionLabel}>Accouplement</Text>
+            <View style={styles.chipsRow}>
+              {accouplementOpts.map((option) => {
+                const active = option === population.accouplement;
+                return (
+                  <TouchableOpacity
+                    key={option}
+                    onPress={() => setField('accouplement', option)}
+                    style={[styles.chip, active && styles.chipActive]}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
-          )}
-        </ScrollView>
 
-        <View style={styles.footer}>
-          <TouchableOpacity style={styles.continueButton} onPress={handleContinue} disabled={isSaving} activeOpacity={0.85}>
-            <Text style={styles.continueButtonText}>Captures  ›</Text>
-          </TouchableOpacity>
-        </View>
+            <Text style={styles.sectionLabel}>Ponte</Text>
+            <View style={styles.chipsRow}>
+              {accouplementOpts.map((option) => {
+                const active = option === population.ponte;
+                return (
+                  <TouchableOpacity
+                    key={option}
+                    onPress={() => setField('ponte', option)}
+                    style={[styles.chip, active && styles.chipActive]}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {insight && (
+              <View style={styles.insightCallout}>
+                <Text style={styles.insightText}>{insight}</Text>
+              </View>
+            )}
+          </ScrollView>
+
+          <View style={styles.footer}>
+            <TouchableOpacity style={styles.continueButton} onPress={handleContinue} disabled={isSaving} activeOpacity={0.85}>
+              <Text style={styles.continueButtonText}>Captures  ›</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
   );
@@ -164,6 +170,7 @@ export default function AccouplementScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
+  keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 10 },
   back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
   title: { fontSize: 14, fontWeight: '700', color: TEXT },
