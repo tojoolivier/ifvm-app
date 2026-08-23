@@ -1,5 +1,5 @@
-import { runTask } from '../src/lib/run-task';
-import { demarrerApp } from '../src/lib/app-startup';
+import { runTask, type TaskOptions } from '../src/lib/run-task';
+import { demarrerApp, messageDeDemarrageManque } from '../src/lib/app-startup';
 import {
   configureLogger,
   resetLoggerForTests,
@@ -78,7 +78,7 @@ describe('runTask — la frontière n’avale jamais rien', () => {
     for (const [, error] of HUIT_CAS) {
       resetLoggerForTests();
       await runTask(() => Promise.reject(error), {
-        name: 'tache',
+        name: 'sync.referentiel',
         criticality: 'best-effort',
       });
       expect(lignesEnAttente().length + ecrites.length).toBeGreaterThan(0);
@@ -92,21 +92,21 @@ describe('runTask — la frontière n’avale jamais rien', () => {
       () => {
         throw new LocalWriteError('table is locked');
       },
-      { name: 'ecriture', criticality: 'essential' }
+      { name: 'db.ecriture', criticality: 'essential' }
     );
 
     expect(r.ok).toBe(false);
-    expect(ecrites.at(-1)?.event).toBe('ecriture.failed');
+    expect(ecrites.at(-1)?.event).toBe('db.ecriture.failed');
     expect(ecrites.at(-1)?.err?.message).toBe('table is locked');
   });
 
   it('l’échec est discernable d’un succès — jamais un null muet', async () => {
     const succes = await runTask(() => Promise.resolve(null), {
-      name: 'lecture',
+      name: 'db.lecture',
       criticality: 'best-effort',
     });
     const echec = await runTask<null>(() => Promise.reject(new NetworkError('boom')), {
-      name: 'lecture',
+      name: 'db.lecture',
       criticality: 'best-effort',
     });
 
@@ -118,7 +118,7 @@ describe('runTask — la frontière n’avale jamais rien', () => {
     // C'est la raison d'être de la frontière au démarrage de l'app.
     await expect(
       runTask(() => Promise.reject(new Error('boum')), {
-        name: 'flottante',
+        name: 'sync.flottante',
         criticality: 'best-effort',
       })
     ).resolves.toMatchObject({ ok: false });
@@ -139,7 +139,7 @@ describe('runTask — la frontière n’avale jamais rien', () => {
 
   it('un succès ne journalise aucun échec', async () => {
     const r = await runTask(() => Promise.resolve(42), {
-      name: 'calcul',
+      name: 'stats.calcul',
       criticality: 'essential',
     });
 
@@ -149,19 +149,34 @@ describe('runTask — la frontière n’avale jamais rien', () => {
 });
 
 describe('runTask — aucune échappatoire', () => {
-  it('la criticité est obligatoire, sans valeur par défaut', async () => {
-    // Le développeur doit se prononcer et la revue doit le voir : c'est le
-    // type qui l'impose, pas une convention.
-    // @ts-expect-error criticality manquante
-    await runTask(() => Promise.resolve(), { name: 'tache' });
+  /** Les clés de `T` que l'appelant peut omettre. */
+  type Optionnelles<T> = {
+    [K in keyof T]-?: object extends Pick<T, K> ? K : never;
+  }[keyof T];
+
+  it('la criticité est obligatoire, sans valeur par défaut', () => {
+    // Assertion de TYPE, vérifiée à la compilation : `context` est la seule
+    // option omissible. Donner un défaut à `criticality` la rendrait
+    // optionnelle et ferait échouer cette ligne — le développeur doit se
+    // prononcer, et c'est le type qui l'impose, pas une convention.
+    const seuleOptionnelle: Optionnelles<TaskOptions> extends 'context' ? true : false = true;
+
+    expect(seuleOptionnelle).toBe(true);
   });
 
-  it('il n’existe pas de niveau silent', async () => {
-    await runTask(() => Promise.reject(new Error('x')), {
-      name: 'tache',
+  it('il n’existe pas de niveau silent — et une criticité inconnue montre', async () => {
+    const r = await runTask(() => Promise.reject(new Error('x')), {
+      name: 'sync.referentiel',
       // @ts-expect-error 'silent' rouvrirait la porte au silence total
       criticality: 'silent',
     });
+
+    // Même forcée par un `as`, une criticité hors union ne produit pas un
+    // traitement `undefined` : en cas de doute, on montre.
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.traitement).toBe('BLOQUER');
+    expect(ecrites.at(-1)?.event).toBe('sync.referentiel.failed');
   });
 });
 
@@ -173,7 +188,6 @@ describe('demarrerApp — les premiers clients de essential', () => {
     const r = await demarrerApp({
       ouvrirBase: () => Promise.reject(new LocalWriteError('migration failed')),
       initDebug: ok,
-      installerFiletGlobal: () => {},
     });
 
     expect(r.base.ok).toBe(false);
@@ -189,7 +203,6 @@ describe('demarrerApp — les premiers clients de essential', () => {
     const r = await demarrerApp({
       ouvrirBase: ok,
       initDebug: () => Promise.reject(new LocalReadError('storage illisible')),
-      installerFiletGlobal: () => {},
     });
 
     expect(r.base.ok).toBe(true);
@@ -197,25 +210,38 @@ describe('demarrerApp — les premiers clients de essential', () => {
     expect(ecrites.some((l) => l.event === 'startup.debug.failed')).toBe(true);
   });
 
-  it('un échec de la base n’empêche pas la pose du filet global', async () => {
-    const pose = jest.fn();
-
-    await demarrerApp({
-      ouvrirBase: () => Promise.reject(new LocalWriteError('x')),
-      initDebug: ok,
-      installerFiletGlobal: pose,
-    });
-
-    expect(pose).toHaveBeenCalledTimes(1);
-  });
-
   it('ne rejette jamais, même si les deux tâches échouent', async () => {
+    // Rien dans `demarrerApp` ne vit hors d'un `runTask` : un rejet ferait du
+    // `void demarrerApp(...)` de `_layout` un rejet flottant, et #160 a établi
+    // qu'aucun filet ne le rattraperait en release.
     await expect(
       demarrerApp({
         ouvrirBase: () => Promise.reject(new Error('a')),
         initDebug: () => Promise.reject(new Error('b')),
-        installerFiletGlobal: () => {},
       })
     ).resolves.toBeDefined();
+  });
+});
+
+describe('messageDeDemarrageManque — le INFORMER atteint l’agent', () => {
+  const ok = () => Promise.resolve();
+
+  it('ne dit rien quand tout s’est ouvert', async () => {
+    const r = await demarrerApp({ ouvrirBase: ok, initDebug: ok });
+
+    expect(messageDeDemarrageManque(r)).toBeNull();
+  });
+
+  it.each([
+    ['la base', { ouvrirBase: () => Promise.reject(new LocalWriteError('x')), initDebug: ok }],
+    ['le mode debug', { ouvrirBase: ok, initDebug: () => Promise.reject(new LocalReadError('x')) }],
+  ])('produit un message quand %s échoue', async (_quoi, deps) => {
+    // Sans ça, le capteur est posé mais l'alarme n'est reliée à rien : l'agent
+    // ne verrait toujours rien, exactement comme avec la promesse flottante.
+    const message = messageDeDemarrageManque(await demarrerApp(deps));
+
+    expect(message).toContain('stockage de l’appareil');
+    // Message métier, jamais le brut technique — ADR-012 décision 2.
+    expect(message).not.toContain('LocalWriteError');
   });
 });

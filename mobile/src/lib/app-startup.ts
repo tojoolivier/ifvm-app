@@ -2,13 +2,14 @@
  * Démarrage de l'application — premiers clients de `runTask({ criticality:
  * 'essential' })`.
  *
- * Ces deux tâches étaient des **promesses flottantes** dans `_layout.tsx` : un
- * échec de migration SQLite au lancement n'avait aucun capteur, l'app
- * continuait avec une base inutilisable et l'agent découvrait le problème à la
- * première saisie perdue.
+ * `getDb()` et `useDebugStore.init()` étaient des **promesses flottantes** dans
+ * `_layout.tsx` : un échec de migration SQLite au lancement n'avait aucun
+ * capteur, l'app continuait avec une base inutilisable et l'agent découvrait le
+ * problème à la première saisie perdue.
  *
  * La logique vit ici, hors du composant, pour être testable sans moteur de
- * rendu — `_layout.tsx` se contente de l'appeler.
+ * rendu. Le composant garde ce qui lui revient : brancher le résultat sur ce
+ * que l'agent voit.
  */
 import { runTask, type TaskOutcome } from './run-task';
 
@@ -17,8 +18,6 @@ export interface StartupDeps {
   ouvrirBase: () => Promise<unknown>;
   /** Relit la préférence « mode debug » depuis le stockage local. */
   initDebug: () => Promise<unknown>;
-  /** Pose le handler d'exceptions JS globales. */
-  installerFiletGlobal: () => void;
 }
 
 export interface StartupOutcome {
@@ -32,7 +31,8 @@ export interface StartupOutcome {
  * que l'agent saisira ensuite sera perdu, et il doit en être informé.
  *
  * Elles sont indépendantes et tournent donc en parallèle ; `runTask` ne
- * rejetant jamais, `Promise.all` ne peut pas court-circuiter l'une des deux.
+ * rejetant jamais, `Promise.all` ne peut ni court-circuiter l'une des deux ni
+ * faire rejeter `demarrerApp`.
  */
 export async function demarrerApp(deps: StartupDeps): Promise<StartupOutcome> {
   const [base, debug] = await Promise.all([
@@ -40,9 +40,18 @@ export async function demarrerApp(deps: StartupDeps): Promise<StartupOutcome> {
     runTask(deps.initDebug, { name: 'startup.debug', criticality: 'essential' }),
   ]);
 
-  // Posé quoi qu'il arrive : c'est précisément quand le démarrage se passe mal
-  // qu'on a besoin du filet.
-  deps.installerFiletGlobal();
-
   return { base, debug };
+}
+
+/**
+ * Le message d'un démarrage manqué, ou `null` si tout s'est ouvert.
+ *
+ * Un seul message pour les deux tâches : la cause technique diffère, la
+ * conséquence terrain non — le stockage de l'appareil ne répond pas, et c'est
+ * la saisie à venir qui est en jeu. Le détail par tâche est dans le journal.
+ */
+export function messageDeDemarrageManque(outcome: StartupOutcome): string | null {
+  if (outcome.base.ok && outcome.debug.ok) return null;
+
+  return 'Le stockage de l’appareil n’a pas pu être ouvert. Vos saisies risquent de ne pas être enregistrées — prévenez le support avant de continuer.';
 }
