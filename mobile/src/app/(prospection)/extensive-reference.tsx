@@ -93,11 +93,16 @@ export default function ExtensiveReferenceScreen() {
     if (!draftId || isSaving) return;
     setIsSaving(true);
     try {
+      // 👇 Convertir en minuscules et remplace les espaces par des underscores si besoin
+      const normalizedTypeStation = typeStation
+        ? typeStation.toLowerCase().replace(/\s+/g, '_') 
+        : null;
+
       const updated = await updateProspectionExtensiveReference(draftId, {
         latitude: latitude ? parseFloat(latitude) : null,
         longitude: longitude ? parseFloat(longitude) : null,
         stationLibre: stationLibre || null,
-        typeStation: typeStation || null,
+        typeStation: normalizedTypeStation, // 👈 Envoie la version minuscule
         surfaceStation: surfaceStation ? parseFloat(surfaceStation) : null,
         nMessage: nMessage || null,
       });
