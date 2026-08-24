@@ -10,6 +10,7 @@ import { ErrorBanner } from '@/components/error-banner';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { installGlobalErrorHandlers } from '@/lib/global-error-handler';
 import { demarrerApp, messageDeDemarrageManque } from '@/lib/app-startup';
+import { installerTransportJournal, purgerJournal } from '@/lib/journal-db';
 import { useErrorStore } from '@/lib/error-store';
 import '../global.css';
 
@@ -46,7 +47,12 @@ export default function RootLayout() {
   useReferentielAutoSync(token);
 
   useEffect(() => {
-    // Posé d'abord, et de façon synchrone : la phase la plus risquée du cycle
+    // Le journal en premier, et de façon synchrone : ce qui échoue avant que
+    // le transport ne soit branché reste dans l'anneau mémoire et disparaît à
+    // la fermeture de l'app — donc n'atteint jamais le support.
+    installerTransportJournal();
+
+    // Posé ensuite, et de façon synchrone : la phase la plus risquée du cycle
     // de vie est celle qui suit immédiatement, pas celle qui la précède.
     installGlobalErrorHandlers();
 
@@ -56,6 +62,10 @@ export default function RootLayout() {
     void demarrerApp({
       ouvrirBase: getDb,
       initDebug: () => useDebugStore.getState().init(),
+      // Le flag debug n'est plus un gate d'écriture (ADR-012 décision 4) : il
+      // ne fait qu'allonger la rétention des `detail`. Il est relu ici, après
+      // `initDebug`, parce que `demarrerApp` séquence la purge derrière lui.
+      purgerJournal: () => purgerJournal({ verbeux: useDebugStore.getState().enabled }),
     }).then((outcome) => {
       const message = messageDeDemarrageManque(outcome);
       if (message) useErrorStore.getState().showError({ message });
