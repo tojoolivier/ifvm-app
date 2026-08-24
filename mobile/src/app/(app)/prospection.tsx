@@ -54,7 +54,7 @@ export default function ProspectionScreen() {
   const [data, setData] = useState<AccueilViewModel>(EMPTY_DATA);
   const [showSavedToast, setShowSavedToast] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
-  const [isSyncingAll, setIsSyncingAll] = useState(false);
+  const { run: runSyncAll, isRunning: isSyncingAll } = useAsyncAction();
   const [syncToast, setSyncToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterKey, setFilterKey] = useState<FilterKey>('TOUS');
@@ -189,33 +189,39 @@ export default function ProspectionScreen() {
     router.push('/(prospection)/type-chooser' as any);
   };
 
-  const handleSyncAll = async () => {
-    if (!token || isSyncingAll || pendingSync.length === 0) return;
-    setIsSyncingAll(true);
-    const failures: string[] = [];
-    for (const draft of pendingSync) {
-      try {
-        await retrySyncProspection(draft, token);
-      } catch (error) {
-        logger.failure('prospection.syncAll.failed', error, { draftId: draft.id });
-        const label = draft.n_fiche ?? `fiche du ${draft.date_prospection}`;
-        const message = error instanceof Error ? error.message : 'erreur inconnue';
-        failures.push(`${label} : ${message}`);
+  const handleSyncAll = () =>
+    runSyncAll(
+      async () => {
+        const failures: string[] = [];
+        for (const draft of pendingSync) {
+          try {
+            await retrySyncProspection(draft, token!);
+          } catch (error) {
+            logger.failure('prospection.syncAll.failed', error, { draftId: draft.id });
+            const label = draft.n_fiche ?? `fiche du ${draft.date_prospection}`;
+            const message = error instanceof Error ? error.message : 'erreur inconnue';
+            failures.push(`${label} : ${message}`);
+          }
+        }
+        const successCount = pendingSync.length - failures.length;
+        if (failures.length === 0) {
+          setSyncToast({
+            type: 'success',
+            message: `${successCount} fiche${successCount > 1 ? 's' : ''} synchronisée${successCount > 1 ? 's' : ''}`,
+          });
+        } else {
+          setSyncToast({ type: 'error', message: failures.join('\n') });
+        }
+        refresh();
+        setTimeout(() => setSyncToast(null), 6000);
+      },
+      {
+        screen: 'prospection',
+        precondition: !!token && pendingSync.length > 0,
+        preconditionMessage: 'Session expirée — reconnectez-vous pour synchroniser.',
+        context: { pendingCount: pendingSync.length },
       }
-    }
-    const successCount = pendingSync.length - failures.length;
-    if (failures.length === 0) {
-      setSyncToast({
-        type: 'success',
-        message: `${successCount} fiche${successCount > 1 ? 's' : ''} synchronisée${successCount > 1 ? 's' : ''}`,
-      });
-    } else {
-      setSyncToast({ type: 'error', message: failures.join('\n') });
-    }
-    setIsSyncingAll(false);
-    refresh();
-    setTimeout(() => setSyncToast(null), 6000);
-  };
+    );
 
   const handleDelete = (draft: DraftProspection) => {
     Alert.alert(
