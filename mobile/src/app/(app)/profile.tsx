@@ -62,10 +62,15 @@ export default function ProfileScreen() {
     return () => clearTimeout(id);
   }, [signalerChargement]);
 
-  const handleLogout = async () => {
-    await logout();
-    router.replace('/(auth)/login');
-  };
+  const { run: runLogout } = useAsyncAction();
+  const handleLogout = () =>
+    runLogout(
+      async () => {
+        await logout();
+        router.replace('/(auth)/login');
+      },
+      { screen: 'profile', context: { action: 'logout' } }
+    );
 
   const handleForcePull = () =>
     runSync(
@@ -130,39 +135,40 @@ export default function ProfileScreen() {
       const docDir = (FileSystem as any).documentDirectory;
       return docDir || '';
     } catch (error) {
-      // Best-effort délibéré : sans répertoire dédié, `saveProfileImage` garde
-      // l'URI d'origine (galerie/caméra) au lieu de copier le fichier.
+      // Best-effort délibéré : sans répertoire dédié, `persistProfileImage`
+      // garde l'URI d'origine (galerie/caméra) au lieu de copier le fichier.
       logger.ignore(error, "répertoire de documents indisponible, l'image n'est pas copiée localement");
       return '';
     }
   };
 
-  const saveProfileImage = (uri: string) =>
-    runImage(
-      async () => {
-        const docDir = getDocumentDirectory();
-        let fileUri = uri;
+  // Étape partagée par takePhoto/pickImage — pas de `runImage` propre : ces
+  // deux appelants sont eux-mêmes déjà dans l'action d'un `runImage` en
+  // cours, et `run()` ignore silencieusement tout appel imbriqué tant que
+  // `isRunningRef` est vrai (voir use-async-action.ts) — la photo ne se
+  // serait jamais sauvegardée.
+  const persistProfileImage = async (uri: string) => {
+    const docDir = getDocumentDirectory();
+    let fileUri = uri;
 
-        // Si nous sommes sur mobile et que le répertoire est disponible
-        if (docDir) {
-          const fileName = `profile_${user?.id || 'user'}_${Date.now()}.jpg`;
-          fileUri = docDir + fileName;
+    // Si nous sommes sur mobile et que le répertoire est disponible
+    if (docDir) {
+      const fileName = `profile_${user?.id || 'user'}_${Date.now()}.jpg`;
+      fileUri = docDir + fileName;
 
-          // Copier le fichier vers le répertoire de l'application
-          await FileSystem.copyAsync({
-            from: uri,
-            to: fileUri,
-          });
-        }
+      // Copier le fichier vers le répertoire de l'application
+      await FileSystem.copyAsync({
+        from: uri,
+        to: fileUri,
+      });
+    }
 
-        // Sauvegarder le chemin dans le storage
-        await storage.setItem(PROFILE_IMAGE_KEY, fileUri);
-        setProfileImage(fileUri);
+    // Sauvegarder le chemin dans le storage
+    await storage.setItem(PROFILE_IMAGE_KEY, fileUri);
+    setProfileImage(fileUri);
 
-        Alert.alert('Succès', 'Photo de profil mise à jour !');
-      },
-      { screen: 'profile', context: { action: 'saveProfileImage' } }
-    );
+    Alert.alert('Succès', 'Photo de profil mise à jour !');
+  };
 
   // Demander les permissions et ouvrir la caméra
   const takePhoto = () =>
@@ -185,7 +191,7 @@ export default function ProfileScreen() {
         });
 
         if (!result.canceled && result.assets && result.assets.length > 0) {
-          await saveProfileImage(result.assets[0].uri);
+          await persistProfileImage(result.assets[0].uri);
         }
       },
       { screen: 'profile', context: { action: 'takePhoto' } }
@@ -212,7 +218,7 @@ export default function ProfileScreen() {
         });
 
         if (!result.canceled && result.assets && result.assets.length > 0) {
-          await saveProfileImage(result.assets[0].uri);
+          await persistProfileImage(result.assets[0].uri);
         }
       },
       { screen: 'profile', context: { action: 'pickImage' } }
