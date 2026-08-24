@@ -198,7 +198,7 @@ export default function ReferenceScreen() {
     return () => {
       isActive = false;
     };
-  }, [draft?.latitude, draft?.longitude]);
+  }, [draft]);
 
   async function applyPa(poste: PosteAcridien): Promise<StationFixe[]> {
     setPa(poste);
