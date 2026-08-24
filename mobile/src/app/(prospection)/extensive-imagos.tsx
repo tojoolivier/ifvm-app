@@ -13,6 +13,8 @@ import {
   populationRowToSpeciesData,
   extractCommonImagoData,
 } from '@/lib/prospection-extensive';
+import { useAsyncAction } from '@/hooks/use-async-action';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -38,28 +40,29 @@ export default function ExtensiveImagosScreen() {
   // Données communes
   const [typeCapture, setTypeCapture] = useState<'essaim' | 'volClair'>('essaim');
   
-  const [isSaving, setIsSaving] = useState(false);
+  const { run, isRunning: isSaving } = useAsyncAction();
+  const signalerChargement = useSignalerChargement('extensive-imagos');
 
   useEffect(() => {
     if (!draftId) return;
-    (async () => {
-      const [lmc, nse] = await Promise.all([
-        getProspectionPopulation(draftId, 'LMC', 'imago'),
-        getProspectionPopulation(draftId, 'NSE', 'imago'),
-      ]);
-      
-      const lmcData = populationRowToSpeciesData(lmc);
-      const nseData = populationRowToSpeciesData(nse);
-      
-      setSpeciesData({
-        LMC: lmcData,
-        NSE: nseData,
-      });
+    void Promise.all([
+      getProspectionPopulation(draftId, 'LMC', 'imago'),
+      getProspectionPopulation(draftId, 'NSE', 'imago'),
+    ])
+      .then(([lmc, nse]) => {
+        const lmcData = populationRowToSpeciesData(lmc);
+        const nseData = populationRowToSpeciesData(nse);
 
-      const commonData = extractCommonImagoData(lmc || nse);
-      setTypeCapture(commonData.typeCapture);
-    })();
-  }, [draftId]);
+        setSpeciesData({
+          LMC: lmcData,
+          NSE: nseData,
+        });
+
+        const commonData = extractCommonImagoData(lmc || nse);
+        setTypeCapture(commonData.typeCapture);
+      })
+      .catch((error) => signalerChargement(error, { draftId }));
+  }, [draftId, signalerChargement]);
 
   const data = speciesData[species];
   
@@ -107,22 +110,9 @@ export default function ExtensiveImagosScreen() {
     }));
   };
 
-const handleContinue = async () => {
-  console.log('🔵 handleContinue appelé');
-  console.log('🔵 draftId:', draftId);
-  console.log('🔵 isSaving:', isSaving);
-  console.log('🔵 isConsistent:', isConsistent);
-  console.log('🔵 totalCaptures:', data.totalCaptures);
-  
-  if (!draftId || isSaving) {
-    console.log('🔴 Bloqué: draftId manquant ou isSaving true');
-    return;
-  }
-
+const handleContinue = () => {
   if (data.totalCaptures > 0) {
-    console.log('🔵 Vérification des phases...');
     if (!isPhasesConsistent) {
-      console.log('🔴 Incohérence des phases');
       Alert.alert(
         'Incohérence des phases',
         `Captures : ${data.totalCaptures}\nPhases : ${totalPhases}\n\nLa somme des phases doit être exactement égale au nombre de captures.`
@@ -130,9 +120,7 @@ const handleContinue = async () => {
       return;
     }
 
-    console.log('🔵 Vérification des stades...');
     if (!isStadesConsistent) {
-      console.log('🔴 Incohérence des stades');
       Alert.alert(
         'Incohérence des stades',
         `Captures : ${data.totalCaptures}\nStades femelles : ${totalStadesF}\nStades mâles : ${totalStadesM}\nTotal stades : ${totalStadesF} + ${totalStadesM} = ${totalStades}\n\nLa règle est :\nCaptures = Phases = Stades ♀ + Stades ♂`
@@ -141,31 +129,29 @@ const handleContinue = async () => {
     }
   }
 
-  console.log('✅ Tout est cohérent, sauvegarde...');
-  setIsSaving(true);
-  try {
-    console.log('🔵 Sauvegarde LMC...');
-    await saveProspectionPopulation(draftId, speciesDataToPopulationRow('LMC', speciesData.LMC, {
-      popDiff: speciesData.LMC.popDiff,
-      popGroup: speciesData.LMC.popGroup,
-      typeCapture,
-    }));
-    
-    console.log('🔵 Sauvegarde NSE...');
-    await saveProspectionPopulation(draftId, speciesDataToPopulationRow('NSE', speciesData.NSE, {
-      popDiff: speciesData.NSE.popDiff,
-      popGroup: speciesData.NSE.popGroup,
-      typeCapture,
-    }));
-    
-    console.log('🔵 Navigation vers extensive-larves...');
-    router.push({ pathname: '/(prospection)/extensive-larves' as any, params: { draftId } });
-  } catch (error) {
-    console.error('❌ Erreur lors de la sauvegarde:', error);
-    Alert.alert('Erreur', 'Une erreur est survenue lors de la sauvegarde des données.');
-  } finally {
-    setIsSaving(false);
-  }
+  return run(
+    async () => {
+      await saveProspectionPopulation(draftId, speciesDataToPopulationRow('LMC', speciesData.LMC, {
+        popDiff: speciesData.LMC.popDiff,
+        popGroup: speciesData.LMC.popGroup,
+        typeCapture,
+      }));
+
+      await saveProspectionPopulation(draftId, speciesDataToPopulationRow('NSE', speciesData.NSE, {
+        popDiff: speciesData.NSE.popDiff,
+        popGroup: speciesData.NSE.popGroup,
+        typeCapture,
+      }));
+
+      router.push({ pathname: '/(prospection)/extensive-larves' as any, params: { draftId } });
+    },
+    {
+      screen: 'extensive-imagos',
+      precondition: !!draftId,
+      preconditionMessage: 'Session de saisie perdue — revenez à l’écran précédent et réessayez.',
+      context: { draftId, species },
+    }
+  );
 };
 
   const renderStades = () => {

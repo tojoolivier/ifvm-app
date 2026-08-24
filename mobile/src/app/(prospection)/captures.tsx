@@ -16,6 +16,7 @@ import { TextInput } from 'react-native-gesture-handler';
 import {
   parseEspeceSelection,
   buildGrilles,
+  parseGrillesCompletees,
 } from '@/lib/prospection-especes';
 
 import {
@@ -36,6 +37,8 @@ import {
 
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
+import { useAsyncAction } from '@/hooks/use-async-action';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -84,16 +87,6 @@ const PHASES_CONFIG = {
 
 type Sexe = 'F' | 'M';
 
-function parseGrillesCompletees(raw: string | null): string[] {
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
 export default function CapturesScreen() {
   const router = useRouter();
   const { draftId, grilleIndex } = useLocalSearchParams<{
@@ -111,7 +104,8 @@ export default function CapturesScreen() {
   const { grilleOrder, currentGrilleIndex, currentSexe, phasesData, stadesDataF, stadesDataM } = store;
 
   const [tick, setTick] = useState(0);
-  const [isSaving, setIsSaving] = useState(false);
+  const { run, isRunning: isSaving } = useAsyncAction();
+  const signalerChargement = useSignalerChargement('captures');
   const [totalCapturesInput, setTotalCapturesInput] = useState('');
   
   // Ref pour éviter les boucles infinies
@@ -177,14 +171,15 @@ export default function CapturesScreen() {
   // Effet 1: Hydratation initiale - une seule fois
   useEffect(() => {
     if (!draftId || isHydrated.current) return;
-    
-    (async () => {
+
+    const hydrate = async () => {
       if (draft?.id !== draftId) {
         await hydrateFromDraft(draftId);
       }
       isHydrated.current = true;
-    })();
-  }, [draftId, draft?.id, hydrateFromDraft]);
+    };
+    void hydrate().catch((error) => signalerChargement(error, { draftId }));
+  }, [draftId, draft?.id, hydrateFromDraft, signalerChargement]);
 
   // Effet 2: Initialisation des grilles - une seule fois
   useEffect(() => {
@@ -209,8 +204,10 @@ export default function CapturesScreen() {
   // Effet 4: Timer de capture - une seule fois
   useEffect(() => {
     if (!draftId || draft?.capture_started_at) return;
-    startCaptureTimer(draftId).then(setDraft);
-  }, [draftId, draft?.capture_started_at, setDraft]);
+    void startCaptureTimer(draftId)
+      .then(setDraft)
+      .catch((error) => signalerChargement(error, { draftId }));
+  }, [draftId, draft?.capture_started_at, setDraft, signalerChargement]);
 
   // Effet 5: Chronomètre
   useEffect(() => {
@@ -254,9 +251,7 @@ export default function CapturesScreen() {
     }
   };
 
-  const handleContinue = async () => {
-    if (!draftId || isSaving) return;
-
+  const handleContinue = () => {
     if (totalCaptures <= 0) {
       Alert.alert('Nombre de captures', 'Veuillez saisir un nombre de captures supérieur à 0.');
       return;
@@ -291,12 +286,11 @@ export default function CapturesScreen() {
       return;
     }
 
-    setIsSaving(true);
+    return run(
+      async () => {
+        const rows: any[] = [];
 
-    try {
-      const rows: any[] = [];
-
-      if (isImago) {
+        if (isImago) {
         // Récupérer les phases avec leurs effectifs
         const phasesWithCounts = phasesList
           .map(phase => ({ phase, count: Number(phasesData[phase]) || 0 }))
@@ -304,7 +298,6 @@ export default function CapturesScreen() {
 
         if (phasesWithCounts.length === 0) {
           Alert.alert('Erreur', 'Aucune phase n\'a été renseignée.');
-          setIsSaving(false);
           return;
         }
 
@@ -365,7 +358,6 @@ export default function CapturesScreen() {
 
         if (phasesWithCounts.length === 0) {
           Alert.alert('Erreur', 'Aucune phase n\'a été renseignée.');
-          setIsSaving(false);
           return;
         }
 
@@ -408,36 +400,37 @@ export default function CapturesScreen() {
         }
       }
 
-      if (rows.length === 0) {
-        Alert.alert('Aucune capture', 'Veuillez saisir au moins une capture avant de continuer.');
-        setIsSaving(false);
-        return;
-      }
+        if (rows.length === 0) {
+          Alert.alert('Aucune capture', 'Veuillez saisir au moins une capture avant de continuer.');
+          return;
+        }
 
-      await saveProspectionCaptures(draftId, grille.espece, grille.categorie, rows);
-      await markGrilleCompleted(draftId, grilleKeyToString(grille));
-      store.markCurrentGrilleCompleted();
-      await refreshCaptures();
+        await saveProspectionCaptures(draftId, grille.espece, grille.categorie, rows);
+        await markGrilleCompleted(draftId, grilleKeyToString(grille));
+        store.markCurrentGrilleCompleted();
+        await refreshCaptures();
 
-      if (isLastGrille) {
-        router.push({
-          pathname: '/(prospection)/infestation' as any,
-          params: { draftId },
-        });
-      } else {
-        const nextGrille = grilleOrder[currentGrilleIndex + 1];
-        const nextScreen = nextGrille.categorie === 'imago' ? 'density' : 'captures';
-        router.push({
-          pathname: `/(prospection)/${nextScreen}` as any,
-          params: { draftId, grilleIndex: String(currentGrilleIndex + 1) },
-        });
+        if (isLastGrille) {
+          router.push({
+            pathname: '/(prospection)/infestation' as any,
+            params: { draftId },
+          });
+        } else {
+          const nextGrille = grilleOrder[currentGrilleIndex + 1];
+          const nextScreen = nextGrille.categorie === 'imago' ? 'density' : 'captures';
+          router.push({
+            pathname: `/(prospection)/${nextScreen}` as any,
+            params: { draftId, grilleIndex: String(currentGrilleIndex + 1) },
+          });
+        }
+      },
+      {
+        screen: 'captures',
+        precondition: !!draftId,
+        preconditionMessage: 'Session de saisie perdue — revenez à l’écran précédent et réessayez.',
+        context: { draftId, grille: grilleKeyToString(grille) },
       }
-    } catch (error) {
-      console.error('Erreur sauvegarde captures:', error);
-      Alert.alert('Erreur', 'Une erreur est survenue lors de la sauvegarde des captures.');
-    } finally {
-      setIsSaving(false);
-    }
+    );
   };
 
   const renderSexeToggle = () => {

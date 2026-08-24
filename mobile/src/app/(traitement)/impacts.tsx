@@ -7,7 +7,7 @@ import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import { validateEmpoisonnement } from '@/lib/traitement-validation';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
-import { LocalReadError } from '@/lib/errors';
+import { logger } from '@/lib/logger';
 import { Chip } from '@/components/traitement/Chip';
 import { ProgressBar } from '@/components/traitement/ProgressBar';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
@@ -43,9 +43,10 @@ export default function ImpactsScreen() {
           comportementNonCibles = draft.comportement_non_cibles ? JSON.parse(draft.comportement_non_cibles) : [];
           mortaliteFamilles = draft.mortalite_familles ? JSON.parse(draft.mortalite_familles) : [];
         } catch (e) {
-          // La donnée n'est pas absente, elle est corrompue : un défaut silencieux
-          // écraserait un impact réellement saisi à l'enregistrement suivant.
-          throw new LocalReadError("Impacts illisibles — la fiche est corrompue localement.", { cause: e });
+          // Sélections cochables, re-saisissables en un geste : même critère que
+          // `parseEspeceSelection` (#189) — repli sur des valeurs vides plutôt
+          // que bloquer la fiche pour une chaîne corrompue.
+          logger.ignore(e, 'Impacts corrompus — repli sur des valeurs vides, re-saisissables.');
         }
         store.updateImp({
           empoisonnement: draft.empoisonnement,

@@ -66,3 +66,21 @@ export async function saveEspeceSelection(draftId: string, selection: EspeceSele
   }
   return updateProspectionEspeces(draftId, JSON.stringify(selection));
 }
+
+/**
+ * Grilles déjà remplies, pour ne pas les re-présenter à l'agent — un simple
+ * indicateur d'avancement, pas une donnée de terrain (#189, même critère que
+ * {@link parseEspeceSelection}) : au pire une grille déjà remplie est
+ * re-montrée, ce qui coûte moins que de bloquer la fiche sur une chaîne
+ * corrompue.
+ */
+export function parseGrillesCompletees(raw: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    log.ignore(error, 'Liste des grilles complétées corrompue — repli sur aucune grille marquée, re-détectable.');
+    return [];
+  }
+}

@@ -20,6 +20,11 @@ import {
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { ReferenceFormValues } from '@/lib/prospection-reference-schema';
 import { validateGpsPosition, validateAntiDoublon, DOUBLON_DELAI_SEUIL_H } from '@/lib/prospection-validation';
+import { useAsyncAction } from '@/hooks/use-async-action';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
+import { useErrorLogStore } from '@/lib/error-log-store';
+import { toFriendlyError } from '@/lib/friendly-error';
+import { logger } from '@/lib/logger';
 
 const INACTIVE_BG = '#efeada';
 const INACTIVE_TEXT = '#9a9484';
@@ -72,7 +77,9 @@ export default function ReferenceScreen() {
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isGpsLoading, setIsGpsLoading] = useState(true);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [isSaving, setIsSaving] = useState(false);
+  const { run, isRunning: isSaving } = useAsyncAction();
+  const signalerChargement = useSignalerChargement('reference');
+  const logError = useErrorLogStore((s) => s.addEntry);
 
   const [postes, setPostes] = useState<PosteAcridien[]>([]);
   const [stationsForPa, setStationsForPa] = useState<StationFixe[]>([]);
@@ -96,13 +103,15 @@ export default function ReferenceScreen() {
 
   useEffect(() => {
     if (draftId && draft?.id !== draftId) {
-      hydrateFromDraft(draftId);
+      void hydrateFromDraft(draftId).catch((error) => signalerChargement(error, { draftId }));
     }
-  }, [draftId, draft?.id, hydrateFromDraft]);
+  }, [draftId, draft?.id, hydrateFromDraft, signalerChargement]);
 
   useEffect(() => {
-    listPostesAcridiens().then(setPostes).catch(() => {});
-  }, []);
+    void listPostesAcridiens()
+      .then(setPostes)
+      .catch((error) => signalerChargement(error, { source: 'listPostesAcridiens' }));
+  }, [signalerChargement]);
 
   // ==========================================
   // CAPTURE GPS AUTOMATIQUE (fiche nouvelle) OU RESTAURATION (fiche déjà enregistrée)
@@ -140,8 +149,9 @@ export default function ReferenceScreen() {
           setStationMode('manuel');
           setStation(matchedStation);
         }
-      } catch {
+      } catch (error) {
         // Best effort : la position reste restaurée même si le PA/la station ne matchent plus le référentiel.
+        logger.ignore(error, 'PA/station du brouillon introuvables dans le référentiel actuel, position conservée');
       }
     };
 
@@ -183,6 +193,13 @@ export default function ReferenceScreen() {
           : 'Position GPS indisponible. Vérifiez que la localisation est activée.';
         setLocationError(message);
         Alert.alert('⚠️ Localisation', message);
+        logger.failure('reference.captureGps.failed', error, { step: 'captureGps' });
+        logError({
+          message: toFriendlyError(error).message,
+          stack: error instanceof Error ? error.stack ?? null : null,
+          screen: 'reference',
+          context: { step: 'captureGps' },
+        });
       } finally {
         if (isActive) {
           setIsGpsLoading(false);
@@ -191,9 +208,9 @@ export default function ReferenceScreen() {
     };
 
     if (draft?.latitude != null && draft?.longitude != null) {
-      restoreFromDraft(draft);
+      void restoreFromDraft(draft);
     } else {
-      captureGps();
+      void captureGps();
     }
 
     return () => {
@@ -248,118 +265,117 @@ export default function ReferenceScreen() {
       surfaceInfestee: draft?.surface_infestee != null ? String(draft.surface_infestee) : '',
       biotope: draft?.biotope ?? null,
     } as ReferenceFormValues & { biotope: string | null },
-    onSubmit: async ({ value }) => {
-      if (!draftId) return;
+    onSubmit: async ({ value }) =>
+      run(
+        async () => {
+          if (!position) {
+            Alert.alert(
+              '⚠️ Position GPS manquante',
+              'La position GPS n\'a pas pu être capturée. Veuillez réessayer ou vérifier la localisation.'
+            );
+            return;
+          }
 
-      if (!position) {
-        Alert.alert(
-          '⚠️ Position GPS manquante',
-          'La position GPS n\'a pas pu être capturée. Veuillez réessayer ou vérifier la localisation.'
-        );
-        return;
-      }
+          const { blocages: gpsBlocages } = validateGpsPosition({
+            latitude: position.latitude,
+            longitude: position.longitude,
+            accuracy: position.accuracy,
+          });
+          if (gpsBlocages.length > 0) {
+            Alert.alert('⚠️ Position GPS invalide', gpsBlocages.join('\n'));
+            return;
+          }
 
-      const { blocages: gpsBlocages } = validateGpsPosition({
-        latitude: position.latitude,
-        longitude: position.longitude,
-        accuracy: position.accuracy,
-      });
-      if (gpsBlocages.length > 0) {
-        Alert.alert('⚠️ Position GPS invalide', gpsBlocages.join('\n'));
-        return;
-      }
+          if (draft?.prospecteur_id) {
+            const sinceIso = new Date(Date.now() - DOUBLON_DELAI_SEUIL_H * 3_600_000).toISOString();
+            const fichesProches = await listProspectionsRecentesAutresProspecteurs(draft.prospecteur_id, sinceIso);
+            const { avertissements: avertissementsDoublon } = validateAntiDoublon({
+              prospecteurId: draft.prospecteur_id,
+              latitude: position.latitude,
+              longitude: position.longitude,
+              timestamp: new Date().toISOString(),
+              fichesProches: fichesProches.map((f) => ({
+                prospecteurId: f.prospecteur_id,
+                latitude: f.latitude,
+                longitude: f.longitude,
+                timestamp: f.updated_at,
+              })),
+            });
+            if (avertissementsDoublon.length > 0) {
+              Alert.alert('⚠️ À vérifier', avertissementsDoublon.join('\n'));
+            }
+          }
 
-      if (draft?.prospecteur_id) {
-        const sinceIso = new Date(Date.now() - DOUBLON_DELAI_SEUIL_H * 3_600_000).toISOString();
-        const fichesProches = await listProspectionsRecentesAutresProspecteurs(draft.prospecteur_id, sinceIso);
-        const { avertissements: avertissementsDoublon } = validateAntiDoublon({
-          prospecteurId: draft.prospecteur_id,
-          latitude: position.latitude,
-          longitude: position.longitude,
-          timestamp: new Date().toISOString(),
-          fichesProches: fichesProches.map((f) => ({
-            prospecteurId: f.prospecteur_id,
-            latitude: f.latitude,
-            longitude: f.longitude,
-            timestamp: f.updated_at,
-          })),
-        });
-        if (avertissementsDoublon.length > 0) {
-          Alert.alert('⚠️ À vérifier', avertissementsDoublon.join('\n'));
+          // VALIDATION PERSONNALISÉE
+          const errors: Record<string, string> = {};
+
+          // Biotope est TOUJOURS obligatoire
+          if (!value.biotope) {
+            errors.biotope = 'Le type de biotope est obligatoire';
+          }
+
+          // Surface station TOUJOURS obligatoire
+          if (!value.surfaceStation || Number(value.surfaceStation) <= 0) {
+            errors.surfaceStation = 'La surface de la station est obligatoire';
+          }
+
+          // Surface prospectée TOUJOURS obligatoire (intensif et extensif)
+          if (!value.surfaceProspectee || Number(value.surfaceProspectee) <= 0) {
+            errors.surfaceProspectee = 'La surface prospectée est obligatoire';
+          }
+
+          // Pour le type extensif : infestée est également obligatoire
+          if (!isIntensive) {
+            if (!value.surfaceInfestee || Number(value.surfaceInfestee) <= 0) {
+              errors.surfaceInfestee = 'La surface infestée est obligatoire';
+            }
+          }
+
+          // Si des erreurs, on les affiche
+          if (Object.keys(errors).length > 0) {
+            setFormErrors(errors);
+            return;
+          }
+
+          setFormErrors({});
+
+          const dateProspection = draft?.date_prospection ?? new Date().toISOString().slice(0, 10);
+          const nFiche = generateNumeroFiche(draftId, dateProspection);
+          const nReleve = generateNumeroReleve(station?.id ?? null, dateProspection);
+
+          // Préparer les données avec des valeurs par défaut (0 pour intensif)
+          const surfaceProspecteeValue = value.surfaceProspectee ? Number(value.surfaceProspectee) : 0;
+          const surfaceInfesteeValue = value.surfaceInfestee ? Number(value.surfaceInfestee) : 0;
+
+          const updated = await updateProspectionReference(draftId, {
+            latitude: position.latitude,
+            longitude: position.longitude,
+            altitude: position.altitude ?? null,
+            surfaceStation: Number(value.surfaceStation),
+            surfaceProspectee: surfaceProspecteeValue,
+            surfaceInfestee: surfaceInfesteeValue,
+            biotope: value.biotope ?? null,
+            nFiche,
+            nReleve,
+            region: adminArea.region,
+            district: adminArea.district,
+            commune: adminArea.commune,
+            pa_code: pa?.code ?? null,
+            pa_nom: pa?.nom ?? null,
+            stationId: station?.id ?? null,
+            station_nom: station?.nom ?? null,
+          });
+
+          setDraft(updated);
+          router.push({ pathname: '/(prospection)/species' as any, params: { draftId } });
+        },
+        {
+          screen: 'reference',
+          precondition: !!draftId,
+          preconditionMessage: 'Session de saisie perdue — revenez à l’écran précédent et réessayez.',
+          context: { draftId },
         }
-      }
-
-      // VALIDATION PERSONNALISÉE
-      const errors: Record<string, string> = {};
-
-      // Biotope est TOUJOURS obligatoire
-      if (!value.biotope) {
-        errors.biotope = 'Le type de biotope est obligatoire';
-      }
-
-      // Surface station TOUJOURS obligatoire
-      if (!value.surfaceStation || Number(value.surfaceStation) <= 0) {
-        errors.surfaceStation = 'La surface de la station est obligatoire';
-      }
-
-      // Surface prospectée TOUJOURS obligatoire (intensif et extensif)
-      if (!value.surfaceProspectee || Number(value.surfaceProspectee) <= 0) {
-        errors.surfaceProspectee = 'La surface prospectée est obligatoire';
-      }
-
-      // Pour le type extensif : infestée est également obligatoire
-      if (!isIntensive) {
-        if (!value.surfaceInfestee || Number(value.surfaceInfestee) <= 0) {
-          errors.surfaceInfestee = 'La surface infestée est obligatoire';
-        }
-      }
-
-      // Si des erreurs, on les affiche
-      if (Object.keys(errors).length > 0) {
-        setFormErrors(errors);
-        return;
-      }
-
-      setFormErrors({});
-      setIsSaving(true);
-
-      try {
-        const dateProspection = draft?.date_prospection ?? new Date().toISOString().slice(0, 10);
-        const nFiche = generateNumeroFiche(draftId, dateProspection);
-        const nReleve = generateNumeroReleve(station?.id ?? null, dateProspection);
-
-        // Préparer les données avec des valeurs par défaut (0 pour intensif)
-        const surfaceProspecteeValue = value.surfaceProspectee ? Number(value.surfaceProspectee) : 0;
-        const surfaceInfesteeValue = value.surfaceInfestee ? Number(value.surfaceInfestee) : 0;
-
-        const updated = await updateProspectionReference(draftId, {
-          latitude: position.latitude,
-          longitude: position.longitude,
-          altitude: position.altitude ?? null,
-          surfaceStation: Number(value.surfaceStation),
-          surfaceProspectee: surfaceProspecteeValue,
-          surfaceInfestee: surfaceInfesteeValue,
-          biotope: value.biotope ?? null,
-          nFiche,
-          nReleve,
-          region: adminArea.region,
-          district: adminArea.district,
-          commune: adminArea.commune,
-          pa_code: pa?.code ?? null,
-          pa_nom: pa?.nom ?? null,
-          stationId: station?.id ?? null,
-          station_nom: station?.nom ?? null,
-        });
-
-        setDraft(updated);
-        router.push({ pathname: '/(prospection)/species' as any, params: { draftId } });
-      } catch (error) {
-        console.error('Erreur lors de l\'enregistrement:', error);
-        Alert.alert('❌ Erreur', 'Impossible d\'enregistrer les données. Veuillez réessayer.');
-      } finally {
-        setIsSaving(false);
-      }
-    },
+      ),
   });
 
   const nFichePreview = draftId ? generateNumeroFiche(draftId, draft?.date_prospection ?? '') : '—';

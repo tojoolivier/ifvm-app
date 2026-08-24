@@ -6,7 +6,7 @@ import { getTraitement, updateTraitementMoyens } from '@/lib/traitement-reposito
 import { validateRecouvrement } from '@/lib/traitement-validation';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
-import { LocalReadError } from '@/lib/errors';
+import { logger } from '@/lib/logger';
 import { Card } from '@/components/traitement/Card';
 import { Chip } from '@/components/traitement/Chip';
 import { ProgressBar } from '@/components/traitement/ProgressBar';
@@ -58,9 +58,10 @@ export default function MoyensScreen() {
           try {
             setZones(JSON.parse(draft.zones_exposees));
           } catch (e) {
-            // La donnée n'est pas absente, elle est corrompue : un défaut
-            // silencieux écraserait des zones réellement saisies à l'enregistrement.
-            throw new LocalReadError('Zones exposées illisibles — la fiche est corrompue localement.', { cause: e });
+            // Zones cochables, re-saisissables en un geste : même critère que
+            // `parseEspeceSelection` (#189) — repli sur aucune zone cochée
+            // plutôt que bloquer la fiche pour une chaîne corrompue.
+            logger.ignore(e, 'Zones exposées corrompues — repli sur aucune zone cochée, re-saisissable.');
           }
         }
         setHauteurHerbeuse(draft.hauteur_strate_herbeuse_m);

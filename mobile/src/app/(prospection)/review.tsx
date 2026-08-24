@@ -8,6 +8,8 @@ import { InfestationRow, listAllProspectionInfestations } from '@/lib/prospectio
 import { buildRecapitulatif, enregistrerEtSynchroniser } from '@/lib/prospection-review';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
+import { useAsyncAction } from '@/hooks/use-async-action';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -23,14 +25,16 @@ export default function ReviewScreen() {
   const captures = useProspectionWizardStore((s) => s.captures);
   const resetWizard = useProspectionWizardStore((s) => s.reset);
   const resetCaptureLoop = useProspectionCaptureStore((s) => s.reset);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { run, isRunning: isSaving } = useAsyncAction();
   const [infestations, setInfestations] = useState<InfestationRow[]>([]);
+  const signalerChargement = useSignalerChargement('review');
 
   useEffect(() => {
     if (!draft) return;
-    listAllProspectionInfestations(draft.id).then(setInfestations);
-  }, [draft?.id]);
+    void listAllProspectionInfestations(draft.id)
+      .then(setInfestations)
+      .catch((error) => signalerChargement(error, { draftId: draft.id }));
+  }, [draft?.id, signalerChargement]);
 
   const recap = useMemo(() => {
     if (!draft) return null;
@@ -48,24 +52,24 @@ export default function ReviewScreen() {
     );
   }
 
-  const handleSave = async () => {
-    if (!token || isSaving) return;
-    setIsSaving(true);
-    setError(null);
-    try {
-      const result = await enregistrerEtSynchroniser(draft, captures, token);
-      resetWizard();
-      resetCaptureLoop();
-      router.replace({
-        pathname: '/(app)/prospection' as any,
-        params: result.syncError ? { syncWarning: result.syncError } : { justSaved: '1' },
-      });
-    } catch {
-      setError("Impossible d'enregistrer la fiche pour le moment.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const handleSave = () =>
+    run(
+      async () => {
+        const result = await enregistrerEtSynchroniser(draft, captures, token!);
+        resetWizard();
+        resetCaptureLoop();
+        router.replace({
+          pathname: '/(app)/prospection' as any,
+          params: result.syncError ? { syncWarning: result.syncError } : { justSaved: '1' },
+        });
+      },
+      {
+        screen: 'review',
+        precondition: !!token,
+        preconditionMessage: 'Session expirée — reconnectez-vous pour enregistrer.',
+        context: { draftId: draft.id },
+      }
+    );
 
   return (
     <View style={styles.root}>
@@ -136,8 +140,6 @@ export default function ReviewScreen() {
               </Text>
             </Text>
           </View>
-
-          {error && <Text style={styles.errorText}>{error}</Text>}
         </ScrollView>
 
         <View style={styles.footer}>

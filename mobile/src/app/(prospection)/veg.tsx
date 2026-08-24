@@ -89,7 +89,7 @@ export default function VegetationScreen() {
       scrollRef.current?.scrollToEnd({ animated: true });
     },
     onSubmit: async ({ value }) => {
-      run(
+      return run(
         async () => {
           const updated = await updateProspectionVegetation(draftId, {
             vegetation: JSON.stringify({ strates }),

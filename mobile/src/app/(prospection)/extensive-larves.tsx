@@ -13,6 +13,8 @@ import {
   populationRowToLarveSpeciesData,
   extractCommonLarveData,
 } from '@/lib/prospection-extensive';
+import { useAsyncAction } from '@/hooks/use-async-action';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -38,31 +40,32 @@ export default function ExtensiveLarvesScreen() {
   const [interdist, setInterdist] = useState('');
   const [deplacement, setDeplacement] = useState('repos');
   
-  const [isSaving, setIsSaving] = useState(false);
+  const { run, isRunning: isSaving } = useAsyncAction();
+  const signalerChargement = useSignalerChargement('extensive-larves');
 
   useEffect(() => {
     if (!draftId) return;
-    (async () => {
-      const [lmc, nse] = await Promise.all([
-        getProspectionPopulation(draftId, 'LMC', 'larve'),
-        getProspectionPopulation(draftId, 'NSE', 'larve'),
-      ]);
-      
-      const lmcData = populationRowToLarveSpeciesData('LMC', lmc);
-      const nseData = populationRowToLarveSpeciesData('NSE', nse);
-      
-      setSpeciesData({
-        LMC: lmcData,
-        NSE: nseData,
-      });
+    void Promise.all([
+      getProspectionPopulation(draftId, 'LMC', 'larve'),
+      getProspectionPopulation(draftId, 'NSE', 'larve'),
+    ])
+      .then(([lmc, nse]) => {
+        const lmcData = populationRowToLarveSpeciesData('LMC', lmc);
+        const nseData = populationRowToLarveSpeciesData('NSE', nse);
 
-      const commonData = extractCommonLarveData(lmc || nse);
-      setTacheLarvaire(commonData.tl);
-      setBandeLarvaire(commonData.bl);
-      setInterdist(commonData.interdist);
-      setDeplacement(commonData.deplacement);
-    })();
-  }, [draftId]);
+        setSpeciesData({
+          LMC: lmcData,
+          NSE: nseData,
+        });
+
+        const commonData = extractCommonLarveData(lmc || nse);
+        setTacheLarvaire(commonData.tl);
+        setBandeLarvaire(commonData.bl);
+        setInterdist(commonData.interdist);
+        setDeplacement(commonData.deplacement);
+      })
+      .catch((error) => signalerChargement(error, { draftId }));
+  }, [draftId, signalerChargement]);
 
   const data = speciesData[species];
   
@@ -100,9 +103,7 @@ export default function ExtensiveLarvesScreen() {
     }));
   };
 
-  const handleContinue = async () => {
-    if (!draftId || isSaving) return;
-
+  const handleContinue = () => {
     if (data.totalCaptures > 0) {
       if (!isPhasesConsistent) {
         Alert.alert(
@@ -121,22 +122,24 @@ export default function ExtensiveLarvesScreen() {
       }
     }
 
-    setIsSaving(true);
-    try {
-      const commonData = { tl: tacheLarvaire, bl: bandeLarvaire, interdist, deplacement };
-      
-      await Promise.all([
-        saveProspectionPopulation(draftId, larveSpeciesDataToPopulationRow('LMC', speciesData.LMC, commonData)),
-        saveProspectionPopulation(draftId, larveSpeciesDataToPopulationRow('NSE', speciesData.NSE, commonData)),
-      ]);
-      
-      router.push({ pathname: '/(prospection)/extensive-recap' as any, params: { draftId } });
-    } catch (error) {
-      console.error('Erreur lors de la sauvegarde:', error);
-      Alert.alert('Erreur', 'Une erreur est survenue lors de la sauvegarde des données.');
-    } finally {
-      setIsSaving(false);
-    }
+    return run(
+      async () => {
+        const commonData = { tl: tacheLarvaire, bl: bandeLarvaire, interdist, deplacement };
+
+        await Promise.all([
+          saveProspectionPopulation(draftId, larveSpeciesDataToPopulationRow('LMC', speciesData.LMC, commonData)),
+          saveProspectionPopulation(draftId, larveSpeciesDataToPopulationRow('NSE', speciesData.NSE, commonData)),
+        ]);
+
+        router.push({ pathname: '/(prospection)/extensive-recap' as any, params: { draftId } });
+      },
+      {
+        screen: 'extensive-larves',
+        precondition: !!draftId,
+        preconditionMessage: 'Session de saisie perdue — revenez à l’écran précédent et réessayez.',
+        context: { draftId, species },
+      }
+    );
   };
 
   const getStadesList = () => {
