@@ -24,7 +24,12 @@ import {
   apiClient,
   isTokenExpired,
   refreshAccessTokenSingleFlight,
+  statutHttpDe,
 } from '../src/lib/api-client';
+import {
+  AuthError,
+  NetworkError,
+} from '../src/lib/errors';
 
 const mockFetch = jest.fn();
 
@@ -1328,6 +1333,9 @@ describe('API Client', () => {
         )
       );
 
+      // Le message brut du moteur ne sort plus : ce qui compte est la classe,
+      // parce que c'est elle qui décide du message et de l'action montrés à
+      // l'agent (ADR-012 décisions 2 et 5).
       await expect(
         apiClient.syncTraitement(
           'token',
@@ -1335,9 +1343,115 @@ describe('API Client', () => {
             id: 'traitement-1',
           }
         )
-      ).rejects.toThrow(
-        'Network request failed'
+      ).rejects.toBeInstanceOf(
+        NetworkError
       );
+    });
+  });
+
+  /*
+   * Ces trois tests protègent la décision 2 d'ADR-012, pas un comportement :
+   * `ApiError` a disparu et tout échec sorti d'api-client appartient au jeu
+   * fermé. Les défaire rendrait `(bug)` à la couche d'affichage, qui
+   * proposerait « Signaler au support » sur une simple panne serveur.
+   */
+  describe('Typage à la source (#173)', () => {
+    it('lève AuthError, statut 401, quand le refresh est impossible', async () => {
+      const token = createJwt(
+        Math.floor(Date.now() / 1000) +
+          3600
+      );
+
+      mockFetch
+        .mockResolvedValueOnce(
+          mockJsonResponse({
+            ok: false,
+            status: 401,
+            json: async () => ({
+              detail: 'Unauthorized',
+            }),
+          })
+        )
+        .mockResolvedValueOnce(
+          mockJsonResponse({
+            ok: false,
+            status: 401,
+            json: async () => ({
+              detail:
+                'Invalid refresh token',
+            }),
+          })
+        );
+
+      const erreur = await apiClient
+        .getProfile(token)
+        .catch(
+          (e: unknown) => e
+        );
+
+      expect(erreur).toBeInstanceOf(
+        AuthError
+      );
+      expect(
+        statutHttpDe(erreur)
+      ).toBe(401);
+    });
+
+    it('lève NetworkError, statut conservé, sur une erreur HTTP hors 401', async () => {
+      const token = createJwt(
+        Math.floor(Date.now() / 1000) +
+          3600
+      );
+
+      mockFetch.mockResolvedValueOnce(
+        mockJsonResponse({
+          ok: false,
+          status: 500,
+          json: async () => ({
+            detail: 'Server error',
+          }),
+        })
+      );
+
+      const erreur = await apiClient
+        .getProfile(token)
+        .catch(
+          (e: unknown) => e
+        );
+
+      expect(erreur).toBeInstanceOf(
+        NetworkError
+      );
+      expect(
+        statutHttpDe(erreur)
+      ).toBe(500);
+    });
+
+    it('lève NetworkError quand fetch lui-même échoue', async () => {
+      const token = createJwt(
+        Math.floor(Date.now() / 1000) +
+          3600
+      );
+
+      mockFetch.mockRejectedValueOnce(
+        new Error(
+          'Network request failed'
+        )
+      );
+
+      const erreur = await apiClient
+        .getProfile(token)
+        .catch(
+          (e: unknown) => e
+        );
+
+      expect(erreur).toBeInstanceOf(
+        NetworkError
+      );
+      // Pas de statut : il n'y a jamais eu de réponse HTTP.
+      expect(
+        statutHttpDe(erreur)
+      ).toBeNull();
     });
   });
 });
