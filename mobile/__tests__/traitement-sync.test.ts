@@ -155,13 +155,19 @@ describe('enregistrerEtSynchroniserTraitement', () => {
     expect(result).toEqual({ synced: false, conflict: true, serverVersion });
   });
 
-  it('échec réseau silencieux si le serveur est injoignable malgré la connectivité', async () => {
+  /*
+   * Ce test protégeait le silence qu'ADR-012 supprime : `{ synced: false }`
+   * seul était indiscernable de « pas encore tentée », et l'écran affichait le
+   * même « Fiche enregistrée » qu'en cas de succès. Le motif remonte
+   * désormais, comme le faisait déjà `prospection-review` (issue #173).
+   */
+  it('remonte le motif de l’échec quand le serveur est injoignable', async () => {
     mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
     mockSyncTraitement.mockRejectedValue(new Error('network error'));
 
     const result = await enregistrerEtSynchroniserTraitement(draft(), 'token-1');
 
-    expect(result).toEqual({ synced: false });
+    expect(result).toEqual({ synced: false, syncError: 'network error' });
     expect(mockMarkSynced).not.toHaveBeenCalled();
   });
 

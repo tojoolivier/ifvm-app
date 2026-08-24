@@ -7,18 +7,38 @@ import {
   markTraitementSynced,
   ServerTraitement,
 } from './traitement-repository';
+import { logger } from './logger';
+
+const log = logger.child({ module: 'traitement-sync' });
 
 export interface TraitementSyncResult {
   synced: boolean;
   conflict?: boolean;
   serverVersion?: ServerTraitement;
+  /**
+   * Motif de l'échec, quand il y en a un.
+   *
+   * `{ synced: false }` seul était indiscernable de « pas encore tenté » : le
+   * `catch` d'origine avalait l'erreur et l'écran affichait le même « Fiche
+   * enregistrée » qu'en cas de succès. `prospection-review` faisait déjà bien
+   * (ADR-012 décision 1, issue #173).
+   */
+  syncError?: string;
 }
 
 function parseJsonField<T>(value: string | null | undefined): T | null {
   if (!value) return null;
   try {
     return JSON.parse(value) as T;
-  } catch {
+  } catch (error) {
+    // Silence délibéré : le champ est optionnel côté backend, et `null` est
+    // une valeur qu'il sait recevoir. Refuser toute la synchronisation pour un
+    // champ annexe corrompu bloquerait une fiche par ailleurs complète — mais
+    // la corruption, elle, doit se voir dans le journal.
+    log.ignore(
+      error,
+      'Champ JSON local corrompu — envoyé à null plutôt que de bloquer la fiche entière.'
+    );
     return null;
   }
 }
@@ -183,8 +203,14 @@ export async function enregistrerEtSynchroniserTraitement(
 
   try {
     return await pushTraitement(draft, token);
-  } catch {
-    return { synced: false };
+  } catch (error) {
+    // La fiche reste enregistrée localement ; seul l'envoi a échoué. Le motif
+    // remonte à l'appelant au lieu d'être avalé — c'est ce qui distingue
+    // « pas encore synchronisée » de « synchronisation refusée ».
+    const syncError =
+      error instanceof Error ? error.message : 'Erreur de synchronisation inconnue';
+
+    return { synced: false, syncError };
   }
 }
 
