@@ -3,9 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Keyboa
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAsyncAction } from '@/hooks/use-async-action';
-import { useErrorStore } from '@/lib/error-store';
-import { useErrorLogStore } from '@/lib/error-log-store';
-import { toFriendlyError } from '@/lib/friendly-error';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import {
   PopulationRow,
   getProspectionPopulation,
@@ -49,25 +47,16 @@ export default function DensityScreen() {
 
   const [population, setPopulation] = useState<PopulationRow | null>(null);
   const { run, isRunning: isSaving } = useAsyncAction();
-  const signaler = useErrorStore((s) => s.signaler);
-  const logError = useErrorLogStore((s) => s.addEntry);
+  const signalerChargement = useSignalerChargement('density');
 
   // Reconstruit le store si l'app Android a été tuée en arrière-plan puis
   // restaurée directement sur cet écran (le store zustand n'est pas persisté).
   useEffect(() => {
     if (!draftId) return;
     if (draft?.id !== draftId) {
-      void hydrateFromDraft(draftId).catch((error) => {
-        signaler(error, 'runTask:essential');
-        logError({
-          message: toFriendlyError(error).message,
-          stack: error instanceof Error ? error.stack ?? null : null,
-          screen: 'density',
-          context: { draftId },
-        });
-      });
+      void hydrateFromDraft(draftId).catch((error) => signalerChargement(error, { draftId }));
     }
-  }, [draftId, draft?.id, hydrateFromDraft, signaler, logError]);
+  }, [draftId, draft?.id, hydrateFromDraft, signalerChargement]);
 
   useEffect(() => {
     if (!draft || draft.id !== draftId) return;
@@ -85,19 +74,13 @@ export default function DensityScreen() {
       .then((row) => {
         setPopulation(row ?? emptyPopulation(grille.espece));
       })
-      .catch((error) => {
+      .catch((error) =>
         // Chargement de fond, pas un geste de l'agent : la frontière est celle
         // de `runTask` (décision 1). Déclarer `useAsyncAction` ferait passer une
         // lecture ratée en BLOQUER, une insistance que la matrice ne prévoit pas.
-        signaler(error, 'runTask:essential');
-        logError({
-          message: toFriendlyError(error).message,
-          stack: error instanceof Error ? error.stack ?? null : null,
-          screen: 'density',
-          context: { draftId, espece: grille.espece, categorie: grille.categorie },
-        });
-      });
-  }, [draftId, grille, signaler, logError]);
+        signalerChargement(error, { draftId, espece: grille.espece, categorie: grille.categorie })
+      );
+  }, [draftId, grille, signalerChargement]);
 
   if (!grille || !population) {
     return (
