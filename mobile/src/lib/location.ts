@@ -1,4 +1,8 @@
 import * as Location from 'expo-location';
+import { PermissionError } from './errors';
+import { logger } from './logger';
+
+const log = logger.child({ module: 'location' });
 
 export interface GpsPosition {
   latitude: number;
@@ -7,18 +11,17 @@ export interface GpsPosition {
   accuracy: number | null;
 }
 
-export class LocationPermissionDeniedError extends Error {
-  constructor() {
-    super('Permission de localisation refusée');
-    this.name = 'LocationPermissionDeniedError';
-  }
-}
-
 /** Demande la permission de localisation puis acquiert la position courante. */
 export async function getCurrentPosition(): Promise<GpsPosition> {
   const { status } = await Location.requestForegroundPermissionsAsync();
   if (status !== 'granted') {
-    throw new LocationPermissionDeniedError();
+    // `PermissionError` remplace l'ancienne `LocationPermissionDeniedError`
+    // (ADR-012 décision 2) : hors du jeu fermé, celle-ci était classée `(bug)`
+    // et l'agent se voyait proposer « Signaler au support » là où le seul
+    // recours utile est « Ouvrir les réglages ».
+    throw new PermissionError('Permission de localisation refusée', {
+      cause: status,
+    });
   }
 
   const position = await Location.getCurrentPositionAsync({});
@@ -50,7 +53,13 @@ export async function reverseGeocode(latitude: number, longitude: number): Promi
       district: result.subregion ?? null,
       commune: result.city ?? result.district ?? null,
     };
-  } catch {
+  } catch (error) {
+    // Silence délibéré : le géocodage inverse est un confort, et il échoue
+    // normalement hors-ligne. Les coordonnées, elles, sont déjà acquises.
+    log.ignore(
+      error,
+      'Géocodage inverse indisponible — les coordonnées suffisent, la zone administrative est un confort.'
+    );
     return { region: null, district: null, commune: null };
   }
 }

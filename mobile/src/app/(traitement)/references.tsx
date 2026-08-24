@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { getCurrentPosition, reverseGeocode, LocationPermissionDeniedError } from '@/lib/location';
+import { getCurrentPosition, reverseGeocode } from '@/lib/location';
+import { PermissionError } from '@/lib/errors';
 import {
   createDraftTraitementAerien,
   createDraftTraitementTerrestre,
@@ -98,7 +99,7 @@ export default function ReferencesScreen() {
       }
     } catch (error) {
       const message =
-        error instanceof LocationPermissionDeniedError
+        error instanceof PermissionError
           ? 'Permission de localisation refusée.'
           : 'Position GPS indisponible.';
       Alert.alert('⚠️ Localisation', message);

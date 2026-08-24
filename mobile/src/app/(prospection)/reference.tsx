@@ -3,7 +3,8 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert,
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm } from '@tanstack/react-form';
-import { getCurrentPosition, reverseGeocode, GpsPosition, LocationPermissionDeniedError } from '@/lib/location';
+import { getCurrentPosition, reverseGeocode, GpsPosition } from '@/lib/location';
+import { PermissionError } from '@/lib/errors';
 import {
   findNearestStation,
   listPostesAcridiens,
@@ -177,7 +178,7 @@ export default function ReferenceScreen() {
         }
       } catch (error) {
         if (!isActive) return;
-        const message = error instanceof LocationPermissionDeniedError
+        const message = error instanceof PermissionError
           ? 'Permission de localisation refusée. Veuillez activer la localisation dans les paramètres.'
           : 'Position GPS indisponible. Vérifiez que la localisation est activée.';
         setLocationError(message);
