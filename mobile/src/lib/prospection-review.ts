@@ -23,6 +23,10 @@ import { CHRONO_MAX_SECONDS, capturesMaxFor, phenotypesFor } from './prospection
 import { buildGrilles, parseEspeceSelection } from './prospection-especes';
 import { getDb } from './prospection-db';
 import { pullReferentiel } from './referentiel-sync';
+import { assertPresent, ReferentialError } from './errors';
+import { logger } from './logger';
+
+const log = logger.child({ module: 'prospection-review' });
 
 export interface ReviewGroupViewModel {
   label: string;
@@ -121,35 +125,46 @@ export function buildRecapitulatif(
   };
 }
 
+/**
+ * Cherche une station active en local, en tentant une synchronisation de
+ * rattrapage si le référentiel est vide.
+ *
+ * Rend `null` quand il n'y en a toujours pas — et `null` est ici discernable :
+ * l'appelant en fait une `ReferentialError`, qui propose « Synchroniser les
+ * référentiels » à l'agent.
+ */
 async function ensureStationExists(token: string): Promise<string | null> {
   const db = await getDb();
-  
+
   const stations = await db.getAllAsync<{ id: string }>(
     'SELECT id FROM station_fixe WHERE actif = 1 LIMIT 1'
   );
-  
+
   if (stations.length > 0) {
-    console.log(`✅ Station locale trouvée: ${stations[0].id}`);
+    log.detail('station.trouvee-en-local', { stationId: stations[0].id });
     return stations[0].id;
   }
-  
-  console.log('🔄 Aucune station locale, synchronisation des référentiels...');
+
+  log.event('referentiel.sync-de-rattrapage');
+
   try {
     await pullReferentiel(token);
-    console.log('✅ Référentiels synchronisés');
-    
+
     const newStations = await db.getAllAsync<{ id: string }>(
       'SELECT id FROM station_fixe WHERE actif = 1 LIMIT 1'
     );
-    
+
     if (newStations.length > 0) {
-      console.log(`✅ Station trouvée après sync: ${newStations[0].id}`);
+      log.detail('station.trouvee-apres-sync', { stationId: newStations[0].id });
       return newStations[0].id;
     }
   } catch (error) {
-    console.error('❌ Erreur lors de la synchronisation:', error);
+    // Pas un `ignore` : l'échec n'est pas silencieux, l'appelant le transforme
+    // en `ReferentialError`. Mais son motif — réseau, jeton, base — ne survit
+    // pas à ce `return null`, et c'est lui que le support cherchera.
+    log.failure('referentiel.sync-de-rattrapage.failed', error);
   }
-  
+
   return null;
 }
 
@@ -170,19 +185,21 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
   
   // 🔑 Pour l'intensif seulement : si station_id est manquant, on essaie de le récupérer
   if (draft.type_prospection === 'intensive' && !stationId) {
-    console.warn(`⚠️ station_id manquant pour ${draft.id}, tentative de récupération...`);
-    
-    if (!token) {
-      throw new Error('Token manquant pour la synchronisation');
-    }
-    
+    log.event('station.manquante', { prospectionId: draft.id });
+
+    assertPresent(token || null, 'Session expirée — reconnectez-vous pour synchroniser.');
+
     stationId = await ensureStationExists(token);
-    
+
     if (!stationId) {
-      throw new Error('Aucune station disponible. Veuillez synchroniser les référentiels dans l\'onglet Synchronisation.');
+      // `ReferentialError` : l'action utile — « Synchroniser les référentiels »
+      // — est une propriété de la classe, pas de ce site d'appel.
+      throw new ReferentialError(
+        'Aucune station disponible. Veuillez synchroniser les référentiels dans l’onglet Synchronisation.'
+      );
     }
-    
-    console.log(`✅ station_id trouvé: ${stationId}`);
+
+    log.detail('station.resolue', { prospectionId: draft.id, stationId });
   }
 
   // 🔓 Pour extensive, on loggue que station_id est ignoré
@@ -352,40 +369,37 @@ export async function enregistrerEtSynchroniser(
     await markProspectionSynced(completed.id);
     return { synced: true };
   } catch (error) {
-    console.error(`❌ Échec de synchronisation pour ${completed.id}:`, error);
+    // ADR-008 : la fiche reste enregistrée localement (completeProspection ci-dessus a
+    // déjà réussi), mais l'échec de synchronisation ne doit jamais rester invisible —
+    // il est remonté à l'appelant plutôt qu'avalé (cf. #98 : symptôme "blocage silencieux").
+    log.failure('prospection.sync.failed', error, { prospectionId: completed.id });
     const syncError = error instanceof Error ? error.message : 'Erreur de synchronisation inconnue';
     return { synced: false, syncError };
   }
 }
 
 export async function retrySyncProspection(draft: DraftProspection, token: string): Promise<void> {
-  console.log(`🔄 Synchronisation de ${draft.id}...`);
-  
-  try {
-    const [captures, populations, infestations] = await Promise.all([
-      listAllProspectionCaptures(draft.id),
-      listAllProspectionPopulations(draft.id),
-      listAllProspectionInfestations(draft.id),
-    ]);
-    
-    const payload = {
-      ...(await buildProspectionPayload(draft, token)),
-      captures: buildCapturesPayload(captures),
-      populations: buildPopulationsPayload(populations),
-      infestations: buildInfestationsPayload(infestations),
-    };
-    
-    console.log('📤 Payload envoyé avec station_id:', payload.station_id);
-    
-    await apiClient.createProspection(token, payload);
-    await markProspectionSynced(draft.id);
-    console.log(`✅ ${draft.id} synchronisé`);
-  } catch (error) {
-    console.error(`❌ Erreur pour ${draft.id}:`, error);
-    if (error && typeof error === 'object' && 'response' in error) {
-      const err = error as { response?: { data?: unknown } };
-      console.error('Détails:', err.response?.data);
-    }
-    throw error;
-  }
+  const [captures, populations, infestations] = await Promise.all([
+    listAllProspectionCaptures(draft.id),
+    listAllProspectionPopulations(draft.id),
+    listAllProspectionInfestations(draft.id),
+  ]);
+
+  const payload = {
+    ...(await buildProspectionPayload(draft, token)),
+    captures: buildCapturesPayload(captures),
+    populations: buildPopulationsPayload(populations),
+    infestations: buildInfestationsPayload(infestations),
+  };
+
+  // Le `try/catch` qui entourait ce corps ne faisait que journaliser puis
+  // relancer. L'erreur remonte désormais typée depuis `api-client`, et la
+  // frontière de l'appelant la journalise une fois — pas deux.
+  await apiClient.createProspection(token, payload);
+  await markProspectionSynced(draft.id);
+
+  log.event('prospection.sync.ok', {
+    prospectionId: draft.id,
+    stationId: payload.station_id,
+  });
 }
