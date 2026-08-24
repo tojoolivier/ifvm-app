@@ -6,6 +6,9 @@ import { getTraitement, Cible } from '@/lib/traitement-repository';
 import { Card } from '@/components/traitement/Card';
 import { ProgressBar } from '@/components/traitement/ProgressBar';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
+import { useErrorStore } from '@/lib/error-store';
+import { useErrorLogStore } from '@/lib/error-log-store';
+import { toFriendlyError } from '@/lib/friendly-error';
 
 function display(value: string | number | null | undefined): string {
   if (value === null || value === undefined || value === '') return 'non renseigné';
@@ -26,12 +29,23 @@ export default function CiblesScreen() {
   const { traitementId, isValidationView, origineId } =
     useLocalSearchParams<{ traitementId: string; isValidationView?: string; origineId?: string }>();
   const [cible, setCible] = useState<Cible | null>(null);
+  const signaler = useErrorStore((s) => s.signaler);
+  const logError = useErrorLogStore((s) => s.addEntry);
 
   useEffect(() => {
-    if (traitementId) {
-      getTraitement(traitementId).then((draft) => setCible(draft?.cible ?? null));
-    }
-  }, [traitementId]);
+    if (!traitementId) return;
+    void getTraitement(traitementId)
+      .then((draft) => setCible(draft?.cible ?? null))
+      .catch((error) => {
+        signaler(error, 'runTask:essential');
+        logError({
+          message: toFriendlyError(error).message,
+          stack: error instanceof Error ? error.stack ?? null : null,
+          screen: 'cibles',
+          context: { traitementId },
+        });
+      });
+  }, [traitementId, signaler, logError]);
 
   return (
     <SafeAreaView style={styles.container}>

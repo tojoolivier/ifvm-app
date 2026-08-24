@@ -5,6 +5,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getTraitement } from '@/lib/traitement-repository';
 import { useTraitementCaptureStore, SignatureRole } from '@/lib/traitement-capture-store';
 import { computeSignatureMatrix } from '@/lib/traitement-validation';
+import { useErrorStore } from '@/lib/error-store';
+import { useErrorLogStore } from '@/lib/error-log-store';
+import { toFriendlyError } from '@/lib/friendly-error';
 import { Card } from '@/components/traitement/Card';
 import { ProgressBar } from '@/components/traitement/ProgressBar';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
@@ -26,16 +29,28 @@ export default function SignaturesScreen() {
   const typeTraitement = store.typeTraitement;
   const [agentEncadreurRenseigne, setAgentEncadreurRenseigne] = useState(false);
   const [draftNames, setDraftNames] = useState<Partial<Record<SignatureRole, string>>>({});
+  const signaler = useErrorStore((s) => s.signaler);
+  const logError = useErrorLogStore((s) => s.addEntry);
 
   useEffect(() => {
     if (!traitementId) return;
-    getTraitement(traitementId).then((draft) => {
-      if (!draft) return;
-      store.setTypeTraitement(draft.type_traitement);
-      setAgentEncadreurRenseigne(draft.type_traitement === 'TERRESTRE' && !!draft.terrestre?.agent_encadreur_id);
-    });
+    getTraitement(traitementId)
+      .then((draft) => {
+        if (!draft) return;
+        store.setTypeTraitement(draft.type_traitement);
+        setAgentEncadreurRenseigne(draft.type_traitement === 'TERRESTRE' && !!draft.terrestre?.agent_encadreur_id);
+      })
+      .catch((error) => {
+        signaler(error, 'runTask:essential');
+        logError({
+          message: toFriendlyError(error).message,
+          stack: error instanceof Error ? error.stack ?? null : null,
+          screen: 'signatures',
+          context: { traitementId },
+        });
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [traitementId]);
+  }, [traitementId, signaler, logError]);
 
   const matrix =
     typeTraitement === 'AERIEN'
@@ -55,8 +70,11 @@ export default function SignaturesScreen() {
 
   const handleSigner = (role: SignatureRole) => {
     const nom = draftNames[role];
-    if (!nom) return;
-    store.setSigned(role, nom);
+    // Précondition imposée par le rendu (bouton désactivé tant que `nom` est
+    // vide) plutôt que par un retour muet ici : un `assertPresent` dans un
+    // handler synchrone échapperait à `useAsyncAction` et planterait sans passer
+    // par la frontière d'erreurs.
+    store.setSigned(role, nom!);
     store.setStamp(role, new Date().toISOString());
   };
 
@@ -86,7 +104,7 @@ export default function SignaturesScreen() {
                 <TouchableOpacity
                   style={[styles.signButton, signe && styles.signButtonDone]}
                   onPress={() => handleSigner(req.role)}
-                  disabled={signe}
+                  disabled={signe || !draftNames[req.role]}
                 >
                   <Text style={styles.signButtonText}>{signe ? '✓ Signé' : 'Signer'}</Text>
                 </TouchableOpacity>

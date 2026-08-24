@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { listValidatedProspections, DraftProspection } from '@/lib/prospection-repository';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
+import { runTask } from '@/lib/run-task';
+import { EtatVide } from '@/components/erreurs/etat-vide';
 
 /**
  * Sélecteur de fiche de prospection à lier (point ouvert du Lot 2, fermé au
@@ -15,13 +17,22 @@ export default function TraitementProspectionPickerScreen() {
   const router = useRouter();
   const [prospections, setProspections] = useState<DraftProspection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [erreurDeLecture, setErreurDeLecture] = useState<unknown>(null);
+
+  const charger = useCallback(() => {
+    void runTask(() => listValidatedProspections(), {
+      name: 'traitement.prospectionPicker',
+      criticality: 'essential',
+    }).then((outcome) => {
+      setErreurDeLecture(outcome.ok ? null : outcome.error);
+      if (outcome.ok) setProspections(outcome.value);
+      setLoading(false);
+    });
+  }, []);
 
   useEffect(() => {
-    listValidatedProspections()
-      .then(setProspections)
-      .catch(() => setProspections([]))
-      .finally(() => setLoading(false));
-  }, []);
+    charger();
+  }, [charger]);
 
   const choisir = (prospection: DraftProspection) => {
     router.push({
@@ -41,7 +52,13 @@ export default function TraitementProspectionPickerScreen() {
           style={styles.list}
           data={prospections}
           keyExtractor={(item) => item.id}
-          ListEmptyComponent={<Text style={styles.emptyText}>Aucune fiche de prospection éligible pour le moment.</Text>}
+          ListEmptyComponent={
+            <EtatVide
+              erreur={erreurDeLecture}
+              titreVide="Aucune fiche de prospection éligible pour le moment."
+              onReessayer={charger}
+            />
+          }
           renderItem={({ item }) => (
             <TouchableOpacity style={styles.row} onPress={() => choisir(item)}>
               <Text style={styles.rowTitle}>
