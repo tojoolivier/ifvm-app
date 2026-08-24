@@ -164,10 +164,11 @@ function buildCapturesPayload(rows: CaptureRow[]): ProspectionCaptureInput[] {
   }));
 }
 
+// ✅ FONCTION MODIFIÉE : Pour extensive, station_id est ignoré
 async function buildProspectionPayload(draft: DraftProspection, token: string) {
   let stationId = draft.station_id;
   
-  // Pour l'intensif, si station_id est manquant, on essaie de le récupérer
+  // 🔑 Pour l'intensif seulement : si station_id est manquant, on essaie de le récupérer
   if (draft.type_prospection === 'intensive' && !stationId) {
     console.warn(`⚠️ station_id manquant pour ${draft.id}, tentative de récupération...`);
     
@@ -184,10 +185,16 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
     console.log(`✅ station_id trouvé: ${stationId}`);
   }
 
+  // 🔓 Pour extensive, on loggue que station_id est ignoré
+  if (draft.type_prospection === 'extensive') {
+    console.log(`🔓 Prospection extensive : station_id ignoré (${stationId || 'null'})`);
+  }
+
   return {
     type_prospection: draft.type_prospection as ProspectionCreateInput['type_prospection'],
     campagne_id: draft.campagne_id,
-    station_id: (draft.type_prospection === 'extensive' ? null : stationId || null),
+    // 🔑 station_id = null pour extensive, la valeur pour intensive
+    station_id: draft.type_prospection === 'extensive' ? null : stationId,
     n_releve: draft.n_releve || null,
     n_fiche: draft.n_fiche || null,
     n_message: draft.n_message || null,
@@ -345,9 +352,6 @@ export async function enregistrerEtSynchroniser(
     await markProspectionSynced(completed.id);
     return { synced: true };
   } catch (error) {
-    // ADR-008 : la fiche reste enregistrée localement (completeProspection ci-dessus a
-    // déjà réussi), mais l'échec de synchronisation ne doit jamais rester invisible —
-    // il est remonté à l'appelant plutôt qu'avalé (cf. #98 : symptôme "blocage silencieux").
     console.error(`❌ Échec de synchronisation pour ${completed.id}:`, error);
     const syncError = error instanceof Error ? error.message : 'Erreur de synchronisation inconnue';
     return { synced: false, syncError };

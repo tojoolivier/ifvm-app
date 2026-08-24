@@ -35,8 +35,7 @@ export default function ExtensiveImagosScreen() {
     NSE: createEmptySpeciesData(),
   });
   
-  const [popDiff, setPopDiff] = useState('');
-  const [popGroup, setPopGroup] = useState('');
+  // Données communes
   const [typeCapture, setTypeCapture] = useState<'essaim' | 'volClair'>('essaim');
   
   const [isSaving, setIsSaving] = useState(false);
@@ -58,8 +57,6 @@ export default function ExtensiveImagosScreen() {
       });
 
       const commonData = extractCommonImagoData(lmc || nse);
-      setPopDiff(commonData.popDiff);
-      setPopGroup(commonData.popGroup);
       setTypeCapture(commonData.typeCapture);
     })();
   }, [draftId]);
@@ -78,8 +75,9 @@ export default function ExtensiveImagosScreen() {
   
   const totalStades = totalStadesF + totalStadesM;
 
-  const isPhasesConsistent = data.totalCaptures === totalPhases;
-  const isStadesConsistent = data.totalCaptures === totalStades;
+  // ✅ MODIFICATION 1 : Accepter 0 comme cohérent
+  const isPhasesConsistent = data.totalCaptures === 0 || data.totalCaptures === totalPhases;
+  const isStadesConsistent = data.totalCaptures === 0 || data.totalCaptures === totalStades;
   const isConsistent = isPhasesConsistent && isStadesConsistent;
 
   const updateSpeciesData = (patch: Partial<ExtensiveImagoSpeciesData>) => {
@@ -109,10 +107,22 @@ export default function ExtensiveImagosScreen() {
     }));
   };
 
-  const handleContinue = async () => {
-    if (!draftId || isSaving) return;
+const handleContinue = async () => {
+  console.log('🔵 handleContinue appelé');
+  console.log('🔵 draftId:', draftId);
+  console.log('🔵 isSaving:', isSaving);
+  console.log('🔵 isConsistent:', isConsistent);
+  console.log('🔵 totalCaptures:', data.totalCaptures);
+  
+  if (!draftId || isSaving) {
+    console.log('🔴 Bloqué: draftId manquant ou isSaving true');
+    return;
+  }
 
+  if (data.totalCaptures > 0) {
+    console.log('🔵 Vérification des phases...');
     if (!isPhasesConsistent) {
+      console.log('🔴 Incohérence des phases');
       Alert.alert(
         'Incohérence des phases',
         `Captures : ${data.totalCaptures}\nPhases : ${totalPhases}\n\nLa somme des phases doit être exactement égale au nombre de captures.`
@@ -120,31 +130,43 @@ export default function ExtensiveImagosScreen() {
       return;
     }
 
+    console.log('🔵 Vérification des stades...');
     if (!isStadesConsistent) {
+      console.log('🔴 Incohérence des stades');
       Alert.alert(
         'Incohérence des stades',
         `Captures : ${data.totalCaptures}\nStades femelles : ${totalStadesF}\nStades mâles : ${totalStadesM}\nTotal stades : ${totalStadesF} + ${totalStadesM} = ${totalStades}\n\nLa règle est :\nCaptures = Phases = Stades ♀ + Stades ♂`
       );
       return;
     }
+  }
 
-    setIsSaving(true);
-    try {
-      const commonData = { popDiff, popGroup, typeCapture };
-      
-      await Promise.all([
-        saveProspectionPopulation(draftId, speciesDataToPopulationRow('LMC', speciesData.LMC, commonData)),
-        saveProspectionPopulation(draftId, speciesDataToPopulationRow('NSE', speciesData.NSE, commonData)),
-      ]);
-      
-      router.push({ pathname: '/(prospection)/extensive-larves' as any, params: { draftId } });
-    } catch (error) {
-      console.error('Erreur lors de la sauvegarde:', error);
-      Alert.alert('Erreur', 'Une erreur est survenue lors de la sauvegarde des données.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  console.log('✅ Tout est cohérent, sauvegarde...');
+  setIsSaving(true);
+  try {
+    console.log('🔵 Sauvegarde LMC...');
+    await saveProspectionPopulation(draftId, speciesDataToPopulationRow('LMC', speciesData.LMC, {
+      popDiff: speciesData.LMC.popDiff,
+      popGroup: speciesData.LMC.popGroup,
+      typeCapture,
+    }));
+    
+    console.log('🔵 Sauvegarde NSE...');
+    await saveProspectionPopulation(draftId, speciesDataToPopulationRow('NSE', speciesData.NSE, {
+      popDiff: speciesData.NSE.popDiff,
+      popGroup: speciesData.NSE.popGroup,
+      typeCapture,
+    }));
+    
+    console.log('🔵 Navigation vers extensive-larves...');
+    router.push({ pathname: '/(prospection)/extensive-larves' as any, params: { draftId } });
+  } catch (error) {
+    console.error('❌ Erreur lors de la sauvegarde:', error);
+    Alert.alert('Erreur', 'Une erreur est survenue lors de la sauvegarde des données.');
+  } finally {
+    setIsSaving(false);
+  }
+};
 
   const renderStades = () => {
     const isFemale = currentSexe === 'F';
@@ -159,8 +181,6 @@ export default function ExtensiveImagosScreen() {
         return `male${stade.replace(/-/g, '_').replace(/\//g, '_')}` as keyof ExtensiveImagoSpeciesData['stades'];
       }
     };
-
-    const totalSexe = isFemale ? totalStadesF : totalStadesM;
 
     return stadesList.map((stade) => {
       const key = getKey(stade);
@@ -309,7 +329,7 @@ export default function ExtensiveImagosScreen() {
                   {totalPhases} {isPhasesConsistent ? '✅' : ''}
                 </Text>
               </View>
-              {!isPhasesConsistent && (
+              {!isPhasesConsistent && data.totalCaptures > 0 && (
                 <Text style={styles.errorText}>
                   La somme des phases doit être égale au nombre de captures ({data.totalCaptures})
                 </Text>
@@ -355,7 +375,7 @@ export default function ExtensiveImagosScreen() {
                 </Text>
               </View>
               
-              {!isStadesConsistent && (
+              {!isStadesConsistent && data.totalCaptures > 0 && (
                 <Text style={styles.errorText}>
                   La somme des stades doit être égale au nombre de captures ({data.totalCaptures})
                 </Text>
@@ -368,8 +388,10 @@ export default function ExtensiveImagosScreen() {
                 <View style={[styles.card, styles.flex1]}>
                   <Text style={styles.label}>Population diffuse D/ha</Text>
                   <TextInput
-                    value={popDiff}
-                    onChangeText={setPopDiff}
+                    value={data.popDiff}
+                    onChangeText={(text) => {
+                      updateSpeciesData({ popDiff: text });
+                    }}
                     keyboardType="decimal-pad"
                     style={styles.inputMono}
                     placeholder="0"
@@ -379,8 +401,10 @@ export default function ExtensiveImagosScreen() {
                 <View style={[styles.card, styles.flex1]}>
                   <Text style={styles.label}>Population groupée D/m²</Text>
                   <TextInput
-                    value={popGroup}
-                    onChangeText={setPopGroup}
+                    value={data.popGroup}
+                    onChangeText={(text) => {
+                      updateSpeciesData({ popGroup: text });
+                    }}
                     keyboardType="decimal-pad"
                     style={styles.inputMono}
                     placeholder="0"
@@ -388,10 +412,12 @@ export default function ExtensiveImagosScreen() {
                   />
                 </View>
               </View>
+              <Text style={styles.speciesHint}>Données spécifiques à {species}</Text>
             </View>
 
             <View style={styles.typeSection}>
               <Text style={styles.sectionLabel}>📊 Type de capture</Text>
+              <Text style={styles.commonHint}>Commun à LMC et NSE</Text>
               <View style={styles.typeRow}>
                 <TouchableOpacity
                   style={[styles.typeButton, typeCapture === 'essaim' && styles.typeButtonActive]}
@@ -413,7 +439,7 @@ export default function ExtensiveImagosScreen() {
             </View>
 
             <View style={styles.summaryContainer}>
-              <Text style={styles.summaryTitle}>📋 Récapitulatif</Text>
+              <Text style={styles.summaryTitle}>📋 Récapitulatif - {species}</Text>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>1. Nombre de captures :</Text>
                 <Text style={[styles.summaryValue, styles.summaryValueValid]}>{data.totalCaptures}</Text>
@@ -439,8 +465,24 @@ export default function ExtensiveImagosScreen() {
                   {totalStadesF} + {totalStadesM} = {totalStades} {isStadesConsistent ? '✅' : '❌'}
                 </Text>
               </View>
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Pop. diffuse D/ha :</Text>
+                <Text style={styles.summaryValue}>{data.popDiff || '0'}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Pop. groupée D/m² :</Text>
+                <Text style={styles.summaryValue}>{data.popGroup || '0'}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Type de capture :</Text>
+                <Text style={styles.summaryValue}>{typeCapture === 'essaim' ? 'Essaim' : 'Vol clair'}</Text>
+              </View>
               <View style={styles.ruleBox}>
                 <Text style={styles.ruleText}>Règle : Captures = Phases = Stades ♀ + Stades ♂</Text>
+                <Text style={[styles.ruleText, { marginTop: 4, color: TEXT_SECONDARY, fontSize: 10 }]}>
+                  {data.totalCaptures === 0 ? '✅ 0 capture : cohérent par défaut' : ''}
+                </Text>
               </View>
             </View>
 
@@ -448,7 +490,10 @@ export default function ExtensiveImagosScreen() {
               <View style={styles.successContainer}>
                 <Text style={styles.successText}>✅ COHÉRENT</Text>
                 <Text style={styles.successDetail}>
-                  {data.totalCaptures} captures = {totalPhases} phases = {totalStadesF} ♀ + {totalStadesM} ♂ = {totalStades} stades
+                  {data.totalCaptures === 0 
+                    ? 'Aucune capture enregistrée' 
+                    : `${data.totalCaptures} captures = ${totalPhases} phases = ${totalStadesF} ♀ + ${totalStadesM} ♂ = ${totalStades} stades`
+                  }
                 </Text>
               </View>
             ) : (
@@ -470,9 +515,9 @@ export default function ExtensiveImagosScreen() {
 
           <View style={styles.footer}>
             <TouchableOpacity 
-              style={[styles.continueButton, !isConsistent && styles.continueButtonDisabled]} 
+              style={[styles.continueButton, (!isConsistent && data.totalCaptures > 0) && styles.continueButtonDisabled]} 
               onPress={handleContinue} 
-              disabled={isSaving || !isConsistent} 
+              disabled={isSaving || (!isConsistent && data.totalCaptures > 0)} 
               activeOpacity={0.85}
             >
               <Text style={styles.continueButtonText}>Suivant : Larves ›</Text>
@@ -554,6 +599,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#f6f3e9', borderRadius: 9, padding: 8 },
   label: { fontSize: 9, fontWeight: '600', color: '#9a9484' },
   inputMono: { fontSize: 15, fontWeight: '700', color: TEXT, fontFamily: 'monospace', padding: 0 },
+  speciesHint: { fontSize: 9, color: '#9a9484', marginTop: 4, textAlign: 'center', fontStyle: 'italic' },
   
   typeSection: { marginTop: 4, marginBottom: 8 },
   typeRow: { flexDirection: 'row', gap: 8 },
@@ -561,6 +607,7 @@ const styles = StyleSheet.create({
   typeButtonActive: { backgroundColor: GREEN },
   typeButtonText: { fontSize: 13, fontWeight: '600', color: TEXT_SECONDARY },
   typeButtonTextActive: { color: '#fff' },
+  commonHint: { fontSize: 9, color: '#9a9484', marginBottom: 6, textAlign: 'center', fontStyle: 'italic' },
   
   summaryContainer: { backgroundColor: '#FFFFFF', borderRadius: 10, padding: 14, marginTop: 8, borderWidth: 1, borderColor: BORDER },
   summaryTitle: { fontSize: 12, fontWeight: '700', color: TEXT, marginBottom: 8, textAlign: 'center' },
