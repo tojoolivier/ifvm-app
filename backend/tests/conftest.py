@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 # Import all models so metadata knows about all tables
 import app.infrastructure.campagne_model  # noqa: F401
+import app.infrastructure.fiche_vol_model  # noqa: F401
 import app.infrastructure.prospection_model  # noqa: F401
 import app.infrastructure.referentiel_model  # noqa: F401
 import app.infrastructure.traitement_model  # noqa: F401
