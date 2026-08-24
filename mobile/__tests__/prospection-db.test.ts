@@ -271,7 +271,7 @@ describe('prospection-db — typage à la source (#173)', () => {
     await getDb();
 
     const evenements = lignesEnAttente().map((ligne) => ligne.event);
-    expect(evenements).toContain('db.migration.colonne-ajoutee');
+    expect(evenements).toContain('db.migration.colonnes-ajoutees');
     expect(evenements).toContain('db.ouverte');
   });
 });

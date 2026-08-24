@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 import { apiClient, User } from './api-client';
 import { storage } from './storage';
+import { LocalReadError } from './errors';
+import { logger } from './logger';
+
+const log = logger.child({ module: 'auth-store' });
 
 const tokenKey = 'auth_token';
 const refreshTokenKey = 'refresh_token';
@@ -34,8 +38,15 @@ function decodeBase64Url(base64Url: string): string {
 }
 
 function decodeJwtPayload(token: string): Record<string, unknown> {
-  const base64Url = token.split('.')[1];
-  return JSON.parse(decodeBase64Url(base64Url));
+  try {
+    const base64Url = token.split('.')[1];
+    return JSON.parse(decodeBase64Url(base64Url));
+  } catch (error) {
+    // Le jeton stocké est corrompu : donnée locale illisible, et déjà perdue.
+    throw new LocalReadError('Jeton d’authentification stocké illisible', {
+      cause: error,
+    });
+  }
 }
 
 interface AuthState {
@@ -72,38 +83,59 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
         }
       }
       set({ isInitialized: true });
-    } catch {
+    } catch (error) {
+      // `failure` et non `throw` : `init()` est appelée derrière `runTask` au
+      // démarrage, et un jeton illisible n'a qu'une conséquence — l'agent se
+      // reconnecte. Ce qui manquait, c'est la trace : le compte se
+      // déconnectait tout seul sans que rien ne dise pourquoi.
+      log.failure('auth.init.failed', error);
+
       try {
         await storage.deleteItem(tokenKey);
-      } catch {
-        // cleanup failed — ignore
+      } catch (erreurNettoyage) {
+        // Silence délibéré, l'un des quatre du mobile : le jeton est déjà
+        // écarté en mémoire, et échouer à l'effacer du disque ne change rien à
+        // ce que l'agent peut faire. La raison va dans le journal plutôt que
+        // dans ce commentaire, pour que le support la voie.
+        log.ignore(
+          erreurNettoyage,
+          'Jeton déjà écarté en mémoire — son effacement disque ne change rien pour l’agent.'
+        );
       }
+
       set({ isInitialized: true });
     }
   },
 
   login: async (email: string, password: string) => {
     try {
-      console.log('[auth] login start', email);
       const response = await apiClient.login({ email, password });
-      console.log('[auth] login API ok, token:', response.access_token?.substring(0, 30));
       const token = response.access_token;
       await storage.setItem(tokenKey, token);
       await storage.setItem(refreshTokenKey, response.refresh_token);
-      console.log('[auth] token stored');
+
       let user = null;
       try {
         user = await apiClient.getProfile(token);
-        console.log('[auth] getProfile ok:', user);
-      } catch (e) {
-        console.warn('[auth] getProfile failed:', e);
+      } catch (erreurProfil) {
+        // Silence délibéré : la session est ouverte et le jeton posé. Le
+        // profil n'est qu'un confort d'affichage, et il sera relu au prochain
+        // `init()`. Refuser la connexion pour ça enfermerait dehors un agent
+        // parfaitement authentifié.
+        log.ignore(
+          erreurProfil,
+          'Profil indisponible — la session est ouverte, il sera relu au prochain démarrage.'
+        );
       }
+
       set({ token, user, isAuthenticated: true });
-      console.log('[auth] state set, isAuthenticated=true');
-    } catch (e) {
-      console.error('[auth] login FAILED:', e);
+      log.event('auth.login.ok', { avecProfil: user !== null });
+    } catch (error) {
+      // L'état est remis à zéro pour ne pas laisser une demi-session ; l'erreur
+      // repart typée telle quelle vers l'écran, qui décide de l'afficher
+      // inline (identifiants) ou en bannière (panne).
       set({ token: null, user: null, isAuthenticated: false });
-      throw e;
+      throw error;
     }
   },
 
@@ -126,7 +158,13 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
       await storage.setItem(tokenKey, response.access_token);
       set({ token: response.access_token });
       return true;
-    } catch {
+    } catch (error) {
+      // Silence délibéré : un refresh refusé n'est pas un incident, c'est la
+      // fin normale d'une session. Le `false` rendu **dit** l'échec — il n'est
+      // pas indiscernable d'un succès — et l'appelant renvoie vers l'écran de
+      // connexion.
+      log.ignore(error, 'Rafraîchissement refusé — fin de session normale, retour à la connexion.');
+
       await storage.deleteItem(tokenKey);
       await storage.deleteItem(refreshTokenKey);
       set({ token: null, user: null, isAuthenticated: false });

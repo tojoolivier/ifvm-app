@@ -344,9 +344,12 @@ async function creerTables(db: SQLite.SQLiteDatabase): Promise<void> {
  * dérive de schéma qui a produit un écran blanc silencieux. Mieux vaut
  * refuser d'ouvrir la base et le dire.
  *
- * Les traces sont des `event`, donc persistées et gardées à l'export : une
- * migration est une opération critique et irréversible, et ces lignes sont la
- * seule trace de ce qui a été joué sur l'appareil d'un agent.
+ * La trace est un `event`, donc persistée et gardée à l'export : une migration
+ * est une opération critique et irréversible, et cette ligne est la seule
+ * trace de ce qui a été joué sur l'appareil d'un agent. **Une ligne par
+ * table, pas par colonne** : sur une installation neuve, les soixante-cinq
+ * colonnes rempliraient l'anneau du logger à elles seules et pousseraient
+ * dehors le contexte utile.
  */
 async function ajouterColonnesManquantes(
   db: SQLite.SQLiteDatabase,
@@ -382,8 +385,13 @@ async function ajouterColonnesManquantes(
         { cause: error }
       );
     }
+  }
 
-    log.event('db.migration.colonne-ajoutee', { table, colonne: col.name, type: col.type });
+  if (manquantes.length > 0) {
+    log.event('db.migration.colonnes-ajoutees', {
+      table,
+      colonnes: manquantes.map((col) => col.name),
+    });
   }
 }
 
