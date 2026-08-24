@@ -75,13 +75,18 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
  * train de saisir et **perdra tout** s'il continue — d'où un traitement
  * BLOQUER là où la lecture se contente d'INFORMER (ADR-012 décision 3).
  */
-const CLASSE_PAR_METHODE = {
+type ConstructeurErreur = new (
+  message: string,
+  options?: { cause?: unknown }
+) => AppError;
+
+const CLASSE_PAR_METHODE: Record<string, ConstructeurErreur | undefined> = {
   getAllAsync: LocalReadError,
   getFirstAsync: LocalReadError,
   runAsync: LocalWriteError,
   execAsync: LocalWriteError,
   withTransactionAsync: LocalWriteError,
-} as const;
+};
 
 /**
  * Rend un handle qui type ses propres échecs.
@@ -92,34 +97,49 @@ const CLASSE_PAR_METHODE = {
  * « Signaler au support » là où l'agent méritait « Réessayer d'enregistrer ».
  * Le typage vit donc au seul endroit par lequel tous passent.
  *
- * Le handle est enveloppé par délégation prototypale : ce qui n'est pas dans
- * {@link CLASSE_PAR_METHODE} reste le membre d'origine, et un handle partiel
- * (les tests en fournissent) ne déclenche rien.
+ * **Le `this` de chaque méthode reste la vraie base**, y compris pour celles
+ * qu'on n'enveloppe pas. Ce n'est pas une précaution de principe : lu dans
+ * `node_modules/expo-sqlite`, `closeAsync()` fait
+ * `unregisterDatabaseForDevToolsAsync(this)`, et un `this` valant l'enveloppe
+ * au lieu de la base ne correspondrait à aucune entrée du registre. Le défaut
+ * serait resté invisible — il est gardé par `__DEV__`, et **tous les tests
+ * mockent `expo-sqlite` par des objets nus**, donc aucun n'aurait pu l'attraper.
+ * C'est le motif que ce dépôt collectionne : du code d'apparence correcte que
+ * rien n'exerce.
+ *
+ * Un `Proxy` plutôt qu'un `Object.create` : il lie le récepteur une fois pour
+ * toutes, au lieu de laisser chaque méthode non listée hériter du mauvais.
  */
 function typerLesEchecs(db: SQLite.SQLiteDatabase): SQLite.SQLiteDatabase {
-  const brut = db as unknown as Record<string, unknown>;
-  const typees: Record<string, unknown> = {};
+  return new Proxy(db, {
+    get(base, propriete) {
+      const membre = Reflect.get(base, propriete, base) as unknown;
 
-  for (const [methode, Classe] of Object.entries(CLASSE_PAR_METHODE)) {
-    const original = brut[methode];
-    if (typeof original !== 'function') continue;
+      if (typeof membre !== 'function') return membre;
 
-    typees[methode] = async (...args: unknown[]): Promise<unknown> => {
-      try {
-        return await (original as (...a: unknown[]) => unknown).apply(db, args);
-      } catch (error) {
-        // Déjà typée : c'est le cas d'un `withTransactionAsync` dont le rappel
-        // lève une `PreconditionError`. La réenvelopper ferait lire
-        // « impossible d'enregistrer » à la place du message écrit pour
-        // l'agent.
-        if (error instanceof AppError) throw error;
+      const appel = membre as (...a: unknown[]) => unknown;
+      const Classe = CLASSE_PAR_METHODE[propriete as string];
 
-        throw new Classe(`${methode} a échoué sur la base locale`, { cause: error });
-      }
-    };
-  }
+      // Méthode hors du tableau : rendue telle quelle, mais liée à la base.
+      if (!Classe) return appel.bind(base);
 
-  return Object.assign(Object.create(db as object), typees) as SQLite.SQLiteDatabase;
+      return async (...args: unknown[]): Promise<unknown> => {
+        try {
+          return await appel.apply(base, args);
+        } catch (error) {
+          // Déjà typée : c'est le cas d'un `withTransactionAsync` dont le
+          // rappel lève une `PreconditionError`. La réenvelopper ferait lire
+          // « impossible d'enregistrer » à la place du message écrit pour
+          // l'agent.
+          if (error instanceof AppError) throw error;
+
+          throw new Classe(`${String(propriete)} a échoué sur la base locale`, {
+            cause: error,
+          });
+        }
+      };
+    },
+  });
 }
 
 async function creerTables(db: SQLite.SQLiteDatabase): Promise<void> {
