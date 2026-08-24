@@ -125,14 +125,29 @@ async def campagne_id(db_session: AsyncSession, utilisateur: Utilisateur) -> uui
 
 
 @pytest_asyncio.fixture
-async def poste_acridien(db_session: AsyncSession):
+async def zone_anti_acridien(db_session: AsyncSession):
+    from app.infrastructure.referentiel_model import ZoneAntiAcridienModel
+
+    za = ZoneAntiAcridienModel(
+        id=uuid.uuid4(),
+        code="ZA-TEST-01",
+        nom="Zone Test",
+    )
+    db_session.add(za)
+    await db_session.commit()
+    await db_session.refresh(za)
+    return za
+
+
+@pytest_asyncio.fixture
+async def poste_acridien(db_session: AsyncSession, zone_anti_acridien):
     from app.infrastructure.referentiel_model import PosteAcridienModel
 
     pa = PosteAcridienModel(
         id=uuid.uuid4(),
         code="PA-TEST-01",
         nom="Poste Test",
-        region="Test Region",
+        za_id=zone_anti_acridien.id,
     )
     db_session.add(pa)
     await db_session.commit()
@@ -141,7 +156,26 @@ async def poste_acridien(db_session: AsyncSession):
 
 
 @pytest_asyncio.fixture
-async def station_fixe(db_session: AsyncSession, poste_acridien):
+async def commune(db_session: AsyncSession):
+    from app.infrastructure.referentiel_model import CommuneModel, DistrictModel, RegionModel
+
+    region = RegionModel(id=uuid.uuid4(), nom="Région Test")
+    db_session.add(region)
+    await db_session.flush()
+
+    district = DistrictModel(id=uuid.uuid4(), nom="District Test", region_id=region.id)
+    db_session.add(district)
+    await db_session.flush()
+
+    commune = CommuneModel(id=uuid.uuid4(), nom="Commune Test", district_id=district.id)
+    db_session.add(commune)
+    await db_session.commit()
+    await db_session.refresh(commune)
+    return commune
+
+
+@pytest_asyncio.fixture
+async def station_fixe(db_session: AsyncSession, poste_acridien, commune):
     from app.infrastructure.referentiel_model import StationFixeModel
 
     station = StationFixeModel(
@@ -152,6 +186,7 @@ async def station_fixe(db_session: AsyncSession, poste_acridien):
         latitude=-20.0,
         longitude=45.0,
         altitude=500,
+        commune_id=commune.id,
         actif=True,
     )
     db_session.add(station)

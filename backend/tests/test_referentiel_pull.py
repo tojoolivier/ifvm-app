@@ -10,11 +10,11 @@ from app.auth import create_access_token
 
 
 @pytest_asyncio.fixture
-async def autre_poste_acridien(db_session: AsyncSession):
+async def autre_poste_acridien(db_session: AsyncSession, zone_anti_acridien):
     from app.infrastructure.referentiel_model import PosteAcridienModel
 
     pa = PosteAcridienModel(
-        id=uuid.uuid4(), code="PA-TEST-02", nom="Autre Poste", region="Autre Region"
+        id=uuid.uuid4(), code="PA-TEST-02", nom="Autre Poste", za_id=zone_anti_acridien.id
     )
     db_session.add(pa)
     await db_session.commit()
@@ -65,7 +65,7 @@ async def collegue_meme_pa(db_session: AsyncSession, poste_acridien):
 
 
 @pytest_asyncio.fixture
-async def station_autre_pa(db_session: AsyncSession, autre_poste_acridien):
+async def station_autre_pa(db_session: AsyncSession, autre_poste_acridien, commune):
     from app.infrastructure.referentiel_model import StationFixeModel
 
     station = StationFixeModel(
@@ -75,6 +75,7 @@ async def station_autre_pa(db_session: AsyncSession, autre_poste_acridien):
         pa_id=autre_poste_acridien.id,
         latitude=-19.0,
         longitude=46.0,
+        commune_id=commune.id,
         actif=True,
     )
     db_session.add(station)
