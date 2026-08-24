@@ -20,6 +20,11 @@ import {
 } from './api-client';
 
 import { useAuthStore } from './auth-store';
+import { AuthError } from './errors';
+import { logger } from './logger';
+import { runTask } from './run-task';
+
+const log = logger.child({ module: 'referentiel-auto-sync' });
 
 const CURSORS_STORAGE_KEY =
   'referentiel_cursors';
@@ -80,9 +85,12 @@ async function loadCursors(): Promise<ReferentielSinceCursors> {
       };
     }
   } catch (error) {
-    console.warn(
-      '[referentiel-auto-sync] Erreur chargement curseurs:',
-      error
+    // Silence délibéré : les curseurs ne sont qu'une optimisation. Les perdre
+    // coûte un pull complet au prochain passage, jamais une donnée. La raison
+    // va dans le journal pour que le support sache que le silence était prévu.
+    log.ignore(
+      error,
+      'Curseurs illisibles — repli sur un pull complet, aucune donnée en jeu.'
     );
   }
 
@@ -98,9 +106,10 @@ async function saveCursors(
       JSON.stringify(cursors)
     );
   } catch (error) {
-    console.warn(
-      '[referentiel-auto-sync] Erreur sauvegarde curseurs:',
-      error
+    // Même raison qu'à la lecture : au pire, le prochain pull repart de zéro.
+    log.ignore(
+      error,
+      'Curseurs non enregistrés — le prochain pull repartira de zéro.'
     );
   }
 }
@@ -191,7 +200,15 @@ export async function isTokenExpiringSoon(
       expiryTime - now <
       TOKEN_REFRESH_THRESHOLD_MS
     );
-  } catch {
+  } catch (error) {
+    // Silence délibéré : un jeton illisible est traité comme expirant, donc
+    // rafraîchi. C'est le rafraîchissement qui tranchera, et lui n'est pas
+    // silencieux.
+    log.ignore(
+      error,
+      'Jeton illisible — traité comme expirant, le rafraîchissement tranchera.'
+    );
+
     return true;
   }
 }
@@ -218,19 +235,13 @@ export async function isTokenExpiringSoon(
  * refreshAccessTokenSingleFlight().
  */
 export async function refreshTokenForAutoSync(): Promise<string | null> {
-  try {
-    const refreshedToken =
-      await refreshAccessTokenSingleFlight();
+  // Pas de `try/catch` ici : il ne faisait que journaliser puis relancer, ce
+  // qui produisait deux lignes pour un seul échec. La frontière `runTask` de
+  // `performSync` journalise une fois, avec la classe et le traitement.
+  const refreshedToken =
+    await refreshAccessTokenSingleFlight();
 
-    return refreshedToken ?? null;
-  } catch (error) {
-    console.warn(
-      '[referentiel-auto-sync] Échec du rafraîchissement du token:',
-      error
-    );
-
-    throw error;
-  }
+  return refreshedToken ?? null;
 }
 
 export function useReferentielAutoSync(
@@ -274,8 +285,8 @@ export function useReferentielAutoSync(
             authToken,
             cursors,
             async () => {
-              console.warn(
-                '[referentiel-auto-sync] Token invalide, déconnexion'
+              log.event(
+                'referentiel.sync.jeton-refuse'
               );
 
               await useAuthStore
@@ -294,8 +305,8 @@ export function useReferentielAutoSync(
           newCursors
         );
 
-        console.log(
-          '[referentiel-auto-sync] Synchronisation réussie'
+        log.event(
+          'referentiel.sync.ok'
         );
       },
       []
@@ -304,10 +315,17 @@ export function useReferentielAutoSync(
   const performSync =
     useCallback(
       async (force = false) => {
-        if (!token) {
-          console.log(
-            '[referentiel-auto-sync] Pas de token, synchronisation ignorée'
+        const ignorer = (
+          raison: string
+        ) => {
+          log.detail(
+            'referentiel.sync.ignoree',
+            { raison }
           );
+        };
+
+        if (!token) {
+          ignorer('pas-de-jeton');
 
           return;
         }
@@ -315,9 +333,7 @@ export function useReferentielAutoSync(
         if (
           syncInProgressRef.current
         ) {
-          console.log(
-            '[referentiel-auto-sync] Synchronisation déjà en cours'
-          );
+          ignorer('deja-en-cours');
 
           return;
         }
@@ -326,82 +342,74 @@ export function useReferentielAutoSync(
           !isConnected &&
           !force
         ) {
-          console.log(
-            '[referentiel-auto-sync] Pas de connexion, synchronisation différée'
-          );
+          ignorer('hors-ligne');
 
           return;
         }
 
+        syncInProgressRef.current =
+          true;
+
+        setIsSyncing(true);
+
         try {
-          syncInProgressRef.current =
-            true;
+          /*
+           * `runTask` remplace le `try/catch` maison. Deux choses changent.
+           *
+           * D'abord la frontière : l'auto-sync est une tâche de fond
+           * `best-effort`, donc son échec est JOURNAL — l'agent n'a rien à
+           * faire d'un référentiel un peu vieux, et l'interrompre pour ça
+           * serait du bruit.
+           *
+           * Ensuite la décision de déconnexion, qui se prenait **par regex sur
+           * le message** (`'Token invalide' || '401' || 'Unauthorized'`) :
+           * elle ratait tout message français, et déconnectait sur n'importe
+           * quel bug contenant « 401 ». `api-client` lève désormais `AuthError`
+           * (#173), donc `instanceof` suffit — c'est la règle d'ADR-012.
+           */
+          const resultat = await runTask(
+            async () => {
+              const tokenExpiring =
+                await isTokenExpiringSoon(
+                  token
+                );
 
-          setIsSyncing(true);
+              if (!tokenExpiring) {
+                return performSyncWithToken(
+                  token
+                );
+              }
 
-          console.log(
-            '[referentiel-auto-sync] Début de la synchronisation...'
-          );
-
-          const tokenExpiring =
-            await isTokenExpiringSoon(
-              token
-            );
-
-          if (tokenExpiring) {
-            console.log(
-              '[referentiel-auto-sync] Token proche de l\'expiration, utilisation du refresh single-flight...'
-            );
-
-            const newToken =
-              await refreshTokenForAutoSync();
-
-            if (!newToken) {
-              console.warn(
-                '[referentiel-auto-sync] Échec du rafraîchissement du token'
+              log.detail(
+                'referentiel.sync.jeton-a-rafraichir'
               );
 
-              await useAuthStore
-                .getState()
-                .logout();
+              const newToken =
+                await refreshTokenForAutoSync();
 
-              return;
+              if (!newToken) {
+                // Le refus est net, pas une panne : on le dit en `AuthError`
+                // plutôt qu'en `return`, pour que la déconnexion ci-dessous
+                // parte du même endroit que les 401 du serveur.
+                throw new AuthError(
+                  'Rafraîchissement du jeton refusé'
+                );
+              }
+
+              return performSyncWithToken(
+                newToken
+              );
+            },
+            {
+              name: 'sync.referentiel',
+              criticality: 'best-effort',
             }
-
-            await performSyncWithToken(
-              newToken
-            );
-
-            return;
-          }
-
-          await performSyncWithToken(
-            token
-          );
-        } catch (error) {
-          console.error(
-            '[referentiel-auto-sync] Erreur lors de la synchronisation:',
-            error
           );
 
           if (
-            error instanceof Error &&
-            (
-              error.message.includes(
-                'Token invalide'
-              ) ||
-              error.message.includes(
-                '401'
-              ) ||
-              error.message.includes(
-                'Unauthorized'
-              )
-            )
+            !resultat.ok &&
+            resultat.error instanceof AuthError
           ) {
-            console.warn(
-              '[referentiel-auto-sync] Token invalide, déconnexion'
-            );
-
             await useAuthStore
               .getState()
               .logout();
@@ -480,8 +488,8 @@ export function useReferentielAutoSync(
               'active' &&
             wasInBackground
           ) {
-            console.log(
-              '[referentiel-auto-sync] App revient au premier plan, synchronisation...'
+            log.detail(
+              'referentiel.sync.retour-premier-plan'
             );
 
             void performSync();
