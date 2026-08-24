@@ -50,12 +50,12 @@ async function upsertPostesAcridiens(
 ): Promise<void> {
   for (const pa of upserts) {
     await db.runAsync(
-      `INSERT INTO poste_acridien (id, code, nom, region, actif, updated_at)
+      `INSERT INTO poste_acridien (id, code, nom, za_id, actif, updated_at)
        VALUES (?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
-         code = excluded.code, nom = excluded.nom, region = excluded.region,
+         code = excluded.code, nom = excluded.nom, za_id = excluded.za_id,
          actif = excluded.actif, updated_at = excluded.updated_at`,
-      [pa.id, pa.code, pa.nom, pa.region, pa.actif ? 1 : 0, pa.updated_at]
+      [pa.id, pa.code, pa.nom, pa.za_id, pa.actif ? 1 : 0, pa.updated_at]
     );
   }
 }
@@ -66,11 +66,13 @@ async function upsertStationsFixes(
 ): Promise<void> {
   for (const station of upserts) {
     await db.runAsync(
-      `INSERT INTO station_fixe (id, code, nom, pa_id, latitude, longitude, altitude, actif, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO station_fixe
+         (id, code, nom, pa_id, latitude, longitude, altitude, commune, district, region, actif, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          code = excluded.code, nom = excluded.nom, pa_id = excluded.pa_id,
          latitude = excluded.latitude, longitude = excluded.longitude, altitude = excluded.altitude,
+         commune = excluded.commune, district = excluded.district, region = excluded.region,
          actif = excluded.actif, updated_at = excluded.updated_at`,
       [
         station.id,
@@ -80,6 +82,9 @@ async function upsertStationsFixes(
         station.latitude,
         station.longitude,
         station.altitude,
+        station.commune,
+        station.district,
+        station.region,
         station.actif ? 1 : 0,
         station.updated_at,
       ]

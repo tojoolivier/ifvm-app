@@ -23,7 +23,7 @@ export interface PosteAcridien {
   id: string;
   code: string;
   nom: string;
-  region: string | null;
+  zaId: string;
 }
 
 export interface StationFixe {
@@ -34,13 +34,16 @@ export interface StationFixe {
   latitude: number;
   longitude: number;
   altitude: number | null;
+  commune: string;
+  district: string;
+  region: string;
 }
 
 /** Liste des PA actifs, triés par nom — alimente le sélecteur "Manuel" du PA. */
 export async function listPostesAcridiens(): Promise<PosteAcridien[]> {
   const db = await getReferentielDb();
   return db.getAllAsync<PosteAcridien>(
-    'SELECT id, code, nom, region FROM poste_acridien WHERE actif = 1 ORDER BY nom'
+    'SELECT id, code, nom, za_id as zaId FROM poste_acridien WHERE actif = 1 ORDER BY nom'
   );
 }
 
@@ -48,7 +51,7 @@ export async function listPostesAcridiens(): Promise<PosteAcridien[]> {
 export async function listStationsByPoste(paId: string): Promise<StationFixe[]> {
   const db = await getReferentielDb();
   return db.getAllAsync<StationFixe>(
-    'SELECT id, code, nom, pa_id as paId, latitude, longitude, altitude FROM station_fixe WHERE pa_id = ? AND actif = 1 ORDER BY nom',
+    'SELECT id, code, nom, pa_id as paId, latitude, longitude, altitude, commune, district, region FROM station_fixe WHERE pa_id = ? AND actif = 1 ORDER BY nom',
     [paId]
   );
 }
@@ -111,7 +114,7 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 export async function findNearestStation(latitude: number, longitude: number): Promise<StationFixe | null> {
   const db = await getReferentielDb();
   const stations = await db.getAllAsync<StationFixe>(
-    'SELECT id, code, nom, pa_id as paId, latitude, longitude, altitude FROM station_fixe WHERE actif = 1'
+    'SELECT id, code, nom, pa_id as paId, latitude, longitude, altitude, commune, district, region FROM station_fixe WHERE actif = 1'
   );
   if (stations.length === 0) return null;
 
@@ -133,7 +136,7 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
       id TEXT PRIMARY KEY NOT NULL,
       code TEXT NOT NULL,
       nom TEXT NOT NULL,
-      region TEXT,
+      za_id TEXT,
       actif INTEGER NOT NULL DEFAULT 1,
       updated_at TEXT NOT NULL
     );
@@ -146,6 +149,9 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
       latitude REAL NOT NULL,
       longitude REAL NOT NULL,
       altitude REAL,
+      commune TEXT,
+      district TEXT,
+      region TEXT,
       actif INTEGER NOT NULL DEFAULT 1,
       updated_at TEXT NOT NULL
     );
@@ -201,4 +207,28 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
       last_pull_at TEXT
     );
   `);
+
+  // Installs antérieurs à l'introduction de la Zone Anti-Acridienne (ZA) et de
+  // commune/district/region par station : poste_acridien/station_fixe existent déjà sans ces
+  // colonnes (CREATE TABLE IF NOT EXISTS ne les touche pas) — on les ajoute au besoin.
+  await addColumnsIfMissing(db, 'poste_acridien', [{ name: 'za_id', type: 'TEXT' }]);
+  await addColumnsIfMissing(db, 'station_fixe', [
+    { name: 'commune', type: 'TEXT' },
+    { name: 'district', type: 'TEXT' },
+    { name: 'region', type: 'TEXT' },
+  ]);
+}
+
+async function addColumnsIfMissing(
+  db: SQLite.SQLiteDatabase,
+  table: string,
+  columns: { name: string; type: string }[]
+): Promise<void> {
+  const tableInfo = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
+  const existing = new Set(tableInfo.map((row) => row.name));
+  for (const col of columns) {
+    if (!existing.has(col.name)) {
+      await db.execAsync(`ALTER TABLE ${table} ADD COLUMN ${col.name} ${col.type};`);
+    }
+  }
 }
