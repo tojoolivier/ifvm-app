@@ -43,7 +43,7 @@ def _vol(type_vol: str, debut: time, fin: time, **kwargs) -> Vol:
 def _fiche(**kwargs) -> FicheVol:
     defaults = dict(
         id=uuid.uuid4(),
-        numero="2026-08-24-IHO01-MDGA21",
+        numero_fiche="2026-08-24-IHO01-MDGA21",
         date_vol=date(2026, 8, 24),
         compagnie="Aviation Malgache",
         immatriculation="MDG-A21",

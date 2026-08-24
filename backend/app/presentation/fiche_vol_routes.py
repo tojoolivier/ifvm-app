@@ -69,7 +69,7 @@ async def creer_fiche_vol(
     donnees = payload.model_dump()
     vols_payload = donnees.pop("vols", [])
     try:
-        fiche = FicheVol(numero="", **donnees)
+        fiche = FicheVol(numero_fiche="", **donnees)
         fiche.vols = [Vol(fiche_vol_id=fiche.id, **v) for v in vols_payload]
     except (VolRattachementInvalideError, HeuresVolIncoherentesError) as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc

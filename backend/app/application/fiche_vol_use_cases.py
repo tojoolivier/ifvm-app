@@ -32,7 +32,9 @@ async def _exiger_brouillon(repo, fiche_vol_id: uuid.UUID) -> FicheVol:
     if fiche is None:
         raise FicheVolIntrouvableError(str(fiche_vol_id))
     if fiche.statut != "brouillon":
-        raise FicheVolVerrouilleeError(f"fiche {fiche.numero} déjà validée : plus aucune écriture")
+        raise FicheVolVerrouilleeError(
+            f"fiche {fiche.numero_fiche} déjà validée : plus aucune écriture"
+        )
     return fiche
 
 
@@ -51,7 +53,7 @@ class CreateFicheVol:
         # préalable — deux tablettes qui synchronisent en même temps ne doivent pas
         # pouvoir obtenir le même numéro.
         for suffixe in [None, *range(2, _SUFFIXE_MAX + 1)]:
-            fiche.numero = composer_numero_fiche(
+            fiche.numero_fiche = composer_numero_fiche(
                 fiche.date_vol, fiche.base_code, fiche.immatriculation, suffixe
             )
             try:

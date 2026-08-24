@@ -33,7 +33,7 @@ def upgrade() -> None:
         sa.Column(
             "id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")
         ),
-        sa.Column("numero", sa.String(60), nullable=False, unique=True),
+        sa.Column("numero_fiche", sa.String(60), nullable=False, unique=True),
         sa.Column("date_vol", sa.Date(), nullable=False),
         sa.Column("compagnie", sa.String(255), nullable=False),
         sa.Column("immatriculation", sa.String(20), nullable=False),
@@ -84,7 +84,7 @@ def upgrade() -> None:
         "celui du jour. Meme patron que cible.'"
     )
     op.execute(
-        "COMMENT ON COLUMN fiche_vol.numero IS "
+        "COMMENT ON COLUMN fiche_vol.numero_fiche IS "
         "'[Date]-[Base numerotee]-[Immatriculation], suffixe -NN a partir de la deuxieme "
         "fiche du jour pour le meme appareil. Seule contrainte d''unicite de la fiche : "
         "« une seule fiche par jour si possible » est une convention, pas une regle.'"

@@ -24,7 +24,7 @@ class FicheVolModel(Base):
     __tablename__ = "fiche_vol"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    numero: Mapped[str] = mapped_column(String(60), nullable=False, unique=True)
+    numero_fiche: Mapped[str] = mapped_column(String(60), nullable=False, unique=True)
     date_vol: Mapped[date] = mapped_column(Date(), nullable=False)
     compagnie: Mapped[str] = mapped_column(String(255), nullable=False)
     immatriculation: Mapped[str] = mapped_column(String(20), nullable=False)

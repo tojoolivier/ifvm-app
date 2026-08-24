@@ -26,7 +26,7 @@ from app.infrastructure.fiche_vol_model import (
 def _to_domain(model: FicheVolModel) -> FicheVol:
     return FicheVol(
         id=model.id,
-        numero=model.numero,
+        numero_fiche=model.numero_fiche,
         date_vol=model.date_vol,
         compagnie=model.compagnie,
         immatriculation=model.immatriculation,
@@ -108,13 +108,6 @@ class FicheVolRepositoryImpl:
         model = await self._charger(fiche_vol_id)
         return _to_domain(model) if model else None
 
-    async def get_by_numero(self, numero: str) -> FicheVol | None:
-        result = await self.session.execute(
-            select(FicheVolModel).options(*self._CHARGEMENT).where(FicheVolModel.numero == numero)
-        )
-        model = result.scalar_one_or_none()
-        return _to_domain(model) if model else None
-
     async def list_by_filters(
         self,
         date_vol: date | None = None,
@@ -136,7 +129,7 @@ class FicheVolRepositoryImpl:
         avec un suffixe (cf. CreateFicheVol)."""
         model = FicheVolModel(
             id=fiche.id,
-            numero=fiche.numero,
+            numero_fiche=fiche.numero_fiche,
             date_vol=fiche.date_vol,
             compagnie=fiche.compagnie,
             immatriculation=fiche.immatriculation,
@@ -252,6 +245,6 @@ def _traduire_integrite(exc: IntegrityError) -> Exception:
         return RotationVolIntrouvableError("la rotation référencée n'existe pas")
     if "vol_prospection_id_fkey" in message:
         return ProspectionVolIntrouvableError("la prospection référencée n'existe pas")
-    if "fiche_vol" in message and "numero" in message:
+    if "fiche_vol" in message and "numero_fiche" in message:
         return NumeroFicheVolConflitError(message)
     return exc
