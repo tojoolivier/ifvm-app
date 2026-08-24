@@ -681,6 +681,7 @@ export async function saveProspectionInfestation(prospectionId: string, typeCibl
     [prospectionId, typeCible]
   );
 
+  // ✅ Correction : 41 valeurs (une colonne en moins)
   const values = [
     row.espece, row.type_cible, row.taille_min, row.taille_max, row.taille_moy,
     row.surface_totale, row.densite_min, row.densite_max, row.densite_moy,
@@ -717,6 +718,7 @@ export async function saveProspectionInfestation(prospectionId: string, typeCibl
     return;
   }
 
+  // ✅ Correction : 41 colonnes dans l'INSERT (une colonne en moins)
   await db.runAsync(
     `INSERT INTO prospection_infestation (
       id, prospection_id, espece, type_cible, taille_min, taille_max,
@@ -729,11 +731,10 @@ export async function saveProspectionInfestation(prospectionId: string, typeCibl
       stade_dominant, taille_groupe_m2, front_longueur_m, front_largeur_m,
       densite_max_front, densite_moy_arriere_front, heure_observation,
       densite_en_vol, dimension_ha
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [generateId(), prospectionId, ...values]
   );
 }
-
 export async function completeProspection(id: string): Promise<DraftProspection> {
   const db = await getDb();
   const now = new Date().toISOString();
