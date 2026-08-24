@@ -15,6 +15,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import InfestationScreen from '@/app/(prospection)/infestation';
 import { ErrorBanner } from '@/components/error-banner';
 import { useErrorStore } from '@/lib/error-store';
+import { useAuthStore } from '@/lib/auth-store';
 import * as prospectionRepository from '@/lib/prospection-repository';
 
 jest.mock('expo-router', () =>
@@ -32,6 +33,9 @@ jest.mock('@/lib/prospection-repository', () => ({
 describe('InfestationScreen', () => {
   beforeEach(() => {
     useErrorStore.getState().dismissAll();
+    // « Signaler au support » mène au journal, sous `(app)` : il n'est proposé
+    // qu'en session (#172).
+    useAuthStore.setState({ isAuthenticated: true });
     jest.mocked(prospectionRepository.getDerniereDensiteMemeSite).mockClear();
   });
 

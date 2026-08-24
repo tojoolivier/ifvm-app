@@ -37,15 +37,7 @@ interface Props {
 export function EtatVide({ erreur, titreVide, sousTitreVide, onReessayer }: Props) {
   const affichable = erreur == null ? null : toFriendlyError(erreur);
   const action = useErrorAction(
-    affichable === null
-      ? null
-      : {
-          ...affichable,
-          traitement: 'INFORMER',
-          occurrences: 1,
-          vueA: 0,
-          retry: onReessayer,
-        }
+    affichable === null ? null : { action: affichable.action, retry: onReessayer }
   );
 
   if (!affichable) {

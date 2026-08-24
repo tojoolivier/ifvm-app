@@ -88,7 +88,10 @@ export default function DensityScreen() {
         setPopulation(row ?? emptyPopulation(grille.espece));
       })
       .catch((error) => {
-        signaler(error, 'useAsyncAction');
+        // Chargement de fond, pas un geste de l'agent : la frontière est celle
+        // de `runTask` (décision 1). Déclarer `useAsyncAction` ferait passer une
+        // lecture ratée en BLOQUER, une insistance que la matrice ne prévoit pas.
+        signaler(error, 'runTask:essential');
         logError({
           message: toFriendlyError(error).message,
           stack: error instanceof Error ? error.stack ?? null : null,
@@ -224,3 +227,9 @@ const styles = StyleSheet.create({
   continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
   continueButtonText: { color: '#fff', fontWeight: '800', fontSize: 15 },
 });
+
+/**
+ * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`
+ * enveloppe la route dans un `<Try>` : la pile de navigation survit au crash.
+ */
+export { RouteErrorBoundary as ErrorBoundary } from '@/components/error-boundary';

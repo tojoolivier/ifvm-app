@@ -13,11 +13,7 @@
  *    accessibles depuis le journal.
  */
 import { NetworkError, AuthError, LocalReadError } from '@/lib/errors';
-import {
-  useErrorStore,
-  autresQueLaPlusGrave,
-  laPlusGrave,
-} from '@/lib/error-store';
+import { useErrorStore, autresNonAffichees, laPlusGrave } from '@/lib/error-store';
 
 function signaler(error: unknown, frontiere: 'useAsyncAction' | 'global' = 'useAsyncAction') {
   useErrorStore.getState().signaler(error, frontiere);
@@ -42,6 +38,16 @@ describe('dédoublonnage par classe', () => {
       'LocalReadError',
       'NetworkError',
     ]);
+  });
+
+  it('un signalement sans reprise efface celle du geste précédent', () => {
+    const premier = jest.fn();
+    useErrorStore.getState().signaler(new NetworkError('a'), 'useAsyncAction', premier);
+    useErrorStore.getState().signaler(new NetworkError('b'), 'useAsyncAction');
+
+    // Garder l'ancien `retry` offrirait un « Réessayer » qui rejoue autre chose
+    // que ce que l'agent vient de tenter.
+    expect(useErrorStore.getState().erreurs[0].retry).toBeUndefined();
   });
 
   it('le dernier signalement d’une classe remplace son action de reprise', () => {
@@ -87,12 +93,33 @@ describe('« +N autres › » — rien ne disparaît en silence', () => {
     signaler(new AuthError('d'));
 
     const { erreurs } = useErrorStore.getState();
-    expect(autresQueLaPlusGrave(erreurs)).toBe(2);
+    const montree = laPlusGrave(erreurs.filter((e) => e.traitement === 'INFORMER'));
+    expect(autresNonAffichees(erreurs, [montree])).toBe(2);
   });
 
   it('vaut zéro quand une seule classe est en jeu', () => {
     signaler(new NetworkError('a'));
-    expect(autresQueLaPlusGrave(useErrorStore.getState().erreurs)).toBe(0);
+    const { erreurs } = useErrorStore.getState();
+    expect(autresNonAffichees(erreurs, [erreurs[0]])).toBe(0);
+  });
+
+  it('n’oublie pas les BLOQUER en attente — compter sur une liste déjà filtrée les perdait', () => {
+    signaler(new NetworkError('a')); // INFORMER, montré par la bannière
+    signaler(new AuthError('b')); // BLOQUER, en attente
+    const { erreurs } = useErrorStore.getState();
+    const montree = laPlusGrave(erreurs.filter((e) => e.traitement === 'INFORMER'));
+
+    expect(autresNonAffichees(erreurs, [montree])).toBe(1);
+  });
+
+  it('ne compte pas deux fois ce que les deux surfaces montrent déjà', () => {
+    signaler(new NetworkError('a'));
+    signaler(new AuthError('b'));
+    const { erreurs } = useErrorStore.getState();
+    const informante = laPlusGrave(erreurs.filter((e) => e.traitement === 'INFORMER'));
+    const bloquante = laPlusGrave(erreurs.filter((e) => e.traitement === 'BLOQUER'));
+
+    expect(autresNonAffichees(erreurs, [informante, bloquante])).toBe(0);
   });
 });
 

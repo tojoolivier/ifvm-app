@@ -1,5 +1,6 @@
 import { Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useAuthStore } from '@/lib/auth-store';
 import { FOREGROUND_TERTIARY } from './tokens';
 
 /**
@@ -12,8 +13,11 @@ import { FOREGROUND_TERTIARY } from './tokens';
  */
 export function LienVersLeJournal({ autres }: { autres: number }) {
   const router = useRouter();
+  // Le journal vit sous `(app)` : hors session, le lien se ferait renvoyer par
+  // le garde d'authentification.
+  const estAuthentifie = useAuthStore((s) => s.isAuthenticated);
 
-  if (autres <= 0) return null;
+  if (autres <= 0 || !estAuthentifie) return null;
 
   return (
     <TouchableOpacity

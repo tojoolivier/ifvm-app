@@ -1,6 +1,5 @@
 import { ActivityIndicator, View } from 'react-native';
 import { Stack } from 'expo-router';
-import { RouteErrorBoundary } from '@/components/error-boundary';
 import { useFonts } from 'expo-font';
 import {
   Archivo_400Regular,
@@ -41,9 +40,5 @@ export default function TraitementParcoursLayout() {
     );
   }
 
-  return (
-    <RouteErrorBoundary zone="traitement">
-      <Stack screenOptions={{ headerShown: false }} />
-    </RouteErrorBoundary>
-  );
+  return <Stack screenOptions={{ headerShown: false }} />;
 }

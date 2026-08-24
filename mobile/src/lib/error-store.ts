@@ -76,11 +76,23 @@ export function laPlusGrave(erreurs: readonly GlobalError[]): GlobalError | null
 }
 
 /**
- * Le N de « +N autres › » : les **classes** restantes, pas les occurrences.
- * L'agent compte des problèmes distincts, pas des répétitions du même.
+ * Le N de « +N autres › » : les **classes ouvertes que personne ne montre**.
+ *
+ * Deux pièges, tous deux rencontrés en revue :
+ *
+ * - on compte des **classes**, pas des occurrences — l'agent compte des
+ *   problèmes distincts, pas des répétitions du même ;
+ * - on compte sur **la liste entière**, pas sur celle qu'une surface a déjà
+ *   filtrée. Compter les seuls INFORMER depuis la bannière laissait les
+ *   BLOQUER en attente comptés nulle part : le dédoublonnage recréait alors le
+ *   silence qu'il est censé supprimer.
  */
-export function autresQueLaPlusGrave(erreurs: readonly GlobalError[]): number {
-  return Math.max(0, erreurs.length - 1);
+export function autresNonAffichees(
+  erreurs: readonly GlobalError[],
+  affichees: readonly (GlobalError | null)[]
+): number {
+  const montrees = new Set(affichees.filter((e): e is GlobalError => e !== null).map((e) => e.classe));
+  return erreurs.filter((e) => !montrees.has(e.classe)).length;
 }
 
 export const useErrorStore = create<ErrorState & ErrorActions>((set) => ({
@@ -102,9 +114,11 @@ export const useErrorStore = create<ErrorState & ErrorActions>((set) => ({
         traitement,
         occurrences: (existante?.occurrences ?? 0) + 1,
         vueA: Date.now(),
-        // Le dernier `retry` gagne : c'est celui du geste que l'agent vient de
-        // faire. Rejouer le premier des cinq le renverrait dans le passé.
-        retry: retry ?? existante?.retry,
+        // Le dernier `retry` gagne, **y compris quand il n'y en a pas**.
+        // Conserver celui d'un geste antérieur donnerait un « Réessayer » qui
+        // rejoue autre chose que ce que l'agent vient de tenter — pire qu'un
+        // bouton absent, parce que l'agent croit avoir repris son action.
+        retry,
       };
       return {
         erreurs: existante

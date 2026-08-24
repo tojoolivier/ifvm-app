@@ -55,7 +55,18 @@ export default function LoginScreen() {
         // (ADR-012 décision 5) : ici on se contente de dire *quelle* erreur
         // c'est et *comment la reprendre*. Un `ApiError` non-401 n'appartient
         // pas encore au jeu fermé — sa migration est le lot de #173.
-        signaler(e instanceof ApiError ? e : new NetworkError(String(e), { cause: e }), 'useAsyncAction', handleSubmit);
+        // `ApiError` n'appartient pas au jeu fermé : non typée, elle serait
+        // classée `(bug)` et l'agent se verrait proposer « Signaler au support »
+        // pour une simple panne serveur, sans pouvoir réessayer. Une réponse
+        // d'erreur du backend est un échec de dialogue avec le serveur, donc
+        // `NetworkError` — et le `handleSubmit` passé ici devient rejouable.
+        // Le reste (écriture du jeton en storage, par ex.) reste non typé : sa
+        // migration à la source est le lot de #173.
+        signaler(
+          e instanceof ApiError ? new NetworkError(e.message, { cause: e }) : e,
+          'useAsyncAction',
+          handleSubmit
+        );
       }
     } finally {
       setIsLoading(false);
@@ -350,3 +361,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 });
+
+/**
+ * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`
+ * enveloppe la route dans un `<Try>` : la pile de navigation survit au crash.
+ */
+export { RouteErrorBoundary as ErrorBoundary } from '@/components/error-boundary';
