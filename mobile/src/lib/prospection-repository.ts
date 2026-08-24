@@ -1,6 +1,9 @@
 import { getDb } from './prospection-db';
 import { generateId } from './id';
 
+import { ExtensiveImagoSpeciesData, createEmptySpeciesData, IMAGO_PHASE_ROWS } from './prospection-extensive';
+import { Espece } from './prospection-especes-stades';
+
 export type TypeProspection = 'intensive' | 'extensive' | 'validation';
 
 export interface DraftProspectionInput {
@@ -819,9 +822,6 @@ export async function deleteProspection(id: string): Promise<boolean> {
   const result = await db.runAsync(`DELETE FROM prospection WHERE id = ?`, [id]);
   return result.changes > 0;
 }
-
-import { ExtensiveImagoSpeciesData, createEmptySpeciesData, IMAGO_PHASE_ROWS } from './prospection-extensive';
-import { Espece } from './prospection-especes-stades';
 
 export async function saveExtensiveImagoSpeciesData(
   prospectionId: string,
