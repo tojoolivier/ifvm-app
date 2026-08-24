@@ -59,7 +59,7 @@ export default function DensityScreen() {
 
   const [population, setPopulation] = useState<PopulationRow | null>(null);
   const { run, isRunning: isSaving } = useAsyncAction();
-  const showError = useErrorStore((s) => s.showError);
+  const signaler = useErrorStore((s) => s.signaler);
   const logError = useErrorLogStore((s) => s.addEntry);
 
   // Reconstruit le store si l'app Android a été tuée en arrière-plan puis
@@ -88,16 +88,15 @@ export default function DensityScreen() {
         setPopulation(row ?? emptyPopulation(grille.espece));
       })
       .catch((error) => {
-        const { message, detail } = toFriendlyError(error);
-        showError({ message, detail });
+        signaler(error, 'useAsyncAction');
         logError({
-          message,
+          message: toFriendlyError(error).message,
           stack: error instanceof Error ? error.stack ?? null : null,
           screen: 'density',
           context: { draftId, espece: grille.espece, categorie: grille.categorie },
         });
       });
-  }, [draftId, grille, showError, logError]);
+  }, [draftId, grille, signaler, logError]);
 
   if (!grille || !population) {
     return (

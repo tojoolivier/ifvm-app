@@ -7,11 +7,13 @@ import { useDebugStore } from '@/lib/debug-store';
 import { getDb } from '@/lib/prospection-db';
 import { useReferentielAutoSync } from '@/hooks/use-referentiel-auto-sync';
 import { ErrorBanner } from '@/components/error-banner';
+import { ModaleBloquante } from '@/components/erreurs/modale-bloquante';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { installGlobalErrorHandlers } from '@/lib/global-error-handler';
 import { demarrerApp, messageDeDemarrageManque } from '@/lib/app-startup';
 import { installerTransportJournal, purgerJournal } from '@/lib/journal-db';
 import { useErrorStore } from '@/lib/error-store';
+import { LocalWriteError } from '@/lib/errors';
 import '../global.css';
 
 function useAuthGuard() {
@@ -68,7 +70,11 @@ export default function RootLayout() {
       purgerJournal: () => purgerJournal({ verbeux: useDebugStore.getState().enabled }),
     }).then((outcome) => {
       const message = messageDeDemarrageManque(outcome);
-      if (message) useErrorStore.getState().showError({ message });
+      // `runTask:essential` donne INFORMER (décision 3) : l'agent continue son
+      // travail, mais il doit savoir que le stockage n'a pas ouvert.
+      if (message) {
+        useErrorStore.getState().signaler(new LocalWriteError(message), 'runTask:essential');
+      }
     });
   }, []);
 
@@ -82,7 +88,8 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ErrorBoundary>
+      {/* Filet de dernier recours : chaque groupe de routes porte la sienne. */}
+      <ErrorBoundary zone="racine">
         <Stack>
           <Stack.Screen name="(app)" options={{ headerShown: false }} />
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
@@ -91,6 +98,7 @@ export default function RootLayout() {
         </Stack>
       </ErrorBoundary>
       <ErrorBanner />
+      <ModaleBloquante />
     </GestureHandlerRootView>
   );
 }

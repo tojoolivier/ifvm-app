@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { RouteErrorBoundary } from '@/components/error-boundary';
 import { useReferentielAutoSync } from '@/hooks/use-referentiel-auto-sync';
 import { useAuthStore } from '@/lib/auth-store';
 
@@ -8,5 +9,9 @@ export default function TabLayout() {
   // Synchronisation automatique des référentiels au démarrage
   useReferentielAutoSync(token);
   
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <RouteErrorBoundary zone="app">
+      <Stack screenOptions={{ headerShown: false }} />
+    </RouteErrorBoundary>
+  );
 }

@@ -1,5 +1,10 @@
 import { Stack } from 'expo-router';
+import { RouteErrorBoundary } from '@/components/error-boundary';
 
 export default function ProspectionParcoursLayout() {
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <RouteErrorBoundary zone="prospection">
+      <Stack screenOptions={{ headerShown: false }} />
+    </RouteErrorBoundary>
+  );
 }
