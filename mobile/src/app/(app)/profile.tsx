@@ -9,7 +9,9 @@ import { storage } from '@/lib/storage';
 import { apiClient } from '@/lib/api-client';
 import { pullReferentiel, resetReferentielSyncCursors } from '@/lib/referentiel-sync';
 import { useDebugStore } from '@/lib/debug-store';
-import { useErrorLogStore } from '@/lib/error-log-store';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
+import { useAsyncAction } from '@/hooks/use-async-action';
+import { logger } from '@/lib/logger';
 
 const IFVM_GREEN = '#1B5E1B';
 const IFVM_GREEN_BG = '#E8F5E9';
@@ -29,14 +31,14 @@ export default function ProfileScreen() {
   const token = useAuthStore((s) => s.token);
   const debugEnabled = useDebugStore((s) => s.enabled);
   const setDebugEnabled = useDebugStore((s) => s.setEnabled);
-  const logError = useErrorLogStore((s) => s.addEntry);
 
   const [locationEnabled, setLocationEnabled] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
-  
+  const { run: runImage, isRunning: isLoading } = useAsyncAction();
+  const { run: runSync, isRunning: isSyncing } = useAsyncAction();
+  const signalerChargement = useSignalerChargement('profile');
+
   // État pour la modification du mot de passe
   const [modalVisible, setModalVisible] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -47,46 +49,38 @@ export default function ProfileScreen() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const loadProfileImage = async () => {
-    try {
-      const image = await storage.getItem(PROFILE_IMAGE_KEY);
-      if (image) {
-        setProfileImage(image);
-      }
-    } catch (error) {
-      console.error('Erreur chargement image:', error);
-    }
-  };
-
   // Charger l'image de profil au montage
   useEffect(() => {
-    const id = setTimeout(() => loadProfileImage(), 0);
+    const id = setTimeout(() => {
+      void storage
+        .getItem(PROFILE_IMAGE_KEY)
+        .then((image) => {
+          if (image) setProfileImage(image);
+        })
+        .catch((error) => signalerChargement(error));
+    }, 0);
     return () => clearTimeout(id);
-  }, []);
+  }, [signalerChargement]);
 
   const handleLogout = async () => {
     await logout();
     router.replace('/(auth)/login');
   };
 
-  const handleForcePull = async () => {
-    if (!token || isSyncing) return;
-    setIsSyncing(true);
-    try {
-      await resetReferentielSyncCursors();
-      await pullReferentiel(token);
-      Alert.alert('Succès', 'Référentiel synchronisé.');
-    } catch (error) {
-      logError({
-        message: error instanceof Error ? error.message : 'Erreur inconnue lors de la synchronisation du référentiel',
-        stack: error instanceof Error ? error.stack ?? null : null,
-        screen: 'ProfileScreen.handleForcePull',
-      });
-      Alert.alert('Erreur', 'Impossible de synchroniser le référentiel pour le moment.');
-    } finally {
-      setIsSyncing(false);
-    }
-  };
+  const handleForcePull = () =>
+    runSync(
+      async () => {
+        await resetReferentielSyncCursors();
+        await pullReferentiel(token!);
+        Alert.alert('Succès', 'Référentiel synchronisé.');
+      },
+      {
+        screen: 'profile',
+        precondition: !!token,
+        preconditionMessage: 'Session expirée — reconnectez-vous pour synchroniser.',
+        context: { action: 'forcePull' },
+      }
+    );
 
   const roleLabels: Record<string, string> = {
     prospecteur: 'Prospecteur',
@@ -136,123 +130,95 @@ export default function ProfileScreen() {
       const docDir = (FileSystem as any).documentDirectory;
       return docDir || '';
     } catch (error) {
-      console.error('Erreur récupération répertoire:', error);
+      // Best-effort délibéré : sans répertoire dédié, `saveProfileImage` garde
+      // l'URI d'origine (galerie/caméra) au lieu de copier le fichier.
+      logger.ignore(error, "répertoire de documents indisponible, l'image n'est pas copiée localement");
       return '';
     }
   };
 
+  const saveProfileImage = (uri: string) =>
+    runImage(
+      async () => {
+        const docDir = getDocumentDirectory();
+        let fileUri = uri;
+
+        // Si nous sommes sur mobile et que le répertoire est disponible
+        if (docDir) {
+          const fileName = `profile_${user?.id || 'user'}_${Date.now()}.jpg`;
+          fileUri = docDir + fileName;
+
+          // Copier le fichier vers le répertoire de l'application
+          await FileSystem.copyAsync({
+            from: uri,
+            to: fileUri,
+          });
+        }
+
+        // Sauvegarder le chemin dans le storage
+        await storage.setItem(PROFILE_IMAGE_KEY, fileUri);
+        setProfileImage(fileUri);
+
+        Alert.alert('Succès', 'Photo de profil mise à jour !');
+      },
+      { screen: 'profile', context: { action: 'saveProfileImage' } }
+    );
+
   // Demander les permissions et ouvrir la caméra
-  const takePhoto = async () => {
-    try {
-      console.log('📷 Tentative d\'ouverture de la caméra...');
-      
-      // Demander la permission caméra
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      console.log('📷 Statut permission caméra:', status);
-      
-      if (status !== 'granted') {
-        Alert.alert(
-          'Permission refusée', 
-          'Vous devez autoriser l\'accès à la caméra pour prendre une photo.'
-        );
-        return;
-      }
+  const takePhoto = () =>
+    runImage(
+      async () => {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert(
+            'Permission refusée',
+            'Vous devez autoriser l\'accès à la caméra pour prendre une photo.'
+          );
+          return;
+        }
 
-      // Ouvrir la caméra
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
+        const result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
+        });
 
-      console.log('📷 Résultat caméra:', result);
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        await saveProfileImage(result.assets[0].uri);
-      } else {
-        console.log('📷 Prise de photo annulée');
-      }
-    } catch (error) {
-      console.error('📷 Erreur prise de photo:', error);
-      Alert.alert('Erreur', 'Impossible de prendre la photo: ' + (error as Error).message);
-    }
-  };
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          await saveProfileImage(result.assets[0].uri);
+        }
+      },
+      { screen: 'profile', context: { action: 'takePhoto' } }
+    );
 
   // Demander les permissions et ouvrir la galerie
-  const pickImage = async () => {
-    try {
-      console.log('🖼️ Tentative d\'ouverture de la galerie...');
-      
-      // Demander la permission galerie
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      console.log('🖼️ Statut permission galerie:', status);
-      
-      if (status !== 'granted') {
-        Alert.alert(
-          'Permission refusée', 
-          'Vous devez autoriser l\'accès à la galerie pour choisir une photo.'
-        );
-        return;
-      }
+  const pickImage = () =>
+    runImage(
+      async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert(
+            'Permission refusée',
+            'Vous devez autoriser l\'accès à la galerie pour choisir une photo.'
+          );
+          return;
+        }
 
-      // Ouvrir la galerie
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      console.log('🖼️ Résultat galerie:', result);
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        await saveProfileImage(result.assets[0].uri);
-      } else {
-        console.log('🖼️ Sélection annulée');
-      }
-    } catch (error) {
-      console.error('🖼️ Erreur sélection image:', error);
-      Alert.alert('Erreur', 'Impossible de sélectionner l\'image: ' + (error as Error).message);
-    }
-  };
-
-  const saveProfileImage = async (uri: string) => {
-    setIsLoading(true);
-    try {
-      console.log('💾 Sauvegarde de l\'image:', uri);
-      
-      const docDir = getDocumentDirectory();
-      let fileUri = uri;
-
-      // Si nous sommes sur mobile et que le répertoire est disponible
-      if (docDir) {
-        const fileName = `profile_${user?.id || 'user'}_${Date.now()}.jpg`;
-        fileUri = docDir + fileName;
-        
-        console.log('💾 Copie vers:', fileUri);
-        
-        // Copier le fichier vers le répertoire de l'application
-        await FileSystem.copyAsync({
-          from: uri,
-          to: fileUri,
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
         });
-      }
 
-      // Sauvegarder le chemin dans le storage
-      await storage.setItem(PROFILE_IMAGE_KEY, fileUri);
-      setProfileImage(fileUri);
-      
-      Alert.alert('Succès', 'Photo de profil mise à jour !');
-    } catch (error) {
-      console.error('💾 Erreur sauvegarde image:', error);
-      Alert.alert('Erreur', 'Impossible de sauvegarder l\'image');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          await saveProfileImage(result.assets[0].uri);
+        }
+      },
+      { screen: 'profile', context: { action: 'pickImage' } }
+    );
 
-  const removeProfileImage = async () => {
+  const removeProfileImage = () => {
     Alert.alert(
       'Supprimer la photo',
       'Voulez-vous vraiment supprimer votre photo de profil ?',
@@ -261,20 +227,19 @@ export default function ProfileScreen() {
         {
           text: 'Supprimer',
           style: 'destructive' as const,
-          onPress: async () => {
-            try {
-              const docDir = getDocumentDirectory();
-              if (profileImage && docDir) {
-                await FileSystem.deleteAsync(profileImage, { idempotent: true });
-              }
-              await storage.deleteItem(PROFILE_IMAGE_KEY);
-              setProfileImage(null);
-              Alert.alert('Succès', 'Photo de profil supprimée');
-            } catch (error) {
-              console.error('Erreur suppression image:', error);
-              Alert.alert('Erreur', 'Impossible de supprimer l\'image');
-            }
-          }
+          onPress: () =>
+            runImage(
+              async () => {
+                const docDir = getDocumentDirectory();
+                if (profileImage && docDir) {
+                  await FileSystem.deleteAsync(profileImage, { idempotent: true });
+                }
+                await storage.deleteItem(PROFILE_IMAGE_KEY);
+                setProfileImage(null);
+                Alert.alert('Succès', 'Photo de profil supprimée');
+              },
+              { screen: 'profile', context: { action: 'removeProfileImage' } }
+            ),
         }
       ]
     );
@@ -282,32 +247,22 @@ export default function ProfileScreen() {
 
   // Fonction principale pour ouvrir le sélecteur
   const showImagePickerOptions = () => {
-    console.log('🔘 Ouverture du menu photo de profil');
     Alert.alert(
       'Photo de profil',
       'Choisissez une option',
       [
-        { 
-          text: '📷 Prendre une photo', 
-          onPress: () => {
-            console.log('📷 Option: Prendre une photo');
-            takePhoto();
-          }
+        {
+          text: '📷 Prendre une photo',
+          onPress: () => takePhoto(),
         },
-        { 
-          text: '🖼️ Choisir dans la galerie', 
-          onPress: () => {
-            console.log('🖼️ Option: Choisir dans la galerie');
-            pickImage();
-          }
+        {
+          text: '🖼️ Choisir dans la galerie',
+          onPress: () => pickImage(),
         },
-        ...(profileImage ? [{ 
-          text: '🗑️ Supprimer la photo', 
-          style: 'destructive' as const, 
-          onPress: () => {
-            console.log('🗑️ Option: Supprimer la photo');
-            removeProfileImage();
-          }
+        ...(profileImage ? [{
+          text: '🗑️ Supprimer la photo',
+          style: 'destructive' as const,
+          onPress: () => removeProfileImage(),
         }] : []),
         { text: 'Annuler', style: 'cancel' as const },
       ]
@@ -355,11 +310,17 @@ export default function ProfileScreen() {
           }
         ]
       );
-    } catch (error: any) {
-      console.error('Erreur changement mot de passe:', error);
+    } catch (error) {
+      // Message serveur affiché verbatim (ex. « mot de passe actuel
+      // incorrect ») : `erreurHttp` mappe tout hors 401 sur `NetworkError`,
+      // dont le message générique de `toFriendlyError` masquerait la vraie
+      // raison. Pas `useAsyncAction` ici pour cette raison précise.
+      logger.failure('profile.changePassword.failed', error);
       Alert.alert(
         'Erreur',
-        error?.message || 'Impossible de modifier le mot de passe. Vérifiez votre mot de passe actuel.'
+        error instanceof Error && error.message
+          ? error.message
+          : 'Impossible de modifier le mot de passe. Vérifiez votre mot de passe actuel.'
       );
     } finally {
       setIsChangingPassword(false);

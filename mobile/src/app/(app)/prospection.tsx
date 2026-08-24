@@ -12,6 +12,8 @@ import { ProspectionRead } from '@/lib/api-client';
 import { navigateToProspectionConsult, navigateToProspectionDraft } from '@/lib/fiche-routing';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { runTask } from '@/lib/run-task';
+import { useAsyncAction } from '@/hooks/use-async-action';
+import { logger } from '@/lib/logger';
 import { FicheCard } from '@/components/fiches/FicheCard';
 import { SearchAndFilterBar, FilterOption } from '@/components/fiches/SearchAndFilterBar';
 import {
@@ -57,6 +59,8 @@ export default function ProspectionScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterKey, setFilterKey] = useState<FilterKey>('TOUS');
   const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
+  const { run: runDelete } = useAsyncAction();
+  const { run: runNavigate } = useAsyncAction();
 
   /*
    * Trois `.then()` sans `.catch()` flottaient ici. Tant que
@@ -128,9 +132,11 @@ export default function ProspectionScreen() {
     };
   }, [syncWarning, router]);
 
-  const resumeDraft = (draft: DraftProspection) => {
-    navigateToProspectionDraft(router, hydrateFromDraft, draft);
-  };
+  const resumeDraft = (draft: DraftProspection) =>
+    runNavigate(
+      () => navigateToProspectionDraft(router, hydrateFromDraft, draft),
+      { screen: 'prospection', context: { draftId: draft.id } }
+    );
 
   const openFicheLecture = (prospection: ProspectionRead) => {
     navigateToProspectionConsult(router, prospection);
@@ -191,6 +197,7 @@ export default function ProspectionScreen() {
       try {
         await retrySyncProspection(draft, token);
       } catch (error) {
+        logger.failure('prospection.syncAll.failed', error, { draftId: draft.id });
         const label = draft.n_fiche ?? `fiche du ${draft.date_prospection}`;
         const message = error instanceof Error ? error.message : 'erreur inconnue';
         failures.push(`${label} : ${message}`);
@@ -219,10 +226,14 @@ export default function ProspectionScreen() {
         {
           text: 'Supprimer',
           style: 'destructive',
-          onPress: async () => {
-            await deleteDraftProspection(draft);
-            refresh();
-          },
+          onPress: () =>
+            runDelete(
+              async () => {
+                await deleteDraftProspection(draft);
+                refresh();
+              },
+              { screen: 'prospection', context: { draftId: draft.id } }
+            ),
         },
       ]
     );

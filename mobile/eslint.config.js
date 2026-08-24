@@ -80,15 +80,16 @@ module.exports = defineConfig([
     },
   },
   {
-    // Périmètre 2 (ADR-012 décision 10, #175) : (traitement) et (prospection),
-    // premiers groupes de routes migrés vers `useAsyncAction`/`runTask`/
-    // `EtatVide`. Élargi à mesure que les groupes restants ((app), (auth))
-    // adoptent à leur tour le logger unifié.
+    // Périmètre 2 (ADR-012 décision 10, #175) : (traitement), (prospection) et
+    // (app), migrés vers `useAsyncAction`/`runTask`/`EtatVide`. Élargi à mesure
+    // que le dernier groupe ((auth)) adopte à son tour le logger unifié.
     files: [
       'src/app/(traitement)/**/*.ts',
       'src/app/(traitement)/**/*.tsx',
       'src/app/(prospection)/**/*.ts',
       'src/app/(prospection)/**/*.tsx',
+      'src/app/(app)/**/*.ts',
+      'src/app/(app)/**/*.tsx',
     ],
     languageOptions: {
       parserOptions: {
