@@ -1,5 +1,9 @@
 import { getDb, resetDbForTests } from '../src/lib/prospection-db';
-import { LocalWriteError } from '../src/lib/errors';
+import {
+  AppError,
+  LocalReadError,
+  LocalWriteError,
+} from '../src/lib/errors';
 import {
   lignesEnAttente,
   resetLoggerForTests,
@@ -82,7 +86,10 @@ const MIGRATED_COLUMNS = [
 
 const execAsync = jest.fn().mockResolvedValue(undefined);
 const getAllAsync = jest.fn().mockResolvedValue(MIGRATED_COLUMNS);
-const openDatabaseAsync = jest.fn().mockResolvedValue({ execAsync, getAllAsync });
+const runAsync = jest.fn().mockResolvedValue(undefined);
+const openDatabaseAsync = jest
+  .fn()
+  .mockResolvedValue({ execAsync, getAllAsync, runAsync });
 
 jest.mock('expo-sqlite', () => ({
   openDatabaseAsync: (...args: unknown[]) => openDatabaseAsync(...args),
@@ -94,6 +101,7 @@ beforeEach(() => {
   openDatabaseAsync.mockClear();
   execAsync.mockClear();
   getAllAsync.mockClear();
+  runAsync.mockClear();
 });
 
 describe('prospection-db', () => {
@@ -263,6 +271,49 @@ describe('prospection-db — typage à la source (#173)', () => {
       .mockRejectedValueOnce(new Error('cannot add column'));
 
     await expect(getDb()).rejects.toBeInstanceOf(LocalWriteError);
+  });
+
+  /*
+   * Les dépôts (`*-repository.ts`) font une centaine d'appels SQLite sans un
+   * `try` : typer chacun d'eux à la main, c'était cent occasions d'en oublier
+   * un. Le handle rendu par `getDb()` type donc les échecs lui-même — une
+   * lecture ratée est `LocalReadError`, une écriture ratée `LocalWriteError`,
+   * partout, sans que le dépôt ait à y penser (ADR-012 décision 2, #173).
+   */
+  it('type les lectures ratées du handle en LocalReadError', async () => {
+    const db = await getDb();
+    getAllAsync.mockRejectedValueOnce(new Error('disk I/O error'));
+
+    await expect(db.getAllAsync('SELECT 1')).rejects.toBeInstanceOf(
+      LocalReadError
+    );
+  });
+
+  it('type les écritures ratées du handle en LocalWriteError', async () => {
+    const db = await getDb();
+    runAsync.mockRejectedValueOnce(new Error('database is locked'));
+
+    await expect(db.runAsync('UPDATE prospection SET x = 1')).rejects.toBeInstanceOf(
+      LocalWriteError
+    );
+  });
+
+  it('laisse passer intacte une erreur déjà typée, sans la réenvelopper', async () => {
+    const db = await getDb();
+    const deja = new LocalReadError('déjà typée');
+    runAsync.mockRejectedValueOnce(deja);
+
+    // Sans ce garde, une `PreconditionError` levée dans un
+    // `withTransactionAsync` ressortirait en `LocalWriteError` et l'agent
+    // lirait « impossible d'enregistrer » au lieu du message écrit pour lui.
+    await expect(db.runAsync('UPDATE prospection SET x = 1')).rejects.toBe(deja);
+  });
+
+  it('rend les résultats inchangés quand tout va bien', async () => {
+    const db = await getDb();
+    getAllAsync.mockResolvedValueOnce([{ id: 'p1' }]);
+
+    await expect(db.getAllAsync('SELECT 1')).resolves.toEqual([{ id: 'p1' }]);
   });
 
   it('journalise l’ouverture et les colonnes ajoutées, pas en console', async () => {

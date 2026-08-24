@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { LocalWriteError } from './errors';
+import { AppError, LocalReadError, LocalWriteError } from './errors';
 import { logger } from './logger';
 
 const DB_NAME = 'ifvm.db';
@@ -62,7 +62,64 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
 
   log.event('db.ouverte', { base: DB_NAME });
 
-  return db;
+  // La migration a tourné sur le handle nu, pour garder ses messages d'échec
+  // à elle ; les dépôts reçoivent le handle typé.
+  return typerLesEchecs(db);
+}
+
+/**
+ * Quelle classe du jeu fermé porte l'échec de quelle méthode SQLite.
+ *
+ * Une lecture ratée est `LocalReadError` : la donnée est déjà perdue, l'agent
+ * n'a aucun recours. Une écriture ratée est `LocalWriteError` : l'agent est en
+ * train de saisir et **perdra tout** s'il continue — d'où un traitement
+ * BLOQUER là où la lecture se contente d'INFORMER (ADR-012 décision 3).
+ */
+const CLASSE_PAR_METHODE = {
+  getAllAsync: LocalReadError,
+  getFirstAsync: LocalReadError,
+  runAsync: LocalWriteError,
+  execAsync: LocalWriteError,
+  withTransactionAsync: LocalWriteError,
+} as const;
+
+/**
+ * Rend un handle qui type ses propres échecs.
+ *
+ * Les dépôts font une centaine d'appels SQLite **sans un seul `try`** : les
+ * typer un par un, c'était cent occasions d'en oublier un — et un oubli ne se
+ * voit pas, il produit juste un `(bug)` de plus dans le journal et un
+ * « Signaler au support » là où l'agent méritait « Réessayer d'enregistrer ».
+ * Le typage vit donc au seul endroit par lequel tous passent.
+ *
+ * Le handle est enveloppé par délégation prototypale : ce qui n'est pas dans
+ * {@link CLASSE_PAR_METHODE} reste le membre d'origine, et un handle partiel
+ * (les tests en fournissent) ne déclenche rien.
+ */
+function typerLesEchecs(db: SQLite.SQLiteDatabase): SQLite.SQLiteDatabase {
+  const brut = db as unknown as Record<string, unknown>;
+  const typees: Record<string, unknown> = {};
+
+  for (const [methode, Classe] of Object.entries(CLASSE_PAR_METHODE)) {
+    const original = brut[methode];
+    if (typeof original !== 'function') continue;
+
+    typees[methode] = async (...args: unknown[]): Promise<unknown> => {
+      try {
+        return await (original as (...a: unknown[]) => unknown).apply(db, args);
+      } catch (error) {
+        // Déjà typée : c'est le cas d'un `withTransactionAsync` dont le rappel
+        // lève une `PreconditionError`. La réenvelopper ferait lire
+        // « impossible d'enregistrer » à la place du message écrit pour
+        // l'agent.
+        if (error instanceof AppError) throw error;
+
+        throw new Classe(`${methode} a échoué sur la base locale`, { cause: error });
+      }
+    };
+  }
+
+  return Object.assign(Object.create(db as object), typees) as SQLite.SQLiteDatabase;
 }
 
 async function creerTables(db: SQLite.SQLiteDatabase): Promise<void> {

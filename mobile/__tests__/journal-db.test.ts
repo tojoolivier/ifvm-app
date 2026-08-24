@@ -185,6 +185,15 @@ describe("l'écriture d'un lot", () => {
   });
 });
 
+/** Remonte la chaîne des `cause` jusqu'à l'erreur d'origine. */
+function racineDeLaCause(erreur: unknown): unknown {
+  let courante = erreur;
+  while (courante instanceof Error && courante.cause !== undefined) {
+    courante = courante.cause;
+  }
+  return courante;
+}
+
 describe("l'échec d'écriture ne passe jamais par le logger", () => {
   it('propage le rejet, typé `LocalWriteError`, pour que `flush()` lève le drapeau', async () => {
     const cause = new Error('database is locked');
@@ -193,7 +202,15 @@ describe("l'échec d'écriture ne passe jamais par le logger", () => {
     // Typé à la source comme partout ailleurs (décision 2) : avaler l'erreur
     // ici rendrait `journalFlushBroken` inatteignable.
     await expect(creerTransportJournal().write([ligne()])).rejects.toBeInstanceOf(LocalWriteError);
-    await expect(creerTransportJournal().write([ligne()])).rejects.toMatchObject({ cause });
+
+    // La cause traverse deux couches de typage — le handle de `getDb()` type
+    // déjà ses écritures (#173), et le journal ajoute par-dessus combien de
+    // lignes sont perdues. L'erreur du moteur reste la racine de la chaîne :
+    // c'est elle que le support lira.
+    const erreur = await creerTransportJournal()
+      .write([ligne()])
+      ?.catch((e: unknown) => e);
+    expect(racineDeLaCause(erreur)).toBe(cause);
   });
 
   it('rend `estLeJournalCasse()` vrai sans se journaliser lui-même', async () => {
