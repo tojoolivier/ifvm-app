@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { listDraftTraitements, DraftTraitementRow } from '@/lib/traitement-repository';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
+import { runTask } from '@/lib/run-task';
+import { EtatVide } from '@/components/erreurs/etat-vide';
 
 /**
  * Écran 0 — point d'entrée du module traitement. `prospectionId` reste accepté
@@ -16,12 +18,21 @@ export default function TraitementSelectScreen() {
   const { prospectionId } = useLocalSearchParams<{ prospectionId?: string }>();
   const [showList, setShowList] = useState(false);
   const [drafts, setDrafts] = useState<DraftTraitementRow[]>([]);
+  const [erreurDeLecture, setErreurDeLecture] = useState<unknown>(null);
+
+  const charger = useCallback(() => {
+    void runTask(() => listDraftTraitements(), {
+      name: 'traitement.select.drafts',
+      criticality: 'essential',
+    }).then((outcome) => {
+      setErreurDeLecture(outcome.ok ? null : outcome.error);
+      if (outcome.ok) setDrafts(outcome.value);
+    });
+  }, []);
 
   useEffect(() => {
-    if (showList) {
-      listDraftTraitements().then(setDrafts).catch(() => setDrafts([]));
-    }
-  }, [showList]);
+    if (showList) charger();
+  }, [showList, charger]);
 
   const handleNouvelleFiche = () => {
     if (prospectionId) {
@@ -75,7 +86,9 @@ export default function TraitementSelectScreen() {
           style={styles.list}
           data={drafts}
           keyExtractor={(item) => item.id}
-          ListEmptyComponent={<Text style={styles.emptyText}>Aucune fiche pour le moment.</Text>}
+          ListEmptyComponent={
+            <EtatVide erreur={erreurDeLecture} titreVide="Aucune fiche pour le moment." onReessayer={charger} />
+          }
           renderItem={({ item }) => (
             <TouchableOpacity style={styles.row} onPress={() => openFiche(item)}>
               <Text style={styles.rowTitle}>{item.numero_fiche ?? 'généré à l’enregistrement'}</Text>

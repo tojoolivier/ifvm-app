@@ -25,6 +25,10 @@ import { ProgressBar } from '@/components/traitement/ProgressBar';
 import { AerienForm } from '@/components/traitement/AerienForm';
 import { TerrestreForm } from '@/components/traitement/TerrestreForm';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
+import { useAsyncAction } from '@/hooks/use-async-action';
+import { useErrorStore } from '@/lib/error-store';
+import { useErrorLogStore } from '@/lib/error-log-store';
+import { toFriendlyError } from '@/lib/friendly-error';
 
 export default function TraitementScreen() {
   const router = useRouter();
@@ -45,8 +49,19 @@ export default function TraitementScreen() {
   // addProduit/removeProduit — donc l'édition des produits utilisés (terrestre)
   // est portée par un état local immuable propre à cet écran.
   const [produits, setProduits] = useState<ProduitDraft[]>([]);
-  const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const { run, isRunning: isSaving } = useAsyncAction();
+  const signaler = useErrorStore((s) => s.signaler);
+  const logError = useErrorLogStore((s) => s.addEntry);
+  const signalerChargement = (error: unknown, source: string) => {
+    signaler(error, 'runTask:essential');
+    logError({
+      message: toFriendlyError(error).message,
+      stack: error instanceof Error ? error.stack ?? null : null,
+      screen: 'traitement',
+      context: { traitementId, source },
+    });
+  };
 
   useEffect(() => {
     if (!traitementId) return;
@@ -112,31 +127,42 @@ export default function TraitementScreen() {
           );
         }
       }
-    });
-    listPesticides().then(setPesticides).catch(() => {});
-    listReprenableTraitements().then(setReprenables).catch(() => {});
+    }).catch((error) => signalerChargement(error, 'getTraitement'));
+    listPesticides().then(setPesticides).catch((error) => signalerChargement(error, 'listPesticides'));
+    listReprenableTraitements().then(setReprenables).catch((error) => signalerChargement(error, 'listReprenableTraitements'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [traitementId]);
 
   useEffect(() => {
-    listUtilisateursByRole('chef_de_base').then(setChefsDeBase).catch(() => {});
-    listUtilisateursByRole('chef_equipe').then(setChefsEquipe).catch(() => {});
-    listUtilisateursByRole('agent_encadreur').then(setAgentsEncadreurs).catch(() => {});
+    listUtilisateursByRole('chef_de_base').then(setChefsDeBase).catch((error) => signalerChargement(error, 'listUtilisateursByRole:chef_de_base'));
+    listUtilisateursByRole('chef_equipe').then(setChefsEquipe).catch((error) => signalerChargement(error, 'listUtilisateursByRole:chef_equipe'));
+    listUtilisateursByRole('agent_encadreur').then(setAgentsEncadreurs).catch((error) => signalerChargement(error, 'listUtilisateursByRole:agent_encadreur'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     const origineId = store.terrestre.traitementOrigineId;
     let cancelled = false;
-    (async () => {
-      const value =
-        store.terrestre.repriseTraitement && origineId
-          ? ((await getTraitement(origineId))?.terrestre?.surface_cumulee_ha ?? null)
-          : null;
-      if (!cancelled) setOrigineCumuleeHa(value);
-    })();
+    if (store.terrestre.repriseTraitement && origineId) {
+      void getTraitement(origineId)
+        .then((draft) => {
+          if (!cancelled) setOrigineCumuleeHa(draft?.terrestre?.surface_cumulee_ha ?? null);
+        })
+        .catch((error) => {
+          if (!cancelled) signalerChargement(error, 'getTraitement:origine');
+        });
+    } else {
+      // Défère hors du tick synchrone de l'effet (react-hooks/set-state-in-effect) :
+      // pas d'E/S ici, mais un `setState` direct dans le corps de l'effet reste
+      // proscrit au même titre.
+      void Promise.resolve().then(() => {
+        if (!cancelled) setOrigineCumuleeHa(null);
+      });
+    }
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store.terrestre.repriseTraitement, store.terrestre.traitementOrigineId]);
 
   const totalPesticideTerrestre = computeTotalPesticideTerrestre(produits);
@@ -144,78 +170,81 @@ export default function TraitementScreen() {
   const surfaceCumulee = computeSurfaceCumulee(surfaceTraitee, store.terrestre.repriseTraitement, origineCumuleeHa);
   const surfaceRestante = computeSurfaceRestante(surfaceInfesteeHa, surfaceCumulee);
 
-  const handleContinuer = async () => {
-    if (!traitementId) return;
+  const handleContinuer = () =>
+    run(
+      async () => {
+        if (typeTraitement === 'AERIEN') {
+          if (!store.aerien.pilote || !store.aerien.mecanicien || !store.aerien.chefDeBaseId) {
+            setErrors({ aerien: 'Pilote, mécanicien et chef de base sont obligatoires' });
+            return;
+          }
+          await updateTraitementAerien(traitementId, {
+            pilote: store.aerien.pilote,
+            mecanicien: store.aerien.mecanicien,
+            chefDeBaseId: store.aerien.chefDeBaseId,
+            consultantInternational: store.aerien.consultantInternational,
+          });
+          for (const r of store.aerien.rotations) {
+            await addRotation(traitementId, {
+              numero_cuve: r.numero_cuve,
+              produit_id: r.produit_id,
+              quantite_l: r.quantite_l,
+              temperature_debut_c: r.temperature_debut_c,
+              temperature_fin_c: r.temperature_fin_c,
+              vent_debut_ms: r.vent_debut_ms,
+              vent_fin_ms: r.vent_fin_ms,
+            });
+          }
+        } else {
+          const conditionErrors = validateTerrestreConditions({
+            heureDebut: store.terrestre.heureDebut ?? null,
+            heureFin: store.terrestre.heureFin ?? null,
+            repriseTraitement: store.terrestre.repriseTraitement ?? false,
+            traitementOrigineId: store.terrestre.traitementOrigineId ?? null,
+            surfaceRestanteHa: surfaceRestante,
+            surfaceRestanteAbandonnee: store.terrestre.surfaceRestanteAbandonnee ?? null,
+            motifSurfaceRestanteAbandonnee: store.terrestre.motifSurfaceRestanteAbandonnee ?? null,
+          });
+          if (!store.terrestre.chefEquipeId || conditionErrors.length > 0) {
+            const byField: Record<string, string> = {};
+            if (!store.terrestre.chefEquipeId) byField.chefEquipeId = "Le chef d'équipe est obligatoire";
+            for (const e of conditionErrors) byField[e.field] = e.message;
+            setErrors(byField);
+            return;
+          }
+          await updateTraitementTerrestre(traitementId, {
+            chefEquipeId: store.terrestre.chefEquipeId,
+            agentEncadreurId: store.terrestre.agentEncadreurId,
+            consultantInternational: store.terrestre.consultantInternational,
+            heureDebut: store.terrestre.heureDebut,
+            heureFin: store.terrestre.heureFin,
+            vitesse_vent_ms: store.terrestre.vitesse_vent_ms,
+            direction_vent: store.terrestre.direction_vent,
+            temperature_c: store.terrestre.temperature_c,
+            repriseTraitement: store.terrestre.repriseTraitement,
+            traitementOrigineId: store.terrestre.traitementOrigineId,
+            surface_atomiseur_ha: store.terrestre.surface_atomiseur_ha,
+            surface_disque_rotatif_ha: store.terrestre.surface_disque_rotatif_ha,
+            surface_ulvamast_ha: store.terrestre.surface_ulvamast_ha,
+            surfaceRestanteAbandonnee: store.terrestre.surfaceRestanteAbandonnee,
+            motifSurfaceRestanteAbandonnee: store.terrestre.motifSurfaceRestanteAbandonnee,
+            essence_litres: store.terrestre.essence_litres,
+            nb_piles: store.terrestre.nb_piles,
+          });
+          for (const p of produits) {
+            await addProduitUtilise(traitementId, { produit_id: p.produit_id, quantite_l: p.quantite_l });
+          }
+        }
 
-    if (typeTraitement === 'AERIEN') {
-      if (!store.aerien.pilote || !store.aerien.mecanicien || !store.aerien.chefDeBaseId) {
-        setErrors({ aerien: 'Pilote, mécanicien et chef de base sont obligatoires' });
-        return;
+        router.push({ pathname: '/(traitement)/moyens' as any, params: { traitementId, isValidationView } });
+      },
+      {
+        screen: 'traitement',
+        precondition: !!traitementId,
+        preconditionMessage: 'Session perdue — revenez à l’écran précédent et réessayez.',
+        context: { traitementId, typeTraitement },
       }
-      setIsSaving(true);
-      await updateTraitementAerien(traitementId, {
-        pilote: store.aerien.pilote,
-        mecanicien: store.aerien.mecanicien,
-        chefDeBaseId: store.aerien.chefDeBaseId,
-        consultantInternational: store.aerien.consultantInternational,
-      });
-      for (const r of store.aerien.rotations) {
-        await addRotation(traitementId, {
-          numero_cuve: r.numero_cuve,
-          produit_id: r.produit_id,
-          quantite_l: r.quantite_l,
-          temperature_debut_c: r.temperature_debut_c,
-          temperature_fin_c: r.temperature_fin_c,
-          vent_debut_ms: r.vent_debut_ms,
-          vent_fin_ms: r.vent_fin_ms,
-        });
-      }
-      setIsSaving(false);
-    } else {
-      const conditionErrors = validateTerrestreConditions({
-        heureDebut: store.terrestre.heureDebut ?? null,
-        heureFin: store.terrestre.heureFin ?? null,
-        repriseTraitement: store.terrestre.repriseTraitement ?? false,
-        traitementOrigineId: store.terrestre.traitementOrigineId ?? null,
-        surfaceRestanteHa: surfaceRestante,
-        surfaceRestanteAbandonnee: store.terrestre.surfaceRestanteAbandonnee ?? null,
-        motifSurfaceRestanteAbandonnee: store.terrestre.motifSurfaceRestanteAbandonnee ?? null,
-      });
-      if (!store.terrestre.chefEquipeId || conditionErrors.length > 0) {
-        const byField: Record<string, string> = {};
-        if (!store.terrestre.chefEquipeId) byField.chefEquipeId = "Le chef d'équipe est obligatoire";
-        for (const e of conditionErrors) byField[e.field] = e.message;
-        setErrors(byField);
-        return;
-      }
-      setIsSaving(true);
-      await updateTraitementTerrestre(traitementId, {
-        chefEquipeId: store.terrestre.chefEquipeId,
-        agentEncadreurId: store.terrestre.agentEncadreurId,
-        consultantInternational: store.terrestre.consultantInternational,
-        heureDebut: store.terrestre.heureDebut,
-        heureFin: store.terrestre.heureFin,
-        vitesse_vent_ms: store.terrestre.vitesse_vent_ms,
-        direction_vent: store.terrestre.direction_vent,
-        temperature_c: store.terrestre.temperature_c,
-        repriseTraitement: store.terrestre.repriseTraitement,
-        traitementOrigineId: store.terrestre.traitementOrigineId,
-        surface_atomiseur_ha: store.terrestre.surface_atomiseur_ha,
-        surface_disque_rotatif_ha: store.terrestre.surface_disque_rotatif_ha,
-        surface_ulvamast_ha: store.terrestre.surface_ulvamast_ha,
-        surfaceRestanteAbandonnee: store.terrestre.surfaceRestanteAbandonnee,
-        motifSurfaceRestanteAbandonnee: store.terrestre.motifSurfaceRestanteAbandonnee,
-        essence_litres: store.terrestre.essence_litres,
-        nb_piles: store.terrestre.nb_piles,
-      });
-      for (const p of produits) {
-        await addProduitUtilise(traitementId, { produit_id: p.produit_id, quantite_l: p.quantite_l });
-      }
-      setIsSaving(false);
-    }
-
-    router.push({ pathname: '/(traitement)/moyens' as any, params: { traitementId, isValidationView } });
-  };
+    );
 
   return (
     <SafeAreaView style={styles.container}>

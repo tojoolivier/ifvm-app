@@ -80,6 +80,23 @@ module.exports = defineConfig([
     },
   },
   {
+    // Périmètre 2 (ADR-012 décision 10, #175) : (traitement), premier groupe de
+    // routes migré vers `useAsyncAction`/`runTask`/`EtatVide`. Élargi à mesure
+    // que d'autres groupes de routes ((prospection), (app), (auth)) adoptent
+    // à leur tour le logger unifié.
+    files: ['src/app/(traitement)/**/*.ts', 'src/app/(traitement)/**/*.tsx'],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: __dirname,
+      },
+    },
+    rules: {
+      ...REGLES_ANTI_SILENCE,
+      'no-console': 'error',
+    },
+  },
+  {
     // `logger.ts` est le cœur du logger unifié : son mirroir dev appelle
     // `console.*` par construction (pas un oubli — exclu de `no-console`),
     // et le `catch {}` de `flush()` est délibéré (anti-récursion : logger un

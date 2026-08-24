@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -16,6 +16,11 @@ import {
 import { Card } from '@/components/traitement/Card';
 import { Toast, useTraitementToast } from '@/components/traitement/Toast';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
+import { useAsyncAction } from '@/hooks/use-async-action';
+import { useErrorStore } from '@/lib/error-store';
+import { useErrorLogStore } from '@/lib/error-log-store';
+import { toFriendlyError } from '@/lib/friendly-error';
+import { EtatVide } from '@/components/erreurs/etat-vide';
 
 const CONTROL_LABELS = ['Références', 'Cibles', 'Traitement', 'Moyens & protection', 'Impacts & risque', 'Signatures'];
 
@@ -29,18 +34,54 @@ export default function RecapScreen() {
 
   const [draft, setDraft] = useState<DraftTraitement | null>(null);
   const [unsyncedCount, setUnsyncedCount] = useState(0);
-  const [isSaving, setIsSaving] = useState(false);
+  const [erreurDeLecture, setErreurDeLecture] = useState<unknown>(null);
+  const { run, isRunning: isSaving } = useAsyncAction();
+  const signaler = useErrorStore((s) => s.signaler);
+  const logError = useErrorLogStore((s) => s.addEntry);
+
+  const chargerRecap = useCallback(() => {
+    if (!traitementId) return;
+    getTraitement(traitementId)
+      .then((d) => {
+        setDraft(d);
+        setErreurDeLecture(null);
+      })
+      .catch((error) => {
+        setErreurDeLecture(error);
+        signaler(error, 'runTask:essential');
+        logError({
+          message: toFriendlyError(error).message,
+          stack: error instanceof Error ? error.stack ?? null : null,
+          screen: 'recap',
+          context: { traitementId },
+        });
+      });
+    // Le compte de fiches en attente est indicatif (bandeau), pas la donnée que
+    // cet écran existe pour afficher : un échec ici ne bloque pas le recap.
+    countUnsyncedTraitements()
+      .then(setUnsyncedCount)
+      .catch((error) => {
+        logError({
+          message: toFriendlyError(error).message,
+          stack: error instanceof Error ? error.stack ?? null : null,
+          screen: 'recap',
+          context: { traitementId, source: 'countUnsyncedTraitements' },
+        });
+      });
+  }, [traitementId, signaler, logError]);
 
   useEffect(() => {
-    if (!traitementId) return;
-    getTraitement(traitementId).then(setDraft);
-    countUnsyncedTraitements().then(setUnsyncedCount);
-  }, [traitementId]);
+    chargerRecap();
+  }, [chargerRecap]);
 
   if (!draft) {
     return (
       <SafeAreaView style={styles.container}>
-        <Text style={styles.title}>Chargement…</Text>
+        <EtatVide
+          erreur={erreurDeLecture}
+          titreVide="Chargement…"
+          onReessayer={erreurDeLecture ? chargerRecap : undefined}
+        />
       </SafeAreaView>
     );
   }
@@ -99,14 +140,22 @@ export default function RecapScreen() {
   const nbSignaturesRequises = signatureMatrix.filter((r) => r.required).length;
   const nbSignaturesFaites = signatureMatrix.filter((r) => r.signe).length;
 
-  const handleEnregistrer = async () => {
-    if (errors.length > 0 || !token) return;
-    setIsSaving(true);
-    await enregistrerEtSynchroniserTraitement(draft, token);
-    setIsSaving(false);
-    toast.show('Fiche enregistrée');
-    setTimeout(() => router.replace('/(app)' as any), 1900);
-  };
+  const handleEnregistrer = () =>
+    run(
+      async () => {
+        // Déjà visible à l'écran (liste des points à corriger) : pas de second signal.
+        if (errors.length > 0) return;
+        await enregistrerEtSynchroniserTraitement(draft, token!);
+        toast.show('Fiche enregistrée');
+        setTimeout(() => router.replace('/(app)' as any), 1900);
+      },
+      {
+        screen: 'recap',
+        precondition: !!token,
+        preconditionMessage: 'Session expirée — reconnectez-vous pour enregistrer.',
+        context: { traitementId },
+      }
+    );
 
   return (
     <SafeAreaView style={styles.container}>

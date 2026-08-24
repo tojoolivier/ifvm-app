@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getCurrentPosition, reverseGeocode } from '@/lib/location';
-import { PermissionError } from '@/lib/errors';
 import {
   createDraftTraitementAerien,
   createDraftTraitementTerrestre,
@@ -15,6 +14,11 @@ import { STATUT_VALIDE } from '@/lib/prospection-fiche-lecture';
 import { generateId } from '@/lib/id';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import { validateReferences } from '@/lib/traitement-validation';
+import { useAsyncAction } from '@/hooks/use-async-action';
+import { useErrorStore } from '@/lib/error-store';
+import { useErrorLogStore } from '@/lib/error-log-store';
+import { toFriendlyError } from '@/lib/friendly-error';
+import { logger } from '@/lib/logger';
 import { Card } from '@/components/traitement/Card';
 import { DateField } from '@/components/traitement/DateField';
 import { ProgressBar } from '@/components/traitement/ProgressBar';
@@ -38,145 +42,162 @@ export default function ReferencesScreen() {
   const [traitementId, setTraitementId] = useState<string | null>(routeTraitementId ?? null);
   const [prospectionId, setProspectionId] = useState<string | null>(routeProspectionId ?? null);
   const [dateValidation, setDateValidation] = useState<string | null>(null);
-  const [isGpsLoading, setIsGpsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isSaving, setIsSaving] = useState(false);
   const [prospectionStatut, setProspectionStatut] = useState<string | null>(null);
   const [prospectionUpdatedAt, setProspectionUpdatedAt] = useState<string | null>(null);
 
   const readOnly = isValidationView === '1';
   const hasGps = store.ref.latitude != null && store.ref.longitude != null;
+  const { run: runGps, isRunning: isGpsLoading } = useAsyncAction();
+  const signaler = useErrorStore((s) => s.signaler);
+  const logError = useErrorLogStore((s) => s.addEntry);
 
   useEffect(() => {
     if (routeTraitementId) {
       store.setValidationView(readOnly);
-      getTraitement(routeTraitementId).then((draft) => {
-        if (!draft) return;
-        store.setTypeTraitement(draft.type_traitement);
-        setProspectionId(draft.prospection_id);
-        setDateValidation(draft.date_validation);
-        store.updateRef({
-          numeroFiche: draft.numero_fiche,
-          dateTraitement: draft.date_traitement,
-          localite: draft.localite,
-          region: draft.region,
-          district: draft.district,
-          commune: draft.commune,
-          latitude: draft.latitude,
-          longitude: draft.longitude,
-          altitude: draft.altitude,
-          modeTraitement: (draft.mode_traitement as 'TOTAL' | 'BARRIERE' | 'IRREGULIER' | null) ?? null,
+      getTraitement(routeTraitementId)
+        .then((draft) => {
+          if (!draft) return;
+          store.setTypeTraitement(draft.type_traitement);
+          setProspectionId(draft.prospection_id);
+          setDateValidation(draft.date_validation);
+          store.updateRef({
+            numeroFiche: draft.numero_fiche,
+            dateTraitement: draft.date_traitement,
+            localite: draft.localite,
+            region: draft.region,
+            district: draft.district,
+            commune: draft.commune,
+            latitude: draft.latitude,
+            longitude: draft.longitude,
+            altitude: draft.altitude,
+            modeTraitement: (draft.mode_traitement as 'TOTAL' | 'BARRIERE' | 'IRREGULIER' | null) ?? null,
+          });
+        })
+        .catch((error) => {
+          signaler(error, 'runTask:essential');
+          logError({
+            message: toFriendlyError(error).message,
+            stack: error instanceof Error ? error.stack ?? null : null,
+            screen: 'references',
+            context: { traitementId: routeTraitementId },
+          });
         });
-      });
     } else {
       store.reset();
     }
-  }, [routeTraitementId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeTraitementId, signaler, logError]);
 
   useEffect(() => {
     if (!prospectionId) return;
-    getProspection(prospectionId).then((prospection) => {
-      if (!prospection) return;
-      setProspectionStatut(prospection.statut);
-      setProspectionUpdatedAt(prospection.updated_at);
-    });
-  }, [prospectionId]);
-
-  const captureGps = async () => {
-    setIsGpsLoading(true);
-    try {
-      const pos = await getCurrentPosition();
-      store.updateRef({ latitude: pos.latitude, longitude: pos.longitude, altitude: pos.altitude });
-      
-      // Géocodage inverse hors-ligne
-      try {
-        const area = await reverseGeocode(pos.latitude, pos.longitude);
-        store.updateRef({ region: area.region, district: area.district, commune: area.commune });
-      } catch (geoError) {
-        // En hors-ligne, on garde les coordonnées mais pas les infos de localisation
-        console.log('Géocodage inverse non disponible hors-ligne');
-        // On ne bloque pas la localisation si le géocodage échoue
-      }
-    } catch (error) {
-      const message =
-        error instanceof PermissionError
-          ? 'Permission de localisation refusée.'
-          : 'Position GPS indisponible.';
-      Alert.alert('⚠️ Localisation', message);
-    } finally {
-      setIsGpsLoading(false);
-    }
-  };
-
-  const handleContinuer = async () => {
-    // Vérifier que la date de validation n'est pas antérieure à la date de traitement
-    if (store.ref.dateTraitement && dateValidation) {
-      const traitementDate = new Date(store.ref.dateTraitement);
-      const validationDate = new Date(dateValidation);
-      if (validationDate < traitementDate) {
-        setErrors({
-          ...errors,
-          dateValidation: 'La date de validation ne peut pas être antérieure à la date de traitement'
+    getProspection(prospectionId)
+      .then((prospection) => {
+        if (!prospection) return;
+        setProspectionStatut(prospection.statut);
+        setProspectionUpdatedAt(prospection.updated_at);
+      })
+      .catch((error) => {
+        signaler(error, 'runTask:essential');
+        logError({
+          message: toFriendlyError(error).message,
+          stack: error instanceof Error ? error.stack ?? null : null,
+          screen: 'references',
+          context: { prospectionId },
         });
-        return;
-      }
-    }
-
-    const validationErrors = validateReferences({
-      typeTraitement,
-      dateTraitement: store.ref.dateTraitement ?? null,
-      dateValidation,
-      localite: store.ref.localite ?? null,
-      prospectionId,
-    });
-    
-    const byField: Record<string, string> = {};
-    for (const e of validationErrors) byField[e.field] = e.message;
-    setErrors(byField);
-    if (validationErrors.length > 0) return;
-
-    setIsSaving(true);
-    try {
-      let id = traitementId;
-      if (!id) {
-        const created =
-          typeTraitement === 'AERIEN'
-            ? await createDraftTraitementAerien({
-                id: generateId(),
-                prospectionId: prospectionId!,
-                dateTraitement: store.ref.dateTraitement,
-                pilote: '',
-                mecanicien: '',
-                chefDeBaseId: '',
-              })
-            : await createDraftTraitementTerrestre({
-                id: generateId(),
-                prospectionId: prospectionId!,
-                dateTraitement: store.ref.dateTraitement,
-                chefEquipeId: '',
-              });
-        id = created.id;
-        setTraitementId(id);
-      }
-
-      await updateTraitementReference(id, {
-        localite: store.ref.localite ?? null,
-        region: store.ref.region ?? null,
-        district: store.ref.district ?? null,
-        commune: store.ref.commune ?? null,
-        latitude: store.ref.latitude ?? null,
-        longitude: store.ref.longitude ?? null,
-        altitude: store.ref.altitude ?? null,
-        dateTraitement: store.ref.dateTraitement ?? null,
-        dateValidation,
-        numeroFiche: null,
       });
+  }, [prospectionId, signaler, logError]);
 
-      router.push({ pathname: '/(traitement)/cibles' as any, params: { traitementId: id, isValidationView, origineId } });
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const captureGps = () =>
+    runGps(
+      async () => {
+        const pos = await getCurrentPosition();
+        store.updateRef({ latitude: pos.latitude, longitude: pos.longitude, altitude: pos.altitude });
+
+        // Géocodage inverse hors-ligne : best-effort délibéré — sans réseau ni
+        // cache, on garde les coordonnées mais pas la région/district/commune,
+        // et ça ne doit pas faire échouer la capture GPS elle-même.
+        try {
+          const area = await reverseGeocode(pos.latitude, pos.longitude);
+          store.updateRef({ region: area.region, district: area.district, commune: area.commune });
+        } catch (geoError) {
+          logger.ignore(geoError, 'géocodage inverse indisponible hors-ligne, coordonnées conservées');
+        }
+      },
+      { screen: 'references', context: { traitementId, prospectionId } }
+    );
+
+  const { run, isRunning: isSaving } = useAsyncAction();
+
+  const handleContinuer = () =>
+    run(
+      async () => {
+        // Vérifier que la date de validation n'est pas antérieure à la date de traitement
+        if (store.ref.dateTraitement && dateValidation) {
+          const traitementDate = new Date(store.ref.dateTraitement);
+          const validationDate = new Date(dateValidation);
+          if (validationDate < traitementDate) {
+            setErrors({
+              ...errors,
+              dateValidation: 'La date de validation ne peut pas être antérieure à la date de traitement'
+            });
+            return;
+          }
+        }
+
+        const validationErrors = validateReferences({
+          typeTraitement,
+          dateTraitement: store.ref.dateTraitement ?? null,
+          dateValidation,
+          localite: store.ref.localite ?? null,
+          prospectionId,
+        });
+
+        const byField: Record<string, string> = {};
+        for (const e of validationErrors) byField[e.field] = e.message;
+        setErrors(byField);
+        // Déjà visible à l'écran (message par champ) : pas de second signal.
+        if (validationErrors.length > 0) return;
+
+        let id = traitementId;
+        if (!id) {
+          const created =
+            typeTraitement === 'AERIEN'
+              ? await createDraftTraitementAerien({
+                  id: generateId(),
+                  prospectionId: prospectionId!,
+                  dateTraitement: store.ref.dateTraitement,
+                  pilote: '',
+                  mecanicien: '',
+                  chefDeBaseId: '',
+                })
+              : await createDraftTraitementTerrestre({
+                  id: generateId(),
+                  prospectionId: prospectionId!,
+                  dateTraitement: store.ref.dateTraitement,
+                  chefEquipeId: '',
+                });
+          id = created.id;
+          setTraitementId(id);
+        }
+
+        await updateTraitementReference(id, {
+          localite: store.ref.localite ?? null,
+          region: store.ref.region ?? null,
+          district: store.ref.district ?? null,
+          commune: store.ref.commune ?? null,
+          latitude: store.ref.latitude ?? null,
+          longitude: store.ref.longitude ?? null,
+          altitude: store.ref.altitude ?? null,
+          dateTraitement: store.ref.dateTraitement ?? null,
+          dateValidation,
+          numeroFiche: null,
+        });
+
+        router.push({ pathname: '/(traitement)/cibles' as any, params: { traitementId: id, isValidationView, origineId } });
+      },
+      { screen: 'references', context: { traitementId, prospectionId } }
+    );
 
   const regionDistrictCommune = [store.ref.region, store.ref.district, store.ref.commune].filter(Boolean).join(' · ');
 
