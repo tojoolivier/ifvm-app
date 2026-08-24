@@ -7,9 +7,6 @@ import { Espece } from './prospection-especes-stades';
 
 const log = logger.child({ module: 'prospection-repository' });
 
-import { ExtensiveImagoSpeciesData, createEmptySpeciesData, IMAGO_PHASE_ROWS } from './prospection-extensive';
-import { Espece } from './prospection-especes-stades';
-
 export type TypeProspection = 'intensive' | 'extensive' | 'validation';
 
 export interface DraftProspectionInput {
