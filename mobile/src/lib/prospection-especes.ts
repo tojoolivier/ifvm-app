@@ -1,5 +1,9 @@
 import { GrilleKey } from './prospection-especes-stades';
 import { updateProspectionEspeces, DraftProspection } from './prospection-repository';
+import { PreconditionError } from './errors';
+import { logger } from './logger';
+
+const log = logger.child({ module: 'prospection-especes' });
 
 export interface EspeceSelection {
   lmcImago: boolean;
@@ -43,14 +47,22 @@ export function parseEspeceSelection(raw: string | null): EspeceSelection {
       nseImago: Boolean(parsed.nseImago),
       nseLarve: Boolean(parsed.nseLarve),
     };
-  } catch {
+  } catch (error) {
+    // Silence délibéré : la sélection d'espèces est re-saisissable en un
+    // geste. Bloquer la fiche pour une chaîne corrompue coûterait plus à
+    // l'agent que de la lui redemander — mais la corruption doit se voir.
+    log.ignore(
+      error,
+      'Sélection d’espèces corrompue — repli sur une sélection vide, re-saisissable.'
+    );
+
     return { ...EMPTY_ESPECE_SELECTION };
   }
 }
 
 export async function saveEspeceSelection(draftId: string, selection: EspeceSelection): Promise<DraftProspection> {
   if (!hasSelection(selection)) {
-    throw new Error('Au moins une espèce/stade doit être sélectionné');
+    throw new PreconditionError('Au moins une espèce/stade doit être sélectionné');
   }
   return updateProspectionEspeces(draftId, JSON.stringify(selection));
 }

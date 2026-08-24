@@ -1,5 +1,11 @@
 import { getDb } from './prospection-db';
 import { generateId } from './id';
+import { logger } from './logger';
+
+import { ExtensiveImagoSpeciesData, createEmptySpeciesData, IMAGO_PHASE_ROWS } from './prospection-extensive';
+import { Espece } from './prospection-especes-stades';
+
+const log = logger.child({ module: 'prospection-repository' });
 
 import { ExtensiveImagoSpeciesData, createEmptySpeciesData, IMAGO_PHASE_ROWS } from './prospection-extensive';
 import { Espece } from './prospection-especes-stades';
@@ -427,7 +433,16 @@ export async function markGrilleCompleted(id: string, grilleKey: string): Promis
     try {
       const parsed = JSON.parse(current.grilles_completees);
       if (Array.isArray(parsed)) existing = parsed;
-    } catch { existing = []; }
+    } catch (error) {
+      // Silence délibéré : la liste des grilles complétées est un indicateur
+      // d'avancement, pas une donnée de terrain. La reconstruire depuis vide
+      // fait au pire remontrer une grille déjà remplie.
+      log.ignore(
+        error,
+        'Liste des grilles complétées corrompue — reconstruite depuis vide.'
+      );
+      existing = [];
+    }
   }
 
   const completed = new Set<string>(existing.filter((v): v is string => typeof v === 'string'));
