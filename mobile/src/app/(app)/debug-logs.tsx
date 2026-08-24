@@ -10,6 +10,7 @@ import { useDebugStore } from '@/lib/debug-store';
 import { estLeJournalCasse } from '@/lib/logger';
 import { viderJournal } from '@/lib/journal-db';
 import { runTask } from '@/lib/run-task';
+import { useAsyncAction } from '@/hooks/use-async-action';
 
 const IFVM_GREEN_DARK = '#163F16';
 
@@ -99,6 +100,7 @@ export default function DebugLogsScreen() {
   // rien notifier sans risquer la récursion que décrit `logger.ts`. Le drapeau
   // ne redescend jamais de lui-même, donc une lecture par ouverture suffit.
   const journalCasse = estLeJournalCasse();
+  const { run, isRunning: isExporting } = useAsyncAction();
 
   const handleClear = () => {
     Alert.alert('Vider le journal ?', 'Toutes les requêtes et erreurs enregistrées seront effacées.', [
@@ -120,20 +122,20 @@ export default function DebugLogsScreen() {
     ]);
   };
 
-  const handleExport = async () => {
-    const report = {
-      generatedAt: new Date().toISOString(),
-      requests: entries,
-      errors: errorEntries,
-    };
-    try {
-      const file = new File(Paths.cache, `ifvm-debug-${Date.now()}.json`);
-      await file.write(JSON.stringify(report, null, 2));
-      await shareAsync(file.uri, { mimeType: 'application/json', dialogTitle: 'Rapport de debug IFVM' });
-    } catch {
-      Alert.alert('Export impossible', "Le rapport n'a pas pu être partagé.");
-    }
-  };
+  const handleExport = () =>
+    run(
+      async () => {
+        const report = {
+          generatedAt: new Date().toISOString(),
+          requests: entries,
+          errors: errorEntries,
+        };
+        const file = new File(Paths.cache, `ifvm-debug-${Date.now()}.json`);
+        await file.write(JSON.stringify(report, null, 2));
+        await shareAsync(file.uri, { mimeType: 'application/json', dialogTitle: 'Rapport de debug IFVM' });
+      },
+      { screen: 'debug-logs' }
+    );
 
   return (
     <View style={styles.root}>
@@ -149,8 +151,8 @@ export default function DebugLogsScreen() {
                 {entries.length} requête{entries.length > 1 ? 's' : ''} · {errorEntries.length} erreur{errorEntries.length > 1 ? 's' : ''}
               </Text>
             </View>
-            <TouchableOpacity style={styles.clearBtn} onPress={handleExport} activeOpacity={0.7}>
-              <Text style={styles.clearBtnText}>Exporter</Text>
+            <TouchableOpacity style={styles.clearBtn} onPress={handleExport} disabled={isExporting} activeOpacity={0.7}>
+              <Text style={styles.clearBtnText}>{isExporting ? 'Export…' : 'Exporter'}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.clearBtn} onPress={handleClear} activeOpacity={0.7}>
               <Text style={styles.clearBtnText}>Vider</Text>

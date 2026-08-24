@@ -17,6 +17,8 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { listRecentProspections, countUnsyncedProspections, DraftProspection } from '@/lib/prospection-repository';
 import { NewFicheFab } from '@/components/fiches/NewFicheFab';
 import * as Network from 'expo-network';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
+import { logger } from '@/lib/logger';
 
 // ============================================
 // CONSTANTES - PALETTE CLAIRE
@@ -59,6 +61,7 @@ export default function DashboardScreen() {
 
   // Référence pour le timer de vérification
   const syncCheckInterval = useRef<NodeJS.Timeout | null>(null);
+  const signalerChargement = useSignalerChargement('index');
 
   // Animation d'entrée
   useEffect(() => {
@@ -79,21 +82,22 @@ export default function DashboardScreen() {
       setPendingSyncCount(pendingCount);
       setShowSyncBanner(pendingCount > 0);
     } catch (error) {
-      console.error('Erreur vérification sync:', error);
+      logger.failure('index.checkSyncStatus.failed', error);
+      signalerChargement(error);
     }
   };
 
   // Effet pour vérifier la sync au chargement et périodiquement
   useEffect(() => {
-    const initialCheck = setTimeout(() => checkSyncStatus(), 0);
+    const initialCheck = setTimeout(() => void checkSyncStatus(), 0);
 
     syncCheckInterval.current = setInterval(() => {
-      checkSyncStatus();
+      void checkSyncStatus();
     }, 30 * 60 * 1000);
 
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState === 'active') {
-        checkSyncStatus();
+        void checkSyncStatus();
       }
     });
 
@@ -120,13 +124,14 @@ export default function DashboardScreen() {
       setPendingSyncCount(pendingCount);
       setShowSyncBanner(pendingCount > 0);
     } catch (error) {
-      console.error('Erreur chargement données:', error);
+      logger.failure('index.loadData.failed', error, { userId: user.id });
+      signalerChargement(error, { userId: user.id });
     }
-  }, [user]);
+  }, [user, signalerChargement]);
 
   useFocusEffect(
     useCallback(() => {
-      loadData();
+      void loadData();
     }, [loadData])
   );
 

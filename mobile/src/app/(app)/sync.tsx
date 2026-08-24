@@ -17,6 +17,8 @@ import { pullReferentiel } from '@/lib/referentiel-sync';
 import { loadAccueilData, AccueilViewModel } from '@/lib/prospection-accueil';
 import { retrySyncProspection } from '@/lib/prospection-review';
 import { DraftProspection } from '@/lib/prospection-repository';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
+import { logger } from '@/lib/logger';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isSmallScreen = SCREEN_WIDTH < 380;
@@ -40,9 +42,11 @@ export default function SyncScreen() {
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [referentielError, setReferentielError] = useState<string | null>(null);
 
+  const signalerChargement = useSignalerChargement('sync');
+
   const refresh = useCallback(() => {
-    loadAccueilData().then(setData);
-  }, []);
+    void loadAccueilData().then(setData).catch((error) => signalerChargement(error));
+  }, [signalerChargement]);
 
   useFocusEffect(refresh);
 
@@ -72,6 +76,7 @@ export default function SyncScreen() {
       try {
         await pullReferentiel(token);
       } catch (error) {
+        logger.failure('sync.referentiel.failed', error);
         setReferentielError(
           error instanceof Error ? error.message : 'Échec de la synchronisation du référentiel'
         );
@@ -92,6 +97,7 @@ export default function SyncScreen() {
       try {
         await retrySyncProspection(draft, token);
       } catch (error) {
+        logger.failure('sync.fiche.failed', error, { draftId: draft.id });
         const message = error instanceof Error ? error.message : 'erreur inconnue';
         currentFailures.push(`${ficheLabel(draft)} : ${message}`);
       }
@@ -117,11 +123,13 @@ export default function SyncScreen() {
     setTimeout(() => setSyncStatus((current) => (current === 'error' ? current : 'idle')), 3000);
   };
 
-  const onRefresh = useCallback(async () => {
+  const onRefresh = useCallback(() => {
     setRefreshing(true);
-    await loadAccueilData().then(setData);
-    setRefreshing(false);
-  }, []);
+    void loadAccueilData()
+      .then(setData)
+      .catch((error) => signalerChargement(error))
+      .finally(() => setRefreshing(false));
+  }, [signalerChargement]);
 
   return (
     <View style={styles.root}>
