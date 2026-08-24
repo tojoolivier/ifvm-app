@@ -1,3 +1,4 @@
+import { LocalWriteError } from '@/lib/errors';
 import { executeAsyncAction } from '../src/hooks/use-async-action';
 
 jest.mock('@/lib/storage', () => ({
@@ -5,7 +6,7 @@ jest.mock('@/lib/storage', () => ({
 }));
 
 function makeDeps() {
-  return { showError: jest.fn(), logError: jest.fn() };
+  return { signaler: jest.fn().mockReturnValue('INFORMER' as const), logError: jest.fn() };
 }
 
 describe('executeAsyncAction', () => {
@@ -16,7 +17,7 @@ describe('executeAsyncAction', () => {
     await executeAsyncAction(action, { screen: 'test' }, deps);
 
     expect(action).toHaveBeenCalledTimes(1);
-    expect(deps.showError).not.toHaveBeenCalled();
+    expect(deps.signaler).not.toHaveBeenCalled();
     expect(deps.logError).not.toHaveBeenCalled();
   });
 
@@ -31,7 +32,12 @@ describe('executeAsyncAction', () => {
     );
 
     expect(action).not.toHaveBeenCalled();
-    expect(deps.showError).toHaveBeenCalledWith({ message: 'draftId manquant' });
+    // Depuis #172 la précondition manquante lève une `PreconditionError` —
+    // seule classe dont le message est écrit au site d'appel et affiché verbatim.
+    expect(deps.signaler).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'PreconditionError', message: 'draftId manquant' }),
+      'useAsyncAction'
+    );
     expect(deps.logError).toHaveBeenCalledWith({
       message: 'draftId manquant',
       screen: 'accouplement',
@@ -44,18 +50,29 @@ describe('executeAsyncAction', () => {
 
     await executeAsyncAction(jest.fn(), { screen: 'density', precondition: false }, deps);
 
-    expect(deps.showError).toHaveBeenCalledWith({ message: 'Action impossible : données manquantes.' });
+    expect(deps.signaler).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Action impossible : données manquantes.' }),
+      'useAsyncAction'
+    );
   });
 
   it('catches a thrown error, maps it to a friendly message, and logs the stack + context', async () => {
     const deps = makeDeps();
-    const error = new Error('SQLITE_CONSTRAINT: NOT NULL constraint failed');
+    // Typée à la source (ADR-012 décision 2) : depuis #172, `toFriendlyError`
+    // décide par `instanceof` et non plus par regex sur le message SQLite —
+    // une `Error` nue serait désormais classée `(bug)`, à juste titre.
+    const error = new LocalWriteError('SQLITE_CONSTRAINT: NOT NULL constraint failed');
     const action = jest.fn().mockRejectedValue(error);
 
     await executeAsyncAction(action, { screen: 'density', context: { draftId: 'abc' } }, deps);
 
-    expect(deps.showError).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'Impossible d’enregistrer ces données sur l’appareil.' })
+    // La frontière ne fabrique plus de message : elle passe l'erreur, et
+    // `error-store` demande son message et son action à la classe.
+    expect(deps.signaler).toHaveBeenCalledWith(error, 'useAsyncAction', expect.any(Function));
+    expect(deps.logError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('Impossible d’enregistrer sur l’appareil'),
+      })
     );
     expect(deps.logError).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -72,7 +89,7 @@ describe('executeAsyncAction', () => {
 
     await executeAsyncAction(action, { screen: 'density' }, deps);
 
-    const retry = deps.showError.mock.calls[0][0].retry;
+    const retry = deps.signaler.mock.calls[0][2];
     expect(retry).toBeInstanceOf(Function);
 
     retry();

@@ -10,10 +10,9 @@ declare const global: typeof globalThis & {
 let installed = false;
 
 function reportUncaught(error: unknown, screen: string) {
-  const { message, detail } = toFriendlyError(error);
-  useErrorStore.getState().showError({ message, detail });
+  useErrorStore.getState().signaler(error, 'global');
   useErrorLogStore.getState().addEntry({
-    message,
+    message: toFriendlyError(error).message,
     stack: error instanceof Error ? error.stack ?? null : null,
     screen,
     context: null,

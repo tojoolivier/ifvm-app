@@ -1,40 +1,80 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useErrorStore } from '@/lib/error-store';
-
-const RED = '#B91C1C';
-const RED_BG = '#FEE2E2';
-const RED_BORDER = '#FCA5A5';
+import {
+  autresQueLaPlusGrave,
+  laPlusGrave,
+  useErrorStore,
+} from '@/lib/error-store';
+import { useErrorAction } from '@/hooks/use-error-action';
+import { LienVersLeJournal } from './erreurs/lien-vers-le-journal';
+import {
+  AMBER_BG,
+  AMBER_BORDER,
+  AMBER_TEXT,
+  FOREGROUND_TERTIARY,
+} from './erreurs/tokens';
 
 /**
- * Bannière d'erreur globale persistante, montée une seule fois à la racine
- * de l'app. Ne disparaît jamais seule — l'utilisateur doit la fermer ou
- * relancer l'action pour la faire disparaître. Voir ADR-008.
+ * La surface **INFORMER globale** d'ADR-012 décision 5 : montée une fois à la
+ * racine, elle porte l'erreur la plus grave qui n'est pas rattachée à une zone.
+ *
+ * Ce qu'elle ne fait plus, depuis #172 :
+ *
+ * - elle ne montre plus « la dernière arrivée » mais **la plus grave**, et ne
+ *   perd plus les autres — elles sont comptées par `LienVersLeJournal` ;
+ * - elle ne propose plus « Réessayer » à tout le monde : l'action vient de la
+ *   classe, et disparaît quand il n'y a rien à rejouer ;
+ * - elle laisse les `BLOQUER` à la modale — un bandeau qu'on peut ignorer est
+ *   le mauvais support pour « n'allez pas plus loin ».
+ *
+ * Le ton est ambre et non rouge : le rouge est réservé au BLOQUER de la
+ * modale, faute de quoi les deux niveaux d'insistance deviennent indiscernables.
  */
 export function ErrorBanner() {
-  const current = useErrorStore((s) => s.current);
+  const erreurs = useErrorStore((s) => s.erreurs);
   const dismiss = useErrorStore((s) => s.dismiss);
 
-  if (!current) return null;
+  const informer = erreurs.filter((e) => e.traitement === 'INFORMER');
+  const courante = laPlusGrave(informer);
+  const action = useErrorAction(courante);
 
-  const handleRetry = () => {
-    dismiss();
-    current.retry?.();
-  };
+  if (!courante) return null;
 
   return (
     <SafeAreaView edges={['top']} style={styles.safe} pointerEvents="box-none">
-      <View style={styles.banner}>
-        <Text style={styles.message} numberOfLines={3}>
-          {current.message}
-        </Text>
+      <View style={styles.banner} accessibilityRole="alert">
+        <View style={styles.corps}>
+          <Text style={styles.message} numberOfLines={3}>
+            {courante.message}
+          </Text>
+          <View style={styles.pied}>
+            {courante.occurrences > 1 && (
+              <Text style={styles.compteur}>{courante.occurrences} fois</Text>
+            )}
+            <LienVersLeJournal autres={autresQueLaPlusGrave(informer)} />
+          </View>
+        </View>
         <View style={styles.actions}>
-          {current.retry && (
-            <TouchableOpacity onPress={handleRetry} activeOpacity={0.7} style={styles.retryBtn}>
-              <Text style={styles.retryText}>Réessayer</Text>
+          {action && (
+            <TouchableOpacity
+              onPress={() => {
+                dismiss(courante.classe);
+                action.run();
+              }}
+              accessibilityRole="button"
+              activeOpacity={0.7}
+              style={styles.actionBtn}
+            >
+              <Text style={styles.actionText}>{action.label}</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity onPress={dismiss} activeOpacity={0.7} style={styles.closeBtn}>
+          <TouchableOpacity
+            onPress={() => dismiss(courante.classe)}
+            accessibilityRole="button"
+            accessibilityLabel="Fermer l’alerte"
+            activeOpacity={0.7}
+            style={styles.closeBtn}
+          >
             <Text style={styles.closeText}>✕</Text>
           </TouchableOpacity>
         </View>
@@ -48,17 +88,20 @@ const styles = StyleSheet.create({
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: RED_BG,
+    backgroundColor: AMBER_BG,
     borderBottomWidth: 1,
-    borderColor: RED_BORDER,
+    borderColor: AMBER_BORDER,
     paddingHorizontal: 14,
     paddingVertical: 10,
     gap: 10,
   },
-  message: { flex: 1, color: RED, fontSize: 13, fontWeight: '600' },
+  corps: { flex: 1, gap: 3 },
+  message: { color: AMBER_TEXT, fontSize: 13, fontWeight: '600' },
+  pied: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  compteur: { color: FOREGROUND_TERTIARY, fontSize: 12, fontWeight: '600' },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  retryBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: RED },
-  retryText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  actionBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: AMBER_TEXT },
+  actionText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   closeBtn: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
-  closeText: { color: RED, fontSize: 15, fontWeight: '700' },
+  closeText: { color: AMBER_TEXT, fontSize: 15, fontWeight: '700' },
 });

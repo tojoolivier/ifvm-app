@@ -31,7 +31,7 @@ jest.mock('@/lib/prospection-repository', () => ({
 
 describe('InfestationScreen', () => {
   beforeEach(() => {
-    useErrorStore.setState({ current: null });
+    useErrorStore.getState().dismissAll();
     jest.mocked(prospectionRepository.getDerniereDensiteMemeSite).mockClear();
   });
 
@@ -58,7 +58,11 @@ describe('InfestationScreen', () => {
     fireEvent.press(await screen.findByText('Comportement  ›'));
     fireEvent.press(await screen.findByText('Continuer  ›'));
 
-    expect(await screen.findByText('Réessayer')).toBeVisible();
+    // `new Error('boom')` n'appartient pas au jeu fermé : c'est un bug, et
+    // depuis #172 l'action offerte est le signalement — plus le « Réessayer »
+    // universel qui rejouait une action condamnée à échouer à nouveau.
+    expect(await screen.findByText(/Un problème inattendu est survenu/)).toBeVisible();
+    expect(await screen.findByText('Signaler au support')).toBeVisible();
   });
 
   it('bascule automatiquement "Tache larvaire" vers "Bande larvaire" dès que la taille du groupe atteint 1000 m² (#103)', async () => {

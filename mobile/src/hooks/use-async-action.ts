@@ -1,7 +1,9 @@
 import { useCallback, useRef, useState } from 'react';
 import { useErrorStore } from '@/lib/error-store';
 import { useErrorLogStore } from '@/lib/error-log-store';
+import { PreconditionError } from '@/lib/errors';
 import { toFriendlyError } from '@/lib/friendly-error';
+import type { Traitement } from '@/lib/logger';
 
 interface RunOptions {
   /** Nom de l'écran, pour le journal de debug. */
@@ -15,7 +17,8 @@ interface RunOptions {
 }
 
 interface AsyncActionDeps {
-  showError: (input: { message: string; detail?: string | null; retry?: () => void }) => void;
+  /** Signale l'erreur à la couche d'affichage et renvoie le traitement déduit. */
+  signaler: (error: unknown, frontiere: 'useAsyncAction', retry?: () => void) => Traitement;
   logError: (entry: { message: string; stack?: string | null; screen: string; context?: Record<string, unknown> | null }) => void;
 }
 
@@ -24,8 +27,12 @@ interface AsyncActionDeps {
  * testable directement, sans moteur de rendu. Remplace le pattern
  * `try { await x() } finally { ... }` sans `catch` qui a causé un bouton
  * d'action silencieusement inopérant (voir ADR-008). Toute précondition
- * manquante ou erreur levée par l'action est systématiquement remontée via la
- * bannière d'erreur globale et journalisée pour le mode debug.
+ * manquante ou erreur levée par l'action est systématiquement remontée à la
+ * couche d'affichage et journalisée pour le mode debug.
+ *
+ * Depuis #172, la précondition manquante n'invente plus son propre message :
+ * elle lève une `PreconditionError` et repart par le même chemin que le reste.
+ * Une seule route vers l'écran, donc un seul endroit où un silence peut naître.
  */
 export async function executeAsyncAction(
   action: () => Promise<void>,
@@ -33,25 +40,22 @@ export async function executeAsyncAction(
   deps: AsyncActionDeps
 ): Promise<void> {
   if (options.precondition === false) {
-    const message = options.preconditionMessage ?? 'Action impossible : données manquantes.';
-    deps.showError({ message });
-    deps.logError({ message, screen: options.screen, context: options.context ?? null });
+    const erreur = new PreconditionError(
+      options.preconditionMessage ?? 'Action impossible : données manquantes.'
+    );
+    deps.signaler(erreur, 'useAsyncAction');
+    deps.logError({ message: erreur.message, screen: options.screen, context: options.context ?? null });
     return;
   }
 
   try {
     await action();
   } catch (error) {
-    const { message, detail } = toFriendlyError(error);
-    deps.showError({
-      message,
-      detail,
-      retry: () => {
-        executeAsyncAction(action, options, deps);
-      },
+    deps.signaler(error, 'useAsyncAction', () => {
+      void executeAsyncAction(action, options, deps);
     });
     deps.logError({
-      message,
+      message: toFriendlyError(error).message,
       stack: error instanceof Error ? error.stack ?? null : null,
       screen: options.screen,
       context: options.context ?? null,
@@ -62,26 +66,26 @@ export async function executeAsyncAction(
 export function useAsyncAction() {
   const [isRunning, setIsRunning] = useState(false);
   const isRunningRef = useRef(false);
-  const showError = useErrorStore((s) => s.showError);
+  const signaler = useErrorStore((s) => s.signaler);
   const logError = useErrorLogStore((s) => s.addEntry);
 
   const run = useCallback(
     async (action: () => Promise<void>, options: RunOptions) => {
       if (options.precondition === false) {
-        return executeAsyncAction(action, options, { showError, logError });
+        return executeAsyncAction(action, options, { signaler, logError });
       }
 
       if (isRunningRef.current) return;
       isRunningRef.current = true;
       setIsRunning(true);
       try {
-        await executeAsyncAction(action, options, { showError, logError });
+        await executeAsyncAction(action, options, { signaler, logError });
       } finally {
         isRunningRef.current = false;
         setIsRunning(false);
       }
     },
-    [showError, logError]
+    [signaler, logError]
   );
 
   return { run, isRunning };
