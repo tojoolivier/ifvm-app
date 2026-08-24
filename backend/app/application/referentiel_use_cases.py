@@ -10,6 +10,7 @@ from app.domain.referentiel import (
     PosteAcridien,
     StationFixe,
     UtilisateurEquipe,
+    ZoneAntiAcridien,
 )
 from app.domain.repositories import (
     CampagneRepository,
@@ -19,7 +20,16 @@ from app.domain.repositories import (
     PosteAcridienRepository,
     StationFixeRepository,
     UtilisateurEquipeRepository,
+    ZoneAntiAcridienRepository,
 )
+
+
+class ListZonesAntiAcridiennes:
+    def __init__(self, repository: ZoneAntiAcridienRepository):
+        self.repository = repository
+
+    async def execute(self) -> list[ZoneAntiAcridien]:
+        return await self.repository.list_all()
 
 
 class ListPostesAcridiens:
@@ -53,6 +63,7 @@ class GetStation:
 
 @dataclass
 class ReferentielSinceCursors:
+    zones_anti_acridiennes: datetime | None = None
     postes_acridiens: datetime | None = None
     stations_fixes: datetime | None = None
     utilisateurs_equipe: datetime | None = None
@@ -64,6 +75,7 @@ class ReferentielSinceCursors:
 
 @dataclass
 class ReferentielPullResult:
+    zones_anti_acridiennes: list[ZoneAntiAcridien]
     postes_acridiens: list[PosteAcridien]
     stations_fixes: list[StationFixe]
     utilisateurs_equipe: list[UtilisateurEquipe]
@@ -77,6 +89,7 @@ class ReferentielPullResult:
 class PullReferentiel:
     def __init__(
         self,
+        zone_repository: ZoneAntiAcridienRepository,
         poste_repository: PosteAcridienRepository,
         station_repository: StationFixeRepository,
         equipe_repository: UtilisateurEquipeRepository,
@@ -85,6 +98,7 @@ class PullReferentiel:
         code_stade_repository: CodeStadeRepository,
         campagne_repository: CampagneRepository,
     ):
+        self.zone_repository = zone_repository
         self.poste_repository = poste_repository
         self.station_repository = station_repository
         self.equipe_repository = equipe_repository
@@ -98,6 +112,9 @@ class PullReferentiel:
         # rester au-dessus de ce curseur pour être reprise au pull suivant, pas sautée.
         server_time = datetime.now(timezone.utc)
         return ReferentielPullResult(
+            zones_anti_acridiennes=await self.zone_repository.list_since(
+                cursors.zones_anti_acridiennes
+            ),
             postes_acridiens=await self.poste_repository.list_since(cursors.postes_acridiens),
             stations_fixes=await self.station_repository.list_since(cursors.stations_fixes),
             utilisateurs_equipe=await self.equipe_repository.list_since(
