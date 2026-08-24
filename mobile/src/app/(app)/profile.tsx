@@ -1130,3 +1130,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+/**
+ * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`
+ * enveloppe la route dans un `<Try>` : la pile de navigation survit au crash.
+ */
+export { RouteErrorBoundary as ErrorBoundary } from '@/components/error-boundary';

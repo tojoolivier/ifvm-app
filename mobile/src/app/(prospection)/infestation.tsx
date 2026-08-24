@@ -1174,3 +1174,9 @@ const styles = StyleSheet.create({
   infoBoxUnit: { fontSize: 10.5, fontWeight: '600', color: '#9a9484' },
   timeFieldBox: { minHeight: 0, borderWidth: 0, padding: 0, backgroundColor: 'transparent' },
 });
+
+/**
+ * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`
+ * enveloppe la route dans un `<Try>` : la pile de navigation survit au crash.
+ */
+export { RouteErrorBoundary as ErrorBoundary } from '@/components/error-boundary';

@@ -17,6 +17,7 @@ import { ErrorBanner } from '@/components/error-banner';
 import { ModaleBloquante } from '@/components/erreurs/modale-bloquante';
 import { EtatVide } from '@/components/erreurs/etat-vide';
 import { useErrorStore } from '@/lib/error-store';
+import { useAuthStore } from '@/lib/auth-store';
 import { AuthError, LocalReadError, NetworkError, PreconditionError } from '@/lib/errors';
 
 // Préfixe `mock` obligatoire : `jest.mock` est hissé avant les const du module.
@@ -35,6 +36,9 @@ jest.mock('@/lib/storage', () => ({
 
 beforeEach(() => {
   useErrorStore.getState().dismissAll();
+  // Le journal vit sous `(app)`, derrière le garde d'authentification : sans
+  // session, les chemins qui y mènent sont volontairement absents.
+  useAuthStore.setState({ isAuthenticated: true });
   mockPush.mockClear();
   mockReplace.mockClear();
 });
@@ -133,8 +137,22 @@ describe('ModaleBloquante — la surface BLOQUER', () => {
     useErrorStore.getState().signaler(new AuthError('401'), 'useAsyncAction');
     await render(<ModaleBloquante />);
 
-    fireEvent.press(screen.getByText('Continuer quand même'));
+    // Le libellé est « Fermer » et non « Continuer quand même » : sur un
+    // `LocalWriteError`, inviter à continuer contredirait le message lui-même.
+    fireEvent.press(screen.getByText('Fermer'));
     expect(useErrorStore.getState().erreurs).toHaveLength(0);
+  });
+});
+
+describe('hors session, aucun chemin vers le journal n’est proposé', () => {
+  it('cache « +N autres › » et « Signaler au support » — ils se feraient renvoyer', async () => {
+    useAuthStore.setState({ isAuthenticated: false });
+    useErrorStore.getState().signaler(new LocalReadError('a'), 'useAsyncAction');
+    useErrorStore.getState().signaler(new PreconditionError('b'), 'useAsyncAction');
+    await render(<ErrorBanner />);
+
+    expect(screen.queryByText('Signaler au support')).toBeNull();
+    expect(screen.queryByText(/autres ›/)).toBeNull();
   });
 });
 

@@ -1,10 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import {
-  autresQueLaPlusGrave,
-  laPlusGrave,
-  useErrorStore,
-} from '@/lib/error-store';
+import { autresNonAffichees, laPlusGrave, useErrorStore } from '@/lib/error-store';
 import { useErrorAction } from '@/hooks/use-error-action';
 import { LienVersLeJournal } from './erreurs/lien-vers-le-journal';
 import {
@@ -36,6 +32,8 @@ export function ErrorBanner() {
 
   const informer = erreurs.filter((e) => e.traitement === 'INFORMER');
   const courante = laPlusGrave(informer);
+  // La modale montre la sienne : on ne la recompte pas dans « +N autres ».
+  const bloquante = laPlusGrave(erreurs.filter((e) => e.traitement === 'BLOQUER'));
   const action = useErrorAction(courante);
 
   if (!courante) return null;
@@ -51,7 +49,7 @@ export function ErrorBanner() {
             {courante.occurrences > 1 && (
               <Text style={styles.compteur}>{courante.occurrences} fois</Text>
             )}
-            <LienVersLeJournal autres={autresQueLaPlusGrave(informer)} />
+            <LienVersLeJournal autres={autresNonAffichees(erreurs, [courante, bloquante])} />
           </View>
         </View>
         <View style={styles.actions}>

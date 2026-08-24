@@ -259,3 +259,9 @@ const styles = StyleSheet.create({
   confirmeeButton: { flex: 1, backgroundColor: GREEN, borderRadius: 13, padding: 14, alignItems: 'center' },
   confirmeeButtonText: { color: '#fff', fontWeight: '800', fontSize: 13 },
 });
+
+/**
+ * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`
+ * enveloppe la route dans un `<Try>` : la pile de navigation survit au crash.
+ */
+export { RouteErrorBoundary as ErrorBoundary } from '@/components/error-boundary';

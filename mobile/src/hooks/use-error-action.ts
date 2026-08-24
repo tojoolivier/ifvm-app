@@ -17,21 +17,31 @@ import { useCallback, useMemo } from 'react';
 import { Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
-import type { GlobalError } from '@/lib/error-store';
-import { LIBELLE_ACTION } from '@/lib/friendly-error';
+import { LIBELLE_ACTION, type ActionErreur } from '@/lib/friendly-error';
 
 export interface ActionResolue {
   label: string;
   run: () => void;
 }
 
+/**
+ * Ce dont le hook a besoin, et rien de plus — surtout pas un `GlobalError`
+ * entier, que `EtatVide` devait sinon fabriquer de toutes pièces avec un
+ * `occurrences: 1` et un `vueA: 0` qui ne veulent rien dire.
+ */
+export interface ErreurActionnable {
+  action: ActionErreur | null;
+  retry?: () => void;
+}
+
 /** Traduit l'action d'une erreur en bouton branché, ou `null` s'il n'y en a pas. */
-export function useErrorAction(erreur: GlobalError | null): ActionResolue | null {
+export function useErrorAction(erreur: ErreurActionnable | null): ActionResolue | null {
   const router = useRouter();
   const logout = useAuthStore((s) => s.logout);
+  const estAuthentifie = useAuthStore((s) => s.isAuthenticated);
 
   const run = useCallback(
-    (action: NonNullable<GlobalError['action']>, retry?: () => void) => {
+    (action: ActionErreur, retry?: () => void) => {
       switch (action) {
         case 'reessayer':
         case 'reessayer-enregistrer':
@@ -60,8 +70,13 @@ export function useErrorAction(erreur: GlobalError | null): ActionResolue | null
       erreur.action === 'reessayer' || erreur.action === 'reessayer-enregistrer';
     if (estUneReprise && !erreur.retry) return null;
 
+    // Le journal vit sous `(app)`, derrière le garde d'authentification : depuis
+    // l'écran de connexion, « Signaler au support » se ferait renvoyer à
+    // l'expéditeur. Encore un bouton sans chance de réussir — donc pas de bouton.
+    if (erreur.action === 'signaler-support' && !estAuthentifie) return null;
+
     const action = erreur.action;
     const retry = erreur.retry;
     return { label: LIBELLE_ACTION[action], run: () => run(action, retry) };
-  }, [erreur, run]);
+  }, [erreur, estAuthentifie, run]);
 }

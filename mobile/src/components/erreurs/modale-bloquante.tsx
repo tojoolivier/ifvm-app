@@ -1,12 +1,16 @@
 import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { laPlusGrave, useErrorStore } from '@/lib/error-store';
+import { autresNonAffichees, laPlusGrave, useErrorStore } from '@/lib/error-store';
 import { useErrorAction } from '@/hooks/use-error-action';
+import { LienVersLeJournal } from './lien-vers-le-journal';
 import {
   DANGER,
   DANGER_BORDER,
   DANGER_TEXT,
+  FOREGROUND_SECONDARY,
   FOREGROUND_TERTIARY,
+  SUR_FOND_COLORE,
   SURFACE,
+  VOILE,
 } from './tokens';
 
 /**
@@ -17,16 +21,19 @@ import {
  * ne fonctionnera, ou la saisie sera perdue. Une bannière serait le mauvais
  * support : l'agent la lit, hausse les épaules, et perd sa fiche.
  *
- * « Continuer quand même » existe quand même, et c'est délibéré : une modale
- * sans sortie sur un appareil en difficulté transformerait un problème
- * d'enregistrement en application inutilisable. Elle ferme la classe courante,
- * pas les autres — l'agent qui insiste reste informé du reste.
+ * « Fermer » existe, et c'est délibéré : une modale sans sortie, sur un
+ * appareil déjà en difficulté, transformerait un problème d'enregistrement en
+ * application inutilisable. Le libellé est neutre à dessein — « Continuer quand
+ * même » inviterait à faire exactement ce que le message de `LocalWriteError`
+ * déconseille. Fermer ne ferme que la classe courante, pas les autres.
  */
 export function ModaleBloquante() {
   const erreurs = useErrorStore((s) => s.erreurs);
   const dismiss = useErrorStore((s) => s.dismiss);
 
   const courante = laPlusGrave(erreurs.filter((e) => e.traitement === 'BLOQUER'));
+  // La bannière montre le plus grave des INFORMER : lui non plus n'est pas « autre ».
+  const informante = laPlusGrave(erreurs.filter((e) => e.traitement === 'INFORMER'));
   const action = useErrorAction(courante);
 
   return (
@@ -56,8 +63,11 @@ export function ModaleBloquante() {
             onPress={() => courante && dismiss(courante.classe)}
             activeOpacity={0.7}
           >
-            <Text style={styles.lien}>Continuer quand même</Text>
+            <Text style={styles.lien}>Fermer</Text>
           </TouchableOpacity>
+          <View style={styles.pied}>
+            <LienVersLeJournal autres={autresNonAffichees(erreurs, [courante, informante])} />
+          </View>
         </View>
       </View>
     </Modal>
@@ -65,7 +75,7 @@ export function ModaleBloquante() {
 }
 
 const styles = StyleSheet.create({
-  fond: { flex: 1, backgroundColor: 'rgba(22,32,26,0.45)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  fond: { flex: 1, backgroundColor: VOILE, alignItems: 'center', justifyContent: 'center', padding: 24 },
   carte: {
     width: '100%',
     maxWidth: 380,
@@ -77,9 +87,10 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   titre: { fontSize: 16, fontWeight: '800', color: DANGER_TEXT },
-  texte: { fontSize: 13, fontWeight: '500', color: '#3a3a30', lineHeight: 19 },
+  texte: { fontSize: 13, fontWeight: '500', color: FOREGROUND_SECONDARY, lineHeight: 19 },
   compteur: { fontSize: 12, fontWeight: '600', color: FOREGROUND_TERTIARY },
   bouton: { backgroundColor: DANGER, borderRadius: 13, paddingVertical: 12, alignItems: 'center', marginTop: 4 },
-  boutonText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  boutonText: { color: SUR_FOND_COLORE, fontWeight: '800', fontSize: 14 },
   lien: { color: FOREGROUND_TERTIARY, fontSize: 12, fontWeight: '700', textAlign: 'center', paddingVertical: 6 },
+  pied: { alignItems: 'center' },
 });

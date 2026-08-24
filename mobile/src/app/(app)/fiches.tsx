@@ -12,6 +12,8 @@ import { navigateToProspectionConsult, navigateToProspectionDraft, navigateToTra
 import { FicheCard } from '@/components/fiches/FicheCard';
 import { SearchAndFilterBar, FilterOption } from '@/components/fiches/SearchAndFilterBar';
 import { NewFicheFab } from '@/components/fiches/NewFicheFab';
+import { EtatVide } from '@/components/erreurs/etat-vide';
+import { runTask } from '@/lib/run-task';
 import {
   BadgeStyle,
   FICHES_BG,
@@ -54,15 +56,48 @@ export default function FichesScreen() {
   const [draftsRecent, setDraftsRecent] = useState<DraftProspection[]>([]);
   const [validated, setValidated] = useState<ProspectionRead[]>([]);
   const [traitements, setTraitements] = useState<DraftTraitementRow[]>([]);
+  const [erreurDeLecture, setErreurDeLecture] = useState<unknown>(null);
 
+  /**
+   * Lecture des trois sources de la liste — ADR-012 décisions 1 et 5 (#172).
+   *
+   * Cet écran portait les trois formes de silence que l'ADR éradique : deux
+   * `.then()` sans `.catch()` (des rejets qui flottaient, et que #160 a montré
+   * n'être rattrapés par rien en release) et un `.catch(() => setTraitements([]))`
+   * qui rendait une liste vide **indiscernable d'une absence de fiches**.
+   * L'agent lisait « Aucune fiche trouvée » et concluait qu'il n'avait rien saisi.
+   *
+   * `runTask` garantit désormais que rien ne flotte ni ne se perd, et l'erreur
+   * retenue s'affiche là où la donnée manque, via `EtatVide`.
+   */
   const refresh = useCallback(() => {
-    loadAccueilData().then((data) => setDraftsRecent(data.recent));
-    if (user && token) {
-      loadValidatedProspections(token, user.id).then(setValidated);
-      listTraitementsByChefEquipe(user.id)
-        .then(setTraitements)
-        .catch(() => setTraitements([]));
-    }
+    void (async () => {
+      const lectures = await Promise.all([
+        runTask(() => loadAccueilData(), { name: 'fiches.brouillons', criticality: 'essential' }),
+        user && token
+          ? runTask(() => loadValidatedProspections(token, user.id), {
+              name: 'fiches.validees',
+              criticality: 'essential',
+            })
+          : null,
+        user
+          ? runTask(() => listTraitementsByChefEquipe(user.id), {
+              name: 'fiches.traitements',
+              criticality: 'essential',
+            })
+          : null,
+      ]);
+
+      const [brouillons, validees, traitementsLus] = lectures;
+      if (brouillons.ok) setDraftsRecent(brouillons.value.recent);
+      if (validees?.ok) setValidated(validees.value);
+      if (traitementsLus?.ok) setTraitements(traitementsLus.value);
+
+      // Une lecture ratée sur trois suffit à rendre la liste incomplète : la
+      // taire ferait exactement le vide muet que ce ticket supprime.
+      const ratee = lectures.find((l) => l !== null && !l.ok);
+      setErreurDeLecture(ratee && !ratee.ok ? ratee.error : null);
+    })();
   }, [user, token]);
 
   useFocusEffect(refresh);
@@ -177,13 +212,14 @@ export default function FichesScreen() {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>📄</Text>
-            <Text style={styles.emptyTitle}>Aucune fiche trouvée</Text>
-            <Text style={styles.emptySub}>
-              {searchQuery ? 'Essayez de modifier votre recherche' : 'Créez votre première fiche'}
-            </Text>
-          </View>
+          <EtatVide
+            erreur={erreurDeLecture}
+            titreVide="Aucune fiche trouvée"
+            sousTitreVide={
+              searchQuery ? 'Essayez de modifier votre recherche' : 'Créez votre première fiche'
+            }
+            onReessayer={refresh}
+          />
         }
         initialNumToRender={10}
         maxToRenderPerBatch={10}
@@ -276,3 +312,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+/**
+ * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`
+ * enveloppe la route dans un `<Try>` : la pile de navigation survit au crash.
+ */
+export { RouteErrorBoundary as ErrorBoundary } from '@/components/error-boundary';
