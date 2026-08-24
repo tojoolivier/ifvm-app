@@ -70,32 +70,75 @@ import { getDb } from './prospection-db';
  * garantie dont la purge n'a pas besoin, puisqu'elle retire les plus anciens
  * et ne fait jamais reculer le maximum.
  */
+/**
+ * Une colonne, décrite **une seule fois**.
+ *
+ * Le DDL, la liste du `INSERT`, ses points d'interrogation et l'ordre des
+ * arguments passés à `runAsync` en dérivent tous. Écrites à la main, ces
+ * quatre listes ordonnées devaient rester alignées de tête : promouvoir un
+ * champ du contexte en colonne — que ce module annonce comme SA voie
+ * d'évolution — se payait en quatre éditions couplées, dont un décalage
+ * positionnel silencieux qui aurait écrit un `stack` dans la colonne `raison`.
+ */
+interface Colonne {
+  nom: string;
+  /** Le fragment DDL qui suit le nom. */
+  type: string;
+  /** D'où vient la valeur, dans la ligne de journal. */
+  valeur: (ligne: LogLine) => SQLite.SQLiteBindValue;
+}
+
+const COLONNES: Colonne[] = [
+  { nom: 'at', type: 'TEXT NOT NULL', valeur: (l) => l.at },
+  { nom: 'cid', type: 'TEXT NOT NULL', valeur: (l) => l.cid },
+  {
+    nom: 'level',
+    type: "TEXT NOT NULL CHECK (level IN ('debug', 'info', 'warn', 'error'))",
+    valeur: (l) => l.level,
+  },
+  { nom: 'event', type: 'TEXT NOT NULL', valeur: (l) => l.event },
+  { nom: 'classe', type: 'TEXT', valeur: (l) => l.classe ?? null },
+  { nom: 'traitement', type: 'TEXT', valeur: (l) => l.traitement ?? null },
+  { nom: 'raison', type: 'TEXT', valeur: (l) => l.raison ?? null },
+  // `err` est un attribut composite : la 1NF impose de l'éclater en colonnes
+  // atomiques plutôt que de ranger l'objet tel quel.
+  { nom: 'err_name', type: 'TEXT', valeur: (l) => l.err?.name ?? null },
+  { nom: 'err_message', type: 'TEXT', valeur: (l) => l.err?.message ?? null },
+  { nom: 'err_stack', type: 'TEXT', valeur: (l) => l.err?.stack ?? null },
+  { nom: 'contexte', type: 'TEXT', valeur: (l) => contexteDe(l) },
+];
+
 export const DDL_JOURNAL = `
   CREATE TABLE IF NOT EXISTS journal (
     id INTEGER PRIMARY KEY,
-    at TEXT NOT NULL,
-    cid TEXT NOT NULL,
-    level TEXT NOT NULL CHECK (level IN ('debug', 'info', 'warn', 'error')),
-    event TEXT NOT NULL,
-    classe TEXT,
-    traitement TEXT,
-    raison TEXT,
-    err_name TEXT,
-    err_message TEXT,
-    err_stack TEXT,
-    contexte TEXT
+    ${COLONNES.map((c) => `${c.nom} ${c.type}`).join(',\n    ')}
   );
 `;
 
-/** Ce que le schéma promeut en colonne. Tout le reste part dans `contexte`. */
-const COLONNES = ['at', 'cid', 'level', 'event', 'classe', 'traitement', 'raison', 'err'] as const;
-const EST_UNE_COLONNE = new Set<string>(COLONNES);
-
 const INSERT = `
   INSERT INTO journal
-    (at, cid, level, event, classe, traitement, raison, err_name, err_message, err_stack, contexte)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (${COLONNES.map((c) => c.nom).join(', ')})
+  VALUES (${COLONNES.map(() => '?').join(', ')})
 `;
+
+/**
+ * Les clés de `LogLine` que le schéma absorbe ; tout le reste part dans
+ * `contexte`.
+ *
+ * Volontairement distincte de `COLONNES` : côté ligne il y a une clé `err`,
+ * côté table trois colonnes `err_*`. Les dériver l'une de l'autre demanderait
+ * une indirection qui coûterait plus de lecture qu'elle n'en épargne.
+ */
+const CLES_ABSORBEES = new Set<string>([
+  'at',
+  'cid',
+  'level',
+  'event',
+  'classe',
+  'traitement',
+  'raison',
+  'err',
+]);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Rétention
@@ -108,19 +151,23 @@ const JOUR = 24 * HEURE;
  * Rétention **par niveau**, pas séparation des flux : une seule ligne de temps,
  * sinon le `correlationId` ne relie rien (décision 4).
  *
- * Le niveau, pas le verbe : `detail` et `ignore` tombent tous deux en `debug`,
- * ce qui est cohérent — un silence délibéré n'est pas un échec. Un `failure` de
- * tâche `best-effort` sort en `warn` et est gardé avec les `error` : c'est bien
- * un échec, même si l'agent ne l'a pas vu.
+ * Les clés portent les **verbes** du logger, pas les niveaux SQL : c'est le
+ * vocabulaire de l'ADR, et une seule taxonomie vaut mieux que deux mêlées.
+ * La traduction en niveaux vit dans `politiqueDeRetention`, un seul endroit.
+ *
+ * `detail` et `ignore` tombent tous deux en `debug`, ce qui est cohérent — un
+ * silence délibéré n'est pas un échec. Un `failure` de tâche `best-effort`
+ * sort en `warn` et est gardé avec les `error` : c'est bien un échec, même si
+ * l'agent ne l'a pas vu.
  */
 export const RETENTION_MS = {
-  /** `detail` et `ignore` — verbeux, purgés agressivement. */
-  debug: 24 * HEURE,
+  /** `detail` et `ignore` (niveau `debug`) — verbeux, purgés agressivement. */
+  detail: 24 * HEURE,
   /** Idem, quand l'agent a activé « détails techniques » à la demande du support. */
-  debugVerbeux: 7 * JOUR,
-  /** `event` — faits notables. */
-  info: 7 * JOUR,
-  /** `failure`, quelle que soit la frontière — `warn` comme `error`. */
+  detailVerbeux: 7 * JOUR,
+  /** `event` (niveau `info`) — faits notables. */
+  evenement: 7 * JOUR,
+  /** `failure` (niveaux `warn` et `error`), quelle que soit la frontière. */
   echec: 30 * JOUR,
 } as const;
 
@@ -136,8 +183,8 @@ interface Tranche {
  */
 function politiqueDeRetention(verbeux: boolean): Tranche[] {
   return [
-    { niveaux: ['debug'], age: verbeux ? RETENTION_MS.debugVerbeux : RETENTION_MS.debug },
-    { niveaux: ['info'], age: RETENTION_MS.info },
+    { niveaux: ['debug'], age: verbeux ? RETENTION_MS.detailVerbeux : RETENTION_MS.detail },
+    { niveaux: ['info'], age: RETENTION_MS.evenement },
     { niveaux: ['warn', 'error'], age: RETENTION_MS.echec },
   ];
 }
@@ -223,7 +270,7 @@ function contexteDe(ligne: LogLine): string | null {
   const reste: Record<string, unknown> = {};
   let vide = true;
   for (const cle of Object.keys(ligne)) {
-    if (EST_UNE_COLONNE.has(cle)) continue;
+    if (CLES_ABSORBEES.has(cle)) continue;
     reste[cle] = ligne[cle];
     vide = false;
   }
@@ -249,20 +296,9 @@ export function creerTransportJournal(): LogTransport {
         const db = await baseDuJournal();
         await db.withTransactionAsync(async () => {
           for (const l of lignes) {
-            await db.runAsync(
-              INSERT,
-              l.at,
-              l.cid,
-              l.level,
-              l.event,
-              l.classe ?? null,
-              l.traitement ?? null,
-              l.raison ?? null,
-              l.err?.name ?? null,
-              l.err?.message ?? null,
-              l.err?.stack ?? null,
-              contexteDe(l)
-            );
+            // L'ordre vient de `COLONNES`, comme le `INSERT` lui-même : les
+            // deux ne peuvent plus se désaligner.
+            await db.runAsync(INSERT, ...COLONNES.map((c) => c.valeur(l)));
           }
         });
 

@@ -92,6 +92,23 @@ describe('le schéma de la table journal — ADR-012 décision 4', () => {
     expect(DDL_JOURNAL).toContain("CHECK (level IN ('debug', 'info', 'warn', 'error'))");
   });
 
+  it('garde le DDL, le INSERT et les arguments alignés — ils dérivent de la même liste', async () => {
+    // L'invariant que protège `COLONNES` : quatre listes ordonnées tenues à la
+    // main se désalignent silencieusement, et un `stack` finit dans `raison`.
+    const colonnesDuDdl = [...DDL_JOURNAL.matchAll(/^\s{4}(\w+) /gm)]
+      .map((m) => m[1])
+      .filter((nom) => nom !== 'id');
+
+    await creerTransportJournal().write([
+      ligne({ err: { name: 'E', message: 'm', stack: 's' }, extra: 1 }),
+    ]);
+
+    expect(parametresInsert()).toHaveLength(colonnesDuDdl.length);
+    // Et l'ordre est bien celui du DDL : `contexte` ferme la marche des deux côtés.
+    expect(colonnesDuDdl.at(-1)).toBe('contexte');
+    expect(parametresInsert().at(-1)).toBe('{"extra":1}');
+  });
+
   it("n'ouvre la base qu'une fois pour plusieurs écritures", async () => {
     const transport = creerTransportJournal();
     await transport.write([ligne()]);
@@ -214,8 +231,8 @@ describe('la rétention par niveau — pas la séparation des flux', () => {
   }
 
   it('garde les échecs bien plus longtemps que les détails', () => {
-    expect(RETENTION_MS.debug).toBeLessThan(RETENTION_MS.info);
-    expect(RETENTION_MS.info).toBeLessThan(RETENTION_MS.echec);
+    expect(RETENTION_MS.detail).toBeLessThan(RETENTION_MS.evenement);
+    expect(RETENTION_MS.evenement).toBeLessThan(RETENTION_MS.echec);
   });
 
   it('purge `debug` à 24 h, `info` à 7 j et les échecs à 30 j', async () => {
@@ -224,8 +241,8 @@ describe('la rétention par niveau — pas la séparation des flux', () => {
     const parNiveau = suppressions().filter((d) => d.sql.includes('level'));
     const borne = (n: number) => new Date(MAINTENANT.getTime() - n).toISOString();
 
-    expect(parNiveau[0].params).toEqual(['debug', borne(RETENTION_MS.debug)]);
-    expect(parNiveau[1].params).toEqual(['info', borne(RETENTION_MS.info)]);
+    expect(parNiveau[0].params).toEqual(['debug', borne(RETENTION_MS.detail)]);
+    expect(parNiveau[1].params).toEqual(['info', borne(RETENTION_MS.evenement)]);
     // `warn` et `error` partagent une tranche : un échec reste un échec, que
     // l'agent l'ait vu (INFORMER) ou non (JOURNAL).
     expect(parNiveau[2].params).toEqual(['warn', 'error', borne(RETENTION_MS.echec)]);
@@ -236,7 +253,7 @@ describe('la rétention par niveau — pas la séparation des flux', () => {
 
     const debug = suppressions().find((d) => d.params[0] === 'debug');
     expect(debug?.params[1]).toBe(
-      new Date(MAINTENANT.getTime() - RETENTION_MS.debugVerbeux).toISOString()
+      new Date(MAINTENANT.getTime() - RETENTION_MS.detailVerbeux).toISOString()
     );
   });
 
