@@ -6,7 +6,9 @@ import { useForm } from '@tanstack/react-form';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import {
   HUMIDITE_OPTIONS,
+  Humidite,
   ORPAD_STAGES,
+  parseVegetationSol,
   STRATE_KEYS,
   STRATE_LABELS,
   StrateKey,
@@ -43,22 +45,34 @@ function emptyStrateForm(): StrateFormValues {
 export default function VegetationScreen() {
   const router = useRouter();
   const { draftId } = useLocalSearchParams<{ draftId: string }>();
+  const draft = useProspectionWizardStore((s) => s.draft);
   const setDraft = useProspectionWizardStore((s) => s.setDraft);
   const { run, isRunning: isSaving } = useAsyncAction();
   const [expandedStrate, setExpandedStrate] = useState<StrateKey | null>(null);
   const scrollRef = useRef<ScrollView>(null);
-  const [strates, setStrates] = useState<Record<StrateKey, StrateFormValues>>(() =>
-    STRATE_KEYS.reduce((acc, key) => {
+  const [strates, setStrates] = useState<Record<StrateKey, StrateFormValues>>(() => {
+    if (draft?.vegetation) {
+      return parseVegetationSol(draft.vegetation, null, null).strates;
+    }
+    return STRATE_KEYS.reduce((acc, key) => {
       acc[key] = emptyStrateForm();
       return acc;
-    }, {} as Record<StrateKey, StrateFormValues>)
-  );
+    }, {} as Record<StrateKey, StrateFormValues>);
+  });
+
+  // ==========================================
+  // SOL : humidité + texture, déjà enregistrés le cas échéant (fiche reprise)
+  // ==========================================
+
+  const savedSol = draft?.sol
+    ? (JSON.parse(draft.sol) as { humidite?: Humidite | null; texture?: string[] | null })
+    : null;
 
   // ==========================================
   // TEXTURE : sélection multiple
   // ==========================================
 
-  const [selectedTextures, setSelectedTextures] = useState<string[]>([]);
+  const [selectedTextures, setSelectedTextures] = useState<string[]>(savedSol?.texture ?? []);
 
   const toggleTexture = (value: string) => {
     setSelectedTextures((current) =>
@@ -68,7 +82,7 @@ export default function VegetationScreen() {
 
   const form = useForm({
     defaultValues: {
-      humidite: null,
+      humidite: savedSol?.humidite ?? null,
       texture: null,
     } as VegetationFormValues,
     onSubmitInvalid: () => {
