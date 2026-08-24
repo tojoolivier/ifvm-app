@@ -414,6 +414,12 @@ export function useReferentielAutoSync(
               .getState()
               .logout();
           }
+        } catch (error) {
+          // `runTask` absorbe déjà les échecs de la tâche en `resultat.error` ;
+          // un throw ici ne peut venir que du code de ce bloc lui-même
+          // (ex. `logout()`) et doit atteindre l'appelant tel quel — seuls
+          // `syncInProgressRef`/`isSyncing` sont du nettoyage local.
+          throw error;
         } finally {
           syncInProgressRef.current =
             false;

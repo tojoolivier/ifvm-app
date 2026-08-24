@@ -202,9 +202,8 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
     log.detail('station.resolue', { prospectionId: draft.id, stationId });
   }
 
-  // 🔓 Pour extensive, on loggue que station_id est ignoré
   if (draft.type_prospection === 'extensive') {
-    console.log(`🔓 Prospection extensive : station_id ignoré (${stationId || 'null'})`);
+    log.detail('station.ignoree_extensive', { prospectionId: draft.id, stationId });
   }
 
   return {

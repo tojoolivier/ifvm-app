@@ -519,6 +519,10 @@ export async function refreshAccessTokenSingleFlight(): Promise<string | null> {
 
   try {
     return await refreshPromise;
+  } catch (error) {
+    // Relance explicite : le refresh échoué doit atteindre l'appelant
+    // (`makeRequest`) tel quel — seul `refreshPromise` est du nettoyage local.
+    throw error;
   } finally {
     refreshPromise = null;
 

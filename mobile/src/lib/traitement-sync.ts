@@ -206,7 +206,9 @@ export async function enregistrerEtSynchroniserTraitement(
   } catch (error) {
     // La fiche reste enregistrée localement ; seul l'envoi a échoué. Le motif
     // remonte à l'appelant au lieu d'être avalé — c'est ce qui distingue
-    // « pas encore synchronisée » de « synchronisation refusée ».
+    // « pas encore synchronisée » de « synchronisation refusée » (même motif
+    // que prospection-review.ts:enregistrerEtSynchroniser).
+    log.failure('traitement.sync.failed', error, { traitementId: draft.id });
     const syncError =
       error instanceof Error ? error.message : 'Erreur de synchronisation inconnue';
 
