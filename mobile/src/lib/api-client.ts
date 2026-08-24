@@ -166,7 +166,7 @@ export interface PosteAcridienSync {
   id: string;
   code: string;
   nom: string;
-  region: string | null;
+  za_id: string;
   actif: boolean;
   updated_at: string;
 }
@@ -179,6 +179,9 @@ export interface StationFixeSync {
   latitude: number;
   longitude: number;
   altitude: number | null;
+  commune: string;
+  district: string;
+  region: string;
   actif: boolean;
   updated_at: string;
 }

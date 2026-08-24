@@ -85,7 +85,7 @@ describe('pullReferentiel', () => {
       ...emptyResponse('2026-08-02T00:00:00Z'),
       postes_acridiens: {
         upserts: [
-          { id: 'pa-1', code: 'PA-01', nom: 'Bekily', region: 'Androy', actif: true, updated_at: '2026-08-01T00:00:00Z' },
+          { id: 'pa-1', code: 'PA-01', nom: 'Bekily', za_id: 'za-1', actif: true, updated_at: '2026-08-01T00:00:00Z' },
         ],
         server_time: '2026-08-02T00:00:00Z',
       },
@@ -95,7 +95,7 @@ describe('pullReferentiel', () => {
 
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO poste_acridien'),
-      ['pa-1', 'PA-01', 'Bekily', 'Androy', 1, '2026-08-01T00:00:00Z']
+      ['pa-1', 'PA-01', 'Bekily', 'za-1', 1, '2026-08-01T00:00:00Z']
     );
   });
 
@@ -112,6 +112,9 @@ describe('pullReferentiel', () => {
             latitude: -20,
             longitude: 45,
             altitude: null,
+            commune: 'Bekily',
+            district: 'Bekily',
+            region: 'Androy',
             actif: false,
             updated_at: '2026-08-01T00:00:00Z',
           },
@@ -124,7 +127,7 @@ describe('pullReferentiel', () => {
 
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO station_fixe'),
-      ['st-1', 'ST-01', 'Station', 'pa-1', -20, 45, null, 0, '2026-08-01T00:00:00Z']
+      ['st-1', 'ST-01', 'Station', 'pa-1', -20, 45, null, 'Bekily', 'Bekily', 'Androy', 0, '2026-08-01T00:00:00Z']
     );
   });
 
