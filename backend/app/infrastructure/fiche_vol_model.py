@@ -1,0 +1,153 @@
+import uuid
+from datetime import date, datetime, time
+
+from sqlalchemy import (
+    TIMESTAMP,
+    CheckConstraint,
+    Date,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    Time,
+    UniqueConstraint,
+)
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.models.base import Base
+
+
+class FicheVolModel(Base):
+    __tablename__ = "fiche_vol"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    numero_fiche: Mapped[str] = mapped_column(String(60), nullable=False, unique=True)
+    date_vol: Mapped[date] = mapped_column(Date(), nullable=False)
+    compagnie: Mapped[str] = mapped_column(String(255), nullable=False)
+    immatriculation: Mapped[str] = mapped_column(String(20), nullable=False)
+
+    # Lieux : relevés ponctuels (nom saisi, position captée hors ligne), pas des
+    # référentiels — décision produit du 2026-08-24, cf. ADR-011 §7.4.
+    base_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    base_nom: Mapped[str] = mapped_column(String(255), nullable=False)
+    base_latitude: Mapped[float | None] = mapped_column(Numeric(10, 8), nullable=True)
+    base_longitude: Mapped[float | None] = mapped_column(Numeric(11, 8), nullable=True)
+    base_altitude: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
+    stand_nom: Mapped[str] = mapped_column(String(255), nullable=False)
+    stand_latitude: Mapped[float | None] = mapped_column(Numeric(10, 8), nullable=True)
+    stand_longitude: Mapped[float | None] = mapped_column(Numeric(11, 8), nullable=True)
+    stand_altitude: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
+
+    # Pilote et mécanicien sont externes à l'IFVM (compagnie aérienne ou Armée malgache) :
+    # des noms, pas des comptes. Même choix que traitement_aerien.
+    pilote: Mapped[str] = mapped_column(String(255), nullable=False)
+    mecanicien: Mapped[str] = mapped_column(String(255), nullable=False)
+    chef_de_base_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("utilisateur.id"), nullable=False
+    )
+    consultant_international: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    observations: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    statut: Mapped[str] = mapped_column(String(30), nullable=False, default="brouillon")
+    statut_sync: Mapped[str] = mapped_column(String(30), nullable=False, default="local")
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    vols: Mapped[list["VolModel"]] = relationship(
+        back_populates="fiche_vol", cascade="all, delete-orphan", order_by="VolModel.numero"
+    )
+    signatures: Mapped[list["FicheVolSignatureModel"]] = relationship(
+        back_populates="fiche_vol", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        CheckConstraint("statut IN ('brouillon','validee')", name="ck_fiche_vol_statut"),
+        Index("ix_fiche_vol_date_vol", "date_vol"),
+        Index("ix_fiche_vol_immatriculation", "immatriculation"),
+        Index("ix_fiche_vol_chef_de_base_id", "chef_de_base_id"),
+    )
+
+
+class VolModel(Base):
+    """Entité faible de `fiche_vol`. La durée n'est pas une colonne : elle se dérive des
+    deux heures, et la stocker laisserait des lignes capables de se contredire."""
+
+    __tablename__ = "vol"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    fiche_vol_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("fiche_vol.id", ondelete="CASCADE"), nullable=False
+    )
+    numero: Mapped[int] = mapped_column(Integer(), nullable=False)
+    type_vol: Mapped[str] = mapped_column(String(20), nullable=False)
+    heure_debut: Mapped[time] = mapped_column(Time(), nullable=False)
+    heure_fin: Mapped[time] = mapped_column(Time(), nullable=False)
+    rotation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("traitement_rotation.id", ondelete="SET NULL"), nullable=True
+    )
+    prospection_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("prospection.id", ondelete="SET NULL"), nullable=True
+    )
+    observations: Mapped[str | None] = mapped_column(Text(), nullable=True)
+
+    fiche_vol: Mapped[FicheVolModel] = relationship(back_populates="vols")
+
+    __table_args__ = (
+        UniqueConstraint("fiche_vol_id", "numero", name="uq_vol_numero"),
+        # « Une rotation nécessite au minimum 1 mise en place + 1 application » : au plus un
+        # vol de chaque type par rotation. Les lignes sans rotation ne se heurtent jamais à
+        # cette contrainte — en SQL, deux NULL ne sont pas égaux.
+        UniqueConstraint("rotation_id", "type_vol", name="uq_vol_rotation_type"),
+        CheckConstraint(
+            "type_vol IN ('PROSPECTION','MEP','APPLICATION','CONVOYAGE','DIVERS')",
+            name="ck_vol_type",
+        ),
+        CheckConstraint(
+            "rotation_id IS NULL OR type_vol IN ('MEP','APPLICATION')",
+            name="ck_vol_rotation_type_compatible",
+        ),
+        CheckConstraint(
+            "prospection_id IS NULL OR type_vol = 'PROSPECTION'",
+            name="ck_vol_prospection_type_compatible",
+        ),
+        CheckConstraint("heure_fin > heure_debut", name="ck_vol_heures"),
+        Index("ix_vol_fiche_vol_id", "fiche_vol_id"),
+        Index("ix_vol_rotation_id", "rotation_id"),
+        Index("ix_vol_prospection_id", "prospection_id"),
+    )
+
+
+class FicheVolSignatureModel(Base):
+    """Décalque de `traitement_signature`, augmenté du tracé manuscrit."""
+
+    __tablename__ = "fiche_vol_signature"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    fiche_vol_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("fiche_vol.id", ondelete="CASCADE"), nullable=False
+    )
+    role: Mapped[str] = mapped_column(String(30), nullable=False)
+    signataire_nom: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Data URI PNG. Nullable : la fiche est enregistrable avant le passage de signature.
+    signature_image: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    horodatage: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    fiche_vol: Mapped[FicheVolModel] = relationship(back_populates="signatures")
+
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('PILOTE','MECANICIEN','CHEF_DE_BASE','CONSULTANT_INTERNATIONAL')",
+            name="ck_fiche_vol_signature_role",
+        ),
+        UniqueConstraint("fiche_vol_id", "role", name="uq_fiche_vol_signature"),
+        Index("ix_fiche_vol_signature_fiche_vol_id", "fiche_vol_id"),
+    )
