@@ -54,7 +54,7 @@ export default function ObservationsScreen() {
       scrollRef.current?.scrollTo({ y: 0, animated: true });
     },
     onSubmit: async ({ value }) => {
-      run(
+      return run(
         async () => {
           // Mettre à jour la prospection avec les champs de pluie
           // Note: ces champs doivent être ajoutés dans la table prospection

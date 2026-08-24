@@ -7,6 +7,8 @@ import { useAuthStore } from '@/lib/auth-store';
 import { updateProspectionExtensiveReference } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { BIOTOPE_EXTENSIVE_OPTIONS } from '@/lib/prospection-extensive';
+import { useAsyncAction } from '@/hooks/use-async-action';
+import { logger } from '@/lib/logger';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -41,7 +43,7 @@ export default function ExtensiveReferenceScreen() {
   const [nMessage, setNMessage] = useState(
     draft?.n_message ?? (draftId && draft ? generateNumeroMessage(draftId, draft.date_prospection) : '')
   );
-  const [isSaving, setIsSaving] = useState(false);
+  const { run, isRunning: isSaving } = useAsyncAction();
 
   // Récupération automatique des coordonnées GPS
   useEffect(() => {
@@ -71,7 +73,9 @@ export default function ExtensiveReferenceScreen() {
           setGpsError('');
         }
       } catch (error) {
-        console.error('Erreur GPS:', error);
+        // Best-effort délibéré : déjà visible via `gpsError`, l'agent peut
+        // saisir les coordonnées à la main.
+        logger.ignore(error, 'position GPS indisponible, saisie manuelle possible');
         if (isMounted) {
           setGpsError('Impossible de récupérer la position GPS');
         }
@@ -82,36 +86,39 @@ export default function ExtensiveReferenceScreen() {
       }
     };
 
-    fetchGpsPosition();
+    void fetchGpsPosition();
 
     return () => {
       isMounted = false;
     };
   }, [draft?.latitude, draft?.longitude]);
 
-  const handleContinue = async () => {
-    if (!draftId || isSaving) return;
-    setIsSaving(true);
-    try {
-      // 👇 Convertir en minuscules et remplace les espaces par des underscores si besoin
-      const normalizedTypeStation = typeStation
-        ? typeStation.toLowerCase().replace(/\s+/g, '_') 
-        : null;
+  const handleContinue = () =>
+    run(
+      async () => {
+        // Convertit en minuscules et remplace les espaces par des underscores.
+        const normalizedTypeStation = typeStation
+          ? typeStation.toLowerCase().replace(/\s+/g, '_')
+          : null;
 
-      const updated = await updateProspectionExtensiveReference(draftId, {
-        latitude: latitude ? parseFloat(latitude) : null,
-        longitude: longitude ? parseFloat(longitude) : null,
-        stationLibre: stationLibre || null,
-        typeStation: normalizedTypeStation, // 👈 Envoie la version minuscule
-        surfaceStation: surfaceStation ? parseFloat(surfaceStation) : null,
-        nMessage: nMessage || null,
-      });
-      setDraft(updated);
-      router.push({ pathname: '/(prospection)/extensive-imagos' as any, params: { draftId } });
-    } finally {
-      setIsSaving(false);
-    }
-  };
+        const updated = await updateProspectionExtensiveReference(draftId, {
+          latitude: latitude ? parseFloat(latitude) : null,
+          longitude: longitude ? parseFloat(longitude) : null,
+          stationLibre: stationLibre || null,
+          typeStation: normalizedTypeStation,
+          surfaceStation: surfaceStation ? parseFloat(surfaceStation) : null,
+          nMessage: nMessage || null,
+        });
+        setDraft(updated);
+        router.push({ pathname: '/(prospection)/extensive-imagos' as any, params: { draftId } });
+      },
+      {
+        screen: 'extensive-reference',
+        precondition: !!draftId,
+        preconditionMessage: 'Session de saisie perdue — revenez à l’écran précédent et réessayez.',
+        context: { draftId },
+      }
+    );
 
   return (
     <View style={styles.root}>

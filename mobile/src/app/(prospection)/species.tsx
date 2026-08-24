@@ -11,6 +11,7 @@ import {
 } from '@/lib/prospection-especes';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
+import { useAsyncAction } from '@/hooks/use-async-action';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -26,7 +27,7 @@ export default function SpeciesScreen() {
   const captures = useProspectionWizardStore((s) => s.captures);
   const initGrilles = useProspectionCaptureStore((s) => s.initGrilles);
   const [selection, setSelection] = useState<EspeceSelection>({ ...EMPTY_ESPECE_SELECTION });
-  const [isSaving, setIsSaving] = useState(false);
+  const { run, isRunning: isSaving } = useAsyncAction();
 
   const stepsCount = countGrilles(selection);
 
@@ -34,19 +35,24 @@ export default function SpeciesScreen() {
     setSelection((current) => ({ ...current, [field]: !current[field] }));
   };
 
-  const handleContinue = async () => {
-    if (!draftId || stepsCount === 0 || isSaving) return;
-    setIsSaving(true);
-    try {
-      await saveEspeceSelection(draftId, selection);
-      const grilles = buildGrilles(selection);
-      initGrilles(grilles, [], captures);
-      const firstScreen = grilles[0]?.categorie === 'imago' ? 'density' : 'captures';
-      router.push({ pathname: `/(prospection)/${firstScreen}` as any, params: { draftId, grilleIndex: '0' } });
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const handleContinue = () =>
+    run(
+      async () => {
+        await saveEspeceSelection(draftId, selection);
+        const grilles = buildGrilles(selection);
+        initGrilles(grilles, [], captures);
+        const firstScreen = grilles[0]?.categorie === 'imago' ? 'density' : 'captures';
+        router.push({ pathname: `/(prospection)/${firstScreen}` as any, params: { draftId, grilleIndex: '0' } });
+      },
+      {
+        screen: 'species',
+        precondition: !!draftId && stepsCount > 0,
+        preconditionMessage: stepsCount === 0
+          ? 'Sélectionnez au moins un stade avant de continuer.'
+          : 'Session de saisie perdue — revenez à l’écran précédent et réessayez.',
+        context: { draftId, stepsCount },
+      }
+    );
 
   return (
     <View style={styles.root}>

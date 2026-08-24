@@ -13,18 +13,8 @@ import {
 } from '@/lib/prospection-repository';
 import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
-import { parseEspeceSelection, buildGrilles } from '@/lib/prospection-especes';
+import { parseEspeceSelection, buildGrilles, parseGrillesCompletees } from '@/lib/prospection-especes';
 import { parseDensite } from '@/lib/prospection-extensive';
-
-function parseGrillesCompletees(raw: string | null): string[] {
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -67,9 +57,17 @@ export default function DensityScreen() {
   useEffect(() => {
     if (!draftId) return;
     if (draft?.id !== draftId) {
-      hydrateFromDraft(draftId);
+      void hydrateFromDraft(draftId).catch((error) => {
+        signaler(error, 'runTask:essential');
+        logError({
+          message: toFriendlyError(error).message,
+          stack: error instanceof Error ? error.stack ?? null : null,
+          screen: 'density',
+          context: { draftId },
+        });
+      });
     }
-  }, [draftId, draft?.id, hydrateFromDraft]);
+  }, [draftId, draft?.id, hydrateFromDraft, signaler, logError]);
 
   useEffect(() => {
     if (!draft || draft.id !== draftId) return;

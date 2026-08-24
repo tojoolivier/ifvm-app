@@ -18,6 +18,7 @@ import {
   oppositeDirection,
 } from '@/lib/prospection-infestation-insights';
 import { useAsyncAction } from '@/hooks/use-async-action';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { TimeField } from '@/components/TimeField';
 import {
   AerialPopulationClassification,
@@ -253,30 +254,33 @@ export default function InfestationScreen() {
   const [selectedTargets, setSelectedTargets] = useState<string[]>([]);
   const [tab, setTab] = useState<Tab>('desc');
   const { run, isRunning: isSaving } = useAsyncAction();
+  const signalerChargement = useSignalerChargement('infestation');
 
   useEffect(() => {
     if (!draftId) return;
-    listAllProspectionInfestations(draftId).then((rows) => {
-      const byType = new Map(rows.map((row) => [row.type_cible, row]));
-      const next: Record<string, FormationForm> = {};
-      const selected: string[] = [];
-      for (const option of TYPE_CIBLE_OPTIONS) {
-        next[option.value] = formFromRow(byType.get(option.value));
-        if (byType.has(option.value)) {
-          selected.push(option.value);
+    void listAllProspectionInfestations(draftId)
+      .then((rows) => {
+        const byType = new Map(rows.map((row) => [row.type_cible, row]));
+        const next: Record<string, FormationForm> = {};
+        const selected: string[] = [];
+        for (const option of TYPE_CIBLE_OPTIONS) {
+          next[option.value] = formFromRow(byType.get(option.value));
+          if (byType.has(option.value)) {
+            selected.push(option.value);
+          }
         }
-      }
-      // Taille du groupe ≥ 1000 m² déjà en base : "tache" n'est plus une cible valide.
-      const size = numOrNull(next.tache_larvaire?.tailleGroupeM2 ?? '') ?? 0;
-      if (size >= TAILLE_GROUPE_SEUIL_BANDE_M2 && selected.includes('tache_larvaire') && !selected.includes('bande_larvaire')) {
-        next.bande_larvaire = next.tache_larvaire;
-        next.tache_larvaire = emptyFormation();
-        selected[selected.indexOf('tache_larvaire')] = 'bande_larvaire';
-      }
-      setForms(next);
-      setSelectedTargets(selected);
-    });
-  }, [draftId]);
+        // Taille du groupe ≥ 1000 m² déjà en base : "tache" n'est plus une cible valide.
+        const size = numOrNull(next.tache_larvaire?.tailleGroupeM2 ?? '') ?? 0;
+        if (size >= TAILLE_GROUPE_SEUIL_BANDE_M2 && selected.includes('tache_larvaire') && !selected.includes('bande_larvaire')) {
+          next.bande_larvaire = next.tache_larvaire;
+          next.tache_larvaire = emptyFormation();
+          selected[selected.indexOf('tache_larvaire')] = 'bande_larvaire';
+        }
+        setForms(next);
+        setSelectedTargets(selected);
+      })
+      .catch((error) => signalerChargement(error, { draftId }));
+  }, [draftId, signalerChargement]);
 
   if (!forms) {
     return (
@@ -398,7 +402,7 @@ export default function InfestationScreen() {
     }
   };
 
-  const handleFooterPress = async () => {
+  const handleFooterPress = () => {
     if (selectedTargets.length === 0) {
       Alert.alert('Sélection requise', 'Veuillez sélectionner au moins un type de cible.');
       return;
@@ -408,9 +412,11 @@ export default function InfestationScreen() {
       return;
     }
 
-    const draft = draftId ? await getProspection(draftId) : null;
+    return run(
+      async () => {
+        const draft = draftId ? await getProspection(draftId) : null;
 
-    const blocages: string[] = [];
+        const blocages: string[] = [];
     const avertissements: string[] = [];
     /** Sous-ensemble des avertissements relevant de #106 (plausibilité horaire, écart historique) : marque la fiche « à vérifier », visible en revue. */
     const avertissementsAVerifier: string[] = [];
@@ -461,19 +467,17 @@ export default function InfestationScreen() {
         );
       }
     }
-    if (blocages.length > 0) {
-      Alert.alert('Saisie incohérente', blocages.join('\n'));
-      return;
-    }
-    if (avertissements.length > 0) {
-      Alert.alert('À vérifier', avertissements.join('\n'));
-    }
-    if (draftId) {
-      await updateProspectionAvertissements(draftId, avertissementsAVerifier);
-    }
+        if (blocages.length > 0) {
+          Alert.alert('Saisie incohérente', blocages.join('\n'));
+          return;
+        }
+        if (avertissements.length > 0) {
+          Alert.alert('À vérifier', avertissements.join('\n'));
+        }
+        if (draftId) {
+          await updateProspectionAvertissements(draftId, avertissementsAVerifier);
+        }
 
-    run(
-      async () => {
         await persistAll();
         router.push({ pathname: '/(prospection)/veg' as any, params: { draftId } });
       },

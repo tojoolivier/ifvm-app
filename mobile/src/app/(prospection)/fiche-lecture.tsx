@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,6 +8,9 @@ import { useAuthStore } from '@/lib/auth-store';
 import { apiClient, ProspectionRead } from '@/lib/api-client';
 import { buildFicheLecture, FicheLectureViewModel, isFicheValidee } from '@/lib/prospection-fiche-lecture';
 import { buildFicheLecturePdfHtml } from '@/lib/prospection-fiche-lecture-pdf';
+import { useAsyncAction } from '@/hooks/use-async-action';
+import { runTask } from '@/lib/run-task';
+import { EtatVide } from '@/components/erreurs/etat-vide';
 
 const IFVM_GREEN = '#1B5E1B';
 const IFVM_GREEN_DARK = '#163F16';
@@ -23,38 +26,40 @@ export default function FicheLectureScreen() {
   const token = useAuthStore((s) => s.token);
 
   const [prospection, setProspection] = useState<ProspectionRead | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [exportError, setExportError] = useState<string | null>(null);
-  const [isExporting, setIsExporting] = useState(false);
+  const [erreurDeLecture, setErreurDeLecture] = useState<unknown>(null);
+  const { run, isRunning: isExporting } = useAsyncAction();
 
-  useEffect(() => {
+  const charger = useCallback(() => {
     if (!id || !token) return;
-    apiClient
-      .getProspection(token, id)
-      .then(setProspection)
-      .catch(() => setLoadError('Impossible de charger la fiche.'));
+    void runTask(() => apiClient.getProspection(token, id), {
+      name: 'ficheLecture.prospection',
+      criticality: 'essential',
+      context: { id },
+    }).then((outcome) => {
+      setErreurDeLecture(outcome.ok ? null : outcome.error);
+      if (outcome.ok) setProspection(outcome.value);
+    });
   }, [id, token]);
 
-  const handleExportPdf = async () => {
-    if (!prospection) return;
-    setIsExporting(true);
-    setExportError(null);
-    try {
-      const prospecteurLabel = user ? `${user.prenom} ${user.nom}` : '—';
-      const { uri } = await Print.printToFileAsync({
-        html: buildFicheLecturePdfHtml(buildFicheLecture(prospection), prospecteurLabel),
-      });
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
-      }
-    } catch {
-      setExportError("Impossible d'exporter la fiche en PDF.");
-    } finally {
-      setIsExporting(false);
-    }
-  };
+  useEffect(() => {
+    charger();
+  }, [charger]);
 
-  if (loadError) {
+  const handleExportPdf = () =>
+    run(
+      async () => {
+        const prospecteurLabel = user ? `${user.prenom} ${user.nom}` : '—';
+        const { uri } = await Print.printToFileAsync({
+          html: buildFicheLecturePdfHtml(buildFicheLecture(prospection!), prospecteurLabel),
+        });
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
+        }
+      },
+      { screen: 'fiche-lecture', precondition: !!prospection, context: { id } }
+    );
+
+  if (erreurDeLecture || !prospection) {
     return (
       <View style={styles.root}>
         <SafeAreaView edges={['top']} style={styles.header}>
@@ -63,12 +68,12 @@ export default function FicheLectureScreen() {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Fiche de lecture</Text>
         </SafeAreaView>
-        <Text style={styles.errorText}>{loadError}</Text>
+        <EtatVide erreur={erreurDeLecture} titreVide="Chargement…" onReessayer={erreurDeLecture ? charger : undefined} />
       </View>
     );
   }
 
-  if (!prospection || !isFicheValidee(prospection)) {
+  if (!isFicheValidee(prospection)) {
     return <View style={styles.root} />;
   }
 
@@ -126,8 +131,6 @@ export default function FicheLectureScreen() {
           <Text style={styles.cardLabel}>Végétation & sol</Text>
           <Text style={styles.summaryText}>{recap.vegetationSummary}</Text>
         </View>
-
-        {exportError && <Text style={styles.errorText}>{exportError}</Text>}
 
         <TouchableOpacity
           style={[styles.btnExport, isExporting && styles.btnDisabled]}
