@@ -109,7 +109,6 @@ const styles = StyleSheet.create({
   cardTitleIntensive: { fontSize: 15, fontWeight: '800', color: '#fff' },
   cardSubtitle: { fontSize: 11.5, lineHeight: 16, color: TEXT_SECONDARY, marginTop: 4 },
   cardSubtitleIntensive: { fontSize: 11.5, lineHeight: 16, color: '#ffffffd9', marginTop: 4 },
-  errorText: { color: '#c0412b', fontSize: 12, marginTop: 4, textAlign: 'center' },
 });
 
 /**

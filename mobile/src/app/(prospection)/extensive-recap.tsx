@@ -241,7 +241,6 @@ const styles = StyleSheet.create({
   checkLabel: { fontSize: 12.5, fontWeight: '600', color: '#2a2a22' },
   offlineBanner: { marginTop: 6, backgroundColor: '#fdf6e7', borderWidth: 1, borderColor: '#f0e2bf', borderRadius: 11, padding: 12 },
   offlineText: { fontSize: 11, lineHeight: 16, color: '#8a6d2f', fontWeight: '500' },
-  errorText: { color: RED, fontSize: 12, marginTop: 8, textAlign: 'center' },
   footer: { padding: 16 },
   saveButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
   saveButtonText: { color: '#fff', fontWeight: '800', fontSize: 15 },

@@ -417,56 +417,56 @@ export default function InfestationScreen() {
         const draft = draftId ? await getProspection(draftId) : null;
 
         const blocages: string[] = [];
-    const avertissements: string[] = [];
-    /** Sous-ensemble des avertissements relevant de #106 (plausibilité horaire, écart historique) : marque la fiche « à vérifier », visible en revue. */
-    const avertissementsAVerifier: string[] = [];
-    for (const target of selectedTargets) {
-      const f = forms[target];
-      if (!isFilled(f)) continue;
-      const result = validateInfestationFormation({
-        densMin: numOrNull(f.densMin),
-        densMax: numOrNull(f.densMax),
-        ventVitesse: numOrNull(f.ventVitesse),
-      });
-      blocages.push(...result.blocages);
-      avertissements.push(...result.avertissements);
+        const avertissements: string[] = [];
+        /** Sous-ensemble des avertissements relevant de #106 (plausibilité horaire, écart historique) : marque la fiche « à vérifier », visible en revue. */
+        const avertissementsAVerifier: string[] = [];
+        for (const target of selectedTargets) {
+          const f = forms[target];
+          if (!isFilled(f)) continue;
+          const result = validateInfestationFormation({
+            densMin: numOrNull(f.densMin),
+            densMax: numOrNull(f.densMax),
+            ventVitesse: numOrNull(f.ventVitesse),
+          });
+          blocages.push(...result.blocages);
+          avertissements.push(...result.avertissements);
 
-      const directionResult = validateComportementDirection({
-        typeCible: target,
-        comportement: f.comportement,
-        directionRenseignee: !!(f.ventDe && f.ventVers),
-      });
-      blocages.push(...directionResult.blocages);
-      avertissements.push(...directionResult.avertissements);
+          const directionResult = validateComportementDirection({
+            typeCible: target,
+            comportement: f.comportement,
+            directionRenseignee: !!(f.ventDe && f.ventVers),
+          });
+          blocages.push(...directionResult.blocages);
+          avertissements.push(...directionResult.avertissements);
 
-      if (target === 'tache_larvaire' || target === 'bande_larvaire') {
-        const groupementResult = validateGroupementLarvaire({
-          typeCible: target,
-          nbTachesBandes: numOrNull(f.nbTachesBandes),
-          interdistanceMoy: numOrNull(f.interdistanceMoy),
-        });
-        blocages.push(...groupementResult.blocages);
-        avertissements.push(...groupementResult.avertissements);
-      }
+          if (target === 'tache_larvaire' || target === 'bande_larvaire') {
+            const groupementResult = validateGroupementLarvaire({
+              typeCible: target,
+              nbTachesBandes: numOrNull(f.nbTachesBandes),
+              interdistanceMoy: numOrNull(f.interdistanceMoy),
+            });
+            blocages.push(...groupementResult.blocages);
+            avertissements.push(...groupementResult.avertissements);
+          }
 
-      const pushAVerifier = (result: { avertissements: string[] }) => {
-        avertissements.push(...result.avertissements);
-        avertissementsAVerifier.push(...result.avertissements);
-      };
+          const pushAVerifier = (result: { avertissements: string[] }) => {
+            avertissements.push(...result.avertissements);
+            avertissementsAVerifier.push(...result.avertissements);
+          };
 
-      if (target === 'vol_clair' || target === 'essaim') {
-        pushAVerifier(
-          validateEssaimNocturne({ typeCible: target, heureObservation: f.heureObservation })
-        );
-      }
+          if (target === 'vol_clair' || target === 'essaim') {
+            pushAVerifier(
+              validateEssaimNocturne({ typeCible: target, heureObservation: f.heureObservation })
+            );
+          }
 
-      if (draft?.station_id) {
-        const derniereDensiteMoyConnue = await getDerniereDensiteMemeSite(draft.station_id, target, draft.id);
-        pushAVerifier(
-          validateEcartHistorique({ densiteMoyActuelle: numOrNull(f.densMoy), derniereDensiteMoyConnue })
-        );
-      }
-    }
+          if (draft?.station_id) {
+            const derniereDensiteMoyConnue = await getDerniereDensiteMemeSite(draft.station_id, target, draft.id);
+            pushAVerifier(
+              validateEcartHistorique({ densiteMoyActuelle: numOrNull(f.densMoy), derniereDensiteMoyConnue })
+            );
+          }
+        }
         if (blocages.length > 0) {
           Alert.alert('Saisie incohérente', blocages.join('\n'));
           return;

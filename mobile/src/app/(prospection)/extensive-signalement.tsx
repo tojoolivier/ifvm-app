@@ -138,7 +138,6 @@ const styles = StyleSheet.create({
   input: { fontSize: 13, fontWeight: '600', color: TEXT, padding: 0 },
   dateFieldBox: { minHeight: 0, borderWidth: 0, padding: 0, backgroundColor: 'transparent' },
   multiline: { minHeight: 60, textAlignVertical: 'top' },
-  errorText: { color: '#c0412b', fontSize: 12, marginTop: 4, textAlign: 'center' },
   footer: { padding: 16 },
   continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
   continueButtonDisabled: { opacity: 0.5 },

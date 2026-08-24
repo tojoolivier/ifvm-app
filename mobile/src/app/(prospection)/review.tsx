@@ -178,7 +178,6 @@ const styles = StyleSheet.create({
   paragraph: { fontSize: 12, lineHeight: 20, color: '#5c5848' },
   paragraphStrong: { color: TEXT, fontWeight: '600' },
   mono: { fontFamily: 'monospace' },
-  errorText: { color: '#c0412b', fontSize: 12, textAlign: 'center', marginTop: 6 },
   footer: { padding: 16 },
   continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
   continueButtonText: { color: '#fff', fontWeight: '800', fontSize: 15 },
