@@ -7,6 +7,7 @@ import { shareAsync } from 'expo-sharing';
 import { useRequestLogStore, RequestLogEntry } from '@/lib/request-log-store';
 import { useErrorLogStore, ErrorLogEntry } from '@/lib/error-log-store';
 import { useDebugStore } from '@/lib/debug-store';
+import { estLeJournalCasse } from '@/lib/logger';
 
 const IFVM_GREEN_DARK = '#163F16';
 
@@ -91,6 +92,11 @@ export default function DebugLogsScreen() {
   const errorEntries = useErrorLogStore((s) => s.entries);
   const clearErrors = useErrorLogStore((s) => s.clear);
   const debugEnabled = useDebugStore((s) => s.enabled);
+  // Lu au montage, pas en continu : `estLeJournalCasse()` est un drapeau
+  // mémoire et non un store réactif — délibérément, puisque le logger ne peut
+  // rien notifier sans risquer la récursion que décrit `logger.ts`. Le drapeau
+  // ne redescend jamais de lui-même, donc une lecture par ouverture suffit.
+  const journalCasse = estLeJournalCasse();
 
   const handleClear = () => {
     Alert.alert('Vider le journal ?', 'Toutes les requêtes et erreurs enregistrées seront effacées.', [
@@ -139,6 +145,14 @@ export default function DebugLogsScreen() {
       </View>
 
       <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        {journalCasse && (
+          <View style={styles.alerte}>
+            <Text style={styles.alerteText}>
+              Une partie du journal n’a pas pu être enregistrée sur l’appareil. Ce que vous voyez
+              ici est peut-être incomplet — signalez-le au support.
+            </Text>
+          </View>
+        )}
         {!debugEnabled && (
           <View style={styles.notice}>
             <Text style={styles.noticeText}>
@@ -197,6 +211,15 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   noticeText: { fontSize: 12, color: '#78350F' },
+  alerte: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+  },
+  alerteText: { fontSize: 12, color: '#7F1D1D' },
   row: {
     backgroundColor: '#FFFFFF',
     borderRadius: 10,

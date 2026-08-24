@@ -18,11 +18,14 @@ export interface StartupDeps {
   ouvrirBase: () => Promise<unknown>;
   /** Relit la préférence « mode debug » depuis le stockage local. */
   initDebug: () => Promise<unknown>;
+  /** Applique la rétention du journal — ADR-012 décision 4. */
+  purgerJournal: () => Promise<unknown>;
 }
 
 export interface StartupOutcome {
   base: TaskOutcome<unknown>;
   debug: TaskOutcome<unknown>;
+  journal: TaskOutcome<unknown>;
 }
 
 /**
@@ -40,7 +43,19 @@ export async function demarrerApp(deps: StartupDeps): Promise<StartupOutcome> {
     runTask(deps.initDebug, { name: 'startup.debug', criticality: 'essential' }),
   ]);
 
-  return { base, debug };
+  // Après, et non en parallèle : la rétention des `detail` dépend du flag de
+  // verbosité, que `initDebug` vient tout juste de relire. Purger avant, ce
+  // serait purger selon la verbosité de la session précédente.
+  //
+  // `best-effort` : une purge ratée ne coûte que du stockage, jamais une
+  // saisie. L'annoncer à l'agent l'inquiéterait pour rien — le journal, lui,
+  // en garde la trace.
+  const journal = await runTask(deps.purgerJournal, {
+    name: 'startup.journal.purge',
+    criticality: 'best-effort',
+  });
+
+  return { base, debug, journal };
 }
 
 /**

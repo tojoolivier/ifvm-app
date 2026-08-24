@@ -188,6 +188,7 @@ describe('demarrerApp — les premiers clients de essential', () => {
     const r = await demarrerApp({
       ouvrirBase: () => Promise.reject(new LocalWriteError('migration failed')),
       initDebug: ok,
+      purgerJournal: ok,
     });
 
     expect(r.base.ok).toBe(false);
@@ -203,6 +204,7 @@ describe('demarrerApp — les premiers clients de essential', () => {
     const r = await demarrerApp({
       ouvrirBase: ok,
       initDebug: () => Promise.reject(new LocalReadError('storage illisible')),
+      purgerJournal: ok,
     });
 
     expect(r.base.ok).toBe(true);
@@ -218,8 +220,59 @@ describe('demarrerApp — les premiers clients de essential', () => {
       demarrerApp({
         ouvrirBase: () => Promise.reject(new Error('a')),
         initDebug: () => Promise.reject(new Error('b')),
+        purgerJournal: ok,
       })
     ).resolves.toBeDefined();
+  });
+});
+
+describe('demarrerApp — la purge du journal', () => {
+  const ok = () => Promise.resolve();
+
+  it('purge après l’init du mode debug, qui décide de la verbosité', async () => {
+    const ordre: string[] = [];
+
+    await demarrerApp({
+      ouvrirBase: ok,
+      initDebug: async () => {
+        ordre.push('debug');
+      },
+      purgerJournal: async () => {
+        ordre.push('purge');
+      },
+    });
+
+    // La rétention des `detail` dépend du flag, qui n'est relu qu'à l'init :
+    // purger avant, ce serait purger selon la verbosité de la session passée.
+    expect(ordre).toEqual(['debug', 'purge']);
+  });
+
+  it('la traite en best-effort — un stockage un peu plus plein n’alarme pas l’agent', async () => {
+    const r = await demarrerApp({
+      ouvrirBase: ok,
+      initDebug: ok,
+      purgerJournal: () => Promise.reject(new LocalWriteError('purge impossible')),
+    });
+
+    expect(r.journal.ok).toBe(false);
+    if (r.journal.ok) return;
+    expect(r.journal.traitement).toBe('JOURNAL');
+    expect(messageDeDemarrageManque(r)).toBeNull();
+
+    const ligne = ecrites.find((l) => l.event === 'startup.journal.purge.failed');
+    expect(ligne?.classe).toBe('LocalWriteError');
+  });
+
+  it('purge quand même si la base a échoué — c’est `runTask` qui décide, pas nous', async () => {
+    const purge = jest.fn(ok);
+
+    await demarrerApp({
+      ouvrirBase: () => Promise.reject(new LocalWriteError('x')),
+      initDebug: ok,
+      purgerJournal: purge,
+    });
+
+    expect(purge).toHaveBeenCalled();
   });
 });
 
@@ -227,14 +280,20 @@ describe('messageDeDemarrageManque — le INFORMER atteint l’agent', () => {
   const ok = () => Promise.resolve();
 
   it('ne dit rien quand tout s’est ouvert', async () => {
-    const r = await demarrerApp({ ouvrirBase: ok, initDebug: ok });
+    const r = await demarrerApp({ ouvrirBase: ok, initDebug: ok, purgerJournal: ok });
 
     expect(messageDeDemarrageManque(r)).toBeNull();
   });
 
   it.each([
-    ['la base', { ouvrirBase: () => Promise.reject(new LocalWriteError('x')), initDebug: ok }],
-    ['le mode debug', { ouvrirBase: ok, initDebug: () => Promise.reject(new LocalReadError('x')) }],
+    [
+      'la base',
+      { ouvrirBase: () => Promise.reject(new LocalWriteError('x')), initDebug: ok, purgerJournal: ok },
+    ],
+    [
+      'le mode debug',
+      { ouvrirBase: ok, initDebug: () => Promise.reject(new LocalReadError('x')), purgerJournal: ok },
+    ],
   ])('produit un message quand %s échoue', async (_quoi, deps) => {
     // Sans ça, le capteur est posé mais l'alarme n'est reliée à rien : l'agent
     // ne verrait toujours rien, exactement comme avec la promesse flottante.
