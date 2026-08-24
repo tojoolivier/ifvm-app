@@ -15,9 +15,7 @@ import { generateId } from '@/lib/id';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import { validateReferences } from '@/lib/traitement-validation';
 import { useAsyncAction } from '@/hooks/use-async-action';
-import { useErrorStore } from '@/lib/error-store';
-import { useErrorLogStore } from '@/lib/error-log-store';
-import { toFriendlyError } from '@/lib/friendly-error';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { logger } from '@/lib/logger';
 import { Card } from '@/components/traitement/Card';
 import { DateField } from '@/components/traitement/DateField';
@@ -49,8 +47,8 @@ export default function ReferencesScreen() {
   const readOnly = isValidationView === '1';
   const hasGps = store.ref.latitude != null && store.ref.longitude != null;
   const { run: runGps, isRunning: isGpsLoading } = useAsyncAction();
-  const signaler = useErrorStore((s) => s.signaler);
-  const logError = useErrorLogStore((s) => s.addEntry);
+  const { run, isRunning: isSaving } = useAsyncAction();
+  const signalerChargement = useSignalerChargement('references');
 
   useEffect(() => {
     if (routeTraitementId) {
@@ -74,20 +72,12 @@ export default function ReferencesScreen() {
             modeTraitement: (draft.mode_traitement as 'TOTAL' | 'BARRIERE' | 'IRREGULIER' | null) ?? null,
           });
         })
-        .catch((error) => {
-          signaler(error, 'runTask:essential');
-          logError({
-            message: toFriendlyError(error).message,
-            stack: error instanceof Error ? error.stack ?? null : null,
-            screen: 'references',
-            context: { traitementId: routeTraitementId },
-          });
-        });
+        .catch((error) => signalerChargement(error, { traitementId: routeTraitementId }));
     } else {
       store.reset();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeTraitementId, signaler, logError]);
+  }, [routeTraitementId, signalerChargement]);
 
   useEffect(() => {
     if (!prospectionId) return;
@@ -97,16 +87,8 @@ export default function ReferencesScreen() {
         setProspectionStatut(prospection.statut);
         setProspectionUpdatedAt(prospection.updated_at);
       })
-      .catch((error) => {
-        signaler(error, 'runTask:essential');
-        logError({
-          message: toFriendlyError(error).message,
-          stack: error instanceof Error ? error.stack ?? null : null,
-          screen: 'references',
-          context: { prospectionId },
-        });
-      });
-  }, [prospectionId, signaler, logError]);
+      .catch((error) => signalerChargement(error, { prospectionId }));
+  }, [prospectionId, signalerChargement]);
 
   const captureGps = () =>
     runGps(
@@ -126,8 +108,6 @@ export default function ReferencesScreen() {
       },
       { screen: 'references', context: { traitementId, prospectionId } }
     );
-
-  const { run, isRunning: isSaving } = useAsyncAction();
 
   const handleContinuer = () =>
     run(

@@ -5,9 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getTraitement, updateTraitementMoyens } from '@/lib/traitement-repository';
 import { validateRecouvrement } from '@/lib/traitement-validation';
 import { useAsyncAction } from '@/hooks/use-async-action';
-import { useErrorStore } from '@/lib/error-store';
-import { useErrorLogStore } from '@/lib/error-log-store';
-import { toFriendlyError } from '@/lib/friendly-error';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { LocalReadError } from '@/lib/errors';
 import { Card } from '@/components/traitement/Card';
 import { Chip } from '@/components/traitement/Chip';
@@ -42,8 +40,7 @@ export default function MoyensScreen() {
   const [hauteurArboree, setHauteurArboree] = useState<number | null>(null);
   const [recouvrement, setRecouvrement] = useState<number | null>(null);
   const { run, isRunning: isSaving } = useAsyncAction();
-  const signaler = useErrorStore((s) => s.signaler);
-  const logError = useErrorLogStore((s) => s.addEntry);
+  const signalerChargement = useSignalerChargement('moyens');
 
   useEffect(() => {
     if (!traitementId) return;
@@ -70,16 +67,8 @@ export default function MoyensScreen() {
         setHauteurArboree(draft.hauteur_strate_arboree_m);
         setRecouvrement(draft.recouvrement_percent);
       })
-      .catch((error) => {
-        signaler(error, 'runTask:essential');
-        logError({
-          message: toFriendlyError(error).message,
-          stack: error instanceof Error ? error.stack ?? null : null,
-          screen: 'moyens',
-          context: { traitementId },
-        });
-      });
-  }, [traitementId, signaler, logError]);
+      .catch((error) => signalerChargement(error, { traitementId }));
+  }, [traitementId, signalerChargement]);
 
   const nbKitCoche = Object.values(kit).filter(Boolean).length;
   const recouvrementErrors = validateRecouvrement(recouvrement);
