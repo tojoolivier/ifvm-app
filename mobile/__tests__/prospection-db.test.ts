@@ -1,4 +1,9 @@
 import { getDb, resetDbForTests } from '../src/lib/prospection-db';
+import { LocalWriteError } from '../src/lib/errors';
+import {
+  lignesEnAttente,
+  resetLoggerForTests,
+} from '../src/lib/logger';
 
 // Liste complète des colonnes migrées pour les tests
 const MIGRATED_COLUMNS = [
@@ -85,6 +90,7 @@ jest.mock('expo-sqlite', () => ({
 
 beforeEach(() => {
   resetDbForTests();
+  resetLoggerForTests();
   openDatabaseAsync.mockClear();
   execAsync.mockClear();
   getAllAsync.mockClear();
@@ -228,5 +234,44 @@ describe('prospection-db', () => {
       MIGRATED_COLUMNS.some(col => col.name === colName)
     );
     expect(allPresent).toBe(true);
+  });
+});
+
+/*
+ * Ces tests protègent la décision 2 d'ADR-012 (issue #173) sur l'endroit du
+ * mobile où un silence coûte le plus cher : une migration ratée laisse une
+ * colonne absente, et c'est cette dérive-là qui a produit l'écran blanc.
+ */
+describe('prospection-db — typage à la source (#173)', () => {
+  it('lève LocalWriteError quand la base ne peut pas être ouverte', async () => {
+    openDatabaseAsync.mockRejectedValueOnce(new Error('disk I/O error'));
+
+    await expect(getDb()).rejects.toBeInstanceOf(LocalWriteError);
+  });
+
+  it('lève LocalWriteError quand la création des tables échoue', async () => {
+    execAsync.mockRejectedValueOnce(new Error('database is locked'));
+
+    await expect(getDb()).rejects.toBeInstanceOf(LocalWriteError);
+  });
+
+  it('lève LocalWriteError au lieu d’avaler un ALTER TABLE refusé', async () => {
+    // La colonne manque, donc l'ALTER part — et il échoue.
+    getAllAsync.mockResolvedValue([]);
+    execAsync
+      .mockResolvedValueOnce(undefined) // CREATE TABLE
+      .mockRejectedValueOnce(new Error('cannot add column'));
+
+    await expect(getDb()).rejects.toBeInstanceOf(LocalWriteError);
+  });
+
+  it('journalise l’ouverture et les colonnes ajoutées, pas en console', async () => {
+    getAllAsync.mockResolvedValue([]);
+
+    await getDb();
+
+    const evenements = lignesEnAttente().map((ligne) => ligne.event);
+    expect(evenements).toContain('db.migration.colonne-ajoutee');
+    expect(evenements).toContain('db.ouverte');
   });
 });

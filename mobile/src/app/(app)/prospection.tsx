@@ -11,6 +11,7 @@ import { DraftProspection } from '@/lib/prospection-repository';
 import { ProspectionRead } from '@/lib/api-client';
 import { navigateToProspectionConsult, navigateToProspectionDraft } from '@/lib/fiche-routing';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
+import { runTask } from '@/lib/run-task';
 import { FicheCard } from '@/components/fiches/FicheCard';
 import { SearchAndFilterBar, FilterOption } from '@/components/fiches/SearchAndFilterBar';
 import {
@@ -57,16 +58,43 @@ export default function ProspectionScreen() {
   const [filterKey, setFilterKey] = useState<FilterKey>('TOUS');
   const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
 
+  /*
+   * Trois `.then()` sans `.catch()` flottaient ici. Tant que
+   * `loadValidatedProspections` avalait ses échecs, ça ne se voyait pas ; elle
+   * les propage désormais typés (#173), et #160 a établi qu'aucun filet global
+   * ne les rattraperait en release. `runTask` est la frontière prévue pour ça :
+   * elle ne rejette jamais et laisse une trace dans le journal.
+   *
+   * L'affichage de ces échecs à l'agent reste à faire — c'est #174.
+   */
   const refresh = useCallback(() => {
-    loadAccueilData().then(setData);
-    if (user && token) {
-      loadValidatedProspections(token, user.id).then((validated) =>
-        setData((current) => ({ ...current, validated }))
-      );
-    }
-    Network.getNetworkStateAsync().then((state) =>
-      setIsOffline(!(state.isConnected && state.isInternetReachable))
-    );
+    void (async () => {
+      const accueil = await runTask(() => loadAccueilData(), {
+        name: 'prospection.accueil',
+        criticality: 'essential',
+      });
+      if (accueil.ok) setData(accueil.value);
+
+      if (user && token) {
+        const validees = await runTask(() => loadValidatedProspections(token, user.id), {
+          name: 'prospection.validees',
+          criticality: 'essential',
+        });
+        if (validees.ok) {
+          setData((current) => ({ ...current, validated: validees.value }));
+        }
+      }
+
+      // `best-effort` : ne pas connaître l'état du réseau n'empêche aucune
+      // saisie, et l'app est offline-first.
+      const reseau = await runTask(() => Network.getNetworkStateAsync(), {
+        name: 'prospection.reseau',
+        criticality: 'best-effort',
+      });
+      if (reseau.ok) {
+        setIsOffline(!(reseau.value.isConnected && reseau.value.isInternetReachable));
+      }
+    })();
   }, [user, token]);
 
   useFocusEffect(refresh);

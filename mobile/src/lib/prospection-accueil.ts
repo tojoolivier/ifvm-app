@@ -12,6 +12,10 @@ import {
   TypeProspection,
 } from './prospection-repository';
 import { validateProspectionDate } from './prospection-validation';
+import { PreconditionError, ReferentialError } from './errors';
+import { logger } from './logger';
+
+const log = logger.child({ module: 'prospection-accueil' });
 
 export interface AccueilViewModel {
   unsyncedCount: number;
@@ -39,26 +43,31 @@ export async function loadAccueilData(): Promise<AccueilViewModel> {
 /**
  * Récupère les fiches au statut Validé du prospecteur courant depuis le serveur (#16) —
  * seul endroit où le statut final "Validé" existe, l'app locale ne connaît que jusqu'à
- * "en_attente". Échec silencieux hors-ligne (liste vide), cohérent avec l'offline-first.
+ * "en_attente".
+ *
+ * **L'échec n'est plus avalé** (ADR-012 décision 1). Le `catch { return [] }`
+ * d'origine rendait « serveur injoignable » strictement indiscernable de
+ * « aucune fiche validée » : l'agent lisait « Aucune fiche » et en concluait
+ * que sa saisie n'avait pas été prise. L'erreur remonte désormais typée depuis
+ * `api-client`, et c'est le `runTask` de l'écran qui décide si l'absence est
+ * un vide ou une panne.
  */
 export async function loadValidatedProspections(
   token: string,
   prospecteurId: string
 ): Promise<ProspectionRead[]> {
-  try {
-    return await apiClient.listProspections(token, { 
-      statut: STATUT_VALIDE, 
-      prospecteur_id: prospecteurId 
-    });
-  } catch {
-    return [];
-  }
+  return apiClient.listProspections(token, {
+    statut: STATUT_VALIDE,
+    prospecteur_id: prospecteurId,
+  });
 }
 
 /** Supprime une fiche brouillon en local. Refuse toute fiche déjà complétée (elle n'existe alors que côté serveur, où le backend applique la même règle). */
 export async function deleteDraftProspection(draft: DraftProspection): Promise<void> {
   if (draft.statut !== 'brouillon') {
-    throw new Error('Seules les fiches en brouillon peuvent être supprimées.');
+    // Message écrit ici pour l'agent et affiché verbatim : c'est ce qui
+    // distingue `PreconditionError` des six autres classes.
+    throw new PreconditionError('Seules les fiches en brouillon peuvent être supprimées.');
   }
   await deleteLocalProspection(draft.id);
 }
@@ -90,74 +99,65 @@ export async function startNewProspection(params: {
   signalementDate?: string | null;
   signalementDescription?: string | null;
 }): Promise<DraftProspection> {
-  console.log('[startNewProspection] ===== DEBUT =====');
-  console.log('[startNewProspection] token:', params.token?.substring(0, 30) + '...');
-  console.log('[startNewProspection] prospecteurId:', params.prospecteurId);
-  console.log('[startNewProspection] typeProspection:', params.typeProspection);
+  log.detail('prospection.nouvelle.demande', {
+    prospecteurId: params.prospecteurId,
+    typeProspection: params.typeProspection ?? 'intensive',
+  });
 
-  try {
-    console.log('[startNewProspection] Lecture des campagnes du référentiel local...');
-    const campagnes: Campagne[] = await listCampagnesLocal();
-    console.log('[startNewProspection] Campagnes locales:', campagnes.length);
+  const campagnes: Campagne[] = await listCampagnesLocal();
 
-    if (campagnes.length === 0) {
-      console.error('[startNewProspection] ❌ Aucune campagne dans le référentiel local !');
-      throw new Error(
-        'Aucune campagne disponible hors-ligne. Synchronisez le référentiel avant de partir sur le terrain.'
-      );
-    }
-
-    const campagneId = pickCurrentCampagneId(campagnes);
-    console.log('[startNewProspection] campagneId après pickCurrentCampagneId:', campagneId);
-
-    // Si aucune campagne en cours, prendre la première disponible
-    let selectedCampagneId = campagneId;
-    if (!selectedCampagneId && campagnes.length > 0) {
-      selectedCampagneId = campagnes[0].id;
-      console.log('[startNewProspection] Aucune campagne en cours, utilisation de la première:', selectedCampagneId);
-    }
-
-    if (!selectedCampagneId) {
-      console.error('[startNewProspection] ❌ Impossible de sélectionner une campagne');
-      throw new Error('Aucune campagne disponible. Veuillez contacter l\'administrateur.');
-    }
-
-    console.log('[startNewProspection] ✅ Campagne sélectionnée:', selectedCampagneId);
-
-    const dateProspection = new Date().toISOString().slice(0, 10);
-    const campagneSelectionnee = campagnes.find((c) => c.id === selectedCampagneId);
-    if (campagneSelectionnee) {
-      const { blocages } = validateProspectionDate({
-        dateProspection,
-        campagneStartDate: campagneSelectionnee.start_date,
-      });
-      if (blocages.length > 0) {
-        throw new Error(blocages[0]);
-      }
-    }
-
-    const draft = await createDraftProspection({
-      id: generateId(),
-      typeProspection: params.typeProspection ?? 'intensive',
-      campagneId: selectedCampagneId,
-      prospecteurId: params.prospecteurId,
-      dateProspection,
-      region: null,
-      district: null,
-      commune: null,
-      za: null,
-      pa_code: null,
-      signalementSource: params.signalementSource ?? null,
-      signalementDate: params.signalementDate ?? null,
-      signalementDescription: params.signalementDescription ?? null,
-    });
-
-    console.log('[startNewProspection] ✅ Brouillon créé:', draft.id);
-    console.log('[startNewProspection] ===== FIN =====');
-    return draft;
-
-  } catch (error) {
-    console.error('[startNewProspection] ❌ Erreur:', error);
-    throw error;
+  if (campagnes.length === 0) {
+    // `ReferentialError`, pas `Error` : la classe porte l'action offerte à
+    // l'agent — « Synchroniser les référentiels » — là où une erreur nue
+    // n'aurait proposé que « Signaler au support », inutile en brousse.
+    throw new ReferentialError(
+      'Aucune campagne disponible hors-ligne. Synchronisez le référentiel avant de partir sur le terrain.'
+    );
   }
+
+  // À défaut de campagne en cours, la plus récente : le référentiel n'est pas
+  // vide, donc `pickCurrentCampagneId` ne peut rendre `null` qu'en l'absence
+  // de campagne *active*.
+  const selectedCampagneId = pickCurrentCampagneId(campagnes) ?? campagnes[0].id;
+
+  const dateProspection = new Date().toISOString().slice(0, 10);
+  const campagneSelectionnee = campagnes.find((c) => c.id === selectedCampagneId);
+
+  if (campagneSelectionnee) {
+    const { blocages } = validateProspectionDate({
+      dateProspection,
+      campagneStartDate: campagneSelectionnee.start_date,
+    });
+    if (blocages.length > 0) {
+      // Le blocage est déjà une phrase écrite pour l'agent : la réécrire
+      // perdrait la seule information utile.
+      throw new PreconditionError(blocages[0]);
+    }
+  }
+
+  const draft = await createDraftProspection({
+    id: generateId(),
+    typeProspection: params.typeProspection ?? 'intensive',
+    campagneId: selectedCampagneId,
+    prospecteurId: params.prospecteurId,
+    dateProspection,
+    region: null,
+    district: null,
+    commune: null,
+    za: null,
+    pa_code: null,
+    signalementSource: params.signalementSource ?? null,
+    signalementDate: params.signalementDate ?? null,
+    signalementDescription: params.signalementDescription ?? null,
+  });
+
+  // `event` et non `detail` : la création d'un brouillon est le fait notable
+  // auquel le support rattache tout le reste de la fiche.
+  log.event('prospection.brouillon.cree', {
+    prospectionId: draft.id,
+    campagneId: selectedCampagneId,
+    typeProspection: draft.type_prospection,
+  });
+
+  return draft;
 }
