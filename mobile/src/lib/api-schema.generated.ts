@@ -127,6 +127,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/zones-anti-acridiennes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Zones Anti Acridiennes */
+        get: operations["list_zones_anti_acridiennes_zones_anti_acridiennes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/postes-acridiens": {
         parameters: {
             query?: never;
@@ -771,6 +788,16 @@ export interface components {
              */
             server_time: string;
         };
+        /** EntityPull[ZoneAntiAcridienSyncRead] */
+        EntityPull_ZoneAntiAcridienSyncRead_: {
+            /** Upserts */
+            upserts: components["schemas"]["ZoneAntiAcridienSyncRead"][];
+            /**
+             * Server Time
+             * Format: date-time
+             */
+            server_time: string;
+        };
         /**
          * EspeceAcridienne
          * @enum {string}
@@ -1084,8 +1111,15 @@ export interface components {
             code: string;
             /** Nom */
             nom: string;
-            /** Region */
-            region: string | null;
+            /**
+             * Za Id
+             * Format: uuid
+             */
+            za_id: string;
+            /** Za Code */
+            za_code: string;
+            /** Za Nom */
+            za_nom: string;
             /**
              * Created At
              * Format: date-time
@@ -1103,8 +1137,11 @@ export interface components {
             code: string;
             /** Nom */
             nom: string;
-            /** Region */
-            region: string | null;
+            /**
+             * Za Id
+             * Format: uuid
+             */
+            za_id: string;
             /** Actif */
             actif: boolean;
             /**
@@ -1451,6 +1488,7 @@ export interface components {
         };
         /** ReferentielPullResponse */
         ReferentielPullResponse: {
+            zones_anti_acridiennes: components["schemas"]["EntityPull_ZoneAntiAcridienSyncRead_"];
             postes_acridiens: components["schemas"]["EntityPull_PosteAcridienSyncRead_"];
             stations_fixes: components["schemas"]["EntityPull_StationFixeSyncRead_"];
             utilisateurs_equipe: components["schemas"]["EntityPull_UtilisateurEquipeSyncRead_"];
@@ -1584,6 +1622,12 @@ export interface components {
             longitude: number;
             /** Altitude */
             altitude: number | null;
+            /** Commune */
+            commune: string;
+            /** District */
+            district: string;
+            /** Region */
+            region: string;
             /** Actif */
             actif: boolean;
             /**
@@ -1614,6 +1658,12 @@ export interface components {
             longitude: number;
             /** Altitude */
             altitude: number | null;
+            /** Commune */
+            commune: string;
+            /** District */
+            district: string;
+            /** Region */
+            region: string;
             /** Actif */
             actif: boolean;
             /**
@@ -2153,7 +2203,7 @@ export interface components {
          * TypeStation
          * @enum {string}
          */
-        TypeStation: "riziere_bordure" | "bas_fond" | "plateau" | "jachere" | "culture";
+        TypeStation: "xerophyle" | "mesophyle" | "hydrophyle";
         /**
          * TypeTraitement
          * @enum {string}
@@ -2264,6 +2314,42 @@ export interface components {
          * @enum {string}
          */
         VerdureStrate: "faible" | "moyenne" | "forte";
+        /** ZoneAntiAcridienRead */
+        ZoneAntiAcridienRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Code */
+            code: string;
+            /** Nom */
+            nom: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** ZoneAntiAcridienSyncRead */
+        ZoneAntiAcridienSyncRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Code */
+            code: string;
+            /** Nom */
+            nom: string;
+            /** Actif */
+            actif: boolean;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -2595,6 +2681,26 @@ export interface operations {
             };
         };
     };
+    list_zones_anti_acridiennes_zones_anti_acridiennes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZoneAntiAcridienRead"][];
+                };
+            };
+        };
+    };
     list_postes_acridiens_postes_acridiens_get: {
         parameters: {
             query?: never;
@@ -2684,6 +2790,7 @@ export interface operations {
     pull_referentiel_referentiel_pull_get: {
         parameters: {
             query?: {
+                since_zones_anti_acridiennes?: string | null;
                 since_postes_acridiens?: string | null;
                 since_stations_fixes?: string | null;
                 since_utilisateurs_equipe?: string | null;

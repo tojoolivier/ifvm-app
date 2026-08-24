@@ -21,7 +21,7 @@ L'**IFVM** (Ivotoerana Famongorana ny Valala eto Madagasikara) est le centre nat
 | Prospection de validation | — | Vérification d'un signalement | À la demande | Signalement agriculteur/non-specialiste |
 | Relevé météorologique | — | Données journalières par station météo | Quotidien | Quotidien |
 | Compte-rendu de traitement | CRT | Rapport d'une opération de traitement (table `traitement` — voir note ci-dessous) | À chaque traitement | Décision de traitement |
-| Fiche de vol | — | Journal journalier d'un aéronef (1 vol = 1 CRT) | À chaque vol | Vol effectué |
+| Fiche de vol | — | Journal journalier d'un aéronef, tous types de vols confondus | Quotidien (1 fiche / jour / aéronef) | Vol effectué |
 
 ### Chaînes de déclenchement
 
@@ -34,6 +34,35 @@ Agriculteur → Signalement → Prospection de Validation
 
 - **Prospection de validation** : type de prospection déclenchée par un **signalement d'agriculteur ou non-specialiste**. Vérification sur le terrain si le signalement est réel. Station `ponctuelle`.
 - **Validation de fiche** : workflow en 3 étapes (voir ci-dessous). À ne pas confondre avec "prospection de validation".
+- **Vol** vs **rotation** vs **fiche de vol**. Un **vol** est un déplacement unitaire de
+  l'aéronef, du décollage à l'atterrissage, et porte un **type de vol**. Une **rotation**
+  (`traitement_rotation`, côté CRT) est le cycle d'épandage d'**une cuve**. Ce ne sont pas le même
+  fait : une rotation exige **au minimum une mise en place et une application**, donc **au moins
+  deux vols**. La **fiche de vol** est le journal d'une journée pour un aéronef donné : elle
+  regroupe tous ses vols, y compris ceux qui ne se rattachent à aucun traitement.
+  Le terme « passage » n'est pas retenu.
+
+- **Les cinq types de vol** :
+
+  | Type | Définition |
+  |------|-----------|
+  | `PROSPECTION` | vol rattaché à une fiche de prospection |
+  | `MEP` (mise en place) | du stand de remplissage jusqu'au bloc à traiter |
+  | `APPLICATION` | épandage ou pulvérisation du pesticide |
+  | `CONVOYAGE` | transit entre deux points (Tana → Toliara, stand → base aérienne) |
+  | `DIVERS` | rinçage, maintenance aérienne, autre |
+
+  Seuls `MEP` et `APPLICATION` se rattachent à une rotation ; `PROSPECTION` se rattache à une
+  prospection ; `CONVOYAGE` et `DIVERS` ne se rattachent à rien.
+
+- **Base aérienne** vs **stand de remplissage**. Deux lieux distincts d'une même journée de vol,
+  chacun relevé en position (lat/lon/alt captées automatiquement, hors ligne) et nommé à la main.
+  Ni l'un ni l'autre n'est un **poste acridien** ou une **station fixe**.
+
+- **Pilote** et **mécanicien** sont **externes à l'IFVM** (compagnie aérienne ou Armée malgache) :
+  ce sont des noms, pas des comptes `utilisateur`. Seul le **chef de base** est un agent IFVM. Le
+  **consultant international** signe lorsqu'il intervient.
+
 - **Relevé** vs **fiche papier** : l'unité d'enregistrement en base est le **relevé** (un point, une ligne `prospection`). La feuille papier de l'extensive juxtapose **2** relevés par commodité d'impression ; en base ils deviennent **2 lignes distinctes** (regroupables via `n_fiche`).
 
 ### Workflow de validation d'une fiche intensive
@@ -62,15 +91,34 @@ Prospecteur (app mobile)
 
 ### Hiérarchie géographique
 
+Deux axes distincts, qui se croisent au niveau de la station — à ne pas confondre :
+
+- **Géographie administrative de Madagascar** (fixe, indépendante de l'IFVM) :
+  `Région → District → Commune rurale (C/R)`.
+- **Hiérarchie organisationnelle IFVM** (zones de lutte, indépendante du découpage
+  administratif) : `Zone Anti-Acridienne (ZA) → Poste Acridien (PA) → Station`.
+
 ```
-Région
-  └── District
-        └── Commune rurale (C/R)
-              └── Poste Acridien (PA)  ← entité de gestion IFVM
-                    ├── Station fixe       (prospection intensive)
-                    ├── Station ponctuelle (prospection extensive / validation)
-                    └── Station météo      (référentiel distinct)
+Zone Anti-Acridienne (ZA)         Région
+  └── Poste Acridien (PA)           └── District
+        ├── Station fixe                  └── Commune rurale (C/R)  ──┐
+        ├── Station ponctuelle                                        │
+        └── Station météo (référentiel distinct)                      │
+              │                                                       │
+              └── chaque station porte sa propre Commune ─────────────┘
 ```
+
+**Un PA n'a pas de région/district uniques** : ses stations peuvent appartenir à des
+communes, districts, voire régions administratives différents (ex. le PA "Amboasary"
+a des stations en région Androy ET Anosy). La commune (et donc le district et la
+région) est un attribut de la **station**, pas du PA ni de la ZA — modélisé par
+`station_fixe.commune_id → commune → district → region` (voir
+`docs/adr/ADR-013-referentiel-za-station-import.md` pour la justification et l'origine
+des données : import réel du réseau intensif, 6 ZA / 17 PA / 97 stations fixes).
+
+Une ZA regroupe plusieurs PA (ex. ZA "Befandriana sud" → PA "Ankaraobato",
+"Tanandava") ; participation totale des deux côtés (tout PA appartient à une ZA, toute
+ZA a au moins un PA observé).
 
 ---
 
@@ -195,10 +243,17 @@ traitement (ex-CRT — le sigle CRT désigne le compte-rendu affiché à l'utili
   └── traitement_signature (1-N selon rôle : PILOTE | MECANICIEN | CHEF_DE_BASE |
                              CHEF_EQUIPE | CONSULTANT_INTERNATIONAL)
 
-fiche_vol → traitement (1-1, hors périmètre — future table)
-  ├── fiche_vol_passage   (jusqu'à 20 passages/jour)
-  ├── fiche_vol_cumul     (jour / décade / campagne)
-  └── fiche_vol_pesticide
+fiche_vol (hors périmètre — future table ; cadrage : docs/adr/ADR-011)
+  ├── 1 fiche par jour et par aéronef (compagnie, immatriculation, base aérienne,
+  │   stand de remplissage, observations)
+  ├── vol (1-N)   type_vol : PROSPECTION | MEP | APPLICATION | CONVOYAGE | DIVERS
+  │   ├── → prospection          (si type_vol = PROSPECTION)
+  │   └── → traitement_rotation  (si type_vol ∈ MEP | APPLICATION ; N:1 —
+  │                               une rotation = 1 MEP + 1 application)
+  └── fiche_vol_signature (1-N) — même patron que traitement_signature
+                          (PILOTE | MECANICIEN | CHEF_DE_BASE | CONSULTANT_INTERNATIONAL)
+
+  Durées de vol et cumuls (jour / semaine / mois / total) sont dérivés : jamais stockés.
 ```
 
 > **Domaine `espece` : `cible` vs `prospection`.** `prospection.espece` et
@@ -277,5 +332,6 @@ npx tsc --noEmit   # Vérification TypeScript
 | `docs/adr/ADR-006-prospection-unifiee.md` | Table unique discriminée pour les 3 types de prospection |
 | `docs/adr/ADR-004-mobile-scaffolding.md` | Choix techniques du scaffolding mobile |
 | `docs/adr/ADR-008-gestion-erreurs-mobile.md` | Hook centralisé obligatoire pour toute erreur/précondition sur écran mobile |
+| `docs/adr/ADR-012-eradication-erreurs-silencieuses-mobile.md` | Jeu fermé de 7 erreurs typées, logger unifié, affichage, export des logs et lint bloquant — achève ADR-008 |
 | `docs/services/mobile-app/overview.md` | Vue d'ensemble du service mobile |
 | `docs/services/mobile-app/runbooks/development.md` | Procédures de développement mobile |
