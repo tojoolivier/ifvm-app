@@ -47,7 +47,7 @@ async def test_list_stations_recherche_textuelle(
 
 
 @pytest_asyncio.fixture
-async def station_inactive(db_session, poste_acridien):
+async def station_inactive(db_session, poste_acridien, commune):
     from app.infrastructure.referentiel_model import StationFixeModel
 
     station = StationFixeModel(
@@ -58,6 +58,7 @@ async def station_inactive(db_session, poste_acridien):
         latitude=-21.0,
         longitude=44.0,
         altitude=300,
+        commune_id=commune.id,
         actif=False,
     )
     db_session.add(station)

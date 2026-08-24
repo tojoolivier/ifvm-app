@@ -5,12 +5,22 @@ from typing import Generic, TypeVar
 from pydantic import BaseModel, ConfigDict
 
 
+class ZoneAntiAcridienRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    code: str
+    nom: str
+    created_at: datetime
+
+
 class PosteAcridienRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     code: str
     nom: str
-    region: str | None
+    za_id: uuid.UUID
+    za_code: str
+    za_nom: str
     created_at: datetime
 
 
@@ -25,8 +35,20 @@ class StationFixeRead(BaseModel):
     latitude: float
     longitude: float
     altitude: float | None
+    commune: str
+    district: str
+    region: str
     actif: bool
     created_at: datetime
+
+
+class ZoneAntiAcridienSyncRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    code: str
+    nom: str
+    actif: bool
+    updated_at: datetime
 
 
 class PosteAcridienSyncRead(BaseModel):
@@ -34,7 +56,7 @@ class PosteAcridienSyncRead(BaseModel):
     id: uuid.UUID
     code: str
     nom: str
-    region: str | None
+    za_id: uuid.UUID
     actif: bool
     updated_at: datetime
 
@@ -48,6 +70,9 @@ class StationFixeSyncRead(BaseModel):
     latitude: float
     longitude: float
     altitude: float | None
+    commune: str
+    district: str
+    region: str
     actif: bool
     updated_at: datetime
 
@@ -110,6 +135,7 @@ class EntityPull(BaseModel, Generic[T]):
 
 
 class ReferentielPullResponse(BaseModel):
+    zones_anti_acridiennes: EntityPull[ZoneAntiAcridienSyncRead]
     postes_acridiens: EntityPull[PosteAcridienSyncRead]
     stations_fixes: EntityPull[StationFixeSyncRead]
     utilisateurs_equipe: EntityPull[UtilisateurEquipeSyncRead]

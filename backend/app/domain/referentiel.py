@@ -10,11 +10,23 @@ class StationNotFoundError(Exception):
 
 
 @dataclass
+class ZoneAntiAcridien:
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    code: str = ""
+    nom: str = ""
+    actif: bool = True
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
 class PosteAcridien:
     id: uuid.UUID = field(default_factory=uuid.uuid4)
     code: str = ""
     nom: str = ""
-    region: str | None = None
+    za_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    za_code: str = ""
+    za_nom: str = ""
     actif: bool = True
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
@@ -31,6 +43,9 @@ class StationFixe:
     latitude: float = 0.0
     longitude: float = 0.0
     altitude: float | None = None
+    commune: str = ""
+    district: str = ""
+    region: str = ""
     actif: bool = True
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)

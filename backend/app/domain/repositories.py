@@ -11,6 +11,7 @@ from app.domain.referentiel import (
     PosteAcridien,
     StationFixe,
     UtilisateurEquipe,
+    ZoneAntiAcridien,
 )
 from app.domain.traitement import ProduitUtilise, Rotation, Traitement, TraitementSignature
 from app.domain.utilisateur import UtilisateurRef
@@ -184,6 +185,16 @@ class AuditLogRepository(ABC):
 
     @abstractmethod
     async def list_by_fiche(self, fiche_id: uuid.UUID) -> list[AuditLog]:
+        pass
+
+
+class ZoneAntiAcridienRepository(ABC):
+    @abstractmethod
+    async def list_all(self) -> list[ZoneAntiAcridien]:
+        pass
+
+    @abstractmethod
+    async def list_since(self, since: datetime | None) -> list[ZoneAntiAcridien]:
         pass
 
 

@@ -24,6 +24,7 @@ async def test_server_time_is_captured_before_issuing_any_query():
     started_at = datetime.now(timezone.utc)
 
     use_case = PullReferentiel(
+        zone_repository=InstantRepository(),
         poste_repository=SlowPosteRepository(),
         station_repository=InstantRepository(),
         equipe_repository=InstantRepository(),

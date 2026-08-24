@@ -9,6 +9,7 @@ from app.application.referentiel_use_cases import (
     GetStation,
     ListPostesAcridiens,
     ListStations,
+    ListZonesAntiAcridiennes,
     PullReferentiel,
     ReferentielSinceCursors,
 )
@@ -18,6 +19,7 @@ from app.infrastructure.campagne_repository import CampagneRepositoryImpl
 from app.infrastructure.referentiel_repository import (
     PosteAcridienRepositoryImpl,
     StationFixeRepositoryImpl,
+    ZoneAntiAcridienRepositoryImpl,
 )
 from app.infrastructure.referentiel_sync_repository import (
     CodeStadeRepositoryImpl,
@@ -31,9 +33,20 @@ from app.presentation.referentiel_schemas import (
     PosteAcridienRead,
     ReferentielPullResponse,
     StationFixeRead,
+    ZoneAntiAcridienRead,
 )
 
 router = APIRouter()
+
+
+@router.get("/zones-anti-acridiennes", response_model=list[ZoneAntiAcridienRead])
+async def list_zones_anti_acridiennes(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    repository = ZoneAntiAcridienRepositoryImpl(db)
+    use_case = ListZonesAntiAcridiennes(repository)
+    return await use_case.execute()
 
 
 @router.get("/postes-acridiens", response_model=list[PosteAcridienRead])
@@ -81,6 +94,7 @@ async def get_station(
 async def pull_referentiel(
     db: Annotated[AsyncSession, Depends(get_db)],
     _current_user: Annotated[Utilisateur, Depends(get_current_user)],
+    since_zones_anti_acridiennes: datetime | None = Query(default=None),
     since_postes_acridiens: datetime | None = Query(default=None),
     since_stations_fixes: datetime | None = Query(default=None),
     since_utilisateurs_equipe: datetime | None = Query(default=None),
@@ -90,6 +104,7 @@ async def pull_referentiel(
     since_campagnes: datetime | None = Query(default=None),
 ):
     use_case = PullReferentiel(
+        zone_repository=ZoneAntiAcridienRepositoryImpl(db),
         poste_repository=PosteAcridienRepositoryImpl(db),
         station_repository=StationFixeRepositoryImpl(db),
         equipe_repository=UtilisateurEquipeRepositoryImpl(db),
@@ -99,6 +114,7 @@ async def pull_referentiel(
         campagne_repository=CampagneRepositoryImpl(db),
     )
     cursors = ReferentielSinceCursors(
+        zones_anti_acridiennes=since_zones_anti_acridiennes,
         postes_acridiens=since_postes_acridiens,
         stations_fixes=since_stations_fixes,
         utilisateurs_equipe=since_utilisateurs_equipe,
@@ -110,6 +126,9 @@ async def pull_referentiel(
     result = await use_case.execute(cursors=cursors)
 
     return ReferentielPullResponse(
+        zones_anti_acridiennes=EntityPull(
+            upserts=result.zones_anti_acridiennes, server_time=result.server_time
+        ),
         postes_acridiens=EntityPull(
             upserts=result.postes_acridiens, server_time=result.server_time
         ),
