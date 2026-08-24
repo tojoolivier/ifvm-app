@@ -15,10 +15,12 @@ fiche) : on la normalise en trois tables plutôt que de dupliquer le texte sur c
 Les données de poste_acridien/station_fixe existantes sont des fixtures de démo intégralement
 remplacées par l'import du référentiel réel (backend/app/fixtures.py) : elles sont purgées ici
 plutôt que migrées, y compris les prospections de démo qui les référencent (station_id remis à
-NULL, FK nullable — cf. 0004_add_referentiel_station.py). La purge est isolée dans cette révision
-(qui commit avant 0028) car `station_fixe` porte une FK déférée depuis `prospection.station_id`
-(DEFERRABLE INITIALLY DEFERRED) : Postgres refuse un ALTER TABLE sur `station_fixe` tant que le
-trigger déféré du DELETE de cette même transaction n'est pas encore résolu.
+NULL, FK nullable — cf. 0004_add_referentiel_station.py). `station_fixe` porte une FK déférée
+depuis `prospection.station_id` (DEFERRABLE INITIALLY DEFERRED) : le DELETE déclenche ce trigger,
+qui ne se résout qu'au COMMIT. Alembic exécute toutes les révisions d'un `upgrade` dans une seule
+transaction (cf. env.py) — scinder la purge en 0027 et l'ALTER en 0028 ne crée donc PAS de commit
+intermédiaire à soi seul. La purge est exécutée dans un `autocommit_block()` ci-dessous pour
+forcer ce commit avant que 0028 n'altère `station_fixe`.
 
 Revision ID: 0027
 Revises: 0026
@@ -92,9 +94,17 @@ def upgrade() -> None:
 
     # Fixtures de démo intégralement remplacées par le référentiel réel : on purge plutôt que
     # de tenter un backfill de za_id/commune_id sur des données jetables.
-    op.execute("UPDATE prospection SET station_id = NULL WHERE station_id IS NOT NULL")
-    op.execute("DELETE FROM station_fixe")
-    op.execute("DELETE FROM poste_acridien")
+    #
+    # autocommit_block() : le DELETE sur station_fixe déclenche le trigger différé de la FK
+    # prospection.station_id (DEFERRABLE INITIALLY DEFERRED), qui ne se résout qu'au COMMIT.
+    # Sans commit explicite ici, ce trigger reste en attente jusqu'à la fin de TOUTE la
+    # transaction alembic (0027 + 0028 partagent la même transaction), et l'ALTER TABLE
+    # station_fixe de 0028 échoue avec ObjectInUseError. Découper en deux révisions ne suffit
+    # pas : il faut un vrai commit intermédiaire.
+    with op.get_context().autocommit_block():
+        op.execute("UPDATE prospection SET station_id = NULL WHERE station_id IS NOT NULL")
+        op.execute("DELETE FROM station_fixe")
+        op.execute("DELETE FROM poste_acridien")
 
 
 def downgrade() -> None:

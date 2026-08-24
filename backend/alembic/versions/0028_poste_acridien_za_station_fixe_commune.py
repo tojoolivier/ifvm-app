@@ -1,7 +1,7 @@
 """poste_acridien.za_id, drop poste_acridien.region, station_fixe.commune_id
 
-Suite de 0027 (séparée pour laisser le DELETE de 0027 commit avant cet ALTER TABLE — cf. note
-dans 0027 sur la FK déférée prospection.station_id -> station_fixe.id).
+Suite de 0027, dont la purge tourne dans un autocommit_block() pour committer avant cet
+ALTER TABLE (cf. note dans 0027 sur la FK déférée prospection.station_id -> station_fixe.id).
 
 Revision ID: 0028
 Revises: 0027
