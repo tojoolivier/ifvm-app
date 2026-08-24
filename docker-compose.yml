@@ -22,6 +22,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change_me_in_production_use_a_long_random_string}
       JWT_ALGORITHM: HS256
       JWT_EXPIRE_MINUTES: 60
+      ROOT_PATH: ${ROOT_PATH:-}
     volumes:
       - ./backend/app:/app/app
       - ./backend/alembic:/app/alembic

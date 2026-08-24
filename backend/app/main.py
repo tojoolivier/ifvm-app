@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
+from app.config import settings
 from app.presentation import (
     campagne_routes,
     prospection_routes,
@@ -18,7 +19,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="IFVM API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="IFVM API", version="0.1.0", lifespan=lifespan, root_path=settings.ROOT_PATH)
 
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 app.add_middleware(
