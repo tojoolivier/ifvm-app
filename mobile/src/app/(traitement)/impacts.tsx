@@ -6,9 +6,7 @@ import { getTraitement, updateTraitementImpacts } from '@/lib/traitement-reposit
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import { validateEmpoisonnement } from '@/lib/traitement-validation';
 import { useAsyncAction } from '@/hooks/use-async-action';
-import { useErrorStore } from '@/lib/error-store';
-import { useErrorLogStore } from '@/lib/error-log-store';
-import { toFriendlyError } from '@/lib/friendly-error';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { LocalReadError } from '@/lib/errors';
 import { Chip } from '@/components/traitement/Chip';
 import { ProgressBar } from '@/components/traitement/ProgressBar';
@@ -30,8 +28,7 @@ export default function ImpactsScreen() {
   const store = useTraitementCaptureStore();
   const readOnly = isValidationView === '1';
   const { run, isRunning: isSaving } = useAsyncAction();
-  const signaler = useErrorStore((s) => s.signaler);
-  const logError = useErrorLogStore((s) => s.addEntry);
+  const signalerChargement = useSignalerChargement('impacts');
 
   useEffect(() => {
     if (!traitementId) return;
@@ -63,17 +60,9 @@ export default function ImpactsScreen() {
         });
         store.setObservations(draft.observations);
       })
-      .catch((error) => {
-        signaler(error, 'runTask:essential');
-        logError({
-          message: toFriendlyError(error).message,
-          stack: error instanceof Error ? error.stack ?? null : null,
-          screen: 'impacts',
-          context: { traitementId },
-        });
-      });
+      .catch((error) => signalerChargement(error, { traitementId }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [traitementId, signaler, logError]);
+  }, [traitementId, signalerChargement]);
 
   const empoisonnementErrors = validateEmpoisonnement({
     empoisonnement: store.imp.empoisonnement ?? null,

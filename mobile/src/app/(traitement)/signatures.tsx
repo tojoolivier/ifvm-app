@@ -5,9 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getTraitement } from '@/lib/traitement-repository';
 import { useTraitementCaptureStore, SignatureRole } from '@/lib/traitement-capture-store';
 import { computeSignatureMatrix } from '@/lib/traitement-validation';
-import { useErrorStore } from '@/lib/error-store';
-import { useErrorLogStore } from '@/lib/error-log-store';
-import { toFriendlyError } from '@/lib/friendly-error';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { Card } from '@/components/traitement/Card';
 import { ProgressBar } from '@/components/traitement/ProgressBar';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
@@ -29,8 +27,7 @@ export default function SignaturesScreen() {
   const typeTraitement = store.typeTraitement;
   const [agentEncadreurRenseigne, setAgentEncadreurRenseigne] = useState(false);
   const [draftNames, setDraftNames] = useState<Partial<Record<SignatureRole, string>>>({});
-  const signaler = useErrorStore((s) => s.signaler);
-  const logError = useErrorLogStore((s) => s.addEntry);
+  const signalerChargement = useSignalerChargement('signatures');
 
   useEffect(() => {
     if (!traitementId) return;
@@ -40,17 +37,9 @@ export default function SignaturesScreen() {
         store.setTypeTraitement(draft.type_traitement);
         setAgentEncadreurRenseigne(draft.type_traitement === 'TERRESTRE' && !!draft.terrestre?.agent_encadreur_id);
       })
-      .catch((error) => {
-        signaler(error, 'runTask:essential');
-        logError({
-          message: toFriendlyError(error).message,
-          stack: error instanceof Error ? error.stack ?? null : null,
-          screen: 'signatures',
-          context: { traitementId },
-        });
-      });
+      .catch((error) => signalerChargement(error, { traitementId }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [traitementId, signaler, logError]);
+  }, [traitementId, signalerChargement]);
 
   const matrix =
     typeTraitement === 'AERIEN'

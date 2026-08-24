@@ -26,9 +26,7 @@ import { AerienForm } from '@/components/traitement/AerienForm';
 import { TerrestreForm } from '@/components/traitement/TerrestreForm';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
 import { useAsyncAction } from '@/hooks/use-async-action';
-import { useErrorStore } from '@/lib/error-store';
-import { useErrorLogStore } from '@/lib/error-log-store';
-import { toFriendlyError } from '@/lib/friendly-error';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
 export default function TraitementScreen() {
   const router = useRouter();
@@ -51,17 +49,9 @@ export default function TraitementScreen() {
   const [produits, setProduits] = useState<ProduitDraft[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { run, isRunning: isSaving } = useAsyncAction();
-  const signaler = useErrorStore((s) => s.signaler);
-  const logError = useErrorLogStore((s) => s.addEntry);
-  const signalerChargement = (error: unknown, source: string) => {
-    signaler(error, 'runTask:essential');
-    logError({
-      message: toFriendlyError(error).message,
-      stack: error instanceof Error ? error.stack ?? null : null,
-      screen: 'traitement',
-      context: { traitementId, source },
-    });
-  };
+  const signalerChargementBase = useSignalerChargement('traitement');
+  const signalerChargement = (error: unknown, source: string) =>
+    signalerChargementBase(error, { traitementId, source });
 
   useEffect(() => {
     if (!traitementId) return;
