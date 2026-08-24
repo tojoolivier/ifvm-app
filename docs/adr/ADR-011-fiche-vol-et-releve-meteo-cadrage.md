@@ -237,5 +237,136 @@ capables de se contredire. Ils restent contestables, mais sur le terrain de la p
 Tant que §5 n'est pas tranché, **aucune migration Alembic, aucune route, aucun écran**. L'ordre de
 traitement compte : **§5.6 d'abord** (si `fiche_vol` recouvre `traitement_aerien`, une bonne part du
 §3 tombe), puis le reste. Une fois
-l'arbitrage rendu, le lot 5 se reformule en tâches codables (migration `0025+`, routes, écran,
+l'arbitrage rendu, le lot 5 se reformule en tâches codables (migration `0029+`, routes, écran,
 extension de la sync mobile si §5.1 l'exige) et l'issue #125 repasse en `ready-for-agent`.
+
+---
+
+## 7. Révision du 2026-08-24 — arbitrage partiel rendu
+
+Le cahier des charges « Formulaire de gestion des heures de vol » (fourni par le porteur produit)
+tranche l'essentiel du §5 **pour la fiche de vol**. Il ne dit **rien du relevé météo** : cette
+moitié du lot reste entièrement ouverte (§7.4).
+
+### 7.1 Questions du §5 désormais tranchées
+
+| § | Question | Réponse | Effet sur le §3 |
+|---|---|---|---|
+| 5.6 | `fiche_vol` ↔ `traitement_aerien` : 1:1 ? | **Non.** La fiche est journalière **par aéronef** et couvre des vols de types hétérogènes, donc potentiellement plusieurs traitements, plusieurs prospections, et des vols rattachés à rien. | Lecture 2/3 confirmée ; le §3 tient. `CONTEXT.md` disait 1:1 — corrigé. |
+| 5.3 | vol ↔ rotation : 1:1 ? | **Non — N:1.** « Une rotation (une cuve) nécessite au minimum 1 mise en place + 1 application » : une rotation vaut **au moins deux vols**. | **Invalide l'option (a) telle qu'écrite** (§3.4) : le `UNIQUE(rotation_id)` est faux. |
+| 5.5 | `aeronef` : colonne ou entité ? | **Entité.** L'immatriculation est un identifiant unique et l'appareil porte sa compagnie (compagnie aérienne ou Armée malgache). | Contredit le « par défaut : colonne » du §3.1. |
+| 5.5 | `base` : quelle table ? | **Ni `poste_acridien` ni `station_fixe`.** Deux lieux distincts et nouveaux : **base aérienne** et **stand de remplissage**, chacun en lat/lon/alt captées automatiquement hors ligne + nom saisi à la main. | — |
+| 5.1 | Support de saisie | **Mobile obligatoire** : la géolocalisation est captée automatiquement hors ligne, et l'heure vient de l'horloge de l'appareil (que le cahier des charges demande de régler au préalable). | Le lot entre dans le périmètre de sync hors-ligne. |
+
+### 7.2 Ce que le cahier des charges ajoute et que le §3 ignorait
+
+- **Le type de vol** — `PROSPECTION | MEP | APPLICATION | CONVOYAGE | DIVERS`. C'est le concept
+  central du modèle, et il est absent aussi bien du §3 que de la maquette. Il détermine à quoi le
+  vol se rattache : une prospection, une rotation, ou rien.
+- **Les signatures** — pilote, mécanicien, chef de base obligatoires ; consultant international si
+  applicable. Le patron existe déjà : `traitement_signature` (`role`, `signataire_nom`,
+  `horodatage`, `UNIQUE(fiche, role)`). À décliner en `fiche_vol_signature` plutôt qu'à réinventer.
+- **Pilote et mécanicien sont externes à l'IFVM** (compagnie aérienne ou Armée malgache). Le §3.1
+  proposait `pilote_id → utilisateur` : **c'est faux**. Le schéma avait d'ailleurs déjà tranché dans
+  le bon sens — `traitement_aerien.pilote` et `.mecanicien` sont des colonnes `String(255)`
+  (`traitement_model.py:125-126`), seul `chef_de_base_id` est une FK.
+- **Le numéro de fiche est dérivé** : `[Date]-[Base numérotée]-[Immatriculation]`. Ce n'est pas une
+  séquence mais une **clé naturelle composite**, ce qui contredit le `VOL-2026-0042` de la maquette
+  (§3.1).
+- **Les cumuls** — journalier, hebdomadaire, mensuel, total. Tous **dérivés**, comme la durée de vol
+  (`heure_fin − heure_début`) : le §3.5 s'applique, aucune colonne. À noter : `CONTEXT.md` prévoyait
+  « jour / décade / campagne » (unités acridiennes), le cahier des charges dit « jour / semaine /
+  mois / total ». Divergence à trancher (§7.4).
+- **Un champ observations** libre.
+- **Une fiche signée téléchargeable** comme pièce justificative — hors modèle de données, mais
+  détermine ce qu'une « signature » doit contenir (§7.4).
+
+### 7.3 Modèle corrigé du rapprochement (remplace le §3.4)
+
+La règle « N rotations ⇒ N mises en place + N applications » se traduit directement en contrainte,
+au lieu de rester un contrôle applicatif :
+
+```
+vol.rotation_id  → traitement_rotation.id   (nullable, N:1)
+UNIQUE (rotation_id, type_vol)              -- partiel : type_vol ∈ (MEP, APPLICATION)
+CHECK  rotation_id IS NULL OR type_vol IN ('MEP','APPLICATION')
+CHECK  prospection_id IS NULL OR type_vol = 'PROSPECTION'
+```
+
+« Exactement une mise en place et une application par rotation » devient une propriété du schéma.
+
+Conséquence sur le §2.1 : **le n° de cuve n'est plus la clé de rapprochement**. Le cahier des
+charges ne le mentionne jamais. Il peut rester une aide à la saisie (proposer la rotation
+correspondante), mais le lien persisté est la FK, arbitrée par le chef de base — ce qui lève
+l'ambiguïté relevée au §2.1 sans avoir à rendre `numero_cuve` unique.
+
+### 7.4 Ce qui reste ouvert
+
+1. **Base aérienne et stand de remplissage : référentiels ou relevés ponctuels ?** Le cahier des
+   charges se contredit — il fait capter la position automatiquement et saisir le nom à la main
+   (donc un relevé ponctuel, propre à la fiche), mais le format du numéro de fiche impose une
+   **base numérotée** (donc un référentiel stable, avec un numéro).
+2. **Unicité de la fiche.** « Une seule fiche par jour si possible » n'est pas une contrainte, mais
+   le numéro `[Date]-[Base]-[Immatriculation]` est déjà pris si une seconde fiche est ouverte le
+   même jour, sur la même base, pour le même appareil. Soit l'unicité est dure, soit le numéro
+   porte un compteur.
+3. **Nature de la signature.** Le patron `traitement_signature` atteste un nom et un horodatage. La
+   « fiche signée téléchargeable » exige-t-elle davantage — un tracé graphique, une image ?
+4. **Unité des cumuls** : décade (unité acridienne, déjà dans `CONTEXT.md`) ou semaine/mois (cahier
+   des charges) ? Question d'affichage, sans effet sur le schéma tant que rien n'est stocké.
+5. **Tout le relevé météo** — le cahier des charges n'en parle pas. Les §5.2, §5.4 et §5.7 restent
+   intégralement ouverts, ainsi que le rattachement du relevé : `CONTEXT.md` prévoit une
+   `station_meteo` **qui n'a jamais été implémentée** (seule `station_fixe` existe, migration
+   `0004`). **Recommandation : scinder l'issue #125** — la fiche de vol est arbitrée et codable,
+   la météo ne l'est pas.
+
+### 7.5 Alerte sur la maquette
+
+Le prototype §8 a été dessiné sur l'hypothèse « un vol = une rotation », que le cahier des charges
+invalide. Trois écarts, dans l'ordre de gravité :
+
+| | Prototype | Cahier des charges |
+|---|---|---|
+| Rapprochement | `V1…V4`, badge « 3 / 4 » | 3 rotations ⇒ **6 vols** (3 MEP + 3 applications) |
+| Clé de rapprochement | n° de cuve | jamais mentionné |
+| Types de vol | absents — tous les vols se valent | **5 types**, dont 3 ne se rapprochent de rien |
+| Numéro de fiche | `VOL-2026-0042` | `[Date]-[Base]-[Immatriculation]` |
+
+L'écran est à **redessiner**, pas seulement à implémenter : un tableau qui liste `V1…V4` sans
+colonne « type de vol » ne peut pas représenter une journée réelle.
+
+### 7.6 Arbitrage du 2026-08-24 sur les trois points ouverts du §7.4, et implémentation
+
+| Question | Décision | Conséquence |
+|---|---|---|
+| Base aérienne / stand de remplissage | **Relevés ponctuels** portés par la fiche (nom saisi, position captée hors ligne) | Aucune nouvelle table de référentiel, aucun élargissement du périmètre ADR-007. Le « numéro de base » du format devient `fiche_vol.base_code`, saisi. |
+| Unicité de la fiche | **Compteur dans le numéro** — seul `numero` est `UNIQUE` | « Une seule fiche par jour si possible » reste une convention. Le terrain n'est jamais bloqué : la 2ᵉ fiche du jour prend le suffixe `-02`. |
+| Nature de la signature | **Nom horodaté + tracé manuscrit** (`signature_image`, data URI, nullable) | Diverge de `traitement_signature`, qui n'a pas de tracé. Coût de sync assumé (~20-50 Ko par signature) ; nullable pour que la fiche reste enregistrable avant le passage de signature. |
+
+Restent ouverts : l'unité des cumuls affichée (décade *vs* semaine — sans effet sur le
+schéma, rien n'étant stocké) et **tout le relevé météo**, désormais suivi séparément.
+
+**Une violation de BCNF assumée, et une seule.** La fiche porte `compagnie` et
+`immatriculation` alors que `immatriculation → compagnie` est une dépendance fonctionnelle
+dont le déterminant n'est pas superclé de `fiche_vol`. Sortir une table `aeronef` la
+lèverait, mais contredirait la décision « pas de nouveau référentiel » et ferait perdre
+l'exploitant du jour lorsqu'un appareil change de compagnie. C'est donc une
+**dénormalisation temporelle** délibérée, du même type que `cible` (« snapshot à la
+création »), documentée par un `COMMENT ON COLUMN` dans la migration `0029`. Les trois
+relations sont en BCNF par ailleurs.
+
+**Ce que la base garantit maintenant seule**, sans contrôle applicatif :
+
+```sql
+UNIQUE (rotation_id, type_vol)                                   -- 1 MEP + 1 application max
+CHECK  (rotation_id IS NULL OR type_vol IN ('MEP','APPLICATION'))
+CHECK  (prospection_id IS NULL OR type_vol = 'PROSPECTION')
+CHECK  (heure_fin > heure_debut)                                 -- un vol ne franchit pas minuit
+```
+
+La règle inverse — une rotation rapprochée doit avoir **les deux** vols — n'est pas
+exprimable en contrainte de ligne ; elle est vérifiée à la validation de la fiche
+(`valider_rotations_completes`), au même endroit que la complétude des signatures.
+
+Migration `0029`, appliquée et annulée avec succès sur base vierge. Aucune colonne dérivée :
+ni durée, ni cumul, ni décompte de rotations rapprochées.
