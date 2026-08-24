@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
 import { useErrorStore } from '@/lib/error-store';
 import { AuthError } from '@/lib/errors';
+import { logger } from '@/lib/logger';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isSmallScreen = SCREEN_WIDTH < 380;
@@ -41,6 +42,7 @@ export default function LoginScreen() {
     try {
       await login(email.trim(), password);
     } catch (e) {
+      logger.failure('auth.login.failed', e);
       if (e instanceof AuthError) {
         // Sur cet écran, et sur lui seul, un 401 ne veut pas dire « session
         // expirée » : il n'y a pas encore de session. C'est une erreur de
