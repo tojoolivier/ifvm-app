@@ -8,6 +8,8 @@ import { useRequestLogStore, RequestLogEntry } from '@/lib/request-log-store';
 import { useErrorLogStore, ErrorLogEntry } from '@/lib/error-log-store';
 import { useDebugStore } from '@/lib/debug-store';
 import { estLeJournalCasse } from '@/lib/logger';
+import { viderJournal } from '@/lib/journal-db';
+import { runTask } from '@/lib/run-task';
 
 const IFVM_GREEN_DARK = '#163F16';
 
@@ -101,7 +103,20 @@ export default function DebugLogsScreen() {
   const handleClear = () => {
     Alert.alert('Vider le journal ?', 'Toutes les requêtes et erreurs enregistrées seront effacées.', [
       { text: 'Annuler', style: 'cancel' },
-      { text: 'Vider', style: 'destructive', onPress: () => { clear(); clearErrors(); } },
+      {
+        text: 'Vider',
+        style: 'destructive',
+        onPress: () => {
+          clear();
+          clearErrors();
+          // Sans ça le bouton mentirait : les deux stores sont en mémoire,
+          // mais la table `journal` est durable et survivrait au « Vider ».
+          void runTask(viderJournal, {
+            name: 'journal.vider',
+            criticality: 'best-effort',
+          });
+        },
+      },
     ]);
   };
 
@@ -156,7 +171,9 @@ export default function DebugLogsScreen() {
         {!debugEnabled && (
           <View style={styles.notice}>
             <Text style={styles.noticeText}>
-              Le mode débogage est désactivé — aucune nouvelle requête ne sera enregistrée. Activez-le depuis le profil.
+              Le mode débogage est désactivé — tout continue d’être enregistré, mais les détails
+              techniques sont conservés moins longtemps. Activez-le depuis le profil si le support
+              vous le demande.
             </Text>
           </View>
         )}
@@ -211,15 +228,17 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   noticeText: { fontSize: 12, color: '#78350F' },
+  // Jetons `danger-bg` / `danger-border` / `danger-text` de DESIGN.md. Le reste
+  // du fichier porte des hex ad hoc antérieurs ; ne pas les recopier.
   alerte: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#fbe9e5',
     borderWidth: 1,
-    borderColor: '#FCA5A5',
+    borderColor: '#f0c4b9',
     borderRadius: 10,
     padding: 12,
     marginBottom: 16,
   },
-  alerteText: { fontSize: 12, color: '#7F1D1D' },
+  alerteText: { fontSize: 12, color: '#a5341c' },
   row: {
     backgroundColor: '#FFFFFF',
     borderRadius: 10,

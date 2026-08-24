@@ -51,8 +51,8 @@
  */
 import * as SQLite from 'expo-sqlite';
 
-import { LocalReadError } from './errors';
-import { configureLogger, type LogLine, type LogTransport } from './logger';
+import { LocalReadError, LocalWriteError } from './errors';
+import { configureLogger, type LogLine, type LogTransport, type Niveau } from './logger';
 import { getDb } from './prospection-db';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -120,9 +120,27 @@ export const RETENTION_MS = {
   debugVerbeux: 7 * JOUR,
   /** `event` — faits notables. */
   info: 7 * JOUR,
-  /** `failure`, quelle que soit la frontière. */
+  /** `failure`, quelle que soit la frontière — `warn` comme `error`. */
   echec: 30 * JOUR,
 } as const;
+
+/** Une tranche de la politique : ces niveaux-là vivent cet âge-là. */
+interface Tranche {
+  niveaux: Niveau[];
+  age: number;
+}
+
+/**
+ * La politique de rétention, en un seul endroit — c'est elle qui se lit en
+ * revue, pas les `DELETE` qui en découlent.
+ */
+function politiqueDeRetention(verbeux: boolean): Tranche[] {
+  return [
+    { niveaux: ['debug'], age: verbeux ? RETENTION_MS.debugVerbeux : RETENTION_MS.debug },
+    { niveaux: ['info'], age: RETENTION_MS.info },
+    { niveaux: ['warn', 'error'], age: RETENTION_MS.echec },
+  ];
+}
 
 /**
  * Plafond dur, en plus de la rétention temporelle.
@@ -133,6 +151,27 @@ export const RETENTION_MS = {
  * d'entrée de gamme dont le stockage est la ressource rare.
  */
 export const PLAFOND_LIGNES = 5000;
+
+/**
+ * Tous les combien de lots le plafond est réappliqué **en cours de session**.
+ *
+ * L'appliquer uniquement au démarrage laisserait justement passer la rafale
+ * qui motive le plafond : une session qui dure la journée écrirait sans borne
+ * jusqu'au prochain lancement. L'appliquer à chaque lot coûterait une
+ * sous-requête par flush, sur le chemin chaud. Un lot valant au plus
+ * `tailleAnneau` lignes (50 par défaut), ce rythme borne le dépassement à
+ * quelques milliers de lignes au pire.
+ */
+const LOTS_ENTRE_DEUX_PLAFONNEMENTS = 20;
+
+let lotsDepuisPlafonnement = 0;
+
+async function appliquerPlafond(db: SQLite.SQLiteDatabase): Promise<void> {
+  await db.runAsync(
+    'DELETE FROM journal WHERE id NOT IN (SELECT id FROM journal ORDER BY id DESC LIMIT ?)',
+    PLAFOND_LIGNES
+  );
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Ouverture
@@ -146,6 +185,15 @@ let prete: Promise<SQLite.SQLiteDatabase> | null = null;
  * L'échec **oublie** la promesse au lieu de la mémoriser : un `SQLITE_BUSY` au
  * démarrage laisserait sinon le journal cassé pour toute la durée de vie du
  * processus, alors que la cause est transitoire par nature.
+ *
+ * **Sur la ré-entrance, attendue dès #173** : `prospection-db` journalisera ses
+ * 21 traces de migration, donc une ligne peut naître *pendant* `getDb()`. Le
+ * cycle `write → getDb → log → flush → write` ne boucle pas et ne bloque pas,
+ * pour deux raisons qu'il faut préserver : `getDb()` mémorise `dbPromise`
+ * **avant** de migrer, si bien qu'un appel ré-entrant reçoit la promesse en
+ * cours au lieu de relancer la migration ; et `sink()` déclenche le flush par
+ * `void flush()`, jamais attendu par l'appelant, donc la migration ne s'attend
+ * pas elle-même. Ne pas rendre `getDb()` non mémoïsant, ni `sink()` awaité.
  */
 function baseDuJournal(): Promise<SQLite.SQLiteDatabase> {
   if (!prete) {
@@ -164,6 +212,7 @@ function baseDuJournal(): Promise<SQLite.SQLiteDatabase> {
 /** Réservé aux tests : force la recréation de la table au prochain accès. */
 export function resetJournalForTests(): void {
   prete = null;
+  lotsDepuisPlafonnement = 0;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -196,25 +245,38 @@ export function creerTransportJournal(): LogTransport {
     async write(lignes: readonly LogLine[]): Promise<void> {
       if (lignes.length === 0) return;
 
-      const db = await baseDuJournal();
-      await db.withTransactionAsync(async () => {
-        for (const l of lignes) {
-          await db.runAsync(
-            INSERT,
-            l.at,
-            l.cid,
-            l.level,
-            l.event,
-            l.classe ?? null,
-            l.traitement ?? null,
-            l.raison ?? null,
-            l.err?.name ?? null,
-            l.err?.message ?? null,
-            l.err?.stack ?? null,
-            contexteDe(l)
-          );
+      try {
+        const db = await baseDuJournal();
+        await db.withTransactionAsync(async () => {
+          for (const l of lignes) {
+            await db.runAsync(
+              INSERT,
+              l.at,
+              l.cid,
+              l.level,
+              l.event,
+              l.classe ?? null,
+              l.traitement ?? null,
+              l.raison ?? null,
+              l.err?.name ?? null,
+              l.err?.message ?? null,
+              l.err?.stack ?? null,
+              contexteDe(l)
+            );
+          }
+        });
+
+
+        if (++lotsDepuisPlafonnement >= LOTS_ENTRE_DEUX_PLAFONNEMENTS) {
+          lotsDepuisPlafonnement = 0;
+          await appliquerPlafond(db);
         }
-      });
+      } catch (e) {
+        // Typé à la source comme partout ailleurs (décision 2), même si le seul
+        // lecteur est le `catch` vide de `flush()` : le jour où le drapeau
+        // remonte une cause à l'écran de journal, elle sera déjà classée.
+        throw new LocalWriteError(`Journal : ${lignes.length} ligne(s) perdue(s)`, { cause: e });
+      }
     },
   };
 }
@@ -268,24 +330,16 @@ export async function purgerJournal({
 }: OptionsPurge): Promise<void> {
   const db = await baseDuJournal();
 
-  await db.runAsync(
-    'DELETE FROM journal WHERE level = ? AND at < ?',
-    'debug',
-    borne(maintenant, verbeux ? RETENTION_MS.debugVerbeux : RETENTION_MS.debug)
-  );
-  await db.runAsync(
-    'DELETE FROM journal WHERE level = ? AND at < ?',
-    'info',
-    borne(maintenant, RETENTION_MS.info)
-  );
-  await db.runAsync(
-    "DELETE FROM journal WHERE level IN ('warn', 'error') AND at < ?",
-    borne(maintenant, RETENTION_MS.echec)
-  );
-  await db.runAsync(
-    'DELETE FROM journal WHERE id NOT IN (SELECT id FROM journal ORDER BY id DESC LIMIT ?)',
-    PLAFOND_LIGNES
-  );
+  for (const { niveaux, age } of politiqueDeRetention(verbeux)) {
+    const trous = niveaux.map(() => '?').join(', ');
+    await db.runAsync(
+      `DELETE FROM journal WHERE level IN (${trous}) AND at < ?`,
+      ...niveaux,
+      borne(maintenant, age)
+    );
+  }
+
+  await appliquerPlafond(db);
 }
 
 /** Vide le journal — l'action « Effacer » de l'écran de journal. */

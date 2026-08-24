@@ -10,7 +10,7 @@ import {
   resetJournalForTests,
   viderJournal,
 } from '../src/lib/journal-db';
-import { LocalReadError } from '../src/lib/errors';
+import { LocalReadError, LocalWriteError } from '../src/lib/errors';
 import {
   configureLogger,
   estLeJournalCasse,
@@ -169,10 +169,14 @@ describe("l'écriture d'un lot", () => {
 });
 
 describe("l'échec d'écriture ne passe jamais par le logger", () => {
-  it('propage le rejet, pour que `flush()` lève le drapeau', async () => {
-    runAsync.mockRejectedValue(new Error('database is locked'));
+  it('propage le rejet, typé `LocalWriteError`, pour que `flush()` lève le drapeau', async () => {
+    const cause = new Error('database is locked');
+    runAsync.mockRejectedValue(cause);
 
-    await expect(creerTransportJournal().write([ligne()])).rejects.toThrow('database is locked');
+    // Typé à la source comme partout ailleurs (décision 2) : avaler l'erreur
+    // ici rendrait `journalFlushBroken` inatteignable.
+    await expect(creerTransportJournal().write([ligne()])).rejects.toBeInstanceOf(LocalWriteError);
+    await expect(creerTransportJournal().write([ligne()])).rejects.toMatchObject({ cause });
   });
 
   it('rend `estLeJournalCasse()` vrai sans se journaliser lui-même', async () => {
@@ -195,7 +199,7 @@ describe("l'échec d'écriture ne passe jamais par le logger", () => {
     });
     const transport = creerTransportJournal();
 
-    await expect(transport.write([ligne()])).rejects.toThrow('SQLITE_BUSY');
+    await expect(transport.write([ligne()])).rejects.toBeInstanceOf(LocalWriteError);
     await expect(transport.write([ligne()])).resolves.toBeUndefined();
   });
 });
@@ -222,8 +226,9 @@ describe('la rétention par niveau — pas la séparation des flux', () => {
 
     expect(parNiveau[0].params).toEqual(['debug', borne(RETENTION_MS.debug)]);
     expect(parNiveau[1].params).toEqual(['info', borne(RETENTION_MS.info)]);
-    expect(parNiveau[2].sql).toContain("level IN ('warn', 'error')");
-    expect(parNiveau[2].params).toEqual([borne(RETENTION_MS.echec)]);
+    // `warn` et `error` partagent une tranche : un échec reste un échec, que
+    // l'agent l'ait vu (INFORMER) ou non (JOURNAL).
+    expect(parNiveau[2].params).toEqual(['warn', 'error', borne(RETENTION_MS.echec)]);
   });
 
   it("allonge la rétention des `detail` quand le mode verbeux est activé — le flag n'est plus un gate d'écriture", async () => {
@@ -241,6 +246,52 @@ describe('la rétention par niveau — pas la séparation des flux', () => {
     const plafond = suppressions().find((d) => d.sql.includes('LIMIT'));
     expect(plafond).toBeDefined();
     expect(plafond?.params).toEqual([PLAFOND_LIGNES]);
+  });
+});
+
+describe('le plafond en cours de session — pas seulement au démarrage', () => {
+  function plafonnements(): unknown[][] {
+    return runAsync.mock.calls.filter((c) => (c[0] as string).includes('LIMIT'));
+  }
+
+  it("ne plafonne pas à chaque lot : ce serait une sous-requête par flush, sur le chemin chaud", async () => {
+    const transport = creerTransportJournal();
+
+    await transport.write([ligne()]);
+    await transport.write([ligne()]);
+
+    expect(plafonnements()).toHaveLength(0);
+  });
+
+  it('plafonne périodiquement, sans quoi une rafale d’échecs court jusqu’au prochain lancement', async () => {
+    const transport = creerTransportJournal();
+
+    // La purge du démarrage ne protège que du passé ; une session qui dure la
+    // journée écrirait sans borne entre deux lancements.
+    for (let i = 0; i < 20; i++) await transport.write([ligne()]);
+
+    expect(plafonnements()).toHaveLength(1);
+    expect(plafonnements()[0].slice(1)).toEqual([PLAFOND_LIGNES]);
+  });
+});
+
+describe('le flush asymétrique atteint bien SQLite', () => {
+  it('un `failure` persiste tout le tampon immédiatement, pas au lot suivant', async () => {
+    installerTransportJournal({ dev: false });
+
+    logger.detail('contexte.avant.1');
+    logger.detail('contexte.avant.2');
+    expect(runAsync).not.toHaveBeenCalled();
+
+    logger.failure('sync.failed', new Error('boum'));
+    await new Promise((r) => setImmediate(r));
+
+    // Vider TOUT le tampon sur un échec persiste le contexte qui le précède —
+    // souvent plus utile que l'échec lui-même (ADR-012 décision 4).
+    const evenements = runAsync.mock.calls
+      .filter((c) => (c[0] as string).includes('INSERT INTO journal'))
+      .map((c) => c[4]);
+    expect(evenements).toEqual(['contexte.avant.1', 'contexte.avant.2', 'sync.failed']);
   });
 });
 
