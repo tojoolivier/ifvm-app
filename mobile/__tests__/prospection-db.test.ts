@@ -87,9 +87,26 @@ const MIGRATED_COLUMNS = [
 const execAsync = jest.fn().mockResolvedValue(undefined);
 const getAllAsync = jest.fn().mockResolvedValue(MIGRATED_COLUMNS);
 const runAsync = jest.fn().mockResolvedValue(undefined);
-const openDatabaseAsync = jest
-  .fn()
-  .mockResolvedValue({ execAsync, getAllAsync, runAsync });
+
+/**
+ * Méthode hors du tableau de typage, qui **rend son propre `this`**.
+ *
+ * `expo-sqlite` en a de vraies : `closeAsync()` fait
+ * `unregisterDatabaseForDevToolsAsync(this)`, et un `this` valant l'enveloppe
+ * ne correspondrait à aucune entrée du registre.
+ */
+function renvoieSonThis(this: unknown): unknown {
+  return this;
+}
+
+const baseNue = {
+  execAsync,
+  getAllAsync,
+  runAsync,
+  closeAsync: renvoieSonThis,
+};
+
+const openDatabaseAsync = jest.fn().mockResolvedValue(baseNue);
 
 jest.mock('expo-sqlite', () => ({
   openDatabaseAsync: (...args: unknown[]) => openDatabaseAsync(...args),
@@ -314,6 +331,19 @@ describe('prospection-db — typage à la source (#173)', () => {
     getAllAsync.mockResolvedValueOnce([{ id: 'p1' }]);
 
     await expect(db.getAllAsync('SELECT 1')).resolves.toEqual([{ id: 'p1' }]);
+  });
+
+  /*
+   * Ce test existe parce que la correction qu'il protège serait restée
+   * invisible autrement : le registre devtools d'`expo-sqlite` est gardé par
+   * `__DEV__`, et toutes les suites mockent `expo-sqlite` par des objets nus.
+   * C'est le motif que ce dépôt collectionne — du code d'apparence correcte
+   * que rien n'exerce.
+   */
+  it('garde la vraie base comme `this`, même pour une méthode non typée', async () => {
+    const db = await getDb();
+
+    expect((db as unknown as { closeAsync: () => unknown }).closeAsync()).toBe(baseNue);
   });
 
   it('journalise l’ouverture et les colonnes ajoutées, pas en console', async () => {
