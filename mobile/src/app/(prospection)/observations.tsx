@@ -31,20 +31,21 @@ const INTENSITE_PLUIE_OPTIONS = [
 export default function ObservationsScreen() {
   const router = useRouter();
   const { draftId } = useLocalSearchParams<{ draftId: string }>();
+  const draft = useProspectionWizardStore((s) => s.draft);
   const setDraft = useProspectionWizardStore((s) => s.setDraft);
   const { run, isRunning: isSaving } = useAsyncAction();
-  const [showAutre, setShowAutre] = useState(false);
+  const initialEnnemis = parseEnnemis(draft?.ennemis_naturels ?? null);
+  const [showAutre, setShowAutre] = useState(initialEnnemis.autre !== '');
   const scrollRef = useRef<ScrollView>(null);
-  const initialEnnemis = parseEnnemis(null);
 
   const form = useForm({
     defaultValues: {
-      dernierePluieDate: '',
-      intensitePluie: null,
-      degatsCultures: null,
+      dernierePluieDate: draft?.derniere_pluie ?? '',
+      intensitePluie: draft?.intensite_pluie ?? null,
+      degatsCultures: draft?.degats_cultures ?? null,
       ennemisSelected: initialEnnemis.selected,
       ennemisAutre: initialEnnemis.autre,
-      observation: '',
+      observation: draft?.observations ?? '',
     } as ObservationsFormValues & {
       dernierePluieDate: string;
       intensitePluie: string | null;

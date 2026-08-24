@@ -11,7 +11,11 @@ import {
   PosteAcridien,
   StationFixe,
 } from '@/lib/referentiel-db';
-import { updateProspectionReference, listProspectionsRecentesAutresProspecteurs } from '@/lib/prospection-repository';
+import {
+  updateProspectionReference,
+  listProspectionsRecentesAutresProspecteurs,
+  DraftProspection,
+} from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { ReferenceFormValues } from '@/lib/prospection-reference-schema';
 import { validateGpsPosition, validateAntiDoublon, DOUBLON_DELAI_SEUIL_H } from '@/lib/prospection-validation';
@@ -100,10 +104,45 @@ export default function ReferenceScreen() {
   }, []);
 
   // ==========================================
-  // CAPTURE GPS AUTOMATIQUE
+  // CAPTURE GPS AUTOMATIQUE (fiche nouvelle) OU RESTAURATION (fiche déjà enregistrée)
   // ==========================================
   useEffect(() => {
     let isActive = true;
+
+    // Fiche déjà enregistrée (brouillon repris, en attente de synchro ou synchronisée) :
+    // on restaure la position, le PA et la station tels que saisis, au lieu de les
+    // écraser silencieusement par une nouvelle détection GPS/plus-proche-station (#201).
+    const restoreFromDraft = async (savedDraft: DraftProspection) => {
+      setPosition({
+        latitude: savedDraft.latitude as number,
+        longitude: savedDraft.longitude as number,
+        altitude: savedDraft.altitude ?? null,
+        accuracy: null,
+      });
+      setAdminArea({ region: savedDraft.region, district: savedDraft.district, commune: savedDraft.commune });
+      setLocationError(null);
+      setIsGpsLoading(false);
+
+      if (!savedDraft.pa_code && !savedDraft.station_id) return;
+
+      try {
+        const postesList = await listPostesAcridiens();
+        if (!isActive) return;
+        setPostes(postesList);
+        const matchedPa = postesList.find((p) => p.code === savedDraft.pa_code) ?? null;
+        if (!matchedPa) return;
+        setPaMode('manuel');
+        const stations = await applyPa(matchedPa);
+        if (!isActive) return;
+        const matchedStation = stations.find((s) => s.id === savedDraft.station_id) ?? null;
+        if (matchedStation) {
+          setStationMode('manuel');
+          setStation(matchedStation);
+        }
+      } catch {
+        // Best effort : la position reste restaurée même si le PA/la station ne matchent plus le référentiel.
+      }
+    };
 
     const captureGps = async () => {
       try {
@@ -150,12 +189,16 @@ export default function ReferenceScreen() {
       }
     };
 
-    captureGps();
+    if (draft?.latitude != null && draft?.longitude != null) {
+      restoreFromDraft(draft);
+    } else {
+      captureGps();
+    }
 
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [draft?.latitude, draft?.longitude]);
 
   async function applyPa(poste: PosteAcridien): Promise<StationFixe[]> {
     setPa(poste);
