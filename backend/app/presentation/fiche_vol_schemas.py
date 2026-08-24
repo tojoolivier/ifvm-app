@@ -76,7 +76,7 @@ class FicheVolRead(BaseModel):
 
     id: uuid.UUID
     # [Date]-[Base numérotée]-[Immatriculation], suffixé à partir de la 2e fiche du jour.
-    numero: str
+    numero_fiche: str
     date_vol: date
     compagnie: str
     immatriculation: str

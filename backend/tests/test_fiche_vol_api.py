@@ -47,7 +47,7 @@ async def _creer(client, auth_headers, payload) -> dict:
 @pytest.mark.asyncio
 async def test_creation_derive_le_numero_de_fiche(client, auth_headers, payload_fiche):
     fiche = await _creer(client, auth_headers, payload_fiche)
-    assert fiche["numero"] == "2026-08-24-IHO01-MDGA21"
+    assert fiche["numero_fiche"] == "2026-08-24-IHO01-MDGA21"
     assert fiche["statut"] == "brouillon"
 
 
@@ -56,8 +56,8 @@ async def test_seconde_fiche_du_jour_recoit_un_compteur(client, auth_headers, pa
     """Le terrain n'est jamais bloqué : la deuxième fiche est acceptée, numérotée."""
     premiere = await _creer(client, auth_headers, payload_fiche)
     seconde = await _creer(client, auth_headers, payload_fiche)
-    assert premiere["numero"] == "2026-08-24-IHO01-MDGA21"
-    assert seconde["numero"] == "2026-08-24-IHO01-MDGA21-02"
+    assert premiere["numero_fiche"] == "2026-08-24-IHO01-MDGA21"
+    assert seconde["numero_fiche"] == "2026-08-24-IHO01-MDGA21-02"
 
 
 @pytest.mark.asyncio
@@ -354,7 +354,7 @@ async def test_lecture_et_liste(client, auth_headers, payload_fiche):
     fiche = await _creer(client, auth_headers, payload_fiche)
     lue = await client.get(f"/fiches-vol/{fiche['id']}", headers=auth_headers)
     assert lue.status_code == 200
-    assert lue.json()["numero"] == fiche["numero"]
+    assert lue.json()["numero_fiche"] == fiche["numero_fiche"]
 
     liste = await client.get(
         "/fiches-vol", params={"immatriculation": "MDG-A21"}, headers=auth_headers

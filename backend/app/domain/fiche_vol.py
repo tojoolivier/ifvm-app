@@ -52,7 +52,7 @@ class VolIntrouvableError(LookupError):
 
 
 class NumeroFicheVolConflitError(Exception):
-    """Le numero viole la contrainte UNIQUE — l'appelant doit réessayer avec un suffixe."""
+    """Le numero_fiche viole la contrainte UNIQUE — l'appelant doit réessayer avec un suffixe."""
 
 
 class FicheVolVerrouilleeError(PermissionError):
@@ -241,7 +241,7 @@ class FicheVol:
     « snapshot à la création » dans CONTEXT.md.
     """
 
-    numero: str
+    numero_fiche: str
     date_vol: date
     compagnie: str
     immatriculation: str
