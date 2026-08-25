@@ -13,6 +13,7 @@ import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { parseEspeceSelection, buildGrilles, parseGrillesCompletees } from '@/lib/prospection-especes';
 import { parseDensite } from '@/lib/prospection-extensive';
+import { retourArriere } from '@/lib/fiche-routing';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -96,13 +97,14 @@ export default function DensityScreen() {
     setPopulation((current) => (current ? { ...current, [field]: value } : current));
   };
 
-  const handleBack = () => {
-    if (isFirstGrille) {
-      router.replace(`/(prospection)/species?draftId=${draftId}`);
-    } else {
-      router.replace(`/(prospection)/captures?draftId=${draftId}&grilleIndex=${requestedIndex - 1}`);
-    }
-  };
+  const handleBack = () =>
+    retourArriere(router, () => {
+      if (isFirstGrille) {
+        router.replace(`/(prospection)/species?draftId=${draftId}`);
+      } else {
+        router.replace(`/(prospection)/captures?draftId=${draftId}&grilleIndex=${requestedIndex - 1}`);
+      }
+    });
 
   const handleContinue = () =>
     run(
