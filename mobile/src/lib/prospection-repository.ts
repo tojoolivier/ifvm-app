@@ -77,6 +77,9 @@ export interface DraftProspection {
   sol: string | null;
   ennemis_naturels: string | null;
   observations: string | null;
+  /** Horodatage ISO de l'acquisition GPS sur l'écran Observations (§ heure d'observation
+   * automatique) — distinct de `heure_observation` sur une ligne d'infestation. */
+  heure_observation_at: string | null;
   avertissements: string | null;
   statut: string;
   statut_sync: string;
@@ -127,6 +130,7 @@ export interface ObservationsUpdateInput {
   dernierePluie?: string | null;
   intensitePluie?: string | null;
   observations: string | null;
+  heureObservationAt: string | null;
 }
 
 export interface VegetationUpdateInput {
@@ -459,9 +463,13 @@ export async function updateProspectionObservations(id: string, input: Observati
   await db.runAsync(
     `UPDATE prospection SET
       degats_cultures = ?, ennemis_naturels = ?, observations = ?,
-      derniere_pluie = ?, intensite_pluie = ?, updated_at = ?
+      derniere_pluie = ?, intensite_pluie = ?, heure_observation_at = ?, updated_at = ?
      WHERE id = ?`,
-    [input.degatsCultures, input.ennemisNaturels, input.observations, input.dernierePluie ?? null, input.intensitePluie ?? null, now, id]
+    [
+      input.degatsCultures, input.ennemisNaturels, input.observations,
+      input.dernierePluie ?? null, input.intensitePluie ?? null, input.heureObservationAt,
+      now, id,
+    ]
   );
 
   const updated = await getProspection(id);
@@ -747,6 +755,20 @@ export async function saveProspectionInfestation(prospectionId: string, typeCibl
     [generateId(), prospectionId, ...values]
   );
 }
+
+/**
+ * Retire une cible désélectionnée par l'utilisateur (infestation.tsx) : la section
+ * Infestation est facultative et réversible — sans ça, une ligne déjà enregistrée
+ * survivait en base après désélection et réapparaissait sélectionnée à la réouverture.
+ */
+export async function deleteProspectionInfestation(prospectionId: string, typeCible: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(
+    `DELETE FROM prospection_infestation WHERE prospection_id = ? AND type_cible = ?`,
+    [prospectionId, typeCible]
+  );
+}
+
 export async function completeProspection(id: string): Promise<DraftProspection> {
   const db = await getDb();
   const now = new Date().toISOString();

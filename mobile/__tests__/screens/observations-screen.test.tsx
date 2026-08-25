@@ -13,6 +13,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import ObservationsScreen from '@/app/(prospection)/observations';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import * as prospectionRepository from '@/lib/prospection-repository';
+import * as location from '@/lib/location';
+import { formatHeureLocale } from '@/lib/prospection-fiche-lecture';
 
 jest.mock('expo-router', () =>
   require('../test-utils/mock-expo-router').expoRouterMock({ params: { draftId: 'draft-123' } })
@@ -24,9 +26,20 @@ jest.mock('@/lib/prospection-repository', () => ({
   listAllProspectionCaptures: jest.fn().mockResolvedValue([]),
 }));
 
+jest.mock('@/lib/location', () => ({
+  getCurrentPosition: jest.fn(),
+}));
+
 describe('ObservationsScreen — restauration des données déjà enregistrées', () => {
   beforeEach(() => {
     jest.mocked(prospectionRepository.updateProspectionObservations).mockClear();
+    jest.mocked(location.getCurrentPosition).mockReset().mockResolvedValue({
+      latitude: -18.9,
+      longitude: 47.5,
+      altitude: null,
+      accuracy: 5,
+      timestamp: new Date('2026-08-25T11:35:00.000Z').getTime(),
+    });
     useProspectionWizardStore.setState({
       draft: {
         id: 'draft-123',
@@ -110,5 +123,61 @@ describe('ObservationsScreen — restauration des données déjà enregistrées'
         })
       )
     );
+  });
+
+  it("renseigne automatiquement l'heure d'observation depuis le timestamp GPS (pas Date.now()), et l'enregistre", async () => {
+    const timestampGps = new Date('2026-08-25T11:35:00.000Z').getTime();
+    jest.mocked(location.getCurrentPosition).mockResolvedValue({
+      latitude: -18.9, longitude: 47.5, altitude: null, accuracy: 5, timestamp: timestampGps,
+    });
+    useProspectionWizardStore.setState({
+      draft: { id: 'draft-123', type_prospection: 'intensive', degats_cultures: 'moyens', heure_observation_at: null } as any,
+      captures: [],
+    });
+
+    await render(<ObservationsScreen />);
+
+    const heureAttendue = formatHeureLocale(new Date(timestampGps).toISOString());
+    expect(await screen.findByText(heureAttendue)).toBeVisible();
+
+    fireEvent.press(screen.getByText('Vérifier & enregistrer ✓'));
+
+    await waitFor(() =>
+      expect(prospectionRepository.updateProspectionObservations).toHaveBeenCalledWith(
+        'draft-123',
+        expect.objectContaining({ heureObservationAt: new Date(timestampGps).toISOString() })
+      )
+    );
+  });
+
+  it("restaure l'heure d'observation déjà enregistrée sans relancer d'acquisition GPS au remontage", async () => {
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'intensive',
+        heure_observation_at: '2026-08-25T09:12:00.000Z',
+      } as any,
+      captures: [],
+    });
+
+    await render(<ObservationsScreen />);
+
+    expect(await screen.findByText(formatHeureLocale('2026-08-25T09:12:00.000Z'))).toBeVisible();
+    expect(location.getCurrentPosition).not.toHaveBeenCalled();
+  });
+
+  it("un GPS indisponible n'invente pas d'heure et ne bloque pas l'écran", async () => {
+    jest.mocked(location.getCurrentPosition).mockRejectedValue(new Error('GPS indisponible'));
+    useProspectionWizardStore.setState({
+      draft: { id: 'draft-123', type_prospection: 'intensive', heure_observation_at: null } as any,
+      captures: [],
+    });
+
+    await render(<ObservationsScreen />);
+
+    await waitFor(() => expect(location.getCurrentPosition).toHaveBeenCalled());
+    expect(screen.getByText('—')).toBeVisible();
+    // L'échec GPS ne doit jamais empêcher de continuer la fiche.
+    expect(screen.getByText('Vérifier & enregistrer ✓')).toBeVisible();
   });
 });

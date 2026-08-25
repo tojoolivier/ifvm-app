@@ -330,3 +330,16 @@ function formatCoordinates(latitude: number | null, longitude: number | null): s
   if (latitude == null || longitude == null) return '—';
   return `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
 }
+
+/**
+ * `HH:mm` en heure locale de l'appareil, à partir d'un timestamp ISO (ex.
+ * `heure_observation_at`, capturé au moment de l'acquisition GPS sur observations.tsx).
+ * Partagé entre l'écran (affichage au moment de la saisie) et le récapitulatif (lecture
+ * depuis le brouillon déjà enregistré) — une seule implémentation du format.
+ */
+export function formatHeureLocale(iso: string | null): string {
+  if (!iso) return '—';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '—';
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
