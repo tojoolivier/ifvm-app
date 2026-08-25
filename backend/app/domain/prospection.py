@@ -184,6 +184,7 @@ class Prospection:
     degats_cultures_pourcent: int | None = None
     verdissement_pourcent: int | None = None
     hauteur_herbe_cm: float | None = None
+    heure_observation_at: datetime | None = None
 
     # ==========================================
     # NOUVEAUX CHAMPS - Extensif & Validation
