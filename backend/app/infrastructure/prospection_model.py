@@ -90,6 +90,14 @@ class ProspectionModel(Base):
     degats_cultures_pourcent: Mapped[int | None] = mapped_column(Integer(), nullable=True)
     verdissement_pourcent: Mapped[int | None] = mapped_column(Integer(), nullable=True)
     hauteur_herbe_cm: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
+    # Horodatage complet (date + heure + fuseau) de l'acquisition GPS sur l'écran
+    # Observations — distinct de `prospection_infestation_imago.heure_observation`
+    # (une heure locale saisie/déduite par cible d'infestation, pas liée au GPS).
+    # L'heure HH:mm affichée à l'agent est dérivée de ce timestamp, jamais stockée
+    # séparément (une seule source de vérité).
+    heure_observation_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
 
     # ==========================================
     # NOUVEAUX CHAMPS - Extensif & Validation

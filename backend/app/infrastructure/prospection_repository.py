@@ -178,6 +178,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             degats_cultures_pourcent=prospection.degats_cultures_pourcent,
             verdissement_pourcent=prospection.verdissement_pourcent,
             hauteur_herbe_cm=prospection.hauteur_herbe_cm,
+            heure_observation_at=prospection.heure_observation_at,
             # ==========================================
             # NOUVEAUX CHAMPS - Extensif & Validation
             # ==========================================
@@ -308,6 +309,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         model.degats_cultures_pourcent = prospection.degats_cultures_pourcent
         model.verdissement_pourcent = prospection.verdissement_pourcent
         model.hauteur_herbe_cm = prospection.hauteur_herbe_cm
+        model.heure_observation_at = prospection.heure_observation_at
 
         # ==========================================
         # NOUVEAUX CHAMPS - Extensif & Validation
@@ -580,6 +582,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             hauteur_herbe_cm=float(model.hauteur_herbe_cm)
             if model.hauteur_herbe_cm is not None
             else None,
+            heure_observation_at=model.heure_observation_at,
             # ==========================================
             # NOUVEAUX CHAMPS - Extensif & Validation
             # ==========================================
