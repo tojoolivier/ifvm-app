@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm } from '@tanstack/react-form';
 import { useAsyncAction } from '@/hooks/use-async-action';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { DEGATS_OPTIONS } from '@/lib/prospection-fiche-lecture';
 import { ENNEMIS_OPTIONS, parseEnnemis, serializeEnnemis } from '@/lib/prospection-observations';
 import { ObservationsFormValues } from '@/lib/prospection-observations-schema';
@@ -35,27 +36,28 @@ export default function ObservationsScreen() {
   const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
   const setDraft = useProspectionWizardStore((s) => s.setDraft);
   const { run, isRunning: isSaving } = useAsyncAction();
-  const [showAutre, setShowAutre] = useState(false);
+  const signalerChargement = useSignalerChargement('observations');
+  const initialEnnemis = parseEnnemis(draft?.ennemis_naturels ?? null);
+  const [showAutre, setShowAutre] = useState(initialEnnemis.autre !== '');
   const scrollRef = useRef<ScrollView>(null);
-  const initialEnnemis = parseEnnemis(null);
 
   // Filet de sécurité si cet écran est atteint sans passer par reference.tsx (deep-link,
   // app relancée en plein milieu du parcours) : le store peut ne pas encore porter cette
   // fiche — cf. même garde sur reference.tsx / captures.tsx / veg.tsx.
   useEffect(() => {
     if (draftId && draft?.id !== draftId) {
-      hydrateFromDraft(draftId);
+      void hydrateFromDraft(draftId).catch((error) => signalerChargement(error, { draftId }));
     }
-  }, [draftId, draft?.id, hydrateFromDraft]);
+  }, [draftId, draft?.id, hydrateFromDraft, signalerChargement]);
 
   const form = useForm({
     defaultValues: {
-      dernierePluieDate: '',
-      intensitePluie: null,
-      degatsCultures: null,
+      dernierePluieDate: draft?.derniere_pluie ?? '',
+      intensitePluie: draft?.intensite_pluie ?? null,
+      degatsCultures: draft?.degats_cultures ?? null,
       ennemisSelected: initialEnnemis.selected,
       ennemisAutre: initialEnnemis.autre,
-      observation: '',
+      observation: draft?.observations ?? '',
     } as ObservationsFormValues & {
       dernierePluieDate: string;
       intensitePluie: string | null;
@@ -64,7 +66,7 @@ export default function ObservationsScreen() {
       scrollRef.current?.scrollTo({ y: 0, animated: true });
     },
     onSubmit: async ({ value }) => {
-      run(
+      return run(
         async () => {
           // Mettre à jour la prospection avec les champs de pluie
           // Note: ces champs doivent être ajoutés dans la table prospection
@@ -98,7 +100,7 @@ export default function ObservationsScreen() {
   useEffect(() => {
     if (!draft || draft.id !== draftId || obsHydratedRef.current === draft.id) return;
     obsHydratedRef.current = draft.id;
-    Promise.resolve().then(() => {
+    void Promise.resolve().then(() => {
       const ennemis = parseEnnemis(draft.ennemis_naturels);
       form.setFieldValue('dernierePluieDate', draft.derniere_pluie ?? '');
       form.setFieldValue('intensitePluie', draft.intensite_pluie ?? null);

@@ -64,9 +64,18 @@ describe('rowsToCounts / countsToRows', () => {
   });
 });
 
+/** Vocabulaire tel que le référentiel synchronisé le livre — le store n'en énumère aucun. */
+const STADES_REFERENTIEL = {
+  'LMC:imago': { F: ['A1', 'A2', 'A3', 'A3-1/4', 'A3-1/2', 'A3-3/4', 'A3-4/4', 'A4', 'A5'], M: ['A1', 'A234', 'A5'], larve: [] },
+  'NSE:imago': { F: ['A1', 'A2', 'A3', 'A3-1/4', 'A3-1/2', 'A3-3/4', 'A3-4/4', 'A4', 'A5'], M: ['A1', 'A234', 'A5'], larve: [] },
+  'LMC:larve': { F: [], M: [], larve: ['L1', 'L2', 'L3', 'L4', 'L5'] },
+  'NSE:larve': { F: [], M: [], larve: ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'] },
+};
+
 describe('useProspectionCaptureStore', () => {
   beforeEach(() => {
     useProspectionCaptureStore.getState().reset();
+    useProspectionCaptureStore.getState().setStadesParGrille(STADES_REFERENTIEL);
   });
 
   it('initGrilles positionne le sexe F et le premier stade pour LMC imago', () => {
@@ -122,9 +131,46 @@ describe('useProspectionCaptureStore', () => {
 
   it('setSexe remappe le stade courant', () => {
     useProspectionCaptureStore.getState().initGrilles([{ espece: 'LMC', categorie: 'imago' }], [], []);
-    useProspectionCaptureStore.getState().setStade('A3¼');
+    useProspectionCaptureStore.getState().setStade('A3-1/4');
     useProspectionCaptureStore.getState().setSexe('M');
     expect(useProspectionCaptureStore.getState().currentStade).toBe('A1');
+  });
+
+  it('cumule les effectifs d’un stade réparti sur plusieurs phases (#201)', () => {
+    // L'enregistrement répartit un stade entre les phases saisies : 10 larves L1
+    // deviennent deux lignes (5 solitaires + 5 grégaires). À la réouverture, le stade
+    // doit valoir 10 — écraser au lieu de cumuler perdait la moitié de la saisie, avec
+    // des phases à 10 et des stades à 5.
+    const capturesReparties: CaptureRow[] = [
+      { espece: 'LMC', categorie: 'larve', sexe: null, phase: 'solitaire', stade: 'L1', effectif: 5 },
+      { espece: 'LMC', categorie: 'larve', sexe: null, phase: 'gregaire', stade: 'L1', effectif: 5 },
+    ];
+
+    useProspectionCaptureStore
+      .getState()
+      .initGrilles([{ espece: 'LMC', categorie: 'larve' }], [], capturesReparties);
+
+    const state = useProspectionCaptureStore.getState();
+    expect(state.stadesData['L1']).toBe(10);
+    // Les deux totaux doivent concorder, c'est la règle de saisie.
+    const totalPhases = Object.values(state.phasesData).reduce((s, n) => s + n, 0);
+    expect(totalPhases).toBe(10);
+  });
+
+  it('cumule aussi côté imagos, par sexe (#201)', () => {
+    const capturesReparties: CaptureRow[] = [
+      { espece: 'LMC', categorie: 'imago', sexe: 'F', phase: 'solitaire', stade: 'A1', effectif: 3 },
+      { espece: 'LMC', categorie: 'imago', sexe: 'F', phase: 'gregaire', stade: 'A1', effectif: 4 },
+      { espece: 'LMC', categorie: 'imago', sexe: 'M', phase: 'gregaire', stade: 'A1', effectif: 2 },
+    ];
+
+    useProspectionCaptureStore
+      .getState()
+      .initGrilles([{ espece: 'LMC', categorie: 'imago' }], [], capturesReparties);
+
+    const state = useProspectionCaptureStore.getState();
+    expect(state.stadesDataF['A1']).toBe(7);
+    expect(state.stadesDataM['A1']).toBe(2);
   });
 
   it('markCurrentGrilleCompleted ajoute la clé une seule fois', () => {

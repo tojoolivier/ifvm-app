@@ -13,6 +13,19 @@ _TRANSITIONS: dict[str, dict[str, list[str]]] = {
     },
 }
 
+
+class ProspectionIntegriteError(Exception):
+    """La fiche viole une contrainte de la base autre que la référence à la station."""
+
+
+class StadeInconnuError(Exception):
+    """Une capture référence un stade absent du référentiel."""
+
+    def __init__(self, codes: set[str]):
+        self.codes = codes
+        super().__init__("stade(s) absent(s) du référentiel : " + ", ".join(sorted(codes)))
+
+
 _ACTION_MAP: dict[str, str] = {
     "en_attente": "soumission",
     "verifiee": "verification",

@@ -13,9 +13,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
-import { ApiError } from '@/lib/api-client';
 import { useErrorStore } from '@/lib/error-store';
-import { NetworkError } from '@/lib/errors';
+import { AuthError } from '@/lib/errors';
+import { logger } from '@/lib/logger';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isSmallScreen = SCREEN_WIDTH < 380;
@@ -42,31 +42,20 @@ export default function LoginScreen() {
     try {
       await login(email.trim(), password);
     } catch (e) {
-      console.error('[login] login() threw:', e);
-      if (e instanceof ApiError && e.status === 401) {
-        // Identifiants refusés par le backend : erreur de saisie, affichée inline dans le formulaire.
+      logger.failure('auth.login.failed', e);
+      if (e instanceof AuthError) {
+        // Sur cet écran, et sur lui seul, un 401 ne veut pas dire « session
+        // expirée » : il n'y a pas encore de session. C'est une erreur de
+        // saisie, donc affichée inline sous le formulaire — la bannière
+        // globale et son « Se reconnecter » n'auraient aucun sens ici.
         setError(e.message || 'Identifiants incorrects. Veuillez réessayer.');
       } else {
-        // Panne réseau/serveur (ou toute erreur JS locale post-login, ex: écriture du token en
-        // storage) : ce n'est pas la faute de l'utilisateur, on le signale via la bannière globale
-        // avec un bouton "Réessayer". Le détail technique est ajouté pour ne pas mélanger un vrai
-        // problème réseau avec une erreur locale sous le même message générique trompeur.
-        // Le message et l'action sont désormais une propriété de la classe
-        // (ADR-012 décision 5) : ici on se contente de dire *quelle* erreur
-        // c'est et *comment la reprendre*. Un `ApiError` non-401 n'appartient
-        // pas encore au jeu fermé — sa migration est le lot de #173.
-        // `ApiError` n'appartient pas au jeu fermé : non typée, elle serait
-        // classée `(bug)` et l'agent se verrait proposer « Signaler au support »
-        // pour une simple panne serveur, sans pouvoir réessayer. Une réponse
-        // d'erreur du backend est un échec de dialogue avec le serveur, donc
-        // `NetworkError` — et le `handleSubmit` passé ici devient rejouable.
-        // Le reste (écriture du jeton en storage, par ex.) reste non typé : sa
-        // migration à la source est le lot de #173.
-        signaler(
-          e instanceof ApiError ? new NetworkError(e.message, { cause: e }) : e,
-          'useAsyncAction',
-          handleSubmit
-        );
+        // Tout le reste est désormais typé à la source (#173) : `api-client`
+        // lève `NetworkError` sur serveur injoignable comme sur réponse
+        // d'erreur, `auth-store` type ses propres écritures. Le message et
+        // l'action sont une propriété de la classe (ADR-012 décision 5) — cet
+        // écran n'a plus qu'à passer l'erreur et de quoi la rejouer.
+        signaler(e, 'useAsyncAction', handleSubmit);
       }
     } finally {
       setIsLoading(false);

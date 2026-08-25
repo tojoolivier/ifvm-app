@@ -7,6 +7,8 @@ import { concludeValidation, listAllProspectionPopulations, PopulationRow } from
 import { enregistrerEtSynchroniser } from '@/lib/prospection-review';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { imagoTotalFromRow, larveTotalFromRow } from '@/lib/prospection-extensive';
+import { useAsyncAction } from '@/hooks/use-async-action';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
 const GREEN = '#235a36';
 const RED = '#c0412b';
@@ -21,14 +23,16 @@ export default function ExtensiveRecapScreen() {
   const token = useAuthStore((s) => s.token);
   const draft = useProspectionWizardStore((s) => s.draft);
   const resetWizard = useProspectionWizardStore((s) => s.reset);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { run, isRunning: isSaving } = useAsyncAction();
   const [populations, setPopulations] = useState<PopulationRow[]>([]);
+  const signalerChargement = useSignalerChargement('extensive-recap');
 
   useEffect(() => {
     if (!draft) return;
-    listAllProspectionPopulations(draft.id).then(setPopulations);
-  }, [draft?.id]);
+    void listAllProspectionPopulations(draft.id)
+      .then(setPopulations)
+      .catch((error) => signalerChargement(error, { draftId: draft.id }));
+  }, [draft?.id, signalerChargement]);
 
   const totals = useMemo(() => {
     const findRow = (espece: 'LMC' | 'NSE', categorie: 'imago' | 'larve') =>
@@ -54,36 +58,36 @@ export default function ExtensiveRecapScreen() {
 
   const isValidation = draft.type_prospection === 'validation';
 
-  const handleSave = async () => {
-    if (!token || isSaving) return;
-    setIsSaving(true);
-    setError(null);
-    try {
-      await enregistrerEtSynchroniser(draft, [], token);
-      resetWizard();
-      router.replace({ pathname: '/(app)/prospection' as any, params: { justSaved: '1' } });
-    } catch {
-      setError("Impossible d'enregistrer la fiche pour le moment.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const handleSave = () =>
+    run(
+      async () => {
+        await enregistrerEtSynchroniser(draft, [], token!);
+        resetWizard();
+        router.replace({ pathname: '/(app)/prospection' as any, params: { justSaved: '1' } });
+      },
+      {
+        screen: 'extensive-recap',
+        precondition: !!token,
+        preconditionMessage: 'Session expirée — reconnectez-vous pour enregistrer.',
+        context: { draftId: draft.id },
+      }
+    );
 
-  const handleConclude = async (conclusion: 'confirmee' | 'infirmee') => {
-    if (!token || isSaving) return;
-    setIsSaving(true);
-    setError(null);
-    try {
-      const concluded = await concludeValidation(draft.id, conclusion);
-      await enregistrerEtSynchroniser(concluded, [], token);
-      resetWizard();
-      router.replace({ pathname: '/(app)/prospection' as any, params: { justSaved: '1' } });
-    } catch {
-      setError("Impossible d'enregistrer la vérification pour le moment.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const handleConclude = (conclusion: 'confirmee' | 'infirmee') =>
+    run(
+      async () => {
+        const concluded = await concludeValidation(draft.id, conclusion);
+        await enregistrerEtSynchroniser(concluded, [], token!);
+        resetWizard();
+        router.replace({ pathname: '/(app)/prospection' as any, params: { justSaved: '1' } });
+      },
+      {
+        screen: 'extensive-recap',
+        precondition: !!token,
+        preconditionMessage: 'Session expirée — reconnectez-vous pour enregistrer.',
+        context: { draftId: draft.id, conclusion },
+      }
+    );
 
   if (isValidation) {
     return (
@@ -132,7 +136,6 @@ export default function ExtensiveRecapScreen() {
               </View>
 
               <Text style={styles.conclusionLabel}>Conclusion de la vérification</Text>
-              {error && <Text style={styles.errorText}>{error}</Text>}
             </ScrollView>
 
             <View style={[styles.footerRow, { paddingBottom: Math.max(insets.bottom, 12) + 10 }]}>
@@ -210,7 +213,6 @@ export default function ExtensiveRecapScreen() {
             <View style={styles.offlineBanner}>
               <Text style={styles.offlineText}>☁︎ Pas de réseau ici — la fiche part en file de synchronisation.</Text>
             </View>
-            {error && <Text style={styles.errorText}>{error}</Text>}
           </ScrollView>
 
           <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
@@ -240,7 +242,6 @@ const styles = StyleSheet.create({
   checkLabel: { fontSize: 12.5, fontWeight: '600', color: '#2a2a22' },
   offlineBanner: { marginTop: 6, backgroundColor: '#fdf6e7', borderWidth: 1, borderColor: '#f0e2bf', borderRadius: 11, padding: 12 },
   offlineText: { fontSize: 11, lineHeight: 16, color: '#8a6d2f', fontWeight: '500' },
-  errorText: { color: RED, fontSize: 12, marginTop: 8, textAlign: 'center' },
   footer: { padding: 16 },
   saveButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
   saveButtonText: { color: '#fff', fontWeight: '800', fontSize: 15 },

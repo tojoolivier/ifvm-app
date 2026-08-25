@@ -73,7 +73,9 @@ class CodeStadeRepositoryImpl(CodeStadeRepository):
         self.session = session
 
     async def list_since(self, since: datetime | None) -> list[CodeStade]:
-        stmt = select(CodeStadeModel).order_by(CodeStadeModel.code)
+        stmt = select(CodeStadeModel).order_by(
+            CodeStadeModel.categorie, CodeStadeModel.sexe, CodeStadeModel.ordre
+        )
         if since is not None:
             stmt = stmt.where(CodeStadeModel.updated_at > since)
         result = await self.session.execute(stmt)
@@ -81,8 +83,11 @@ class CodeStadeRepositoryImpl(CodeStadeRepository):
             CodeStade(
                 id=m.id,
                 code=m.code,
+                categorie=m.categorie,
+                sexe=m.sexe,
                 espece=m.espece,
                 libelle=m.libelle,
+                ordre=m.ordre,
                 actif=m.actif,
                 updated_at=m.updated_at,
             )

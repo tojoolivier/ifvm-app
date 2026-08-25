@@ -23,6 +23,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.config import settings
+from app.domain.stades import GRILLES, VOCABULAIRE
 
 REFERENTIEL_DATA = {
     "zones_anti_acridiennes": [
@@ -1037,22 +1038,17 @@ REFERENTIEL_DATA = {
         {"code": "CULT-PAT", "nom": "Patate douce"},
         {"code": "CULT-VEG", "nom": "Zone non cultivée / végétation naturelle"},
     ],
+    "stades": [{"code": code, "libelle": libelle} for code, libelle in VOCABULAIRE],
     "codes_stades": [
-        {"code": "A1", "espece": "LMC", "libelle": "Imago stade A1"},
-        {"code": "A2", "espece": "LMC", "libelle": "Imago stade A2"},
-        {"code": "A3", "espece": "LMC", "libelle": "Imago stade A3"},
-        {"code": "A4", "espece": "LMC", "libelle": "Imago stade A4"},
-        {"code": "A5", "espece": "LMC", "libelle": "Imago stade A5"},
-        {"code": "A1b", "espece": "LMC", "libelle": "Imago mâle stade A1"},
-        {"code": "A2b", "espece": "LMC", "libelle": "Imago mâle stade A2"},
-        {"code": "A5b", "espece": "LMC", "libelle": "Imago mâle stade A5"},
-        {"code": "L1", "espece": "NSE", "libelle": "Larve stade L1"},
-        {"code": "L2", "espece": "NSE", "libelle": "Larve stade L2"},
-        {"code": "L3", "espece": "NSE", "libelle": "Larve stade L3"},
-        {"code": "L4", "espece": "NSE", "libelle": "Larve stade L4"},
-        {"code": "L5", "espece": "NSE", "libelle": "Larve stade L5"},
-        {"code": "L6", "espece": "NSE", "libelle": "Larve stade L6"},
-        {"code": "L7", "espece": "NSE", "libelle": "Larve stade L7"},
+        {
+            "code": p.code,
+            "categorie": p.categorie,
+            "sexe": p.sexe,
+            "espece": p.espece,
+            "libelle": p.libelle,
+            "ordre": p.ordre,
+        }
+        for p in GRILLES
     ],
 }
 
@@ -1192,15 +1188,27 @@ async def load_fixtures():
                 c,
             )
 
-        # Charger les codes stades
+        # Charger le vocabulaire des stades, puis leur place dans les grilles de saisie
+        for s in REFERENTIEL_DATA["stades"]:
+            await conn.execute(
+                text("""
+                    INSERT INTO stade (code, libelle)
+                    VALUES (:code, :libelle)
+                    ON CONFLICT (code) DO UPDATE SET
+                        libelle = EXCLUDED.libelle,
+                        updated_at = now()
+                """),
+                s,
+            )
+
         for cs in REFERENTIEL_DATA["codes_stades"]:
             await conn.execute(
                 text("""
-                    INSERT INTO code_stade (code, espece, libelle)
-                    VALUES (:code, :espece, :libelle)
-                    ON CONFLICT (code) DO UPDATE SET
-                        espece = EXCLUDED.espece,
+                    INSERT INTO code_stade (code, categorie, sexe, espece, libelle, ordre)
+                    VALUES (:code, :categorie, :sexe, :espece, :libelle, :ordre)
+                    ON CONFLICT (code, categorie, sexe, espece) DO UPDATE SET
                         libelle = EXCLUDED.libelle,
+                        ordre = EXCLUDED.ordre,
                         updated_at = now()
                 """),
                 cs,

@@ -55,6 +55,15 @@ Agriculteur → Signalement → Prospection de Validation
   Seuls `MEP` et `APPLICATION` se rattachent à une rotation ; `PROSPECTION` se rattache à une
   prospection ; `CONVOYAGE` et `DIVERS` ne se rattachent à rien.
 
+- **`fiche_vol` : le nom retient la feuille, la table représente un fait.** Une fiche de vol
+  regroupe les vols d'un aéronef sur **une journée** — le regroupement est déterminé par
+  `(jour, aéronef)`, pas par la feuille : il existe que quelqu'un la remplisse ou non. Le nom
+  est donc une **exception de vocabulaire**, retenue parce que « fiche de vol » est le mot du
+  terrain, et non une exception de modélisation. Comme pour le CRT (voir `traitement`
+  ci-dessous), l'identité du **document** vit dans `numero_fiche`, pas dans le nom de la table.
+  Une seconde fiche le même jour pour le même appareil n'est pas censée exister ; elle n'est
+  pourtant pas refusée — bloquer un pilote hors-ligne coûterait plus cher que la numéroter.
+
 - **Base aérienne** vs **stand de remplissage**. Deux lieux distincts d'une même journée de vol,
   chacun relevé en position (lat/lon/alt captées automatiquement, hors ligne) et nommé à la main.
   Ni l'un ni l'autre n'est un **poste acridien** ou une **station fixe**.
@@ -161,7 +170,12 @@ Avant de partir sur le terrain, l'app doit télécharger :
 **Niveau 2 (indispensable)** :
 - Noms de pesticides disponibles
 - Types de cultures / zones cibles
-- Codes stades d'espèces (LMC: A1-A5, NSE: L1-L7)
+- Codes stades (`code_stade`) : où chaque stade se saisit — catégorie, sexe, espèce, ordre.
+  Le vocabulaire lui-même vit dans `stade`, cible de la FK `prospection_capture.stade`.
+  Un même code appartient à plusieurs grilles (A1 est un stade ♀ *et* ♂) ; `espece`/`sexe`
+  à NULL valent « toutes espèces » / « non sexé ». Seuls L6 et L7 sont propres à NSE.
+  Les grilles de saisie du mobile se construisent depuis cette table, jamais depuis une
+  liste écrite en dur — c'est cette divergence qui a fait échouer #201.
 
 ### Gestion des conflits
 
@@ -213,7 +227,7 @@ prospection → station (fixe pour intensive, ponctuelle pour extensive/validati
   ├── prospection_population (densités diffuses/groupées, captures, accouplement, ponte)  [queryable]
   ├── prospection_capture    (espece × categorie × sexe? × phase × stade × effectif)      [queryable]
   │                          ├── sexe NULL pour extensive/validation (absorbe les 2 granularités)
-  │                          └── stade contraint par espece : LMC ⇒ A1-A5, NSE ⇒ L1-L7
+  │                          └── stade → FK vers `stade.code` (le référentiel fait autorité, cf. ci-dessous)
   └── prospection_infestation (taches, bandes, vols, essaims)                             [queryable]
 
 audit_log

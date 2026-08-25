@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingV
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAsyncAction } from '@/hooks/use-async-action';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { accouplementOptionsFor } from '@/lib/prospection-especes-stades';
 import { accouplementInsight } from '@/lib/prospection-accouplement-insight';
 import { dominantPhenotype, rowsToCounts , useProspectionCaptureStore } from '@/lib/prospection-capture-store';
@@ -44,6 +45,7 @@ export default function AccouplementScreen() {
   const [population, setPopulation] = useState<PopulationRow | null>(null);
   const [dominant, setDominant] = useState<ReturnType<typeof dominantPhenotype>>(null);
   const { run, isRunning: isSaving } = useAsyncAction();
+  const signalerChargement = useSignalerChargement('accouplement');
 
   useEffect(() => {
     if (!draftId || !grille) return;
@@ -51,13 +53,17 @@ export default function AccouplementScreen() {
       router.replace({ pathname: '/(prospection)/captures' as any, params: { draftId, grilleIndex: String(requestedIndex) } });
       return;
     }
-    getProspectionPopulation(draftId, grille.espece, 'imago').then((row) => {
-      setPopulation(row ?? emptyPopulation(grille.espece));
-    });
-    listProspectionCaptures(draftId, grille.espece, 'imago').then((rows) => {
-      setDominant(dominantPhenotype(rowsToCounts(rows)));
-    });
-  }, [draftId, grille?.espece, grille?.categorie, requestedIndex]);
+    void getProspectionPopulation(draftId, grille.espece, 'imago')
+      .then((row) => {
+        setPopulation(row ?? emptyPopulation(grille.espece));
+      })
+      .catch((error) => signalerChargement(error, { draftId, espece: grille.espece }));
+    void listProspectionCaptures(draftId, grille.espece, 'imago')
+      .then((rows) => {
+        setDominant(dominantPhenotype(rowsToCounts(rows)));
+      })
+      .catch((error) => signalerChargement(error, { draftId, espece: grille.espece }));
+  }, [draftId, grille?.espece, grille?.categorie, requestedIndex, signalerChargement]);
 
   if (!grille || !population) {
     return (

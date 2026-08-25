@@ -111,8 +111,12 @@ class CodeStadeSyncRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     code: str
-    espece: str
+    categorie: str
+    # NULL : stade larvaire (non sexé) / applicable aux deux espèces.
+    sexe: str | None
+    espece: str | None
     libelle: str
+    ordre: int
     actif: bool
     updated_at: datetime
 

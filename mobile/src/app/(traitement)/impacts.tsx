@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getTraitement, updateTraitementImpacts } from '@/lib/traitement-repository';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import { validateEmpoisonnement } from '@/lib/traitement-validation';
+import { useAsyncAction } from '@/hooks/use-async-action';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
+import { logger } from '@/lib/logger';
 import { Chip } from '@/components/traitement/Chip';
 import { ProgressBar } from '@/components/traitement/ProgressBar';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
@@ -24,33 +27,43 @@ export default function ImpactsScreen() {
   const { traitementId, isValidationView } = useLocalSearchParams<{ traitementId: string; isValidationView?: string }>();
   const store = useTraitementCaptureStore();
   const readOnly = isValidationView === '1';
-  const [isSaving, setIsSaving] = useState(false);
+  const { run, isRunning: isSaving } = useAsyncAction();
+  const signalerChargement = useSignalerChargement('impacts');
 
   useEffect(() => {
     if (!traitementId) return;
-    getTraitement(traitementId).then((draft) => {
-      if (!draft) return;
-      let evaluationRisque = {};
-      let comportementNonCibles: string[] = [];
-      let mortaliteFamilles: string[] = [];
-      try { evaluationRisque = draft.evaluation_risque ? JSON.parse(draft.evaluation_risque) : {}; } catch {}
-      try { comportementNonCibles = draft.comportement_non_cibles ? JSON.parse(draft.comportement_non_cibles) : []; } catch {}
-      try { mortaliteFamilles = draft.mortalite_familles ? JSON.parse(draft.mortalite_familles) : []; } catch {}
-      store.updateImp({
-        empoisonnement: draft.empoisonnement,
-        empoisonnementType: draft.empoisonnement_type as any,
-        empoisonnementMode: draft.empoisonnement_mode as any,
-        empoisonnementAutre: draft.empoisonnement_autre,
-        evaluationRisque,
-        comportementAnormal: draft.comportement_anormal,
-        comportementNonCibles,
-        mortalite: draft.mortalite,
-        mortaliteFamilles,
-      });
-      store.setObservations(draft.observations);
-    });
+    getTraitement(traitementId)
+      .then((draft) => {
+        if (!draft) return;
+        let evaluationRisque: Record<string, string> = {};
+        let comportementNonCibles: string[] = [];
+        let mortaliteFamilles: string[] = [];
+        try {
+          evaluationRisque = draft.evaluation_risque ? JSON.parse(draft.evaluation_risque) : {};
+          comportementNonCibles = draft.comportement_non_cibles ? JSON.parse(draft.comportement_non_cibles) : [];
+          mortaliteFamilles = draft.mortalite_familles ? JSON.parse(draft.mortalite_familles) : [];
+        } catch (e) {
+          // Sélections cochables, re-saisissables en un geste : même critère que
+          // `parseEspeceSelection` (#189) — repli sur des valeurs vides plutôt
+          // que bloquer la fiche pour une chaîne corrompue.
+          logger.ignore(e, 'Impacts corrompus — repli sur des valeurs vides, re-saisissables.');
+        }
+        store.updateImp({
+          empoisonnement: draft.empoisonnement,
+          empoisonnementType: draft.empoisonnement_type as any,
+          empoisonnementMode: draft.empoisonnement_mode as any,
+          empoisonnementAutre: draft.empoisonnement_autre,
+          evaluationRisque,
+          comportementAnormal: draft.comportement_anormal,
+          comportementNonCibles,
+          mortalite: draft.mortalite,
+          mortaliteFamilles,
+        });
+        store.setObservations(draft.observations);
+      })
+      .catch((error) => signalerChargement(error, { traitementId }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [traitementId]);
+  }, [traitementId, signalerChargement]);
 
   const empoisonnementErrors = validateEmpoisonnement({
     empoisonnement: store.imp.empoisonnement ?? null,
@@ -61,24 +74,32 @@ export default function ImpactsScreen() {
   const errorsByField: Record<string, string> = {};
   for (const e of empoisonnementErrors) errorsByField[e.field] = e.message;
 
-  const handleContinuer = async () => {
-    if (!traitementId || empoisonnementErrors.length > 0) return;
-    setIsSaving(true);
-    await updateTraitementImpacts(traitementId, {
-      empoisonnement: !!store.imp.empoisonnement,
-      empoisonnement_type: store.imp.empoisonnementType ?? null,
-      empoisonnement_mode: store.imp.empoisonnementMode ?? null,
-      empoisonnement_autre: store.imp.empoisonnementAutre ?? null,
-      evaluation_risque: store.imp.evaluationRisque ?? {},
-      comportement_anormal: !!store.imp.comportementAnormal,
-      comportement_non_cibles: store.imp.comportementNonCibles ?? [],
-      mortalite: !!store.imp.mortalite,
-      mortalite_familles: store.imp.mortaliteFamilles ?? [],
-      observations: store.observations,
-    });
-    setIsSaving(false);
-    router.push({ pathname: '/(traitement)/signatures' as any, params: { traitementId, isValidationView } });
-  };
+  const handleContinuer = () =>
+    run(
+      async () => {
+        // Déjà visible à l'écran (message par champ) : pas de second signal.
+        if (empoisonnementErrors.length > 0) return;
+        await updateTraitementImpacts(traitementId, {
+          empoisonnement: !!store.imp.empoisonnement,
+          empoisonnement_type: store.imp.empoisonnementType ?? null,
+          empoisonnement_mode: store.imp.empoisonnementMode ?? null,
+          empoisonnement_autre: store.imp.empoisonnementAutre ?? null,
+          evaluation_risque: store.imp.evaluationRisque ?? {},
+          comportement_anormal: !!store.imp.comportementAnormal,
+          comportement_non_cibles: store.imp.comportementNonCibles ?? [],
+          mortalite: !!store.imp.mortalite,
+          mortalite_familles: store.imp.mortaliteFamilles ?? [],
+          observations: store.observations,
+        });
+        router.push({ pathname: '/(traitement)/signatures' as any, params: { traitementId, isValidationView } });
+      },
+      {
+        screen: 'impacts',
+        precondition: !!traitementId,
+        preconditionMessage: 'Session perdue — revenez à l’écran précédent et réessayez.',
+        context: { traitementId },
+      }
+    );
 
   return (
     <SafeAreaView style={styles.container}>

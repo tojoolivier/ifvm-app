@@ -57,7 +57,10 @@ export function useErrorAction(erreur: ErreurActionnable | null): ActionResolue 
           router.push('/(app)/sync');
           return;
         case 'signaler-support':
-          router.push('/(app)/debug-logs');
+          // L'**entrée chaude** de #176 : sur l'erreur elle-même, et vers
+          // l'écran de signalement — pas vers le journal brut, que l'agent ne
+          // sait pas quoi faire d'autre que regarder.
+          router.push('/(app)/signalement');
       }
     },
     [logout, router]

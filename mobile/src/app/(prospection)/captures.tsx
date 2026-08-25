@@ -8,6 +8,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,12 +17,17 @@ import { TextInput } from 'react-native-gesture-handler';
 import {
   parseEspeceSelection,
   buildGrilles,
+  parseGrillesCompletees,
 } from '@/lib/prospection-especes';
 
 import {
   capturesMaxFor,
   grilleKeyToString,
+  phasesFor,
 } from '@/lib/prospection-especes-stades';
+
+import { listStadesGrille } from '@/lib/referentiel-db';
+import { retourArriere } from '@/lib/fiche-routing';
 
 import {
   chronoSeconds,
@@ -35,7 +41,9 @@ import {
 } from '@/lib/prospection-repository';
 
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
-import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
+import { useProspectionCaptureStore, StadesGrille } from '@/lib/prospection-capture-store';
+import { useAsyncAction } from '@/hooks/use-async-action';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -54,45 +62,7 @@ const CATEGORIE_LABEL = {
   larve: 'Larves',
 } as const;
 
-const STADES_CONFIG = {
-  imago: {
-    LMC: {
-      F: ['A1', 'A2', 'A3', 'A3-1/4', 'A3-1/2', 'A3-3/4', 'A3-4/4', 'A4', 'A5'],
-      M: ['A1', 'A123', 'A5'],
-    },
-    NSE: {
-      F: ['A1', 'A2', 'A3', 'A3-1/4', 'A3-1/2', 'A3-3/4', 'A3-4/4', 'A4', 'A5'],
-      M: ['A1', 'A123', 'A5'],
-    },
-  },
-  larve: {
-    LMC: ['L1', 'L2', 'L3', 'L4', 'L5'],
-    NSE: ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'],
-  },
-} as const;
-
-const PHASES_CONFIG = {
-  LMC: {
-    imago: ['solitaire', 'transiens', 'solitaro_trans', 'gregaire'],
-    larve: ['solitaire', 'transiens', 'solitaro_trans', 'gregaire'],
-  },
-  NSE: {
-    imago: ['solitaire', 'transiens', 'solitaro_trans', 'gregaire'],
-    larve: ['solitaire', 'transiens', 'gregaire'],
-  },
-} as const;
-
 type Sexe = 'F' | 'M';
-
-function parseGrillesCompletees(raw: string | null): string[] {
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
 
 export default function CapturesScreen() {
   const router = useRouter();
@@ -112,8 +82,11 @@ export default function CapturesScreen() {
   const { grilleOrder, currentGrilleIndex, currentSexe, phasesData, stadesDataF, stadesDataM } = store;
 
   const [tick, setTick] = useState(0);
-  const [isSaving, setIsSaving] = useState(false);
+  const { run, isRunning: isSaving } = useAsyncAction();
+  const signalerChargement = useSignalerChargement('captures');
   const [totalCapturesInput, setTotalCapturesInput] = useState('');
+  /** Lecture du vocabulaire en base : distingue « pas encore chargé » de « absent ». */
+  const [chargementStades, setChargementStades] = useState(true);
   
   // Ref pour éviter les boucles infinies
   const isInitialized = useRef(false);
@@ -121,6 +94,11 @@ export default function CapturesScreen() {
   // Ref pour ne réhydrater "totalCapturesInput" qu'au changement effectif de grille
   // (évite d'écraser la saisie en cours de l'utilisateur sur la grille courante)
   const syncedGrilleIndexRef = useRef<number | null>(null);
+
+  // Le brouillon de *cette* fiche est-il en mémoire ? Tant qu'il ne l'est pas, on ne
+  // peut rien conclure sur les grilles : afficher « aucune grille à saisir » à ce
+  // moment-là accuse à tort l'agent de n'avoir rien sélectionné (#201).
+  const brouillonPret = !!draft && draft.id === draftId;
 
   const requestedIndex = Number(grilleIndex ?? '0');
   const grille = grilleOrder[currentGrilleIndex];
@@ -133,30 +111,14 @@ export default function CapturesScreen() {
     (sum, value) => sum + (Number(value) || 0), 0
   );
 
-  const getStadesFList = () => {
-    if (!grille || grille.categorie !== 'imago') return [];
-    return [...STADES_CONFIG.imago[grille.espece].F];
-  };
+  const stadesGrille = grille
+    ? (store.stadesParGrille[grilleKeyToString(grille)] ?? { F: [], M: [], larve: [] })
+    : { F: [], M: [], larve: [] };
 
-  const getStadesMList = () => {
-    if (!grille || grille.categorie !== 'imago') return [];
-    return [...STADES_CONFIG.imago[grille.espece].M];
-  };
-
-  const getLarvesList = () => {
-    if (!grille || grille.categorie !== 'larve') return [];
-    return [...STADES_CONFIG.larve[grille.espece]];
-  };
-
-  const getPhasesList = () => {
-    if (!grille) return [];
-    return [...PHASES_CONFIG[grille.espece][grille.categorie]];
-  };
-
-  const stadesFList = getStadesFList();
-  const stadesMList = getStadesMList();
-  const larvesList = getLarvesList();
-  const phasesList = getPhasesList();
+  const stadesFList = isImago ? stadesGrille.F : [];
+  const stadesMList = isImago ? stadesGrille.M : [];
+  const larvesList = isLarve ? stadesGrille.larve : [];
+  const phasesList = grille ? phasesFor(grille.espece, grille.categorie) : [];
 
   const totalStadesF = stadesFList.reduce(
     (sum, stade) => sum + (Number(stadesDataF[stade]) || 0), 0
@@ -183,26 +145,76 @@ export default function CapturesScreen() {
   // Effet 1: Hydratation initiale - une seule fois
   useEffect(() => {
     if (!draftId || isHydrated.current) return;
-    
-    (async () => {
+
+    const hydrate = async () => {
       if (draft?.id !== draftId) {
         await hydrateFromDraft(draftId);
       }
       isHydrated.current = true;
-    })();
-  }, [draftId, draft?.id, hydrateFromDraft]);
+    };
+    void hydrate().catch((error) => signalerChargement(error, { draftId }));
+  }, [draftId, draft?.id, hydrateFromDraft, signalerChargement]);
 
-  // Effet 2: Initialisation des grilles - une seule fois
+  // Effet 2: vocabulaire des stades, puis initialisation des grilles. Les stades
+  // viennent du référentiel synchronisé, jamais d'une liste écrite dans l'écran : c'est
+  // le backend qui décide quels codes existent (#201).
+  //
+  // Cet effet ne s'abrège pas quand `grilleOrder` est déjà rempli : l'écran « espèces »
+  // appelle `initGrilles` avant de naviguer ici, sans connaître le vocabulaire. Sauter
+  // le chargement dans ce cas — le parcours normal — laissait des grilles sans aucun
+  // stade, et l'agent croyait sa saisie perdue.
   useEffect(() => {
     if (!draft || draft.id !== draftId || isInitialized.current) return;
-    if (store.grilleOrder.length === 0) {
-      const selection = parseEspeceSelection(draft.especes);
-      const grilles = buildGrilles(selection);
-      const completed = parseGrillesCompletees(draft.grilles_completees);
+    isInitialized.current = true;
+
+    const selection = parseEspeceSelection(draft.especes);
+    const grilles = buildGrilles(selection);
+    const completed = parseGrillesCompletees(draft.grilles_completees);
+
+    const codesDe = async (
+      espece: typeof grilles[number]['espece'],
+      categorie: 'imago' | 'larve',
+      sexe: 'F' | 'M' | null
+    ): Promise<string[]> => {
+      const stades = await listStadesGrille(espece, categorie, sexe);
+      return stades.map((s) => s.code);
+    };
+
+    const chargerStades = async () => {
+      const parGrille: Record<string, StadesGrille> = {};
+      for (const g of grilles) {
+        const stades: StadesGrille = { F: [], M: [], larve: [] };
+        if (g.categorie === 'imago') {
+          stades.F = await codesDe(g.espece, 'imago', 'F');
+          stades.M = await codesDe(g.espece, 'imago', 'M');
+        } else {
+          stades.larve = await codesDe(g.espece, 'larve', null);
+        }
+        parGrille[grilleKeyToString(g)] = stades;
+      }
+      store.setStadesParGrille(parGrille);
+      // Rejoué même si l'écran « espèces » l'a déjà fait : les compteurs par stade se
+      // construisent à partir du vocabulaire, qui n'était pas connu à ce moment-là.
       store.initGrilles(grilles, completed, captures);
-      isInitialized.current = true;
-    }
-  }, [draft, draftId, captures, store]);
+
+      // `initGrilles` se positionne sur la première grille non complétée, d'après le
+      // brouillon en mémoire — lequel est en retard d'une grille au moment où l'on
+      // enchaîne (la complétion vient d'être écrite en base). La route, elle, sait quelle
+      // grille est demandée : c'est elle qui tranche, sinon on revient sans cesse sur la
+      // première.
+      if (requestedIndex >= 0 && requestedIndex < grilles.length) {
+        store.goToGrille(requestedIndex, captures);
+      }
+    };
+
+    setChargementStades(true);
+    void chargerStades()
+      .catch((error) => {
+        isInitialized.current = false;
+        signalerChargement(error, { draftId });
+      })
+      .finally(() => setChargementStades(false));
+  }, [draft, draftId, captures, store, requestedIndex, signalerChargement]);
 
   // Effet 3: Navigation vers la grille demandée - une seule fois
   useEffect(() => {
@@ -229,10 +241,27 @@ export default function CapturesScreen() {
   // Effet 4: Timer de capture - une seule fois
   useEffect(() => {
     if (!draftId || draft?.capture_started_at) return;
-    startCaptureTimer(draftId).then(setDraft);
-  }, [draftId, draft?.capture_started_at, setDraft]);
+    void startCaptureTimer(draftId)
+      .then(setDraft)
+      .catch((error) => signalerChargement(error, { draftId }));
+  }, [draftId, draft?.capture_started_at, setDraft, signalerChargement]);
 
-  // Effet 5: Chronomètre
+  // Effet 5: Grille déjà remplie (fiche reprise) — le total est déduit des captures
+  // enregistrées, sinon les sections « Phases » et « Stades » restent masquées (total = 0)
+  // et la saisie précédente semble perdue (#201).
+  // On ne peut pas déduire un total avant de savoir quels stades composent la grille :
+  // tant que le vocabulaire n'est pas chargé, `totalStades` vaut 0 pour une grille
+  // pourtant remplie. Attendre évite de figer ce 0 et de masquer la saisie.
+  const vocabulairePret = stadesFList.length > 0 || larvesList.length > 0;
+  const prefilledGrilleRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!grille || !vocabulairePret) return;
+    if (prefilledGrilleRef.current === currentGrilleIndex) return;
+    prefilledGrilleRef.current = currentGrilleIndex;
+    setTotalCapturesInput(totalStades > 0 ? String(totalStades) : '');
+  }, [grille, vocabulairePret, currentGrilleIndex, totalStades]);
+
+  // Effet 6: Chronomètre
   useEffect(() => {
     const interval = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(interval);
@@ -247,10 +276,50 @@ export default function CapturesScreen() {
     store.setSexe(sexe);
   };
 
+  const handleBack = () =>
+    retourArriere(router, () => {
+      if (currentGrilleIndex > 0) {
+        router.replace({
+          pathname: '/(prospection)/captures' as any,
+          params: { draftId, grilleIndex: String(currentGrilleIndex - 1) },
+        });
+      } else {
+        router.replace({
+          pathname: '/(prospection)/species' as any,
+          params: { draftId },
+        });
+      }
+    });
+
+  // Écran d'attente : le vocabulaire et le brouillon se lisent en base au montage.
+  // Auparavant cet état rendait une page **entièrement vide**, sans même un retour :
+  // l'agent croyait l'app figée et n'avait aucune issue.
   if (!grille) {
     return (
       <View style={styles.root}>
-        <SafeAreaView style={styles.safe} />
+        <SafeAreaView edges={['top']} style={styles.safe}>
+          <View style={styles.headerRow}>
+            <TouchableOpacity onPress={handleBack} activeOpacity={0.7}>
+              <Text style={styles.back}>‹</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>Captures</Text>
+          </View>
+          <View style={styles.chargementBloc}>
+            {chargementStades || !brouillonPret ? (
+              <>
+                <ActivityIndicator color={GREEN} />
+                <Text style={styles.chargementTexte}>Chargement de la grille…</Text>
+              </>
+            ) : (
+              // Chargement terminé sans grille : la sélection d'espèces est vide ou
+              // illisible. Un indicateur qui tourne indéfiniment serait un mensonge.
+              <Text style={styles.chargementTexte}>
+                Aucune grille à saisir — revenez à l’écran précédent pour choisir les
+                espèces observées.
+              </Text>
+            )}
+          </View>
+        </SafeAreaView>
       </View>
     );
   }
@@ -260,23 +329,7 @@ export default function CapturesScreen() {
   const seconds = chronoSeconds(draft?.capture_started_at ?? null);
   void tick;
 
-  const handleBack = () => {
-    if (currentGrilleIndex > 0) {
-      router.replace({
-        pathname: '/(prospection)/captures' as any,
-        params: { draftId, grilleIndex: String(currentGrilleIndex - 1) },
-      });
-    } else {
-      router.replace({
-        pathname: '/(prospection)/species' as any,
-        params: { draftId },
-      });
-    }
-  };
-
-  const handleContinue = async () => {
-    if (!draftId || isSaving) return;
-
+  const handleContinue = () => {
     // Le nombre de captures est facultatif : si la grille est laissée vide, on
     // passe directement à la sauvegarde (0 capture) sans bloquer la navigation
     // ni exiger de répartition phases/stades.
@@ -311,14 +364,13 @@ export default function CapturesScreen() {
       }
     }
 
-    setIsSaving(true);
+    return run(
+      async () => {
+        const rows: any[] = [];
 
-    try {
-      const rows: any[] = [];
-
-      if (totalCaptures === 0) {
-        // Rien à répartir : la grille est enregistrée comme complétée sans capture.
-      } else if (isImago) {
+        if (totalCaptures === 0) {
+          // Rien à répartir : la grille est enregistrée comme complétée sans capture.
+        } else if (isImago) {
         // Récupérer les phases avec leurs effectifs
         const phasesWithCounts = phasesList
           .map(phase => ({ phase, count: Number(phasesData[phase]) || 0 }))
@@ -326,7 +378,6 @@ export default function CapturesScreen() {
 
         if (phasesWithCounts.length === 0) {
           Alert.alert('Erreur', 'Aucune phase n\'a été renseignée.');
-          setIsSaving(false);
           return;
         }
 
@@ -387,7 +438,6 @@ export default function CapturesScreen() {
 
         if (phasesWithCounts.length === 0) {
           Alert.alert('Erreur', 'Aucune phase n\'a été renseignée.');
-          setIsSaving(false);
           return;
         }
 
@@ -430,39 +480,41 @@ export default function CapturesScreen() {
         }
       }
 
-      if (totalCaptures > 0 && rows.length === 0) {
-        // Garde-fou : ne devrait plus se produire (déjà couvert par les contrôles
-        // "Aucune phase n'a été renseignée" ci-dessus), conservé par sécurité.
-        Alert.alert('Aucune capture', 'Veuillez saisir au moins une capture avant de continuer.');
-        setIsSaving(false);
-        return;
-      }
+        if (totalCaptures > 0 && rows.length === 0) {
+          // Garde-fou : ne devrait plus se produire (déjà couvert par les contrôles
+          // « Aucune phase n'a été renseignée » ci-dessus), conservé par sécurité.
+          Alert.alert('Aucune capture', 'Veuillez saisir au moins une capture avant de continuer.');
+          return;
+        }
 
-      if (rows.length > 0) {
-        await saveProspectionCaptures(draftId, grille.espece, grille.categorie, rows);
-      }
-      await markGrilleCompleted(draftId, grilleKeyToString(grille));
-      store.markCurrentGrilleCompleted();
-      await refreshCaptures();
+        if (rows.length > 0) {
+          await saveProspectionCaptures(draftId, grille.espece, grille.categorie, rows);
+        }
+        await markGrilleCompleted(draftId, grilleKeyToString(grille));
+        store.markCurrentGrilleCompleted();
+        await refreshCaptures();
 
-      if (isLastGrille) {
-        router.push({
-          pathname: '/(prospection)/infestation' as any,
-          params: { draftId },
-        });
-      } else {
-        // Chaque grille (imago ou larve) passe par l'étape "densités" dédiée avant ses captures.
-        router.push({
-          pathname: '/(prospection)/density' as any,
-          params: { draftId, grilleIndex: String(currentGrilleIndex + 1) },
-        });
+        if (isLastGrille) {
+          router.push({
+            pathname: '/(prospection)/infestation' as any,
+            params: { draftId },
+          });
+        } else {
+          const nextGrille = grilleOrder[currentGrilleIndex + 1];
+          const nextScreen = nextGrille.categorie === 'imago' ? 'density' : 'captures';
+          router.push({
+            pathname: `/(prospection)/${nextScreen}` as any,
+            params: { draftId, grilleIndex: String(currentGrilleIndex + 1) },
+          });
+        }
+      },
+      {
+        screen: 'captures',
+        precondition: !!draftId,
+        preconditionMessage: 'Session de saisie perdue — revenez à l’écran précédent et réessayez.',
+        context: { draftId, grille: grilleKeyToString(grille) },
       }
-    } catch (error) {
-      console.error('Erreur sauvegarde captures:', error);
-      Alert.alert('Erreur', 'Une erreur est survenue lors de la sauvegarde des captures.');
-    } finally {
-      setIsSaving(false);
-    }
+    );
   };
 
   const renderSexeToggle = () => {
@@ -483,8 +535,8 @@ export default function CapturesScreen() {
         </View>
         <Text style={styles.sexeHint}>
           {currentSexe === 'F'
-            ? '♀ Stades : A1, A2, A3, A3-1/4, A3-1/2, A3-3/4, A3-4/4, A4, A5'
-            : '♂ Stades : A1, A123, A5'}
+            ? `♀ Stades : ${stadesFList.join(', ')}`
+            : `♂ Stades : ${stadesMList.join(', ')}`}
         </Text>
       </>
     );
@@ -593,6 +645,26 @@ export default function CapturesScreen() {
     );
   };
 
+  /**
+   * Une grille sans stades signifie que le référentiel n'est pas synchronisé sur cet
+   * appareil. Le dire plutôt que d'afficher un tableau vide : sinon l'agent conclut
+   * que sa saisie a disparu (#201).
+   */
+  const renderReferentielManquant = () =>
+    chargementStades ? (
+      <View style={styles.chargementLigne}>
+        <ActivityIndicator color={GREEN} size="small" />
+        <Text style={styles.chargementTexte}>Chargement des stades…</Text>
+      </View>
+    ) : (
+      <View style={styles.referentielManquant}>
+        <Text style={styles.referentielManquantText}>
+          Stades indisponibles hors ligne — synchronisez les référentiels depuis
+          l’écran Synchronisation, puis rouvrez cette grille.
+        </Text>
+      </View>
+    );
+
   const renderImagoStades = () => {
     if (!isImago || totalCaptures === 0) return null;
     const isFemale = currentSexe === 'F';
@@ -616,6 +688,7 @@ export default function CapturesScreen() {
           <Text style={[styles.tableHeaderCell, styles.tableCellValue]}>Effectif</Text>
           <Text style={[styles.tableHeaderCell, styles.tableCellActions]}>Actions</Text>
         </View>
+        {stadesList.length === 0 && renderReferentielManquant()}
         {stadesList.map((stade) => (
           <View key={stade} style={styles.tableRow}>
             <Text style={[styles.tableCell, styles.tableCellStade, styles.tableCellText]}>{stade}</Text>
@@ -690,6 +763,7 @@ export default function CapturesScreen() {
           <Text style={[styles.tableHeaderCell, styles.tableCellValue]}>Effectif</Text>
           <Text style={[styles.tableHeaderCell, styles.tableCellActions]}>Actions</Text>
         </View>
+        {larvesList.length === 0 && renderReferentielManquant()}
         {larvesList.map((stade) => (
           <View key={stade} style={styles.tableRow}>
             <Text style={[styles.tableCell, styles.tableCellStade, styles.tableCellText]}>{stade}</Text>
@@ -933,6 +1007,11 @@ const styles = StyleSheet.create({
   totalCaptureInput: { flex: 1, backgroundColor: '#f8f6f0', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 10, fontSize: 18, fontWeight: '700', color: TEXT },
   totalCaptureMax: { fontSize: 14, fontWeight: '600', color: TEXT_SECONDARY },
   totalCaptureInfo: { marginTop: 6, fontSize: 12, color: TEXT_SECONDARY, textAlign: 'center' },
+  chargementBloc: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
+  chargementLigne: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 14 },
+  chargementTexte: { fontSize: 12.5, color: TEXT_SECONDARY, fontWeight: '600' },
+  referentielManquant: { padding: 14, backgroundColor: '#fdf3e3', borderRadius: 10, marginTop: 8 },
+  referentielManquantText: { fontSize: 12, lineHeight: 17, color: '#8a5a12', fontWeight: '600' },
   tableSection: { backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 10, marginBottom: 8 },
   summaryBar: { backgroundColor: '#f8f6f0', borderRadius: 6, padding: 8, marginBottom: 10, alignItems: 'center' },
   summaryBarText: { fontSize: 13, color: TEXT_SECONDARY, textAlign: 'center' },

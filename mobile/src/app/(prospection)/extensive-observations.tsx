@@ -6,6 +6,7 @@ import { updateProspectionExtensiveObservations } from '@/lib/prospection-reposi
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { NIVEAU_OPTIONS } from '@/lib/prospection-extensive';
 import { DateField } from '@/components/DateField';
+import { useAsyncAction } from '@/hooks/use-async-action';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -26,25 +27,28 @@ export default function ExtensiveObservationsScreen() {
   const [hauteur, setHauteur] = useState(draft?.hauteur_herbe_cm != null ? String(draft.hauteur_herbe_cm) : '');
   const [dernierePluie, setDernierePluie] = useState(draft?.derniere_pluie ?? '');
   const [intensite, setIntensite] = useState(draft?.intensite_pluie ?? 'faible');
-  const [isSaving, setIsSaving] = useState(false);
+  const { run, isRunning: isSaving } = useAsyncAction();
 
-  const handleContinue = async () => {
-    if (!draftId || isSaving) return;
-    setIsSaving(true);
-    try {
-      const updated = await updateProspectionExtensiveObservations(draftId, {
-        degatsCulturesPourcent: degats,
-        verdureStrate: verdure || null,
-        hauteurHerbeCm: hauteur ? parseFloat(hauteur) : null,
-        dernierePluie: dernierePluie || null,
-        intensitePluie: intensite || null,
-      });
-      setDraft(updated);
-      router.push({ pathname: '/(prospection)/extensive-recap' as any, params: { draftId } });
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const handleContinue = () =>
+    run(
+      async () => {
+        const updated = await updateProspectionExtensiveObservations(draftId, {
+          degatsCulturesPourcent: degats,
+          verdureStrate: verdure || null,
+          hauteurHerbeCm: hauteur ? parseFloat(hauteur) : null,
+          dernierePluie: dernierePluie || null,
+          intensitePluie: intensite || null,
+        });
+        setDraft(updated);
+        router.push({ pathname: '/(prospection)/extensive-recap' as any, params: { draftId } });
+      },
+      {
+        screen: 'extensive-observations',
+        precondition: !!draftId,
+        preconditionMessage: 'Session de saisie perdue — revenez à l’écran précédent et réessayez.',
+        context: { draftId },
+      }
+    );
 
   return (
     <View style={styles.root}>

@@ -22,6 +22,7 @@ import {
   oppositeDirection,
 } from '@/lib/prospection-infestation-insights';
 import { useAsyncAction } from '@/hooks/use-async-action';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { TimeField } from '@/components/TimeField';
 import {
   AerialPopulationClassification,
@@ -49,7 +50,7 @@ const INACTIVE_BG = '#f6f3e9';
 const TARGET_ACTIVE = '#c0412b';
 
 // Groupes incompatibles (au sein d'un même groupe, un seul type sélectionnable à la fois)
-// "essaim" a disparu (migration backend 0029) : Dense et Très dense sont désormais des
+// "essaim" a disparu (migration backend 0031) : Dense et Très dense sont désormais des
 // types de cible à part entière (comme Vol clair), plus une sous-classification.
 const INCOMPATIBLE_GROUPS = {
   larve: ['tache_larvaire', 'bande_larvaire'],
@@ -223,7 +224,7 @@ function ventVitesseMsInputToKmh(ms: string): number | null {
   return Number.isFinite(parsed) ? Math.round(parsed * KMH_PAR_MS * 10) / 10 : null;
 }
 
-// "essaim" a disparu (migration backend 0029) : Vol clair, Dense et Très dense sont les
+// "essaim" a disparu (migration backend 0031) : Vol clair, Dense et Très dense sont les
 // 3 types de cible aériens (imago), au même niveau que Tache/Bande larvaire.
 function isTypeCibleAerien(typeCible: string): boolean {
   return typeCible === 'vol_clair' || typeCible === 'dense' || typeCible === 'tres_dense';
@@ -280,7 +281,7 @@ function rowFromForm(typeCible: string, form: FormationForm): InfestationRow {
           : 0
       : null,
     // type_essaim reste alimenté (confirmation détaillée via le questionnaire séquentiel,
-    // redondante avec type_cible depuis 0029 mais sans perte d'information côté backend).
+    // redondante avec type_cible depuis 0031 mais sans perte d'information côté backend).
     type_essaim: aerien ? computeAerialClassification(form) : null,
     nb_taches_bandes: typeCible === 'bande_larvaire' ? numOrNull(form.nbTachesBandes) : null,
     interdistance_m: null,
@@ -299,8 +300,23 @@ function rowFromForm(typeCible: string, form: FormationForm): InfestationRow {
   };
 }
 
+/**
+ * Une formation aérienne (vol clair / essaim) n'affiche pas de champ « densité moyenne » :
+ * sa saisie passe par le questionnaire de classification, l'heure et les dimensions. Les
+ * inclure ici évite qu'une cible aérienne renseignée soit considérée comme vide (#201).
+ */
 function isFilled(form: FormationForm): boolean {
-  return form.surfaceTotale !== '' || form.densMoy !== '';
+  return (
+    form.surfaceTotale !== '' ||
+    form.densMoy !== '' ||
+    form.tailleMoy !== '' ||
+    form.heureObservation !== '' ||
+    form.dimensionHa !== '' ||
+    form.densiteEnVol !== '' ||
+    form.comportement !== null ||
+    form.essaimComportement !== null ||
+    computeAerialClassification(form) !== null
+  );
 }
 
 type Tab = 'desc' | 'comport';
@@ -313,22 +329,27 @@ export default function InfestationScreen() {
   const [selectedTargetsRaw, setSelectedTargets] = useState<string[]>([]);
   const [tab, setTab] = useState<Tab>('desc');
   const { run, isRunning: isSaving } = useAsyncAction();
+  const signalerChargement = useSignalerChargement('infestation');
 
   // Fiche chargée une seule fois au montage (réutilisée aussi par handleFooterPress
   // pour station_id, qui appelait déjà `getProspection` séparément auparavant).
   const [draftRow, setDraftRow] = useState<DraftProspection | null>(null);
   useEffect(() => {
     if (!draftId) return;
-    getProspection(draftId).then(setDraftRow);
-  }, [draftId]);
+    void getProspection(draftId)
+      .then(setDraftRow)
+      .catch((error) => signalerChargement(error, { draftId }));
+  }, [draftId, signalerChargement]);
 
   // Captures déjà saisies sur cette fiche (écran Captures) : sert à calculer
   // automatiquement le stade dominant Imagos/Larves (cf. dominantStadeLarve/Imago).
   const [captures, setCaptures] = useState<CaptureRow[]>([]);
   useEffect(() => {
     if (!draftId) return;
-    listAllProspectionCaptures(draftId).then(setCaptures);
-  }, [draftId]);
+    void listAllProspectionCaptures(draftId)
+      .then(setCaptures)
+      .catch((error) => signalerChargement(error, { draftId }));
+  }, [draftId, signalerChargement]);
   const dominantLarve = dominantStadeLarve(captures);
   const dominantImago = dominantStadeImago(captures);
 
@@ -353,27 +374,29 @@ export default function InfestationScreen() {
 
   useEffect(() => {
     if (!draftId) return;
-    listAllProspectionInfestations(draftId).then((rows) => {
-      const byType = new Map(rows.map((row) => [row.type_cible, row]));
-      const next: Record<string, FormationForm> = {};
-      const selected: string[] = [];
-      for (const option of TYPE_CIBLE_OPTIONS) {
-        next[option.value] = formFromRow(byType.get(option.value));
-        if (byType.has(option.value)) {
-          selected.push(option.value);
+    void listAllProspectionInfestations(draftId)
+      .then((rows) => {
+        const byType = new Map(rows.map((row) => [row.type_cible, row]));
+        const next: Record<string, FormationForm> = {};
+        const selected: string[] = [];
+        for (const option of TYPE_CIBLE_OPTIONS) {
+          next[option.value] = formFromRow(byType.get(option.value));
+          if (byType.has(option.value)) {
+            selected.push(option.value);
+          }
         }
-      }
-      // Taille du groupe ≥ 1000 m² déjà en base : "tache" n'est plus une cible valide.
-      const size = numOrNull(next.tache_larvaire?.tailleGroupeM2 ?? '') ?? 0;
-      if (size >= TAILLE_GROUPE_SEUIL_BANDE_M2 && selected.includes('tache_larvaire') && !selected.includes('bande_larvaire')) {
-        next.bande_larvaire = next.tache_larvaire;
-        next.tache_larvaire = emptyFormation();
-        selected[selected.indexOf('tache_larvaire')] = 'bande_larvaire';
-      }
-      setForms(next);
-      setSelectedTargets(selected);
-    });
-  }, [draftId]);
+        // Taille du groupe ≥ 1000 m² déjà en base : "tache" n'est plus une cible valide.
+        const size = numOrNull(next.tache_larvaire?.tailleGroupeM2 ?? '') ?? 0;
+        if (size >= TAILLE_GROUPE_SEUIL_BANDE_M2 && selected.includes('tache_larvaire') && !selected.includes('bande_larvaire')) {
+          next.bande_larvaire = next.tache_larvaire;
+          next.tache_larvaire = emptyFormation();
+          selected[selected.indexOf('tache_larvaire')] = 'bande_larvaire';
+        }
+        setForms(next);
+        setSelectedTargets(selected);
+      })
+      .catch((error) => signalerChargement(error, { draftId }));
+  }, [draftId, signalerChargement]);
 
   // Règle #7 : l'heure d'observation est renseignée automatiquement (heure système, au
   // moment où l'utilisateur ouvre le détail comportemental de cette cible) plutôt que
@@ -384,7 +407,7 @@ export default function InfestationScreen() {
     const target = selectedTargets.length > 0 ? selectedTargets[0] : null;
     if (!target || !isTypeCibleAerien(target)) return;
     if (forms[target]?.heureObservation) return;
-    Promise.resolve().then(() => {
+    void Promise.resolve().then(() => {
       const now = new Date();
       const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
       setForms((current) =>
@@ -404,7 +427,7 @@ export default function InfestationScreen() {
     if (target !== 'tache_larvaire' && target !== 'bande_larvaire') return;
     if (forms[target]?.stadeDominant) return;
     const bucket = dominantLarve.bucket;
-    Promise.resolve().then(() => {
+    void Promise.resolve().then(() => {
       setForms((current) =>
         current && !current[target].stadeDominant
           ? { ...current, [target]: { ...current[target], stadeDominant: bucket } }
@@ -577,15 +600,15 @@ export default function InfestationScreen() {
   };
 
   const persistAll = async () => {
-    // Ne sauvegarder que les types sélectionnés
+    // La sélection d'une cible est elle-même une donnée : on enregistre chaque type
+    // sélectionné, même partiellement rempli, sinon la sélection disparaît à la
+    // réouverture de la fiche (#201).
     for (const target of selectedTargets) {
-      const f = forms[target];
-      if (!isFilled(f)) continue;
-      await saveProspectionInfestation(draftId, target, rowFromForm(target, f));
+      await saveProspectionInfestation(draftId, target, rowFromForm(target, forms[target]));
     }
   };
 
-  const handleFooterPress = async () => {
+  const handleFooterPress = () => {
     if (selectedTargets.length === 0) {
       Alert.alert('Sélection requise', 'Veuillez sélectionner au moins un type de cible.');
       return;
@@ -595,75 +618,77 @@ export default function InfestationScreen() {
       return;
     }
 
-    // Réutilise la fiche déjà chargée au montage plutôt que de la refetcher ici.
-    const draft = draftRow;
-
-    const blocages: string[] = [];
-    const avertissements: string[] = [];
-    /** Sous-ensemble des avertissements relevant de #106 (plausibilité horaire, écart historique) : marque la fiche « à vérifier », visible en revue. */
-    const avertissementsAVerifier: string[] = [];
-    for (const target of selectedTargets) {
-      const f = forms[target];
-      if (!isFilled(f)) continue;
-      const result = validateInfestationFormation({
-        densMin: numOrNull(f.densMin),
-        densMax: numOrNull(f.densMax),
-        // Les seuils de validation sont exprimés en km/h (cf. VENT_VITESSE_SEUIL_*_KMH) ;
-        // le formulaire saisit désormais en m/s (règle #8) — on reconvertit avant validation.
-        ventVitesse: ventVitesseMsInputToKmh(f.ventVitesse),
-      });
-      blocages.push(...result.blocages);
-      avertissements.push(...result.avertissements);
-
-      const directionResult = validateComportementDirection({
-        typeCible: target,
-        comportement: f.comportement,
-        directionRenseignee: !!(f.deplacementDe && f.deplacementVers),
-      });
-      blocages.push(...directionResult.blocages);
-      avertissements.push(...directionResult.avertissements);
-
-      if (target === 'tache_larvaire' || target === 'bande_larvaire') {
-        const groupementResult = validateGroupementLarvaire({
-          typeCible: target,
-          nbTachesBandes: numOrNull(f.nbTachesBandes),
-          interdistanceMoy: numOrNull(f.interdistanceMoy),
-        });
-        blocages.push(...groupementResult.blocages);
-        avertissements.push(...groupementResult.avertissements);
-      }
-
-      const pushAVerifier = (result: { avertissements: string[] }) => {
-        avertissements.push(...result.avertissements);
-        avertissementsAVerifier.push(...result.avertissements);
-      };
-
-      if (isTypeCibleAerien(target)) {
-        pushAVerifier(
-          validateEssaimNocturne({ typeCible: target, heureObservation: f.heureObservation })
-        );
-      }
-
-      if (draft?.station_id) {
-        const derniereDensiteMoyConnue = await getDerniereDensiteMemeSite(draft.station_id, target, draft.id);
-        pushAVerifier(
-          validateEcartHistorique({ densiteMoyActuelle: numOrNull(f.densMoy), derniereDensiteMoyConnue })
-        );
-      }
-    }
-    if (blocages.length > 0) {
-      Alert.alert('Saisie incohérente', blocages.join('\n'));
-      return;
-    }
-    if (avertissements.length > 0) {
-      Alert.alert('À vérifier', avertissements.join('\n'));
-    }
-    if (draftId) {
-      await updateProspectionAvertissements(draftId, avertissementsAVerifier);
-    }
-
-    run(
+    // Tout le contrôle passe par `run` : la lecture de l'historique (`getDerniereDensiteMemeSite`)
+    // est asynchrone, la laisser hors frontière renvoyait ses échecs dans le vide (#175/#177).
+    return run(
       async () => {
+        // Réutilise la fiche déjà chargée au montage plutôt que de la refetcher ici.
+        const draft = draftRow;
+
+        const blocages: string[] = [];
+        const avertissements: string[] = [];
+        /** Sous-ensemble des avertissements relevant de #106 (plausibilité horaire, écart historique) : marque la fiche « à vérifier », visible en revue. */
+        const avertissementsAVerifier: string[] = [];
+        for (const target of selectedTargets) {
+          const f = forms[target];
+          if (!isFilled(f)) continue;
+          const result = validateInfestationFormation({
+            densMin: numOrNull(f.densMin),
+            densMax: numOrNull(f.densMax),
+            // Les seuils de validation sont exprimés en km/h (cf. VENT_VITESSE_SEUIL_*_KMH) ;
+            // le formulaire saisit désormais en m/s (règle #8) — on reconvertit avant validation.
+            ventVitesse: ventVitesseMsInputToKmh(f.ventVitesse),
+          });
+          blocages.push(...result.blocages);
+          avertissements.push(...result.avertissements);
+
+          const directionResult = validateComportementDirection({
+            typeCible: target,
+            comportement: f.comportement,
+            directionRenseignee: !!(f.deplacementDe && f.deplacementVers),
+          });
+          blocages.push(...directionResult.blocages);
+          avertissements.push(...directionResult.avertissements);
+
+          if (target === 'tache_larvaire' || target === 'bande_larvaire') {
+            const groupementResult = validateGroupementLarvaire({
+              typeCible: target,
+              nbTachesBandes: numOrNull(f.nbTachesBandes),
+              interdistanceMoy: numOrNull(f.interdistanceMoy),
+            });
+            blocages.push(...groupementResult.blocages);
+            avertissements.push(...groupementResult.avertissements);
+          }
+
+          const pushAVerifier = (result: { avertissements: string[] }) => {
+            avertissements.push(...result.avertissements);
+            avertissementsAVerifier.push(...result.avertissements);
+          };
+
+          if (isTypeCibleAerien(target)) {
+            pushAVerifier(
+              validateEssaimNocturne({ typeCible: target, heureObservation: f.heureObservation })
+            );
+          }
+
+          if (draft?.station_id) {
+            const derniereDensiteMoyConnue = await getDerniereDensiteMemeSite(draft.station_id, target, draft.id);
+            pushAVerifier(
+              validateEcartHistorique({ densiteMoyActuelle: numOrNull(f.densMoy), derniereDensiteMoyConnue })
+            );
+          }
+        }
+        if (blocages.length > 0) {
+          Alert.alert('Saisie incohérente', blocages.join('\n'));
+          return;
+        }
+        if (avertissements.length > 0) {
+          Alert.alert('À vérifier', avertissements.join('\n'));
+        }
+        if (draftId) {
+          await updateProspectionAvertissements(draftId, avertissementsAVerifier);
+        }
+
         await persistAll();
         router.push({ pathname: '/(prospection)/veg' as any, params: { draftId } });
       },

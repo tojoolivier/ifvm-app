@@ -7,11 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 # Import all models so metadata knows about all tables
 import app.infrastructure.campagne_model  # noqa: F401
+import app.infrastructure.fiche_vol_model  # noqa: F401
 import app.infrastructure.prospection_model  # noqa: F401
 import app.infrastructure.referentiel_model  # noqa: F401
 import app.infrastructure.traitement_model  # noqa: F401
 from app.auth import create_access_token, hash_password
 from app.database import get_db
+from app.domain.stades import GRILLES, VOCABULAIRE
+from app.infrastructure.referentiel_model import CodeStadeModel, StadeModel
 from app.main import app as fastapi_app
 from app.models.base import Base
 from app.models.users import Utilisateur
@@ -35,6 +38,24 @@ async def db_engine():
 async def db_session(db_engine):
     session_factory = async_sessionmaker(db_engine, expire_on_commit=False)
     async with session_factory() as session:
+        # `prospection_capture.stade` référence `stade` : sans le référentiel, aucune
+        # capture n'est insérable.
+        session.add_all(StadeModel(code=code, libelle=libelle) for code, libelle in VOCABULAIRE)
+        # `code_stade.code` référence `stade.code` — aucune relation ORM ne l'indique à
+        # l'unit of work, il faut donc écrire le vocabulaire avant les grilles.
+        await session.flush()
+        session.add_all(
+            CodeStadeModel(
+                code=p.code,
+                categorie=p.categorie,
+                sexe=p.sexe,
+                espece=p.espece,
+                libelle=p.libelle,
+                ordre=p.ordre,
+            )
+            for p in GRILLES
+        )
+        await session.commit()
         yield session
 
 

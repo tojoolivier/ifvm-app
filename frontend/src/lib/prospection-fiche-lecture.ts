@@ -36,7 +36,7 @@ export const PHENOTYPES: { value: string; label: string }[] = [
   { value: 'gregaire', label: 'Grégaires' },
 ]
 
-// "essaim" a disparu (migration backend 0029) : Dense et Très dense sont désormais des
+// "essaim" a disparu (migration backend 0031) : Dense et Très dense sont désormais des
 // types de cible à part entière, au même niveau que Vol clair.
 export const TYPE_CIBLE_OPTIONS: { value: string; label: string }[] = [
   { value: 'tache_larvaire', label: 'Tache larvaire' },

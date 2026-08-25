@@ -6,11 +6,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Network from 'expo-network';
 import { useAuthStore } from '@/lib/auth-store';
 import { loadAccueilData, loadValidatedProspections, deleteDraftProspection, AccueilViewModel } from '@/lib/prospection-accueil';
-import { retrySyncProspection } from '@/lib/prospection-review';
+import { syncAllProspections } from '@/lib/prospection-review';
+import { estDansLaFile, estToutParti, resumerEnPhrase } from '@/lib/sync-lot';
 import { DraftProspection } from '@/lib/prospection-repository';
 import { ProspectionRead } from '@/lib/api-client';
 import { navigateToProspectionConsult, navigateToProspectionDraft } from '@/lib/fiche-routing';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
+import { runTask } from '@/lib/run-task';
+import { useAsyncAction } from '@/hooks/use-async-action';
 import { FicheCard } from '@/components/fiches/FicheCard';
 import { SearchAndFilterBar, FilterOption } from '@/components/fiches/SearchAndFilterBar';
 import {
@@ -51,22 +54,51 @@ export default function ProspectionScreen() {
   const [data, setData] = useState<AccueilViewModel>(EMPTY_DATA);
   const [showSavedToast, setShowSavedToast] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
-  const [isSyncingAll, setIsSyncingAll] = useState(false);
+  const { run: runSyncAll, isRunning: isSyncingAll } = useAsyncAction();
   const [syncToast, setSyncToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterKey, setFilterKey] = useState<FilterKey>('TOUS');
   const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
+  const { run: runDelete } = useAsyncAction();
+  const { run: runNavigate } = useAsyncAction();
 
+  /*
+   * Trois `.then()` sans `.catch()` flottaient ici. Tant que
+   * `loadValidatedProspections` avalait ses échecs, ça ne se voyait pas ; elle
+   * les propage désormais typés (#173), et #160 a établi qu'aucun filet global
+   * ne les rattraperait en release. `runTask` est la frontière prévue pour ça :
+   * elle ne rejette jamais et laisse une trace dans le journal.
+   *
+   * L'affichage de ces échecs à l'agent reste à faire — c'est #174.
+   */
   const refresh = useCallback(() => {
-    loadAccueilData().then(setData);
-    if (user && token) {
-      loadValidatedProspections(token, user.id).then((validated) =>
-        setData((current) => ({ ...current, validated }))
-      );
-    }
-    Network.getNetworkStateAsync().then((state) =>
-      setIsOffline(!(state.isConnected && state.isInternetReachable))
-    );
+    void (async () => {
+      const accueil = await runTask(() => loadAccueilData(), {
+        name: 'prospection.accueil',
+        criticality: 'essential',
+      });
+      if (accueil.ok) setData(accueil.value);
+
+      if (user && token) {
+        const validees = await runTask(() => loadValidatedProspections(token, user.id), {
+          name: 'prospection.validees',
+          criticality: 'essential',
+        });
+        if (validees.ok) {
+          setData((current) => ({ ...current, validated: validees.value }));
+        }
+      }
+
+      // `best-effort` : ne pas connaître l'état du réseau n'empêche aucune
+      // saisie, et l'app est offline-first.
+      const reseau = await runTask(() => Network.getNetworkStateAsync(), {
+        name: 'prospection.reseau',
+        criticality: 'best-effort',
+      });
+      if (reseau.ok) {
+        setIsOffline(!(reseau.value.isConnected && reseau.value.isInternetReachable));
+      }
+    })();
   }, [user, token]);
 
   useFocusEffect(refresh);
@@ -100,9 +132,11 @@ export default function ProspectionScreen() {
     };
   }, [syncWarning, router]);
 
-  const resumeDraft = (draft: DraftProspection) => {
-    navigateToProspectionDraft(router, hydrateFromDraft, draft);
-  };
+  const resumeDraft = (draft: DraftProspection) =>
+    runNavigate(
+      () => navigateToProspectionDraft(router, hydrateFromDraft, draft),
+      { screen: 'prospection', context: { draftId: draft.id } }
+    );
 
   const openFicheLecture = (prospection: ProspectionRead) => {
     navigateToProspectionConsult(router, prospection);
@@ -146,8 +180,11 @@ export default function ProspectionScreen() {
     });
   }, [items, searchQuery, filterKey]);
 
+  // `estDansLaFile` exclut les fiches en `'echec'` : le serveur les a refusées,
+  // les renvoyer à l'identique reproduirait le refus. Elles se relancent depuis
+  // l'écran de synchronisation, qui montre leur motif (#177).
   const pendingSync = useMemo(
-    () => data.recent.filter((item) => item.statut === 'en_attente' && item.statut_sync !== 'synced'),
+    () => data.recent.filter((item) => item.statut === 'en_attente' && estDansLaFile(item.statut_sync)),
     [data.recent]
   );
 
@@ -155,32 +192,27 @@ export default function ProspectionScreen() {
     router.push('/(prospection)/type-chooser' as any);
   };
 
-  const handleSyncAll = async () => {
-    if (!token || isSyncingAll || pendingSync.length === 0) return;
-    setIsSyncingAll(true);
-    const failures: string[] = [];
-    for (const draft of pendingSync) {
-      try {
-        await retrySyncProspection(draft, token);
-      } catch (error) {
-        const label = draft.n_fiche ?? `fiche du ${draft.date_prospection}`;
-        const message = error instanceof Error ? error.message : 'erreur inconnue';
-        failures.push(`${label} : ${message}`);
+  const handleSyncAll = () =>
+    runSyncAll(
+      async () => {
+        // Le lot résume, il ne lève pas : la boucle `try/catch` qui concaténait
+        // des chaînes est devenue `syncAll` (ADR-012 décision 9, #177).
+        const resume = await syncAllProspections(pendingSync, token!);
+
+        setSyncToast({
+          type: estToutParti(resume) ? 'success' : 'error',
+          message: resumerEnPhrase(resume),
+        });
+        refresh();
+        setTimeout(() => setSyncToast(null), 6000);
+      },
+      {
+        screen: 'prospection',
+        precondition: !!token && pendingSync.length > 0,
+        preconditionMessage: 'Session expirée — reconnectez-vous pour synchroniser.',
+        context: { pendingCount: pendingSync.length },
       }
-    }
-    const successCount = pendingSync.length - failures.length;
-    if (failures.length === 0) {
-      setSyncToast({
-        type: 'success',
-        message: `${successCount} fiche${successCount > 1 ? 's' : ''} synchronisée${successCount > 1 ? 's' : ''}`,
-      });
-    } else {
-      setSyncToast({ type: 'error', message: failures.join('\n') });
-    }
-    setIsSyncingAll(false);
-    refresh();
-    setTimeout(() => setSyncToast(null), 6000);
-  };
+    );
 
   const handleDelete = (draft: DraftProspection) => {
     Alert.alert(
@@ -191,10 +223,14 @@ export default function ProspectionScreen() {
         {
           text: 'Supprimer',
           style: 'destructive',
-          onPress: async () => {
-            await deleteDraftProspection(draft);
-            refresh();
-          },
+          onPress: () =>
+            runDelete(
+              async () => {
+                await deleteDraftProspection(draft);
+                refresh();
+              },
+              { screen: 'prospection', context: { draftId: draft.id } }
+            ),
         },
       ]
     );

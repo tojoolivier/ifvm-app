@@ -11,6 +11,26 @@ export const PROSPECTION_CONSULT_ROUTE = '/(prospection)/fiche-lecture';
 export const TRAITEMENT_EDIT_ROUTE = '/(traitement)/references';
 
 /**
+ * Retour arrière dans le tunnel de saisie : dépile l'historique.
+ *
+ * `router.replace` ne dépile pas — il échange l'entrée du dessus. L'utiliser comme
+ * « retour » empile des écrans périmés dans le désordre : après un aller-retour entre
+ * deux grilles, la pile contenait `[… species, captures, species]`, et le retour suivant
+ * depuis « Qu'avez-vous observé ? » ramenait à l'écran de capture au lieu de remonter le
+ * tunnel.
+ *
+ * `repli` ne sert qu'aux arrivées sans historique (lien profond, écran monté seul) : là,
+ * il n'y a rien à dépiler et la destination doit être nommée.
+ */
+export function retourArriere(router: Router, repli: () => void): void {
+  if (router.canGoBack()) {
+    router.back();
+    return;
+  }
+  repli();
+}
+
+/**
  * Navigue vers l'écran d'édition d'un brouillon de prospection (intensive, extensive
  * ou validation). `extensive-reference.tsx` ne s'auto-hydrate pas depuis `draftId`
  * (contrairement à `reference.tsx`) : on hydrate systématiquement le store avant de

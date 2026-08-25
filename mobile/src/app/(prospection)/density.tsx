@@ -3,9 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Keyboa
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAsyncAction } from '@/hooks/use-async-action';
-import { useErrorStore } from '@/lib/error-store';
-import { useErrorLogStore } from '@/lib/error-log-store';
-import { toFriendlyError } from '@/lib/friendly-error';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import {
   PopulationRow,
   getProspectionPopulation,
@@ -13,18 +11,9 @@ import {
 } from '@/lib/prospection-repository';
 import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
-import { parseEspeceSelection, buildGrilles } from '@/lib/prospection-especes';
+import { parseEspeceSelection, buildGrilles, parseGrillesCompletees } from '@/lib/prospection-especes';
 import { parseDensite } from '@/lib/prospection-extensive';
-
-function parseGrillesCompletees(raw: string | null): string[] {
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
+import { retourArriere } from '@/lib/fiche-routing';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -62,17 +51,16 @@ export default function DensityScreen() {
   const [population, setPopulation] = useState<PopulationRow | null>(null);
   const [showDensiteDiffuseError, setShowDensiteDiffuseError] = useState(false);
   const { run, isRunning: isSaving } = useAsyncAction();
-  const signaler = useErrorStore((s) => s.signaler);
-  const logError = useErrorLogStore((s) => s.addEntry);
+  const signalerChargement = useSignalerChargement('density');
 
   // Reconstruit le store si l'app Android a été tuée en arrière-plan puis
   // restaurée directement sur cet écran (le store zustand n'est pas persisté).
   useEffect(() => {
     if (!draftId) return;
     if (draft?.id !== draftId) {
-      hydrateFromDraft(draftId);
+      void hydrateFromDraft(draftId).catch((error) => signalerChargement(error, { draftId }));
     }
-  }, [draftId, draft?.id, hydrateFromDraft]);
+  }, [draftId, draft?.id, hydrateFromDraft, signalerChargement]);
 
   useEffect(() => {
     if (!draft || draft.id !== draftId) return;
@@ -91,19 +79,13 @@ export default function DensityScreen() {
         setPopulation(row ?? emptyPopulation(grille.espece, grille.categorie));
         setShowDensiteDiffuseError(false);
       })
-      .catch((error) => {
+      .catch((error) =>
         // Chargement de fond, pas un geste de l'agent : la frontière est celle
         // de `runTask` (décision 1). Déclarer `useAsyncAction` ferait passer une
         // lecture ratée en BLOQUER, une insistance que la matrice ne prévoit pas.
-        signaler(error, 'runTask:essential');
-        logError({
-          message: toFriendlyError(error).message,
-          stack: error instanceof Error ? error.stack ?? null : null,
-          screen: 'density',
-          context: { draftId, espece: grille.espece, categorie: grille.categorie },
-        });
-      });
-  }, [draftId, grille, signaler, logError]);
+        signalerChargement(error, { draftId, espece: grille.espece, categorie: grille.categorie })
+      );
+  }, [draftId, grille, signalerChargement]);
 
   if (!grille || !population) {
     return (
@@ -119,13 +101,14 @@ export default function DensityScreen() {
     setPopulation((current) => (current ? { ...current, [field]: value } : current));
   };
 
-  const handleBack = () => {
-    if (isFirstGrille) {
-      router.replace(`/(prospection)/species?draftId=${draftId}`);
-    } else {
-      router.replace(`/(prospection)/captures?draftId=${draftId}&grilleIndex=${requestedIndex - 1}`);
-    }
-  };
+  const handleBack = () =>
+    retourArriere(router, () => {
+      if (isFirstGrille) {
+        router.replace(`/(prospection)/species?draftId=${draftId}`);
+      } else {
+        router.replace(`/(prospection)/captures?draftId=${draftId}&grilleIndex=${requestedIndex - 1}`);
+      }
+    });
 
   const handleContinue = () => {
     // Densité diffuse obligatoire, indépendamment pour chaque combinaison espèce/stade

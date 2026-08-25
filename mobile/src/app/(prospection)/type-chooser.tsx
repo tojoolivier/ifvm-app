@@ -1,10 +1,10 @@
-import { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
 import { startNewProspection } from '@/lib/prospection-accueil';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
+import { useAsyncAction } from '@/hooks/use-async-action';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -17,46 +17,37 @@ export default function TypeChooserScreen() {
   const user = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.token);
   const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
-  const [isCreating, setIsCreating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { run, isRunning: isCreating } = useAsyncAction();
 
-  const chooseIntensive = async () => {
-    if (!user || !token || isCreating) return;
-    setIsCreating(true);
-    setError(null);
-    try {
-      const draft = await startNewProspection({ token, prospecteurId: user.id, typeProspection: 'intensive' });
-      await hydrateFromDraft(draft.id);
-      router.replace({ pathname: '/(prospection)/reference' as any, params: { draftId: draft.id } });
-    } catch (e) {
-      setError(
-        e instanceof Error && e.message
-          ? e.message
-          : 'Impossible de démarrer une nouvelle fiche (campagne introuvable ou hors-ligne).'
-      );
-    } finally {
-      setIsCreating(false);
-    }
-  };
+  const chooseIntensive = () =>
+    run(
+      async () => {
+        const draft = await startNewProspection({ token: token!, prospecteurId: user!.id, typeProspection: 'intensive' });
+        await hydrateFromDraft(draft.id);
+        router.replace({ pathname: '/(prospection)/reference' as any, params: { draftId: draft.id } });
+      },
+      {
+        screen: 'type-chooser',
+        precondition: !!user && !!token,
+        preconditionMessage: 'Session expirée — reconnectez-vous pour créer une fiche.',
+        context: { typeProspection: 'intensive' },
+      }
+    );
 
-  const chooseExtensive = async () => {
-    if (!user || !token || isCreating) return;
-    setIsCreating(true);
-    setError(null);
-    try {
-      const draft = await startNewProspection({ token, prospecteurId: user.id, typeProspection: 'extensive' });
-      await hydrateFromDraft(draft.id);
-      router.replace({ pathname: '/(prospection)/extensive-reference' as any, params: { draftId: draft.id } });
-    } catch (e) {
-      setError(
-        e instanceof Error && e.message
-          ? e.message
-          : 'Impossible de démarrer une nouvelle fiche (campagne introuvable ou hors-ligne).'
-      );
-    } finally {
-      setIsCreating(false);
-    }
-  };
+  const chooseExtensive = () =>
+    run(
+      async () => {
+        const draft = await startNewProspection({ token: token!, prospecteurId: user!.id, typeProspection: 'extensive' });
+        await hydrateFromDraft(draft.id);
+        router.replace({ pathname: '/(prospection)/extensive-reference' as any, params: { draftId: draft.id } });
+      },
+      {
+        screen: 'type-chooser',
+        precondition: !!user && !!token,
+        preconditionMessage: 'Session expirée — reconnectez-vous pour créer une fiche.',
+        context: { typeProspection: 'extensive' },
+      }
+    );
 
   const chooseValidation = () => {
     router.push('/(prospection)/extensive-signalement' as any);
@@ -98,8 +89,6 @@ export default function TypeChooserScreen() {
               Même fiche A→D, conclue par Confirmée / Infirmée sur place.
             </Text>
           </TouchableOpacity>
-
-          {error && <Text style={styles.errorText}>{error}</Text>}
         </View>
       </SafeAreaView>
     </View>
@@ -120,7 +109,6 @@ const styles = StyleSheet.create({
   cardTitleIntensive: { fontSize: 15, fontWeight: '800', color: '#fff' },
   cardSubtitle: { fontSize: 11.5, lineHeight: 16, color: TEXT_SECONDARY, marginTop: 4 },
   cardSubtitleIntensive: { fontSize: 11.5, lineHeight: 16, color: '#ffffffd9', marginTop: 4 },
-  errorText: { color: '#c0412b', fontSize: 12, marginTop: 4, textAlign: 'center' },
 });
 
 /**

@@ -1,22 +1,44 @@
 import * as SQLite from 'expo-sqlite';
 
 import { getDb } from './prospection-db';
+import { ReferentialError } from './errors';
 
-let migrated = false;
+/**
+ * Migration en cours ou terminée. C'est une **promesse** mémoïsée, pas un booléen :
+ * deux `_layout` montent le pull automatique, donc deux appels concurrents arrivent ici.
+ * Avec un drapeau posé après coup, le second rejouait la migration pendant que le
+ * premier écrivait — et depuis que la migration de `code_stade` contient un `DROP TABLE`,
+ * cette course effaçait les lignes tout juste synchronisées (#201).
+ */
+let basePrete: Promise<SQLite.SQLiteDatabase> | null = null;
 
-/** Ouvre la base partagée et s'assure que les tables miroir du référentiel existent. */
+/**
+ * Ouvre la base partagée et s'assure que les tables miroir du référentiel existent.
+ *
+ * La mémoïsation couvre **aussi** l'ouverture de la base : la poser après un `await`
+ * laissait deux appels concurrents franchir la garde et migrer tous les deux. Depuis que
+ * la migration de `code_stade` contient un `DROP TABLE`, cette course effaçait les lignes
+ * que la synchro venait d'écrire — d'où une « synchro réussie » suivie d'une grille de
+ * stades vide (#201).
+ */
 export async function getReferentielDb(): Promise<SQLite.SQLiteDatabase> {
-  const db = await getDb();
-  if (!migrated) {
-    await migrateReferentielTables(db);
-    migrated = true;
+  if (!basePrete) {
+    basePrete = (async () => {
+      const db = await getDb();
+      await migrateReferentielTables(db);
+      return db;
+    })();
+    // Un échec ne doit pas rester mémoïsé : le prochain appel réessaie.
+    basePrete.catch(() => {
+      basePrete = null;
+    });
   }
-  return db;
+  return basePrete;
 }
 
 /** Réservé aux tests : force la remigration au prochain `getReferentielDb()`. */
 export function resetReferentielDbForTests(): void {
-  migrated = false;
+  basePrete = null;
 }
 
 export interface PosteAcridien {
@@ -54,6 +76,74 @@ export async function listStationsByPoste(paId: string): Promise<StationFixe[]> 
     'SELECT id, code, nom, pa_id as paId, latitude, longitude, altitude, commune, district, region FROM station_fixe WHERE pa_id = ? AND actif = 1 ORDER BY nom',
     [paId]
   );
+}
+
+export interface StadeGrille {
+  code: string;
+  libelle: string;
+}
+
+export interface EtatTableReferentiel {
+  table: string;
+  lignes: number;
+}
+
+/** Tables miroir du référentiel, dans l'ordre d'affichage du diagnostic. */
+const TABLES_REFERENTIEL = [
+  'poste_acridien',
+  'station_fixe',
+  'utilisateur_equipe',
+  'pesticide',
+  'culture',
+  'code_stade',
+  'campagne',
+];
+
+/**
+ * Nombre de lignes par table miroir — diagnostic affiché sur l'écran Synchronisation.
+ * « Synchro réussie » ne dit rien de ce qui a atterri : sans ce compte, une table vide
+ * reste invisible et se confond avec un bug d'écran (#201).
+ */
+export async function compterReferentielLocal(): Promise<EtatTableReferentiel[]> {
+  const db = await getReferentielDb();
+  const etats: EtatTableReferentiel[] = [];
+  for (const table of TABLES_REFERENTIEL) {
+    const row = await db.getFirstAsync<{ n: number }>(`SELECT count(*) AS n FROM ${table}`);
+    etats.push({ table, lignes: row?.n ?? 0 });
+  }
+  return etats;
+}
+
+/**
+ * Stades d'une grille de saisie, dans l'ordre du référentiel. C'est le référentiel
+ * synchronisé — et non une liste écrite en dur dans l'écran — qui décide quels stades
+ * existent : une liste locale finit par diverger de ce que le backend accepte (#201).
+ *
+ * Toute grille valide a des stades. Un résultat vide signifie que le référentiel local
+ * n'a pas encore été synchronisé, et l'erreur est typée ici plutôt que laissée à
+ * l'écran : sans cela, la grille s'affiche vide et muette, et l'agent croit avoir perdu
+ * sa saisie (ADR-012 — le typage se fait à la source).
+ */
+export async function listStadesGrille(
+  espece: string,
+  categorie: 'imago' | 'larve',
+  sexe: 'F' | 'M' | null
+): Promise<StadeGrille[]> {
+  const db = await getReferentielDb();
+  const stades = await db.getAllAsync<StadeGrille>(
+    `SELECT code, libelle FROM code_stade
+     WHERE actif = 1 AND categorie = ?
+       AND (sexe IS NULL OR sexe = ?)
+       AND (espece IS NULL OR espece = ?)
+     ORDER BY ordre`,
+    [categorie, sexe, espece]
+  );
+  if (stades.length === 0) {
+    throw new ReferentialError(
+      `Aucun stade ${categorie} connu pour ${espece} sur cet appareil.`
+    );
+  }
+  return stades;
 }
 
 export interface Pesticide {
@@ -185,11 +275,17 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
       updated_at TEXT NOT NULL
     );
 
+    -- Place d'un code de stade dans une grille de saisie. Un même code y figure
+    -- plusieurs fois (A1 est un stade femelle et un stade mâle) ; espece/sexe NULL
+    -- valent « toutes espèces » / « non sexé ».
     CREATE TABLE IF NOT EXISTS code_stade (
       id TEXT PRIMARY KEY NOT NULL,
       code TEXT NOT NULL,
-      espece TEXT NOT NULL,
+      categorie TEXT,
+      sexe TEXT,
+      espece TEXT,
       libelle TEXT NOT NULL,
+      ordre INTEGER NOT NULL DEFAULT 0,
       actif INTEGER NOT NULL DEFAULT 1,
       updated_at TEXT NOT NULL
     );
@@ -217,6 +313,39 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
     { name: 'district', type: 'TEXT' },
     { name: 'region', type: 'TEXT' },
   ]);
+  await migrateCodeStade(db);
+}
+
+/**
+ * `code_stade` ne portait que (code, espece NOT NULL) : il ne pouvait pas décrire les
+ * grilles, et refuserait désormais les stades valables pour les deux espèces
+ * (espece = NULL). SQLite ne sait pas relâcher un NOT NULL — la table étant un simple
+ * cache du référentiel, on la recrée et on remet son curseur à zéro pour que la
+ * prochaine synchro la repeuple entièrement.
+ */
+async function migrateCodeStade(db: SQLite.SQLiteDatabase): Promise<void> {
+  const colonnes = await db.getAllAsync<{ name: string; notnull: number }>(
+    'PRAGMA table_info(code_stade)'
+  );
+  const espece = colonnes.find((c) => c.name === 'espece');
+  const aJour = colonnes.some((c) => c.name === 'categorie') && espece?.notnull === 0;
+  if (aJour) return;
+
+  await db.execAsync(`
+    DROP TABLE IF EXISTS code_stade;
+    CREATE TABLE code_stade (
+      id TEXT PRIMARY KEY NOT NULL,
+      code TEXT NOT NULL,
+      categorie TEXT,
+      sexe TEXT,
+      espece TEXT,
+      libelle TEXT NOT NULL,
+      ordre INTEGER NOT NULL DEFAULT 0,
+      actif INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL
+    );
+  `);
+  await db.runAsync("DELETE FROM referentiel_sync_meta WHERE entity_type = 'codes_stades'");
 }
 
 async function addColumnsIfMissing(

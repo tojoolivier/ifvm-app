@@ -3,7 +3,6 @@ import { View, Text, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platfor
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  EMPTY_ESPECE_SELECTION,
   EspeceSelection,
   countGrilles,
   buildGrilles,
@@ -12,6 +11,8 @@ import {
 } from '@/lib/prospection-especes';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
+import { useAsyncAction } from '@/hooks/use-async-action';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -30,30 +31,28 @@ export default function SpeciesScreen() {
   const setDraft = useProspectionWizardStore((s) => s.setDraft);
   const captures = useProspectionWizardStore((s) => s.captures);
   const initGrilles = useProspectionCaptureStore((s) => s.initGrilles);
-  const [selection, setSelection] = useState<EspeceSelection>({ ...EMPTY_ESPECE_SELECTION });
-  const [isSaving, setIsSaving] = useState(false);
+  const [selection, setSelection] = useState<EspeceSelection>(() =>
+    parseEspeceSelection(draft?.especes ?? null)
+  );
+  const { run, isRunning: isSaving } = useAsyncAction();
+  const signalerChargement = useSignalerChargement('species');
 
   // Reconstruit le store si l'app a été relancée directement sur cet écran
   // (même garde-fou que les autres écrans du parcours).
   useEffect(() => {
-    if (!draftId) return;
-    if (draft?.id !== draftId) {
-      hydrateFromDraft(draftId);
+    if (draftId && draft?.id !== draftId) {
+      void hydrateFromDraft(draftId).catch((error) => signalerChargement(error, { draftId }));
     }
-  }, [draftId, draft?.id, hydrateFromDraft]);
+  }, [draftId, draft?.id, hydrateFromDraft, signalerChargement]);
 
-  // Règle #3 : la sélection espèce/stade doit survivre à un retour arrière sur ce slide.
-  // Réhydratée une seule fois depuis la fiche déjà sauvegardée (n'écrase pas les
-  // changements faits ensuite par l'utilisateur dans cette même session).
-  const selectionHydratedRef = useRef(false);
+  // Le store peut n'être hydraté qu'après le montage : on rejoue la restauration
+  // à l'arrivée du brouillon, sans écraser une sélection déjà touchée par l'agent.
+  const restoredRef = useRef(draft?.id ?? null);
   useEffect(() => {
-    if (selectionHydratedRef.current || draft?.id !== draftId) return;
-    selectionHydratedRef.current = true;
-    if (draft.especes) {
-      const hydrated = parseEspeceSelection(draft.especes);
-      Promise.resolve().then(() => setSelection(hydrated));
-    }
-  }, [draft, draftId]);
+    if (!draft || restoredRef.current === draft.id) return;
+    restoredRef.current = draft.id;
+    setSelection(parseEspeceSelection(draft.especes));
+  }, [draft]);
 
   const stepsCount = countGrilles(selection);
 
@@ -61,23 +60,28 @@ export default function SpeciesScreen() {
     setSelection((current) => ({ ...current, [field]: !current[field] }));
   };
 
-  const handleContinue = async () => {
-    if (!draftId || stepsCount === 0 || isSaving) return;
-    setIsSaving(true);
-    try {
-      // Le store `draft` doit refléter la sélection sauvegardée : sans ça, un retour
-      // ultérieur sur ce slide (remontage du composant) réhydrate `selection` depuis un
-      // `draft.especes` resté périmé (souvent vide) et affiche une sélection réinitialisée.
-      const updated = await saveEspeceSelection(draftId, selection);
-      setDraft(updated);
-      const grilles = buildGrilles(selection);
-      initGrilles(grilles, [], captures);
-      // Chaque grille (imago ou larve) passe désormais par l'étape "densités" avant ses captures.
-      router.push({ pathname: '/(prospection)/density' as any, params: { draftId, grilleIndex: '0' } });
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const handleContinue = () =>
+    run(
+      async () => {
+        // Le brouillon en mémoire doit suivre la base : l'écran de capture lit
+        // `draft.especes` pour construire ses grilles. Jeter la valeur renvoyée le
+        // laissait sur l'ancienne sélection (vide sur une fiche neuve) — d'où un
+        // « aucune grille à saisir » alors que la sélection venait d'être faite (#201).
+        setDraft(await saveEspeceSelection(draftId, selection));
+        const grilles = buildGrilles(selection);
+        initGrilles(grilles, [], captures);
+        const firstScreen = grilles[0]?.categorie === 'imago' ? 'density' : 'captures';
+        router.push({ pathname: `/(prospection)/${firstScreen}` as any, params: { draftId, grilleIndex: '0' } });
+      },
+      {
+        screen: 'species',
+        precondition: !!draftId && stepsCount > 0,
+        preconditionMessage: stepsCount === 0
+          ? 'Sélectionnez au moins un stade avant de continuer.'
+          : 'Session de saisie perdue — revenez à l’écran précédent et réessayez.',
+        context: { draftId, stepsCount },
+      }
+    );
 
   return (
     <View style={styles.root}>

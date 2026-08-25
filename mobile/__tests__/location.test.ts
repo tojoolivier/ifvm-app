@@ -1,4 +1,5 @@
-import { getCurrentPosition, LocationPermissionDeniedError } from '../src/lib/location';
+import { getCurrentPosition } from '../src/lib/location';
+import { PermissionError } from '../src/lib/errors';
 
 const requestForegroundPermissionsAsync = jest.fn();
 const getCurrentPositionAsync = jest.fn();
@@ -31,10 +32,10 @@ describe('getCurrentPosition', () => {
     });
   });
 
-  it('throws LocationPermissionDeniedError when permission is denied', async () => {
+  it('throws PermissionError when permission is denied', async () => {
     requestForegroundPermissionsAsync.mockResolvedValueOnce({ status: 'denied' });
 
-    await expect(getCurrentPosition()).rejects.toThrow(LocationPermissionDeniedError);
+    await expect(getCurrentPosition()).rejects.toThrow(PermissionError);
     expect(getCurrentPositionAsync).not.toHaveBeenCalled();
   });
 });

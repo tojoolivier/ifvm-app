@@ -6,6 +6,7 @@ import { useAuthStore } from '@/lib/auth-store';
 import { startNewProspection } from '@/lib/prospection-accueil';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { DateField } from '@/components/DateField';
+import { useAsyncAction } from '@/hooks/use-async-action';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -25,36 +26,32 @@ export default function ExtensiveSignalementScreen() {
   const [source, setSource] = useState('');
   const [date, setDate] = useState('');
   const [description, setDescription] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { run, isRunning: isCreating } = useAsyncAction();
 
   const canContinue = source.trim().length > 0 && description.trim().length > 0;
 
-  const startValidation = async () => {
-    if (!user || !token || isCreating || !canContinue) return;
-    setIsCreating(true);
-    setError(null);
-    try {
-      const draft = await startNewProspection({
-        token,
-        prospecteurId: user.id,
-        typeProspection: 'validation',
-        signalementSource: source.trim(),
-        signalementDate: date.trim() || null,
-        signalementDescription: description.trim(),
-      });
-      await hydrateFromDraft(draft.id);
-      router.replace({ pathname: '/(prospection)/extensive-reference' as any, params: { draftId: draft.id } });
-    } catch (e) {
-      setError(
-        e instanceof Error && e.message
-          ? e.message
-          : 'Impossible de démarrer la vérification (campagne introuvable ou hors-ligne).'
-      );
-    } finally {
-      setIsCreating(false);
-    }
-  };
+  const startValidation = () =>
+    run(
+      async () => {
+        const draft = await startNewProspection({
+          token: token!,
+          prospecteurId: user!.id,
+          typeProspection: 'validation',
+          signalementSource: source.trim(),
+          signalementDate: date.trim() || null,
+          signalementDescription: description.trim(),
+        });
+        await hydrateFromDraft(draft.id);
+        router.replace({ pathname: '/(prospection)/extensive-reference' as any, params: { draftId: draft.id } });
+      },
+      {
+        screen: 'extensive-signalement',
+        precondition: !!user && !!token && canContinue,
+        preconditionMessage: !user || !token
+          ? 'Session expirée — reconnectez-vous pour créer une fiche.'
+          : 'Renseignez la source et la description avant de continuer.',
+      }
+    );
 
   return (
     <View style={styles.root}>
@@ -110,8 +107,6 @@ export default function ExtensiveSignalementScreen() {
                 multiline
               />
             </View>
-
-            {error && <Text style={styles.errorText}>{error}</Text>}
           </ScrollView>
 
           <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
@@ -144,7 +139,6 @@ const styles = StyleSheet.create({
   input: { fontSize: 13, fontWeight: '600', color: TEXT, padding: 0 },
   dateFieldBox: { minHeight: 0, borderWidth: 0, padding: 0, backgroundColor: 'transparent' },
   multiline: { minHeight: 60, textAlignVertical: 'top' },
-  errorText: { color: '#c0412b', fontSize: 12, marginTop: 4, textAlign: 'center' },
   footer: { padding: 16 },
   continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
   continueButtonDisabled: { opacity: 0.5 },

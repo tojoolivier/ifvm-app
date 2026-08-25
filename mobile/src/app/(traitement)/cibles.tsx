@@ -6,6 +6,7 @@ import { getTraitement, Cible } from '@/lib/traitement-repository';
 import { Card } from '@/components/traitement/Card';
 import { ProgressBar } from '@/components/traitement/ProgressBar';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
 function display(value: string | number | null | undefined): string {
   if (value === null || value === undefined || value === '') return 'non renseigné';
@@ -26,12 +27,14 @@ export default function CiblesScreen() {
   const { traitementId, isValidationView, origineId } =
     useLocalSearchParams<{ traitementId: string; isValidationView?: string; origineId?: string }>();
   const [cible, setCible] = useState<Cible | null>(null);
+  const signalerChargement = useSignalerChargement('cibles');
 
   useEffect(() => {
-    if (traitementId) {
-      getTraitement(traitementId).then((draft) => setCible(draft?.cible ?? null));
-    }
-  }, [traitementId]);
+    if (!traitementId) return;
+    void getTraitement(traitementId)
+      .then((draft) => setCible(draft?.cible ?? null))
+      .catch((error) => signalerChargement(error, { traitementId }));
+  }, [traitementId, signalerChargement]);
 
   return (
     <SafeAreaView style={styles.container}>

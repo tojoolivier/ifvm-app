@@ -620,7 +620,7 @@ async def test_create_prospection_avec_stades_larvaires_l6_l7(
 async def test_create_prospection_avec_type_cible_dense_enum(
     client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
 ):
-    """Test de création avec les 3 types de cible aériens (0029 : "essaim" a disparu,
+    """Test de création avec les 3 types de cible aériens (0031 : "essaim" a disparu,
     "dense"/"tres_dense" sont désormais des type_cible à part entière — type_essaim
     reste alimenté en parallèle, à titre de confirmation détaillée, non contraignant)."""
     for type_cible in ["vol_clair", "dense", "tres_dense"]:
@@ -794,3 +794,117 @@ async def test_create_prospection_conclusion_invalide_echoue(
     # conclusion_validation est un Enum Pydantic (issue #117) : la valeur invalide est
     # rejetée à la validation du payload, avant toute requête SQL.
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_intensive_station_inexistante_renvoie_409(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+):
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "intensive",
+            "campagne_id": str(campagne_id),
+            "station_id": str(uuid.uuid4()),
+            "date_prospection": "2026-06-25",
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 409
+    assert "station" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_create_intensive_autre_violation_ne_blame_pas_la_station(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+):
+    """#201 : n'importe quelle contrainte violée (ici deux populations LMC/imago, qui
+    violent `uq_prospection_population`) remontait « station_id n'existe pas » alors que
+    la station est bien référencée — le vrai motif était masqué."""
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "intensive",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-06-25",
+            "populations": [
+                {"espece": "LMC", "categorie": "imago", "densite_diffuse": 3.5},
+                {"espece": "LMC", "categorie": "imago", "densite_diffuse": 4.0},
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+    assert "station" not in response.text
+    assert "uq_prospection_population" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_create_capture_stade_inconnu_refuse_avant_la_base(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+):
+    """#201 : le vocabulaire des stades est un invariant du domaine, pas seulement une
+    contrainte de base. Un stade hors référentiel doit être refusé à la frontière, en
+    nommant le stade fautif — pas remonter en violation d'intégrité opaque."""
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "intensive",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-06-25",
+            "captures": [
+                {
+                    "espece": "LMC",
+                    "categorie": "imago",
+                    "sexe": "M",
+                    "phase": "gregaire",
+                    "stade": "A123",
+                    "effectif": 3,
+                }
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+    assert "A123" in response.text
+    assert "station" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_create_capture_sous_stade_a3_et_male_groupe_acceptes(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+):
+    """#201 : les stades réellement saisis sur le terrain (sous-stades A3 femelles et
+    stade mâle groupé) doivent s'enregistrer."""
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "intensive",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-06-25",
+            "captures": [
+                {
+                    "espece": "LMC",
+                    "categorie": "imago",
+                    "sexe": "F",
+                    "phase": "gregaire",
+                    "stade": "A3-1/4",
+                    "effectif": 2,
+                },
+                {
+                    "espece": "LMC",
+                    "categorie": "imago",
+                    "sexe": "M",
+                    "phase": "gregaire",
+                    "stade": "A234",
+                    "effectif": 1,
+                },
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    assert {c["stade"] for c in response.json()["captures"]} == {"A3-1/4", "A234"}

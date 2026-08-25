@@ -1,4 +1,13 @@
 import { getDb, resetDbForTests } from '../src/lib/prospection-db';
+import {
+  AppError,
+  LocalReadError,
+  LocalWriteError,
+} from '../src/lib/errors';
+import {
+  lignesEnAttente,
+  resetLoggerForTests,
+} from '../src/lib/logger';
 
 // Liste complète des colonnes migrées pour les tests
 const MIGRATED_COLUMNS = [
@@ -77,7 +86,27 @@ const MIGRATED_COLUMNS = [
 
 const execAsync = jest.fn().mockResolvedValue(undefined);
 const getAllAsync = jest.fn().mockResolvedValue(MIGRATED_COLUMNS);
-const openDatabaseAsync = jest.fn().mockResolvedValue({ execAsync, getAllAsync });
+const runAsync = jest.fn().mockResolvedValue(undefined);
+
+/**
+ * Méthode hors du tableau de typage, qui **rend son propre `this`**.
+ *
+ * `expo-sqlite` en a de vraies : `closeAsync()` fait
+ * `unregisterDatabaseForDevToolsAsync(this)`, et un `this` valant l'enveloppe
+ * ne correspondrait à aucune entrée du registre.
+ */
+function renvoieSonThis(this: unknown): unknown {
+  return this;
+}
+
+const baseNue = {
+  execAsync,
+  getAllAsync,
+  runAsync,
+  closeAsync: renvoieSonThis,
+};
+
+const openDatabaseAsync = jest.fn().mockResolvedValue(baseNue);
 
 jest.mock('expo-sqlite', () => ({
   openDatabaseAsync: (...args: unknown[]) => openDatabaseAsync(...args),
@@ -85,9 +114,11 @@ jest.mock('expo-sqlite', () => ({
 
 beforeEach(() => {
   resetDbForTests();
+  resetLoggerForTests();
   openDatabaseAsync.mockClear();
   execAsync.mockClear();
   getAllAsync.mockClear();
+  runAsync.mockClear();
 });
 
 describe('prospection-db', () => {
@@ -228,5 +259,100 @@ describe('prospection-db', () => {
       MIGRATED_COLUMNS.some(col => col.name === colName)
     );
     expect(allPresent).toBe(true);
+  });
+});
+
+/*
+ * Ces tests protègent la décision 2 d'ADR-012 (issue #173) sur l'endroit du
+ * mobile où un silence coûte le plus cher : une migration ratée laisse une
+ * colonne absente, et c'est cette dérive-là qui a produit l'écran blanc.
+ */
+describe('prospection-db — typage à la source (#173)', () => {
+  it('lève LocalWriteError quand la base ne peut pas être ouverte', async () => {
+    openDatabaseAsync.mockRejectedValueOnce(new Error('disk I/O error'));
+
+    await expect(getDb()).rejects.toBeInstanceOf(LocalWriteError);
+  });
+
+  it('lève LocalWriteError quand la création des tables échoue', async () => {
+    execAsync.mockRejectedValueOnce(new Error('database is locked'));
+
+    await expect(getDb()).rejects.toBeInstanceOf(LocalWriteError);
+  });
+
+  it('lève LocalWriteError au lieu d’avaler un ALTER TABLE refusé', async () => {
+    // La colonne manque, donc l'ALTER part — et il échoue.
+    getAllAsync.mockResolvedValue([]);
+    execAsync
+      .mockResolvedValueOnce(undefined) // CREATE TABLE
+      .mockRejectedValueOnce(new Error('cannot add column'));
+
+    await expect(getDb()).rejects.toBeInstanceOf(LocalWriteError);
+  });
+
+  /*
+   * Les dépôts (`*-repository.ts`) font une centaine d'appels SQLite sans un
+   * `try` : typer chacun d'eux à la main, c'était cent occasions d'en oublier
+   * un. Le handle rendu par `getDb()` type donc les échecs lui-même — une
+   * lecture ratée est `LocalReadError`, une écriture ratée `LocalWriteError`,
+   * partout, sans que le dépôt ait à y penser (ADR-012 décision 2, #173).
+   */
+  it('type les lectures ratées du handle en LocalReadError', async () => {
+    const db = await getDb();
+    getAllAsync.mockRejectedValueOnce(new Error('disk I/O error'));
+
+    await expect(db.getAllAsync('SELECT 1')).rejects.toBeInstanceOf(
+      LocalReadError
+    );
+  });
+
+  it('type les écritures ratées du handle en LocalWriteError', async () => {
+    const db = await getDb();
+    runAsync.mockRejectedValueOnce(new Error('database is locked'));
+
+    await expect(db.runAsync('UPDATE prospection SET x = 1')).rejects.toBeInstanceOf(
+      LocalWriteError
+    );
+  });
+
+  it('laisse passer intacte une erreur déjà typée, sans la réenvelopper', async () => {
+    const db = await getDb();
+    const deja = new LocalReadError('déjà typée');
+    runAsync.mockRejectedValueOnce(deja);
+
+    // Sans ce garde, une `PreconditionError` levée dans un
+    // `withTransactionAsync` ressortirait en `LocalWriteError` et l'agent
+    // lirait « impossible d'enregistrer » au lieu du message écrit pour lui.
+    await expect(db.runAsync('UPDATE prospection SET x = 1')).rejects.toBe(deja);
+  });
+
+  it('rend les résultats inchangés quand tout va bien', async () => {
+    const db = await getDb();
+    getAllAsync.mockResolvedValueOnce([{ id: 'p1' }]);
+
+    await expect(db.getAllAsync('SELECT 1')).resolves.toEqual([{ id: 'p1' }]);
+  });
+
+  /*
+   * Ce test existe parce que la correction qu'il protège serait restée
+   * invisible autrement : le registre devtools d'`expo-sqlite` est gardé par
+   * `__DEV__`, et toutes les suites mockent `expo-sqlite` par des objets nus.
+   * C'est le motif que ce dépôt collectionne — du code d'apparence correcte
+   * que rien n'exerce.
+   */
+  it('garde la vraie base comme `this`, même pour une méthode non typée', async () => {
+    const db = await getDb();
+
+    expect((db as unknown as { closeAsync: () => unknown }).closeAsync()).toBe(baseNue);
+  });
+
+  it('journalise l’ouverture et les colonnes ajoutées, pas en console', async () => {
+    getAllAsync.mockResolvedValue([]);
+
+    await getDb();
+
+    const evenements = lignesEnAttente().map((ligne) => ligne.event);
+    expect(evenements).toContain('db.migration.colonnes-ajoutees');
+    expect(evenements).toContain('db.ouverte');
   });
 });

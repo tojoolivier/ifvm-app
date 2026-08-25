@@ -27,35 +27,48 @@ import {
   CaptureRow,
   DraftProspection,
   completeProspection,
+  markProspectionEchec,
   markProspectionSynced,
   listAllProspectionCaptures,
   listAllProspectionPopulations,
   listAllProspectionInfestations,
 } from '../src/lib/prospection-repository';
 import { apiClient } from '../src/lib/api-client';
+import { NetworkError } from '../src/lib/errors';
 import * as Network from 'expo-network';
 import {
   buildRecapitulatif,
   chronoSeconds,
   enregistrerEtSynchroniser,
-  retrySyncProspection,
+  syncOneProspection,
+  syncAllProspections,
   formatChrono,
 } from '../src/lib/prospection-review';
 
 jest.mock('../src/lib/prospection-repository', () => ({
   completeProspection: jest.fn(),
   markProspectionSynced: jest.fn(),
+  markProspectionEchec: jest.fn(),
   listAllProspectionCaptures: jest.fn(),
   listAllProspectionPopulations: jest.fn(),
   listAllProspectionInfestations: jest.fn(),
 }));
 jest.mock('../src/lib/api-client', () => ({
   apiClient: { createProspection: jest.fn() },
+  // `sync-lot` lit le statut HTTP joint à l'erreur : la vraie implémentation,
+  // trois lignes sans effet de bord, plutôt qu'un stub qui mentirait.
+  statutHttpDe: (error: unknown) => {
+    const statut = (error as { status?: number } | null)?.status;
+    return typeof statut === 'number' ? statut : null;
+  },
+  versionServeurDe: (error: unknown) =>
+    (error as { serverVersion?: unknown } | null)?.serverVersion ?? null,
 }));
 jest.mock('expo-network', () => ({ getNetworkStateAsync: jest.fn() }));
 
 const mockCompleteProspection = jest.mocked(completeProspection);
 const mockMarkSynced = jest.mocked(markProspectionSynced);
+const mockMarkEchec = jest.mocked(markProspectionEchec);
 const mockCreateProspection = jest.mocked(apiClient.createProspection);
 const mockGetNetworkState = jest.mocked(Network.getNetworkStateAsync);
 const mockListAllCaptures = jest.mocked(listAllProspectionCaptures);
@@ -241,10 +254,11 @@ describe('enregistrerEtSynchroniser', () => {
       })
     );
     expect(mockMarkSynced).toHaveBeenCalledWith('draft-1');
-    expect(result).toEqual({ synced: true });
+    expect(result.reussies).toEqual(['draft-1']);
+    expect(result.echouees).toEqual([]);
   });
 
-  it('normalise type_cible et type_essaim pour la synchro (0029 : "essaim" a disparu du contrat TypeCible ; anciennes valeurs à 5 niveaux de type_essaim toujours reconnues)', async () => {
+  it('normalise type_cible et type_essaim pour la synchro (0031 : "essaim" a disparu du contrat TypeCible ; anciennes valeurs à 5 niveaux de type_essaim toujours reconnues)', async () => {
     mockCompleteProspection.mockResolvedValue(draft({ statut: 'en_attente' }));
     mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
     mockCreateProspection.mockResolvedValue({ id: 'remote-1' });
@@ -271,7 +285,7 @@ describe('enregistrerEtSynchroniser', () => {
     );
   });
 
-  it('ne tente pas le réseau hors-ligne, la fiche reste locale', async () => {
+  it('ne tente pas le réseau hors-ligne, et la fiche reste dans la file', async () => {
     mockCompleteProspection.mockResolvedValue(draft({ statut: 'en_attente' }));
     mockGetNetworkState.mockResolvedValue({ isConnected: false, isInternetReachable: false } as any);
 
@@ -279,19 +293,36 @@ describe('enregistrerEtSynchroniser', () => {
 
     expect(mockCreateProspection).not.toHaveBeenCalled();
     expect(mockMarkSynced).not.toHaveBeenCalled();
-    expect(result).toEqual({ synced: false });
+    // Hors ligne n'est plus un `{ synced: false }` indiscernable d'un succès :
+    // c'est un échec transitoire nommé, qui laisse la fiche dans la file.
+    expect(result.reussies).toEqual([]);
+    expect(result.echouees[0]).toMatchObject({ id: 'draft-1', sort: 'file', classe: 'NetworkError' });
+    expect(mockMarkEchec).not.toHaveBeenCalled();
   });
 
-  it("remonte l'erreur de synchronisation au lieu de l'avaler, la fiche restant enregistrée localement (#98)", async () => {
+  it("remonte l'échec de synchronisation au lieu de l'avaler, la fiche restant enregistrée localement (#98)", async () => {
     mockCompleteProspection.mockResolvedValue(draft({ statut: 'en_attente' }));
     mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
-    mockCreateProspection.mockRejectedValue(new Error('network error'));
+    mockCreateProspection.mockRejectedValue(new NetworkError('network error'));
 
     const result = await enregistrerEtSynchroniser(draft(), [], 'token-1');
 
     expect(mockCompleteProspection).toHaveBeenCalledWith('draft-1');
-    expect(result).toEqual({ synced: false, syncError: 'network error' });
+    expect(result.echouees[0]).toMatchObject({ id: 'draft-1', classe: 'NetworkError' });
     expect(mockMarkSynced).not.toHaveBeenCalled();
+  });
+
+  it('sort de la file la fiche que le serveur refuse (4xx), et elle seule', async () => {
+    mockCompleteProspection.mockResolvedValue(draft({ statut: 'en_attente' }));
+    mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
+    const refus = new NetworkError('champ obligatoire manquant');
+    (refus as unknown as { status: number }).status = 422;
+    mockCreateProspection.mockRejectedValue(refus);
+
+    const result = await enregistrerEtSynchroniser(draft(), [], 'token-1');
+
+    expect(result.echouees[0].sort).toBe('echec');
+    expect(mockMarkEchec).toHaveBeenCalledWith('draft-1');
   });
 
   it('enregistre normalement une 3e, 4e, 5e fiche à la suite, même si le serveur rejette une des synchronisations (#98)', async () => {
@@ -301,7 +332,7 @@ describe('enregistrerEtSynchroniser', () => {
     for (let i = 1; i <= 5; i += 1) {
       mockCompleteProspection.mockResolvedValueOnce(draft({ id: `draft-${i}`, statut: 'en_attente' }));
       if (i === 3) {
-        mockCreateProspection.mockRejectedValueOnce(new Error(`Erreur serveur sur la fiche ${i}`));
+        mockCreateProspection.mockRejectedValueOnce(new NetworkError(`Erreur serveur sur la fiche ${i}`));
       } else {
         mockCreateProspection.mockResolvedValueOnce({ id: `remote-${i}` });
       }
@@ -310,21 +341,22 @@ describe('enregistrerEtSynchroniser', () => {
 
       expect(mockCompleteProspection).toHaveBeenCalledWith(`draft-${i}`);
       if (i === 3) {
-        expect(result).toEqual({ synced: false, syncError: 'Erreur serveur sur la fiche 3' });
+        expect(result.reussies).toEqual([]);
+        expect(result.echouees).toHaveLength(1);
       } else {
-        expect(result).toEqual({ synced: true });
+        expect(result.reussies).toEqual([`draft-${i}`]);
       }
     }
   });
 });
 
-describe('retrySyncProspection', () => {
+describe('syncOneProspection — l’unitaire lève', () => {
   it('renvoie la fiche en_attente au serveur puis la marque synchronisée', async () => {
     mockListAllCaptures.mockResolvedValue([]);
     mockCreateProspection.mockResolvedValue({ id: 'remote-1' });
     mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
 
-    await retrySyncProspection(draft({ statut: 'en_attente' }), 'token-1');
+    await syncOneProspection(draft({ statut: 'en_attente' }), 'token-1');
 
     expect(mockListAllCaptures).toHaveBeenCalledWith('draft-1');
     expect(mockListAllPopulations).toHaveBeenCalledWith('draft-1');
@@ -333,13 +365,32 @@ describe('retrySyncProspection', () => {
     expect(mockMarkSynced).toHaveBeenCalledWith('draft-1');
   });
 
-  it("laisse remonter l'erreur au lieu de l'avaler, pour que l'appelant puisse afficher un toast", async () => {
+  it("laisse remonter l'erreur au lieu de l'avaler — c'est le lot qui la range", async () => {
     mockListAllCaptures.mockResolvedValue([]);
     mockCreateProspection.mockRejectedValue(new Error('Erreur serveur 500'));
 
-    await expect(retrySyncProspection(draft({ statut: 'en_attente' }), 'token-1')).rejects.toThrow(
+    await expect(syncOneProspection(draft({ statut: 'en_attente' }), 'token-1')).rejects.toThrow(
       'Erreur serveur 500'
     );
     expect(mockMarkSynced).not.toHaveBeenCalled();
+  });
+});
+
+describe('syncAllProspections — le lot résume', () => {
+  it('ne s’arrête pas à la fiche en échec et rend le compte des deux côtés', async () => {
+    mockListAllCaptures.mockResolvedValue([]);
+    mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
+    mockCreateProspection
+      .mockResolvedValueOnce({ id: 'remote-1' })
+      .mockRejectedValueOnce(new NetworkError('coupure'))
+      .mockResolvedValueOnce({ id: 'remote-3' });
+
+    const resume = await syncAllProspections(
+      [draft({ id: 'a' }), draft({ id: 'b' }), draft({ id: 'c' })],
+      'token-1'
+    );
+
+    expect(resume.reussies).toEqual(['a', 'c']);
+    expect(resume.echouees.map((f) => f.id)).toEqual(['b']);
   });
 });

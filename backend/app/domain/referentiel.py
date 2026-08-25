@@ -83,9 +83,14 @@ class Culture:
 
 @dataclass
 class CodeStade:
+    """Place d'un code de stade dans une grille de saisie (catégorie, sexe, espèce)."""
+
     id: uuid.UUID = field(default_factory=uuid.uuid4)
     code: str = ""
-    espece: str = ""
+    categorie: str = ""
+    sexe: str | None = None
+    espece: str | None = None
     libelle: str = ""
+    ordre: int = 0
     actif: bool = True
     updated_at: datetime = field(default_factory=datetime.utcnow)

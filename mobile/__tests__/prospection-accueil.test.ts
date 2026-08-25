@@ -8,6 +8,11 @@ import {
   DraftProspection,
 } from '../src/lib/prospection-repository';
 import { listCampagnesLocal } from '../src/lib/referentiel-db';
+import {
+  NetworkError,
+  PreconditionError,
+  ReferentialError,
+} from '../src/lib/errors';
 
 import {
   loadAccueilData,
@@ -185,9 +190,11 @@ describe('startNewProspection', () => {
   it('throws when no campagne is available locally (référentiel jamais synchronisé)', async () => {
     mockListCampagnesLocal.mockResolvedValueOnce([]);
 
+    // `ReferentialError` et non `Error` : la classe porte l'action offerte à
+    // l'agent — « Synchroniser les référentiels », le seul geste qui débloque.
     await expect(
       startNewProspection({ token: 'tok', prospecteurId: 'p1' })
-    ).rejects.toThrow('Aucune campagne disponible');
+    ).rejects.toBeInstanceOf(ReferentialError);
     expect(mockCreateDraft).not.toHaveBeenCalled();
   });
 
@@ -196,10 +203,22 @@ describe('startNewProspection', () => {
       { id: 'future', name: 'Future', start_date: '2099-01-01', end_date: null },
     ]);
 
+    // Message écrit pour l'agent et affiché verbatim : c'est la définition de
+    // `PreconditionError` (ADR-012 décision 5).
     await expect(
       startNewProspection({ token: 'tok', prospecteurId: 'p1' })
     ).rejects.toThrow('antérieure au début de la mission');
     expect(mockCreateDraft).not.toHaveBeenCalled();
+  });
+
+  it('lève PreconditionError quand la date précède le début de campagne', async () => {
+    mockListCampagnesLocal.mockResolvedValueOnce([
+      { id: 'future', name: 'Future', start_date: '2099-01-01', end_date: null },
+    ]);
+
+    await expect(
+      startNewProspection({ token: 'tok', prospecteurId: 'p1' })
+    ).rejects.toBeInstanceOf(PreconditionError);
   });
 });
 
@@ -215,12 +234,21 @@ describe('loadValidatedProspections', () => {
     });
   });
 
-  it('returns an empty list instead of throwing when offline', async () => {
-    mockApiClient.listProspections.mockRejectedValueOnce(new Error('offline'));
+  /*
+   * Le `catch { return [] }` d'origine rendait « serveur injoignable »
+   * indiscernable de « aucune fiche validée » : l'agent lisait « Aucune fiche »
+   * et concluait qu'il n'avait rien saisi. ADR-012 décision 1 interdit ce
+   * retour ; l'appelant enveloppe désormais l'appel dans `runTask`, qui décide
+   * quoi montrer.
+   */
+  it('propage l’erreur typée au lieu de rendre une liste vide hors-ligne', async () => {
+    mockApiClient.listProspections.mockRejectedValueOnce(
+      new NetworkError('Serveur injoignable')
+    );
 
-    const result = await loadValidatedProspections('tok', 'p1');
-
-    expect(result).toEqual([]);
+    await expect(loadValidatedProspections('tok', 'p1')).rejects.toBeInstanceOf(
+      NetworkError
+    );
   });
 });
 
@@ -237,6 +265,9 @@ describe('deleteDraftProspection', () => {
     await expect(
       deleteDraftProspection({ ...STORED_ROW, statut: 'en_attente' })
     ).rejects.toThrow('brouillon');
+    await expect(
+      deleteDraftProspection({ ...STORED_ROW, statut: 'en_attente' })
+    ).rejects.toBeInstanceOf(PreconditionError);
 
     expect(mockDeleteLocal).not.toHaveBeenCalled();
   });

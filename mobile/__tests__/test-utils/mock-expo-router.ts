@@ -8,7 +8,7 @@
  */
 export function expoRouterMock(overrides: { params?: Record<string, string> } = {}) {
   return {
-    useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
+    useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: () => true }),
     useLocalSearchParams: () => overrides.params ?? {},
   };
 }

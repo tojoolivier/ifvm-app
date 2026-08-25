@@ -4,15 +4,17 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm } from '@tanstack/react-form';
 import { useAsyncAction } from '@/hooks/use-async-action';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import {
   HUMIDITE_OPTIONS,
+  Humidite,
   ORPAD_STAGES,
+  parseVegetationSol,
   STRATE_KEYS,
   STRATE_LABELS,
   StrateKey,
   TEXTURE_OPTIONS,
   defaultStrateDetail,
-  parseVegetationSol,
 } from '@/lib/prospection-fiche-lecture';
 import { updateProspectionVegetation } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
@@ -72,15 +74,16 @@ export default function VegetationScreen() {
   const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
   const setDraft = useProspectionWizardStore((s) => s.setDraft);
   const { run, isRunning: isSaving } = useAsyncAction();
+  const signalerChargement = useSignalerChargement('veg');
 
   // Filet de sécurité si cet écran est atteint sans passer par reference.tsx (deep-link,
   // app relancée en plein milieu du parcours) : le store peut ne pas encore porter cette
   // fiche — cf. même garde sur reference.tsx / captures.tsx.
   useEffect(() => {
     if (draftId && draft?.id !== draftId) {
-      hydrateFromDraft(draftId);
+      void hydrateFromDraft(draftId).catch((error) => signalerChargement(error, { draftId }));
     }
-  }, [draftId, draft?.id, hydrateFromDraft]);
+  }, [draftId, draft?.id, hydrateFromDraft, signalerChargement]);
   const [expandedStrate, setExpandedStrate] = useState<StrateKey | null>(null);
   // Texte brut en cours de saisie pour les 5 champs décimaux libres de chaque strate
   // (Surf. rel. %, H. moy, % Verdissement, % Repousse, Sol nu %) — permet de taper un
@@ -90,18 +93,29 @@ export default function VegetationScreen() {
     Partial<Record<StrateKey, Partial<Record<DecimalFieldKey, string>>>>
   >({});
   const scrollRef = useRef<ScrollView>(null);
-  const [strates, setStrates] = useState<Record<StrateKey, StrateFormValues>>(() =>
-    STRATE_KEYS.reduce((acc, key) => {
+  const [strates, setStrates] = useState<Record<StrateKey, StrateFormValues>>(() => {
+    if (draft?.vegetation) {
+      return parseVegetationSol(draft.vegetation, null, null).strates;
+    }
+    return STRATE_KEYS.reduce((acc, key) => {
       acc[key] = emptyStrateForm();
       return acc;
-    }, {} as Record<StrateKey, StrateFormValues>)
-  );
+    }, {} as Record<StrateKey, StrateFormValues>);
+  });
+
+  // ==========================================
+  // SOL : humidité + texture, déjà enregistrés le cas échéant (fiche reprise)
+  // ==========================================
+
+  const savedSol = draft?.sol
+    ? (JSON.parse(draft.sol) as { humidite?: Humidite | null; texture?: string[] | null })
+    : null;
 
   // ==========================================
   // TEXTURE : sélection multiple
   // ==========================================
 
-  const [selectedTextures, setSelectedTextures] = useState<string[]>([]);
+  const [selectedTextures, setSelectedTextures] = useState<string[]>(savedSol?.texture ?? []);
 
   const toggleTexture = (value: string) => {
     setSelectedTextures((current) =>
@@ -111,14 +125,14 @@ export default function VegetationScreen() {
 
   const form = useForm({
     defaultValues: {
-      humidite: null,
+      humidite: savedSol?.humidite ?? null,
       texture: null,
     } as VegetationFormValues,
     onSubmitInvalid: () => {
       scrollRef.current?.scrollToEnd({ animated: true });
     },
     onSubmit: async ({ value }) => {
-      run(
+      return run(
         async () => {
           const updated = await updateProspectionVegetation(draftId, {
             vegetation: JSON.stringify({ strates }),

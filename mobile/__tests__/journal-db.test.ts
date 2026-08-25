@@ -5,6 +5,7 @@ import {
   creerTransportJournal,
   installerTransportJournal,
   lireJournal,
+  lireSession,
   purgerJournal,
   estEnDev,
   resetJournalForTests,
@@ -185,6 +186,15 @@ describe("l'écriture d'un lot", () => {
   });
 });
 
+/** Remonte la chaîne des `cause` jusqu'à l'erreur d'origine. */
+function racineDeLaCause(erreur: unknown): unknown {
+  let courante = erreur;
+  while (courante instanceof Error && courante.cause !== undefined) {
+    courante = courante.cause;
+  }
+  return courante;
+}
+
 describe("l'échec d'écriture ne passe jamais par le logger", () => {
   it('propage le rejet, typé `LocalWriteError`, pour que `flush()` lève le drapeau', async () => {
     const cause = new Error('database is locked');
@@ -193,7 +203,15 @@ describe("l'échec d'écriture ne passe jamais par le logger", () => {
     // Typé à la source comme partout ailleurs (décision 2) : avaler l'erreur
     // ici rendrait `journalFlushBroken` inatteignable.
     await expect(creerTransportJournal().write([ligne()])).rejects.toBeInstanceOf(LocalWriteError);
-    await expect(creerTransportJournal().write([ligne()])).rejects.toMatchObject({ cause });
+
+    // La cause traverse deux couches de typage — le handle de `getDb()` type
+    // déjà ses écritures (#173), et le journal ajoute par-dessus combien de
+    // lignes sont perdues. L'erreur du moteur reste la racine de la chaîne :
+    // c'est elle que le support lira.
+    const erreur = await creerTransportJournal()
+      .write([ligne()])
+      ?.catch((e: unknown) => e);
+    expect(racineDeLaCause(erreur)).toBe(cause);
   });
 
   it('rend `estLeJournalCasse()` vrai sans se journaliser lui-même', async () => {
@@ -359,6 +377,56 @@ describe('la lecture du journal', () => {
     ]);
 
     await expect(lireJournal()).rejects.toBeInstanceOf(LocalReadError);
+  });
+
+  // #176 : la tranche exportée est « depuis le dernier démarrage ». Le `cid` la
+  // désigne exactement — il est posé une fois au chargement de `logger` — et il
+  // le fait mieux qu'un filtre sur `at`, dont l'horloge de terrain peut sauter.
+  it('rend la session courante en ordre chronologique croissant', async () => {
+    const rangee = (id: number) => ({
+      id,
+      at: `2026-08-24T10:00:0${id}.000Z`,
+      cid: 'ABC123',
+      level: 'info' as const,
+      event: `e${id}`,
+      contexte: null,
+    });
+    // Le SQL rend les plus récentes d'abord ; l'export veut l'inverse.
+    getAllAsync.mockResolvedValue([rangee(3), rangee(2), rangee(1)]);
+
+    const { lignes } = await lireSession('ABC123');
+
+    const select = getAllAsync.mock.calls.find((c) => (c[0] as string).includes('SELECT *'));
+    expect(select?.[0]).toContain('WHERE cid = ?');
+    expect(select?.[1]).toBe('ABC123');
+    expect(lignes.map((l) => l.event)).toEqual(['e1', 'e2', 'e3']);
+  });
+
+  it('borne la session au plafond de lignes — le rapport ne peut pas tout porter', async () => {
+    await lireSession('ABC123');
+
+    const select = getAllAsync.mock.calls.find((c) => (c[0] as string).includes('SELECT *'));
+    expect(select?.[2]).toBe(PLAFOND_LIGNES);
+  });
+
+  /**
+   * Sans ce compte, la coupure faite **en SQL** serait invisible : l'export
+   * calculerait ses « écartées » sur ce qu'il a reçu, et déclarerait complet un
+   * rapport amputé de 20 000 lignes. C'est le silence que la décision 7
+   * supprime, déplacé d'un cran plus bas.
+   */
+  it('dit combien la session compte réellement de lignes, pas seulement ce qu’elle rend', async () => {
+    getAllAsync.mockImplementation(async (sql: string) =>
+      sql.includes('COUNT(*)') ? [{ total: 12_000 }] : []
+    );
+
+    const { lignes, total } = await lireSession('ABC123');
+
+    expect(lignes).toEqual([]);
+    expect(total).toBe(12_000);
+    const compte = getAllAsync.mock.calls.find((c) => (c[0] as string).includes('COUNT(*)'));
+    expect(compte?.[0]).toContain('WHERE cid = ?');
+    expect(compte?.[1]).toBe('ABC123');
   });
 
   it('vide la table sur demande', async () => {

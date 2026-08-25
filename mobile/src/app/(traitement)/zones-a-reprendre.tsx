@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { listReprenableTraitements, DraftTraitementRow } from '@/lib/traitement-repository';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
+import { runTask } from '@/lib/run-task';
+import { EtatVide } from '@/components/erreurs/etat-vide';
 
 /**
  * Écran "Zones à reprendre" (Lot 3) — fiches terrestres validées dont la
@@ -16,13 +18,22 @@ export default function TraitementZonesAReprendreScreen() {
   const router = useRouter();
   const [fiches, setFiches] = useState<DraftTraitementRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [erreurDeLecture, setErreurDeLecture] = useState<unknown>(null);
+
+  const charger = useCallback(() => {
+    void runTask(() => listReprenableTraitements(), {
+      name: 'traitement.zonesAReprendre',
+      criticality: 'essential',
+    }).then((outcome) => {
+      setErreurDeLecture(outcome.ok ? null : outcome.error);
+      if (outcome.ok) setFiches(outcome.value);
+      setLoading(false);
+    });
+  }, []);
 
   useEffect(() => {
-    listReprenableTraitements()
-      .then(setFiches)
-      .catch(() => setFiches([]))
-      .finally(() => setLoading(false));
-  }, []);
+    charger();
+  }, [charger]);
 
   const openFiche = (fiche: DraftTraitementRow) => {
     router.push({
@@ -42,7 +53,9 @@ export default function TraitementZonesAReprendreScreen() {
           style={styles.list}
           data={fiches}
           keyExtractor={(item) => item.id}
-          ListEmptyComponent={<Text style={styles.emptyText}>Aucune zone à reprendre pour le moment.</Text>}
+          ListEmptyComponent={
+            <EtatVide erreur={erreurDeLecture} titreVide="Aucune zone à reprendre pour le moment." onReessayer={charger} />
+          }
           renderItem={({ item }) => (
             <TouchableOpacity style={styles.row} onPress={() => openFiche(item)}>
               <Text style={styles.rowTitle}>{item.numero_fiche ?? 'généré à l’enregistrement'}</Text>

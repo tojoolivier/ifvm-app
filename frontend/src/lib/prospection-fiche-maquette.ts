@@ -156,7 +156,7 @@ export function buildReferenceRows(
 // Bloc D — Infestation
 // ---------------------------------------------------------------------------
 
-// "essaim" a disparu (migration backend 0029) : Dense et Très dense sont désormais des
+// "essaim" a disparu (migration backend 0031) : Dense et Très dense sont désormais des
 // types de cible à part entière, au même niveau que Vol clair.
 const CIBLES_IMAGO = ['vol_clair', 'dense', 'tres_dense']
 const CIBLES_LARVE = ['tache_larvaire', 'bande_larvaire']

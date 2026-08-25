@@ -4,6 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getTraitement, updateTraitementMoyens } from '@/lib/traitement-repository';
 import { validateRecouvrement } from '@/lib/traitement-validation';
+import { useAsyncAction } from '@/hooks/use-async-action';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
+import { logger } from '@/lib/logger';
 import { Card } from '@/components/traitement/Card';
 import { Chip } from '@/components/traitement/Chip';
 import { ProgressBar } from '@/components/traitement/ProgressBar';
@@ -36,50 +39,66 @@ export default function MoyensScreen() {
   const [hauteurHerbeuse, setHauteurHerbeuse] = useState<number | null>(null);
   const [hauteurArboree, setHauteurArboree] = useState<number | null>(null);
   const [recouvrement, setRecouvrement] = useState<number | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const { run, isRunning: isSaving } = useAsyncAction();
+  const signalerChargement = useSignalerChargement('moyens');
 
   useEffect(() => {
     if (!traitementId) return;
-    getTraitement(traitementId).then((draft) => {
-      if (!draft) return;
-      setKit({
-        kit_combinaison: draft.kit_combinaison ?? false,
-        kit_gants: draft.kit_gants ?? false,
-        kit_lunettes: draft.kit_lunettes ?? false,
-        kit_masques: draft.kit_masques ?? false,
-        kit_boite: draft.kit_boite ?? false,
-      });
-      try {
-        setZones(draft.zones_exposees ? JSON.parse(draft.zones_exposees) : {});
-      } catch {
-        setZones({});
-      }
-      setHauteurHerbeuse(draft.hauteur_strate_herbeuse_m);
-      setHauteurArboree(draft.hauteur_strate_arboree_m);
-      setRecouvrement(draft.recouvrement_percent);
-    });
-  }, [traitementId]);
+    getTraitement(traitementId)
+      .then((draft) => {
+        if (!draft) return;
+        setKit({
+          kit_combinaison: draft.kit_combinaison ?? false,
+          kit_gants: draft.kit_gants ?? false,
+          kit_lunettes: draft.kit_lunettes ?? false,
+          kit_masques: draft.kit_masques ?? false,
+          kit_boite: draft.kit_boite ?? false,
+        });
+        if (draft.zones_exposees) {
+          try {
+            setZones(JSON.parse(draft.zones_exposees));
+          } catch (e) {
+            // Zones cochables, re-saisissables en un geste : même critère que
+            // `parseEspeceSelection` (#189) — repli sur aucune zone cochée
+            // plutôt que bloquer la fiche pour une chaîne corrompue.
+            logger.ignore(e, 'Zones exposées corrompues — repli sur aucune zone cochée, re-saisissable.');
+          }
+        }
+        setHauteurHerbeuse(draft.hauteur_strate_herbeuse_m);
+        setHauteurArboree(draft.hauteur_strate_arboree_m);
+        setRecouvrement(draft.recouvrement_percent);
+      })
+      .catch((error) => signalerChargement(error, { traitementId }));
+  }, [traitementId, signalerChargement]);
 
   const nbKitCoche = Object.values(kit).filter(Boolean).length;
   const recouvrementErrors = validateRecouvrement(recouvrement);
 
-  const handleContinuer = async () => {
-    if (!traitementId || recouvrementErrors.length > 0) return;
-    setIsSaving(true);
-    await updateTraitementMoyens(traitementId, {
-      kit_combinaison: !!kit.kit_combinaison,
-      kit_gants: !!kit.kit_gants,
-      kit_lunettes: !!kit.kit_lunettes,
-      kit_masques: !!kit.kit_masques,
-      kit_boite: !!kit.kit_boite,
-      zones_exposees: zones,
-      hauteur_strate_herbeuse_m: hauteurHerbeuse,
-      hauteur_strate_arboree_m: hauteurArboree,
-      recouvrement_percent: recouvrement,
-    });
-    setIsSaving(false);
-    router.push({ pathname: '/(traitement)/impacts' as any, params: { traitementId, isValidationView } });
-  };
+  const handleContinuer = () =>
+    run(
+      async () => {
+        // Déjà visible à l'écran (message par champ) : pas de second signal.
+        if (recouvrementErrors.length > 0) return;
+        await updateTraitementMoyens(traitementId, {
+          kit_combinaison: !!kit.kit_combinaison,
+          kit_gants: !!kit.kit_gants,
+          kit_lunettes: !!kit.kit_lunettes,
+          kit_masques: !!kit.kit_masques,
+          kit_boite: !!kit.kit_boite,
+          zones_exposees: zones,
+          hauteur_strate_herbeuse_m: hauteurHerbeuse,
+          hauteur_strate_arboree_m: hauteurArboree,
+          recouvrement_percent: recouvrement,
+        });
+        router.push({ pathname: '/(traitement)/impacts' as any, params: { traitementId, isValidationView } });
+      },
+      {
+        screen: 'moyens',
+        precondition: !!traitementId,
+        preconditionMessage: 'Session perdue — revenez à l’écran précédent et réessayez.',
+        context: { traitementId },
+      }
+    );
 
   return (
     <SafeAreaView style={styles.container}>

@@ -16,7 +16,7 @@ export const PHENOTYPES_3: { value: Phenotype; label: string }[] = PHENOTYPES.fi
   (p) => p.value !== 'solitaro_trans'
 );
 
-// "essaim" a disparu (migration backend 0029) : la densité de l'essaim est désormais le
+// "essaim" a disparu (migration backend 0031) : la densité de l'essaim est désormais le
 // type de cible lui-même, au même niveau que "Vol clair" — plus une sous-classification.
 type TypeCible = 'tache_larvaire' | 'bande_larvaire' | 'vol_clair' | 'dense' | 'tres_dense';
 

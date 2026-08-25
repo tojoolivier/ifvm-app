@@ -4,27 +4,120 @@ import {
 } from './request-log-store';
 import type { components } from './api-schema.generated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AuthError, NetworkError, isTypedError } from './errors';
+import { logger } from './logger';
 
 const REDACTED = '[redacted]';
 const TOKEN_KEY = 'auth_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 
-/**
- * Erreur HTTP typée.
- *
- * Permet aux appelants de distinguer :
- * - 401 : authentification invalide / session expirée
- * - 409 : conflit métier
- * - 422 : erreur de validation
- * - 5xx : erreur serveur
- */
-export class ApiError extends Error {
-  status: number;
+const log = logger.child({ module: 'api-client' });
 
-  constructor(message: string, status: number) {
-    super(message);
-    this.name = 'ApiError';
-    this.status = status;
+/**
+ * Le statut HTTP, joint à l'erreur typée — ADR-012 décision 2, issue #173.
+ *
+ * `ApiError` a disparu : elle n'appartenait pas au jeu fermé, donc `classeDe`
+ * la rangeait en `(bug)` et l'agent se voyait proposer « Signaler au support »
+ * pour une simple panne serveur. Un échec de dialogue avec le serveur est une
+ * `NetworkError` ; un 401 est une `AuthError`.
+ *
+ * Le statut survit comme **donnée jointe**, jamais comme sous-classe :
+ * `classeDe` lit `constructor.name`, donc un `class HttpError extends
+ * NetworkError` ferait apparaître une huitième classe dans le journal et
+ * rouvrirait le jeu qu'on vient de fermer.
+ */
+export interface AvecStatutHttp {
+  status: number;
+}
+
+/** Statut HTTP porté par une erreur d'api-client, ou `null` si elle n'en a pas. */
+export function statutHttpDe(error: unknown): number | null {
+  const statut = (error as Partial<AvecStatutHttp> | null | undefined)?.status;
+  return typeof statut === 'number' ? statut : null;
+}
+
+/**
+ * Le conflit (409) voyage comme **donnée jointe**, exactement pour la raison qui
+ * a fait disparaître `ApiError` : une `class ConflitError extends AppError`
+ * serait la huitième classe du jeu fermé, et rouvrirait ce que la décision 2
+ * vient de fermer.
+ *
+ * La version serveur est jointe pour la même raison que le statut : jusqu'ici
+ * `retrySyncTraitement` la récupérait par le réseau, puis l'aplatissait en
+ * `new Error('Conflit de synchronisation')` — la donnée était payée puis jetée
+ * (ADR-012 décision 9, issue #177).
+ */
+export interface AvecVersionServeur {
+  serverVersion: unknown;
+}
+
+/** Version serveur portée par une erreur de conflit, ou `null`. */
+export function versionServeurDe(error: unknown): unknown | null {
+  const version = (error as Partial<AvecVersionServeur> | null | undefined)?.serverVersion;
+  return version ?? null;
+}
+
+/**
+ * Fabrique l'erreur de conflit : une `NetworkError` de statut 409 qui **porte**
+ * la version serveur au lieu de la perdre.
+ */
+export function conflitSync(message: string, serverVersion: unknown): NetworkError {
+  const erreur = erreurHttp(409, message) as NetworkError;
+  (erreur as unknown as AvecVersionServeur).serverVersion = serverVersion;
+  return erreur;
+}
+
+/**
+ * Fabrique l'erreur typée qui correspond à un statut HTTP.
+ *
+ * Un seul endroit décide `AuthError` vs `NetworkError` : la règle est ainsi
+ * lisible d'un coup d'œil, au lieu d'être répartie sur les six `throw` du
+ * module.
+ */
+function erreurHttp(
+  status: number,
+  message: string,
+  cause?: unknown
+): AuthError | NetworkError {
+  const erreur =
+    status === 401
+      ? new AuthError(message, { cause })
+      : new NetworkError(message, { cause });
+
+  (erreur as unknown as AvecStatutHttp).status = status;
+
+  return erreur;
+}
+
+/**
+ * Corps d'erreur JSON, en meilleur effort.
+ *
+ * Un corps illisible ne doit pas masquer le statut HTTP qui l'accompagne —
+ * c'est le statut qui type l'échec. Le silence est donc délibéré, et dit sa
+ * raison **au journal** plutôt qu'à un commentaire (décision 3).
+ */
+async function corpsJsonOuVide(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch (error) {
+    log.ignore(
+      error,
+      'Corps d’erreur illisible — le statut HTTP suffit à typer l’échec.'
+    );
+    return {};
+  }
+}
+
+/** Corps textuel destiné au journal réseau. Son absence ne casse rien. */
+async function texteOuNull(response: Response): Promise<string | null> {
+  try {
+    return await response.text();
+  } catch (error) {
+    log.ignore(
+      error,
+      'Corps de réponse illisible — la ligne de journal réseau reste utile sans lui.'
+    );
+    return null;
   }
 }
 
@@ -213,14 +306,11 @@ export interface CultureSync {
   updated_at: string;
 }
 
-export interface CodeStadeSync {
-  id: string;
-  code: string;
-  espece: string;
-  libelle: string;
-  actif: boolean;
-  updated_at: string;
-}
+/**
+ * Place d'un stade dans une grille de saisie, telle que le backend la publie.
+ * `sexe = null` : stade larvaire, non sexé. `espece = null` : les deux espèces.
+ */
+export type CodeStadeSync = components['schemas']['CodeStadeSyncRead'];
 
 export interface CampagneSync {
   id: string;
@@ -343,7 +433,12 @@ export function isTokenExpired(
     const exp = payload.exp * 1000;
 
     return Date.now() >= exp;
-  } catch {
+  } catch (error) {
+    log.ignore(
+      error,
+      'Jeton illisible — traité comme expiré, le rafraîchissement tranchera.'
+    );
+
     return true;
   }
 }
@@ -365,9 +460,7 @@ async function refreshAccessToken(): Promise<string | null> {
       );
 
     if (!refreshToken) {
-      console.warn(
-        '[api-client] Pas de refresh token disponible'
-      );
+      log.event('auth.refresh.absent');
 
       return null;
     }
@@ -388,10 +481,9 @@ async function refreshAccessToken(): Promise<string | null> {
     );
 
     if (!response.ok) {
-      console.warn(
-        '[api-client] Échec du rafraîchissement du token:',
-        response.status
-      );
+      log.event('auth.refresh.refuse', {
+        status: response.status,
+      });
 
       return null;
     }
@@ -400,9 +492,7 @@ async function refreshAccessToken(): Promise<string | null> {
       (await response.json()) as RefreshResponse;
 
     if (!data.access_token) {
-      console.warn(
-        '[api-client] Réponse refresh sans access_token'
-      );
+      log.event('auth.refresh.sans-jeton');
 
       return null;
     }
@@ -414,9 +504,15 @@ async function refreshAccessToken(): Promise<string | null> {
 
     return data.access_token;
   } catch (error) {
-    console.error(
-      '[api-client] Erreur lors du rafraîchissement du token:',
-      error
+    // Seul `failure` du module : l'erreur s'arrête ici. Partout ailleurs
+    // api-client relance du typé, et c'est la frontière qui journalise —
+    // journaliser des deux côtés doublerait chaque ligne.
+    log.failure(
+      'auth.refresh.failed',
+      new NetworkError(
+        'Rafraîchissement du jeton impossible',
+        { cause: error }
+      )
     );
 
     return null;
@@ -440,27 +536,25 @@ let refreshPromise: Promise<string | null> | null = null;
  */
 export async function refreshAccessTokenSingleFlight(): Promise<string | null> {
   if (refreshPromise) {
-    console.log(
-      '[api-client] Refresh déjà en cours, attente du refresh existant...'
-    );
+    log.detail('auth.refresh.attente');
 
     return refreshPromise;
   }
 
-  console.log(
-    '[api-client] Démarrage du refresh single-flight...'
-  );
+  log.detail('auth.refresh.demarrage');
 
   refreshPromise = refreshAccessToken();
 
   try {
     return await refreshPromise;
+  } catch (error) {
+    // Relance explicite : le refresh échoué doit atteindre l'appelant
+    // (`makeRequest`) tel quel — seul `refreshPromise` est du nettoyage local.
+    throw error;
   } finally {
     refreshPromise = null;
 
-    console.log(
-      '[api-client] Refresh single-flight terminé'
-    );
+    log.detail('auth.refresh.termine');
   }
 }
 
@@ -482,9 +576,7 @@ const makeRequest = async <T>(
     currentToken &&
     isTokenExpired(currentToken)
   ) {
-    console.log(
-      '[api-client] Token expiré, tentative de rafraîchissement...'
-    );
+    log.detail('auth.jeton.expire', { url });
 
     const newToken =
       await refreshAccessTokenSingleFlight();
@@ -492,19 +584,13 @@ const makeRequest = async <T>(
     if (newToken) {
       currentToken = newToken;
 
-      console.log(
-        '[api-client] Token rafraîchi avec succès'
-      );
+      log.detail('auth.jeton.rafraichi');
     } else {
-      console.warn(
-        '[api-client] Échec du rafraîchissement du token'
-      );
-
       onUnauthorized?.();
 
-      throw new ApiError(
-        'Token invalide. Veuillez vous reconnecter.',
-        401
+      throw erreurHttp(
+        401,
+        'Token invalide. Veuillez vous reconnecter.'
       );
     }
   }
@@ -553,7 +639,12 @@ const makeRequest = async <T>(
           : 'Erreur réseau',
     });
 
-    throw error;
+    // `fetch` ne rejette que sur panne de transport : serveur injoignable,
+    // DNS, coupure. C'est le cas NOMINAL sur le terrain, pas un bug.
+    throw new NetworkError(
+      'Serveur injoignable',
+      { cause: error }
+    );
   }
 
   /**
@@ -567,9 +658,7 @@ const makeRequest = async <T>(
     response.status === 401 &&
     currentToken
   ) {
-    console.log(
-      '[api-client] 401 Unauthorized, tentative de rafraîchissement...'
-    );
+    log.detail('auth.401', { url });
 
     const newToken =
       await refreshAccessTokenSingleFlight();
@@ -640,9 +729,9 @@ const makeRequest = async <T>(
         }
 
         const retryErrorData =
-          await retryResponse
-            .json()
-            .catch(() => ({}));
+          await corpsJsonOuVide(
+            retryResponse
+          );
 
         logRequest({
           method:
@@ -660,31 +749,28 @@ const makeRequest = async <T>(
               ? options.body
               : null,
           responseBody:
-            await retryClone
-              .text()
-              .catch(() => null),
+            await texteOuNull(retryClone),
         });
 
-        throw new ApiError(
+        throw erreurHttp(
+          retryResponse.status,
           extractErrorMessage(
             retryErrorData
           ) ||
-            `HTTP error! status: ${retryResponse.status}`,
-          retryResponse.status
+            `HTTP error! status: ${retryResponse.status}`
         );
       } catch (retryError) {
-        if (
-          retryError instanceof ApiError
-        ) {
+        // Déjà typée : c'est le `throw` juste au-dessus, on la laisse passer
+        // intacte plutôt que de l'envelopper une seconde fois.
+        if (isTypedError(retryError)) {
           throw retryError;
         }
 
-        console.error(
-          '[api-client] Erreur lors de la retry:',
-          retryError
+        // Sinon : le second `fetch` a échoué, ou son corps était illisible.
+        throw new NetworkError(
+          'Serveur injoignable lors de la nouvelle tentative',
+          { cause: retryError }
         );
-
-        throw retryError;
       }
     }
 
@@ -692,15 +778,13 @@ const makeRequest = async <T>(
      * Refresh impossible :
      * la session n'est plus valide.
      */
-    console.warn(
-      '[api-client] Refresh impossible après 401'
-    );
+    log.event('auth.refresh.impossible', { url });
 
     onUnauthorized?.();
 
-    throw new ApiError(
-      'Token invalide. Veuillez vous reconnecter.',
-      401
+    throw erreurHttp(
+      401,
+      'Token invalide. Veuillez vous reconnecter.'
     );
   }
 
@@ -712,9 +796,7 @@ const makeRequest = async <T>(
       response.clone();
 
     const errorData =
-      await response
-        .json()
-        .catch(() => ({}));
+      await corpsJsonOuVide(response);
 
     logRequest({
       method:
@@ -731,15 +813,13 @@ const makeRequest = async <T>(
           ? options.body
           : null,
       responseBody:
-        await responseClone
-          .text()
-          .catch(() => null),
+        await texteOuNull(responseClone),
     });
 
-    throw new ApiError(
+    throw erreurHttp(
+      response.status,
       extractErrorMessage(errorData) ||
-        `HTTP error! status: ${response.status}`,
-      response.status
+        `HTTP error! status: ${response.status}`
     );
   }
 
@@ -1180,13 +1260,14 @@ export const apiClient = {
             : 'Erreur réseau',
       });
 
-      throw error;
+      throw new NetworkError(
+        'Serveur injoignable',
+        { cause: error }
+      );
     }
 
     const responseBody =
-      await response
-        .json()
-        .catch(() => ({}));
+      await corpsJsonOuVide(response);
 
     logRequest({
       method: 'POST',
@@ -1207,12 +1288,12 @@ export const apiClient = {
       !response.ok &&
       response.status !== 409
     ) {
-      throw new ApiError(
+      throw erreurHttp(
+        response.status,
         extractErrorMessage(
           responseBody
         ) ||
-          `HTTP error! status: ${response.status}`,
-        response.status
+          `HTTP error! status: ${response.status}`
       );
     }
 
@@ -1241,51 +1322,48 @@ export const apiClient = {
     const startedAt = new Date();
     const startTime = Date.now();
 
+    let response: Response;
+
     try {
-      const response =
-        await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type':
-              'application/json',
-            Authorization:
-              `Bearer ${token}`,
-          },
-          body: JSON.stringify(data),
-        });
-
-      logRequest({
+      response = await fetch(url, {
         method: 'POST',
-        url,
-        status: response.status,
-        ok: response.ok,
-        durationMs:
-          Date.now() - startTime,
-        startedAt:
-          startedAt.toISOString(),
-        requestBody:
-          JSON.stringify(data),
+        headers: {
+          'Content-Type':
+            'application/json',
+          Authorization:
+            `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
       });
-
-      if (!response.ok) {
-        const error =
-          await response
-            .json()
-            .catch(() => ({}));
-
-        throw new ApiError(
-          extractErrorMessage(error) ||
-            'Erreur lors du changement de mot de passe',
-          response.status
-        );
-      }
     } catch (error) {
-      console.error(
-        'Erreur changement mot de passe:',
-        error
+      throw new NetworkError(
+        'Serveur injoignable',
+        { cause: error }
       );
+    }
 
-      throw error;
+    logRequest({
+      method: 'POST',
+      url,
+      status: response.status,
+      ok: response.ok,
+      durationMs:
+        Date.now() - startTime,
+      startedAt:
+        startedAt.toISOString(),
+      requestBody:
+        JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const corps =
+        await corpsJsonOuVide(response);
+
+      throw erreurHttp(
+        response.status,
+        extractErrorMessage(corps) ||
+          'Erreur lors du changement de mot de passe'
+      );
     }
   },
 };
