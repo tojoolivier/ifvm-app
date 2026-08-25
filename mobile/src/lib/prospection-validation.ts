@@ -128,7 +128,7 @@ export interface ComportementDirectionValidationInput {
  * point 15 du manuel) : la direction devient obligatoire. Absente/non requise
  * pour une tache larvaire isolée.
  */
-const TYPES_DIRECTION_OBLIGATOIRE = ['bande_larvaire', 'vol_clair', 'essaim'];
+const TYPES_DIRECTION_OBLIGATOIRE = ['bande_larvaire', 'vol_clair', 'dense', 'tres_dense'];
 
 export function validateComportementDirection(input: ComportementDirectionValidationInput): ValidationResult {
   const blocages: string[] = [];
@@ -218,7 +218,7 @@ export interface EssaimNocturneValidationInput {
   heureObservation: string;
 }
 
-const TYPES_AILES_GROUPES = ['vol_clair', 'essaim'];
+const TYPES_AILES_GROUPES = ['vol_clair', 'dense', 'tres_dense'];
 
 /** Bornes horaires (heure locale) au-delà/en-deçà desquelles une observation est jugée nocturne. */
 const NUIT_HEURE_DEBUT = 18;
@@ -253,12 +253,10 @@ export function validateEssaimNocturne(input: EssaimNocturneValidationInput): Va
   return { blocages, avertissements };
 }
 
-export type AerialPopulationClassification =
-  | 'non_classe'
-  | 'vol_clair'
-  | 'essaim_densite_moyenne'
-  | 'essaim_densite_forte'
-  | 'essaim_densite_tres_forte';
+// Doit rester aligné sur l'enum backend `TypeEssaim` (vol_clair/dense/tres_dense —
+// prospection_schemas.py) : c'est la valeur persistée dans `type_essaim`. `null`
+// signifie « non classable » (ex. vol provoqué) et n'est jamais envoyé au backend.
+export type AerialPopulationClassification = 'vol_clair' | 'dense' | 'tres_dense';
 
 export interface AerialPopulationClassificationInput {
   /** Q1 — le vol est-il spontané, non provoqué par le prospecteur ? */
@@ -278,12 +276,17 @@ export interface AerialPopulationClassificationInput {
  * Sinon, chaque question ferme une branche du questionnaire dès qu'elle
  * répond « oui » ; la classe de densité n'est donc jamais saisissable
  * directement (garde-fou §2.1 point 47 / #104 AC).
+ *
+ * Le questionnaire distingue 3 profils de densité (masse sombre / masque partiel /
+ * masque total) mais le contrat backend `TypeEssaim` n'en accepte que 2 (dense/
+ * tres_dense) : "masse sombre" et "masque partiellement" sont regroupés sous
+ * "dense", seul "masque entièrement" (le cas le plus dense) donne "tres_dense".
  */
 export function classifyAerialPopulation(
   input: AerialPopulationClassificationInput
-): AerialPopulationClassification {
+): AerialPopulationClassification | null {
   if (!input.volSpontaneNonProvoque) {
-    return 'non_classe';
+    return null;
   }
 
   if (input.visibleSeulementDePres) {
@@ -291,18 +294,36 @@ export function classifyAerialPopulation(
   }
 
   if (input.masseSombreSansMasquerPaysage) {
-    return 'essaim_densite_moyenne';
+    return 'dense';
   }
 
   if (input.masquePaysage === 'partiellement') {
-    return 'essaim_densite_forte';
+    return 'dense';
   }
 
   if (input.masquePaysage === 'entierement') {
-    return 'essaim_densite_tres_forte';
+    return 'tres_dense';
   }
 
-  return 'non_classe';
+  return null;
+}
+
+// Anciens brouillons locaux : `type_essaim` a pu être enregistré avant la bascule sur les
+// 3 catégories officielles (vol_clair/dense/tres_dense), avec les 5 valeurs internes
+// d'origine de `classifyAerialPopulation`. Même règle de regroupement qu'alors.
+const LEGACY_AERIAL_CLASSIFICATION: Record<string, AerialPopulationClassification | null> = {
+  non_classe: null,
+  essaim_densite_moyenne: 'dense',
+  essaim_densite_forte: 'dense',
+  essaim_densite_tres_forte: 'tres_dense',
+};
+
+/** Normalise une valeur `type_essaim` chargée depuis la base, qu'elle soit déjà au
+ * format officiel ou héritée d'un brouillon antérieur à ce format. */
+export function normalizeAerialClassification(raw: string | null | undefined): AerialPopulationClassification | null {
+  if (!raw) return null;
+  if (raw === 'vol_clair' || raw === 'dense' || raw === 'tres_dense') return raw;
+  return LEGACY_AERIAL_CLASSIFICATION[raw] ?? null;
 }
 
 /** Fenêtre de proximité anti-doublon (#107, §2.2 point 16 du manuel) — valeurs par défaut à confirmer avec le référent métier. */

@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   EMPTY_ESPECE_SELECTION,
   EspeceSelection,
   countGrilles,
   buildGrilles,
+  parseEspeceSelection,
   saveEspeceSelection,
 } from '@/lib/prospection-especes';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
@@ -22,11 +23,37 @@ const INACTIVE_TEXT = '#9a9484';
 
 export default function SpeciesScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { draftId } = useLocalSearchParams<{ draftId: string }>();
+  const draft = useProspectionWizardStore((s) => s.draft);
+  const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
+  const setDraft = useProspectionWizardStore((s) => s.setDraft);
   const captures = useProspectionWizardStore((s) => s.captures);
   const initGrilles = useProspectionCaptureStore((s) => s.initGrilles);
   const [selection, setSelection] = useState<EspeceSelection>({ ...EMPTY_ESPECE_SELECTION });
   const [isSaving, setIsSaving] = useState(false);
+
+  // Reconstruit le store si l'app a été relancée directement sur cet écran
+  // (même garde-fou que les autres écrans du parcours).
+  useEffect(() => {
+    if (!draftId) return;
+    if (draft?.id !== draftId) {
+      hydrateFromDraft(draftId);
+    }
+  }, [draftId, draft?.id, hydrateFromDraft]);
+
+  // Règle #3 : la sélection espèce/stade doit survivre à un retour arrière sur ce slide.
+  // Réhydratée une seule fois depuis la fiche déjà sauvegardée (n'écrase pas les
+  // changements faits ensuite par l'utilisateur dans cette même session).
+  const selectionHydratedRef = useRef(false);
+  useEffect(() => {
+    if (selectionHydratedRef.current || draft?.id !== draftId) return;
+    selectionHydratedRef.current = true;
+    if (draft.especes) {
+      const hydrated = parseEspeceSelection(draft.especes);
+      Promise.resolve().then(() => setSelection(hydrated));
+    }
+  }, [draft, draftId]);
 
   const stepsCount = countGrilles(selection);
 
@@ -38,11 +65,15 @@ export default function SpeciesScreen() {
     if (!draftId || stepsCount === 0 || isSaving) return;
     setIsSaving(true);
     try {
-      await saveEspeceSelection(draftId, selection);
+      // Le store `draft` doit refléter la sélection sauvegardée : sans ça, un retour
+      // ultérieur sur ce slide (remontage du composant) réhydrate `selection` depuis un
+      // `draft.especes` resté périmé (souvent vide) et affiche une sélection réinitialisée.
+      const updated = await saveEspeceSelection(draftId, selection);
+      setDraft(updated);
       const grilles = buildGrilles(selection);
       initGrilles(grilles, [], captures);
-      const firstScreen = grilles[0]?.categorie === 'imago' ? 'density' : 'captures';
-      router.push({ pathname: `/(prospection)/${firstScreen}` as any, params: { draftId, grilleIndex: '0' } });
+      // Chaque grille (imago ou larve) passe désormais par l'étape "densités" avant ses captures.
+      router.push({ pathname: '/(prospection)/density' as any, params: { draftId, grilleIndex: '0' } });
     } finally {
       setIsSaving(false);
     }
@@ -124,7 +155,7 @@ export default function SpeciesScreen() {
             </View>
           </View>
 
-          <View style={styles.footer}>
+          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
             <TouchableOpacity
               style={[styles.continueButton, stepsCount === 0 && styles.continueButtonDisabled]}
               onPress={handleContinue}

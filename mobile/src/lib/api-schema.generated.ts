@@ -2183,7 +2183,7 @@ export interface components {
          * TypeCible
          * @enum {string}
          */
-        TypeCible: "tache_larvaire" | "bande_larvaire" | "vol_clair" | "essaim";
+        TypeCible: "tache_larvaire" | "bande_larvaire" | "vol_clair" | "dense" | "tres_dense";
         /**
          * TypeEssaim
          * @enum {string}

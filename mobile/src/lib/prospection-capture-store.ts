@@ -74,6 +74,72 @@ export function dominantPhenotype(counts: CaptureCounts): Phenotype | null {
   return best;
 }
 
+export interface DominantStadeLarve {
+  /** Libellé brut du stade le plus capturé, ex. "L2". */
+  stade: string;
+  effectif: number;
+  /** Regroupement attendu par le champ backend `stade_dominant` (StadeDominant : l1_l3/l4_l5). */
+  bucket: 'l1_l3' | 'l4_l5';
+}
+
+/**
+ * Stade larvaire dominant, agrégé sur toutes les espèces (LMC+NSE) de la fiche : la
+ * fiche d'infestation ne distingue pas l'espèce, donc on additionne les effectifs par
+ * stade brut avant de retenir le plus capturé, puis on le classe dans le bucket attendu.
+ */
+export function dominantStadeLarve(rows: CaptureRow[]): DominantStadeLarve | null {
+  const totals: Record<string, number> = {};
+  for (const row of rows) {
+    if (row.categorie !== 'larve') continue;
+    totals[row.stade] = (totals[row.stade] ?? 0) + row.effectif;
+  }
+  let best: string | null = null;
+  let bestCount = 0;
+  for (const [stade, n] of Object.entries(totals)) {
+    if (n > bestCount) {
+      best = stade;
+      bestCount = n;
+    }
+  }
+  if (!best || bestCount <= 0) return null;
+  const numero = Number(best.replace(/\D/g, ''));
+  const bucket: 'l1_l3' | 'l4_l5' = Number.isFinite(numero) && numero <= 3 ? 'l1_l3' : 'l4_l5';
+  return { stade: best, effectif: bestCount, bucket };
+}
+
+export interface DominantStadeImago {
+  sexe: Sexe;
+  /** Libellé brut du stade le plus capturé, ex. "A3" ou "A123". */
+  stade: string;
+  effectif: number;
+}
+
+/**
+ * Stade imago dominant, agrégé sur toutes les espèces (LMC+NSE) de la fiche. Femelles et
+ * mâles n'ont pas le même référentiel de stades (♀ A1..A5, ♂ A1/A123/A5) : chaque paire
+ * (sexe, stade) est comptée séparément, on retient la plus capturée toutes confondues.
+ * Purement informatif (affiché à l'écran) — le backend n'a pas de champ dédié pour ça.
+ */
+export function dominantStadeImago(rows: CaptureRow[]): DominantStadeImago | null {
+  const totals: Record<string, number> = {};
+  for (const row of rows) {
+    if (row.categorie !== 'imago' || !row.sexe) continue;
+    const key = `${row.sexe}|${row.stade}`;
+    totals[key] = (totals[key] ?? 0) + row.effectif;
+  }
+  let best: string | null = null;
+  let bestCount = 0;
+  for (const [key, n] of Object.entries(totals)) {
+    if (n > bestCount) {
+      best = key;
+      bestCount = n;
+    }
+  }
+  if (!best || bestCount <= 0) return null;
+  const [sexe, stade] = best.split('|') as [Sexe, string];
+  return { sexe, stade, effectif: bestCount };
+}
+
 export function rowsToCounts(rows: CaptureRow[]): CaptureCounts {
   const counts: CaptureCounts = {};
   for (const row of rows) {

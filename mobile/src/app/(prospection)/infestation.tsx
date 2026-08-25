@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TYPE_CIBLE_OPTIONS } from '@/lib/prospection-fiche-lecture';
+import { EspeceSelection, parseEspeceSelection } from '@/lib/prospection-especes';
 import {
+  CaptureRow,
+  DraftProspection,
   InfestationRow,
   getDerniereDensiteMemeSite,
   getProspection,
+  listAllProspectionCaptures,
   listAllProspectionInfestations,
   saveProspectionInfestation,
   updateProspectionAvertissements,
@@ -24,12 +28,17 @@ import {
   TAILLE_GROUPE_SEUIL_BANDE_M2,
   classifyAerialPopulation,
   isHeureNocturne,
+  normalizeAerialClassification,
   validateComportementDirection,
   validateEcartHistorique,
   validateEssaimNocturne,
   validateGroupementLarvaire,
   validateInfestationFormation,
 } from '@/lib/prospection-validation';
+import {
+  dominantStadeImago,
+  dominantStadeLarve,
+} from '@/lib/prospection-capture-store';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -39,10 +48,22 @@ const BORDER = '#e7e0cd';
 const INACTIVE_BG = '#f6f3e9';
 const TARGET_ACTIVE = '#c0412b';
 
-// Groupes incompatibles
+// Groupes incompatibles (au sein d'un même groupe, un seul type sélectionnable à la fois)
+// "essaim" a disparu (migration backend 0029) : Dense et Très dense sont désormais des
+// types de cible à part entière (comme Vol clair), plus une sous-classification.
 const INCOMPATIBLE_GROUPS = {
   larve: ['tache_larvaire', 'bande_larvaire'],
-  imago: ['vol_clair', 'essaim'],
+  imago: ['vol_clair', 'dense', 'tres_dense'],
+};
+
+// Stade requis pour que chaque type de cible soit disponible : un type "larve" n'a de
+// sens que si des larves ont été prospectées sur cette fiche (et inversement pour "imago").
+const TARGET_STADE: Record<string, 'imago' | 'larve'> = {
+  tache_larvaire: 'larve',
+  bande_larvaire: 'larve',
+  vol_clair: 'imago',
+  dense: 'imago',
+  tres_dense: 'imago',
 };
 
 interface FormationForm {
@@ -57,8 +78,11 @@ interface FormationForm {
   interdistanceMax: string;
   interdistanceMoy: string;
   comportement: 'repos' | 'deplacement' | null;
-  ventDe: string;
-  ventVers: string;
+  // Direction du déplacement (bande/essaim) et direction du vent sont deux mesures
+  // indépendantes : le vent peut souffler dans un sens différent du déplacement observé.
+  deplacementDe: string;
+  deplacementVers: string;
+  ventDirectionDe: string;
   ventVitesse: string;
   stadeDominant: 'l1_l3' | 'l4_l5' | null;
   tailleGroupeM2: string;
@@ -81,11 +105,9 @@ interface FormationForm {
 }
 
 const AERIAL_CLASSIFICATION_LABELS: Record<AerialPopulationClassification, string> = {
-  non_classe: 'Non classé (vol non spontané)',
   vol_clair: 'Vol clair',
-  essaim_densite_moyenne: 'Essaim — densité moyenne',
-  essaim_densite_forte: 'Essaim — densité forte',
-  essaim_densite_tres_forte: 'Essaim — densité très forte',
+  dense: 'Dense',
+  tres_dense: 'Très dense',
 };
 
 function computeAerialClassification(form: FormationForm): AerialPopulationClassification | null {
@@ -113,8 +135,9 @@ function emptyFormation(): FormationForm {
     interdistanceMax: '',
     interdistanceMoy: '',
     comportement: null,
-    ventDe: '',
-    ventVers: '',
+    deplacementDe: '',
+    deplacementVers: '',
+    ventDirectionDe: '',
     ventVitesse: '',
     stadeDominant: null,
     tailleGroupeM2: '',
@@ -151,9 +174,13 @@ function formFromRow(row: InfestationRow | undefined): FormationForm {
     interdistanceMax: row.interdistance_max != null ? String(row.interdistance_max) : '',
     interdistanceMoy: row.interdistance_moy != null ? String(row.interdistance_moy) : '',
     comportement: (row.comportement as 'repos' | 'deplacement' | null) ?? null,
-    ventDe: row.vent_de ?? row.direction_de ?? '',
-    ventVers: row.direction_vers ?? '',
-    ventVitesse: row.vent_vitesse != null ? String(row.vent_vitesse) : '',
+    // Indépendants : direction du déplacement (direction_de/vers) vs direction du vent
+    // (vent_de) — ne plus faire retomber l'un sur l'autre (cf. anciens brouillons où les
+    // deux colonnes étaient toujours écrites avec la même valeur, avant ce correctif).
+    deplacementDe: row.direction_de ?? '',
+    deplacementVers: row.direction_vers ?? '',
+    ventDirectionDe: row.vent_de ?? '',
+    ventVitesse: ventVitesseKmhToMsInput(row.vent_vitesse ?? null),
     stadeDominant: (row.stade_dominant as 'l1_l3' | 'l4_l5' | null) ?? null,
     tailleGroupeM2: row.taille_groupe_m2 != null ? String(row.taille_groupe_m2) : '',
     nbTachesBandes: row.nb_taches_bandes != null ? String(row.nb_taches_bandes) : '',
@@ -171,7 +198,7 @@ function formFromRow(row: InfestationRow | undefined): FormationForm {
     aerialVisibleDePres: null,
     aerialMasseSombre: null,
     aerialMasquePaysage: null,
-    aerialStoredClassification: (row.type_essaim as AerialPopulationClassification | null) ?? null,
+    aerialStoredClassification: normalizeAerialClassification(row.type_essaim),
   };
 }
 
@@ -179,7 +206,37 @@ function numOrNull(value: string): number | null {
   return value === '' ? null : Number(value);
 }
 
+// Règle #8 : le champ "vent_vitesse" reste en km/h côté base/validation/backend (contrat
+// OpenAPI inchangé, seuils de prospection-validation.ts déjà exprimés en km/h) — seule
+// l'unité affichée/saisie à l'écran devient m/s. Conversion appliquée aux deux bornes
+// (chargement/enregistrement), jamais un simple changement de texte.
+const KMH_PAR_MS = 3.6;
+
+function ventVitesseKmhToMsInput(kmh: number | null): string {
+  if (kmh == null) return '';
+  return String(Math.round((kmh / KMH_PAR_MS) * 10) / 10);
+}
+
+function ventVitesseMsInputToKmh(ms: string): number | null {
+  if (ms === '') return null;
+  const parsed = Number(ms);
+  return Number.isFinite(parsed) ? Math.round(parsed * KMH_PAR_MS * 10) / 10 : null;
+}
+
+// "essaim" a disparu (migration backend 0029) : Vol clair, Dense et Très dense sont les
+// 3 types de cible aériens (imago), au même niveau que Tache/Bande larvaire.
+function isTypeCibleAerien(typeCible: string): boolean {
+  return typeCible === 'vol_clair' || typeCible === 'dense' || typeCible === 'tres_dense';
+}
+// Champs auparavant réservés à "essaim" : maintenant Dense et Très dense (Vol clair,
+// par nature diffus, ne les concerne pas — inchangé par rapport à avant).
+function isTypeCibleDense(typeCible: string): boolean {
+  return typeCible === 'dense' || typeCible === 'tres_dense';
+}
+
 function rowFromForm(typeCible: string, form: FormationForm): InfestationRow {
+  const aerien = isTypeCibleAerien(typeCible);
+  const dense = isTypeCibleDense(typeCible);
   return {
     espece: null,
     type_cible: typeCible,
@@ -195,48 +252,50 @@ function rowFromForm(typeCible: string, form: FormationForm): InfestationRow {
     interdistance_max: numOrNull(form.interdistanceMax),
     interdistance_moy: numOrNull(form.interdistanceMoy),
     comportement: form.comportement,
-    direction_de: form.ventDe || null,
-    direction_vers: form.ventVers || null,
-    vent_de: form.ventDe || null,
-    vent_vitesse: numOrNull(form.ventVitesse),
+    direction_de: form.deplacementDe || null,
+    direction_vers: form.deplacementVers || null,
+    vent_de: form.ventDirectionDe || null,
+    vent_vitesse: ventVitesseMsInputToKmh(form.ventVitesse),
     pullulation_nb: null,
     taille_long: null,
     taille_large: null,
     taille_epaisseur: null,
-    essaim_en_vol:
-      typeCible === 'vol_clair' || typeCible === 'essaim'
-        ? isHeureNocturne(form.heureObservation)
-          ? 0
-          : form.essaimComportement === 'vol'
-            ? 1
-            : 0
-        : null,
-    essaim_pose:
-      typeCible === 'vol_clair' || typeCible === 'essaim'
-        ? isHeureNocturne(form.heureObservation)
+    // Comportement de l'essaim piloté par l'État à l'écran (règles #4-#6, cf.
+    // handleEtatChange) ; le filet de sécurité #106 reste appliqué ici à la sauvegarde,
+    // uniquement : de nuit, un essaim ne se déplace pas, donc on force "posé" quel que
+    // soit l'État affiché (l'avertissement horaire correspondant, lui, est indépendant —
+    // cf. validateEssaimNocturne).
+    essaim_en_vol: aerien
+      ? isHeureNocturne(form.heureObservation)
+        ? 0
+        : form.essaimComportement === 'vol'
           ? 1
-          : form.essaimComportement === 'pose'
-            ? 1
-            : 0
-        : null,
-    type_essaim:
-      typeCible === 'vol_clair' || typeCible === 'essaim' ? computeAerialClassification(form) : null,
+          : 0
+      : null,
+    essaim_pose: aerien
+      ? isHeureNocturne(form.heureObservation)
+        ? 1
+        : form.essaimComportement === 'pose'
+          ? 1
+          : 0
+      : null,
+    // type_essaim reste alimenté (confirmation détaillée via le questionnaire séquentiel,
+    // redondante avec type_cible depuis 0029 mais sans perte d'information côté backend).
+    type_essaim: aerien ? computeAerialClassification(form) : null,
     nb_taches_bandes: typeCible === 'bande_larvaire' ? numOrNull(form.nbTachesBandes) : null,
     interdistance_m: null,
-    surface_contaminee_ha: typeCible === 'essaim' ? numOrNull(form.surfaceContamineeHa) : null,
+    surface_contaminee_ha: dense ? numOrNull(form.surfaceContamineeHa) : null,
     type_larve: null,
-    surface_infestee_pourcent: typeCible === 'essaim' ? numOrNull(form.surfaceInfesteePourcent) : null,
+    surface_infestee_pourcent: dense ? numOrNull(form.surfaceInfesteePourcent) : null,
     stade_dominant: form.stadeDominant,
     taille_groupe_m2: numOrNull(form.tailleGroupeM2),
     front_longueur_m: numOrNull(form.frontLongueurM),
     front_largeur_m: numOrNull(form.frontLargeurM),
     densite_max_front: numOrNull(form.densiteMaxFront),
     densite_moy_arriere_front: numOrNull(form.densiteMoyArriereFront),
-    heure_observation:
-      typeCible === 'vol_clair' || typeCible === 'essaim' ? form.heureObservation || null : null,
-    densite_en_vol: typeCible === 'essaim' ? numOrNull(form.densiteEnVol) : null,
-    dimension_ha:
-      typeCible === 'vol_clair' || typeCible === 'essaim' ? numOrNull(form.dimensionHa) : null,
+    heure_observation: aerien ? form.heureObservation || null : null,
+    densite_en_vol: dense ? numOrNull(form.densiteEnVol) : null,
+    dimension_ha: aerien ? numOrNull(form.dimensionHa) : null,
   };
 }
 
@@ -248,11 +307,49 @@ type Tab = 'desc' | 'comport';
 
 export default function InfestationScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { draftId } = useLocalSearchParams<{ draftId: string }>();
   const [forms, setForms] = useState<Record<string, FormationForm> | null>(null);
-  const [selectedTargets, setSelectedTargets] = useState<string[]>([]);
+  const [selectedTargetsRaw, setSelectedTargets] = useState<string[]>([]);
   const [tab, setTab] = useState<Tab>('desc');
   const { run, isRunning: isSaving } = useAsyncAction();
+
+  // Fiche chargée une seule fois au montage (réutilisée aussi par handleFooterPress
+  // pour station_id, qui appelait déjà `getProspection` séparément auparavant).
+  const [draftRow, setDraftRow] = useState<DraftProspection | null>(null);
+  useEffect(() => {
+    if (!draftId) return;
+    getProspection(draftId).then(setDraftRow);
+  }, [draftId]);
+
+  // Captures déjà saisies sur cette fiche (écran Captures) : sert à calculer
+  // automatiquement le stade dominant Imagos/Larves (cf. dominantStadeLarve/Imago).
+  const [captures, setCaptures] = useState<CaptureRow[]>([]);
+  useEffect(() => {
+    if (!draftId) return;
+    listAllProspectionCaptures(draftId).then(setCaptures);
+  }, [draftId]);
+  const dominantLarve = dominantStadeLarve(captures);
+  const dominantImago = dominantStadeImago(captures);
+
+  // Stades effectivement prospectés sur cette fiche (cf. species.tsx). Tant que la
+  // fiche n'est pas encore chargée (ou si elle n'a pas de sélection d'espèces —
+  // fiche ancienne, incomplète), on ne bloque rien plutôt que de tout désactiver
+  // par erreur : `especeSelection` reste `null` et hasImago/hasLarve valent `true`.
+  const especeSelection: EspeceSelection | null = draftRow?.especes ? parseEspeceSelection(draftRow.especes) : null;
+  const hasImago = especeSelection ? especeSelection.lmcImago || especeSelection.nseImago : true;
+  const hasLarve = especeSelection ? especeSelection.lmcLarve || especeSelection.nseLarve : true;
+
+  const isTargetAvailable = (value: string) => {
+    const stade = TARGET_STADE[value];
+    return stade === 'larve' ? hasLarve : stade === 'imago' ? hasImago : true;
+  };
+
+  // Règle #6 : dérivé (pas de state dupliqué) — si le stade correspondant devient
+  // indisponible (retour arrière sur species.tsx puis modification de la sélection),
+  // le type de cible devenu invalide disparaît de la sélection affichée/persistée
+  // sans qu'on ait besoin de le retirer explicitement de l'état brut.
+  const selectedTargets = selectedTargetsRaw.filter(isTargetAvailable);
 
   useEffect(() => {
     if (!draftId) return;
@@ -278,6 +375,44 @@ export default function InfestationScreen() {
     });
   }, [draftId]);
 
+  // Règle #7 : l'heure d'observation est renseignée automatiquement (heure système, au
+  // moment où l'utilisateur ouvre le détail comportemental de cette cible) plutôt que
+  // saisie à la main — mais seulement si aucune heure n'a déjà été enregistrée pour cette
+  // cible (ne pas recalculer/écraser une valeur existante en revenant sur ce slide).
+  useEffect(() => {
+    if (!forms || tab !== 'comport') return;
+    const target = selectedTargets.length > 0 ? selectedTargets[0] : null;
+    if (!target || !isTypeCibleAerien(target)) return;
+    if (forms[target]?.heureObservation) return;
+    Promise.resolve().then(() => {
+      const now = new Date();
+      const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      setForms((current) =>
+        current && !current[target].heureObservation
+          ? { ...current, [target]: { ...current[target], heureObservation: hhmm } }
+          : current
+      );
+    });
+  }, [forms, tab, selectedTargets]);
+
+  // Stade dominant Larves : pré-rempli automatiquement depuis les captures déjà saisies
+  // (règle demandée), tout en restant modifiable manuellement — jamais écrasé si déjà
+  // renseigné (rechargé depuis la base, ou déjà corrigé par le prospecteur).
+  useEffect(() => {
+    if (!forms || tab !== 'comport' || !dominantLarve) return;
+    const target = selectedTargets.length > 0 ? selectedTargets[0] : null;
+    if (target !== 'tache_larvaire' && target !== 'bande_larvaire') return;
+    if (forms[target]?.stadeDominant) return;
+    const bucket = dominantLarve.bucket;
+    Promise.resolve().then(() => {
+      setForms((current) =>
+        current && !current[target].stadeDominant
+          ? { ...current, [target]: { ...current[target], stadeDominant: bucket } }
+          : current
+      );
+    });
+  }, [forms, tab, selectedTargets, dominantLarve]);
+
   if (!forms) {
     return (
       <View style={styles.root}>
@@ -297,17 +432,11 @@ export default function InfestationScreen() {
   const setField = <K extends keyof FormationForm>(field: K, value: FormationForm[K]) => {
     setForms((current) => (current ? { ...current, [currentTarget]: { ...current[currentTarget], [field]: value } } : current));
 
-    if (
-      field === 'heureObservation' &&
-      (currentTarget === 'vol_clair' || currentTarget === 'essaim') &&
-      isHeureNocturne(value as string)
-    ) {
-      setForms((current) =>
-        current
-          ? { ...current, [currentTarget]: { ...current[currentTarget], essaimComportement: 'pose' } }
-          : current
-      );
-    }
+    // Le comportement de l'essaim est désormais principalement piloté par l'État
+    // (repos/déplacement, cf. handleEtatChange) : l'ancienne bascule "nuit → posé" en
+    // saisie live est retirée d'ici pour ne pas contredire visuellement l'État choisi.
+    // Le filet de sécurité #106 (nuit → forcé "posé") reste appliqué à la sauvegarde
+    // dans rowFromForm, lui, inchangé — ainsi que l'avertissement validateEssaimNocturne.
 
     if (
       field === 'tailleGroupeM2' &&
@@ -324,11 +453,59 @@ export default function InfestationScreen() {
     }
   };
 
+  // Règles #4-#6 : l'État (Repos/Déplacement) contrôle automatiquement la Direction et
+  // le Comportement de l'essaim. Toggle complet (repos → déplacement → aucun état).
+  const handleEtatChange = (value: 'repos' | 'deplacement') => {
+    setForms((current) => {
+      if (!current) return current;
+      const currentForm = current[currentTarget];
+      const nextEtat = currentForm.comportement === value ? null : value;
+      // Seule la direction du DÉPLACEMENT est effacée/indisponible en Repos (règle #4) —
+      // la direction du vent (ventDirectionDe) est indépendante de l'État de l'insecte,
+      // elle n'est jamais touchée ici.
+      const next: FormationForm =
+        nextEtat === 'repos'
+          ? { ...currentForm, comportement: 'repos', essaimComportement: 'pose', deplacementDe: '', deplacementVers: '' }
+          : nextEtat === 'deplacement'
+            ? { ...currentForm, comportement: 'deplacement', essaimComportement: 'vol' }
+            : { ...currentForm, comportement: null, essaimComportement: null, deplacementDe: '', deplacementVers: '' };
+      return { ...current, [currentTarget]: next };
+    });
+  };
+
+  // Réponses "Oui/Non" du questionnaire séquentiel (classification aérienne) :
+  // réversibles, avec effacement réel (pas seulement masqué) des réponses en aval
+  // devenues invalides quand une réponse amont change ou est effacée.
+  const handleAerialAnswer = (
+    field: 'aerialVolSpontane' | 'aerialVisibleDePres' | 'aerialMasseSombre',
+    value: boolean
+  ) => {
+    setForms((current) => {
+      if (!current) return current;
+      const currentForm = current[currentTarget];
+      const nextValue = currentForm[field] === value ? null : value;
+      const next: FormationForm = { ...currentForm, [field]: nextValue };
+      if (field === 'aerialVolSpontane') {
+        next.aerialVisibleDePres = null;
+        next.aerialMasseSombre = null;
+        next.aerialMasquePaysage = null;
+      } else if (field === 'aerialVisibleDePres') {
+        next.aerialMasseSombre = null;
+        next.aerialMasquePaysage = null;
+      } else if (field === 'aerialMasseSombre') {
+        next.aerialMasquePaysage = null;
+      }
+      return { ...current, [currentTarget]: next };
+    });
+  };
+
   const descInsight = densityInsight(numOrNull(form.densMoy));
-  const comportInsight = comportementInsight(form.comportement, form.ventVers || null, numOrNull(form.ventVitesse));
-  const windTarget = COMPASS_DIRECTIONS.find((d) => d.label === form.ventVers);
-  const windAngle = windTarget ? windTarget.deg : 0;
-  const windLabel = form.ventDe && form.ventVers ? `${form.ventDe} → ${form.ventVers}` : '—';
+  const comportInsight = comportementInsight(form.comportement, form.deplacementVers || null, numOrNull(form.ventVitesse));
+  const deplacementTarget = COMPASS_DIRECTIONS.find((d) => d.label === form.deplacementVers);
+  const deplacementAngle = deplacementTarget ? deplacementTarget.deg : 0;
+  // Le vent n'a qu'une seule direction saisie (origine, pas de colonne "vers" côté
+  // backend) : contrairement au déplacement, pas de flèche origine → destination.
+  const ventDirectionLabel = form.ventDirectionDe || '—';
 
   // ==========================================
   // LOGIQUE DE SELECTION
@@ -336,6 +513,16 @@ export default function InfestationScreen() {
 
   const handleTargetSelect = (value: string) => {
     const isSelected = selectedTargets.includes(value);
+
+    if (!isSelected && !isTargetAvailable(value)) {
+      Alert.alert(
+        'Stade non prospecté',
+        TARGET_STADE[value] === 'larve'
+          ? 'Aucun stade larvaire n\'a été prospecté sur cette fiche (voir l\'étape "Qu\'avez-vous observé ?").'
+          : 'Aucun stade imago n\'a été prospecté sur cette fiche (voir l\'étape "Qu\'avez-vous observé ?").'
+      );
+      return;
+    }
 
     if (value === 'tache_larvaire' && !isSelected && tacheDisabledBySize) {
       Alert.alert(
@@ -408,7 +595,8 @@ export default function InfestationScreen() {
       return;
     }
 
-    const draft = draftId ? await getProspection(draftId) : null;
+    // Réutilise la fiche déjà chargée au montage plutôt que de la refetcher ici.
+    const draft = draftRow;
 
     const blocages: string[] = [];
     const avertissements: string[] = [];
@@ -420,7 +608,9 @@ export default function InfestationScreen() {
       const result = validateInfestationFormation({
         densMin: numOrNull(f.densMin),
         densMax: numOrNull(f.densMax),
-        ventVitesse: numOrNull(f.ventVitesse),
+        // Les seuils de validation sont exprimés en km/h (cf. VENT_VITESSE_SEUIL_*_KMH) ;
+        // le formulaire saisit désormais en m/s (règle #8) — on reconvertit avant validation.
+        ventVitesse: ventVitesseMsInputToKmh(f.ventVitesse),
       });
       blocages.push(...result.blocages);
       avertissements.push(...result.avertissements);
@@ -428,7 +618,7 @@ export default function InfestationScreen() {
       const directionResult = validateComportementDirection({
         typeCible: target,
         comportement: f.comportement,
-        directionRenseignee: !!(f.ventDe && f.ventVers),
+        directionRenseignee: !!(f.deplacementDe && f.deplacementVers),
       });
       blocages.push(...directionResult.blocages);
       avertissements.push(...directionResult.avertissements);
@@ -448,7 +638,7 @@ export default function InfestationScreen() {
         avertissementsAVerifier.push(...result.avertissements);
       };
 
-      if (target === 'vol_clair' || target === 'essaim') {
+      if (isTypeCibleAerien(target)) {
         pushAVerifier(
           validateEssaimNocturne({ typeCible: target, heureObservation: f.heureObservation })
         );
@@ -502,7 +692,9 @@ export default function InfestationScreen() {
           break;
         }
       }
-      const isDisabled = option.value === 'tache_larvaire' && !isSelected && tacheDisabledBySize;
+      const isStadeBlocked = !isSelected && !isTargetAvailable(option.value);
+      const isDisabled =
+        isStadeBlocked || (option.value === 'tache_larvaire' && !isSelected && tacheDisabledBySize);
 
       return (
         <TouchableOpacity
@@ -599,7 +791,7 @@ export default function InfestationScreen() {
                   </View>
                 </View>
 
-                {currentTarget === 'vol_clair' || currentTarget === 'essaim' ? (
+                {isTypeCibleAerien(currentTarget) ? (
                   <>
                     <Text style={styles.sectionLabel}>Classification (questionnaire séquentiel)</Text>
                     <Text style={styles.fieldGroupLabel}>Vol spontané, non provoqué ?</Text>
@@ -609,7 +801,7 @@ export default function InfestationScreen() {
                         return (
                           <TouchableOpacity
                             key={String(value)}
-                            onPress={() => setField('aerialVolSpontane', value)}
+                            onPress={() => handleAerialAnswer('aerialVolSpontane', value)}
                             style={[styles.chip, active && styles.chipActive]}
                             activeOpacity={0.8}
                           >
@@ -630,7 +822,7 @@ export default function InfestationScreen() {
                             return (
                               <TouchableOpacity
                                 key={String(value)}
-                                onPress={() => setField('aerialVisibleDePres', value)}
+                                onPress={() => handleAerialAnswer('aerialVisibleDePres', value)}
                                 style={[styles.chip, active && styles.chipActive]}
                                 activeOpacity={0.8}
                               >
@@ -653,7 +845,7 @@ export default function InfestationScreen() {
                             return (
                               <TouchableOpacity
                                 key={String(value)}
-                                onPress={() => setField('aerialMasseSombre', value)}
+                                onPress={() => handleAerialAnswer('aerialMasseSombre', value)}
                                 style={[styles.chip, active && styles.chipActive]}
                                 activeOpacity={0.8}
                               >
@@ -678,7 +870,7 @@ export default function InfestationScreen() {
                               return (
                                 <TouchableOpacity
                                   key={value}
-                                  onPress={() => setField('aerialMasquePaysage', value)}
+                                  onPress={() => setField('aerialMasquePaysage', active ? null : value)}
                                   style={[styles.chip, active && styles.chipActive]}
                                   activeOpacity={0.8}
                                 >
@@ -779,7 +971,7 @@ export default function InfestationScreen() {
                         return (
                           <TouchableOpacity
                             key={value}
-                            onPress={() => setField('stadeDominant', value)}
+                            onPress={() => setField('stadeDominant', active ? null : value)}
                             style={[styles.chip, active && styles.chipActive]}
                             activeOpacity={0.8}
                           >
@@ -790,6 +982,12 @@ export default function InfestationScreen() {
                         );
                       })}
                     </View>
+                    {dominantLarve && (
+                      <Text style={styles.hintText}>
+                        Calculé depuis les captures : {dominantLarve.stade} ({dominantLarve.effectif} individus)
+                        {dominantLarve.bucket === form.stadeDominant ? ' ✓' : ` → suggère ${dominantLarve.bucket === 'l1_l3' ? 'L1-L3' : 'L4-L5'}`}
+                      </Text>
+                    )}
 
                     <View style={styles.row2NoMargin}>
                       <View style={styles.infoBox}>
@@ -887,7 +1085,7 @@ export default function InfestationScreen() {
                     return (
                       <TouchableOpacity
                         key={value}
-                        onPress={() => setField('comportement', value)}
+                        onPress={() => handleEtatChange(value)}
                         style={[styles.chip, active && styles.chipActive]}
                         activeOpacity={0.8}
                       >
@@ -899,17 +1097,23 @@ export default function InfestationScreen() {
                   })}
                 </View>
 
-                {(currentTarget === 'vol_clair' || currentTarget === 'essaim') && (
+                {isTypeCibleAerien(currentTarget) && (
                   <>
                     <Text style={styles.fieldGroupLabel}>Comportement de l&apos;essaim</Text>
                     <View style={styles.row2}>
                       {(['vol', 'pose'] as const).map((value) => {
                         const active = form.essaimComportement === value;
+                        // Figé par l'État (règles #4-#6) : l'option contraire à l'État
+                        // sélectionné n'est pas disponible tant qu'un État est choisi.
+                        const isLocked =
+                          (value === 'vol' && form.comportement === 'repos') ||
+                          (value === 'pose' && form.comportement === 'deplacement');
                         return (
                           <TouchableOpacity
                             key={value}
-                            onPress={() => setField('essaimComportement', value)}
-                            style={[styles.chip, active && styles.chipActive]}
+                            onPress={() => !isLocked && setField('essaimComportement', value)}
+                            disabled={isLocked}
+                            style={[styles.chip, active && styles.chipActive, isLocked && styles.chipDisabled]}
                             activeOpacity={0.8}
                           >
                             <Text style={[styles.chipText, active && styles.chipTextActive]}>
@@ -919,6 +1123,17 @@ export default function InfestationScreen() {
                         );
                       })}
                     </View>
+
+                    {/* Purement informatif (pas de champ backend dédié aux stades imago,
+                        contrairement aux larves) : calculé depuis les captures saisies. */}
+                    {dominantImago && (
+                      <View style={styles.insightCallout}>
+                        <Text style={styles.insightText}>
+                          Stade dominant calculé : {dominantImago.sexe === 'F' ? '♀' : '♂'} {dominantImago.stade} (
+                          {dominantImago.effectif} individus)
+                        </Text>
+                      </View>
+                    )}
 
                     <Text style={styles.fieldGroupLabel}>Heure d&apos;observation</Text>
                     <View style={styles.infoBox}>
@@ -944,7 +1159,7 @@ export default function InfestationScreen() {
                       />
                     </View>
 
-                    {currentTarget === 'essaim' && (
+                    {isTypeCibleDense(currentTarget) && (
                       <>
                         <Text style={styles.fieldGroupLabel}>Densité en vol (ind./m²)</Text>
                         <View style={styles.infoBox}>
@@ -986,26 +1201,60 @@ export default function InfestationScreen() {
                   </>
                 )}
 
-                <Text style={styles.fieldGroupLabel}>Direction du déplacement</Text>
-                <View style={styles.compassCard}>
-                  <View style={styles.compassCircle}>
-                    <Text style={[styles.compassCardinal, styles.compassCardinalN]}>N</Text>
-                    <Text style={[styles.compassCardinal, styles.compassCardinalS]}>S</Text>
-                    <Text style={[styles.compassCardinal, styles.compassCardinalO]}>O</Text>
-                    <Text style={[styles.compassCardinal, styles.compassCardinalE]}>E</Text>
-                    <View style={[styles.compassArrow, { transform: [{ rotate: `${windAngle}deg` }] }]} />
-                    <View style={styles.compassArrowDot} />
-                  </View>
+                {/* Règle #4 : la direction n'a de sens qu'en Déplacement — masquée (et effacée
+                    par handleEtatChange) tant que l'État n'est pas "Déplacement". */}
+                {form.comportement === 'deplacement' && (
+                  <>
+                    <Text style={styles.fieldGroupLabel}>Direction du déplacement</Text>
+                    <View style={styles.compassCard}>
+                      <View style={styles.compassCircle}>
+                        <Text style={[styles.compassCardinal, styles.compassCardinalN]}>N</Text>
+                        <Text style={[styles.compassCardinal, styles.compassCardinalS]}>S</Text>
+                        <Text style={[styles.compassCardinal, styles.compassCardinalO]}>O</Text>
+                        <Text style={[styles.compassCardinal, styles.compassCardinalE]}>E</Text>
+                        <View style={[styles.compassArrow, { transform: [{ rotate: `${deplacementAngle}deg` }] }]} />
+                        <View style={styles.compassArrowDot} />
+                      </View>
+                      <View style={styles.compassChips}>
+                        {COMPASS_DIRECTIONS.map((dir) => {
+                          const active = dir.label === form.deplacementDe;
+                          return (
+                            <TouchableOpacity
+                              key={dir.label}
+                              onPress={() => {
+                                if (active) {
+                                  // Réversible : retaper la direction active la désélectionne.
+                                  setField('deplacementDe', '');
+                                  setField('deplacementVers', '');
+                                } else {
+                                  setField('deplacementDe', dir.label);
+                                  setField('deplacementVers', oppositeDirection(dir.label));
+                                }
+                              }}
+                              style={[styles.compassChip, active && styles.compassChipActive]}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={[styles.compassChipText, active && styles.compassChipTextActive]}>{dir.label}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  </>
+                )}
+
+                <View style={styles.card}>
+                  <Text style={styles.cardTitle}>Vent</Text>
+                  {/* Indépendante de la direction du déplacement (règle du 24/08) : le vent
+                      peut souffler dans un sens différent de celui de l'insecte. */}
+                  <Text style={styles.fieldGroupLabel}>Direction du vent</Text>
                   <View style={styles.compassChips}>
                     {COMPASS_DIRECTIONS.map((dir) => {
-                      const active = dir.label === form.ventDe;
+                      const active = dir.label === form.ventDirectionDe;
                       return (
                         <TouchableOpacity
                           key={dir.label}
-                          onPress={() => {
-                            setField('ventDe', dir.label);
-                            setField('ventVers', oppositeDirection(dir.label));
-                          }}
+                          onPress={() => setField('ventDirectionDe', active ? '' : dir.label)}
                           style={[styles.compassChip, active && styles.compassChipActive]}
                           activeOpacity={0.8}
                         >
@@ -1014,14 +1263,10 @@ export default function InfestationScreen() {
                       );
                     })}
                   </View>
-                </View>
-
-                <View style={styles.card}>
-                  <Text style={styles.cardTitle}>Vent</Text>
                   <View style={styles.row2NoMargin}>
                     <View style={styles.infoBox}>
                       <Text style={styles.infoBoxLabel}>Direction</Text>
-                      <Text style={styles.infoBoxValue}>{windLabel}</Text>
+                      <Text style={styles.infoBoxValue}>{ventDirectionLabel}</Text>
                     </View>
                     <View style={styles.infoBox}>
                       <Text style={styles.infoBoxLabel}>Vitesse</Text>
@@ -1032,7 +1277,7 @@ export default function InfestationScreen() {
                           keyboardType="decimal-pad"
                           style={styles.infoBoxInput}
                         />
-                        <Text style={styles.infoBoxUnit}>km/h</Text>
+                        <Text style={styles.infoBoxUnit}>m/s</Text>
                       </View>
                     </View>
                   </View>
@@ -1047,10 +1292,10 @@ export default function InfestationScreen() {
             )}
           </ScrollView>
 
-          <View style={styles.footer}>
-            <TouchableOpacity 
-              style={[styles.continueButton, selectedTargets.length === 0 && styles.continueButtonDisabled]} 
-              onPress={handleFooterPress} 
+          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
+            <TouchableOpacity
+              style={[styles.continueButton, selectedTargets.length === 0 && styles.continueButtonDisabled]}
+              onPress={handleFooterPress}
               disabled={isSaving || selectedTargets.length === 0}
               activeOpacity={0.85}
             >
@@ -1123,6 +1368,7 @@ const styles = StyleSheet.create({
   boxEmphasis: { backgroundColor: GREEN, borderColor: GREEN },
   chip: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 10, backgroundColor: INACTIVE_BG },
   chipActive: { backgroundColor: GREEN },
+  chipDisabled: { opacity: 0.4 },
   chipText: { fontSize: 12.5, fontWeight: '700', color: TEXT_SECONDARY },
   chipTextActive: { fontWeight: '800', color: '#fff' },
   footer: { padding: 16 },

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
 import { startNewProspection } from '@/lib/prospection-accueil';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
@@ -17,6 +17,7 @@ const BORDER = '#e7e0cd';
  * Il n'existe pas encore de liste de signalements côté serveur (cf. ADR-006) : saisie manuelle en attendant. */
 export default function ExtensiveSignalementScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const user = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.token);
   const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
@@ -57,7 +58,7 @@ export default function ExtensiveSignalementScreen() {
 
   return (
     <View style={styles.root}>
-      <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
+      <SafeAreaView edges={['top']} style={styles.safe}>
         <KeyboardAvoidingView 
           style={styles.keyboardAvoidingView} 
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -113,7 +114,7 @@ export default function ExtensiveSignalementScreen() {
             {error && <Text style={styles.errorText}>{error}</Text>}
           </ScrollView>
 
-          <View style={styles.footer}>
+          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
             <TouchableOpacity
               style={[styles.continueButton, !canContinue && styles.continueButtonDisabled]}
               onPress={startValidation}

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -31,11 +31,22 @@ const INTENSITE_PLUIE_OPTIONS = [
 export default function ObservationsScreen() {
   const router = useRouter();
   const { draftId } = useLocalSearchParams<{ draftId: string }>();
+  const draft = useProspectionWizardStore((s) => s.draft);
+  const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
   const setDraft = useProspectionWizardStore((s) => s.setDraft);
   const { run, isRunning: isSaving } = useAsyncAction();
   const [showAutre, setShowAutre] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const initialEnnemis = parseEnnemis(null);
+
+  // Filet de sécurité si cet écran est atteint sans passer par reference.tsx (deep-link,
+  // app relancée en plein milieu du parcours) : le store peut ne pas encore porter cette
+  // fiche — cf. même garde sur reference.tsx / captures.tsx / veg.tsx.
+  useEffect(() => {
+    if (draftId && draft?.id !== draftId) {
+      hydrateFromDraft(draftId);
+    }
+  }, [draftId, draft?.id, hydrateFromDraft]);
 
   const form = useForm({
     defaultValues: {
@@ -77,6 +88,27 @@ export default function ObservationsScreen() {
       );
     },
   });
+
+  // Restaure la pluie, les dégâts, les ennemis naturels et l'observation libre déjà
+  // enregistrés pour cette fiche — sans ça, cet écran repartait systématiquement de zéro
+  // à chaque remontage (retour arrière, reprise d'un brouillon...), et "Vérifier &
+  // enregistrer" écrasait alors les données existantes par des valeurs vides. Ne s'exécute
+  // qu'une fois par fiche chargée (`obsHydratedRef`), cf. même garde sur veg.tsx.
+  const obsHydratedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!draft || draft.id !== draftId || obsHydratedRef.current === draft.id) return;
+    obsHydratedRef.current = draft.id;
+    Promise.resolve().then(() => {
+      const ennemis = parseEnnemis(draft.ennemis_naturels);
+      form.setFieldValue('dernierePluieDate', draft.derniere_pluie ?? '');
+      form.setFieldValue('intensitePluie', draft.intensite_pluie ?? null);
+      form.setFieldValue('degatsCultures', (draft.degats_cultures as ObservationsFormValues['degatsCultures']) ?? null);
+      form.setFieldValue('ennemisSelected', ennemis.selected);
+      form.setFieldValue('ennemisAutre', ennemis.autre);
+      form.setFieldValue('observation', draft.observations ?? '');
+      if (ennemis.autre) setShowAutre(true);
+    });
+  }, [draft, draftId, form]);
 
   return (
     <View style={styles.root}>

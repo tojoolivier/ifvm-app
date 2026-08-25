@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
 import { concludeValidation, listAllProspectionPopulations, PopulationRow } from '@/lib/prospection-repository';
 import { enregistrerEtSynchroniser } from '@/lib/prospection-review';
@@ -17,6 +17,7 @@ const BORDER = '#e7e0cd';
 
 export default function ExtensiveRecapScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const token = useAuthStore((s) => s.token);
   const draft = useProspectionWizardStore((s) => s.draft);
   const resetWizard = useProspectionWizardStore((s) => s.reset);
@@ -87,7 +88,7 @@ export default function ExtensiveRecapScreen() {
   if (isValidation) {
     return (
       <View style={styles.root}>
-        <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
+        <SafeAreaView edges={['top']} style={styles.safe}>
           <KeyboardAvoidingView 
             style={styles.keyboardAvoidingView} 
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -134,7 +135,7 @@ export default function ExtensiveRecapScreen() {
               {error && <Text style={styles.errorText}>{error}</Text>}
             </ScrollView>
 
-            <View style={styles.footerRow}>
+            <View style={[styles.footerRow, { paddingBottom: Math.max(insets.bottom, 12) + 10 }]}>
               <TouchableOpacity
                 style={styles.infirmeeButton}
                 onPress={() => handleConclude('infirmee')}
@@ -160,7 +161,7 @@ export default function ExtensiveRecapScreen() {
 
   return (
     <View style={styles.root}>
-      <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
+      <SafeAreaView edges={['top']} style={styles.safe}>
         <KeyboardAvoidingView 
           style={styles.keyboardAvoidingView} 
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -212,7 +213,7 @@ export default function ExtensiveRecapScreen() {
             {error && <Text style={styles.errorText}>{error}</Text>}
           </ScrollView>
 
-          <View style={styles.footer}>
+          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
             <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={isSaving} activeOpacity={0.85}>
               <Text style={styles.saveButtonText}>Enregistrer (hors-ligne) ✓</Text>
             </TouchableOpacity>

@@ -10,7 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TextInput } from 'react-native-gesture-handler';
 
 import {
@@ -96,6 +96,7 @@ function parseGrillesCompletees(raw: string | null): string[] {
 
 export default function CapturesScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { draftId, grilleIndex } = useLocalSearchParams<{
     draftId: string;
     grilleIndex: string;
@@ -117,6 +118,9 @@ export default function CapturesScreen() {
   // Ref pour éviter les boucles infinies
   const isInitialized = useRef(false);
   const isHydrated = useRef(false);
+  // Ref pour ne réhydrater "totalCapturesInput" qu'au changement effectif de grille
+  // (évite d'écraser la saisie en cours de l'utilisateur sur la grille courante)
+  const syncedGrilleIndexRef = useRef<number | null>(null);
 
   const requestedIndex = Number(grilleIndex ?? '0');
   const grille = grilleOrder[currentGrilleIndex];
@@ -170,9 +174,11 @@ export default function CapturesScreen() {
 
   const totalStades = isImago ? totalStadesImago : totalStadesLarve;
 
-  const isPhasesConsistent = totalPhases === totalCaptures;
-  const isStadesConsistent = totalStades === totalCaptures;
-  const isConsistent = totalCaptures > 0 && isPhasesConsistent && isStadesConsistent;
+  // Le nombre de captures est facultatif : une grille laissée vide (0) est cohérente
+  // par défaut et ne doit pas bloquer la navigation (cf. extensive-imagos.tsx, même règle).
+  const isPhasesConsistent = totalCaptures === 0 || totalPhases === totalCaptures;
+  const isStadesConsistent = totalCaptures === 0 || totalStades === totalCaptures;
+  const isConsistent = isPhasesConsistent && isStadesConsistent;
 
   // Effet 1: Hydratation initiale - une seule fois
   useEffect(() => {
@@ -205,6 +211,20 @@ export default function CapturesScreen() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestedIndex, store.grilleOrder.length]);
+
+  // Effet 3bis: Réhydratation du "nombre total de captures" au changement de grille.
+  // Ce champ est un state local (non stocké dans le store zustand) : sans cet effet, un
+  // retour en arrière (router.replace démonte/remonte l'écran) le remet à '', ce qui masque
+  // les phases/stades déjà enregistrés (tout l'affichage est conditionné à totalCaptures > 0)
+  // et donne l'impression que les données saisies ont été perdues alors qu'elles sont
+  // toujours dans le store (reconstruites par goToGrille depuis les captures sauvegardées).
+  useEffect(() => {
+    if (syncedGrilleIndexRef.current === currentGrilleIndex) return;
+    syncedGrilleIndexRef.current = currentGrilleIndex;
+    const existingTotal = Object.values(phasesData).reduce((sum, value) => sum + (Number(value) || 0), 0);
+    setTotalCapturesInput(existingTotal > 0 ? String(existingTotal) : '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentGrilleIndex]);
 
   // Effet 4: Timer de capture - une seule fois
   useEffect(() => {
@@ -257,38 +277,38 @@ export default function CapturesScreen() {
   const handleContinue = async () => {
     if (!draftId || isSaving) return;
 
-    if (totalCaptures <= 0) {
-      Alert.alert('Nombre de captures', 'Veuillez saisir un nombre de captures supérieur à 0.');
-      return;
-    }
+    // Le nombre de captures est facultatif : si la grille est laissée vide, on
+    // passe directement à la sauvegarde (0 capture) sans bloquer la navigation
+    // ni exiger de répartition phases/stades.
+    if (totalCaptures > 0) {
+      if (!isPhasesConsistent) {
+        Alert.alert(
+          'Incohérence des phases',
+          `Captures : ${totalCaptures}\nPhases : ${totalPhases}\n\nLa somme des phases doit être exactement égale au nombre de captures.`
+        );
+        return;
+      }
 
-    if (!isPhasesConsistent) {
-      Alert.alert(
-        'Incohérence des phases',
-        `Captures : ${totalCaptures}\nPhases : ${totalPhases}\n\nLa somme des phases doit être exactement égale au nombre de captures.`
-      );
-      return;
-    }
+      if (isImago && !isStadesConsistent) {
+        Alert.alert(
+          'Incohérence des stades',
+          `Captures : ${totalCaptures}\nStades femelles : ${totalStadesF}\nStades mâles : ${totalStadesM}\nTotal stades : ${totalStadesF} + ${totalStadesM} = ${totalStadesImago}\n\nLa règle est :\nCaptures = Phases = Stades ♀ + Stades ♂`
+        );
+        return;
+      }
 
-    if (isImago && !isStadesConsistent) {
-      Alert.alert(
-        'Incohérence des stades',
-        `Captures : ${totalCaptures}\nStades femelles : ${totalStadesF}\nStades mâles : ${totalStadesM}\nTotal stades : ${totalStadesF} + ${totalStadesM} = ${totalStadesImago}\n\nLa règle est :\nCaptures = Phases = Stades ♀ + Stades ♂`
-      );
-      return;
-    }
+      if (isLarve && !isStadesConsistent) {
+        Alert.alert(
+          'Incohérence des stades larvaires',
+          `Captures : ${totalCaptures}\nPhases : ${totalPhases}\nStades larvaires : ${totalStadesLarve}\n\nLa règle est :\nCaptures = Phases = Stades larvaires`
+        );
+        return;
+      }
 
-    if (isLarve && !isStadesConsistent) {
-      Alert.alert(
-        'Incohérence des stades larvaires',
-        `Captures : ${totalCaptures}\nPhases : ${totalPhases}\nStades larvaires : ${totalStadesLarve}\n\nLa règle est :\nCaptures = Phases = Stades larvaires`
-      );
-      return;
-    }
-
-    if (!isConsistent) {
-      Alert.alert('Incohérence', `Captures : ${totalCaptures}\nPhases : ${totalPhases}\nStades : ${totalStades}`);
-      return;
+      if (!isConsistent) {
+        Alert.alert('Incohérence', `Captures : ${totalCaptures}\nPhases : ${totalPhases}\nStades : ${totalStades}`);
+        return;
+      }
     }
 
     setIsSaving(true);
@@ -296,7 +316,9 @@ export default function CapturesScreen() {
     try {
       const rows: any[] = [];
 
-      if (isImago) {
+      if (totalCaptures === 0) {
+        // Rien à répartir : la grille est enregistrée comme complétée sans capture.
+      } else if (isImago) {
         // Récupérer les phases avec leurs effectifs
         const phasesWithCounts = phasesList
           .map(phase => ({ phase, count: Number(phasesData[phase]) || 0 }))
@@ -408,13 +430,17 @@ export default function CapturesScreen() {
         }
       }
 
-      if (rows.length === 0) {
+      if (totalCaptures > 0 && rows.length === 0) {
+        // Garde-fou : ne devrait plus se produire (déjà couvert par les contrôles
+        // "Aucune phase n'a été renseignée" ci-dessus), conservé par sécurité.
         Alert.alert('Aucune capture', 'Veuillez saisir au moins une capture avant de continuer.');
         setIsSaving(false);
         return;
       }
 
-      await saveProspectionCaptures(draftId, grille.espece, grille.categorie, rows);
+      if (rows.length > 0) {
+        await saveProspectionCaptures(draftId, grille.espece, grille.categorie, rows);
+      }
       await markGrilleCompleted(draftId, grilleKeyToString(grille));
       store.markCurrentGrilleCompleted();
       await refreshCaptures();
@@ -425,10 +451,9 @@ export default function CapturesScreen() {
           params: { draftId },
         });
       } else {
-        const nextGrille = grilleOrder[currentGrilleIndex + 1];
-        const nextScreen = nextGrille.categorie === 'imago' ? 'density' : 'captures';
+        // Chaque grille (imago ou larve) passe par l'étape "densités" dédiée avant ses captures.
         router.push({
-          pathname: `/(prospection)/${nextScreen}` as any,
+          pathname: '/(prospection)/density' as any,
           params: { draftId, grilleIndex: String(currentGrilleIndex + 1) },
         });
       }
@@ -857,11 +882,16 @@ export default function CapturesScreen() {
             {renderSummary()}
             {renderValidationMessage()}
           </ScrollView>
-          <View style={styles.footer}>
+          <View
+            style={[
+              styles.footer,
+              { paddingBottom: Math.max(insets.bottom, 12) + 8 },
+            ]}
+          >
             <TouchableOpacity
-              style={[styles.continueButton, (!isConsistent || totalCaptures === 0) && styles.continueButtonDisabled]}
+              style={[styles.continueButton, !isConsistent && styles.continueButtonDisabled]}
               onPress={handleContinue}
-              disabled={isSaving || !isConsistent || totalCaptures === 0}
+              disabled={isSaving || !isConsistent}
               activeOpacity={0.85}>
               <Text style={styles.continueButtonText}>
                 {isLastGrille ? 'Infestation  ›' : 'Grille suivante  ›'}

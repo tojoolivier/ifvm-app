@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,6 +12,7 @@ import {
   StrateKey,
   TEXTURE_OPTIONS,
   defaultStrateDetail,
+  parseVegetationSol,
 } from '@/lib/prospection-fiche-lecture';
 import { updateProspectionVegetation } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
@@ -36,6 +37,30 @@ function clampTo5(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, roundTo5(value)));
 }
 
+// Champs de saisie décimale libre de la strate (Surf. rel. %, H. moy, % Verdissement,
+// % Repousse, Sol nu %) : contrairement au Recouvrement (stepper dédié par pas de 5),
+// on conserve la valeur réellement saisie — seule la borne [min, max] est appliquée
+// pour les champs qui sont des pourcentages (H. moy n'en a aucune).
+function clampPercent(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+// Saisie francophone : la virgule est le séparateur décimal attendu par l'utilisateur,
+// mais JS/JSON n'utilisent que le point en interne — conversion aux deux frontières
+// (affichage → virgule, parsing → point), la valeur stockée reste un `number` standard.
+function parseDecimalInput(raw: string): number | null {
+  if (raw === '') return null;
+  const val = Number(raw.replace(',', '.'));
+  return isNaN(val) ? null : val;
+}
+
+function formatDecimalDisplay(value: number | null): string {
+  return value != null ? String(value).replace('.', ',') : '';
+}
+
+/** Les cinq champs décimaux libres d'une strate — tous `number | null` dans StrateFormValues. */
+type DecimalFieldKey = 'surfRel' | 'hMoy' | 'verdissement' | 'repousse' | 'solNu';
+
 function emptyStrateForm(): StrateFormValues {
   return defaultStrateDetail();
 }
@@ -43,9 +68,27 @@ function emptyStrateForm(): StrateFormValues {
 export default function VegetationScreen() {
   const router = useRouter();
   const { draftId } = useLocalSearchParams<{ draftId: string }>();
+  const draft = useProspectionWizardStore((s) => s.draft);
+  const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
   const setDraft = useProspectionWizardStore((s) => s.setDraft);
   const { run, isRunning: isSaving } = useAsyncAction();
+
+  // Filet de sécurité si cet écran est atteint sans passer par reference.tsx (deep-link,
+  // app relancée en plein milieu du parcours) : le store peut ne pas encore porter cette
+  // fiche — cf. même garde sur reference.tsx / captures.tsx.
+  useEffect(() => {
+    if (draftId && draft?.id !== draftId) {
+      hydrateFromDraft(draftId);
+    }
+  }, [draftId, draft?.id, hydrateFromDraft]);
   const [expandedStrate, setExpandedStrate] = useState<StrateKey | null>(null);
+  // Texte brut en cours de saisie pour les 5 champs décimaux libres de chaque strate
+  // (Surf. rel. %, H. moy, % Verdissement, % Repousse, Sol nu %) — permet de taper un
+  // séparateur décimal ou un zéro de fin ("25,", "25,10") sans que le champ ne se
+  // reformate à chaque frappe (cf. `strate.xxx != null ? String(strate.xxx) : ''` sinon).
+  const [decimalDrafts, setDecimalDrafts] = useState<
+    Partial<Record<StrateKey, Partial<Record<DecimalFieldKey, string>>>>
+  >({});
   const scrollRef = useRef<ScrollView>(null);
   const [strates, setStrates] = useState<Record<StrateKey, StrateFormValues>>(() =>
     STRATE_KEYS.reduce((acc, key) => {
@@ -97,13 +140,31 @@ export default function VegetationScreen() {
     },
   });
 
+  // Restaure les strates, l'humidité et la (les) texture(s) déjà enregistrées pour cette
+  // fiche — sans ça, cet écran repartait systématiquement de zéro à chaque remontage
+  // (retour arrière, reprise d'un brouillon...), et "Continuer" écrasait alors les
+  // données existantes par des valeurs vides. Ne s'exécute qu'une fois par fiche chargée
+  // (`vegHydratedRef`) pour ne pas effacer une saisie en cours si `draft` est republié
+  // entre-temps par un autre écran (cf. `setDraft` après chaque sauvegarde).
+  const vegHydratedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!draft || draft.id !== draftId || vegHydratedRef.current === draft.id) return;
+    vegHydratedRef.current = draft.id;
+    const parsed = parseVegetationSol(draft.vegetation, draft.sol, draft.degats_cultures);
+    setStrates(parsed.strates);
+    setSelectedTextures(parsed.texture);
+    form.setFieldValue('humidite', parsed.humidite);
+  }, [draft, draftId, form]);
+
   const setStrateField = <K extends keyof StrateFormValues>(key: StrateKey, field: K, value: StrateFormValues[K]) => {
-    // Arrondir les pourcentages à 5
+    // Recouvrement reste par pas de 5 (stepper dédié, cf. handleRecouvrementChange). Les
+    // quatre autres pourcentages (surfRel, verdissement, repousse, solNu) sont des saisies
+    // libres décimales, seulement bornées à [0, 100] — H. moy n'a aucune contrainte connue.
     let processedValue = value;
-    if (typeof value === 'number' && ['recouvrement', 'surfRel', 'verdissement', 'repousse', 'solNu'].includes(field)) {
-      const min = field === 'recouvrement' ? 0 : 0;
-      const max = field === 'recouvrement' ? 100 : 100;
-      processedValue = clampTo5(value, min, max) as StrateFormValues[K];
+    if (typeof value === 'number' && field === 'recouvrement') {
+      processedValue = clampTo5(value, 0, 100) as StrateFormValues[K];
+    } else if (typeof value === 'number' && ['surfRel', 'verdissement', 'repousse', 'solNu'].includes(field as string)) {
+      processedValue = clampPercent(value, 0, 100) as StrateFormValues[K];
     }
     setStrates((current) => ({ ...current, [key]: { ...current[key], [field]: processedValue } }));
   };
@@ -112,6 +173,56 @@ export default function VegetationScreen() {
     const current = strates[key].orpad;
     const next = current.includes(stage) ? current.filter((s) => s !== stage) : [...current, stage];
     setStrateField(key, 'orpad', next);
+  };
+
+  // ==========================================
+  // SAISIE DÉCIMALE LIBRE : Surf. rel. %, H. moy, % Verdissement, % Repousse, Sol nu %
+  // ==========================================
+
+  const getDecimalDraft = (key: StrateKey, field: DecimalFieldKey): string | undefined => decimalDrafts[key]?.[field];
+
+  const setDecimalDraft = (key: StrateKey, field: DecimalFieldKey, text: string) => {
+    setDecimalDrafts((current) => ({ ...current, [key]: { ...current[key], [field]: text } }));
+  };
+
+  const clearDecimalDraft = (key: StrateKey, field: DecimalFieldKey) => {
+    setDecimalDrafts((current) => {
+      if (current[key]?.[field] === undefined) return current;
+      const nextStrate = { ...current[key] };
+      delete nextStrate[field];
+      return { ...current, [key]: nextStrate };
+    });
+  };
+
+  const clearDecimalDraftsForStrate = (key: StrateKey) => {
+    setDecimalDrafts((current) => {
+      if (!(key in current)) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  };
+
+  // Accepte "," et ".", tolère la saisie intermédiaire ("25," / "25.") sans la figer tant
+  // qu'elle n'est pas exploitable, et applique la borne [min, max] une fois convertie —
+  // sans borne (H. moy), la valeur décimale saisie est conservée telle quelle.
+  const handleDecimalChange = (key: StrateKey, field: DecimalFieldKey, raw: string, bounds?: { min: number; max: number }) => {
+    if (raw !== '' && !/^\d*[.,]?\d*$/.test(raw)) return;
+    setDecimalDraft(key, field, raw);
+    if (raw === '') {
+      setStrateField(key, field, null);
+      return;
+    }
+    if (raw.endsWith('.') || raw.endsWith(',')) return;
+    const val = parseDecimalInput(raw);
+    if (val === null) return;
+    setStrateField(key, field, bounds ? clampPercent(val, bounds.min, bounds.max) : val);
+  };
+
+  const handleDecimalBlur = (key: StrateKey, field: DecimalFieldKey) => {
+    // Resynchronise l'affichage sur la valeur numérique canonique (bornée si applicable,
+    // décimales conservées, virgule) une fois la saisie terminée.
+    clearDecimalDraft(key, field);
   };
 
   // ==========================================
@@ -147,7 +258,17 @@ export default function VegetationScreen() {
               const expanded = key === expandedStrate;
               return (
                 <View key={key} style={[styles.strateCard, expanded && styles.strateCardExpanded]}>
-                  <TouchableOpacity onPress={() => setExpandedStrate(expanded ? null : key)} activeOpacity={0.7}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setExpandedStrate(expanded ? null : key);
+                      if (expanded) {
+                        // Repli de la strate : on abandonne un éventuel texte intermédiaire
+                        // ("25,") pour resynchroniser l'affichage sur la valeur numérique.
+                        clearDecimalDraftsForStrate(key);
+                      }
+                    }}
+                    activeOpacity={0.7}
+                  >
                     <View style={styles.strateHeaderRow}>
                       <Text style={[styles.strateLabel, expanded && styles.strateLabelExpanded]}>
                         {STRATE_LABELS[key]}
@@ -166,25 +287,19 @@ export default function VegetationScreen() {
                         <View style={styles.field}>
                           <Text style={styles.fieldLabel}>Surf. rel. %</Text>
                           <TextInput
-                            value={strate.surfRel != null ? String(strate.surfRel) : ''}
-                            onChangeText={(v) => {
-                              const val = v === '' ? null : Number(v);
-                              if (val !== null && !isNaN(val)) {
-                                setStrateField(key, 'surfRel', clampTo5(val, 0, 100));
-                              } else {
-                                setStrateField(key, 'surfRel', null);
-                              }
-                            }}
+                            value={getDecimalDraft(key, 'surfRel') ?? formatDecimalDisplay(strate.surfRel)}
+                            onChangeText={(v) => handleDecimalChange(key, 'surfRel', v, { min: 0, max: 100 })}
+                            onBlur={() => handleDecimalBlur(key, 'surfRel')}
                             keyboardType="decimal-pad"
                             style={styles.fieldInput}
                           />
-                          <Text style={styles.stepHint}>par pas de 5%</Text>
                         </View>
                         <View style={styles.field}>
                           <Text style={styles.fieldLabel}>H. moy (m)</Text>
                           <TextInput
-                            value={strate.hMoy != null ? String(strate.hMoy) : ''}
-                            onChangeText={(v) => setStrateField(key, 'hMoy', v === '' ? null : Number(v))}
+                            value={getDecimalDraft(key, 'hMoy') ?? formatDecimalDisplay(strate.hMoy)}
+                            onChangeText={(v) => handleDecimalChange(key, 'hMoy', v)}
+                            onBlur={() => handleDecimalBlur(key, 'hMoy')}
                             keyboardType="decimal-pad"
                             style={styles.fieldInput}
                           />
@@ -218,36 +333,22 @@ export default function VegetationScreen() {
                         <View style={styles.field}>
                           <Text style={styles.fieldLabel}>% Verdissement</Text>
                           <TextInput
-                            value={strate.verdissement != null ? String(strate.verdissement) : ''}
-                            onChangeText={(v) => {
-                              const val = v === '' ? null : Number(v);
-                              if (val !== null && !isNaN(val)) {
-                                setStrateField(key, 'verdissement', clampTo5(val, 0, 100));
-                              } else {
-                                setStrateField(key, 'verdissement', null);
-                              }
-                            }}
+                            value={getDecimalDraft(key, 'verdissement') ?? formatDecimalDisplay(strate.verdissement)}
+                            onChangeText={(v) => handleDecimalChange(key, 'verdissement', v, { min: 0, max: 100 })}
+                            onBlur={() => handleDecimalBlur(key, 'verdissement')}
                             keyboardType="decimal-pad"
                             style={styles.fieldInput}
                           />
-                          <Text style={styles.stepHint}>par pas de 5%</Text>
                         </View>
                         <View style={styles.field}>
                           <Text style={styles.fieldLabel}>% Repousse</Text>
                           <TextInput
-                            value={strate.repousse != null ? String(strate.repousse) : ''}
-                            onChangeText={(v) => {
-                              const val = v === '' ? null : Number(v);
-                              if (val !== null && !isNaN(val)) {
-                                setStrateField(key, 'repousse', clampTo5(val, 0, 100));
-                              } else {
-                                setStrateField(key, 'repousse', null);
-                              }
-                            }}
+                            value={getDecimalDraft(key, 'repousse') ?? formatDecimalDisplay(strate.repousse)}
+                            onChangeText={(v) => handleDecimalChange(key, 'repousse', v, { min: 0, max: 100 })}
+                            onBlur={() => handleDecimalBlur(key, 'repousse')}
                             keyboardType="decimal-pad"
                             style={styles.fieldInput}
                           />
-                          <Text style={styles.stepHint}>par pas de 5%</Text>
                         </View>
                       </View>
 
@@ -270,19 +371,12 @@ export default function VegetationScreen() {
 
                       <Text style={styles.fieldLabel}>Sol nu %</Text>
                       <TextInput
-                        value={strate.solNu != null ? String(strate.solNu) : ''}
-                        onChangeText={(v) => {
-                          const val = v === '' ? null : Number(v);
-                          if (val !== null && !isNaN(val)) {
-                            setStrateField(key, 'solNu', clampTo5(val, 0, 100));
-                          } else {
-                            setStrateField(key, 'solNu', null);
-                          }
-                        }}
+                        value={getDecimalDraft(key, 'solNu') ?? formatDecimalDisplay(strate.solNu)}
+                        onChangeText={(v) => handleDecimalChange(key, 'solNu', v, { min: 0, max: 100 })}
+                        onBlur={() => handleDecimalBlur(key, 'solNu')}
                         keyboardType="decimal-pad"
                         style={styles.fieldInput}
                       />
-                      <Text style={styles.stepHint}>par pas de 5%</Text>
                     </View>
                   )}
                 </View>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { accouplementOptionsFor } from '@/lib/prospection-especes-stades';
 import { accouplementInsight } from '@/lib/prospection-accouplement-insight';
@@ -35,6 +35,7 @@ function emptyPopulation(espece: 'LMC' | 'NSE'): PopulationRow {
 
 export default function AccouplementScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { draftId, grilleIndex } = useLocalSearchParams<{ draftId: string; grilleIndex: string }>();
   const store = useProspectionCaptureStore();
   const requestedIndex = Number(grilleIndex ?? '0');
@@ -69,7 +70,7 @@ export default function AccouplementScreen() {
   const accouplementOpts = accouplementOptionsFor(grille.espece);
   const insight = accouplementInsight(population.ponte, dominant);
 
-  const setField = (field: 'accouplement' | 'ponte', value: string) => {
+  const setField = (field: 'accouplement' | 'ponte', value: string | null) => {
     setPopulation((current) => (current ? { ...current, [field]: value } : current));
   };
 
@@ -122,7 +123,7 @@ export default function AccouplementScreen() {
                 return (
                   <TouchableOpacity
                     key={option}
-                    onPress={() => setField('accouplement', option)}
+                    onPress={() => setField('accouplement', active ? null : option)}
                     style={[styles.chip, active && styles.chipActive]}
                     activeOpacity={0.8}
                   >
@@ -139,7 +140,7 @@ export default function AccouplementScreen() {
                 return (
                   <TouchableOpacity
                     key={option}
-                    onPress={() => setField('ponte', option)}
+                    onPress={() => setField('ponte', active ? null : option)}
                     style={[styles.chip, active && styles.chipActive]}
                     activeOpacity={0.8}
                   >
@@ -156,7 +157,7 @@ export default function AccouplementScreen() {
             )}
           </ScrollView>
 
-          <View style={styles.footer}>
+          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
             <TouchableOpacity style={styles.continueButton} onPress={handleContinue} disabled={isSaving} activeOpacity={0.85}>
               <Text style={styles.continueButtonText}>Captures  ›</Text>
             </TouchableOpacity>
