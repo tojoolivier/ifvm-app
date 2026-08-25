@@ -1,30 +1,18 @@
 import * as Network from 'expo-network';
 import type { components } from './api-schema.generated';
-import { apiClient } from './api-client';
+import { apiClient, conflitSync } from './api-client';
+import { NetworkError } from './errors';
 import {
   DraftTraitement,
   markTraitementConflict,
+  markTraitementEchec,
   markTraitementSynced,
   ServerTraitement,
 } from './traitement-repository';
 import { logger } from './logger';
+import { syncAll, type LotSync, type ResumeSync } from './sync-lot';
 
 const log = logger.child({ module: 'traitement-sync' });
-
-export interface TraitementSyncResult {
-  synced: boolean;
-  conflict?: boolean;
-  serverVersion?: ServerTraitement;
-  /**
-   * Motif de l'échec, quand il y en a un.
-   *
-   * `{ synced: false }` seul était indiscernable de « pas encore tenté » : le
-   * `catch` d'origine avalait l'erreur et l'écran affichait le même « Fiche
-   * enregistrée » qu'en cas de succès. `prospection-review` faisait déjà bien
-   * (ADR-012 décision 1, issue #173).
-   */
-  syncError?: string;
-}
 
 function parseJsonField<T>(value: string | null | undefined): T | null {
   if (!value) return null;
@@ -174,54 +162,83 @@ async function pushRotationsEtProduits(draft: DraftTraitement, token: string): P
   }
 }
 
-async function pushTraitement(
-  draft: DraftTraitement,
-  token: string
-): Promise<TraitementSyncResult> {
+/**
+ * L'unitaire — ADR-012 décision 9. **Il lève**, et c'est tout ce qu'il fait
+ * savoir : une fiche a une seule issue.
+ *
+ * Le 409 ne s'aplatit plus en `new Error('Conflit de synchronisation')` : la
+ * version serveur, déjà payée d'un aller-retour réseau, voyage jointe à
+ * l'erreur (`conflitSync`) jusqu'au résumé, où le lot décide de la persister.
+ * C'est `syncAll` qui écrit `statut_sync`, pas cette fonction — l'unitaire ne
+ * connaît pas le sort réservé à la fiche.
+ */
+export async function syncOneTraitement(draft: DraftTraitement, token: string): Promise<void> {
   const payload = buildTraitementSyncPayload(draft);
   const { status, body } = await apiClient.syncTraitement(token, payload);
 
   if (status === 409) {
-    await markTraitementConflict(draft.id, body as ServerTraitement);
-    return { synced: false, conflict: true, serverVersion: body as ServerTraitement };
+    throw conflitSync(
+      'La fiche a été modifiée ou validée sur le serveur.',
+      body as ServerTraitement
+    );
   }
 
   await pushRotationsEtProduits(draft, token);
-
-  const serverVersion = body as ServerTraitement;
-  await markTraitementSynced(draft.id, serverVersion?.updated_at);
-  return { synced: true, serverVersion };
+  await markTraitementSynced(draft.id, (body as ServerTraitement)?.updated_at);
 }
 
+/** Ce que le domaine « traitement » fournit pour être synchronisé en lot. */
+export const lotTraitement: LotSync<DraftTraitement> = {
+  nom: 'traitement',
+  syncOne: syncOneTraitement,
+  idDe: (draft) => draft.id,
+  labelDe: (draft) => draft.numero_fiche ?? `Fiche du ${draft.date_traitement ?? '—'}`,
+  marquerEchec: markTraitementEchec,
+  marquerConflit: async (id, serverVersion) => {
+    await markTraitementConflict(id, serverVersion as ServerTraitement);
+  },
+};
+
+/**
+ * Hors ligne, l'envoi n'est pas tenté — mais il ne réussit pas non plus.
+ *
+ * Le `return { synced: false }` d'origine était indiscernable d'un succès pour
+ * qui ne lisait pas le champ ; une `NetworkError` levée traverse la même
+ * classification que n'importe quelle coupure et laisse la fiche en file.
+ */
+async function exigerConnexion(): Promise<void> {
+  const network = await Network.getNetworkStateAsync();
+  if (!(network.isConnected && network.isInternetReachable)) {
+    throw new NetworkError(
+      'Appareil hors ligne — la fiche partira à la prochaine synchronisation.'
+    );
+  }
+}
+
+/**
+ * Enregistre localement puis tente l'envoi, et **résume**.
+ *
+ * Le `{ synced, syncError }` d'avant était le Data Clump que #173 avait
+ * délibérément laissé en place : l'extraire avant de connaître la forme du
+ * résumé aurait été le concevoir par le mauvais bout (#190).
+ */
 export async function enregistrerEtSynchroniserTraitement(
   draft: DraftTraitement,
   token: string
-): Promise<TraitementSyncResult> {
-  const network = await Network.getNetworkStateAsync();
-  const isOnline = Boolean(network.isConnected && network.isInternetReachable);
-  if (!isOnline) return { synced: false };
-
-  try {
-    return await pushTraitement(draft, token);
-  } catch (error) {
-    // La fiche reste enregistrée localement ; seul l'envoi a échoué. Le motif
-    // remonte à l'appelant au lieu d'être avalé — c'est ce qui distingue
-    // « pas encore synchronisée » de « synchronisation refusée » (même motif
-    // que prospection-review.ts:enregistrerEtSynchroniser).
-    log.failure('traitement.sync.failed', error, { traitementId: draft.id });
-    const syncError =
-      error instanceof Error ? error.message : 'Erreur de synchronisation inconnue';
-
-    return { synced: false, syncError };
-  }
+): Promise<ResumeSync> {
+  return syncAll([draft], token, {
+    ...lotTraitement,
+    syncOne: async (fiche, jeton) => {
+      await exigerConnexion();
+      await syncOneTraitement(fiche, jeton);
+    },
+  });
 }
 
-export async function retrySyncTraitement(draft: DraftTraitement, token: string): Promise<void> {
-  const result = await pushTraitement(draft, token);
-
-  if (result.conflict) {
-    throw new Error(
-      'Conflit de synchronisation : la fiche a été modifiée ou validée sur le serveur.'
-    );
-  }
+/** Synchronise un lot de traitements en attente. Ne lève jamais. */
+export async function syncAllTraitements(
+  drafts: DraftTraitement[],
+  token: string
+): Promise<ResumeSync> {
+  return syncAll(drafts, token, lotTraitement);
 }

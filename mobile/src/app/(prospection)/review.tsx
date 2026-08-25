@@ -55,12 +55,16 @@ export default function ReviewScreen() {
   const handleSave = () =>
     run(
       async () => {
-        const result = await enregistrerEtSynchroniser(draft, captures, token!);
+        const resume = await enregistrerEtSynchroniser(draft, captures, token!);
         resetWizard();
         resetCaptureLoop();
+        // La fiche est enregistrée localement dans tous les cas ; seul l'envoi
+        // peut avoir échoué. `resume.echouees[0].message` est déjà traduit par
+        // classe (#172) — le message brut ne sort plus d'ici.
+        const echec = resume.echouees[0];
         router.replace({
           pathname: '/(app)/prospection' as any,
-          params: result.syncError ? { syncWarning: result.syncError } : { justSaved: '1' },
+          params: echec ? { syncWarning: echec.message } : { justSaved: '1' },
         });
       },
       {

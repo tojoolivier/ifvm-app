@@ -916,6 +916,22 @@ export async function markTraitementConflict(
   return updated;
 }
 
+/**
+ * Sort la fiche de la file d'attente — ADR-012 décision 9, issue #177.
+ *
+ * Pendant de {@link markProspectionEchec} côté traitement : même règle, même
+ * motif journalisé plutôt que stocké en colonne.
+ */
+export async function markTraitementEchec(id: string): Promise<void> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    `UPDATE traitement SET statut_sync = 'echec', updated_at = ? WHERE id = ?`,
+    [now, id]
+  );
+}
+
 export async function countUnsyncedTraitements(): Promise<number> {
   const db = await getDb();
 

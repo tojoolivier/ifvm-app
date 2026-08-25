@@ -12,6 +12,7 @@ import {
   InfestationRow,
   PopulationRow,
   completeProspection,
+  markProspectionEchec,
   markProspectionSynced,
   listAllProspectionCaptures,
   listAllProspectionPopulations,
@@ -23,8 +24,9 @@ import { CHRONO_MAX_SECONDS, capturesMaxFor, phenotypesFor } from './prospection
 import { buildGrilles, parseEspeceSelection } from './prospection-especes';
 import { getDb } from './prospection-db';
 import { pullReferentiel } from './referentiel-sync';
-import { assertPresent, ReferentialError } from './errors';
+import { assertPresent, NetworkError, ReferentialError } from './errors';
 import { logger } from './logger';
+import { syncAll, type LotSync, type ResumeSync } from './sync-lot';
 
 const log = logger.child({ module: 'prospection-review' });
 
@@ -343,43 +345,40 @@ function buildInfestationsPayload(rows: InfestationRow[]): ProspectionInfestatio
   }));
 }
 
-export async function enregistrerEtSynchroniser(
-  draft: DraftProspection,
-  captures: CaptureRow[],
-  token: string
-): Promise<{ synced: boolean; syncError?: string }> {
-  const completed = await completeProspection(draft.id);
-
+/**
+ * Refuse l'envoi hors ligne — en **levant**, pas en rendant un faux calme.
+ *
+ * `return { synced: false }` était indiscernable d'un succès pour qui ne lisait
+ * pas le champ. Une `NetworkError` traverse la même classification que
+ * n'importe quelle coupure et laisse la fiche dans la file.
+ */
+async function exigerConnexion(): Promise<void> {
   const network = await Network.getNetworkStateAsync();
-  const isOnline = Boolean(network.isConnected && network.isInternetReachable);
-  if (!isOnline) return { synced: false };
-
-  try {
-    const [populations, infestations] = await Promise.all([
-      listAllProspectionPopulations(completed.id),
-      listAllProspectionInfestations(completed.id),
-    ]);
-    await apiClient.createProspection(token, {
-      ...(await buildProspectionPayload(completed, token)),
-      captures: buildCapturesPayload(captures),
-      populations: buildPopulationsPayload(populations),
-      infestations: buildInfestationsPayload(infestations),
-    });
-    await markProspectionSynced(completed.id);
-    return { synced: true };
-  } catch (error) {
-    // ADR-008 : la fiche reste enregistrée localement (completeProspection ci-dessus a
-    // déjà réussi), mais l'échec de synchronisation ne doit jamais rester invisible —
-    // il est remonté à l'appelant plutôt qu'avalé (cf. #98 : symptôme "blocage silencieux").
-    log.failure('prospection.sync.failed', error, { prospectionId: completed.id });
-    const syncError = error instanceof Error ? error.message : 'Erreur de synchronisation inconnue';
-    return { synced: false, syncError };
+  if (!(network.isConnected && network.isInternetReachable)) {
+    throw new NetworkError(
+      'Appareil hors ligne — la fiche partira à la prochaine synchronisation.'
+    );
   }
 }
 
-export async function retrySyncProspection(draft: DraftProspection, token: string): Promise<void> {
+/**
+ * L'unitaire — ADR-012 décision 9. **Il lève.**
+ *
+ * Ex-`retrySyncProspection` : le nom disait « réessai » alors que c'était le
+ * seul envoi unitaire du domaine, et les deux autres conventions du mobile
+ * s'appuyaient sur cette confusion.
+ *
+ * `captures` vient de l'écran lors du premier envoi — la boucle de capture les
+ * tient en mémoire — et de la base lors des suivants. C'est la seule différence
+ * entre les deux chemins, d'où le paramètre plutôt qu'une seconde fonction.
+ */
+export async function syncOneProspection(
+  draft: DraftProspection,
+  token: string,
+  capturesDeLEcran?: CaptureRow[]
+): Promise<void> {
   const [captures, populations, infestations] = await Promise.all([
-    listAllProspectionCaptures(draft.id),
+    capturesDeLEcran ? Promise.resolve(capturesDeLEcran) : listAllProspectionCaptures(draft.id),
     listAllProspectionPopulations(draft.id),
     listAllProspectionInfestations(draft.id),
   ]);
@@ -401,4 +400,49 @@ export async function retrySyncProspection(draft: DraftProspection, token: strin
     prospectionId: draft.id,
     stationId: payload.station_id,
   });
+}
+
+/**
+ * Ce que le domaine « prospection » fournit pour être synchronisé en lot.
+ *
+ * `marquerConflit` est **absent** : `POST /prospections` ne rend pas de 409.
+ * Le déclarer vide inventerait une gestion de conflit qui n'existe pas ; son
+ * absence fait compter un 409 imprévu comme un échec visible (`sync-lot`).
+ */
+export const lotProspection: LotSync<DraftProspection> = {
+  nom: 'prospection',
+  syncOne: syncOneProspection,
+  idDe: (draft) => draft.id,
+  labelDe: (draft) => draft.n_fiche ?? `Fiche du ${draft.date_prospection}`,
+  marquerEchec: markProspectionEchec,
+};
+
+/**
+ * Clôt la fiche localement, puis tente l'envoi et **résume**.
+ *
+ * `completeProspection` est hors du lot à dessein : la clôture locale doit
+ * réussir ou lever, elle n'a rien d'un résultat partiel (ADR-008).
+ */
+export async function enregistrerEtSynchroniser(
+  draft: DraftProspection,
+  captures: CaptureRow[],
+  token: string
+): Promise<ResumeSync> {
+  const completed = await completeProspection(draft.id);
+
+  return syncAll([completed], token, {
+    ...lotProspection,
+    syncOne: async (fiche, jeton) => {
+      await exigerConnexion();
+      await syncOneProspection(fiche, jeton, captures);
+    },
+  });
+}
+
+/** Synchronise un lot de prospections en attente. Ne lève jamais. */
+export async function syncAllProspections(
+  drafts: DraftProspection[],
+  token: string
+): Promise<ResumeSync> {
+  return syncAll(drafts, token, lotProspection);
 }

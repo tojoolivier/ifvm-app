@@ -37,6 +37,37 @@ export function statutHttpDe(error: unknown): number | null {
 }
 
 /**
+ * Le conflit (409) voyage comme **donnée jointe**, exactement pour la raison qui
+ * a fait disparaître `ApiError` : une `class ConflitError extends AppError`
+ * serait la huitième classe du jeu fermé, et rouvrirait ce que la décision 2
+ * vient de fermer.
+ *
+ * La version serveur est jointe pour la même raison que le statut : jusqu'ici
+ * `retrySyncTraitement` la récupérait par le réseau, puis l'aplatissait en
+ * `new Error('Conflit de synchronisation')` — la donnée était payée puis jetée
+ * (ADR-012 décision 9, issue #177).
+ */
+export interface AvecVersionServeur {
+  serverVersion: unknown;
+}
+
+/** Version serveur portée par une erreur de conflit, ou `null`. */
+export function versionServeurDe(error: unknown): unknown | null {
+  const version = (error as Partial<AvecVersionServeur> | null | undefined)?.serverVersion;
+  return version ?? null;
+}
+
+/**
+ * Fabrique l'erreur de conflit : une `NetworkError` de statut 409 qui **porte**
+ * la version serveur au lieu de la perdre.
+ */
+export function conflitSync(message: string, serverVersion: unknown): NetworkError {
+  const erreur = erreurHttp(409, message) as NetworkError;
+  (erreur as unknown as AvecVersionServeur).serverVersion = serverVersion;
+  return erreur;
+}
+
+/**
  * Fabrique l'erreur typée qui correspond à un statut HTTP.
  *
  * Un seul endroit décide `AuthError` vs `NetworkError` : la règle est ainsi
