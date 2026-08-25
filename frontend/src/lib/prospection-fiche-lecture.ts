@@ -36,11 +36,14 @@ export const PHENOTYPES: { value: string; label: string }[] = [
   { value: 'gregaire', label: 'Grégaires' },
 ]
 
+// "essaim" a disparu (migration backend 0029) : Dense et Très dense sont désormais des
+// types de cible à part entière, au même niveau que Vol clair.
 export const TYPE_CIBLE_OPTIONS: { value: string; label: string }[] = [
   { value: 'tache_larvaire', label: 'Tache larvaire' },
   { value: 'bande_larvaire', label: 'Bande larvaire' },
   { value: 'vol_clair', label: 'Vol clair' },
-  { value: 'essaim', label: 'Essaim' },
+  { value: 'dense', label: 'Dense' },
+  { value: 'tres_dense', label: 'Très dense' },
 ]
 
 /** Une fiche n'est imprimable/exportable (#19) que si elle a atteint le statut final Validé. */
@@ -172,9 +175,15 @@ export function buildVegetationSummary(
 
   const parts: string[] = [`Strates (${total}%) : ${strateParts || '—'}`]
   const humidite = sol?.humidite as string | undefined
-  const texture = sol?.texture as string | undefined
+  // Sélection multiple côté mobile (veg.tsx) : `sol.texture` est un tableau. Un ancien
+  // brouillon enregistré avant l'ajout du multi-select peut encore porter une simple
+  // string — les deux formats sont acceptés pour ne pas faire disparaître la texture.
+  const textureRaw = sol?.texture as string | string[] | undefined
+  const textures = Array.isArray(textureRaw) ? textureRaw : textureRaw ? [textureRaw] : []
   if (humidite) parts.push(`Humidité ${HUMIDITE_LABELS[humidite] ?? humidite}`)
-  if (texture) parts.push(`Texture ${TEXTURE_LABELS[texture] ?? texture}`)
+  if (textures.length > 0) {
+    parts.push(`Texture ${textures.map((t) => TEXTURE_LABELS[t] ?? t).join(', ')}`)
+  }
   if (degatsCultures) parts.push(`Dégâts culture ${DEGATS_LABELS[degatsCultures] ?? degatsCultures}`)
   return parts.join(' · ')
 }

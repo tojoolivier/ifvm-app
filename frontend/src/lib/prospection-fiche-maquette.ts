@@ -156,7 +156,9 @@ export function buildReferenceRows(
 // Bloc D — Infestation
 // ---------------------------------------------------------------------------
 
-const CIBLES_IMAGO = ['vol_clair', 'essaim']
+// "essaim" a disparu (migration backend 0029) : Dense et Très dense sont désormais des
+// types de cible à part entière, au même niveau que Vol clair.
+const CIBLES_IMAGO = ['vol_clair', 'dense', 'tres_dense']
 const CIBLES_LARVE = ['tache_larvaire', 'bande_larvaire']
 
 export function buildInfestationRows(
@@ -177,7 +179,9 @@ export function buildInfestationRows(
     ),
     ligne('Répartition', repartition),
     ligne('Vols clairs', String(compte('vol_clair'))),
-    ligne('Essaims', String(compte('essaim'))),
+    // "Essaims" regroupe les deux niveaux de densité (Dense + Très dense) : la maquette
+    // imprimée garde une seule ligne, comme avant la bascule du type de cible "essaim".
+    ligne('Essaims', String(compte('dense') + compte('tres_dense'))),
     // Dernière ligne de la maquette : « Niveau d'alerte », qu'aucune colonne
     // backend ne fournit — remplacée par la surface prospectée, de même nature.
     ligne(

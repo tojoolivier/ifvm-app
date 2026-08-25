@@ -602,7 +602,14 @@ export function ProspectionDetailPage() {
             />
             <Tuile
               label="Type de sol"
-              value={humaniser(prospection.sol?.texture as string | undefined)}
+              value={
+                // Sélection multiple (cf. mobile veg.tsx) : `sol.texture` est un tableau ;
+                // une ancienne fiche enregistrée avant le multi-select peut encore porter
+                // une simple string — les deux formats sont acceptés.
+                Array.isArray(prospection.sol?.texture)
+                  ? prospection.sol.texture.map((t) => humaniser(t as string)).join(', ') || TIRET
+                  : humaniser(prospection.sol?.texture as string | undefined)
+              }
             />
           </div>
         </Carte>
