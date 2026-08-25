@@ -181,13 +181,22 @@ export default function CapturesScreen() {
       // Rejoué même si l'écran « espèces » l'a déjà fait : les compteurs par stade se
       // construisent à partir du vocabulaire, qui n'était pas connu à ce moment-là.
       store.initGrilles(grilles, completed, captures);
+
+      // `initGrilles` se positionne sur la première grille non complétée, d'après le
+      // brouillon en mémoire — lequel est en retard d'une grille au moment où l'on
+      // enchaîne (la complétion vient d'être écrite en base). La route, elle, sait quelle
+      // grille est demandée : c'est elle qui tranche, sinon on revient sans cesse sur la
+      // première.
+      if (requestedIndex >= 0 && requestedIndex < grilles.length) {
+        store.goToGrille(requestedIndex, captures);
+      }
     };
 
     void chargerStades().catch((error) => {
       isInitialized.current = false;
       signalerChargement(error, { draftId });
     });
-  }, [draft, draftId, captures, store, signalerChargement]);
+  }, [draft, draftId, captures, store, requestedIndex, signalerChargement]);
 
   // Effet 3: Navigation vers la grille demandée - une seule fois
   useEffect(() => {
