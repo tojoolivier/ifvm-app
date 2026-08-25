@@ -134,7 +134,15 @@ export function validateComportementDirection(input: ComportementDirectionValida
   const blocages: string[] = [];
   const avertissements: string[] = [];
 
-  if (TYPES_DIRECTION_OBLIGATOIRE.includes(input.typeCible) && !input.directionRenseignee) {
+  // La direction n'a de sens qu'en Déplacement — l'écran la masque (et l'efface) tant
+  // que l'État n'est pas "Déplacement" (règle #4) : l'exiger aussi pour "Repos" rendrait
+  // la fiche impossible à enregistrer via l'interface qui, elle, cache le seul moyen de
+  // la renseigner.
+  if (
+    TYPES_DIRECTION_OBLIGATOIRE.includes(input.typeCible) &&
+    input.comportement !== 'repos' &&
+    !input.directionRenseignee
+  ) {
     blocages.push(
       'Direction de déplacement obligatoire pour ce type de cible (bande, vol clair ou essaim).'
     );

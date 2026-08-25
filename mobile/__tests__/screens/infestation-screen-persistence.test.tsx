@@ -67,6 +67,8 @@ describe('InfestationScreen — persistance des cibles sélectionnées', () => {
   });
 
   it('restaure la cible aérienne enregistrée à la réouverture de la fiche (#201)', async () => {
+    // "essaim" a disparu de type_cible (0031) : Dense/Très dense sont désormais des
+    // cibles à part entière, au même niveau que Vol clair.
     jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValue([
       // « essaim » a été reclassé en Dense / Très dense par la migration 0031.
       { type_cible: 'dense', comportement: 'deplacement', heure_observation: '09:30' } as any,
