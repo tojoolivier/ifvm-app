@@ -116,6 +116,7 @@ async def create_prospection(
             degats_cultures_pourcent=body.degats_cultures_pourcent,
             verdissement_pourcent=body.verdissement_pourcent,
             hauteur_herbe_cm=body.hauteur_herbe_cm,
+            heure_observation_at=body.heure_observation_at,
             # ==========================================
             # NOUVEAUX CHAMPS - Extensif & Validation
             # ==========================================
@@ -208,6 +209,7 @@ async def update_prospection(
             degats_cultures_pourcent=body.degats_cultures_pourcent,
             verdissement_pourcent=body.verdissement_pourcent,
             hauteur_herbe_cm=body.hauteur_herbe_cm,
+            heure_observation_at=body.heure_observation_at,
             # ==========================================
             # NOUVEAUX CHAMPS - Extensif & Validation
             # ==========================================

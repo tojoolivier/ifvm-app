@@ -379,6 +379,9 @@ class ProspectionCreate(BaseModel):
     degats_cultures_pourcent: int | None = Field(None, ge=0, le=100)
     verdissement_pourcent: int | None = Field(None, ge=0, le=100)
     hauteur_herbe_cm: float | None = Field(None, ge=0)
+    # Horodatage GPS complet (écran Observations) — distinct de l'heure_observation
+    # par cible d'infestation (`InfestationCreate.heure_observation`, un HH:mm libre).
+    heure_observation_at: datetime | None = None
 
     # ==========================================
     # NOUVEAUX CHAMPS - Extensif & Validation
@@ -437,6 +440,7 @@ class ProspectionUpdate(BaseModel):
     degats_cultures_pourcent: int | None = Field(None, ge=0, le=100)
     verdissement_pourcent: int | None = Field(None, ge=0, le=100)
     hauteur_herbe_cm: float | None = Field(None, ge=0)
+    heure_observation_at: datetime | None = None
 
     # ==========================================
     # NOUVEAUX CHAMPS - Extensif & Validation
@@ -519,6 +523,7 @@ class ProspectionRead(BaseModel):
     degats_cultures_pourcent: int | None = None
     verdissement_pourcent: int | None = None
     hauteur_herbe_cm: float | None = None
+    heure_observation_at: datetime | None = None
 
     # ==========================================
     # NOUVEAUX CHAMPS - Extensif & Validation

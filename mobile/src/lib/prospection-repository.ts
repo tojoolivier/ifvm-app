@@ -747,6 +747,20 @@ export async function saveProspectionInfestation(prospectionId: string, typeCibl
     [generateId(), prospectionId, ...values]
   );
 }
+
+/**
+ * Retire une cible désélectionnée par l'utilisateur (infestation.tsx) : la section
+ * Infestation est facultative et réversible — sans ça, une ligne déjà enregistrée
+ * survivait en base après désélection et réapparaissait sélectionnée à la réouverture.
+ */
+export async function deleteProspectionInfestation(prospectionId: string, typeCible: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(
+    `DELETE FROM prospection_infestation WHERE prospection_id = ? AND type_cible = ?`,
+    [prospectionId, typeCible]
+  );
+}
+
 export async function completeProspection(id: string): Promise<DraftProspection> {
   const db = await getDb();
   const now = new Date().toISOString();

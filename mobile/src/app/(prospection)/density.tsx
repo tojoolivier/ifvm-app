@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import {
@@ -23,11 +23,12 @@ const BORDER = '#e7e0cd';
 const INACTIVE_BG = '#efeada';
 
 const ESPECE_LABEL = { LMC: 'Locusta', NSE: 'Nomadacris' } as const;
+const CATEGORIE_LABEL = { imago: 'imagos', larve: 'larves' } as const;
 
-function emptyPopulation(espece: 'LMC' | 'NSE'): PopulationRow {
+function emptyPopulation(espece: 'LMC' | 'NSE', categorie: 'imago' | 'larve'): PopulationRow {
   return {
     espece,
-    categorie: 'imago',
+    categorie,
     densite_diffuse: null,
     densite_groupee: null,
     methode: null,
@@ -38,6 +39,7 @@ function emptyPopulation(espece: 'LMC' | 'NSE'): PopulationRow {
 
 export default function DensityScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { draftId, grilleIndex } = useLocalSearchParams<{ draftId: string; grilleIndex: string }>();
   const store = useProspectionCaptureStore();
   const draft = useProspectionWizardStore((s) => s.draft);
@@ -47,6 +49,7 @@ export default function DensityScreen() {
   const grille = store.grilleOrder[requestedIndex];
 
   const [population, setPopulation] = useState<PopulationRow | null>(null);
+  const [showDensiteDiffuseError, setShowDensiteDiffuseError] = useState(false);
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('density');
 
@@ -73,7 +76,8 @@ export default function DensityScreen() {
     if (!draftId || !grille) return;
     getProspectionPopulation(draftId, grille.espece, grille.categorie)
       .then((row) => {
-        setPopulation(row ?? emptyPopulation(grille.espece));
+        setPopulation(row ?? emptyPopulation(grille.espece, grille.categorie));
+        setShowDensiteDiffuseError(false);
       })
       .catch((error) =>
         // Chargement de fond, pas un geste de l'agent : la frontière est celle
@@ -106,11 +110,25 @@ export default function DensityScreen() {
       }
     });
 
-  const handleContinue = () =>
-    run(
+  const handleContinue = () => {
+    // Densité diffuse obligatoire, indépendamment pour chaque combinaison espèce/stade
+    // (population est déjà chargée/sauvée par (espece, categorie) — cf. getProspectionPopulation).
+    if (population.densite_diffuse == null) {
+      setShowDensiteDiffuseError(true);
+      Alert.alert('Densité diffuse requise', 'Veuillez renseigner la densité diffuse (D/ha).');
+      return;
+    }
+
+    return run(
       async () => {
         await saveProspectionPopulation(draftId, population);
-        router.replace(`/(prospection)/accouplement?draftId=${draftId}&grilleIndex=${requestedIndex}`);
+        // L'accouplement/ponte ne concerne que les imagos : les grilles larve vont
+        // directement à leurs captures (cf. le garde-fou déjà présent dans accouplement.tsx).
+        const next =
+          grille.categorie === 'imago'
+            ? `/(prospection)/accouplement?draftId=${draftId}&grilleIndex=${requestedIndex}`
+            : `/(prospection)/captures?draftId=${draftId}&grilleIndex=${requestedIndex}`;
+        router.replace(next as any);
       },
       {
         screen: 'density',
@@ -119,6 +137,7 @@ export default function DensityScreen() {
         context: { draftId, espece: grille.espece, grilleIndex: requestedIndex },
       }
     );
+  };
 
   return (
     <View style={styles.root}>
@@ -132,13 +151,15 @@ export default function DensityScreen() {
             <TouchableOpacity onPress={handleBack} activeOpacity={0.7}>
               <Text style={styles.back}>‹</Text>
             </TouchableOpacity>
-            <Text style={styles.title}>{ESPECE_LABEL[grille.espece]} · densités</Text>
+            <Text style={styles.title}>
+              {ESPECE_LABEL[grille.espece]} · densités {CATEGORIE_LABEL[grille.categorie]}
+            </Text>
           </View>
 
           <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
             <View style={styles.fieldsRow}>
-              <View style={styles.field}>
-                <Text style={styles.fieldLabel}>Densité diffuse (/ha)</Text>
+              <View style={[styles.field, showDensiteDiffuseError && population.densite_diffuse == null && styles.fieldError]}>
+                <Text style={[styles.fieldLabel, styles.requiredLabel]}>Densité diffuse (D/ha) *</Text>
                 <TextInput
                   value={population.densite_diffuse != null ? String(population.densite_diffuse) : ''}
                   onChangeText={(text) => setField('densite_diffuse', parseDensite(text))}
@@ -156,6 +177,9 @@ export default function DensityScreen() {
                 />
               </View>
             </View>
+            {showDensiteDiffuseError && population.densite_diffuse == null && (
+              <Text style={styles.errorText}>Veuillez renseigner la densité diffuse (D/ha).</Text>
+            )}
 
             <Text style={styles.sectionLabel}>Méthode</Text>
             <View style={styles.chipsRow}>
@@ -164,7 +188,7 @@ export default function DensityScreen() {
                 return (
                   <TouchableOpacity
                     key={option}
-                    onPress={() => setField('methode', option)}
+                    onPress={() => setField('methode', active ? null : option)}
                     style={[styles.chip, active && styles.chipActive]}
                     activeOpacity={0.8}
                   >
@@ -177,9 +201,11 @@ export default function DensityScreen() {
             </View>
           </ScrollView>
 
-          <View style={styles.footer}>
+          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
             <TouchableOpacity style={styles.continueButton} onPress={handleContinue} disabled={isSaving} activeOpacity={0.85}>
-              <Text style={styles.continueButtonText}>Accouplement  ›</Text>
+              <Text style={styles.continueButtonText}>
+                {grille.categorie === 'imago' ? 'Accouplement  ›' : 'Captures  ›'}
+              </Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -198,8 +224,11 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   fieldsRow: { flexDirection: 'row', gap: 9, marginBottom: 12 },
   field: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 10 },
+  fieldError: { borderColor: '#c0412b', borderWidth: 1.5 },
   fieldLabel: { fontSize: 9.5, color: '#9a9484', marginBottom: 2 },
+  requiredLabel: { color: '#c0412b' },
   fieldInput: { fontSize: 16, fontWeight: '700', color: TEXT, padding: 0 },
+  errorText: { color: '#c0412b', fontSize: 11, marginTop: -6, marginBottom: 12 },
   sectionLabel: { fontSize: 11, fontWeight: '700', color: TEXT_SECONDARY, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
   chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: INACTIVE_BG },
