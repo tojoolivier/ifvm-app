@@ -14,13 +14,18 @@ const mockPullReferentiel = jest.mocked(apiClient.pullReferentiel);
 
 const runAsync = jest.fn().mockResolvedValue(undefined);
 const getAllAsync = jest.fn();
+/** `count(*)` par table : un curseur ne vaut que si sa table locale est peuplée. */
+const getFirstAsync = jest.fn();
 
-const db = { runAsync, getAllAsync } as unknown as Awaited<ReturnType<typeof getReferentielDb>>;
+const db = { runAsync, getAllAsync, getFirstAsync } as unknown as Awaited<
+  ReturnType<typeof getReferentielDb>
+>;
 
 beforeEach(() => {
   jest.clearAllMocks();
   mockGetReferentielDb.mockResolvedValue(db);
   getAllAsync.mockResolvedValue([]);
+  getFirstAsync.mockResolvedValue({ n: 12 });
 });
 
 function emptyResponse(serverTime: string) {
@@ -52,6 +57,29 @@ describe('pullReferentiel', () => {
         codes_stades: null,
         campagnes: null,
       },
+      undefined
+    );
+  });
+
+  it('ignore le curseur d’une table locale vide, pour sortir de l’impasse « synchro réussie, table vide » (#201)', async () => {
+    getAllAsync.mockResolvedValue([
+      { entity_type: 'codes_stades', last_pull_at: '2026-08-01T00:00:00Z' },
+      { entity_type: 'pesticides', last_pull_at: '2026-08-01T00:00:00Z' },
+    ]);
+    // `code_stade` est vide (recréée par une migration) ; `pesticide` est peuplée.
+    getFirstAsync.mockImplementation((sql: string) =>
+      Promise.resolve({ n: sql.includes('code_stade') ? 0 : 12 })
+    );
+    mockPullReferentiel.mockResolvedValue(emptyResponse('2026-08-02T00:00:00Z'));
+
+    await pullReferentiel('token-1');
+
+    expect(mockPullReferentiel).toHaveBeenCalledWith(
+      'token-1',
+      expect.objectContaining({
+        codes_stades: null,
+        pesticides: '2026-08-01T00:00:00Z',
+      }),
       undefined
     );
   });

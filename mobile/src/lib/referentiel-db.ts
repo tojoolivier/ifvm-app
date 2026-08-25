@@ -3,21 +3,42 @@ import * as SQLite from 'expo-sqlite';
 import { getDb } from './prospection-db';
 import { ReferentialError } from './errors';
 
-let migrated = false;
+/**
+ * Migration en cours ou terminée. C'est une **promesse** mémoïsée, pas un booléen :
+ * deux `_layout` montent le pull automatique, donc deux appels concurrents arrivent ici.
+ * Avec un drapeau posé après coup, le second rejouait la migration pendant que le
+ * premier écrivait — et depuis que la migration de `code_stade` contient un `DROP TABLE`,
+ * cette course effaçait les lignes tout juste synchronisées (#201).
+ */
+let basePrete: Promise<SQLite.SQLiteDatabase> | null = null;
 
-/** Ouvre la base partagée et s'assure que les tables miroir du référentiel existent. */
+/**
+ * Ouvre la base partagée et s'assure que les tables miroir du référentiel existent.
+ *
+ * La mémoïsation couvre **aussi** l'ouverture de la base : la poser après un `await`
+ * laissait deux appels concurrents franchir la garde et migrer tous les deux. Depuis que
+ * la migration de `code_stade` contient un `DROP TABLE`, cette course effaçait les lignes
+ * que la synchro venait d'écrire — d'où une « synchro réussie » suivie d'une grille de
+ * stades vide (#201).
+ */
 export async function getReferentielDb(): Promise<SQLite.SQLiteDatabase> {
-  const db = await getDb();
-  if (!migrated) {
-    await migrateReferentielTables(db);
-    migrated = true;
+  if (!basePrete) {
+    basePrete = (async () => {
+      const db = await getDb();
+      await migrateReferentielTables(db);
+      return db;
+    })();
+    // Un échec ne doit pas rester mémoïsé : le prochain appel réessaie.
+    basePrete.catch(() => {
+      basePrete = null;
+    });
   }
-  return db;
+  return basePrete;
 }
 
 /** Réservé aux tests : force la remigration au prochain `getReferentielDb()`. */
 export function resetReferentielDbForTests(): void {
-  migrated = false;
+  basePrete = null;
 }
 
 export interface PosteAcridien {
