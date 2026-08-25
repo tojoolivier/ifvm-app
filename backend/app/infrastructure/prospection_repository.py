@@ -24,31 +24,42 @@ from app.infrastructure.prospection_model import (
 )
 from app.infrastructure.referentiel_model import StadeModel
 
+# La clé étrangère `prospection.station_id` porte le nom donné par la migration 0004, ou
+# celui qu'engendre Postgres quand le schéma est créé depuis les métadonnées (en test).
+CONTRAINTES_STATION_FK = frozenset({"fk_prospection_station_id", "prospection_station_id_fkey"})
 
-def _contrainte_violee(exc: IntegrityError) -> str:
-    """Nom de la contrainte violée, pour que la tablette sache quoi corriger."""
-    # `exc.orig` est l'erreur de l'adaptateur asyncpg ; le `constraint_name` est porté
-    # par l'exception asyncpg d'origine, un cran plus bas.
+
+def _contrainte_violee(exc: IntegrityError) -> str | None:
+    """Nom de la contrainte violée, pour que la tablette sache quoi corriger.
+
+    `exc.orig` est l'erreur de l'adaptateur asyncpg ; le `constraint_name` est porté par
+    l'exception asyncpg d'origine, un cran plus bas.
+    """
     erreur: BaseException | None = getattr(exc, "orig", None)
     while erreur is not None:
         nom = getattr(erreur, "constraint_name", None)
         if nom:
-            return f"contrainte violée : {nom}"
+            return str(nom)
         erreur = erreur.__cause__
-    return "la fiche viole une contrainte de la base"
+    return None
+
+
+def _motif_integrite(exc: IntegrityError) -> str:
+    contrainte = _contrainte_violee(exc)
+    return (
+        f"contrainte violée : {contrainte}"
+        if contrainte
+        else "la fiche viole une contrainte de la base"
+    )
 
 
 def _is_station_fk_violation(exc: IntegrityError) -> bool:
     """La violation porte-t-elle bien sur `prospection.station_id` ?
 
-    Sans ce filtre, n'importe quelle autre contrainte violée par la fiche (phase de
-    capture hors énuméré, biotope inconnu, ...) remontait à la tablette comme
-    « station_id n'existe pas », alors que la station est bien présente (#201).
+    Sans ce filtre, n'importe quelle autre contrainte violée par la fiche remontait à la
+    tablette comme « station_id n'existe pas », alors que la station est bien là (#201).
     """
-    # La contrainte s'appelle `fk_prospection_station_id` (migration 0004) ou
-    # `prospection_station_id_fkey` (schéma créé depuis les métadonnées, en test).
-    message = str(exc.orig)
-    return "prospection" in message and "station_id" in message
+    return _contrainte_violee(exc) in CONTRAINTES_STATION_FK
 
 
 class ProspectionRepositoryImpl(ProspectionRepository):
@@ -230,7 +241,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         except IntegrityError as exc:
             await self.session.rollback()
             if not _is_station_fk_violation(exc):
-                raise ProspectionIntegriteError(_contrainte_violee(exc)) from exc
+                raise ProspectionIntegriteError(_motif_integrite(exc)) from exc
             if prospection.type_prospection == "extensive":
                 model.station_id = None
                 await self.session.commit()
@@ -320,7 +331,15 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         for i in prospection.infestations:
             self.session.add(self._infestation_to_model(i, prospection.id))
 
-        await self.session.commit()
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            if _is_station_fk_violation(exc):
+                raise StationNotFoundError(
+                    "station_id ne référence pas une station fixe existante"
+                ) from exc
+            raise ProspectionIntegriteError(_motif_integrite(exc)) from exc
         return await self.get_by_id(model.id)
 
     async def delete(self, prospection_id: uuid.UUID) -> bool:

@@ -9,7 +9,8 @@ import {
 
 const execAsync = jest.fn().mockResolvedValue(undefined);
 const getAllAsync = jest.fn().mockResolvedValue([]);
-const openDatabaseAsync = jest.fn().mockResolvedValue({ execAsync, getAllAsync });
+const runAsync = jest.fn().mockResolvedValue(undefined);
+const openDatabaseAsync = jest.fn().mockResolvedValue({ execAsync, getAllAsync, runAsync });
 
 jest.mock('expo-sqlite', () => ({
   openDatabaseAsync: (...args: unknown[]) => openDatabaseAsync(...args),
@@ -21,6 +22,7 @@ beforeEach(() => {
   openDatabaseAsync.mockClear();
   execAsync.mockClear();
   getAllAsync.mockClear();
+  runAsync.mockClear();
 });
 
 describe('referentiel-db', () => {

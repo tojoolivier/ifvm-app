@@ -74,7 +74,7 @@ export default function ExtensiveImagosScreen() {
     data.stades.femelleA3_4_4 + data.stades.femelleA4 + data.stades.femelleA5;
   
   const totalStadesM = 
-    data.stades.maleA1 + data.stades.maleA123 + data.stades.maleA5;
+    data.stades.maleA1 + data.stades.maleA234 + data.stades.maleA5;
   
   const totalStades = totalStadesF + totalStadesM;
 
@@ -158,7 +158,7 @@ const handleContinue = () => {
     const isFemale = currentSexe === 'F';
     const stadesList = isFemale 
       ? ['A1', 'A2', 'A3', 'A3-1/4', 'A3-1/2', 'A3-3/4', 'A3-4/4', 'A4', 'A5']
-      : ['A1', 'A123', 'A5'];
+      : ['A1', 'A234', 'A5'];
     
     const getKey = (stade: string): keyof ExtensiveImagoSpeciesData['stades'] => {
       if (isFemale) {
@@ -348,7 +348,7 @@ const handleContinue = () => {
               <Text style={styles.sexeHint}>
                 {currentSexe === 'F'
                   ? '♀ Stades : A1, A2, A3, A3-1/4, A3-1/2, A3-3/4, A3-4/4, A4, A5'
-                  : '♂ Stades : A1, A123, A5'}
+                  : '♂ Stades : A1, A234, A5'}
               </Text>
 
               <View style={styles.stadesGrid}>
