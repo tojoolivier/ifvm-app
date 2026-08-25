@@ -2,6 +2,7 @@ import { AuthError, LocalWriteError, NetworkError } from '../src/lib/errors';
 import { conflitSync, versionServeurDe } from '../src/lib/api-client';
 import {
   LIBELLE_STATUT_FICHE,
+  estDansLaFile,
   resumerEnPhrase,
   sortDeLEchec,
   statutFicheDe,
@@ -156,6 +157,23 @@ describe('syncAll — le lot résume, il ne lève pas', () => {
     expect(marquerConflit).toHaveBeenCalledWith('a', versionServeur);
   });
 
+  it('ne propose pas « Réessayer » sur un conflit — c’est ce qui ne peut pas marcher', async () => {
+    // Le conflit voyage en `NetworkError` pour ne pas ouvrir le jeu fermé des
+    // sept classes ; il en hériterait sinon l'action « Réessayer ».
+    const syncOne = jest.fn(async () => {
+      throw conflitSync('déjà validée', { updated_at: 'x' });
+    });
+
+    const resume = await syncAll(
+      [fiche('a')],
+      'token',
+      lot({ syncOne, marquerConflit: undefined })
+    );
+
+    expect(resume.echouees[0].action).not.toBe('reessayer');
+    expect(resume.echouees[0].message).toContain('modifiée sur le serveur');
+  });
+
   it('traite un conflit comme un échec quand le lot ne sait pas le persister', async () => {
     // La prospection n’a pas d’écriture de conflit : mieux vaut un échec visible
     // qu’un conflit silencieusement rangé nulle part.
@@ -217,6 +235,19 @@ describe('statutFicheDe — le badge se lit en base, il survit au départ de l�
       'en-attente',
       'synchronisee',
     ]);
+  });
+});
+
+describe('estDansLaFile — la sortie de file se décide dans le modèle', () => {
+  it('garde en file une fiche en attente ou en conflit', () => {
+    // Le conflit a rafraîchi `server_updated_at` : le renvoi peut aboutir.
+    expect(estDansLaFile('local')).toBe(true);
+    expect(estDansLaFile('conflict')).toBe(true);
+  });
+
+  it('sort de la file ce qui est parti et ce que le serveur a refusé', () => {
+    expect(estDansLaFile('synced')).toBe(false);
+    expect(estDansLaFile('echec')).toBe(false);
   });
 });
 

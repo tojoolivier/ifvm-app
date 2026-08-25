@@ -24,9 +24,9 @@ import { CHRONO_MAX_SECONDS, capturesMaxFor, phenotypesFor } from './prospection
 import { buildGrilles, parseEspeceSelection } from './prospection-especes';
 import { getDb } from './prospection-db';
 import { pullReferentiel } from './referentiel-sync';
-import { assertPresent, NetworkError, ReferentialError } from './errors';
+import { assertPresent, ReferentialError } from './errors';
 import { logger } from './logger';
-import { syncAll, type LotSync, type ResumeSync } from './sync-lot';
+import { avecConnexion, syncAll, type LotSync, type ResumeSync } from './sync-lot';
 
 const log = logger.child({ module: 'prospection-review' });
 
@@ -345,20 +345,10 @@ function buildInfestationsPayload(rows: InfestationRow[]): ProspectionInfestatio
   }));
 }
 
-/**
- * Refuse l'envoi hors ligne — en **levant**, pas en rendant un faux calme.
- *
- * `return { synced: false }` était indiscernable d'un succès pour qui ne lisait
- * pas le champ. Une `NetworkError` traverse la même classification que
- * n'importe quelle coupure et laisse la fiche dans la file.
- */
-async function exigerConnexion(): Promise<void> {
+/** Le réseau, tel que l'appareil le voit à cet instant. */
+async function estEnLigne(): Promise<boolean> {
   const network = await Network.getNetworkStateAsync();
-  if (!(network.isConnected && network.isInternetReachable)) {
-    throw new NetworkError(
-      'Appareil hors ligne — la fiche partira à la prochaine synchronisation.'
-    );
-  }
+  return Boolean(network.isConnected && network.isInternetReachable);
 }
 
 /**
@@ -430,13 +420,19 @@ export async function enregistrerEtSynchroniser(
 ): Promise<ResumeSync> {
   const completed = await completeProspection(draft.id);
 
-  return syncAll([completed], token, {
-    ...lotProspection,
-    syncOne: async (fiche, jeton) => {
-      await exigerConnexion();
-      await syncOneProspection(fiche, jeton, captures);
-    },
-  });
+  return syncAll(
+    [completed],
+    token,
+    avecConnexion(
+      {
+        ...lotProspection,
+        // Les captures viennent de l'écran au premier envoi : la boucle de
+        // capture les tient encore en mémoire.
+        syncOne: (fiche, jeton) => syncOneProspection(fiche, jeton, captures),
+      },
+      estEnLigne
+    )
+  );
 }
 
 /** Synchronise un lot de prospections en attente. Ne lève jamais. */

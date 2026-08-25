@@ -16,7 +16,7 @@
  * ne s'interpose pas entre `syncOne` et son appelant, il agrège N issues.
  */
 import { statutHttpDe, versionServeurDe } from './api-client';
-import { AuthError } from './errors';
+import { AuthError, NetworkError } from './errors';
 import { classeDe, logger } from './logger';
 import { toFriendlyError, type ActionErreur } from './friendly-error';
 
@@ -126,6 +126,54 @@ function estConflit(error: unknown): boolean {
 }
 
 /**
+ * Ce que l'agent lit, et ce qu'on lui propose.
+ *
+ * Le conflit est traité **avant** `toFriendlyError` : il voyage en
+ * `NetworkError` — pour ne pas ouvrir le jeu fermé des sept classes (décision 2)
+ * — et hériterait sinon du « Connexion impossible · Réessayer » de cette classe.
+ * Or réessayer à l'identique est exactement ce qui ne peut pas marcher : le
+ * serveur a une version plus récente. Le statut joint le distingue, comme il
+ * distingue déjà 4xx de 5xx.
+ */
+function affichageDe(error: unknown): { message: string; action: ActionErreur | null } {
+  if (estConflit(error)) {
+    return {
+      message:
+        'Cette fiche a été modifiée sur le serveur. Votre version est conservée sur l’appareil.',
+      action: 'signaler-support',
+    };
+  }
+
+  const affichable = toFriendlyError(error);
+  return { message: affichable.message, action: affichable.action };
+}
+
+/**
+ * Enveloppe un lot pour qu'il **refuse d'envoyer hors ligne** — en levant, pas
+ * en rendant un faux calme.
+ *
+ * `return { synced: false }` était indiscernable d'un succès pour qui ne lisait
+ * pas le champ. Une `NetworkError` traverse la même classification que
+ * n'importe quelle coupure et laisse la fiche dans la file.
+ */
+export function avecConnexion<D>(
+  lot: LotSync<D>,
+  estEnLigne: () => Promise<boolean>
+): LotSync<D> {
+  return {
+    ...lot,
+    syncOne: async (draft, token) => {
+      if (!(await estEnLigne())) {
+        throw new NetworkError(
+          'Appareil hors ligne — la fiche partira à la prochaine synchronisation.'
+        );
+      }
+      await lot.syncOne(draft, token);
+    },
+  };
+}
+
+/**
  * Synchronise un lot et **résume**. Ne lève jamais : un lot partiellement parti
  * est un état, pas une erreur — c'est ce qui a fait disparaître l'`Alert`
  * modale de `sync.tsx`.
@@ -160,18 +208,17 @@ export async function syncAll<D>(
         continue;
       }
 
-      const sort = estConflit(error) ? 'echec' : sortDeLEchec(error);
+      // `sortDeLEchec` rend déjà `'echec'` pour un 409 : c'est un 4xx.
+      const sort = sortDeLEchec(error);
       if (sort === 'echec') {
         await persister(() => lot.marquerEchec(id), log);
       }
 
-      const affichable = toFriendlyError(error);
       resume.echouees.push({
         id,
         label,
         classe: classeDe(error),
-        message: affichable.message,
-        action: affichable.action,
+        ...affichageDe(error),
         statutHttp: statutHttpDe(error),
         sort,
       });
@@ -230,6 +277,19 @@ export function statutFicheDe(statutSync: string): StatutFiche {
   return PAR_STATUT_SYNC[statutSync] ?? 'en-attente';
 }
 
+/**
+ * Cette fiche part-elle au prochain envoi de lot ?
+ *
+ * Non pour une fiche déjà partie, et non pour une fiche en `'echec'` : le
+ * serveur l'a refusée, la renvoyer à l'identique produirait le même refus.
+ * C'est ici que « sortir de la file » se décide — dans le modèle, pour que les
+ * deux écrans qui composent un lot ne puissent pas en juger différemment.
+ */
+export function estDansLaFile(statutSync: string): boolean {
+  const statut = statutFicheDe(statutSync);
+  return statut === 'en-attente' || statut === 'conflit';
+}
+
 /** Libellés, au même endroit que le jeu — l'écran ne les réécrit pas. */
 export const LIBELLE_STATUT_FICHE: Record<StatutFiche, string> = {
   'en-attente': 'En attente',
@@ -237,6 +297,11 @@ export const LIBELLE_STATUT_FICHE: Record<StatutFiche, string> = {
   conflit: 'Conflit',
   synchronisee: 'Synchronisée',
 };
+
+/** Le lot est-il intégralement parti ? Un conflit compte comme non parti. */
+export function estToutParti(resume: ResumeSync): boolean {
+  return resume.echouees.length === 0 && resume.conflits.length === 0;
+}
 
 const pluriel = (n: number, mot: string) => (n > 1 ? `${mot}s` : mot);
 

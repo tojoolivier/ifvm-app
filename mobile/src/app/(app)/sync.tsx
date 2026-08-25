@@ -19,12 +19,15 @@ import { syncAllProspections } from '@/lib/prospection-review';
 import { DraftProspection } from '@/lib/prospection-repository';
 import {
   LIBELLE_STATUT_FICHE,
+  estDansLaFile,
+  estToutParti,
   resumerEnPhrase,
   statutFicheDe,
   type ResumeSync,
   type StatutFiche,
 } from '@/lib/sync-lot';
-import { LIBELLE_ACTION, type ActionErreur } from '@/lib/friendly-error';
+import { LIBELLE_ACTION, toFriendlyError, type ActionErreur } from '@/lib/friendly-error';
+import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { logger } from '@/lib/logger';
 
@@ -53,7 +56,6 @@ export default function SyncScreen() {
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
   const [data, setData] = useState<AccueilViewModel>(EMPTY_DATA);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [resume, setResume] = useState<ResumeSync | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
@@ -61,6 +63,9 @@ export default function SyncScreen() {
   const [etatReferentiel, setEtatReferentiel] = useState<EtatTableReferentiel[]>([]);
 
   const signalerChargement = useSignalerChargement('sync');
+  // `isRunning` remplace l'ancien `isSyncing` : un seul état, remis à zéro par
+  // le hook même si l'action lève — le `finally` maison ne pouvait pas mieux.
+  const { run, isRunning: isSyncing } = useAsyncAction();
 
   const refresh = useCallback(() => {
     void loadAccueilData().then(setData).catch((error) => signalerChargement(error));
@@ -90,34 +95,43 @@ export default function SyncScreen() {
    * Une fiche en `'echec'` est **sortie de la file** : le serveur l'a refusée,
    * la renvoyer à l'identique produirait le même refus. Elle reste visible avec
    * son badge, et ne repart que par le bouton dédié.
+   *
+   * Les deux listes se lisent en base — pas dans le résumé du dernier envoi :
+   * c'est ce qui permet au « Réessayer les N en échec » d'être encore là quand
+   * l'agent revient sur l'écran.
    */
-  const aEnvoyer = pendingFiches.filter((item) => statutFicheDe(item.statut_sync) !== 'echec');
+  const aEnvoyer = pendingFiches.filter((item) => estDansLaFile(item.statut_sync));
   const enEchec = pendingFiches.filter((item) => statutFicheDe(item.statut_sync) === 'echec');
 
-  const synchroniser = async (drafts: DraftProspection[]) => {
-    if (isSyncing || !token) return;
+  const synchroniser = (drafts: DraftProspection[]) =>
+    run(
+      async () => {
+        setReferentielError(null);
+        setResume(null);
 
-    setIsSyncing(true);
-    setReferentielError(null);
-    setResume(null);
+        try {
+          await pullReferentiel(token!);
+        } catch (error) {
+          logger.failure('sync.referentiel.failed', error);
+          // Le message technique brut ne s'affiche jamais (décision 2).
+          setReferentielError(toFriendlyError(error).message);
+        }
 
-    try {
-      await pullReferentiel(token);
-    } catch (error) {
-      logger.failure('sync.referentiel.failed', error);
-      setReferentielError(
-        error instanceof Error ? error.message : 'Échec de la synchronisation du référentiel'
-      );
-    }
-
-    // `syncAll` ne lève pas : un lot partiellement parti est un état du terrain,
-    // pas une erreur. L'`Alert` modale qui l'annonçait interrompait l'agent pour
-    // lui dire « réessayez » sans lui dire quoi (ADR-012 décision 9).
-    setResume(await syncAllProspections(drafts, token));
-    setLastSync(new Date());
-    setIsSyncing(false);
-    refresh();
-  };
+        // `syncAll` ne lève pas : un lot partiellement parti est un état du
+        // terrain, pas une erreur. L'`Alert` modale qui l'annonçait
+        // interrompait l'agent pour lui dire « réessayez » sans lui dire quoi
+        // (ADR-012 décision 9).
+        setResume(await syncAllProspections(drafts, token!));
+        setLastSync(new Date());
+        refresh();
+      },
+      {
+        screen: 'sync',
+        precondition: !!token,
+        preconditionMessage: 'Session expirée — reconnectez-vous pour synchroniser.',
+        context: { nbFiches: drafts.length },
+      }
+    );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -186,9 +200,7 @@ export default function SyncScreen() {
           <View
             style={[
               styles.statusBanner,
-              resume.echouees.length + resume.conflits.length === 0
-                ? styles.statusSuccess
-                : styles.statusPartiel,
+              estToutParti(resume) ? styles.statusSuccess : styles.statusPartiel,
             ]}
           >
             <Text style={styles.statusBannerText}>{resumerEnPhrase(resume)}</Text>
@@ -207,19 +219,25 @@ export default function SyncScreen() {
               </Text>
             ))}
 
-            {enEchec.length > 0 && (
-              <TouchableOpacity
-                style={styles.retryCible}
-                onPress={() => void synchroniser(enEchec)}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.retryCibleText}>
-                  Réessayer {enEchec.length === 1 ? 'la fiche' : `les ${enEchec.length} fiches`} en
-                  échec
-                </Text>
-              </TouchableOpacity>
-            )}
           </View>
+        )}
+
+        {/*
+          Hors de la bannière du dernier envoi, et volontairement : `enEchec` se
+          lit en base, donc le retry ciblé est encore là quand l'agent revient
+          sur l'écran — alors qu'un bouton rendu depuis `resume` disparaîtrait
+          avec lui (#177, « Réessayer les N en échec »).
+        */}
+        {enEchec.length > 0 && !isSyncing && (
+          <TouchableOpacity
+            style={styles.retryCible}
+            onPress={() => void synchroniser(enEchec)}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.retryCibleText}>
+              Réessayer {enEchec.length === 1 ? 'la fiche' : `les ${enEchec.length} fiches`} en échec
+            </Text>
+          </TouchableOpacity>
         )}
         {referentielError && (
           <View style={[styles.statusBanner, styles.statusError]}>
@@ -297,10 +315,15 @@ export default function SyncScreen() {
         </View>
 
         {/* Bouton de synchronisation */}
+        {/*
+          Le bouton reste actif sans fiche en attente : il tire aussi le
+          référentiel, et le désactiver rendrait cette mise à jour impossible
+          tant qu'il n'y a rien à envoyer.
+        */}
         <TouchableOpacity
-          style={[styles.syncButton, (isSyncing || aEnvoyer.length === 0) && styles.syncButtonDisabled]}
+          style={[styles.syncButton, isSyncing && styles.syncButtonDisabled]}
           onPress={() => void synchroniser(aEnvoyer)}
-          disabled={isSyncing || aEnvoyer.length === 0}
+          disabled={isSyncing}
           activeOpacity={0.85}
         >
           {isSyncing ? (
@@ -312,7 +335,7 @@ export default function SyncScreen() {
             <Text style={styles.syncButtonText}>
               {aEnvoyer.length > 0
                 ? `🔄 Synchroniser (${aEnvoyer.length})`
-                : '✅ Tout est synchronisé'}
+                : '🔄 Mettre à jour le référentiel'}
             </Text>
           )}
         </TouchableOpacity>
@@ -459,7 +482,7 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   retryCible: {
-    marginTop: 12,
+    marginBottom: 16,
     paddingVertical: 10,
     borderRadius: 8,
     backgroundColor: '#FFFFFF',

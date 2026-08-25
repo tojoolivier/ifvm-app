@@ -7,7 +7,7 @@ import * as Network from 'expo-network';
 import { useAuthStore } from '@/lib/auth-store';
 import { loadAccueilData, loadValidatedProspections, deleteDraftProspection, AccueilViewModel } from '@/lib/prospection-accueil';
 import { syncAllProspections } from '@/lib/prospection-review';
-import { resumerEnPhrase } from '@/lib/sync-lot';
+import { estDansLaFile, estToutParti, resumerEnPhrase } from '@/lib/sync-lot';
 import { DraftProspection } from '@/lib/prospection-repository';
 import { ProspectionRead } from '@/lib/api-client';
 import { navigateToProspectionConsult, navigateToProspectionDraft } from '@/lib/fiche-routing';
@@ -180,8 +180,11 @@ export default function ProspectionScreen() {
     });
   }, [items, searchQuery, filterKey]);
 
+  // `estDansLaFile` exclut les fiches en `'echec'` : le serveur les a refusées,
+  // les renvoyer à l'identique reproduirait le refus. Elles se relancent depuis
+  // l'écran de synchronisation, qui montre leur motif (#177).
   const pendingSync = useMemo(
-    () => data.recent.filter((item) => item.statut === 'en_attente' && item.statut_sync !== 'synced'),
+    () => data.recent.filter((item) => item.statut === 'en_attente' && estDansLaFile(item.statut_sync)),
     [data.recent]
   );
 
@@ -197,7 +200,7 @@ export default function ProspectionScreen() {
         const resume = await syncAllProspections(pendingSync, token!);
 
         setSyncToast({
-          type: resume.echouees.length + resume.conflits.length === 0 ? 'success' : 'error',
+          type: estToutParti(resume) ? 'success' : 'error',
           message: resumerEnPhrase(resume),
         });
         refresh();
