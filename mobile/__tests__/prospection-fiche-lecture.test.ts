@@ -143,7 +143,7 @@ describe('buildInfestationSynthese', () => {
     const infestation: InfestationRead = {
       id: 'inf-1',
       espece: 'LMC',
-      type_cible: 'essaim',
+      type_cible: 'dense',
       taille_min: null,
       taille_max: null,
       taille_moy: null,
@@ -173,7 +173,7 @@ describe('buildInfestationSynthese', () => {
 
     expect(buildInfestationSynthese([infestation])).toEqual({
       hasInfestation: true,
-      typeLabel: 'Essaim',
+      typeLabel: 'Dense',
       surfaceTotale: 3.5,
       comportementLabel: 'Déplacement',
       pullulationNb: null,
@@ -260,5 +260,26 @@ describe('parseVegetationSol / buildVegetationSummary (multi-strate)', () => {
   it('ne casse pas sur un JSON vide', () => {
     const state = parseVegetationSol(null, null, null);
     expect(STRATE_KEYS.every((k) => state.strates[k].recouvrement === 0)).toBe(true);
+    expect(state.texture).toEqual([]);
+  });
+
+  it('conserve TOUTES les textures d’une sélection multiple, pas seulement la première', () => {
+    // Régression : `texture` était traité comme une valeur scalaire (`Texture | null`)
+    // alors que veg.tsx enregistre un tableau ("sélection multiple") — la comparaison
+    // `state.texture === option.value` échouait donc toujours et la texture disparaissait
+    // silencieusement du récapitulatif, même correctement enregistrée en base.
+    const sol = JSON.stringify({ humidite: 'surface', texture: ['limoneuse', 'argileuse', 'cailloux'] });
+    const state = parseVegetationSol(null, sol, null);
+    expect(state.texture).toEqual(['limoneuse', 'argileuse', 'cailloux']);
+
+    const summary = buildVegetationSummary(state);
+    expect(summary).toContain('Texture Limoneuse, Argileuse, Cailloux');
+  });
+
+  it('reconnaît encore une ancienne fiche enregistrée avec une texture scalaire (avant le multi-select)', () => {
+    const sol = JSON.stringify({ humidite: 'surface', texture: 'sable_fin' });
+    const state = parseVegetationSol(null, sol, null);
+    expect(state.texture).toEqual(['sable_fin']);
+    expect(buildVegetationSummary(state)).toContain('Texture Sable fin');
   });
 });

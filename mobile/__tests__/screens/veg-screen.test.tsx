@@ -3,7 +3,7 @@
  * en attente de synchro ou déjà synchronisée), les strates de végétation ainsi que
  * l'humidité/texture du sol précédemment saisies ne doivent pas disparaître.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import VegetationScreen from '@/app/(prospection)/veg';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import * as prospectionRepository from '@/lib/prospection-repository';
@@ -17,6 +17,11 @@ jest.mock('@/lib/prospection-repository', () => ({
 }));
 
 describe('VegetationScreen', () => {
+  afterEach(cleanup);
+  beforeEach(() => {
+    jest.mocked(prospectionRepository.updateProspectionVegetation).mockClear();
+  });
+
   it('recharge et réenregistre les strates, l’humidité et la texture déjà enregistrées lors de la réouverture d’une fiche (#201)', async () => {
     useProspectionWizardStore.setState({
       draft: {
@@ -49,5 +54,38 @@ describe('VegetationScreen', () => {
         })
       )
     );
+  });
+
+  it('accepte une saisie décimale libre (virgule) pour H. moy/Verdissement/Repousse/Sol nu, sans arrondi au pas de 5', async () => {
+    // Régression : ces 4 champs étaient arrondis au multiple de 5 le plus proche
+    // (clampTo5), comme le stepper Recouvrement — qui, lui, garde ce comportement.
+    useProspectionWizardStore.setState({
+      draft: { id: 'draft-123', type_prospection: 'intensive', vegetation: null, sol: null } as any,
+      captures: [],
+    });
+
+    await render(<VegetationScreen />);
+    fireEvent.press(await screen.findByText('Strate arborée'));
+    await waitFor(() => expect(screen.getByText('Recouvrement')).toBeVisible());
+
+    // Une seule strate dépliée : H. moy est le 2e des 5 champs décimaux vides (Surf. rel. %,
+    // H. moy, % Verdissement, % Repousse, Sol nu %) — on retape après chaque frappe, l'index
+    // des champs encore vides se décalant à mesure qu'ils se remplissent.
+    fireEvent.changeText(screen.getAllByDisplayValue('')[1], '2,75');
+    expect(await screen.findByDisplayValue('2,75')).toBeVisible();
+
+    fireEvent.changeText(screen.getAllByDisplayValue('')[0], '33,5');
+    expect(await screen.findByDisplayValue('33,5')).toBeVisible();
+
+    fireEvent.changeText(screen.getAllByDisplayValue('')[0], '12,25');
+    expect(await screen.findByDisplayValue('12,25')).toBeVisible();
+
+    fireEvent.changeText(screen.getAllByDisplayValue('')[0], '5,5');
+    // Aucun de ces 4 champs n'est arrondi à un multiple de 5 (contrairement à
+    // Recouvrement) : les quatre valeurs décimales saisies restent visibles telles quelles.
+    expect(await screen.findByDisplayValue('5,5')).toBeVisible();
+    expect(screen.getByDisplayValue('2,75')).toBeVisible();
+    expect(screen.getByDisplayValue('33,5')).toBeVisible();
+    expect(screen.getByDisplayValue('12,25')).toBeVisible();
   });
 });

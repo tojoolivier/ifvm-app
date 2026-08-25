@@ -92,15 +92,17 @@ describe('buildInfestationRows — bloc D de la maquette', () => {
     expect(valeur(buildInfestationRows(PROSPECTION, [], []), 'Répartition')).toBe(TIRET)
   })
 
-  it('compte les vols clairs et les essaims parmi les cibles', () => {
+  it('compte les vols clairs et les essaims (dense + très dense) parmi les cibles', () => {
     const infestations = [
       { id: 'i1', type_cible: 'vol_clair' },
       { id: 'i2', type_cible: 'vol_clair' },
       { id: 'i3', type_cible: 'bande_larvaire' },
+      { id: 'i4', type_cible: 'dense' },
+      { id: 'i5', type_cible: 'tres_dense' },
     ] as InfestationFiche[]
     const rows = buildInfestationRows(PROSPECTION, infestations, populations)
     expect(valeur(rows, 'Vols clairs')).toBe('2')
-    expect(valeur(rows, 'Essaims')).toBe('0')
+    expect(valeur(rows, 'Essaims')).toBe('2')
   })
 
   it('exprime les surfaces en hectares', () => {

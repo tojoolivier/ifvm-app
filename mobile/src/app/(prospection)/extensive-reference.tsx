@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getCurrentPosition } from '@/lib/location';
 import { useAuthStore } from '@/lib/auth-store';
 import { updateProspectionExtensiveReference } from '@/lib/prospection-repository';
@@ -27,6 +27,7 @@ function generateNumeroMessage(draftId: string, dateProspection: string): string
 
 export default function ExtensiveReferenceScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { draftId } = useLocalSearchParams<{ draftId: string }>();
   const user = useAuthStore((s) => s.user);
   const draft = useProspectionWizardStore((s) => s.draft);
@@ -169,8 +170,17 @@ export default function ExtensiveReferenceScreen() {
             </View>
 
             <View style={styles.card}>
-              <Text style={styles.label}>Station</Text>
-              <TextInput value={stationLibre} onChangeText={setStationLibre} style={styles.input} />
+              {/* Prospection extensive = pas de station fixe du référentiel : nom saisi
+                  librement sur place, ses coordonnées restant récupérées automatiquement
+                  par GPS ci-dessous (contrairement à l'intensif, cf. reference.tsx). */}
+              <Text style={styles.label}>Station (saisie libre)</Text>
+              <TextInput
+                value={stationLibre}
+                onChangeText={setStationLibre}
+                placeholder="Nom du lieu-dit / repère local"
+                placeholderTextColor={TEXT_SECONDARY}
+                style={styles.input}
+              />
             </View>
 
             <View style={styles.row}>
@@ -223,7 +233,7 @@ export default function ExtensiveReferenceScreen() {
             <Text style={styles.hintText}>Vert = auto-rempli par GPS/session ; blanc = à confirmer ou saisir.</Text>
           </ScrollView>
 
-          <View style={styles.footer}>
+          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
             <TouchableOpacity style={styles.continueButton} onPress={handleContinue} disabled={isSaving} activeOpacity={0.85}>
               <Text style={styles.continueButtonText}>Suivant : Imagos ›</Text>
             </TouchableOpacity>
