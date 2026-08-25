@@ -27,12 +27,21 @@
  * {@link DELAI_AFFICHAGE_MS}, annulable par `onHandled`.
  *
  * Ce délai ne protège pas d'un retard d'Hermes ; il protège d'un `.catch()`
- * attaché tardivement, qui rendrait la bannière mensongère. Il existe parce que
- * la bannière de la décision 5 **ne disparaît pas seule** : ne pouvant pas se
+ * attaché tardivement, qui rendrait l'affichage mensonger. Il existe parce que
+ * la surface de la décision 5 **ne disparaît pas seule** : ne pouvant pas se
  * rétracter, elle ne doit pas s'afficher trop tôt.
+ *
+ * ⚠️ **La surface est une modale, pas une bannière.** `traitementDe` rend
+ * `BLOQUER` à la frontière `'global'`, et la décision 5 mappe `BLOQUER` sur
+ * `ModaleBloquante`. #178 et la décision 8 raisonnent en termes de « bannière »
+ * — le raisonnement tient, mais l'enjeu est plus lourd qu'écrit : un `.catch()`
+ * arrivé à 600 ms produit une modale **bloquante** mensongère, pas un bandeau
+ * ignorable. Si ce coût est jugé trop élevé, c'est {@link DELAI_AFFICHAGE_MS}
+ * qu'il faut rediscuter, pas la frontière.
  */
 import { logger } from './logger';
 import { useErrorStore } from './error-store';
+import { PreconditionError } from './errors';
 
 /**
  * Délai avant affichage, annulable par `onHandled`.
@@ -72,71 +81,98 @@ let installe = false;
 const enAttente = new Map<number, ReturnType<typeof setTimeout>>();
 
 /** À cette frontière `traitementDe` rend toujours BLOQUER — rien à choisir. */
-const journal = logger.child({}, 'global');
+const log = logger.child({}, 'global');
 
 /**
  * Pose le filet. Renvoie `true` s'il a effectivement été posé.
  *
- * Le booléen n'est pas décoratif : l'appelant doit pouvoir distinguer « posé »
- * de « pas posé », sans quoi on retombe sur le motif que cet ADR éradique —
- * un filet supposé en place et jamais installé.
+ * Le booléen ne porte pas la garantie — c'est le **journal** qui la porte :
+ * chaque cause de non-installation autre que le mode dev y écrit sa ligne.
+ * Il sert à l'assertion des tests, et reste disponible pour un appelant qui
+ * voudrait s'en servir. Les trois raisons de rendre `false` (dev, déjà posé,
+ * tracker indisponible) s'aplatissent volontairement : les distinguer
+ * demanderait un type que personne n'a encore besoin de lire.
  */
 export function installerFiletRejets(options: OptionsFilet = {}): boolean {
   const enDev = options.enDev ?? __DEV__;
   // En dev, LogBox affiche le rejet avec sa pile et sa source. Doubler ça d'une
-  // bannière n'ajoute rien et masque l'outil le plus précis des deux.
+  // modale n'ajoute rien et masque l'outil le plus précis des deux.
   if (enDev) return false;
 
   if (installe) return false;
 
+  // `'hermes' in options` plutôt que `options.hermes ?? global.HermesInternal` :
+  // un test doit pouvoir simuler l'absence du tracker en passant
+  // `hermes: undefined`, sans retomber sur le vrai global du moteur qui
+  // exécute les tests — sinon le cas « pas de tracker » est intestable.
   const hermes = 'hermes' in options ? options.hermes : global.HermesInternal;
   const activer = hermes?.enablePromiseRejectionTracker;
   if (typeof activer !== 'function') {
     // On ne lève pas : l'absence de filet ne doit pas empêcher l'app de
     // démarrer. Mais elle est **journalisée**, parce qu'un filet absent qu'on
     // croit posé est précisément l'erreur silencieuse qu'ADR-012 traque.
-    journal.event('promise.tracker_absent', {
-      raison: hermes ? 'methode absente' : 'HermesInternal absent',
-    });
+    //
+    // `failure` et non `event` : seul `failure` vide le tampon immédiatement
+    // (décision 4). Écrite au démarrage, cette ligne resterait sinon dans
+    // l'anneau mémoire, et un crash dur emporterait justement l'explication de
+    // pourquoi rien n'a été capturé.
+    log.failure(
+      'promise.tracker_absent',
+      new PreconditionError(
+        hermes ? 'enablePromiseRejectionTracker absent' : 'HermesInternal absent'
+      )
+    );
     return false;
   }
 
-  installe = true;
+  try {
+    activer.call(hermes, {
+      // Sans ce drapeau, Hermes ne remonte que les rejets qu'il juge définitifs
+      // et laisse passer ceux qui ont déjà été observés — donc une partie de ce
+      // que le filet est censé rattraper.
+      allRejections: true,
 
-  activer.call(hermes, {
-    // Sans ce drapeau, Hermes ne remonte que les rejets qu'il juge définitifs
-    // et laisse passer ceux qui ont déjà été observés — donc une partie de ce
-    // que le filet est censé rattraper.
-    allRejections: true,
+      onUnhandled: (id, rejection) => {
+        // `rejection` est l'erreur D'ORIGINE, typée — pas une enveloppe. C'est
+        // ce que #166 a vérifié sur build release, et ce que ces options
+        // préservent.
+        log.failure('promise.unhandled', rejection, { id });
 
-    onUnhandled: (id, rejection) => {
-      // `rejection` est l'erreur D'ORIGINE, typée — pas une enveloppe. C'est ce
-      // que #166 a vérifié sur build release, et ce que ces options préservent.
-      journal.failure('promise.unhandled', rejection, { id });
+        enAttente.set(
+          id,
+          setTimeout(() => {
+            enAttente.delete(id);
+            useErrorStore.getState().signaler(rejection, 'global');
+          }, DELAI_AFFICHAGE_MS)
+        );
+      },
 
-      enAttente.set(
-        id,
-        setTimeout(() => {
+      onHandled: (id) => {
+        const minuteur = enAttente.get(id);
+        // Arrivé dans le délai, le `.catch()` annule l'affichage. Arrivé après,
+        // il ne retire rien : la surface ne se rétracte pas. Les deux cas se
+        // distinguent dans le journal — sans quoi le support ne saurait pas si
+        // ce que l'agent a vu correspondait à un échec réel.
+        if (minuteur) {
+          clearTimeout(minuteur);
           enAttente.delete(id);
-          useErrorStore.getState().signaler(rejection, 'global');
-        }, DELAI_AFFICHAGE_MS)
-      );
-    },
+        }
+        log.event('promise.late_catch', { id, affichage_annule: minuteur !== undefined });
+      },
+    });
+  } catch (error) {
+    // #166 a mesuré l'appel « sans lever », mais le promettre en commentaire
+    // sans le garantir en code serait la fausse confiance décrite plus haut :
+    // une exception ici remonterait dans le `useEffect` du layout racine et
+    // empêcherait `demarrerApp` de partir — le filet ferait tomber l'app qu'il
+    // est censé protéger.
+    log.failure('promise.tracker_echec_installation', error);
+    return false;
+  }
 
-    onHandled: (id) => {
-      const minuteur = enAttente.get(id);
-      // Arrivé dans le délai, le `.catch()` annule l'affichage. Arrivé après,
-      // il ne retire rien : la bannière ne se rétracte pas. Les deux cas se
-      // distinguent dans le journal — sans quoi le support ne saurait pas si
-      // une bannière vue par l'agent correspondait à un échec réel.
-      if (minuteur) {
-        clearTimeout(minuteur);
-        enAttente.delete(id);
-      }
-      journal.event('promise.late_catch', { id, affichage_annule: minuteur !== undefined });
-    },
-  });
-
+  // Après l'appel, et non avant : un échec d'installation ne doit pas laisser
+  // le module croire qu'il a posé un filet.
+  installe = true;
   return true;
 }
 

@@ -112,6 +112,47 @@ describe('absence du tracker', () => {
 
     expect(journalisees().map((l) => l.event)).toContain('promise.tracker_absent');
   });
+
+  /**
+   * `event()` n'entraine pas de flush, `failure()` si. Ecrite au demarrage,
+   * cette ligne resterait sinon dans l'anneau memoire — et un crash dur
+   * emporterait justement l'explication de pourquoi rien n'a ete capture.
+   */
+  it("ecrit l'absence jusqu'au transport, pas seulement dans l'anneau", () => {
+    installerFiletRejets({ hermes: {}, enDev: false });
+
+    expect(ecrites.map((l) => l.event)).toContain('promise.tracker_absent');
+  });
+
+  /**
+   * #166 a mesure l'appel « sans lever ». Le garantir en code plutot qu'en
+   * commentaire : une exception ici remonterait dans le `useEffect` racine et
+   * empecherait le demarrage — le filet ferait tomber l'app qu'il protege.
+   */
+  it("ne laisse pas echapper une exception levee par le tracker", () => {
+    const tracker = {
+      enablePromiseRejectionTracker: () => {
+        throw new Error('moteur hostile');
+      },
+    };
+
+    expect(installerFiletRejets({ hermes: tracker, enDev: false })).toBe(false);
+    expect(ecrites.map((l) => l.event)).toContain('promise.tracker_echec_installation');
+  });
+
+  it("ne se croit pas installe apres un echec, et retente au prochain appel", () => {
+    let tentatives = 0;
+    const capricieux = {
+      enablePromiseRejectionTracker: () => {
+        tentatives += 1;
+        if (tentatives === 1) throw new Error('moteur hostile');
+      },
+    };
+
+    installerFiletRejets({ hermes: capricieux, enDev: false });
+    expect(installerFiletRejets({ hermes: capricieux, enDev: false })).toBe(true);
+    expect(tentatives).toBe(2);
+  });
 });
 
 describe('onUnhandled — le journal est immediat', () => {
