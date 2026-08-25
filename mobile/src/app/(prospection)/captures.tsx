@@ -91,6 +91,11 @@ export default function CapturesScreen() {
   const isInitialized = useRef(false);
   const isHydrated = useRef(false);
 
+  // Le brouillon de *cette* fiche est-il en mémoire ? Tant qu'il ne l'est pas, on ne
+  // peut rien conclure sur les grilles : afficher « aucune grille à saisir » à ce
+  // moment-là accuse à tort l'agent de n'avoir rien sélectionné (#201).
+  const brouillonPret = !!draft && draft.id === draftId;
+
   const requestedIndex = Number(grilleIndex ?? '0');
   const grille = grilleOrder[currentGrilleIndex];
   const isImago = grille?.categorie === 'imago';
@@ -280,7 +285,7 @@ export default function CapturesScreen() {
             <Text style={styles.title}>Captures</Text>
           </View>
           <View style={styles.chargementBloc}>
-            {chargementStades ? (
+            {chargementStades || !brouillonPret ? (
               <>
                 <ActivityIndicator color={GREEN} />
                 <Text style={styles.chargementTexte}>Chargement de la grille…</Text>

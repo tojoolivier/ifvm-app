@@ -26,6 +26,7 @@ export default function SpeciesScreen() {
   const { draftId } = useLocalSearchParams<{ draftId: string }>();
   const captures = useProspectionWizardStore((s) => s.captures);
   const draft = useProspectionWizardStore((s) => s.draft);
+  const setDraft = useProspectionWizardStore((s) => s.setDraft);
   const initGrilles = useProspectionCaptureStore((s) => s.initGrilles);
   const [selection, setSelection] = useState<EspeceSelection>(() =>
     parseEspeceSelection(draft?.especes ?? null)
@@ -50,7 +51,11 @@ export default function SpeciesScreen() {
   const handleContinue = () =>
     run(
       async () => {
-        await saveEspeceSelection(draftId, selection);
+        // Le brouillon en mémoire doit suivre la base : l'écran de capture lit
+        // `draft.especes` pour construire ses grilles. Jeter la valeur renvoyée le
+        // laissait sur l'ancienne sélection (vide sur une fiche neuve) — d'où un
+        // « aucune grille à saisir » alors que la sélection venait d'être faite (#201).
+        setDraft(await saveEspeceSelection(draftId, selection));
         const grilles = buildGrilles(selection);
         initGrilles(grilles, [], captures);
         const firstScreen = grilles[0]?.categorie === 'imago' ? 'density' : 'captures';

@@ -250,6 +250,27 @@ describe('CapturesScreen', () => {
     );
   });
 
+  it('attend le brouillon plutôt que d’annoncer « aucune grille » à tort (#201)', async () => {
+    // Brouillon d'une autre fiche encore en mémoire : l'écran ne sait rien des grilles
+    // de celle-ci. Accuser l'agent de n'avoir rien sélectionné serait faux.
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'un-autre-brouillon',
+        type_prospection: 'intensive',
+        especes: null,
+        // Chrono déjà démarré : sans cela le mock de `startCaptureTimer` remplacerait
+        // le brouillon et fausserait ce que le test observe.
+        capture_started_at: '2026-08-25T08:00:00.000Z',
+      } as any,
+      captures: [],
+    });
+
+    await render(<CapturesScreen />);
+
+    expect(await screen.findByText('Chargement de la grille…')).toBeVisible();
+    expect(screen.queryByText(/Aucune grille à saisir/)).toBeNull();
+  });
+
   it('laisse le total vide sur une grille encore vierge', async () => {
     useProspectionWizardStore.setState({
       draft: {
