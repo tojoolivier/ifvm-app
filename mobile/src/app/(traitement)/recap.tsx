@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getTraitement, countUnsyncedTraitements, DraftTraitement } from '@/lib/traitement-repository';
 import { enregistrerEtSynchroniserTraitement } from '@/lib/traitement-sync';
+import { estToutParti, resumerEnPhrase } from '@/lib/sync-lot';
 import { useAuthStore } from '@/lib/auth-store';
 import { useTraitementCaptureStore, SignatureRole } from '@/lib/traitement-capture-store';
 import {
@@ -145,8 +146,16 @@ export default function RecapScreen() {
       async () => {
         // Déjà visible à l'écran (liste des points à corriger) : pas de second signal.
         if (errors.length > 0) return;
-        await enregistrerEtSynchroniserTraitement(draft, token!);
-        toast.show('Fiche enregistrée');
+        const resume = await enregistrerEtSynchroniserTraitement(draft, token!);
+        // La fiche est enregistrée localement dans tous les cas ; seul l'envoi
+        // peut avoir échoué. Annoncer « Fiche enregistrée » sans regarder le
+        // résumé rendrait un refus 4xx ou un conflit 409 totalement muets —
+        // le silence exact que #177 supprime.
+        toast.show(
+          estToutParti(resume)
+            ? 'Fiche enregistrée et synchronisée'
+            : `Fiche enregistrée sur l’appareil — ${resumerEnPhrase(resume)}`
+        );
         setTimeout(() => router.replace('/(app)' as any), 1900);
       },
       {

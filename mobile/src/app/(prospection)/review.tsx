@@ -6,6 +6,7 @@ import { useAuthStore } from '@/lib/auth-store';
 import { buildVegetationSummary, parseVegetationSol } from '@/lib/prospection-fiche-lecture';
 import { InfestationRow, listAllProspectionInfestations } from '@/lib/prospection-repository';
 import { buildRecapitulatif, enregistrerEtSynchroniser } from '@/lib/prospection-review';
+import { estToutParti, resumerEnPhrase } from '@/lib/sync-lot';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
 import { useAsyncAction } from '@/hooks/use-async-action';
@@ -59,12 +60,15 @@ export default function ReviewScreen() {
         resetWizard();
         resetCaptureLoop();
         // La fiche est enregistrée localement dans tous les cas ; seul l'envoi
-        // peut avoir échoué. `resume.echouees[0].message` est déjà traduit par
-        // classe (#172) — le message brut ne sort plus d'ici.
-        const echec = resume.echouees[0];
+        // peut avoir échoué. Le message du résumé est déjà traduit par classe
+        // (#172) — le message brut ne sort plus d'ici. Le conflit compte comme
+        // « non parti » : le laisser passer pour un succès rendrait muet
+        // exactement ce que ce ticket rend visible.
         router.replace({
           pathname: '/(app)/prospection' as any,
-          params: echec ? { syncWarning: echec.message } : { justSaved: '1' },
+          params: estToutParti(resume)
+            ? { justSaved: '1' }
+            : { syncWarning: resumerEnPhrase(resume) },
         });
       },
       {

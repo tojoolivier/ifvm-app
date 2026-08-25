@@ -1,7 +1,6 @@
 import * as Network from 'expo-network';
 import type { components } from './api-schema.generated';
 import { apiClient, conflitSync } from './api-client';
-import { NetworkError } from './errors';
 import {
   DraftTraitement,
   markTraitementConflict,
@@ -10,9 +9,15 @@ import {
   ServerTraitement,
 } from './traitement-repository';
 import { logger } from './logger';
-import { syncAll, type LotSync, type ResumeSync } from './sync-lot';
+import { avecConnexion, syncAll, type LotSync, type ResumeSync } from './sync-lot';
 
 const log = logger.child({ module: 'traitement-sync' });
+
+/** Le réseau, tel que l'appareil le voit à cet instant. */
+async function estEnLigne(): Promise<boolean> {
+  const network = await Network.getNetworkStateAsync();
+  return Boolean(network.isConnected && network.isInternetReachable);
+}
 
 function parseJsonField<T>(value: string | null | undefined): T | null {
   if (!value) return null;
@@ -200,22 +205,6 @@ export const lotTraitement: LotSync<DraftTraitement> = {
 };
 
 /**
- * Hors ligne, l'envoi n'est pas tenté — mais il ne réussit pas non plus.
- *
- * Le `return { synced: false }` d'origine était indiscernable d'un succès pour
- * qui ne lisait pas le champ ; une `NetworkError` levée traverse la même
- * classification que n'importe quelle coupure et laisse la fiche en file.
- */
-async function exigerConnexion(): Promise<void> {
-  const network = await Network.getNetworkStateAsync();
-  if (!(network.isConnected && network.isInternetReachable)) {
-    throw new NetworkError(
-      'Appareil hors ligne — la fiche partira à la prochaine synchronisation.'
-    );
-  }
-}
-
-/**
  * Enregistre localement puis tente l'envoi, et **résume**.
  *
  * Le `{ synced, syncError }` d'avant était le Data Clump que #173 avait
@@ -226,13 +215,7 @@ export async function enregistrerEtSynchroniserTraitement(
   draft: DraftTraitement,
   token: string
 ): Promise<ResumeSync> {
-  return syncAll([draft], token, {
-    ...lotTraitement,
-    syncOne: async (fiche, jeton) => {
-      await exigerConnexion();
-      await syncOneTraitement(fiche, jeton);
-    },
-  });
+  return syncAll([draft], token, avecConnexion(lotTraitement, estEnLigne));
 }
 
 /** Synchronise un lot de traitements en attente. Ne lève jamais. */
