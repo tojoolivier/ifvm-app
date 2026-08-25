@@ -26,6 +26,7 @@ jest.mock('@/lib/prospection-repository', () => ({
   listAllProspectionInfestations: jest.fn().mockResolvedValue([]),
   listAllProspectionCaptures: jest.fn().mockResolvedValue([]),
   saveProspectionInfestation: jest.fn().mockResolvedValue(undefined),
+  deleteProspectionInfestation: jest.fn().mockResolvedValue(undefined),
   getProspection: jest.fn().mockResolvedValue(null),
   getDerniereDensiteMemeSite: jest.fn().mockResolvedValue(null),
   updateProspectionAvertissements: jest.fn().mockResolvedValue(undefined),
@@ -147,7 +148,7 @@ describe('InfestationScreen', () => {
   it('force le comportement sur "posé" pour un essaim signalé de nuit (#106)', async () => {
     jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
       {
-        // "essaim" a disparu (migration 0029) : Dense/Très dense sont désormais des
+        // "essaim" a disparu (migration 0031) : Dense/Très dense sont désormais des
         // type_cible à part entière, au même niveau que Vol clair.
         type_cible: 'dense',
         surface_totale: 12,
