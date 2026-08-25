@@ -156,22 +156,26 @@ export default function CapturesScreen() {
     const grilles = buildGrilles(selection);
     const completed = parseGrillesCompletees(draft.grilles_completees);
 
+    const codesDe = async (
+      espece: typeof grilles[number]['espece'],
+      categorie: 'imago' | 'larve',
+      sexe: 'F' | 'M' | null
+    ): Promise<string[]> => {
+      const stades = await listStadesGrille(espece, categorie, sexe);
+      return stades.map((s) => s.code);
+    };
+
     const chargerStades = async () => {
       const parGrille: Record<string, StadesGrille> = {};
       for (const g of grilles) {
-        const [f, m, larve] =
-          g.categorie === 'imago'
-            ? [
-                await listStadesGrille(g.espece, 'imago', 'F'),
-                await listStadesGrille(g.espece, 'imago', 'M'),
-                [],
-              ]
-            : [[], [], await listStadesGrille(g.espece, 'larve', null)];
-        parGrille[grilleKeyToString(g)] = {
-          F: f.map((s) => s.code),
-          M: m.map((s) => s.code),
-          larve: larve.map((s) => s.code),
-        };
+        const stades: StadesGrille = { F: [], M: [], larve: [] };
+        if (g.categorie === 'imago') {
+          stades.F = await codesDe(g.espece, 'imago', 'F');
+          stades.M = await codesDe(g.espece, 'imago', 'M');
+        } else {
+          stades.larve = await codesDe(g.espece, 'larve', null);
+        }
+        parGrille[grilleKeyToString(g)] = stades;
       }
       store.setStadesParGrille(parGrille);
       // Rejoué même si l'écran « espèces » l'a déjà fait : les compteurs par stade se
