@@ -83,6 +83,37 @@ export interface StadeGrille {
   libelle: string;
 }
 
+export interface EtatTableReferentiel {
+  table: string;
+  lignes: number;
+}
+
+/** Tables miroir du référentiel, dans l'ordre d'affichage du diagnostic. */
+const TABLES_REFERENTIEL = [
+  'poste_acridien',
+  'station_fixe',
+  'utilisateur_equipe',
+  'pesticide',
+  'culture',
+  'code_stade',
+  'campagne',
+];
+
+/**
+ * Nombre de lignes par table miroir — diagnostic affiché sur l'écran Synchronisation.
+ * « Synchro réussie » ne dit rien de ce qui a atterri : sans ce compte, une table vide
+ * reste invisible et se confond avec un bug d'écran (#201).
+ */
+export async function compterReferentielLocal(): Promise<EtatTableReferentiel[]> {
+  const db = await getReferentielDb();
+  const etats: EtatTableReferentiel[] = [];
+  for (const table of TABLES_REFERENTIEL) {
+    const row = await db.getFirstAsync<{ n: number }>(`SELECT count(*) AS n FROM ${table}`);
+    etats.push({ table, lignes: row?.n ?? 0 });
+  }
+  return etats;
+}
+
 /**
  * Stades d'une grille de saisie, dans l'ordre du référentiel. C'est le référentiel
  * synchronisé — et non une liste écrite en dur dans l'écran — qui décide quels stades
