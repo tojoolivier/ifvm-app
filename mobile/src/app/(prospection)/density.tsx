@@ -203,7 +203,9 @@ export default function DensityScreen() {
 
           <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
             <TouchableOpacity style={styles.continueButton} onPress={handleContinue} disabled={isSaving} activeOpacity={0.85}>
-              <Text style={styles.continueButtonText}>Accouplement  ›</Text>
+              <Text style={styles.continueButtonText}>
+                {grille.categorie === 'imago' ? 'Accouplement  ›' : 'Captures  ›'}
+              </Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>

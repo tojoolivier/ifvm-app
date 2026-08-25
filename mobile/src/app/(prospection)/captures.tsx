@@ -500,10 +500,13 @@ export default function CapturesScreen() {
             params: { draftId },
           });
         } else {
-          const nextGrille = grilleOrder[currentGrilleIndex + 1];
-          const nextScreen = nextGrille.categorie === 'imago' ? 'density' : 'captures';
+          // density.tsx gère déjà indifféremment imagos et larves (densité diffuse/groupée
+          // par espèce + stade) : chaque grille — larve comprise — y transite d'abord, avant
+          // de repartir vers accouplement.tsx (imago) ou directement captures.tsx (larve).
+          // Sans ce détour systématique, les grilles larve sautaient density.tsx et leurs
+          // densités n'étaient jamais saisies.
           router.push({
-            pathname: `/(prospection)/${nextScreen}` as any,
+            pathname: '/(prospection)/density' as any,
             params: { draftId, grilleIndex: String(currentGrilleIndex + 1) },
           });
         }

@@ -70,8 +70,10 @@ export default function SpeciesScreen() {
         setDraft(await saveEspeceSelection(draftId, selection));
         const grilles = buildGrilles(selection);
         initGrilles(grilles, [], captures);
-        const firstScreen = grilles[0]?.categorie === 'imago' ? 'density' : 'captures';
-        router.push({ pathname: `/(prospection)/${firstScreen}` as any, params: { draftId, grilleIndex: '0' } });
+        // density.tsx gère indifféremment imagos et larves (densité diffuse/groupée par
+        // espèce + stade) : toute grille — larve comprise — y transite d'abord, sans quoi
+        // ses densités n'étaient jamais saisies (cf. même correctif dans captures.tsx).
+        router.push({ pathname: '/(prospection)/density' as any, params: { draftId, grilleIndex: '0' } });
       },
       {
         screen: 'species',
