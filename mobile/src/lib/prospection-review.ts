@@ -18,7 +18,7 @@ import {
   listAllProspectionPopulations,
   listAllProspectionInfestations,
 } from './prospection-repository';
-import { PHENOTYPES, TYPE_CIBLE_OPTIONS } from './prospection-fiche-lecture';
+import { PHENOTYPES, TYPE_CIBLE_OPTIONS, formatHeureLocale } from './prospection-fiche-lecture';
 import { CaptureCounts, dominantPhenotype, rowsToCounts, totalBySexe, totalCaptures } from './prospection-capture-store';
 import { CHRONO_MAX_SECONDS, capturesMaxFor, phenotypesFor } from './prospection-especes-stades';
 import { buildGrilles, parseEspeceSelection } from './prospection-especes';
@@ -58,6 +58,7 @@ export interface RecapitulatifViewModel {
   infestationSummary: string;
   comportementSummary: string;
   observationsText: string;
+  heureObservationLabel: string;
 }
 
 const ESPECE_LABEL = { LMC: 'Locusta', NSE: 'Nomadacris' } as const;
@@ -154,6 +155,7 @@ export function buildRecapitulatif(
     infestationSummary: buildInfestationSummary(infestations),
     comportementSummary: buildComportementSummary(infestations),
     observationsText: draft.observations?.trim() ? draft.observations : 'Aucune observation renseignée.',
+    heureObservationLabel: formatHeureLocale(draft.heure_observation_at),
   };
 }
 
@@ -272,6 +274,7 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
     degats_cultures_pourcent: draft.degats_cultures_pourcent ? Number(draft.degats_cultures_pourcent) : null,
     verdissement_pourcent: draft.verdissement_pourcent ? Number(draft.verdissement_pourcent) : null,
     hauteur_herbe_cm: draft.hauteur_herbe_cm ? Number(draft.hauteur_herbe_cm) : null,
+    heure_observation_at: draft.heure_observation_at || null,
     station_libre: draft.station_libre || null,
     type_station: (draft.type_station || null) as ProspectionCreateInput['type_station'],
     verdure_strate: (draft.verdure_strate || null) as ProspectionCreateInput['verdure_strate'],

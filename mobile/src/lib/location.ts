@@ -9,6 +9,9 @@ export interface GpsPosition {
   longitude: number;
   altitude: number | null;
   accuracy: number | null;
+  /** Horodatage (ms epoch) fourni par le GPS lui-même au moment du fix — pas `Date.now()`,
+   * pris à un instant potentiellement différent (calcul, attente réseau...). */
+  timestamp: number;
 }
 
 /** Demande la permission de localisation puis acquiert la position courante. */
@@ -30,6 +33,7 @@ export async function getCurrentPosition(): Promise<GpsPosition> {
     longitude: position.coords.longitude,
     altitude: position.coords.altitude,
     accuracy: position.coords.accuracy,
+    timestamp: position.timestamp,
   };
 }
 

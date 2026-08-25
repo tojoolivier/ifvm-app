@@ -93,6 +93,7 @@ function draft(overrides: Partial<DraftProspection> = {}): DraftProspection {
     degats_cultures_pourcent: null,
     verdissement_pourcent: null,
     hauteur_herbe_cm: null,
+    heure_observation_at: null,
     station_libre: null,
     type_station: null,
     verdure_strate: null,

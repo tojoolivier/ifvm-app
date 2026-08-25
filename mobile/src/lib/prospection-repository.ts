@@ -77,6 +77,9 @@ export interface DraftProspection {
   sol: string | null;
   ennemis_naturels: string | null;
   observations: string | null;
+  /** Horodatage ISO de l'acquisition GPS sur l'écran Observations (§ heure d'observation
+   * automatique) — distinct de `heure_observation` sur une ligne d'infestation. */
+  heure_observation_at: string | null;
   avertissements: string | null;
   statut: string;
   statut_sync: string;
@@ -127,6 +130,7 @@ export interface ObservationsUpdateInput {
   dernierePluie?: string | null;
   intensitePluie?: string | null;
   observations: string | null;
+  heureObservationAt: string | null;
 }
 
 export interface VegetationUpdateInput {
@@ -459,9 +463,13 @@ export async function updateProspectionObservations(id: string, input: Observati
   await db.runAsync(
     `UPDATE prospection SET
       degats_cultures = ?, ennemis_naturels = ?, observations = ?,
-      derniere_pluie = ?, intensite_pluie = ?, updated_at = ?
+      derniere_pluie = ?, intensite_pluie = ?, heure_observation_at = ?, updated_at = ?
      WHERE id = ?`,
-    [input.degatsCultures, input.ennemisNaturels, input.observations, input.dernierePluie ?? null, input.intensitePluie ?? null, now, id]
+    [
+      input.degatsCultures, input.ennemisNaturels, input.observations,
+      input.dernierePluie ?? null, input.intensitePluie ?? null, input.heureObservationAt,
+      now, id,
+    ]
   );
 
   const updated = await getProspection(id);

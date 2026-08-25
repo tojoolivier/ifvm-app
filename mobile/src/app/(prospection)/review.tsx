@@ -142,6 +142,10 @@ export default function ReviewScreen() {
 
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Observations</Text>
+            <View style={styles.summaryLine}>
+              <Text style={styles.summaryLineLabel}>Heure d&apos;observation</Text>
+              <Text style={styles.summaryLineValue}>{recap.heureObservationLabel}</Text>
+            </View>
             <Text style={styles.paragraph}>{recap.observationsText}</Text>
           </View>
 

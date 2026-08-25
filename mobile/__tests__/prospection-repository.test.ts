@@ -315,9 +315,10 @@ describe('updateProspectionObservations', () => {
     degatsCultures: 'moyens',
     ennemisNaturels: 'Oiseaux, Mantes',
     observations: 'RAS',
+    heureObservationAt: null as string | null,
   };
 
-  it('updates degats_cultures/ennemis_naturels/observations/derniere_pluie/intensite_pluie columns', async () => {
+  it('updates degats_cultures/ennemis_naturels/observations/derniere_pluie/intensite_pluie/heure_observation_at columns', async () => {
     getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW, ...OBSERVATIONS_INPUT });
 
     await updateProspectionObservations(BASE_INPUT.id, OBSERVATIONS_INPUT);
@@ -330,14 +331,20 @@ describe('updateProspectionObservations', () => {
         OBSERVATIONS_INPUT.observations,
         null,
         null,
+        OBSERVATIONS_INPUT.heureObservationAt,
         expect.any(String),
         BASE_INPUT.id,
       ]
     );
   });
 
-  it('passes derniere_pluie/intensite_pluie through when provided', async () => {
-    const input = { ...OBSERVATIONS_INPUT, dernierePluie: '2026-08-01', intensitePluie: 'forte' };
+  it('passes derniere_pluie/intensite_pluie/heure_observation_at through when provided', async () => {
+    const input = {
+      ...OBSERVATIONS_INPUT,
+      dernierePluie: '2026-08-01',
+      intensitePluie: 'forte',
+      heureObservationAt: '2026-08-25T14:35:00.000Z',
+    };
     getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW, ...input });
 
     await updateProspectionObservations(BASE_INPUT.id, input);
@@ -350,6 +357,7 @@ describe('updateProspectionObservations', () => {
         input.observations,
         input.dernierePluie,
         input.intensitePluie,
+        input.heureObservationAt,
         expect.any(String),
         BASE_INPUT.id,
       ]
