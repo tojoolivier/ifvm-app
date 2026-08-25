@@ -4,6 +4,7 @@
  * l'heure d'observation. Elle était donc jugée « vide » et jamais enregistrée : à la
  * réouverture de la fiche, la partie comportement/infestation n'affichait plus rien.
  */
+import { Alert } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import InfestationScreen from '@/app/(prospection)/infestation';
 import * as prospectionRepository from '@/lib/prospection-repository';
@@ -15,6 +16,7 @@ jest.mock('expo-router', () =>
 jest.mock('@/lib/prospection-repository', () => ({
   listAllProspectionInfestations: jest.fn().mockResolvedValue([]),
   saveProspectionInfestation: jest.fn().mockResolvedValue(undefined),
+  deleteProspectionInfestation: jest.fn().mockResolvedValue(undefined),
   getProspection: jest.fn().mockResolvedValue(null),
   // Ajouté par le parcours « stade dominant auto » : l'écran lit désormais les
   // captures déjà saisies au montage.
@@ -29,6 +31,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
 describe('InfestationScreen — persistance des cibles sélectionnées', () => {
   beforeEach(() => {
     jest.mocked(prospectionRepository.saveProspectionInfestation).mockClear();
+    jest.mocked(prospectionRepository.deleteProspectionInfestation).mockClear();
     jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValue([]);
   });
 
@@ -76,5 +79,41 @@ describe('InfestationScreen — persistance des cibles sélectionnées', () => {
 
     expect(await screen.findByText('09:30')).toBeVisible();
     expect(screen.getByText(/Comportement · Dense/)).toBeVisible();
+  });
+
+  it('la section Infestation est facultative : "Continuer" passe au slide suivant sans aucune cible sélectionnée', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert');
+    await render(<InfestationScreen />);
+    expect(await screen.findByText('Aucun type sélectionné')).toBeVisible();
+    // Sans sélection, il n'y a rien à configurer dans l'onglet Comportement : le bouton
+    // dit directement "Continuer" et ne fait pas transiter par cet onglet vide.
+    expect(screen.getByText('Continuer  ›')).toBeVisible();
+
+    fireEvent.press(screen.getByText('Continuer  ›'));
+    await settle();
+
+    // Ni bloqué par "Sélection requise", ni par aucune autre alerte de validation.
+    expect(alertSpy).not.toHaveBeenCalled();
+    // Rien à enregistrer : aucune ligne n'a été ni sauvegardée ni supprimée.
+    expect(prospectionRepository.saveProspectionInfestation).not.toHaveBeenCalled();
+    expect(prospectionRepository.deleteProspectionInfestation).not.toHaveBeenCalled();
+  });
+
+  it('désélectionner une cible déjà enregistrée la supprime réellement de la base (et pas seulement de l’écran)', async () => {
+    jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValue([
+      { type_cible: 'vol_clair', comportement: 'repos' } as any,
+    ]);
+
+    await render(<InfestationScreen />);
+    // La cible restaurée apparaît cochée (✓) — un nouvel appui la désélectionne.
+    fireEvent.press(await screen.findByText('Vol clair'));
+    await settle();
+
+    fireEvent.press(screen.getByText('Continuer  ›'));
+
+    await waitFor(() =>
+      expect(prospectionRepository.deleteProspectionInfestation).toHaveBeenCalledWith('draft-123', 'vol_clair')
+    );
+    expect(prospectionRepository.saveProspectionInfestation).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import {
   CaptureRow,
   DraftProspection,
   InfestationRow,
+  deleteProspectionInfestation,
   getDerniereDensiteMemeSite,
   getProspection,
   listAllProspectionCaptures,
@@ -372,6 +373,11 @@ export default function InfestationScreen() {
   // sans qu'on ait besoin de le retirer explicitement de l'état brut.
   const selectedTargets = selectedTargetsRaw.filter(isTargetAvailable);
 
+  // Cibles effectivement enregistrées en base au dernier chargement/enregistrement — sert
+  // à distinguer « jamais sélectionné » de « désélectionné après avoir été enregistré » :
+  // seul ce dernier cas doit déclencher une suppression (cf. persistAll ci-dessous).
+  const savedTargetsRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     if (!draftId) return;
     void listAllProspectionInfestations(draftId)
@@ -394,6 +400,7 @@ export default function InfestationScreen() {
         }
         setForms(next);
         setSelectedTargets(selected);
+        savedTargetsRef.current = new Set(selected);
       })
       .catch((error) => signalerChargement(error, { draftId }));
   }, [draftId, signalerChargement]);
@@ -606,14 +613,24 @@ export default function InfestationScreen() {
     for (const target of selectedTargets) {
       await saveProspectionInfestation(draftId, target, rowFromForm(target, forms[target]));
     }
+    // Symétrique : une cible désélectionnée après avoir été enregistrée doit disparaître
+    // de la base, sinon elle réapparaît sélectionnée à la prochaine ouverture de la fiche
+    // — la section Infestation doit rester réversible, pas seulement remplissable.
+    for (const target of savedTargetsRef.current) {
+      if (!selectedTargets.includes(target)) {
+        await deleteProspectionInfestation(draftId, target);
+      }
+    }
+    savedTargetsRef.current = new Set(selectedTargets);
   };
 
   const handleFooterPress = () => {
-    if (selectedTargets.length === 0) {
-      Alert.alert('Sélection requise', 'Veuillez sélectionner au moins un type de cible.');
-      return;
-    }
-    if (tab === 'desc') {
+    // La section Infestation est entièrement facultative : ne rien sélectionner ne doit
+    // jamais bloquer la navigation. Sans cible sélectionnée, il n'y a rien à configurer
+    // dans l'onglet Comportement (masqué dans ce cas, cf. `tab === 'comport' &&
+    // selectedTargets.length > 0` plus bas) — on saute donc directement l'étape et on
+    // enregistre (aucune ligne à persister) avant de continuer.
+    if (tab === 'desc' && selectedTargets.length > 0) {
       setTab('comport');
       return;
     }
@@ -1319,13 +1336,13 @@ export default function InfestationScreen() {
 
           <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
             <TouchableOpacity
-              style={[styles.continueButton, selectedTargets.length === 0 && styles.continueButtonDisabled]}
+              style={[styles.continueButton, isSaving && styles.continueButtonDisabled]}
               onPress={handleFooterPress}
-              disabled={isSaving || selectedTargets.length === 0}
+              disabled={isSaving}
               activeOpacity={0.85}
             >
               <Text style={styles.continueButtonText}>
-                {tab === 'desc' ? 'Comportement  ›' : 'Continuer  ›'}
+                {tab === 'desc' && selectedTargets.length > 0 ? 'Comportement  ›' : 'Continuer  ›'}
               </Text>
             </TouchableOpacity>
           </View>
