@@ -65,11 +65,11 @@ describe('buildInfestationSynthese', () => {
 
   it('résout les labels de type de cible et comportement', () => {
     const infestations: InfestationRead[] = [
-      { id: 'i1', type_cible: 'essaim', surface_totale: 12.5, densite_moy: null, comportement: 'deplacement' },
+      { id: 'i1', type_cible: 'dense', surface_totale: 12.5, densite_moy: null, comportement: 'deplacement' },
     ]
     expect(buildInfestationSynthese(infestations)).toEqual({
       hasInfestation: true,
-      typeLabel: 'Essaim',
+      typeLabel: 'Dense',
       surfaceTotale: 12.5,
       comportementLabel: 'Déplacement',
     })
@@ -86,6 +86,18 @@ describe('buildVegetationSummary', () => {
     expect(summary).toBe('Strates (100%) : herbeuse 60%, arboree 40% · Humidité 0,5 cm · Texture Limoneuse · Dégâts culture Faibles'
       .replace('herbeuse', 'Herbeuse')
       .replace('arboree', 'Arborée'))
+  })
+
+  it('liste TOUTES les textures d’une sélection multiple (mobile veg.tsx), pas seulement la première', () => {
+    // Régression : `sol.texture` était traité comme une simple string alors que le mobile
+    // enregistre un tableau ("sélection multiple") — la texture disparaissait donc
+    // silencieusement de la synthèse, même correctement enregistrée en base.
+    const summary = buildVegetationSummary(
+      { strates: {} },
+      { humidite: 'surface', texture: ['limoneuse', 'argileuse', 'cailloux'] },
+      null,
+    )
+    expect(summary).toContain('Texture Limoneuse, Argileuse, Cailloux')
   })
 
   it('retourne un tiret si aucune donnée de végétation', () => {
@@ -108,13 +120,13 @@ describe('buildFicheImprimable', () => {
       degats_cultures: 'nuls',
       captures: [{ id: '1', espece: 'LMC', categorie: 'imago', phase: 'gregaire', stade: 'A1', effectif: 5 }],
       populations: [],
-      infestations: [{ id: 'i1', type_cible: 'essaim', surface_totale: 10, densite_moy: null, comportement: 'repos' }],
+      infestations: [{ id: 'i1', type_cible: 'dense', surface_totale: 10, densite_moy: null, comportement: 'repos' }],
     })
 
     expect(vm.nFiche).toBe('F-042')
     expect(vm.positionGps).toBe('-18.5000, 47.2000')
     expect(vm.especes).toHaveLength(1)
-    expect(vm.infestation.typeLabel).toBe('Essaim')
+    expect(vm.infestation.typeLabel).toBe('Dense')
     expect(vm.vegetationSummary).toContain('Herbeuse 100%')
   })
 
