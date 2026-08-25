@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   EspeceSelection,
   countGrilles,
@@ -12,6 +12,7 @@ import {
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
 import { useAsyncAction } from '@/hooks/use-async-action';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -23,15 +24,26 @@ const INACTIVE_TEXT = '#9a9484';
 
 export default function SpeciesScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { draftId } = useLocalSearchParams<{ draftId: string }>();
-  const captures = useProspectionWizardStore((s) => s.captures);
   const draft = useProspectionWizardStore((s) => s.draft);
+  const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
   const setDraft = useProspectionWizardStore((s) => s.setDraft);
+  const captures = useProspectionWizardStore((s) => s.captures);
   const initGrilles = useProspectionCaptureStore((s) => s.initGrilles);
   const [selection, setSelection] = useState<EspeceSelection>(() =>
     parseEspeceSelection(draft?.especes ?? null)
   );
   const { run, isRunning: isSaving } = useAsyncAction();
+  const signalerChargement = useSignalerChargement('species');
+
+  // Reconstruit le store si l'app a été relancée directement sur cet écran
+  // (même garde-fou que les autres écrans du parcours).
+  useEffect(() => {
+    if (draftId && draft?.id !== draftId) {
+      void hydrateFromDraft(draftId).catch((error) => signalerChargement(error, { draftId }));
+    }
+  }, [draftId, draft?.id, hydrateFromDraft, signalerChargement]);
 
   // Le store peut n'être hydraté qu'après le montage : on rejoue la restauration
   // à l'arrivée du brouillon, sans écraser une sélection déjà touchée par l'agent.
@@ -58,8 +70,10 @@ export default function SpeciesScreen() {
         setDraft(await saveEspeceSelection(draftId, selection));
         const grilles = buildGrilles(selection);
         initGrilles(grilles, [], captures);
-        const firstScreen = grilles[0]?.categorie === 'imago' ? 'density' : 'captures';
-        router.push({ pathname: `/(prospection)/${firstScreen}` as any, params: { draftId, grilleIndex: '0' } });
+        // density.tsx gère indifféremment imagos et larves (densité diffuse/groupée par
+        // espèce + stade) : toute grille — larve comprise — y transite d'abord, sans quoi
+        // ses densités n'étaient jamais saisies (cf. même correctif dans captures.tsx).
+        router.push({ pathname: '/(prospection)/density' as any, params: { draftId, grilleIndex: '0' } });
       },
       {
         screen: 'species',
@@ -147,7 +161,7 @@ export default function SpeciesScreen() {
             </View>
           </View>
 
-          <View style={styles.footer}>
+          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
             <TouchableOpacity
               style={[styles.continueButton, stepsCount === 0 && styles.continueButtonDisabled]}
               onPress={handleContinue}

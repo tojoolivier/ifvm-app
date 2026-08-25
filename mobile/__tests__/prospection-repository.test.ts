@@ -21,6 +21,7 @@ import {
   listAllProspectionPopulations,
   getProspectionInfestation,
   saveProspectionInfestation,
+  deleteProspectionInfestation,
   listAllProspectionInfestations,
   deleteProspection,
 } from '../src/lib/prospection-repository';
@@ -796,6 +797,17 @@ describe('saveProspectionInfestation', () => {
         null,
         'existing-id',
       ]
+    );
+  });
+});
+
+describe('deleteProspectionInfestation', () => {
+  it('removes only the row for this prospection + type_cible, leaving other formations untouched', async () => {
+    await deleteProspectionInfestation(BASE_INPUT.id, 'vol_clair');
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('DELETE FROM prospection_infestation'),
+      [BASE_INPUT.id, 'vol_clair']
     );
   });
 });
