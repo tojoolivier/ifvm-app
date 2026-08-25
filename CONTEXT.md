@@ -170,7 +170,12 @@ Avant de partir sur le terrain, l'app doit télécharger :
 **Niveau 2 (indispensable)** :
 - Noms de pesticides disponibles
 - Types de cultures / zones cibles
-- Codes stades d'espèces (LMC: A1-A5, NSE: L1-L7)
+- Codes stades (`code_stade`) : où chaque stade se saisit — catégorie, sexe, espèce, ordre.
+  Le vocabulaire lui-même vit dans `stade`, cible de la FK `prospection_capture.stade`.
+  Un même code appartient à plusieurs grilles (A1 est un stade ♀ *et* ♂) ; `espece`/`sexe`
+  à NULL valent « toutes espèces » / « non sexé ». Seuls L6 et L7 sont propres à NSE.
+  Les grilles de saisie du mobile se construisent depuis cette table, jamais depuis une
+  liste écrite en dur — c'est cette divergence qui a fait échouer #201.
 
 ### Gestion des conflits
 
@@ -222,7 +227,7 @@ prospection → station (fixe pour intensive, ponctuelle pour extensive/validati
   ├── prospection_population (densités diffuses/groupées, captures, accouplement, ponte)  [queryable]
   ├── prospection_capture    (espece × categorie × sexe? × phase × stade × effectif)      [queryable]
   │                          ├── sexe NULL pour extensive/validation (absorbe les 2 granularités)
-  │                          └── stade contraint par espece : LMC ⇒ A1-A5, NSE ⇒ L1-L7
+  │                          └── stade → FK vers `stade.code` (le référentiel fait autorité, cf. ci-dessous)
   └── prospection_infestation (taches, bandes, vols, essaims)                             [queryable]
 
 audit_log

@@ -249,12 +249,39 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
     { name: 'district', type: 'TEXT' },
     { name: 'region', type: 'TEXT' },
   ]);
-  // `code_stade` ne portait que (code, espece) : il ne pouvait pas décrire les grilles.
-  await addColumnsIfMissing(db, 'code_stade', [
-    { name: 'categorie', type: 'TEXT' },
-    { name: 'sexe', type: 'TEXT' },
-    { name: 'ordre', type: 'INTEGER NOT NULL DEFAULT 0' },
-  ]);
+  await migrateCodeStade(db);
+}
+
+/**
+ * `code_stade` ne portait que (code, espece NOT NULL) : il ne pouvait pas décrire les
+ * grilles, et refuserait désormais les stades valables pour les deux espèces
+ * (espece = NULL). SQLite ne sait pas relâcher un NOT NULL — la table étant un simple
+ * cache du référentiel, on la recrée et on remet son curseur à zéro pour que la
+ * prochaine synchro la repeuple entièrement.
+ */
+async function migrateCodeStade(db: SQLite.SQLiteDatabase): Promise<void> {
+  const colonnes = await db.getAllAsync<{ name: string; notnull: number }>(
+    'PRAGMA table_info(code_stade)'
+  );
+  const espece = colonnes.find((c) => c.name === 'espece');
+  const aJour = colonnes.some((c) => c.name === 'categorie') && espece?.notnull === 0;
+  if (aJour) return;
+
+  await db.execAsync(`
+    DROP TABLE IF EXISTS code_stade;
+    CREATE TABLE code_stade (
+      id TEXT PRIMARY KEY NOT NULL,
+      code TEXT NOT NULL,
+      categorie TEXT,
+      sexe TEXT,
+      espece TEXT,
+      libelle TEXT NOT NULL,
+      ordre INTEGER NOT NULL DEFAULT 0,
+      actif INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL
+    );
+  `);
+  await db.runAsync("DELETE FROM referentiel_sync_meta WHERE entity_type = 'codes_stades'");
 }
 
 async function addColumnsIfMissing(

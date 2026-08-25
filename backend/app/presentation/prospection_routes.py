@@ -224,6 +224,10 @@ async def update_prospection(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    except StationNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except (ProspectionIntegriteError, StadeInconnuError) as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     if prospection is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prospection non trouvée")
     return prospection

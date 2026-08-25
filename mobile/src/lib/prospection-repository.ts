@@ -893,7 +893,7 @@ export async function loadExtensiveImagoSpeciesData(
       femelleA1: 0, femelleA2: 0, femelleA3: 0,
       femelleA3_1_4: 0, femelleA3_1_2: 0, femelleA3_3_4: 0,
       femelleA3_4_4: 0, femelleA4: 0, femelleA5: 0,
-      maleA1: 0, maleA123: 0, maleA5: 0,
+      maleA1: 0, maleA234: 0, maleA5: 0,
     },
     popDiff: row.densite_diffuse != null ? String(row.densite_diffuse) : '',
     popGroup: row.densite_groupee != null ? String(row.densite_groupee) : '',

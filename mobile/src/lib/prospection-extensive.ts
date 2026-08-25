@@ -1,4 +1,4 @@
-import { Espece, stadesFor } from './prospection-especes-stades';
+import { Espece, stadesLarvairesFor } from './prospection-especes-stades';
 import { PopulationRow } from './prospection-repository';
 
 export const EXTENSIVE_IMAGO_PHASES = ['A1', 'A2', 'A3', 'A4', 'A5'];
@@ -82,7 +82,7 @@ export interface ExtensiveImagoSpeciesData {
     femelleA4: number;
     femelleA5: number;
     maleA1: number;
-    maleA123: number;
+    maleA234: number;
     maleA5: number;
   };
   popDiff: string;
@@ -135,7 +135,7 @@ export function createEmptySpeciesData(): ExtensiveImagoSpeciesData {
       femelleA4: 0,
       femelleA5: 0,
       maleA1: 0,
-      maleA123: 0,
+      maleA234: 0,
       maleA5: 0,
     },
     popDiff: '',
@@ -145,7 +145,7 @@ export function createEmptySpeciesData(): ExtensiveImagoSpeciesData {
 }
 
 export function createEmptyLarveSpeciesData(espece: Espece): ExtensiveLarveSpeciesData {
-  const stadesList = stadesFor(espece, 'larve', null);
+  const stadesList = stadesLarvairesFor(espece);
   const stades: Record<string, number> = {};
   for (const stade of stadesList) {
     stades[stade] = 0;
@@ -164,8 +164,8 @@ export function createEmptyLarveSpeciesData(espece: Espece): ExtensiveLarveSpeci
 
 export function emptyExtensiveLarveState(espece: Espece): ExtensiveLarveState {
   const densites: Record<string, number> = {};
-  for (const stade of stadesFor(espece, 'larve', null)) densites[stade] = 0;
-  return { stade: stadesFor(espece, 'larve', null)[0], densites, tl: false, bl: false, interdist: '', deplacement: 'repos' };
+  for (const stade of stadesLarvairesFor(espece)) densites[stade] = 0;
+  return { stade: stadesLarvairesFor(espece)[0], densites, tl: false, bl: false, interdist: '', deplacement: 'repos' };
 }
 
 export function imagoTotal(state: ExtensiveImagoState): number {
@@ -185,7 +185,7 @@ export function totalStadesFemelles(data: ExtensiveImagoSpeciesData): number {
 
 export function totalStadesMales(data: ExtensiveImagoSpeciesData): number {
   const s = data.stades;
-  return s.maleA1 + s.maleA123 + s.maleA5;
+  return s.maleA1 + s.maleA234 + s.maleA5;
 }
 
 export function totalStadesForSpecies(data: ExtensiveImagoSpeciesData): number {
@@ -307,7 +307,7 @@ export function populationRowToSpeciesData(row: PopulationRow | null): Extensive
       femelleA4: 0,
       femelleA5: 0,
       maleA1: 0,
-      maleA123: 0,
+      maleA234: 0,
       maleA5: 0,
     },
     popDiff: row.densite_diffuse != null ? String(row.densite_diffuse) : '',
