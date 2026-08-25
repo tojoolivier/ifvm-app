@@ -92,6 +92,7 @@ async def test_create_prospection_avec_nouveaux_champs(
             "degats_cultures_pourcent": 25,
             "verdissement_pourcent": 60,
             "hauteur_herbe_cm": 30.5,
+            "heure_observation_at": "2026-07-29T11:35:00+03:00",
             "infestations": [
                 {
                     "espece": "LMC",
@@ -124,6 +125,9 @@ async def test_create_prospection_avec_nouveaux_champs(
     assert data["degats_cultures_pourcent"] == 25
     assert data["verdissement_pourcent"] == 60
     assert data["hauteur_herbe_cm"] == 30.5
+    # Horodatage GPS de l'écran Observations, distinct de l'heure_observation par
+    # cible d'infestation testée juste en dessous (infestation["heure_observation"]).
+    assert data["heure_observation_at"] == "2026-07-29T11:35:00+03:00"
 
     assert len(data["infestations"]) == 1
     infestation = data["infestations"][0]
