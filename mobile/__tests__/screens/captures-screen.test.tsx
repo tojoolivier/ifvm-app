@@ -4,7 +4,7 @@
  * Tant qu'il vaut 0, les sections Phases et Stades restent masquées et la saisie
  * précédente paraît perdue.
  */
-import { render, screen } from '@testing-library/react-native';
+import { act, render, screen } from '@testing-library/react-native';
 import CapturesScreen from '@/app/(prospection)/captures';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
@@ -163,6 +163,36 @@ describe('CapturesScreen', () => {
     await render(<CapturesScreen />);
 
     // Grille 1 = LMC larve — l'en-tête nomme la grille effectivement affichée.
+    expect(await screen.findByText(/Larves/)).toBeVisible();
+  });
+
+  it('montre un chargement, jamais un écran vide, pendant la lecture du vocabulaire (#201)', async () => {
+    let libere: (v: { code: string; libelle: string }[]) => void = () => {};
+    jest
+      .mocked(referentielDb.listStadesGrille)
+      .mockImplementation(() => new Promise((resolve) => (libere = resolve)));
+
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'intensive',
+        especes: JSON.stringify({ lmcImago: false, lmcLarve: true, nseImago: false, nseLarve: false }),
+        grilles_completees: null,
+        capture_started_at: '2026-08-25T08:00:00.000Z',
+      } as any,
+      captures: [],
+    });
+
+    await render(<CapturesScreen />);
+
+    // L'attente est visible, et un retour reste offert — pas une page morte.
+    expect(await screen.findByText('Chargement de la grille…')).toBeVisible();
+    expect(screen.getByText('‹')).toBeVisible();
+
+    await act(async () => {
+      libere([{ code: 'L1', libelle: 'L1' }]);
+    });
+
     expect(await screen.findByText(/Larves/)).toBeVisible();
   });
 
