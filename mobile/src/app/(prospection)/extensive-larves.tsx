@@ -132,7 +132,12 @@ export default function ExtensiveLarvesScreen() {
           saveProspectionPopulation(draftId, larveSpeciesDataToPopulationRow('NSE', speciesData.NSE, commonData)),
         ]);
 
-        router.push({ pathname: '/(prospection)/extensive-recap' as any, params: { draftId } });
+        // Observations (dégâts/verdure/hauteur/pluie) suit toujours Larves dans le
+        // parcours Extensive — cf. extensive-observations.tsx et le récapitulatif
+        // (bloc « D · Observations »), tous deux déjà écrits pour cette place dans
+        // le parcours. Cet écran était jusqu'ici sauté (routage direct vers le
+        // récapitulatif), rendant Observations inatteignable côté Extensif.
+        router.push({ pathname: '/(prospection)/extensive-observations' as any, params: { draftId } });
       },
       {
         screen: 'extensive-larves',
@@ -425,7 +430,7 @@ export default function ExtensiveLarvesScreen() {
               disabled={isSaving || (!isConsistent && data.totalCaptures > 0)}
               activeOpacity={0.85}
             >
-              <Text style={styles.continueButtonText}>Suivant : Récap ›</Text>
+              <Text style={styles.continueButtonText}>Suivant : Observations ›</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>

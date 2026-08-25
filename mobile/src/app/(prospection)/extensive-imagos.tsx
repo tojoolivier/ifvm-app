@@ -11,7 +11,6 @@ import {
   createEmptySpeciesData,
   speciesDataToPopulationRow,
   populationRowToSpeciesData,
-  extractCommonImagoData,
 } from '@/lib/prospection-extensive';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
@@ -38,9 +37,6 @@ export default function ExtensiveImagosScreen() {
     NSE: createEmptySpeciesData(),
   });
   
-  // Données communes
-  const [typeCapture, setTypeCapture] = useState<'essaim' | 'volClair'>('essaim');
-  
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('extensive-imagos');
 
@@ -58,9 +54,6 @@ export default function ExtensiveImagosScreen() {
           LMC: lmcData,
           NSE: nseData,
         });
-
-        const commonData = extractCommonImagoData(lmc || nse);
-        setTypeCapture(commonData.typeCapture);
       })
       .catch((error) => signalerChargement(error, { draftId }));
   }, [draftId, signalerChargement]);
@@ -135,13 +128,13 @@ const handleContinue = () => {
       await saveProspectionPopulation(draftId, speciesDataToPopulationRow('LMC', speciesData.LMC, {
         popDiff: speciesData.LMC.popDiff,
         popGroup: speciesData.LMC.popGroup,
-        typeCapture,
+        typeCapture: speciesData.LMC.typeCapture,
       }));
 
       await saveProspectionPopulation(draftId, speciesDataToPopulationRow('NSE', speciesData.NSE, {
         popDiff: speciesData.NSE.popDiff,
         popGroup: speciesData.NSE.popGroup,
-        typeCapture,
+        typeCapture: speciesData.NSE.typeCapture,
       }));
 
       router.push({ pathname: '/(prospection)/extensive-larves' as any, params: { draftId } });
@@ -404,21 +397,21 @@ const handleContinue = () => {
 
             <View style={styles.typeSection}>
               <Text style={styles.sectionLabel}>📊 Type de capture</Text>
-              <Text style={styles.commonHint}>Commun à LMC et NSE</Text>
+              <Text style={styles.commonHint}>Données spécifiques à {species}</Text>
               <View style={styles.typeRow}>
                 <TouchableOpacity
-                  style={[styles.typeButton, typeCapture === 'essaim' && styles.typeButtonActive]}
-                  onPress={() => setTypeCapture('essaim')}
+                  style={[styles.typeButton, data.typeCapture === 'essaim' && styles.typeButtonActive]}
+                  onPress={() => updateSpeciesData({ typeCapture: 'essaim' })}
                 >
-                  <Text style={[styles.typeButtonText, typeCapture === 'essaim' && styles.typeButtonTextActive]}>
+                  <Text style={[styles.typeButtonText, data.typeCapture === 'essaim' && styles.typeButtonTextActive]}>
                     Essaim
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.typeButton, typeCapture === 'volClair' && styles.typeButtonActive]}
-                  onPress={() => setTypeCapture('volClair')}
+                  style={[styles.typeButton, data.typeCapture === 'volClair' && styles.typeButtonActive]}
+                  onPress={() => updateSpeciesData({ typeCapture: 'volClair' })}
                 >
-                  <Text style={[styles.typeButtonText, typeCapture === 'volClair' && styles.typeButtonTextActive]}>
+                  <Text style={[styles.typeButtonText, data.typeCapture === 'volClair' && styles.typeButtonTextActive]}>
                     Vol clair
                   </Text>
                 </TouchableOpacity>
@@ -463,7 +456,7 @@ const handleContinue = () => {
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Type de capture :</Text>
-                <Text style={styles.summaryValue}>{typeCapture === 'essaim' ? 'Essaim' : 'Vol clair'}</Text>
+                <Text style={styles.summaryValue}>{data.typeCapture === 'essaim' ? 'Essaim' : 'Vol clair'}</Text>
               </View>
               <View style={styles.ruleBox}>
                 <Text style={styles.ruleText}>Règle : Captures = Phases = Stades ♀ + Stades ♂</Text>
