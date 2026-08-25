@@ -28,7 +28,9 @@ function reportUncaught(error: unknown, screen: string) {
  * 'unhandledrejection')` qui vivait ici était une branche morte : c'est une API
  * du DOM, absente de React Native — elle compilait grâce à un `declare` écrit à
  * la main et ne s'exécutait jamais. Elle donnait une fausse confiance, ce qui
- * est pire que rien. Le vrai tracker de rejets fait l'objet d'une issue à part.
+ * est pire que rien. Les rejets sont couverts par `filet-rejets.ts`, qui
+ * s'appuie sur le tracker d'Hermes — mesuré présent et fonctionnel sur un
+ * build release (#166) **avant** d'être écrit, et non supposé tel.
  *
  * **Dette assumée** : le corps passe encore par `error-log-store` et
  * `toFriendlyError`, que la décision 4 d'ADR-012 supprime au profit du logger
