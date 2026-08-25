@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm } from '@tanstack/react-form';
 import { useAsyncAction } from '@/hooks/use-async-action';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import {
   HUMIDITE_OPTIONS,
   Humidite,
@@ -70,8 +71,19 @@ export default function VegetationScreen() {
   const router = useRouter();
   const { draftId } = useLocalSearchParams<{ draftId: string }>();
   const draft = useProspectionWizardStore((s) => s.draft);
+  const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
   const setDraft = useProspectionWizardStore((s) => s.setDraft);
   const { run, isRunning: isSaving } = useAsyncAction();
+  const signalerChargement = useSignalerChargement('veg');
+
+  // Filet de sécurité si cet écran est atteint sans passer par reference.tsx (deep-link,
+  // app relancée en plein milieu du parcours) : le store peut ne pas encore porter cette
+  // fiche — cf. même garde sur reference.tsx / captures.tsx.
+  useEffect(() => {
+    if (draftId && draft?.id !== draftId) {
+      void hydrateFromDraft(draftId).catch((error) => signalerChargement(error, { draftId }));
+    }
+  }, [draftId, draft?.id, hydrateFromDraft, signalerChargement]);
   const [expandedStrate, setExpandedStrate] = useState<StrateKey | null>(null);
   // Texte brut en cours de saisie pour les 5 champs décimaux libres de chaque strate
   // (Surf. rel. %, H. moy, % Verdissement, % Repousse, Sol nu %) — permet de taper un
@@ -141,6 +153,22 @@ export default function VegetationScreen() {
       );
     },
   });
+
+  // Restaure les strates, l'humidité et la (les) texture(s) déjà enregistrées pour cette
+  // fiche — sans ça, cet écran repartait systématiquement de zéro à chaque remontage
+  // (retour arrière, reprise d'un brouillon...), et "Continuer" écrasait alors les
+  // données existantes par des valeurs vides. Ne s'exécute qu'une fois par fiche chargée
+  // (`vegHydratedRef`) pour ne pas effacer une saisie en cours si `draft` est republié
+  // entre-temps par un autre écran (cf. `setDraft` après chaque sauvegarde).
+  const vegHydratedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!draft || draft.id !== draftId || vegHydratedRef.current === draft.id) return;
+    vegHydratedRef.current = draft.id;
+    const parsed = parseVegetationSol(draft.vegetation, draft.sol, draft.degats_cultures);
+    setStrates(parsed.strates);
+    setSelectedTextures(parsed.texture);
+    form.setFieldValue('humidite', parsed.humidite);
+  }, [draft, draftId, form]);
 
   const setStrateField = <K extends keyof StrateFormValues>(key: StrateKey, field: K, value: StrateFormValues[K]) => {
     // Recouvrement reste par pas de 5 (stepper dédié, cf. handleRecouvrementChange). Les
