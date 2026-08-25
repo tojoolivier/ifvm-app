@@ -14,11 +14,16 @@ import { useAuthStore } from '@/lib/auth-store';
 import { ReferentialError } from '@/lib/errors';
 import * as referentielDb from '@/lib/referentiel-db';
 
-jest.mock('expo-router', () =>
-  require('../test-utils/mock-expo-router').expoRouterMock({
-    params: { draftId: 'draft-123', grilleIndex: '0' },
-  })
-);
+/** Paramètres de route mutables : un test change de grille demandée. */
+const params: { draftId: string; grilleIndex: string } = {
+  draftId: 'draft-123',
+  grilleIndex: '0',
+};
+
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
+  useLocalSearchParams: () => params,
+}));
 
 jest.mock('@/lib/prospection-repository', () => ({
   markGrilleCompleted: jest.fn(),
@@ -49,6 +54,7 @@ describe('CapturesScreen', () => {
     useErrorStore.getState().dismissAll();
     useAuthStore.setState({ isAuthenticated: true });
     jest.mocked(referentielDb.listStadesGrille).mockImplementation(STADES_PAR_DEFAUT);
+    params.grilleIndex = '0';
   });
 
   it('recalcule le nombre total de captures d’une grille larvaire déjà remplie (#201)', async () => {
@@ -120,6 +126,44 @@ describe('CapturesScreen', () => {
 
     expect(await screen.findByText('L1')).toBeVisible();
     expect(screen.getByText('L5')).toBeVisible();
+  });
+
+  it('reste sur la grille demandée par la route, sans revenir sur la première (#201)', async () => {
+    // Passage imago -> larve : la route demande la grille 1. `draft.grilles_completees`
+    // est encore l'ancienne valeur (la complétion vient d'être écrite en base, le
+    // brouillon du store n'a pas été rechargé) : l'écran ne doit pas s'y fier pour
+    // décider quelle grille montrer.
+    params.grilleIndex = '1';
+
+    // Le store survit à la navigation : la grille précédente y a laissé son ordre, et
+    // `currentGrilleIndex` pointe encore sur 0. C'est cet état — pas un store vierge —
+    // que l'écran rencontre en enchaînant les grilles.
+    useProspectionCaptureStore
+      .getState()
+      .initGrilles(
+        [
+          { espece: 'LMC', categorie: 'imago' },
+          { espece: 'LMC', categorie: 'larve' },
+        ],
+        [],
+        []
+      );
+
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'intensive',
+        especes: JSON.stringify({ lmcImago: true, lmcLarve: true, nseImago: false, nseLarve: false }),
+        grilles_completees: null,
+        capture_started_at: '2026-08-25T08:00:00.000Z',
+      } as any,
+      captures: [],
+    });
+
+    await render(<CapturesScreen />);
+
+    // Grille 1 = LMC larve — l'en-tête nomme la grille effectivement affichée.
+    expect(await screen.findByText(/Larves/)).toBeVisible();
   });
 
   it('laisse le total vide sur une grille encore vierge', async () => {
