@@ -14,6 +14,7 @@ jest.mock('expo-router', () =>
 
 jest.mock('@/lib/prospection-repository', () => ({
   listAllProspectionInfestations: jest.fn().mockResolvedValue([]),
+  listAllProspectionCaptures: jest.fn().mockResolvedValue([]),
   saveProspectionInfestation: jest.fn().mockResolvedValue(undefined),
   getProspection: jest.fn().mockResolvedValue(null),
   getDerniereDensiteMemeSite: jest.fn().mockResolvedValue(null),
@@ -58,8 +59,10 @@ describe('InfestationScreen — persistance des cibles sélectionnées', () => {
   });
 
   it('restaure la cible aérienne enregistrée à la réouverture de la fiche (#201)', async () => {
+    // "essaim" a disparu de type_cible (0031) : Dense/Très dense sont désormais des
+    // cibles à part entière, au même niveau que Vol clair.
     jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValue([
-      { type_cible: 'essaim', comportement: 'deplacement', heure_observation: '09:30' } as any,
+      { type_cible: 'dense', comportement: 'deplacement', heure_observation: '09:30' } as any,
     ]);
 
     await render(<InfestationScreen />);
@@ -68,6 +71,6 @@ describe('InfestationScreen — persistance des cibles sélectionnées', () => {
     await settle();
 
     expect(await screen.findByText('09:30')).toBeVisible();
-    expect(screen.getByText(/Comportement · Essaim/)).toBeVisible();
+    expect(screen.getByText(/Comportement · Dense/)).toBeVisible();
   });
 });

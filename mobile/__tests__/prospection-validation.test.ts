@@ -142,7 +142,7 @@ describe('validateGpsPosition — précision GPS', () => {
 });
 
 describe('validateComportementDirection — direction obligatoire', () => {
-  it.each(['bande_larvaire', 'vol_clair', 'essaim'])(
+  it.each(['bande_larvaire', 'vol_clair', 'dense', 'tres_dense'])(
     'bloque quand la direction est absente pour %s',
     (typeCible) => {
       const { blocages } = validateComportementDirection({
@@ -154,7 +154,7 @@ describe('validateComportementDirection — direction obligatoire', () => {
     }
   );
 
-  it.each(['bande_larvaire', 'vol_clair', 'essaim'])(
+  it.each(['bande_larvaire', 'vol_clair', 'dense', 'tres_dense'])(
     'ne bloque pas quand la direction est renseignée pour %s',
     (typeCible) => {
       const { blocages } = validateComportementDirection({
@@ -234,7 +234,7 @@ describe('isHeureNocturne — bornes jour/nuit', () => {
 
 describe('validateEssaimNocturne — plausibilité horaire (§2.2 point 14 du manuel)', () => {
   it('avertit quand un essaim est signalé de nuit', () => {
-    const { avertissements } = validateEssaimNocturne({ typeCible: 'essaim', heureObservation: '23:15' });
+    const { avertissements } = validateEssaimNocturne({ typeCible: 'dense', heureObservation: '23:15' });
     expect(avertissements).toEqual([expect.stringContaining('forcé sur « posé »')]);
   });
 
@@ -244,7 +244,7 @@ describe('validateEssaimNocturne — plausibilité horaire (§2.2 point 14 du ma
   });
 
   it('n’avertit pas de jour', () => {
-    const { avertissements } = validateEssaimNocturne({ typeCible: 'essaim', heureObservation: '10:00' });
+    const { avertissements } = validateEssaimNocturne({ typeCible: 'dense', heureObservation: '10:00' });
     expect(avertissements).toEqual([]);
   });
 
@@ -254,7 +254,7 @@ describe('validateEssaimNocturne — plausibilité horaire (§2.2 point 14 du ma
   });
 
   it('ne bloque jamais (avertissement non bloquant)', () => {
-    const { blocages } = validateEssaimNocturne({ typeCible: 'essaim', heureObservation: '23:00' });
+    const { blocages } = validateEssaimNocturne({ typeCible: 'dense', heureObservation: '23:00' });
     expect(blocages).toEqual([]);
   });
 });
@@ -373,27 +373,27 @@ describe('classifyAerialPopulation — vol clair vs essaim (#104)', () => {
     masquePaysage: null as 'partiellement' | 'entierement' | null,
   };
 
-  it("classe non_classe quand le vol n'est pas spontané (provoqué)", () => {
+  it("classe null (non classable) quand le vol n'est pas spontané (provoqué)", () => {
     expect(
       classifyAerialPopulation({ ...base, volSpontaneNonProvoque: false, visibleSeulementDePres: true })
-    ).toBe('non_classe');
+    ).toBeNull();
   });
 
   it('classe vol_clair quand la formation n’est visible que de près', () => {
     expect(classifyAerialPopulation({ ...base, visibleSeulementDePres: true })).toBe('vol_clair');
   });
 
-  it('classe essaim_densite_moyenne pour une masse sombre qui ne masque pas le paysage', () => {
+  it('classe dense pour une masse sombre qui ne masque pas le paysage', () => {
     expect(
       classifyAerialPopulation({
         ...base,
         visibleSeulementDePres: false,
         masseSombreSansMasquerPaysage: true,
       })
-    ).toBe('essaim_densite_moyenne');
+    ).toBe('dense');
   });
 
-  it('classe essaim_densite_forte quand le paysage est masqué partiellement', () => {
+  it('classe dense quand le paysage est masqué partiellement (regroupé avec "masse sombre" — contrat backend TypeEssaim à 2 niveaux)', () => {
     expect(
       classifyAerialPopulation({
         ...base,
@@ -401,10 +401,10 @@ describe('classifyAerialPopulation — vol clair vs essaim (#104)', () => {
         masseSombreSansMasquerPaysage: false,
         masquePaysage: 'partiellement',
       })
-    ).toBe('essaim_densite_forte');
+    ).toBe('dense');
   });
 
-  it('classe essaim_densite_tres_forte quand le paysage est masqué entièrement', () => {
+  it('classe tres_dense quand le paysage est masqué entièrement', () => {
     expect(
       classifyAerialPopulation({
         ...base,
@@ -412,10 +412,10 @@ describe('classifyAerialPopulation — vol clair vs essaim (#104)', () => {
         masseSombreSansMasquerPaysage: false,
         masquePaysage: 'entierement',
       })
-    ).toBe('essaim_densite_tres_forte');
+    ).toBe('tres_dense');
   });
 
-  it('classe non_classe quand le questionnaire est incomplet (aucune réponse positive)', () => {
+  it('classe null (non classable) quand le questionnaire est incomplet (aucune réponse positive)', () => {
     expect(
       classifyAerialPopulation({
         ...base,
@@ -423,7 +423,7 @@ describe('classifyAerialPopulation — vol clair vs essaim (#104)', () => {
         masseSombreSansMasquerPaysage: false,
         masquePaysage: null,
       })
-    ).toBe('non_classe');
+    ).toBeNull();
   });
 });
 

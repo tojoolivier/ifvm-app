@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { updateProspectionExtensiveObservations } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { NIVEAU_OPTIONS } from '@/lib/prospection-extensive';
@@ -17,6 +17,7 @@ const INACTIVE_BG = '#efeada';
 
 export default function ExtensiveObservationsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { draftId } = useLocalSearchParams<{ draftId: string }>();
   const draft = useProspectionWizardStore((s) => s.draft);
   const setDraft = useProspectionWizardStore((s) => s.setDraft);
@@ -142,7 +143,7 @@ export default function ExtensiveObservationsScreen() {
             </View>
           </ScrollView>
 
-          <View style={styles.footer}>
+          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
             <TouchableOpacity style={styles.continueButton} onPress={handleContinue} disabled={isSaving} activeOpacity={0.85}>
               <Text style={styles.continueButtonText}>Suivant : Récapitulatif ›</Text>
             </TouchableOpacity>
