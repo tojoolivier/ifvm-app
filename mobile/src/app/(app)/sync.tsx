@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
 import { pullReferentiel } from '@/lib/referentiel-sync';
+import { compterReferentielLocal, EtatTableReferentiel } from '@/lib/referentiel-db';
 import { loadAccueilData, AccueilViewModel } from '@/lib/prospection-accueil';
 import { retrySyncProspection } from '@/lib/prospection-review';
 import { DraftProspection } from '@/lib/prospection-repository';
@@ -41,11 +42,16 @@ export default function SyncScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [referentielError, setReferentielError] = useState<string | null>(null);
+  const [etatReferentiel, setEtatReferentiel] = useState<EtatTableReferentiel[]>([]);
 
   const signalerChargement = useSignalerChargement('sync');
 
   const refresh = useCallback(() => {
     void loadAccueilData().then(setData).catch((error) => signalerChargement(error));
+    // « Synchro réussie » ne dit pas ce qui a atterri : on montre le contenu réel.
+    void compterReferentielLocal()
+      .then(setEtatReferentiel)
+      .catch((error) => signalerChargement(error));
   }, [signalerChargement]);
 
   useFocusEffect(refresh);
@@ -199,6 +205,26 @@ export default function SyncScreen() {
         {referentielError && (
           <View style={[styles.statusBanner, styles.statusError]}>
             <Text style={styles.statusBannerText}>❌ Référentiel : {referentielError}</Text>
+          </View>
+        )}
+
+        {/* Contenu réel du référentiel local — une table vide se voit ici. */}
+        {etatReferentiel.length > 0 && (
+          <View style={styles.referentielEtat}>
+            <Text style={styles.referentielEtatTitre}>Référentiel sur cet appareil</Text>
+            {etatReferentiel.map(({ table, lignes }) => (
+              <View key={table} style={styles.referentielEtatLigne}>
+                <Text style={styles.referentielEtatTable}>{table}</Text>
+                <Text
+                  style={[
+                    styles.referentielEtatNombre,
+                    lignes === 0 && styles.referentielEtatVide,
+                  ]}
+                >
+                  {lignes === 0 ? 'vide' : lignes}
+                </Text>
+              </View>
+            ))}
           </View>
         )}
 
@@ -393,6 +419,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#111827',
   },
+  referentielEtat: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e7e0cd',
+  },
+  referentielEtatTitre: { fontSize: 12, fontWeight: '800', color: IFVM_GREEN, marginBottom: 6 },
+  referentielEtatLigne: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 },
+  referentielEtatTable: { fontSize: 11.5, color: '#6f6a59' },
+  referentielEtatNombre: { fontSize: 11.5, fontWeight: '700', color: '#16201a' },
+  referentielEtatVide: { color: '#c0412b' },
   lastSyncContainer: {
     marginBottom: 16,
     alignItems: 'center',
