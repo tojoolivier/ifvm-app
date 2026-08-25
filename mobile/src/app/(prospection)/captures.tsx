@@ -557,6 +557,20 @@ export default function CapturesScreen() {
     );
   };
 
+  /**
+   * Une grille sans stades signifie que le référentiel n'est pas synchronisé sur cet
+   * appareil. Le dire plutôt que d'afficher un tableau vide : sinon l'agent conclut
+   * que sa saisie a disparu (#201).
+   */
+  const renderReferentielManquant = () => (
+    <View style={styles.referentielManquant}>
+      <Text style={styles.referentielManquantText}>
+        Stades indisponibles hors ligne — synchronisez les référentiels depuis
+        l’écran Synchronisation, puis rouvrez cette grille.
+      </Text>
+    </View>
+  );
+
   const renderImagoStades = () => {
     if (!isImago || totalCaptures === 0) return null;
     const isFemale = currentSexe === 'F';
@@ -580,6 +594,7 @@ export default function CapturesScreen() {
           <Text style={[styles.tableHeaderCell, styles.tableCellValue]}>Effectif</Text>
           <Text style={[styles.tableHeaderCell, styles.tableCellActions]}>Actions</Text>
         </View>
+        {stadesList.length === 0 && renderReferentielManquant()}
         {stadesList.map((stade) => (
           <View key={stade} style={styles.tableRow}>
             <Text style={[styles.tableCell, styles.tableCellStade, styles.tableCellText]}>{stade}</Text>
@@ -654,6 +669,7 @@ export default function CapturesScreen() {
           <Text style={[styles.tableHeaderCell, styles.tableCellValue]}>Effectif</Text>
           <Text style={[styles.tableHeaderCell, styles.tableCellActions]}>Actions</Text>
         </View>
+        {larvesList.length === 0 && renderReferentielManquant()}
         {larvesList.map((stade) => (
           <View key={stade} style={styles.tableRow}>
             <Text style={[styles.tableCell, styles.tableCellStade, styles.tableCellText]}>{stade}</Text>
@@ -892,6 +908,8 @@ const styles = StyleSheet.create({
   totalCaptureInput: { flex: 1, backgroundColor: '#f8f6f0', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 10, fontSize: 18, fontWeight: '700', color: TEXT },
   totalCaptureMax: { fontSize: 14, fontWeight: '600', color: TEXT_SECONDARY },
   totalCaptureInfo: { marginTop: 6, fontSize: 12, color: TEXT_SECONDARY, textAlign: 'center' },
+  referentielManquant: { padding: 14, backgroundColor: '#fdf3e3', borderRadius: 10, marginTop: 8 },
+  referentielManquantText: { fontSize: 12, lineHeight: 17, color: '#8a5a12', fontWeight: '600' },
   tableSection: { backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 10, marginBottom: 8 },
   summaryBar: { backgroundColor: '#f8f6f0', borderRadius: 6, padding: 8, marginBottom: 10, alignItems: 'center' },
   summaryBarText: { fontSize: 13, color: TEXT_SECONDARY, textAlign: 'center' },

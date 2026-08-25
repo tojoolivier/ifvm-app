@@ -8,6 +8,11 @@ import { render, screen } from '@testing-library/react-native';
 import CapturesScreen from '@/app/(prospection)/captures';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
+import { ErrorBanner } from '@/components/error-banner';
+import { useErrorStore } from '@/lib/error-store';
+import { useAuthStore } from '@/lib/auth-store';
+import { ReferentialError } from '@/lib/errors';
+import * as referentielDb from '@/lib/referentiel-db';
 
 jest.mock('expo-router', () =>
   require('../test-utils/mock-expo-router').expoRouterMock({
@@ -22,15 +27,15 @@ jest.mock('@/lib/prospection-repository', () => ({
 }));
 
 // Les stades viennent du référentiel synchronisé, pas d'une liste dans l'écran.
-jest.mock('@/lib/referentiel-db', () => ({
-  listStadesGrille: jest.fn((_espece: string, categorie: string, sexe: string | null) => {
-    if (categorie === 'larve') {
-      return Promise.resolve(['L1', 'L2', 'L3', 'L4', 'L5'].map((code) => ({ code, libelle: code })));
-    }
-    const codes = sexe === 'F' ? ['A1', 'A2', 'A3', 'A4', 'A5'] : ['A1', 'A234', 'A5'];
-    return Promise.resolve(codes.map((code) => ({ code, libelle: code })));
-  }),
-}));
+const STADES_PAR_DEFAUT = (_espece: string, categorie: string, sexe: string | null) => {
+  if (categorie === 'larve') {
+    return Promise.resolve(['L1', 'L2', 'L3', 'L4', 'L5'].map((code) => ({ code, libelle: code })));
+  }
+  const codes = sexe === 'F' ? ['A1', 'A2', 'A3', 'A4', 'A5'] : ['A1', 'A234', 'A5'];
+  return Promise.resolve(codes.map((code) => ({ code, libelle: code })));
+};
+
+jest.mock('@/lib/referentiel-db', () => ({ listStadesGrille: jest.fn() }));
 
 const CAPTURES_LARVE = [
   { espece: 'LMC', categorie: 'larve', sexe: null, phase: 'solitaire', stade: 'L1', effectif: 4 },
@@ -40,6 +45,10 @@ const CAPTURES_LARVE = [
 describe('CapturesScreen', () => {
   beforeEach(() => {
     useProspectionCaptureStore.getState().reset();
+    useProspectionCaptureStore.getState().setStadesParGrille({});
+    useErrorStore.getState().dismissAll();
+    useAuthStore.setState({ isAuthenticated: true });
+    jest.mocked(referentielDb.listStadesGrille).mockImplementation(STADES_PAR_DEFAUT);
   });
 
   it('recalcule le nombre total de captures d’une grille larvaire déjà remplie (#201)', async () => {
@@ -59,6 +68,33 @@ describe('CapturesScreen', () => {
     expect(await screen.findByDisplayValue('10')).toBeVisible();
     // Sections déverrouillées : le total non nul les rend à nouveau visibles.
     expect(await screen.findByText('📊 2. Phases')).toBeVisible();
+  });
+
+  it('dit que le référentiel manque au lieu d’afficher une grille vide et muette (#201)', async () => {
+    // Référentiel jamais synchronisé sur l'appareil : `listStadesGrille` lève.
+    jest
+      .mocked(referentielDb.listStadesGrille)
+      .mockRejectedValue(new ReferentialError('Aucun stade larve connu pour LMC sur cet appareil.'));
+
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'intensive',
+        especes: JSON.stringify({ lmcImago: false, lmcLarve: true, nseImago: false, nseLarve: false }),
+        grilles_completees: null,
+        capture_started_at: '2026-08-25T08:00:00.000Z',
+      } as any,
+      captures: [],
+    });
+
+    await render(
+      <>
+        <ErrorBanner />
+        <CapturesScreen />
+      </>
+    );
+
+    expect(await screen.findByText(/absente du référentiel de l’appareil/)).toBeVisible();
   });
 
   it('laisse le total vide sur une grille encore vierge', async () => {

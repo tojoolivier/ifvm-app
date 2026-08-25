@@ -1,6 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
 import { getDb } from './prospection-db';
+import { ReferentialError } from './errors';
 
 let migrated = false;
 
@@ -65,6 +66,11 @@ export interface StadeGrille {
  * Stades d'une grille de saisie, dans l'ordre du référentiel. C'est le référentiel
  * synchronisé — et non une liste écrite en dur dans l'écran — qui décide quels stades
  * existent : une liste locale finit par diverger de ce que le backend accepte (#201).
+ *
+ * Toute grille valide a des stades. Un résultat vide signifie que le référentiel local
+ * n'a pas encore été synchronisé, et l'erreur est typée ici plutôt que laissée à
+ * l'écran : sans cela, la grille s'affiche vide et muette, et l'agent croit avoir perdu
+ * sa saisie (ADR-012 — le typage se fait à la source).
  */
 export async function listStadesGrille(
   espece: string,
@@ -72,7 +78,7 @@ export async function listStadesGrille(
   sexe: 'F' | 'M' | null
 ): Promise<StadeGrille[]> {
   const db = await getReferentielDb();
-  return db.getAllAsync<StadeGrille>(
+  const stades = await db.getAllAsync<StadeGrille>(
     `SELECT code, libelle FROM code_stade
      WHERE actif = 1 AND categorie = ?
        AND (sexe IS NULL OR sexe = ?)
@@ -80,6 +86,12 @@ export async function listStadesGrille(
      ORDER BY ordre`,
     [categorie, sexe, espece]
   );
+  if (stades.length === 0) {
+    throw new ReferentialError(
+      `Aucun stade ${categorie} connu pour ${espece} sur cet appareil.`
+    );
+  }
+  return stades;
 }
 
 export interface Pesticide {
