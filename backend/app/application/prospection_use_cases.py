@@ -73,6 +73,7 @@ class CreateProspection:
         degats_cultures_pourcent: int | None = None,
         verdissement_pourcent: int | None = None,
         hauteur_herbe_cm: float | None = None,
+        heure_observation_at: datetime | None = None,
         # ==========================================
         # NOUVEAUX CHAMPS - Extensif & Validation
         # ==========================================
@@ -136,6 +137,7 @@ class CreateProspection:
             degats_cultures_pourcent=degats_cultures_pourcent,
             verdissement_pourcent=verdissement_pourcent,
             hauteur_herbe_cm=hauteur_herbe_cm,
+            heure_observation_at=heure_observation_at,
             # ==========================================
             # NOUVEAUX CHAMPS - Extensif & Validation
             # ==========================================
@@ -235,6 +237,7 @@ class UpdateProspection:
         degats_cultures_pourcent: int | None = None,
         verdissement_pourcent: int | None = None,
         hauteur_herbe_cm: float | None = None,
+        heure_observation_at: datetime | None = None,
         # ==========================================
         # NOUVEAUX CHAMPS - Extensif & Validation
         # ==========================================
@@ -322,6 +325,8 @@ class UpdateProspection:
             prospection.verdissement_pourcent = verdissement_pourcent
         if hauteur_herbe_cm is not None:
             prospection.hauteur_herbe_cm = hauteur_herbe_cm
+        if heure_observation_at is not None:
+            prospection.heure_observation_at = heure_observation_at
 
         # ==========================================
         # Mise à jour des nouveaux champs - Extensif & Validation
