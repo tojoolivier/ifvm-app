@@ -148,6 +148,13 @@ jobs:
         env:
           EAS_LOCAL_BUILD_WORKINGDIR: /home/runner/.gradle/easwork
         run: |
+          # Le workingdir vit sur le volume Longhorn PERSISTANT : un run annule ou
+          # interrompu y laisse son workspace, et "eas build --local" refuse alors de
+          # demarrer ("Error: Workingdir is not empty."). C'est ce qui a fait echouer le
+          # build du 2026-08-24 puis publier 5 updates OTA sur un fingerprint sans APK.
+          # On repart donc d'un repertoire vide a chaque run (le cache Gradle lui-meme
+          # est ailleurs dans GRADLE_USER_HOME et n'est pas touche).
+          rm -rf "$EAS_LOCAL_BUILD_WORKINGDIR"
           mkdir -p "$EAS_LOCAL_BUILD_WORKINGDIR"
           eas build --platform android --profile preview --local --non-interactive --output ./ifvm-preview.apk
 
