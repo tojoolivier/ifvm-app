@@ -791,3 +791,47 @@ async def test_create_prospection_conclusion_invalide_echoue(
     # conclusion_validation est un Enum Pydantic (issue #117) : la valeur invalide est
     # rejetée à la validation du payload, avant toute requête SQL.
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_intensive_station_inexistante_renvoie_409(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+):
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "intensive",
+            "campagne_id": str(campagne_id),
+            "station_id": str(uuid.uuid4()),
+            "date_prospection": "2026-06-25",
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 409
+    assert "station" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_create_intensive_autre_violation_ne_blame_pas_la_station(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+):
+    """#201 : n'importe quelle contrainte violée (ici deux populations LMC/imago, qui
+    violent `uq_prospection_population`) remontait « station_id n'existe pas » alors que
+    la station est bien référencée — le vrai motif était masqué."""
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "intensive",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-06-25",
+            "populations": [
+                {"espece": "LMC", "categorie": "imago", "densite_diffuse": 3.5},
+                {"espece": "LMC", "categorie": "imago", "densite_diffuse": 4.0},
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+    assert "station" not in response.text
+    assert "uq_prospection_population" in response.json()["detail"]

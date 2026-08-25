@@ -13,6 +13,11 @@ _TRANSITIONS: dict[str, dict[str, list[str]]] = {
     },
 }
 
+
+class ProspectionIntegriteError(Exception):
+    """La fiche viole une contrainte de la base autre que la référence à la station."""
+
+
 _ACTION_MAP: dict[str, str] = {
     "en_attente": "soumission",
     "verifiee": "verification",

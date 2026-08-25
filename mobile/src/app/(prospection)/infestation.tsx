@@ -241,8 +241,23 @@ function rowFromForm(typeCible: string, form: FormationForm): InfestationRow {
   };
 }
 
+/**
+ * Une formation aérienne (vol clair / essaim) n'affiche pas de champ « densité moyenne » :
+ * sa saisie passe par le questionnaire de classification, l'heure et les dimensions. Les
+ * inclure ici évite qu'une cible aérienne renseignée soit considérée comme vide (#201).
+ */
 function isFilled(form: FormationForm): boolean {
-  return form.surfaceTotale !== '' || form.densMoy !== '';
+  return (
+    form.surfaceTotale !== '' ||
+    form.densMoy !== '' ||
+    form.tailleMoy !== '' ||
+    form.heureObservation !== '' ||
+    form.dimensionHa !== '' ||
+    form.densiteEnVol !== '' ||
+    form.comportement !== null ||
+    form.essaimComportement !== null ||
+    computeAerialClassification(form) !== null
+  );
 }
 
 type Tab = 'desc' | 'comport';
@@ -394,11 +409,11 @@ export default function InfestationScreen() {
   };
 
   const persistAll = async () => {
-    // Ne sauvegarder que les types sélectionnés
+    // La sélection d'une cible est elle-même une donnée : on enregistre chaque type
+    // sélectionné, même partiellement rempli, sinon la sélection disparaît à la
+    // réouverture de la fiche (#201).
     for (const target of selectedTargets) {
-      const f = forms[target];
-      if (!isFilled(f)) continue;
-      await saveProspectionInfestation(draftId, target, rowFromForm(target, f));
+      await saveProspectionInfestation(draftId, target, rowFromForm(target, forms[target]));
     }
   };
 

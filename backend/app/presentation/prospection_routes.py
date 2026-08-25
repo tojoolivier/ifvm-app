@@ -19,6 +19,7 @@ from app.database import get_db
 from app.domain.prospection import (
     ProspectionCapture,
     ProspectionInfestation,
+    ProspectionIntegriteError,
     ProspectionPopulation,
 )
 from app.domain.referentiel import StationNotFoundError
@@ -140,6 +141,8 @@ async def create_prospection(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     except StationNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except ProspectionIntegriteError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
 
 @router.get("/{prospection_id}", response_model=ProspectionRead)
