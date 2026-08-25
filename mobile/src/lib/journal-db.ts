@@ -451,6 +451,14 @@ export async function lireJournal(limite = 500): Promise<LigneJournal[]> {
   return rangees.map(recomposer);
 }
 
+/** Une session relue, et **ce qu'elle pesait** avant que le `LIMIT` ne coupe. */
+export interface SessionJournal {
+  /** Les lignes rendues, en ordre chronologique croissant. */
+  lignes: LigneJournal[];
+  /** Le nombre total de lignes de la session en base, coupure comprise. */
+  total: number;
+}
+
 /**
  * La tranche exportée par le signalement (#176) : **la session courante**, en
  * ordre chronologique **croissant**.
@@ -463,18 +471,34 @@ export async function lireJournal(limite = 500): Promise<LigneJournal[]> {
  *
  * Le `LIMIT` porte sur les plus **récentes** (`ORDER BY id DESC`), puis l'ordre
  * est inversé : une session très bavarde perd son début, jamais l'incident qui
- * la termine. La troncature fine, en octets, est ensuite l'affaire de
- * `construireRapport`.
+ * la termine.
+ *
+ * **`total` n'est pas un ornement.** Sans lui, la coupure faite ici, en SQL,
+ * serait parfaitement invisible pour l'export : il compterait ses lignes
+ * écartées sur ce qu'il a reçu et déclarerait complet un rapport amputé. Le
+ * `COUNT(*)` coûte un scan de plus, une fois, sur un geste rare — le prix d'un
+ * en-tête qui ne ment pas.
  */
 export async function lireSession(
   cid: string,
   limite = PLAFOND_LIGNES
-): Promise<LigneJournal[]> {
+): Promise<SessionJournal> {
   const db = await baseDuJournal();
+
   const rangees = await db.getAllAsync<RangeeBrute>(
     'SELECT * FROM journal WHERE cid = ? ORDER BY id DESC LIMIT ?',
     cid,
     limite
   );
-  return rangees.reverse().map(recomposer);
+  const comptes = await db.getAllAsync<{ total: number }>(
+    'SELECT COUNT(*) AS total FROM journal WHERE cid = ?',
+    cid
+  );
+
+  return {
+    lignes: rangees.reverse().map(recomposer),
+    // Un compte absent vaut « rien de plus que ce qu'on tient » plutôt qu'un
+    // `NaN` qui contaminerait le compteur d'écartées de l'en-tête.
+    total: comptes[0]?.total ?? rangees.length,
+  };
 }

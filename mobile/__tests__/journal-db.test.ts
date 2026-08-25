@@ -394,9 +394,9 @@ describe('la lecture du journal', () => {
     // Le SQL rend les plus récentes d'abord ; l'export veut l'inverse.
     getAllAsync.mockResolvedValue([rangee(3), rangee(2), rangee(1)]);
 
-    const lignes = await lireSession('ABC123');
+    const { lignes } = await lireSession('ABC123');
 
-    const select = getAllAsync.mock.calls.find((c) => (c[0] as string).includes('FROM journal'));
+    const select = getAllAsync.mock.calls.find((c) => (c[0] as string).includes('SELECT *'));
     expect(select?.[0]).toContain('WHERE cid = ?');
     expect(select?.[1]).toBe('ABC123');
     expect(lignes.map((l) => l.event)).toEqual(['e1', 'e2', 'e3']);
@@ -405,8 +405,28 @@ describe('la lecture du journal', () => {
   it('borne la session au plafond de lignes — le rapport ne peut pas tout porter', async () => {
     await lireSession('ABC123');
 
-    const select = getAllAsync.mock.calls.find((c) => (c[0] as string).includes('FROM journal'));
+    const select = getAllAsync.mock.calls.find((c) => (c[0] as string).includes('SELECT *'));
     expect(select?.[2]).toBe(PLAFOND_LIGNES);
+  });
+
+  /**
+   * Sans ce compte, la coupure faite **en SQL** serait invisible : l'export
+   * calculerait ses « écartées » sur ce qu'il a reçu, et déclarerait complet un
+   * rapport amputé de 20 000 lignes. C'est le silence que la décision 7
+   * supprime, déplacé d'un cran plus bas.
+   */
+  it('dit combien la session compte réellement de lignes, pas seulement ce qu’elle rend', async () => {
+    getAllAsync.mockImplementation(async (sql: string) =>
+      sql.includes('COUNT(*)') ? [{ total: 12_000 }] : []
+    );
+
+    const { lignes, total } = await lireSession('ABC123');
+
+    expect(lignes).toEqual([]);
+    expect(total).toBe(12_000);
+    const compte = getAllAsync.mock.calls.find((c) => (c[0] as string).includes('COUNT(*)'));
+    expect(compte?.[0]).toContain('WHERE cid = ?');
+    expect(compte?.[1]).toBe('ABC123');
   });
 
   it('vide la table sur demande', async () => {

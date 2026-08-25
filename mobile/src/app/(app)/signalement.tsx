@@ -27,11 +27,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
 import { useAsyncAction } from '@/hooks/use-async-action';
-import { envoyerSignalement } from '@/lib/signalement';
+import { envoyerSignalement, LONGUEUR_MAX_COMMENTAIRE } from '@/lib/signalement';
 import { depsSignalement } from '@/lib/signalement-natif';
 
-/** Jetons de `DESIGN.md`. Ne pas recopier les hex ad hoc des écrans antérieurs. */
-const C = {
+/**
+ * Jetons de `DESIGN.md`. Ne pas recopier les hex ad hoc des écrans antérieurs.
+ *
+ * La famille **vert clair** s'emploie par son trio complet fond / texte /
+ * bordure : c'est celle du « panneau d'aide » au tableau des familles
+ * sémantiques. Le bleu y désigne « vérifiée », un tout autre sens.
+ */
+const JETONS = {
   primary: '#235a36',
   background: '#faf7ef',
   surface: '#FFFFFF',
@@ -41,9 +47,9 @@ const C = {
   foregroundSecondary: '#3a3a30',
   foregroundTertiary: '#6f6a59',
   foregroundWeak: '#9a9484',
-  blueBg: '#eaf0f7',
-  blueBorder: '#cdddef',
-  blueText: '#31567f',
+  aideBg: '#eaf2ec',
+  aideBordure: '#cfe0d4',
+  aideTexte: '#235a36',
 } as const;
 
 /**
@@ -107,10 +113,13 @@ export default function SignalementScreen() {
           value={commentaire}
           onChangeText={setCommentaire}
           placeholder="Ex. : l’écran reste blanc après « Enregistrer »"
-          placeholderTextColor={C.foregroundWeak}
+          placeholderTextColor={JETONS.foregroundWeak}
           multiline
           numberOfLines={5}
           textAlignVertical="top"
+          // Le clavier s'arrête là où `construireRapport` couperait de toute
+          // façon : mieux vaut que l'agent le voie en tapant qu'après l'envoi.
+          maxLength={LONGUEUR_MAX_COMMENTAIRE}
           editable={!isRunning}
           accessibilityLabel="Commentaire (facultatif)"
         />
@@ -162,8 +171,8 @@ export default function SignalementScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.background },
-  header: { backgroundColor: C.primary, paddingHorizontal: 16, paddingBottom: 14 },
+  root: { flex: 1, backgroundColor: JETONS.background },
+  header: { backgroundColor: JETONS.primary, paddingHorizontal: 16, paddingBottom: 14 },
   headerContent: { flexDirection: 'row', alignItems: 'center', paddingTop: 8 },
   backBtn: {
     width: 32,
@@ -173,52 +182,52 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backIcon: { color: C.surface, fontSize: 22, fontWeight: '300', lineHeight: 26, marginTop: -2 },
-  headerTitle: { color: C.surface, fontSize: 19, fontWeight: '800', marginLeft: 12 },
+  backIcon: { color: JETONS.surface, fontSize: 22, fontWeight: '300', lineHeight: 26, marginTop: -2 },
+  headerTitle: { color: JETONS.surface, fontSize: 19, fontWeight: '800', marginLeft: 12 },
   container: { flex: 1 },
   content: { padding: 16, paddingBottom: 40 },
-  intro: { fontSize: 13, color: C.foregroundSecondary, lineHeight: 19, marginBottom: 12 },
+  intro: { fontSize: 13, color: JETONS.foregroundSecondary, lineHeight: 19, marginBottom: 12 },
   champ: {
-    backgroundColor: C.surface,
+    backgroundColor: JETONS.surface,
     borderWidth: 1,
-    borderColor: C.borderField,
+    borderColor: JETONS.borderField,
     borderRadius: 10,
     padding: 12,
     minHeight: 110,
     fontSize: 13,
-    color: C.foreground,
+    color: JETONS.foreground,
   },
   carte: {
-    backgroundColor: C.blueBg,
+    backgroundColor: JETONS.aideBg,
     borderWidth: 1,
-    borderColor: C.blueBorder,
+    borderColor: JETONS.aideBordure,
     borderRadius: 10,
     padding: 12,
     marginTop: 16,
   },
-  carteTitre: { fontSize: 13, fontWeight: '700', color: C.blueText, marginBottom: 6 },
-  carteLigne: { fontSize: 12, color: C.blueText, lineHeight: 18 },
-  carteNote: { fontSize: 12, color: C.blueText, marginTop: 8, fontWeight: '700' },
+  carteTitre: { fontSize: 13, fontWeight: '700', color: JETONS.aideTexte, marginBottom: 6 },
+  carteLigne: { fontSize: 12, color: JETONS.aideTexte, lineHeight: 18 },
+  carteNote: { fontSize: 12, color: JETONS.aideTexte, marginTop: 8, fontWeight: '700' },
   boutonPrincipal: {
-    backgroundColor: C.primary,
+    backgroundColor: JETONS.primary,
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 20,
   },
-  boutonPrincipalTexte: { color: C.surface, fontSize: 14, fontWeight: '700' },
+  boutonPrincipalTexte: { color: JETONS.surface, fontSize: 14, fontWeight: '700' },
   boutonSecondaire: {
-    backgroundColor: C.surface,
+    backgroundColor: JETONS.surface,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: JETONS.border,
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 10,
   },
-  boutonSecondaireTexte: { color: C.primary, fontSize: 14, fontWeight: '700' },
+  boutonSecondaireTexte: { color: JETONS.primary, fontSize: 14, fontWeight: '700' },
   boutonDesactive: { opacity: 0.6 },
-  aide: { fontSize: 12, color: C.foregroundTertiary, marginTop: 14, lineHeight: 18 },
+  aide: { fontSize: 12, color: JETONS.foregroundTertiary, marginTop: 14, lineHeight: 18 },
 });
 
 /**

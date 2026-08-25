@@ -40,7 +40,7 @@ function buildNatif(): string | null {
   return brut === undefined || brut === null ? null : String(brut);
 }
 
-function app(): ContexteApp {
+function contexteApp(): ContexteApp {
   return {
     version: Constants.expoConfig?.version ?? null,
     build: buildNatif(),
@@ -50,7 +50,7 @@ function app(): ContexteApp {
   };
 }
 
-function appareil(): ContexteAppareil {
+function contexteAppareil(): ContexteAppareil {
   return {
     marque: Device.brand,
     modele: Device.modelName,
@@ -59,7 +59,7 @@ function appareil(): ContexteAppareil {
   };
 }
 
-function agent(): IdentiteAgent | null {
+function identiteAgent(): IdentiteAgent | null {
   const user = useAuthStore.getState().user;
   if (!user) return null;
   // L'e-mail n'est pas repris : le support identifie l'agent par son nom et son
@@ -84,9 +84,9 @@ export function depsSignalement(): SignalementDeps {
     flush,
     lireSession,
     correlationId: getCorrelationId,
-    app,
-    appareil,
-    agent,
+    app: contexteApp,
+    appareil: contexteAppareil,
+    agent: identiteAgent,
     maintenant: () => new Date(),
     ecrire,
     partager: (uri) =>
