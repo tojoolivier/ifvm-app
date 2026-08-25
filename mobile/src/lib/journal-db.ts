@@ -450,3 +450,31 @@ export async function lireJournal(limite = 500): Promise<LigneJournal[]> {
   );
   return rangees.map(recomposer);
 }
+
+/**
+ * La tranche exportée par le signalement (#176) : **la session courante**, en
+ * ordre chronologique **croissant**.
+ *
+ * Le `correlationId` est posé une seule fois au chargement de `logger.ts` et ne
+ * tourne pas : « toutes les lignes de même `cid` » et « depuis le dernier
+ * démarrage » désignent donc la même chose. C'est un meilleur critère qu'un
+ * filtre sur `at`, dont l'horloge d'un téléphone de terrain peut sauter — et
+ * qui découperait alors la tranche au mauvais endroit sans rien dire.
+ *
+ * Le `LIMIT` porte sur les plus **récentes** (`ORDER BY id DESC`), puis l'ordre
+ * est inversé : une session très bavarde perd son début, jamais l'incident qui
+ * la termine. La troncature fine, en octets, est ensuite l'affaire de
+ * `construireRapport`.
+ */
+export async function lireSession(
+  cid: string,
+  limite = PLAFOND_LIGNES
+): Promise<LigneJournal[]> {
+  const db = await baseDuJournal();
+  const rangees = await db.getAllAsync<RangeeBrute>(
+    'SELECT * FROM journal WHERE cid = ? ORDER BY id DESC LIMIT ?',
+    cid,
+    limite
+  );
+  return rangees.reverse().map(recomposer);
+}

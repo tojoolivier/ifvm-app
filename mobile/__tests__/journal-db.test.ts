@@ -5,6 +5,7 @@ import {
   creerTransportJournal,
   installerTransportJournal,
   lireJournal,
+  lireSession,
   purgerJournal,
   estEnDev,
   resetJournalForTests,
@@ -376,6 +377,36 @@ describe('la lecture du journal', () => {
     ]);
 
     await expect(lireJournal()).rejects.toBeInstanceOf(LocalReadError);
+  });
+
+  // #176 : la tranche exportée est « depuis le dernier démarrage ». Le `cid` la
+  // désigne exactement — il est posé une fois au chargement de `logger` — et il
+  // le fait mieux qu'un filtre sur `at`, dont l'horloge de terrain peut sauter.
+  it('rend la session courante en ordre chronologique croissant', async () => {
+    const rangee = (id: number) => ({
+      id,
+      at: `2026-08-24T10:00:0${id}.000Z`,
+      cid: 'ABC123',
+      level: 'info' as const,
+      event: `e${id}`,
+      contexte: null,
+    });
+    // Le SQL rend les plus récentes d'abord ; l'export veut l'inverse.
+    getAllAsync.mockResolvedValue([rangee(3), rangee(2), rangee(1)]);
+
+    const lignes = await lireSession('ABC123');
+
+    const select = getAllAsync.mock.calls.find((c) => (c[0] as string).includes('FROM journal'));
+    expect(select?.[0]).toContain('WHERE cid = ?');
+    expect(select?.[1]).toBe('ABC123');
+    expect(lignes.map((l) => l.event)).toEqual(['e1', 'e2', 'e3']);
+  });
+
+  it('borne la session au plafond de lignes — le rapport ne peut pas tout porter', async () => {
+    await lireSession('ABC123');
+
+    const select = getAllAsync.mock.calls.find((c) => (c[0] as string).includes('FROM journal'));
+    expect(select?.[2]).toBe(PLAFOND_LIGNES);
   });
 
   it('vide la table sur demande', async () => {

@@ -483,30 +483,59 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Aide — ADR-012 décision 7 (#176) */}
+        <View style={styles.infoSection}>
+          <ThemedText style={styles.sectionTitle}>🆘 Aide</ThemedText>
+          {/*
+            L'**entrée froide**, sans aucune condition. C'est tout le ticket :
+            ce lien vivait derrière `debugEnabled`, donc l'agent devait avoir
+            activé l'interrupteur AVANT le bug — une dépendance temporelle
+            impossible à satisfaire. Pas de geste caché non plus : il faudrait
+            l'enseigner par téléphone, exactement le coût qu'on supprime.
+          */}
+          <TouchableOpacity
+            style={styles.securityButton}
+            onPress={() => router.push('/(app)/signalement')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.securityButtonLeft}>
+              <ThemedText style={styles.securityIcon}>🆘</ThemedText>
+              <ThemedText style={styles.securityText}>Signaler un problème</ThemedText>
+            </View>
+            <ThemedText style={styles.securityArrow}>→</ThemedText>
+          </TouchableOpacity>
+        </View>
+
         {/* Débogage */}
         <View style={styles.infoSection}>
           <ThemedText style={styles.sectionTitle}>🐞 Débogage</ThemedText>
           <View style={styles.preferencesCard}>
+            {/*
+              Le flag n'est plus un gate : tout part au journal sans condition
+              (décision 4). Il ne règle plus que la **verbosité** — la durée de
+              vie des lignes `detail` dans `journal-db.purgerJournal`. Le
+              libellé le dit, sinon l'agent croirait encore devoir l'activer
+              pour que quoi que ce soit soit enregistré.
+            */}
             <PreferenceItem
-              icon="🐞"
-              label="Mode débogage"
+              icon="🔬"
+              label="Enregistrer les détails techniques"
+              hint="À activer si le support vous le demande."
               value={debugEnabled}
               onToggle={setDebugEnabled}
             />
           </View>
-          {debugEnabled && (
-            <TouchableOpacity
-              style={styles.securityButton}
-              onPress={() => router.push('/(app)/debug-logs')}
-              activeOpacity={0.8}
-            >
-              <View style={styles.securityButtonLeft}>
-                <ThemedText style={styles.securityIcon}>📋</ThemedText>
-                <ThemedText style={styles.securityText}>Journal des requêtes</ThemedText>
-              </View>
-              <ThemedText style={styles.securityArrow}>→</ThemedText>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={styles.securityButton}
+            onPress={() => router.push('/(app)/debug-logs')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.securityButtonLeft}>
+              <ThemedText style={styles.securityIcon}>📋</ThemedText>
+              <ThemedText style={styles.securityText}>Journal des requêtes</ThemedText>
+            </View>
+            <ThemedText style={styles.securityArrow}>→</ThemedText>
+          </TouchableOpacity>
         </View>
 
         {/* Bouton déconnexion */}
@@ -662,17 +691,22 @@ function InfoItem({ label, value }: { label: string; value: string }) {
   );
 }
 
-function PreferenceItem({ icon, label, value, onToggle }: { 
-  icon: string; 
-  label: string; 
-  value: boolean; 
+function PreferenceItem({ icon, label, hint, value, onToggle }: {
+  icon: string;
+  label: string;
+  /** Seconde ligne, quand le libellé seul laisserait l'agent deviner. */
+  hint?: string;
+  value: boolean;
   onToggle: (val: boolean) => void;
 }) {
   return (
     <View style={styles.preferenceItem}>
       <View style={styles.preferenceLeft}>
         <ThemedText style={styles.preferenceIcon}>{icon}</ThemedText>
-        <ThemedText style={styles.preferenceLabel}>{label}</ThemedText>
+        <View style={styles.preferenceTextes}>
+          <ThemedText style={styles.preferenceLabel}>{label}</ThemedText>
+          {hint && <ThemedText style={styles.preferenceHint}>{hint}</ThemedText>}
+        </View>
       </View>
       <Switch
         value={value}
@@ -942,14 +976,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    // Sans borne, un libellé sur deux lignes pousse le Switch hors de l'écran.
+    flex: 1,
+    paddingRight: 12,
   },
   preferenceIcon: {
     fontSize: 18,
+  },
+  preferenceTextes: {
+    flex: 1,
   },
   preferenceLabel: {
     fontSize: 14,
     color: '#1A237E',
     fontWeight: '500',
+  },
+  // Jeton `foreground-tertiary` de DESIGN.md ; le reste de ce fichier porte des
+  // hex ad hoc antérieurs, ne pas les recopier.
+  preferenceHint: {
+    fontSize: 12,
+    color: '#6f6a59',
+    marginTop: 2,
   },
   versionContainer: {
     alignItems: 'center',

@@ -171,11 +171,14 @@ describe('EtatVide — l’erreur s’affiche là où la donnée manque', () => 
     expect(screen.getByText(/n’ont pas pu être relues/)).toBeVisible();
   });
 
+  // #176 : « Signaler au support » est l'**entrée chaude** et mène désormais au
+  // parcours de signalement, pas au journal brut — l'agent n'a rien à faire
+  // d'une liste de lignes qu'il ne peut ni lire ni envoyer.
   it('porte l’action de la classe jusque dans la zone', async () => {
     await render(<EtatVide erreur={new LocalReadError('boom')} titreVide="Aucune fiche" />);
 
-    fireEvent.press(screen.getByText('Signaler au support'));
-    expect(mockPush).toHaveBeenCalledWith('/(app)/debug-logs');
+    await fireEvent.press(screen.getByText('Signaler au support'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/signalement');
   });
 
   it('n’offre pas « Réessayer » quand l’écran ne sait pas rejouer la lecture', async () => {
