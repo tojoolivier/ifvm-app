@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -93,6 +93,24 @@ export default function ExtensiveReferenceScreen() {
       isMounted = false;
     };
   }, [draft?.latitude, draft?.longitude]);
+
+  // Station saisie librement, type de station, surface et n° message : de simples
+  // `useState(draft?.x)` d'initialisation ne se remettent jamais à jour si `draft`
+  // n'est pas encore hydraté au moment du montage (deep-link, app relancée en plein
+  // parcours — cf. le commentaire de `fiche-routing.ts` sur cet écran qui, contrairement
+  // à `reference.tsx`, ne s'auto-hydrate pas). Restaure une seule fois par fiche chargée
+  // pour ne pas écraser une saisie en cours si `draft` est republié entre-temps.
+  const refHydratedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!draft || draft.id !== draftId || refHydratedRef.current === draft.id) return;
+    refHydratedRef.current = draft.id;
+    void Promise.resolve().then(() => {
+      setStationLibre(draft.station_libre ?? '');
+      setTypeStation(draft.type_station ?? '');
+      setSurfaceStation(draft.surface_station != null ? String(draft.surface_station) : '');
+      setNMessage(draft.n_message ?? generateNumeroMessage(draft.id, draft.date_prospection));
+    });
+  }, [draft, draftId]);
 
   const handleContinue = () =>
     run(
