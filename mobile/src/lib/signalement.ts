@@ -30,7 +30,11 @@ import { LocalWriteError } from './errors';
 import { expurger } from './log-redaction';
 import { logger, type LogLine } from './logger';
 
-const log = logger.child({ module: 'signalement' });
+// La frontière est prononcée, pas laissée par défaut : `envoyerSignalement` est
+// toujours appelée depuis un geste de l'agent, derrière `useAsyncAction`. Sans
+// elle, le journal hériterait de `runTask:best-effort` et dirait au support que
+// l'échec vient d'une tâche de fond — décision 4.
+const log = logger.child({ module: 'signalement' }, 'useAsyncAction');
 
 /**
  * Plafond du rapport, en octets.
@@ -41,6 +45,19 @@ const log = logger.child({ module: 'signalement' });
  * complet qui n'arrive pas.
  */
 export const PLAFOND_OCTETS = 1_000_000;
+
+/**
+ * Longueur maximale du commentaire, en caractères.
+ *
+ * Le champ est du texte libre, donc sans borne l'en-tête peut à lui seul crever
+ * le plafond : le budget des lignes deviendrait négatif, le corps partirait
+ * vide, **et** le fichier dépasserait quand même. Autrement dit, un agent
+ * bavard supprimerait le journal qu'il essaie d'envoyer.
+ *
+ * 2 000 caractères, c'est plusieurs paragraphes — largement au-delà de ce
+ * qu'on tape sur un clavier de téléphone en brousse.
+ */
+export const LONGUEUR_MAX_COMMENTAIRE = 2_000;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // L'en-tête
@@ -149,17 +166,34 @@ function enteteComplet(base: BaseEntete, lignes: number, tronquees: number): str
 export function construireRapport({
   base,
   lignes,
+  totalSession = lignes.length,
   plafondOctets = PLAFOND_OCTETS,
 }: {
   base: BaseEntete;
   lignes: readonly LogLine[];
+  /**
+   * Ce que la session **pesait en base**, `LIMIT` compris.
+   *
+   * `lireSession` coupe déjà au-delà de `PLAFOND_LIGNES`, en SQL. Compter les
+   * écartées sur les seules lignes reçues ferait déclarer complet un rapport
+   * amputé de milliers de lignes — le silence de la décision 7, déplacé d'un
+   * cran plus bas.
+   */
+  totalSession?: number;
   plafondOctets?: number;
 }): string {
+  // Borné ici, et pas seulement par `maxLength` sur le champ : l'écran n'est
+  // pas la seule voie d'entrée, et un en-tête sans borne crève le plafond.
+  const borne: BaseEntete = {
+    ...base,
+    commentaire: base.commentaire?.slice(0, LONGUEUR_MAX_COMMENTAIRE) ?? null,
+  };
+
   // Le budget se calcule contre un en-tête de taille **maximale**, faute de quoi
   // le calcul serait circulaire : la taille de l'en-tête dépend des compteurs,
-  // qui dépendent du budget. `lignes.length` majore les deux compteurs, donc
+  // qui dépendent du budget. `totalSession` majore les deux compteurs, donc
   // l'en-tête réel ne peut qu'être plus court — le plafond tient toujours.
-  const budget = plafondOctets - octetsUtf8(enteteComplet(base, lignes.length, lignes.length));
+  const budget = plafondOctets - octetsUtf8(enteteComplet(borne, totalSession, totalSession));
 
   const corps: string[] = [];
   let utilises = 0;
@@ -171,7 +205,7 @@ export function construireRapport({
     corps.unshift(serialisee);
   }
 
-  const entete = enteteComplet(base, corps.length, lignes.length - corps.length);
+  const entete = enteteComplet(borne, corps.length, totalSession - corps.length);
   return [entete, ...corps].join('\n');
 }
 
@@ -188,8 +222,11 @@ export function nomDuFichier(maintenant: Date, correlationId: string): string {
 export interface SignalementDeps {
   /** Vide l'anneau mémoire du logger vers le transport SQLite. */
   flush: () => Promise<void>;
-  /** Les lignes de la session, en ordre chronologique croissant. */
-  lireSession: (correlationId: string) => Promise<LogLine[]>;
+  /**
+   * Les lignes de la session (ordre chronologique croissant) **et** ce qu'elle
+   * pesait en base : la coupure faite en SQL doit rester visible d'ici.
+   */
+  lireSession: (correlationId: string) => Promise<{ lignes: LogLine[]; total: number }>;
   correlationId: () => string;
   app: () => ContexteApp;
   appareil: () => ContexteAppareil;
@@ -234,13 +271,12 @@ export async function envoyerSignalement(
   const cid = deps.correlationId();
   const maintenant = deps.maintenant();
 
-  // Le journal de la **session courante** : le `correlationId` est posé une fois
-  // au chargement du module `logger` et ne tourne pas, donc « depuis le dernier
-  // démarrage » et « même `cid` » désignent la même tranche. Ne pas remplacer
-  // par un filtre sur `at` : l'horloge d'un téléphone de terrain saute.
-  const lignes = await deps.lireSession(cid);
+  // Le journal de la session courante — voir `journal-db.lireSession` pour
+  // pourquoi le `cid` découpe cette tranche mieux qu'un filtre sur `at`.
+  const { lignes, total } = await deps.lireSession(cid);
 
   const rapport = construireRapport({
+    totalSession: total,
     base: {
       generatedAt: maintenant.toISOString(),
       correlationId: cid,

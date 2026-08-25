@@ -16,6 +16,7 @@ import type { LogLine } from '@/lib/logger';
 import {
   construireRapport,
   envoyerSignalement,
+  LONGUEUR_MAX_COMMENTAIRE,
   nomDuFichier,
   octetsUtf8,
   PLAFOND_OCTETS,
@@ -157,6 +158,34 @@ describe('construireRapport', () => {
     it('vaut ~1 Mo par défaut : le fichier part sur WhatsApp en 2G', () => {
       expect(PLAFOND_OCTETS).toBe(1_000_000);
     });
+
+    // Le plafond en octets n'est pas le seul endroit où des lignes se perdent :
+    // `lireSession` en jette déjà en SQL, au-delà de `PLAFOND_LIGNES`. Sans
+    // `totalSession`, l'en-tête déclarerait « 0 écartée » sur un rapport amputé
+    // de 20 000 lignes — le silence même que la décision 7 supprime.
+    it('compte aussi les lignes jetées en amont, avant même d’arriver ici', () => {
+      const rapport = construireRapport({
+        base: BASE,
+        lignes: [ligne(1), ligne(2)],
+        totalSession: 7000,
+      });
+
+      const entete = lireEntete(rapport);
+      expect(entete.lignes).toBe(2);
+      expect(entete.tronquees).toBe(6998);
+    });
+
+    it('borne le commentaire, sinon l’en-tête seul peut crever le plafond', () => {
+      const rapport = construireRapport({
+        base: { ...BASE, commentaire: 'a'.repeat(50_000) },
+        lignes: [ligne(1)],
+      });
+
+      expect(octetsUtf8(rapport)).toBeLessThanOrEqual(PLAFOND_OCTETS);
+      expect(lireEntete(rapport).commentaire).toHaveLength(LONGUEUR_MAX_COMMENTAIRE);
+      // Le corps survit : c'est bien le commentaire qui cède, pas le journal.
+      expect(lireCorps(rapport)).toHaveLength(1);
+    });
   });
 
   // L'expurgation est posée à l'écriture, dans `sink()` — mais l'en-tête, lui,
@@ -183,7 +212,7 @@ describe('envoyerSignalement', () => {
   function deps(surcharge: Partial<SignalementDeps> = {}) {
     return {
       flush: jest.fn(async () => {}),
-      lireSession: jest.fn(async () => [ligne(1), ligne(2)]),
+      lireSession: jest.fn(async () => ({ lignes: [ligne(1), ligne(2)], total: 2 })),
       correlationId: () => 'ABC123',
       app: () => BASE.app,
       appareil: () => BASE.appareil,
@@ -203,7 +232,7 @@ describe('envoyerSignalement', () => {
       }),
       lireSession: jest.fn(async () => {
         ordre.push('lire');
-        return [ligne(1)];
+        return { lignes: [ligne(1)], total: 1 };
       }),
     });
 
@@ -243,6 +272,16 @@ describe('envoyerSignalement', () => {
 
   // Le signalement est le dernier recours de l'agent : s'il échoue, il doit
   // échouer bruyamment, avec une classe que la couche d'affichage sait traduire.
+  it('reporte les lignes jetées par SQLite jusque dans l’en-tête', async () => {
+    const d = deps({
+      lireSession: jest.fn(async () => ({ lignes: [ligne(1)], total: 12_000 })),
+    });
+
+    await envoyerSignalement({ commentaire: null }, d);
+
+    expect(lireEntete((d.ecrire as jest.Mock).mock.calls[0][1] as string).tronquees).toBe(11_999);
+  });
+
   it('type l’échec d’écriture en LocalWriteError', async () => {
     const d = deps({
       ecrire: jest.fn(async () => {
