@@ -140,12 +140,16 @@ export default function CapturesScreen() {
     void hydrate().catch((error) => signalerChargement(error, { draftId }));
   }, [draftId, draft?.id, hydrateFromDraft, signalerChargement]);
 
-  // Effet 2: Initialisation des grilles - une seule fois. Les stades viennent du
-  // référentiel synchronisé, jamais d'une liste écrite dans l'écran : c'est le backend
-  // qui décide quels codes existent, et une liste locale finit par en diverger (#201).
+  // Effet 2: vocabulaire des stades, puis initialisation des grilles. Les stades
+  // viennent du référentiel synchronisé, jamais d'une liste écrite dans l'écran : c'est
+  // le backend qui décide quels codes existent (#201).
+  //
+  // Cet effet ne s'abrège pas quand `grilleOrder` est déjà rempli : l'écran « espèces »
+  // appelle `initGrilles` avant de naviguer ici, sans connaître le vocabulaire. Sauter
+  // le chargement dans ce cas — le parcours normal — laissait des grilles sans aucun
+  // stade, et l'agent croyait sa saisie perdue.
   useEffect(() => {
     if (!draft || draft.id !== draftId || isInitialized.current) return;
-    if (store.grilleOrder.length > 0) return;
     isInitialized.current = true;
 
     const selection = parseEspeceSelection(draft.especes);
@@ -170,6 +174,8 @@ export default function CapturesScreen() {
         };
       }
       store.setStadesParGrille(parGrille);
+      // Rejoué même si l'écran « espèces » l'a déjà fait : les compteurs par stade se
+      // construisent à partir du vocabulaire, qui n'était pas connu à ce moment-là.
       store.initGrilles(grilles, completed, captures);
     };
 
@@ -198,12 +204,17 @@ export default function CapturesScreen() {
   // Effet 5: Grille déjà remplie (fiche reprise) — le total est déduit des captures
   // enregistrées, sinon les sections « Phases » et « Stades » restent masquées (total = 0)
   // et la saisie précédente semble perdue (#201).
+  // On ne peut pas déduire un total avant de savoir quels stades composent la grille :
+  // tant que le vocabulaire n'est pas chargé, `totalStades` vaut 0 pour une grille
+  // pourtant remplie. Attendre évite de figer ce 0 et de masquer la saisie.
+  const vocabulairePret = stadesFList.length > 0 || larvesList.length > 0;
   const prefilledGrilleRef = useRef<number | null>(null);
   useEffect(() => {
-    if (!grille || prefilledGrilleRef.current === currentGrilleIndex) return;
+    if (!grille || !vocabulairePret) return;
+    if (prefilledGrilleRef.current === currentGrilleIndex) return;
     prefilledGrilleRef.current = currentGrilleIndex;
     setTotalCapturesInput(totalStades > 0 ? String(totalStades) : '');
-  }, [grille, currentGrilleIndex, totalStades]);
+  }, [grille, vocabulairePret, currentGrilleIndex, totalStades]);
 
   // Effet 6: Chronomètre
   useEffect(() => {

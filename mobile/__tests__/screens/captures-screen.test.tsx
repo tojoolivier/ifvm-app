@@ -97,6 +97,31 @@ describe('CapturesScreen', () => {
     expect(await screen.findByText(/absente du référentiel de l’appareil/)).toBeVisible();
   });
 
+  it('charge le vocabulaire même quand l’écran « espèces » a déjà posé les grilles (#201)', async () => {
+    // Parcours réel : species.tsx appelle `initGrilles` avant de naviguer ici. L'écran
+    // ne doit pas en conclure qu'il n'a plus rien à charger — le vocabulaire, lui,
+    // n'est pas encore connu.
+    useProspectionCaptureStore
+      .getState()
+      .initGrilles([{ espece: 'LMC', categorie: 'larve' }], [], []);
+
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'intensive',
+        especes: JSON.stringify({ lmcImago: false, lmcLarve: true, nseImago: false, nseLarve: false }),
+        grilles_completees: null,
+        capture_started_at: '2026-08-25T08:00:00.000Z',
+      } as any,
+      captures: CAPTURES_LARVE,
+    });
+
+    await render(<CapturesScreen />);
+
+    expect(await screen.findByText('L1')).toBeVisible();
+    expect(screen.getByText('L5')).toBeVisible();
+  });
+
   it('laisse le total vide sur une grille encore vierge', async () => {
     useProspectionWizardStore.setState({
       draft: {
