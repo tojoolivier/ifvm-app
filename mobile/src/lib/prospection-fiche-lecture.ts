@@ -16,13 +16,16 @@ export const PHENOTYPES_3: { value: Phenotype; label: string }[] = PHENOTYPES.fi
   (p) => p.value !== 'solitaro_trans'
 );
 
-type TypeCible = 'tache_larvaire' | 'bande_larvaire' | 'vol_clair' | 'essaim';
+// "essaim" a disparu (migration backend 0029) : la densité de l'essaim est désormais le
+// type de cible lui-même, au même niveau que "Vol clair" — plus une sous-classification.
+type TypeCible = 'tache_larvaire' | 'bande_larvaire' | 'vol_clair' | 'dense' | 'tres_dense';
 
 export const TYPE_CIBLE_OPTIONS: { value: TypeCible; label: string }[] = [
   { value: 'tache_larvaire', label: 'Tache larvaire' },
   { value: 'bande_larvaire', label: 'Bande larvaire' },
   { value: 'vol_clair', label: 'Vol clair' },
-  { value: 'essaim', label: 'Essaim' },
+  { value: 'dense', label: 'Dense' },
+  { value: 'tres_dense', label: 'Très dense' },
 ];
 
 export type Humidite = 'surface' | '0_5cm' | '5_12cm' | '12_30cm' | 'gt_30cm';
@@ -86,8 +89,18 @@ export type StratesState = Record<StrateKey, StrateDetail>;
 export interface VegetationSolState {
   strates: StratesState;
   humidite: Humidite | null;
-  texture: Texture | null;
+  // Sélection multiple (cf. veg.tsx "Texture du sol (sélection multiple)") : toujours un
+  // tableau, jamais une valeur scalaire — un ancien brouillon enregistré avant l'ajout du
+  // multi-select peut encore porter une simple string, normalisée en tableau à un élément.
+  texture: Texture[];
   degatsCultures: DegatsCultures | null;
+}
+
+/** Accepte le format actuel (tableau) et l'ancien format scalaire d'un brouillon antérieur. */
+function normalizeTextureSelection(raw: unknown): Texture[] {
+  if (Array.isArray(raw)) return raw.filter((t): t is Texture => typeof t === 'string');
+  if (typeof raw === 'string' && raw) return [raw as Texture];
+  return [];
 }
 
 export function defaultStrateDetail(): StrateDetail {
@@ -133,7 +146,7 @@ export function parseVegetationSol(
   return {
     strates,
     humidite: (solParsed.humidite as Humidite) ?? null,
-    texture: (solParsed.texture as Texture) ?? null,
+    texture: normalizeTextureSelection(solParsed.texture),
     degatsCultures: (degatsCultures as DegatsCultures) ?? null,
   };
 }
@@ -146,8 +159,12 @@ export function buildVegetationSummary(state: VegetationSolState): string {
   if (state.humidite) {
     parts.push(`Humidité ${HUMIDITE_OPTIONS.find((o) => o.value === state.humidite)?.label}`);
   }
-  if (state.texture) {
-    parts.push(`Texture ${TEXTURE_OPTIONS.find((o) => o.value === state.texture)?.label}`);
+  if (state.texture.length > 0) {
+    // Sélection multiple : toutes les textures cochées apparaissent, pas seulement la première.
+    const labels = state.texture
+      .map((t) => TEXTURE_OPTIONS.find((o) => o.value === t)?.label ?? t)
+      .join(', ');
+    parts.push(`Texture ${labels}`);
   }
   if (state.degatsCultures) {
     parts.push(`Dégâts culture ${DEGATS_OPTIONS.find((o) => o.value === state.degatsCultures)?.label}`);

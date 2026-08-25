@@ -24,6 +24,7 @@ jest.mock('expo-router', () =>
 
 jest.mock('@/lib/prospection-repository', () => ({
   listAllProspectionInfestations: jest.fn().mockResolvedValue([]),
+  listAllProspectionCaptures: jest.fn().mockResolvedValue([]),
   saveProspectionInfestation: jest.fn().mockResolvedValue(undefined),
   getProspection: jest.fn().mockResolvedValue(null),
   getDerniereDensiteMemeSite: jest.fn().mockResolvedValue(null),
@@ -89,6 +90,9 @@ describe('InfestationScreen', () => {
         nb_taches_bandes: 3,
         interdistance_moy: 250,
         comportement: 'deplacement',
+        // Direction du déplacement distincte de la direction du vent (24/08) : direction_de
+        // doit être renseignée explicitement, vent_de ne suffit plus (elles sont indépendantes).
+        direction_de: 'N',
         vent_de: 'N',
         direction_vers: 'S',
       } as any,
@@ -115,6 +119,12 @@ describe('InfestationScreen', () => {
         surface_totale: 12,
         essaim_en_vol: 1,
         essaim_pose: 0,
+        // Heure de jour explicite : une heure déjà enregistrée ne doit pas être recalculée
+        // (règle #7), et ne doit pas déclencher le filet de sécurité nocturne (#106).
+        heure_observation: '14:00',
+        // Direction du déplacement distincte de la direction du vent (24/08) : direction_de
+        // doit être renseignée explicitement, vent_de ne suffit plus (elles sont indépendantes).
+        direction_de: 'N',
         vent_de: 'N',
         direction_vers: 'S',
       } as any,
@@ -137,11 +147,16 @@ describe('InfestationScreen', () => {
   it('force le comportement sur "posé" pour un essaim signalé de nuit (#106)', async () => {
     jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
       {
-        type_cible: 'essaim',
+        // "essaim" a disparu (migration 0029) : Dense/Très dense sont désormais des
+        // type_cible à part entière, au même niveau que Vol clair.
+        type_cible: 'dense',
         surface_totale: 12,
         essaim_en_vol: 1,
         essaim_pose: 0,
         heure_observation: '23:00',
+        // Direction du déplacement distincte de la direction du vent (24/08) : direction_de
+        // doit être renseignée explicitement, vent_de ne suffit plus (elles sont indépendantes).
+        direction_de: 'N',
         vent_de: 'N',
         direction_vers: 'S',
       } as any,
@@ -155,7 +170,7 @@ describe('InfestationScreen', () => {
     await waitFor(() =>
       expect(prospectionRepository.saveProspectionInfestation).toHaveBeenCalledWith(
         'draft-123',
-        'essaim',
+        'dense',
         expect.objectContaining({ essaim_en_vol: 0, essaim_pose: 1 })
       )
     );
@@ -164,10 +179,13 @@ describe('InfestationScreen', () => {
   it('conserve la surface contaminée et la part infestée à la sauvegarde d’un essaim (#104)', async () => {
     jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
       {
-        type_cible: 'essaim',
+        type_cible: 'dense',
         surface_totale: 12,
         surface_contaminee_ha: 40,
         surface_infestee_pourcent: 25,
+        // Direction du déplacement distincte de la direction du vent (24/08) : direction_de
+        // doit être renseignée explicitement, vent_de ne suffit plus (elles sont indépendantes).
+        direction_de: 'N',
         vent_de: 'N',
         direction_vers: 'S',
       } as any,
@@ -181,7 +199,7 @@ describe('InfestationScreen', () => {
     await waitFor(() =>
       expect(prospectionRepository.saveProspectionInfestation).toHaveBeenCalledWith(
         'draft-123',
-        'essaim',
+        'dense',
         expect.objectContaining({ surface_contaminee_ha: 40, surface_infestee_pourcent: 25 })
       )
     );
@@ -189,7 +207,7 @@ describe('InfestationScreen', () => {
 
   it('classe "vol clair" via le questionnaire séquentiel et bloque la densité en saisie libre (#104)', async () => {
     jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
-      { type_cible: 'vol_clair', surface_totale: 12, vent_de: 'N', direction_vers: 'S' } as any,
+      { type_cible: 'vol_clair', surface_totale: 12, direction_de: 'N', vent_de: 'N', direction_vers: 'S' } as any,
     ]);
 
     await render(<InfestationScreen />);

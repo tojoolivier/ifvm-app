@@ -191,12 +191,39 @@ describe('buildRecapitulatif', () => {
 
   it("résume l'infestation : formations renseignées listées, sinon 'aucune'", () => {
     const filled = buildRecapitulatif(draft(), [], '', [
-      { espece: null, type_cible: 'essaim', taille_min: null, taille_max: null, taille_moy: null, surface_totale: 5, densite_min: null, densite_max: null, densite_moy: null, interdistance: null, comportement: null, direction_de: null, direction_vers: null, vent_de: null, vent_vitesse: null, pullulation_nb: null, taille_long: null, taille_large: null, taille_epaisseur: null, essaim_en_vol: null, essaim_pose: null, type_essaim: null, nb_taches_bandes: null, interdistance_m: null, interdistance_min: null, interdistance_max: null, interdistance_moy: null, surface_contaminee_ha: null, type_larve: null, surface_infestee_pourcent: null, stade_dominant: null, taille_groupe_m2: null, front_longueur_m: null, front_largeur_m: null, densite_max_front: null, densite_moy_arriere_front: null, heure_observation: null, densite_en_vol: null, dimension_ha: null },
+      { espece: null, type_cible: 'dense', taille_min: null, taille_max: null, taille_moy: null, surface_totale: 5, densite_min: null, densite_max: null, densite_moy: null, interdistance: null, comportement: null, direction_de: null, direction_vers: null, vent_de: null, vent_vitesse: null, pullulation_nb: null, taille_long: null, taille_large: null, taille_epaisseur: null, essaim_en_vol: null, essaim_pose: null, type_essaim: null, nb_taches_bandes: null, interdistance_m: null, interdistance_min: null, interdistance_max: null, interdistance_moy: null, surface_contaminee_ha: null, type_larve: null, surface_infestee_pourcent: null, stade_dominant: null, taille_groupe_m2: null, front_longueur_m: null, front_largeur_m: null, densite_max_front: null, densite_moy_arriere_front: null, heure_observation: null, densite_en_vol: null, dimension_ha: null },
     ]);
-    expect(filled.infestationSummary).toBe('Essaim renseignée.');
+    expect(filled.infestationSummary).toBe('Dense renseignée.');
 
     const empty = buildRecapitulatif(draft(), [], '', []);
     expect(empty.infestationSummary).toBe('Aucune formation renseignée.');
+  });
+
+  it("résume le comportement (État + Direction), sans confondre avec le vent (indépendant)", () => {
+    const row = {
+      espece: null, type_cible: 'bande_larvaire', taille_min: null, taille_max: null, taille_moy: null,
+      surface_totale: null, densite_min: null, densite_max: null, densite_moy: null, interdistance: null,
+      comportement: 'deplacement', direction_de: 'N', direction_vers: 'S',
+      vent_de: 'E', vent_vitesse: 12, pullulation_nb: null, taille_long: null, taille_large: null,
+      taille_epaisseur: null, essaim_en_vol: null, essaim_pose: null, type_essaim: null, nb_taches_bandes: null,
+      interdistance_m: null, interdistance_min: null, interdistance_max: null, interdistance_moy: null,
+      surface_contaminee_ha: null, type_larve: null, surface_infestee_pourcent: null, stade_dominant: null,
+      taille_groupe_m2: null, front_longueur_m: null, front_largeur_m: null, densite_max_front: null,
+      densite_moy_arriere_front: null, heure_observation: null, densite_en_vol: null, dimension_ha: null,
+    } as const;
+    const recap = buildRecapitulatif(draft(), [], '', [row]);
+    expect(recap.comportementSummary).toBe('État Déplacement · Direction N → S');
+
+    const empty = buildRecapitulatif(draft(), [], '', []);
+    expect(empty.comportementSummary).toBe('Aucun comportement renseigné.');
+  });
+
+  it("reprend le texte d'observations tel qu'enregistré sur la fiche, sinon un texte neutre", () => {
+    const withObs = buildRecapitulatif(draft({ observations: 'RAS, végétation sèche.' }), [], '', []);
+    expect(withObs.observationsText).toBe('RAS, végétation sèche.');
+
+    const withoutObs = buildRecapitulatif(draft({ observations: null }), [], '', []);
+    expect(withoutObs.observationsText).toBe('Aucune observation renseignée.');
   });
 });
 
@@ -210,7 +237,7 @@ describe('enregistrerEtSynchroniser', () => {
       { espece: 'LMC', categorie: 'imago', densite_diffuse: 5, densite_groupee: 1, methode: null, accouplement: 'rare', ponte: null },
     ]);
     mockListAllInfestations.mockResolvedValue([
-      { espece: null, type_cible: 'essaim', taille_min: null, taille_max: null, taille_moy: null, surface_totale: 5, densite_min: null, densite_max: null, densite_moy: null, interdistance: null, comportement: null, direction_de: null, direction_vers: null, vent_de: null, vent_vitesse: null, pullulation_nb: null, taille_long: null, taille_large: null, taille_epaisseur: null, essaim_en_vol: null, essaim_pose: null, type_essaim: null, nb_taches_bandes: null, interdistance_m: null, interdistance_min: null, interdistance_max: null, interdistance_moy: null, surface_contaminee_ha: null, type_larve: null, surface_infestee_pourcent: null, stade_dominant: null, taille_groupe_m2: null, front_longueur_m: null, front_largeur_m: null, densite_max_front: null, densite_moy_arriere_front: null, heure_observation: null, densite_en_vol: null, dimension_ha: null },
+      { espece: null, type_cible: 'dense', taille_min: null, taille_max: null, taille_moy: null, surface_totale: 5, densite_min: null, densite_max: null, densite_moy: null, interdistance: null, comportement: null, direction_de: null, direction_vers: null, vent_de: null, vent_vitesse: null, pullulation_nb: null, taille_long: null, taille_large: null, taille_epaisseur: null, essaim_en_vol: null, essaim_pose: null, type_essaim: null, nb_taches_bandes: null, interdistance_m: null, interdistance_min: null, interdistance_max: null, interdistance_moy: null, surface_contaminee_ha: null, type_larve: null, surface_infestee_pourcent: null, stade_dominant: null, taille_groupe_m2: null, front_longueur_m: null, front_largeur_m: null, densite_max_front: null, densite_moy_arriere_front: null, heure_observation: null, densite_en_vol: null, dimension_ha: null },
     ]);
 
     const result = await enregistrerEtSynchroniser(draft(), [], 'token-1');
@@ -223,12 +250,39 @@ describe('enregistrerEtSynchroniser', () => {
       expect.objectContaining({
         n_releve: null,
         populations: [expect.objectContaining({ espece: 'LMC', categorie: 'imago', densite_diffuse: 5 })],
-        infestations: [expect.objectContaining({ type_cible: 'essaim', surface_totale: 5 })],
+        infestations: [expect.objectContaining({ type_cible: 'dense', surface_totale: 5 })],
       })
     );
     expect(mockMarkSynced).toHaveBeenCalledWith('draft-1');
     expect(result.reussies).toEqual(['draft-1']);
     expect(result.echouees).toEqual([]);
+  });
+
+  it('normalise type_cible et type_essaim pour la synchro (0031 : "essaim" a disparu du contrat TypeCible ; anciennes valeurs à 5 niveaux de type_essaim toujours reconnues)', async () => {
+    mockCompleteProspection.mockResolvedValue(draft({ statut: 'en_attente' }));
+    mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
+    mockCreateProspection.mockResolvedValue({ id: 'remote-1' });
+    mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
+    mockListAllPopulations.mockResolvedValue([]);
+    mockListAllInfestations.mockResolvedValue([
+      { espece: null, type_cible: 'essaim', taille_min: null, taille_max: null, taille_moy: null, surface_totale: 5, densite_min: null, densite_max: null, densite_moy: null, interdistance: null, comportement: null, direction_de: null, direction_vers: null, vent_de: null, vent_vitesse: null, pullulation_nb: null, taille_long: null, taille_large: null, taille_epaisseur: null, essaim_en_vol: null, essaim_pose: null, type_essaim: 'dense', nb_taches_bandes: null, interdistance_m: null, interdistance_min: null, interdistance_max: null, interdistance_moy: null, surface_contaminee_ha: null, type_larve: null, surface_infestee_pourcent: null, stade_dominant: null, taille_groupe_m2: null, front_longueur_m: null, front_largeur_m: null, densite_max_front: null, densite_moy_arriere_front: null, heure_observation: null, densite_en_vol: null, dimension_ha: null },
+      { espece: null, type_cible: 'vol_clair', taille_min: null, taille_max: null, taille_moy: null, surface_totale: 5, densite_min: null, densite_max: null, densite_moy: null, interdistance: null, comportement: null, direction_de: null, direction_vers: null, vent_de: null, vent_vitesse: null, pullulation_nb: null, taille_long: null, taille_large: null, taille_epaisseur: null, essaim_en_vol: null, essaim_pose: null, type_essaim: 'tres_dense', nb_taches_bandes: null, interdistance_m: null, interdistance_min: null, interdistance_max: null, interdistance_moy: null, surface_contaminee_ha: null, type_larve: null, surface_infestee_pourcent: null, stade_dominant: null, taille_groupe_m2: null, front_longueur_m: null, front_largeur_m: null, densite_max_front: null, densite_moy_arriere_front: null, heure_observation: null, densite_en_vol: null, dimension_ha: null },
+      // Ancien brouillon (avant la bascule sur les 3 catégories officielles) : doit toujours se normaliser.
+      { espece: null, type_cible: 'essaim', taille_min: null, taille_max: null, taille_moy: null, surface_totale: 5, densite_min: null, densite_max: null, densite_moy: null, interdistance: null, comportement: null, direction_de: null, direction_vers: null, vent_de: null, vent_vitesse: null, pullulation_nb: null, taille_long: null, taille_large: null, taille_epaisseur: null, essaim_en_vol: null, essaim_pose: null, type_essaim: 'essaim_densite_forte', nb_taches_bandes: null, interdistance_m: null, interdistance_min: null, interdistance_max: null, interdistance_moy: null, surface_contaminee_ha: null, type_larve: null, surface_infestee_pourcent: null, stade_dominant: null, taille_groupe_m2: null, front_longueur_m: null, front_largeur_m: null, densite_max_front: null, densite_moy_arriere_front: null, heure_observation: null, densite_en_vol: null, dimension_ha: null },
+    ] as any);
+
+    await enregistrerEtSynchroniser(draft(), [], 'token-1');
+
+    expect(mockCreateProspection).toHaveBeenCalledWith(
+      'token-1',
+      expect.objectContaining({
+        infestations: [
+          expect.objectContaining({ type_cible: 'dense', type_essaim: 'dense' }),
+          expect.objectContaining({ type_cible: 'vol_clair', type_essaim: 'tres_dense' }),
+          expect.objectContaining({ type_cible: 'dense', type_essaim: 'dense' }),
+        ],
+      })
+    );
   });
 
   it('ne tente pas le réseau hors-ligne, et la fiche reste dans la file', async () => {

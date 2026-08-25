@@ -56,6 +56,8 @@ export interface RecapitulatifViewModel {
   vegetationSummary: string;
   reviewGroups: ReviewGroupViewModel[];
   infestationSummary: string;
+  comportementSummary: string;
+  observationsText: string;
 }
 
 const ESPECE_LABEL = { LMC: 'Locusta', NSE: 'Nomadacris' } as const;
@@ -82,6 +84,32 @@ function buildInfestationSummary(infestations: InfestationRow[]): string {
   if (filled.length === 0) return 'Aucune formation renseignée.';
   const labels = filled.map((row) => TYPE_CIBLE_OPTIONS.find((o) => o.value === row.type_cible)?.label ?? row.type_cible);
   return `${labels.join(', ')} renseignée${filled.length > 1 ? 's' : ''}.`;
+}
+
+/**
+ * Comportement (État/Direction/Essaim en vol-posé) : rattaché à une ligne
+ * `prospection_infestation`, comme dans infestation.tsx (onglet "Comport.") — même
+ * vocabulaire, direction du déplacement et direction du vent restant deux mesures
+ * indépendantes (cf. commentaire de `formFromRow` dans infestation.tsx).
+ */
+function buildComportementSummary(infestations: InfestationRow[]): string {
+  const row = infestations.find(
+    (r) => r.comportement != null || r.essaim_en_vol || r.essaim_pose || r.direction_de != null
+  );
+  if (!row) return 'Aucun comportement renseigné.';
+
+  const parts: string[] = [];
+  if (row.comportement) {
+    parts.push(`État ${row.comportement === 'deplacement' ? 'Déplacement' : 'Repos'}`);
+  }
+  if (row.direction_de || row.direction_vers) {
+    parts.push(`Direction ${row.direction_de ?? '—'} → ${row.direction_vers ?? '—'}`);
+  }
+  if (row.essaim_en_vol || row.essaim_pose) {
+    const etats = [row.essaim_en_vol ? 'en vol' : null, row.essaim_pose ? 'posé' : null].filter(Boolean);
+    parts.push(`Essaim ${etats.join(' / ')}`);
+  }
+  return parts.length > 0 ? parts.join(' · ') : 'Aucun comportement renseigné.';
 }
 
 export function chronoSeconds(startedAt: string | null, now: Date = new Date()): number {
@@ -124,6 +152,8 @@ export function buildRecapitulatif(
     vegetationSummary,
     reviewGroups: buildReviewGroups(draft, captures),
     infestationSummary: buildInfestationSummary(infestations),
+    comportementSummary: buildComportementSummary(infestations),
+    observationsText: draft.observations?.trim() ? draft.observations : 'Aucune observation renseignée.',
   };
 }
 
@@ -288,61 +318,82 @@ function buildPopulationsPayload(rows: PopulationRow[]): ProspectionPopulationIn
 }
 
 /**
- * Le mobile calcule 5 niveaux de densité aérienne (aide à la décision, cf.
- * classifyAerialPopulation) mais le backend n'accepte que les 3 catégories
- * officielles de la fiche PDF (vol_clair/dense/tres_dense). non_classe n'a
- * pas d'équivalent -> null ; moyenne et forte se regroupent sous 'dense'.
+ * `classifyAerialPopulation` calcule désormais directement les 3 catégories officielles
+ * du backend (vol_clair/dense/tres_dense — enum TypeEssaim). Cette table ne sert plus
+ * qu'à normaliser d'anciens brouillons locaux enregistrés avant cette bascule, avec les
+ * 5 valeurs internes d'origine (non_classe/essaim_densite_moyenne/forte/tres_forte) —
+ * même règle de regroupement qu'alors (moyenne+forte -> 'dense').
  */
 const TYPE_ESSAIM_TO_BACKEND: Record<string, 'vol_clair' | 'dense' | 'tres_dense' | null> = {
-  non_classe: null,
   vol_clair: 'vol_clair',
+  dense: 'dense',
+  tres_dense: 'tres_dense',
+  non_classe: null,
   essaim_densite_moyenne: 'dense',
   essaim_densite_forte: 'dense',
   essaim_densite_tres_forte: 'tres_dense',
 };
 
+/**
+ * `type_cible` n'accepte plus 'essaim' côté backend depuis la migration 0031 (Dense et
+ * Très dense sont désormais des types de cible à part entière). Un brouillon local
+ * enregistré avant cette bascule et pas encore synchronisé peut encore porter
+ * `type_cible: 'essaim'` : on le reclasse ici avec la même règle que la migration
+ * backend, à partir du `type_essaim` déjà normalisé (dense/tres_dense -> repris tel
+ * quel, y compris pour un ancien brouillon à 5 niveaux ; sinon 'vol_clair' par défaut).
+ */
+function normalizeTypeCible(rawTypeCible: string, normalizedTypeEssaim: string | null): string {
+  if (rawTypeCible !== 'essaim') return rawTypeCible;
+  return normalizedTypeEssaim === 'dense' || normalizedTypeEssaim === 'tres_dense'
+    ? normalizedTypeEssaim
+    : 'vol_clair';
+}
+
 function buildInfestationsPayload(rows: InfestationRow[]): ProspectionInfestationInput[] {
-  return rows.map((row) => ({
-    type_cible: row.type_cible as ProspectionInfestationInput['type_cible'],
-    espece: (row.espece || null) as ProspectionInfestationInput['espece'],
-    taille_min: row.taille_min ? Number(row.taille_min) : null,
-    taille_max: row.taille_max ? Number(row.taille_max) : null,
-    taille_moy: row.taille_moy ? Number(row.taille_moy) : null,
-    surface_totale: row.surface_totale ? Number(row.surface_totale) : null,
-    densite_min: row.densite_min ? Number(row.densite_min) : null,
-    densite_max: row.densite_max ? Number(row.densite_max) : null,
-    densite_moy: row.densite_moy ? Number(row.densite_moy) : null,
-    interdistance: row.interdistance ? Number(row.interdistance) : null,
-    comportement: (row.comportement || null) as ProspectionInfestationInput['comportement'],
-    direction_de: row.direction_de || null,
-    direction_vers: row.direction_vers || null,
-    vent_de: row.vent_de || null,
-    vent_vitesse: row.vent_vitesse ? Number(row.vent_vitesse) : null,
-    pullulation_nb: row.pullulation_nb ? Number(row.pullulation_nb) : null,
-    taille_long: row.taille_long ? Number(row.taille_long) : null,
-    taille_large: row.taille_large ? Number(row.taille_large) : null,
-    taille_epaisseur: row.taille_epaisseur ? Number(row.taille_epaisseur) : null,
-    essaim_en_vol: row.essaim_en_vol != null ? Boolean(row.essaim_en_vol) : null,
-    essaim_pose: row.essaim_pose != null ? Boolean(row.essaim_pose) : null,
-    type_essaim: (row.type_essaim ? (TYPE_ESSAIM_TO_BACKEND[row.type_essaim] ?? null) : null) as ProspectionInfestationInput['type_essaim'],
-    heure_observation: row.heure_observation || null,
-    densite_en_vol: row.densite_en_vol ? Number(row.densite_en_vol) : null,
-    dimension_ha: row.dimension_ha ? Number(row.dimension_ha) : null,
-    nb_taches_bandes: row.nb_taches_bandes ? Number(row.nb_taches_bandes) : null,
-    interdistance_m: row.interdistance_m ? Number(row.interdistance_m) : null,
-    interdistance_min: row.interdistance_min ? Number(row.interdistance_min) : null,
-    interdistance_max: row.interdistance_max ? Number(row.interdistance_max) : null,
-    interdistance_moy: row.interdistance_moy ? Number(row.interdistance_moy) : null,
-    surface_contaminee_ha: row.surface_contaminee_ha ? Number(row.surface_contaminee_ha) : null,
-    type_larve: (row.type_larve || null) as ProspectionInfestationInput['type_larve'],
-    surface_infestee_pourcent: row.surface_infestee_pourcent ? Number(row.surface_infestee_pourcent) : null,
-    stade_dominant: (row.stade_dominant || null) as ProspectionInfestationInput['stade_dominant'],
-    taille_groupe_m2: row.taille_groupe_m2 ? Number(row.taille_groupe_m2) : null,
-    front_longueur_m: row.front_longueur_m ? Number(row.front_longueur_m) : null,
-    front_largeur_m: row.front_largeur_m ? Number(row.front_largeur_m) : null,
-    densite_max_front: row.densite_max_front ? Number(row.densite_max_front) : null,
-    densite_moy_arriere_front: row.densite_moy_arriere_front ? Number(row.densite_moy_arriere_front) : null,
-  }));
+  return rows.map((row) => {
+    const typeEssaim = row.type_essaim ? (TYPE_ESSAIM_TO_BACKEND[row.type_essaim] ?? null) : null;
+    return {
+      type_cible: normalizeTypeCible(row.type_cible, typeEssaim) as ProspectionInfestationInput['type_cible'],
+      espece: (row.espece || null) as ProspectionInfestationInput['espece'],
+      taille_min: row.taille_min ? Number(row.taille_min) : null,
+      taille_max: row.taille_max ? Number(row.taille_max) : null,
+      taille_moy: row.taille_moy ? Number(row.taille_moy) : null,
+      surface_totale: row.surface_totale ? Number(row.surface_totale) : null,
+      densite_min: row.densite_min ? Number(row.densite_min) : null,
+      densite_max: row.densite_max ? Number(row.densite_max) : null,
+      densite_moy: row.densite_moy ? Number(row.densite_moy) : null,
+      interdistance: row.interdistance ? Number(row.interdistance) : null,
+      comportement: (row.comportement || null) as ProspectionInfestationInput['comportement'],
+      direction_de: row.direction_de || null,
+      direction_vers: row.direction_vers || null,
+      vent_de: row.vent_de || null,
+      vent_vitesse: row.vent_vitesse ? Number(row.vent_vitesse) : null,
+      pullulation_nb: row.pullulation_nb ? Number(row.pullulation_nb) : null,
+      taille_long: row.taille_long ? Number(row.taille_long) : null,
+      taille_large: row.taille_large ? Number(row.taille_large) : null,
+      taille_epaisseur: row.taille_epaisseur ? Number(row.taille_epaisseur) : null,
+      essaim_en_vol: row.essaim_en_vol != null ? Boolean(row.essaim_en_vol) : null,
+      essaim_pose: row.essaim_pose != null ? Boolean(row.essaim_pose) : null,
+      type_essaim: typeEssaim as ProspectionInfestationInput['type_essaim'],
+      heure_observation: row.heure_observation || null,
+      densite_en_vol: row.densite_en_vol ? Number(row.densite_en_vol) : null,
+      dimension_ha: row.dimension_ha ? Number(row.dimension_ha) : null,
+      nb_taches_bandes: row.nb_taches_bandes ? Number(row.nb_taches_bandes) : null,
+      interdistance_m: row.interdistance_m ? Number(row.interdistance_m) : null,
+      interdistance_min: row.interdistance_min ? Number(row.interdistance_min) : null,
+      interdistance_max: row.interdistance_max ? Number(row.interdistance_max) : null,
+      interdistance_moy: row.interdistance_moy ? Number(row.interdistance_moy) : null,
+      surface_contaminee_ha: row.surface_contaminee_ha ? Number(row.surface_contaminee_ha) : null,
+      type_larve: (row.type_larve || null) as ProspectionInfestationInput['type_larve'],
+      surface_infestee_pourcent: row.surface_infestee_pourcent ? Number(row.surface_infestee_pourcent) : null,
+      stade_dominant: (row.stade_dominant || null) as ProspectionInfestationInput['stade_dominant'],
+      taille_groupe_m2: row.taille_groupe_m2 ? Number(row.taille_groupe_m2) : null,
+      front_longueur_m: row.front_longueur_m ? Number(row.front_longueur_m) : null,
+      front_largeur_m: row.front_largeur_m ? Number(row.front_largeur_m) : null,
+      densite_max_front: row.densite_max_front ? Number(row.densite_max_front) : null,
+      densite_moy_arriere_front: row.densite_moy_arriere_front ? Number(row.densite_moy_arriere_front) : null,
+    };
+  });
 }
 
 /** Le réseau, tel que l'appareil le voit à cet instant. */

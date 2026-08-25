@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Espece } from '@/lib/prospection-especes-stades';
 import { getProspectionPopulation, saveProspectionPopulation } from '@/lib/prospection-repository';
 import {
@@ -27,6 +27,7 @@ type Sexe = 'F' | 'M';
 
 export default function ExtensiveImagosScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { draftId } = useLocalSearchParams<{ draftId: string }>();
 
   const [species, setSpecies] = useState<Espece>('LMC');
@@ -499,11 +500,11 @@ const handleContinue = () => {
             )}
           </ScrollView>
 
-          <View style={styles.footer}>
-            <TouchableOpacity 
-              style={[styles.continueButton, (!isConsistent && data.totalCaptures > 0) && styles.continueButtonDisabled]} 
-              onPress={handleContinue} 
-              disabled={isSaving || (!isConsistent && data.totalCaptures > 0)} 
+          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
+            <TouchableOpacity
+              style={[styles.continueButton, (!isConsistent && data.totalCaptures > 0) && styles.continueButtonDisabled]}
+              onPress={handleContinue}
+              disabled={isSaving || (!isConsistent && data.totalCaptures > 0)}
               activeOpacity={0.85}
             >
               <Text style={styles.continueButtonText}>Suivant : Larves ›</Text>

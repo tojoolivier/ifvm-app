@@ -131,8 +131,18 @@ export default function ReviewScreen() {
           </View>
 
           <View style={styles.card}>
+            <Text style={styles.cardTitle}>Comportement</Text>
+            <Text style={styles.paragraph}>{recap.comportementSummary}</Text>
+          </View>
+
+          <View style={styles.card}>
             <Text style={styles.cardTitle}>Végétation & sol</Text>
             <Text style={styles.paragraph}>{recap.vegetationSummary}</Text>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Observations</Text>
+            <Text style={styles.paragraph}>{recap.observationsText}</Text>
           </View>
 
           <View style={styles.card}>
