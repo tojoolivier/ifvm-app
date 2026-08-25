@@ -1,0 +1,69 @@
+/**
+ * Non-régression #201 : en rouvrant une grille de captures déjà remplie, le
+ * « nombre total de captures » doit se recalculer depuis les captures enregistrées.
+ * Tant qu'il vaut 0, les sections Phases et Stades restent masquées et la saisie
+ * précédente paraît perdue.
+ */
+import { render, screen } from '@testing-library/react-native';
+import CapturesScreen from '@/app/(prospection)/captures';
+import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
+import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
+
+jest.mock('expo-router', () =>
+  require('../test-utils/mock-expo-router').expoRouterMock({
+    params: { draftId: 'draft-123', grilleIndex: '0' },
+  })
+);
+
+jest.mock('@/lib/prospection-repository', () => ({
+  markGrilleCompleted: jest.fn(),
+  saveProspectionCaptures: jest.fn(),
+  startCaptureTimer: jest.fn().mockResolvedValue({ id: 'draft-123' }),
+}));
+
+const CAPTURES_LARVE = [
+  { espece: 'LMC', categorie: 'larve', sexe: null, phase: 'solitaire', stade: 'L1', effectif: 4 },
+  { espece: 'LMC', categorie: 'larve', sexe: null, phase: 'gregaire', stade: 'L3', effectif: 6 },
+] as any;
+
+describe('CapturesScreen', () => {
+  beforeEach(() => {
+    useProspectionCaptureStore.getState().reset();
+  });
+
+  it('recalcule le nombre total de captures d’une grille larvaire déjà remplie (#201)', async () => {
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'intensive',
+        especes: JSON.stringify({ lmcImago: false, lmcLarve: true, nseImago: false, nseLarve: false }),
+        grilles_completees: null,
+        capture_started_at: '2026-08-25T08:00:00.000Z',
+      } as any,
+      captures: CAPTURES_LARVE,
+    });
+
+    await render(<CapturesScreen />);
+
+    expect(await screen.findByDisplayValue('10')).toBeVisible();
+    // Sections déverrouillées : le total non nul les rend à nouveau visibles.
+    expect(await screen.findByText('📊 2. Phases')).toBeVisible();
+  });
+
+  it('laisse le total vide sur une grille encore vierge', async () => {
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'intensive',
+        especes: JSON.stringify({ lmcImago: false, lmcLarve: true, nseImago: false, nseLarve: false }),
+        grilles_completees: null,
+        capture_started_at: '2026-08-25T08:00:00.000Z',
+      } as any,
+      captures: [],
+    });
+
+    await render(<CapturesScreen />);
+
+    expect(await screen.findByPlaceholderText('Saisir le nombre de captures')).toHaveDisplayValue('');
+  });
+});

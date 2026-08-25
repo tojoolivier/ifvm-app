@@ -9,6 +9,7 @@ from app.domain.prospection import (
     Prospection,
     ProspectionCapture,
     ProspectionInfestation,
+    ProspectionIntegriteError,
     ProspectionPopulation,
 )
 from app.domain.referentiel import StationNotFoundError
@@ -21,6 +22,32 @@ from app.infrastructure.prospection_model import (
     ProspectionModel,
     ProspectionPopulationModel,
 )
+
+
+def _contrainte_violee(exc: IntegrityError) -> str:
+    """Nom de la contrainte violée, pour que la tablette sache quoi corriger."""
+    # `exc.orig` est l'erreur de l'adaptateur asyncpg ; le `constraint_name` est porté
+    # par l'exception asyncpg d'origine, un cran plus bas.
+    erreur: BaseException | None = getattr(exc, "orig", None)
+    while erreur is not None:
+        nom = getattr(erreur, "constraint_name", None)
+        if nom:
+            return f"contrainte violée : {nom}"
+        erreur = erreur.__cause__
+    return "la fiche viole une contrainte de la base"
+
+
+def _is_station_fk_violation(exc: IntegrityError) -> bool:
+    """La violation porte-t-elle bien sur `prospection.station_id` ?
+
+    Sans ce filtre, n'importe quelle autre contrainte violée par la fiche (phase de
+    capture hors énuméré, biotope inconnu, ...) remontait à la tablette comme
+    « station_id n'existe pas », alors que la station est bien présente (#201).
+    """
+    # La contrainte s'appelle `fk_prospection_station_id` (migration 0004) ou
+    # `prospection_station_id_fkey` (schéma créé depuis les métadonnées, en test).
+    message = str(exc.orig)
+    return "prospection" in message and "station_id" in message
 
 
 class ProspectionRepositoryImpl(ProspectionRepository):
@@ -191,13 +218,17 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         self.session.add(model)
         try:
             await self.session.commit()
-        except IntegrityError:
+        except IntegrityError as exc:
             await self.session.rollback()
+            if not _is_station_fk_violation(exc):
+                raise ProspectionIntegriteError(_contrainte_violee(exc)) from exc
             if prospection.type_prospection == "extensive":
                 model.station_id = None
                 await self.session.commit()
             else:
-                raise StationNotFoundError("station_id ne référence pas une station fixe existante")
+                raise StationNotFoundError(
+                    "station_id ne référence pas une station fixe existante"
+                ) from exc
 
         # Recharger les relations principales
         await self.session.refresh(

@@ -209,7 +209,17 @@ export default function CapturesScreen() {
       .catch((error) => signalerChargement(error, { draftId }));
   }, [draftId, draft?.capture_started_at, setDraft, signalerChargement]);
 
-  // Effet 5: Chronomètre
+  // Effet 5: Grille déjà remplie (fiche reprise) — le total est déduit des captures
+  // enregistrées, sinon les sections « Phases » et « Stades » restent masquées (total = 0)
+  // et la saisie précédente semble perdue (#201).
+  const prefilledGrilleRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!grille || prefilledGrilleRef.current === currentGrilleIndex) return;
+    prefilledGrilleRef.current = currentGrilleIndex;
+    setTotalCapturesInput(totalStades > 0 ? String(totalStades) : '');
+  }, [grille, currentGrilleIndex, totalStades]);
+
+  // Effet 6: Chronomètre
   useEffect(() => {
     const interval = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(interval);

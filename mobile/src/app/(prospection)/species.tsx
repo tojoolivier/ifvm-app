@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-  EMPTY_ESPECE_SELECTION,
   EspeceSelection,
   countGrilles,
   buildGrilles,
+  parseEspeceSelection,
   saveEspeceSelection,
 } from '@/lib/prospection-especes';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
@@ -25,9 +25,21 @@ export default function SpeciesScreen() {
   const router = useRouter();
   const { draftId } = useLocalSearchParams<{ draftId: string }>();
   const captures = useProspectionWizardStore((s) => s.captures);
+  const draft = useProspectionWizardStore((s) => s.draft);
   const initGrilles = useProspectionCaptureStore((s) => s.initGrilles);
-  const [selection, setSelection] = useState<EspeceSelection>({ ...EMPTY_ESPECE_SELECTION });
+  const [selection, setSelection] = useState<EspeceSelection>(() =>
+    parseEspeceSelection(draft?.especes ?? null)
+  );
   const { run, isRunning: isSaving } = useAsyncAction();
+
+  // Le store peut n'être hydraté qu'après le montage : on rejoue la restauration
+  // à l'arrivée du brouillon, sans écraser une sélection déjà touchée par l'agent.
+  const restoredRef = useRef(draft?.id ?? null);
+  useEffect(() => {
+    if (!draft || restoredRef.current === draft.id) return;
+    restoredRef.current = draft.id;
+    setSelection(parseEspeceSelection(draft.especes));
+  }, [draft]);
 
   const stepsCount = countGrilles(selection);
 
