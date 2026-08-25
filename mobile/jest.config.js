@@ -1,6 +1,9 @@
 const roots = ['<rootDir>/__tests__'];
 
 const moduleNameMapper = {
+  // Avant l'alias `@/` : sinon `@/global.css` part vers `src/global.css` et
+  // Jest tente d'exécuter du Tailwind comme du JavaScript.
+  '\\.css$': '<rootDir>/__tests__/test-utils/style-mock.js',
   '^@/(.*)$': '<rootDir>/src/$1',
 };
 
