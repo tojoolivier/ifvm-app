@@ -144,12 +144,23 @@ async function upsertCodesStades(
 ): Promise<void> {
   for (const codeStade of upserts) {
     await db.runAsync(
-      `INSERT INTO code_stade (id, code, espece, libelle, actif, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)
+      `INSERT INTO code_stade (id, code, categorie, sexe, espece, libelle, ordre, actif, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
-         code = excluded.code, espece = excluded.espece, libelle = excluded.libelle,
+         code = excluded.code, categorie = excluded.categorie, sexe = excluded.sexe,
+         espece = excluded.espece, libelle = excluded.libelle, ordre = excluded.ordre,
          actif = excluded.actif, updated_at = excluded.updated_at`,
-      [codeStade.id, codeStade.code, codeStade.espece, codeStade.libelle, codeStade.actif ? 1 : 0, codeStade.updated_at]
+      [
+        codeStade.id,
+        codeStade.code,
+        codeStade.categorie,
+        codeStade.sexe,
+        codeStade.espece,
+        codeStade.libelle,
+        codeStade.ordre,
+        codeStade.actif ? 1 : 0,
+        codeStade.updated_at,
+      ]
     );
   }
 }

@@ -233,7 +233,9 @@ class ProspectionCaptureModel(Base):
     categorie: Mapped[str] = mapped_column(Text(), nullable=False)
     sexe: Mapped[str | None] = mapped_column(Text(), nullable=True)
     phase: Mapped[str] = mapped_column(Text(), nullable=False)
-    stade: Mapped[str] = mapped_column(Text(), nullable=False)
+    # Le référentiel `stade` est l'unique autorité sur le vocabulaire des stades : une
+    # énumération recopiée ici dériverait de lui (#201).
+    stade: Mapped[str] = mapped_column(Text(), ForeignKey("stade.code"), nullable=False)
     effectif: Mapped[int] = mapped_column(Integer(), nullable=False, server_default="0")
 
     prospection: Mapped["ProspectionModel"] = relationship(back_populates="captures")

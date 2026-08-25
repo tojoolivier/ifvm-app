@@ -21,6 +21,17 @@ jest.mock('@/lib/prospection-repository', () => ({
   startCaptureTimer: jest.fn().mockResolvedValue({ id: 'draft-123' }),
 }));
 
+// Les stades viennent du référentiel synchronisé, pas d'une liste dans l'écran.
+jest.mock('@/lib/referentiel-db', () => ({
+  listStadesGrille: jest.fn((_espece: string, categorie: string, sexe: string | null) => {
+    if (categorie === 'larve') {
+      return Promise.resolve(['L1', 'L2', 'L3', 'L4', 'L5'].map((code) => ({ code, libelle: code })));
+    }
+    const codes = sexe === 'F' ? ['A1', 'A2', 'A3', 'A4', 'A5'] : ['A1', 'A234', 'A5'];
+    return Promise.resolve(codes.map((code) => ({ code, libelle: code })));
+  }),
+}));
+
 const CAPTURES_LARVE = [
   { espece: 'LMC', categorie: 'larve', sexe: null, phase: 'solitaire', stade: 'L1', effectif: 4 },
   { espece: 'LMC', categorie: 'larve', sexe: null, phase: 'gregaire', stade: 'L3', effectif: 6 },

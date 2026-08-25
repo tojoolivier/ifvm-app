@@ -22,7 +22,10 @@ import {
 import {
   capturesMaxFor,
   grilleKeyToString,
+  phasesFor,
 } from '@/lib/prospection-especes-stades';
+
+import { listStadesGrille } from '@/lib/referentiel-db';
 
 import {
   chronoSeconds,
@@ -36,7 +39,7 @@ import {
 } from '@/lib/prospection-repository';
 
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
-import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
+import { useProspectionCaptureStore, StadesGrille } from '@/lib/prospection-capture-store';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
@@ -55,34 +58,6 @@ const ESPECE_LABEL = {
 const CATEGORIE_LABEL = {
   imago: 'Imagos',
   larve: 'Larves',
-} as const;
-
-const STADES_CONFIG = {
-  imago: {
-    LMC: {
-      F: ['A1', 'A2', 'A3', 'A3-1/4', 'A3-1/2', 'A3-3/4', 'A3-4/4', 'A4', 'A5'],
-      M: ['A1', 'A123', 'A5'],
-    },
-    NSE: {
-      F: ['A1', 'A2', 'A3', 'A3-1/4', 'A3-1/2', 'A3-3/4', 'A3-4/4', 'A4', 'A5'],
-      M: ['A1', 'A123', 'A5'],
-    },
-  },
-  larve: {
-    LMC: ['L1', 'L2', 'L3', 'L4', 'L5'],
-    NSE: ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'],
-  },
-} as const;
-
-const PHASES_CONFIG = {
-  LMC: {
-    imago: ['solitaire', 'transiens', 'solitaro_trans', 'gregaire'],
-    larve: ['solitaire', 'transiens', 'solitaro_trans', 'gregaire'],
-  },
-  NSE: {
-    imago: ['solitaire', 'transiens', 'solitaro_trans', 'gregaire'],
-    larve: ['solitaire', 'transiens', 'gregaire'],
-  },
 } as const;
 
 type Sexe = 'F' | 'M';
@@ -123,30 +98,14 @@ export default function CapturesScreen() {
     (sum, value) => sum + (Number(value) || 0), 0
   );
 
-  const getStadesFList = () => {
-    if (!grille || grille.categorie !== 'imago') return [];
-    return [...STADES_CONFIG.imago[grille.espece].F];
-  };
+  const stadesGrille = grille
+    ? (store.stadesParGrille[grilleKeyToString(grille)] ?? { F: [], M: [], larve: [] })
+    : { F: [], M: [], larve: [] };
 
-  const getStadesMList = () => {
-    if (!grille || grille.categorie !== 'imago') return [];
-    return [...STADES_CONFIG.imago[grille.espece].M];
-  };
-
-  const getLarvesList = () => {
-    if (!grille || grille.categorie !== 'larve') return [];
-    return [...STADES_CONFIG.larve[grille.espece]];
-  };
-
-  const getPhasesList = () => {
-    if (!grille) return [];
-    return [...PHASES_CONFIG[grille.espece][grille.categorie]];
-  };
-
-  const stadesFList = getStadesFList();
-  const stadesMList = getStadesMList();
-  const larvesList = getLarvesList();
-  const phasesList = getPhasesList();
+  const stadesFList = isImago ? stadesGrille.F : [];
+  const stadesMList = isImago ? stadesGrille.M : [];
+  const larvesList = isLarve ? stadesGrille.larve : [];
+  const phasesList = grille ? phasesFor(grille.espece, grille.categorie) : [];
 
   const totalStadesF = stadesFList.reduce(
     (sum, stade) => sum + (Number(stadesDataF[stade]) || 0), 0
@@ -181,17 +140,44 @@ export default function CapturesScreen() {
     void hydrate().catch((error) => signalerChargement(error, { draftId }));
   }, [draftId, draft?.id, hydrateFromDraft, signalerChargement]);
 
-  // Effet 2: Initialisation des grilles - une seule fois
+  // Effet 2: Initialisation des grilles - une seule fois. Les stades viennent du
+  // référentiel synchronisé, jamais d'une liste écrite dans l'écran : c'est le backend
+  // qui décide quels codes existent, et une liste locale finit par en diverger (#201).
   useEffect(() => {
     if (!draft || draft.id !== draftId || isInitialized.current) return;
-    if (store.grilleOrder.length === 0) {
-      const selection = parseEspeceSelection(draft.especes);
-      const grilles = buildGrilles(selection);
-      const completed = parseGrillesCompletees(draft.grilles_completees);
+    if (store.grilleOrder.length > 0) return;
+    isInitialized.current = true;
+
+    const selection = parseEspeceSelection(draft.especes);
+    const grilles = buildGrilles(selection);
+    const completed = parseGrillesCompletees(draft.grilles_completees);
+
+    const chargerStades = async () => {
+      const parGrille: Record<string, StadesGrille> = {};
+      for (const g of grilles) {
+        const [f, m, larve] =
+          g.categorie === 'imago'
+            ? [
+                await listStadesGrille(g.espece, 'imago', 'F'),
+                await listStadesGrille(g.espece, 'imago', 'M'),
+                [],
+              ]
+            : [[], [], await listStadesGrille(g.espece, 'larve', null)];
+        parGrille[grilleKeyToString(g)] = {
+          F: f.map((s) => s.code),
+          M: m.map((s) => s.code),
+          larve: larve.map((s) => s.code),
+        };
+      }
+      store.setStadesParGrille(parGrille);
       store.initGrilles(grilles, completed, captures);
-      isInitialized.current = true;
-    }
-  }, [draft, draftId, captures, store]);
+    };
+
+    void chargerStades().catch((error) => {
+      isInitialized.current = false;
+      signalerChargement(error, { draftId });
+    });
+  }, [draft, draftId, captures, store, signalerChargement]);
 
   // Effet 3: Navigation vers la grille demandée - une seule fois
   useEffect(() => {
@@ -461,8 +447,8 @@ export default function CapturesScreen() {
         </View>
         <Text style={styles.sexeHint}>
           {currentSexe === 'F'
-            ? '♀ Stades : A1, A2, A3, A3-1/4, A3-1/2, A3-3/4, A3-4/4, A4, A5'
-            : '♂ Stades : A1, A123, A5'}
+            ? `♀ Stades : ${stadesFList.join(', ')}`
+            : `♂ Stades : ${stadesMList.join(', ')}`}
         </Text>
       </>
     );

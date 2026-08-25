@@ -56,6 +56,32 @@ export async function listStationsByPoste(paId: string): Promise<StationFixe[]> 
   );
 }
 
+export interface StadeGrille {
+  code: string;
+  libelle: string;
+}
+
+/**
+ * Stades d'une grille de saisie, dans l'ordre du référentiel. C'est le référentiel
+ * synchronisé — et non une liste écrite en dur dans l'écran — qui décide quels stades
+ * existent : une liste locale finit par diverger de ce que le backend accepte (#201).
+ */
+export async function listStadesGrille(
+  espece: string,
+  categorie: 'imago' | 'larve',
+  sexe: 'F' | 'M' | null
+): Promise<StadeGrille[]> {
+  const db = await getReferentielDb();
+  return db.getAllAsync<StadeGrille>(
+    `SELECT code, libelle FROM code_stade
+     WHERE actif = 1 AND categorie = ?
+       AND (sexe IS NULL OR sexe = ?)
+       AND (espece IS NULL OR espece = ?)
+     ORDER BY ordre`,
+    [categorie, sexe, espece]
+  );
+}
+
 export interface Pesticide {
   id: string;
   code: string;
@@ -185,11 +211,17 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
       updated_at TEXT NOT NULL
     );
 
+    -- Place d'un code de stade dans une grille de saisie. Un même code y figure
+    -- plusieurs fois (A1 est un stade femelle et un stade mâle) ; espece/sexe NULL
+    -- valent « toutes espèces » / « non sexé ».
     CREATE TABLE IF NOT EXISTS code_stade (
       id TEXT PRIMARY KEY NOT NULL,
       code TEXT NOT NULL,
-      espece TEXT NOT NULL,
+      categorie TEXT,
+      sexe TEXT,
+      espece TEXT,
       libelle TEXT NOT NULL,
+      ordre INTEGER NOT NULL DEFAULT 0,
       actif INTEGER NOT NULL DEFAULT 1,
       updated_at TEXT NOT NULL
     );
@@ -216,6 +248,12 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
     { name: 'commune', type: 'TEXT' },
     { name: 'district', type: 'TEXT' },
     { name: 'region', type: 'TEXT' },
+  ]);
+  // `code_stade` ne portait que (code, espece) : il ne pouvait pas décrire les grilles.
+  await addColumnsIfMissing(db, 'code_stade', [
+    { name: 'categorie', type: 'TEXT' },
+    { name: 'sexe', type: 'TEXT' },
+    { name: 'ordre', type: 'INTEGER NOT NULL DEFAULT 0' },
   ]);
 }
 

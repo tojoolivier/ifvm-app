@@ -7,40 +7,24 @@ import {
   Phenotype,
   Sexe,
   grilleKeyToString,
-  remapStadeForSexeChange,
-  stadesFor,
+  phasesFor,
 } from './prospection-especes-stades';
 import { CaptureRow } from './prospection-repository';
 
 export type CaptureCounts = Record<string, number>;
 
-const STADES_CONFIG = {
-  imago: {
-    LMC: {
-      F: ['A1', 'A2', 'A3', 'A3-1/4', 'A3-1/2', 'A3-3/4', 'A3-4/4', 'A4', 'A5'],
-      M: ['A1', 'A123', 'A5'],
-    },
-    NSE: {
-      F: ['A1', 'A2', 'A3', 'A3-1/4', 'A3-1/2', 'A3-3/4', 'A3-4/4', 'A4', 'A5'],
-      M: ['A1', 'A123', 'A5'],
-    },
-  },
-  larve: {
-    LMC: ['L1', 'L2', 'L3', 'L4', 'L5'],
-    NSE: ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'],
-  },
-} as const;
+/**
+ * Stades d'une grille, tels que le référentiel synchronisé les décrit. Rien n'est
+ * énuméré ici : une liste écrite en dur finit par diverger de ce que le backend accepte,
+ * et la fiche échoue à l'enregistrement (#201).
+ */
+export interface StadesGrille {
+  F: string[];
+  M: string[];
+  larve: string[];
+}
 
-const PHASES_CONFIG = {
-  LMC: {
-    imago: ['solitaire', 'transiens', 'solitaro_trans', 'gregaire'],
-    larve: ['solitaire', 'transiens', 'solitaro_trans', 'gregaire'],
-  },
-  NSE: {
-    imago: ['solitaire', 'transiens', 'solitaro_trans', 'gregaire'],
-    larve: ['solitaire', 'transiens', 'gregaire'],
-  },
-} as const;
+const STADES_GRILLE_VIDE: StadesGrille = { F: [], M: [], larve: [] };
 
 export function captureKey(sexe: Sexe | null, phenotype: Phenotype, stade: string): string {
   return sexe ? `${sexe}|${phenotype}|${stade}` : `${phenotype}|${stade}`;
@@ -131,6 +115,9 @@ export interface CaptureLoopState {
   stadesDataM: Record<string, number>;
   phasesData: Record<string, number>;
   currentSexe: Sexe;
+  /** Stades de chaque grille, lus dans le référentiel synchronisé, indexés par `grilleKeyToString`. */
+  stadesParGrille: Record<string, StadesGrille>;
+  setStadesParGrille: (stades: Record<string, StadesGrille>) => void;
   initGrilles: (order: GrilleKey[], completed: string[], allCaptures: CaptureRow[]) => void;
   goToGrille: (index: number, allCaptures: CaptureRow[]) => void;
   markCurrentGrilleCompleted: () => void;
@@ -151,6 +138,10 @@ export interface CaptureLoopState {
   reset: () => void;
 }
 
+function stadesDe(state: { stadesParGrille: Record<string, StadesGrille> }, grille: GrilleKey): StadesGrille {
+  return state.stadesParGrille[grilleKeyToString(grille)] ?? STADES_GRILLE_VIDE;
+}
+
 function firstIncompleteIndex(order: GrilleKey[], completed: string[]): number {
   const index = order.findIndex((g) => !completed.includes(grilleKeyToString(g)));
   return index === -1 ? Math.max(0, order.length - 1) : index;
@@ -160,37 +151,16 @@ function countsForGrille(grille: GrilleKey, allCaptures: CaptureRow[]): CaptureC
   return rowsToCounts(allCaptures.filter((row) => row.espece === grille.espece && row.categorie === grille.categorie));
 }
 
-function stadesFemellesFromCaptures(grille: GrilleKey, allCaptures: CaptureRow[]): Record<string, number> {
-  const stades = getInitialStades(grille.categorie === 'imago' ? STADES_CONFIG.imago[grille.espece].F : []);
+function stadesDepuisCaptures(
+  grille: GrilleKey,
+  allCaptures: CaptureRow[],
+  stadesAttendus: string[],
+  sexe: Sexe | null
+): Record<string, number> {
+  const stades = getInitialStades(stadesAttendus);
   for (const row of allCaptures) {
     if (row.espece !== grille.espece || row.categorie !== grille.categorie) continue;
-    if (grille.categorie !== 'imago') continue;
-    if (row.sexe !== 'F') continue;
-    if (Object.prototype.hasOwnProperty.call(stades, row.stade)) {
-      stades[row.stade] = row.effectif;
-    }
-  }
-  return stades;
-}
-
-function stadesMalesFromCaptures(grille: GrilleKey, allCaptures: CaptureRow[]): Record<string, number> {
-  const stades = getInitialStades(grille.categorie === 'imago' ? STADES_CONFIG.imago[grille.espece].M : []);
-  for (const row of allCaptures) {
-    if (row.espece !== grille.espece || row.categorie !== grille.categorie) continue;
-    if (grille.categorie !== 'imago') continue;
-    if (row.sexe !== 'M') continue;
-    if (Object.prototype.hasOwnProperty.call(stades, row.stade)) {
-      stades[row.stade] = row.effectif;
-    }
-  }
-  return stades;
-}
-
-function stadesLarvesFromCaptures(grille: GrilleKey, allCaptures: CaptureRow[]): Record<string, number> {
-  const stades = getInitialStades(grille.categorie === 'larve' ? STADES_CONFIG.larve[grille.espece] : []);
-  for (const row of allCaptures) {
-    if (row.espece !== grille.espece || row.categorie !== grille.categorie) continue;
-    if (grille.categorie !== 'larve') continue;
+    if (row.sexe !== sexe) continue;
     if (Object.prototype.hasOwnProperty.call(stades, row.stade)) {
       stades[row.stade] = row.effectif;
     }
@@ -199,9 +169,7 @@ function stadesLarvesFromCaptures(grille: GrilleKey, allCaptures: CaptureRow[]):
 }
 
 function phasesFromCaptures(grille: GrilleKey, allCaptures: CaptureRow[]): Record<string, number> {
-  const category = grille.categorie as 'imago' | 'larve';
-  const phasesList = PHASES_CONFIG[grille.espece][category];
-  const phases = getInitialPhases(phasesList);
+  const phases = getInitialPhases(phasesFor(grille.espece, grille.categorie));
   for (const row of allCaptures) {
     if (row.espece !== grille.espece || row.categorie !== grille.categorie) continue;
     const phase = row.phase;
@@ -211,21 +179,18 @@ function phasesFromCaptures(grille: GrilleKey, allCaptures: CaptureRow[]): Recor
   return phases;
 }
 
-function buildGrilleData(grille: GrilleKey, allCaptures: CaptureRow[]) {
-  const currentSexe: Sexe = grille.categorie === 'imago' ? 'F' : 'F';
-  const stadesDataF = grille.categorie === 'imago' ? stadesFemellesFromCaptures(grille, allCaptures) : {};
-  const stadesDataM = grille.categorie === 'imago' ? stadesMalesFromCaptures(grille, allCaptures) : {};
-  const stadesData = grille.categorie === 'larve' ? stadesLarvesFromCaptures(grille, allCaptures) : {};
-  const phasesData = phasesFromCaptures(grille, allCaptures);
+function buildGrilleData(grille: GrilleKey, allCaptures: CaptureRow[], stades: StadesGrille) {
+  const isImago = grille.categorie === 'imago';
+  const currentSexe: Sexe = 'F';
   return {
     currentSexe,
-    currentStade: stadesFor(grille.espece, grille.categorie, grille.categorie === 'imago' ? currentSexe : 'F')[0] ?? null,
+    currentStade: (isImago ? stades.F : stades.larve)[0] ?? null,
     currentPhenotype: 'transiens' as Phenotype,
     counts: countsForGrille(grille, allCaptures),
-    stadesData,
-    stadesDataF,
-    stadesDataM,
-    phasesData,
+    stadesData: isImago ? {} : stadesDepuisCaptures(grille, allCaptures, stades.larve, null),
+    stadesDataF: isImago ? stadesDepuisCaptures(grille, allCaptures, stades.F, 'F') : {},
+    stadesDataM: isImago ? stadesDepuisCaptures(grille, allCaptures, stades.M, 'M') : {},
+    phasesData: phasesFromCaptures(grille, allCaptures),
   };
 }
 
@@ -242,6 +207,9 @@ export const useProspectionCaptureStore = create<CaptureLoopState>((set, get) =>
   stadesDataM: {},
   phasesData: {},
   currentSexe: 'F',
+  stadesParGrille: {},
+
+  setStadesParGrille: (stadesParGrille) => set({ stadesParGrille }),
 
   initGrilles: (order, completed, allCaptures) => {
     const index = firstIncompleteIndex(order, completed);
@@ -263,7 +231,7 @@ export const useProspectionCaptureStore = create<CaptureLoopState>((set, get) =>
       });
       return;
     }
-    const data = buildGrilleData(grille, allCaptures);
+    const data = buildGrilleData(grille, allCaptures, stadesDe(get(), grille));
     set({
       grilleOrder: order,
       completedGrilleKeys: completed,
@@ -283,7 +251,7 @@ export const useProspectionCaptureStore = create<CaptureLoopState>((set, get) =>
   goToGrille: (index, allCaptures) => {
     const grille = get().grilleOrder[index];
     if (!grille) return;
-    const data = buildGrilleData(grille, allCaptures);
+    const data = buildGrilleData(grille, allCaptures, stadesDe(get(), grille));
     set({
       currentGrilleIndex: index,
       sexe: grille.categorie === 'imago' ? 'F' : null,
@@ -309,10 +277,15 @@ export const useProspectionCaptureStore = create<CaptureLoopState>((set, get) =>
   },
 
   setSexe: (sexe) => {
-    const grille = get().grilleOrder[get().currentGrilleIndex];
+    const state = get();
+    const grille = state.grilleOrder[state.currentGrilleIndex];
     if (!grille) return;
     if (grille.categorie !== 'imago') return;
-    const currentStade = remapStadeForSexeChange(get().currentStade, sexe);
+    // Les jeux femelle et mâle ne coïncident pas : un stade absent du nouveau jeu
+    // retombe sur son premier stade.
+    const stades = stadesDe(state, grille)[sexe];
+    const currentStade =
+      state.currentStade && stades.includes(state.currentStade) ? state.currentStade : (stades[0] ?? null);
     set({ sexe, currentSexe: sexe, currentStade });
   },
 
@@ -401,6 +374,7 @@ export const useProspectionCaptureStore = create<CaptureLoopState>((set, get) =>
     }));
   },
 
+  // `stadesParGrille` survit : c'est le référentiel synchronisé, pas de la saisie.
   reset: () => {
     set({
       grilleOrder: [],

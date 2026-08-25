@@ -22,6 +22,7 @@ from app.infrastructure.prospection_model import (
     ProspectionModel,
     ProspectionPopulationModel,
 )
+from app.infrastructure.referentiel_model import StadeModel
 
 
 def _contrainte_violee(exc: IntegrityError) -> str:
@@ -105,6 +106,14 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         stmt = stmt.order_by(ProspectionModel.date_prospection.desc())
         result = await self.session.execute(stmt)
         return [self._to_domain(m) for m in result.scalars().all()]
+
+    async def stades_inconnus(self, codes: set[str]) -> set[str]:
+        if not codes:
+            return set()
+        result = await self.session.execute(
+            select(StadeModel.code).where(StadeModel.code.in_(codes))
+        )
+        return codes - set(result.scalars().all())
 
     async def create(self, prospection: Prospection) -> Prospection:
         model = ProspectionModel(

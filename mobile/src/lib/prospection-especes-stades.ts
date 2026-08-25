@@ -18,17 +18,31 @@ export function grilleKeyFromString(value: string): GrilleKey {
   return { espece, categorie };
 }
 
+/**
+ * Vocabulaire des stades — autorité unique côté mobile. Ces codes partent tels quels
+ * vers `prospection_capture.stade`, qui référence le référentiel `code_stade` : une
+ * liste recopiée ailleurs dérive et fait échouer l'enregistrement de la fiche (#201).
+ */
+
 /** Imagos femelles (LMC et NSE) : 9 stades incluant les sous-stades A3 — même jeu pour les deux espèces (PDF officiel). */
-export const LMC_FEMALE_STADES = ['A1', 'A2', 'A3', 'A3¼', 'A3½', 'A3¾', 'A3 4/4', 'A4', 'A5'];
-/** Imagos mâles (LMC et NSE) : jeu simplifié, sans sous-stades. */
+export const LMC_FEMALE_STADES = ['A1', 'A2', 'A3', 'A3-1/4', 'A3-1/2', 'A3-3/4', 'A3-4/4', 'A4', 'A5'];
+/** Imagos mâles (LMC et NSE) : jeu simplifié — A2, A3 et A4 sont regroupés en A234. */
 export const LMC_MALE_STADES = ['A1', 'A234', 'A5'];
 /** Larves : stades propres à chaque espèce (ADR-006). */
 export const LMC_LARVE_STADES = ['L1', 'L2', 'L3', 'L4', 'L5'];
 export const NSE_LARVE_STADES = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'];
 
+export const PHASES_LMC = ['solitaire', 'transiens', 'solitaro_trans', 'gregaire'];
+/** Nomadacris larvaire ne distingue pas le solitaro-transiens (PDF 16). */
+export const PHASES_NSE_LARVE = ['solitaire', 'transiens', 'gregaire'];
+
 export function stadesFor(espece: Espece, categorie: Categorie, sexe: Sexe | null): string[] {
   if (categorie === 'larve') return espece === 'LMC' ? LMC_LARVE_STADES : NSE_LARVE_STADES;
   return sexe === 'F' ? LMC_FEMALE_STADES : LMC_MALE_STADES;
+}
+
+export function phasesFor(espece: Espece, categorie: Categorie): string[] {
+  return espece === 'NSE' && categorie === 'larve' ? PHASES_NSE_LARVE : PHASES_LMC;
 }
 
 /** Ramène le stade courant vers le premier stade du nouveau jeu si absent du nouveau jeu (bascule sexe imago). */
