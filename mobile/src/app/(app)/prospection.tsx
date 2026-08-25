@@ -6,14 +6,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Network from 'expo-network';
 import { useAuthStore } from '@/lib/auth-store';
 import { loadAccueilData, loadValidatedProspections, deleteDraftProspection, AccueilViewModel } from '@/lib/prospection-accueil';
-import { retrySyncProspection } from '@/lib/prospection-review';
+import { syncAllProspections } from '@/lib/prospection-review';
+import { resumerEnPhrase } from '@/lib/sync-lot';
 import { DraftProspection } from '@/lib/prospection-repository';
 import { ProspectionRead } from '@/lib/api-client';
 import { navigateToProspectionConsult, navigateToProspectionDraft } from '@/lib/fiche-routing';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { runTask } from '@/lib/run-task';
 import { useAsyncAction } from '@/hooks/use-async-action';
-import { logger } from '@/lib/logger';
 import { FicheCard } from '@/components/fiches/FicheCard';
 import { SearchAndFilterBar, FilterOption } from '@/components/fiches/SearchAndFilterBar';
 import {
@@ -192,26 +192,14 @@ export default function ProspectionScreen() {
   const handleSyncAll = () =>
     runSyncAll(
       async () => {
-        const failures: string[] = [];
-        for (const draft of pendingSync) {
-          try {
-            await retrySyncProspection(draft, token!);
-          } catch (error) {
-            logger.failure('prospection.syncAll.failed', error, { draftId: draft.id });
-            const label = draft.n_fiche ?? `fiche du ${draft.date_prospection}`;
-            const message = error instanceof Error ? error.message : 'erreur inconnue';
-            failures.push(`${label} : ${message}`);
-          }
-        }
-        const successCount = pendingSync.length - failures.length;
-        if (failures.length === 0) {
-          setSyncToast({
-            type: 'success',
-            message: `${successCount} fiche${successCount > 1 ? 's' : ''} synchronisée${successCount > 1 ? 's' : ''}`,
-          });
-        } else {
-          setSyncToast({ type: 'error', message: failures.join('\n') });
-        }
+        // Le lot résume, il ne lève pas : la boucle `try/catch` qui concaténait
+        // des chaînes est devenue `syncAll` (ADR-012 décision 9, #177).
+        const resume = await syncAllProspections(pendingSync, token!);
+
+        setSyncToast({
+          type: resume.echouees.length + resume.conflits.length === 0 ? 'success' : 'error',
+          message: resumerEnPhrase(resume),
+        });
         refresh();
         setTimeout(() => setSyncToast(null), 6000);
       },

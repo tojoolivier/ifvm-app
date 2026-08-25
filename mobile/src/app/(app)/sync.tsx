@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ScrollView,
   RefreshControl,
-  Alert,
   ActivityIndicator,
   Dimensions,
 } from 'react-native';
@@ -16,8 +15,16 @@ import { useAuthStore } from '@/lib/auth-store';
 import { pullReferentiel } from '@/lib/referentiel-sync';
 import { compterReferentielLocal, EtatTableReferentiel } from '@/lib/referentiel-db';
 import { loadAccueilData, AccueilViewModel } from '@/lib/prospection-accueil';
-import { retrySyncProspection } from '@/lib/prospection-review';
+import { syncAllProspections } from '@/lib/prospection-review';
 import { DraftProspection } from '@/lib/prospection-repository';
+import {
+  LIBELLE_STATUT_FICHE,
+  resumerEnPhrase,
+  statutFicheDe,
+  type ResumeSync,
+  type StatutFiche,
+} from '@/lib/sync-lot';
+import { LIBELLE_ACTION, type ActionErreur } from '@/lib/friendly-error';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { logger } from '@/lib/logger';
 
@@ -30,15 +37,24 @@ const IFVM_GREEN_DARK = '#163F16';
 
 const EMPTY_DATA: AccueilViewModel = { unsyncedCount: 0, activeDraft: null, recent: [], validated: [] };
 
-type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
+/**
+ * Le badge d'état d'une fiche. Sa valeur vient de `statut_sync`, en base : il
+ * **survit au départ de l'écran**, contrairement au `useState` d'avant qui
+ * repartait de zéro à chaque retour sur l'onglet (ADR-012 décision 9, #177).
+ */
+const STYLE_STATUT: Record<StatutFiche, { icone: string; couleur: string }> = {
+  'en-attente': { icone: '⏳', couleur: '#D97706' },
+  echec: { icone: '❌', couleur: '#B91C1C' },
+  conflit: { icone: '⚠️', couleur: '#B45309' },
+  synchronisee: { icone: '✅', couleur: '#15803D' },
+};
 
 export default function SyncScreen() {
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
   const [data, setData] = useState<AccueilViewModel>(EMPTY_DATA);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
-  const [failures, setFailures] = useState<string[]>([]);
+  const [resume, setResume] = useState<ResumeSync | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [referentielError, setReferentielError] = useState<string | null>(null);
@@ -68,65 +84,39 @@ export default function SyncScreen() {
     synced: syncedFiches.length,
   };
 
-  const ficheLabel = (draft: DraftProspection) => draft.n_fiche ?? `Fiche du ${draft.date_prospection}`;
+  /**
+   * Le lot à envoyer, et rien d'autre.
+   *
+   * Une fiche en `'echec'` est **sortie de la file** : le serveur l'a refusée,
+   * la renvoyer à l'identique produirait le même refus. Elle reste visible avec
+   * son badge, et ne repart que par le bouton dédié.
+   */
+  const aEnvoyer = pendingFiches.filter((item) => statutFicheDe(item.statut_sync) !== 'echec');
+  const enEchec = pendingFiches.filter((item) => statutFicheDe(item.statut_sync) === 'echec');
 
-  const handleSync = async () => {
-    if (isSyncing) return;
+  const synchroniser = async (drafts: DraftProspection[]) => {
+    if (isSyncing || !token) return;
 
     setIsSyncing(true);
-    setSyncStatus('syncing');
     setReferentielError(null);
-    setFailures([]);
+    setResume(null);
 
-    if (token) {
-      try {
-        await pullReferentiel(token);
-      } catch (error) {
-        logger.failure('sync.referentiel.failed', error);
-        setReferentielError(
-          error instanceof Error ? error.message : 'Échec de la synchronisation du référentiel'
-        );
-      }
-    }
-
-    if (pendingFiches.length === 0 || !token) {
-      setSyncStatus(pendingFiches.length === 0 ? 'idle' : 'error');
-      if (pendingFiches.length === 0) {
-        Alert.alert('✅ Synchronisation', 'Aucune fiche à synchroniser');
-      }
-      setIsSyncing(false);
-      return;
-    }
-
-    const currentFailures: string[] = [];
-    for (const draft of pendingFiches) {
-      try {
-        await retrySyncProspection(draft, token);
-      } catch (error) {
-        logger.failure('sync.fiche.failed', error, { draftId: draft.id });
-        const message = error instanceof Error ? error.message : 'erreur inconnue';
-        currentFailures.push(`${ficheLabel(draft)} : ${message}`);
-      }
-    }
-
-    setFailures(currentFailures);
-    setLastSync(new Date());
-    refresh();
-
-    if (currentFailures.length === 0) {
-      setSyncStatus('success');
-      Alert.alert('✅ Synchronisation réussie', 'Toutes les fiches ont été synchronisées');
-    } else {
-      setSyncStatus('error');
-      Alert.alert(
-        '⚠️ Synchronisation partielle',
-        'Certaines fiches n\'ont pas pu être synchronisées. Veuillez réessayer.',
-        [{ text: 'OK' }]
+    try {
+      await pullReferentiel(token);
+    } catch (error) {
+      logger.failure('sync.referentiel.failed', error);
+      setReferentielError(
+        error instanceof Error ? error.message : 'Échec de la synchronisation du référentiel'
       );
     }
 
+    // `syncAll` ne lève pas : un lot partiellement parti est un état du terrain,
+    // pas une erreur. L'`Alert` modale qui l'annonçait interrompait l'agent pour
+    // lui dire « réessayez » sans lui dire quoi (ADR-012 décision 9).
+    setResume(await syncAllProspections(drafts, token));
+    setLastSync(new Date());
     setIsSyncing(false);
-    setTimeout(() => setSyncStatus((current) => (current === 'error' ? current : 'idle')), 3000);
+    refresh();
   };
 
   const onRefresh = useCallback(() => {
@@ -192,14 +182,43 @@ export default function SyncScreen() {
             <Text style={styles.progressLabel}>Synchronisation en cours…</Text>
           </View>
         )}
-        {syncStatus === 'success' && !isSyncing && (
-          <View style={[styles.statusBanner, styles.statusSuccess]}>
-            <Text style={styles.statusBannerText}>✅ Synchronisation réussie</Text>
-          </View>
-        )}
-        {failures.length > 0 && (
-          <View style={[styles.statusBanner, styles.statusError]}>
-            <Text style={styles.statusBannerText}>❌ {failures.join('\n')}</Text>
+        {resume && !isSyncing && (
+          <View
+            style={[
+              styles.statusBanner,
+              resume.echouees.length + resume.conflits.length === 0
+                ? styles.statusSuccess
+                : styles.statusPartiel,
+            ]}
+          >
+            <Text style={styles.statusBannerText}>{resumerEnPhrase(resume)}</Text>
+
+            {/* Le motif par fiche, traduit par classe (#172) — jamais le message brut. */}
+            {resume.echouees.map((fiche) => (
+              <Text key={fiche.id} style={styles.resumeLigne}>
+                • {fiche.label} — {fiche.message}
+                {fiche.action ? ` (${LIBELLE_ACTION[fiche.action as ActionErreur]})` : ''}
+              </Text>
+            ))}
+            {resume.conflits.map((fiche) => (
+              <Text key={fiche.id} style={styles.resumeLigne}>
+                • {fiche.label} — modifiée sur le serveur. Votre version est conservée sur
+                l’appareil.
+              </Text>
+            ))}
+
+            {enEchec.length > 0 && (
+              <TouchableOpacity
+                style={styles.retryCible}
+                onPress={() => void synchroniser(enEchec)}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.retryCibleText}>
+                  Réessayer {enEchec.length === 1 ? 'la fiche' : `les ${enEchec.length} fiches`} en
+                  échec
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
         {referentielError && (
@@ -251,31 +270,37 @@ export default function SyncScreen() {
               <Text style={styles.emptySub}>Toutes vos prospections sont synchronisées</Text>
             </View>
           ) : (
-            pendingFiches.map((draft) => (
-              <View key={draft.id} style={styles.syncItem}>
-                <View style={styles.syncItemLeft}>
-                  <View style={[styles.typeBadge, { backgroundColor: '#DBEAFE' }]}>
-                    <Text style={[styles.typeBadgeText, { color: '#2563EB' }]}>🔍 PRO</Text>
+            pendingFiches.map((draft) => {
+              const statut = statutFicheDe(draft.statut_sync);
+              const { icone, couleur } = STYLE_STATUT[statut];
+              return (
+                <View key={draft.id} style={styles.syncItem}>
+                  <View style={styles.syncItemLeft}>
+                    <View style={[styles.typeBadge, { backgroundColor: '#DBEAFE' }]}>
+                      <Text style={[styles.typeBadgeText, { color: '#2563EB' }]}>🔍 PRO</Text>
+                    </View>
+                    <View style={styles.syncItemInfo}>
+                      <Text style={styles.syncItemCode}>{draft.n_fiche ?? '—'}</Text>
+                      <Text style={styles.syncItemDate}>{draft.date_prospection}</Text>
+                    </View>
                   </View>
-                  <View style={styles.syncItemInfo}>
-                    <Text style={styles.syncItemCode}>{draft.n_fiche ?? '—'}</Text>
-                    <Text style={styles.syncItemDate}>{draft.date_prospection}</Text>
+                  <View style={styles.syncItemRight}>
+                    <Text style={[styles.syncItemStatus, { color: couleur }]}>{icone}</Text>
+                    <Text style={[styles.syncItemStatusLabel, { color: couleur }]}>
+                      {LIBELLE_STATUT_FICHE[statut]}
+                    </Text>
                   </View>
                 </View>
-                <View style={styles.syncItemRight}>
-                  <Text style={[styles.syncItemStatus, { color: '#D97706' }]}>⏳</Text>
-                  <Text style={[styles.syncItemStatusLabel, { color: '#D97706' }]}>En attente</Text>
-                </View>
-              </View>
-            ))
+              );
+            })
           )}
         </View>
 
         {/* Bouton de synchronisation */}
         <TouchableOpacity
-          style={[styles.syncButton, isSyncing && styles.syncButtonDisabled]}
-          onPress={handleSync}
-          disabled={isSyncing}
+          style={[styles.syncButton, (isSyncing || aEnvoyer.length === 0) && styles.syncButtonDisabled]}
+          onPress={() => void synchroniser(aEnvoyer)}
+          disabled={isSyncing || aEnvoyer.length === 0}
           activeOpacity={0.85}
         >
           {isSyncing ? (
@@ -285,7 +310,9 @@ export default function SyncScreen() {
             </View>
           ) : (
             <Text style={styles.syncButtonText}>
-              {stats.pending > 0 ? `🔄 Synchroniser (${stats.pending})` : '✅ Tout est synchronisé'}
+              {aEnvoyer.length > 0
+                ? `🔄 Synchroniser (${aEnvoyer.length})`
+                : '✅ Tout est synchronisé'}
             </Text>
           )}
         </TouchableOpacity>
@@ -413,11 +440,37 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#FCA5A5',
   },
+  /** Partiel ≠ échec : l'ambre dit « à finir », le rouge disait « c'est cassé ». */
+  statusPartiel: {
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
   statusBannerText: {
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
     color: '#111827',
+  },
+  resumeLigne: {
+    fontSize: 12,
+    color: '#374151',
+    marginTop: 6,
+    lineHeight: 17,
+  },
+  retryCible: {
+    marginTop: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D97706',
+    alignItems: 'center',
+  },
+  retryCibleText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#B45309',
   },
   referentielEtat: {
     marginHorizontal: 16,

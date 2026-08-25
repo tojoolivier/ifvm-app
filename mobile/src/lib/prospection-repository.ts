@@ -769,6 +769,26 @@ export async function markProspectionSynced(id: string): Promise<DraftProspectio
   return updated;
 }
 
+/**
+ * Sort la fiche de la file d'attente — ADR-012 décision 9, issue #177.
+ *
+ * Réservé aux refus du serveur (4xx) : réessayer à l'identique reproduirait le
+ * même refus, et la laisser en file la ferait échouer indéfiniment sans que
+ * personne ne le remarque.
+ *
+ * Le **motif** n'est pas stocké en colonne : il vit dans le journal (#171), sous
+ * `prospection.sync.failed` avec l'identifiant de la fiche. Une colonne de plus
+ * coûterait une migration pour une donnée que l'écran de journal sait déjà
+ * montrer ; `statut_sync` est un `TEXT` libre, une valeur de plus n'en coûte
+ * aucune.
+ */
+export async function markProspectionEchec(id: string): Promise<void> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync(`UPDATE prospection SET statut_sync = 'echec', updated_at = ? WHERE id = ?`, [now, id]);
+}
+
 export async function deleteDraftProspection(draft: DraftProspection): Promise<void> {
   const db = await getDb();
   const now = new Date().toISOString();
