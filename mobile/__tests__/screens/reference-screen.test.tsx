@@ -3,9 +3,17 @@
  * y compris en mode intensif (auparavant seule la fiche extensive l'exigeait).
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import ReferenceScreen from '@/app/(prospection)/reference';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import * as prospectionRepository from '@/lib/prospection-repository';
+
+// `reference.tsx` lit useSafeAreaInsets() (position du bouton "Continuer" au-dessus
+// de la zone de geste) : il faut un SafeAreaProvider avec des métriques initiales.
+const TEST_SAFE_AREA_METRICS = {
+  insets: { top: 0, left: 0, right: 0, bottom: 0 },
+  frame: { x: 0, y: 0, width: 0, height: 0 },
+};
 
 jest.mock('expo-router', () =>
   require('../test-utils/mock-expo-router').expoRouterMock({ params: { draftId: 'draft-123' } })
@@ -45,7 +53,11 @@ describe('ReferenceScreen', () => {
   });
 
   it('bloque sans surface prospectée puis autorise une fois le champ rempli (mode intensif)', async () => {
-    await render(<ReferenceScreen />);
+    await render(
+      <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
+        <ReferenceScreen />
+      </SafeAreaProvider>
+    );
 
     await waitFor(() => expect(screen.getByText('Continuer  ›')).toBeVisible());
 
