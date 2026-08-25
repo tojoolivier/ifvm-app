@@ -124,7 +124,8 @@ class TypeCible(str, Enum):
     TACHE_LARVAIRE = "tache_larvaire"
     BANDE_LARVAIRE = "bande_larvaire"
     VOL_CLAIR = "vol_clair"
-    ESSAIM = "essaim"
+    DENSE = "dense"
+    TRES_DENSE = "tres_dense"
 
 
 class ComportementInfestation(str, Enum):
