@@ -4,7 +4,7 @@
  * Tant qu'il vaut 0, les sections Phases et Stades restent masquées et la saisie
  * précédente paraît perdue.
  */
-import { act, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import CapturesScreen from '@/app/(prospection)/captures';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
@@ -20,8 +20,17 @@ const params: { draftId: string; grilleIndex: string } = {
   grilleIndex: '0',
 };
 
+const mockBack = jest.fn();
+const mockReplace = jest.fn();
+const nav = { peutRevenir: true };
+
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
+  useRouter: () => ({
+    push: jest.fn(),
+    back: mockBack,
+    replace: mockReplace,
+    canGoBack: () => nav.peutRevenir,
+  }),
   useLocalSearchParams: () => params,
 }));
 
@@ -55,6 +64,9 @@ describe('CapturesScreen', () => {
     useAuthStore.setState({ isAuthenticated: true });
     jest.mocked(referentielDb.listStadesGrille).mockImplementation(STADES_PAR_DEFAUT);
     params.grilleIndex = '0';
+    mockBack.mockClear();
+    mockReplace.mockClear();
+    nav.peutRevenir = true;
   });
 
   it('recalcule le nombre total de captures d’une grille larvaire déjà remplie (#201)', async () => {
@@ -194,6 +206,48 @@ describe('CapturesScreen', () => {
     });
 
     expect(await screen.findByText(/Larves/)).toBeVisible();
+  });
+
+  it('dépile l’historique au retour, au lieu d’empiler un écran de plus (#201)', async () => {
+    // `router.replace` comme « retour » laissait des écrans périmés dans la pile :
+    // depuis « Qu'avez-vous observé ? », le retour suivant ramenait à l'écran de capture.
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'intensive',
+        especes: JSON.stringify({ lmcImago: false, lmcLarve: true, nseImago: false, nseLarve: false }),
+        grilles_completees: null,
+        capture_started_at: '2026-08-25T08:00:00.000Z',
+      } as any,
+      captures: [],
+    });
+
+    await render(<CapturesScreen />);
+    fireEvent.press(await screen.findByText('‹'));
+
+    expect(mockBack).toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('nomme la destination quand il n’y a pas d’historique à dépiler (lien profond)', async () => {
+    nav.peutRevenir = false;
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'intensive',
+        especes: JSON.stringify({ lmcImago: false, lmcLarve: true, nseImago: false, nseLarve: false }),
+        grilles_completees: null,
+        capture_started_at: '2026-08-25T08:00:00.000Z',
+      } as any,
+      captures: [],
+    });
+
+    await render(<CapturesScreen />);
+    fireEvent.press(await screen.findByText('‹'));
+
+    expect(mockReplace).toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/(prospection)/species' })
+    );
   });
 
   it('laisse le total vide sur une grille encore vierge', async () => {

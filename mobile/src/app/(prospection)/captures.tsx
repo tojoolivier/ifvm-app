@@ -27,6 +27,7 @@ import {
 } from '@/lib/prospection-especes-stades';
 
 import { listStadesGrille } from '@/lib/referentiel-db';
+import { retourArriere } from '@/lib/fiche-routing';
 
 import {
   chronoSeconds,
@@ -250,6 +251,21 @@ export default function CapturesScreen() {
     store.setSexe(sexe);
   };
 
+  const handleBack = () =>
+    retourArriere(router, () => {
+      if (currentGrilleIndex > 0) {
+        router.replace({
+          pathname: '/(prospection)/captures' as any,
+          params: { draftId, grilleIndex: String(currentGrilleIndex - 1) },
+        });
+      } else {
+        router.replace({
+          pathname: '/(prospection)/species' as any,
+          params: { draftId },
+        });
+      }
+    });
+
   // Écran d'attente : le vocabulaire et le brouillon se lisent en base au montage.
   // Auparavant cet état rendait une page **entièrement vide**, sans même un retour :
   // l'agent croyait l'app figée et n'avait aucune issue.
@@ -258,7 +274,7 @@ export default function CapturesScreen() {
       <View style={styles.root}>
         <SafeAreaView edges={['top']} style={styles.safe}>
           <View style={styles.headerRow}>
-            <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
+            <TouchableOpacity onPress={handleBack} activeOpacity={0.7}>
               <Text style={styles.back}>‹</Text>
             </TouchableOpacity>
             <Text style={styles.title}>Captures</Text>
@@ -287,20 +303,6 @@ export default function CapturesScreen() {
   const isLastGrille = currentGrilleIndex === grilleOrder.length - 1;
   const seconds = chronoSeconds(draft?.capture_started_at ?? null);
   void tick;
-
-  const handleBack = () => {
-    if (currentGrilleIndex > 0) {
-      router.replace({
-        pathname: '/(prospection)/captures' as any,
-        params: { draftId, grilleIndex: String(currentGrilleIndex - 1) },
-      });
-    } else {
-      router.replace({
-        pathname: '/(prospection)/species' as any,
-        params: { draftId },
-      });
-    }
-  };
 
   const handleContinue = () => {
     if (totalCaptures <= 0) {
