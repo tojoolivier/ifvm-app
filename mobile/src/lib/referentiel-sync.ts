@@ -24,7 +24,25 @@ const ENTITY_TYPES: EntityType[] = [
   'campagnes',
 ];
 
-/** ADR-007 : chaque table référentiel se rafraîchit indépendamment — un curseur par type d'entité. */
+const TABLE_PAR_ENTITE: Record<EntityType, string> = {
+  postes_acridiens: 'poste_acridien',
+  stations_fixes: 'station_fixe',
+  utilisateurs_equipe: 'utilisateur_equipe',
+  pesticides: 'pesticide',
+  cultures: 'culture',
+  codes_stades: 'code_stade',
+  campagnes: 'campagne',
+};
+
+/**
+ * ADR-007 : chaque table référentiel se rafraîchit indépendamment — un curseur par type
+ * d'entité.
+ *
+ * Un curseur ne vaut que si la table qu'il décrit contient quelque chose. Table vide et
+ * curseur avancé, c'est l'impasse : le serveur ne renvoie que les modifications depuis
+ * le curseur, donc rien, et la synchro « réussit » sans jamais repeupler la table. On
+ * ignore donc le curseur d'une table vide, ce qui répare l'appareil tout seul (#201).
+ */
 async function getPerEntityCursors(
   db: Awaited<ReturnType<typeof getReferentielDb>>
 ): Promise<ReferentielSinceCursors> {
@@ -33,15 +51,22 @@ async function getPerEntityCursors(
   );
   const stored = new Map(rows.map((row) => [row.entity_type, row.last_pull_at]));
 
-  return {
-    postes_acridiens: stored.get('postes_acridiens') ?? null,
-    stations_fixes: stored.get('stations_fixes') ?? null,
-    utilisateurs_equipe: stored.get('utilisateurs_equipe') ?? null,
-    pesticides: stored.get('pesticides') ?? null,
-    cultures: stored.get('cultures') ?? null,
-    codes_stades: stored.get('codes_stades') ?? null,
-    campagnes: stored.get('campagnes') ?? null,
-  };
+  const cursors = {} as ReferentielSinceCursors;
+  for (const entity of ENTITY_TYPES) {
+    const curseur = stored.get(entity) ?? null;
+    cursors[entity] = curseur !== null && (await estVide(db, TABLE_PAR_ENTITE[entity]))
+      ? null
+      : curseur;
+  }
+  return cursors;
+}
+
+async function estVide(
+  db: Awaited<ReturnType<typeof getReferentielDb>>,
+  table: string
+): Promise<boolean> {
+  const row = await db.getFirstAsync<{ n: number }>(`SELECT count(*) AS n FROM ${table}`);
+  return (row?.n ?? 0) === 0;
 }
 
 async function upsertPostesAcridiens(

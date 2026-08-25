@@ -62,6 +62,18 @@ describe('referentiel-db', () => {
     expect(execAsync.mock.calls.length).toBe(callsAfterFirst);
   });
 
+  it('ne migre qu’une fois même sur deux appels concurrents (#201)', async () => {
+    // Deux `_layout` montent le pull automatique : `getReferentielDb` est appelé deux
+    // fois en parallèle. Avec un drapeau posé après coup, la seconde migration rejouait
+    // le `DROP TABLE code_stade` pendant que la première synchro écrivait ses lignes.
+    await Promise.all([getReferentielDb(), getReferentielDb()]);
+
+    const drops = execAsync.mock.calls.filter((call) =>
+      String(call[0]).includes('DROP TABLE IF EXISTS code_stade')
+    );
+    expect(drops).toHaveLength(1);
+  });
+
   it('reuses the single prospection SQLite database', async () => {
     await getReferentielDb();
 
