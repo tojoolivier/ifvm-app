@@ -162,7 +162,10 @@ function stadesDepuisCaptures(
     if (row.espece !== grille.espece || row.categorie !== grille.categorie) continue;
     if (row.sexe !== sexe) continue;
     if (Object.prototype.hasOwnProperty.call(stades, row.stade)) {
-      stades[row.stade] = row.effectif;
+      // Cumul, jamais affectation : l'enregistrement répartit un stade entre les phases
+      // saisies, donc un même stade arrive en plusieurs lignes. Écraser n'en gardait
+      // qu'une — 10 captures ressortaient à 5, avec des phases restées à 10 (#201).
+      stades[row.stade] += row.effectif;
     }
   }
   return stades;
