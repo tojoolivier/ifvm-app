@@ -8,6 +8,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -82,6 +83,8 @@ export default function CapturesScreen() {
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('captures');
   const [totalCapturesInput, setTotalCapturesInput] = useState('');
+  /** Lecture du vocabulaire en base : distingue « pas encore chargé » de « absent ». */
+  const [chargementStades, setChargementStades] = useState(true);
   
   // Ref pour éviter les boucles infinies
   const isInitialized = useRef(false);
@@ -192,10 +195,13 @@ export default function CapturesScreen() {
       }
     };
 
-    void chargerStades().catch((error) => {
-      isInitialized.current = false;
-      signalerChargement(error, { draftId });
-    });
+    setChargementStades(true);
+    void chargerStades()
+      .catch((error) => {
+        isInitialized.current = false;
+        signalerChargement(error, { draftId });
+      })
+      .finally(() => setChargementStades(false));
   }, [draft, draftId, captures, store, requestedIndex, signalerChargement]);
 
   // Effet 3: Navigation vers la grille demandée - une seule fois
@@ -244,10 +250,35 @@ export default function CapturesScreen() {
     store.setSexe(sexe);
   };
 
+  // Écran d'attente : le vocabulaire et le brouillon se lisent en base au montage.
+  // Auparavant cet état rendait une page **entièrement vide**, sans même un retour :
+  // l'agent croyait l'app figée et n'avait aucune issue.
   if (!grille) {
     return (
       <View style={styles.root}>
-        <SafeAreaView style={styles.safe} />
+        <SafeAreaView edges={['top']} style={styles.safe}>
+          <View style={styles.headerRow}>
+            <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
+              <Text style={styles.back}>‹</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>Captures</Text>
+          </View>
+          <View style={styles.chargementBloc}>
+            {chargementStades ? (
+              <>
+                <ActivityIndicator color={GREEN} />
+                <Text style={styles.chargementTexte}>Chargement de la grille…</Text>
+              </>
+            ) : (
+              // Chargement terminé sans grille : la sélection d'espèces est vide ou
+              // illisible. Un indicateur qui tourne indéfiniment serait un mensonge.
+              <Text style={styles.chargementTexte}>
+                Aucune grille à saisir — revenez à l’écran précédent pour choisir les
+                espèces observées.
+              </Text>
+            )}
+          </View>
+        </SafeAreaView>
       </View>
     );
   }
@@ -586,14 +617,20 @@ export default function CapturesScreen() {
    * appareil. Le dire plutôt que d'afficher un tableau vide : sinon l'agent conclut
    * que sa saisie a disparu (#201).
    */
-  const renderReferentielManquant = () => (
-    <View style={styles.referentielManquant}>
-      <Text style={styles.referentielManquantText}>
-        Stades indisponibles hors ligne — synchronisez les référentiels depuis
-        l’écran Synchronisation, puis rouvrez cette grille.
-      </Text>
-    </View>
-  );
+  const renderReferentielManquant = () =>
+    chargementStades ? (
+      <View style={styles.chargementLigne}>
+        <ActivityIndicator color={GREEN} size="small" />
+        <Text style={styles.chargementTexte}>Chargement des stades…</Text>
+      </View>
+    ) : (
+      <View style={styles.referentielManquant}>
+        <Text style={styles.referentielManquantText}>
+          Stades indisponibles hors ligne — synchronisez les référentiels depuis
+          l’écran Synchronisation, puis rouvrez cette grille.
+        </Text>
+      </View>
+    );
 
   const renderImagoStades = () => {
     if (!isImago || totalCaptures === 0) return null;
@@ -932,6 +969,9 @@ const styles = StyleSheet.create({
   totalCaptureInput: { flex: 1, backgroundColor: '#f8f6f0', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 10, fontSize: 18, fontWeight: '700', color: TEXT },
   totalCaptureMax: { fontSize: 14, fontWeight: '600', color: TEXT_SECONDARY },
   totalCaptureInfo: { marginTop: 6, fontSize: 12, color: TEXT_SECONDARY, textAlign: 'center' },
+  chargementBloc: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
+  chargementLigne: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 14 },
+  chargementTexte: { fontSize: 12.5, color: TEXT_SECONDARY, fontWeight: '600' },
   referentielManquant: { padding: 14, backgroundColor: '#fdf3e3', borderRadius: 10, marginTop: 8 },
   referentielManquantText: { fontSize: 12, lineHeight: 17, color: '#8a5a12', fontWeight: '600' },
   tableSection: { backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 10, marginBottom: 8 },
