@@ -10,6 +10,7 @@ import { ErrorBanner } from '@/components/error-banner';
 import { ModaleBloquante } from '@/components/erreurs/modale-bloquante';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { installGlobalErrorHandlers } from '@/lib/global-error-handler';
+import { installerFiletRejets } from '@/lib/filet-rejets';
 import { demarrerApp, messageDeDemarrageManque } from '@/lib/app-startup';
 import { installerTransportJournal, purgerJournal } from '@/lib/journal-db';
 import { useErrorStore } from '@/lib/error-store';
@@ -57,6 +58,11 @@ export default function RootLayout() {
     // Posé ensuite, et de façon synchrone : la phase la plus risquée du cycle
     // de vie est celle qui suit immédiatement, pas celle qui la précède.
     installGlobalErrorHandlers();
+
+    // Le pendant asynchrone du précédent : `ErrorUtils` ne voit que les
+    // exceptions synchrones, les rejets de promesse lui échappent. Posé avant
+    // `demarrerApp`, qui est justement la première chose asynchrone à tourner.
+    installerFiletRejets();
 
     // `demarrerApp` ne rejette jamais — le `void` dit que c'est délibéré, pas
     // oublié. Le traitement de `essential` est INFORMER : l'agent continue son
