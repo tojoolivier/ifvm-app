@@ -275,14 +275,11 @@ export interface CultureSync {
   updated_at: string;
 }
 
-export interface CodeStadeSync {
-  id: string;
-  code: string;
-  espece: string;
-  libelle: string;
-  actif: boolean;
-  updated_at: string;
-}
+/**
+ * Place d'un stade dans une grille de saisie, telle que le backend la publie.
+ * `sexe = null` : stade larvaire, non sexé. `espece = null` : les deux espèces.
+ */
+export type CodeStadeSync = components['schemas']['CodeStadeSyncRead'];
 
 export interface CampagneSync {
   id: string;

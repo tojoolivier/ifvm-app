@@ -64,9 +64,18 @@ describe('rowsToCounts / countsToRows', () => {
   });
 });
 
+/** Vocabulaire tel que le référentiel synchronisé le livre — le store n'en énumère aucun. */
+const STADES_REFERENTIEL = {
+  'LMC:imago': { F: ['A1', 'A2', 'A3', 'A3-1/4', 'A3-1/2', 'A3-3/4', 'A3-4/4', 'A4', 'A5'], M: ['A1', 'A234', 'A5'], larve: [] },
+  'NSE:imago': { F: ['A1', 'A2', 'A3', 'A3-1/4', 'A3-1/2', 'A3-3/4', 'A3-4/4', 'A4', 'A5'], M: ['A1', 'A234', 'A5'], larve: [] },
+  'LMC:larve': { F: [], M: [], larve: ['L1', 'L2', 'L3', 'L4', 'L5'] },
+  'NSE:larve': { F: [], M: [], larve: ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'] },
+};
+
 describe('useProspectionCaptureStore', () => {
   beforeEach(() => {
     useProspectionCaptureStore.getState().reset();
+    useProspectionCaptureStore.getState().setStadesParGrille(STADES_REFERENTIEL);
   });
 
   it('initGrilles positionne le sexe F et le premier stade pour LMC imago', () => {
@@ -122,7 +131,7 @@ describe('useProspectionCaptureStore', () => {
 
   it('setSexe remappe le stade courant', () => {
     useProspectionCaptureStore.getState().initGrilles([{ espece: 'LMC', categorie: 'imago' }], [], []);
-    useProspectionCaptureStore.getState().setStade('A3¼');
+    useProspectionCaptureStore.getState().setStade('A3-1/4');
     useProspectionCaptureStore.getState().setSexe('M');
     expect(useProspectionCaptureStore.getState().currentStade).toBe('A1');
   });

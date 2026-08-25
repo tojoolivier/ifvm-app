@@ -7,6 +7,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import create_access_token
+from app.domain.stades import VOCABULAIRE
 
 
 @pytest_asyncio.fixture
@@ -105,12 +106,15 @@ async def culture(db_session: AsyncSession):
 
 @pytest_asyncio.fixture
 async def code_stade(db_session: AsyncSession):
+    # Le référentiel des stades est déjà semé pour toute la session (cf. conftest) :
+    # `prospection_capture.stade` le référence par clé étrangère.
+    from sqlalchemy import select
+
     from app.infrastructure.referentiel_model import CodeStadeModel
 
-    cs = CodeStadeModel(id=uuid.uuid4(), code="A1", espece="LMC", libelle="Larve stade 1")
-    db_session.add(cs)
-    await db_session.commit()
-    return cs
+    # A1 figure dans deux grilles (femelle et mâle) : n'importe laquelle fait l'affaire.
+    result = await db_session.execute(select(CodeStadeModel).where(CodeStadeModel.code == "A1"))
+    return result.scalars().first()
 
 
 @pytest.mark.asyncio
@@ -147,7 +151,8 @@ async def test_pull_since_null_returns_full_referentiel_unscoped(
     assert culture_codes == {culture.code}
 
     stade_codes = {c["code"] for c in body["codes_stades"]["upserts"]}
-    assert stade_codes == {code_stade.code}
+    assert stade_codes == {code for code, _ in VOCABULAIRE}
+    assert code_stade.code in stade_codes
 
     for entity in body.values():
         assert "server_time" in entity

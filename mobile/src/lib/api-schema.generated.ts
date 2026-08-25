@@ -445,6 +445,126 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/fiches-vol": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lister Fiches Vol */
+        get: operations["lister_fiches_vol_fiches_vol_get"];
+        put?: never;
+        /** Creer Fiche Vol */
+        post: operations["creer_fiche_vol_fiches_vol_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/fiches-vol/cumuls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cumuls Heures Vol */
+        get: operations["cumuls_heures_vol_fiches_vol_cumuls_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/fiches-vol/{fiche_vol_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lire Fiche Vol */
+        get: operations["lire_fiche_vol_fiches_vol__fiche_vol_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/fiches-vol/{fiche_vol_id}/vols": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ajouter Vol */
+        post: operations["ajouter_vol_fiches_vol__fiche_vol_id__vols_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/fiches-vol/{fiche_vol_id}/vols/{vol_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Retirer Vol */
+        delete: operations["retirer_vol_fiches_vol__fiche_vol_id__vols__vol_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/fiches-vol/{fiche_vol_id}/signatures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Signer Fiche Vol */
+        put: operations["signer_fiche_vol_fiches_vol__fiche_vol_id__signatures_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/fiches-vol/{fiche_vol_id}/valider": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Valider Fiche Vol */
+        put: operations["valider_fiche_vol_fiches_vol__fiche_vol_id__valider_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -647,10 +767,16 @@ export interface components {
             id: string;
             /** Code */
             code: string;
+            /** Categorie */
+            categorie: string;
+            /** Sexe */
+            sexe: string | null;
             /** Espece */
-            espece: string;
+            espece: string | null;
             /** Libelle */
             libelle: string;
+            /** Ordre */
+            ordre: number;
             /** Actif */
             actif: boolean;
             /**
@@ -692,6 +818,17 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** CumulsRead */
+        CumulsRead: {
+            /** Jour */
+            jour: number;
+            /** Semaine */
+            semaine: number;
+            /** Mois */
+            mois: number;
+            /** Total */
+            total: number;
         };
         /**
          * DegatsCultures
@@ -813,6 +950,115 @@ export interface components {
          * @enum {string}
          */
         FicheType: "intensive" | "extensive" | "validation" | "crt" | "vol" | "meteo";
+        /** FicheVolCreate */
+        FicheVolCreate: {
+            /**
+             * Date Vol
+             * Format: date
+             */
+            date_vol: string;
+            /** Compagnie */
+            compagnie: string;
+            /** Immatriculation */
+            immatriculation: string;
+            /** Base Code */
+            base_code: string;
+            /** Base Nom */
+            base_nom: string;
+            /** Base Latitude */
+            base_latitude?: number | null;
+            /** Base Longitude */
+            base_longitude?: number | null;
+            /** Base Altitude */
+            base_altitude?: number | null;
+            /** Stand Nom */
+            stand_nom: string;
+            /** Stand Latitude */
+            stand_latitude?: number | null;
+            /** Stand Longitude */
+            stand_longitude?: number | null;
+            /** Stand Altitude */
+            stand_altitude?: number | null;
+            /** Pilote */
+            pilote: string;
+            /** Mecanicien */
+            mecanicien: string;
+            /**
+             * Chef De Base Id
+             * Format: uuid
+             */
+            chef_de_base_id: string;
+            /** Consultant International */
+            consultant_international?: string | null;
+            /** Observations */
+            observations?: string | null;
+            /** Vols */
+            vols?: components["schemas"]["VolCreate"][];
+        };
+        /** FicheVolRead */
+        FicheVolRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Numero Fiche */
+            numero_fiche: string;
+            /**
+             * Date Vol
+             * Format: date
+             */
+            date_vol: string;
+            /** Compagnie */
+            compagnie: string;
+            /** Immatriculation */
+            immatriculation: string;
+            /** Base Code */
+            base_code: string;
+            /** Base Nom */
+            base_nom: string;
+            /** Base Latitude */
+            base_latitude?: number | null;
+            /** Base Longitude */
+            base_longitude?: number | null;
+            /** Base Altitude */
+            base_altitude?: number | null;
+            /** Stand Nom */
+            stand_nom: string;
+            /** Stand Latitude */
+            stand_latitude?: number | null;
+            /** Stand Longitude */
+            stand_longitude?: number | null;
+            /** Stand Altitude */
+            stand_altitude?: number | null;
+            /** Pilote */
+            pilote: string;
+            /** Mecanicien */
+            mecanicien: string;
+            /**
+             * Chef De Base Id
+             * Format: uuid
+             */
+            chef_de_base_id: string;
+            /** Consultant International */
+            consultant_international?: string | null;
+            /** Observations */
+            observations?: string | null;
+            /** Statut */
+            statut: string;
+            /** Statut Sync */
+            statut_sync: string;
+            /** Vols */
+            vols?: components["schemas"]["VolRead"][];
+            /** Signatures */
+            signatures?: components["schemas"]["SignatureVolRead"][];
+            /** Duree Totale Minutes */
+            duree_totale_minutes: number;
+            /** Created At */
+            created_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1586,6 +1832,34 @@ export interface components {
              */
             horodatage: string;
         };
+        /** SignatureVolRead */
+        SignatureVolRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Role */
+            role: string;
+            /** Signataire Nom */
+            signataire_nom: string;
+            /** Signature Image */
+            signature_image?: string | null;
+            /** Horodatage */
+            horodatage?: string | null;
+        };
+        /** SignatureVolUpsert */
+        SignatureVolUpsert: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "PILOTE" | "MECANICIEN" | "CHEF_DE_BASE" | "CONSULTANT_INTERNATIONAL";
+            /** Signataire Nom */
+            signataire_nom: string;
+            /** Signature Image */
+            signature_image?: string | null;
+        };
         /**
          * StadeDominant
          * @enum {string}
@@ -2314,6 +2588,62 @@ export interface components {
          * @enum {string}
          */
         VerdureStrate: "faible" | "moyenne" | "forte";
+        /** VolCreate */
+        VolCreate: {
+            /** Numero */
+            numero: number;
+            /**
+             * Type Vol
+             * @enum {string}
+             */
+            type_vol: "PROSPECTION" | "MEP" | "APPLICATION" | "CONVOYAGE" | "DIVERS";
+            /**
+             * Heure Debut
+             * Format: time
+             */
+            heure_debut: string;
+            /**
+             * Heure Fin
+             * Format: time
+             */
+            heure_fin: string;
+            /** Rotation Id */
+            rotation_id?: string | null;
+            /** Prospection Id */
+            prospection_id?: string | null;
+            /** Observations */
+            observations?: string | null;
+        };
+        /** VolRead */
+        VolRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Numero */
+            numero: number;
+            /** Type Vol */
+            type_vol: string;
+            /**
+             * Heure Debut
+             * Format: time
+             */
+            heure_debut: string;
+            /**
+             * Heure Fin
+             * Format: time
+             */
+            heure_fin: string;
+            /** Rotation Id */
+            rotation_id?: string | null;
+            /** Prospection Id */
+            prospection_id?: string | null;
+            /** Observations */
+            observations?: string | null;
+            /** Duree Minutes */
+            duree_minutes: number;
+        };
         /** ZoneAntiAcridienRead */
         ZoneAntiAcridienRead: {
             /**
@@ -3412,6 +3742,270 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TraitementRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lister_fiches_vol_fiches_vol_get: {
+        parameters: {
+            query?: {
+                date_vol?: string | null;
+                immatriculation?: string | null;
+                chef_de_base_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FicheVolRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    creer_fiche_vol_fiches_vol_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FicheVolCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FicheVolRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cumuls_heures_vol_fiches_vol_cumuls_get: {
+        parameters: {
+            query: {
+                /** @description Jour de référence des cumuls */
+                reference: string;
+                immatriculation?: string | null;
+                chef_de_base_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CumulsRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lire_fiche_vol_fiches_vol__fiche_vol_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fiche_vol_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FicheVolRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ajouter_vol_fiches_vol__fiche_vol_id__vols_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fiche_vol_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VolCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FicheVolRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retirer_vol_fiches_vol__fiche_vol_id__vols__vol_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fiche_vol_id: string;
+                vol_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FicheVolRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    signer_fiche_vol_fiches_vol__fiche_vol_id__signatures_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fiche_vol_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignatureVolUpsert"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FicheVolRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    valider_fiche_vol_fiches_vol__fiche_vol_id__valider_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fiche_vol_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FicheVolRead"];
                 };
             };
             /** @description Validation Error */

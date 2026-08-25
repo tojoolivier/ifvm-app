@@ -8,8 +8,21 @@ from app.domain.prospection import (
     ProspectionCapture,
     ProspectionInfestation,
     ProspectionPopulation,
+    StadeInconnuError,
 )
 from app.domain.repositories import AuditLogRepository, ProspectionRepository
+
+
+async def _verifier_stades(
+    repository: ProspectionRepository, captures: list[ProspectionCapture] | None
+) -> None:
+    """Le référentiel des stades fait autorité — un code absent est refusé ici, en le
+    nommant, plutôt que de remonter en violation de clé étrangère anonyme (#201)."""
+    if not captures:
+        return
+    inconnus = await repository.stades_inconnus({c.stade for c in captures})
+    if inconnus:
+        raise StadeInconnuError(inconnus)
 
 
 class CreateProspection:
@@ -74,6 +87,8 @@ class CreateProspection:
     ) -> Prospection:
         if type_prospection == "intensive" and station_id is None:
             raise ValueError("station_id est obligatoire pour une prospection intensive")
+
+        await _verifier_stades(self.repository, captures)
 
         now = datetime.utcnow()
         prospection = Prospection(

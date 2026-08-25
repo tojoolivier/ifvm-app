@@ -21,6 +21,7 @@ from app.domain.prospection import (
     ProspectionInfestation,
     ProspectionIntegriteError,
     ProspectionPopulation,
+    StadeInconnuError,
 )
 from app.domain.referentiel import StationNotFoundError
 from app.infrastructure.audit_log_repository import AuditLogRepositoryImpl
@@ -141,7 +142,7 @@ async def create_prospection(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     except StationNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
-    except ProspectionIntegriteError as e:
+    except (ProspectionIntegriteError, StadeInconnuError) as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
 

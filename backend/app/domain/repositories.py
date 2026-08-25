@@ -71,6 +71,10 @@ class ProspectionRepository(ABC):
     async def delete(self, prospection_id: uuid.UUID) -> bool:
         pass
 
+    @abstractmethod
+    async def stades_inconnus(self, codes: set[str]) -> set[str]:
+        """Codes absents du référentiel des stades, parmi ceux fournis."""
+
 
 class TraitementRepository(ABC):
     @abstractmethod

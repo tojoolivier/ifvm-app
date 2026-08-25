@@ -1,7 +1,16 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import TIMESTAMP, Boolean, ForeignKey, Numeric, Text
+from sqlalchemy import (
+    TIMESTAMP,
+    Boolean,
+    CheckConstraint,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    Text,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -117,13 +126,52 @@ class CultureModel(Base):
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
 
 
-class CodeStadeModel(Base):
-    __tablename__ = "code_stade"
+class StadeModel(Base):
+    """Vocabulaire des stades : ce qu'une capture a le droit de référencer.
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    code: Mapped[str] = mapped_column(Text(), nullable=False, unique=True)
-    espece: Mapped[str] = mapped_column(Text(), nullable=False)
+    Distinct de `code_stade`, qui dit *où* un code apparaît à la saisie — un même code
+    figure dans plusieurs grilles (A1 est un stade femelle et un stade mâle).
+    """
+
+    __tablename__ = "stade"
+
+    code: Mapped[str] = mapped_column(Text(), primary_key=True)
     libelle: Mapped[str] = mapped_column(Text(), nullable=False)
     actif: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+
+
+class CodeStadeModel(Base):
+    """Place d'un code de stade dans une grille de saisie — l'entité que les tablettes
+    synchronisent pour construire leurs écrans de capture."""
+
+    __tablename__ = "code_stade"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    code: Mapped[str] = mapped_column(Text(), ForeignKey("stade.code"), nullable=False)
+    categorie: Mapped[str] = mapped_column(Text(), nullable=False)
+    # NULL = stade larvaire, non sexé à la saisie.
+    sexe: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    # NULL = applicable aux deux espèces (A1, L1, ...) ; seuls L6/L7 sont propres à
+    # Nomadacris.
+    espece: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    libelle: Mapped[str] = mapped_column(Text(), nullable=False)
+    ordre: Mapped[int] = mapped_column(Integer(), nullable=False, default=0)
+    actif: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+
+    __table_args__ = (
+        CheckConstraint("categorie IN ('imago', 'larve')", name="ck_code_stade_categorie"),
+        CheckConstraint("sexe IN ('F', 'M')", name="ck_code_stade_sexe"),
+        Index(
+            "uq_code_stade_grille",
+            "code",
+            "categorie",
+            "sexe",
+            "espece",
+            unique=True,
+            postgresql_nulls_not_distinct=True,
+        ),
+    )
