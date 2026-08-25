@@ -283,7 +283,7 @@ class ProspectionInfestationModel(Base):
     __table_args__ = (
         CheckConstraint("espece IN ('LMC','NSE')", name="ck_prospection_infestation_espece"),
         CheckConstraint(
-            "type_cible IN ('tache_larvaire','bande_larvaire','vol_clair','essaim')",
+            "type_cible IN ('tache_larvaire','bande_larvaire','vol_clair','dense','tres_dense')",
             name="ck_prospection_infestation_type_cible",
         ),
         CheckConstraint(

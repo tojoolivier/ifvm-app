@@ -95,7 +95,7 @@ async def test_create_prospection_avec_nouveaux_champs(
             "infestations": [
                 {
                     "espece": "LMC",
-                    "type_cible": "essaim",
+                    "type_cible": "dense",
                     "surface_totale": 5.0,
                     "pullulation_nb": 3,
                     "taille_long": 100.0,
@@ -617,11 +617,13 @@ async def test_create_prospection_avec_stades_larvaires_l6_l7(
 
 
 @pytest.mark.asyncio
-async def test_create_prospection_avec_type_essaim_enum(
+async def test_create_prospection_avec_type_cible_dense_enum(
     client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
 ):
-    """Test de création avec les différents types d'essaim"""
-    for type_essaim in ["vol_clair", "dense", "tres_dense"]:
+    """Test de création avec les 3 types de cible aériens (0029 : "essaim" a disparu,
+    "dense"/"tres_dense" sont désormais des type_cible à part entière — type_essaim
+    reste alimenté en parallèle, à titre de confirmation détaillée, non contraignant)."""
+    for type_cible in ["vol_clair", "dense", "tres_dense"]:
         response = await client.post(
             "/prospections",
             json={
@@ -632,9 +634,9 @@ async def test_create_prospection_avec_type_essaim_enum(
                 "infestations": [
                     {
                         "espece": "LMC",
-                        "type_cible": "essaim",
+                        "type_cible": type_cible,
                         "surface_totale": 3.0,
-                        "type_essaim": type_essaim,
+                        "type_essaim": type_cible,
                         "essaim_en_vol": True,
                         "essaim_pose": False,
                     }
@@ -644,7 +646,8 @@ async def test_create_prospection_avec_type_essaim_enum(
         )
         assert response.status_code == 201
         data = response.json()
-        assert data["infestations"][0]["type_essaim"] == type_essaim
+        assert data["infestations"][0]["type_cible"] == type_cible
+        assert data["infestations"][0]["type_essaim"] == type_cible
 
 
 @pytest.mark.asyncio
