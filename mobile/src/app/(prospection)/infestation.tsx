@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import {
   CaptureRow,
   DraftProspection,
   InfestationRow,
+  deleteProspectionInfestation,
   getDerniereDensiteMemeSite,
   getProspection,
   listAllProspectionCaptures,
@@ -50,7 +51,7 @@ const INACTIVE_BG = '#f6f3e9';
 const TARGET_ACTIVE = '#c0412b';
 
 // Groupes incompatibles (au sein d'un même groupe, un seul type sélectionnable à la fois)
-// "essaim" a disparu (migration backend 0029) : Dense et Très dense sont désormais des
+// "essaim" a disparu (migration backend 0031) : Dense et Très dense sont désormais des
 // types de cible à part entière (comme Vol clair), plus une sous-classification.
 const INCOMPATIBLE_GROUPS = {
   larve: ['tache_larvaire', 'bande_larvaire'],
@@ -224,7 +225,7 @@ function ventVitesseMsInputToKmh(ms: string): number | null {
   return Number.isFinite(parsed) ? Math.round(parsed * KMH_PAR_MS * 10) / 10 : null;
 }
 
-// "essaim" a disparu (migration backend 0029) : Vol clair, Dense et Très dense sont les
+// "essaim" a disparu (migration backend 0031) : Vol clair, Dense et Très dense sont les
 // 3 types de cible aériens (imago), au même niveau que Tache/Bande larvaire.
 function isTypeCibleAerien(typeCible: string): boolean {
   return typeCible === 'vol_clair' || typeCible === 'dense' || typeCible === 'tres_dense';
@@ -281,7 +282,7 @@ function rowFromForm(typeCible: string, form: FormationForm): InfestationRow {
           : 0
       : null,
     // type_essaim reste alimenté (confirmation détaillée via le questionnaire séquentiel,
-    // redondante avec type_cible depuis 0029 mais sans perte d'information côté backend).
+    // redondante avec type_cible depuis 0031 mais sans perte d'information côté backend).
     type_essaim: aerien ? computeAerialClassification(form) : null,
     nb_taches_bandes: typeCible === 'bande_larvaire' ? numOrNull(form.nbTachesBandes) : null,
     interdistance_m: null,
@@ -336,16 +337,20 @@ export default function InfestationScreen() {
   const [draftRow, setDraftRow] = useState<DraftProspection | null>(null);
   useEffect(() => {
     if (!draftId) return;
-    void getProspection(draftId).then(setDraftRow);
-  }, [draftId]);
+    void getProspection(draftId)
+      .then(setDraftRow)
+      .catch((error) => signalerChargement(error, { draftId }));
+  }, [draftId, signalerChargement]);
 
   // Captures déjà saisies sur cette fiche (écran Captures) : sert à calculer
   // automatiquement le stade dominant Imagos/Larves (cf. dominantStadeLarve/Imago).
   const [captures, setCaptures] = useState<CaptureRow[]>([]);
   useEffect(() => {
     if (!draftId) return;
-    void listAllProspectionCaptures(draftId).then(setCaptures);
-  }, [draftId]);
+    void listAllProspectionCaptures(draftId)
+      .then(setCaptures)
+      .catch((error) => signalerChargement(error, { draftId }));
+  }, [draftId, signalerChargement]);
   const dominantLarve = dominantStadeLarve(captures);
   const dominantImago = dominantStadeImago(captures);
 
@@ -367,6 +372,11 @@ export default function InfestationScreen() {
   // le type de cible devenu invalide disparaît de la sélection affichée/persistée
   // sans qu'on ait besoin de le retirer explicitement de l'état brut.
   const selectedTargets = selectedTargetsRaw.filter(isTargetAvailable);
+
+  // Cibles effectivement enregistrées en base au dernier chargement/enregistrement — sert
+  // à distinguer « jamais sélectionné » de « désélectionné après avoir été enregistré » :
+  // seul ce dernier cas doit déclencher une suppression (cf. persistAll ci-dessous).
+  const savedTargetsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!draftId) return;
@@ -390,6 +400,7 @@ export default function InfestationScreen() {
         }
         setForms(next);
         setSelectedTargets(selected);
+        savedTargetsRef.current = new Set(selected);
       })
       .catch((error) => signalerChargement(error, { draftId }));
   }, [draftId, signalerChargement]);
@@ -602,18 +613,30 @@ export default function InfestationScreen() {
     for (const target of selectedTargets) {
       await saveProspectionInfestation(draftId, target, rowFromForm(target, forms[target]));
     }
+    // Symétrique : une cible désélectionnée après avoir été enregistrée doit disparaître
+    // de la base, sinon elle réapparaît sélectionnée à la prochaine ouverture de la fiche
+    // — la section Infestation doit rester réversible, pas seulement remplissable.
+    for (const target of savedTargetsRef.current) {
+      if (!selectedTargets.includes(target)) {
+        await deleteProspectionInfestation(draftId, target);
+      }
+    }
+    savedTargetsRef.current = new Set(selectedTargets);
   };
 
   const handleFooterPress = () => {
-    if (selectedTargets.length === 0) {
-      Alert.alert('Sélection requise', 'Veuillez sélectionner au moins un type de cible.');
-      return;
-    }
-    if (tab === 'desc') {
+    // La section Infestation est entièrement facultative : ne rien sélectionner ne doit
+    // jamais bloquer la navigation. Sans cible sélectionnée, il n'y a rien à configurer
+    // dans l'onglet Comportement (masqué dans ce cas, cf. `tab === 'comport' &&
+    // selectedTargets.length > 0` plus bas) — on saute donc directement l'étape et on
+    // enregistre (aucune ligne à persister) avant de continuer.
+    if (tab === 'desc' && selectedTargets.length > 0) {
       setTab('comport');
       return;
     }
 
+    // Tout le contrôle passe par `run` : la lecture de l'historique (`getDerniereDensiteMemeSite`)
+    // est asynchrone, la laisser hors frontière renvoyait ses échecs dans le vide (#175/#177).
     return run(
       async () => {
         // Réutilise la fiche déjà chargée au montage plutôt que de la refetcher ici.
@@ -1313,13 +1336,13 @@ export default function InfestationScreen() {
 
           <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
             <TouchableOpacity
-              style={[styles.continueButton, selectedTargets.length === 0 && styles.continueButtonDisabled]}
+              style={[styles.continueButton, isSaving && styles.continueButtonDisabled]}
               onPress={handleFooterPress}
-              disabled={isSaving || selectedTargets.length === 0}
+              disabled={isSaving}
               activeOpacity={0.85}
             >
               <Text style={styles.continueButtonText}>
-                {tab === 'desc' ? 'Comportement  ›' : 'Continuer  ›'}
+                {tab === 'desc' && selectedTargets.length > 0 ? 'Comportement  ›' : 'Continuer  ›'}
               </Text>
             </TouchableOpacity>
           </View>

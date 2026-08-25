@@ -4,7 +4,7 @@
  * Tant qu'il vaut 0, les sections Phases et Stades restent masquées et la saisie
  * précédente paraît perdue.
  */
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import CapturesScreen from '@/app/(prospection)/captures';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
@@ -20,13 +20,14 @@ const params: { draftId: string; grilleIndex: string } = {
   grilleIndex: '0',
 };
 
+const mockPush = jest.fn();
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
 const nav = { peutRevenir: true };
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
-    push: jest.fn(),
+    push: mockPush,
     back: mockBack,
     replace: mockReplace,
     canGoBack: () => nav.peutRevenir,
@@ -37,6 +38,7 @@ jest.mock('expo-router', () => ({
 jest.mock('@/lib/prospection-repository', () => ({
   markGrilleCompleted: jest.fn(),
   saveProspectionCaptures: jest.fn(),
+  listAllProspectionCaptures: jest.fn().mockResolvedValue([]),
   startCaptureTimer: jest.fn().mockResolvedValue({ id: 'draft-123' }),
 }));
 
@@ -64,6 +66,7 @@ describe('CapturesScreen', () => {
     useAuthStore.setState({ isAuthenticated: true });
     jest.mocked(referentielDb.listStadesGrille).mockImplementation(STADES_PAR_DEFAUT);
     params.grilleIndex = '0';
+    mockPush.mockClear();
     mockBack.mockClear();
     mockReplace.mockClear();
     nav.peutRevenir = true;
@@ -286,5 +289,46 @@ describe('CapturesScreen', () => {
     await render(<CapturesScreen />);
 
     expect(await screen.findByPlaceholderText('Saisir le nombre de captures')).toHaveDisplayValue('');
+  });
+
+  it("route toujours vers density.tsx pour la grille suivante — larve comprise, pas seulement imago", async () => {
+    // Régression : la densité n'était saisie que pour les grilles imagos, `captures.tsx`
+    // envoyant une grille larve directement vers `captures` (sautant density.tsx). La
+    // Densité diffuse/groupée doit exister pour CHAQUE combinaison espèce+stade cochée.
+    useProspectionCaptureStore
+      .getState()
+      .initGrilles(
+        [
+          { espece: 'LMC', categorie: 'imago' },
+          { espece: 'LMC', categorie: 'larve' },
+        ],
+        [],
+        []
+      );
+
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'intensive',
+        especes: JSON.stringify({ lmcImago: true, lmcLarve: true, nseImago: false, nseLarve: false }),
+        grilles_completees: null,
+        capture_started_at: '2026-08-25T08:00:00.000Z',
+      } as any,
+      captures: [],
+    });
+
+    await render(<CapturesScreen />);
+    // 0 capture est cohérent par défaut (règle déjà en place) : pas besoin de remplir
+    // phases/stades pour atteindre le bouton de la grille suivante.
+    fireEvent.press(await screen.findByText('Grille suivante  ›'));
+
+    await waitFor(() =>
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(prospection)/density',
+          params: { draftId: 'draft-123', grilleIndex: '1' },
+        })
+      )
+    );
   });
 });
