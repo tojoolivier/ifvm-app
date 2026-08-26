@@ -51,16 +51,29 @@ export const DEPLACEMENT_OPTIONS: { value: string; label: string }[] = [
   { value: 'perchee', label: 'Perchée' },
 ];
 
-export interface ExtensiveImagoState {
-  sol: number;
-  trans: number;
-  greg: number;
-  active: PhenotypeKey;
-  phase: string;
-  popDiff: string;
-  popGroup: string;
-  essaim: boolean;
+
+/** Type de cible (extensif, par espèce) : mêmes 3 valeurs que l'Infestation intensive
+ * (migration backend 0031) — remplace l'ancien « Type de capture » (essaim/vol clair). */
+export type TypeCibleImago = 'vol_clair' | 'dense' | 'tres_dense';
+
+/** Libellés partagés entre l'écran de saisie (extensive-imagos.tsx) et le récapitulatif
+ * (extensive-recap.tsx) — une seule source pour ne pas laisser les deux dériver. */
+export const TYPE_CIBLE_IMAGO_OPTIONS: { value: TypeCibleImago; label: string }[] = [
+  { value: 'vol_clair', label: 'Vol clair' },
+  { value: 'dense', label: 'Dense' },
+  { value: 'tres_dense', label: 'Très dense' },
+];
+
+export function typeCibleImagoLabel(value: string | null | undefined): string {
+  if (!value) return '—';
+  return TYPE_CIBLE_IMAGO_OPTIONS.find((o) => o.value === value)?.label ?? value;
 }
+
+/** État (extensif, par espèce) : même vocabulaire que `prospection_infestation.comportement`
+ * côté intensif. Détermine automatiquement le Comportement de l'essaim (cf. handleEtatChange
+ * dans infestation.tsx, repris à l'identique dans extensive-imagos.tsx). */
+export type EtatImago = 'repos' | 'deplacement';
+export type ComportementEssaimImago = 'vol' | 'pose';
 
 export interface ExtensiveImagoSpeciesData {
   totalCaptures: number;
@@ -87,7 +100,14 @@ export interface ExtensiveImagoSpeciesData {
   };
   popDiff: string;
   popGroup: string;
-  typeCapture: 'essaim' | 'volClair';
+  typeCible: TypeCibleImago;
+  accouplement: string | null;
+  ponte: string | null;
+  interdistance: string;
+  etat: EtatImago | null;
+  comportementEssaim: ComportementEssaimImago | null;
+  directionDe: string;
+  directionVers: string;
 }
 
 export interface ExtensiveLarveSpeciesData {
@@ -99,19 +119,17 @@ export interface ExtensiveLarveSpeciesData {
   };
   stades: Record<string, number>;
   activePhase: PhaseKey | null;
-}
-
-export interface ExtensiveLarveState {
-  stade: string;
-  densites: Record<string, number>;
-  tl: boolean;
-  bl: boolean;
-  interdist: string;
+  // Ex-« données communes » (#225) : tache/bande larvaire, interdistance, déplacement et
+  // surface contaminée étaient jusqu'ici un unique jeu de valeurs partagé entre LMC et
+  // NSE (une seule ligne d'état sur l'écran, appliquée aux deux lignes population lors
+  // de l'enregistrement) — modifier l'une écrasait silencieusement l'autre au prochain
+  // « Suivant ». Repris ici en per-espèce, même principe que
+  // `ExtensiveImagoSpeciesData` (accouplement, ponte, interdistance...).
+  tacheLarvaire: boolean;
+  bandeLarvaire: boolean;
+  interdistance: string;
   deplacement: string;
-}
-
-export function emptyExtensiveImagoState(): ExtensiveImagoState {
-  return { sol: 0, trans: 0, greg: 0, active: 'trans', phase: 'A1', popDiff: '', popGroup: '', essaim: false };
+  surfaceContamineeHa: string;
 }
 
 export function createEmptySpeciesData(): ExtensiveImagoSpeciesData {
@@ -140,7 +158,14 @@ export function createEmptySpeciesData(): ExtensiveImagoSpeciesData {
     },
     popDiff: '',
     popGroup: '',
-    typeCapture: 'essaim',
+    typeCible: 'vol_clair',
+    accouplement: null,
+    ponte: null,
+    interdistance: '',
+    etat: null,
+    comportementEssaim: null,
+    directionDe: '',
+    directionVers: '',
   };
 }
 
@@ -159,17 +184,12 @@ export function createEmptyLarveSpeciesData(espece: Espece): ExtensiveLarveSpeci
     },
     stades,
     activePhase: null,
+    tacheLarvaire: false,
+    bandeLarvaire: false,
+    interdistance: '',
+    deplacement: 'repos',
+    surfaceContamineeHa: '',
   };
-}
-
-export function emptyExtensiveLarveState(espece: Espece): ExtensiveLarveState {
-  const densites: Record<string, number> = {};
-  for (const stade of stadesLarvairesFor(espece)) densites[stade] = 0;
-  return { stade: stadesLarvairesFor(espece)[0], densites, tl: false, bl: false, interdist: '', deplacement: 'repos' };
-}
-
-export function imagoTotal(state: ExtensiveImagoState): number {
-  return (state.sol || 0) + (state.trans || 0) + (state.greg || 0);
 }
 
 export function totalPhasesForSpecies(data: ExtensiveImagoSpeciesData): number {
@@ -207,13 +227,9 @@ export function isLarveDataConsistent(data: ExtensiveLarveSpeciesData): boolean 
   return data.totalCaptures === totalPhases && data.totalCaptures === totalStades;
 }
 
-export function larveTotal(state: ExtensiveLarveState): number {
-  return Object.values(state.densites).reduce((acc, v) => acc + (v || 0), 0);
-}
-
 export function imagoTotalFromRow(row: PopulationRow | null): number {
   if (!row) return 0;
-  return (row.captures_sol ?? 0) + (row.captures_trans ?? 0) + (row.captures_greg ?? 0);
+  return (row.captures_sol ?? 0) + (row.captures_trans ?? 0) + (row.captures_greg ?? 0) + (row.captures_solitaro_transiens ?? 0);
 }
 
 export function larveTotalFromRow(row: PopulationRow | null): number {
@@ -228,60 +244,35 @@ export function parseDensite(value: string | null | undefined): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-export function imagoStateToPopulationRow(espece: Espece, state: ExtensiveImagoState): PopulationRow {
+export function speciesDataToPopulationRow(espece: Espece, data: ExtensiveImagoSpeciesData): PopulationRow {
   return {
     espece,
     categorie: 'imago',
-    densite_diffuse: parseDensite(state.popDiff),
-    densite_groupee: parseDensite(state.popGroup),
+    densite_diffuse: data.popDiff ? parseFloat(data.popDiff) : null,
+    densite_groupee: data.popGroup ? parseFloat(data.popGroup) : null,
     methode: null,
-    accouplement: null,
-    ponte: null,
-    captures_sol: state.sol,
-    captures_trans: state.trans,
-    captures_greg: state.greg,
-    stade_imago: state.phase,
-    essaim_observe: state.essaim,
-  };
-}
-
-export function speciesDataToPopulationRow(
-  espece: Espece,
-  data: ExtensiveImagoSpeciesData,
-  commonData: {
-    popDiff: string;
-    popGroup: string;
-    typeCapture: 'essaim' | 'volClair';
-  }
-): PopulationRow {
-  return {
-    espece,
-    categorie: 'imago',
-    densite_diffuse: commonData.popDiff ? parseFloat(commonData.popDiff) : null,
-    densite_groupee: commonData.popGroup ? parseFloat(commonData.popGroup) : null,
-    methode: null,
-    accouplement: null,
-    ponte: null,
+    accouplement: data.accouplement,
+    ponte: data.ponte,
     captures_nombre: data.totalCaptures,
     captures_sol: data.phases.solitaire,
     captures_trans: data.phases.transiens,
     captures_greg: data.phases.gregaire,
+    // Bug corrigé : cette 4e case de phase (PDF 11) avait sa propre colonne en base
+    // depuis toujours, mais n'était jamais alimentée ici — une valeur saisie et
+    // comptée dans la validation « Captures = Phases » disparaissait donc au
+    // premier enregistrement.
+    captures_solitaro_transiens: data.phases.solitaroTransiens,
     stade_imago: 'A1',
-    essaim_observe: commonData.typeCapture === 'essaim',
-  };
-}
-
-export function populationRowToImagoState(row: PopulationRow | null): ExtensiveImagoState {
-  if (!row) return emptyExtensiveImagoState();
-  return {
-    sol: row.captures_sol ?? 0,
-    trans: row.captures_trans ?? 0,
-    greg: row.captures_greg ?? 0,
-    active: 'trans',
-    phase: row.stade_imago ?? 'A1',
-    popDiff: row.densite_diffuse != null ? String(row.densite_diffuse) : '',
-    popGroup: row.densite_groupee != null ? String(row.densite_groupee) : '',
-    essaim: Boolean(row.essaim_observe),
+    interdistance: data.interdistance ? parseFloat(data.interdistance) : null,
+    type_cible: data.typeCible,
+    direction_de: data.directionDe || null,
+    direction_vers: data.directionVers || null,
+    etat: data.etat,
+    // Comportement de l'essaim dérivé de l'État à la sauvegarde (source de vérité unique),
+    // même logique que rowFromForm dans infestation.tsx : ne pas se fier uniquement à
+    // comportementEssaim, tenu à jour par l'écran mais recalculé ici par sécurité.
+    essaim_en_vol: data.etat === 'deplacement' ? true : data.etat === 'repos' ? false : null,
+    essaim_pose: data.etat === 'repos' ? true : data.etat === 'deplacement' ? false : null,
   };
 }
 
@@ -293,7 +284,7 @@ export function populationRowToSpeciesData(row: PopulationRow | null): Extensive
     phases: {
       solitaire: row.captures_sol ?? 0,
       transiens: row.captures_trans ?? 0,
-      solitaroTransiens: 0,
+      solitaroTransiens: row.captures_solitaro_transiens ?? 0,
       gregaire: row.captures_greg ?? 0,
     },
     stades: {
@@ -312,39 +303,18 @@ export function populationRowToSpeciesData(row: PopulationRow | null): Extensive
     },
     popDiff: row.densite_diffuse != null ? String(row.densite_diffuse) : '',
     popGroup: row.densite_groupee != null ? String(row.densite_groupee) : '',
-    typeCapture: Boolean(row.essaim_observe) ? 'essaim' : 'volClair',
+    typeCible: (row.type_cible as TypeCibleImago | null) ?? 'vol_clair',
+    accouplement: row.accouplement ?? null,
+    ponte: row.ponte ?? null,
+    interdistance: row.interdistance != null ? String(row.interdistance) : '',
+    etat: (row.etat as EtatImago | null) ?? null,
+    comportementEssaim: row.essaim_en_vol ? 'vol' : row.essaim_pose ? 'pose' : null,
+    directionDe: row.direction_de ?? '',
+    directionVers: row.direction_vers ?? '',
   };
 }
 
-export function extractCommonImagoData(row: PopulationRow | null): {
-  popDiff: string;
-  popGroup: string;
-  typeCapture: 'essaim' | 'volClair';
-} {
-  if (!row) {
-    return {
-      popDiff: '',
-      popGroup: '',
-      typeCapture: 'essaim',
-    };
-  }
-  return {
-    popDiff: row.densite_diffuse != null ? String(row.densite_diffuse) : '',
-    popGroup: row.densite_groupee != null ? String(row.densite_groupee) : '',
-    typeCapture: Boolean(row.essaim_observe) ? 'essaim' : 'volClair',
-  };
-}
-
-export function larveSpeciesDataToPopulationRow(
-  espece: Espece,
-  data: ExtensiveLarveSpeciesData,
-  commonData: {
-    tl: boolean;
-    bl: boolean;
-    interdist: string;
-    deplacement: string;
-  }
-): PopulationRow {
+export function larveSpeciesDataToPopulationRow(espece: Espece, data: ExtensiveLarveSpeciesData): PopulationRow {
   return {
     espece,
     categorie: 'larve',
@@ -358,10 +328,11 @@ export function larveSpeciesDataToPopulationRow(
     captures_trans: data.phases.transiens,
     captures_greg: data.phases.gregaire,
     densites_larve: JSON.stringify(data.stades),
-    tache_larvaire: commonData.tl,
-    bande_larvaire: commonData.bl,
-    interdistance: commonData.interdist ? parseFloat(commonData.interdist) : null,
-    deplacement: commonData.deplacement,
+    tache_larvaire: data.tacheLarvaire,
+    bande_larvaire: data.bandeLarvaire,
+    interdistance: data.interdistance ? parseFloat(data.interdistance) : null,
+    deplacement: data.deplacement,
+    surface_contaminee_ha: data.surfaceContamineeHa ? parseFloat(data.surfaceContamineeHa) : null,
   };
 }
 
@@ -371,9 +342,9 @@ export function populationRowToLarveSpeciesData(
 ): ExtensiveLarveSpeciesData {
   const empty = createEmptyLarveSpeciesData(espece);
   if (!row) return empty;
-  
+
   const parsedStades = row.densites_larve ? JSON.parse(row.densites_larve) : {};
-  
+
   return {
     totalCaptures: row.captures_nombre ?? 0,
     phases: {
@@ -383,58 +354,11 @@ export function populationRowToLarveSpeciesData(
     },
     stades: { ...empty.stades, ...parsedStades },
     activePhase: null,
-  };
-}
-
-export function extractCommonLarveData(row: PopulationRow | null): {
-  tl: boolean;
-  bl: boolean;
-  interdist: string;
-  deplacement: string;
-} {
-  if (!row) {
-    return {
-      tl: false,
-      bl: false,
-      interdist: '',
-      deplacement: 'repos',
-    };
-  }
-  return {
-    tl: Boolean(row.tache_larvaire),
-    bl: Boolean(row.bande_larvaire),
-    interdist: row.interdistance != null ? String(row.interdistance) : '',
+    tacheLarvaire: Boolean(row.tache_larvaire),
+    bandeLarvaire: Boolean(row.bande_larvaire),
+    interdistance: row.interdistance != null ? String(row.interdistance) : '',
     deplacement: row.deplacement ?? 'repos',
+    surfaceContamineeHa: row.surface_contaminee_ha != null ? String(row.surface_contaminee_ha) : '',
   };
 }
 
-export function larveStateToPopulationRow(espece: Espece, state: ExtensiveLarveState): PopulationRow {
-  return {
-    espece,
-    categorie: 'larve',
-    densite_diffuse: null,
-    densite_groupee: null,
-    methode: null,
-    accouplement: null,
-    ponte: null,
-    densites_larve: JSON.stringify(state.densites),
-    tache_larvaire: state.tl,
-    bande_larvaire: state.bl,
-    interdistance: state.interdist ? parseFloat(state.interdist) : null,
-    deplacement: state.deplacement,
-  };
-}
-
-export function populationRowToLarveState(espece: Espece, row: PopulationRow | null): ExtensiveLarveState {
-  const fresh = emptyExtensiveLarveState(espece);
-  if (!row) return fresh;
-  const parsed = row.densites_larve ? JSON.parse(row.densites_larve) : {};
-  return {
-    stade: fresh.stade,
-    densites: { ...fresh.densites, ...parsed },
-    tl: Boolean(row.tache_larvaire),
-    bl: Boolean(row.bande_larvaire),
-    interdist: row.interdistance != null ? String(row.interdistance) : '',
-    deplacement: row.deplacement ?? 'repos',
-  };
-}

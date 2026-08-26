@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,6 +7,7 @@ import { useAuthStore } from '@/lib/auth-store';
 import { updateProspectionExtensiveReference } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { BIOTOPE_EXTENSIVE_OPTIONS } from '@/lib/prospection-extensive';
+import { formatHeureLocale } from '@/lib/prospection-fiche-lecture';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { logger } from '@/lib/logger';
 
@@ -41,9 +42,16 @@ export default function ExtensiveReferenceScreen() {
   const [stationLibre, setStationLibre] = useState(draft?.station_libre ?? '');
   const [typeStation, setTypeStation] = useState(draft?.type_station ?? '');
   const [surfaceStation, setSurfaceStation] = useState(draft?.surface_station != null ? String(draft.surface_station) : '');
+  const [surfaceInfestee, setSurfaceInfestee] = useState(draft?.surface_infestee != null ? String(draft.surface_infestee) : '');
   const [nMessage, setNMessage] = useState(
     draft?.n_message ?? (draftId && draft ? generateNumeroMessage(draftId, draft.date_prospection) : '')
   );
+  // Horodatage technique (ISO) de l'heure d'observation — même mécanisme que
+  // observations.tsx côté Intensif (`getCurrentPosition().timestamp`, colonne
+  // partagée `prospection.heure_observation_at`), mais capturé ici : l'Extensif
+  // n'a pas d'écran Infestation séparé, et c'est déjà sur cet écran Référence
+  // que se fait l'acquisition GPS.
+  const [heureObservationAt, setHeureObservationAt] = useState<string | null>(draft?.heure_observation_at ?? null);
   const { run, isRunning: isSaving } = useAsyncAction();
 
   // Récupération automatique des coordonnées GPS
@@ -52,10 +60,14 @@ export default function ExtensiveReferenceScreen() {
 
     const fetchGpsPosition = async () => {
       // Si les coordonnées existent déjà dans le brouillon, on les utilise
+      // (une heure d'observation déjà enregistrée est restaurée telle quelle,
+      // sans jamais relancer d'acquisition GPS simplement parce que l'écran
+      // est remonté — même règle que observations.tsx).
       if (draft?.latitude && draft?.longitude) {
         if (isMounted) {
           setLatitude(String(draft.latitude));
           setLongitude(String(draft.longitude));
+          if (draft.heure_observation_at) setHeureObservationAt(draft.heure_observation_at);
         }
         return;
       }
@@ -71,6 +83,7 @@ export default function ExtensiveReferenceScreen() {
         if (isMounted) {
           setLatitude(String(position.latitude));
           setLongitude(String(position.longitude));
+          setHeureObservationAt(new Date(position.timestamp).toISOString());
           setGpsError('');
         }
       } catch (error) {
@@ -92,7 +105,27 @@ export default function ExtensiveReferenceScreen() {
     return () => {
       isMounted = false;
     };
-  }, [draft?.latitude, draft?.longitude]);
+  }, [draft?.latitude, draft?.longitude, draft?.heure_observation_at]);
+
+  // Station saisie librement, type de station, surface et n° message : de simples
+  // `useState(draft?.x)` d'initialisation ne se remettent jamais à jour si `draft`
+  // n'est pas encore hydraté au moment du montage (deep-link, app relancée en plein
+  // parcours — cf. le commentaire de `fiche-routing.ts` sur cet écran qui, contrairement
+  // à `reference.tsx`, ne s'auto-hydrate pas). Restaure une seule fois par fiche chargée
+  // pour ne pas écraser une saisie en cours si `draft` est republié entre-temps.
+  const refHydratedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!draft || draft.id !== draftId || refHydratedRef.current === draft.id) return;
+    refHydratedRef.current = draft.id;
+    void Promise.resolve().then(() => {
+      setStationLibre(draft.station_libre ?? '');
+      setTypeStation(draft.type_station ?? '');
+      setSurfaceStation(draft.surface_station != null ? String(draft.surface_station) : '');
+      setSurfaceInfestee(draft.surface_infestee != null ? String(draft.surface_infestee) : '');
+      setNMessage(draft.n_message ?? generateNumeroMessage(draft.id, draft.date_prospection));
+      if (draft.heure_observation_at) setHeureObservationAt(draft.heure_observation_at);
+    });
+  }, [draft, draftId]);
 
   const handleContinue = () =>
     run(
@@ -108,7 +141,9 @@ export default function ExtensiveReferenceScreen() {
           stationLibre: stationLibre || null,
           typeStation: normalizedTypeStation,
           surfaceStation: surfaceStation ? parseFloat(surfaceStation) : null,
+          surfaceInfestee: surfaceInfestee ? parseFloat(surfaceInfestee) : null,
           nMessage: nMessage || null,
+          heureObservationAt,
         });
         setDraft(updated);
         router.push({ pathname: '/(prospection)/extensive-imagos' as any, params: { draftId } });
@@ -208,6 +243,15 @@ export default function ExtensiveReferenceScreen() {
               </View>
             </View>
 
+            <View style={styles.autoCard}>
+              <Text style={styles.autoLabel}>🕐 Heure d&apos;observation (GPS)</Text>
+              {isLoadingGps ? (
+                <Text style={styles.gpsLoading}>Récupération GPS...</Text>
+              ) : (
+                <Text style={styles.autoValueMono}>{formatHeureLocale(heureObservationAt)}</Text>
+              )}
+            </View>
+
             <Text style={styles.sectionLabel}>Type de station (biotope)</Text>
             <View style={styles.chipsRow}>
               {BIOTOPE_EXTENSIVE_OPTIONS.map((option) => {
@@ -226,6 +270,18 @@ export default function ExtensiveReferenceScreen() {
                 value={surfaceStation}
                 onChangeText={setSurfaceStation}
                 keyboardType="decimal-pad"
+                style={styles.input}
+              />
+            </View>
+
+            <View style={[styles.card, { marginTop: 8 }]}>
+              <Text style={styles.label}>Surface infestée (ha)</Text>
+              <TextInput
+                value={surfaceInfestee}
+                onChangeText={setSurfaceInfestee}
+                keyboardType="decimal-pad"
+                placeholder="0"
+                placeholderTextColor={TEXT_SECONDARY}
                 style={styles.input}
               />
             </View>

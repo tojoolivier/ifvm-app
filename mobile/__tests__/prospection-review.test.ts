@@ -313,6 +313,41 @@ describe('enregistrerEtSynchroniser', () => {
     expect(result.echouees).toEqual([]);
   });
 
+  it("transmet les champs extensif-imagos ajoutés (type de cible, direction, état/comportement, interdistance)", async () => {
+    mockCompleteProspection.mockResolvedValue(draft({ statut: 'en_attente' }));
+    mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
+    mockCreateProspection.mockResolvedValue({ id: 'remote-1' });
+    mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
+    mockListAllPopulations.mockResolvedValue([
+      {
+        espece: 'NSE', categorie: 'imago', densite_diffuse: null, densite_groupee: null, methode: null,
+        accouplement: 'neant', ponte: 'beaucoup', interdistance: 40.75, type_cible: 'tres_dense',
+        direction_de: 'N', direction_vers: 'S', etat: 'deplacement', essaim_en_vol: true, essaim_pose: false,
+      },
+      {
+        espece: 'LMC', categorie: 'larve', densite_diffuse: null, densite_groupee: null, methode: null,
+        accouplement: null, ponte: null, surface_contaminee_ha: 12.75,
+      },
+    ] as any);
+    mockListAllInfestations.mockResolvedValue([]);
+
+    await enregistrerEtSynchroniser(draft(), [], 'token-1');
+
+    expect(mockCreateProspection).toHaveBeenCalledWith(
+      'token-1',
+      expect.objectContaining({
+        populations: [
+          expect.objectContaining({
+            espece: 'NSE', accouplement: 'neant', ponte: 'beaucoup', interdistance: 40.75,
+            type_cible: 'tres_dense', direction_de: 'N', direction_vers: 'S',
+            etat: 'deplacement', essaim_en_vol: true, essaim_pose: false,
+          }),
+          expect.objectContaining({ espece: 'LMC', surface_contaminee_ha: 12.75 }),
+        ],
+      })
+    );
+  });
+
   it('normalise type_cible et type_essaim pour la synchro (0031 : "essaim" a disparu du contrat TypeCible ; anciennes valeurs à 5 niveaux de type_essaim toujours reconnues)', async () => {
     mockCompleteProspection.mockResolvedValue(draft({ statut: 'en_attente' }));
     mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);

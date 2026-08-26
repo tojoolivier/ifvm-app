@@ -128,6 +128,16 @@ class TypeCible(str, Enum):
     TRES_DENSE = "tres_dense"
 
 
+class TypeCibleImago(str, Enum):
+    """`prospection_population.type_cible` (extensif, par espèce) : l'extensif n'a pas
+    d'écran Infestation séparé — sous-ensemble de TypeCible pertinent pour un imago
+    (pas tache_larvaire/bande_larvaire, réservées aux larves)."""
+
+    VOL_CLAIR = "vol_clair"
+    DENSE = "dense"
+    TRES_DENSE = "tres_dense"
+
+
 class ComportementInfestation(str, Enum):
     REPOS = "repos"
     DEPLACEMENT = "deplacement"
@@ -183,6 +193,17 @@ class PopulationRead(BaseModel):
     bande_larvaire: bool | None = None
     interdistance: float | None = None
     deplacement: Deplacement | None = None
+    surface_contaminee_ha: float | None = None
+
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif Imagos : Type de cible, État/Comportement
+    # ==========================================
+    type_cible: TypeCibleImago | None = None
+    direction_de: str | None = None
+    direction_vers: str | None = None
+    etat: ComportementInfestation | None = None
+    essaim_en_vol: bool | None = None
+    essaim_pose: bool | None = None
 
 
 class CaptureRead(BaseModel):
@@ -277,6 +298,17 @@ class PopulationCreate(BaseModel):
     bande_larvaire: bool | None = None
     interdistance: float | None = Field(None, ge=0)
     deplacement: Deplacement | None = None
+    surface_contaminee_ha: float | None = Field(None, ge=0, allow_inf_nan=False)
+
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif Imagos : Type de cible, État/Comportement
+    # ==========================================
+    type_cible: TypeCibleImago | None = None
+    direction_de: str | None = None
+    direction_vers: str | None = None
+    etat: ComportementInfestation | None = None
+    essaim_en_vol: bool | None = None
+    essaim_pose: bool | None = None
 
 
 class CaptureCreate(BaseModel):

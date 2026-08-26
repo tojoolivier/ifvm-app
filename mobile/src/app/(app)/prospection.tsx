@@ -35,6 +35,17 @@ const FILTERS: FilterOption<FilterKey>[] = [
   { value: 'validee', label: 'Validées' },
 ];
 
+/**
+ * `station_id` est une clé du référentiel (UUID) — jamais un nom à afficher, et de
+ * toute façon absente pour l'extensif (pas de station fixe du référentiel, cf.
+ * extensive-reference.tsx). `station_nom` (intensif, référentiel) ou `station_libre`
+ * (extensif, saisie libre) sont les vrais noms lisibles ; « Localité inconnue »
+ * seulement quand aucun des deux n'est réellement renseigné.
+ */
+function stationLabel(item: { station_nom?: string | null; station_libre?: string | null }): string {
+  return item.station_nom || item.station_libre || 'Localité inconnue';
+}
+
 interface FicheListItem {
   id: string;
   title: string;
@@ -148,7 +159,7 @@ export default function ProspectionScreen() {
       .filter((item) => !validatedIds.has(item.id))
       .map((item) => ({
       id: item.id,
-      title: item.station_id ?? 'Localité inconnue',
+      title: stationLabel(item),
       nFiche: item.n_fiche,
       date: item.date_prospection,
       badge: item.statut_sync === 'synced' ? 'synchro' : 'a_synchro',
@@ -158,7 +169,7 @@ export default function ProspectionScreen() {
     }));
     const validatedItems: FicheListItem[] = data.validated.map((item) => ({
       id: item.id,
-      title: item.station_id ?? 'Localité inconnue',
+      title: stationLabel(item),
       nFiche: item.n_fiche,
       date: item.date_prospection,
       badge: 'validee',
@@ -318,7 +329,7 @@ export default function ProspectionScreen() {
           >
             <Text style={styles.draftLabel}>Reprendre le brouillon</Text>
             <Text style={styles.draftTitle}>
-              {data.activeDraft.station_id ?? 'Localité inconnue'} · {data.activeDraft.date_prospection}
+              {stationLabel(data.activeDraft)} · {data.activeDraft.date_prospection}
             </Text>
           </TouchableOpacity>
         )}

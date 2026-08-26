@@ -22,8 +22,8 @@ export const referenceSchema = yup.object({
   surfaceInfestee: yup
     .number()
     .typeError('La surface infestée doit être un nombre')
+    .transform((value, originalValue) => (originalValue === '' || originalValue == null ? 0 : value))
     .min(0, 'La surface infestée ne peut pas être négative')
-    .required('Surface infestée requise')
     .max(yup.ref('surfaceProspectee'), 'La surface infestée ne peut pas dépasser la surface prospectée'),
     biotope: yup
     .string()

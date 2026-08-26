@@ -2,9 +2,6 @@ import { getDb } from './prospection-db';
 import { generateId } from './id';
 import { logger } from './logger';
 
-import { ExtensiveImagoSpeciesData, createEmptySpeciesData, IMAGO_PHASE_ROWS } from './prospection-extensive';
-import { Espece } from './prospection-especes-stades';
-
 const log = logger.child({ module: 'prospection-repository' });
 
 export type TypeProspection = 'intensive' | 'extensive' | 'validation';
@@ -113,7 +110,13 @@ export interface ExtensiveReferenceUpdateInput {
   stationLibre: string | null;
   typeStation: string | null;
   surfaceStation: number | null;
+  surfaceInfestee: number | null;
   nMessage: string | null;
+  /** Même colonne partagée `prospection.heure_observation_at` que l'Intensif
+   * (cf. `ObservationsUpdateInput`) — capturée ici sur l'écran Référence, où
+   * l'Extensif fait déjà son acquisition GPS (contrairement à l'Intensif, qui
+   * la capture sur Observations). */
+  heureObservationAt: string | null;
 }
 
 export interface ExtensiveObservationsUpdateInput {
@@ -172,6 +175,15 @@ export interface PopulationRow {
   bande_larvaire?: boolean | null;
   interdistance?: number | null;
   deplacement?: string | null;
+  surface_contaminee_ha?: number | null;
+  /** Extensif imagos uniquement — remplace essaim_observe (booléen à 2 états) par les
+   * 3 mêmes valeurs que le type_cible de l'Infestation intensive (migration 0033). */
+  type_cible?: string | null;
+  direction_de?: string | null;
+  direction_vers?: string | null;
+  etat?: string | null;
+  essaim_en_vol?: boolean | null;
+  essaim_pose?: boolean | null;
 }
 
 export interface InfestationRow {
@@ -235,7 +247,14 @@ const POPULATION_COLUMNS = `
   tache_larvaire,
   bande_larvaire,
   interdistance,
-  deplacement
+  deplacement,
+  surface_contaminee_ha,
+  type_cible,
+  direction_de,
+  direction_vers,
+  etat,
+  essaim_en_vol,
+  essaim_pose
 `;
 
 const INFESTATION_COLUMNS = `
@@ -294,6 +313,8 @@ function normalizePopulationRow(row: PopulationRow): PopulationRow {
     essaim_observe: normalizeBoolean(row.essaim_observe),
     tache_larvaire: normalizeBoolean(row.tache_larvaire),
     bande_larvaire: normalizeBoolean(row.bande_larvaire),
+    essaim_en_vol: normalizeBoolean(row.essaim_en_vol),
+    essaim_pose: normalizeBoolean(row.essaim_pose),
   };
 }
 
@@ -372,9 +393,12 @@ export async function updateProspectionExtensiveReference(id: string, input: Ext
   await db.runAsync(
     `UPDATE prospection SET
       latitude = ?, longitude = ?, station_libre = ?, type_station = ?,
-      surface_station = ?, n_message = ?, updated_at = ?
+      surface_station = ?, surface_infestee = ?, n_message = ?, heure_observation_at = ?, updated_at = ?
      WHERE id = ?`,
-    [input.latitude, input.longitude, input.stationLibre, input.typeStation, input.surfaceStation, input.nMessage, now, id]
+    [
+      input.latitude, input.longitude, input.stationLibre, input.typeStation,
+      input.surfaceStation, input.surfaceInfestee, input.nMessage, input.heureObservationAt, now, id,
+    ]
   );
 
   const updated = await getProspection(id);
@@ -589,7 +613,14 @@ export async function saveProspectionPopulation(
         tache_larvaire = ?,
         bande_larvaire = ?,
         interdistance = ?,
-        deplacement = ?
+        deplacement = ?,
+        surface_contaminee_ha = ?,
+        type_cible = ?,
+        direction_de = ?,
+        direction_vers = ?,
+        etat = ?,
+        essaim_en_vol = ?,
+        essaim_pose = ?
        WHERE id = ?`,
       [
         row.phase ?? null,
@@ -611,6 +642,13 @@ export async function saveProspectionPopulation(
         normalizeBoolean(row.bande_larvaire),
         row.interdistance ?? null,
         row.deplacement ?? null,
+        row.surface_contaminee_ha ?? null,
+        row.type_cible ?? null,
+        row.direction_de ?? null,
+        row.direction_vers ?? null,
+        row.etat ?? null,
+        normalizeBoolean(row.essaim_en_vol),
+        normalizeBoolean(row.essaim_pose),
         existing.id,
       ]
     );
@@ -642,11 +680,18 @@ export async function saveProspectionPopulation(
       tache_larvaire,
       bande_larvaire,
       interdistance,
-      deplacement
+      deplacement,
+      surface_contaminee_ha,
+      type_cible,
+      direction_de,
+      direction_vers,
+      etat,
+      essaim_en_vol,
+      essaim_pose
     )
     VALUES (
       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
     )`,
     [
       generateId(),
@@ -672,6 +717,13 @@ export async function saveProspectionPopulation(
       normalizeBoolean(row.bande_larvaire),
       row.interdistance ?? null,
       row.deplacement ?? null,
+      row.surface_contaminee_ha ?? null,
+      row.type_cible ?? null,
+      row.direction_de ?? null,
+      row.direction_vers ?? null,
+      row.etat ?? null,
+      normalizeBoolean(row.essaim_en_vol),
+      normalizeBoolean(row.essaim_pose),
     ]
   );
 }
@@ -878,82 +930,3 @@ export async function deleteProspection(id: string): Promise<boolean> {
   return result.changes > 0;
 }
 
-export async function saveExtensiveImagoSpeciesData(
-  prospectionId: string,
-  espece: Espece,
-  data: ExtensiveImagoSpeciesData
-): Promise<void> {
-  const db = await getDb();
-
-  const row: PopulationRow = {
-    espece,
-    categorie: 'imago',
-    densite_diffuse: data.popDiff ? parseFloat(data.popDiff) : null,
-    densite_groupee: data.popGroup ? parseFloat(data.popGroup) : null,
-    methode: null,
-    accouplement: null,
-    ponte: null,
-    captures_sol: data.phases.solitaire,
-    captures_trans: data.phases.transiens,
-    captures_greg: data.phases.gregaire,
-    captures_solitaro_transiens: data.phases.solitaroTransiens,
-    stade_imago: 'A1',
-    essaim_observe: data.typeCapture === 'essaim',
-  };
-
-  await saveProspectionPopulation(prospectionId, row);
-}
-
-export async function loadExtensiveImagoSpeciesData(
-  prospectionId: string,
-  espece: Espece
-): Promise<ExtensiveImagoSpeciesData> {
-  const db = await getDb();
-
-  const row = await db.getFirstAsync<PopulationRow>(
-    `SELECT 
-      espece, categorie, densite_diffuse, densite_groupee,
-      captures_sol, captures_trans, captures_greg, captures_solitaro_transiens,
-      stade_imago, essaim_observe
-     FROM prospection_population
-     WHERE prospection_id = ? AND espece = ? AND categorie = ?`,
-    [prospectionId, espece, 'imago']
-  );
-
-  if (!row) return createEmptySpeciesData();
-
-  return {
-    totalCaptures: (row.captures_sol ?? 0) + (row.captures_trans ?? 0) + (row.captures_greg ?? 0) + (row.captures_solitaro_transiens ?? 0),
-    activePhase: 'solitaire',
-    phases: {
-      solitaire: row.captures_sol ?? 0,
-      transiens: row.captures_trans ?? 0,
-      solitaroTransiens: row.captures_solitaro_transiens ?? 0,
-      gregaire: row.captures_greg ?? 0,
-    },
-    stades: {
-      femelleA1: 0, femelleA2: 0, femelleA3: 0,
-      femelleA3_1_4: 0, femelleA3_1_2: 0, femelleA3_3_4: 0,
-      femelleA3_4_4: 0, femelleA4: 0, femelleA5: 0,
-      maleA1: 0, maleA234: 0, maleA5: 0,
-    },
-    popDiff: row.densite_diffuse != null ? String(row.densite_diffuse) : '',
-    popGroup: row.densite_groupee != null ? String(row.densite_groupee) : '',
-    typeCapture: Boolean(row.essaim_observe) ? 'essaim' : 'volClair',
-  };
-}
-
-export async function saveCompleteExtensiveImagoData(
-  prospectionId: string,
-  espece: Espece,
-  data: ExtensiveImagoSpeciesData
-): Promise<void> {
-  await saveExtensiveImagoSpeciesData(prospectionId, espece, data);
-}
-
-export async function loadCompleteExtensiveImagoData(
-  prospectionId: string,
-  espece: Espece
-): Promise<ExtensiveImagoSpeciesData> {
-  return loadExtensiveImagoSpeciesData(prospectionId, espece);
-}

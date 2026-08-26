@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Espece } from '@/lib/prospection-especes-stades';
+import { Espece, stadesLarvairesFor } from '@/lib/prospection-especes-stades';
 import { getProspectionPopulation, saveProspectionPopulation } from '@/lib/prospection-repository';
 import {
   LARVE_PHASE_ROWS,
@@ -11,7 +11,6 @@ import {
   createEmptyLarveSpeciesData,
   larveSpeciesDataToPopulationRow,
   populationRowToLarveSpeciesData,
-  extractCommonLarveData,
 } from '@/lib/prospection-extensive';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
@@ -35,12 +34,6 @@ export default function ExtensiveLarvesScreen() {
     NSE: createEmptyLarveSpeciesData('NSE'),
   });
   
-  // Données communes
-  const [tacheLarvaire, setTacheLarvaire] = useState(false);
-  const [bandeLarvaire, setBandeLarvaire] = useState(false);
-  const [interdist, setInterdist] = useState('');
-  const [deplacement, setDeplacement] = useState('repos');
-  
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('extensive-larves');
 
@@ -51,19 +44,10 @@ export default function ExtensiveLarvesScreen() {
       getProspectionPopulation(draftId, 'NSE', 'larve'),
     ])
       .then(([lmc, nse]) => {
-        const lmcData = populationRowToLarveSpeciesData('LMC', lmc);
-        const nseData = populationRowToLarveSpeciesData('NSE', nse);
-
         setSpeciesData({
-          LMC: lmcData,
-          NSE: nseData,
+          LMC: populationRowToLarveSpeciesData('LMC', lmc),
+          NSE: populationRowToLarveSpeciesData('NSE', nse),
         });
-
-        const commonData = extractCommonLarveData(lmc || nse);
-        setTacheLarvaire(commonData.tl);
-        setBandeLarvaire(commonData.bl);
-        setInterdist(commonData.interdist);
-        setDeplacement(commonData.deplacement);
       })
       .catch((error) => signalerChargement(error, { draftId }));
   }, [draftId, signalerChargement]);
@@ -125,14 +109,17 @@ export default function ExtensiveLarvesScreen() {
 
     return run(
       async () => {
-        const commonData = { tl: tacheLarvaire, bl: bandeLarvaire, interdist, deplacement };
-
         await Promise.all([
-          saveProspectionPopulation(draftId, larveSpeciesDataToPopulationRow('LMC', speciesData.LMC, commonData)),
-          saveProspectionPopulation(draftId, larveSpeciesDataToPopulationRow('NSE', speciesData.NSE, commonData)),
+          saveProspectionPopulation(draftId, larveSpeciesDataToPopulationRow('LMC', speciesData.LMC)),
+          saveProspectionPopulation(draftId, larveSpeciesDataToPopulationRow('NSE', speciesData.NSE)),
         ]);
 
-        router.push({ pathname: '/(prospection)/extensive-recap' as any, params: { draftId } });
+        // Observations (dégâts/verdure/hauteur/pluie) suit toujours Larves dans le
+        // parcours Extensive — cf. extensive-observations.tsx et le récapitulatif
+        // (bloc « D · Observations »), tous deux déjà écrits pour cette place dans
+        // le parcours. Cet écran était jusqu'ici sauté (routage direct vers le
+        // récapitulatif), rendant Observations inatteignable côté Extensif.
+        router.push({ pathname: '/(prospection)/extensive-observations' as any, params: { draftId } });
       },
       {
         screen: 'extensive-larves',
@@ -143,15 +130,10 @@ export default function ExtensiveLarvesScreen() {
     );
   };
 
-  const getStadesList = () => {
-    if (species === 'LMC') {
-      return ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8'];
-    } else {
-      return ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'];
-    }
-  };
-
-  const stadesList = getStadesList();
+  // Source unique du vocabulaire des stades larvaires (cf. prospection-especes-stades.ts) :
+  // LMC s'arrête à L5, NSE à L7 — un doublon local ici avait dérivé jusqu'à L6/L7/L8 pour
+  // LMC, des stades qui n'existent pas pour cette espèce.
+  const stadesList = stadesLarvairesFor(species);
 
   return (
     <View style={styles.root}>
@@ -312,15 +294,16 @@ export default function ExtensiveLarvesScreen() {
 
             <View style={styles.observationsSection}>
               <Text style={styles.sectionLabel}>📊 Observations</Text>
-              
+              <Text style={styles.speciesHint}>Données spécifiques à {species}</Text>
+
               <View style={styles.toggleRow}>
                 <Text style={styles.toggleLabel}>Tache larvaire</Text>
                 <TouchableOpacity
-                  style={[styles.toggleButton, tacheLarvaire && styles.toggleButtonActive]}
-                  onPress={() => setTacheLarvaire(!tacheLarvaire)}
+                  style={[styles.toggleButton, data.tacheLarvaire && styles.toggleButtonActive]}
+                  onPress={() => updateSpeciesData({ tacheLarvaire: !data.tacheLarvaire })}
                 >
-                  <Text style={[styles.toggleText, tacheLarvaire && styles.toggleTextActive]}>
-                    {tacheLarvaire ? 'Oui' : 'Non'}
+                  <Text style={[styles.toggleText, data.tacheLarvaire && styles.toggleTextActive]}>
+                    {data.tacheLarvaire ? 'Oui' : 'Non'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -328,11 +311,11 @@ export default function ExtensiveLarvesScreen() {
               <View style={styles.toggleRow}>
                 <Text style={styles.toggleLabel}>Bande larvaire</Text>
                 <TouchableOpacity
-                  style={[styles.toggleButton, bandeLarvaire && styles.toggleButtonActive]}
-                  onPress={() => setBandeLarvaire(!bandeLarvaire)}
+                  style={[styles.toggleButton, data.bandeLarvaire && styles.toggleButtonActive]}
+                  onPress={() => updateSpeciesData({ bandeLarvaire: !data.bandeLarvaire })}
                 >
-                  <Text style={[styles.toggleText, bandeLarvaire && styles.toggleTextActive]}>
-                    {bandeLarvaire ? 'Oui' : 'Non'}
+                  <Text style={[styles.toggleText, data.bandeLarvaire && styles.toggleTextActive]}>
+                    {data.bandeLarvaire ? 'Oui' : 'Non'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -340,8 +323,20 @@ export default function ExtensiveLarvesScreen() {
               <View style={styles.inputRow}>
                 <Text style={styles.inputLabel}>Interdistance (m)</Text>
                 <TextInput
-                  value={interdist}
-                  onChangeText={setInterdist}
+                  value={data.interdistance}
+                  onChangeText={(text) => updateSpeciesData({ interdistance: text })}
+                  keyboardType="decimal-pad"
+                  style={styles.inputField}
+                  placeholder="0"
+                  placeholderTextColor={TEXT_SECONDARY}
+                />
+              </View>
+
+              <View style={styles.inputRow}>
+                <Text style={styles.inputLabel}>Surface contaminée (ha)</Text>
+                <TextInput
+                  value={data.surfaceContamineeHa}
+                  onChangeText={(text) => updateSpeciesData({ surfaceContamineeHa: text })}
                   keyboardType="decimal-pad"
                   style={styles.inputField}
                   placeholder="0"
@@ -355,10 +350,10 @@ export default function ExtensiveLarvesScreen() {
                   {['repos', 'perchee'].map((option) => (
                     <TouchableOpacity
                       key={option}
-                      style={[styles.deplacementButton, deplacement === option && styles.deplacementButtonActive]}
-                      onPress={() => setDeplacement(option)}
+                      style={[styles.deplacementButton, data.deplacement === option && styles.deplacementButtonActive]}
+                      onPress={() => updateSpeciesData({ deplacement: option })}
                     >
-                      <Text style={[styles.deplacementText, deplacement === option && styles.deplacementTextActive]}>
+                      <Text style={[styles.deplacementText, data.deplacement === option && styles.deplacementTextActive]}>
                         {option === 'repos' ? 'Repos' : 'Perchée'}
                       </Text>
                     </TouchableOpacity>
@@ -425,7 +420,7 @@ export default function ExtensiveLarvesScreen() {
               disabled={isSaving || (!isConsistent && data.totalCaptures > 0)}
               activeOpacity={0.85}
             >
-              <Text style={styles.continueButtonText}>Suivant : Récap ›</Text>
+              <Text style={styles.continueButtonText}>Suivant : Observations ›</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -486,6 +481,7 @@ const styles = StyleSheet.create({
   miniButtonAddText: { color: '#fff' },
   
   observationsSection: { marginTop: 4, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
+  speciesHint: { fontSize: 9, color: '#9a9484', marginBottom: 6, textAlign: 'center', fontStyle: 'italic' },
   toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: BORDER },
   toggleLabel: { fontSize: 13, fontWeight: '500', color: TEXT },
   toggleButton: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 8, backgroundColor: INACTIVE_BG },

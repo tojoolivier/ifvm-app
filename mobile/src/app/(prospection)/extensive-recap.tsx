@@ -6,7 +6,8 @@ import { useAuthStore } from '@/lib/auth-store';
 import { concludeValidation, listAllProspectionPopulations, PopulationRow } from '@/lib/prospection-repository';
 import { enregistrerEtSynchroniser } from '@/lib/prospection-review';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
-import { imagoTotalFromRow, larveTotalFromRow } from '@/lib/prospection-extensive';
+import { imagoTotalFromRow, larveTotalFromRow, typeCibleImagoLabel } from '@/lib/prospection-extensive';
+import { formatHeureLocale } from '@/lib/prospection-fiche-lecture';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
@@ -16,6 +17,112 @@ const BG = '#faf7ef';
 const TEXT = '#16201a';
 const TEXT_SECONDARY = '#6f6a59';
 const BORDER = '#e7e0cd';
+
+interface DetailRow {
+  label: string;
+  value: string;
+}
+
+/**
+ * Récapitulatif complet (#227) : chaque ligne du mockup demandé par l'utilisateur
+ * (Nombre de captures, Phases, Accouplement, Ponte, Interdistance, Type de cible,
+ * Direction, État, Comportement, Densités…) est affichée explicitement, même quand
+ * la valeur est absente (« — ») — ne jamais masquer un champ silencieusement, c'est
+ * précisément ce qui donnait l'impression qu'une donnée saisie avait « disparu ».
+ * Seul le bloc entier LMC/NSE est masqué si l'espèce n'a strictement aucune donnée
+ * (elle n'a jamais été ouverte) : cf. `imagoRowHasData`/`larveRowHasData`.
+ */
+function buildImagoRows(row: PopulationRow | null): DetailRow[] {
+  return [
+    { label: 'Nombre de captures', value: String(row?.captures_nombre ?? 0) },
+    {
+      label: 'Phases',
+      value: `Sol. ${row?.captures_sol ?? 0} · Trans. ${row?.captures_trans ?? 0} · Sol-Trans. ${row?.captures_solitaro_transiens ?? 0} · Grég. ${row?.captures_greg ?? 0}`,
+    },
+    // Le détail des stades (femelleA1, maleA234…) n'est pas persisté pour les imagos —
+    // seule la répartition par phases l'est. Le dire explicitement plutôt que d'omettre
+    // la ligne : ne jamais laisser croire qu'une saisie a été perdue (règle #11).
+    { label: 'Stades', value: 'Non conservés en base (seule la répartition par phases l’est)' },
+    { label: 'Accouplement', value: row?.accouplement ?? '—' },
+    { label: 'Ponte', value: row?.ponte ?? '—' },
+    { label: 'Interdistance (m)', value: row?.interdistance != null ? String(row.interdistance) : '—' },
+    { label: 'Type de cible', value: typeCibleImagoLabel(row?.type_cible) },
+    {
+      label: 'Direction du déplacement',
+      value: row?.direction_de ? `${row.direction_de} → ${row.direction_vers}` : '—',
+    },
+    { label: 'État', value: row?.etat === 'repos' ? 'Repos' : row?.etat === 'deplacement' ? 'Déplacement' : '—' },
+    {
+      label: 'Comportement de l’essaim',
+      value: row?.essaim_en_vol ? 'En vol' : row?.essaim_pose ? 'Posé' : '—',
+    },
+    { label: 'Densité diffuse', value: row?.densite_diffuse != null ? `${row.densite_diffuse} D/ha` : '—' },
+    { label: 'Densité groupée', value: row?.densite_groupee != null ? `${row.densite_groupee} D/m²` : '—' },
+  ];
+}
+
+function imagoRowHasData(row: PopulationRow | null): boolean {
+  if (!row) return false;
+  return (
+    (row.captures_nombre ?? 0) > 0 ||
+    row.densite_diffuse != null ||
+    row.densite_groupee != null ||
+    !!row.accouplement ||
+    !!row.ponte ||
+    row.interdistance != null ||
+    !!row.etat
+  );
+}
+
+function buildLarveRows(row: PopulationRow | null): DetailRow[] {
+  let stadesValue = '—';
+  if (row?.densites_larve) {
+    const parsed = JSON.parse(row.densites_larve) as Record<string, number>;
+    const nonZero = Object.entries(parsed).filter(([, v]) => v > 0);
+    if (nonZero.length > 0) stadesValue = nonZero.map(([stade, v]) => `${stade} ${v}`).join(' · ');
+  }
+  const autres = [
+    row?.tache_larvaire ? 'Tache larvaire' : null,
+    row?.bande_larvaire ? 'Bande larvaire' : null,
+    row?.deplacement ? `Déplacement : ${row.deplacement === 'perchee' ? 'Perchée' : 'Repos'}` : null,
+  ].filter(Boolean);
+
+  return [
+    { label: 'Nombre de captures', value: String(row?.captures_nombre ?? 0) },
+    { label: 'Stades renseignés', value: stadesValue },
+    { label: 'Interdistance (m)', value: row?.interdistance != null ? String(row.interdistance) : '—' },
+    { label: 'Surface contaminée (ha)', value: row?.surface_contaminee_ha != null ? String(row.surface_contaminee_ha) : '—' },
+    // Pas de saisie densité diffuse/groupée sur l'écran Larves (la densité y est
+    // exprimée uniquement par la répartition de captures par stade) — la ligne reste
+    // affichée pour respecter la structure demandée, avec une valeur honnête (« — »).
+    { label: 'Densité diffuse', value: row?.densite_diffuse != null ? `${row.densite_diffuse} D/ha` : '—' },
+    { label: 'Densité groupée', value: row?.densite_groupee != null ? `${row.densite_groupee} D/m²` : '—' },
+    { label: 'Autres informations', value: autres.length > 0 ? autres.join(' · ') : '—' },
+  ];
+}
+
+function larveRowHasData(row: PopulationRow | null): boolean {
+  if (!row) return false;
+  if ((row.captures_nombre ?? 0) > 0) return true;
+  if (row.interdistance != null) return true;
+  if (row.surface_contaminee_ha != null) return true;
+  if (row.tache_larvaire || row.bande_larvaire) return true;
+  if (row.deplacement && row.deplacement !== 'repos') return true;
+  return false;
+}
+
+function DetailRows({ rows }: { rows: DetailRow[] }) {
+  return (
+    <>
+      {rows.map((row) => (
+        <View key={row.label} style={styles.detailRow}>
+          <Text style={styles.detailRowLabel}>{row.label}</Text>
+          <Text style={styles.detailRowValue}>{row.value}</Text>
+        </View>
+      ))}
+    </>
+  );
+}
 
 export default function ExtensiveRecapScreen() {
   const router = useRouter();
@@ -38,13 +145,18 @@ export default function ExtensiveRecapScreen() {
     const findRow = (espece: 'LMC' | 'NSE', categorie: 'imago' | 'larve') =>
       populations.find((p) => p.espece === espece && p.categorie === categorie) ?? null;
     const imagoLMCRow = findRow('LMC', 'imago');
+    const imagoNSERow = findRow('NSE', 'imago');
+    const larveLMCRow = findRow('LMC', 'larve');
+    const larveNSERow = findRow('NSE', 'larve');
     return {
       imagoLMC: imagoTotalFromRow(imagoLMCRow),
-      imagoNSE: imagoTotalFromRow(findRow('NSE', 'imago')),
-      larveLMC: larveTotalFromRow(findRow('LMC', 'larve')),
-      larveNSE: larveTotalFromRow(findRow('NSE', 'larve')),
-      imagoLMCTrans: imagoLMCRow?.captures_trans ?? 0,
-      imagoLMCPopDiff: imagoLMCRow?.densite_diffuse ?? null,
+      imagoNSE: imagoTotalFromRow(imagoNSERow),
+      larveLMC: larveTotalFromRow(larveLMCRow),
+      larveNSE: larveTotalFromRow(larveNSERow),
+      imagoLMCRows: imagoRowHasData(imagoLMCRow) ? buildImagoRows(imagoLMCRow) : null,
+      imagoNSERows: imagoRowHasData(imagoNSERow) ? buildImagoRows(imagoNSERow) : null,
+      larveLMCRows: larveRowHasData(larveLMCRow) ? buildLarveRows(larveLMCRow) : null,
+      larveNSERows: larveRowHasData(larveNSERow) ? buildLarveRows(larveNSERow) : null,
     };
   }, [populations]);
 
@@ -93,8 +205,8 @@ export default function ExtensiveRecapScreen() {
     return (
       <View style={styles.root}>
         <SafeAreaView edges={['top']} style={styles.safe}>
-          <KeyboardAvoidingView 
-            style={styles.keyboardAvoidingView} 
+          <KeyboardAvoidingView
+            style={styles.keyboardAvoidingView}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
           >
@@ -119,20 +231,74 @@ export default function ExtensiveRecapScreen() {
 
               <View style={styles.row}>
                 <View style={[styles.figureCard, styles.flex1]}>
-                  <Text style={styles.figureLabel}>LMC · Trans.</Text>
-                  <Text style={styles.figureValue}>{totals.imagoLMCTrans}</Text>
+                  <Text style={styles.figureLabel}>Imagos — LMC/NSE</Text>
+                  <Text style={styles.figureValue}>{totals.imagoLMC} / {totals.imagoNSE}</Text>
                 </View>
                 <View style={[styles.figureCard, styles.flex1]}>
-                  <Text style={styles.figureLabel}>NSE · Densité L</Text>
-                  <Text style={styles.figureValue}>{totals.larveNSE}</Text>
+                  <Text style={styles.figureLabel}>Larves — LMC/NSE</Text>
+                  <Text style={styles.figureValue}>{totals.larveLMC} / {totals.larveNSE}</Text>
                 </View>
               </View>
 
+              <Text style={styles.detailSubtitle}>Référence</Text>
               <View style={styles.summaryCard}>
-                <Text style={styles.summaryText}>
-                  Fiche A→D remplie sur place, comme pour l&apos;extensif — Pop diff D/ha {totals.imagoLMCPopDiff ?? '—'} · dégâts{' '}
-                  {draft.degats_cultures_pourcent ?? 0} %.
+                <Text style={styles.detailLine}>Station : {draft.station_libre ?? '—'} · Type : {draft.type_station ?? '—'}</Text>
+                <Text style={styles.detailLine}>
+                  GPS : {draft.latitude?.toFixed(4) ?? '—'}, {draft.longitude?.toFixed(4) ?? '—'}
                 </Text>
+                <Text style={styles.detailLine}>Surface infestée : {draft.surface_infestee ?? '—'} ha</Text>
+                <Text style={styles.detailLine}>Heure d’observation : {formatHeureLocale(draft.heure_observation_at)}</Text>
+              </View>
+
+              {(totals.imagoLMCRows || totals.imagoNSERows) && (
+                <>
+                  <Text style={styles.detailSubtitle}>Imagos</Text>
+                  <View style={styles.summaryCard}>
+                    {totals.imagoLMCRows && (
+                      <>
+                        <Text style={styles.detailLine}>LMC</Text>
+                        <DetailRows rows={totals.imagoLMCRows} />
+                      </>
+                    )}
+                    {totals.imagoNSERows && (
+                      <>
+                        <Text style={[styles.detailLine, { marginTop: totals.imagoLMCRows ? 6 : 0 }]}>NSE</Text>
+                        <DetailRows rows={totals.imagoNSERows} />
+                      </>
+                    )}
+                  </View>
+                </>
+              )}
+
+              {(totals.larveLMCRows || totals.larveNSERows) && (
+                <>
+                  <Text style={styles.detailSubtitle}>Larves</Text>
+                  <View style={styles.summaryCard}>
+                    {totals.larveLMCRows && (
+                      <>
+                        <Text style={styles.detailLine}>LMC</Text>
+                        <DetailRows rows={totals.larveLMCRows} />
+                      </>
+                    )}
+                    {totals.larveNSERows && (
+                      <>
+                        <Text style={[styles.detailLine, { marginTop: totals.larveLMCRows ? 6 : 0 }]}>NSE</Text>
+                        <DetailRows rows={totals.larveNSERows} />
+                      </>
+                    )}
+                  </View>
+                </>
+              )}
+
+              <Text style={styles.detailSubtitle}>Observations</Text>
+              <View style={styles.summaryCard}>
+                <Text style={styles.detailLine}>Dégâts sur les cultures : {draft.degats_cultures_pourcent ?? 0} %</Text>
+                <Text style={styles.detailLine}>Verdure strate herbeuse : {draft.verdure_strate ?? '—'}</Text>
+                <Text style={styles.detailLine}>
+                  H. strate herbeuse : {draft.hauteur_herbe_cm != null ? `${(draft.hauteur_herbe_cm / 100).toFixed(2)} m` : '—'}
+                </Text>
+                <Text style={styles.detailLine}>Dernière pluie : {draft.derniere_pluie ?? '—'}</Text>
+                <Text style={styles.detailLine}>Intensité pluie : {draft.intensite_pluie ?? '—'}</Text>
               </View>
 
               <Text style={styles.conclusionLabel}>Conclusion de la vérification</Text>
@@ -165,8 +331,8 @@ export default function ExtensiveRecapScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.safe}>
-        <KeyboardAvoidingView 
-          style={styles.keyboardAvoidingView} 
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoidingView}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
@@ -189,25 +355,88 @@ export default function ExtensiveRecapScreen() {
               <View style={styles.checkBadge}>
                 <Text style={styles.checkBadgeText}>✓</Text>
               </View>
-              <Text style={styles.checkLabel}>A · Références</Text>
+              <Text style={styles.checkLabel}>A · Référence</Text>
             </View>
+            <View style={styles.detailCard}>
+              <Text style={styles.detailSubtitle}>Informations générales</Text>
+              <Text style={styles.detailLine}>N° message : {draft.n_message ?? '—'}</Text>
+              <Text style={styles.detailLine}>Date : {draft.date_prospection ?? '—'}</Text>
+
+              <Text style={[styles.detailSubtitle, { marginTop: 8 }]}>Station</Text>
+              <Text style={styles.detailLine}>Station : {draft.station_libre ?? '—'}</Text>
+              <Text style={styles.detailLine}>Type de station : {draft.type_station ?? '—'}</Text>
+              <Text style={styles.detailLine}>
+                GPS : {draft.latitude?.toFixed(4) ?? '—'}, {draft.longitude?.toFixed(4) ?? '—'}
+              </Text>
+
+              <Text style={[styles.detailSubtitle, { marginTop: 8 }]}>Surfaces</Text>
+              <Text style={styles.detailLine}>Surface station : {draft.surface_station ?? '—'} ha</Text>
+              <Text style={styles.detailLine}>Surface infestée : {draft.surface_infestee ?? '—'} ha</Text>
+
+              <Text style={[styles.detailSubtitle, { marginTop: 8 }]}>Heure d’observation</Text>
+              <Text style={styles.detailLine}>{formatHeureLocale(draft.heure_observation_at)}</Text>
+            </View>
+
             <View style={styles.checkRow}>
               <View style={styles.checkBadge}>
                 <Text style={styles.checkBadgeText}>✓</Text>
               </View>
               <Text style={styles.checkLabel}>B · Imagos — LMC {totals.imagoLMC} · NSE {totals.imagoNSE}</Text>
             </View>
+            {(totals.imagoLMCRows || totals.imagoNSERows) && (
+              <View style={styles.detailCard}>
+                {totals.imagoLMCRows && (
+                  <>
+                    <Text style={styles.detailSubtitle}>LMC</Text>
+                    <DetailRows rows={totals.imagoLMCRows} />
+                  </>
+                )}
+                {totals.imagoNSERows && (
+                  <>
+                    <Text style={[styles.detailSubtitle, { marginTop: totals.imagoLMCRows ? 8 : 0 }]}>NSE</Text>
+                    <DetailRows rows={totals.imagoNSERows} />
+                  </>
+                )}
+              </View>
+            )}
+
             <View style={styles.checkRow}>
               <View style={styles.checkBadge}>
                 <Text style={styles.checkBadgeText}>✓</Text>
               </View>
               <Text style={styles.checkLabel}>C · Larves — LMC {totals.larveLMC} · NSE {totals.larveNSE}</Text>
             </View>
+            {(totals.larveLMCRows || totals.larveNSERows) && (
+              <View style={styles.detailCard}>
+                {totals.larveLMCRows && (
+                  <>
+                    <Text style={styles.detailSubtitle}>LMC</Text>
+                    <DetailRows rows={totals.larveLMCRows} />
+                  </>
+                )}
+                {totals.larveNSERows && (
+                  <>
+                    <Text style={[styles.detailSubtitle, { marginTop: totals.larveLMCRows ? 8 : 0 }]}>NSE</Text>
+                    <DetailRows rows={totals.larveNSERows} />
+                  </>
+                )}
+              </View>
+            )}
+
             <View style={styles.checkRow}>
               <View style={styles.checkBadge}>
                 <Text style={styles.checkBadgeText}>✓</Text>
               </View>
               <Text style={styles.checkLabel}>D · Observations — dégâts {draft.degats_cultures_pourcent ?? 0} %</Text>
+            </View>
+            <View style={styles.detailCard}>
+              <Text style={styles.detailLine}>Dégâts sur les cultures : {draft.degats_cultures_pourcent ?? 0} %</Text>
+              <Text style={styles.detailLine}>Verdure strate herbeuse : {draft.verdure_strate ?? '—'}</Text>
+              <Text style={styles.detailLine}>
+                H. strate herbeuse : {draft.hauteur_herbe_cm != null ? `${(draft.hauteur_herbe_cm / 100).toFixed(2)} m` : '—'}
+              </Text>
+              <Text style={styles.detailLine}>Dernière pluie : {draft.derniere_pluie ?? '—'}</Text>
+              <Text style={styles.detailLine}>Intensité pluie : {draft.intensite_pluie ?? '—'}</Text>
             </View>
 
             <View style={styles.offlineBanner}>
@@ -240,6 +469,12 @@ const styles = StyleSheet.create({
   checkBadge: { width: 24, height: 24, borderRadius: 7, backgroundColor: GREEN, alignItems: 'center', justifyContent: 'center' },
   checkBadgeText: { color: '#fff', fontWeight: '800', fontSize: 11 },
   checkLabel: { fontSize: 12.5, fontWeight: '600', color: '#2a2a22' },
+  detailCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 11, marginTop: -2 },
+  detailSubtitle: { fontSize: 10, fontWeight: '700', color: GREEN, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
+  detailLine: { fontSize: 12, color: '#5c5848', lineHeight: 17 },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: '#f0eee8' },
+  detailRowLabel: { fontSize: 11.5, color: TEXT_SECONDARY, flexShrink: 1 },
+  detailRowValue: { fontSize: 11.5, color: TEXT, fontWeight: '600', textAlign: 'right', flexShrink: 1 },
   offlineBanner: { marginTop: 6, backgroundColor: '#fdf6e7', borderWidth: 1, borderColor: '#f0e2bf', borderRadius: 11, padding: 12 },
   offlineText: { fontSize: 11, lineHeight: 16, color: '#8a6d2f', fontWeight: '500' },
   footer: { padding: 16 },

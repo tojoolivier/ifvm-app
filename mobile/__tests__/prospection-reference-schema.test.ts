@@ -24,4 +24,16 @@ describe('referenceSchema', () => {
       referenceSchema.validate({ surfaceStation: '', surfaceProspectee: '5', surfaceInfestee: '1' })
     ).rejects.toThrow();
   });
+
+  it("accepte une surface infestée absente (facultative, 0 par défaut)", async () => {
+    await expect(
+      referenceSchema.validate({ surfaceStation: '12', surfaceProspectee: '8.5', surfaceInfestee: '' })
+    ).resolves.toBeTruthy();
+  });
+
+  it('rejette une surface infestée négative', async () => {
+    await expect(
+      referenceSchema.validate({ surfaceStation: '12', surfaceProspectee: '8.5', surfaceInfestee: '-1' })
+    ).rejects.toThrow();
+  });
 });

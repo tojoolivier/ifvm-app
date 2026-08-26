@@ -145,6 +145,89 @@ async def test_create_prospection_avec_nouveaux_champs(
 
 
 @pytest.mark.asyncio
+async def test_create_prospection_population_extensive_imagos_larves(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+):
+    """La fiche Extensive n'a pas d'écran Infestation séparé : type de cible, direction du
+    déplacement, État/Comportement de l'essaim et surface contaminée vivent directement
+    sur la ligne `prospection_population` de l'espèce concernée (migration 0033) — donc
+    naturellement indépendants entre LMC et NSE. On vérifie ici que LMC et NSE peuvent
+    avoir des valeurs différentes simultanément, sans se mélanger."""
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "extensive",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-08-26",
+            "surface_infestee": 0.5,
+            "populations": [
+                {
+                    "espece": "LMC",
+                    "categorie": "imago",
+                    "accouplement": "dominant",
+                    "ponte": "rare",
+                    "interdistance": 25.5,
+                    "type_cible": "vol_clair",
+                    "etat": "repos",
+                    "essaim_en_vol": False,
+                    "essaim_pose": True,
+                },
+                {
+                    "espece": "NSE",
+                    "categorie": "imago",
+                    "accouplement": "neant",
+                    "ponte": "beaucoup",
+                    "interdistance": 40.75,
+                    "type_cible": "tres_dense",
+                    "direction_de": "N",
+                    "direction_vers": "S",
+                    "etat": "deplacement",
+                    "essaim_en_vol": True,
+                    "essaim_pose": False,
+                },
+                {
+                    "espece": "LMC",
+                    "categorie": "larve",
+                    "surface_contaminee_ha": 12.75,
+                },
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    data = response.json()
+
+    assert data["surface_infestee"] == 0.5
+
+    by_key = {(p["espece"], p["categorie"]): p for p in data["populations"]}
+
+    lmc_imago = by_key[("LMC", "imago")]
+    assert lmc_imago["accouplement"] == "dominant"
+    assert lmc_imago["ponte"] == "rare"
+    assert lmc_imago["interdistance"] == 25.5
+    assert lmc_imago["type_cible"] == "vol_clair"
+    assert lmc_imago["etat"] == "repos"
+    assert lmc_imago["essaim_en_vol"] is False
+    assert lmc_imago["essaim_pose"] is True
+
+    nse_imago = by_key[("NSE", "imago")]
+    assert nse_imago["accouplement"] == "neant"
+    assert nse_imago["ponte"] == "beaucoup"
+    # LMC et NSE ne doivent jamais partager la même valeur ici (indépendance par espèce).
+    assert nse_imago["interdistance"] == 40.75
+    assert nse_imago["type_cible"] == "tres_dense"
+    assert nse_imago["direction_de"] == "N"
+    assert nse_imago["direction_vers"] == "S"
+    assert nse_imago["etat"] == "deplacement"
+    assert nse_imago["essaim_en_vol"] is True
+    assert nse_imago["essaim_pose"] is False
+
+    lmc_larve = by_key[("LMC", "larve")]
+    assert lmc_larve["surface_contaminee_ha"] == 12.75
+
+
+@pytest.mark.asyncio
 async def test_create_prospection_avec_avertissements(
     client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
 ):

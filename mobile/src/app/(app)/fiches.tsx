@@ -33,6 +33,17 @@ const FILTERS: FilterOption<FilterKey>[] = [
   { value: 'METEO', label: 'Météo', icon: '🌤️', disabled: true },
 ];
 
+/**
+ * `station_id` est une clé du référentiel (UUID) — jamais un nom à afficher, et de
+ * toute façon absente pour l'extensif (pas de station fixe du référentiel, cf.
+ * extensive-reference.tsx). `station_nom` (intensif, référentiel) ou `station_libre`
+ * (extensif, saisie libre) sont les vrais noms lisibles ; « Localité inconnue »
+ * seulement quand aucun des deux n'est réellement renseigné.
+ */
+function stationLabel(item: { station_nom?: string | null; station_libre?: string | null }): string {
+  return item.station_nom || item.station_libre || 'Localité inconnue';
+}
+
 interface FicheRow {
   id: string;
   filterKey: FilterKey;
@@ -116,7 +127,7 @@ export default function FichesScreen() {
         id: draft.id,
         filterKey: 'PROSPECTION',
         code: draft.n_fiche ?? 'Fiche sans numéro',
-        meta: `${draft.station_nom ?? draft.station_id ?? 'Localité inconnue'} · ${draft.date_prospection}`,
+        meta: `${stationLabel(draft)} · ${draft.date_prospection}`,
         typeBadge: TYPE_BADGE_CONFIG.PROSPECTION,
         subTypeBadge: PROSPECTION_SUBTYPE_BADGE_CONFIG[draft.type_prospection] ?? null,
         statutBadge: STATUT_BADGE_CONFIG[draft.statut] ?? STATUT_BADGE_CONFIG.brouillon,
@@ -128,7 +139,7 @@ export default function FichesScreen() {
       id: prospection.id,
       filterKey: 'PROSPECTION',
       code: prospection.n_fiche ?? 'Fiche sans numéro',
-      meta: `${prospection.station_id ?? 'Localité inconnue'} · ${prospection.date_prospection}`,
+      meta: `${stationLabel(prospection)} · ${prospection.date_prospection}`,
       typeBadge: TYPE_BADGE_CONFIG.PROSPECTION,
       subTypeBadge: PROSPECTION_SUBTYPE_BADGE_CONFIG[prospection.type_prospection] ?? null,
       statutBadge: STATUT_BADGE_CONFIG.validee,
