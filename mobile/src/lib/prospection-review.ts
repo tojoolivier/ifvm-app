@@ -12,23 +12,45 @@ import {
   InfestationRow,
   PopulationRow,
   completeProspection,
+  markProspectionEchec,
   markProspectionSynced,
   listAllProspectionCaptures,
   listAllProspectionPopulations,
   listAllProspectionInfestations,
 } from './prospection-repository';
-import { PHENOTYPES, TYPE_CIBLE_OPTIONS } from './prospection-fiche-lecture';
+import { PHENOTYPES, TYPE_CIBLE_OPTIONS, formatHeureLocale } from './prospection-fiche-lecture';
 import { CaptureCounts, dominantPhenotype, rowsToCounts, totalBySexe, totalCaptures } from './prospection-capture-store';
 import { CHRONO_MAX_SECONDS, capturesMaxFor, phenotypesFor } from './prospection-especes-stades';
 import { buildGrilles, parseEspeceSelection } from './prospection-especes';
 import { getDb } from './prospection-db';
 import { pullReferentiel } from './referentiel-sync';
+import { assertPresent, ReferentialError } from './errors';
+import { logger } from './logger';
+import { avecConnexion, syncAll, type LotSync, type ResumeSync } from './sync-lot';
+
+const log = logger.child({ module: 'prospection-review' });
 
 export interface ReviewGroupViewModel {
   label: string;
   total: number;
   max: number;
   dominantLabel: string;
+}
+
+export interface DensiteViewModel {
+  key: string;
+  espece: 'LMC' | 'NSE';
+  categorie: 'imago' | 'larve';
+  label: string;
+  densiteDiffuse: number | null;
+  densiteGroupee: number | null;
+}
+
+/** Une ligne `prospection_infestation` = une cible réellement sélectionnée et enregistrée. */
+export interface InfestationCibleViewModel {
+  key: string;
+  label: string;
+  details: string[];
 }
 
 export interface RecapitulatifViewModel {
@@ -49,11 +71,41 @@ export interface RecapitulatifViewModel {
   longitude: number | null;
   vegetationSummary: string;
   reviewGroups: ReviewGroupViewModel[];
-  infestationSummary: string;
+  infestationCibles: InfestationCibleViewModel[];
+  comportementSummary: string;
+  observationsText: string;
+  densites: DensiteViewModel[];
+  heureObservationLabel: string;
 }
 
 const ESPECE_LABEL = { LMC: 'Locusta', NSE: 'Nomadacris' } as const;
 const CATEGORIE_LABEL = { imago: 'Imagos', larve: 'Larves' } as const;
+
+/**
+ * Densité diffuse/groupée par espèce + stade — 4 blocs indépendants (LMC/NSE ×
+ * imago/larve), jamais partagés (cf. `saveProspectionPopulation`, upsert par
+ * `(prospection_id, espece, categorie)`). Toujours les 4 combinaisons, même sans
+ * ligne en base pour l'une d'elles (densités alors affichées comme non renseignées).
+ */
+function buildDensitesSummary(populations: PopulationRow[]): DensiteViewModel[] {
+  const especes: ('LMC' | 'NSE')[] = ['LMC', 'NSE'];
+  const categories: ('imago' | 'larve')[] = ['imago', 'larve'];
+  const rows: DensiteViewModel[] = [];
+  for (const espece of especes) {
+    for (const categorie of categories) {
+      const row = populations.find((p) => p.espece === espece && p.categorie === categorie);
+      rows.push({
+        key: `${espece}-${categorie}`,
+        espece,
+        categorie,
+        label: `${ESPECE_LABEL[espece]} — ${CATEGORIE_LABEL[categorie]}`,
+        densiteDiffuse: row?.densite_diffuse ?? null,
+        densiteGroupee: row?.densite_groupee ?? null,
+      });
+    }
+  }
+  return rows;
+}
 
 function buildReviewGroups(draft: DraftProspection, captures: CaptureRow[]): ReviewGroupViewModel[] {
   const grilles = buildGrilles(parseEspeceSelection(draft.especes));
@@ -71,11 +123,63 @@ function buildReviewGroups(draft: DraftProspection, captures: CaptureRow[]): Rev
   });
 }
 
-function buildInfestationSummary(infestations: InfestationRow[]): string {
-  const filled = infestations.filter((row) => row.surface_totale != null || row.densite_moy != null);
-  if (filled.length === 0) return 'Aucune formation renseignée.';
-  const labels = filled.map((row) => TYPE_CIBLE_OPTIONS.find((o) => o.value === row.type_cible)?.label ?? row.type_cible);
-  return `${labels.join(', ')} renseignée${filled.length > 1 ? 's' : ''}.`;
+/**
+ * Une cible affichée = une cible sélectionnée par l'utilisateur (une ligne existe pour
+ * elle en base, cf. `persistAll`/`deleteProspectionInfestation` dans infestation.tsx qui
+ * gardent exactement synchronisées sélection et lignes enregistrées — désélectionner
+ * supprime la ligne, donc plus rien à afficher ici pour cette cible).
+ *
+ * Ancien bug : ce résumé ne retenait qu'une cible ayant surface_totale ou densite_moy
+ * renseigné — une cible sélectionnée mais pas encore quantifiée (la section Infestation
+ * est facultative) disparaissait donc silencieusement du récapitulatif alors qu'elle
+ * était bien enregistrée.
+ */
+function buildInfestationCibles(infestations: InfestationRow[]): InfestationCibleViewModel[] {
+  return infestations.map((row) => {
+    const details: string[] = [];
+    if (row.surface_totale != null) details.push(`Surface : ${row.surface_totale} ha`);
+    if (row.densite_moy != null) {
+      details.push(`Densité moy. : ${row.densite_moy}`);
+    } else if (row.densite_min != null || row.densite_max != null) {
+      details.push(`Densité : ${row.densite_min ?? '—'} – ${row.densite_max ?? '—'}`);
+    }
+    // Un brouillon local pré-migration 0031 pas encore resynchronisé peut encore porter
+    // type_cible='essaim' — même reclassement que buildInfestationsPayload, pour ne pas
+    // afficher la valeur brute non traduite dans le récapitulatif.
+    const typeEssaim = row.type_essaim ? (TYPE_ESSAIM_TO_BACKEND[row.type_essaim] ?? null) : null;
+    const typeCible = normalizeTypeCible(row.type_cible, typeEssaim);
+    return {
+      key: row.type_cible,
+      label: TYPE_CIBLE_OPTIONS.find((o) => o.value === typeCible)?.label ?? typeCible,
+      details,
+    };
+  });
+}
+
+/**
+ * Comportement (État/Direction/Essaim en vol-posé) : rattaché à une ligne
+ * `prospection_infestation`, comme dans infestation.tsx (onglet "Comport.") — même
+ * vocabulaire, direction du déplacement et direction du vent restant deux mesures
+ * indépendantes (cf. commentaire de `formFromRow` dans infestation.tsx).
+ */
+function buildComportementSummary(infestations: InfestationRow[]): string {
+  const row = infestations.find(
+    (r) => r.comportement != null || r.essaim_en_vol || r.essaim_pose || r.direction_de != null
+  );
+  if (!row) return 'Aucun comportement renseigné.';
+
+  const parts: string[] = [];
+  if (row.comportement) {
+    parts.push(`État ${row.comportement === 'deplacement' ? 'Déplacement' : 'Repos'}`);
+  }
+  if (row.direction_de || row.direction_vers) {
+    parts.push(`Direction ${row.direction_de ?? '—'} → ${row.direction_vers ?? '—'}`);
+  }
+  if (row.essaim_en_vol || row.essaim_pose) {
+    const etats = [row.essaim_en_vol ? 'en vol' : null, row.essaim_pose ? 'posé' : null].filter(Boolean);
+    parts.push(`Essaim ${etats.join(' / ')}`);
+  }
+  return parts.length > 0 ? parts.join(' · ') : 'Aucun comportement renseigné.';
 }
 
 export function chronoSeconds(startedAt: string | null, now: Date = new Date()): number {
@@ -94,7 +198,8 @@ export function buildRecapitulatif(
   draft: DraftProspection,
   captures: CaptureRow[],
   vegetationSummary: string,
-  infestations: InfestationRow[]
+  infestations: InfestationRow[],
+  populations: PopulationRow[] = []
 ): RecapitulatifViewModel {
   const counts: CaptureCounts = rowsToCounts(captures);
   const dominant = dominantPhenotype(counts);
@@ -117,39 +222,54 @@ export function buildRecapitulatif(
     longitude: draft.longitude,
     vegetationSummary,
     reviewGroups: buildReviewGroups(draft, captures),
-    infestationSummary: buildInfestationSummary(infestations),
+    infestationCibles: buildInfestationCibles(infestations),
+    comportementSummary: buildComportementSummary(infestations),
+    observationsText: draft.observations?.trim() ? draft.observations : 'Aucune observation renseignée.',
+    densites: buildDensitesSummary(populations),
+    heureObservationLabel: formatHeureLocale(draft.heure_observation_at),
   };
 }
 
+/**
+ * Cherche une station active en local, en tentant une synchronisation de
+ * rattrapage si le référentiel est vide.
+ *
+ * Rend `null` quand il n'y en a toujours pas — et `null` est ici discernable :
+ * l'appelant en fait une `ReferentialError`, qui propose « Synchroniser les
+ * référentiels » à l'agent.
+ */
 async function ensureStationExists(token: string): Promise<string | null> {
   const db = await getDb();
-  
+
   const stations = await db.getAllAsync<{ id: string }>(
     'SELECT id FROM station_fixe WHERE actif = 1 LIMIT 1'
   );
-  
+
   if (stations.length > 0) {
-    console.log(`✅ Station locale trouvée: ${stations[0].id}`);
+    log.detail('station.trouvee-en-local', { stationId: stations[0].id });
     return stations[0].id;
   }
-  
-  console.log('🔄 Aucune station locale, synchronisation des référentiels...');
+
+  log.event('referentiel.sync-de-rattrapage');
+
   try {
     await pullReferentiel(token);
-    console.log('✅ Référentiels synchronisés');
-    
+
     const newStations = await db.getAllAsync<{ id: string }>(
       'SELECT id FROM station_fixe WHERE actif = 1 LIMIT 1'
     );
-    
+
     if (newStations.length > 0) {
-      console.log(`✅ Station trouvée après sync: ${newStations[0].id}`);
+      log.detail('station.trouvee-apres-sync', { stationId: newStations[0].id });
       return newStations[0].id;
     }
   } catch (error) {
-    console.error('❌ Erreur lors de la synchronisation:', error);
+    // Pas un `ignore` : l'échec n'est pas silencieux, l'appelant le transforme
+    // en `ReferentialError`. Mais son motif — réseau, jeton, base — ne survit
+    // pas à ce `return null`, et c'est lui que le support cherchera.
+    log.failure('referentiel.sync-de-rattrapage.failed', error);
   }
-  
+
   return null;
 }
 
@@ -170,24 +290,25 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
   
   // 🔑 Pour l'intensif seulement : si station_id est manquant, on essaie de le récupérer
   if (draft.type_prospection === 'intensive' && !stationId) {
-    console.warn(`⚠️ station_id manquant pour ${draft.id}, tentative de récupération...`);
-    
-    if (!token) {
-      throw new Error('Token manquant pour la synchronisation');
-    }
-    
+    log.event('station.manquante', { prospectionId: draft.id });
+
+    assertPresent(token || null, 'Session expirée — reconnectez-vous pour synchroniser.');
+
     stationId = await ensureStationExists(token);
-    
+
     if (!stationId) {
-      throw new Error('Aucune station disponible. Veuillez synchroniser les référentiels dans l\'onglet Synchronisation.');
+      // `ReferentialError` : l'action utile — « Synchroniser les référentiels »
+      // — est une propriété de la classe, pas de ce site d'appel.
+      throw new ReferentialError(
+        'Aucune station disponible. Veuillez synchroniser les référentiels dans l’onglet Synchronisation.'
+      );
     }
-    
-    console.log(`✅ station_id trouvé: ${stationId}`);
+
+    log.detail('station.resolue', { prospectionId: draft.id, stationId });
   }
 
-  // 🔓 Pour extensive, on loggue que station_id est ignoré
   if (draft.type_prospection === 'extensive') {
-    console.log(`🔓 Prospection extensive : station_id ignoré (${stationId || 'null'})`);
+    log.detail('station.ignoree_extensive', { prospectionId: draft.id, stationId });
   }
 
   return {
@@ -224,6 +345,7 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
     degats_cultures_pourcent: draft.degats_cultures_pourcent ? Number(draft.degats_cultures_pourcent) : null,
     verdissement_pourcent: draft.verdissement_pourcent ? Number(draft.verdissement_pourcent) : null,
     hauteur_herbe_cm: draft.hauteur_herbe_cm ? Number(draft.hauteur_herbe_cm) : null,
+    heure_observation_at: draft.heure_observation_at || null,
     station_libre: draft.station_libre || null,
     type_station: (draft.type_station || null) as ProspectionCreateInput['type_station'],
     verdure_strate: (draft.verdure_strate || null) as ProspectionCreateInput['verdure_strate'],
@@ -244,6 +366,7 @@ function normalizeIntensite(value: string | null): string | null {
   return value.toLowerCase().normalize('NFD').replace(COMBINING_DIACRITICS_RE, '');
 }
 
+// ✅ FONCTION CORRIGÉE : Suppression des propriétés qui n'existent pas sur PopulationRow
 function buildPopulationsPayload(rows: PopulationRow[]): ProspectionPopulationInput[] {
   return rows.map((row) => ({
     espece: row.espece,
@@ -266,126 +389,185 @@ function buildPopulationsPayload(rows: PopulationRow[]): ProspectionPopulationIn
     bande_larvaire: row.bande_larvaire != null ? Boolean(row.bande_larvaire) : null,
     interdistance: row.interdistance ? Number(row.interdistance) : null,
     deplacement: (row.deplacement || null) as ProspectionPopulationInput['deplacement'],
+    // ❌ Les propriétés suivantes ont été supprimées car elles n'existent pas sur PopulationRow
+    // surface_contaminee_ha, type_cible, direction_de, direction_vers, etat, essaim_en_vol, essaim_pose
+    // Ces propriétés sont gérées dans buildInfestationsPayload
   }));
 }
 
 /**
- * Le mobile calcule 5 niveaux de densité aérienne (aide à la décision, cf.
- * classifyAerialPopulation) mais le backend n'accepte que les 3 catégories
- * officielles de la fiche PDF (vol_clair/dense/tres_dense). non_classe n'a
- * pas d'équivalent -> null ; moyenne et forte se regroupent sous 'dense'.
+ * `classifyAerialPopulation` calcule désormais directement les 3 catégories officielles
+ * du backend (vol_clair/dense/tres_dense — enum TypeEssaim). Cette table ne sert plus
+ * qu'à normaliser d'anciens brouillons locaux enregistrés avant cette bascule, avec les
+ * 5 valeurs internes d'origine (non_classe/essaim_densite_moyenne/forte/tres_forte) —
+ * même règle de regroupement qu'alors (moyenne+forte -> 'dense').
  */
 const TYPE_ESSAIM_TO_BACKEND: Record<string, 'vol_clair' | 'dense' | 'tres_dense' | null> = {
-  non_classe: null,
   vol_clair: 'vol_clair',
+  dense: 'dense',
+  tres_dense: 'tres_dense',
+  non_classe: null,
   essaim_densite_moyenne: 'dense',
   essaim_densite_forte: 'dense',
   essaim_densite_tres_forte: 'tres_dense',
 };
 
-function buildInfestationsPayload(rows: InfestationRow[]): ProspectionInfestationInput[] {
-  return rows.map((row) => ({
-    type_cible: row.type_cible as ProspectionInfestationInput['type_cible'],
-    espece: (row.espece || null) as ProspectionInfestationInput['espece'],
-    taille_min: row.taille_min ? Number(row.taille_min) : null,
-    taille_max: row.taille_max ? Number(row.taille_max) : null,
-    taille_moy: row.taille_moy ? Number(row.taille_moy) : null,
-    surface_totale: row.surface_totale ? Number(row.surface_totale) : null,
-    densite_min: row.densite_min ? Number(row.densite_min) : null,
-    densite_max: row.densite_max ? Number(row.densite_max) : null,
-    densite_moy: row.densite_moy ? Number(row.densite_moy) : null,
-    interdistance: row.interdistance ? Number(row.interdistance) : null,
-    comportement: (row.comportement || null) as ProspectionInfestationInput['comportement'],
-    direction_de: row.direction_de || null,
-    direction_vers: row.direction_vers || null,
-    vent_de: row.vent_de || null,
-    vent_vitesse: row.vent_vitesse ? Number(row.vent_vitesse) : null,
-    pullulation_nb: row.pullulation_nb ? Number(row.pullulation_nb) : null,
-    taille_long: row.taille_long ? Number(row.taille_long) : null,
-    taille_large: row.taille_large ? Number(row.taille_large) : null,
-    taille_epaisseur: row.taille_epaisseur ? Number(row.taille_epaisseur) : null,
-    essaim_en_vol: row.essaim_en_vol != null ? Boolean(row.essaim_en_vol) : null,
-    essaim_pose: row.essaim_pose != null ? Boolean(row.essaim_pose) : null,
-    type_essaim: (row.type_essaim ? (TYPE_ESSAIM_TO_BACKEND[row.type_essaim] ?? null) : null) as ProspectionInfestationInput['type_essaim'],
-    heure_observation: row.heure_observation || null,
-    densite_en_vol: row.densite_en_vol ? Number(row.densite_en_vol) : null,
-    dimension_ha: row.dimension_ha ? Number(row.dimension_ha) : null,
-    nb_taches_bandes: row.nb_taches_bandes ? Number(row.nb_taches_bandes) : null,
-    interdistance_m: row.interdistance_m ? Number(row.interdistance_m) : null,
-    interdistance_min: row.interdistance_min ? Number(row.interdistance_min) : null,
-    interdistance_max: row.interdistance_max ? Number(row.interdistance_max) : null,
-    interdistance_moy: row.interdistance_moy ? Number(row.interdistance_moy) : null,
-    surface_contaminee_ha: row.surface_contaminee_ha ? Number(row.surface_contaminee_ha) : null,
-    type_larve: (row.type_larve || null) as ProspectionInfestationInput['type_larve'],
-    surface_infestee_pourcent: row.surface_infestee_pourcent ? Number(row.surface_infestee_pourcent) : null,
-    stade_dominant: (row.stade_dominant || null) as ProspectionInfestationInput['stade_dominant'],
-    taille_groupe_m2: row.taille_groupe_m2 ? Number(row.taille_groupe_m2) : null,
-    front_longueur_m: row.front_longueur_m ? Number(row.front_longueur_m) : null,
-    front_largeur_m: row.front_largeur_m ? Number(row.front_largeur_m) : null,
-    densite_max_front: row.densite_max_front ? Number(row.densite_max_front) : null,
-    densite_moy_arriere_front: row.densite_moy_arriere_front ? Number(row.densite_moy_arriere_front) : null,
-  }));
+/**
+ * `type_cible` n'accepte plus 'essaim' côté backend depuis la migration 0031 (Dense et
+ * Très dense sont désormais des types de cible à part entière). Un brouillon local
+ * enregistré avant cette bascule et pas encore synchronisé peut encore porter
+ * `type_cible: 'essaim'` : on le reclasse ici avec la même règle que la migration
+ * backend, à partir du `type_essaim` déjà normalisé (dense/tres_dense -> repris tel
+ * quel, y compris pour un ancien brouillon à 5 niveaux ; sinon 'vol_clair' par défaut).
+ */
+function normalizeTypeCible(rawTypeCible: string, normalizedTypeEssaim: string | null): string {
+  if (rawTypeCible !== 'essaim') return rawTypeCible;
+  return normalizedTypeEssaim === 'dense' || normalizedTypeEssaim === 'tres_dense'
+    ? normalizedTypeEssaim
+    : 'vol_clair';
 }
 
+function buildInfestationsPayload(rows: InfestationRow[]): ProspectionInfestationInput[] {
+  return rows.map((row) => {
+    const typeEssaim = row.type_essaim ? (TYPE_ESSAIM_TO_BACKEND[row.type_essaim] ?? null) : null;
+    return {
+      type_cible: normalizeTypeCible(row.type_cible, typeEssaim) as ProspectionInfestationInput['type_cible'],
+      espece: (row.espece || null) as ProspectionInfestationInput['espece'],
+      taille_min: row.taille_min ? Number(row.taille_min) : null,
+      taille_max: row.taille_max ? Number(row.taille_max) : null,
+      taille_moy: row.taille_moy ? Number(row.taille_moy) : null,
+      surface_totale: row.surface_totale ? Number(row.surface_totale) : null,
+      densite_min: row.densite_min ? Number(row.densite_min) : null,
+      densite_max: row.densite_max ? Number(row.densite_max) : null,
+      densite_moy: row.densite_moy ? Number(row.densite_moy) : null,
+      interdistance: row.interdistance ? Number(row.interdistance) : null,
+      comportement: (row.comportement || null) as ProspectionInfestationInput['comportement'],
+      direction_de: row.direction_de || null,
+      direction_vers: row.direction_vers || null,
+      vent_de: row.vent_de || null,
+      vent_vitesse: row.vent_vitesse ? Number(row.vent_vitesse) : null,
+      pullulation_nb: row.pullulation_nb ? Number(row.pullulation_nb) : null,
+      taille_long: row.taille_long ? Number(row.taille_long) : null,
+      taille_large: row.taille_large ? Number(row.taille_large) : null,
+      taille_epaisseur: row.taille_epaisseur ? Number(row.taille_epaisseur) : null,
+      essaim_en_vol: row.essaim_en_vol != null ? Boolean(row.essaim_en_vol) : null,
+      essaim_pose: row.essaim_pose != null ? Boolean(row.essaim_pose) : null,
+      type_essaim: typeEssaim as ProspectionInfestationInput['type_essaim'],
+      heure_observation: row.heure_observation || null,
+      densite_en_vol: row.densite_en_vol ? Number(row.densite_en_vol) : null,
+      dimension_ha: row.dimension_ha ? Number(row.dimension_ha) : null,
+      nb_taches_bandes: row.nb_taches_bandes ? Number(row.nb_taches_bandes) : null,
+      interdistance_m: row.interdistance_m ? Number(row.interdistance_m) : null,
+      interdistance_min: row.interdistance_min ? Number(row.interdistance_min) : null,
+      interdistance_max: row.interdistance_max ? Number(row.interdistance_max) : null,
+      interdistance_moy: row.interdistance_moy ? Number(row.interdistance_moy) : null,
+      surface_contaminee_ha: row.surface_contaminee_ha ? Number(row.surface_contaminee_ha) : null,
+      type_larve: (row.type_larve || null) as ProspectionInfestationInput['type_larve'],
+      surface_infestee_pourcent: row.surface_infestee_pourcent ? Number(row.surface_infestee_pourcent) : null,
+      stade_dominant: (row.stade_dominant || null) as ProspectionInfestationInput['stade_dominant'],
+      taille_groupe_m2: row.taille_groupe_m2 ? Number(row.taille_groupe_m2) : null,
+      front_longueur_m: row.front_longueur_m ? Number(row.front_longueur_m) : null,
+      front_largeur_m: row.front_largeur_m ? Number(row.front_largeur_m) : null,
+      densite_max_front: row.densite_max_front ? Number(row.densite_max_front) : null,
+      densite_moy_arriere_front: row.densite_moy_arriere_front ? Number(row.densite_moy_arriere_front) : null,
+    };
+  });
+}
+
+/** Le réseau, tel que l'appareil le voit à cet instant. */
+async function estEnLigne(): Promise<boolean> {
+  const network = await Network.getNetworkStateAsync();
+  return Boolean(network.isConnected && network.isInternetReachable);
+}
+
+/**
+ * L'unitaire — ADR-012 décision 9. **Il lève.**
+ *
+ * Ex-`retrySyncProspection` : le nom disait « réessai » alors que c'était le
+ * seul envoi unitaire du domaine, et les deux autres conventions du mobile
+ * s'appuyaient sur cette confusion.
+ *
+ * `captures` vient de l'écran lors du premier envoi — la boucle de capture les
+ * tient en mémoire — et de la base lors des suivants. C'est la seule différence
+ * entre les deux chemins, d'où le paramètre plutôt qu'une seconde fonction.
+ */
+export async function syncOneProspection(
+  draft: DraftProspection,
+  token: string,
+  capturesDeLEcran?: CaptureRow[]
+): Promise<void> {
+  const [captures, populations, infestations] = await Promise.all([
+    capturesDeLEcran ? Promise.resolve(capturesDeLEcran) : listAllProspectionCaptures(draft.id),
+    listAllProspectionPopulations(draft.id),
+    listAllProspectionInfestations(draft.id),
+  ]);
+
+  const payload = {
+    ...(await buildProspectionPayload(draft, token)),
+    captures: buildCapturesPayload(captures),
+    populations: buildPopulationsPayload(populations),
+    infestations: buildInfestationsPayload(infestations),
+  };
+
+  // Le `try/catch` qui entourait ce corps ne faisait que journaliser puis
+  // relancer. L'erreur remonte désormais typée depuis `api-client`, et la
+  // frontière de l'appelant la journalise une fois — pas deux.
+  await apiClient.createProspection(token, payload);
+  await markProspectionSynced(draft.id);
+
+  log.event('prospection.sync.ok', {
+    prospectionId: draft.id,
+    stationId: payload.station_id,
+  });
+}
+
+/**
+ * Ce que le domaine « prospection » fournit pour être synchronisé en lot.
+ *
+ * `marquerConflit` est **absent** : `POST /prospections` ne rend pas de 409.
+ * Le déclarer vide inventerait une gestion de conflit qui n'existe pas ; son
+ * absence fait compter un 409 imprévu comme un échec visible (`sync-lot`).
+ */
+export const lotProspection: LotSync<DraftProspection> = {
+  nom: 'prospection',
+  syncOne: syncOneProspection,
+  idDe: (draft) => draft.id,
+  labelDe: (draft) => draft.n_fiche ?? `Fiche du ${draft.date_prospection}`,
+  marquerEchec: markProspectionEchec,
+};
+
+/**
+ * Clôt la fiche localement, puis tente l'envoi et **résume**.
+ *
+ * `completeProspection` est hors du lot à dessein : la clôture locale doit
+ * réussir ou lever, elle n'a rien d'un résultat partiel (ADR-008).
+ */
 export async function enregistrerEtSynchroniser(
   draft: DraftProspection,
   captures: CaptureRow[],
   token: string
-): Promise<{ synced: boolean; syncError?: string }> {
+): Promise<ResumeSync> {
   const completed = await completeProspection(draft.id);
 
-  const network = await Network.getNetworkStateAsync();
-  const isOnline = Boolean(network.isConnected && network.isInternetReachable);
-  if (!isOnline) return { synced: false };
-
-  try {
-    const [populations, infestations] = await Promise.all([
-      listAllProspectionPopulations(completed.id),
-      listAllProspectionInfestations(completed.id),
-    ]);
-    await apiClient.createProspection(token, {
-      ...(await buildProspectionPayload(completed, token)),
-      captures: buildCapturesPayload(captures),
-      populations: buildPopulationsPayload(populations),
-      infestations: buildInfestationsPayload(infestations),
-    });
-    await markProspectionSynced(completed.id);
-    return { synced: true };
-  } catch (error) {
-    console.error(`❌ Échec de synchronisation pour ${completed.id}:`, error);
-    const syncError = error instanceof Error ? error.message : 'Erreur de synchronisation inconnue';
-    return { synced: false, syncError };
-  }
+  return syncAll(
+    [completed],
+    token,
+    avecConnexion(
+      {
+        ...lotProspection,
+        // Les captures viennent de l'écran au premier envoi : la boucle de
+        // capture les tient encore en mémoire.
+        syncOne: (fiche, jeton) => syncOneProspection(fiche, jeton, captures),
+      },
+      estEnLigne
+    )
+  );
 }
 
-export async function retrySyncProspection(draft: DraftProspection, token: string): Promise<void> {
-  console.log(`🔄 Synchronisation de ${draft.id}...`);
-  
-  try {
-    const [captures, populations, infestations] = await Promise.all([
-      listAllProspectionCaptures(draft.id),
-      listAllProspectionPopulations(draft.id),
-      listAllProspectionInfestations(draft.id),
-    ]);
-    
-    const payload = {
-      ...(await buildProspectionPayload(draft, token)),
-      captures: buildCapturesPayload(captures),
-      populations: buildPopulationsPayload(populations),
-      infestations: buildInfestationsPayload(infestations),
-    };
-    
-    console.log('📤 Payload envoyé avec station_id:', payload.station_id);
-    
-    await apiClient.createProspection(token, payload);
-    await markProspectionSynced(draft.id);
-    console.log(`✅ ${draft.id} synchronisé`);
-  } catch (error) {
-    console.error(`❌ Erreur pour ${draft.id}:`, error);
-    if (error && typeof error === 'object' && 'response' in error) {
-      const err = error as { response?: { data?: unknown } };
-      console.error('Détails:', err.response?.data);
-    }
-    throw error;
-  }
+/** Synchronise un lot de prospections en attente. Ne lève jamais. */
+export async function syncAllProspections(
+  drafts: DraftProspection[],
+  token: string
+): Promise<ResumeSync> {
+  return syncAll(drafts, token, lotProspection);
 }
