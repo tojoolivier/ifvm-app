@@ -388,6 +388,13 @@ function buildPopulationsPayload(rows: PopulationRow[]): ProspectionPopulationIn
     bande_larvaire: row.bande_larvaire != null ? Boolean(row.bande_larvaire) : null,
     interdistance: row.interdistance ? Number(row.interdistance) : null,
     deplacement: (row.deplacement || null) as ProspectionPopulationInput['deplacement'],
+    surface_contaminee_ha: row.surface_contaminee_ha ? Number(row.surface_contaminee_ha) : null,
+    type_cible: (row.type_cible || null) as ProspectionPopulationInput['type_cible'],
+    direction_de: row.direction_de || null,
+    direction_vers: row.direction_vers || null,
+    etat: (row.etat || null) as ProspectionPopulationInput['etat'],
+    essaim_en_vol: row.essaim_en_vol != null ? Boolean(row.essaim_en_vol) : null,
+    essaim_pose: row.essaim_pose != null ? Boolean(row.essaim_pose) : null,
   }));
 }
 

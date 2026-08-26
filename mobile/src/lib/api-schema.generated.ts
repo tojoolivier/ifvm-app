@@ -1302,6 +1302,18 @@ export interface components {
             /** Interdistance */
             interdistance?: number | null;
             deplacement?: components["schemas"]["Deplacement"] | null;
+            /** Surface Contaminee Ha */
+            surface_contaminee_ha?: number | null;
+            type_cible?: components["schemas"]["TypeCibleImago"] | null;
+            /** Direction De */
+            direction_de?: string | null;
+            /** Direction Vers */
+            direction_vers?: string | null;
+            etat?: components["schemas"]["ComportementInfestation"] | null;
+            /** Essaim En Vol */
+            essaim_en_vol?: boolean | null;
+            /** Essaim Pose */
+            essaim_pose?: boolean | null;
         };
         /** PopulationRead */
         PopulationRead: {
@@ -1345,6 +1357,18 @@ export interface components {
             /** Interdistance */
             interdistance?: number | null;
             deplacement?: components["schemas"]["Deplacement"] | null;
+            /** Surface Contaminee Ha */
+            surface_contaminee_ha?: number | null;
+            type_cible?: components["schemas"]["TypeCibleImago"] | null;
+            /** Direction De */
+            direction_de?: string | null;
+            /** Direction Vers */
+            direction_vers?: string | null;
+            etat?: components["schemas"]["ComportementInfestation"] | null;
+            /** Essaim En Vol */
+            essaim_en_vol?: boolean | null;
+            /** Essaim Pose */
+            essaim_pose?: boolean | null;
         };
         /** PosteAcridienRead */
         PosteAcridienRead: {
@@ -2464,6 +2488,11 @@ export interface components {
          * @enum {string}
          */
         TypeCible: "tache_larvaire" | "bande_larvaire" | "vol_clair" | "dense" | "tres_dense";
+        /**
+         * TypeCibleImago
+         * @enum {string}
+         */
+        TypeCibleImago: "vol_clair" | "dense" | "tres_dense";
         /**
          * TypeEssaim
          * @enum {string}

@@ -2,18 +2,27 @@ import { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Espece } from '@/lib/prospection-especes-stades';
+import { Espece, accouplementOptionsFor } from '@/lib/prospection-especes-stades';
 import { getProspectionPopulation, saveProspectionPopulation } from '@/lib/prospection-repository';
 import {
   IMAGO_PHASE_ROWS,
   PhaseKey,
   ExtensiveImagoSpeciesData,
+  TypeCibleImago,
+  EtatImago,
   createEmptySpeciesData,
   speciesDataToPopulationRow,
   populationRowToSpeciesData,
 } from '@/lib/prospection-extensive';
+import { COMPASS_DIRECTIONS, oppositeDirection } from '@/lib/prospection-infestation-insights';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
+
+const TYPE_CIBLE_OPTIONS: { value: TypeCibleImago; label: string }[] = [
+  { value: 'vol_clair', label: 'Vol clair' },
+  { value: 'dense', label: 'Dense' },
+  { value: 'tres_dense', label: 'Très dense' },
+];
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -104,6 +113,26 @@ export default function ExtensiveImagosScreen() {
     }));
   };
 
+  /** Même logique que handleEtatChange dans infestation.tsx : le Comportement de
+   * l'essaim est entièrement dérivé de l'État, jamais choisi indépendamment — appuyer
+   * à nouveau sur l'État actif le désélectionne (et efface la direction, qui n'a de
+   * sens qu'en Déplacement). */
+  const handleEtatChange = (value: EtatImago) => {
+    setSpeciesData((prev) => {
+      const current = prev[species];
+      const nextEtat = current.etat === value ? null : value;
+      return {
+        ...prev,
+        [species]:
+          nextEtat === 'repos'
+            ? { ...current, etat: 'repos', comportementEssaim: 'pose', directionDe: '', directionVers: '' }
+            : nextEtat === 'deplacement'
+              ? { ...current, etat: 'deplacement', comportementEssaim: 'vol' }
+              : { ...current, etat: null, comportementEssaim: null, directionDe: '', directionVers: '' },
+      };
+    });
+  };
+
 const handleContinue = () => {
   if (data.totalCaptures > 0) {
     if (!isPhasesConsistent) {
@@ -125,17 +154,8 @@ const handleContinue = () => {
 
   return run(
     async () => {
-      await saveProspectionPopulation(draftId, speciesDataToPopulationRow('LMC', speciesData.LMC, {
-        popDiff: speciesData.LMC.popDiff,
-        popGroup: speciesData.LMC.popGroup,
-        typeCapture: speciesData.LMC.typeCapture,
-      }));
-
-      await saveProspectionPopulation(draftId, speciesDataToPopulationRow('NSE', speciesData.NSE, {
-        popDiff: speciesData.NSE.popDiff,
-        popGroup: speciesData.NSE.popGroup,
-        typeCapture: speciesData.NSE.typeCapture,
-      }));
+      await saveProspectionPopulation(draftId, speciesDataToPopulationRow('LMC', speciesData.LMC));
+      await saveProspectionPopulation(draftId, speciesDataToPopulationRow('NSE', speciesData.NSE));
 
       router.push({ pathname: '/(prospection)/extensive-larves' as any, params: { draftId } });
     },
@@ -395,26 +415,145 @@ const handleContinue = () => {
               <Text style={styles.speciesHint}>Données spécifiques à {species}</Text>
             </View>
 
+            {/* Accouplement & Ponte : mêmes options et même fonctionnement que
+                accouplement.tsx côté intensif (accouplementOptionsFor), une ligne
+                population par espèce déjà indépendante — pas de risque de mélange. */}
+            <View style={styles.densitySection}>
+              <Text style={styles.sectionLabel}>📊 Accouplement</Text>
+              <View style={styles.chipsRow}>
+                {accouplementOptionsFor(species).map((option) => {
+                  const active = option === data.accouplement;
+                  return (
+                    <TouchableOpacity
+                      key={option}
+                      onPress={() => updateSpeciesData({ accouplement: active ? null : option })}
+                      style={[styles.chip, active && styles.chipActive]}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{option}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={[styles.sectionLabel, { marginTop: 10 }]}>📊 Ponte</Text>
+              <View style={styles.chipsRow}>
+                {accouplementOptionsFor(species).map((option) => {
+                  const active = option === data.ponte;
+                  return (
+                    <TouchableOpacity
+                      key={option}
+                      onPress={() => updateSpeciesData({ ponte: active ? null : option })}
+                      style={[styles.chip, active && styles.chipActive]}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{option}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <Text style={styles.speciesHint}>Données spécifiques à {species}</Text>
+            </View>
+
+            <View style={styles.densitySection}>
+              <Text style={styles.sectionLabel}>📊 Interdistance (m)</Text>
+              <View style={styles.card}>
+                <TextInput
+                  value={data.interdistance}
+                  onChangeText={(text) => updateSpeciesData({ interdistance: text })}
+                  keyboardType="decimal-pad"
+                  style={styles.inputMono}
+                  placeholder="0"
+                  placeholderTextColor={TEXT_SECONDARY}
+                />
+              </View>
+              <Text style={styles.speciesHint}>Données spécifiques à {species}</Text>
+            </View>
+
             <View style={styles.typeSection}>
-              <Text style={styles.sectionLabel}>📊 Type de capture</Text>
+              <Text style={styles.sectionLabel}>📊 Type de cible</Text>
               <Text style={styles.commonHint}>Données spécifiques à {species}</Text>
               <View style={styles.typeRow}>
-                <TouchableOpacity
-                  style={[styles.typeButton, data.typeCapture === 'essaim' && styles.typeButtonActive]}
-                  onPress={() => updateSpeciesData({ typeCapture: 'essaim' })}
-                >
-                  <Text style={[styles.typeButtonText, data.typeCapture === 'essaim' && styles.typeButtonTextActive]}>
-                    Essaim
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.typeButton, data.typeCapture === 'volClair' && styles.typeButtonActive]}
-                  onPress={() => updateSpeciesData({ typeCapture: 'volClair' })}
-                >
-                  <Text style={[styles.typeButtonText, data.typeCapture === 'volClair' && styles.typeButtonTextActive]}>
-                    Vol clair
-                  </Text>
-                </TouchableOpacity>
+                {TYPE_CIBLE_OPTIONS.map((option) => {
+                  const active = data.typeCible === option.value;
+                  return (
+                    <TouchableOpacity
+                      key={option.value}
+                      style={[styles.typeButton, active && styles.typeButtonActive]}
+                      onPress={() => updateSpeciesData({ typeCible: option.value })}
+                    >
+                      <Text style={[styles.typeButtonText, active && styles.typeButtonTextActive]}>
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Direction du déplacement : n'a de sens qu'en État = Déplacement, comme côté
+                intensif (infestation.tsx, règle #4) — masquée (et effacée par
+                handleEtatChange) tant que l'État n'est pas "Déplacement". */}
+            {data.etat === 'deplacement' && (
+              <View style={styles.densitySection}>
+                <Text style={styles.sectionLabel}>📊 Direction du déplacement</Text>
+                <View style={styles.chipsRow}>
+                  {COMPASS_DIRECTIONS.map((dir) => {
+                    const active = dir.label === data.directionDe;
+                    return (
+                      <TouchableOpacity
+                        key={dir.label}
+                        onPress={() =>
+                          active
+                            ? updateSpeciesData({ directionDe: '', directionVers: '' })
+                            : updateSpeciesData({ directionDe: dir.label, directionVers: oppositeDirection(dir.label) })
+                        }
+                        style={[styles.chip, active && styles.chipActive]}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[styles.chipText, active && styles.chipTextActive]}>{dir.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <Text style={styles.speciesHint}>Données spécifiques à {species}</Text>
+              </View>
+            )}
+
+            <View style={styles.typeSection}>
+              <Text style={styles.sectionLabel}>📊 État</Text>
+              <View style={styles.typeRow}>
+                {(['repos', 'deplacement'] as EtatImago[]).map((value) => {
+                  const active = data.etat === value;
+                  return (
+                    <TouchableOpacity
+                      key={value}
+                      style={[styles.typeButton, active && styles.typeButtonActive]}
+                      onPress={() => handleEtatChange(value)}
+                    >
+                      <Text style={[styles.typeButtonText, active && styles.typeButtonTextActive]}>
+                        {value === 'repos' ? 'Repos' : 'Déplacement'}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={styles.typeSection}>
+              <Text style={styles.sectionLabel}>📊 Comportement de l&apos;essaim</Text>
+              <Text style={styles.commonHint}>Déterminé automatiquement par l&apos;État</Text>
+              <View style={styles.typeRow}>
+                {(['vol', 'pose'] as const).map((value) => {
+                  const active = data.comportementEssaim === value;
+                  return (
+                    <View key={value} style={[styles.typeButton, active && styles.typeButtonActive]}>
+                      <Text style={[styles.typeButtonText, active && styles.typeButtonTextActive]}>
+                        {value === 'vol' ? 'En vol' : 'Posé'}
+                      </Text>
+                    </View>
+                  );
+                })}
               </View>
             </View>
 
@@ -455,9 +594,43 @@ const handleContinue = () => {
                 <Text style={styles.summaryValue}>{data.popGroup || '0'}</Text>
               </View>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Type de capture :</Text>
-                <Text style={styles.summaryValue}>{data.typeCapture === 'essaim' ? 'Essaim' : 'Vol clair'}</Text>
+                <Text style={styles.summaryLabel}>Accouplement :</Text>
+                <Text style={styles.summaryValue}>{data.accouplement ?? '—'}</Text>
               </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Ponte :</Text>
+                <Text style={styles.summaryValue}>{data.ponte ?? '—'}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Interdistance :</Text>
+                <Text style={styles.summaryValue}>{data.interdistance || '0'} m</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Type de cible :</Text>
+                <Text style={styles.summaryValue}>
+                  {TYPE_CIBLE_OPTIONS.find((o) => o.value === data.typeCible)?.label}
+                </Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>État :</Text>
+                <Text style={styles.summaryValue}>
+                  {data.etat === 'repos' ? 'Repos' : data.etat === 'deplacement' ? 'Déplacement' : '—'}
+                </Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Comportement de l&apos;essaim :</Text>
+                <Text style={styles.summaryValue}>
+                  {data.comportementEssaim === 'vol' ? 'En vol' : data.comportementEssaim === 'pose' ? 'Posé' : '—'}
+                </Text>
+              </View>
+              {data.etat === 'deplacement' && (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Direction :</Text>
+                  <Text style={styles.summaryValue}>
+                    {data.directionDe ? `${data.directionDe} → ${data.directionVers}` : '—'}
+                  </Text>
+                </View>
+              )}
               <View style={styles.ruleBox}>
                 <Text style={styles.ruleText}>Règle : Captures = Phases = Stades ♀ + Stades ♂</Text>
                 <Text style={[styles.ruleText, { marginTop: 4, color: TEXT_SECONDARY, fontSize: 10 }]}>
@@ -588,6 +761,12 @@ const styles = StyleSheet.create({
   typeButtonText: { fontSize: 13, fontWeight: '600', color: TEXT_SECONDARY },
   typeButtonTextActive: { color: '#fff' },
   commonHint: { fontSize: 9, color: '#9a9484', marginBottom: 6, textAlign: 'center', fontStyle: 'italic' },
+
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: INACTIVE_BG },
+  chipActive: { backgroundColor: GREEN },
+  chipText: { fontSize: 12, fontWeight: '600', color: TEXT_SECONDARY },
+  chipTextActive: { fontWeight: '700', color: '#fff' },
   
   summaryContainer: { backgroundColor: '#FFFFFF', borderRadius: 10, padding: 14, marginTop: 8, borderWidth: 1, borderColor: BORDER },
   summaryTitle: { fontSize: 12, fontWeight: '700', color: TEXT, marginBottom: 8, textAlign: 'center' },

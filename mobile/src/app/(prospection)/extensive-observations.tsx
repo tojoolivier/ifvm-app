@@ -15,6 +15,23 @@ const TEXT_SECONDARY = '#6f6a59';
 const BORDER = '#e7e0cd';
 const INACTIVE_BG = '#efeada';
 
+// La colonne backend `hauteur_herbe_cm` reste en centimètres (partagée avec l'intensif,
+// cf. reference.tsx/observations.tsx) : seule l'unité affichée/saisie à l'écran devient
+// le mètre. Conversion appliquée aux deux bornes (chargement/enregistrement), même
+// principe que ventVitesseKmhToMsInput dans infestation.tsx.
+const CM_PAR_M = 100;
+
+function hauteurCmToMInput(cm: number | null): string {
+  if (cm == null) return '';
+  return String(Math.round((cm / CM_PAR_M) * 100) / 100);
+}
+
+function hauteurMInputToCm(m: string): number | null {
+  if (m === '') return null;
+  const parsed = parseFloat(m);
+  return Number.isFinite(parsed) ? Math.round(parsed * CM_PAR_M * 100) / 100 : null;
+}
+
 export default function ExtensiveObservationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -24,7 +41,7 @@ export default function ExtensiveObservationsScreen() {
 
   const [degats, setDegats] = useState(draft?.degats_cultures_pourcent ?? 0);
   const [verdure, setVerdure] = useState(draft?.verdure_strate ?? 'moyenne');
-  const [hauteur, setHauteur] = useState(draft?.hauteur_herbe_cm != null ? String(draft.hauteur_herbe_cm) : '');
+  const [hauteur, setHauteur] = useState(hauteurCmToMInput(draft?.hauteur_herbe_cm ?? null));
   const [dernierePluie, setDernierePluie] = useState(draft?.derniere_pluie ?? '');
   const [intensite, setIntensite] = useState(draft?.intensite_pluie ?? 'faible');
   const { run, isRunning: isSaving } = useAsyncAction();
@@ -39,7 +56,7 @@ export default function ExtensiveObservationsScreen() {
     void Promise.resolve().then(() => {
       setDegats(draft.degats_cultures_pourcent ?? 0);
       setVerdure(draft.verdure_strate ?? 'moyenne');
-      setHauteur(draft.hauteur_herbe_cm != null ? String(draft.hauteur_herbe_cm) : '');
+      setHauteur(hauteurCmToMInput(draft.hauteur_herbe_cm));
       setDernierePluie(draft.derniere_pluie ?? '');
       setIntensite(draft.intensite_pluie ?? 'faible');
     });
@@ -51,7 +68,7 @@ export default function ExtensiveObservationsScreen() {
         const updated = await updateProspectionExtensiveObservations(draftId, {
           degatsCulturesPourcent: degats,
           verdureStrate: verdure || null,
-          hauteurHerbeCm: hauteur ? parseFloat(hauteur) : null,
+          hauteurHerbeCm: hauteurMInputToCm(hauteur),
           dernierePluie: dernierePluie || null,
           intensitePluie: intensite || null,
         });
@@ -123,7 +140,7 @@ export default function ExtensiveObservationsScreen() {
             </View>
 
             <View style={[styles.card, { marginBottom: 9 }]}>
-              <Text style={styles.label}>H Str Herb (cm)</Text>
+              <Text style={styles.label}>H Str Herb (m)</Text>
               <TextInput value={hauteur} onChangeText={setHauteur} keyboardType="decimal-pad" style={styles.input} />
             </View>
 

@@ -41,6 +41,7 @@ export default function ExtensiveReferenceScreen() {
   const [stationLibre, setStationLibre] = useState(draft?.station_libre ?? '');
   const [typeStation, setTypeStation] = useState(draft?.type_station ?? '');
   const [surfaceStation, setSurfaceStation] = useState(draft?.surface_station != null ? String(draft.surface_station) : '');
+  const [surfaceInfestee, setSurfaceInfestee] = useState(draft?.surface_infestee != null ? String(draft.surface_infestee) : '');
   const [nMessage, setNMessage] = useState(
     draft?.n_message ?? (draftId && draft ? generateNumeroMessage(draftId, draft.date_prospection) : '')
   );
@@ -108,6 +109,7 @@ export default function ExtensiveReferenceScreen() {
       setStationLibre(draft.station_libre ?? '');
       setTypeStation(draft.type_station ?? '');
       setSurfaceStation(draft.surface_station != null ? String(draft.surface_station) : '');
+      setSurfaceInfestee(draft.surface_infestee != null ? String(draft.surface_infestee) : '');
       setNMessage(draft.n_message ?? generateNumeroMessage(draft.id, draft.date_prospection));
     });
   }, [draft, draftId]);
@@ -126,6 +128,7 @@ export default function ExtensiveReferenceScreen() {
           stationLibre: stationLibre || null,
           typeStation: normalizedTypeStation,
           surfaceStation: surfaceStation ? parseFloat(surfaceStation) : null,
+          surfaceInfestee: surfaceInfestee ? parseFloat(surfaceInfestee) : null,
           nMessage: nMessage || null,
         });
         setDraft(updated);
@@ -244,6 +247,18 @@ export default function ExtensiveReferenceScreen() {
                 value={surfaceStation}
                 onChangeText={setSurfaceStation}
                 keyboardType="decimal-pad"
+                style={styles.input}
+              />
+            </View>
+
+            <View style={[styles.card, { marginTop: 8 }]}>
+              <Text style={styles.label}>Surface infestée (ha)</Text>
+              <TextInput
+                value={surfaceInfestee}
+                onChangeText={setSurfaceInfestee}
+                keyboardType="decimal-pad"
+                placeholder="0"
+                placeholderTextColor={TEXT_SECONDARY}
                 style={styles.input}
               />
             </View>

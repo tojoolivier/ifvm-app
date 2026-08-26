@@ -198,6 +198,17 @@ class ProspectionPopulationModel(Base):
     bande_larvaire: Mapped[bool | None] = mapped_column(Boolean(), nullable=True)
     interdistance: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
     deplacement: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    surface_contaminee_ha: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
+
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif Imagos : Type de cible, État/Comportement (migration 0033)
+    # ==========================================
+    type_cible: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    direction_de: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    direction_vers: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    etat: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    essaim_en_vol: Mapped[bool | None] = mapped_column(Boolean(), nullable=True)
+    essaim_pose: Mapped[bool | None] = mapped_column(Boolean(), nullable=True)
 
     prospection: Mapped["ProspectionModel"] = relationship(back_populates="populations")
 
@@ -221,6 +232,14 @@ class ProspectionPopulationModel(Base):
         CheckConstraint(
             "stade_imago IN ('A1','A2','A3','A4','A5')",
             name="ck_prospection_population_stade_imago",
+        ),
+        CheckConstraint(
+            "type_cible IN ('vol_clair','dense','tres_dense')",
+            name="ck_prospection_population_type_cible",
+        ),
+        CheckConstraint(
+            "etat IN ('repos','deplacement')",
+            name="ck_prospection_population_etat",
         ),
         CheckConstraint(
             "deplacement IN ('repos','perchee')",

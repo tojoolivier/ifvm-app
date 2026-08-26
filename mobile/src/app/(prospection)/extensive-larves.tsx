@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Espece } from '@/lib/prospection-especes-stades';
+import { Espece, stadesLarvairesFor } from '@/lib/prospection-especes-stades';
 import { getProspectionPopulation, saveProspectionPopulation } from '@/lib/prospection-repository';
 import {
   LARVE_PHASE_ROWS,
@@ -40,6 +40,7 @@ export default function ExtensiveLarvesScreen() {
   const [bandeLarvaire, setBandeLarvaire] = useState(false);
   const [interdist, setInterdist] = useState('');
   const [deplacement, setDeplacement] = useState('repos');
+  const [surfaceContamineeHa, setSurfaceContamineeHa] = useState('');
   
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('extensive-larves');
@@ -64,6 +65,7 @@ export default function ExtensiveLarvesScreen() {
         setBandeLarvaire(commonData.bl);
         setInterdist(commonData.interdist);
         setDeplacement(commonData.deplacement);
+        setSurfaceContamineeHa(commonData.surfaceContamineeHa);
       })
       .catch((error) => signalerChargement(error, { draftId }));
   }, [draftId, signalerChargement]);
@@ -125,7 +127,7 @@ export default function ExtensiveLarvesScreen() {
 
     return run(
       async () => {
-        const commonData = { tl: tacheLarvaire, bl: bandeLarvaire, interdist, deplacement };
+        const commonData = { tl: tacheLarvaire, bl: bandeLarvaire, interdist, deplacement, surfaceContamineeHa };
 
         await Promise.all([
           saveProspectionPopulation(draftId, larveSpeciesDataToPopulationRow('LMC', speciesData.LMC, commonData)),
@@ -148,15 +150,10 @@ export default function ExtensiveLarvesScreen() {
     );
   };
 
-  const getStadesList = () => {
-    if (species === 'LMC') {
-      return ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8'];
-    } else {
-      return ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'];
-    }
-  };
-
-  const stadesList = getStadesList();
+  // Source unique du vocabulaire des stades larvaires (cf. prospection-especes-stades.ts) :
+  // LMC s'arrête à L5, NSE à L7 — un doublon local ici avait dérivé jusqu'à L6/L7/L8 pour
+  // LMC, des stades qui n'existent pas pour cette espèce.
+  const stadesList = stadesLarvairesFor(species);
 
   return (
     <View style={styles.root}>
@@ -347,6 +344,18 @@ export default function ExtensiveLarvesScreen() {
                 <TextInput
                   value={interdist}
                   onChangeText={setInterdist}
+                  keyboardType="decimal-pad"
+                  style={styles.inputField}
+                  placeholder="0"
+                  placeholderTextColor={TEXT_SECONDARY}
+                />
+              </View>
+
+              <View style={styles.inputRow}>
+                <Text style={styles.inputLabel}>Surface contaminée (ha)</Text>
+                <TextInput
+                  value={surfaceContamineeHa}
+                  onChangeText={setSurfaceContamineeHa}
                   keyboardType="decimal-pad"
                   style={styles.inputField}
                   placeholder="0"

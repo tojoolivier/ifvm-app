@@ -215,6 +215,13 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                 bande_larvaire=p.bande_larvaire,
                 interdistance=p.interdistance,
                 deplacement=p.deplacement,
+                surface_contaminee_ha=p.surface_contaminee_ha,
+                type_cible=p.type_cible,
+                direction_de=p.direction_de,
+                direction_vers=p.direction_vers,
+                etat=p.etat,
+                essaim_en_vol=p.essaim_en_vol,
+                essaim_pose=p.essaim_pose,
             )
             for p in prospection.populations
         ]
@@ -625,6 +632,15 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                     bande_larvaire=p.bande_larvaire,
                     interdistance=float(p.interdistance) if p.interdistance is not None else None,
                     deplacement=p.deplacement,
+                    surface_contaminee_ha=float(p.surface_contaminee_ha)
+                    if p.surface_contaminee_ha is not None
+                    else None,
+                    type_cible=p.type_cible,
+                    direction_de=p.direction_de,
+                    direction_vers=p.direction_vers,
+                    etat=p.etat,
+                    essaim_en_vol=p.essaim_en_vol,
+                    essaim_pose=p.essaim_pose,
                 )
                 for p in model.populations
             ],

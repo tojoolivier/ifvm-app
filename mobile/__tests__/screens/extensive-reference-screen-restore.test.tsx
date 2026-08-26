@@ -26,6 +26,7 @@ jest.mock('@/lib/prospection-repository', () => ({
     station_libre: 'Andasibe',
     type_station: 'xerophyle',
     surface_station: 12,
+    surface_infestee: 3.5,
     n_message: '20260825-AB12',
     latitude: -18.9,
     longitude: 47.5,
@@ -59,6 +60,7 @@ describe('ExtensiveReferenceScreen — restauration après hydratation tardive d
           station_libre: 'Andasibe',
           type_station: 'xerophyle',
           surface_station: 12,
+          surface_infestee: 3.5,
           n_message: '20260825-AB12',
           latitude: -18.9,
           longitude: 47.5,
@@ -69,6 +71,7 @@ describe('ExtensiveReferenceScreen — restauration après hydratation tardive d
 
     await waitFor(() => expect(screen.getByDisplayValue('Andasibe')).toBeVisible());
     expect(screen.getByDisplayValue('12')).toBeVisible();
+    expect(screen.getByDisplayValue('3.5')).toBeVisible();
     expect(screen.getByDisplayValue('20260825-AB12')).toBeVisible();
     expect(screen.getByText('Xerophyle').props.style).toEqual(
       expect.arrayContaining([expect.objectContaining({ color: '#fff' })])
@@ -83,10 +86,35 @@ describe('ExtensiveReferenceScreen — restauration après hydratation tardive d
           stationLibre: 'Andasibe',
           typeStation: 'xerophyle',
           surfaceStation: 12,
+          surfaceInfestee: 3.5,
           nMessage: '20260825-AB12',
           latitude: -18.9,
           longitude: 47.5,
         })
+      )
+    );
+  });
+
+  it('Surface infestée (ha) accepte une saisie décimale et la conserve exactement', async () => {
+    useProspectionWizardStore.setState({
+      draft: { id: 'draft-123', type_prospection: 'extensive', date_prospection: '2026-08-25', latitude: -18.9, longitude: 47.5 } as any,
+      captures: [],
+    });
+
+    await render(<ExtensiveReferenceScreen />);
+    await screen.findByText('Surface infestée (ha)');
+
+    // Station (saisie libre), Surf. (ha) puis Surface infestée (ha) sont les 3 champs
+    // vides, dans cet ordre.
+    fireEvent.changeText(screen.getAllByDisplayValue('')[2], '0.5');
+    expect(await screen.findByDisplayValue('0.5')).toBeVisible();
+
+    fireEvent.press(screen.getByText('Suivant : Imagos ›'));
+
+    await waitFor(() =>
+      expect(prospectionRepository.updateProspectionExtensiveReference).toHaveBeenCalledWith(
+        'draft-123',
+        expect.objectContaining({ surfaceInfestee: 0.5 })
       )
     );
   });

@@ -554,6 +554,16 @@ const COLONNES_POPULATION: readonly Colonne[] = [
   { name: 'bande_larvaire', type: 'INTEGER' },
   { name: 'interdistance', type: 'REAL' },
   { name: 'deplacement', type: 'TEXT' },
+  { name: 'surface_contaminee_ha', type: 'REAL' },
+  // Extensif imagos uniquement — type de cible, État/Comportement (par espèce, cf.
+  // migration backend 0033) : remplace essaim_observe (2 états) par les 3 mêmes valeurs
+  // que le type_cible de l'Infestation intensive.
+  { name: 'type_cible', type: 'TEXT' },
+  { name: 'direction_de', type: 'TEXT' },
+  { name: 'direction_vers', type: 'TEXT' },
+  { name: 'etat', type: 'TEXT' },
+  { name: 'essaim_en_vol', type: 'INTEGER' },
+  { name: 'essaim_pose', type: 'INTEGER' },
 ];
 
 /** Colonnes ajoutées à `traitement` après sa création initiale. */

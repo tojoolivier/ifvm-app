@@ -390,10 +390,11 @@ describe('updateProspectionExtensiveReference', () => {
     stationLibre: 'Ambohimanga',
     typeStation: 'riziere_bordure',
     surfaceStation: 2.1,
+    surfaceInfestee: 0.5,
     nMessage: '2026-0301',
   };
 
-  it('writes station_libre/type_station/surface_station/n_message, not station_id lookup fields', async () => {
+  it('writes station_libre/type_station/surface_station/surface_infestee/n_message, not station_id lookup fields', async () => {
     getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW });
 
     await updateProspectionExtensiveReference(BASE_INPUT.id, REF_INPUT);
@@ -406,6 +407,7 @@ describe('updateProspectionExtensiveReference', () => {
         REF_INPUT.stationLibre,
         REF_INPUT.typeStation,
         REF_INPUT.surfaceStation,
+        REF_INPUT.surfaceInfestee,
         REF_INPUT.nMessage,
         expect.any(String),
         BASE_INPUT.id,
@@ -604,7 +606,14 @@ describe('getProspectionPopulation', () => {
 
     const result = await getProspectionPopulation(BASE_INPUT.id, 'LMC', 'imago');
 
-    expect(result).toEqual({ ...row, essaim_observe: null, tache_larvaire: null, bande_larvaire: null });
+    expect(result).toEqual({
+      ...row,
+      essaim_observe: null,
+      tache_larvaire: null,
+      bande_larvaire: null,
+      essaim_en_vol: null,
+      essaim_pose: null,
+    });
   });
 });
 
@@ -629,6 +638,13 @@ describe('saveProspectionPopulation', () => {
     bande_larvaire: null,
     interdistance: null,
     deplacement: null,
+    surface_contaminee_ha: null,
+    type_cible: null,
+    direction_de: null,
+    direction_vers: null,
+    etat: null,
+    essaim_en_vol: null,
+    essaim_pose: null,
   };
 
   it('inserts a new row when none exists for the espece/categorie', async () => {
@@ -647,7 +663,7 @@ describe('saveProspectionPopulation', () => {
 
     await saveProspectionPopulation(BASE_INPUT.id, ROW);
 
-    // 20 paramètres : 19 champs SET + 1 WHERE id
+    // 27 paramètres : 26 champs SET + 1 WHERE id
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE prospection_population SET'),
       [
@@ -658,6 +674,9 @@ describe('saveProspectionPopulation', () => {
         null, null,        // stade_imago, essaim_observe
         null, null, null,  // densites_larve, tache_larvaire, bande_larvaire
         null, null,        // interdistance, deplacement
+        null,              // surface_contaminee_ha
+        null, null, null,  // type_cible, direction_de, direction_vers
+        null, null, null,  // etat, essaim_en_vol, essaim_pose
         'existing-id'      // WHERE id
       ]
     );
@@ -672,7 +691,14 @@ describe('listAllProspectionPopulations', () => {
     const result = await listAllProspectionPopulations(BASE_INPUT.id);
 
     expect(result).toEqual(
-      rows.map((row) => ({ ...row, essaim_observe: null, tache_larvaire: null, bande_larvaire: null }))
+      rows.map((row) => ({
+        ...row,
+        essaim_observe: null,
+        tache_larvaire: null,
+        bande_larvaire: null,
+        essaim_en_vol: null,
+        essaim_pose: null,
+      }))
     );
     expect(getAllAsync).toHaveBeenCalledWith(expect.any(String), [BASE_INPUT.id]);
   });

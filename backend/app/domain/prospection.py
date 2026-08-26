@@ -66,6 +66,17 @@ class ProspectionPopulation:
     bande_larvaire: bool | None = None
     interdistance: float | None = None
     deplacement: str | None = None
+    surface_contaminee_ha: float | None = None
+
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif Imagos : Type de cible, État/Comportement
+    # ==========================================
+    type_cible: str | None = None
+    direction_de: str | None = None
+    direction_vers: str | None = None
+    etat: str | None = None
+    essaim_en_vol: bool | None = None
+    essaim_pose: bool | None = None
 
 
 @dataclass

@@ -62,6 +62,16 @@ export interface ExtensiveImagoState {
   essaim: boolean;
 }
 
+/** Type de cible (extensif, par espèce) : mêmes 3 valeurs que l'Infestation intensive
+ * (migration backend 0031) — remplace l'ancien « Type de capture » (essaim/vol clair). */
+export type TypeCibleImago = 'vol_clair' | 'dense' | 'tres_dense';
+
+/** État (extensif, par espèce) : même vocabulaire que `prospection_infestation.comportement`
+ * côté intensif. Détermine automatiquement le Comportement de l'essaim (cf. handleEtatChange
+ * dans infestation.tsx, repris à l'identique dans extensive-imagos.tsx). */
+export type EtatImago = 'repos' | 'deplacement';
+export type ComportementEssaimImago = 'vol' | 'pose';
+
 export interface ExtensiveImagoSpeciesData {
   totalCaptures: number;
   activePhase: PhaseKey;
@@ -87,7 +97,14 @@ export interface ExtensiveImagoSpeciesData {
   };
   popDiff: string;
   popGroup: string;
-  typeCapture: 'essaim' | 'volClair';
+  typeCible: TypeCibleImago;
+  accouplement: string | null;
+  ponte: string | null;
+  interdistance: string;
+  etat: EtatImago | null;
+  comportementEssaim: ComportementEssaimImago | null;
+  directionDe: string;
+  directionVers: string;
 }
 
 export interface ExtensiveLarveSpeciesData {
@@ -140,7 +157,14 @@ export function createEmptySpeciesData(): ExtensiveImagoSpeciesData {
     },
     popDiff: '',
     popGroup: '',
-    typeCapture: 'essaim',
+    typeCible: 'vol_clair',
+    accouplement: null,
+    ponte: null,
+    interdistance: '',
+    etat: null,
+    comportementEssaim: null,
+    directionDe: '',
+    directionVers: '',
   };
 }
 
@@ -245,29 +269,30 @@ export function imagoStateToPopulationRow(espece: Espece, state: ExtensiveImagoS
   };
 }
 
-export function speciesDataToPopulationRow(
-  espece: Espece,
-  data: ExtensiveImagoSpeciesData,
-  commonData: {
-    popDiff: string;
-    popGroup: string;
-    typeCapture: 'essaim' | 'volClair';
-  }
-): PopulationRow {
+export function speciesDataToPopulationRow(espece: Espece, data: ExtensiveImagoSpeciesData): PopulationRow {
   return {
     espece,
     categorie: 'imago',
-    densite_diffuse: commonData.popDiff ? parseFloat(commonData.popDiff) : null,
-    densite_groupee: commonData.popGroup ? parseFloat(commonData.popGroup) : null,
+    densite_diffuse: data.popDiff ? parseFloat(data.popDiff) : null,
+    densite_groupee: data.popGroup ? parseFloat(data.popGroup) : null,
     methode: null,
-    accouplement: null,
-    ponte: null,
+    accouplement: data.accouplement,
+    ponte: data.ponte,
     captures_nombre: data.totalCaptures,
     captures_sol: data.phases.solitaire,
     captures_trans: data.phases.transiens,
     captures_greg: data.phases.gregaire,
     stade_imago: 'A1',
-    essaim_observe: commonData.typeCapture === 'essaim',
+    interdistance: data.interdistance ? parseFloat(data.interdistance) : null,
+    type_cible: data.typeCible,
+    direction_de: data.directionDe || null,
+    direction_vers: data.directionVers || null,
+    etat: data.etat,
+    // Comportement de l'essaim dérivé de l'État à la sauvegarde (source de vérité unique),
+    // même logique que rowFromForm dans infestation.tsx : ne pas se fier uniquement à
+    // comportementEssaim, tenu à jour par l'écran mais recalculé ici par sécurité.
+    essaim_en_vol: data.etat === 'deplacement' ? true : data.etat === 'repos' ? false : null,
+    essaim_pose: data.etat === 'repos' ? true : data.etat === 'deplacement' ? false : null,
   };
 }
 
@@ -312,26 +337,14 @@ export function populationRowToSpeciesData(row: PopulationRow | null): Extensive
     },
     popDiff: row.densite_diffuse != null ? String(row.densite_diffuse) : '',
     popGroup: row.densite_groupee != null ? String(row.densite_groupee) : '',
-    typeCapture: Boolean(row.essaim_observe) ? 'essaim' : 'volClair',
-  };
-}
-
-export function extractCommonImagoData(row: PopulationRow | null): {
-  popDiff: string;
-  popGroup: string;
-  typeCapture: 'essaim' | 'volClair';
-} {
-  if (!row) {
-    return {
-      popDiff: '',
-      popGroup: '',
-      typeCapture: 'essaim',
-    };
-  }
-  return {
-    popDiff: row.densite_diffuse != null ? String(row.densite_diffuse) : '',
-    popGroup: row.densite_groupee != null ? String(row.densite_groupee) : '',
-    typeCapture: Boolean(row.essaim_observe) ? 'essaim' : 'volClair',
+    typeCible: (row.type_cible as TypeCibleImago | null) ?? 'vol_clair',
+    accouplement: row.accouplement ?? null,
+    ponte: row.ponte ?? null,
+    interdistance: row.interdistance != null ? String(row.interdistance) : '',
+    etat: (row.etat as EtatImago | null) ?? null,
+    comportementEssaim: row.essaim_en_vol ? 'vol' : row.essaim_pose ? 'pose' : null,
+    directionDe: row.direction_de ?? '',
+    directionVers: row.direction_vers ?? '',
   };
 }
 
@@ -343,6 +356,7 @@ export function larveSpeciesDataToPopulationRow(
     bl: boolean;
     interdist: string;
     deplacement: string;
+    surfaceContamineeHa: string;
   }
 ): PopulationRow {
   return {
@@ -362,6 +376,7 @@ export function larveSpeciesDataToPopulationRow(
     bande_larvaire: commonData.bl,
     interdistance: commonData.interdist ? parseFloat(commonData.interdist) : null,
     deplacement: commonData.deplacement,
+    surface_contaminee_ha: commonData.surfaceContamineeHa ? parseFloat(commonData.surfaceContamineeHa) : null,
   };
 }
 
@@ -391,6 +406,7 @@ export function extractCommonLarveData(row: PopulationRow | null): {
   bl: boolean;
   interdist: string;
   deplacement: string;
+  surfaceContamineeHa: string;
 } {
   if (!row) {
     return {
@@ -398,6 +414,7 @@ export function extractCommonLarveData(row: PopulationRow | null): {
       bl: false,
       interdist: '',
       deplacement: 'repos',
+      surfaceContamineeHa: '',
     };
   }
   return {
@@ -405,6 +422,7 @@ export function extractCommonLarveData(row: PopulationRow | null): {
     bl: Boolean(row.bande_larvaire),
     interdist: row.interdistance != null ? String(row.interdistance) : '',
     deplacement: row.deplacement ?? 'repos',
+    surfaceContamineeHa: row.surface_contaminee_ha != null ? String(row.surface_contaminee_ha) : '',
   };
 }
 

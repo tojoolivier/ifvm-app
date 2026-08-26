@@ -76,7 +76,14 @@ const MIGRATED_COLUMNS = [
   { name: 'bande_larvaire' },
   { name: 'interdistance' },
   { name: 'deplacement' },
-  
+  { name: 'surface_contaminee_ha' },
+  { name: 'type_cible' },
+  { name: 'direction_de' },
+  { name: 'direction_vers' },
+  { name: 'etat' },
+  { name: 'essaim_en_vol' },
+  { name: 'essaim_pose' },
+
   // Autres colonnes
   { name: 'server_updated_at' },
   { name: 'surface_station' },

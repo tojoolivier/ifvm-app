@@ -33,7 +33,9 @@ describe('ExtensiveObservationsScreen — restauration après hydratation tardiv
   it("restaure dégâts/verdure/hauteur/pluie/intensité quand le draft n'est disponible qu'après le montage", async () => {
     await render(<ExtensiveObservationsScreen />);
 
-    expect(screen.queryByDisplayValue('45')).toBeNull();
+    // 45 cm affichés/saisis en mètres (0,45 m) — la colonne reste en cm (partagée avec
+    // l'intensif), seule l'unité à l'écran change.
+    expect(screen.queryByDisplayValue('0.45')).toBeNull();
 
     await act(async () => {
       useProspectionWizardStore.setState({
@@ -51,7 +53,7 @@ describe('ExtensiveObservationsScreen — restauration après hydratation tardiv
     });
 
     await waitFor(() => expect(screen.getByDisplayValue('30')).toBeVisible());
-    expect(screen.getByDisplayValue('45')).toBeVisible();
+    expect(screen.getByDisplayValue('0.45')).toBeVisible();
     // « Forte » apparaît deux fois (Verdure et Intensité) : les deux doivent être actives.
     for (const active of screen.getAllByText('Forte')) {
       expect(active.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ color: '#fff' })]));
@@ -69,6 +71,25 @@ describe('ExtensiveObservationsScreen — restauration après hydratation tardiv
           dernierePluie: '2026-08-20',
           intensitePluie: 'forte',
         })
+      )
+    );
+  });
+
+  it("H STR HERB : une saisie décimale en mètres (1,25 m) est convertie et enregistrée en centimètres (125 cm)", async () => {
+    useProspectionWizardStore.setState({ draft: { id: 'draft-123', type_prospection: 'extensive' } as any, captures: [] });
+
+    await render(<ExtensiveObservationsScreen />);
+    await screen.findByText('H Str Herb (m)');
+
+    fireEvent.changeText(screen.getByDisplayValue(''), '1.25');
+    expect(await screen.findByDisplayValue('1.25')).toBeVisible();
+
+    fireEvent.press(screen.getByText('Suivant : Récapitulatif ›'));
+
+    await waitFor(() =>
+      expect(prospectionRepository.updateProspectionExtensiveObservations).toHaveBeenCalledWith(
+        'draft-123',
+        expect.objectContaining({ hauteurHerbeCm: 125 })
       )
     );
   });
