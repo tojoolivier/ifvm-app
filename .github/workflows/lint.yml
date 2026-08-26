@@ -10,7 +10,8 @@ concurrency:
 
 jobs:
   lint-backend:
-    runs-on: ubuntu-latest
+    # "services: postgres" impose un daemon Docker dans le pod -> pool dind.
+    runs-on: self-hosted-dind
     defaults:
       run:
         working-directory: backend
@@ -42,7 +43,7 @@ jobs:
       - run: pytest
 
   lint-frontend:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted-linux
     defaults:
       run:
         working-directory: frontend
@@ -60,7 +61,7 @@ jobs:
       - run: npm test
 
   lint-mobile:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted-linux
     defaults:
       run:
         working-directory: mobile
