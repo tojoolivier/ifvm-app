@@ -26,6 +26,7 @@ jest.mock('../src/lib/referentiel-sync', () => ({
 import {
   CaptureRow,
   DraftProspection,
+  PopulationRow,
   completeProspection,
   markProspectionEchec,
   markProspectionSynced,
@@ -189,14 +190,44 @@ describe('buildRecapitulatif', () => {
     ]);
   });
 
-  it("résume l'infestation : formations renseignées listées, sinon 'aucune'", () => {
+  it("liste chaque cible réellement sélectionnée (une ligne = une cible), quelle que soit la surface/densité", () => {
     const filled = buildRecapitulatif(draft(), [], '', [
-      { espece: null, type_cible: 'dense', taille_min: null, taille_max: null, taille_moy: null, surface_totale: 5, densite_min: null, densite_max: null, densite_moy: null, interdistance: null, comportement: null, direction_de: null, direction_vers: null, vent_de: null, vent_vitesse: null, pullulation_nb: null, taille_long: null, taille_large: null, taille_epaisseur: null, essaim_en_vol: null, essaim_pose: null, type_essaim: null, nb_taches_bandes: null, interdistance_m: null, interdistance_min: null, interdistance_max: null, interdistance_moy: null, surface_contaminee_ha: null, type_larve: null, surface_infestee_pourcent: null, stade_dominant: null, taille_groupe_m2: null, front_longueur_m: null, front_largeur_m: null, densite_max_front: null, densite_moy_arriere_front: null, heure_observation: null, densite_en_vol: null, dimension_ha: null },
+      { espece: null, type_cible: 'dense', taille_min: null, taille_max: null, taille_moy: null, surface_totale: 5, densite_min: null, densite_max: null, densite_moy: 12, interdistance: null, comportement: null, direction_de: null, direction_vers: null, vent_de: null, vent_vitesse: null, pullulation_nb: null, taille_long: null, taille_large: null, taille_epaisseur: null, essaim_en_vol: null, essaim_pose: null, type_essaim: null, nb_taches_bandes: null, interdistance_m: null, interdistance_min: null, interdistance_max: null, interdistance_moy: null, surface_contaminee_ha: null, type_larve: null, surface_infestee_pourcent: null, stade_dominant: null, taille_groupe_m2: null, front_longueur_m: null, front_largeur_m: null, densite_max_front: null, densite_moy_arriere_front: null, heure_observation: null, densite_en_vol: null, dimension_ha: null },
     ]);
-    expect(filled.infestationSummary).toBe('Dense renseignée.');
+    expect(filled.infestationCibles).toEqual([
+      { key: 'dense', label: 'Dense', details: ['Surface : 5 ha', 'Densité moy. : 12'] },
+    ]);
 
     const empty = buildRecapitulatif(draft(), [], '', []);
-    expect(empty.infestationSummary).toBe('Aucune formation renseignée.');
+    expect(empty.infestationCibles).toEqual([]);
+  });
+
+  it('n’oublie pas une cible sélectionnée mais pas encore quantifiée — régression : elle disparaissait du récapitulatif', () => {
+    // La section Infestation est facultative (cf. persistAll dans infestation.tsx qui
+    // enregistre chaque cible sélectionnée "même partiellement remplie") : une cible
+    // choisie sans surface ni densité renseignée doit quand même apparaître ici.
+    const recap = buildRecapitulatif(draft(), [], '', [
+      { espece: null, type_cible: 'bande_larvaire', taille_min: null, taille_max: null, taille_moy: null, surface_totale: null, densite_min: null, densite_max: null, densite_moy: null, interdistance: null, comportement: null, direction_de: null, direction_vers: null, vent_de: null, vent_vitesse: null, pullulation_nb: null, taille_long: null, taille_large: null, taille_epaisseur: null, essaim_en_vol: null, essaim_pose: null, type_essaim: null, nb_taches_bandes: null, interdistance_m: null, interdistance_min: null, interdistance_max: null, interdistance_moy: null, surface_contaminee_ha: null, type_larve: null, surface_infestee_pourcent: null, stade_dominant: null, taille_groupe_m2: null, front_longueur_m: null, front_largeur_m: null, densite_max_front: null, densite_moy_arriere_front: null, heure_observation: null, densite_en_vol: null, dimension_ha: null },
+    ]);
+    expect(recap.infestationCibles).toEqual([{ key: 'bande_larvaire', label: 'Bande larvaire', details: [] }]);
+  });
+
+  it('reclasse un brouillon local pré-migration encore marqué "essaim" plutôt que d’afficher la valeur brute', () => {
+    const recap = buildRecapitulatif(draft(), [], '', [
+      { espece: null, type_cible: 'essaim', taille_min: null, taille_max: null, taille_moy: null, surface_totale: null, densite_min: null, densite_max: null, densite_moy: null, interdistance: null, comportement: null, direction_de: null, direction_vers: null, vent_de: null, vent_vitesse: null, pullulation_nb: null, taille_long: null, taille_large: null, taille_epaisseur: null, essaim_en_vol: null, essaim_pose: null, type_essaim: 'tres_dense', nb_taches_bandes: null, interdistance_m: null, interdistance_min: null, interdistance_max: null, interdistance_moy: null, surface_contaminee_ha: null, type_larve: null, surface_infestee_pourcent: null, stade_dominant: null, taille_groupe_m2: null, front_longueur_m: null, front_largeur_m: null, densite_max_front: null, densite_moy_arriere_front: null, heure_observation: null, densite_en_vol: null, dimension_ha: null },
+    ]);
+    expect(recap.infestationCibles).toEqual([{ key: 'essaim', label: 'Très dense', details: [] }]);
+  });
+
+  it('liste plusieurs cibles sélectionnées simultanément, chacune avec ses propres informations', () => {
+    const recap = buildRecapitulatif(draft(), [], '', [
+      { espece: null, type_cible: 'tache_larvaire', taille_min: null, taille_max: null, taille_moy: null, surface_totale: null, densite_min: 2, densite_max: 8, densite_moy: null, interdistance: null, comportement: null, direction_de: null, direction_vers: null, vent_de: null, vent_vitesse: null, pullulation_nb: null, taille_long: null, taille_large: null, taille_epaisseur: null, essaim_en_vol: null, essaim_pose: null, type_essaim: null, nb_taches_bandes: null, interdistance_m: null, interdistance_min: null, interdistance_max: null, interdistance_moy: null, surface_contaminee_ha: null, type_larve: null, surface_infestee_pourcent: null, stade_dominant: null, taille_groupe_m2: null, front_longueur_m: null, front_largeur_m: null, densite_max_front: null, densite_moy_arriere_front: null, heure_observation: null, densite_en_vol: null, dimension_ha: null },
+      { espece: null, type_cible: 'dense', taille_min: null, taille_max: null, taille_moy: null, surface_totale: 3, densite_min: null, densite_max: null, densite_moy: null, interdistance: null, comportement: null, direction_de: null, direction_vers: null, vent_de: null, vent_vitesse: null, pullulation_nb: null, taille_long: null, taille_large: null, taille_epaisseur: null, essaim_en_vol: null, essaim_pose: null, type_essaim: null, nb_taches_bandes: null, interdistance_m: null, interdistance_min: null, interdistance_max: null, interdistance_moy: null, surface_contaminee_ha: null, type_larve: null, surface_infestee_pourcent: null, stade_dominant: null, taille_groupe_m2: null, front_longueur_m: null, front_largeur_m: null, densite_max_front: null, densite_moy_arriere_front: null, heure_observation: null, densite_en_vol: null, dimension_ha: null },
+    ]);
+    expect(recap.infestationCibles).toEqual([
+      { key: 'tache_larvaire', label: 'Tache larvaire', details: ['Densité : 2 – 8'] },
+      { key: 'dense', label: 'Dense', details: ['Surface : 3 ha'] },
+    ]);
   });
 
   it("résume le comportement (État + Direction), sans confondre avec le vent (indépendant)", () => {
@@ -224,6 +255,29 @@ describe('buildRecapitulatif', () => {
 
     const withoutObs = buildRecapitulatif(draft({ observations: null }), [], '', []);
     expect(withoutObs.observationsText).toBe('Aucune observation renseignée.');
+  });
+
+  it('expose toujours les 4 blocs de densité LMC/NSE × imago/larve, jamais partagés entre eux', () => {
+    const populations: PopulationRow[] = [
+      { espece: 'LMC', categorie: 'imago', densite_diffuse: 12, densite_groupee: 3, methode: null, accouplement: null, ponte: null },
+      { espece: 'LMC', categorie: 'larve', densite_diffuse: 40, densite_groupee: null, methode: null, accouplement: null, ponte: null },
+      { espece: 'NSE', categorie: 'imago', densite_diffuse: 7, densite_groupee: 1, methode: null, accouplement: null, ponte: null },
+      // NSE larve : pas encore renseigné — doit apparaître à part, non nul par contamination des 3 autres.
+    ];
+    const recap = buildRecapitulatif(draft(), [], '', [], populations);
+
+    expect(recap.densites).toEqual([
+      { key: 'LMC-imago', espece: 'LMC', categorie: 'imago', label: 'Locusta — Imagos', densiteDiffuse: 12, densiteGroupee: 3 },
+      { key: 'LMC-larve', espece: 'LMC', categorie: 'larve', label: 'Locusta — Larves', densiteDiffuse: 40, densiteGroupee: null },
+      { key: 'NSE-imago', espece: 'NSE', categorie: 'imago', label: 'Nomadacris — Imagos', densiteDiffuse: 7, densiteGroupee: 1 },
+      { key: 'NSE-larve', espece: 'NSE', categorie: 'larve', label: 'Nomadacris — Larves', densiteDiffuse: null, densiteGroupee: null },
+    ]);
+  });
+
+  it('les 4 blocs de densité sont vides sans donnée, plutôt que de faire disparaître la section', () => {
+    const recap = buildRecapitulatif(draft(), [], '', []);
+    expect(recap.densites).toHaveLength(4);
+    expect(recap.densites.every((d) => d.densiteDiffuse === null && d.densiteGroupee === null)).toBe(true);
   });
 });
 
