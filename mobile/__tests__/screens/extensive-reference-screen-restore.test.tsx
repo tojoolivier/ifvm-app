@@ -1,0 +1,93 @@
+/**
+ * Non-régression — harmonisation Extensive/Intensive : `extensive-reference.tsx` ne
+ * s'auto-hydrate pas depuis `draftId` (cf. commentaire de `fiche-routing.ts`), et ses
+ * champs (station saisie libre, type de station, surface, n° message) n'étaient
+ * initialisés qu'une fois, via `useState(draft?.x)`. Si le store se peuple APRÈS le
+ * montage de l'écran (deep-link, app relancée en plein parcours), ces champs restaient
+ * vides indéfiniment et un « Continuer » sans y toucher écrasait les valeurs déjà
+ * enregistrées par du vide — même classe de bug déjà corrigée côté intensif
+ * (observations.tsx, veg.tsx, species.tsx).
+ */
+import { fireEvent, render, screen, waitFor, act } from '@testing-library/react-native';
+import ExtensiveReferenceScreen from '@/app/(prospection)/extensive-reference';
+import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
+import * as prospectionRepository from '@/lib/prospection-repository';
+import * as location from '@/lib/location';
+
+jest.mock('expo-router', () =>
+  require('../test-utils/mock-expo-router').expoRouterMock({ params: { draftId: 'draft-123' } })
+);
+
+jest.mock('@/lib/prospection-repository', () => ({
+  updateProspectionExtensiveReference: jest.fn().mockResolvedValue({
+    id: 'draft-123',
+    type_prospection: 'extensive',
+    date_prospection: '2026-08-25',
+    station_libre: 'Andasibe',
+    type_station: 'xerophyle',
+    surface_station: 12,
+    n_message: '20260825-AB12',
+    latitude: -18.9,
+    longitude: 47.5,
+  }),
+}));
+
+jest.mock('@/lib/location', () => ({
+  getCurrentPosition: jest.fn().mockResolvedValue({ latitude: -18.9, longitude: 47.5, altitude: null, accuracy: 5, timestamp: Date.now() }),
+}));
+
+describe('ExtensiveReferenceScreen — restauration après hydratation tardive du draft', () => {
+  beforeEach(() => {
+    jest.mocked(prospectionRepository.updateProspectionExtensiveReference).mockClear();
+    jest.mocked(location.getCurrentPosition).mockClear();
+    useProspectionWizardStore.setState({ draft: null, captures: [] });
+  });
+
+  it("restaure station/type de station/surface/n° message quand le draft n'est disponible qu'après le montage", async () => {
+    await render(<ExtensiveReferenceScreen />);
+
+    // Rien à afficher tant que le draft n'est pas encore là.
+    expect(screen.queryByDisplayValue('Andasibe')).toBeNull();
+
+    // Hydratation tardive du store (deep-link / relance app) — après le montage.
+    await act(async () => {
+      useProspectionWizardStore.setState({
+        draft: {
+          id: 'draft-123',
+          type_prospection: 'extensive',
+          date_prospection: '2026-08-25',
+          station_libre: 'Andasibe',
+          type_station: 'xerophyle',
+          surface_station: 12,
+          n_message: '20260825-AB12',
+          latitude: -18.9,
+          longitude: 47.5,
+        } as any,
+        captures: [],
+      });
+    });
+
+    await waitFor(() => expect(screen.getByDisplayValue('Andasibe')).toBeVisible());
+    expect(screen.getByDisplayValue('12')).toBeVisible();
+    expect(screen.getByDisplayValue('20260825-AB12')).toBeVisible();
+    expect(screen.getByText('Xerophyle').props.style).toEqual(
+      expect.arrayContaining([expect.objectContaining({ color: '#fff' })])
+    );
+
+    fireEvent.press(screen.getByText('Suivant : Imagos ›'));
+
+    await waitFor(() =>
+      expect(prospectionRepository.updateProspectionExtensiveReference).toHaveBeenCalledWith(
+        'draft-123',
+        expect.objectContaining({
+          stationLibre: 'Andasibe',
+          typeStation: 'xerophyle',
+          surfaceStation: 12,
+          nMessage: '20260825-AB12',
+          latitude: -18.9,
+          longitude: 47.5,
+        })
+      )
+    );
+  });
+});

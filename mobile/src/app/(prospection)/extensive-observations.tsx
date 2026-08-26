@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,6 +28,22 @@ export default function ExtensiveObservationsScreen() {
   const [dernierePluie, setDernierePluie] = useState(draft?.derniere_pluie ?? '');
   const [intensite, setIntensite] = useState(draft?.intensite_pluie ?? 'faible');
   const { run, isRunning: isSaving } = useAsyncAction();
+
+  // Même garde que sur extensive-reference.tsx : ces `useState(draft?.x)` d'initialisation
+  // ne se remettent jamais à jour si `draft` n'est pas encore hydraté au montage. Restaure
+  // une seule fois par fiche chargée pour ne pas écraser une saisie en cours.
+  const obsHydratedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!draft || draft.id !== draftId || obsHydratedRef.current === draft.id) return;
+    obsHydratedRef.current = draft.id;
+    void Promise.resolve().then(() => {
+      setDegats(draft.degats_cultures_pourcent ?? 0);
+      setVerdure(draft.verdure_strate ?? 'moyenne');
+      setHauteur(draft.hauteur_herbe_cm != null ? String(draft.hauteur_herbe_cm) : '');
+      setDernierePluie(draft.derniere_pluie ?? '');
+      setIntensite(draft.intensite_pluie ?? 'faible');
+    });
+  }, [draft, draftId]);
 
   const handleContinue = () =>
     run(
