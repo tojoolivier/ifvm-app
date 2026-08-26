@@ -1,15 +1,20 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm } from '@tanstack/react-form';
 import { useAsyncAction } from '@/hooks/use-async-action';
-import { DEGATS_OPTIONS } from '@/lib/prospection-fiche-lecture';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
+import { DEGATS_OPTIONS, formatHeureLocale } from '@/lib/prospection-fiche-lecture';
 import { ENNEMIS_OPTIONS, parseEnnemis, serializeEnnemis } from '@/lib/prospection-observations';
 import { ObservationsFormValues } from '@/lib/prospection-observations-schema';
 import { updateProspectionObservations } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { DateField } from '@/components/DateField';
+import { getCurrentPosition } from '@/lib/location';
+import { logger } from '@/lib/logger';
+
+const log = logger.child({ module: 'observations' });
 
 const ORANGE = '#e89b2b';
 const BG = '#faf7ef';
@@ -17,6 +22,8 @@ const TEXT = '#16201a';
 const TEXT_SECONDARY = '#6f6a59';
 const BORDER = '#e7e0cd';
 const INACTIVE_BG = '#efeada';
+const GREEN = '#235a36';
+const AUTO_BG = '#eaf2ec';
 
 // ==========================================
 // OPTIONS INTENSITE PLUIE
@@ -32,11 +39,26 @@ export default function ObservationsScreen() {
   const router = useRouter();
   const { draftId } = useLocalSearchParams<{ draftId: string }>();
   const draft = useProspectionWizardStore((s) => s.draft);
+  const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
   const setDraft = useProspectionWizardStore((s) => s.setDraft);
   const { run, isRunning: isSaving } = useAsyncAction();
+  const signalerChargement = useSignalerChargement('observations');
   const initialEnnemis = parseEnnemis(draft?.ennemis_naturels ?? null);
   const [showAutre, setShowAutre] = useState(initialEnnemis.autre !== '');
   const scrollRef = useRef<ScrollView>(null);
+  // Horodatage technique (ISO, fuseau inclus) de l'heure d'observation — la valeur
+  // affichée (HH:mm) en est dérivée à l'affichage, jamais stockée séparément.
+  const [heureObservationAt, setHeureObservationAt] = useState<string | null>(null);
+  const [isHeureLoading, setIsHeureLoading] = useState(false);
+
+  // Filet de sécurité si cet écran est atteint sans passer par reference.tsx (deep-link,
+  // app relancée en plein milieu du parcours) : le store peut ne pas encore porter cette
+  // fiche — cf. même garde sur reference.tsx / captures.tsx / veg.tsx.
+  useEffect(() => {
+    if (draftId && draft?.id !== draftId) {
+      void hydrateFromDraft(draftId).catch((error) => signalerChargement(error, { draftId }));
+    }
+  }, [draftId, draft?.id, hydrateFromDraft, signalerChargement]);
 
   const form = useForm({
     defaultValues: {
@@ -65,6 +87,7 @@ export default function ObservationsScreen() {
             observations: value.observation || null,
             dernierePluie: value.dernierePluieDate || null,
             intensitePluie: value.intensitePluie || null,
+            heureObservationAt,
           });
           setDraft(updated);
           router.push({ pathname: '/(prospection)/review' as any, params: { draftId } });
@@ -78,6 +101,48 @@ export default function ObservationsScreen() {
       );
     },
   });
+
+  // Restaure la pluie, les dégâts, les ennemis naturels et l'observation libre déjà
+  // enregistrés pour cette fiche — sans ça, cet écran repartait systématiquement de zéro
+  // à chaque remontage (retour arrière, reprise d'un brouillon...), et "Vérifier &
+  // enregistrer" écrasait alors les données existantes par des valeurs vides. Ne s'exécute
+  // qu'une fois par fiche chargée (`obsHydratedRef`), cf. même garde sur veg.tsx.
+  const obsHydratedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!draft || draft.id !== draftId || obsHydratedRef.current === draft.id) return;
+    obsHydratedRef.current = draft.id;
+    void Promise.resolve().then(() => {
+      const ennemis = parseEnnemis(draft.ennemis_naturels);
+      form.setFieldValue('dernierePluieDate', draft.derniere_pluie ?? '');
+      form.setFieldValue('intensitePluie', draft.intensite_pluie ?? null);
+      form.setFieldValue('degatsCultures', (draft.degats_cultures as ObservationsFormValues['degatsCultures']) ?? null);
+      form.setFieldValue('ennemisSelected', ennemis.selected);
+      form.setFieldValue('ennemisAutre', ennemis.autre);
+      form.setFieldValue('observation', draft.observations ?? '');
+      if (ennemis.autre) setShowAutre(true);
+    });
+
+    // Heure d'observation automatique (GPS) : une heure déjà enregistrée pour cette
+    // fiche est restaurée telle quelle, sans jamais relancer d'acquisition GPS
+    // simplement parce que l'écran est remonté — seule l'absence de toute heure
+    // enregistrée déclenche un nouveau fix.
+    if (draft.heure_observation_at) {
+      void Promise.resolve().then(() => setHeureObservationAt(draft.heure_observation_at));
+      return;
+    }
+    void Promise.resolve().then(() => setIsHeureLoading(true));
+    getCurrentPosition()
+      .then((position) => {
+        setHeureObservationAt(new Date(position.timestamp).toISOString());
+      })
+      .catch((error) => {
+        // Silence délibéré : l'heure d'observation est un confort GPS, pas une donnée
+        // bloquante — son absence ne doit jamais empêcher de continuer la fiche
+        // (contrairement à la position GPS obligatoire de reference.tsx).
+        log.ignore(error, "Heure d'observation GPS indisponible — le champ reste vide.");
+      })
+      .finally(() => setIsHeureLoading(false));
+  }, [draft, draftId, form]);
 
   return (
     <View style={styles.root}>
@@ -95,6 +160,21 @@ export default function ObservationsScreen() {
           </View>
 
           <ScrollView ref={scrollRef} style={styles.scroll} contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
+            {/* ==========================================
+                SECTION : HEURE D'OBSERVATION (GPS)
+                ========================================== */}
+
+            <View style={styles.autoCard}>
+              <Text style={styles.autoLabel}>🕐 Heure d&apos;observation (GPS)</Text>
+              {isHeureLoading ? (
+                <Text style={styles.autoValueLoading}>Récupération GPS...</Text>
+              ) : (
+                <Text style={styles.autoValue}>
+                  {formatHeureLocale(heureObservationAt)}
+                </Text>
+              )}
+            </View>
+
             {/* ==========================================
                 SECTION : DERNIERE PLUIE
                 ========================================== */}
@@ -285,6 +365,10 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 12, padding: 14, marginBottom: 11 },
   cardError: { borderColor: '#c0412b', borderWidth: 1.5 },
   cardTitle: { fontSize: 12.5, fontWeight: '700', color: TEXT, marginBottom: 11 },
+  autoCard: { backgroundColor: AUTO_BG, borderRadius: 12, padding: 14, marginBottom: 11 },
+  autoLabel: { fontSize: 10, fontWeight: '600', color: GREEN, textTransform: 'uppercase', marginBottom: 4 },
+  autoValue: { fontSize: 16, fontWeight: '700', color: TEXT, fontFamily: 'monospace' },
+  autoValueLoading: { fontSize: 13, fontWeight: '600', color: TEXT_SECONDARY, fontStyle: 'italic' },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },
   chip: { paddingHorizontal: 12, paddingVertical: 9, borderRadius: 8, backgroundColor: INACTIVE_BG },
   chipFlex: { flex: 1, alignItems: 'center' },

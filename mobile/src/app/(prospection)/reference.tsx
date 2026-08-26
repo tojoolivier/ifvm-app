@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useForm } from '@tanstack/react-form';
 import { getCurrentPosition, reverseGeocode, GpsPosition } from '@/lib/location';
 import { PermissionError } from '@/lib/errors';
@@ -63,6 +63,7 @@ function formatDateHeure(date: Date): string {
 
 export default function ReferenceScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { draftId } = useLocalSearchParams<{ draftId: string }>();
   const draft = useProspectionWizardStore((s) => s.draft);
   const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
@@ -81,12 +82,12 @@ export default function ReferenceScreen() {
   const signalerChargement = useSignalerChargement('reference');
   const logError = useErrorLogStore((s) => s.addEntry);
 
-  const [postes, setPostes] = useState<PosteAcridien[]>([]);
-  const [stationsForPa, setStationsForPa] = useState<StationFixe[]>([]);
   const [paMode, setPaMode] = useState<SelectMode>('auto');
   const [stationMode, setStationMode] = useState<SelectMode>('auto');
   const [pa, setPa] = useState<PosteAcridien | null>(null);
+  const [paManualNom, setPaManualNom] = useState('');
   const [station, setStation] = useState<StationFixe | null>(null);
+  const [stationManualNom, setStationManualNom] = useState('');
   const [autoPa, setAutoPa] = useState<PosteAcridien | null>(null);
   const [autoStation, setAutoStation] = useState<StationFixe | null>(null);
 
@@ -107,11 +108,34 @@ export default function ReferenceScreen() {
     }
   }, [draftId, draft?.id, hydrateFromDraft, signalerChargement]);
 
+  // Réhydrate le poste acridien saisi manuellement (pas de pa_code : ce n'est pas un
+  // poste du référentiel) lorsqu'on revient sur cet écran après l'avoir déjà rempli.
+  const paHydratedRef = useRef(false);
   useEffect(() => {
-    void listPostesAcridiens()
-      .then(setPostes)
-      .catch((error) => signalerChargement(error, { source: 'listPostesAcridiens' }));
-  }, [signalerChargement]);
+    if (paHydratedRef.current || draft?.id !== draftId) return;
+    paHydratedRef.current = true;
+    void Promise.resolve().then(() => {
+      if (draft.pa_nom && !draft.pa_code) {
+        setPaManualNom(draft.pa_nom);
+        setPaMode('manuel');
+        paModeRef.current = 'manuel';
+      }
+    });
+  }, [draft, draftId]);
+
+  // Même réhydratation pour la station saisie manuellement (pas de station_id connu).
+  const stationHydratedRef = useRef(false);
+  useEffect(() => {
+    if (stationHydratedRef.current || draft?.id !== draftId) return;
+    stationHydratedRef.current = true;
+    void Promise.resolve().then(() => {
+      if (draft.station_nom && !draft.station_id) {
+        setStationManualNom(draft.station_nom);
+        setStationMode('manuel');
+        stationModeRef.current = 'manuel';
+      }
+    });
+  }, [draft, draftId]);
 
   // ==========================================
   // CAPTURE GPS AUTOMATIQUE (fiche nouvelle) OU RESTAURATION (fiche déjà enregistrée)
@@ -128,6 +152,9 @@ export default function ReferenceScreen() {
         longitude: savedDraft.longitude as number,
         altitude: savedDraft.altitude ?? null,
         accuracy: null,
+        // Pas un vrai fix GPS restauré : `updated_at` est la meilleure approximation
+        // disponible du moment de la saisie (aucun timestamp GPS n'est archivé ici).
+        timestamp: new Date(savedDraft.updated_at).getTime(),
       });
       setAdminArea({ region: savedDraft.region, district: savedDraft.district, commune: savedDraft.commune });
       setLocationError(null);
@@ -138,15 +165,15 @@ export default function ReferenceScreen() {
       try {
         const postesList = await listPostesAcridiens();
         if (!isActive) return;
-        setPostes(postesList);
         const matchedPa = postesList.find((p) => p.code === savedDraft.pa_code) ?? null;
         if (!matchedPa) return;
-        setPaMode('manuel');
-        const stations = await applyPa(matchedPa);
+        // `pa_code` renseigné = poste du référentiel : c'est le mode « auto » de cet
+        // écran (le mode « manuel » est réservé à la saisie libre, sans code).
+        applyPa(matchedPa);
+        const stations = await listStationsByPoste(matchedPa.id);
         if (!isActive) return;
         const matchedStation = stations.find((s) => s.id === savedDraft.station_id) ?? null;
         if (matchedStation) {
-          setStationMode('manuel');
           setStation(matchedStation);
         }
       } catch (error) {
@@ -180,7 +207,7 @@ export default function ReferenceScreen() {
           setAutoPa(nearestPa);
 
           if (nearestPa && paModeRef.current === 'auto') {
-            await applyPa(nearestPa);
+            applyPa(nearestPa);
             if (stationModeRef.current === 'auto') {
               setStation(nearestStation);
             }
@@ -218,27 +245,19 @@ export default function ReferenceScreen() {
     };
   }, [draft]);
 
-  async function applyPa(poste: PosteAcridien): Promise<StationFixe[]> {
+  function applyPa(poste: PosteAcridien): void {
     setPa(poste);
-    const list = await listStationsByPoste(poste.id);
-    setStationsForPa(list);
-    return list;
   }
 
-  async function setPaAuto() {
+  function setPaAuto() {
     setPaMode('auto');
     if (!autoPa) return;
-    await applyPa(autoPa);
+    applyPa(autoPa);
     if (stationModeRef.current === 'auto' && autoStation) setStation(autoStation);
   }
 
   function setPaManuel() {
     setPaMode('manuel');
-  }
-
-  async function selectPa(poste: PosteAcridien) {
-    const list = await applyPa(poste);
-    setStation((current) => (current && list.some((s) => s.id === current.id) ? current : list[0] ?? null));
   }
 
   function setStationAuto() {
@@ -247,11 +266,6 @@ export default function ReferenceScreen() {
   }
 
   function setStationManuel() {
-    setStationMode('manuel');
-  }
-
-  function selectStation(next: StationFixe) {
-    setStation(next);
     setStationMode('manuel');
   }
 
@@ -324,11 +338,27 @@ export default function ReferenceScreen() {
             errors.surfaceProspectee = 'La surface prospectée est obligatoire';
           }
 
-          // Pour le type extensif : infestée est également obligatoire
-          if (!isIntensive) {
-            if (!value.surfaceInfestee || Number(value.surfaceInfestee) <= 0) {
-              errors.surfaceInfestee = 'La surface infestée est obligatoire';
-            }
+          // Surface infestée : facultative (0 par défaut si non saisie)
+          if (value.surfaceInfestee && Number(value.surfaceInfestee) < 0) {
+            errors.surfaceInfestee = 'La surface infestée ne peut pas être négative';
+          }
+
+          // Cohérence relationnelle : station >= prospectée >= infestée (ADR-006)
+          if (
+            !errors.surfaceStation &&
+            !errors.surfaceProspectee &&
+            Number(value.surfaceProspectee) > Number(value.surfaceStation)
+          ) {
+            errors.surfaceProspectee = 'La surface prospectée ne peut pas dépasser la surface station';
+          }
+
+          const surfaceInfesteeNum = value.surfaceInfestee ? Number(value.surfaceInfestee) : 0;
+          if (
+            !errors.surfaceProspectee &&
+            !errors.surfaceInfestee &&
+            surfaceInfesteeNum > Number(value.surfaceProspectee)
+          ) {
+            errors.surfaceInfestee = 'La surface infestée ne peut pas dépasser la surface prospectée';
           }
 
           // Si des erreurs, on les affiche
@@ -341,7 +371,7 @@ export default function ReferenceScreen() {
 
           const dateProspection = draft?.date_prospection ?? new Date().toISOString().slice(0, 10);
           const nFiche = generateNumeroFiche(draftId, dateProspection);
-          const nReleve = generateNumeroReleve(station?.id ?? null, dateProspection);
+          const nReleve = generateNumeroReleve(stationMode === 'manuel' ? null : station?.id ?? null, dateProspection);
 
           // Préparer les données avec des valeurs par défaut (0 pour intensif)
           const surfaceProspecteeValue = value.surfaceProspectee ? Number(value.surfaceProspectee) : 0;
@@ -360,10 +390,12 @@ export default function ReferenceScreen() {
             region: adminArea.region,
             district: adminArea.district,
             commune: adminArea.commune,
-            pa_code: pa?.code ?? null,
-            pa_nom: pa?.nom ?? null,
-            stationId: station?.id ?? null,
-            station_nom: station?.nom ?? null,
+            // Mode manuel : saisie libre, sans code du référentiel (pas un poste connu).
+            pa_code: paMode === 'manuel' ? null : pa?.code ?? null,
+            pa_nom: paMode === 'manuel' ? (paManualNom.trim() || null) : pa?.nom ?? null,
+            // Mode manuel : saisie libre, sans id du référentiel (pas une station connue).
+            stationId: stationMode === 'manuel' ? null : station?.id ?? null,
+            station_nom: stationMode === 'manuel' ? (stationManualNom.trim() || null) : station?.nom ?? null,
           });
 
           setDraft(updated);
@@ -379,16 +411,19 @@ export default function ReferenceScreen() {
   });
 
   const nFichePreview = draftId ? generateNumeroFiche(draftId, draft?.date_prospection ?? '') : '—';
-  const nRelevePreview = generateNumeroReleve(station?.id ?? null, draft?.date_prospection ?? '');
+  const nRelevePreview = generateNumeroReleve(
+    stationMode === 'manuel' ? null : station?.id ?? null,
+    draft?.date_prospection ?? ''
+  );
 
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.safe}>
-        <KeyboardAvoidingView 
-          style={styles.keyboardAvoidingView} 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-        >
+        <KeyboardAvoidingView
+            style={styles.keyboardAvoidingView}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          >
           <View style={styles.headerRow}>
             <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
               <Text style={styles.back}>‹</Text>
@@ -402,7 +437,12 @@ export default function ReferenceScreen() {
             <View style={styles.progressBar} />
           </View>
 
-          <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          >
             {/* ===== GPS ===== */}
             <View style={styles.gpsCard}>
               <View style={styles.gpsHeaderRow}>
@@ -476,16 +516,13 @@ export default function ReferenceScreen() {
                   </View>
                 </View>
               ) : (
-                <View style={styles.chipsRow}>
-                  {postes.map((poste) => {
-                    const active = poste.id === pa?.id;
-                    return (
-                      <TouchableOpacity key={poste.id} onPress={() => selectPa(poste)} activeOpacity={0.7}>
-                        <Text style={[styles.chip, active && styles.chipActive]}>{poste.nom}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                <TextInput
+                  value={paManualNom}
+                  onChangeText={setPaManualNom}
+                  placeholder="Saisir le nom du poste acridien"
+                  placeholderTextColor={INACTIVE_TEXT}
+                  style={styles.manualInput}
+                />
               )}
             </View>
 
@@ -514,16 +551,13 @@ export default function ReferenceScreen() {
                   </View>
                 </View>
               ) : (
-                <View style={styles.chipsRow}>
-                  {stationsForPa.map((s) => {
-                    const active = s.id === station?.id;
-                    return (
-                      <TouchableOpacity key={s.id} onPress={() => selectStation(s)} activeOpacity={0.7}>
-                        <Text style={[styles.chip, active && styles.chipActive]}>{s.nom}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                <TextInput
+                  value={stationManualNom}
+                  onChangeText={setStationManualNom}
+                  placeholder="Saisir le nom de la station"
+                  placeholderTextColor={INACTIVE_TEXT}
+                  style={styles.manualInput}
+                />
               )}
             </View>
 
@@ -545,11 +579,10 @@ export default function ReferenceScreen() {
 
             {/* ===== Surfaces ===== */}
             <Text style={styles.sectionLabel}>Surfaces (ha) — saisie</Text>
-            {isIntensive && (
-              <Text style={styles.infoText}>
-                ℹ️ Mode intensif : la surface infestée n&apos;est pas obligatoire
-              </Text>
-            )}
+            <Text style={styles.infoText}>
+              ℹ️ La surface infestée est facultative (0 par défaut) — elle ne peut pas dépasser la
+              surface prospectée, qui elle-même ne peut pas dépasser la surface station.
+            </Text>
             <View style={styles.surfacesRow}>
               <form.Field name="surfaceStation">
                 {(field) => (
@@ -584,18 +617,13 @@ export default function ReferenceScreen() {
               <form.Field name="surfaceInfestee">
                 {(field) => (
                   <View style={styles.surfaceField}>
-                    <Text style={[
-                      styles.surfaceLabel,
-                      !isIntensive && styles.requiredLabel
-                    ]}>
-                      Infestée {!isIntensive && '*'}
-                    </Text>
+                    <Text style={styles.surfaceLabel}>Infestée</Text>
                     <TextInput
                       value={field.state.value ?? ''}
                       onChangeText={field.handleChange}
                       keyboardType="decimal-pad"
                       style={styles.surfaceInput}
-                      placeholder={isIntensive ? '0' : '0'}
+                      placeholder="0"
                     />
                   </View>
                 )}
@@ -643,15 +671,29 @@ export default function ReferenceScreen() {
             </Text>
           </ScrollView>
 
-          <View style={styles.footer}>
+          <View
+            style={[
+              styles.footer,
+              {
+                paddingBottom: Math.max(insets.bottom, 12) + 8,
+              },
+            ]}
+          >
             <TouchableOpacity
-              style={[styles.continueButton, (isSaving || isGpsLoading) && styles.continueButtonDisabled]}
+              style={[
+                styles.continueButton,
+                (isSaving || isGpsLoading) && styles.continueButtonDisabled,
+              ]}
               onPress={form.handleSubmit}
               disabled={isSaving || isGpsLoading}
               activeOpacity={0.85}
             >
               <Text style={styles.continueButtonText}>
-                {isGpsLoading ? '⏳ GPS en cours...' : isSaving ? 'Enregistrement…' : 'Continuer  ›'}
+                {isGpsLoading
+                  ? '⏳ GPS en cours...'
+                  : isSaving
+                    ? 'Enregistrement…'
+                    : 'Continuer  ›'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -735,6 +777,15 @@ const styles = StyleSheet.create({
   toggleSegmentActive: { backgroundColor: GREEN, color: '#fff' },
   autoValueRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   autoValueText: { fontSize: 15, fontWeight: '700', color: TEXT },
+  manualInput: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: TEXT,
+    backgroundColor: INACTIVE_BG,
+    borderRadius: 8,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+  },
   gpsBadge: { backgroundColor: GPS_BADGE_BG, borderRadius: 20, paddingHorizontal: 7, paddingVertical: 2 },
   gpsBadgeText: { fontSize: 9, fontWeight: '600', color: GREEN },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
@@ -779,6 +830,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 9,
   },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 24,
+  },
   surfaceLabel: { fontSize: 9.5, color: '#9a9484', marginBottom: 2 },
   surfaceInput: { fontSize: 18, fontWeight: '700', color: TEXT, padding: 0 },
   biotopeContainer: { marginTop: 4, marginBottom: 12 },
@@ -814,7 +869,11 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 6,
   },
-  footer: { padding: 16 },
+  footer: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    backgroundColor: BG,
+  },
   continueButton: {
     backgroundColor: GREEN,
     borderRadius: 13,
