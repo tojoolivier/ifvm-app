@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useForm } from '@tanstack/react-form';
 import { getCurrentPosition, reverseGeocode, GpsPosition } from '@/lib/location';
+import { PRECISION_GPS_CIBLE_M } from '@/lib/gps-precision';
 import { PermissionError } from '@/lib/errors';
 import {
   findNearestStation,
@@ -184,7 +185,14 @@ export default function ReferenceScreen() {
 
     const captureGps = async () => {
       try {
-        const pos = await getCurrentPosition();
+        const pos = await getCurrentPosition({
+          // Le GPS converge de plusieurs centaines de mètres vers quelques mètres :
+          // on affiche cette descente en direct, l'agent voit que ça travaille et
+          // sait quand la position devient exploitable.
+          onProgress: (enCours) => {
+            if (isActive) setPosition(enCours);
+          },
+        });
         if (!isActive) return;
 
         setPosition(pos);
@@ -449,7 +457,15 @@ export default function ReferenceScreen() {
                 <Text style={styles.gpsTitle}>
                   📍 {isGpsLoading ? 'Capture GPS en cours...' : 'Position acquise'}
                 </Text>
-                <View style={styles.accuracyBadge}>
+                <View
+                  testID="gps-accuracy-badge"
+                  style={[
+                    styles.accuracyBadge,
+                    position?.accuracy != null &&
+                      position.accuracy > PRECISION_GPS_CIBLE_M &&
+                      styles.accuracyBadgeAlerte,
+                  ]}
+                >
                   <Text style={styles.accuracyText}>
                     {position?.accuracy != null ? `± ${Math.round(position.accuracy)} m` : '…'}
                   </Text>
@@ -737,6 +753,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
+  /** Ambre : « utilisable, mais attends encore un peu » — ni neutre, ni bloquant. */
+  accuracyBadgeAlerte: { backgroundColor: '#f59e0b' },
   accuracyText: { color: '#fff', fontSize: 9.5, fontWeight: '600' },
   gpsFieldsRow: { flexDirection: 'row', gap: 8, marginBottom: 9 },
   gpsField: { flex: 1, backgroundColor: '#ffffff1f', borderRadius: 8, padding: 7 },
