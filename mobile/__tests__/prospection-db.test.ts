@@ -30,7 +30,8 @@ const MIGRATED_COLUMNS = [
   { name: 'signalement_description' },
   { name: 'conclusion_validation' },
   { name: 'avertissements' },
-  
+  { name: 'heure_observation_at' },
+
   // Colonnes de prospection_infestation
   { name: 'espece' },
   { name: 'direction_de' },
@@ -225,6 +226,7 @@ describe('prospection-db', () => {
       'signalement_description',
       'conclusion_validation',
       'avertissements',
+      'heure_observation_at',
     ];
 
     const allPresent = requiredColumns.every(colName =>
