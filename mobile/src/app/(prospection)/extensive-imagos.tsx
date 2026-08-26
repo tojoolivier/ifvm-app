@@ -8,8 +8,8 @@ import {
   IMAGO_PHASE_ROWS,
   PhaseKey,
   ExtensiveImagoSpeciesData,
-  TypeCibleImago,
   EtatImago,
+  TYPE_CIBLE_IMAGO_OPTIONS,
   createEmptySpeciesData,
   speciesDataToPopulationRow,
   populationRowToSpeciesData,
@@ -17,12 +17,6 @@ import {
 import { COMPASS_DIRECTIONS, oppositeDirection } from '@/lib/prospection-infestation-insights';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
-
-const TYPE_CIBLE_OPTIONS: { value: TypeCibleImago; label: string }[] = [
-  { value: 'vol_clair', label: 'Vol clair' },
-  { value: 'dense', label: 'Dense' },
-  { value: 'tres_dense', label: 'Très dense' },
-];
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -474,7 +468,7 @@ const handleContinue = () => {
               <Text style={styles.sectionLabel}>📊 Type de cible</Text>
               <Text style={styles.commonHint}>Données spécifiques à {species}</Text>
               <View style={styles.typeRow}>
-                {TYPE_CIBLE_OPTIONS.map((option) => {
+                {TYPE_CIBLE_IMAGO_OPTIONS.map((option) => {
                   const active = data.typeCible === option.value;
                   return (
                     <TouchableOpacity
@@ -608,7 +602,7 @@ const handleContinue = () => {
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Type de cible :</Text>
                 <Text style={styles.summaryValue}>
-                  {TYPE_CIBLE_OPTIONS.find((o) => o.value === data.typeCible)?.label}
+                  {TYPE_CIBLE_IMAGO_OPTIONS.find((o) => o.value === data.typeCible)?.label}
                 </Text>
               </View>
               <View style={styles.summaryRow}>

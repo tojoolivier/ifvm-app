@@ -112,6 +112,11 @@ export interface ExtensiveReferenceUpdateInput {
   surfaceStation: number | null;
   surfaceInfestee: number | null;
   nMessage: string | null;
+  /** Même colonne partagée `prospection.heure_observation_at` que l'Intensif
+   * (cf. `ObservationsUpdateInput`) — capturée ici sur l'écran Référence, où
+   * l'Extensif fait déjà son acquisition GPS (contrairement à l'Intensif, qui
+   * la capture sur Observations). */
+  heureObservationAt: string | null;
 }
 
 export interface ExtensiveObservationsUpdateInput {
@@ -388,11 +393,11 @@ export async function updateProspectionExtensiveReference(id: string, input: Ext
   await db.runAsync(
     `UPDATE prospection SET
       latitude = ?, longitude = ?, station_libre = ?, type_station = ?,
-      surface_station = ?, surface_infestee = ?, n_message = ?, updated_at = ?
+      surface_station = ?, surface_infestee = ?, n_message = ?, heure_observation_at = ?, updated_at = ?
      WHERE id = ?`,
     [
       input.latitude, input.longitude, input.stationLibre, input.typeStation,
-      input.surfaceStation, input.surfaceInfestee, input.nMessage, now, id,
+      input.surfaceStation, input.surfaceInfestee, input.nMessage, input.heureObservationAt, now, id,
     ]
   );
 

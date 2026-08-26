@@ -392,9 +392,10 @@ describe('updateProspectionExtensiveReference', () => {
     surfaceStation: 2.1,
     surfaceInfestee: 0.5,
     nMessage: '2026-0301',
+    heureObservationAt: '2026-08-26T09:15:00.000Z',
   };
 
-  it('writes station_libre/type_station/surface_station/surface_infestee/n_message, not station_id lookup fields', async () => {
+  it('writes station_libre/type_station/surface_station/surface_infestee/n_message/heure_observation_at, not station_id lookup fields', async () => {
     getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW });
 
     await updateProspectionExtensiveReference(BASE_INPUT.id, REF_INPUT);
@@ -409,6 +410,7 @@ describe('updateProspectionExtensiveReference', () => {
         REF_INPUT.surfaceStation,
         REF_INPUT.surfaceInfestee,
         REF_INPUT.nMessage,
+        REF_INPUT.heureObservationAt,
         expect.any(String),
         BASE_INPUT.id,
       ]

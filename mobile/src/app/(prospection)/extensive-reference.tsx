@@ -7,6 +7,7 @@ import { useAuthStore } from '@/lib/auth-store';
 import { updateProspectionExtensiveReference } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { BIOTOPE_EXTENSIVE_OPTIONS } from '@/lib/prospection-extensive';
+import { formatHeureLocale } from '@/lib/prospection-fiche-lecture';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { logger } from '@/lib/logger';
 
@@ -45,6 +46,12 @@ export default function ExtensiveReferenceScreen() {
   const [nMessage, setNMessage] = useState(
     draft?.n_message ?? (draftId && draft ? generateNumeroMessage(draftId, draft.date_prospection) : '')
   );
+  // Horodatage technique (ISO) de l'heure d'observation — même mécanisme que
+  // observations.tsx côté Intensif (`getCurrentPosition().timestamp`, colonne
+  // partagée `prospection.heure_observation_at`), mais capturé ici : l'Extensif
+  // n'a pas d'écran Infestation séparé, et c'est déjà sur cet écran Référence
+  // que se fait l'acquisition GPS.
+  const [heureObservationAt, setHeureObservationAt] = useState<string | null>(draft?.heure_observation_at ?? null);
   const { run, isRunning: isSaving } = useAsyncAction();
 
   // Récupération automatique des coordonnées GPS
@@ -53,10 +60,14 @@ export default function ExtensiveReferenceScreen() {
 
     const fetchGpsPosition = async () => {
       // Si les coordonnées existent déjà dans le brouillon, on les utilise
+      // (une heure d'observation déjà enregistrée est restaurée telle quelle,
+      // sans jamais relancer d'acquisition GPS simplement parce que l'écran
+      // est remonté — même règle que observations.tsx).
       if (draft?.latitude && draft?.longitude) {
         if (isMounted) {
           setLatitude(String(draft.latitude));
           setLongitude(String(draft.longitude));
+          if (draft.heure_observation_at) setHeureObservationAt(draft.heure_observation_at);
         }
         return;
       }
@@ -72,6 +83,7 @@ export default function ExtensiveReferenceScreen() {
         if (isMounted) {
           setLatitude(String(position.latitude));
           setLongitude(String(position.longitude));
+          setHeureObservationAt(new Date(position.timestamp).toISOString());
           setGpsError('');
         }
       } catch (error) {
@@ -93,7 +105,7 @@ export default function ExtensiveReferenceScreen() {
     return () => {
       isMounted = false;
     };
-  }, [draft?.latitude, draft?.longitude]);
+  }, [draft?.latitude, draft?.longitude, draft?.heure_observation_at]);
 
   // Station saisie librement, type de station, surface et n° message : de simples
   // `useState(draft?.x)` d'initialisation ne se remettent jamais à jour si `draft`
@@ -111,6 +123,7 @@ export default function ExtensiveReferenceScreen() {
       setSurfaceStation(draft.surface_station != null ? String(draft.surface_station) : '');
       setSurfaceInfestee(draft.surface_infestee != null ? String(draft.surface_infestee) : '');
       setNMessage(draft.n_message ?? generateNumeroMessage(draft.id, draft.date_prospection));
+      if (draft.heure_observation_at) setHeureObservationAt(draft.heure_observation_at);
     });
   }, [draft, draftId]);
 
@@ -130,6 +143,7 @@ export default function ExtensiveReferenceScreen() {
           surfaceStation: surfaceStation ? parseFloat(surfaceStation) : null,
           surfaceInfestee: surfaceInfestee ? parseFloat(surfaceInfestee) : null,
           nMessage: nMessage || null,
+          heureObservationAt,
         });
         setDraft(updated);
         router.push({ pathname: '/(prospection)/extensive-imagos' as any, params: { draftId } });
@@ -227,6 +241,15 @@ export default function ExtensiveReferenceScreen() {
                   <Text style={styles.gpsErrorText}>{gpsError}</Text>
                 ) : null}
               </View>
+            </View>
+
+            <View style={styles.autoCard}>
+              <Text style={styles.autoLabel}>🕐 Heure d&apos;observation (GPS)</Text>
+              {isLoadingGps ? (
+                <Text style={styles.gpsLoading}>Récupération GPS...</Text>
+              ) : (
+                <Text style={styles.autoValueMono}>{formatHeureLocale(heureObservationAt)}</Text>
+              )}
             </View>
 
             <Text style={styles.sectionLabel}>Type de station (biotope)</Text>

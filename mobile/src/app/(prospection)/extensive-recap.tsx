@@ -6,7 +6,8 @@ import { useAuthStore } from '@/lib/auth-store';
 import { concludeValidation, listAllProspectionPopulations, PopulationRow } from '@/lib/prospection-repository';
 import { enregistrerEtSynchroniser } from '@/lib/prospection-review';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
-import { imagoTotalFromRow, larveTotalFromRow } from '@/lib/prospection-extensive';
+import { imagoTotalFromRow, larveTotalFromRow, typeCibleImagoLabel } from '@/lib/prospection-extensive';
+import { formatHeureLocale } from '@/lib/prospection-fiche-lecture';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
@@ -17,41 +18,110 @@ const TEXT = '#16201a';
 const TEXT_SECONDARY = '#6f6a59';
 const BORDER = '#e7e0cd';
 
-/**
- * Détail imago réellement enregistré pour une espèce — reflète exactement ce que
- * `speciesDataToPopulationRow` (extensive-imagos.tsx) écrit en base. Le détail des
- * stades (femelleA1, maleA123…) et la phase « solitaro-transiens » ne sont, eux, pas
- * persistés par cet écran (seuls captures_sol/trans/greg le sont) : ne pas les afficher
- * ici reviendrait sinon à inventer une valeur (règle #11 — jamais de donnée inventée).
- */
-function buildImagoDetails(row: PopulationRow | null): string[] {
-  if (!row || (row.captures_nombre ?? 0) === 0) return [];
-  const details: string[] = [`Captures : ${row.captures_nombre}`];
-  details.push(`Phases : Sol. ${row.captures_sol ?? 0} · Trans. ${row.captures_trans ?? 0} · Grég. ${row.captures_greg ?? 0}`);
-  if (row.densite_diffuse != null) details.push(`Densité diffuse : ${row.densite_diffuse} D/ha`);
-  if (row.densite_groupee != null) details.push(`Densité groupée : ${row.densite_groupee} D/m²`);
-  details.push(`Type de capture : ${row.essaim_observe ? 'Essaim' : 'Vol clair'}`);
-  return details;
+interface DetailRow {
+  label: string;
+  value: string;
 }
 
-/** Détail larve réellement enregistré — `densites_larve` restitue le détail par stade
- * (L1…L8), réellement persisté par extensive-larves.tsx (contrairement aux stades imago). */
-function buildLarveDetails(row: PopulationRow | null): string[] {
-  if (!row || (row.captures_nombre ?? 0) === 0) return [];
-  const details: string[] = [`Captures : ${row.captures_nombre}`];
-  details.push(`Phases : Sol. ${row.captures_sol ?? 0} · Trans. ${row.captures_trans ?? 0} · Grég. ${row.captures_greg ?? 0}`);
-  if (row.densites_larve) {
+/**
+ * Récapitulatif complet (#227) : chaque ligne du mockup demandé par l'utilisateur
+ * (Nombre de captures, Phases, Accouplement, Ponte, Interdistance, Type de cible,
+ * Direction, État, Comportement, Densités…) est affichée explicitement, même quand
+ * la valeur est absente (« — ») — ne jamais masquer un champ silencieusement, c'est
+ * précisément ce qui donnait l'impression qu'une donnée saisie avait « disparu ».
+ * Seul le bloc entier LMC/NSE est masqué si l'espèce n'a strictement aucune donnée
+ * (elle n'a jamais été ouverte) : cf. `imagoRowHasData`/`larveRowHasData`.
+ */
+function buildImagoRows(row: PopulationRow | null): DetailRow[] {
+  return [
+    { label: 'Nombre de captures', value: String(row?.captures_nombre ?? 0) },
+    {
+      label: 'Phases',
+      value: `Sol. ${row?.captures_sol ?? 0} · Trans. ${row?.captures_trans ?? 0} · Sol-Trans. ${row?.captures_solitaro_transiens ?? 0} · Grég. ${row?.captures_greg ?? 0}`,
+    },
+    // Le détail des stades (femelleA1, maleA234…) n'est pas persisté pour les imagos —
+    // seule la répartition par phases l'est. Le dire explicitement plutôt que d'omettre
+    // la ligne : ne jamais laisser croire qu'une saisie a été perdue (règle #11).
+    { label: 'Stades', value: 'Non conservés en base (seule la répartition par phases l’est)' },
+    { label: 'Accouplement', value: row?.accouplement ?? '—' },
+    { label: 'Ponte', value: row?.ponte ?? '—' },
+    { label: 'Interdistance (m)', value: row?.interdistance != null ? String(row.interdistance) : '—' },
+    { label: 'Type de cible', value: typeCibleImagoLabel(row?.type_cible) },
+    {
+      label: 'Direction du déplacement',
+      value: row?.direction_de ? `${row.direction_de} → ${row.direction_vers}` : '—',
+    },
+    { label: 'État', value: row?.etat === 'repos' ? 'Repos' : row?.etat === 'deplacement' ? 'Déplacement' : '—' },
+    {
+      label: 'Comportement de l’essaim',
+      value: row?.essaim_en_vol ? 'En vol' : row?.essaim_pose ? 'Posé' : '—',
+    },
+    { label: 'Densité diffuse', value: row?.densite_diffuse != null ? `${row.densite_diffuse} D/ha` : '—' },
+    { label: 'Densité groupée', value: row?.densite_groupee != null ? `${row.densite_groupee} D/m²` : '—' },
+  ];
+}
+
+function imagoRowHasData(row: PopulationRow | null): boolean {
+  if (!row) return false;
+  return (
+    (row.captures_nombre ?? 0) > 0 ||
+    row.densite_diffuse != null ||
+    row.densite_groupee != null ||
+    !!row.accouplement ||
+    !!row.ponte ||
+    row.interdistance != null ||
+    !!row.etat
+  );
+}
+
+function buildLarveRows(row: PopulationRow | null): DetailRow[] {
+  let stadesValue = '—';
+  if (row?.densites_larve) {
     const parsed = JSON.parse(row.densites_larve) as Record<string, number>;
     const nonZero = Object.entries(parsed).filter(([, v]) => v > 0);
-    if (nonZero.length > 0) {
-      details.push(`Stades : ${nonZero.map(([stade, v]) => `${stade} ${v}`).join(' · ')}`);
-    }
+    if (nonZero.length > 0) stadesValue = nonZero.map(([stade, v]) => `${stade} ${v}`).join(' · ');
   }
-  const infestations = [row.tache_larvaire ? 'Tache larvaire' : null, row.bande_larvaire ? 'Bande larvaire' : null].filter(Boolean);
-  if (infestations.length > 0) details.push(infestations.join(' · '));
-  if (row.interdistance != null) details.push(`Interdistance : ${row.interdistance} m`);
-  if (row.deplacement) details.push(`Déplacement : ${row.deplacement === 'perchee' ? 'Perchée' : 'Repos'}`);
-  return details;
+  const autres = [
+    row?.tache_larvaire ? 'Tache larvaire' : null,
+    row?.bande_larvaire ? 'Bande larvaire' : null,
+    row?.deplacement ? `Déplacement : ${row.deplacement === 'perchee' ? 'Perchée' : 'Repos'}` : null,
+  ].filter(Boolean);
+
+  return [
+    { label: 'Nombre de captures', value: String(row?.captures_nombre ?? 0) },
+    { label: 'Stades renseignés', value: stadesValue },
+    { label: 'Interdistance (m)', value: row?.interdistance != null ? String(row.interdistance) : '—' },
+    { label: 'Surface contaminée (ha)', value: row?.surface_contaminee_ha != null ? String(row.surface_contaminee_ha) : '—' },
+    // Pas de saisie densité diffuse/groupée sur l'écran Larves (la densité y est
+    // exprimée uniquement par la répartition de captures par stade) — la ligne reste
+    // affichée pour respecter la structure demandée, avec une valeur honnête (« — »).
+    { label: 'Densité diffuse', value: row?.densite_diffuse != null ? `${row.densite_diffuse} D/ha` : '—' },
+    { label: 'Densité groupée', value: row?.densite_groupee != null ? `${row.densite_groupee} D/m²` : '—' },
+    { label: 'Autres informations', value: autres.length > 0 ? autres.join(' · ') : '—' },
+  ];
+}
+
+function larveRowHasData(row: PopulationRow | null): boolean {
+  if (!row) return false;
+  if ((row.captures_nombre ?? 0) > 0) return true;
+  if (row.interdistance != null) return true;
+  if (row.surface_contaminee_ha != null) return true;
+  if (row.tache_larvaire || row.bande_larvaire) return true;
+  if (row.deplacement && row.deplacement !== 'repos') return true;
+  return false;
+}
+
+function DetailRows({ rows }: { rows: DetailRow[] }) {
+  return (
+    <>
+      {rows.map((row) => (
+        <View key={row.label} style={styles.detailRow}>
+          <Text style={styles.detailRowLabel}>{row.label}</Text>
+          <Text style={styles.detailRowValue}>{row.value}</Text>
+        </View>
+      ))}
+    </>
+  );
 }
 
 export default function ExtensiveRecapScreen() {
@@ -83,10 +153,10 @@ export default function ExtensiveRecapScreen() {
       imagoNSE: imagoTotalFromRow(imagoNSERow),
       larveLMC: larveTotalFromRow(larveLMCRow),
       larveNSE: larveTotalFromRow(larveNSERow),
-      imagoLMCDetails: buildImagoDetails(imagoLMCRow),
-      imagoNSEDetails: buildImagoDetails(imagoNSERow),
-      larveLMCDetails: buildLarveDetails(larveLMCRow),
-      larveNSEDetails: buildLarveDetails(larveNSERow),
+      imagoLMCRows: imagoRowHasData(imagoLMCRow) ? buildImagoRows(imagoLMCRow) : null,
+      imagoNSERows: imagoRowHasData(imagoNSERow) ? buildImagoRows(imagoNSERow) : null,
+      larveLMCRows: larveRowHasData(larveLMCRow) ? buildLarveRows(larveLMCRow) : null,
+      larveNSERows: larveRowHasData(larveNSERow) ? buildLarveRows(larveNSERow) : null,
     };
   }, [populations]);
 
@@ -135,8 +205,8 @@ export default function ExtensiveRecapScreen() {
     return (
       <View style={styles.root}>
         <SafeAreaView edges={['top']} style={styles.safe}>
-          <KeyboardAvoidingView 
-            style={styles.keyboardAvoidingView} 
+          <KeyboardAvoidingView
+            style={styles.keyboardAvoidingView}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
           >
@@ -170,56 +240,50 @@ export default function ExtensiveRecapScreen() {
                 </View>
               </View>
 
-              <Text style={styles.detailSubtitle}>Références</Text>
+              <Text style={styles.detailSubtitle}>Référence</Text>
               <View style={styles.summaryCard}>
                 <Text style={styles.detailLine}>Station : {draft.station_libre ?? '—'} · Type : {draft.type_station ?? '—'}</Text>
                 <Text style={styles.detailLine}>
                   GPS : {draft.latitude?.toFixed(4) ?? '—'}, {draft.longitude?.toFixed(4) ?? '—'}
                 </Text>
+                <Text style={styles.detailLine}>Surface infestée : {draft.surface_infestee ?? '—'} ha</Text>
+                <Text style={styles.detailLine}>Heure d’observation : {formatHeureLocale(draft.heure_observation_at)}</Text>
               </View>
 
-              {(totals.imagoLMCDetails.length > 0 || totals.imagoNSEDetails.length > 0) && (
+              {(totals.imagoLMCRows || totals.imagoNSERows) && (
                 <>
                   <Text style={styles.detailSubtitle}>Imagos</Text>
                   <View style={styles.summaryCard}>
-                    {totals.imagoLMCDetails.length > 0 && (
+                    {totals.imagoLMCRows && (
                       <>
                         <Text style={styles.detailLine}>LMC</Text>
-                        {totals.imagoLMCDetails.map((line) => (
-                          <Text key={line} style={styles.detailLine}>· {line}</Text>
-                        ))}
+                        <DetailRows rows={totals.imagoLMCRows} />
                       </>
                     )}
-                    {totals.imagoNSEDetails.length > 0 && (
+                    {totals.imagoNSERows && (
                       <>
-                        <Text style={[styles.detailLine, { marginTop: totals.imagoLMCDetails.length > 0 ? 6 : 0 }]}>NSE</Text>
-                        {totals.imagoNSEDetails.map((line) => (
-                          <Text key={line} style={styles.detailLine}>· {line}</Text>
-                        ))}
+                        <Text style={[styles.detailLine, { marginTop: totals.imagoLMCRows ? 6 : 0 }]}>NSE</Text>
+                        <DetailRows rows={totals.imagoNSERows} />
                       </>
                     )}
                   </View>
                 </>
               )}
 
-              {(totals.larveLMCDetails.length > 0 || totals.larveNSEDetails.length > 0) && (
+              {(totals.larveLMCRows || totals.larveNSERows) && (
                 <>
                   <Text style={styles.detailSubtitle}>Larves</Text>
                   <View style={styles.summaryCard}>
-                    {totals.larveLMCDetails.length > 0 && (
+                    {totals.larveLMCRows && (
                       <>
                         <Text style={styles.detailLine}>LMC</Text>
-                        {totals.larveLMCDetails.map((line) => (
-                          <Text key={line} style={styles.detailLine}>· {line}</Text>
-                        ))}
+                        <DetailRows rows={totals.larveLMCRows} />
                       </>
                     )}
-                    {totals.larveNSEDetails.length > 0 && (
+                    {totals.larveNSERows && (
                       <>
-                        <Text style={[styles.detailLine, { marginTop: totals.larveLMCDetails.length > 0 ? 6 : 0 }]}>NSE</Text>
-                        {totals.larveNSEDetails.map((line) => (
-                          <Text key={line} style={styles.detailLine}>· {line}</Text>
-                        ))}
+                        <Text style={[styles.detailLine, { marginTop: totals.larveLMCRows ? 6 : 0 }]}>NSE</Text>
+                        <DetailRows rows={totals.larveNSERows} />
                       </>
                     )}
                   </View>
@@ -230,7 +294,9 @@ export default function ExtensiveRecapScreen() {
               <View style={styles.summaryCard}>
                 <Text style={styles.detailLine}>Dégâts sur les cultures : {draft.degats_cultures_pourcent ?? 0} %</Text>
                 <Text style={styles.detailLine}>Verdure strate herbeuse : {draft.verdure_strate ?? '—'}</Text>
-                <Text style={styles.detailLine}>H. strate herbeuse : {draft.hauteur_herbe_cm ?? '—'} cm</Text>
+                <Text style={styles.detailLine}>
+                  H. strate herbeuse : {draft.hauteur_herbe_cm != null ? `${(draft.hauteur_herbe_cm / 100).toFixed(2)} m` : '—'}
+                </Text>
                 <Text style={styles.detailLine}>Dernière pluie : {draft.derniere_pluie ?? '—'}</Text>
                 <Text style={styles.detailLine}>Intensité pluie : {draft.intensite_pluie ?? '—'}</Text>
               </View>
@@ -265,8 +331,8 @@ export default function ExtensiveRecapScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.safe}>
-        <KeyboardAvoidingView 
-          style={styles.keyboardAvoidingView} 
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoidingView}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
@@ -289,16 +355,26 @@ export default function ExtensiveRecapScreen() {
               <View style={styles.checkBadge}>
                 <Text style={styles.checkBadgeText}>✓</Text>
               </View>
-              <Text style={styles.checkLabel}>A · Références</Text>
+              <Text style={styles.checkLabel}>A · Référence</Text>
             </View>
             <View style={styles.detailCard}>
+              <Text style={styles.detailSubtitle}>Informations générales</Text>
+              <Text style={styles.detailLine}>N° message : {draft.n_message ?? '—'}</Text>
+              <Text style={styles.detailLine}>Date : {draft.date_prospection ?? '—'}</Text>
+
+              <Text style={[styles.detailSubtitle, { marginTop: 8 }]}>Station</Text>
               <Text style={styles.detailLine}>Station : {draft.station_libre ?? '—'}</Text>
               <Text style={styles.detailLine}>Type de station : {draft.type_station ?? '—'}</Text>
-              <Text style={styles.detailLine}>Surface : {draft.surface_station ?? '—'} ha</Text>
               <Text style={styles.detailLine}>
                 GPS : {draft.latitude?.toFixed(4) ?? '—'}, {draft.longitude?.toFixed(4) ?? '—'}
               </Text>
-              <Text style={styles.detailLine}>N° message : {draft.n_message ?? '—'}</Text>
+
+              <Text style={[styles.detailSubtitle, { marginTop: 8 }]}>Surfaces</Text>
+              <Text style={styles.detailLine}>Surface station : {draft.surface_station ?? '—'} ha</Text>
+              <Text style={styles.detailLine}>Surface infestée : {draft.surface_infestee ?? '—'} ha</Text>
+
+              <Text style={[styles.detailSubtitle, { marginTop: 8 }]}>Heure d’observation</Text>
+              <Text style={styles.detailLine}>{formatHeureLocale(draft.heure_observation_at)}</Text>
             </View>
 
             <View style={styles.checkRow}>
@@ -307,22 +383,18 @@ export default function ExtensiveRecapScreen() {
               </View>
               <Text style={styles.checkLabel}>B · Imagos — LMC {totals.imagoLMC} · NSE {totals.imagoNSE}</Text>
             </View>
-            {(totals.imagoLMCDetails.length > 0 || totals.imagoNSEDetails.length > 0) && (
+            {(totals.imagoLMCRows || totals.imagoNSERows) && (
               <View style={styles.detailCard}>
-                {totals.imagoLMCDetails.length > 0 && (
+                {totals.imagoLMCRows && (
                   <>
                     <Text style={styles.detailSubtitle}>LMC</Text>
-                    {totals.imagoLMCDetails.map((line) => (
-                      <Text key={line} style={styles.detailLine}>{line}</Text>
-                    ))}
+                    <DetailRows rows={totals.imagoLMCRows} />
                   </>
                 )}
-                {totals.imagoNSEDetails.length > 0 && (
+                {totals.imagoNSERows && (
                   <>
-                    <Text style={[styles.detailSubtitle, { marginTop: totals.imagoLMCDetails.length > 0 ? 8 : 0 }]}>NSE</Text>
-                    {totals.imagoNSEDetails.map((line) => (
-                      <Text key={line} style={styles.detailLine}>{line}</Text>
-                    ))}
+                    <Text style={[styles.detailSubtitle, { marginTop: totals.imagoLMCRows ? 8 : 0 }]}>NSE</Text>
+                    <DetailRows rows={totals.imagoNSERows} />
                   </>
                 )}
               </View>
@@ -334,22 +406,18 @@ export default function ExtensiveRecapScreen() {
               </View>
               <Text style={styles.checkLabel}>C · Larves — LMC {totals.larveLMC} · NSE {totals.larveNSE}</Text>
             </View>
-            {(totals.larveLMCDetails.length > 0 || totals.larveNSEDetails.length > 0) && (
+            {(totals.larveLMCRows || totals.larveNSERows) && (
               <View style={styles.detailCard}>
-                {totals.larveLMCDetails.length > 0 && (
+                {totals.larveLMCRows && (
                   <>
                     <Text style={styles.detailSubtitle}>LMC</Text>
-                    {totals.larveLMCDetails.map((line) => (
-                      <Text key={line} style={styles.detailLine}>{line}</Text>
-                    ))}
+                    <DetailRows rows={totals.larveLMCRows} />
                   </>
                 )}
-                {totals.larveNSEDetails.length > 0 && (
+                {totals.larveNSERows && (
                   <>
-                    <Text style={[styles.detailSubtitle, { marginTop: totals.larveLMCDetails.length > 0 ? 8 : 0 }]}>NSE</Text>
-                    {totals.larveNSEDetails.map((line) => (
-                      <Text key={line} style={styles.detailLine}>{line}</Text>
-                    ))}
+                    <Text style={[styles.detailSubtitle, { marginTop: totals.larveLMCRows ? 8 : 0 }]}>NSE</Text>
+                    <DetailRows rows={totals.larveNSERows} />
                   </>
                 )}
               </View>
@@ -364,7 +432,9 @@ export default function ExtensiveRecapScreen() {
             <View style={styles.detailCard}>
               <Text style={styles.detailLine}>Dégâts sur les cultures : {draft.degats_cultures_pourcent ?? 0} %</Text>
               <Text style={styles.detailLine}>Verdure strate herbeuse : {draft.verdure_strate ?? '—'}</Text>
-              <Text style={styles.detailLine}>H. strate herbeuse : {draft.hauteur_herbe_cm ?? '—'} cm</Text>
+              <Text style={styles.detailLine}>
+                H. strate herbeuse : {draft.hauteur_herbe_cm != null ? `${(draft.hauteur_herbe_cm / 100).toFixed(2)} m` : '—'}
+              </Text>
               <Text style={styles.detailLine}>Dernière pluie : {draft.derniere_pluie ?? '—'}</Text>
               <Text style={styles.detailLine}>Intensité pluie : {draft.intensite_pluie ?? '—'}</Text>
             </View>
@@ -402,6 +472,9 @@ const styles = StyleSheet.create({
   detailCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 11, marginTop: -2 },
   detailSubtitle: { fontSize: 10, fontWeight: '700', color: GREEN, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
   detailLine: { fontSize: 12, color: '#5c5848', lineHeight: 17 },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: '#f0eee8' },
+  detailRowLabel: { fontSize: 11.5, color: TEXT_SECONDARY, flexShrink: 1 },
+  detailRowValue: { fontSize: 11.5, color: TEXT, fontWeight: '600', textAlign: 'right', flexShrink: 1 },
   offlineBanner: { marginTop: 6, backgroundColor: '#fdf6e7', borderWidth: 1, borderColor: '#f0e2bf', borderRadius: 11, padding: 12 },
   offlineText: { fontSize: 11, lineHeight: 16, color: '#8a6d2f', fontWeight: '500' },
   footer: { padding: 16 },

@@ -1,103 +1,168 @@
 import {
-  emptyExtensiveImagoState,
-  emptyExtensiveLarveState,
-  imagoStateToPopulationRow,
-  imagoTotal,
+  createEmptySpeciesData,
+  createEmptyLarveSpeciesData,
+  speciesDataToPopulationRow,
+  populationRowToSpeciesData,
+  larveSpeciesDataToPopulationRow,
+  populationRowToLarveSpeciesData,
   imagoTotalFromRow,
-  larveStateToPopulationRow,
-  larveTotal,
   larveTotalFromRow,
-  populationRowToImagoState,
-  populationRowToLarveState,
 } from '../src/lib/prospection-extensive';
 
-describe('emptyExtensiveImagoState / imagoTotal', () => {
-  it('démarre à zéro pour les trois phénotypes', () => {
-    const state = emptyExtensiveImagoState();
-    expect(imagoTotal(state)).toBe(0);
-    expect(state.active).toBe('trans');
-    expect(state.essaim).toBe(false);
-  });
-
-  it('additionne sol + trans + greg', () => {
-    const state = { ...emptyExtensiveImagoState(), sol: 3, trans: 14, greg: 2 };
-    expect(imagoTotal(state)).toBe(19);
+describe('createEmptySpeciesData (imago)', () => {
+  it('démarre à zéro, sans espèce/état choisis', () => {
+    const data = createEmptySpeciesData();
+    expect(data.totalCaptures).toBe(0);
+    expect(data.typeCible).toBe('vol_clair');
+    expect(data.etat).toBeNull();
+    expect(data.comportementEssaim).toBeNull();
+    expect(data.accouplement).toBeNull();
+    expect(data.ponte).toBeNull();
   });
 });
 
-describe('emptyExtensiveLarveState', () => {
-  it('initialise les densités LMC sur L1-L5', () => {
-    const state = emptyExtensiveLarveState('LMC');
-    expect(Object.keys(state.densites)).toEqual(['L1', 'L2', 'L3', 'L4', 'L5']);
-    expect(state.stade).toBe('L1');
+describe('createEmptyLarveSpeciesData', () => {
+  it('initialise les stades LMC sur L1-L5', () => {
+    const data = createEmptyLarveSpeciesData('LMC');
+    expect(Object.keys(data.stades)).toEqual(['L1', 'L2', 'L3', 'L4', 'L5']);
+    expect(data.deplacement).toBe('repos');
+    expect(data.tacheLarvaire).toBe(false);
   });
 
-  it('initialise les densités NSE sur L1-L7', () => {
-    const state = emptyExtensiveLarveState('NSE');
-    expect(Object.keys(state.densites)).toEqual(['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7']);
-  });
-});
-
-describe('larveTotal', () => {
-  it('additionne toutes les densités renseignées', () => {
-    const state = emptyExtensiveLarveState('NSE');
-    state.densites.L3 = 31;
-    state.densites.L5 = 4;
-    expect(larveTotal(state)).toBe(35);
+  it('initialise les stades NSE sur L1-L7', () => {
+    const data = createEmptyLarveSpeciesData('NSE');
+    expect(Object.keys(data.stades)).toEqual(['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7']);
   });
 });
 
-describe('imagoStateToPopulationRow / populationRowToImagoState — round-trip', () => {
-  it('conserve sol/trans/greg, phase, densités et essaim', () => {
-    const state = { sol: 3, trans: 14, greg: 0, active: 'trans' as const, phase: 'A2', popDiff: '2.4', popGroup: '', essaim: false };
-    const row = imagoStateToPopulationRow('LMC', state);
-    expect(row.espece).toBe('LMC');
-    expect(row.categorie).toBe('imago');
-    expect(row.captures_sol).toBe(3);
-    expect(row.captures_trans).toBe(14);
-    expect(row.stade_imago).toBe('A2');
-    expect(row.densite_diffuse).toBe(2.4);
-    expect(row.densite_groupee).toBeNull();
+describe('speciesDataToPopulationRow / populationRowToSpeciesData — round-trip imago', () => {
+  it('conserve le nombre de captures — non-régression #227 (« la valeur ne doit jamais disparaître »)', () => {
+    const data = { ...createEmptySpeciesData(), totalCaptures: 25 };
+    const row = speciesDataToPopulationRow('LMC', data);
+    expect(row.captures_nombre).toBe(25);
 
-    const restored = populationRowToImagoState(row);
-    expect(restored.sol).toBe(3);
-    expect(restored.trans).toBe(14);
-    expect(restored.phase).toBe('A2');
-    expect(restored.popDiff).toBe('2.4');
-    expect(restored.essaim).toBe(false);
+    const restored = populationRowToSpeciesData(row);
+    expect(restored.totalCaptures).toBe(25);
   });
 
-  it('populationRowToImagoState renvoie un état vide si row est null', () => {
-    expect(populationRowToImagoState(null)).toEqual(emptyExtensiveImagoState());
+  it('conserve la 4e phase « Solitaro-Transiens » — non-régression #227 (colonne existante jamais alimentée)', () => {
+    const data = {
+      ...createEmptySpeciesData(),
+      totalCaptures: 10,
+      phases: { solitaire: 2, transiens: 3, solitaroTransiens: 4, gregaire: 1 },
+    };
+    const row = speciesDataToPopulationRow('NSE', data);
+    expect(row.captures_solitaro_transiens).toBe(4);
+
+    const restored = populationRowToSpeciesData(row);
+    expect(restored.phases.solitaroTransiens).toBe(4);
+    expect(restored.phases.solitaire).toBe(2);
+    expect(restored.phases.transiens).toBe(3);
+    expect(restored.phases.gregaire).toBe(1);
+  });
+
+  it('conserve accouplement, ponte, interdistance, type de cible, état, comportement et direction', () => {
+    const data = {
+      ...createEmptySpeciesData(),
+      accouplement: 'Dominant',
+      ponte: 'Beaucoup',
+      interdistance: '25.5',
+      typeCible: 'tres_dense' as const,
+      etat: 'deplacement' as const,
+      comportementEssaim: 'vol' as const,
+      directionDe: 'Nord',
+      directionVers: 'Sud',
+    };
+    const row = speciesDataToPopulationRow('LMC', data);
+    expect(row.accouplement).toBe('Dominant');
+    expect(row.ponte).toBe('Beaucoup');
+    expect(row.interdistance).toBe(25.5);
+    expect(row.type_cible).toBe('tres_dense');
+    expect(row.etat).toBe('deplacement');
+    expect(row.essaim_en_vol).toBe(true);
+    expect(row.essaim_pose).toBe(false);
+    expect(row.direction_de).toBe('Nord');
+    expect(row.direction_vers).toBe('Sud');
+
+    const restored = populationRowToSpeciesData(row);
+    expect(restored.accouplement).toBe('Dominant');
+    expect(restored.ponte).toBe('Beaucoup');
+    expect(restored.interdistance).toBe('25.5');
+    expect(restored.typeCible).toBe('tres_dense');
+    expect(restored.etat).toBe('deplacement');
+    expect(restored.comportementEssaim).toBe('vol');
+    expect(restored.directionDe).toBe('Nord');
+    expect(restored.directionVers).toBe('Sud');
+  });
+
+  it('populationRowToSpeciesData renvoie des données vides si row est null', () => {
+    expect(populationRowToSpeciesData(null)).toEqual(createEmptySpeciesData());
   });
 });
 
-describe('larveStateToPopulationRow / populationRowToLarveState — round-trip', () => {
-  it('conserve les densités par stade, TL/BL, interdistance et déplacement', () => {
-    const state = { ...emptyExtensiveLarveState('NSE'), tl: true, bl: false, interdist: '0.6', deplacement: 'repos' };
-    state.densites.L3 = 31;
-    const row = larveStateToPopulationRow('NSE', state);
-    expect(row.categorie).toBe('larve');
+describe('larveSpeciesDataToPopulationRow / populationRowToLarveSpeciesData — round-trip larve', () => {
+  it('conserve le nombre de captures et les stades par espèce', () => {
+    const data = {
+      ...createEmptyLarveSpeciesData('NSE'),
+      totalCaptures: 35,
+      stades: { ...createEmptyLarveSpeciesData('NSE').stades, L3: 31, L5: 4 },
+    };
+    const row = larveSpeciesDataToPopulationRow('NSE', data);
+    expect(row.captures_nombre).toBe(35);
     expect(JSON.parse(row.densites_larve as string).L3).toBe(31);
-    expect(row.tache_larvaire).toBe(true);
-    expect(row.bande_larvaire).toBe(false);
-    expect(row.interdistance).toBe(0.6);
 
-    const restored = populationRowToLarveState('NSE', row);
-    expect(restored.densites.L3).toBe(31);
-    expect(restored.tl).toBe(true);
-    expect(restored.interdist).toBe('0.6');
-    expect(restored.deplacement).toBe('repos');
+    const restored = populationRowToLarveSpeciesData('NSE', row);
+    expect(restored.totalCaptures).toBe(35);
+    expect(restored.stades.L3).toBe(31);
+    expect(restored.stades.L5).toBe(4);
   });
 
-  it('populationRowToLarveState renvoie un état vide (par espèce) si row est null', () => {
-    expect(populationRowToLarveState('LMC', null)).toEqual(emptyExtensiveLarveState('LMC'));
+  it('conserve tache/bande larvaire, interdistance, déplacement et surface contaminée — par espèce, non-régression #226', () => {
+    const dataLmc = {
+      ...createEmptyLarveSpeciesData('LMC'),
+      tacheLarvaire: true,
+      bandeLarvaire: false,
+      interdistance: '0.6',
+      deplacement: 'perchee',
+      surfaceContamineeHa: '12.75',
+    };
+    const dataNse = { ...createEmptyLarveSpeciesData('NSE'), interdistance: '3.2', surfaceContamineeHa: '0.5' };
+
+    const rowLmc = larveSpeciesDataToPopulationRow('LMC', dataLmc);
+    const rowNse = larveSpeciesDataToPopulationRow('NSE', dataNse);
+
+    expect(rowLmc.tache_larvaire).toBe(true);
+    expect(rowLmc.interdistance).toBe(0.6);
+    expect(rowLmc.deplacement).toBe('perchee');
+    expect(rowLmc.surface_contaminee_ha).toBe(12.75);
+
+    // LMC et NSE ne doivent jamais partager ces valeurs (bug corrigé : elles étaient
+    // jusqu'ici un unique état partagé entre les deux espèces sur extensive-larves.tsx).
+    expect(rowNse.tache_larvaire).toBe(false);
+    expect(rowNse.interdistance).toBe(3.2);
+    expect(rowNse.deplacement).toBe('repos');
+    expect(rowNse.surface_contaminee_ha).toBe(0.5);
+
+    const restoredLmc = populationRowToLarveSpeciesData('LMC', rowLmc);
+    const restoredNse = populationRowToLarveSpeciesData('NSE', rowNse);
+    expect(restoredLmc.tacheLarvaire).toBe(true);
+    expect(restoredLmc.surfaceContamineeHa).toBe('12.75');
+    expect(restoredNse.tacheLarvaire).toBe(false);
+    expect(restoredNse.surfaceContamineeHa).toBe('0.5');
+  });
+
+  it('populationRowToLarveSpeciesData renvoie des données vides (par espèce) si row est null', () => {
+    expect(populationRowToLarveSpeciesData('LMC', null)).toEqual(createEmptyLarveSpeciesData('LMC'));
   });
 });
 
 describe('imagoTotalFromRow / larveTotalFromRow', () => {
-  it('additionne sol/trans/greg directement depuis la ligne persistée', () => {
-    const row = imagoStateToPopulationRow('LMC', { sol: 3, trans: 14, greg: 2, active: 'trans', phase: 'A2', popDiff: '', popGroup: '', essaim: false });
+  it('additionne sol/trans/solitaro-trans/greg directement depuis la ligne persistée', () => {
+    const row = speciesDataToPopulationRow('LMC', {
+      ...createEmptySpeciesData(),
+      totalCaptures: 19,
+      phases: { solitaire: 3, transiens: 14, solitaroTransiens: 0, gregaire: 2 },
+    });
     expect(imagoTotalFromRow(row)).toBe(19);
   });
 
@@ -105,11 +170,12 @@ describe('imagoTotalFromRow / larveTotalFromRow', () => {
     expect(imagoTotalFromRow(null)).toBe(0);
   });
 
-  it('additionne les densités par stade directement depuis la ligne persistée', () => {
-    const state = emptyExtensiveLarveState('NSE');
-    state.densites.L3 = 31;
-    state.densites.L5 = 4;
-    const row = larveStateToPopulationRow('NSE', state);
+  it('additionne les stades directement depuis la ligne persistée', () => {
+    const data = {
+      ...createEmptyLarveSpeciesData('NSE'),
+      stades: { ...createEmptyLarveSpeciesData('NSE').stades, L3: 31, L5: 4 },
+    };
+    const row = larveSpeciesDataToPopulationRow('NSE', data);
     expect(larveTotalFromRow(row)).toBe(35);
   });
 

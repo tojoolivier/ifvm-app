@@ -11,7 +11,6 @@ import {
   createEmptyLarveSpeciesData,
   larveSpeciesDataToPopulationRow,
   populationRowToLarveSpeciesData,
-  extractCommonLarveData,
 } from '@/lib/prospection-extensive';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
@@ -35,13 +34,6 @@ export default function ExtensiveLarvesScreen() {
     NSE: createEmptyLarveSpeciesData('NSE'),
   });
   
-  // Données communes
-  const [tacheLarvaire, setTacheLarvaire] = useState(false);
-  const [bandeLarvaire, setBandeLarvaire] = useState(false);
-  const [interdist, setInterdist] = useState('');
-  const [deplacement, setDeplacement] = useState('repos');
-  const [surfaceContamineeHa, setSurfaceContamineeHa] = useState('');
-  
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('extensive-larves');
 
@@ -52,20 +44,10 @@ export default function ExtensiveLarvesScreen() {
       getProspectionPopulation(draftId, 'NSE', 'larve'),
     ])
       .then(([lmc, nse]) => {
-        const lmcData = populationRowToLarveSpeciesData('LMC', lmc);
-        const nseData = populationRowToLarveSpeciesData('NSE', nse);
-
         setSpeciesData({
-          LMC: lmcData,
-          NSE: nseData,
+          LMC: populationRowToLarveSpeciesData('LMC', lmc),
+          NSE: populationRowToLarveSpeciesData('NSE', nse),
         });
-
-        const commonData = extractCommonLarveData(lmc || nse);
-        setTacheLarvaire(commonData.tl);
-        setBandeLarvaire(commonData.bl);
-        setInterdist(commonData.interdist);
-        setDeplacement(commonData.deplacement);
-        setSurfaceContamineeHa(commonData.surfaceContamineeHa);
       })
       .catch((error) => signalerChargement(error, { draftId }));
   }, [draftId, signalerChargement]);
@@ -127,11 +109,9 @@ export default function ExtensiveLarvesScreen() {
 
     return run(
       async () => {
-        const commonData = { tl: tacheLarvaire, bl: bandeLarvaire, interdist, deplacement, surfaceContamineeHa };
-
         await Promise.all([
-          saveProspectionPopulation(draftId, larveSpeciesDataToPopulationRow('LMC', speciesData.LMC, commonData)),
-          saveProspectionPopulation(draftId, larveSpeciesDataToPopulationRow('NSE', speciesData.NSE, commonData)),
+          saveProspectionPopulation(draftId, larveSpeciesDataToPopulationRow('LMC', speciesData.LMC)),
+          saveProspectionPopulation(draftId, larveSpeciesDataToPopulationRow('NSE', speciesData.NSE)),
         ]);
 
         // Observations (dégâts/verdure/hauteur/pluie) suit toujours Larves dans le
@@ -314,15 +294,16 @@ export default function ExtensiveLarvesScreen() {
 
             <View style={styles.observationsSection}>
               <Text style={styles.sectionLabel}>📊 Observations</Text>
-              
+              <Text style={styles.speciesHint}>Données spécifiques à {species}</Text>
+
               <View style={styles.toggleRow}>
                 <Text style={styles.toggleLabel}>Tache larvaire</Text>
                 <TouchableOpacity
-                  style={[styles.toggleButton, tacheLarvaire && styles.toggleButtonActive]}
-                  onPress={() => setTacheLarvaire(!tacheLarvaire)}
+                  style={[styles.toggleButton, data.tacheLarvaire && styles.toggleButtonActive]}
+                  onPress={() => updateSpeciesData({ tacheLarvaire: !data.tacheLarvaire })}
                 >
-                  <Text style={[styles.toggleText, tacheLarvaire && styles.toggleTextActive]}>
-                    {tacheLarvaire ? 'Oui' : 'Non'}
+                  <Text style={[styles.toggleText, data.tacheLarvaire && styles.toggleTextActive]}>
+                    {data.tacheLarvaire ? 'Oui' : 'Non'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -330,11 +311,11 @@ export default function ExtensiveLarvesScreen() {
               <View style={styles.toggleRow}>
                 <Text style={styles.toggleLabel}>Bande larvaire</Text>
                 <TouchableOpacity
-                  style={[styles.toggleButton, bandeLarvaire && styles.toggleButtonActive]}
-                  onPress={() => setBandeLarvaire(!bandeLarvaire)}
+                  style={[styles.toggleButton, data.bandeLarvaire && styles.toggleButtonActive]}
+                  onPress={() => updateSpeciesData({ bandeLarvaire: !data.bandeLarvaire })}
                 >
-                  <Text style={[styles.toggleText, bandeLarvaire && styles.toggleTextActive]}>
-                    {bandeLarvaire ? 'Oui' : 'Non'}
+                  <Text style={[styles.toggleText, data.bandeLarvaire && styles.toggleTextActive]}>
+                    {data.bandeLarvaire ? 'Oui' : 'Non'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -342,8 +323,8 @@ export default function ExtensiveLarvesScreen() {
               <View style={styles.inputRow}>
                 <Text style={styles.inputLabel}>Interdistance (m)</Text>
                 <TextInput
-                  value={interdist}
-                  onChangeText={setInterdist}
+                  value={data.interdistance}
+                  onChangeText={(text) => updateSpeciesData({ interdistance: text })}
                   keyboardType="decimal-pad"
                   style={styles.inputField}
                   placeholder="0"
@@ -354,8 +335,8 @@ export default function ExtensiveLarvesScreen() {
               <View style={styles.inputRow}>
                 <Text style={styles.inputLabel}>Surface contaminée (ha)</Text>
                 <TextInput
-                  value={surfaceContamineeHa}
-                  onChangeText={setSurfaceContamineeHa}
+                  value={data.surfaceContamineeHa}
+                  onChangeText={(text) => updateSpeciesData({ surfaceContamineeHa: text })}
                   keyboardType="decimal-pad"
                   style={styles.inputField}
                   placeholder="0"
@@ -369,10 +350,10 @@ export default function ExtensiveLarvesScreen() {
                   {['repos', 'perchee'].map((option) => (
                     <TouchableOpacity
                       key={option}
-                      style={[styles.deplacementButton, deplacement === option && styles.deplacementButtonActive]}
-                      onPress={() => setDeplacement(option)}
+                      style={[styles.deplacementButton, data.deplacement === option && styles.deplacementButtonActive]}
+                      onPress={() => updateSpeciesData({ deplacement: option })}
                     >
-                      <Text style={[styles.deplacementText, deplacement === option && styles.deplacementTextActive]}>
+                      <Text style={[styles.deplacementText, data.deplacement === option && styles.deplacementTextActive]}>
                         {option === 'repos' ? 'Repos' : 'Perchée'}
                       </Text>
                     </TouchableOpacity>
@@ -500,6 +481,7 @@ const styles = StyleSheet.create({
   miniButtonAddText: { color: '#fff' },
   
   observationsSection: { marginTop: 4, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
+  speciesHint: { fontSize: 9, color: '#9a9484', marginBottom: 6, textAlign: 'center', fontStyle: 'italic' },
   toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: BORDER },
   toggleLabel: { fontSize: 13, fontWeight: '500', color: TEXT },
   toggleButton: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 8, backgroundColor: INACTIVE_BG },

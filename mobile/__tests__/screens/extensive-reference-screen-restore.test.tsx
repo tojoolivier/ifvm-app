@@ -13,6 +13,7 @@ import ExtensiveReferenceScreen from '@/app/(prospection)/extensive-reference';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import * as prospectionRepository from '@/lib/prospection-repository';
 import * as location from '@/lib/location';
+import { formatHeureLocale } from '@/lib/prospection-fiche-lecture';
 
 jest.mock('expo-router', () =>
   require('../test-utils/mock-expo-router').expoRouterMock({ params: { draftId: 'draft-123' } })
@@ -117,5 +118,54 @@ describe('ExtensiveReferenceScreen — restauration après hydratation tardive d
         expect.objectContaining({ surfaceInfestee: 0.5 })
       )
     );
+  });
+
+  /**
+   * Heure d'observation (#227) : même mécanisme que observations.tsx côté Intensif
+   * (`getCurrentPosition().timestamp`, colonne partagée `heure_observation_at`), mais
+   * capturée ici sur Référence — l'écran où l'Extensif fait déjà son acquisition GPS.
+   */
+  it("renseigne automatiquement l'heure d'observation depuis le timestamp GPS (pas Date.now()) lors du premier fix, et l'enregistre", async () => {
+    const timestampGps = new Date('2026-08-25T11:35:00.000Z').getTime();
+    jest.mocked(location.getCurrentPosition).mockResolvedValue({
+      latitude: -18.9, longitude: 47.5, altitude: null, accuracy: 5, timestamp: timestampGps,
+    });
+    useProspectionWizardStore.setState({
+      draft: { id: 'draft-123', type_prospection: 'extensive', date_prospection: '2026-08-25', latitude: null, longitude: null } as any,
+      captures: [],
+    });
+
+    await render(<ExtensiveReferenceScreen />);
+
+    const heureAttendue = formatHeureLocale(new Date(timestampGps).toISOString());
+    expect(await screen.findByText(heureAttendue)).toBeVisible();
+
+    fireEvent.press(screen.getByText('Suivant : Imagos ›'));
+
+    await waitFor(() =>
+      expect(prospectionRepository.updateProspectionExtensiveReference).toHaveBeenCalledWith(
+        'draft-123',
+        expect.objectContaining({ heureObservationAt: new Date(timestampGps).toISOString() })
+      )
+    );
+  });
+
+  it("restaure l'heure d'observation déjà enregistrée sans relancer d'acquisition GPS au remontage", async () => {
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'extensive',
+        date_prospection: '2026-08-25',
+        latitude: -18.9,
+        longitude: 47.5,
+        heure_observation_at: '2026-08-25T09:12:00.000Z',
+      } as any,
+      captures: [],
+    });
+
+    await render(<ExtensiveReferenceScreen />);
+
+    expect(await screen.findByText(formatHeureLocale('2026-08-25T09:12:00.000Z'))).toBeVisible();
+    expect(location.getCurrentPosition).not.toHaveBeenCalled();
   });
 });
