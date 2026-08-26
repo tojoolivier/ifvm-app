@@ -152,6 +152,9 @@ export default function ReferenceScreen() {
         longitude: savedDraft.longitude as number,
         altitude: savedDraft.altitude ?? null,
         accuracy: null,
+        // Pas un vrai fix GPS restauré : `updated_at` est la meilleure approximation
+        // disponible du moment de la saisie (aucun timestamp GPS n'est archivé ici).
+        timestamp: new Date(savedDraft.updated_at).getTime(),
       });
       setAdminArea({ region: savedDraft.region, district: savedDraft.district, commune: savedDraft.commune });
       setLocationError(null);

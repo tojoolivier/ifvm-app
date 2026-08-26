@@ -16,7 +16,7 @@ export const PHENOTYPES_3: { value: Phenotype; label: string }[] = PHENOTYPES.fi
   (p) => p.value !== 'solitaro_trans'
 );
 
-// "essaim" a disparu (migration backend 0029) : la densité de l'essaim est désormais le
+// "essaim" a disparu (migration backend 0031) : la densité de l'essaim est désormais le
 // type de cible lui-même, au même niveau que "Vol clair" — plus une sous-classification.
 type TypeCible = 'tache_larvaire' | 'bande_larvaire' | 'vol_clair' | 'dense' | 'tres_dense';
 
@@ -329,4 +329,17 @@ export function buildFicheLecture(prospection: ProspectionRead): FicheLectureVie
 function formatCoordinates(latitude: number | null, longitude: number | null): string {
   if (latitude == null || longitude == null) return '—';
   return `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+}
+
+/**
+ * `HH:mm` en heure locale de l'appareil, à partir d'un timestamp ISO (ex.
+ * `heure_observation_at`, capturé au moment de l'acquisition GPS sur observations.tsx).
+ * Partagé entre l'écran (affichage au moment de la saisie) et le récapitulatif (lecture
+ * depuis le brouillon déjà enregistré) — une seule implémentation du format.
+ */
+export function formatHeureLocale(iso: string | null): string {
+  if (!iso) return '—';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '—';
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
