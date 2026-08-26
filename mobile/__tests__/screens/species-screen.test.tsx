@@ -8,9 +8,12 @@ import SpeciesScreen from '@/app/(prospection)/species';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import * as prospectionRepository from '@/lib/prospection-repository';
 
-jest.mock('expo-router', () =>
-  require('../test-utils/mock-expo-router').expoRouterMock({ params: { draftId: 'draft-123' } })
-);
+const mockPush = jest.fn();
+
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: mockPush, back: jest.fn(), replace: jest.fn(), canGoBack: () => true }),
+  useLocalSearchParams: () => ({ draftId: 'draft-123' }),
+}));
 
 jest.mock('@/lib/prospection-repository', () => ({
   updateProspectionEspeces: jest.fn(),
@@ -67,6 +70,33 @@ describe('SpeciesScreen', () => {
 
     await waitFor(() =>
       expect(useProspectionWizardStore.getState().draft?.especes).toBe(enregistre.especes)
+    );
+  });
+
+  it("part toujours vers density.tsx, même quand la première grille sélectionnée est une larve", async () => {
+    // Régression : `firstScreen` ne testait que `grilles[0]?.categorie === 'imago'` —
+    // sélectionner uniquement une larve envoyait directement vers `captures`, sautant
+    // la saisie de sa densité. density.tsx doit être le point de passage systématique.
+    mockPush.mockClear();
+    jest.mocked(prospectionRepository.updateProspectionEspeces).mockResolvedValue({
+      id: 'draft-123',
+      especes: JSON.stringify({ lmcImago: false, lmcLarve: true, nseImago: false, nseLarve: false }),
+    } as any);
+
+    useProspectionWizardStore.setState({
+      draft: { id: 'draft-123', type_prospection: 'intensive', especes: null } as any,
+      captures: [],
+    });
+
+    await render(<SpeciesScreen />);
+    fireEvent.press((await screen.findAllByText('Larves'))[0]);
+    expect(await screen.findByText('1 grille(s)')).toBeVisible();
+    fireEvent.press(screen.getByText('Captures  ›'));
+
+    await waitFor(() =>
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.objectContaining({ pathname: '/(prospection)/density', params: { draftId: 'draft-123', grilleIndex: '0' } })
+      )
     );
   });
 });

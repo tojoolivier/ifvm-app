@@ -186,9 +186,14 @@ L'export n'a **aucune responsabilité de confidentialité** : le filtre est à l
 
 Les options par défaut de RN et d'Expo enveloppent le rejet dans `new Error(…, { cause: rejection })` : vu par `instanceof`, **tout rejet serait classé « bug »** alors que la classe est dans `.cause`. D'où des `onUnhandled` / `onHandled` maison.
 
-**Journal immédiat, affichage à 500 ms annulé par `onHandled`.** Hermes attend déjà 2000 ms (100 ms pour `ReferenceError` / `TypeError` / `RangeError`), donc le journal ne perd rien — un rattrapage tardif produit sa propre ligne. Le délai ne concerne que l'écran, parce que la bannière de la décision 5 ne disparaît pas seule et ne peut donc pas se rétracter.
+**Journal immédiat, affichage à 500 ms annulé par `onHandled`.** Hermes attend déjà 2000 ms (100 ms pour `ReferenceError` / `TypeError` / `RangeError`), donc le journal ne perd rien — un rattrapage tardif produit sa propre ligne. Le délai ne concerne que l'écran, parce que la surface de la décision 5 ne disparaît pas seule et ne peut donc pas se rétracter.
 
-⚠️ **Cette décision reste conditionnée** à la vérification de [#166](https://github.com/tojoolivier/ifvm-app/issues/166) — voir « Ce qui reste à vérifier ».
+✅ **Condition levée** par le relevé de [#166](https://github.com/tojoolivier/ifvm-app/issues/166), sur build release réel. Le tracker existe, tire, et transmet le rejet **non enveloppé** — donc `instanceof` retrouve la classe typée, ce qui valide le cœur de la décision. Implémentée par [#178](https://github.com/tojoolivier/ifvm-app/issues/178) dans `mobile/src/lib/filet-rejets.ts`.
+
+Deux précisions que le relevé apporte, et que le texte ci-dessus ne portait pas :
+
+- **Les délais mesurés sont 2015 ms et 228 ms**, et surtout la répartition annoncée est trompeuse. Le chemin rapide est réservé à `ReferenceError` / `TypeError` / `RangeError` ; les sept classes du jeu fermé héritant toutes d'`Error`, c'est **2015 ms qui s'applique en pratique**. Le journal ne perd toujours rien, mais l'affichage arrive ~2,5 s après le rejet.
+- **La surface est une modale, pas une bannière.** `traitementDe` rend `BLOQUER` à la frontière `'global'`, et la décision 5 mappe `BLOQUER` sur `ModaleBloquante`. Le raisonnement des 500 ms tient, mais l'enjeu est plus lourd qu'écrit : un `.catch()` arrivé à 600 ms produit une modale **bloquante** mensongère, pas un bandeau ignorable.
 
 ## Décision 9 — Sync : l'unitaire lève, le lot résume
 
@@ -262,13 +267,17 @@ Les voies progressives classiques (`--max-warnings` dégressif, baseline de supp
 - **La branche morte de `global-error-handler.ts:47` est à supprimer**, pas à corriger : tant qu'elle est là, on croit avoir un filet.
 - **Ordre de migration** : `lib/` d'abord (33 sites, banc d'essai du logger), puis les écrans par groupe de routes.
 
-## Ce qui reste à vérifier
+## Ce qui a été vérifié
 
-[#166](https://github.com/tojoolivier/ifvm-app/issues/166) — **la décision 8 est conditionnée** à la vérification, sur un build **release** réel, que `HermesInternal.enablePromiseRejectionTracker` existe et tire effectivement. Cette hypothèse n'a jamais été testée.
+[#166](https://github.com/tojoolivier/ifvm-app/issues/166) — **la décision 8 était conditionnée** à la vérification, sur un build **release** réel, que `HermesInternal.enablePromiseRejectionTracker` existe et tire effectivement.
 
-Le doute est motivé : cette carte a trouvé **deux branches mortes du même genre** — `global.addEventListener('unhandledrejection')`, qui compile grâce à une déclaration écrite à la main et ne s'exécute jamais, et `promise/setimmediate/rejection-tracking`, inopérant sous Hermes parce que le polyfill JS n'y est jamais installé.
+Le doute était motivé : cette carte a trouvé **deux branches mortes du même genre** — `global.addEventListener('unhandledrejection')`, qui compile grâce à une déclaration écrite à la main et ne s'exécute jamais, et `promise/setimmediate/rejection-tracking`, inopérant sous Hermes parce que le polyfill JS n'y est jamais installé.
 
-**Si le tracker s'avère inerte en release**, la décision 8 tombe : il n'y a alors aucun filet possible en production, et « les trois frontières doivent être étanches » (décision 1) cesse d'être une précaution pour devenir la seule garantie.
+**Le relevé a été fait** (Static Hermes, `"Build":"Release"`, OSS `250829098.0.10`) : les 6 points sont vérifiés, le tracker existe et discrimine. La sonde comportait un **témoin négatif** — un rejet rattrapé immédiatement, dont `onUnhandled` ne devait pas tirer, et n'a pas tiré. C'est ce qui manquait aux deux branches mortes : elles n'ont jamais été confrontées à un cas qui aurait dû les faire taire.
+
+Réserve : relevé sur émulateur, pas sur appareil physique. Hermes étant le même moteur et le build étant release, seuls les **délais sous charge CPU** mériteraient d'être remesurés sur un vrai terminal — jamais l'existence ni le déclenchement.
+
+Sonde conservée sur `research/filet-global-rejets`, jamais fusionnée.
 
 ## Sources
 

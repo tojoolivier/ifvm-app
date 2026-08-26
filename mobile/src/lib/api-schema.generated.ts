@@ -1496,6 +1496,8 @@ export interface components {
             verdissement_pourcent?: number | null;
             /** Hauteur Herbe Cm */
             hauteur_herbe_cm?: number | null;
+            /** Heure Observation At */
+            heure_observation_at?: string | null;
             /** Station Libre */
             station_libre?: string | null;
             type_station?: components["schemas"]["TypeStation"] | null;
@@ -1623,6 +1625,8 @@ export interface components {
             verdissement_pourcent?: number | null;
             /** Hauteur Herbe Cm */
             hauteur_herbe_cm?: number | null;
+            /** Heure Observation At */
+            heure_observation_at?: string | null;
             /** Station Libre */
             station_libre?: string | null;
             type_station?: components["schemas"]["TypeStation"] | null;
@@ -1718,6 +1722,8 @@ export interface components {
             verdissement_pourcent?: number | null;
             /** Hauteur Herbe Cm */
             hauteur_herbe_cm?: number | null;
+            /** Heure Observation At */
+            heure_observation_at?: string | null;
             /** Station Libre */
             station_libre?: string | null;
             type_station?: components["schemas"]["TypeStation"] | null;

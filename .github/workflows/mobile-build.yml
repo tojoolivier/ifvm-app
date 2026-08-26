@@ -19,7 +19,7 @@ jobs:
   # Detecte si le push touche du natif (deps, config Expo) ou seulement du JS/TS.
   # JS/TS seul -> update OTA (secondes) ; natif -> build APK complet sur le runner self-hoste.
   changes:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted-linux
     outputs:
       native: ${{ steps.filter.outputs.native }}
     steps:
@@ -35,7 +35,7 @@ jobs:
               - "mobile/eas.json"
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted-linux
     steps:
       - uses: actions/checkout@v4
 
@@ -55,7 +55,7 @@ jobs:
   ota-update:
     needs: [changes, test]
     if: github.event_name == 'push' && needs.changes.outputs.native != 'true'
-    runs-on: ubuntu-latest
+    runs-on: self-hosted-linux
     steps:
       - uses: actions/checkout@v4
 

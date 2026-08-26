@@ -499,6 +499,11 @@ const COLONNES_PROSPECTION: readonly Colonne[] = [
   { name: 'signalement_description', type: 'TEXT' },
   { name: 'conclusion_validation', type: 'TEXT' },
   { name: 'avertissements', type: 'TEXT' },
+  // Horodatage ISO complet (date + heure + fuseau) de l'acquisition GPS sur l'écran
+  // Observations — distinct de `prospection_infestation.heure_observation` (HH:mm par
+  // cible d'infestation, sans lien avec le GPS). L'heure HH:mm affichée est dérivée de
+  // cette valeur à la lecture, jamais stockée séparément.
+  { name: 'heure_observation_at', type: 'TEXT' },
 ];
 
 /** Colonnes ajoutées à `prospection_infestation` après sa création initiale. */
