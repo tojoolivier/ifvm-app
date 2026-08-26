@@ -155,10 +155,17 @@ describe('ExtensiveRecapScreen — récapitulatif complet (#227)', () => {
     await render(<ExtensiveRecapScreen />);
 
     expect(await screen.findByText('Vérification du signalement')).toBeVisible();
+    // Nombre de captures (#228) : bien la vraie valeur enregistrée (12), pas un total
+    // recalculé ou un champ manquant — présent explicitement, pas seulement dans le
+    // chiffre-clé LMC/NSE du bandeau.
+    expect(screen.getAllByText('Nombre de captures')[0]).toBeVisible();
+    expect(screen.getByText('12')).toBeVisible();
     expect(screen.getAllByText('Densité diffuse')[0]).toBeVisible();
     expect(screen.getByText('8 D/ha')).toBeVisible();
     expect(screen.getByText(/L1 4 · L2 2/)).toBeVisible();
     expect(screen.getByText(/Dégâts sur les cultures : 30 %/)).toBeVisible();
+    // H STR HERB (#228) : affiché en mètres, non arrondi à l'entier (45 cm → 0.45 m).
+    expect(screen.getByText(/H\. strate herbeuse : 0.45 m/)).toBeVisible();
     expect(screen.getByText(new RegExp(`Heure d.observation : ${HEURE_ATTENDUE}`))).toBeVisible();
   });
 });

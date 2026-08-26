@@ -78,7 +78,18 @@ export default function ExtensiveImagosScreen() {
   // ✅ MODIFICATION 1 : Accepter 0 comme cohérent
   const isPhasesConsistent = data.totalCaptures === 0 || data.totalCaptures === totalPhases;
   const isStadesConsistent = data.totalCaptures === 0 || data.totalCaptures === totalStades;
-  const isConsistent = isPhasesConsistent && isStadesConsistent;
+  // Bug corrigé (#228) : seule la cohérence des Phases bloque la suite — c'est la seule
+  // répartition réellement enregistrée en base (captures_sol/trans/greg/
+  // captures_solitaro_transiens). Le détail des Stades (femelleA1, maleA234…) n'est
+  // jamais persisté pour les imagos (cf. speciesDataToPopulationRow) : à la
+  // réouverture d'une fiche existante, il est donc TOUJOURS restauré à 0, quelle que
+  // soit la valeur de captures. L'exiger comme condition bloquante rendait le bouton
+  // « Suivant » définitivement désactivé dès qu'on rouvrait une fiche avec des
+  // captures > 0 — impossible de modifier quoi que ce soit (dont le nombre de
+  // captures lui-même) sans ressaisir des stades qui, de toute façon, repartiraient à
+  // zéro au prochain rechargement. `isStadesConsistent` reste calculé pour le retour
+  // visuel de la section Stades (utile en saisie initiale), mais ne bloque plus rien.
+  const isConsistent = isPhasesConsistent;
 
   const updateSpeciesData = (patch: Partial<ExtensiveImagoSpeciesData>) => {
     setSpeciesData((prev) => ({
@@ -128,22 +139,15 @@ export default function ExtensiveImagosScreen() {
   };
 
 const handleContinue = () => {
-  if (data.totalCaptures > 0) {
-    if (!isPhasesConsistent) {
-      Alert.alert(
-        'Incohérence des phases',
-        `Captures : ${data.totalCaptures}\nPhases : ${totalPhases}\n\nLa somme des phases doit être exactement égale au nombre de captures.`
-      );
-      return;
-    }
-
-    if (!isStadesConsistent) {
-      Alert.alert(
-        'Incohérence des stades',
-        `Captures : ${data.totalCaptures}\nStades femelles : ${totalStadesF}\nStades mâles : ${totalStadesM}\nTotal stades : ${totalStadesF} + ${totalStadesM} = ${totalStades}\n\nLa règle est :\nCaptures = Phases = Stades ♀ + Stades ♂`
-      );
-      return;
-    }
+  // Seule la cohérence des Phases est bloquante — cf. commentaire sur `isConsistent` :
+  // les Stades ne sont jamais persistés pour les imagos, les exiger bloquerait la
+  // modification de toute fiche déjà enregistrée.
+  if (data.totalCaptures > 0 && !isPhasesConsistent) {
+    Alert.alert(
+      'Incohérence des phases',
+      `Captures : ${data.totalCaptures}\nPhases : ${totalPhases}\n\nLa somme des phases doit être exactement égale au nombre de captures.`
+    );
+    return;
   }
 
   return run(
@@ -626,9 +630,11 @@ const handleContinue = () => {
                 </View>
               )}
               <View style={styles.ruleBox}>
-                <Text style={styles.ruleText}>Règle : Captures = Phases = Stades ♀ + Stades ♂</Text>
+                <Text style={styles.ruleText}>Règle bloquante : Captures = Phases</Text>
                 <Text style={[styles.ruleText, { marginTop: 4, color: TEXT_SECONDARY, fontSize: 10 }]}>
-                  {data.totalCaptures === 0 ? '✅ 0 capture : cohérent par défaut' : ''}
+                  {data.totalCaptures === 0
+                    ? '✅ 0 capture : cohérent par défaut'
+                    : 'Stades ♀ + ♂ : aide à la saisie, non enregistrés en base, sans effet sur la sauvegarde'}
                 </Text>
               </View>
             </View>
@@ -637,9 +643,11 @@ const handleContinue = () => {
               <View style={styles.successContainer}>
                 <Text style={styles.successText}>✅ COHÉRENT</Text>
                 <Text style={styles.successDetail}>
-                  {data.totalCaptures === 0 
-                    ? 'Aucune capture enregistrée' 
-                    : `${data.totalCaptures} captures = ${totalPhases} phases = ${totalStadesF} ♀ + ${totalStadesM} ♂ = ${totalStades} stades`
+                  {data.totalCaptures === 0
+                    ? 'Aucune capture enregistrée'
+                    : isStadesConsistent
+                      ? `${data.totalCaptures} captures = ${totalPhases} phases = ${totalStadesF} ♀ + ${totalStadesM} ♂ = ${totalStades} stades`
+                      : `${data.totalCaptures} captures = ${totalPhases} phases (détail des stades non enregistré en base — sans effet sur la sauvegarde)`
                   }
                 </Text>
               </View>
@@ -649,12 +657,9 @@ const handleContinue = () => {
                 <Text style={styles.warningDetail}>
                   Captures : {data.totalCaptures}
                   {'\n'}Phases : {totalPhases}
-                  {'\n'}Stades ♀ : {totalStadesF}
-                  {'\n'}Stades ♂ : {totalStadesM}
-                  {'\n'}Total stades : {totalStadesF} + {totalStadesM} = {totalStades}
                 </Text>
                 <Text style={styles.warningHint}>
-                  La règle est : Captures = Phases = Stades ♀ + Stades ♂
+                  La règle est : Captures = Phases
                 </Text>
               </View>
             )}

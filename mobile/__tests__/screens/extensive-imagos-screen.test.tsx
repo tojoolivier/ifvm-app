@@ -149,4 +149,89 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
     const [, lmcRow] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
     expect(lmcRow).toMatchObject({ espece: 'LMC', etat: 'deplacement', essaim_en_vol: true, essaim_pose: false });
   });
+
+  /**
+   * Non-régression explicite (#228) : « Nombre total de capture » doit rester
+   * préaffiché à sa valeur enregistrée et survivre à la modification d'un autre champ
+   * — sans jamais revenir à 0/vide/null/undefined. (Le faire passer directement de
+   * 25 à 30 sans retoucher les phases est bloqué par la règle métier « Captures =
+   * Phases », vérifiée séparément par les tests de cohérence de cet écran — ce n'est
+   * pas la perte de donnée que ce test cible.)
+   */
+  it('modification d’une fiche existante : Nombre de captures (25) reste préaffiché et enregistré tel quel après modification d’un autre champ', async () => {
+    jest.mocked(prospectionRepository.getProspectionPopulation).mockImplementation(async (_id, espece) =>
+      espece === 'LMC'
+        ? ({
+            espece: 'LMC',
+            categorie: 'imago',
+            captures_nombre: 25,
+            captures_sol: 10,
+            captures_trans: 10,
+            captures_greg: 5,
+            captures_solitaro_transiens: 0,
+            densite_diffuse: 4.2,
+            densite_groupee: 1.1,
+            accouplement: 'Beaucoup',
+            ponte: 'Rare',
+            interdistance: 12.5,
+            type_cible: 'dense',
+            etat: 'repos',
+            essaim_en_vol: false,
+            essaim_pose: true,
+          } as any)
+        : ({ espece: 'NSE', categorie: 'imago', captures_nombre: 0 } as any)
+    );
+
+    await render(<ExtensiveImagosScreen />);
+    // Préaffiché avec la valeur enregistrée — jamais 0, vide, null ou undefined.
+    expect(await screen.findByDisplayValue('25')).toBeVisible();
+    await settle();
+
+    // Modifie l'Accouplement (champ indépendant, non soumis à la règle Captures = Phases).
+    fireEvent.press(screen.getAllByText('Peu')[0]);
+    await settle();
+
+    fireEvent.press(screen.getByText('Suivant : Larves ›'));
+
+    await waitFor(() => expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalledTimes(2));
+    const [, lmcRow] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
+    // Nombre de captures : toujours 25, jamais réinitialisé par la modification d'Accouplement.
+    expect(lmcRow).toMatchObject({ espece: 'LMC', captures_nombre: 25, accouplement: 'Peu' });
+    // …et tous les autres champs déjà présents avant la modification survivent tels quels.
+    expect(lmcRow).toMatchObject({
+      densite_diffuse: 4.2,
+      densite_groupee: 1.1,
+      ponte: 'Rare',
+      interdistance: 12.5,
+      type_cible: 'dense',
+      etat: 'repos',
+      essaim_en_vol: false,
+      essaim_pose: true,
+    });
+  });
+
+  /**
+   * La fiche Signalement (type_prospection = 'validation') passe par exactement le
+   * même écran/mêmes fonctions que l'Extensive — cf. `getProspectionEditRoute` dans
+   * `fiche-routing.ts`, qui route les deux vers `extensive-reference`. Ce test le
+   * vérifie explicitement : rien dans cet écran ne dépend de `type_prospection`, donc
+   * le même round-trip s'applique aux fiches Signalement.
+   */
+  it('fiche Signalement (validation) : même préaffichage et même persistance du Nombre de captures que l’Extensive', async () => {
+    jest.mocked(prospectionRepository.getProspectionPopulation).mockImplementation(async (_id, espece) =>
+      espece === 'LMC'
+        ? ({ espece: 'LMC', categorie: 'imago', captures_nombre: 25, captures_sol: 25, captures_trans: 0, captures_greg: 0 } as any)
+        : ({ espece: 'NSE', categorie: 'imago', captures_nombre: 0 } as any)
+    );
+
+    await render(<ExtensiveImagosScreen />);
+    expect(await screen.findByDisplayValue('25')).toBeVisible();
+    await settle();
+
+    fireEvent.press(screen.getByText('Suivant : Larves ›'));
+
+    await waitFor(() => expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalledTimes(2));
+    const [, lmcRow] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
+    expect(lmcRow).toMatchObject({ espece: 'LMC', captures_nombre: 25 });
+  });
 });

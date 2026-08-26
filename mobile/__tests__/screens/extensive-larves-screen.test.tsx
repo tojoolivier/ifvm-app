@@ -85,4 +85,36 @@ describe('ExtensiveLarvesScreen', () => {
     const [, lmcRow] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
     expect(lmcRow).toMatchObject({ espece: 'LMC', surface_contaminee_ha: 12.75 });
   });
+
+  /**
+   * Non-régression (#228) : contrairement aux imagos (cf. extensive-imagos-screen.test.tsx),
+   * le détail des stades larvaires EST réellement persisté (`densites_larve`) — rouvrir une
+   * fiche existante avec captures > 0 doit donc immédiatement repasser « cohérent » sans
+   * ressaisie, « Suivant » ne doit jamais être bloqué par une donnée déjà enregistrée.
+   */
+  it('réouverture d’une fiche existante : Nombre de captures et stades déjà enregistrés restent cohérents, « Suivant » fonctionne sans ressaisie', async () => {
+    jest.mocked(prospectionRepository.getProspectionPopulation).mockImplementation(async (_id, espece) =>
+      espece === 'LMC'
+        ? ({
+            espece: 'LMC',
+            categorie: 'larve',
+            captures_nombre: 25,
+            captures_sol: 25,
+            captures_trans: 0,
+            captures_greg: 0,
+            densites_larve: JSON.stringify({ L1: 25, L2: 0, L3: 0, L4: 0, L5: 0 }),
+          } as any)
+        : ({ espece: 'NSE', categorie: 'larve', captures_nombre: 0 } as any)
+    );
+
+    await render(<ExtensiveLarvesScreen />);
+    expect(await screen.findByDisplayValue('25')).toBeVisible();
+    await settle();
+
+    fireEvent.press(screen.getByText('Suivant : Observations ›'));
+
+    await waitFor(() => expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalledTimes(2));
+    const [, lmcRow] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
+    expect(lmcRow).toMatchObject({ espece: 'LMC', captures_nombre: 25 });
+  });
 });

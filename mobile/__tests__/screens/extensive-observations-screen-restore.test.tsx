@@ -93,4 +93,76 @@ describe('ExtensiveObservationsScreen — restauration après hydratation tardiv
       )
     );
   });
+
+  /**
+   * Non-régression explicite (#228) : « H STR HERB (m) » doit rester préaffiché et
+   * modifiable sans effacer le reste de la fiche — reproduit exactement le scénario
+   * donné par l'utilisateur (1.25 m → 1.50 m après modification, ni arrondi ni entier).
+   */
+  it('modification d’une fiche existante : H STR HERB préaffiché à 1.25 m, modifié à 1.50 m sans effacer les autres champs déjà enregistrés', async () => {
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'extensive',
+        degats_cultures_pourcent: 30,
+        verdure_strate: 'forte',
+        hauteur_herbe_cm: 125,
+        derniere_pluie: '2026-08-20',
+        intensite_pluie: 'forte',
+      } as any,
+      captures: [],
+    });
+
+    await render(<ExtensiveObservationsScreen />);
+    // Préaffiché avec la valeur enregistrée, convertie en mètres — jamais 0/vide/arrondie à l'entier.
+    expect(await screen.findByDisplayValue('1.25')).toBeVisible();
+
+    fireEvent.changeText(screen.getByDisplayValue('1.25'), '1.5');
+    expect(await screen.findByDisplayValue('1.5')).toBeVisible();
+
+    fireEvent.press(screen.getByText('Suivant : Récapitulatif ›'));
+
+    await waitFor(() =>
+      expect(prospectionRepository.updateProspectionExtensiveObservations).toHaveBeenCalledWith(
+        'draft-123',
+        expect.objectContaining({
+          // Nouvelle valeur bien enregistrée…
+          hauteurHerbeCm: 150,
+          // …et tous les autres champs déjà présents avant la modification survivent tels quels.
+          degatsCulturesPourcent: 30,
+          verdureStrate: 'forte',
+          dernierePluie: '2026-08-20',
+          intensitePluie: 'forte',
+        })
+      )
+    );
+  });
+
+  /**
+   * La fiche Signalement (type_prospection = 'validation') passe par exactement le
+   * même écran/mêmes fonctions que l'Extensive — cf. `getProspectionEditRoute` dans
+   * `fiche-routing.ts`, qui route les deux vers `extensive-reference`. Ce test le
+   * vérifie explicitement : rien dans cet écran ne dépend de `type_prospection`, donc
+   * le même round-trip s'applique aux fiches Signalement.
+   */
+  it('fiche Signalement (validation) : même préaffichage et même round-trip de H STR HERB que l’Extensive', async () => {
+    useProspectionWizardStore.setState({
+      draft: { id: 'draft-123', type_prospection: 'validation', hauteur_herbe_cm: 125 } as any,
+      captures: [],
+    });
+
+    await render(<ExtensiveObservationsScreen />);
+    expect(await screen.findByDisplayValue('1.25')).toBeVisible();
+
+    fireEvent.changeText(screen.getByDisplayValue('1.25'), '1.5');
+    expect(await screen.findByDisplayValue('1.5')).toBeVisible();
+    fireEvent.press(screen.getByText('Suivant : Récapitulatif ›'));
+
+    await waitFor(() =>
+      expect(prospectionRepository.updateProspectionExtensiveObservations).toHaveBeenCalledWith(
+        'draft-123',
+        expect.objectContaining({ hauteurHerbeCm: 150 })
+      )
+    );
+  });
 });
