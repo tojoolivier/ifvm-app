@@ -15,7 +15,8 @@ env:
 
 jobs:
   build-and-push:
-    runs-on: ubuntu-latest
+    # docker/build-push-action impose un daemon Docker dans le pod -> pool dind.
+    runs-on: self-hosted-dind
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
     steps:
@@ -57,7 +58,7 @@ jobs:
 
   update-manifests:
     needs: build-and-push
-    runs-on: ubuntu-latest
+    runs-on: self-hosted-linux
     steps:
       - name: Checkout infra-k8s
         uses: actions/checkout@v4

@@ -4,7 +4,12 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
 import { buildVegetationSummary, parseVegetationSol } from '@/lib/prospection-fiche-lecture';
-import { InfestationRow, listAllProspectionInfestations } from '@/lib/prospection-repository';
+import {
+  InfestationRow,
+  PopulationRow,
+  listAllProspectionInfestations,
+  listAllProspectionPopulations,
+} from '@/lib/prospection-repository';
 import { buildRecapitulatif, enregistrerEtSynchroniser } from '@/lib/prospection-review';
 import { estToutParti, resumerEnPhrase } from '@/lib/sync-lot';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
@@ -28,12 +33,18 @@ export default function ReviewScreen() {
   const resetCaptureLoop = useProspectionCaptureStore((s) => s.reset);
   const { run, isRunning: isSaving } = useAsyncAction();
   const [infestations, setInfestations] = useState<InfestationRow[]>([]);
+  const [populations, setPopulations] = useState<PopulationRow[]>([]);
   const signalerChargement = useSignalerChargement('review');
 
   useEffect(() => {
     if (!draft) return;
     void listAllProspectionInfestations(draft.id)
       .then(setInfestations)
+      .catch((error) => signalerChargement(error, { draftId: draft.id }));
+    // Densités par espèce + stade (4 blocs indépendants LMC/NSE × imago/larve, cf.
+    // density.tsx) : jamais affichées jusqu'ici dans ce récapitulatif.
+    void listAllProspectionPopulations(draft.id)
+      .then(setPopulations)
       .catch((error) => signalerChargement(error, { draftId: draft.id }));
   }, [draft?.id, signalerChargement]);
 
@@ -42,8 +53,8 @@ export default function ReviewScreen() {
     const vegetationSummary = buildVegetationSummary(
       parseVegetationSol(draft.vegetation, draft.sol, draft.degats_cultures)
     );
-    return buildRecapitulatif(draft, captures, vegetationSummary, infestations);
-  }, [draft, captures, infestations]);
+    return buildRecapitulatif(draft, captures, vegetationSummary, infestations, populations);
+  }, [draft, captures, infestations, populations]);
 
   if (!draft || !recap) {
     return (
@@ -121,13 +132,34 @@ export default function ReviewScreen() {
           ))}
 
           <View style={styles.card}>
+            <Text style={styles.cardTitle}>Densités par espèce et stade</Text>
+            {recap.densites.map((d) => (
+              <View key={d.key} style={styles.summaryLine}>
+                <Text style={styles.summaryLineLabel}>{d.label}</Text>
+                <Text style={styles.summaryLineValue}>
+                  {d.densiteDiffuse ?? '—'} D/ha · {d.densiteGroupee ?? '—'} D/m²
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.card}>
             <Text style={styles.cardTitle}>Temps de capture</Text>
             <Text style={styles.paragraph}>{recap.dureeSession} min</Text>
           </View>
 
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Infestation</Text>
-            <Text style={styles.paragraph}>{recap.infestationSummary}</Text>
+            {recap.infestationCibles.length === 0 ? (
+              <Text style={styles.paragraph}>Aucune information renseignée.</Text>
+            ) : (
+              recap.infestationCibles.map((cible) => (
+                <View key={cible.key} style={styles.summaryLine}>
+                  <Text style={styles.summaryLineLabel}>• {cible.label}</Text>
+                  <Text style={styles.summaryLineValue}>{cible.details.join(' · ') || '—'}</Text>
+                </View>
+              ))
+            )}
           </View>
 
           <View style={styles.card}>
@@ -142,6 +174,10 @@ export default function ReviewScreen() {
 
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Observations</Text>
+            <View style={styles.summaryLine}>
+              <Text style={styles.summaryLineLabel}>Heure d&apos;observation</Text>
+              <Text style={styles.summaryLineValue}>{recap.heureObservationLabel}</Text>
+            </View>
             <Text style={styles.paragraph}>{recap.observationsText}</Text>
           </View>
 

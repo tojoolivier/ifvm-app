@@ -16,10 +16,11 @@ beforeEach(() => {
 });
 
 describe('getCurrentPosition', () => {
-  it('returns lat/lon/altitude/accuracy when permission is granted', async () => {
+  it('returns lat/lon/altitude/accuracy/timestamp when permission is granted', async () => {
     requestForegroundPermissionsAsync.mockResolvedValueOnce({ status: 'granted' });
     getCurrentPositionAsync.mockResolvedValueOnce({
       coords: { latitude: -18.9, longitude: 47.5, altitude: 1280, accuracy: 5 },
+      timestamp: 1_756_123_456_000,
     });
 
     const position = await getCurrentPosition();
@@ -29,6 +30,7 @@ describe('getCurrentPosition', () => {
       longitude: 47.5,
       altitude: 1280,
       accuracy: 5,
+      timestamp: 1_756_123_456_000,
     });
   });
 
