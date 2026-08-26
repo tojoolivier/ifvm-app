@@ -10,6 +10,8 @@
  * pas encore présent dans le schéma : à traiter avec #106).
  */
 
+import { PRECISION_GPS_CIBLE_M, PRECISION_GPS_SEUIL_ALERTE_M } from './gps-precision';
+
 export interface ValidationResult {
   blocages: string[];
   avertissements: string[];
@@ -37,9 +39,6 @@ const MADAGASCAR_BBOX = {
   lonMin: 43.1,
   lonMax: 50.5,
 };
-
-/** Précision GPS au-delà de laquelle la position est jugée inexploitable sur le terrain. */
-const GPS_ACCURACY_SEUIL_BLOQUANT_M = 100;
 
 export interface ProspectionDateValidationInput {
   dateProspection: string;
@@ -76,9 +75,16 @@ export function validateGpsPosition(input: GpsPositionValidationInput): Validati
     );
   }
 
-  if (input.accuracy != null && input.accuracy > GPS_ACCURACY_SEUIL_BLOQUANT_M) {
-    blocages.push(
-      `Précision GPS insuffisante (${Math.round(input.accuracy)} m, seuil ${GPS_ACCURACY_SEUIL_BLOQUANT_M} m). Veuillez recapturer la position.`
+  // Seuils partagés avec l'acquisition (`gps-precision.ts`). La précision avertit
+  // mais ne bloque jamais : refuser la fiche ferait perdre l'observation, alors
+  // qu'un point imprécis reste exploitable une fois signalé comme tel.
+  if (input.accuracy != null && input.accuracy > PRECISION_GPS_SEUIL_ALERTE_M) {
+    avertissements.push(
+      `Précision GPS insuffisante (${Math.round(input.accuracy)} m, au-delà de ${PRECISION_GPS_SEUIL_ALERTE_M} m). Placez-vous à découvert et attendez quelques secondes avant d'enregistrer.`
+    );
+  } else if (input.accuracy != null && input.accuracy > PRECISION_GPS_CIBLE_M) {
+    avertissements.push(
+      `Précision GPS moyenne (${Math.round(input.accuracy)} m). Attendez quelques secondes à découvert pour descendre sous ${PRECISION_GPS_CIBLE_M} m.`
     );
   }
 
