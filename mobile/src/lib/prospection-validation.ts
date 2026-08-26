@@ -10,7 +10,7 @@
  * pas encore présent dans le schéma : à traiter avec #106).
  */
 
-import { PRECISION_GPS_CIBLE_M, PRECISION_GPS_SEUIL_BLOQUANT_M } from './gps-precision';
+import { PRECISION_GPS_CIBLE_M, PRECISION_GPS_SEUIL_ALERTE_M } from './gps-precision';
 
 export interface ValidationResult {
   blocages: string[];
@@ -75,12 +75,12 @@ export function validateGpsPosition(input: GpsPositionValidationInput): Validati
     );
   }
 
-  // Seuils partagés avec l'acquisition (`gps-precision.ts`) : ils supposent un fix
-  // GNSS, pas la triangulation réseau qui rendait 300–500 m et justifiait l'ancien
-  // seuil de 100 m — celui-ci tolérait un point inexploitable pour situer une tache.
-  if (input.accuracy != null && input.accuracy > PRECISION_GPS_SEUIL_BLOQUANT_M) {
-    blocages.push(
-      `Précision GPS insuffisante (${Math.round(input.accuracy)} m, seuil ${PRECISION_GPS_SEUIL_BLOQUANT_M} m). Veuillez recapturer la position.`
+  // Seuils partagés avec l'acquisition (`gps-precision.ts`). La précision avertit
+  // mais ne bloque jamais : refuser la fiche ferait perdre l'observation, alors
+  // qu'un point imprécis reste exploitable une fois signalé comme tel.
+  if (input.accuracy != null && input.accuracy > PRECISION_GPS_SEUIL_ALERTE_M) {
+    avertissements.push(
+      `Précision GPS insuffisante (${Math.round(input.accuracy)} m, au-delà de ${PRECISION_GPS_SEUIL_ALERTE_M} m). Placez-vous à découvert et attendez quelques secondes avant d'enregistrer.`
     );
   } else if (input.accuracy != null && input.accuracy > PRECISION_GPS_CIBLE_M) {
     avertissements.push(

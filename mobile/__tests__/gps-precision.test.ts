@@ -1,6 +1,6 @@
 import {
   PRECISION_GPS_CIBLE_M,
-  PRECISION_GPS_SEUIL_BLOQUANT_M,
+  PRECISION_GPS_SEUIL_ALERTE_M,
 } from '../src/lib/gps-precision';
 
 describe('seuils de précision GPS', () => {
@@ -8,11 +8,11 @@ describe('seuils de précision GPS', () => {
     expect(PRECISION_GPS_CIBLE_M).toBe(15);
   });
 
-  it('bloque au-delà de la taille d\'une tache larvaire', () => {
-    expect(PRECISION_GPS_SEUIL_BLOQUANT_M).toBe(50);
+  it('alerte au-delà de 100 m sans jamais empêcher l\'enregistrement', () => {
+    expect(PRECISION_GPS_SEUIL_ALERTE_M).toBe(100);
   });
 
-  it('garde la cible strictement sous le seuil bloquant', () => {
-    expect(PRECISION_GPS_CIBLE_M).toBeLessThan(PRECISION_GPS_SEUIL_BLOQUANT_M);
+  it('garde la cible strictement sous le seuil d\'alerte', () => {
+    expect(PRECISION_GPS_CIBLE_M).toBeLessThan(PRECISION_GPS_SEUIL_ALERTE_M);
   });
 });

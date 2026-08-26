@@ -17,10 +17,13 @@
 export const PRECISION_GPS_CIBLE_M = 15;
 
 /**
- * Au-delà, le point ne localise plus la tache observée de façon exploitable :
- * une tache larvaire se compte en dizaines de mètres.
+ * Au-delà, le point ne localise plus la tache observée de façon exploitable
+ * (une tache larvaire se compte en dizaines de mètres) : la fiche est signalée
+ * en rouge, mais jamais refusée. Sur le terrain, une position imprécise vaut
+ * mieux qu'une fiche perdue — l'agent n'a pas toujours le loisir d'attendre un
+ * meilleur fix, et c'est lui qui juge s'il peut se déplacer à découvert.
  */
-export const PRECISION_GPS_SEUIL_BLOQUANT_M = 50;
+export const PRECISION_GPS_SEUIL_ALERTE_M = 100;
 
 /** Délai maximal laissé au GPS pour converger avant de retenir le meilleur fix obtenu. */
 export const PRECISION_GPS_TIMEOUT_MS = 20_000;

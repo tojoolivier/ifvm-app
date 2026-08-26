@@ -120,28 +120,38 @@ describe('validateGpsPosition — emprise Madagascar', () => {
 });
 
 describe('validateGpsPosition — précision GPS', () => {
-  it('ne bloque pas une précision exactement au seuil bloquant (50 m)', () => {
-    const { blocages } = validateGpsPosition({ latitude: -18.9, longitude: 47.5, accuracy: 50 });
+  // La précision n'est jamais bloquante : sur le terrain, un point imprécis vaut
+  // mieux qu'une fiche perdue. Elle remonte en avertissement, à charge de l'écran
+  // de le rendre visible avant l'enregistrement.
+  it.each([16, 100, 101, 450, 2000])('ne bloque jamais sur la précision (%s m)', (accuracy) => {
+    const { blocages } = validateGpsPosition({ latitude: -18.9, longitude: 47.5, accuracy });
     expect(blocages).toEqual([]);
   });
 
-  it('bloque une précision au-delà du seuil de 50 m', () => {
-    const { blocages } = validateGpsPosition({ latitude: -18.9, longitude: 47.5, accuracy: 51 });
-    expect(blocages).toEqual([expect.stringContaining('Précision GPS insuffisante')]);
+  it('avertit fortement au-delà du seuil d\'alerte (fix réseau typique, ~450 m)', () => {
+    const { avertissements } = validateGpsPosition({
+      latitude: -18.9,
+      longitude: 47.5,
+      accuracy: 450,
+    });
+    expect(avertissements).toEqual([expect.stringContaining('Précision GPS insuffisante')]);
   });
 
-  it('bloque un fix réseau typique (mode Balanced, ~450 m)', () => {
-    const { blocages } = validateGpsPosition({ latitude: -18.9, longitude: 47.5, accuracy: 450 });
-    expect(blocages).toEqual([expect.stringContaining('Précision GPS insuffisante')]);
+  it('n\'alerte pas encore à exactement 100 m', () => {
+    const { avertissements } = validateGpsPosition({
+      latitude: -18.9,
+      longitude: 47.5,
+      accuracy: 100,
+    });
+    expect(avertissements).toEqual([expect.stringContaining('Précision GPS moyenne')]);
   });
 
-  it('avertit sans bloquer entre la cible (15 m) et le seuil bloquant', () => {
-    const { blocages, avertissements } = validateGpsPosition({
+  it('avertit modérément entre la cible (15 m) et le seuil d\'alerte', () => {
+    const { avertissements } = validateGpsPosition({
       latitude: -18.9,
       longitude: 47.5,
       accuracy: 30,
     });
-    expect(blocages).toEqual([]);
     expect(avertissements).toEqual([expect.stringContaining('Précision GPS moyenne')]);
   });
 
@@ -155,7 +165,7 @@ describe('validateGpsPosition — précision GPS', () => {
     expect(avertissements).toEqual([]);
   });
 
-  it('ne bloque pas quand la précision est indisponible', () => {
+  it('n\'avertit pas quand la précision est indisponible', () => {
     const { blocages, avertissements } = validateGpsPosition({
       latitude: -18.9,
       longitude: 47.5,
@@ -165,9 +175,14 @@ describe('validateGpsPosition — précision GPS', () => {
     expect(avertissements).toEqual([]);
   });
 
-  it('cumule le blocage hors-Madagascar et le blocage de précision', () => {
-    const { blocages } = validateGpsPosition({ latitude: 48.85, longitude: 2.35, accuracy: 200 });
-    expect(blocages.length).toBe(2);
+  it('bloque hors-Madagascar tout en avertissant sur la précision', () => {
+    const { blocages, avertissements } = validateGpsPosition({
+      latitude: 48.85,
+      longitude: 2.35,
+      accuracy: 200,
+    });
+    expect(blocages).toEqual([expect.stringContaining('hors de Madagascar')]);
+    expect(avertissements).toEqual([expect.stringContaining('Précision GPS insuffisante')]);
   });
 });
 

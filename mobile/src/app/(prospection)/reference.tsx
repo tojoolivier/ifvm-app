@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useForm } from '@tanstack/react-form';
 import { getCurrentPosition, reverseGeocode, GpsPosition } from '@/lib/location';
-import { PRECISION_GPS_CIBLE_M } from '@/lib/gps-precision';
+import { PRECISION_GPS_CIBLE_M, PRECISION_GPS_SEUIL_ALERTE_M } from '@/lib/gps-precision';
 import { PermissionError } from '@/lib/errors';
 import {
   findNearestStation,
@@ -79,6 +79,27 @@ export default function ReferenceScreen() {
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isGpsLoading, setIsGpsLoading] = useState(true);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  // Retour visuel continu sur la qualité du fix : la précision n'empêche jamais
+  // d'enregistrer, c'est donc ici — sous les yeux de l'agent pendant qu'il saisit —
+  // qu'elle doit se voir, et pas dans une alerte au moment de valider.
+  const accuracyBadgeStyle =
+    position?.accuracy == null
+      ? null
+      : position.accuracy > PRECISION_GPS_SEUIL_ALERTE_M
+        ? styles.accuracyBadgeInsuffisante
+        : position.accuracy > PRECISION_GPS_CIBLE_M
+          ? styles.accuracyBadgeMoyenne
+          : null;
+
+  const avertissementPrecision =
+    position == null
+      ? null
+      : (validateGpsPosition({
+          latitude: position.latitude,
+          longitude: position.longitude,
+          accuracy: position.accuracy,
+        }).avertissements[0] ?? null);
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('reference');
   const logError = useErrorLogStore((s) => s.addEntry);
@@ -298,6 +319,10 @@ export default function ReferenceScreen() {
             return;
           }
 
+          // Seuls les blocages (position hors Madagascar) arrêtent l'enregistrement.
+          // Les avertissements de précision sont affichés en continu dans la carte GPS
+          // ci-dessous : l'agent les a sous les yeux avant d'appuyer, inutile de lui
+          // barrer la route au moment où il valide.
           const { blocages: gpsBlocages } = validateGpsPosition({
             latitude: position.latitude,
             longitude: position.longitude,
@@ -459,18 +484,17 @@ export default function ReferenceScreen() {
                 </Text>
                 <View
                   testID="gps-accuracy-badge"
-                  style={[
-                    styles.accuracyBadge,
-                    position?.accuracy != null &&
-                      position.accuracy > PRECISION_GPS_CIBLE_M &&
-                      styles.accuracyBadgeAlerte,
-                  ]}
+                  style={[styles.accuracyBadge, accuracyBadgeStyle]}
                 >
                   <Text style={styles.accuracyText}>
                     {position?.accuracy != null ? `± ${Math.round(position.accuracy)} m` : '…'}
                   </Text>
                 </View>
               </View>
+
+              {avertissementPrecision ? (
+                <Text style={styles.gpsPrecisionAvertissement}>⚠️ {avertissementPrecision}</Text>
+              ) : null}
 
               {isGpsLoading ? (
                 <View style={styles.gpsLoadingContainer}>
@@ -753,9 +777,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  /** Ambre : « utilisable, mais attends encore un peu » — ni neutre, ni bloquant. */
-  accuracyBadgeAlerte: { backgroundColor: '#f59e0b' },
+  /** Ambre : « utilisable, mais attends encore un peu ». */
+  accuracyBadgeMoyenne: { backgroundColor: '#f59e0b' },
+  /** Rouge : « position peu fiable » — signal fort, mais jamais bloquant. */
+  accuracyBadgeInsuffisante: { backgroundColor: '#dc2626' },
   accuracyText: { color: '#fff', fontSize: 9.5, fontWeight: '600' },
+  gpsPrecisionAvertissement: {
+    color: '#fff',
+    fontSize: 10.5,
+    lineHeight: 14,
+    marginBottom: 9,
+  },
   gpsFieldsRow: { flexDirection: 'row', gap: 8, marginBottom: 9 },
   gpsField: { flex: 1, backgroundColor: '#ffffff1f', borderRadius: 8, padding: 7 },
   gpsFieldLabel: { color: '#ffffffbf', fontSize: 8.5, textTransform: 'uppercase' },

@@ -3,14 +3,17 @@
  * le « ± N m » descendre et sait quand la position est exploitable, au lieu
  * d'attendre un chiffre unique tombé du premier fix (souvent un fix réseau).
  */
-import { act, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import ReferenceScreen from '@/app/(prospection)/reference';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
+import * as prospectionRepository from '@/lib/prospection-repository';
 import { getCurrentPosition } from '@/lib/location';
 
-/** Ambre : « utilisable, mais attends encore un peu » — ni neutre, ni bloquant. */
-const PRECISION_BADGE_COULEUR_ALERTE = '#f59e0b';
+/** Ambre : « utilisable, mais attends encore un peu ». */
+const PRECISION_BADGE_COULEUR_MOYENNE = '#f59e0b';
+/** Rouge : « position peu fiable » — signal fort, mais jamais bloquant. */
+const PRECISION_BADGE_COULEUR_INSUFFISANTE = '#dc2626';
 
 const TEST_SAFE_AREA_METRICS = {
   insets: { top: 0, left: 0, right: 0, bottom: 0 },
@@ -92,7 +95,7 @@ describe('ReferenceScreen — précision GPS', () => {
     expect(await screen.findByText('± 9 m')).toBeVisible();
   });
 
-  it('signale visuellement une précision entre la cible et le seuil bloquant', async () => {
+  it('signale en ambre une précision entre la cible et le seuil d\'alerte', async () => {
     (getCurrentPosition as jest.Mock).mockResolvedValue(fixe(37));
 
     await render(
@@ -102,7 +105,22 @@ describe('ReferenceScreen — précision GPS', () => {
     );
 
     const badge = await screen.findByTestId('gps-accuracy-badge');
-    expect(badge).toHaveStyle({ backgroundColor: PRECISION_BADGE_COULEUR_ALERTE });
+    expect(badge).toHaveStyle({ backgroundColor: PRECISION_BADGE_COULEUR_MOYENNE });
+    expect(screen.getByText(/Précision GPS moyenne/)).toBeVisible();
+  });
+
+  it('signale en rouge une précision au-delà de 100 m, sans empêcher la saisie', async () => {
+    (getCurrentPosition as jest.Mock).mockResolvedValue(fixe(450));
+
+    await render(
+      <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
+        <ReferenceScreen />
+      </SafeAreaProvider>
+    );
+
+    const badge = await screen.findByTestId('gps-accuracy-badge');
+    expect(badge).toHaveStyle({ backgroundColor: PRECISION_BADGE_COULEUR_INSUFFISANTE });
+    expect(screen.getByText(/Précision GPS insuffisante/)).toBeVisible();
   });
 
   it('n\'alerte pas quand la précision atteint la cible', async () => {
@@ -115,6 +133,30 @@ describe('ReferenceScreen — précision GPS', () => {
     );
 
     const badge = await screen.findByTestId('gps-accuracy-badge');
-    expect(badge).not.toHaveStyle({ backgroundColor: PRECISION_BADGE_COULEUR_ALERTE });
+    expect(badge).not.toHaveStyle({ backgroundColor: PRECISION_BADGE_COULEUR_MOYENNE });
+    expect(badge).not.toHaveStyle({ backgroundColor: PRECISION_BADGE_COULEUR_INSUFFISANTE });
+    expect(screen.queryByText(/Précision GPS/)).toBeNull();
+  });
+
+  it('enregistre malgré une précision de 450 m — la précision avertit, elle ne bloque pas', async () => {
+    (getCurrentPosition as jest.Mock).mockResolvedValue(fixe(450));
+
+    await render(
+      <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
+        <ReferenceScreen />
+      </SafeAreaProvider>
+    );
+
+    await waitFor(() => expect(screen.getByText('Continuer  ›')).toBeVisible());
+
+    const surfaceInputs = screen.getAllByPlaceholderText('0');
+    fireEvent.changeText(surfaceInputs[0], '10');
+    fireEvent.press(screen.getByText('Xérophyle'));
+    fireEvent.changeText(surfaceInputs[1], '5');
+    fireEvent.press(screen.getByText('Continuer  ›'));
+
+    await waitFor(() =>
+      expect(prospectionRepository.updateProspectionReference).toHaveBeenCalled()
+    );
   });
 });
