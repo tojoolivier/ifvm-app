@@ -37,6 +37,22 @@ export interface ReviewGroupViewModel {
   dominantLabel: string;
 }
 
+export interface DensiteViewModel {
+  key: string;
+  espece: 'LMC' | 'NSE';
+  categorie: 'imago' | 'larve';
+  label: string;
+  densiteDiffuse: number | null;
+  densiteGroupee: number | null;
+}
+
+/** Une ligne `prospection_infestation` = une cible réellement sélectionnée et enregistrée. */
+export interface InfestationCibleViewModel {
+  key: string;
+  label: string;
+  details: string[];
+}
+
 export interface RecapitulatifViewModel {
   nFiche: string;
   nReleve: string;
@@ -55,14 +71,41 @@ export interface RecapitulatifViewModel {
   longitude: number | null;
   vegetationSummary: string;
   reviewGroups: ReviewGroupViewModel[];
-  infestationSummary: string;
+  infestationCibles: InfestationCibleViewModel[];
   comportementSummary: string;
   observationsText: string;
+  densites: DensiteViewModel[];
   heureObservationLabel: string;
 }
 
 const ESPECE_LABEL = { LMC: 'Locusta', NSE: 'Nomadacris' } as const;
 const CATEGORIE_LABEL = { imago: 'Imagos', larve: 'Larves' } as const;
+
+/**
+ * Densité diffuse/groupée par espèce + stade — 4 blocs indépendants (LMC/NSE ×
+ * imago/larve), jamais partagés (cf. `saveProspectionPopulation`, upsert par
+ * `(prospection_id, espece, categorie)`). Toujours les 4 combinaisons, même sans
+ * ligne en base pour l'une d'elles (densités alors affichées comme non renseignées).
+ */
+function buildDensitesSummary(populations: PopulationRow[]): DensiteViewModel[] {
+  const especes: ('LMC' | 'NSE')[] = ['LMC', 'NSE'];
+  const categories: ('imago' | 'larve')[] = ['imago', 'larve'];
+  const rows: DensiteViewModel[] = [];
+  for (const espece of especes) {
+    for (const categorie of categories) {
+      const row = populations.find((p) => p.espece === espece && p.categorie === categorie);
+      rows.push({
+        key: `${espece}-${categorie}`,
+        espece,
+        categorie,
+        label: `${ESPECE_LABEL[espece]} — ${CATEGORIE_LABEL[categorie]}`,
+        densiteDiffuse: row?.densite_diffuse ?? null,
+        densiteGroupee: row?.densite_groupee ?? null,
+      });
+    }
+  }
+  return rows;
+}
 
 function buildReviewGroups(draft: DraftProspection, captures: CaptureRow[]): ReviewGroupViewModel[] {
   const grilles = buildGrilles(parseEspeceSelection(draft.especes));
@@ -80,11 +123,37 @@ function buildReviewGroups(draft: DraftProspection, captures: CaptureRow[]): Rev
   });
 }
 
-function buildInfestationSummary(infestations: InfestationRow[]): string {
-  const filled = infestations.filter((row) => row.surface_totale != null || row.densite_moy != null);
-  if (filled.length === 0) return 'Aucune formation renseignée.';
-  const labels = filled.map((row) => TYPE_CIBLE_OPTIONS.find((o) => o.value === row.type_cible)?.label ?? row.type_cible);
-  return `${labels.join(', ')} renseignée${filled.length > 1 ? 's' : ''}.`;
+/**
+ * Une cible affichée = une cible sélectionnée par l'utilisateur (une ligne existe pour
+ * elle en base, cf. `persistAll`/`deleteProspectionInfestation` dans infestation.tsx qui
+ * gardent exactement synchronisées sélection et lignes enregistrées — désélectionner
+ * supprime la ligne, donc plus rien à afficher ici pour cette cible).
+ *
+ * Ancien bug : ce résumé ne retenait qu'une cible ayant surface_totale ou densite_moy
+ * renseigné — une cible sélectionnée mais pas encore quantifiée (la section Infestation
+ * est facultative) disparaissait donc silencieusement du récapitulatif alors qu'elle
+ * était bien enregistrée.
+ */
+function buildInfestationCibles(infestations: InfestationRow[]): InfestationCibleViewModel[] {
+  return infestations.map((row) => {
+    const details: string[] = [];
+    if (row.surface_totale != null) details.push(`Surface : ${row.surface_totale} ha`);
+    if (row.densite_moy != null) {
+      details.push(`Densité moy. : ${row.densite_moy}`);
+    } else if (row.densite_min != null || row.densite_max != null) {
+      details.push(`Densité : ${row.densite_min ?? '—'} – ${row.densite_max ?? '—'}`);
+    }
+    // Un brouillon local pré-migration 0031 pas encore resynchronisé peut encore porter
+    // type_cible='essaim' — même reclassement que buildInfestationsPayload, pour ne pas
+    // afficher la valeur brute non traduite dans le récapitulatif.
+    const typeEssaim = row.type_essaim ? (TYPE_ESSAIM_TO_BACKEND[row.type_essaim] ?? null) : null;
+    const typeCible = normalizeTypeCible(row.type_cible, typeEssaim);
+    return {
+      key: row.type_cible,
+      label: TYPE_CIBLE_OPTIONS.find((o) => o.value === typeCible)?.label ?? typeCible,
+      details,
+    };
+  });
 }
 
 /**
@@ -129,7 +198,8 @@ export function buildRecapitulatif(
   draft: DraftProspection,
   captures: CaptureRow[],
   vegetationSummary: string,
-  infestations: InfestationRow[]
+  infestations: InfestationRow[],
+  populations: PopulationRow[] = []
 ): RecapitulatifViewModel {
   const counts: CaptureCounts = rowsToCounts(captures);
   const dominant = dominantPhenotype(counts);
@@ -152,9 +222,10 @@ export function buildRecapitulatif(
     longitude: draft.longitude,
     vegetationSummary,
     reviewGroups: buildReviewGroups(draft, captures),
-    infestationSummary: buildInfestationSummary(infestations),
+    infestationCibles: buildInfestationCibles(infestations),
     comportementSummary: buildComportementSummary(infestations),
     observationsText: draft.observations?.trim() ? draft.observations : 'Aucune observation renseignée.',
+    densites: buildDensitesSummary(populations),
     heureObservationLabel: formatHeureLocale(draft.heure_observation_at),
   };
 }
@@ -317,6 +388,13 @@ function buildPopulationsPayload(rows: PopulationRow[]): ProspectionPopulationIn
     bande_larvaire: row.bande_larvaire != null ? Boolean(row.bande_larvaire) : null,
     interdistance: row.interdistance ? Number(row.interdistance) : null,
     deplacement: (row.deplacement || null) as ProspectionPopulationInput['deplacement'],
+    surface_contaminee_ha: row.surface_contaminee_ha ? Number(row.surface_contaminee_ha) : null,
+    type_cible: (row.type_cible || null) as ProspectionPopulationInput['type_cible'],
+    direction_de: row.direction_de || null,
+    direction_vers: row.direction_vers || null,
+    etat: (row.etat || null) as ProspectionPopulationInput['etat'],
+    essaim_en_vol: row.essaim_en_vol != null ? Boolean(row.essaim_en_vol) : null,
+    essaim_pose: row.essaim_pose != null ? Boolean(row.essaim_pose) : null,
   }));
 }
 
