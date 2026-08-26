@@ -389,9 +389,9 @@ function buildPopulationsPayload(rows: PopulationRow[]): ProspectionPopulationIn
     bande_larvaire: row.bande_larvaire != null ? Boolean(row.bande_larvaire) : null,
     interdistance: row.interdistance ? Number(row.interdistance) : null,
     deplacement: (row.deplacement || null) as ProspectionPopulationInput['deplacement'],
-    // ❌ Les propriétés suivantes ont été supprimées car elles n'existent pas sur PopulationRow
-    // surface_contaminee_ha, type_cible, direction_de, direction_vers, etat, essaim_en_vol, essaim_pose
-    // Ces propriétés sont gérées dans buildInfestationsPayload
+    // Les champs surface_contaminee_ha, type_cible, direction_de, direction_vers, etat,
+    // essaim_en_vol, essaim_pose n'existent pas sur PopulationRow — ils sont gérés dans
+    // buildInfestationsPayload (à partir d'InfestationRow), pas ici.
   }));
 }
 
