@@ -366,7 +366,6 @@ function normalizeIntensite(value: string | null): string | null {
   return value.toLowerCase().normalize('NFD').replace(COMBINING_DIACRITICS_RE, '');
 }
 
-// ✅ FONCTION CORRIGÉE : Suppression des propriétés qui n'existent pas sur PopulationRow
 function buildPopulationsPayload(rows: PopulationRow[]): ProspectionPopulationInput[] {
   return rows.map((row) => ({
     espece: row.espece,
@@ -389,9 +388,18 @@ function buildPopulationsPayload(rows: PopulationRow[]): ProspectionPopulationIn
     bande_larvaire: row.bande_larvaire != null ? Boolean(row.bande_larvaire) : null,
     interdistance: row.interdistance ? Number(row.interdistance) : null,
     deplacement: (row.deplacement || null) as ProspectionPopulationInput['deplacement'],
-    // ❌ Les propriétés suivantes ont été supprimées car elles n'existent pas sur PopulationRow
-    // surface_contaminee_ha, type_cible, direction_de, direction_vers, etat, essaim_en_vol, essaim_pose
-    // Ces propriétés sont gérées dans buildInfestationsPayload
+    // Champs extensif-imagos par espèce (migration 0033) : bien présents sur PopulationRow
+    // (cf. prospection-repository.ts) — indépendants de prospection_infestation/
+    // buildInfestationsPayload, une table différente. Les omettre ici les fait
+    // silencieusement disparaître à la synchro serveur (régression déjà rencontrée une
+    // fois, cf. commit ca39761 qui les avait retirés à tort).
+    surface_contaminee_ha: row.surface_contaminee_ha ? Number(row.surface_contaminee_ha) : null,
+    type_cible: (row.type_cible || null) as ProspectionPopulationInput['type_cible'],
+    direction_de: row.direction_de || null,
+    direction_vers: row.direction_vers || null,
+    etat: (row.etat || null) as ProspectionPopulationInput['etat'],
+    essaim_en_vol: row.essaim_en_vol != null ? Boolean(row.essaim_en_vol) : null,
+    essaim_pose: row.essaim_pose != null ? Boolean(row.essaim_pose) : null,
   }));
 }
 
