@@ -390,9 +390,10 @@ function buildPopulationsPayload(rows: PopulationRow[]): ProspectionPopulationIn
     deplacement: (row.deplacement || null) as ProspectionPopulationInput['deplacement'],
     // Champs extensif-imagos par espèce (migration 0033) : bien présents sur PopulationRow
     // (cf. prospection-repository.ts) — indépendants de prospection_infestation/
-    // buildInfestationsPayload, une table différente. Les omettre ici les fait
-    // silencieusement disparaître à la synchro serveur (régression déjà rencontrée une
-    // fois, cf. commit ca39761 qui les avait retirés à tort).
+    // buildInfestationsPayload, une table différente (InfestationRow). Les omettre ici les
+    // fait silencieusement disparaître à la synchro serveur (régression déjà rencontrée à
+    // deux reprises, cf. commits ca39761 et 55cdc59 qui les avaient retirés à tort — vérifié
+    // sans ambiguïté par `npx tsc --noEmit`, aucune erreur sur ces champs).
     surface_contaminee_ha: row.surface_contaminee_ha ? Number(row.surface_contaminee_ha) : null,
     type_cible: (row.type_cible || null) as ProspectionPopulationInput['type_cible'],
     direction_de: row.direction_de || null,
