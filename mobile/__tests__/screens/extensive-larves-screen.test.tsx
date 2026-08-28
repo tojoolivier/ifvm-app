@@ -76,8 +76,7 @@ describe('ExtensiveLarvesScreen', () => {
     await screen.findByText('Surface contaminée (ha)');
     await settle();
 
-    // Interdistance (m) puis Surface contaminée (ha) sont les 2 champs vides, dans cet ordre.
-    fireEvent.changeText(screen.getAllByDisplayValue('')[1], '12.75');
+    fireEvent.changeText(screen.getByTestId('surface-contaminee-input'), '12.75');
     await settle();
     fireEvent.press(screen.getByText('Suivant : Observations ›'));
 
