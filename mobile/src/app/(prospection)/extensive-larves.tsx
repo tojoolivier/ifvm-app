@@ -349,6 +349,7 @@ export default function ExtensiveLarvesScreen() {
               <View style={styles.inputRow}>
                 <Text style={styles.inputLabel}>Interdistance (m)</Text>
                 <TextInput
+                  testID="interdistance-input"
                   value={data.interdistance}
                   onChangeText={(text) => updateSpeciesData({ interdistance: text })}
                   keyboardType="decimal-pad"
@@ -361,6 +362,7 @@ export default function ExtensiveLarvesScreen() {
               <View style={styles.inputRow}>
                 <Text style={styles.inputLabel}>Surface contaminée (ha)</Text>
                 <TextInput
+                  testID="surface-contaminee-input"
                   value={data.surfaceContamineeHa}
                   onChangeText={(text) => updateSpeciesData({ surfaceContamineeHa: text })}
                   keyboardType="decimal-pad"
