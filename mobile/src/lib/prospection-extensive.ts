@@ -324,9 +324,8 @@ export function larveSpeciesDataToPopulationRow(espece: Espece, data: ExtensiveL
   return {
     espece,
     categorie: 'larve',
-    // ✨ AJOUT : Densités maintenant sauvegardées pour les larves
-    densite_diffuse: data.popDiff ? parseFloat(data.popDiff) : null,
-    densite_groupee: data.popGroup ? parseFloat(data.popGroup) : null,
+    densite_diffuse: data.popDiff && data.popDiff.trim() !== '' ? parseFloat(data.popDiff) : null,
+    densite_groupee: data.popGroup && data.popGroup.trim() !== '' ? parseFloat(data.popGroup) : null,
     methode: null,
     accouplement: null,
     ponte: null,
@@ -337,9 +336,12 @@ export function larveSpeciesDataToPopulationRow(espece: Espece, data: ExtensiveL
     densites_larve: JSON.stringify(data.stades),
     tache_larvaire: data.tacheLarvaire,
     bande_larvaire: data.bandeLarvaire,
-    interdistance: data.interdistance ? parseFloat(data.interdistance) : null,
+    interdistance: data.interdistance && data.interdistance.trim() !== '' ? parseFloat(data.interdistance) : null,
     deplacement: data.deplacement,
-    surface_contaminee_ha: data.surfaceContamineeHa ? parseFloat(data.surfaceContamineeHa) : null,
+    // ✅ CORRECTION
+    surface_contaminee_ha: data.surfaceContamineeHa && data.surfaceContamineeHa.trim() !== '' 
+      ? parseFloat(data.surfaceContamineeHa) 
+      : null,
   };
 }
 
