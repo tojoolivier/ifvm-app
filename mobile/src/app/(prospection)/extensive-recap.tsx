@@ -33,8 +33,11 @@ interface DetailRow {
  * (elle n'a jamais été ouverte) : cf. `imagoRowHasData`/`larveRowHasData`.
  */
 function buildImagoRows(row: PopulationRow | null): DetailRow[] {
+  // ✅ CORRECTION : Le nombre de captures est la somme des phases
+  const totalCaptures = imagoTotalFromRow(row);
+  
   return [
-    { label: 'Nombre de captures', value: String(row?.captures_nombre ?? 0) },
+    { label: 'Nombre de captures', value: String(totalCaptures) },
     {
       label: 'Phases',
       value: `Sol. ${row?.captures_sol ?? 0} · Trans. ${row?.captures_trans ?? 0} · Sol-Trans. ${row?.captures_solitaro_transiens ?? 0} · Grég. ${row?.captures_greg ?? 0}`,
@@ -65,6 +68,10 @@ function imagoRowHasData(row: PopulationRow | null): boolean {
   if (!row) return false;
   return (
     (row.captures_nombre ?? 0) > 0 ||
+    (row.captures_sol ?? 0) > 0 ||
+    (row.captures_trans ?? 0) > 0 ||
+    (row.captures_solitaro_transiens ?? 0) > 0 ||
+    (row.captures_greg ?? 0) > 0 ||
     row.densite_diffuse != null ||
     row.densite_groupee != null ||
     !!row.accouplement ||
@@ -75,6 +82,9 @@ function imagoRowHasData(row: PopulationRow | null): boolean {
 }
 
 function buildLarveRows(row: PopulationRow | null): DetailRow[] {
+  // ✅ CORRECTION : Le nombre de captures est la somme des stades
+  const totalCaptures = larveTotalFromRow(row);
+  
   let stadesValue = '—';
   if (row?.densites_larve) {
     const parsed = JSON.parse(row.densites_larve) as Record<string, number>;
@@ -88,13 +98,11 @@ function buildLarveRows(row: PopulationRow | null): DetailRow[] {
   ].filter(Boolean);
 
   return [
-    { label: 'Nombre de captures', value: String(row?.captures_nombre ?? 0) },
+    { label: 'Nombre de captures', value: String(totalCaptures) },
     { label: 'Stades renseignés', value: stadesValue },
     { label: 'Interdistance (m)', value: row?.interdistance != null ? String(row.interdistance) : '—' },
     { label: 'Surface contaminée (ha)', value: row?.surface_contaminee_ha != null ? String(row.surface_contaminee_ha) : '—' },
-    // Pas de saisie densité diffuse/groupée sur l'écran Larves (la densité y est
-    // exprimée uniquement par la répartition de captures par stade) — la ligne reste
-    // affichée pour respecter la structure demandée, avec une valeur honnête (« — »).
+    // ✅ AJOUT : Densités pour les larves (maintenant sauvegardées en base)
     { label: 'Densité diffuse', value: row?.densite_diffuse != null ? `${row.densite_diffuse} D/ha` : '—' },
     { label: 'Densité groupée', value: row?.densite_groupee != null ? `${row.densite_groupee} D/m²` : '—' },
     { label: 'Autres informations', value: autres.length > 0 ? autres.join(' · ') : '—' },
@@ -108,6 +116,9 @@ function larveRowHasData(row: PopulationRow | null): boolean {
   if (row.surface_contaminee_ha != null) return true;
   if (row.tache_larvaire || row.bande_larvaire) return true;
   if (row.deplacement && row.deplacement !== 'repos') return true;
+  // ✅ AJOUT : Vérifier les densités
+  if (row.densite_diffuse != null) return true;
+  if (row.densite_groupee != null) return true;
   return false;
 }
 

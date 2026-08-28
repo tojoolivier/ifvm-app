@@ -114,11 +114,6 @@ export default function ExtensiveLarvesScreen() {
           saveProspectionPopulation(draftId, larveSpeciesDataToPopulationRow('NSE', speciesData.NSE)),
         ]);
 
-        // Observations (dégâts/verdure/hauteur/pluie) suit toujours Larves dans le
-        // parcours Extensive — cf. extensive-observations.tsx et le récapitulatif
-        // (bloc « D · Observations »), tous deux déjà écrits pour cette place dans
-        // le parcours. Cet écran était jusqu'ici sauté (routage direct vers le
-        // récapitulatif), rendant Observations inatteignable côté Extensif.
         router.push({ pathname: '/(prospection)/extensive-observations' as any, params: { draftId } });
       },
       {
@@ -130,9 +125,6 @@ export default function ExtensiveLarvesScreen() {
     );
   };
 
-  // Source unique du vocabulaire des stades larvaires (cf. prospection-especes-stades.ts) :
-  // LMC s'arrête à L5, NSE à L7 — un doublon local ici avait dérivé jusqu'à L6/L7/L8 pour
-  // LMC, des stades qui n'existent pas pour cette espèce.
   const stadesList = stadesLarvairesFor(species);
 
   return (
@@ -292,6 +284,40 @@ export default function ExtensiveLarvesScreen() {
               )}
             </View>
 
+            {/* ✨ SECTION DENSITÉS AJOUTÉE (comme dans extensive-imagos.tsx) */}
+            <View style={styles.densitySection}>
+              <Text style={styles.sectionLabel}>📊 Densités</Text>
+              <View style={styles.row}>
+                <View style={[styles.card, styles.flex1]}>
+                  <Text style={styles.label}>Population diffuse D/ha</Text>
+                  <TextInput
+                    value={data.popDiff}
+                    onChangeText={(text) => {
+                      updateSpeciesData({ popDiff: text });
+                    }}
+                    keyboardType="decimal-pad"
+                    style={styles.inputMono}
+                    placeholder="0"
+                    placeholderTextColor={TEXT_SECONDARY}
+                  />
+                </View>
+                <View style={[styles.card, styles.flex1]}>
+                  <Text style={styles.label}>Population groupée D/m²</Text>
+                  <TextInput
+                    value={data.popGroup}
+                    onChangeText={(text) => {
+                      updateSpeciesData({ popGroup: text });
+                    }}
+                    keyboardType="decimal-pad"
+                    style={styles.inputMono}
+                    placeholder="0"
+                    placeholderTextColor={TEXT_SECONDARY}
+                  />
+                </View>
+              </View>
+              <Text style={styles.speciesHint}>Données spécifiques à {species}</Text>
+            </View>
+
             <View style={styles.observationsSection}>
               <Text style={styles.sectionLabel}>📊 Observations</Text>
               <Text style={styles.speciesHint}>Données spécifiques à {species}</Text>
@@ -379,6 +405,16 @@ export default function ExtensiveLarvesScreen() {
                 <Text style={[styles.summaryValue, isStadesConsistent ? styles.summaryValueValid : styles.summaryValueInvalid]}>
                   {totalStades} {isStadesConsistent ? '✅' : '❌'}
                 </Text>
+              </View>
+              {/* ✨ AJOUT : Densités dans le récapitulatif */}
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Pop. diffuse D/ha :</Text>
+                <Text style={styles.summaryValue}>{data.popDiff || '0'}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Pop. groupée D/m² :</Text>
+                <Text style={styles.summaryValue}>{data.popGroup || '0'}</Text>
               </View>
               <View style={styles.ruleBox}>
                 <Text style={styles.ruleText}>Règle : Captures = Phases = Stades</Text>
@@ -480,8 +516,16 @@ const styles = StyleSheet.create({
   miniButtonText: { fontSize: 14, fontWeight: '700', color: TEXT_SECONDARY },
   miniButtonAddText: { color: '#fff' },
   
-  observationsSection: { marginTop: 4, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
+  // ✨ STYLES AJOUTÉS POUR LA SECTION DENSITÉS
+  densitySection: { marginTop: 4, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
+  row: { flexDirection: 'row', gap: 8, marginBottom: 0 },
+  flex1: { flex: 1 },
+  card: { backgroundColor: '#f6f3e9', borderRadius: 9, padding: 8 },
+  label: { fontSize: 9, fontWeight: '600', color: '#9a9484' },
+  inputMono: { fontSize: 15, fontWeight: '700', color: TEXT, fontFamily: 'monospace', padding: 0 },
   speciesHint: { fontSize: 9, color: '#9a9484', marginBottom: 6, textAlign: 'center', fontStyle: 'italic' },
+  
+  observationsSection: { marginTop: 4, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
   toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: BORDER },
   toggleLabel: { fontSize: 13, fontWeight: '500', color: TEXT },
   toggleButton: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 8, backgroundColor: INACTIVE_BG },
@@ -500,6 +544,7 @@ const styles = StyleSheet.create({
   summaryContainer: { backgroundColor: '#FFFFFF', borderRadius: 10, padding: 14, marginTop: 8, borderWidth: 1, borderColor: BORDER },
   summaryTitle: { fontSize: 12, fontWeight: '700', color: TEXT, marginBottom: 8, textAlign: 'center' },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: '#f0eee8' },
+  summaryDivider: { height: 1, backgroundColor: '#f0eee8', marginVertical: 4 },
   summaryLabel: { fontSize: 13, color: TEXT_SECONDARY },
   summaryValue: { fontSize: 13, fontWeight: '700', color: TEXT },
   summaryValueValid: { color: GREEN },

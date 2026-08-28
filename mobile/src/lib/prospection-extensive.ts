@@ -119,6 +119,9 @@ export interface ExtensiveLarveSpeciesData {
   };
   stades: Record<string, number>;
   activePhase: PhaseKey | null;
+  // ✨ AJOUT : Densités par espèce (comme pour les imagos)
+  popDiff: string;
+  popGroup: string;
   // Ex-« données communes » (#225) : tache/bande larvaire, interdistance, déplacement et
   // surface contaminée étaient jusqu'ici un unique jeu de valeurs partagé entre LMC et
   // NSE (une seule ligne d'état sur l'écran, appliquée aux deux lignes population lors
@@ -184,6 +187,9 @@ export function createEmptyLarveSpeciesData(espece: Espece): ExtensiveLarveSpeci
     },
     stades,
     activePhase: null,
+    // ✨ AJOUT : Initialisation des densités
+    popDiff: '',
+    popGroup: '',
     tacheLarvaire: false,
     bandeLarvaire: false,
     interdistance: '',
@@ -318,8 +324,9 @@ export function larveSpeciesDataToPopulationRow(espece: Espece, data: ExtensiveL
   return {
     espece,
     categorie: 'larve',
-    densite_diffuse: null,
-    densite_groupee: null,
+    // ✨ AJOUT : Densités maintenant sauvegardées pour les larves
+    densite_diffuse: data.popDiff ? parseFloat(data.popDiff) : null,
+    densite_groupee: data.popGroup ? parseFloat(data.popGroup) : null,
     methode: null,
     accouplement: null,
     ponte: null,
@@ -354,6 +361,9 @@ export function populationRowToLarveSpeciesData(
     },
     stades: { ...empty.stades, ...parsedStades },
     activePhase: null,
+    // ✨ AJOUT : Restauration des densités depuis la base
+    popDiff: row.densite_diffuse != null ? String(row.densite_diffuse) : '',
+    popGroup: row.densite_groupee != null ? String(row.densite_groupee) : '',
     tacheLarvaire: Boolean(row.tache_larvaire),
     bandeLarvaire: Boolean(row.bande_larvaire),
     interdistance: row.interdistance != null ? String(row.interdistance) : '',
@@ -361,4 +371,3 @@ export function populationRowToLarveSpeciesData(
     surfaceContamineeHa: row.surface_contaminee_ha != null ? String(row.surface_contaminee_ha) : '',
   };
 }
-
