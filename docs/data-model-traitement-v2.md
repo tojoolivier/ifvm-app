@@ -45,8 +45,8 @@ erDiagram
         string type_traitement "CHECK AERIEN|TERRESTRE"
         string mode_traitement "CHECK TOTAL|BARRIERE|IRREGULIER, nullable"
         uuid prospection_id FK "NOT NULL"
-        date date_traitement
-        date date_validation "NOT NULL, >= date_traitement"
+        date date_traitement "NOT NULL, >= date_validation"
+        date date_validation
         numeric longitude
         numeric latitude
         numeric altitude

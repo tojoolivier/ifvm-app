@@ -112,14 +112,15 @@ export default function ReferencesScreen() {
   const handleContinuer = () =>
     run(
       async () => {
-        // Vérifier que la date de validation n'est pas antérieure à la date de traitement
+        // Vérifier que la date de traitement n'est pas antérieure à la date de validation
+        // (on valide/approuve d'abord, le traitement s'exécute ensuite).
         if (store.ref.dateTraitement && dateValidation) {
           const traitementDate = new Date(store.ref.dateTraitement);
           const validationDate = new Date(dateValidation);
-          if (validationDate < traitementDate) {
+          if (traitementDate < validationDate) {
             setErrors({
               ...errors,
-              dateValidation: 'La date de validation ne peut pas être antérieure à la date de traitement'
+              dateTraitement: 'La date de traitement ne peut pas être antérieure à la date de validation'
             });
             return;
           }

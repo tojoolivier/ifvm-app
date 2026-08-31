@@ -61,8 +61,8 @@ async def _persister_avec_numero_fiche_unique(
 
 
 def _valider_dates(date_traitement: date, date_validation: date) -> None:
-    if date_validation < date_traitement:
-        raise ValueError("date_validation doit être postérieure ou égale à date_traitement")
+    if date_traitement < date_validation:
+        raise ValueError("date_traitement doit être postérieure ou égale à date_validation")
 
 
 def _generer_et_valider_numero_fiche(

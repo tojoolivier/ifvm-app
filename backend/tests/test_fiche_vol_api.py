@@ -390,7 +390,7 @@ async def _rotation_reelle(
         json={
             "prospection_id": str(prospection.id),
             "date_traitement": "2026-08-11",
-            "date_validation": "2026-08-12",
+            "date_validation": "2026-08-10",
             "localite": "Betioky",
             "aerien": {
                 "pilote": "J. Dupont",

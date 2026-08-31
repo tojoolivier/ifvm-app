@@ -87,14 +87,14 @@ export function validateReferences(input: ReferencesValidationInput): Validation
   }
   if (!input.dateTraitement) {
     errors.push({ field: 'dateTraitement', message: 'La date de traitement est obligatoire' });
+  } else if (input.dateValidation && input.dateTraitement < input.dateValidation) {
+    errors.push({
+      field: 'dateTraitement',
+      message: 'La date de traitement ne peut pas être antérieure à la date de validation',
+    });
   }
   if (!input.dateValidation) {
     errors.push({ field: 'dateValidation', message: 'La date de validation est obligatoire' });
-  } else if (input.dateTraitement && input.dateValidation < input.dateTraitement) {
-    errors.push({
-      field: 'dateValidation',
-      message: 'La date de validation ne peut pas être antérieure à la date de traitement',
-    });
   }
   if (!input.localite || input.localite.trim() === '') {
     errors.push({ field: 'localite', message: 'La localité est obligatoire' });
