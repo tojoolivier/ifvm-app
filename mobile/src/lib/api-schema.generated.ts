@@ -1894,7 +1894,7 @@ export interface components {
          * StadeDominant
          * @enum {string}
          */
-        StadeDominant: "l1_l3" | "l4_l5";
+        StadeDominant: "l1_l3" | "l1_l2" | "l2_l3" | "l3_l4" | "l4_l5" | "l5_l6" | "l6_l7";
         /**
          * StadeImago
          * @enum {string}
@@ -2490,6 +2490,9 @@ export interface components {
         TypeCible: "tache_larvaire" | "bande_larvaire" | "vol_clair" | "dense" | "tres_dense";
         /**
          * TypeCibleImago
+         * @description `prospection_population.type_cible` (extensif, par espèce) : l'extensif n'a pas
+         *     d'écran Infestation séparé — sous-ensemble de TypeCible pertinent pour un imago
+         *     (pas tache_larvaire/bande_larvaire, réservées aux larves).
          * @enum {string}
          */
         TypeCibleImago: "vol_clair" | "dense" | "tres_dense";
