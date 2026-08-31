@@ -30,8 +30,19 @@ class TypeLarve(str, Enum):
 
 
 class StadeDominant(str, Enum):
+    # Découpage par paires (#regroupement-slides) : le choix affiché côté mobile est
+    # désormais L1-L2/L2-L3/L3-L4/L4-L5. `L1_L3` reste dans le jeu de valeurs — retiré
+    # ici, une fiche déjà enregistrée avec cette valeur ferait échouer la validation
+    # Pydantic à la lecture (`InfestationRead`) — mais n'est plus proposé à la saisie.
     L1_L3 = "l1_l3"
+    L1_L2 = "l1_l2"
+    L2_L3 = "l2_l3"
+    L3_L4 = "l3_l4"
     L4_L5 = "l4_l5"
+    # NSE va jusqu'à L7 (LMC s'arrête à L5) — sans ces deux paires, un stade dominant NSE
+    # L6/L7 n'avait aucune option représentative.
+    L5_L6 = "l5_l6"
+    L6_L7 = "l6_l7"
 
 
 class DegatsCultures(str, Enum):
