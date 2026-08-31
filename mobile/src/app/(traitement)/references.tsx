@@ -8,8 +8,10 @@ import {
   createDraftTraitementTerrestre,
   updateTraitementReference,
   getTraitement,
+  saveCible,
 } from '@/lib/traitement-repository';
-import { getProspection } from '@/lib/prospection-repository';
+import { construireCible } from '@/lib/traitement-cible';
+import { getProspection, listAllProspectionPopulations, listAllProspectionInfestations } from '@/lib/prospection-repository';
 import { STATUT_VALIDE } from '@/lib/prospection-fiche-lecture';
 import { generateId } from '@/lib/id';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
@@ -182,6 +184,20 @@ export default function ReferencesScreen() {
                 });
           id = created.id;
           setTraitementId(id);
+
+          // Snapshot de la cible, figé à la création (jamais recalculé ensuite,
+          // cf. l'avertissement affiché sur l'écran Cibles) — dérivé de la fiche
+          // de prospection liée, même logique que construire_cible() côté backend.
+          if (prospectionId) {
+            const [prospectionLiee, populations, infestations] = await Promise.all([
+              getProspection(prospectionId),
+              listAllProspectionPopulations(prospectionId),
+              listAllProspectionInfestations(prospectionId),
+            ]);
+            if (prospectionLiee) {
+              await saveCible(id, construireCible(prospectionLiee, populations, infestations));
+            }
+          }
         }
 
         await updateTraitementReference(id, {
