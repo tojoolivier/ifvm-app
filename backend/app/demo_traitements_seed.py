@@ -157,7 +157,7 @@ async def seed():
             type_traitement="AERIEN",
             mode_traitement="BARRIERE",
             date_traitement=date(2026, 8, 12),
-            date_validation=date(2026, 8, 13),
+            date_validation=date(2026, 8, 11),
             localite="Beroroha",
             region="Atsimo-Andrefana",
             district="Beroroha",
