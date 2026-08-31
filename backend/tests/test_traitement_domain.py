@@ -207,7 +207,7 @@ def _args(**overrides):
     args = dict(
         prospection_id=uuid.uuid4(),
         date_traitement=date(2026, 8, 11),
-        date_validation=date(2026, 8, 12),
+        date_validation=date(2026, 8, 10),
         localite="Betioky",
         pilote="J. Dupont",
         mecanicien="M. Rabe",
@@ -275,11 +275,11 @@ async def test_rejette_numero_fiche_trop_long():
 
 
 @pytest.mark.asyncio
-async def test_rejette_date_validation_anterieure():
+async def test_rejette_date_traitement_anterieure():
     use_case, _ = _use_case(prospection=_prospection(), chef=_CHEF)
     with pytest.raises(ValueError):
         await use_case.execute(
-            **_args(date_traitement=date(2026, 8, 11), date_validation=date(2026, 8, 10))
+            **_args(date_traitement=date(2026, 8, 10), date_validation=date(2026, 8, 11))
         )
 
 
@@ -572,7 +572,7 @@ def _args_terrestre(**overrides):
     args = dict(
         prospection_id=uuid.uuid4(),
         date_traitement=date(2026, 8, 11),
-        date_validation=date(2026, 8, 12),
+        date_validation=date(2026, 8, 10),
         localite="Betioky",
         heure_debut=time(6, 0),
         heure_fin=time(9, 0),
@@ -643,11 +643,11 @@ async def test_terrestre_rejette_heure_fin_anterieure_ou_egale():
 
 
 @pytest.mark.asyncio
-async def test_terrestre_rejette_date_validation_anterieure():
+async def test_terrestre_rejette_date_traitement_anterieure():
     use_case, _ = _use_case_terrestre(prospection=_prospection(), chef=_CHEF_EQUIPE)
     with pytest.raises(ValueError):
         await use_case.execute(
-            **_args_terrestre(date_traitement=date(2026, 8, 11), date_validation=date(2026, 8, 10))
+            **_args_terrestre(date_traitement=date(2026, 8, 10), date_validation=date(2026, 8, 11))
         )
 
 
@@ -961,7 +961,7 @@ def _traitement_aerien_valide(**overrides) -> Traitement:
     return Traitement(
         type_traitement="AERIEN",
         statut="brouillon",
-        date_traitement=date(2026, 8, 11),
+        date_traitement=date(2026, 8, 13),
         aerien=aerien,
     )
 
@@ -979,7 +979,7 @@ def _traitement_terrestre_valide(**overrides) -> Traitement:
     return Traitement(
         type_traitement="TERRESTRE",
         statut="brouillon",
-        date_traitement=date(2026, 8, 11),
+        date_traitement=date(2026, 8, 13),
         terrestre=terrestre,
     )
 
@@ -1086,11 +1086,11 @@ def test_valider_role_signature_invalide_pour_type_traitement():
         )
 
 
-def test_valider_date_validation_anterieure_bloque():
+def test_valider_date_validation_posterieure_bloque():
     traitement = _traitement_aerien_valide()
     with pytest.raises(ValueError):
         traitement.valider(
-            date(2026, 8, 10),
+            date(2026, 8, 14),
             [
                 {"role": "PILOTE", "signataire_nom": "J. Dupont"},
                 {"role": "MECANICIEN", "signataire_nom": "M. Rabe"},
@@ -1172,7 +1172,7 @@ def _traitement_terrestre_sync(**overrides) -> Traitement:
         numero_fiche="Hery-Terrestre-2026-08-11",
         mode_traitement=None,
         date_traitement=date(2026, 8, 11),
-        date_validation=date(2026, 8, 12),
+        date_validation=date(2026, 8, 10),
         localite="Betioky",
         region=None,
         district=None,
@@ -1312,7 +1312,7 @@ def _sync_terrestre_args(fiche_id, base_updated_at, **overrides):
         base_updated_at=base_updated_at,
         prospection_id=_PROSPECTION_ID_SYNC,
         date_traitement=date(2026, 8, 11),
-        date_validation=date(2026, 8, 12),
+        date_validation=date(2026, 8, 10),
         localite="Betioky",
         heure_debut=time(6, 0),
         heure_fin=time(9, 0),

@@ -92,8 +92,8 @@ describe('computeSurfaceRestante', () => {
 describe('validateReferences', () => {
   const valid = {
     typeTraitement: 'AERIEN' as const,
-    dateTraitement: '2026-08-10',
-    dateValidation: '2026-08-11',
+    dateTraitement: '2026-08-11',
+    dateValidation: '2026-08-10',
     localite: 'Ambositra',
     prospectionId: 'presp-1',
   };
@@ -112,9 +112,9 @@ describe('validateReferences', () => {
     expect(errors.some((e) => e.field === 'prospectionId')).toBe(true);
   });
 
-  it('rejects a validation date earlier than the treatment date', () => {
-    const errors = validateReferences({ ...valid, dateTraitement: '2026-08-12', dateValidation: '2026-08-11' });
-    expect(errors.some((e) => e.field === 'dateValidation')).toBe(true);
+  it('rejects a treatment date earlier than the validation date', () => {
+    const errors = validateReferences({ ...valid, dateTraitement: '2026-08-10', dateValidation: '2026-08-11' });
+    expect(errors.some((e) => e.field === 'dateTraitement')).toBe(true);
   });
 
   it('rejects a missing localite', () => {
@@ -253,8 +253,8 @@ describe('aggregateRecapErrors', () => {
     typeTraitement: 'AERIEN' as const,
     references: {
       typeTraitement: 'AERIEN' as const,
-      dateTraitement: '2026-08-10',
-      dateValidation: '2026-08-11',
+      dateTraitement: '2026-08-11',
+      dateValidation: '2026-08-10',
       localite: 'Ambositra',
       prospectionId: 'presp-1',
     },

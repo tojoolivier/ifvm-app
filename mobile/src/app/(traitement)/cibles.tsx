@@ -13,13 +13,22 @@ function display(value: string | number | null | undefined): string {
   return String(value);
 }
 
+/** `vols_clairs_essaims` est stocké en base locale sous forme 1/0 (colonne REAL,
+ * cf. construireCible dans traitement-cible.ts) — jamais renseigné si null. */
+function displayVolsClairsEssaims(value: number | null | undefined): string {
+  if (value === null || value === undefined) return 'non renseigné';
+  return value ? 'oui' : 'non';
+}
+
 /**
  * Écran B — Cibles (snapshot figé à la création).
  *
- * Déviation notée : ce lot ne construit pas la logique qui alimente `cible`
- * depuis la fiche de prospection liée (choix de la fiche = Lot 3, pas encore
- * livré). Cet écran se contente de lire `getTraitement(id).cible` tel qu'il
- * existe déjà en base ; s'il est vide (aucune capture amont), chaque champ
+ * La cible est calculée une seule fois, à la création de la fiche de traitement
+ * (references.tsx, via `construireCible` dans traitement-cible.ts — même logique que
+ * `construire_cible()` côté backend), à partir des populations/infestations de la
+ * fiche de prospection liée. Cet écran se contente de la relire telle quelle
+ * (`getTraitement(id).cible`) : elle ne se recalcule jamais après coup, même si la
+ * prospection est modifiée ensuite. Si vide (aucune capture amont), chaque champ
  * affiche "non renseigné" comme prévu par le brief.
  */
 export default function CiblesScreen() {
@@ -60,7 +69,7 @@ export default function CiblesScreen() {
         </View>
         <View style={styles.field}>
           <Text style={styles.label}>Vols/essaims</Text>
-          <Text style={styles.value}>{display(cible?.vols_clairs_essaims)}</Text>
+          <Text style={styles.value}>{displayVolsClairsEssaims(cible?.vols_clairs_essaims)}</Text>
         </View>
         <View style={styles.field}>
           <Text style={styles.label}>Répartition de la population</Text>

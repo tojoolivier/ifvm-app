@@ -14,7 +14,7 @@ def payload_traitement(chef_de_base):
         payload = {
             "prospection_id": str(prospection_id),
             "date_traitement": "2026-08-11",
-            "date_validation": "2026-08-12",
+            "date_validation": "2026-08-10",
             "localite": "Betioky",
             "aerien": {
                 "pilote": "J. Dupont",
@@ -375,7 +375,7 @@ def payload_traitement_terrestre(chef_equipe):
         payload = {
             "prospection_id": str(prospection_id),
             "date_traitement": "2026-08-11",
-            "date_validation": "2026-08-12",
+            "date_validation": "2026-08-10",
             "localite": "Betioky",
             "terrestre": {
                 "heure_debut": "06:00:00",
@@ -501,7 +501,7 @@ async def test_create_traitement_sans_aerien_ni_terrestre_422(
     payload = {
         "prospection_id": str(prospection_id),
         "date_traitement": "2026-08-11",
-        "date_validation": "2026-08-12",
+        "date_validation": "2026-08-10",
         "localite": "Betioky",
     }
     resp = await client.post("/traitements", json=payload, headers=auth_headers)
@@ -953,7 +953,7 @@ async def test_valider_cycle_aerien_complet(
     resp = await client.post(
         f"/traitements/{traitement_id}/valider",
         json={
-            "date_validation": "2026-08-13",
+            "date_validation": "2026-08-11",
             "signatures": [
                 {"role": "PILOTE", "signataire_nom": "J. Dupont"},
                 {"role": "MECANICIEN", "signataire_nom": "M. Rabe"},
@@ -965,7 +965,7 @@ async def test_valider_cycle_aerien_complet(
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["statut"] == "validee"
-    assert body["date_validation"] == "2026-08-13"
+    assert body["date_validation"] == "2026-08-11"
     assert {s["role"] for s in body["signatures"]} == {"PILOTE", "MECANICIEN", "CHEF_DE_BASE"}
 
 
@@ -981,7 +981,7 @@ async def test_valider_cycle_terrestre_complet_sans_agent_encadreur(
     resp = await client.post(
         f"/traitements/{traitement_id}/valider",
         json={
-            "date_validation": "2026-08-13",
+            "date_validation": "2026-08-11",
             "signatures": [{"role": "CHEF_EQUIPE", "signataire_nom": "Hery"}],
         },
         headers=auth_headers,
@@ -1005,7 +1005,7 @@ async def test_valider_aerien_consultant_renseigne_sans_signature_422(
     resp = await client.post(
         f"/traitements/{traitement_id}/valider",
         json={
-            "date_validation": "2026-08-13",
+            "date_validation": "2026-08-11",
             "signatures": [
                 {"role": "PILOTE", "signataire_nom": "J. Dupont"},
                 {"role": "MECANICIEN", "signataire_nom": "M. Rabe"},
@@ -1035,7 +1035,7 @@ async def test_valider_terrestre_surface_restante_abandonnee_sans_motif_422(
     resp = await client.post(
         f"/traitements/{traitement_id}/valider",
         json={
-            "date_validation": "2026-08-13",
+            "date_validation": "2026-08-11",
             "signatures": [{"role": "CHEF_EQUIPE", "signataire_nom": "Hery"}],
         },
         headers=auth_headers,
@@ -1060,7 +1060,7 @@ async def test_valider_terrestre_surface_restante_abandonnee_avec_motif_ok(
     resp = await client.post(
         f"/traitements/{traitement_id}/valider",
         json={
-            "date_validation": "2026-08-13",
+            "date_validation": "2026-08-11",
             "signatures": [{"role": "CHEF_EQUIPE", "signataire_nom": "Hery"}],
         },
         headers=auth_headers,
@@ -1073,7 +1073,7 @@ async def test_valider_terrestre_surface_restante_abandonnee_avec_motif_ok(
 async def test_valider_traitement_inexistant_404(client, auth_headers, db_engine):
     resp = await client.post(
         f"/traitements/{uuid.uuid4()}/valider",
-        json={"date_validation": "2026-08-13", "signatures": []},
+        json={"date_validation": "2026-08-11", "signatures": []},
         headers=auth_headers,
     )
     assert resp.status_code == 404
@@ -1087,7 +1087,7 @@ async def test_valider_fiche_deja_validee_403(
         client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
     )
     body = {
-        "date_validation": "2026-08-13",
+        "date_validation": "2026-08-11",
         "signatures": [{"role": "CHEF_EQUIPE", "signataire_nom": "Hery"}],
     }
     first = await client.post(
@@ -1117,7 +1117,7 @@ async def test_modifier_fiche_aerien_validee_rejetee_sur_tous_les_writes_403(
     await client.post(
         f"/traitements/{traitement_id}/valider",
         json={
-            "date_validation": "2026-08-13",
+            "date_validation": "2026-08-11",
             "signatures": [
                 {"role": "PILOTE", "signataire_nom": "J. Dupont"},
                 {"role": "MECANICIEN", "signataire_nom": "M. Rabe"},
@@ -1166,7 +1166,7 @@ async def test_modifier_fiche_terrestre_validee_rejetee_sur_tous_les_writes_403(
     await client.post(
         f"/traitements/{traitement_id}/valider",
         json={
-            "date_validation": "2026-08-13",
+            "date_validation": "2026-08-11",
             "signatures": [{"role": "CHEF_EQUIPE", "signataire_nom": "Hery"}],
         },
         headers=auth_headers,
@@ -1194,7 +1194,7 @@ def _payload_sync(fiche_id, prospection_id, base_updated_at, **overrides):
         "base_updated_at": base_updated_at.isoformat(),
         "prospection_id": str(prospection_id),
         "date_traitement": "2026-08-11",
-        "date_validation": "2026-08-12",
+        "date_validation": "2026-08-10",
         "localite": "Betioky",
         "terrestre": {
             "heure_debut": "06:00:00",
@@ -1298,7 +1298,7 @@ async def test_sync_fiche_validee_rejette_systematiquement_sans_jamais_passer_pa
     validee = await client.post(
         f"/traitements/{fiche_id}/valider",
         json={
-            "date_validation": "2026-08-13",
+            "date_validation": "2026-08-11",
             "signatures": [{"role": "CHEF_EQUIPE", "signataire_nom": "Hery"}],
         },
         headers=auth_headers,

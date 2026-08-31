@@ -268,8 +268,8 @@ class Traitement:
         """
         self.verifier_modifiable()
 
-        if date_validation < self.date_traitement:
-            raise ValueError("date_validation doit être postérieure ou égale à date_traitement")
+        if date_validation > self.date_traitement:
+            raise ValueError("date_traitement doit être postérieure ou égale à date_validation")
 
         specialisation = self.aerien if self.type_traitement == "AERIEN" else self.terrestre
         matrice = _MATRICE_SIGNATURES[self.type_traitement]

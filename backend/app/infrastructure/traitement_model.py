@@ -88,7 +88,9 @@ class TraitementModel(Base):
     __table_args__ = (
         CheckConstraint("type_traitement IN ('AERIEN','TERRESTRE')", name="ck_traitement_type"),
         CheckConstraint("statut IN ('brouillon','validee')", name="ck_traitement_statut"),
-        CheckConstraint("date_validation >= date_traitement", name="ck_traitement_date_validation"),
+        # Nom de contrainte conservé pour continuité malgré l'inversion du sens : elle
+        # porte toujours sur la relation date_traitement/date_validation.
+        CheckConstraint("date_traitement >= date_validation", name="ck_traitement_date_validation"),
     )
 
 

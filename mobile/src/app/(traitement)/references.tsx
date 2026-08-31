@@ -8,8 +8,10 @@ import {
   createDraftTraitementTerrestre,
   updateTraitementReference,
   getTraitement,
+  saveCible,
 } from '@/lib/traitement-repository';
-import { getProspection } from '@/lib/prospection-repository';
+import { construireCible } from '@/lib/traitement-cible';
+import { getProspection, listAllProspectionPopulations, listAllProspectionInfestations } from '@/lib/prospection-repository';
 import { STATUT_VALIDE } from '@/lib/prospection-fiche-lecture';
 import { generateId } from '@/lib/id';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
@@ -32,8 +34,17 @@ function formatDateFr(iso: string | null | undefined): string | null {
 
 export default function ReferencesScreen() {
   const router = useRouter();
-  const { prospectionId: routeProspectionId, traitementId: routeTraitementId, isValidationView, origineId } =
-    useLocalSearchParams<{ prospectionId?: string; traitementId?: string; isValidationView?: string; origineId?: string }>();
+  const {
+    prospectionId: routeProspectionId,
+    traitementId: routeTraitementId,
+    isValidationView,
+    origineId,
+  } = useLocalSearchParams<{
+    prospectionId?: string;
+    traitementId?: string;
+    isValidationView?: string;
+    origineId?: string;
+  }>();
 
   const store = useTraitementCaptureStore();
   const typeTraitement = store.typeTraitement;
@@ -75,6 +86,11 @@ export default function ReferencesScreen() {
         .catch((error) => signalerChargement(error, { traitementId: routeTraitementId }));
     } else {
       store.reset();
+      // Nouvelle fiche de traitement (pas encore de brouillon) : la date de
+      // traitement est toujours celle du jour, non modifiable (cf. DateField
+      // `editable={false}` plus bas) — la date de validation, elle aussi non
+      // modifiable, se déduit de la fiche de prospection liée (effet suivant).
+      store.updateRef({ dateTraitement: new Date().toISOString().slice(0, 10) });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeTraitementId, signalerChargement]);
@@ -86,9 +102,17 @@ export default function ReferencesScreen() {
         if (!prospection) return;
         setProspectionStatut(prospection.statut);
         setProspectionUpdatedAt(prospection.updated_at);
+        // Nouvelle fiche seulement (une fiche déjà créée garde sa date de
+        // validation enregistrée, restaurée par l'effet précédent) : la date de
+        // validation — non modifiable — est celle de la fiche de prospection liée,
+        // quel que soit l'écran d'où l'agent est arrivé (sélecteur, zones à
+        // reprendre, entrée directe par prospectionId).
+        if (!routeTraitementId) {
+          setDateValidation(prospection.date_prospection.slice(0, 10));
+        }
       })
       .catch((error) => signalerChargement(error, { prospectionId }));
-  }, [prospectionId, signalerChargement]);
+  }, [prospectionId, routeTraitementId, signalerChargement]);
 
   const captureGps = () =>
     runGps(
@@ -112,14 +136,15 @@ export default function ReferencesScreen() {
   const handleContinuer = () =>
     run(
       async () => {
-        // Vérifier que la date de validation n'est pas antérieure à la date de traitement
+        // Vérifier que la date de traitement n'est pas antérieure à la date de validation
+        // (on valide/approuve d'abord, le traitement s'exécute ensuite).
         if (store.ref.dateTraitement && dateValidation) {
           const traitementDate = new Date(store.ref.dateTraitement);
           const validationDate = new Date(dateValidation);
-          if (validationDate < traitementDate) {
+          if (traitementDate < validationDate) {
             setErrors({
               ...errors,
-              dateValidation: 'La date de validation ne peut pas être antérieure à la date de traitement'
+              dateTraitement: 'La date de traitement ne peut pas être antérieure à la date de validation'
             });
             return;
           }
@@ -159,6 +184,20 @@ export default function ReferencesScreen() {
                 });
           id = created.id;
           setTraitementId(id);
+
+          // Snapshot de la cible, figé à la création (jamais recalculé ensuite,
+          // cf. l'avertissement affiché sur l'écran Cibles) — dérivé de la fiche
+          // de prospection liée, même logique que construire_cible() côté backend.
+          if (prospectionId) {
+            const [prospectionLiee, populations, infestations] = await Promise.all([
+              getProspection(prospectionId),
+              listAllProspectionPopulations(prospectionId),
+              listAllProspectionInfestations(prospectionId),
+            ]);
+            if (prospectionLiee) {
+              await saveCible(id, construireCible(prospectionLiee, populations, infestations));
+            }
+          }
         }
 
         await updateTraitementReference(id, {
@@ -234,16 +273,16 @@ export default function ReferencesScreen() {
 
           <View style={styles.row}>
             <View style={[styles.field, styles.flex1]}>
-              <Text style={styles.label}>Date de traitement *</Text>
+              <Text style={styles.label}>Date de traitement * (auto — aujourd’hui)</Text>
               <DateField
-                editable={!readOnly}
+                editable={false}
                 value={store.ref.dateTraitement ?? null}
                 onChange={(v) => store.updateRef({ dateTraitement: v })}
               />
             </View>
             <View style={[styles.field, styles.flex1]}>
-              <Text style={styles.label}>Date de validation *</Text>
-              <DateField editable={!readOnly} value={dateValidation} onChange={setDateValidation} />
+              <Text style={styles.label}>Date de validation * (auto — fiche de prospection)</Text>
+              <DateField editable={false} value={dateValidation} onChange={setDateValidation} />
             </View>
           </View>
           {errors.dateTraitement && <Text style={styles.error}>{errors.dateTraitement}</Text>}
