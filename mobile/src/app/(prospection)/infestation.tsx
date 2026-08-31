@@ -38,9 +38,28 @@ import {
   validateInfestationFormation,
 } from '@/lib/prospection-validation';
 import {
+  StadeDominantBucket,
   dominantStadeImago,
   dominantStadeLarve,
 } from '@/lib/prospection-capture-store';
+
+/**
+ * Les paires proposées à la saisie — ordre d'affichage, labels partagés capture/hint.
+ * L5-L6/L6-L7 couvrent NSE (larves jusqu'à L7) ; LMC s'arrête à L5, ces deux paires n'y
+ * seront simplement jamais suggérées automatiquement (cf. `dominantStadeLarve`).
+ */
+const STADE_DOMINANT_OPTIONS: { value: StadeDominantBucket; label: string }[] = [
+  { value: 'l1_l2', label: 'L1-L2' },
+  { value: 'l2_l3', label: 'L2-L3' },
+  { value: 'l3_l4', label: 'L3-L4' },
+  { value: 'l4_l5', label: 'L4-L5' },
+  { value: 'l5_l6', label: 'L5-L6' },
+  { value: 'l6_l7', label: 'L6-L7' },
+];
+
+function stadeDominantLabel(value: StadeDominantBucket | null): string {
+  return STADE_DOMINANT_OPTIONS.find((o) => o.value === value)?.label ?? '—';
+}
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -86,7 +105,7 @@ interface FormationForm {
   deplacementVers: string;
   ventDirectionDe: string;
   ventVitesse: string;
-  stadeDominant: 'l1_l3' | 'l4_l5' | null;
+  stadeDominant: StadeDominantBucket | null;
   tailleGroupeM2: string;
   nbTachesBandes: string;
   frontLongueurM: string;
@@ -183,7 +202,7 @@ function formFromRow(row: InfestationRow | undefined): FormationForm {
     deplacementVers: row.direction_vers ?? '',
     ventDirectionDe: row.vent_de ?? '',
     ventVitesse: ventVitesseKmhToMsInput(row.vent_vitesse ?? null),
-    stadeDominant: (row.stade_dominant as 'l1_l3' | 'l4_l5' | null) ?? null,
+    stadeDominant: (row.stade_dominant as StadeDominantBucket | null) ?? null,
     tailleGroupeM2: row.taille_groupe_m2 != null ? String(row.taille_groupe_m2) : '',
     nbTachesBandes: row.nb_taches_bandes != null ? String(row.nb_taches_bandes) : '',
     frontLongueurM: row.front_longueur_m != null ? String(row.front_longueur_m) : '',
@@ -1007,19 +1026,17 @@ export default function InfestationScreen() {
                 {(currentTarget === 'tache_larvaire' || currentTarget === 'bande_larvaire') && (
                   <>
                     <Text style={styles.fieldGroupLabel}>Stade dominant</Text>
-                    <View style={styles.row2}>
-                      {(['l1_l3', 'l4_l5'] as const).map((value) => {
-                        const active = form.stadeDominant === value;
+                    <View style={styles.rowWrap}>
+                      {STADE_DOMINANT_OPTIONS.map((option) => {
+                        const active = form.stadeDominant === option.value;
                         return (
                           <TouchableOpacity
-                            key={value}
-                            onPress={() => setField('stadeDominant', active ? null : value)}
-                            style={[styles.chip, active && styles.chipActive]}
+                            key={option.value}
+                            onPress={() => setField('stadeDominant', active ? null : option.value)}
+                            style={[styles.chipWrap, active && styles.chipActive]}
                             activeOpacity={0.8}
                           >
-                            <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                              {value === 'l1_l3' ? 'L1-L3' : 'L4-L5'}
-                            </Text>
+                            <Text style={[styles.chipText, active && styles.chipTextActive]}>{option.label}</Text>
                           </TouchableOpacity>
                         );
                       })}
@@ -1027,7 +1044,9 @@ export default function InfestationScreen() {
                     {dominantLarve && (
                       <Text style={styles.hintText}>
                         Calculé depuis les captures : {dominantLarve.stade} ({dominantLarve.effectif} individus)
-                        {dominantLarve.bucket === form.stadeDominant ? ' ✓' : ` → suggère ${dominantLarve.bucket === 'l1_l3' ? 'L1-L3' : 'L4-L5'}`}
+                        {dominantLarve.bucket === form.stadeDominant
+                          ? ' ✓'
+                          : ` → suggère ${stadeDominantLabel(dominantLarve.bucket)}`}
                       </Text>
                     )}
 
@@ -1402,6 +1421,10 @@ const styles = StyleSheet.create({
   row3: { flexDirection: 'row', gap: 7 },
   row2: { flexDirection: 'row', gap: 7, marginTop: 7 },
   row2NoMargin: { flexDirection: 'row', gap: 7 },
+  // Rangée qui s'enroule — pour les groupes de plus de 2-3 options (ex. stade dominant,
+  // 6 paires) où `row2`/`row3` (chips `flex: 1`) deviendraient illisibles sur une ligne.
+  rowWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 7 },
+  chipWrap: { alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, backgroundColor: INACTIVE_BG },
   box: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 11, paddingVertical: 10, paddingHorizontal: 9, minHeight: 62 },
   boxCaption: { fontSize: 10.5, fontWeight: '500', color: '#9a9484', marginBottom: 3 },
   boxCaptionEmphasis: { color: 'rgba(255,255,255,0.75)' },
