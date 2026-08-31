@@ -58,18 +58,24 @@ export function dominantPhenotype(counts: CaptureCounts): Phenotype | null {
   return best;
 }
 
+/**
+ * Les paires proposées à la saisie du stade dominant (#regroupement-slides). L5-L6 et
+ * L6-L7 couvrent NSE, qui va jusqu'à L7 (LMC s'arrête à L5).
+ */
+export type StadeDominantBucket = 'l1_l2' | 'l2_l3' | 'l3_l4' | 'l4_l5' | 'l5_l6' | 'l6_l7';
+
 export interface DominantStadeLarve {
   /** Libellé brut du stade le plus capturé, ex. "L2". */
   stade: string;
   effectif: number;
-  /** Regroupement attendu par le champ backend `stade_dominant` (StadeDominant : l1_l3/l4_l5). */
-  bucket: 'l1_l3' | 'l4_l5';
+  /** Regroupement attendu par le champ backend `stade_dominant` (StadeDominant : l1_l2/l2_l3/l3_l4/l4_l5). */
+  bucket: StadeDominantBucket;
 }
 
 /**
  * Stade larvaire dominant, agrégé sur toutes les espèces (LMC+NSE) de la fiche : la
  * fiche d'infestation ne distingue pas l'espèce, donc on additionne les effectifs par
- * stade brut avant de retenir le plus capturé, puis on le classe dans le bucket attendu.
+ * stade brut avant de retenir le plus capturé, puis on le classe dans la paire attendue.
  */
 export function dominantStadeLarve(rows: CaptureRow[]): DominantStadeLarve | null {
   const totals: Record<string, number> = {};
@@ -87,7 +93,21 @@ export function dominantStadeLarve(rows: CaptureRow[]): DominantStadeLarve | nul
   }
   if (!best || bestCount <= 0) return null;
   const numero = Number(best.replace(/\D/g, ''));
-  const bucket: 'l1_l3' | 'l4_l5' = Number.isFinite(numero) && numero <= 3 ? 'l1_l3' : 'l4_l5';
+  // Paire se terminant sur le stade dominant (L3 → L2-L3, L4 → L3-L4...) ; L1 n'a pas de
+  // paire "L0-L1", il retombe donc sur la première paire disponible, L1-L2. Au-delà de L7
+  // (ne devrait pas arriver, NSE s'arrête là), on retombe sur la dernière paire, L6-L7.
+  const bucket: StadeDominantBucket =
+    !Number.isFinite(numero) || numero <= 2
+      ? 'l1_l2'
+      : numero === 3
+        ? 'l2_l3'
+        : numero === 4
+          ? 'l3_l4'
+          : numero === 5
+            ? 'l4_l5'
+            : numero === 6
+              ? 'l5_l6'
+              : 'l6_l7';
   return { stade: best, effectif: bestCount, bucket };
 }
 
@@ -217,7 +237,13 @@ function countsForGrille(grille: GrilleKey, allCaptures: CaptureRow[]): CaptureC
   return rowsToCounts(allCaptures.filter((row) => row.espece === grille.espece && row.categorie === grille.categorie));
 }
 
-function stadesDepuisCaptures(
+/**
+ * Exportée pour `intensive-imagos.tsx`/`intensive-larves.tsx` (#Regroupement-slides) :
+ * ces écrans reconstruisent l'état de saisie d'une grille sans passer par le slot
+ * unique `goToGrille` du store (ils tiennent LMC et NSE en mémoire simultanément).
+ * Même fonction, aucun changement de comportement.
+ */
+export function stadesDepuisCaptures(
   grille: GrilleKey,
   allCaptures: CaptureRow[],
   stadesAttendus: string[],
@@ -237,7 +263,8 @@ function stadesDepuisCaptures(
   return stades;
 }
 
-function phasesFromCaptures(grille: GrilleKey, allCaptures: CaptureRow[]): Record<string, number> {
+/** Exportée pour la même raison que `stadesDepuisCaptures` ci-dessus. */
+export function phasesFromCaptures(grille: GrilleKey, allCaptures: CaptureRow[]): Record<string, number> {
   const phases = getInitialPhases(phasesFor(grille.espece, grille.categorie));
   for (const row of allCaptures) {
     if (row.espece !== grille.espece || row.categorie !== grille.categorie) continue;
