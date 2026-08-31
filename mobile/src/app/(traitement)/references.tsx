@@ -32,8 +32,17 @@ function formatDateFr(iso: string | null | undefined): string | null {
 
 export default function ReferencesScreen() {
   const router = useRouter();
-  const { prospectionId: routeProspectionId, traitementId: routeTraitementId, isValidationView, origineId } =
-    useLocalSearchParams<{ prospectionId?: string; traitementId?: string; isValidationView?: string; origineId?: string }>();
+  const {
+    prospectionId: routeProspectionId,
+    traitementId: routeTraitementId,
+    isValidationView,
+    origineId,
+  } = useLocalSearchParams<{
+    prospectionId?: string;
+    traitementId?: string;
+    isValidationView?: string;
+    origineId?: string;
+  }>();
 
   const store = useTraitementCaptureStore();
   const typeTraitement = store.typeTraitement;
@@ -75,6 +84,11 @@ export default function ReferencesScreen() {
         .catch((error) => signalerChargement(error, { traitementId: routeTraitementId }));
     } else {
       store.reset();
+      // Nouvelle fiche de traitement (pas encore de brouillon) : la date de
+      // traitement est toujours celle du jour, non modifiable (cf. DateField
+      // `editable={false}` plus bas) — la date de validation, elle aussi non
+      // modifiable, se déduit de la fiche de prospection liée (effet suivant).
+      store.updateRef({ dateTraitement: new Date().toISOString().slice(0, 10) });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeTraitementId, signalerChargement]);
@@ -86,9 +100,17 @@ export default function ReferencesScreen() {
         if (!prospection) return;
         setProspectionStatut(prospection.statut);
         setProspectionUpdatedAt(prospection.updated_at);
+        // Nouvelle fiche seulement (une fiche déjà créée garde sa date de
+        // validation enregistrée, restaurée par l'effet précédent) : la date de
+        // validation — non modifiable — est celle de la fiche de prospection liée,
+        // quel que soit l'écran d'où l'agent est arrivé (sélecteur, zones à
+        // reprendre, entrée directe par prospectionId).
+        if (!routeTraitementId) {
+          setDateValidation(prospection.date_prospection.slice(0, 10));
+        }
       })
       .catch((error) => signalerChargement(error, { prospectionId }));
-  }, [prospectionId, signalerChargement]);
+  }, [prospectionId, routeTraitementId, signalerChargement]);
 
   const captureGps = () =>
     runGps(
@@ -235,16 +257,16 @@ export default function ReferencesScreen() {
 
           <View style={styles.row}>
             <View style={[styles.field, styles.flex1]}>
-              <Text style={styles.label}>Date de traitement *</Text>
+              <Text style={styles.label}>Date de traitement * (auto — aujourd’hui)</Text>
               <DateField
-                editable={!readOnly}
+                editable={false}
                 value={store.ref.dateTraitement ?? null}
                 onChange={(v) => store.updateRef({ dateTraitement: v })}
               />
             </View>
             <View style={[styles.field, styles.flex1]}>
-              <Text style={styles.label}>Date de validation *</Text>
-              <DateField editable={!readOnly} value={dateValidation} onChange={setDateValidation} />
+              <Text style={styles.label}>Date de validation * (auto — fiche de prospection)</Text>
+              <DateField editable={false} value={dateValidation} onChange={setDateValidation} />
             </View>
           </View>
           {errors.dateTraitement && <Text style={styles.error}>{errors.dateTraitement}</Text>}
