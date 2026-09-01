@@ -39,7 +39,6 @@ class UtilisateurEquipeRepositoryImpl(UtilisateurEquipeRepository):
                 id=m.id,
                 nom=m.nom,
                 prenom=m.prenom,
-                email=m.email,
                 role=m.role,
                 pa_id=m.pa_id,
                 actif=m.actif,

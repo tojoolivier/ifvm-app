@@ -286,7 +286,6 @@ export interface UtilisateurEquipeSync {
   id: string;
   nom: string;
   prenom: string;
-  email: string;
   role: string;
   pa_id: string | null;
   actif: boolean;
