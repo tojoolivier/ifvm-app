@@ -6,6 +6,7 @@ from app.domain.campagne import Campagne
 from app.domain.prospection import AuditLog, Prospection
 from app.domain.referentiel import (
     CodeStade,
+    Commune,
     Culture,
     Pesticide,
     PosteAcridien,
@@ -254,7 +255,35 @@ class StationFixeRepository(ABC):
         pass
 
     @abstractmethod
+    async def code_pris_par_un_autre(self, code: str, exclude_id: uuid.UUID | None = None) -> bool:
+        """`exclude_id` : renvoyer son propre code inchangé n'est pas un conflit."""
+        pass
+
+    @abstractmethod
+    async def create(self, station: StationFixe) -> StationFixe:
+        pass
+
+    @abstractmethod
+    async def update(self, station: StationFixe) -> StationFixe:
+        """Réécrit la ligne et avance `updated_at` — c'est le curseur du pull hors-ligne.
+
+        Aucune contrepartie `delete` : `GET /referentiel/pull` ne transporte que des
+        upserts, une suppression physique resterait sur les téléphones synchronisés.
+        """
+        pass
+
+    @abstractmethod
     async def list_since(self, since: datetime | None) -> list[StationFixe]:
+        pass
+
+
+class CommuneRepository(ABC):
+    @abstractmethod
+    async def list_all(self) -> list[Commune]:
+        pass
+
+    @abstractmethod
+    async def exists(self, commune_id: uuid.UUID) -> bool:
         pass
 
 
@@ -267,6 +296,27 @@ class UtilisateurEquipeRepository(ABC):
 class PesticideRepository(ABC):
     @abstractmethod
     async def list_since(self, since: datetime | None) -> list[Pesticide]:
+        pass
+
+    @abstractmethod
+    async def list_all(self, actif: bool | None = True) -> list[Pesticide]:
+        pass
+
+    @abstractmethod
+    async def get_by_id(self, pesticide_id: uuid.UUID) -> Pesticide | None:
+        pass
+
+    @abstractmethod
+    async def code_pris_par_un_autre(self, code: str, exclude_id: uuid.UUID | None = None) -> bool:
+        """`exclude_id` permet de réenregistrer un pesticide sans buter sur son propre code."""
+        pass
+
+    @abstractmethod
+    async def create(self, pesticide: Pesticide) -> Pesticide:
+        pass
+
+    @abstractmethod
+    async def update(self, pesticide: Pesticide) -> Pesticide:
         pass
 
 

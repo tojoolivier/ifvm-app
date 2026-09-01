@@ -8,13 +8,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application.referentiel_use_cases import (
     CreateCodeStade,
     CreateCulture,
+    CreatePesticide,
     CreatePosteAcridien,
+    CreateStation,
     GetCodeStade,
     GetCulture,
+    GetPesticide,
     GetPosteAcridien,
     GetStation,
     ListCodesStades,
+    ListCommunes,
     ListCultures,
+    ListPesticides,
     ListPostesAcridiens,
     ListStations,
     ListZonesAntiAcridiennes,
@@ -22,19 +27,25 @@ from app.application.referentiel_use_cases import (
     ReferentielSinceCursors,
     UpdateCodeStade,
     UpdateCulture,
+    UpdatePesticide,
     UpdatePosteAcridien,
+    UpdateStation,
 )
 from app.auth import get_current_user
 from app.database import get_db
 from app.domain.referentiel import (
     CodeReferentielDejaPrisError,
+    CommuneInconnueError,
     GrilleDejaOccupeeError,
     PosteAcridienAvecStationsActivesError,
+    PosteAcridienInactifError,
+    PosteAcridienIntrouvableError,
     StadeInconnuError,
     ZoneAntiAcridienIntrouvableError,
 )
 from app.infrastructure.campagne_repository import CampagneRepositoryImpl
 from app.infrastructure.referentiel_repository import (
+    CommuneRepositoryImpl,
     PosteAcridienRepositoryImpl,
     StationFixeRepositoryImpl,
     ZoneAntiAcridienRepositoryImpl,
@@ -50,15 +61,21 @@ from app.presentation.referentiel_schemas import (
     CodeStadeCreate,
     CodeStadeRead,
     CodeStadeUpdate,
+    CommuneRead,
     CultureCreate,
     CultureRead,
     CultureUpdate,
     EntityPull,
+    PesticideCreate,
+    PesticideRead,
+    PesticideUpdate,
     PosteAcridienCreate,
     PosteAcridienRead,
     PosteAcridienUpdate,
     ReferentielPullResponse,
+    StationFixeCreate,
     StationFixeRead,
+    StationFixeUpdate,
     ZoneAntiAcridienRead,
 )
 
@@ -174,6 +191,15 @@ async def update_poste_acridien(
     return poste
 
 
+@router.get("/communes", response_model=list[CommuneRead])
+async def list_communes(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = ListCommunes(CommuneRepositoryImpl(db))
+    return await use_case.execute()
+
+
 @router.get("/stations", response_model=list[StationFixeRead])
 async def list_stations(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -200,6 +226,93 @@ async def get_station(
     repository = StationFixeRepositoryImpl(db)
     use_case = GetStation(repository)
     station = await use_case.execute(station_id)
+    if station is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Station non trouvée")
+    return station
+
+
+def _conflit_ecriture_station(exc: Exception, code: str | None) -> HTTPException:
+    """Les quatre refus d'écriture d'une station, en 409 avec le motif en clair."""
+    if isinstance(exc, PosteAcridienIntrouvableError):
+        detail = "Poste acridien inconnu"
+    elif isinstance(exc, PosteAcridienInactifError):
+        detail = (
+            f"Le poste acridien « {exc.args[0]} » est désactivé : "
+            "aucun nouveau rattachement possible"
+        )
+    elif isinstance(exc, CommuneInconnueError):
+        detail = "Commune inconnue"
+    else:
+        detail = f"Le code « {code} » est déjà utilisé par une autre station"
+    return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
+
+
+ERREURS_ECRITURE_STATION = (
+    PosteAcridienIntrouvableError,
+    PosteAcridienInactifError,
+    CommuneInconnueError,
+    CodeReferentielDejaPrisError,
+)
+
+
+@router.post("/stations", response_model=StationFixeRead, status_code=201)
+async def create_station(
+    body: StationFixeCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = CreateStation(
+        repository=StationFixeRepositoryImpl(db),
+        poste_repository=PosteAcridienRepositoryImpl(db),
+        commune_repository=CommuneRepositoryImpl(db),
+    )
+    try:
+        return await use_case.execute(
+            code=body.code,
+            nom=body.nom,
+            pa_id=body.pa_id,
+            latitude=body.latitude,
+            longitude=body.longitude,
+            altitude=body.altitude,
+            commune_id=body.commune_id,
+        )
+    except ERREURS_ECRITURE_STATION as exc:
+        raise _conflit_ecriture_station(exc, body.code) from exc
+
+
+# Aucune route DELETE, volontairement : `GET /referentiel/pull` ne transporte que des
+# upserts, une suppression physique resterait sur les téléphones déjà synchronisés —
+# et une station est référencée par des prospections. La désactivation logique passe
+# par `PUT` avec `actif: false` (issue #133).
+@router.put("/stations/{station_id}", response_model=StationFixeRead)
+async def update_station(
+    station_id: uuid.UUID,
+    body: StationFixeUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = UpdateStation(
+        repository=StationFixeRepositoryImpl(db),
+        poste_repository=PosteAcridienRepositoryImpl(db),
+        commune_repository=CommuneRepositoryImpl(db),
+    )
+    try:
+        station = await use_case.execute(
+            station_id=station_id,
+            code=body.code,
+            nom=body.nom,
+            pa_id=body.pa_id,
+            latitude=body.latitude,
+            longitude=body.longitude,
+            altitude=body.altitude,
+            commune_id=body.commune_id,
+            actif=body.actif,
+            # `altitude` est nullable : seul le corps reçu distingue « absent » de
+            # « mis à NULL ».
+            champs_fournis=body.model_fields_set,
+        )
+    except ERREURS_ECRITURE_STATION as exc:
+        raise _conflit_ecriture_station(exc, body.code) from exc
     if station is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Station non trouvée")
     return station
@@ -371,6 +484,89 @@ async def update_culture(
     if culture is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Culture non trouvée")
     return culture
+
+
+# --- pesticide -------------------------------------------------------------------
+#
+# Aucune route DELETE, volontairement : `GET /referentiel/pull` ne transporte que des
+# upserts, une suppression physique resterait indéfiniment sur les téléphones déjà
+# synchronisés. La sortie de service passe par `actif=false` (issue #129).
+
+
+@router.get("/pesticides", response_model=list[PesticideRead])
+async def list_pesticides(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+    actif: bool = Query(default=True),
+    inclure_inactifs: bool = Query(
+        default=False,
+        description="Renvoie les pesticides des deux états — écran d'administration.",
+    ),
+):
+    use_case = ListPesticides(PesticideRepositoryImpl(db))
+    return await use_case.execute(actif=None if inclure_inactifs else actif)
+
+
+@router.post("/pesticides", response_model=PesticideRead, status_code=201)
+async def create_pesticide(
+    body: PesticideCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = CreatePesticide(PesticideRepositoryImpl(db))
+    try:
+        return await use_case.execute(
+            code=body.code,
+            nom=body.nom,
+            matiere_active=body.matiere_active,
+            dose_reference=body.dose_reference,
+        )
+    except CodeReferentielDejaPrisError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Le code « {body.code} » est déjà utilisé par un autre pesticide",
+        ) from exc
+
+
+@router.get("/pesticides/{pesticide_id}", response_model=PesticideRead)
+async def get_pesticide(
+    pesticide_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = GetPesticide(PesticideRepositoryImpl(db))
+    pesticide = await use_case.execute(pesticide_id)
+    if pesticide is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pesticide non trouvé")
+    return pesticide
+
+
+@router.put("/pesticides/{pesticide_id}", response_model=PesticideRead)
+async def update_pesticide(
+    pesticide_id: uuid.UUID,
+    body: PesticideUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = UpdatePesticide(PesticideRepositoryImpl(db))
+    try:
+        pesticide = await use_case.execute(
+            pesticide_id=pesticide_id,
+            code=body.code,
+            nom=body.nom,
+            matiere_active=body.matiere_active,
+            dose_reference=body.dose_reference,
+            actif=body.actif,
+        )
+    except CodeReferentielDejaPrisError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Le code « {body.code} » est déjà utilisé par un autre pesticide",
+        ) from exc
+
+    if pesticide is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pesticide non trouvé")
+    return pesticide
 
 
 @router.get("/referentiel/pull", response_model=ReferentielPullResponse)
