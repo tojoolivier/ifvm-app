@@ -9,6 +9,29 @@ class StationNotFoundError(Exception):
     pass
 
 
+class CodeReferentielDejaPrisError(Exception):
+    """Le `code` d'une entité de référentiel est unique : un doublon est refusé."""
+
+    pass
+
+
+class ZoneAntiAcridienIntrouvableError(Exception):
+    """za_id ne référence pas une zone anti-acridienne existante."""
+
+    pass
+
+
+class PosteAcridienAvecStationsActivesError(Exception):
+    """Désactiver un poste n'orpheline pas ses stations.
+
+    La désactivation ne se propage pas — laisser des stations actives rattachées à un
+    poste inactif rendrait la hiérarchie incohérente sur le terrain, sans qu'aucun
+    écran ne le signale. On refuse donc tant que des stations actives y pendent.
+    """
+
+    pass
+
+
 @dataclass
 class ZoneAntiAcridien:
     id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -28,6 +51,9 @@ class PosteAcridien:
     za_code: str = ""
     za_nom: str = ""
     actif: bool = True
+    # Dérivé : nombre de stations fixes actives rattachées. Jamais saisissable — c'est
+    # la colonne « Stations » de l'écran Référentiels, et le garde-fou de désactivation.
+    nb_stations: int = 0
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -94,3 +120,15 @@ class CodeStade:
     ordre: int = 0
     actif: bool = True
     updated_at: datetime = field(default_factory=datetime.utcnow)
+
+
+class StadeInconnuError(Exception):
+    """`code_stade.code` référence `stade.code` : le code n'est pas au vocabulaire."""
+
+    pass
+
+
+class GrilleDejaOccupeeError(Exception):
+    """(code, categorie, sexe, espece) identifie une place de grille — elle est prise."""
+
+    pass

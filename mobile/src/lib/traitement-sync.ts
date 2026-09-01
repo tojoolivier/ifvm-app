@@ -153,6 +153,11 @@ async function pushRotationsEtProduits(draft: DraftTraitement, token: string): P
         temperature_fin_c: rotation.temperature_fin_c ?? 0,
         vent_debut_ms: rotation.vent_debut_ms ?? 0,
         vent_fin_ms: rotation.vent_fin_ms ?? 0,
+        // Obligatoires côté serveur (RotationCuveCreate) et déjà saisies dans le
+        // brouillon : elles n'étaient simplement pas transmises. Dérive révélée par
+        // la régénération de api-schema.generated.ts (#131).
+        heure_debut: rotation.heure_debut ?? '',
+        heure_fin: rotation.heure_fin ?? '',
       });
     }
   }
