@@ -36,11 +36,11 @@ beforeEach(() => {
 });
 
 /*
- * C'est le hook VIVANT (celui que les deux `_layout.tsx` montent), pas le
- * `useReferentielAutoSync` homonyme de `lib/referentiel-auto-sync.ts`, qu'aucun
- * écran n'importe (#187). Son `catch { console.warn }` était le dernier échec
- * avalé du chemin référentiel — trouvé en revue de #173 précisément parce que
- * le jumeau mort, lui, avait été soigné à sa place.
+ * C'est le hook VIVANT (celui que les deux `_layout.tsx` montent). Il a
+ * longtemps eu un homonyme mort, `lib/referentiel-auto-sync.ts`, qu'aucun
+ * écran n'importait (#187, supprimé en #188). Son `catch { console.warn }`
+ * était le dernier échec avalé du chemin référentiel — trouvé en revue de
+ * #173 précisément parce que le jumeau mort, lui, avait été soigné à sa place.
  */
 describe('checkAndSyncReferentiel', () => {
   it('tire le pull quand la connectivité revient', async () => {
