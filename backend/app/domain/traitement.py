@@ -223,11 +223,14 @@ class Traitement:
     latitude: float | None = None
     longitude: float | None = None
     altitude: float | None = None
-    kit_combinaison: bool = False
-    kit_gants: bool = False
-    kit_lunettes: bool = False
-    kit_masques: bool = False
-    kit_boite: bool = False
+    # Nombre de personnes équipées de chaque matériel de protection (toutes les
+    # personnes à bord de l'hélicoptère/dans l'équipe doivent être équipées, pas
+    # seulement « au moins une ») — plus des cases à cocher depuis la migration 0036.
+    kit_combinaison: int = 0
+    kit_gants: int = 0
+    kit_lunettes: int = 0
+    kit_masques: int = 0
+    kit_botte: int = 0
     zones_exposees: dict[str, Any] | None = None
     hauteur_strate_herbeuse_m: float | None = None
     hauteur_strate_arboree_m: float | None = None
@@ -337,7 +340,7 @@ _CHAMPS_CONTENU_COMMUNS = (
     "kit_gants",
     "kit_lunettes",
     "kit_masques",
-    "kit_boite",
+    "kit_botte",
     "zones_exposees",
     "hauteur_strate_herbeuse_m",
     "hauteur_strate_arboree_m",

@@ -118,11 +118,11 @@ class TraitementCreate(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
     altitude: float | None = None
-    kit_combinaison: bool = False
-    kit_gants: bool = False
-    kit_lunettes: bool = False
-    kit_masques: bool = False
-    kit_boite: bool = False
+    kit_combinaison: int = Field(0, ge=0)
+    kit_gants: int = Field(0, ge=0)
+    kit_lunettes: int = Field(0, ge=0)
+    kit_masques: int = Field(0, ge=0)
+    kit_botte: int = Field(0, ge=0)
     zones_exposees: dict[str, Any] | None = None
     hauteur_strate_herbeuse_m: float | None = Field(None, ge=0)
     hauteur_strate_arboree_m: float | None = Field(None, ge=0)
@@ -298,11 +298,11 @@ class TraitementRead(BaseModel):
     latitude: float | None
     longitude: float | None
     altitude: float | None
-    kit_combinaison: bool
-    kit_gants: bool
-    kit_lunettes: bool
-    kit_masques: bool
-    kit_boite: bool
+    kit_combinaison: int
+    kit_gants: int
+    kit_lunettes: int
+    kit_masques: int
+    kit_botte: int
     zones_exposees: dict[str, Any] | None
     hauteur_strate_herbeuse_m: float | None
     hauteur_strate_arboree_m: float | None

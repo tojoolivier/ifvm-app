@@ -66,11 +66,11 @@ erDiagram
         jsonb comportement_non_cibles
         bool mortalite
         jsonb mortalite_familles
-        bool kit_combinaison
-        bool kit_gants
-        bool kit_lunettes
-        bool kit_masques
-        bool kit_boite
+        int kit_combinaison "nb de personnes équipées"
+        int kit_gants "nb de personnes équipées"
+        int kit_lunettes "nb de personnes équipées"
+        int kit_masques "nb de personnes équipées"
+        int kit_botte "nb de personnes équipées"
         timestamptz created_at
         timestamptz updated_at
     }

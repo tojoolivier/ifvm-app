@@ -93,7 +93,7 @@ def _champs_communs(body: TraitementCreate) -> dict[str, Any]:
         kit_gants=body.kit_gants,
         kit_lunettes=body.kit_lunettes,
         kit_masques=body.kit_masques,
-        kit_boite=body.kit_boite,
+        kit_botte=body.kit_botte,
         zones_exposees=body.zones_exposees,
         hauteur_strate_herbeuse_m=body.hauteur_strate_herbeuse_m,
         hauteur_strate_arboree_m=body.hauteur_strate_arboree_m,

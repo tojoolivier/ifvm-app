@@ -66,7 +66,7 @@ function draft(overrides: Partial<DraftTraitement> = {}): DraftTraitement {
     kit_gants: null,
     kit_lunettes: null,
     kit_masques: null,
-    kit_boite: null,
+    kit_botte: null,
     zones_exposees: null,
     hauteur_strate_herbeuse_m: null,
     hauteur_strate_arboree_m: null,

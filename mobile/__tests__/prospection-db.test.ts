@@ -396,3 +396,70 @@ describe('prospection-db — typage à la source (#173)', () => {
     expect(evenements).toContain('db.ouverte');
   });
 });
+
+/*
+ * `kit_boite` -> `kit_botte` (renommage métier, #kit-botte) : une installation
+ * déjà en place a la colonne sous l'ancien nom, remplie. Un simple ajout de
+ * colonne (comme `ajouterColonnesManquantes`) créerait `kit_botte` vide à côté
+ * au lieu de reprendre ces valeurs — d'où une fonction de renommage dédiée,
+ * appelée avant l'ajout de colonnes sur `traitement`.
+ */
+describe('prospection-db — renommage de colonne (kit_boite -> kit_botte)', () => {
+  it('renomme kit_boite en kit_botte quand l’ancienne colonne existe encore', async () => {
+    getAllAsync
+      .mockResolvedValueOnce(MIGRATED_COLUMNS) // prospection
+      .mockResolvedValueOnce(MIGRATED_COLUMNS) // prospection_infestation
+      .mockResolvedValueOnce(MIGRATED_COLUMNS) // prospection_population
+      .mockResolvedValueOnce(MIGRATED_COLUMNS) // prospection_operation_aerienne
+      .mockResolvedValueOnce([{ name: 'kit_boite' }]); // traitement (avant renommage)
+
+    await getDb();
+
+    const renommage = execAsync.mock.calls.find(([sql]) =>
+      (sql as string).includes('RENAME COLUMN')
+    );
+    expect(renommage?.[0]).toContain(
+      'ALTER TABLE traitement RENAME COLUMN kit_boite TO kit_botte'
+    );
+  });
+
+  it('ne fait rien si kit_boite est déjà absente (installation neuve ou déjà migrée)', async () => {
+    // MIGRATED_COLUMNS (défaut) ne contient ni kit_boite ni kit_botte.
+    await getDb();
+
+    const renommage = execAsync.mock.calls.find(([sql]) =>
+      (sql as string).includes('RENAME COLUMN')
+    );
+    expect(renommage).toBeUndefined();
+  });
+
+  it('ne fait rien si kit_botte existe déjà (migration déjà jouée)', async () => {
+    getAllAsync
+      .mockResolvedValueOnce(MIGRATED_COLUMNS)
+      .mockResolvedValueOnce(MIGRATED_COLUMNS)
+      .mockResolvedValueOnce(MIGRATED_COLUMNS)
+      .mockResolvedValueOnce(MIGRATED_COLUMNS)
+      .mockResolvedValueOnce([{ name: 'kit_boite' }, { name: 'kit_botte' }]);
+
+    await getDb();
+
+    const renommage = execAsync.mock.calls.find(([sql]) =>
+      (sql as string).includes('RENAME COLUMN')
+    );
+    expect(renommage).toBeUndefined();
+  });
+
+  it('lève LocalWriteError si le RENAME COLUMN échoue', async () => {
+    getAllAsync
+      .mockResolvedValueOnce(MIGRATED_COLUMNS)
+      .mockResolvedValueOnce(MIGRATED_COLUMNS)
+      .mockResolvedValueOnce(MIGRATED_COLUMNS)
+      .mockResolvedValueOnce(MIGRATED_COLUMNS)
+      .mockResolvedValueOnce([{ name: 'kit_boite' }]);
+    execAsync
+      .mockResolvedValueOnce(undefined) // CREATE TABLE
+      .mockRejectedValueOnce(new Error('cannot rename column'));
+
+    await expect(getDb()).rejects.toBeInstanceOf(LocalWriteError);
+  });
+});

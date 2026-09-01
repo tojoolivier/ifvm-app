@@ -67,7 +67,7 @@ const STORED_TRAITEMENT_ROW = {
   kit_gants: null,
   kit_lunettes: null,
   kit_masques: null,
-  kit_boite: null,
+  kit_botte: null,
   zones_exposees: null,
   hauteur_strate_herbeuse_m: null,
   hauteur_strate_arboree_m: null,
@@ -216,11 +216,11 @@ describe('updateTraitementMoyens', () => {
     getFirstAsync.mockResolvedValueOnce(STORED_TRAITEMENT_ROW).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
 
     await updateTraitementMoyens(AERIEN_INPUT.id, {
-      kit_combinaison: true,
-      kit_gants: true,
-      kit_lunettes: false,
-      kit_masques: false,
-      kit_boite: true,
+      kit_combinaison: 3,
+      kit_gants: 3,
+      kit_lunettes: 0,
+      kit_masques: 0,
+      kit_botte: 3,
       zones_exposees: { habitations: true },
       hauteur_strate_herbeuse_m: 1.2,
       hauteur_strate_arboree_m: 5,
@@ -229,7 +229,7 @@ describe('updateTraitementMoyens', () => {
 
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE traitement SET'),
-      expect.arrayContaining([true, true, JSON.stringify({ habitations: true }), 1.2, 5, 40])
+      expect.arrayContaining([3, 3, JSON.stringify({ habitations: true }), 1.2, 5, 40])
     );
   });
 });

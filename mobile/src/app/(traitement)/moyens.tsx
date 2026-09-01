@@ -12,12 +12,12 @@ import { Chip } from '@/components/traitement/Chip';
 import { ProgressBar } from '@/components/traitement/ProgressBar';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
 
-const KIT_ROWS: { key: 'kit_combinaison' | 'kit_gants' | 'kit_lunettes' | 'kit_masques' | 'kit_boite'; label: string }[] = [
+const KIT_ROWS: { key: 'kit_combinaison' | 'kit_gants' | 'kit_lunettes' | 'kit_masques' | 'kit_botte'; label: string }[] = [
   { key: 'kit_combinaison', label: 'Combinaison' },
   { key: 'kit_gants', label: 'Gants' },
   { key: 'kit_lunettes', label: 'Lunettes' },
   { key: 'kit_masques', label: 'Masques' },
-  { key: 'kit_boite', label: 'Boîte à pharmacie' },
+  { key: 'kit_botte', label: 'Botte' },
 ];
 
 const ZONES = [
@@ -34,7 +34,10 @@ export default function MoyensScreen() {
   const { traitementId, isValidationView } = useLocalSearchParams<{ traitementId: string; isValidationView?: string }>();
   const readOnly = isValidationView === '1';
 
-  const [kit, setKit] = useState<Record<string, boolean>>({});
+  // Nombre de personnes équipées de chaque matériel — toutes les personnes à
+  // bord de l'hélicoptère (ou de l'équipe terrestre) doivent être équipées, pas
+  // seulement « au moins une » : un compteur par matériel, plus une case à cocher.
+  const [kit, setKit] = useState<Record<string, number>>({});
   const [zones, setZones] = useState<Record<string, boolean>>({});
   const [hauteurHerbeuse, setHauteurHerbeuse] = useState<number | null>(null);
   const [hauteurArboree, setHauteurArboree] = useState<number | null>(null);
@@ -48,11 +51,11 @@ export default function MoyensScreen() {
       .then((draft) => {
         if (!draft) return;
         setKit({
-          kit_combinaison: draft.kit_combinaison ?? false,
-          kit_gants: draft.kit_gants ?? false,
-          kit_lunettes: draft.kit_lunettes ?? false,
-          kit_masques: draft.kit_masques ?? false,
-          kit_boite: draft.kit_boite ?? false,
+          kit_combinaison: draft.kit_combinaison ?? 0,
+          kit_gants: draft.kit_gants ?? 0,
+          kit_lunettes: draft.kit_lunettes ?? 0,
+          kit_masques: draft.kit_masques ?? 0,
+          kit_botte: draft.kit_botte ?? 0,
         });
         if (draft.zones_exposees) {
           try {
@@ -71,7 +74,10 @@ export default function MoyensScreen() {
       .catch((error) => signalerChargement(error, { traitementId }));
   }, [traitementId, signalerChargement]);
 
-  const nbKitCoche = Object.values(kit).filter(Boolean).length;
+  // Un matériel est considéré fourni dès qu'au moins une personne en a un
+  // (compteur > 0) — même seuil que l'ancienne case à cocher, généralisé au
+  // comptage. Le nombre exact par matériel reste visible ligne par ligne.
+  const nbKitFournis = KIT_ROWS.filter((row) => (kit[row.key] ?? 0) > 0).length;
   const recouvrementErrors = validateRecouvrement(recouvrement);
 
   const handleContinuer = () =>
@@ -80,11 +86,11 @@ export default function MoyensScreen() {
         // Déjà visible à l'écran (message par champ) : pas de second signal.
         if (recouvrementErrors.length > 0) return;
         await updateTraitementMoyens(traitementId, {
-          kit_combinaison: !!kit.kit_combinaison,
-          kit_gants: !!kit.kit_gants,
-          kit_lunettes: !!kit.kit_lunettes,
-          kit_masques: !!kit.kit_masques,
-          kit_boite: !!kit.kit_boite,
+          kit_combinaison: kit.kit_combinaison ?? 0,
+          kit_gants: kit.kit_gants ?? 0,
+          kit_lunettes: kit.kit_lunettes ?? 0,
+          kit_masques: kit.kit_masques ?? 0,
+          kit_botte: kit.kit_botte ?? 0,
           zones_exposees: zones,
           hauteur_strate_herbeuse_m: hauteurHerbeuse,
           hauteur_strate_arboree_m: hauteurArboree,
@@ -106,23 +112,38 @@ export default function MoyensScreen() {
         <ProgressBar currentIndex={3} />
         <Text style={styles.title}>Moyens & protection</Text>
 
-        <Card variant={nbKitCoche === 5 ? 'info' : 'avertissement'}>
-          <Text style={nbKitCoche === 5 ? styles.bannerTextOk : styles.bannerTextWarn}>
-            {nbKitCoche === 5 ? '✓ Kit complet (5/5)' : `⚠ Kit incomplet (${nbKitCoche}/5)`}
+        <Card variant={nbKitFournis === 5 ? 'info' : 'avertissement'}>
+          <Text style={nbKitFournis === 5 ? styles.bannerTextOk : styles.bannerTextWarn}>
+            {nbKitFournis === 5 ? '✓ Tous les matériels fournis (5/5)' : `⚠ Matériel(s) manquant(s) (${nbKitFournis}/5)`}
           </Text>
         </Card>
+        <Text style={styles.hint}>Nombre de personnes équipées de chaque matériel (tout l&apos;équipage doit l&apos;être).</Text>
 
-        {KIT_ROWS.map((row) => (
-          <TouchableOpacity
-            key={row.key}
-            style={styles.kitRow}
-            disabled={readOnly}
-            onPress={() => setKit((prev) => ({ ...prev, [row.key]: !prev[row.key] }))}
-          >
-            <Text style={styles.kitCheckbox}>{kit[row.key] ? '✓' : '✕'}</Text>
-            <Text style={styles.kitLabel}>{row.label}</Text>
-          </TouchableOpacity>
-        ))}
+        {KIT_ROWS.map((row) => {
+          const valeur = kit[row.key] ?? 0;
+          return (
+            <View key={row.key} style={styles.kitRow}>
+              <Text style={styles.kitLabel}>{row.label}</Text>
+              <View style={styles.counterRow}>
+                <TouchableOpacity
+                  style={styles.counterButton}
+                  disabled={readOnly || valeur === 0}
+                  onPress={() => setKit((prev) => ({ ...prev, [row.key]: Math.max(0, (prev[row.key] ?? 0) - 1) }))}
+                >
+                  <Text style={styles.counterButtonText}>−</Text>
+                </TouchableOpacity>
+                <Text style={styles.counterValue}>{valeur}</Text>
+                <TouchableOpacity
+                  style={[styles.counterButton, styles.counterButtonAdd]}
+                  disabled={readOnly}
+                  onPress={() => setKit((prev) => ({ ...prev, [row.key]: (prev[row.key] ?? 0) + 1 }))}
+                >
+                  <Text style={[styles.counterButtonText, styles.counterButtonAddText]}>+</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        })}
 
         <Text style={styles.label}>Zones exposées</Text>
         <View style={styles.chipRow}>
@@ -181,9 +202,28 @@ const styles = StyleSheet.create({
   title: { fontFamily: traitementFonts.uiExtraBold, fontSize: traitementTypeSizes.titreEcran, color: traitementColors.texteTitre },
   bannerTextOk: { fontFamily: traitementFonts.uiSemiBold, color: traitementColors.vertPrincipal },
   bannerTextWarn: { fontFamily: traitementFonts.uiSemiBold, color: traitementColors.avertissementTexte },
-  kitRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingVertical: 6 },
-  kitCheckbox: { fontFamily: traitementFonts.uiBold, fontSize: 16, color: traitementColors.vertPrincipal, width: 24 },
+  hint: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel, fontStyle: 'italic' },
+  kitRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 44, paddingVertical: 6 },
   kitLabel: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre },
+  counterRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  counterButton: {
+    width: 32,
+    height: 32,
+    borderRadius: traitementRadii.chip,
+    backgroundColor: '#efeada',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  counterButtonAdd: { backgroundColor: traitementColors.vertPrincipal },
+  counterButtonText: { fontFamily: traitementFonts.uiBold, fontSize: 17, color: traitementColors.texteLabel },
+  counterButtonAddText: { color: '#fff' },
+  counterValue: {
+    fontFamily: traitementFonts.monoBold,
+    fontSize: traitementTypeSizes.corps + 1,
+    color: traitementColors.texteTitre,
+    minWidth: 20,
+    textAlign: 'center',
+  },
   label: { fontFamily: traitementFonts.uiMedium, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   input: {
