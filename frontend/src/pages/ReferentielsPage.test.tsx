@@ -76,55 +76,39 @@ describe('ReferentielsPage — maquette §11 du handoff', () => {
 
     await waitFor(() => expect(nav().getByText('7 référentiels')).toBeInTheDocument())
 
-    // 1 entité sans écriture backend : pesticide.
-    expect(nav().getAllByText('à créer')).toHaveLength(1)
-    // 6 entités avec au moins une lecture/écriture exposée : culture (#130),
-    // code_stade, poste_acridien, station_fixe (#133), utilisateur, campagne.
-    expect(nav().getAllByText('API')).toHaveLength(6)
+    // Les 7 référentiels exposent désormais au moins une lecture/écriture :
+    // culture (#130), code_stade, poste_acridien, station_fixe (#133),
+    // utilisateur, campagne, pesticide (#129, #134).
+    expect(nav().queryAllByText('à créer')).toHaveLength(0)
+    expect(nav().getAllByText('API')).toHaveLength(7)
   })
 
-  it("signale l'écart matière active / dose de référence sur les pesticides", async () => {
-    mockedGet.mockResolvedValue(
-      pull({
-        pesticides: {
-          upserts: [
-            { id: 'p1', code: 'PST-ADO4', nom: 'Adonis 4 UL', actif: true, updated_at: SERVER_TIME },
-          ],
-          server_time: SERVER_TIME,
-        },
-      }),
-    )
+  it('affiche la matière active et la dose de référence sur les pesticides', async () => {
+    const pesticide = {
+      id: 'p1',
+      code: 'PST-ADO4',
+      nom: 'Adonis 4 UL',
+      matiere_active: 'Deltaméthrine',
+      dose_reference: '0.5 l/ha',
+      actif: true,
+      created_at: SERVER_TIME,
+      updated_at: SERVER_TIME,
+    }
+    // Le tableau pesticide se recharge via `write.listPath`, pas le pull.
+    mockedGet.mockImplementation((url: string) => {
+      if (url.startsWith('/pesticides')) return Promise.resolve({ data: [pesticide] })
+      return Promise.resolve(pull())
+    })
     renderPage()
 
     // Le code apparaît dans la ligne du tableau et dans le panneau Modifier.
     await waitFor(() => expect(screen.getAllByText('PST-ADO4').length).toBeGreaterThan(0))
 
-    // En-tête de colonne + libellé du champ dans le panneau Modifier.
-    expect(screen.getAllByText('Matière active').length).toBeGreaterThan(0)
+    // Les valeurs réelles sont affichées, plus de placeholder « — ».
+    expect(screen.getAllByText('Deltaméthrine').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('0.5 l/ha').length).toBeGreaterThan(0)
     expect(screen.getByRole('columnheader', { name: 'Dose de référence' })).toBeInTheDocument()
-    expect(
-      screen.getByText(/la table pesticide ne porte que code, nom et actif/),
-    ).toBeInTheDocument()
-    expect(screen.getAllByText('colonne absente en base')).toHaveLength(2)
-  })
-
-  it("désactive l'ajout quand aucune route d'écriture n'existe côté backend", async () => {
-    mockedGet.mockResolvedValue(pull())
-    renderPage()
-
-    await waitFor(() => expect(nav().getByText('7 référentiels')).toBeInTheDocument())
-
-    // Pesticides est sélectionné par défaut — aucune écriture exposée.
-    // `aria-disabled` plutôt que `disabled` : couleurs pleines de la maquette
-    // conservées, état tout de même annoncé et bouton atteignable au clavier.
-    expect(screen.getByRole('button', { name: '+ Nouveau pesticide' })).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    )
-    expect(screen.getByRole('button', { name: 'Enregistrer' })).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    )
+    expect(screen.queryByText('colonne absente en base')).not.toBeInTheDocument()
   })
 
   it('renvoie vers le CRUD existant pour les entités déjà administrables', async () => {
@@ -304,18 +288,6 @@ describe('ReferentielsPage — écritures code_stade (#131)', () => {
     expect(screen.getByLabelText('Libellé *')).toHaveValue('Larve stade L1')
   })
 
-  it("laisse les autres référentiels en lecture seule", async () => {
-    mockedGet.mockResolvedValue(pull())
-    renderPage()
-
-    await waitFor(() => expect(nav().getByText('7 référentiels')).toBeInTheDocument())
-
-    // Pesticides sélectionné par défaut — toujours aucune écriture exposée.
-    expect(screen.getByRole('button', { name: 'Enregistrer' })).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    )
-  })
 })
 
 describe('ReferentielsPage — écritures poste_acridien (#132)', () => {
@@ -575,6 +547,147 @@ describe('ReferentielsPage — écritures culture (#130)', () => {
     ])
 
     expect(screen.getByText('MAN')).toBeInTheDocument()
+  })
+})
+
+describe('ReferentielsPage — écritures pesticide (#129, #134)', () => {
+  const PESTICIDE = {
+    id: 'p1',
+    code: 'PST-ADO4',
+    nom: 'Adonis 4 UL',
+    matiere_active: 'Deltaméthrine',
+    dose_reference: '0.5 l/ha',
+    actif: true,
+    created_at: SERVER_TIME,
+    updated_at: SERVER_TIME,
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  /**
+   * L'administration lit `/pesticides?inclure_inactifs=true` et non le pull :
+   * elle affiche un badge « État », il lui faut donc aussi les pesticides
+   * désactivés.
+   */
+  function mockGetParUrl(pesticides: Record<string, unknown>[] = [PESTICIDE]) {
+    mockedGet.mockImplementation((url: string) => {
+      if (url.startsWith('/pesticides')) return Promise.resolve({ data: pesticides })
+      return Promise.resolve(pull())
+    })
+  }
+
+  async function ouvrirPesticides(pesticides: Record<string, unknown>[] = [PESTICIDE]) {
+    mockGetParUrl(pesticides)
+    renderPage()
+    await waitFor(() => expect(nav().getByText('pesticide')).toBeInTheDocument())
+    fireEvent.click(nav().getByText('pesticide'))
+    await screen.findByDisplayValue('PST-ADO4')
+  }
+
+  it("expose la pastille « API » et active les affordances d'écriture", async () => {
+    await ouvrirPesticides()
+
+    expect(screen.getByText('GET · POST · PUT /pesticides')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '+ Nouveau pesticide' })).not.toHaveAttribute(
+      'aria-disabled',
+    )
+    expect(screen.getByRole('button', { name: 'Enregistrer' })).not.toHaveAttribute('aria-disabled')
+  })
+
+  it('ouvre le panneau Modifier prérempli sur le pesticide sélectionné', async () => {
+    await ouvrirPesticides()
+
+    expect(screen.getByLabelText('Code *')).toHaveValue('PST-ADO4')
+    expect(screen.getByLabelText('Nom commercial *')).toHaveValue('Adonis 4 UL')
+    expect(screen.getByLabelText('Matière active')).toHaveValue('Deltaméthrine')
+    expect(screen.getByLabelText('Dose de référence')).toHaveValue('0.5 l/ha')
+  })
+
+  it('enregistre une modification via PUT /pesticides/{id}', async () => {
+    mockedPut.mockResolvedValue({ data: { ...PESTICIDE, dose_reference: '0.75 l/ha' } })
+    await ouvrirPesticides()
+
+    fireEvent.change(screen.getByLabelText('Dose de référence'), {
+      target: { value: '0.75 l/ha' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    await waitFor(() =>
+      expect(mockedPut).toHaveBeenCalledWith('/pesticides/p1', {
+        code: 'PST-ADO4',
+        nom: 'Adonis 4 UL',
+        matiere_active: 'Deltaméthrine',
+        dose_reference: '0.75 l/ha',
+        actif: true,
+      }),
+    )
+  })
+
+  it('crée un pesticide via POST /pesticides', async () => {
+    mockedPost.mockResolvedValue({
+      data: { ...PESTICIDE, id: 'p2', code: 'PST-NEW', nom: 'Nouveau produit' },
+    })
+    await ouvrirPesticides()
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Nouveau pesticide' }))
+
+    const modal = within(screen.getByRole('dialog', { name: 'Nouveau pesticide' }))
+    fireEvent.change(modal.getByLabelText('Code *'), { target: { value: 'PST-NEW' } })
+    fireEvent.change(modal.getByLabelText('Nom commercial *'), {
+      target: { value: 'Nouveau produit' },
+    })
+    fireEvent.change(modal.getByLabelText('Matière active'), { target: { value: 'Métarhizium' } })
+    fireEvent.click(modal.getByRole('button', { name: 'Créer' }))
+
+    await waitFor(() => expect(mockedPost).toHaveBeenCalledTimes(1))
+    expect(mockedPost).toHaveBeenCalledWith('/pesticides', {
+      code: 'PST-NEW',
+      nom: 'Nouveau produit',
+      matiere_active: 'Métarhizium',
+      dose_reference: null,
+    })
+  })
+
+  it('désactive logiquement plutôt que de supprimer', async () => {
+    mockedPut.mockResolvedValue({ data: { ...PESTICIDE, actif: false } })
+    await ouvrirPesticides()
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Actif' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    await waitFor(() => expect(mockedPut).toHaveBeenCalledTimes(1))
+    expect(mockedPut.mock.calls[0][1]).toMatchObject({ actif: false })
+    // Aucune affordance de suppression : le pull ne transporte que des upserts.
+    expect(screen.queryByRole('button', { name: /supprimer/i })).not.toBeInTheDocument()
+  })
+
+  it('remonte le conflit du serveur quand le code est déjà pris', async () => {
+    mockedPut.mockRejectedValue({
+      response: { data: { detail: 'Le code « PST-ADO4 » est déjà utilisé par un autre pesticide' } },
+    })
+    await ouvrirPesticides()
+
+    fireEvent.change(screen.getByLabelText('Nom commercial *'), {
+      target: { value: 'Adonis 4 UL (bis)' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    await waitFor(() =>
+      expect(
+        screen.getByText('Le code « PST-ADO4 » est déjà utilisé par un autre pesticide'),
+      ).toBeInTheDocument(),
+    )
+  })
+
+  it('affiche aussi les pesticides désactivés, badge « État » oblige', async () => {
+    await ouvrirPesticides([
+      PESTICIDE,
+      { ...PESTICIDE, id: 'p3', code: 'PST-OFF', nom: 'Retiré', actif: false },
+    ])
+
+    expect(screen.getByText('PST-OFF')).toBeInTheDocument()
   })
 })
 
