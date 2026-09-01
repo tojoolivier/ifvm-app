@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { AxiosError } from 'axios'
 import { api } from '../api/client'
 import { cn } from '@/lib/utils'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { ErrorBanner } from '@/components/ui/error-banner'
 import { Switch } from '@/components/ui/switch'
 
 /**
@@ -13,11 +15,16 @@ import { Switch } from '@/components/ui/switch'
  * carte d'en-tête + carte « Enregistrements » + grille `1fr 320px` (panneau
  * Modifier / panneau Fraîcheur terrain).
  *
- * Périmètre volontairement en lecture seule (#124) : le backend n'expose aucune
- * écriture pour pesticide, culture, code_stade, utilisateur_equipe,
- * poste_acridien et station_fixe. Les affordances d'écriture de la maquette sont
- * rendues mais désactivées, avec l'état API réel affiché en pastille — la
- * consigne du handoff est de ne pas masquer ces écarts.
+ * L'écran est en lecture seule là où le backend n'expose pas d'écriture
+ * (#124) : pesticide, culture, poste_acridien et station_fixe. Les affordances
+ * d'écriture de la maquette y sont rendues mais désactivées, avec l'état API
+ * réel affiché en pastille — la consigne du handoff est de ne pas masquer ces
+ * écarts.
+ *
+ * `code_stade` a ses écritures depuis #131 : `write` porte le formulaire, et la
+ * sortie de service passe par `actif=false`. Aucune suppression n'est offerte —
+ * `GET /referentiel/pull` ne transporte que des upserts, une ligne effacée
+ * resterait indéfiniment sur les téléphones déjà synchronisés.
  */
 
 type Row = Record<string, unknown>
@@ -46,6 +53,31 @@ interface FieldSpec {
   value: (row: Row) => string
 }
 
+/**
+ * Champ éditable d'un référentiel administrable. `nullable` distingue « — » de
+ * la chaîne vide : `code_stade.sexe` et `code_stade.espece` sont NULL en base
+ * (larve non sexée, stade valable pour les deux espèces).
+ */
+interface EditableField {
+  /** Nom de colonne backend — clé du corps envoyé à l'API. */
+  name: string
+  label: string
+  kind: 'text' | 'number' | 'select'
+  mono?: boolean
+  required?: boolean
+  nullable?: boolean
+  options?: { value: string; label: string }[]
+  hint?: string
+}
+
+/** Écritures exposées par le backend pour ce référentiel. */
+interface WriteSpec {
+  /** Collection REST : `POST {path}`, `PUT {path}/{id}`. Jamais de DELETE. */
+  path: string
+  createTitle: string
+  fields: EditableField[]
+}
+
 interface EntitySpec {
   key: string
   /** Clé correspondante dans le payload `GET /referentiel/pull`. */
@@ -64,6 +96,8 @@ interface EntitySpec {
   addRoute?: string
   /** `campagne` n'a pas de colonne `actif` en base. */
   hasActif: boolean
+  /** Présent quand le backend expose POST/PUT : active l'ajout et le panneau Modifier. */
+  write?: WriteSpec
   /**
    * Identifiant lisible de la ligne sélectionnée, affiché sous « Modifier ».
    * La maquette y met la valeur de la première colonne — ce n'est donc pas
@@ -189,26 +223,78 @@ const ENTITES: EntitySpec[] = [
     label: 'Codes stades',
     table: 'code_stade',
     addLabel: '+ Nouveau code stade',
-    apiOk: false,
-    apiLabel: 'Écriture à créer — référentiel non lu par le mobile',
+    apiOk: true,
+    apiLabel: 'GET · POST · PUT /codes-stades',
     desc: 'Doit alimenter le stade dominant (infestation larvaire) et les phases du compteur de captures.',
-    note: 'Synchronisée dans le SQLite du terrain mais aucune fonction de lecture : les phases et stades restent des constantes dans le code mobile.',
+    note: "Écriture disponible côté serveur ; la lecture terrain manque encore : listCodesStades() n'existe pas dans referentiel-db.ts, les phases et stades restent des constantes dans le code mobile.",
     hasActif: true,
     rowLabel: (row) => text(row, 'code'),
     columns: [
       codeColumn(),
+      {
+        key: 'categorie',
+        header: 'Catégorie',
+        render: (row) => <span className="text-ifvm-text-tertiary">{text(row, 'categorie')}</span>,
+      },
+      {
+        key: 'sexe',
+        header: 'Sexe',
+        render: (row) => <span className="text-ifvm-text-tertiary">{text(row, 'sexe')}</span>,
+      },
       {
         key: 'espece',
         header: 'Espèce',
         render: (row) => <span className="text-ifvm-text-tertiary">{text(row, 'espece')}</span>,
       },
       { key: 'libelle', header: 'Libellé', render: (row) => text(row, 'libelle') },
+      { key: 'ordre', header: 'Ordre', align: 'right', mono: true, render: (row) => text(row, 'ordre') },
     ],
-    fields: [
-      { label: 'Code *', mono: true, value: (row) => text(row, 'code') },
-      { label: 'Espèce *', value: (row) => text(row, 'espece') },
-      { label: 'Libellé *', value: (row) => text(row, 'libelle') },
-    ],
+    // Panneau en lecture seule inutilisé : `write` prend le relais.
+    fields: [],
+    write: {
+      path: '/codes-stades',
+      createTitle: 'Nouveau code stade',
+      fields: [
+        {
+          name: 'code',
+          label: 'Code',
+          kind: 'text',
+          mono: true,
+          required: true,
+          hint: 'doit exister dans le vocabulaire `stade`',
+        },
+        {
+          name: 'categorie',
+          label: 'Catégorie',
+          kind: 'select',
+          required: true,
+          options: [
+            { value: 'imago', label: 'imago' },
+            { value: 'larve', label: 'larve' },
+          ],
+        },
+        {
+          name: 'sexe',
+          label: 'Sexe',
+          kind: 'select',
+          nullable: true,
+          options: [
+            { value: '', label: '— (larve, non sexée)' },
+            { value: 'F', label: 'F' },
+            { value: 'M', label: 'M' },
+          ],
+        },
+        {
+          name: 'espece',
+          label: 'Espèce',
+          kind: 'text',
+          nullable: true,
+          hint: 'vide = les deux espèces',
+        },
+        { name: 'libelle', label: 'Libellé', kind: 'text', required: true },
+        { name: 'ordre', label: 'Ordre', kind: 'number', mono: true },
+      ],
+    },
   },
   {
     key: 'poste_acridien',
@@ -344,6 +430,101 @@ const ENTITES: EntitySpec[] = [
   },
 ]
 
+type FormValues = Record<string, string>
+
+/** État du serveur → champs de formulaire. NULL et absent deviennent la chaîne vide. */
+function toFormValues(fields: EditableField[], row: Row | undefined): FormValues {
+  const values: FormValues = {}
+  for (const field of fields) {
+    const value = row?.[field.name]
+    values[field.name] = value === null || value === undefined ? '' : String(value)
+  }
+  return values
+}
+
+/** Valeurs initiales d'une création : la première option pour les listes fermées. */
+function blankFormValues(fields: EditableField[]): FormValues {
+  const values: FormValues = {}
+  for (const field of fields) {
+    values[field.name] = field.kind === 'select' ? (field.options?.[0]?.value ?? '') : ''
+  }
+  return values
+}
+
+/**
+ * Champs de formulaire → corps JSON. La chaîne vide vaut NULL sur un champ
+ * nullable ; ailleurs elle part telle quelle, le backend restant l'autorité
+ * (409 code hors vocabulaire, 409 grille déjà occupée, 422 valeur interdite).
+ */
+function toPayload(fields: EditableField[], values: FormValues): Record<string, unknown> {
+  const payload: Record<string, unknown> = {}
+  for (const field of fields) {
+    const raw = values[field.name] ?? ''
+    if (field.kind === 'number') payload[field.name] = raw === '' ? 0 : Number(raw)
+    else payload[field.name] = raw === '' && field.nullable ? null : raw
+  }
+  return payload
+}
+
+function apiErrorMessage(error: unknown, fallback: string): string {
+  const detail = (error as AxiosError<{ detail?: string }>)?.response?.data?.detail
+  return typeof detail === 'string' ? detail : fallback
+}
+
+const inputClass =
+  'min-h-9 w-full rounded-lg border border-[#e0d9c4] bg-white px-[11px] text-[12.5px] font-semibold text-[#16201a] focus:outline-none focus:ring-2 focus:ring-[#235a36]'
+
+const fieldLabelClass =
+  'font-sans text-[9.5px] font-semibold uppercase tracking-[.8px] text-ifvm-text-weak'
+
+/** Un champ éditable — même gabarit dans le panneau « Modifier » et la boîte de création. */
+function EditableInput({
+  field,
+  idPrefix,
+  value,
+  onChange,
+}: {
+  field: EditableField
+  idPrefix: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  const id = `${idPrefix}-${field.name}`
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className={fieldLabelClass}>
+        {field.label}
+        {field.required ? ' *' : ''}
+      </label>
+      {field.kind === 'select' ? (
+        <select
+          id={id}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className={cn(inputClass, 'font-sans')}
+        >
+          {field.options?.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          id={id}
+          type={field.kind === 'number' ? 'number' : 'text'}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className={cn(inputClass, field.mono ? 'font-mono' : 'font-sans')}
+        />
+      )}
+      {field.hint && (
+        <span className="font-sans text-[10px] font-medium text-ifvm-text-weak">{field.hint}</span>
+      )}
+    </div>
+  )
+}
+
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="px-0.5 pb-[3px] font-sans text-[9.5px] font-semibold uppercase tracking-[1px] text-ifvm-text-weak">
@@ -354,6 +535,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 export function ReferentielsPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [selectedKey, setSelectedKey] = useState(ENTITES[0].key)
   const [selectedRowIndex, setSelectedRowIndex] = useState(0)
 
@@ -367,18 +549,90 @@ export function ReferentielsPage() {
   const selectedRow = rows[selectedRowIndex] ?? rows[0]
   const serverTime = data?.[entity.pullKey]?.server_time
 
+  // --- Écritures (entités portant un `write`) --------------------------------
+  const writeFields = entity.write?.fields ?? []
+  const [editValues, setEditValues] = useState<FormValues>({})
+  const [editActif, setEditActif] = useState(true)
+  const [editError, setEditError] = useState('')
+  const [createValues, setCreateValues] = useState<FormValues>({})
+  const [createError, setCreateError] = useState('')
+  const [creating, setCreating] = useState(false)
+
+  const selectedRowId = selectedRow ? String(selectedRow.id) : undefined
+
+  // Le panneau repart de l'état serveur dès qu'on change d'entité ou de ligne :
+  // une saisie non enregistrée ne doit pas déteindre sur la ligne suivante.
+  useEffect(() => {
+    setEditValues(toFormValues(writeFields, selectedRow))
+    setEditActif(selectedRow ? Boolean(selectedRow.actif) : true)
+    setEditError('')
+    // `writeFields` se redéduit de `entity` à chaque rendu : la clé d'entité suffit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entity.key, selectedRowId, data])
+
+  function invalidatePull() {
+    queryClient.invalidateQueries({ queryKey: ['referentiel-pull'] })
+  }
+
+  const updateMutation = useMutation({
+    mutationFn: (payload: Record<string, unknown>) =>
+      api.put(`${entity.write!.path}/${selectedRowId}`, payload),
+    onSuccess: () => {
+      setEditError('')
+      invalidatePull()
+    },
+    onError: (error) => setEditError(apiErrorMessage(error, "Enregistrement impossible.")),
+  })
+
+  const createMutation = useMutation({
+    mutationFn: (payload: Record<string, unknown>) => api.post(entity.write!.path, payload),
+    onSuccess: () => {
+      setCreating(false)
+      setCreateError('')
+      invalidatePull()
+    },
+    onError: (error) => setCreateError(apiErrorMessage(error, 'Création impossible.')),
+  })
+
+  function openCreate() {
+    setCreateValues(blankFormValues(writeFields))
+    setCreateError('')
+    setCreating(true)
+  }
+
+  function submitCreate(event: React.FormEvent) {
+    event.preventDefault()
+    setCreateError('')
+    createMutation.mutate(toPayload(writeFields, createValues))
+  }
+
+  function submitEdit(event: React.FormEvent) {
+    event.preventDefault()
+    setEditError('')
+    updateMutation.mutate({ ...toPayload(writeFields, editValues), actif: editActif })
+  }
+
+  function resetEdit() {
+    setEditValues(toFormValues(writeFields, selectedRow))
+    setEditActif(selectedRow ? Boolean(selectedRow.actif) : true)
+    setEditError('')
+  }
+
   const columns = useMemo<DataTableColumn<Row>[]>(() => {
     const trailing: DataTableColumn<Row>[] = []
     if (entity.hasActif) {
       trailing.push({
         key: 'actif',
         header: 'Actif',
+        // Nom accessible porté par la ligne : un tableau de 20 interrupteurs tous
+        // nommés « Actif » est illisible au lecteur d'écran, et se confond avec
+        // celui du panneau « Modifier ».
         render: (row) => (
           <Switch
             checked={Boolean(row.actif)}
             disabled
             className={READONLY_SWITCH}
-            aria-label={row.actif ? 'Actif' : 'Inactif'}
+            aria-label={`${entity.rowLabel(row)} — ${row.actif ? 'actif' : 'inactif'}`}
           />
         ),
       })
@@ -485,16 +739,20 @@ export function ReferentielsPage() {
             <h3 className="flex-1 font-sans text-[13px] font-bold">Enregistrements</h3>
             <button
               type="button"
-              aria-disabled={entity.addRoute ? undefined : true}
-              onClick={entity.addRoute ? () => navigate(entity.addRoute!) : noop}
+              aria-disabled={entity.write || entity.addRoute ? undefined : true}
+              onClick={
+                entity.write ? openCreate : entity.addRoute ? () => navigate(entity.addRoute!) : noop
+              }
               title={
-                entity.addRoute
-                  ? `Gestion complète sur ${entity.addRoute}`
-                  : `${entity.apiLabel} — aucune route d'écriture exposée par le backend`
+                entity.write
+                  ? `POST ${entity.write.path}`
+                  : entity.addRoute
+                    ? `Gestion complète sur ${entity.addRoute}`
+                    : `${entity.apiLabel} — aucune route d'écriture exposée par le backend`
               }
               className={cn(
                 'rounded-lg bg-[#235a36] px-[14px] py-2 font-sans text-[11.5px] font-bold text-white transition-colors duration-[120ms]',
-                entity.addRoute ? 'hover:bg-[#1a4429]' : UNAVAILABLE,
+                entity.write || entity.addRoute ? 'hover:bg-[#1a4429]' : UNAVAILABLE,
               )}
             >
               {entity.addLabel}
@@ -543,66 +801,112 @@ export function ReferentielsPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-              {entity.fields.map((field) => (
-                <div key={field.label} className="flex flex-col gap-1.5">
-                  <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[.8px] text-ifvm-text-weak">
-                    {field.label}
-                  </span>
-                  <div
+            {entity.write ? (
+              <form onSubmit={submitEdit} className="flex flex-col gap-[13px]">
+                {editError && <ErrorBanner label="Enregistrement impossible" message={editError} />}
+
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  {entity.write.fields.map((field) => (
+                    <EditableInput
+                      key={field.name}
+                      field={field}
+                      idPrefix="ref-edit"
+                      value={editValues[field.name] ?? ''}
+                      onChange={(value) =>
+                        setEditValues((current) => ({ ...current, [field.name]: value }))
+                      }
+                    />
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between pt-0.5">
+                  <span className="font-sans text-[11.5px] font-semibold text-[#3a3a30]">Actif</span>
+                  <Switch checked={editActif} onCheckedChange={setEditActif} aria-label="Actif" />
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    disabled={!selectedRow || updateMutation.isPending}
+                    className="flex-1 rounded-[9px] bg-[#235a36] py-[11px] font-sans text-[12px] font-bold text-white transition-colors duration-[120ms] hover:bg-[#1a4429] disabled:opacity-50"
+                  >
+                    {updateMutation.isPending ? 'Enregistrement…' : 'Enregistrer'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetEdit}
+                    className="rounded-[9px] border border-[#e0d9c4] bg-white px-4 py-[11px] font-sans text-[12px] font-semibold text-ifvm-text-tertiary transition-colors duration-[120ms] hover:bg-[#faf7ef]"
+                  >
+                    Annuler
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  {entity.fields.map((field) => (
+                    <div key={field.label} className="flex flex-col gap-1.5">
+                      <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[.8px] text-ifvm-text-weak">
+                        {field.label}
+                      </span>
+                      <div
+                        className={cn(
+                          'flex min-h-9 items-center rounded-lg border border-[#e0d9c4] bg-[#fffdf8] px-[11px] text-[12.5px] font-semibold text-[#16201a]',
+                          field.mono ? 'font-mono' : 'font-sans',
+                        )}
+                      >
+                        {selectedRow ? field.value(selectedRow) : '—'}
+                      </div>
+                      {field.hint && (
+                        <span className="font-sans text-[10px] font-medium text-ifvm-amber-text">
+                          {field.hint}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {entity.hasActif && (
+                  <div className="flex items-center justify-between pt-0.5">
+                    <span className="font-sans text-[11.5px] font-semibold text-[#3a3a30]">
+                      Actif
+                    </span>
+                    <Switch
+                      checked={Boolean(selectedRow?.actif)}
+                      disabled
+                      className={READONLY_SWITCH}
+                      aria-label="Actif"
+                    />
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    aria-disabled
+                    onClick={noop}
+                    title={`${entity.apiLabel} — enregistrement impossible tant que la route d'écriture n'existe pas`}
                     className={cn(
-                      'flex min-h-9 items-center rounded-lg border border-[#e0d9c4] bg-[#fffdf8] px-[11px] text-[12.5px] font-semibold text-[#16201a]',
-                      field.mono ? 'font-mono' : 'font-sans',
+                      'flex-1 rounded-[9px] bg-[#235a36] py-[11px] font-sans text-[12px] font-bold text-white',
+                      UNAVAILABLE,
                     )}
                   >
-                    {selectedRow ? field.value(selectedRow) : '—'}
-                  </div>
-                  {field.hint && (
-                    <span className="font-sans text-[10px] font-medium text-ifvm-amber-text">
-                      {field.hint}
-                    </span>
-                  )}
+                    Enregistrer
+                  </button>
+                  <button
+                    type="button"
+                    aria-disabled
+                    onClick={noop}
+                    className={cn(
+                      'rounded-[9px] border border-[#e0d9c4] bg-white px-4 py-[11px] font-sans text-[12px] font-semibold text-ifvm-text-tertiary',
+                      UNAVAILABLE,
+                    )}
+                  >
+                    Annuler
+                  </button>
                 </div>
-              ))}
-            </div>
-
-            {entity.hasActif && (
-              <div className="flex items-center justify-between pt-0.5">
-                <span className="font-sans text-[11.5px] font-semibold text-[#3a3a30]">Actif</span>
-                <Switch
-                  checked={Boolean(selectedRow?.actif)}
-                  disabled
-                  className={READONLY_SWITCH}
-                  aria-label="Actif"
-                />
-              </div>
+              </>
             )}
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                aria-disabled
-                onClick={noop}
-                title={`${entity.apiLabel} — enregistrement impossible tant que la route d'écriture n'existe pas`}
-                className={cn(
-                  'flex-1 rounded-[9px] bg-[#235a36] py-[11px] font-sans text-[12px] font-bold text-white',
-                  UNAVAILABLE,
-                )}
-              >
-                Enregistrer
-              </button>
-              <button
-                type="button"
-                aria-disabled
-                onClick={noop}
-                className={cn(
-                  'rounded-[9px] border border-[#e0d9c4] bg-white px-4 py-[11px] font-sans text-[12px] font-semibold text-ifvm-text-tertiary',
-                  UNAVAILABLE,
-                )}
-              >
-                Annuler
-              </button>
-            </div>
           </div>
 
           <div className="rounded-[11px] border border-ifvm-green-border bg-ifvm-green-bg px-[18px] py-4">
@@ -631,6 +935,57 @@ export function ReferentielsPage() {
           </div>
         </div>
       </div>
+
+      {creating && entity.write && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={entity.write.createTitle}
+            className="mx-4 w-full max-w-md rounded-[11px] border border-[#e7e0cd] bg-white shadow-xl"
+          >
+            <div className="border-b border-[#f4efe2] px-6 py-4">
+              <h2 className="font-sans text-[15px] font-extrabold">{entity.write.createTitle}</h2>
+            </div>
+            <form onSubmit={submitCreate} className="flex flex-col gap-4 px-6 py-4">
+              {createError && <ErrorBanner label="Création impossible" message={createError} />}
+
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                {entity.write.fields.map((field) => (
+                  <EditableInput
+                    key={field.name}
+                    field={field}
+                    idPrefix="ref-new"
+                    value={createValues[field.name] ?? ''}
+                    onChange={(value) =>
+                      setCreateValues((current) => ({ ...current, [field.name]: value }))
+                    }
+                  />
+                ))}
+              </div>
+
+              {/* Pas de champ « Actif » : une création part active, la désactivation
+                  est un geste explicite depuis le panneau Modifier. */}
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="submit"
+                  disabled={createMutation.isPending}
+                  className="rounded-[9px] bg-[#235a36] px-4 py-[10px] font-sans text-[12px] font-bold text-white transition-colors duration-[120ms] hover:bg-[#1a4429] disabled:opacity-50"
+                >
+                  {createMutation.isPending ? 'Création…' : 'Créer'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCreating(false)}
+                  className="rounded-[9px] border border-[#e7e0cd] px-4 py-[10px] font-sans text-[12px] font-bold text-ifvm-text-tertiary transition-colors duration-[120ms] hover:bg-[#faf7ef]"
+                >
+                  Annuler
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

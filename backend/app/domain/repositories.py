@@ -262,3 +262,35 @@ class CodeStadeRepository(ABC):
     @abstractmethod
     async def list_since(self, since: datetime | None) -> list[CodeStade]:
         pass
+
+    @abstractmethod
+    async def list_all(self, actif: bool | None = True) -> list[CodeStade]:
+        pass
+
+    @abstractmethod
+    async def get_by_id(self, code_stade_id: uuid.UUID) -> CodeStade | None:
+        pass
+
+    @abstractmethod
+    async def create(self, code_stade: CodeStade) -> CodeStade:
+        pass
+
+    @abstractmethod
+    async def update(self, code_stade: CodeStade) -> CodeStade:
+        pass
+
+    @abstractmethod
+    async def code_au_vocabulaire(self, code: str) -> bool:
+        """`stade.code` fait autorité : une place de grille ne peut viser qu'un code connu."""
+        pass
+
+    @abstractmethod
+    async def grille_occupee_par(
+        self,
+        code: str,
+        categorie: str,
+        sexe: str | None,
+        espece: str | None,
+    ) -> uuid.UUID | None:
+        """Identifiant de la place occupant déjà cette grille, `None` si elle est libre."""
+        pass
