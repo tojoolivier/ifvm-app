@@ -68,3 +68,40 @@ export type { Phenotype };
 export function phenotypesFor(espece: Espece, categorie: Categorie): typeof PHENOTYPES {
   return espece === 'NSE' && categorie === 'larve' ? PHENOTYPES_3 : PHENOTYPES;
 }
+
+export interface PhaseAllocation {
+  phase: string;
+  effectif: number;
+}
+
+/**
+ * Répartit `count` individus d'un stade entre les phases renseignées, proportionnellement
+ * à leur effectif déclaré — algorithme extrait à l'identique de `captures.tsx`
+ * (`createRowsForStade`, historique #201/#228) pour être partagé par les écrans de saisie
+ * intensifs (`intensive-imagos.tsx`, `intensive-larves.tsx`). La dernière phase de la liste
+ * absorbe l'écart d'arrondi, garantissant que la somme des effectifs alloués retombe
+ * exactement sur `count` — c'est la règle bloquante Captures = Phases = Stades qui l'exige.
+ */
+export function repartirStadeSurPhases(
+  count: number,
+  phasesAvecEffectifs: { phase: string; count: number }[]
+): PhaseAllocation[] {
+  if (count <= 0 || phasesAvecEffectifs.length === 0) return [];
+  const totalPhaseCount = phasesAvecEffectifs.reduce((sum, p) => sum + p.count, 0);
+  const allocations: PhaseAllocation[] = [];
+  let remaining = count;
+  for (let i = 0; i < phasesAvecEffectifs.length; i++) {
+    const phase = phasesAvecEffectifs[i];
+    if (i === phasesAvecEffectifs.length - 1) {
+      if (remaining > 0) allocations.push({ phase: phase.phase, effectif: remaining });
+    } else {
+      const proportion = phase.count / totalPhaseCount;
+      const allocated = Math.round(count * proportion);
+      if (allocated > 0) {
+        allocations.push({ phase: phase.phase, effectif: allocated });
+        remaining -= allocated;
+      }
+    }
+  }
+  return allocations;
+}
