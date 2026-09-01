@@ -32,8 +32,8 @@ import { storage } from './storage';
  *
  * Dupliqué depuis `signalement-natif.ts` plutôt qu'importé : ce dernier tire
  * `expo-device` / `expo-file-system` / `expo-sharing` dans sa chaîne de
- * dépendances, que ce module n'a aucune raison de charger (même motif que le
- * jumeau `referentiel-auto-sync`). Trois lignes valent mieux que ce couplage.
+ * dépendances, que ce module n'a aucune raison de charger. Trois lignes valent
+ * mieux que ce couplage.
  */
 export function buildNatif(): string | null {
   const config = Constants.expoConfig;
