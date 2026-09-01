@@ -12,6 +12,8 @@ import { useDebugStore } from '@/lib/debug-store';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { logger } from '@/lib/logger';
+import { OtaSection } from '@/components/ota-section';
+import { buildNatif, formatVersionBuild, versionApp } from '@/lib/ota';
 
 const IFVM_GREEN = '#1B5E1B';
 const IFVM_GREEN_BG = '#E8F5E9';
@@ -441,6 +443,9 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Mises à jour OTA */}
+        <OtaSection />
+
         {/* Synchronisation */}
         <View style={styles.infoSection}>
           <ThemedText style={styles.sectionTitle}>🔄 Synchronisation</ThemedText>
@@ -551,7 +556,7 @@ export default function ProfileScreen() {
         {/* Footer */}
         <View style={styles.footer}>
           <ThemedText style={styles.footerText}>
-            © 2026 CDV_IFVM - Application Mobile V_1.0.0
+            © 2026 CDV_IFVM · {formatVersionBuild(versionApp(), buildNatif())}
           </ThemedText>
         </View>
       </ScrollView>
