@@ -411,6 +411,10 @@ describe('updateProspectionExtensiveReference', () => {
         REF_INPUT.surfaceInfestee,
         REF_INPUT.nMessage,
         REF_INPUT.heureObservationAt,
+        // Mode aérien uniquement — non fournis par REF_INPUT (mode terrestre implicite
+        // dans ce test), donc null : cf. les 7 champs équipe/aéronef ajoutés à
+        // ExtensiveReferenceUpdateInput.
+        null, null, null, null, null, null, null,
         expect.any(String),
         BASE_INPUT.id,
       ]
@@ -448,6 +452,77 @@ describe('updateProspectionExtensiveObservations', () => {
         OBS_INPUT.hauteurHerbeCm,
         OBS_INPUT.dernierePluie,
         OBS_INPUT.intensitePluie,
+        null, // pesticidesEmbarques
+        null, // pesticideNomCommercial
+        null, // pesticideQuantiteDisponible
+        null, // pesticideQuantiteRecue
+        null, // futsDisponible
+        null, // futsPleins
+        null, // futsVides
+        null, // futsRecues
+        null, // signatureVisaNom
+        null, // signatureVisaHorodatage
+        null, // signatureConsultantFaoNom
+        null, // signatureConsultantFaoHorodatage
+        null, // signaturePiloteNom
+        null, // signaturePiloteHorodatage
+        null, // signatureChefBaseNom
+        null, // signatureChefBaseHorodatage
+        null, // observations (Remarques)
+        expect.any(String),
+        BASE_INPUT.id,
+      ]
+    );
+  });
+
+  it('writes pesticides embarqués + fûts + signatures columns (mode aérien)', async () => {
+    getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW });
+
+    await updateProspectionExtensiveObservations(BASE_INPUT.id, {
+      ...OBS_INPUT,
+      pesticidesEmbarques: true,
+      pesticideNomCommercial: 'Fyfanon ULV',
+      pesticideQuantiteDisponible: 500,
+      pesticideQuantiteRecue: 200,
+      futsDisponible: 10,
+      futsPleins: 6,
+      futsVides: 4,
+      futsRecues: 5,
+      signatureVisaNom: 'Rakoto V.',
+      signatureVisaHorodatage: '2026-09-01T09:00:00.000Z',
+      signatureConsultantFaoNom: 'John Smith',
+      signatureConsultantFaoHorodatage: '2026-09-01T09:05:00.000Z',
+      signaturePiloteNom: 'Jean Rakoto',
+      signaturePiloteHorodatage: '2026-09-01T09:10:00.000Z',
+      signatureChefBaseNom: 'Sarah Ravelo',
+      signatureChefBaseHorodatage: '2026-09-01T09:15:00.000Z',
+    });
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE prospection SET'),
+      [
+        OBS_INPUT.degatsCulturesPourcent,
+        OBS_INPUT.verdureStrate,
+        OBS_INPUT.hauteurHerbeCm,
+        OBS_INPUT.dernierePluie,
+        OBS_INPUT.intensitePluie,
+        1, // pesticidesEmbarques stocké en 0/1 (SQLite n'a pas de type booléen natif)
+        'Fyfanon ULV',
+        500,
+        200,
+        10,
+        6,
+        4,
+        5,
+        'Rakoto V.',
+        '2026-09-01T09:00:00.000Z',
+        'John Smith',
+        '2026-09-01T09:05:00.000Z',
+        'Jean Rakoto',
+        '2026-09-01T09:10:00.000Z',
+        'Sarah Ravelo',
+        '2026-09-01T09:15:00.000Z',
+        null, // observations (Remarques)
         expect.any(String),
         BASE_INPUT.id,
       ]

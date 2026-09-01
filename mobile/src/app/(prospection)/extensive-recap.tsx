@@ -3,10 +3,24 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingV
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
-import { concludeValidation, listAllProspectionPopulations, PopulationRow } from '@/lib/prospection-repository';
+import {
+  concludeValidation,
+  DraftProspection,
+  listAllProspectionPopulations,
+  listOperationsAeriennes,
+  normalizeBoolean,
+  OperationAerienneRow,
+  PopulationRow,
+} from '@/lib/prospection-repository';
 import { enregistrerEtSynchroniser } from '@/lib/prospection-review';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
-import { imagoTotalFromRow, larveTotalFromRow, typeCibleImagoLabel } from '@/lib/prospection-extensive';
+import {
+  TYPE_OPERATION_OPTIONS,
+  formatDuree,
+  imagoTotalFromRow,
+  larveTotalFromRow,
+  typeCibleImagoLabel,
+} from '@/lib/prospection-extensive';
 import { formatHeureLocale } from '@/lib/prospection-fiche-lecture';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
@@ -122,6 +136,77 @@ function larveRowHasData(row: PopulationRow | null): boolean {
   return false;
 }
 
+/**
+ * Bloc « E · Aérien » — mode aérien uniquement. Doit afficher TOUT le domaine
+ * aérien de la fiche : Références (équipe/aéronef, déjà ajoutées) ET Pesticides
+ * embarqués + Signatures (cf. prompt « pesticides embarqués + signatures »).
+ * `Non applicable` — jamais de valeur par défaut/périmée — n'apparaît QUE si
+ * Pesticides = NON : les champs dépendants (nom commercial, quantités, fûts)
+ * sont alors omis plutôt qu'affichés à `null`, cf. `buildPesticidesRows`.
+ */
+function buildReferencesAeriennesRows(draft: DraftProspection): DetailRow[] {
+  return [
+    { label: 'Société', value: draft.societe ?? '—' },
+    { label: 'Immatricule Aéronef', value: draft.immatricule_aeronef ?? '—' },
+    { label: 'Pilote', value: draft.pilote ?? '—' },
+    { label: 'Mécanicien', value: draft.mecanicien ?? '—' },
+    { label: 'Chef de base', value: draft.chef_de_base ?? '—' },
+    { label: 'Base', value: draft.base ?? '—' },
+    { label: 'Base secondaire', value: draft.base_secondaire ?? '—' },
+  ];
+}
+
+function typeOperationLabel(value: string): string {
+  return TYPE_OPERATION_OPTIONS.find((o) => o.value === value)?.label ?? value;
+}
+
+function buildOperationRows(op: OperationAerienneRow): DetailRow[] {
+  return [
+    { label: 'Type', value: typeOperationLabel(op.type_operation) },
+    // Uniquement pour Divers — jamais affiché pour Convoyage/Prospection.
+    ...(op.type_operation === 'divers' ? [{ label: 'Motif', value: op.motif_divers || '—' }] : []),
+    { label: 'Début — Heure', value: op.debut_heure || '—' },
+    { label: 'Début — Température', value: op.debut_temperature_c != null ? `${op.debut_temperature_c} °C` : '—' },
+    { label: 'Début — Vent', value: op.debut_vent_ms != null ? `${op.debut_vent_ms} m/s` : '—' },
+    { label: 'Fin — Heure', value: op.fin_heure || '—' },
+    { label: 'Fin — Température', value: op.fin_temperature_c != null ? `${op.fin_temperature_c} °C` : '—' },
+    { label: 'Fin — Vent', value: op.fin_vent_ms != null ? `${op.fin_vent_ms} m/s` : '—' },
+    { label: 'Total heure de vol', value: formatDuree(op.duree_minutes) },
+  ];
+}
+
+/** `NON` (ou jamais renseigné) → une seule ligne, les champs dépendants ne sont
+ * ni affichés à vide ni à une valeur périmée : ils sont absents du tableau. */
+function buildPesticidesRows(draft: DraftProspection): DetailRow[] {
+  const embarques = normalizeBoolean(draft.pesticides_embarques);
+  if (embarques !== true) {
+    return [{ label: 'Pesticides embarqués', value: embarques === false ? 'NON' : '—' }];
+  }
+  return [
+    { label: 'Pesticides embarqués', value: 'OUI' },
+    { label: 'Nom commercial', value: draft.pesticide_nom_commercial ?? '—' },
+    { label: 'Quantité disponible', value: draft.pesticide_quantite_disponible != null ? `${draft.pesticide_quantite_disponible} L` : '—' },
+    { label: 'Quantité reçue', value: draft.pesticide_quantite_recue != null ? `${draft.pesticide_quantite_recue} L` : '—' },
+    { label: 'Fûts — Disponible', value: draft.futs_disponible != null ? String(draft.futs_disponible) : '—' },
+    { label: 'Fûts — Pleins', value: draft.futs_pleins != null ? String(draft.futs_pleins) : '—' },
+    { label: 'Fûts — Vides', value: draft.futs_vides != null ? String(draft.futs_vides) : '—' },
+    { label: 'Fûts — Reçues', value: draft.futs_recues != null ? String(draft.futs_recues) : '—' },
+  ];
+}
+
+function buildSignaturesRows(draft: DraftProspection): DetailRow[] {
+  const roles: [string, string | null, string | null][] = [
+    ['VISA', draft.signature_visa_nom, draft.signature_visa_horodatage],
+    ['Consultant FAO', draft.signature_consultant_fao_nom, draft.signature_consultant_fao_horodatage],
+    ['Pilote', draft.signature_pilote_nom, draft.signature_pilote_horodatage],
+    ['Chef de Base', draft.signature_chef_base_nom, draft.signature_chef_base_horodatage],
+  ];
+  return roles.map(([label, nom, horodatage]) => ({
+    label,
+    value: nom ? `${nom} — ${formatHeureLocale(horodatage)}` : '—',
+  }));
+}
+
 function DetailRows({ rows }: { rows: DetailRow[] }) {
   return (
     <>
@@ -143,7 +228,10 @@ export default function ExtensiveRecapScreen() {
   const resetWizard = useProspectionWizardStore((s) => s.reset);
   const { run, isRunning: isSaving } = useAsyncAction();
   const [populations, setPopulations] = useState<PopulationRow[]>([]);
+  const [operationsAeriennes, setOperationsAeriennes] = useState<OperationAerienneRow[]>([]);
   const signalerChargement = useSignalerChargement('extensive-recap');
+  // Terrestre implicite (NULL) — même garde que sur les autres écrans du mode aérien.
+  const isAerien = draft?.mode_extensif === 'aerien';
 
   useEffect(() => {
     if (!draft) return;
@@ -151,6 +239,18 @@ export default function ExtensiveRecapScreen() {
       .then(setPopulations)
       .catch((error) => signalerChargement(error, { draftId: draft.id }));
   }, [draft?.id, signalerChargement]);
+
+  useEffect(() => {
+    if (!draft || !isAerien) return;
+    void listOperationsAeriennes(draft.id)
+      .then(setOperationsAeriennes)
+      .catch((error) => signalerChargement(error, { draftId: draft.id }));
+  }, [draft, isAerien, signalerChargement]);
+
+  const totalJourMinutes = useMemo(
+    () => operationsAeriennes.reduce((sum, op) => sum + op.duree_minutes, 0),
+    [operationsAeriennes]
+  );
 
   const totals = useMemo(() => {
     const findRow = (espece: 'LMC' | 'NSE', categorie: 'imago' | 'larve') =>
@@ -310,6 +410,7 @@ export default function ExtensiveRecapScreen() {
                 </Text>
                 <Text style={styles.detailLine}>Dernière pluie : {draft.derniere_pluie ?? '—'}</Text>
                 <Text style={styles.detailLine}>Intensité pluie : {draft.intensite_pluie ?? '—'}</Text>
+                <Text style={styles.detailLine}>Remarques : {draft.observations || '—'}</Text>
               </View>
 
               <Text style={styles.conclusionLabel}>Conclusion de la vérification</Text>
@@ -448,7 +549,45 @@ export default function ExtensiveRecapScreen() {
               </Text>
               <Text style={styles.detailLine}>Dernière pluie : {draft.derniere_pluie ?? '—'}</Text>
               <Text style={styles.detailLine}>Intensité pluie : {draft.intensite_pluie ?? '—'}</Text>
+              <Text style={styles.detailLine}>Remarques : {draft.observations || '—'}</Text>
             </View>
+
+            {isAerien && (
+              <>
+                <View style={styles.checkRow}>
+                  <View style={styles.checkBadge}>
+                    <Text style={styles.checkBadgeText}>✓</Text>
+                  </View>
+                  <Text style={styles.checkLabel}>E · Aérien</Text>
+                </View>
+                <View style={styles.detailCard}>
+                  <Text style={styles.detailSubtitle}>Références aériennes</Text>
+                  <DetailRows rows={buildReferencesAeriennesRows(draft)} />
+
+                  <Text style={[styles.detailSubtitle, { marginTop: 8 }]}>Opérations</Text>
+                  {operationsAeriennes.length === 0 ? (
+                    <Text style={styles.detailLine}>Aucune opération enregistrée.</Text>
+                  ) : (
+                    operationsAeriennes.map((op, index) => (
+                      <View key={index} style={index > 0 ? { marginTop: 8 } : undefined}>
+                        <Text style={styles.detailLine}>Opération {index + 1}</Text>
+                        <DetailRows rows={buildOperationRows(op)} />
+                      </View>
+                    ))
+                  )}
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.detailRowLabel, { fontWeight: '700' }]}>Total jour</Text>
+                    <Text style={styles.detailRowValue}>{formatDuree(totalJourMinutes)}</Text>
+                  </View>
+
+                  <Text style={[styles.detailSubtitle, { marginTop: 8 }]}>Pesticides embarqués</Text>
+                  <DetailRows rows={buildPesticidesRows(draft)} />
+
+                  <Text style={[styles.detailSubtitle, { marginTop: 8 }]}>Signatures</Text>
+                  <DetailRows rows={buildSignaturesRows(draft)} />
+                </View>
+              </>
+            )}
 
             <View style={styles.offlineBanner}>
               <Text style={styles.offlineText}>☁︎ Pas de réseau ici — la fiche part en file de synchronisation.</Text>
