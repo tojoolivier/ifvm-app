@@ -44,6 +44,17 @@ class PosteAcridienUpdate(BaseModel):
     actif: bool | None = None
 
 
+class CommuneRead(BaseModel):
+    """Sélecteur du formulaire de station : `station_fixe.commune_id` est NOT NULL,
+    l'UI a besoin de la liste pour le renseigner."""
+
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    nom: str
+    district: str
+    region: str
+
+
 class StationFixeRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
@@ -55,11 +66,41 @@ class StationFixeRead(BaseModel):
     latitude: float
     longitude: float
     altitude: float | None
+    # FK écrite, en plus des libellés joints : le panneau « Modifier » doit pouvoir
+    # présélectionner la commune courante.
+    commune_id: uuid.UUID
     commune: str
     district: str
     region: str
     actif: bool
     created_at: datetime
+    updated_at: datetime
+
+
+class StationFixeCreate(BaseModel):
+    """Bornes reprises du domaine géographique : un 422 lisible plutôt qu'une station
+    posée au large de Madagascar."""
+
+    code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    pa_id: uuid.UUID
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+    altitude: float | None = None
+    commune_id: uuid.UUID
+
+
+class StationFixeUpdate(BaseModel):
+    """Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie."""
+
+    code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
+    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
+    pa_id: uuid.UUID | None = None
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    altitude: float | None = None
+    commune_id: uuid.UUID | None = None
+    actif: bool | None = None
 
 
 class ZoneAntiAcridienSyncRead(BaseModel):
@@ -109,11 +150,42 @@ class UtilisateurEquipeSyncRead(BaseModel):
     updated_at: datetime
 
 
+class PesticideRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    code: str
+    nom: str
+    matiere_active: str | None
+    dose_reference: str | None
+    actif: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class PesticideCreate(BaseModel):
+    code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    matiere_active: str | None = None
+    dose_reference: str | None = None
+
+
+class PesticideUpdate(BaseModel):
+    """Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie."""
+
+    code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
+    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
+    matiere_active: str | None = None
+    dose_reference: str | None = None
+    actif: bool | None = None
+
+
 class PesticideSyncRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     code: str
     nom: str
+    matiere_active: str | None
+    dose_reference: str | None
     actif: bool
     updated_at: datetime
 

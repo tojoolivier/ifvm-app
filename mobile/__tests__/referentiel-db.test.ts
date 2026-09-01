@@ -83,21 +83,37 @@ describe('referentiel-db', () => {
 });
 
 describe('listPesticides', () => {
-  it('lists active pesticides ordered by name, without a matière active column', async () => {
+  it('lists active pesticides ordered by name, matière active et dose de référence comprises', async () => {
     // getDb() runs its own PRAGMA table_info(...) migration queries against the same
     // mocked getAllAsync — match on SQL content rather than call order.
     getAllAsync.mockImplementation((sql: string) =>
       sql.includes('FROM pesticide')
-        ? Promise.resolve([{ id: 'p-1', code: 'DELTA', nom: 'Deltaméthrine' }])
+        ? Promise.resolve([
+            {
+              id: 'p-1',
+              code: 'DELTA',
+              nom: 'Deltaméthrine',
+              matiere_active: 'Deltaméthrine',
+              dose_reference: '0.5 l/ha',
+            },
+          ])
         : Promise.resolve([])
     );
 
     const result = await listPesticides();
 
     expect(getAllAsync).toHaveBeenCalledWith(
-      'SELECT id, code, nom FROM pesticide WHERE actif = 1 ORDER BY nom'
+      'SELECT id, code, nom, matiere_active, dose_reference FROM pesticide WHERE actif = 1 ORDER BY nom'
     );
-    expect(result).toEqual([{ id: 'p-1', code: 'DELTA', nom: 'Deltaméthrine' }]);
+    expect(result).toEqual([
+      {
+        id: 'p-1',
+        code: 'DELTA',
+        nom: 'Deltaméthrine',
+        matiere_active: 'Deltaméthrine',
+        dose_reference: '0.5 l/ha',
+      },
+    ]);
   });
 });
 

@@ -180,6 +180,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/communes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Communes */
+        get: operations["list_communes_communes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/stations": {
         parameters: {
             query?: never;
@@ -190,7 +207,8 @@ export interface paths {
         /** List Stations */
         get: operations["list_stations_stations_get"];
         put?: never;
-        post?: never;
+        /** Create Station */
+        post: operations["create_station_stations_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -206,7 +224,8 @@ export interface paths {
         };
         /** Get Station */
         get: operations["get_station_stations__station_id__get"];
-        put?: never;
+        /** Update Station */
+        put: operations["update_station_stations__station_id__put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -279,6 +298,42 @@ export interface paths {
         get: operations["get_culture_cultures__culture_id__get"];
         /** Update Culture */
         put: operations["update_culture_cultures__culture_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pesticides": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Pesticides */
+        get: operations["list_pesticides_pesticides_get"];
+        put?: never;
+        /** Create Pesticide */
+        post: operations["create_pesticide_pesticides_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pesticides/{pesticide_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Pesticide */
+        get: operations["get_pesticide_pesticides__pesticide_id__get"];
+        /** Update Pesticide */
+        put: operations["update_pesticide_pesticides__pesticide_id__put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -954,6 +1009,24 @@ export interface components {
             texte: string;
         };
         /**
+         * CommuneRead
+         * @description Sélecteur du formulaire de station : `station_fixe.commune_id` est NOT NULL,
+         *     l'UI a besoin de la liste pour le renseigner.
+         */
+        CommuneRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Nom */
+            nom: string;
+            /** District */
+            district: string;
+            /** Region */
+            region: string;
+        };
+        /**
          * ComportementInfestation
          * @enum {string}
          */
@@ -1504,6 +1577,45 @@ export interface components {
             /** Duree Minutes */
             duree_minutes: number;
         };
+        /** PesticideCreate */
+        PesticideCreate: {
+            /** Code */
+            code: string;
+            /** Nom */
+            nom: string;
+            /** Matiere Active */
+            matiere_active?: string | null;
+            /** Dose Reference */
+            dose_reference?: string | null;
+        };
+        /** PesticideRead */
+        PesticideRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Code */
+            code: string;
+            /** Nom */
+            nom: string;
+            /** Matiere Active */
+            matiere_active: string | null;
+            /** Dose Reference */
+            dose_reference: string | null;
+            /** Actif */
+            actif: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
         /** PesticideSyncRead */
         PesticideSyncRead: {
             /**
@@ -1515,6 +1627,10 @@ export interface components {
             code: string;
             /** Nom */
             nom: string;
+            /** Matiere Active */
+            matiere_active: string | null;
+            /** Dose Reference */
+            dose_reference: string | null;
             /** Actif */
             actif: boolean;
             /**
@@ -1522,6 +1638,22 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /**
+         * PesticideUpdate
+         * @description Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie.
+         */
+        PesticideUpdate: {
+            /** Code */
+            code?: string | null;
+            /** Nom */
+            nom?: string | null;
+            /** Matiere Active */
+            matiere_active?: string | null;
+            /** Dose Reference */
+            dose_reference?: string | null;
+            /** Actif */
+            actif?: boolean | null;
         };
         /**
          * PhaseAcridienne
@@ -2363,12 +2495,39 @@ export interface components {
          * StadeDominant
          * @enum {string}
          */
-        StadeDominant: "l1_l3" | "l1_l2" | "l2_l3" | "l3_l4" | "l4_l5" | "l5_l6" | "l6_l7";
+        StadeDominant: "l1_l3" | "l4_l5";
         /**
          * StadeImago
          * @enum {string}
          */
         StadeImago: "A1" | "A2" | "A3" | "A4" | "A5";
+        /**
+         * StationFixeCreate
+         * @description Bornes reprises du domaine géographique : un 422 lisible plutôt qu'une station
+         *     posée au large de Madagascar.
+         */
+        StationFixeCreate: {
+            /** Code */
+            code: string;
+            /** Nom */
+            nom: string;
+            /**
+             * Pa Id
+             * Format: uuid
+             */
+            pa_id: string;
+            /** Latitude */
+            latitude: number;
+            /** Longitude */
+            longitude: number;
+            /** Altitude */
+            altitude?: number | null;
+            /**
+             * Commune Id
+             * Format: uuid
+             */
+            commune_id: string;
+        };
         /** StationFixeRead */
         StationFixeRead: {
             /**
@@ -2395,6 +2554,11 @@ export interface components {
             longitude: number;
             /** Altitude */
             altitude: number | null;
+            /**
+             * Commune Id
+             * Format: uuid
+             */
+            commune_id: string;
             /** Commune */
             commune: string;
             /** District */
@@ -2408,6 +2572,11 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** StationFixeSyncRead */
         StationFixeSyncRead: {
@@ -2444,6 +2613,28 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /**
+         * StationFixeUpdate
+         * @description Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie.
+         */
+        StationFixeUpdate: {
+            /** Code */
+            code?: string | null;
+            /** Nom */
+            nom?: string | null;
+            /** Pa Id */
+            pa_id?: string | null;
+            /** Latitude */
+            latitude?: number | null;
+            /** Longitude */
+            longitude?: number | null;
+            /** Altitude */
+            altitude?: number | null;
+            /** Commune Id */
+            commune_id?: string | null;
+            /** Actif */
+            actif?: boolean | null;
         };
         /** StatutChange */
         StatutChange: {
@@ -2551,29 +2742,29 @@ export interface components {
             altitude?: number | null;
             /**
              * Kit Combinaison
-             * @default false
+             * @default 0
              */
-            kit_combinaison: boolean;
+            kit_combinaison: number;
             /**
              * Kit Gants
-             * @default false
+             * @default 0
              */
-            kit_gants: boolean;
+            kit_gants: number;
             /**
              * Kit Lunettes
-             * @default false
+             * @default 0
              */
-            kit_lunettes: boolean;
+            kit_lunettes: number;
             /**
              * Kit Masques
-             * @default false
+             * @default 0
              */
-            kit_masques: boolean;
+            kit_masques: number;
             /**
-             * Kit Boite
-             * @default false
+             * Kit Botte
+             * @default 0
              */
-            kit_boite: boolean;
+            kit_botte: number;
             /** Zones Exposees */
             zones_exposees?: {
                 [key: string]: unknown;
@@ -2661,15 +2852,15 @@ export interface components {
             /** Altitude */
             altitude: number | null;
             /** Kit Combinaison */
-            kit_combinaison: boolean;
+            kit_combinaison: number;
             /** Kit Gants */
-            kit_gants: boolean;
+            kit_gants: number;
             /** Kit Lunettes */
-            kit_lunettes: boolean;
+            kit_lunettes: number;
             /** Kit Masques */
-            kit_masques: boolean;
-            /** Kit Boite */
-            kit_boite: boolean;
+            kit_masques: number;
+            /** Kit Botte */
+            kit_botte: number;
             /** Zones Exposees */
             zones_exposees: {
                 [key: string]: unknown;
@@ -2767,29 +2958,29 @@ export interface components {
             altitude?: number | null;
             /**
              * Kit Combinaison
-             * @default false
+             * @default 0
              */
-            kit_combinaison: boolean;
+            kit_combinaison: number;
             /**
              * Kit Gants
-             * @default false
+             * @default 0
              */
-            kit_gants: boolean;
+            kit_gants: number;
             /**
              * Kit Lunettes
-             * @default false
+             * @default 0
              */
-            kit_lunettes: boolean;
+            kit_lunettes: number;
             /**
              * Kit Masques
-             * @default false
+             * @default 0
              */
-            kit_masques: boolean;
+            kit_masques: number;
             /**
-             * Kit Boite
-             * @default false
+             * Kit Botte
+             * @default 0
              */
-            kit_boite: boolean;
+            kit_botte: number;
             /** Zones Exposees */
             zones_exposees?: {
                 [key: string]: unknown;
@@ -2959,9 +3150,6 @@ export interface components {
         TypeCible: "tache_larvaire" | "bande_larvaire" | "vol_clair" | "dense" | "tres_dense";
         /**
          * TypeCibleImago
-         * @description `prospection_population.type_cible` (extensif, par espèce) : l'extensif n'a pas
-         *     d'écran Infestation séparé — sous-ensemble de TypeCible pertinent pour un imago
-         *     (pas tache_larvaire/bande_larvaire, réservées aux larves).
          * @enum {string}
          */
         TypeCibleImago: "vol_clair" | "dense" | "tres_dense";
@@ -3674,6 +3862,26 @@ export interface operations {
             };
         };
     };
+    list_communes_communes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommuneRead"][];
+                };
+            };
+        };
+    };
     list_stations_stations_get: {
         parameters: {
             query?: {
@@ -3709,6 +3917,39 @@ export interface operations {
             };
         };
     };
+    create_station_stations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StationFixeCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationFixeRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_station_stations__station_id__get: {
         parameters: {
             query?: never;
@@ -3719,6 +3960,41 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationFixeRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_station_stations__station_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                station_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StationFixeUpdate"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -3991,6 +4267,138 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CultureRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_pesticides_pesticides_get: {
+        parameters: {
+            query?: {
+                actif?: boolean;
+                /** @description Renvoie les pesticides des deux états — écran d'administration. */
+                inclure_inactifs?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PesticideRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_pesticide_pesticides_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PesticideCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PesticideRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_pesticide_pesticides__pesticide_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pesticide_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PesticideRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_pesticide_pesticides__pesticide_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pesticide_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PesticideUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PesticideRead"];
                 };
             };
             /** @description Validation Error */

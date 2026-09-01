@@ -59,6 +59,10 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
   await ajouterColonnesManquantes(db, 'prospection_infestation', COLONNES_INFESTATION);
   await ajouterColonnesManquantes(db, 'prospection_population', COLONNES_POPULATION);
   await ajouterColonnesManquantes(db, 'prospection_operation_aerienne', COLONNES_OPERATION_AERIENNE);
+  // Renommage avant l'ajout de colonnes : sinon une installation existante se
+  // retrouverait avec `kit_boite` (ancien, déjà rempli) ET un `kit_botte` vide
+  // ajouté à côté, au lieu de reprendre les valeurs déjà saisies.
+  await renommerColonneSiPresente(db, 'traitement', 'kit_boite', 'kit_botte');
   await ajouterColonnesManquantes(db, 'traitement', COLONNES_TRAITEMENT);
   await ajouterColonnesManquantes(db, 'rotation', COLONNES_ROTATION);
 
@@ -311,7 +315,7 @@ async function creerTables(db: SQLite.SQLiteDatabase): Promise<void> {
       kit_gants INTEGER,
       kit_lunettes INTEGER,
       kit_masques INTEGER,
-      kit_boite INTEGER,
+      kit_botte INTEGER,
       zones_exposees TEXT,
       hauteur_strate_herbeuse_m REAL,
       hauteur_strate_arboree_m REAL,
@@ -492,6 +496,49 @@ async function ajouterColonnesManquantes(
       colonnes: manquantes.map((col) => col.name),
     });
   }
+}
+
+/**
+ * Renomme une colonne existante — distinct de `ajouterColonnesManquantes` (qui
+ * n'ajoute jamais que des colonnes absentes). Sert aux renommages métier ponctuels
+ * (ex. `kit_boite` -> `kit_botte`) : sans ça, une installation déjà en place
+ * perdrait silencieusement les valeurs déjà saisies sous l'ancien nom — un simple
+ * ajout créerait une colonne vide à côté, sans reprendre les données.
+ *
+ * Sans effet si l'ancien nom est déjà absent (installation neuve : la table est
+ * créée directement avec le nouveau nom) ou si le nouveau nom existe déjà
+ * (migration déjà jouée).
+ */
+async function renommerColonneSiPresente(
+  db: SQLite.SQLiteDatabase,
+  table: string,
+  ancienNom: string,
+  nouveauNom: string
+): Promise<void> {
+  let existantes: string[];
+
+  try {
+    const info = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
+    existantes = info.map((row) => row.name);
+  } catch (error) {
+    throw new LocalWriteError(
+      `Schéma de la table ${table} illisible — migration impossible`,
+      { cause: error }
+    );
+  }
+
+  if (!existantes.includes(ancienNom) || existantes.includes(nouveauNom)) return;
+
+  try {
+    await db.execAsync(`ALTER TABLE ${table} RENAME COLUMN ${ancienNom} TO ${nouveauNom};`);
+  } catch (error) {
+    throw new LocalWriteError(
+      `Colonne ${table}.${ancienNom} impossible à renommer en ${nouveauNom} — la base est inutilisable en l’état`,
+      { cause: error }
+    );
+  }
+
+  log.event('db.migration.colonne-renommee', { table, ancienNom, nouveauNom });
 }
 
 // ==========================================

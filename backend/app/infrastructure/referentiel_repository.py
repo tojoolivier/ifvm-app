@@ -4,8 +4,9 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.referentiel import PosteAcridien, StationFixe, ZoneAntiAcridien
+from app.domain.referentiel import Commune, PosteAcridien, StationFixe, ZoneAntiAcridien
 from app.domain.repositories import (
+    CommuneRepository,
     PosteAcridienRepository,
     StationFixeRepository,
     ZoneAntiAcridienRepository,
@@ -188,6 +189,7 @@ class StationFixeRepositoryImpl(StationFixeRepository):
             latitude=float(model.latitude),
             longitude=float(model.longitude),
             altitude=float(model.altitude) if model.altitude is not None else None,
+            commune_id=model.commune_id,
             commune=row.commune_nom,
             district=row.district_nom,
             region=row.region_nom,
@@ -238,6 +240,48 @@ class StationFixeRepositoryImpl(StationFixeRepository):
         )
         return result.scalar_one_or_none() is not None
 
+    async def code_pris_par_un_autre(self, code: str, exclude_id: uuid.UUID | None = None) -> bool:
+        stmt = select(StationFixeModel.id).where(StationFixeModel.code == code)
+        if exclude_id is not None:
+            stmt = stmt.where(StationFixeModel.id != exclude_id)
+        result = await self.session.execute(stmt)
+        return result.first() is not None
+
+    async def create(self, station: StationFixe) -> StationFixe:
+        model = StationFixeModel(
+            id=station.id,
+            code=station.code,
+            nom=station.nom,
+            pa_id=station.pa_id,
+            latitude=station.latitude,
+            longitude=station.longitude,
+            altitude=station.altitude,
+            commune_id=station.commune_id,
+            actif=station.actif,
+            created_at=station.created_at,
+            updated_at=station.updated_at,
+        )
+        self.session.add(model)
+        await self.session.commit()
+        return await self._relire(model.id)
+
+    async def update(self, station: StationFixe) -> StationFixe:
+        result = await self.session.execute(
+            select(StationFixeModel).where(StationFixeModel.id == station.id)
+        )
+        model = result.scalar_one()
+        model.code = station.code
+        model.nom = station.nom
+        model.pa_id = station.pa_id
+        model.latitude = station.latitude
+        model.longitude = station.longitude
+        model.altitude = station.altitude
+        model.commune_id = station.commune_id
+        model.actif = station.actif
+        model.updated_at = station.updated_at
+        await self.session.commit()
+        return await self._relire(model.id)
+
     async def list_since(self, since: datetime | None) -> list[StationFixe]:
         stmt = self._select_with_geo().order_by(StationFixeModel.code)
         if since is not None:
@@ -245,3 +289,39 @@ class StationFixeRepositoryImpl(StationFixeRepository):
 
         result = await self.session.execute(stmt)
         return [self._to_domain(row) for row in result.all()]
+
+    async def _relire(self, station_id: uuid.UUID) -> StationFixe:
+        """Une écriture ne renvoie jamais l'entité écrite telle quelle : `pa_code`,
+        `commune`, `district` et `region` sont des jointures, absentes du modèle ORM."""
+        station = await self.get_by_id(station_id)
+        if station is None:  # pragma: no cover — on vient de l'écrire dans cette session
+            raise RuntimeError(f"Station {station_id} introuvable juste après écriture")
+        return station
+
+
+class CommuneRepositoryImpl(CommuneRepository):
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def list_all(self) -> list[Commune]:
+        result = await self.session.execute(
+            select(
+                CommuneModel.id,
+                CommuneModel.nom,
+                DistrictModel.nom.label("district_nom"),
+                RegionModel.nom.label("region_nom"),
+            )
+            .join(DistrictModel, CommuneModel.district_id == DistrictModel.id)
+            .join(RegionModel, DistrictModel.region_id == RegionModel.id)
+            .order_by(RegionModel.nom, DistrictModel.nom, CommuneModel.nom)
+        )
+        return [
+            Commune(id=row.id, nom=row.nom, district=row.district_nom, region=row.region_nom)
+            for row in result.all()
+        ]
+
+    async def exists(self, commune_id: uuid.UUID) -> bool:
+        result = await self.session.execute(
+            select(CommuneModel.id).where(CommuneModel.id == commune_id)
+        )
+        return result.scalar_one_or_none() is not None

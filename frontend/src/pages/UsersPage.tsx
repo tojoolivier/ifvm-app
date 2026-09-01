@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AxiosError } from 'axios'
 import { api } from '../api/client'
 import { Utilisateur } from '../types'
+import { useCurrentUser } from '../hooks/useCurrentUser'
 import { DataTable, DataTableColumn } from '../components/ui/data-table'
 import { Switch } from '../components/ui/switch'
 import { ErrorBanner } from '@/components/ui/error-banner'
@@ -57,6 +58,7 @@ interface UsersPageProps {
 
 export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
   const queryClient = useQueryClient()
+  const { data: currentUser } = useCurrentUser()
   const [nom, setNom] = useState('')
   const [prenom, setPrenom] = useState('')
   const [email, setEmail] = useState('')
@@ -154,10 +156,12 @@ export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
       render: (u) => (
         // La maquette dessine un badge ; le rôle reste modifiable, on garde donc
         // un `select` habillé aux couleurs du badge plutôt qu'un texte inerte.
+        // Exception : un admin ne peut pas changer son propre rôle (il se
+        // verrouillerait hors de l'administration) — le backend renvoie 403.
         <select
           value={u.role}
           aria-label={`Rôle de ${u.prenom} ${u.nom}`}
-          disabled={updateMutation.isPending}
+          disabled={updateMutation.isPending || u.id === currentUser?.id}
           onChange={(e) => updateMutation.mutate({ id: u.id, role: e.target.value })}
           className={cn(
             'inline-flex items-center rounded-full border px-[9px] py-[3px] font-sans text-[10px] font-bold disabled:opacity-50',
@@ -204,7 +208,7 @@ export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
       render: (u) => (
         <Switch
           checked={u.actif}
-          disabled={updateMutation.isPending}
+          disabled={updateMutation.isPending || u.id === currentUser?.id}
           onCheckedChange={(checked) => updateMutation.mutate({ id: u.id, actif: checked })}
         />
       ),

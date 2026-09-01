@@ -122,7 +122,7 @@ class TraitementRepositoryImpl(TraitementRepository):
             kit_gants=traitement.kit_gants,
             kit_lunettes=traitement.kit_lunettes,
             kit_masques=traitement.kit_masques,
-            kit_boite=traitement.kit_boite,
+            kit_botte=traitement.kit_botte,
             zones_exposees=traitement.zones_exposees,
             hauteur_strate_herbeuse_m=traitement.hauteur_strate_herbeuse_m,
             hauteur_strate_arboree_m=traitement.hauteur_strate_arboree_m,
@@ -343,7 +343,7 @@ class TraitementRepositoryImpl(TraitementRepository):
         model.kit_gants = traitement.kit_gants
         model.kit_lunettes = traitement.kit_lunettes
         model.kit_masques = traitement.kit_masques
-        model.kit_boite = traitement.kit_boite
+        model.kit_botte = traitement.kit_botte
         model.zones_exposees = traitement.zones_exposees
         model.hauteur_strate_herbeuse_m = traitement.hauteur_strate_herbeuse_m
         model.hauteur_strate_arboree_m = traitement.hauteur_strate_arboree_m
@@ -465,7 +465,7 @@ class TraitementRepositoryImpl(TraitementRepository):
             kit_gants=model.kit_gants,
             kit_lunettes=model.kit_lunettes,
             kit_masques=model.kit_masques,
-            kit_boite=model.kit_boite,
+            kit_botte=model.kit_botte,
             zones_exposees=model.zones_exposees,
             hauteur_strate_herbeuse_m=float(model.hauteur_strate_herbeuse_m)
             if model.hauteur_strate_herbeuse_m is not None

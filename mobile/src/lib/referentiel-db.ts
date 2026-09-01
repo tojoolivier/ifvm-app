@@ -150,12 +150,16 @@ export interface Pesticide {
   id: string;
   code: string;
   nom: string;
+  matiere_active: string | null;
+  dose_reference: string | null;
 }
 
 /** Pesticides actifs, triés par nom — alimente les chips "Produit" des rotations/produits utilisés. */
 export async function listPesticides(): Promise<Pesticide[]> {
   const db = await getReferentielDb();
-  return db.getAllAsync<Pesticide>('SELECT id, code, nom FROM pesticide WHERE actif = 1 ORDER BY nom');
+  return db.getAllAsync<Pesticide>(
+    'SELECT id, code, nom, matiere_active, dose_reference FROM pesticide WHERE actif = 1 ORDER BY nom'
+  );
 }
 
 export interface UtilisateurEquipe {
@@ -263,6 +267,8 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
       id TEXT PRIMARY KEY NOT NULL,
       code TEXT NOT NULL,
       nom TEXT NOT NULL,
+      matiere_active TEXT,
+      dose_reference TEXT,
       actif INTEGER NOT NULL DEFAULT 1,
       updated_at TEXT NOT NULL
     );
@@ -312,6 +318,10 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
     { name: 'commune', type: 'TEXT' },
     { name: 'district', type: 'TEXT' },
     { name: 'region', type: 'TEXT' },
+  ]);
+  await addColumnsIfMissing(db, 'pesticide', [
+    { name: 'matiere_active', type: 'TEXT' },
+    { name: 'dose_reference', type: 'TEXT' },
   ]);
   await migrateCodeStade(db);
 }
