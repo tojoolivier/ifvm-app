@@ -219,8 +219,8 @@ const ENTITES: EntitySpec[] = [
       fields: [
         { name: 'code', label: 'Code', kind: 'text', mono: true, required: true },
         { name: 'nom', label: 'Nom commercial', kind: 'text', required: true },
-        { name: 'matiere_active', label: 'Matière active', kind: 'text' },
-        { name: 'dose_reference', label: 'Dose de référence', kind: 'text' },
+        { name: 'matiere_active', label: 'Matière active', kind: 'text', nullable: true },
+        { name: 'dose_reference', label: 'Dose de référence', kind: 'text', nullable: true },
       ],
     },
   },
