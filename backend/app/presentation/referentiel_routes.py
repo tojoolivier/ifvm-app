@@ -8,15 +8,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application.referentiel_use_cases import (
     CreateCodeStade,
     CreateCulture,
+    CreatePesticide,
     CreatePosteAcridien,
     CreateStation,
     GetCodeStade,
     GetCulture,
+    GetPesticide,
     GetPosteAcridien,
     GetStation,
     ListCodesStades,
     ListCommunes,
     ListCultures,
+    ListPesticides,
     ListPostesAcridiens,
     ListStations,
     ListZonesAntiAcridiennes,
@@ -24,6 +27,7 @@ from app.application.referentiel_use_cases import (
     ReferentielSinceCursors,
     UpdateCodeStade,
     UpdateCulture,
+    UpdatePesticide,
     UpdatePosteAcridien,
     UpdateStation,
 )
@@ -62,6 +66,9 @@ from app.presentation.referentiel_schemas import (
     CultureRead,
     CultureUpdate,
     EntityPull,
+    PesticideCreate,
+    PesticideRead,
+    PesticideUpdate,
     PosteAcridienCreate,
     PosteAcridienRead,
     PosteAcridienUpdate,
@@ -477,6 +484,89 @@ async def update_culture(
     if culture is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Culture non trouvée")
     return culture
+
+
+# --- pesticide -------------------------------------------------------------------
+#
+# Aucune route DELETE, volontairement : `GET /referentiel/pull` ne transporte que des
+# upserts, une suppression physique resterait indéfiniment sur les téléphones déjà
+# synchronisés. La sortie de service passe par `actif=false` (issue #129).
+
+
+@router.get("/pesticides", response_model=list[PesticideRead])
+async def list_pesticides(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+    actif: bool = Query(default=True),
+    inclure_inactifs: bool = Query(
+        default=False,
+        description="Renvoie les pesticides des deux états — écran d'administration.",
+    ),
+):
+    use_case = ListPesticides(PesticideRepositoryImpl(db))
+    return await use_case.execute(actif=None if inclure_inactifs else actif)
+
+
+@router.post("/pesticides", response_model=PesticideRead, status_code=201)
+async def create_pesticide(
+    body: PesticideCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = CreatePesticide(PesticideRepositoryImpl(db))
+    try:
+        return await use_case.execute(
+            code=body.code,
+            nom=body.nom,
+            matiere_active=body.matiere_active,
+            dose_reference=body.dose_reference,
+        )
+    except CodeReferentielDejaPrisError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Le code « {body.code} » est déjà utilisé par un autre pesticide",
+        ) from exc
+
+
+@router.get("/pesticides/{pesticide_id}", response_model=PesticideRead)
+async def get_pesticide(
+    pesticide_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = GetPesticide(PesticideRepositoryImpl(db))
+    pesticide = await use_case.execute(pesticide_id)
+    if pesticide is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pesticide non trouvé")
+    return pesticide
+
+
+@router.put("/pesticides/{pesticide_id}", response_model=PesticideRead)
+async def update_pesticide(
+    pesticide_id: uuid.UUID,
+    body: PesticideUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = UpdatePesticide(PesticideRepositoryImpl(db))
+    try:
+        pesticide = await use_case.execute(
+            pesticide_id=pesticide_id,
+            code=body.code,
+            nom=body.nom,
+            matiere_active=body.matiere_active,
+            dose_reference=body.dose_reference,
+            actif=body.actif,
+        )
+    except CodeReferentielDejaPrisError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Le code « {body.code} » est déjà utilisé par un autre pesticide",
+        ) from exc
+
+    if pesticide is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pesticide non trouvé")
+    return pesticide
 
 
 @router.get("/referentiel/pull", response_model=ReferentielPullResponse)

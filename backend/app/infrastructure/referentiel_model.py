@@ -110,6 +110,8 @@ class PesticideModel(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     code: Mapped[str] = mapped_column(Text(), nullable=False, unique=True)
     nom: Mapped[str] = mapped_column(Text(), nullable=False)
+    matiere_active: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    dose_reference: Mapped[str | None] = mapped_column(Text(), nullable=True)
     actif: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)

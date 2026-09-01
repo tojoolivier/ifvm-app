@@ -58,10 +58,71 @@ class PesticideRepositoryImpl(PesticideRepository):
         if since is not None:
             stmt = stmt.where(PesticideModel.updated_at > since)
         result = await self.session.execute(stmt)
-        return [
-            Pesticide(id=m.id, code=m.code, nom=m.nom, actif=m.actif, updated_at=m.updated_at)
-            for m in result.scalars().all()
-        ]
+        return [self._to_domain(m) for m in result.scalars().all()]
+
+    async def list_all(self, actif: bool | None = True) -> list[Pesticide]:
+        stmt = select(PesticideModel).order_by(PesticideModel.code)
+        if actif is not None:
+            stmt = stmt.where(PesticideModel.actif == actif)
+        result = await self.session.execute(stmt)
+        return [self._to_domain(m) for m in result.scalars().all()]
+
+    async def code_pris_par_un_autre(self, code: str, exclude_id: uuid.UUID | None = None) -> bool:
+        stmt = select(PesticideModel.id).where(PesticideModel.code == code)
+        if exclude_id is not None:
+            stmt = stmt.where(PesticideModel.id != exclude_id)
+        result = await self.session.execute(stmt)
+        return result.first() is not None
+
+    async def get_by_id(self, pesticide_id: uuid.UUID) -> Pesticide | None:
+        result = await self.session.execute(
+            select(PesticideModel).where(PesticideModel.id == pesticide_id)
+        )
+        model = result.scalar_one_or_none()
+        return None if model is None else self._to_domain(model)
+
+    async def create(self, pesticide: Pesticide) -> Pesticide:
+        model = PesticideModel(
+            id=pesticide.id,
+            code=pesticide.code,
+            nom=pesticide.nom,
+            matiere_active=pesticide.matiere_active,
+            dose_reference=pesticide.dose_reference,
+            actif=pesticide.actif,
+            created_at=pesticide.created_at,
+            updated_at=pesticide.updated_at,
+        )
+        self.session.add(model)
+        await self.session.commit()
+        await self.session.refresh(model)
+        return self._to_domain(model)
+
+    async def update(self, pesticide: Pesticide) -> Pesticide:
+        result = await self.session.execute(
+            select(PesticideModel).where(PesticideModel.id == pesticide.id)
+        )
+        model = result.scalar_one()
+        model.code = pesticide.code
+        model.nom = pesticide.nom
+        model.matiere_active = pesticide.matiere_active
+        model.dose_reference = pesticide.dose_reference
+        model.actif = pesticide.actif
+        model.updated_at = pesticide.updated_at
+        await self.session.commit()
+        await self.session.refresh(model)
+        return self._to_domain(model)
+
+    def _to_domain(self, model: PesticideModel) -> Pesticide:
+        return Pesticide(
+            id=model.id,
+            code=model.code,
+            nom=model.nom,
+            matiere_active=model.matiere_active,
+            dose_reference=model.dose_reference,
+            actif=model.actif,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+        )
 
 
 class CultureRepositoryImpl(CultureRepository):
