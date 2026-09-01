@@ -17,7 +17,16 @@ jest.mock('expo-router', () =>
 
 jest.mock('@/lib/prospection-repository', () => ({
   listAllProspectionPopulations: jest.fn().mockResolvedValue([]),
+  listOperationsAeriennes: jest.fn().mockResolvedValue([]),
   concludeValidation: jest.fn(),
+  // Vraie implémentation (pas de mock utile ici) : `buildPesticidesRows` en dépend
+  // pour normaliser `pesticides_embarques` (0/1/null en SQLite).
+  normalizeBoolean: (value: unknown) => {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value !== 0;
+    return null;
+  },
 }));
 
 const DRAFT_BASE = {
@@ -167,5 +176,212 @@ describe('ExtensiveRecapScreen — récapitulatif complet (#227)', () => {
     // H STR HERB (#228) : affiché en mètres, non arrondi à l'entier (45 cm → 0.45 m).
     expect(screen.getByText(/H\. strate herbeuse : 0.45 m/)).toBeVisible();
     expect(screen.getByText(new RegExp(`Heure d.observation : ${HEURE_ATTENDUE}`))).toBeVisible();
+  });
+});
+
+/**
+ * Récapitulatif — mode aérien : pesticides embarqués + signatures (suite du mode
+ * aérien #regroupement-slides). Doit afficher TOUTES les données aériennes —
+ * Références équipe/aéronef, Opérations (avec Total heure de vol par opération et
+ * Total jour), Pesticides embarqués et Signatures — jamais une valeur inventée ou
+ * périmée quand Pesticides = NON (cf. `buildPesticidesRows`).
+ */
+describe('ExtensiveRecapScreen — mode aérien : pesticides embarqués + signatures', () => {
+  const DRAFT_AERIEN = {
+    ...DRAFT_BASE,
+    mode_extensif: 'aerien',
+    societe: 'Air Acridien',
+    immatricule_aeronef: '5R-ABC',
+    pilote: 'Jean Rakoto',
+    mecanicien: 'Marc Andria',
+    chef_de_base: 'Sarah Ravelo',
+    base: 'Tuléar',
+    base_secondaire: 'Ihosy',
+  };
+
+  beforeEach(() => {
+    jest.mocked(prospectionRepository.listAllProspectionPopulations).mockResolvedValue([]);
+    jest.mocked(prospectionRepository.listOperationsAeriennes).mockResolvedValue([
+      {
+        type_operation: 'prospection',
+        debut_heure: '08:00',
+        debut_temperature_c: 24,
+        debut_vent_ms: 3.2,
+        fin_heure: '10:30',
+        fin_temperature_c: 26,
+        fin_vent_ms: 4.1,
+        duree_minutes: 150,
+      },
+      {
+        type_operation: 'convoyage',
+        debut_heure: '23:00',
+        debut_temperature_c: null,
+        debut_vent_ms: null,
+        fin_heure: '01:15',
+        fin_temperature_c: null,
+        fin_vent_ms: null,
+        duree_minutes: 135,
+      },
+    ] as any);
+  });
+
+  it('une fiche terrestre ne montre aucun bloc « E · Aérien »', async () => {
+    useProspectionWizardStore.setState({ draft: { ...DRAFT_BASE, type_prospection: 'extensive' }, captures: [] });
+
+    await render(<ExtensiveRecapScreen />);
+    await screen.findByText(/Dégâts sur les cultures/);
+
+    expect(screen.queryByText('E · Aérien')).toBeNull();
+    expect(prospectionRepository.listOperationsAeriennes).not.toHaveBeenCalled();
+  });
+
+  it('Pesticides = NON : une seule ligne « NON », aucun champ dépendant affiché', async () => {
+    useProspectionWizardStore.setState({
+      draft: { ...DRAFT_AERIEN, type_prospection: 'extensive', pesticides_embarques: 0 },
+      captures: [],
+    });
+
+    await render(<ExtensiveRecapScreen />);
+    await screen.findByText('E · Aérien');
+
+    expect(screen.getAllByText('Pesticides embarqués').length).toBeGreaterThan(0);
+    expect(screen.getByText('NON')).toBeVisible();
+    expect(screen.queryByText('Nom commercial')).toBeNull();
+    expect(screen.queryByText(/Fûts —/)).toBeNull();
+  });
+
+  it('Pesticides = OUI : références, opérations (total jour inclus), pesticides et fûts sont tous affichés', async () => {
+    useProspectionWizardStore.setState({
+      draft: {
+        ...DRAFT_AERIEN,
+        type_prospection: 'extensive',
+        pesticides_embarques: 1,
+        pesticide_nom_commercial: 'Fyfanon ULV',
+        pesticide_quantite_disponible: 500,
+        pesticide_quantite_recue: 200,
+        futs_disponible: 10,
+        futs_pleins: 6,
+        futs_vides: 4,
+        futs_recues: 5,
+        signature_visa_nom: 'Rakoto V.',
+        signature_visa_horodatage: '2026-09-01T09:00:00.000Z',
+        signature_pilote_nom: 'Jean Rakoto',
+        signature_pilote_horodatage: '2026-09-01T09:10:00.000Z',
+      },
+      captures: [],
+    });
+
+    await render(<ExtensiveRecapScreen />);
+    await screen.findByText('E · Aérien');
+
+    // Références aériennes
+    expect(screen.getByText('Air Acridien')).toBeVisible();
+    expect(screen.getByText('5R-ABC')).toBeVisible();
+    expect(screen.getByText('Ihosy')).toBeVisible();
+
+    // Opérations + Total heure de vol par opération (150 min = 02:30, 135 min = 02:15,
+    // franchissement de minuit 23:00 → 01:15 inclus) + Total jour = 285 min = 04:45.
+    expect(screen.getByText('Opération 1')).toBeVisible();
+    expect(screen.getByText('Opération 2')).toBeVisible();
+    expect(screen.getAllByText('Total heure de vol')).toHaveLength(2);
+    expect(screen.getByText('02:30')).toBeVisible();
+    expect(screen.getByText('02:15')).toBeVisible();
+    expect(screen.getByText('Total jour')).toBeVisible();
+    expect(screen.getByText('04:45')).toBeVisible();
+
+    // Pesticides embarqués + fûts (valeurs de test 10/6/4/5 du prompt)
+    expect(screen.getByText('OUI')).toBeVisible();
+    expect(screen.getByText('Fyfanon ULV')).toBeVisible();
+    expect(screen.getByText('500 L')).toBeVisible();
+    expect(screen.getByText('200 L')).toBeVisible();
+    expect(screen.getByText('Fûts — Disponible')).toBeVisible();
+    expect(screen.getByText('10')).toBeVisible();
+    expect(screen.getByText('Fûts — Pleins')).toBeVisible();
+    expect(screen.getByText('6')).toBeVisible();
+    expect(screen.getByText('Fûts — Vides')).toBeVisible();
+    expect(screen.getByText('4')).toBeVisible();
+    expect(screen.getByText('Fûts — Reçues')).toBeVisible();
+    expect(screen.getByText('5')).toBeVisible();
+
+    // Signatures
+    expect(screen.getByText(`Rakoto V. — ${formatHeureLocale('2026-09-01T09:00:00.000Z')}`)).toBeVisible();
+    expect(screen.getByText(`Jean Rakoto — ${formatHeureLocale('2026-09-01T09:10:00.000Z')}`)).toBeVisible();
+    // Consultant FAO et Chef de Base non signés : ligne présente avec « — », pas absente.
+    expect(screen.getByText('Consultant FAO')).toBeVisible();
+    expect(screen.getByText('Chef de Base')).toBeVisible();
+  });
+
+  /** « Motif du divers » (#ux-aerien) : affiché uniquement pour l'opération Divers. */
+  it('« Motif du divers » apparaît seulement pour l’opération de type Divers', async () => {
+    jest.mocked(prospectionRepository.listOperationsAeriennes).mockResolvedValue([
+      {
+        type_operation: 'divers',
+        motif_divers: 'Rinçage',
+        debut_heure: '11:00',
+        debut_temperature_c: null,
+        debut_vent_ms: null,
+        fin_heure: '11:30',
+        fin_temperature_c: null,
+        fin_vent_ms: null,
+        duree_minutes: 30,
+      },
+      {
+        type_operation: 'prospection',
+        motif_divers: null,
+        debut_heure: '08:00',
+        debut_temperature_c: null,
+        debut_vent_ms: null,
+        fin_heure: '09:00',
+        fin_temperature_c: null,
+        fin_vent_ms: null,
+        duree_minutes: 60,
+      },
+    ] as any);
+    useProspectionWizardStore.setState({
+      draft: { ...DRAFT_AERIEN, type_prospection: 'extensive', pesticides_embarques: 0 },
+      captures: [],
+    });
+
+    await render(<ExtensiveRecapScreen />);
+    await screen.findByText('Opération 1');
+
+    expect(screen.getByText('Motif')).toBeVisible();
+    expect(screen.getByText('Rinçage')).toBeVisible();
+    // Une seule ligne « Motif » — pas pour l'opération 2 (Prospection).
+    expect(screen.getAllByText('Motif')).toHaveLength(1);
+  });
+});
+
+/**
+ * « Remarques » (#ux-aerien) : réutilise `prospection.observations`, affichée dans
+ * la récapitulation D — Observations pour les deux modes (terrestre et aérien).
+ */
+describe('ExtensiveRecapScreen — Remarques', () => {
+  it('affiche les remarques saisies, avec retours à la ligne conservés', async () => {
+    jest.mocked(prospectionRepository.listAllProspectionPopulations).mockResolvedValue([]);
+    useProspectionWizardStore.setState({
+      draft: { ...DRAFT_BASE, type_prospection: 'extensive', observations: 'Ligne 1.\nLigne 2.' },
+      captures: [],
+    });
+
+    await render(<ExtensiveRecapScreen />);
+
+    // Le contenu réel (avec le vrai saut de ligne) est vérifié à la saisie, côté
+    // écran (`extensive-observations-screen-restore.test.tsx`, via
+    // `getByDisplayValue`) — ici, le normaliseur de texte par défaut de RTL
+    // aplatit les espaces/retours à la ligne pour la recherche, d'où le `\s+`.
+    expect(await screen.findByText(/Remarques\s*:\s*Ligne 1\.\s*Ligne 2\./)).toBeVisible();
+  });
+
+  it('affiche « — » quand aucune remarque n’a été saisie', async () => {
+    jest.mocked(prospectionRepository.listAllProspectionPopulations).mockResolvedValue([]);
+    useProspectionWizardStore.setState({
+      draft: { ...DRAFT_BASE, type_prospection: 'extensive' },
+      captures: [],
+    });
+
+    await render(<ExtensiveRecapScreen />);
+
+    expect(await screen.findByText('Remarques : —')).toBeVisible();
   });
 });
