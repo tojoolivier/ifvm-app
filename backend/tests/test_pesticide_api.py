@@ -247,7 +247,7 @@ async def test_update_pesticide_code_deja_pris(client: AsyncClient, auth_headers
     response = await client.put(
         f"/pesticides/{p2.id}",
         json={"code": "PEST-1"},
-        headers={**{"Authorization": "Bearer test"}},
+        headers=auth_headers,
     )
 
     assert response.status_code == 409
