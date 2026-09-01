@@ -480,6 +480,89 @@ class UpdateCulture:
         return await self.repository.update(culture)
 
 
+class ListPesticides:
+    def __init__(self, repository: PesticideRepository):
+        self.repository = repository
+
+    async def execute(self, actif: bool | None = True) -> list[Pesticide]:
+        return await self.repository.list_all(actif=actif)
+
+
+class GetPesticide:
+    def __init__(self, repository: PesticideRepository):
+        self.repository = repository
+
+    async def execute(self, pesticide_id: uuid.UUID) -> Pesticide | None:
+        return await self.repository.get_by_id(pesticide_id)
+
+
+class CreatePesticide:
+    def __init__(self, repository: PesticideRepository):
+        self.repository = repository
+
+    async def execute(
+        self,
+        code: str,
+        nom: str,
+        matiere_active: str | None = None,
+        dose_reference: str | None = None,
+    ) -> Pesticide:
+        if await self.repository.code_pris_par_un_autre(code):
+            raise CodeReferentielDejaPrisError(code)
+
+        maintenant = datetime.now(timezone.utc)
+        return await self.repository.create(
+            Pesticide(
+                code=code,
+                nom=nom,
+                matiere_active=matiere_active,
+                dose_reference=dose_reference,
+                actif=True,
+                created_at=maintenant,
+                updated_at=maintenant,
+            )
+        )
+
+
+class UpdatePesticide:
+    """Mise a update partielle, `actif` compris. Pas de suppression : `actif=False` est
+    la seule sortie, le pull hors-ligne ne transportant que des upserts."""
+
+    def __init__(self, repository: PesticideRepository):
+        self.repository = repository
+
+    async def execute(
+        self,
+        pesticide_id: uuid.UUID,
+        code: str | None = None,
+        nom: str | None = None,
+        matiere_active: str | None = None,
+        dose_reference: str | None = None,
+        actif: bool | None = None,
+    ) -> Pesticide | None:
+        pesticide = await self.repository.get_by_id(pesticide_id)
+        if pesticide is None:
+            return None
+
+        if code is not None and code != pesticide.code:
+            if await self.repository.code_pris_par_un_autre(code, exclude_id=pesticide_id):
+                raise CodeReferentielDejaPrisError(code)
+            pesticide.code = code
+
+        if nom is not None:
+            pesticide.nom = nom
+        if matiere_active is not None:
+            pesticide.matiere_active = matiere_active
+        if dose_reference is not None:
+            pesticide.dose_reference = dose_reference
+        if actif is not None:
+            pesticide.actif = actif
+
+        # Sans `updated_at` rehausse, le pull incremental sauterait la modification.
+        pesticide.updated_at = datetime.now(timezone.utc)
+        return await self.repository.update(pesticide)
+
+
 @dataclass
 class ReferentielSinceCursors:
     zones_anti_acridiennes: datetime | None = None

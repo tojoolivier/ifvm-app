@@ -298,6 +298,27 @@ class PesticideRepository(ABC):
     async def list_since(self, since: datetime | None) -> list[Pesticide]:
         pass
 
+    @abstractmethod
+    async def list_all(self, actif: bool | None = True) -> list[Pesticide]:
+        pass
+
+    @abstractmethod
+    async def get_by_id(self, pesticide_id: uuid.UUID) -> Pesticide | None:
+        pass
+
+    @abstractmethod
+    async def code_pris_par_un_autre(self, code: str, exclude_id: uuid.UUID | None = None) -> bool:
+        """`exclude_id` permet de réenregistrer un pesticide sans buter sur son propre code."""
+        pass
+
+    @abstractmethod
+    async def create(self, pesticide: Pesticide) -> Pesticide:
+        pass
+
+    @abstractmethod
+    async def update(self, pesticide: Pesticide) -> Pesticide:
+        pass
+
 
 class CultureRepository(ABC):
     """Aucune méthode de suppression : la sortie du référentiel est `actif=false`.

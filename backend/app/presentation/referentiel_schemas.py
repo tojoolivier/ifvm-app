@@ -150,11 +150,42 @@ class UtilisateurEquipeSyncRead(BaseModel):
     updated_at: datetime
 
 
+class PesticideRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    code: str
+    nom: str
+    matiere_active: str | None
+    dose_reference: str | None
+    actif: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class PesticideCreate(BaseModel):
+    code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    matiere_active: str | None = None
+    dose_reference: str | None = None
+
+
+class PesticideUpdate(BaseModel):
+    """Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie."""
+
+    code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
+    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
+    matiere_active: str | None = None
+    dose_reference: str | None = None
+    actif: bool | None = None
+
+
 class PesticideSyncRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     code: str
     nom: str
+    matiere_active: str | None
+    dose_reference: str | None
     actif: bool
     updated_at: datetime
 

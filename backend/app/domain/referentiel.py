@@ -131,7 +131,10 @@ class Pesticide:
     id: uuid.UUID = field(default_factory=uuid.uuid4)
     code: str = ""
     nom: str = ""
+    matiere_active: str | None = None
+    dose_reference: str | None = None
     actif: bool = True
+    created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
 
 
