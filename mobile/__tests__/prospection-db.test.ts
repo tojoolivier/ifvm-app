@@ -90,6 +90,10 @@ const MIGRATED_COLUMNS = [
   { name: 'surface_prospectee' },
   { name: 'surface_infestee' },
   { name: 'surface_totale' },
+
+  // Colonnes de rotation
+  { name: 'heure_debut' },
+  { name: 'heure_fin' },
 ];
 
 const execAsync = jest.fn().mockResolvedValue(undefined);
