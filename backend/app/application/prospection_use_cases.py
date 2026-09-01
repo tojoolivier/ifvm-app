@@ -7,6 +7,7 @@ from app.domain.prospection import (
     Prospection,
     ProspectionCapture,
     ProspectionInfestation,
+    ProspectionOperationAerienne,
     ProspectionPopulation,
     StadeInconnuError,
 )
@@ -23,6 +24,18 @@ async def _verifier_stades(
     inconnus = await repository.stades_inconnus({c.stade for c in captures})
     if inconnus:
         raise StadeInconnuError(inconnus)
+
+
+def _calculer_duree_minutes(debut_heure: str, fin_heure: str) -> int:
+    """Durée entre deux `HH:MM`, jamais saisie côté client — recalculée ici pour
+    ne jamais lui faire confiance. Franchissement de minuit : fin < début ⇒ +24h."""
+    heure_debut, minute_debut = (int(p) for p in debut_heure.split(":"))
+    heure_fin, minute_fin = (int(p) for p in fin_heure.split(":"))
+    debut = heure_debut * 60 + minute_debut
+    fin = heure_fin * 60 + minute_fin
+    if fin < debut:
+        fin += 24 * 60
+    return fin - debut
 
 
 class CreateProspection:
@@ -85,6 +98,37 @@ class CreateProspection:
         signalement_description: str | None = None,
         conclusion_validation: str | None = None,
         avertissements: list[str] | None = None,
+        # ==========================================
+        # NOUVEAUX CHAMPS - Extensif : mode aérien
+        # ==========================================
+        mode_extensif: str | None = None,
+        societe: str | None = None,
+        immatricule_aeronef: str | None = None,
+        pilote: str | None = None,
+        mecanicien: str | None = None,
+        chef_de_base: str | None = None,
+        base: str | None = None,
+        base_secondaire: str | None = None,
+        operations_aeriennes: list[ProspectionOperationAerienne] | None = None,
+        # ==========================================
+        # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
+        # ==========================================
+        pesticides_embarques: bool | None = None,
+        pesticide_nom_commercial: str | None = None,
+        pesticide_quantite_disponible: float | None = None,
+        pesticide_quantite_recue: float | None = None,
+        futs_disponible: int | None = None,
+        futs_pleins: int | None = None,
+        futs_vides: int | None = None,
+        futs_recues: int | None = None,
+        signature_visa_nom: str | None = None,
+        signature_visa_horodatage: datetime | None = None,
+        signature_consultant_fao_nom: str | None = None,
+        signature_consultant_fao_horodatage: datetime | None = None,
+        signature_pilote_nom: str | None = None,
+        signature_pilote_horodatage: datetime | None = None,
+        signature_chef_base_nom: str | None = None,
+        signature_chef_base_horodatage: datetime | None = None,
     ) -> Prospection:
         if type_prospection == "intensive" and station_id is None:
             raise ValueError("station_id est obligatoire pour une prospection intensive")
@@ -149,6 +193,37 @@ class CreateProspection:
             signalement_description=signalement_description,
             conclusion_validation=conclusion_validation,
             avertissements=avertissements or [],
+            # ==========================================
+            # NOUVEAUX CHAMPS - Extensif : mode aérien
+            # ==========================================
+            mode_extensif=mode_extensif,
+            societe=societe,
+            immatricule_aeronef=immatricule_aeronef,
+            pilote=pilote,
+            mecanicien=mecanicien,
+            chef_de_base=chef_de_base,
+            base=base,
+            base_secondaire=base_secondaire,
+            operations_aeriennes=operations_aeriennes or [],
+            # ==========================================
+            # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
+            # ==========================================
+            pesticides_embarques=pesticides_embarques,
+            pesticide_nom_commercial=pesticide_nom_commercial,
+            pesticide_quantite_disponible=pesticide_quantite_disponible,
+            pesticide_quantite_recue=pesticide_quantite_recue,
+            futs_disponible=futs_disponible,
+            futs_pleins=futs_pleins,
+            futs_vides=futs_vides,
+            futs_recues=futs_recues,
+            signature_visa_nom=signature_visa_nom,
+            signature_visa_horodatage=signature_visa_horodatage,
+            signature_consultant_fao_nom=signature_consultant_fao_nom,
+            signature_consultant_fao_horodatage=signature_consultant_fao_horodatage,
+            signature_pilote_nom=signature_pilote_nom,
+            signature_pilote_horodatage=signature_pilote_horodatage,
+            signature_chef_base_nom=signature_chef_base_nom,
+            signature_chef_base_horodatage=signature_chef_base_horodatage,
         )
 
         for child in prospection.populations:
@@ -157,6 +232,13 @@ class CreateProspection:
             child.prospection_id = prospection.id
         for child in prospection.infestations:
             child.prospection_id = prospection.id
+        # `numero` (séquence par fiche) et `duree_minutes` sont assignés ici, jamais
+        # fait confiance à une valeur du client — cf. OperationAerienneCreate qui ne
+        # porte ni l'un ni l'autre.
+        for index, child in enumerate(prospection.operations_aeriennes, start=1):
+            child.prospection_id = prospection.id
+            child.numero = index
+            child.duree_minutes = _calculer_duree_minutes(child.debut_heure, child.fin_heure)
 
         # 👇 MODIFICATION ICI
         created = await self.repository.create(prospection)
@@ -249,6 +331,36 @@ class UpdateProspection:
         signalement_description: str | None = None,
         conclusion_validation: str | None = None,
         avertissements: list[str] | None = None,
+        # ==========================================
+        # NOUVEAUX CHAMPS - Extensif : mode aérien
+        # ==========================================
+        mode_extensif: str | None = None,
+        societe: str | None = None,
+        immatricule_aeronef: str | None = None,
+        pilote: str | None = None,
+        mecanicien: str | None = None,
+        chef_de_base: str | None = None,
+        base: str | None = None,
+        base_secondaire: str | None = None,
+        # ==========================================
+        # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
+        # ==========================================
+        pesticides_embarques: bool | None = None,
+        pesticide_nom_commercial: str | None = None,
+        pesticide_quantite_disponible: float | None = None,
+        pesticide_quantite_recue: float | None = None,
+        futs_disponible: int | None = None,
+        futs_pleins: int | None = None,
+        futs_vides: int | None = None,
+        futs_recues: int | None = None,
+        signature_visa_nom: str | None = None,
+        signature_visa_horodatage: datetime | None = None,
+        signature_consultant_fao_nom: str | None = None,
+        signature_consultant_fao_horodatage: datetime | None = None,
+        signature_pilote_nom: str | None = None,
+        signature_pilote_horodatage: datetime | None = None,
+        signature_chef_base_nom: str | None = None,
+        signature_chef_base_horodatage: datetime | None = None,
     ) -> Prospection | None:
         prospection = await self.repository.get_by_id(prospection_id)
         if prospection is None:
@@ -347,6 +459,62 @@ class UpdateProspection:
             prospection.conclusion_validation = conclusion_validation
         if avertissements is not None:
             prospection.avertissements = avertissements
+
+        # ==========================================
+        # Mise à jour des nouveaux champs - Extensif : mode aérien
+        # ==========================================
+        if mode_extensif is not None:
+            prospection.mode_extensif = mode_extensif
+        if societe is not None:
+            prospection.societe = societe
+        if immatricule_aeronef is not None:
+            prospection.immatricule_aeronef = immatricule_aeronef
+        if pilote is not None:
+            prospection.pilote = pilote
+        if mecanicien is not None:
+            prospection.mecanicien = mecanicien
+        if chef_de_base is not None:
+            prospection.chef_de_base = chef_de_base
+        if base is not None:
+            prospection.base = base
+        if base_secondaire is not None:
+            prospection.base_secondaire = base_secondaire
+
+        # ==========================================
+        # Mise à jour des nouveaux champs - Extensif : pesticides embarqués + signatures
+        # ==========================================
+        if pesticides_embarques is not None:
+            prospection.pesticides_embarques = pesticides_embarques
+        if pesticide_nom_commercial is not None:
+            prospection.pesticide_nom_commercial = pesticide_nom_commercial
+        if pesticide_quantite_disponible is not None:
+            prospection.pesticide_quantite_disponible = pesticide_quantite_disponible
+        if pesticide_quantite_recue is not None:
+            prospection.pesticide_quantite_recue = pesticide_quantite_recue
+        if futs_disponible is not None:
+            prospection.futs_disponible = futs_disponible
+        if futs_pleins is not None:
+            prospection.futs_pleins = futs_pleins
+        if futs_vides is not None:
+            prospection.futs_vides = futs_vides
+        if futs_recues is not None:
+            prospection.futs_recues = futs_recues
+        if signature_visa_nom is not None:
+            prospection.signature_visa_nom = signature_visa_nom
+        if signature_visa_horodatage is not None:
+            prospection.signature_visa_horodatage = signature_visa_horodatage
+        if signature_consultant_fao_nom is not None:
+            prospection.signature_consultant_fao_nom = signature_consultant_fao_nom
+        if signature_consultant_fao_horodatage is not None:
+            prospection.signature_consultant_fao_horodatage = signature_consultant_fao_horodatage
+        if signature_pilote_nom is not None:
+            prospection.signature_pilote_nom = signature_pilote_nom
+        if signature_pilote_horodatage is not None:
+            prospection.signature_pilote_horodatage = signature_pilote_horodatage
+        if signature_chef_base_nom is not None:
+            prospection.signature_chef_base_nom = signature_chef_base_nom
+        if signature_chef_base_horodatage is not None:
+            prospection.signature_chef_base_horodatage = signature_chef_base_horodatage
 
         prospection.updated_at = datetime.utcnow()
 

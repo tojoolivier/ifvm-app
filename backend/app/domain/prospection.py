@@ -145,6 +145,25 @@ class ProspectionInfestation:
 
 
 @dataclass
+class ProspectionOperationAerienne:
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    prospection_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    numero: int = 0
+    type_operation: str = ""
+    # Pertinent seulement si type_operation == "divers" — laissé libre sinon.
+    motif_divers: str | None = None
+    debut_heure: str = ""
+    debut_temperature_c: float | None = None
+    debut_vent_ms: float | None = None
+    fin_heure: str = ""
+    fin_temperature_c: float | None = None
+    fin_vent_ms: float | None = None
+    # Calculée par CreateProspection.execute (gère le passage de minuit) — jamais
+    # fait confiance à une valeur envoyée par le client.
+    duree_minutes: int = 0
+
+
+@dataclass
 class Prospection:
     id: uuid.UUID = field(default_factory=uuid.uuid4)
     type_prospection: str = ""
@@ -213,9 +232,42 @@ class Prospection:
     # ==========================================
     avertissements: list[str] = field(default_factory=list)
 
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif : mode aérien
+    # ==========================================
+    mode_extensif: str | None = None
+    societe: str | None = None
+    immatricule_aeronef: str | None = None
+    pilote: str | None = None
+    mecanicien: str | None = None
+    chef_de_base: str | None = None
+    base: str | None = None
+    base_secondaire: str | None = None
+
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
+    # ==========================================
+    pesticides_embarques: bool | None = None
+    pesticide_nom_commercial: str | None = None
+    pesticide_quantite_disponible: float | None = None
+    pesticide_quantite_recue: float | None = None
+    futs_disponible: int | None = None
+    futs_pleins: int | None = None
+    futs_vides: int | None = None
+    futs_recues: int | None = None
+    signature_visa_nom: str | None = None
+    signature_visa_horodatage: datetime | None = None
+    signature_consultant_fao_nom: str | None = None
+    signature_consultant_fao_horodatage: datetime | None = None
+    signature_pilote_nom: str | None = None
+    signature_pilote_horodatage: datetime | None = None
+    signature_chef_base_nom: str | None = None
+    signature_chef_base_horodatage: datetime | None = None
+
     populations: list[ProspectionPopulation] = field(default_factory=list)
     captures: list[ProspectionCapture] = field(default_factory=list)
     infestations: list[ProspectionInfestation] = field(default_factory=list)
+    operations_aeriennes: list[ProspectionOperationAerienne] = field(default_factory=list)
 
     def apply_transition(self, nouveau_statut: str, acteur_role: str) -> str:
         """Valide et applique une transition de statut. Retourne l'action d'audit.

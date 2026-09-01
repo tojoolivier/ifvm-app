@@ -10,6 +10,7 @@ from app.domain.prospection import (
     ProspectionCapture,
     ProspectionInfestation,
     ProspectionIntegriteError,
+    ProspectionOperationAerienne,
     ProspectionPopulation,
 )
 from app.domain.referentiel import StationNotFoundError
@@ -20,6 +21,7 @@ from app.infrastructure.prospection_model import (
     ProspectionInfestationLarveModel,
     ProspectionInfestationModel,
     ProspectionModel,
+    ProspectionOperationAerienneModel,
     ProspectionPopulationModel,
 )
 from app.infrastructure.referentiel_model import StadeModel
@@ -79,6 +81,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                 selectinload(ProspectionModel.infestations).selectinload(
                     ProspectionInfestationModel.larve
                 ),
+                selectinload(ProspectionModel.operations_aeriennes),
             )
         )
         model = result.scalar_one_or_none()
@@ -103,6 +106,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             selectinload(ProspectionModel.infestations).selectinload(
                 ProspectionInfestationModel.larve
             ),
+            selectinload(ProspectionModel.operations_aeriennes),
         )
         if type_prospection is not None:
             stmt = stmt.where(ProspectionModel.type_prospection == type_prospection)
@@ -190,6 +194,36 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             signalement_description=prospection.signalement_description,
             conclusion_validation=prospection.conclusion_validation,
             avertissements=prospection.avertissements,
+            # ==========================================
+            # NOUVEAUX CHAMPS - Extensif : mode aérien
+            # ==========================================
+            mode_extensif=prospection.mode_extensif,
+            societe=prospection.societe,
+            immatricule_aeronef=prospection.immatricule_aeronef,
+            pilote=prospection.pilote,
+            mecanicien=prospection.mecanicien,
+            chef_de_base=prospection.chef_de_base,
+            base=prospection.base,
+            base_secondaire=prospection.base_secondaire,
+            # ==========================================
+            # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
+            # ==========================================
+            pesticides_embarques=prospection.pesticides_embarques,
+            pesticide_nom_commercial=prospection.pesticide_nom_commercial,
+            pesticide_quantite_disponible=prospection.pesticide_quantite_disponible,
+            pesticide_quantite_recue=prospection.pesticide_quantite_recue,
+            futs_disponible=prospection.futs_disponible,
+            futs_pleins=prospection.futs_pleins,
+            futs_vides=prospection.futs_vides,
+            futs_recues=prospection.futs_recues,
+            signature_visa_nom=prospection.signature_visa_nom,
+            signature_visa_horodatage=prospection.signature_visa_horodatage,
+            signature_consultant_fao_nom=prospection.signature_consultant_fao_nom,
+            signature_consultant_fao_horodatage=prospection.signature_consultant_fao_horodatage,
+            signature_pilote_nom=prospection.signature_pilote_nom,
+            signature_pilote_horodatage=prospection.signature_pilote_horodatage,
+            signature_chef_base_nom=prospection.signature_chef_base_nom,
+            signature_chef_base_horodatage=prospection.signature_chef_base_horodatage,
         )
 
         model.populations = [
@@ -243,6 +277,23 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             self._infestation_to_model(i, prospection.id) for i in prospection.infestations
         ]
 
+        model.operations_aeriennes = [
+            ProspectionOperationAerienneModel(
+                id=o.id,
+                numero=o.numero,
+                type_operation=o.type_operation,
+                motif_divers=o.motif_divers,
+                debut_heure=o.debut_heure,
+                debut_temperature_c=o.debut_temperature_c,
+                debut_vent_ms=o.debut_vent_ms,
+                fin_heure=o.fin_heure,
+                fin_temperature_c=o.fin_temperature_c,
+                fin_vent_ms=o.fin_vent_ms,
+                duree_minutes=o.duree_minutes,
+            )
+            for o in prospection.operations_aeriennes
+        ]
+
         self.session.add(model)
         try:
             await self.session.commit()
@@ -261,7 +312,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         # Recharger les relations principales
         await self.session.refresh(
             model,
-            attribute_names=["populations", "captures", "infestations"],
+            attribute_names=["populations", "captures", "infestations", "operations_aeriennes"],
         )
 
         # Recharger les sous-relations des infestations (imago et larve)
@@ -329,6 +380,38 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         model.signalement_description = prospection.signalement_description
         model.conclusion_validation = prospection.conclusion_validation
         model.avertissements = prospection.avertissements
+
+        # ==========================================
+        # NOUVEAUX CHAMPS - Extensif : mode aérien
+        # ==========================================
+        model.mode_extensif = prospection.mode_extensif
+        model.societe = prospection.societe
+        model.immatricule_aeronef = prospection.immatricule_aeronef
+        model.pilote = prospection.pilote
+        model.mecanicien = prospection.mecanicien
+        model.chef_de_base = prospection.chef_de_base
+        model.base = prospection.base
+        model.base_secondaire = prospection.base_secondaire
+
+        # ==========================================
+        # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
+        # ==========================================
+        model.pesticides_embarques = prospection.pesticides_embarques
+        model.pesticide_nom_commercial = prospection.pesticide_nom_commercial
+        model.pesticide_quantite_disponible = prospection.pesticide_quantite_disponible
+        model.pesticide_quantite_recue = prospection.pesticide_quantite_recue
+        model.futs_disponible = prospection.futs_disponible
+        model.futs_pleins = prospection.futs_pleins
+        model.futs_vides = prospection.futs_vides
+        model.futs_recues = prospection.futs_recues
+        model.signature_visa_nom = prospection.signature_visa_nom
+        model.signature_visa_horodatage = prospection.signature_visa_horodatage
+        model.signature_consultant_fao_nom = prospection.signature_consultant_fao_nom
+        model.signature_consultant_fao_horodatage = prospection.signature_consultant_fao_horodatage
+        model.signature_pilote_nom = prospection.signature_pilote_nom
+        model.signature_pilote_horodatage = prospection.signature_pilote_horodatage
+        model.signature_chef_base_nom = prospection.signature_chef_base_nom
+        model.signature_chef_base_horodatage = prospection.signature_chef_base_horodatage
 
         # Mise à jour des infestations
         await self.session.execute(
@@ -602,6 +685,40 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             conclusion_validation=model.conclusion_validation,
             avertissements=list(model.avertissements or []),
             # ==========================================
+            # NOUVEAUX CHAMPS - Extensif : mode aérien
+            # ==========================================
+            mode_extensif=model.mode_extensif,
+            societe=model.societe,
+            immatricule_aeronef=model.immatricule_aeronef,
+            pilote=model.pilote,
+            mecanicien=model.mecanicien,
+            chef_de_base=model.chef_de_base,
+            base=model.base,
+            base_secondaire=model.base_secondaire,
+            # ==========================================
+            # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
+            # ==========================================
+            pesticides_embarques=model.pesticides_embarques,
+            pesticide_nom_commercial=model.pesticide_nom_commercial,
+            pesticide_quantite_disponible=float(model.pesticide_quantite_disponible)
+            if model.pesticide_quantite_disponible is not None
+            else None,
+            pesticide_quantite_recue=float(model.pesticide_quantite_recue)
+            if model.pesticide_quantite_recue is not None
+            else None,
+            futs_disponible=model.futs_disponible,
+            futs_pleins=model.futs_pleins,
+            futs_vides=model.futs_vides,
+            futs_recues=model.futs_recues,
+            signature_visa_nom=model.signature_visa_nom,
+            signature_visa_horodatage=model.signature_visa_horodatage,
+            signature_consultant_fao_nom=model.signature_consultant_fao_nom,
+            signature_consultant_fao_horodatage=model.signature_consultant_fao_horodatage,
+            signature_pilote_nom=model.signature_pilote_nom,
+            signature_pilote_horodatage=model.signature_pilote_horodatage,
+            signature_chef_base_nom=model.signature_chef_base_nom,
+            signature_chef_base_horodatage=model.signature_chef_base_horodatage,
+            # ==========================================
             # RELATIONSHIPS
             # ==========================================
             populations=[
@@ -658,4 +775,25 @@ class ProspectionRepositoryImpl(ProspectionRepository):
                 for c in model.captures
             ],
             infestations=[self._infestation_to_domain(i) for i in model.infestations],
+            operations_aeriennes=[
+                ProspectionOperationAerienne(
+                    id=o.id,
+                    prospection_id=o.prospection_id,
+                    numero=o.numero,
+                    type_operation=o.type_operation,
+                    motif_divers=o.motif_divers,
+                    debut_heure=o.debut_heure,
+                    debut_temperature_c=float(o.debut_temperature_c)
+                    if o.debut_temperature_c is not None
+                    else None,
+                    debut_vent_ms=float(o.debut_vent_ms) if o.debut_vent_ms is not None else None,
+                    fin_heure=o.fin_heure,
+                    fin_temperature_c=float(o.fin_temperature_c)
+                    if o.fin_temperature_c is not None
+                    else None,
+                    fin_vent_ms=float(o.fin_vent_ms) if o.fin_vent_ms is not None else None,
+                    duree_minutes=o.duree_minutes,
+                )
+                for o in model.operations_aeriennes
+            ],
         )
