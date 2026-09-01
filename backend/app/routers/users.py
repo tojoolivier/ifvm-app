@@ -67,8 +67,15 @@ async def update_user(
     user_id: uuid.UUID,
     body: UtilisateurUpdate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[Utilisateur, Depends(require_admin)],
+    current_user: Annotated[Utilisateur, Depends(require_admin)],
 ):
+    # Un admin ne modifie pas son propre compte ici : il pourrait se retirer le
+    # rôle admin ou se désactiver et se verrouiller hors de l'administration.
+    if user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Un admin ne peut pas modifier son propre compte",
+        )
     user = await db.get(Utilisateur, user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable")
