@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { normalizeBoolean, updateProspectionExtensiveObservations } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
-import { NIVEAU_OPTIONS } from '@/lib/prospection-extensive';
+import { DEGATS_CULTURES_EXTENSIF_OPTIONS, NIVEAU_OPTIONS } from '@/lib/prospection-extensive';
 import { DateField } from '@/components/DateField';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { formatHeureLocale } from '@/lib/prospection-fiche-lecture';
@@ -48,6 +48,23 @@ function validerEntierPositif(raw: string, label: string): { value: number | nul
   return { value: parseInt(trimmed, 10), erreur: null };
 }
 
+/** Pourcentage entier 0-100 — vide accepté (champ non renseigné, pas bloquant).
+ * `verdissement_pourcent` est un entier côté backend (Pydantic `int`, pas de
+ * décimales acceptées aujourd'hui) : on refuse donc aussi les décimales ici,
+ * plutôt que de laisser croire qu'elles seraient conservées. */
+function validerPourcentage(raw: string, label: string): { value: number | null; erreur: string | null } {
+  const trimmed = raw.trim();
+  if (trimmed === '') return { value: null, erreur: null };
+  if (!/^\d+$/.test(trimmed)) {
+    return { value: null, erreur: `${label} : un nombre entier entre 0 et 100 est requis.` };
+  }
+  const parsed = parseInt(trimmed, 10);
+  if (parsed > 100) {
+    return { value: null, erreur: `${label} : la valeur ne peut pas dépasser 100 %.` };
+  }
+  return { value: parsed, erreur: null };
+}
+
 type SignatureRole = 'visa' | 'consultant_fao' | 'pilote' | 'chef_base';
 
 const SIGNATURE_LABELS: Record<SignatureRole, string> = {
@@ -70,8 +87,19 @@ export default function ExtensiveObservationsScreen() {
   // explicitement ; le reste de cet écran reste identique dans tous les autres cas.
   const isAerien = draft?.mode_extensif === 'aerien';
 
-  const [degats, setDegats] = useState(draft?.degats_cultures_pourcent ?? 0);
-  const [verdure, setVerdure] = useState(draft?.verdure_strate ?? 'moyenne');
+  // Dégâts sur les cultures : choix unique Faible/Moyen/Forte — réutilise
+  // `prospection.degats_cultures` (déjà utilisé par l'Intensif), pas
+  // `degats_cultures_pourcent` (l'ancien stepper %, abandonné pour ce champ
+  // mais colonne conservée : une ancienne fiche qui n'a que cette valeur
+  // s'ouvre sans erreur, simplement sans sélection ici).
+  const [degatsCultures, setDegatsCultures] = useState<string | null>(draft?.degats_cultures ?? null);
+  // Verdure strate herbeuse : pourcentage — réutilise `prospection.verdissement_pourcent`
+  // (déjà utilisé par l'Intensif), pas `verdure_strate` (l'ancien chip Faible/
+  // Moyenne/Forte, abandonné pour ce champ mais colonne conservée, même principe
+  // de compatibilité que ci-dessus).
+  const [verdissement, setVerdissement] = useState(
+    draft?.verdissement_pourcent != null ? String(draft.verdissement_pourcent) : ''
+  );
   const [hauteur, setHauteur] = useState(hauteurCmToMInput(draft?.hauteur_herbe_cm ?? null));
   const [dernierePluie, setDernierePluie] = useState(draft?.derniere_pluie ?? '');
   const [intensite, setIntensite] = useState(draft?.intensite_pluie ?? 'faible');
@@ -136,8 +164,8 @@ export default function ExtensiveObservationsScreen() {
     if (!draft || draft.id !== draftId || obsHydratedRef.current === draft.id) return;
     obsHydratedRef.current = draft.id;
     void Promise.resolve().then(() => {
-      setDegats(draft.degats_cultures_pourcent ?? 0);
-      setVerdure(draft.verdure_strate ?? 'moyenne');
+      setDegatsCultures(draft.degats_cultures ?? null);
+      setVerdissement(draft.verdissement_pourcent != null ? String(draft.verdissement_pourcent) : '');
       setHauteur(hauteurCmToMInput(draft.hauteur_herbe_cm));
       setDernierePluie(draft.derniere_pluie ?? '');
       setIntensite(draft.intensite_pluie ?? 'faible');
@@ -167,6 +195,18 @@ export default function ExtensiveObservationsScreen() {
   }, [draft, draftId]);
 
   const handleContinue = () => {
+    // Verdure strate herbeuse : validée avant tout enregistrement, comme les
+    // fûts plus bas — message d'erreur nommant le champ, rien de bloquant si
+    // laissé vide.
+    const { value: verdissementValeur, erreur: verdissementErreur } = validerPourcentage(
+      verdissement,
+      'Verdure strate herbeuse'
+    );
+    if (verdissementErreur) {
+      Alert.alert('Pourcentage invalide', verdissementErreur);
+      return;
+    }
+
     // Fûts : validés avant tout enregistrement, seulement si Pesticides = OUI
     // (compact/masqué sinon, donc rien à valider) — mêmes AlertDialogs bloquants
     // que la validation des opérations sur extensive-reference.tsx.
@@ -191,8 +231,8 @@ export default function ExtensiveObservationsScreen() {
     return run(
       async () => {
         const updated = await updateProspectionExtensiveObservations(draftId, {
-          degatsCulturesPourcent: degats,
-          verdureStrate: verdure || null,
+          degatsCultures: degatsCultures || null,
+          verdissementPourcent: verdissementValeur,
           hauteurHerbeCm: hauteurMInputToCm(hauteur),
           dernierePluie: dernierePluie || null,
           intensitePluie: intensite || null,
@@ -254,38 +294,35 @@ export default function ExtensiveObservationsScreen() {
           </View>
 
           <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
-            <View style={styles.card}>
-              <Text style={styles.label}>Dégâts sur les cultures</Text>
-              <View style={styles.stepperRow}>
-                <TouchableOpacity style={styles.stepperButton} onPress={() => setDegats(Math.max(0, degats - 5))}>
-                  <Text style={styles.stepperButtonText}>−</Text>
-                </TouchableOpacity>
-                <TextInput
-                  value={String(degats)}
-                  onChangeText={(v) => {
-                    const parsed = parseInt(v, 10);
-                    setDegats(Number.isNaN(parsed) ? 0 : Math.max(0, Math.min(100, parsed)));
-                  }}
-                  keyboardType="number-pad"
-                  style={styles.stepperInput}
-                />
-                <Text style={styles.stepperUnit}>%</Text>
-                <TouchableOpacity style={[styles.stepperButton, styles.stepperButtonAdd]} onPress={() => setDegats(Math.min(100, degats + 5))}>
-                  <Text style={[styles.stepperButtonText, styles.stepperButtonAddText]}>+</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <Text style={styles.sectionLabel}>Verdure strate herbeuse</Text>
+            <Text style={styles.sectionLabel}>Dégâts sur les cultures</Text>
             <View style={[styles.chipsRow, { marginBottom: 10 }]}>
-              {NIVEAU_OPTIONS.map((option) => {
-                const active = option.value === verdure;
+              {DEGATS_CULTURES_EXTENSIF_OPTIONS.map((option) => {
+                const active = option.value === degatsCultures;
                 return (
-                  <TouchableOpacity key={option.value} style={{ flex: 1 }} onPress={() => setVerdure(option.value)} activeOpacity={0.7}>
+                  <TouchableOpacity
+                    key={option.value}
+                    style={{ flex: 1 }}
+                    onPress={() => setDegatsCultures(option.value)}
+                    activeOpacity={0.7}
+                  >
                     <Text style={[styles.chip, active && styles.chipActive]}>{option.label}</Text>
                   </TouchableOpacity>
                 );
               })}
+            </View>
+
+            <View style={[styles.card, { marginBottom: 9 }]}>
+              <Text style={styles.label}>Verdure strate herbeuse</Text>
+              <View style={styles.pourcentageRow}>
+                <TextInput
+                  testID="verdissement-input"
+                  value={verdissement}
+                  onChangeText={setVerdissement}
+                  keyboardType="number-pad"
+                  style={[styles.input, styles.pourcentageInput]}
+                />
+                <Text style={styles.pourcentageUnit}>%</Text>
+              </View>
             </View>
 
             <View style={[styles.card, { marginBottom: 9 }]}>
@@ -501,14 +538,11 @@ const styles = StyleSheet.create({
   label: { fontSize: 9, fontWeight: '500', color: '#9a9484', textTransform: 'uppercase', marginBottom: 5 },
   input: { fontSize: 13, fontWeight: '700', color: TEXT, fontFamily: 'monospace', padding: 0 },
   dateFieldBox: { minHeight: 0, borderWidth: 0, padding: 0, backgroundColor: 'transparent' },
-  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  stepperButton: { width: 32, height: 32, borderRadius: 9, backgroundColor: INACTIVE_BG, alignItems: 'center', justifyContent: 'center' },
-  stepperButtonAdd: { backgroundColor: '#c0412b' },
-  stepperButtonText: { fontSize: 17, fontWeight: '700', color: TEXT_SECONDARY },
-  stepperButtonAddText: { color: '#fff' },
-  stepperValue: { fontSize: 15, fontWeight: '700', color: TEXT, fontFamily: 'monospace', flex: 1 },
-  stepperInput: { fontSize: 15, fontWeight: '700', color: TEXT, fontFamily: 'monospace', flex: 1, textAlign: 'right', padding: 0 },
-  stepperUnit: { fontSize: 15, fontWeight: '700', color: TEXT },
+  // Verdure strate herbeuse (%) — même principe que le stepper Dégâts d'origine :
+  // valeur + unité affichée à côté, dans la carte.
+  pourcentageRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  pourcentageInput: { flex: 1 },
+  pourcentageUnit: { fontSize: 15, fontWeight: '700', color: TEXT },
   sectionLabel: { fontSize: 9, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase', marginBottom: 5 },
   chipsRow: { flexDirection: 'row', gap: 6 },
   chip: { fontSize: 12, fontWeight: '600', color: TEXT_SECONDARY, backgroundColor: INACTIVE_BG, paddingVertical: 8, textAlign: 'center', borderRadius: 8, overflow: 'hidden' },

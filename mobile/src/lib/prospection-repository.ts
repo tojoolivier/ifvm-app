@@ -162,8 +162,16 @@ export interface ExtensiveReferenceUpdateInput {
 }
 
 export interface ExtensiveObservationsUpdateInput {
-  degatsCulturesPourcent: number | null;
-  verdureStrate: string | null;
+  /** Choix unique Faible/Moyen/Forte — réutilise `prospection.degats_cultures`
+   * (déjà utilisé par l'Intensif), pas de nouvelle colonne. Anciennes fiches
+   * extensives qui n'avaient que `degats_cultures_pourcent` (stepper %,
+   * remplacé par ce choix) : ce champ y reste `null`, sans erreur. */
+  degatsCultures: string | null;
+  /** Pourcentage 0-100 — réutilise `prospection.verdissement_pourcent` (déjà
+   * utilisé par l'Intensif), pas de nouvelle colonne. Anciennes fiches
+   * extensives qui n'avaient que `verdure_strate` (chip Faible/Moyenne/Forte,
+   * remplacé par ce pourcentage) : ce champ y reste `null`, sans erreur. */
+  verdissementPourcent: number | null;
   hauteurHerbeCm: number | null;
   dernierePluie: string | null;
   intensitePluie: string | null;
@@ -485,7 +493,7 @@ export async function updateProspectionExtensiveObservations(id: string, input: 
 
   await db.runAsync(
     `UPDATE prospection SET
-      degats_cultures_pourcent = ?, verdure_strate = ?, hauteur_herbe_cm = ?,
+      degats_cultures = ?, verdissement_pourcent = ?, hauteur_herbe_cm = ?,
       derniere_pluie = ?, intensite_pluie = ?,
       pesticides_embarques = ?, pesticide_nom_commercial = ?,
       pesticide_quantite_disponible = ?, pesticide_quantite_recue = ?,
@@ -498,7 +506,7 @@ export async function updateProspectionExtensiveObservations(id: string, input: 
       updated_at = ?
      WHERE id = ?`,
     [
-      input.degatsCulturesPourcent, input.verdureStrate, input.hauteurHerbeCm, input.dernierePluie, input.intensitePluie,
+      input.degatsCultures, input.verdissementPourcent, input.hauteurHerbeCm, input.dernierePluie, input.intensitePluie,
       input.pesticidesEmbarques == null ? null : input.pesticidesEmbarques ? 1 : 0,
       input.pesticideNomCommercial ?? null,
       input.pesticideQuantiteDisponible ?? null,

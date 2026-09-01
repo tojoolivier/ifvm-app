@@ -46,6 +46,17 @@ export const NIVEAU_OPTIONS: { value: string; label: string }[] = [
   { value: 'forte', label: 'Forte' },
 ];
 
+/** Dégâts sur les cultures (D — Observations, Terrestre + Aérien) — choix
+ * unique à 3 niveaux. Réutilise les valeurs de `DegatsCultures` côté backend
+ * (déjà utilisé par l'Intensif, 4 valeurs : nuls/faibles/moyens/forts) — cet
+ * écran n'en propose que 3, jamais "nuls" côté extensif, mais reste
+ * compatible avec le même champ. */
+export const DEGATS_CULTURES_EXTENSIF_OPTIONS: { value: string; label: string }[] = [
+  { value: 'faibles', label: 'Faible' },
+  { value: 'moyens', label: 'Moyen' },
+  { value: 'forts', label: 'Forte' },
+];
+
 export const DEPLACEMENT_OPTIONS: { value: string; label: string }[] = [
   { value: 'repos', label: 'Repos' },
   { value: 'perchee', label: 'Perchée' },

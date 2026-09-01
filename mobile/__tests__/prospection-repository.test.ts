@@ -432,14 +432,14 @@ describe('updateProspectionExtensiveReference', () => {
 
 describe('updateProspectionExtensiveObservations', () => {
   const OBS_INPUT = {
-    degatsCulturesPourcent: 15,
-    verdureStrate: 'moyenne',
+    degatsCultures: 'moyens',
+    verdissementPourcent: 65,
     hauteurHerbeCm: 32,
     dernierePluie: '22/06',
     intensitePluie: 'faible',
   };
 
-  it('writes degats/verdure/hauteur/pluie columns', async () => {
+  it('writes degats/verdissement/hauteur/pluie columns', async () => {
     getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW });
 
     await updateProspectionExtensiveObservations(BASE_INPUT.id, OBS_INPUT);
@@ -447,8 +447,8 @@ describe('updateProspectionExtensiveObservations', () => {
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE prospection SET'),
       [
-        OBS_INPUT.degatsCulturesPourcent,
-        OBS_INPUT.verdureStrate,
+        OBS_INPUT.degatsCultures,
+        OBS_INPUT.verdissementPourcent,
         OBS_INPUT.hauteurHerbeCm,
         OBS_INPUT.dernierePluie,
         OBS_INPUT.intensitePluie,
@@ -501,8 +501,8 @@ describe('updateProspectionExtensiveObservations', () => {
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE prospection SET'),
       [
-        OBS_INPUT.degatsCulturesPourcent,
-        OBS_INPUT.verdureStrate,
+        OBS_INPUT.degatsCultures,
+        OBS_INPUT.verdissementPourcent,
         OBS_INPUT.hauteurHerbeCm,
         OBS_INPUT.dernierePluie,
         OBS_INPUT.intensitePluie,
