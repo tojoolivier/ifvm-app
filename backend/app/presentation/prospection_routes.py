@@ -20,6 +20,7 @@ from app.domain.prospection import (
     ProspectionCapture,
     ProspectionInfestation,
     ProspectionIntegriteError,
+    ProspectionOperationAerienne,
     ProspectionPopulation,
     StadeInconnuError,
 )
@@ -102,6 +103,9 @@ async def create_prospection(
             populations=[ProspectionPopulation(**p.model_dump()) for p in body.populations],
             captures=[ProspectionCapture(**c.model_dump()) for c in body.captures],
             infestations=[ProspectionInfestation(**i.model_dump()) for i in body.infestations],
+            operations_aeriennes=[
+                ProspectionOperationAerienne(**o.model_dump()) for o in body.operations_aeriennes
+            ],
             # ==========================================
             # NOUVEAUX CHAMPS - Références (A)
             # ==========================================
@@ -128,6 +132,36 @@ async def create_prospection(
             signalement_description=body.signalement_description,
             conclusion_validation=body.conclusion_validation,
             avertissements=body.avertissements,
+            # ==========================================
+            # NOUVEAUX CHAMPS - Extensif : mode aérien
+            # ==========================================
+            mode_extensif=body.mode_extensif,
+            societe=body.societe,
+            immatricule_aeronef=body.immatricule_aeronef,
+            pilote=body.pilote,
+            mecanicien=body.mecanicien,
+            chef_de_base=body.chef_de_base,
+            base=body.base,
+            base_secondaire=body.base_secondaire,
+            # ==========================================
+            # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
+            # ==========================================
+            pesticides_embarques=body.pesticides_embarques,
+            pesticide_nom_commercial=body.pesticide_nom_commercial,
+            pesticide_quantite_disponible=body.pesticide_quantite_disponible,
+            pesticide_quantite_recue=body.pesticide_quantite_recue,
+            futs_disponible=body.futs_disponible,
+            futs_pleins=body.futs_pleins,
+            futs_vides=body.futs_vides,
+            futs_recues=body.futs_recues,
+            signature_visa_nom=body.signature_visa_nom,
+            signature_visa_horodatage=body.signature_visa_horodatage,
+            signature_consultant_fao_nom=body.signature_consultant_fao_nom,
+            signature_consultant_fao_horodatage=body.signature_consultant_fao_horodatage,
+            signature_pilote_nom=body.signature_pilote_nom,
+            signature_pilote_horodatage=body.signature_pilote_horodatage,
+            signature_chef_base_nom=body.signature_chef_base_nom,
+            signature_chef_base_horodatage=body.signature_chef_base_horodatage,
         )
 
         # 👇 AJOUTE CETTE VÉRIFICATION POUR ÉVITER L'ERREUR 500

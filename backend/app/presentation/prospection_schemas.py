@@ -381,6 +381,57 @@ class InfestationCreate(BaseModel):
     densite_moy_arriere_front: float | None = Field(None, ge=0)
 
 
+class ModeExtensif(str, Enum):
+    """Axe orthogonal à TypeProspection — pertinent seulement quand
+    type_prospection='extensive'. Absent (None) sur une fiche existante ou une
+    fiche extensive terrestre : jamais None sur une fiche aérienne."""
+
+    TERRESTRE = "terrestre"
+    AERIEN = "aerien"
+
+
+class TypeOperationAerienne(str, Enum):
+    CONVOYAGE = "convoyage"
+    PROSPECTION = "prospection"
+    DIVERS = "divers"
+
+
+# HH:MM strict (00-23:00-59) — même contrainte que côté DB (migration 0035).
+_HHMM_PATTERN = r"^([01]\d|2[0-3]):[0-5]\d$"
+
+
+class OperationAerienneCreate(BaseModel):
+    """Pas de `numero` (assigné côté serveur, séquence par fiche) ni de
+    `duree_minutes` (calculée côté serveur depuis début/fin — jamais saisie)."""
+
+    type_operation: TypeOperationAerienne
+    # Pertinent seulement si type_operation == DIVERS — laissé None sinon (jamais
+    # exigé, jamais affiché pour Convoyage/Prospection).
+    motif_divers: str | None = Field(None, max_length=200)
+    debut_heure: str = Field(..., pattern=_HHMM_PATTERN)
+    debut_temperature_c: float | None = None
+    debut_vent_ms: float | None = Field(None, ge=0)
+    fin_heure: str = Field(..., pattern=_HHMM_PATTERN)
+    fin_temperature_c: float | None = None
+    fin_vent_ms: float | None = Field(None, ge=0)
+
+
+class OperationAerienneRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    numero: int
+    type_operation: TypeOperationAerienne
+    motif_divers: str | None = None
+    debut_heure: str
+    debut_temperature_c: float | None
+    debut_vent_ms: float | None
+    fin_heure: str
+    fin_temperature_c: float | None
+    fin_vent_ms: float | None
+    duree_minutes: int
+
+
 class ProspectionCreate(BaseModel):
     type_prospection: TypeProspection
     campagne_id: uuid.UUID
@@ -438,9 +489,42 @@ class ProspectionCreate(BaseModel):
     conclusion_validation: ConclusionValidation | None = None
     avertissements: list[str] = []
 
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif : mode aérien
+    # ==========================================
+    mode_extensif: ModeExtensif | None = None
+    societe: str | None = None
+    immatricule_aeronef: str | None = None
+    pilote: str | None = None
+    mecanicien: str | None = None
+    chef_de_base: str | None = None
+    base: str | None = None
+    base_secondaire: str | None = None
+
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
+    # ==========================================
+    pesticides_embarques: bool | None = None
+    pesticide_nom_commercial: str | None = None
+    pesticide_quantite_disponible: float | None = Field(None, ge=0, allow_inf_nan=False)
+    pesticide_quantite_recue: float | None = Field(None, ge=0, allow_inf_nan=False)
+    futs_disponible: int | None = Field(None, ge=0)
+    futs_pleins: int | None = Field(None, ge=0)
+    futs_vides: int | None = Field(None, ge=0)
+    futs_recues: int | None = Field(None, ge=0)
+    signature_visa_nom: str | None = None
+    signature_visa_horodatage: datetime | None = None
+    signature_consultant_fao_nom: str | None = None
+    signature_consultant_fao_horodatage: datetime | None = None
+    signature_pilote_nom: str | None = None
+    signature_pilote_horodatage: datetime | None = None
+    signature_chef_base_nom: str | None = None
+    signature_chef_base_horodatage: datetime | None = None
+
     populations: list[PopulationCreate] = []
     captures: list[CaptureCreate] = []
     infestations: list[InfestationCreate] = []
+    operations_aeriennes: list[OperationAerienneCreate] = []
     surface_infestee_pourcent: float | None = Field(None, ge=0, le=100)
 
 
@@ -496,6 +580,38 @@ class ProspectionUpdate(BaseModel):
     signalement_description: str | None = None
     conclusion_validation: ConclusionValidation | None = None
     avertissements: list[str] | None = None
+
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif : mode aérien
+    # ==========================================
+    mode_extensif: ModeExtensif | None = None
+    societe: str | None = None
+    immatricule_aeronef: str | None = None
+    pilote: str | None = None
+    mecanicien: str | None = None
+    chef_de_base: str | None = None
+    base: str | None = None
+    base_secondaire: str | None = None
+
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
+    # ==========================================
+    pesticides_embarques: bool | None = None
+    pesticide_nom_commercial: str | None = None
+    pesticide_quantite_disponible: float | None = Field(None, ge=0, allow_inf_nan=False)
+    pesticide_quantite_recue: float | None = Field(None, ge=0, allow_inf_nan=False)
+    futs_disponible: int | None = Field(None, ge=0)
+    futs_pleins: int | None = Field(None, ge=0)
+    futs_vides: int | None = Field(None, ge=0)
+    futs_recues: int | None = Field(None, ge=0)
+    signature_visa_nom: str | None = None
+    signature_visa_horodatage: datetime | None = None
+    signature_consultant_fao_nom: str | None = None
+    signature_consultant_fao_horodatage: datetime | None = None
+    signature_pilote_nom: str | None = None
+    signature_pilote_horodatage: datetime | None = None
+    signature_chef_base_nom: str | None = None
+    signature_chef_base_horodatage: datetime | None = None
 
 
 class StatutChange(BaseModel):
@@ -580,6 +696,39 @@ class ProspectionRead(BaseModel):
     conclusion_validation: ConclusionValidation | None = None
     avertissements: list[str] = []
 
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif : mode aérien
+    # ==========================================
+    mode_extensif: ModeExtensif | None = None
+    societe: str | None = None
+    immatricule_aeronef: str | None = None
+    pilote: str | None = None
+    mecanicien: str | None = None
+    chef_de_base: str | None = None
+    base: str | None = None
+    base_secondaire: str | None = None
+
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
+    # ==========================================
+    pesticides_embarques: bool | None = None
+    pesticide_nom_commercial: str | None = None
+    pesticide_quantite_disponible: float | None = None
+    pesticide_quantite_recue: float | None = None
+    futs_disponible: int | None = None
+    futs_pleins: int | None = None
+    futs_vides: int | None = None
+    futs_recues: int | None = None
+    signature_visa_nom: str | None = None
+    signature_visa_horodatage: datetime | None = None
+    signature_consultant_fao_nom: str | None = None
+    signature_consultant_fao_horodatage: datetime | None = None
+    signature_pilote_nom: str | None = None
+    signature_pilote_horodatage: datetime | None = None
+    signature_chef_base_nom: str | None = None
+    signature_chef_base_horodatage: datetime | None = None
+
     populations: list[PopulationRead] = []
     captures: list[CaptureRead] = []
     infestations: list[InfestationRead] = []
+    operations_aeriennes: list[OperationAerienneRead] = []

@@ -117,6 +117,57 @@ class ProspectionModel(Base):
         JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb")
     )
 
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif : mode aérien (migration 0035)
+    # ==========================================
+    # Axe orthogonal à `type_prospection`, même pattern que `station_libre`/
+    # `type_station` (migration 0008) — NULL sur toute fiche déjà enregistrée,
+    # traité comme terrestre côté application (aucun backfill).
+    mode_extensif: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    societe: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    immatricule_aeronef: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    pilote: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    mecanicien: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    chef_de_base: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    base: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    base_secondaire: Mapped[str | None] = mapped_column(Text(), nullable=True)
+
+    # ==========================================
+    # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures (migration 0036)
+    # ==========================================
+    # Jeu de valeurs fixe et non répétable par fiche, comme l'équipe/aéronef
+    # ci-dessus — colonnes nullables directes, pas de table séparée.
+    pesticides_embarques: Mapped[bool | None] = mapped_column(Boolean(), nullable=True)
+    pesticide_nom_commercial: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    pesticide_quantite_disponible: Mapped[float | None] = mapped_column(
+        Numeric(10, 2), nullable=True
+    )
+    pesticide_quantite_recue: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    futs_disponible: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    futs_pleins: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    futs_vides: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    futs_recues: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+
+    # Signatures — indépendantes du choix Pesticides. Même principe nom +
+    # horodatage que `TraitementSignatureModel`, en colonnes nommées à plat
+    # (4 rôles fixes, jamais une liste ouverte comme côté traitement).
+    signature_visa_nom: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    signature_visa_horodatage: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    signature_consultant_fao_nom: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    signature_consultant_fao_horodatage: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    signature_pilote_nom: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    signature_pilote_horodatage: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    signature_chef_base_nom: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    signature_chef_base_horodatage: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+
     populations: Mapped[list["ProspectionPopulationModel"]] = relationship(
         back_populates="prospection", cascade="all, delete-orphan"
     )
@@ -125,6 +176,11 @@ class ProspectionModel(Base):
     )
     infestations: Mapped[list["ProspectionInfestationModel"]] = relationship(
         back_populates="prospection", cascade="all, delete-orphan"
+    )
+    operations_aeriennes: Mapped[list["ProspectionOperationAerienneModel"]] = relationship(
+        back_populates="prospection",
+        cascade="all, delete-orphan",
+        order_by="ProspectionOperationAerienneModel.numero",
     )
 
     __table_args__ = (
@@ -159,6 +215,10 @@ class ProspectionModel(Base):
         CheckConstraint(
             "conclusion_validation IN ('confirmee','infirmee')",
             name="ck_prospection_conclusion_validation",
+        ),
+        CheckConstraint(
+            "mode_extensif IN ('terrestre','aerien')",
+            name="ck_prospection_mode_extensif",
         ),
     )
 
@@ -274,6 +334,55 @@ class ProspectionCaptureModel(Base):
         CheckConstraint(
             "phase IN ('solitaire','solitaro_trans','transiens','gregaire')",
             name="ck_prospection_capture_phase",
+        ),
+    )
+
+
+class ProspectionOperationAerienneModel(Base):
+    """Opération de vol (1-N, mode extensif aérien) — miroir structurel de
+    `RotationModel` (traitement_rotation) : `numero` assigné côté application,
+    unicité (prospection_id, numero), suppression en cascade avec la fiche."""
+
+    __tablename__ = "prospection_operation_aerienne"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    prospection_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("prospection.id", ondelete="CASCADE"), nullable=False
+    )
+    numero: Mapped[int] = mapped_column(Integer(), nullable=False)
+    type_operation: Mapped[str] = mapped_column(Text(), nullable=False)
+    # Pertinent seulement si type_operation = 'divers' (migration 0037) — laissé
+    # à l'application plutôt qu'à un CHECK, même politique que les autres champs
+    # conditionnels de la fiche (ex. pesticide_nom_commercial).
+    motif_divers: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    debut_heure: Mapped[str] = mapped_column(Text(), nullable=False)
+    debut_temperature_c: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    debut_vent_ms: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    fin_heure: Mapped[str] = mapped_column(Text(), nullable=False)
+    fin_temperature_c: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    fin_vent_ms: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    # Calculée côté serveur (jamais fait confiance à une valeur client), gère le
+    # passage de minuit — cf. CreateProspection.execute.
+    duree_minutes: Mapped[int] = mapped_column(Integer(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, server_default=sa.text("now()")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=sa.text("now()"),
+        onupdate=sa.text("now()"),
+    )
+
+    prospection: Mapped["ProspectionModel"] = relationship(back_populates="operations_aeriennes")
+
+    __table_args__ = (
+        CheckConstraint(
+            "type_operation IN ('convoyage','prospection','divers')",
+            name="ck_prospection_operation_aerienne_type",
+        ),
+        UniqueConstraint(
+            "prospection_id", "numero", name="uq_prospection_operation_aerienne_numero"
         ),
     )
 

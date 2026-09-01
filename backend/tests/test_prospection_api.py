@@ -228,6 +228,253 @@ async def test_create_prospection_population_extensive_imagos_larves(
 
 
 @pytest.mark.asyncio
+async def test_create_prospection_extensive_mode_aerien(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+):
+    """Mode aérien : infos équipe/aéronef + opérations, numero et duree_minutes
+    assignés côté serveur (jamais fait confiance au client — OperationAerienneCreate
+    ne porte d'ailleurs ni l'un ni l'autre). Deuxième opération choisie à cheval sur
+    minuit pour vérifier explicitement ce cas (23:00 → 01:15 = 135 min, pas -1305)."""
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "extensive",
+            "campagne_id": str(campagne_id),
+            "date_prospection": "2026-08-26",
+            "mode_extensif": "aerien",
+            "societe": "Air Acridien",
+            "immatricule_aeronef": "5R-ABC",
+            "pilote": "Jean Rakoto",
+            "mecanicien": "Marc Andria",
+            "chef_de_base": "Sarah Ravelo",
+            "base": "Tuléar",
+            "base_secondaire": "Ihosy",
+            "operations_aeriennes": [
+                {
+                    "type_operation": "prospection",
+                    "debut_heure": "08:00",
+                    "debut_temperature_c": 24,
+                    "debut_vent_ms": 3.2,
+                    "fin_heure": "10:30",
+                    "fin_temperature_c": 26,
+                    "fin_vent_ms": 4.1,
+                },
+                {
+                    "type_operation": "convoyage",
+                    "debut_heure": "23:00",
+                    "fin_heure": "01:15",
+                },
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    data = response.json()
+
+    assert data["mode_extensif"] == "aerien"
+    assert data["societe"] == "Air Acridien"
+    assert data["immatricule_aeronef"] == "5R-ABC"
+    assert data["pilote"] == "Jean Rakoto"
+    assert data["mecanicien"] == "Marc Andria"
+    assert data["chef_de_base"] == "Sarah Ravelo"
+    assert data["base"] == "Tuléar"
+    assert data["base_secondaire"] == "Ihosy"
+
+    operations = data["operations_aeriennes"]
+    assert len(operations) == 2
+    op1, op2 = sorted(operations, key=lambda o: o["numero"])
+    assert op1["numero"] == 1
+    assert op1["type_operation"] == "prospection"
+    assert op1["duree_minutes"] == 150  # 08:00 → 10:30
+    assert op2["numero"] == 2
+    assert op2["type_operation"] == "convoyage"
+    assert op2["duree_minutes"] == 135  # 23:00 → 01:15, franchit minuit
+
+    total_jour = sum(o["duree_minutes"] for o in operations)
+    assert total_jour == 285
+
+
+@pytest.mark.asyncio
+async def test_create_prospection_operation_motif_divers(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+):
+    """« Motif du divers » (#ux-aerien) : persisté seulement pour l'opération de
+    type Divers, `None` pour les autres — jamais exigé ni inventé."""
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "extensive",
+            "campagne_id": str(campagne_id),
+            "date_prospection": "2026-09-02",
+            "mode_extensif": "aerien",
+            "operations_aeriennes": [
+                {
+                    "type_operation": "divers",
+                    "motif_divers": "Rinçage",
+                    "debut_heure": "11:00",
+                    "fin_heure": "11:30",
+                },
+                {
+                    "type_operation": "prospection",
+                    "debut_heure": "08:00",
+                    "fin_heure": "09:00",
+                },
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    data = response.json()
+
+    op1, op2 = sorted(data["operations_aeriennes"], key=lambda o: o["numero"])
+    assert op1["type_operation"] == "divers"
+    assert op1["motif_divers"] == "Rinçage"
+    assert op2["type_operation"] == "prospection"
+    assert op2["motif_divers"] is None
+
+
+@pytest.mark.asyncio
+async def test_create_prospection_extensive_mode_terrestre_inchange(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+):
+    """Non-régression : une fiche extensive sans mode_extensif (terrestre implicite,
+    comportement historique) ne réclame et n'active aucun champ aérien."""
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "extensive",
+            "campagne_id": str(campagne_id),
+            "date_prospection": "2026-08-26",
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    data = response.json()
+
+    assert data["mode_extensif"] is None
+    assert data["societe"] is None
+    assert data["pilote"] is None
+    assert data["operations_aeriennes"] == []
+    # Suite du mode aérien (#pesticides-embarques-signatures) : une fiche terrestre
+    # ne réclame ni n'active davantage les champs pesticides/signatures.
+    assert data["pesticides_embarques"] is None
+    assert data["pesticide_nom_commercial"] is None
+    assert data["futs_disponible"] is None
+    assert data["signature_visa_nom"] is None
+
+
+@pytest.mark.asyncio
+async def test_create_prospection_extensive_pesticides_embarques_oui(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+):
+    """Pesticides embarqués = OUI : nom commercial, quantités, fûts (valeurs de
+    test 10/6/4/5) et les 4 signatures sont tous persistés et relus tels quels."""
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "extensive",
+            "campagne_id": str(campagne_id),
+            "date_prospection": "2026-08-26",
+            "mode_extensif": "aerien",
+            "pesticides_embarques": True,
+            "pesticide_nom_commercial": "Fyfanon ULV",
+            "pesticide_quantite_disponible": 500,
+            "pesticide_quantite_recue": 200,
+            "futs_disponible": 10,
+            "futs_pleins": 6,
+            "futs_vides": 4,
+            "futs_recues": 5,
+            "signature_visa_nom": "Rakoto V.",
+            "signature_visa_horodatage": "2026-08-26T09:00:00Z",
+            "signature_consultant_fao_nom": "John Smith",
+            "signature_consultant_fao_horodatage": "2026-08-26T09:05:00Z",
+            "signature_pilote_nom": "Jean Rakoto",
+            "signature_pilote_horodatage": "2026-08-26T09:10:00Z",
+            "signature_chef_base_nom": "Sarah Ravelo",
+            "signature_chef_base_horodatage": "2026-08-26T09:15:00Z",
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    data = response.json()
+
+    assert data["pesticides_embarques"] is True
+    assert data["pesticide_nom_commercial"] == "Fyfanon ULV"
+    assert data["pesticide_quantite_disponible"] == 500
+    assert data["pesticide_quantite_recue"] == 200
+    assert data["futs_disponible"] == 10
+    assert data["futs_pleins"] == 6
+    assert data["futs_vides"] == 4
+    assert data["futs_recues"] == 5
+    assert data["signature_visa_nom"] == "Rakoto V."
+    assert data["signature_consultant_fao_nom"] == "John Smith"
+    assert data["signature_pilote_nom"] == "Jean Rakoto"
+    assert data["signature_chef_base_nom"] == "Sarah Ravelo"
+
+    # Round-trip GET : la relecture renvoie exactement ce qui a été enregistré.
+    get_response = await client.get(f"/prospections/{data['id']}", headers=auth_headers)
+    assert get_response.status_code == 200
+    reread = get_response.json()
+    assert reread["futs_disponible"] == 10
+    assert reread["futs_pleins"] == 6
+    assert reread["futs_vides"] == 4
+    assert reread["futs_recues"] == 5
+    assert reread["signature_visa_nom"] == "Rakoto V."
+
+
+@pytest.mark.asyncio
+async def test_create_prospection_extensive_pesticides_embarques_non(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+):
+    """Pesticides embarqués = NON : les champs dépendants (nom commercial,
+    quantités, fûts) ne sont ni exigés ni inventés — restent `None`."""
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "extensive",
+            "campagne_id": str(campagne_id),
+            "date_prospection": "2026-08-26",
+            "mode_extensif": "aerien",
+            "pesticides_embarques": False,
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    data = response.json()
+
+    assert data["pesticides_embarques"] is False
+    assert data["pesticide_nom_commercial"] is None
+    assert data["pesticide_quantite_disponible"] is None
+    assert data["futs_disponible"] is None
+    assert data["futs_pleins"] is None
+    assert data["futs_vides"] is None
+    assert data["futs_recues"] is None
+
+
+@pytest.mark.asyncio
+async def test_create_prospection_futs_negatif_rejete(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+):
+    """Un fût négatif est rejeté (422) avec un message qui nomme le champ en
+    cause — jamais silencieusement accepté ni arrondi à zéro."""
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "extensive",
+            "campagne_id": str(campagne_id),
+            "date_prospection": "2026-08-26",
+            "mode_extensif": "aerien",
+            "pesticides_embarques": True,
+            "futs_disponible": -1,
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert any(err["loc"][-1] == "futs_disponible" for err in detail)
+
+
+@pytest.mark.asyncio
 async def test_create_prospection_avec_avertissements(
     client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
 ):
