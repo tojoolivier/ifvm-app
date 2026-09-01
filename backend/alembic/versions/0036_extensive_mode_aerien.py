@@ -21,8 +21,8 @@ terrestre existant (comportement inchangé).
   d'écriture (mobile et backend appliquent la même règle), et ça évite de
   reparser `HH:MM` à chaque rendu de liste/récapitulatif.
 
-Revision ID: 0035
-Revises: 0034
+Revision ID: 0036
+Revises: 0035
 Create Date: 2026-09-01
 
 """
@@ -32,8 +32,8 @@ from sqlalchemy.dialects.postgresql import UUID
 
 from alembic import op
 
-revision = "0035"
-down_revision = "0034"
+revision = "0036"
+down_revision = "0035"
 branch_labels = None
 depends_on = None
 
