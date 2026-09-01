@@ -6,11 +6,15 @@ from app.domain.campagne import Campagne
 from app.domain.referentiel import (
     CodeReferentielDejaPrisError,
     CodeStade,
+    Commune,
+    CommuneInconnueError,
     Culture,
     GrilleDejaOccupeeError,
     Pesticide,
     PosteAcridien,
     PosteAcridienAvecStationsActivesError,
+    PosteAcridienInactifError,
+    PosteAcridienIntrouvableError,
     StadeInconnuError,
     StationFixe,
     UtilisateurEquipe,
@@ -20,6 +24,7 @@ from app.domain.referentiel import (
 from app.domain.repositories import (
     CampagneRepository,
     CodeStadeRepository,
+    CommuneRepository,
     CultureRepository,
     PesticideRepository,
     PosteAcridienRepository,
@@ -127,6 +132,157 @@ class UpdatePosteAcridien:
 
         poste.updated_at = datetime.now(timezone.utc)
         return await self.repository.update(poste)
+
+
+class ListCommunes:
+    def __init__(self, repository: CommuneRepository):
+        self.repository = repository
+
+    async def execute(self) -> list[Commune]:
+        return await self.repository.list_all()
+
+
+class CreateStation:
+    def __init__(
+        self,
+        repository: StationFixeRepository,
+        poste_repository: PosteAcridienRepository,
+        commune_repository: CommuneRepository,
+    ):
+        self.repository = repository
+        self.poste_repository = poste_repository
+        self.commune_repository = commune_repository
+
+    async def execute(
+        self,
+        code: str,
+        nom: str,
+        pa_id: uuid.UUID,
+        latitude: float,
+        longitude: float,
+        commune_id: uuid.UUID,
+        altitude: float | None = None,
+    ) -> StationFixe:
+        await _valide_rattachement_station(
+            poste_repository=self.poste_repository,
+            commune_repository=self.commune_repository,
+            pa_id=pa_id,
+            commune_id=commune_id,
+        )
+        if await self.repository.code_pris_par_un_autre(code):
+            raise CodeReferentielDejaPrisError(code)
+
+        maintenant = datetime.now(timezone.utc)
+        station = StationFixe(
+            code=code,
+            nom=nom,
+            pa_id=pa_id,
+            latitude=latitude,
+            longitude=longitude,
+            altitude=altitude,
+            commune_id=commune_id,
+            actif=True,
+            created_at=maintenant,
+            updated_at=maintenant,
+        )
+        return await self.repository.create(station)
+
+
+class UpdateStation:
+    """Mise à jour d'une station, `actif` compris.
+
+    Aucune suppression physique n'est offerte : le pull hors-ligne ne transporte que
+    des upserts, une ligne supprimée resterait sur les téléphones déjà synchronisés —
+    et une station est référencée par des prospections.
+    """
+
+    def __init__(
+        self,
+        repository: StationFixeRepository,
+        poste_repository: PosteAcridienRepository,
+        commune_repository: CommuneRepository,
+    ):
+        self.repository = repository
+        self.poste_repository = poste_repository
+        self.commune_repository = commune_repository
+
+    async def execute(
+        self,
+        station_id: uuid.UUID,
+        champs_fournis: set[str],
+        code: str | None = None,
+        nom: str | None = None,
+        pa_id: uuid.UUID | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
+        altitude: float | None = None,
+        commune_id: uuid.UUID | None = None,
+        actif: bool | None = None,
+    ) -> StationFixe | None:
+        station = await self.repository.get_by_id(station_id)
+        if station is None:
+            return None
+
+        # Rattachements validés seulement s'ils changent : un poste fermé ne doit pas
+        # rendre inéditable une station qui lui était déjà rattachée.
+        if pa_id is not None and pa_id != station.pa_id:
+            await _valide_rattachement_station(
+                poste_repository=self.poste_repository,
+                commune_repository=self.commune_repository,
+                pa_id=pa_id,
+            )
+            station.pa_id = pa_id
+
+        if commune_id is not None and commune_id != station.commune_id:
+            await _valide_rattachement_station(
+                poste_repository=self.poste_repository,
+                commune_repository=self.commune_repository,
+                commune_id=commune_id,
+            )
+            station.commune_id = commune_id
+
+        if code is not None and code != station.code:
+            if await self.repository.code_pris_par_un_autre(code, exclude_id=station_id):
+                raise CodeReferentielDejaPrisError(code)
+            station.code = code
+
+        if nom is not None:
+            station.nom = nom
+        if latitude is not None:
+            station.latitude = latitude
+        if longitude is not None:
+            station.longitude = longitude
+        # `altitude` est nullable : seul le corps reçu distingue « absent » de
+        # « mis à NULL », la comparaison de valeur ne suffit pas.
+        if "altitude" in champs_fournis:
+            station.altitude = altitude
+        if actif is not None:
+            station.actif = actif
+
+        # Sans `updated_at` rehaussé, le pull incrémental sauterait la modification.
+        station.updated_at = datetime.now(timezone.utc)
+        return await self.repository.update(station)
+
+
+async def _valide_rattachement_station(
+    poste_repository: PosteAcridienRepository,
+    commune_repository: CommuneRepository,
+    pa_id: uuid.UUID | None = None,
+    commune_id: uuid.UUID | None = None,
+) -> None:
+    """Les deux FK de `station_fixe` sont NOT NULL et sortent d'un sélecteur : on les
+    contrôle ici pour rendre un 409 explicite plutôt qu'une IntegrityError 500."""
+    if pa_id is not None:
+        poste = await poste_repository.get_by_id(pa_id)
+        if poste is None:
+            raise PosteAcridienIntrouvableError(str(pa_id))
+        # Réciproque de `PosteAcridienAvecStationsActivesError` : on ne ferme pas un
+        # poste sous des stations actives, on n'en accroche pas une à un poste fermé.
+        if not poste.actif:
+            raise PosteAcridienInactifError(poste.code)
+
+    if commune_id is not None and not await commune_repository.exists(commune_id):
+        raise CommuneInconnueError(str(commune_id))
 
 
 class ListStations:

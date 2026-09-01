@@ -76,11 +76,11 @@ describe('ReferentielsPage — maquette §11 du handoff', () => {
 
     await waitFor(() => expect(nav().getByText('7 référentiels')).toBeInTheDocument())
 
-    // 2 entités sans écriture backend : pesticide, station_fixe.
-    expect(nav().getAllByText('à créer')).toHaveLength(2)
-    // 5 entités avec au moins une lecture/écriture exposée : culture (#130),
-    // code_stade, poste_acridien, utilisateur, campagne.
-    expect(nav().getAllByText('API')).toHaveLength(5)
+    // 1 entité sans écriture backend : pesticide.
+    expect(nav().getAllByText('à créer')).toHaveLength(1)
+    // 6 entités avec au moins une lecture/écriture exposée : culture (#130),
+    // code_stade, poste_acridien, station_fixe (#133), utilisateur, campagne.
+    expect(nav().getAllByText('API')).toHaveLength(6)
   })
 
   it("signale l'écart matière active / dose de référence sur les pesticides", async () => {
@@ -575,5 +575,165 @@ describe('ReferentielsPage — écritures culture (#130)', () => {
     ])
 
     expect(screen.getByText('MAN')).toBeInTheDocument()
+  })
+})
+
+describe('ReferentielsPage — écritures station_fixe (#133)', () => {
+  const POSTE = { id: 'pa1', code: 'PA-ZOM', nom: 'Zombitse', actif: true }
+  const COMMUNE = { id: 'cm1', nom: 'Ambovombe', district: 'Androy', region: 'Anosy' }
+
+  const STATION = {
+    id: 'st1',
+    code: 'ST-001',
+    nom: 'Ambovombe Nord',
+    pa_id: 'pa1',
+    pa_code: 'PA-ZOM',
+    pa_nom: 'Zombitse',
+    commune_id: 'cm1',
+    commune: 'Ambovombe',
+    district: 'Androy',
+    region: 'Anosy',
+    latitude: -25.17,
+    longitude: 46.08,
+    altitude: 120,
+    actif: true,
+    created_at: SERVER_TIME,
+    updated_at: SERVER_TIME,
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  /**
+   * L'écran lit `/stations` et non le pull : `StationFixeSyncRead` ne porte que les
+   * FK brutes, sans `commune_id` — impossible d'y présélectionner la commune.
+   */
+  function mockGetParUrl(stations: Record<string, unknown>[] = [STATION]) {
+    mockedGet.mockImplementation((url: string) => {
+      if (url.startsWith('/stations')) return Promise.resolve({ data: stations })
+      if (url.startsWith('/postes-acridiens')) return Promise.resolve({ data: [POSTE] })
+      if (url.startsWith('/communes')) return Promise.resolve({ data: [COMMUNE] })
+      return Promise.resolve(pull())
+    })
+  }
+
+  async function ouvrirStations(stations: Record<string, unknown>[] = [STATION]) {
+    mockGetParUrl(stations)
+    renderPage()
+    await waitFor(() => expect(nav().getByText('station_fixe')).toBeInTheDocument())
+    fireEvent.click(nav().getByText('station_fixe'))
+    await screen.findByDisplayValue('ST-001')
+  }
+
+  it('ouvre le panneau Modifier prérempli, rattachements compris', async () => {
+    await ouvrirStations()
+
+    expect(screen.getByDisplayValue('Ambovombe Nord')).toBeInTheDocument()
+    expect(screen.getByLabelText('Poste acridien *')).toHaveValue('pa1')
+    expect(screen.getByLabelText('Commune *')).toHaveValue('cm1')
+    expect(screen.getByLabelText('Latitude *')).toHaveValue(-25.17)
+    expect(screen.getByLabelText('Altitude (m)')).toHaveValue(120)
+    expect(screen.getByRole('button', { name: 'Enregistrer' })).not.toHaveAttribute('aria-disabled')
+    expect(screen.getByRole('button', { name: '+ Nouvelle station' })).not.toHaveAttribute(
+      'aria-disabled',
+    )
+  })
+
+  it('affiche district et région en champs dérivés, jamais saisissables', async () => {
+    await ouvrirStations()
+
+    expect(screen.getByText('District')).toBeInTheDocument()
+    expect(screen.getByText('Région')).toBeInTheDocument()
+    expect(screen.queryByDisplayValue('Androy')).not.toBeInTheDocument()
+  })
+
+  it('enregistre une modification en PUT', async () => {
+    mockedPut.mockResolvedValue({ data: STATION })
+    await ouvrirStations()
+
+    fireEvent.change(screen.getByDisplayValue('Ambovombe Nord'), {
+      target: { value: 'Ambovombe Sud' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    await waitFor(() =>
+      expect(mockedPut).toHaveBeenCalledWith(
+        '/stations/st1',
+        expect.objectContaining({ nom: 'Ambovombe Sud', pa_id: 'pa1', commune_id: 'cm1' }),
+      ),
+    )
+  })
+
+  it('crée une station via POST /stations', async () => {
+    mockedPost.mockResolvedValue({ data: { ...STATION, id: 'st2', code: 'ST-002' } })
+    await ouvrirStations()
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Nouvelle station' }))
+
+    const modal = within(screen.getByRole('dialog', { name: 'Nouvelle station' }))
+    fireEvent.change(modal.getByLabelText('Code *'), { target: { value: 'ST-002' } })
+    fireEvent.change(modal.getByLabelText('Nom *'), { target: { value: 'Ambovombe Est' } })
+    fireEvent.change(modal.getByLabelText('Poste acridien *'), { target: { value: 'pa1' } })
+    fireEvent.change(modal.getByLabelText('Commune *'), { target: { value: 'cm1' } })
+    fireEvent.change(modal.getByLabelText('Latitude *'), { target: { value: '-25' } })
+    fireEvent.change(modal.getByLabelText('Longitude *'), { target: { value: '46' } })
+    fireEvent.click(modal.getByRole('button', { name: 'Créer' }))
+
+    await waitFor(() => expect(mockedPost).toHaveBeenCalledTimes(1))
+    const [url, payload] = mockedPost.mock.calls[0]
+    expect(url).toBe('/stations')
+    expect(payload).toMatchObject({
+      code: 'ST-002',
+      nom: 'Ambovombe Est',
+      pa_id: 'pa1',
+      commune_id: 'cm1',
+      latitude: -25,
+      longitude: 46,
+    })
+  })
+
+  it("désactive une station par l'interrupteur, seule sortie de service offerte", async () => {
+    mockedPut.mockResolvedValue({ data: { ...STATION, actif: false } })
+    await ouvrirStations()
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Actif' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    await waitFor(() =>
+      expect(mockedPut).toHaveBeenCalledWith(
+        '/stations/st1',
+        expect.objectContaining({ actif: false }),
+      ),
+    )
+  })
+
+  it('affiche le refus du backend quand le poste visé est désactivé', async () => {
+    mockedPut.mockRejectedValue({
+      response: {
+        data: { detail: 'Le poste acridien « PA-OFF » est désactivé : aucun nouveau rattachement possible' },
+      },
+    })
+    await ouvrirStations()
+
+    fireEvent.change(screen.getByDisplayValue('Ambovombe Nord'), { target: { value: 'X' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('est désactivé')
+  })
+
+  it('« Annuler » revient à la valeur du serveur', async () => {
+    await ouvrirStations()
+
+    fireEvent.change(screen.getByDisplayValue('Ambovombe Nord'), { target: { value: 'Brouillon' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Annuler' }))
+
+    expect(screen.getByDisplayValue('Ambovombe Nord')).toBeInTheDocument()
+  })
+
+  it('aucune affordance de suppression : le pull ne transporte que des upserts', async () => {
+    await ouvrirStations()
+
+    expect(screen.queryByRole('button', { name: /supprimer/i })).not.toBeInTheDocument()
   })
 })

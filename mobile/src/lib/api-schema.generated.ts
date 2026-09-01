@@ -180,6 +180,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/communes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Communes */
+        get: operations["list_communes_communes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/stations": {
         parameters: {
             query?: never;
@@ -190,7 +207,8 @@ export interface paths {
         /** List Stations */
         get: operations["list_stations_stations_get"];
         put?: never;
-        post?: never;
+        /** Create Station */
+        post: operations["create_station_stations_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -206,7 +224,8 @@ export interface paths {
         };
         /** Get Station */
         get: operations["get_station_stations__station_id__get"];
-        put?: never;
+        /** Update Station */
+        put: operations["update_station_stations__station_id__put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -952,6 +971,24 @@ export interface components {
         CommentaireCreate: {
             /** Texte */
             texte: string;
+        };
+        /**
+         * CommuneRead
+         * @description Sélecteur du formulaire de station : `station_fixe.commune_id` est NOT NULL,
+         *     l'UI a besoin de la liste pour le renseigner.
+         */
+        CommuneRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Nom */
+            nom: string;
+            /** District */
+            district: string;
+            /** Region */
+            region: string;
         };
         /**
          * ComportementInfestation
@@ -2369,6 +2406,33 @@ export interface components {
          * @enum {string}
          */
         StadeImago: "A1" | "A2" | "A3" | "A4" | "A5";
+        /**
+         * StationFixeCreate
+         * @description Bornes reprises du domaine géographique : un 422 lisible plutôt qu'une station
+         *     posée au large de Madagascar.
+         */
+        StationFixeCreate: {
+            /** Code */
+            code: string;
+            /** Nom */
+            nom: string;
+            /**
+             * Pa Id
+             * Format: uuid
+             */
+            pa_id: string;
+            /** Latitude */
+            latitude: number;
+            /** Longitude */
+            longitude: number;
+            /** Altitude */
+            altitude?: number | null;
+            /**
+             * Commune Id
+             * Format: uuid
+             */
+            commune_id: string;
+        };
         /** StationFixeRead */
         StationFixeRead: {
             /**
@@ -2395,6 +2459,11 @@ export interface components {
             longitude: number;
             /** Altitude */
             altitude: number | null;
+            /**
+             * Commune Id
+             * Format: uuid
+             */
+            commune_id: string;
             /** Commune */
             commune: string;
             /** District */
@@ -2408,6 +2477,11 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** StationFixeSyncRead */
         StationFixeSyncRead: {
@@ -2444,6 +2518,28 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /**
+         * StationFixeUpdate
+         * @description Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie.
+         */
+        StationFixeUpdate: {
+            /** Code */
+            code?: string | null;
+            /** Nom */
+            nom?: string | null;
+            /** Pa Id */
+            pa_id?: string | null;
+            /** Latitude */
+            latitude?: number | null;
+            /** Longitude */
+            longitude?: number | null;
+            /** Altitude */
+            altitude?: number | null;
+            /** Commune Id */
+            commune_id?: string | null;
+            /** Actif */
+            actif?: boolean | null;
         };
         /** StatutChange */
         StatutChange: {
@@ -3674,6 +3770,26 @@ export interface operations {
             };
         };
     };
+    list_communes_communes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommuneRead"][];
+                };
+            };
+        };
+    };
     list_stations_stations_get: {
         parameters: {
             query?: {
@@ -3709,6 +3825,39 @@ export interface operations {
             };
         };
     };
+    create_station_stations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StationFixeCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationFixeRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_station_stations__station_id__get: {
         parameters: {
             query?: never;
@@ -3719,6 +3868,41 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationFixeRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_station_stations__station_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                station_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StationFixeUpdate"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
