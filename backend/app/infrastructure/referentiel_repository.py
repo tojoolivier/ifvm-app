@@ -119,7 +119,8 @@ class PosteAcridienRepositoryImpl(PosteAcridienRepository):
         """Une écriture ne renvoie jamais l'entité écrite telle quelle : `za_code`,
         `za_nom` et `nb_stations` sont des jointures/agrégats, absents du modèle ORM."""
         poste = await self.get_by_id(pa_id)
-        assert poste is not None  # on vient de l'écrire dans la même session
+        if poste is None:  # pragma: no cover — on vient de l'écrire dans cette session
+            raise RuntimeError(f"Poste acridien {pa_id} introuvable juste après écriture")
         return poste
 
     def _select_with_zone(self):
