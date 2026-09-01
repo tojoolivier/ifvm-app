@@ -34,20 +34,13 @@ export default function TypeChooserScreen() {
       }
     );
 
-  const chooseExtensive = () =>
-    run(
-      async () => {
-        const draft = await startNewProspection({ token: token!, prospecteurId: user!.id, typeProspection: 'extensive' });
-        await hydrateFromDraft(draft.id);
-        router.replace({ pathname: '/(prospection)/extensive-reference' as any, params: { draftId: draft.id } });
-      },
-      {
-        screen: 'type-chooser',
-        precondition: !!user && !!token,
-        preconditionMessage: 'Session expirée — reconnectez-vous pour créer une fiche.',
-        context: { typeProspection: 'extensive' },
-      }
-    );
+  // Le brouillon extensif n'est pas créé ici : l'écran de choix du mode
+  // (terrestre/aérien) le crée lui-même une fois le mode choisi — même report
+  // qu'avant "☑ Vérifier un signalement" ci-dessous, pour ne jamais créer de
+  // brouillon orphelin si l'agent revient en arrière avant d'avoir choisi.
+  const chooseExtensive = () => {
+    router.push('/(prospection)/extensive-mode-chooser' as any);
+  };
 
   const chooseValidation = () => {
     router.push('/(prospection)/extensive-signalement' as any);

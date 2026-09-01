@@ -98,6 +98,8 @@ export async function startNewProspection(params: {
   signalementSource?: string | null;
   signalementDate?: string | null;
   signalementDescription?: string | null;
+  /** Extensif uniquement — choisi sur l'écran Terrestre/Aérien avant la création. */
+  modeExtensif?: string | null;
 }): Promise<DraftProspection> {
   log.detail('prospection.nouvelle.demande', {
     prospecteurId: params.prospecteurId,
@@ -149,6 +151,7 @@ export async function startNewProspection(params: {
     signalementSource: params.signalementSource ?? null,
     signalementDate: params.signalementDate ?? null,
     signalementDescription: params.signalementDescription ?? null,
+    modeExtensif: params.modeExtensif ?? null,
   });
 
   // `event` et non `detail` : la création d'un brouillon est le fait notable
