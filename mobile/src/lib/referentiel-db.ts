@@ -194,6 +194,49 @@ export async function listCampagnesLocal(): Promise<CampagneLocal[]> {
   );
 }
 
+export interface Culture {
+  id: string;
+  code: string;
+  nom: string;
+}
+
+/**
+ * Cultures actives du référentiel local, triées par nom. Alimente les « dégâts sur
+ * culture » (prospection) : c'est le référentiel synchronisé — et non une liste écrite
+ * en dur dans l'écran — qui décide quelles cultures existent. `culture` descend déjà
+ * dans le SQLite via `GET /referentiel/pull` mais n'était jamais relue (#135).
+ */
+export async function listCultures(): Promise<Culture[]> {
+  const db = await getReferentielDb();
+  return db.getAllAsync<Culture>(
+    'SELECT id, code, nom FROM culture WHERE actif = 1 ORDER BY nom'
+  );
+}
+
+export interface CodeStade {
+  id: string;
+  code: string;
+  categorie: string | null;
+  sexe: string | null;
+  espece: string | null;
+  libelle: string;
+  ordre: number;
+}
+
+/**
+ * Codes de stade actifs du référentiel local, dans l'ordre du référentiel. Alimente
+ * les usages qui recensent les stades/phases (zones exposées, stade dominant, phases du
+ * compteur). Contrairement à `listStadesGrille`, aucune projection espèce/sexe ici :
+ * la liste brute du référentiel, à charge à l'appelant de filtrer. `code_stade`
+ * descend déjà dans le SQLite mais n'était relu que par `listStadesGrille` (#135).
+ */
+export async function listCodesStades(): Promise<CodeStade[]> {
+  const db = await getReferentielDb();
+  return db.getAllAsync<CodeStade>(
+    'SELECT id, code, categorie, sexe, espece, libelle, ordre FROM code_stade WHERE actif = 1 ORDER BY ordre'
+  );
+}
+
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const toRad = (deg: number) => (deg * Math.PI) / 180;
   const R = 6371;
