@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
 import { startNewProspection } from '@/lib/prospection-accueil';
+import { setProspectionModeExtensif } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useAsyncAction } from '@/hooks/use-async-action';
 
@@ -21,9 +22,19 @@ type ModeExtensif = 'terrestre' | 'aerien';
  * charge la fiche extensive exactement comme avant (aucun champ aérien affiché,
  * aucune donnée aérienne créée) ; le mode aérien ajoute le bloc équipe/aéronef et
  * les opérations de vol sur le slide Références (cf. extensive-reference.tsx).
+ *
+ * Deux points d'entrée :
+ * - Depuis `type-chooser.tsx` (carte « Extensive »), aucun brouillon n'existe
+ *   encore : `draftId` est absent, ce choix crée le brouillon (comportement
+ *   historique, inchangé).
+ * - Depuis `extensive-signalement.tsx` (« Vérifier un signalement »), le
+ *   brouillon existe déjà (type_prospection = 'validation', champs de
+ *   signalement déjà enregistrés) et arrive ici via `draftId` : ce choix se
+ *   contente de fixer son `mode_extensif`, sans recréer de brouillon.
  */
 export default function ExtensiveModeChooserScreen() {
   const router = useRouter();
+  const { draftId: existingDraftId } = useLocalSearchParams<{ draftId?: string }>();
   const user = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.token);
   const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
@@ -33,12 +44,14 @@ export default function ExtensiveModeChooserScreen() {
   const handleContinue = () =>
     run(
       async () => {
-        const draft = await startNewProspection({
-          token: token!,
-          prospecteurId: user!.id,
-          typeProspection: 'extensive',
-          modeExtensif: mode,
-        });
+        const draft = existingDraftId
+          ? await setProspectionModeExtensif(existingDraftId, mode!)
+          : await startNewProspection({
+              token: token!,
+              prospecteurId: user!.id,
+              typeProspection: 'extensive',
+              modeExtensif: mode,
+            });
         await hydrateFromDraft(draft.id);
         router.replace({ pathname: '/(prospection)/extensive-reference' as any, params: { draftId: draft.id } });
       },
@@ -48,7 +61,7 @@ export default function ExtensiveModeChooserScreen() {
         preconditionMessage: mode
           ? 'Session expirée — reconnectez-vous pour créer une fiche.'
           : 'Choisissez un mode de prospection avant de continuer.',
-        context: { typeProspection: 'extensive', mode },
+        context: { typeProspection: existingDraftId ? 'validation' : 'extensive', mode, draftId: existingDraftId ?? null },
       }
     );
 
@@ -63,7 +76,7 @@ export default function ExtensiveModeChooserScreen() {
         </View>
 
         <View style={styles.content}>
-          <Text style={styles.hint}>Choisissez comment cette prospection extensive a été réalisée.</Text>
+          <Text style={styles.hint}>Choisissez comment cette prospection a été réalisée.</Text>
 
           <TouchableOpacity
             style={[styles.card, mode === 'terrestre' && styles.cardActiveGreen]}

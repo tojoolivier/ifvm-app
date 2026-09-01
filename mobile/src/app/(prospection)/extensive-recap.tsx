@@ -422,6 +422,43 @@ export default function ExtensiveRecapScreen() {
                 <Text style={styles.detailLine}>Remarques : {draft.observations || '—'}</Text>
               </View>
 
+              {isAerien && (
+                <>
+                  <Text style={styles.detailSubtitle}>Références aériennes</Text>
+                  <View style={styles.summaryCard}>
+                    <DetailRows rows={buildReferencesAeriennesRows(draft)} />
+                  </View>
+
+                  <Text style={styles.detailSubtitle}>Opérations</Text>
+                  <View style={styles.summaryCard}>
+                    {operationsAeriennes.length === 0 ? (
+                      <Text style={styles.detailLine}>Aucune opération enregistrée.</Text>
+                    ) : (
+                      operationsAeriennes.map((op, index) => (
+                        <View key={index} style={index > 0 ? { marginTop: 8 } : undefined}>
+                          <Text style={styles.detailLine}>Opération {index + 1}</Text>
+                          <DetailRows rows={buildOperationRows(op)} />
+                        </View>
+                      ))
+                    )}
+                    <View style={styles.detailRow}>
+                      <Text style={[styles.detailRowLabel, { fontWeight: '700' }]}>Total jour</Text>
+                      <Text style={styles.detailRowValue}>{formatDuree(totalJourMinutes)}</Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.detailSubtitle}>Pesticides embarqués</Text>
+                  <View style={styles.summaryCard}>
+                    <DetailRows rows={buildPesticidesRows(draft)} />
+                  </View>
+
+                  <Text style={styles.detailSubtitle}>Signatures</Text>
+                  <View style={styles.summaryCard}>
+                    <DetailRows rows={buildSignaturesRows(draft)} />
+                  </View>
+                </>
+              )}
+
               <Text style={styles.conclusionLabel}>Conclusion de la vérification</Text>
             </ScrollView>
 

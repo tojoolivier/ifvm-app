@@ -5,6 +5,8 @@ import {
   listPesticides,
   listUtilisateursByRole,
   listCampagnesLocal,
+  listCultures,
+  listCodesStades,
 } from '../src/lib/referentiel-db';
 
 const execAsync = jest.fn().mockResolvedValue(undefined);
@@ -134,6 +136,60 @@ describe('listCampagnesLocal', () => {
     );
     expect(result).toEqual([
       { id: 'camp-1', name: 'Campagne 2026', start_date: '2026-01-01', end_date: null },
+    ]);
+  });
+});
+
+describe('listCultures', () => {
+  it('lists active cultures ordered by name', async () => {
+    getAllAsync.mockImplementation((sql: string) =>
+      sql.includes('FROM culture')
+        ? Promise.resolve([{ id: 'c-1', code: 'RIZ', nom: 'Riz' }])
+        : Promise.resolve([])
+    );
+
+    const result = await listCultures();
+
+    expect(getAllAsync).toHaveBeenCalledWith(
+      'SELECT id, code, nom FROM culture WHERE actif = 1 ORDER BY nom'
+    );
+    expect(result).toEqual([{ id: 'c-1', code: 'RIZ', nom: 'Riz' }]);
+  });
+});
+
+describe('listCodesStades', () => {
+  it('lists active code_stade rows in référentiel order', async () => {
+    getAllAsync.mockImplementation((sql: string) =>
+      sql.includes('FROM code_stade')
+        ? Promise.resolve([
+            {
+              id: 's-1',
+              code: 'L3',
+              categorie: 'larve',
+              sexe: null,
+              espece: null,
+              libelle: 'Larve L3',
+              ordre: 3,
+            },
+          ])
+        : Promise.resolve([])
+    );
+
+    const result = await listCodesStades();
+
+    expect(getAllAsync).toHaveBeenCalledWith(
+      'SELECT id, code, categorie, sexe, espece, libelle, ordre FROM code_stade WHERE actif = 1 ORDER BY ordre'
+    );
+    expect(result).toEqual([
+      {
+        id: 's-1',
+        code: 'L3',
+        categorie: 'larve',
+        sexe: null,
+        espece: null,
+        libelle: 'Larve L3',
+        ordre: 3,
+      },
     ]);
   });
 });
