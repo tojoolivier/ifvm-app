@@ -32,6 +32,10 @@ jest.mock('@/lib/prospection-repository', () => ({
     latitude: -18.9,
     longitude: 47.5,
   }),
+  // Mode aérien uniquement — jamais appelées pour un brouillon terrestre (garde
+  // `isAerien` dans l'écran), donc sans effet sur les tests existants ci-dessous.
+  listOperationsAeriennes: jest.fn().mockResolvedValue([]),
+  saveOperationsAeriennes: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('@/lib/location', () => ({
@@ -167,5 +171,205 @@ describe('ExtensiveReferenceScreen — restauration après hydratation tardive d
 
     expect(await screen.findByText(formatHeureLocale('2026-08-25T09:12:00.000Z'))).toBeVisible();
     expect(location.getCurrentPosition).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Mode aérien (#regroupement-slides — ajout du mode aérien) : le bloc équipe/aéronef
+ * et les opérations n'apparaissent que si `mode_extensif === 'aerien'`, se restaurent
+ * depuis la base locale, et se réenregistrent avec la durée recalculée à l'identique.
+ */
+describe('ExtensiveReferenceScreen — mode aérien', () => {
+  beforeEach(() => {
+    jest.mocked(prospectionRepository.updateProspectionExtensiveReference).mockClear();
+    jest.mocked(prospectionRepository.listOperationsAeriennes).mockClear().mockResolvedValue([]);
+    jest.mocked(prospectionRepository.saveOperationsAeriennes).mockClear();
+    useProspectionWizardStore.setState({ draft: null, captures: [] });
+  });
+
+  it("n'affiche aucun champ aérien pour une fiche terrestre (mode_extensif absent)", async () => {
+    useProspectionWizardStore.setState({
+      draft: { id: 'draft-123', type_prospection: 'extensive', date_prospection: '2026-08-25', latitude: -18.9, longitude: 47.5 } as any,
+      captures: [],
+    });
+
+    await render(<ExtensiveReferenceScreen />);
+    await screen.findByText('Surface infestée (ha)');
+
+    expect(screen.queryByText('INFORMATIONS AÉRONEF / ÉQUIPE')).toBeNull();
+    expect(screen.queryByText('Opérations')).toBeNull();
+    expect(prospectionRepository.listOperationsAeriennes).not.toHaveBeenCalled();
+  });
+
+  it('restaure les infos équipe/aéronef et une opération déjà enregistrée, calcule le total, et réenregistre à l’identique', async () => {
+    jest.mocked(prospectionRepository.listOperationsAeriennes).mockResolvedValue([
+      {
+        type_operation: 'prospection',
+        motif_divers: null,
+        debut_heure: '08:00',
+        debut_temperature_c: 24,
+        debut_vent_ms: 3.2,
+        fin_heure: '10:30',
+        fin_temperature_c: 26,
+        fin_vent_ms: 4.1,
+        duree_minutes: 150,
+      },
+    ]);
+
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'extensive',
+        date_prospection: '2026-08-25',
+        latitude: -18.9,
+        longitude: 47.5,
+        mode_extensif: 'aerien',
+        societe: 'Air Acridien',
+        immatricule_aeronef: '5R-ABC',
+        pilote: 'Jean Rakoto',
+        mecanicien: 'Marc Andria',
+        chef_de_base: 'Sarah Ravelo',
+        base: 'Tuléar',
+        base_secondaire: 'Ihosy',
+      } as any,
+      captures: [],
+    });
+
+    await render(<ExtensiveReferenceScreen />);
+
+    await waitFor(() => expect(prospectionRepository.listOperationsAeriennes).toHaveBeenCalledWith('draft-123'));
+    // Bloc visuel dédié (#ux-aerien) : titre + sous-groupes Aéronef/Équipe/Base.
+    expect(screen.getByText('INFORMATIONS AÉRONEF / ÉQUIPE')).toBeVisible();
+    expect(screen.getByText('Aéronef')).toBeVisible();
+    expect(screen.getByText('Équipe')).toBeVisible();
+    // « Base » est à la fois le sous-groupe et le label du champ « Base » lui-même.
+    expect(screen.getAllByText('Base').length).toBeGreaterThan(0);
+    expect(await screen.findByDisplayValue('Air Acridien')).toBeVisible();
+    expect(screen.getByDisplayValue('5R-ABC')).toBeVisible();
+    expect(screen.getByDisplayValue('Jean Rakoto')).toBeVisible();
+
+    // Opération restaurée : heures affichées, total calculé sans re-saisie.
+    expect(screen.getByText('08:00')).toBeVisible();
+    expect(screen.getByText('10:30')).toBeVisible();
+    // "02:30" apparaît deux fois : total de l'opération ET total jour (une seule opération).
+    expect(screen.getAllByText('02:30')).toHaveLength(2);
+    expect(screen.getByText('TOTAL JOUR')).toBeVisible();
+
+    fireEvent.press(screen.getByText('Suivant : Imagos ›'));
+
+    await waitFor(() =>
+      expect(prospectionRepository.updateProspectionExtensiveReference).toHaveBeenCalledWith(
+        'draft-123',
+        expect.objectContaining({
+          societe: 'Air Acridien',
+          immatriculeAeronef: '5R-ABC',
+          pilote: 'Jean Rakoto',
+          mecanicien: 'Marc Andria',
+          chefDeBase: 'Sarah Ravelo',
+          base: 'Tuléar',
+          baseSecondaire: 'Ihosy',
+        })
+      )
+    );
+    expect(prospectionRepository.saveOperationsAeriennes).toHaveBeenCalledWith('draft-123', [
+      expect.objectContaining({
+        type_operation: 'prospection',
+        debut_heure: '08:00',
+        fin_heure: '10:30',
+        duree_minutes: 150,
+      }),
+    ]);
+  });
+
+  /**
+   * « Motif du divers » (#ux-aerien) : n'apparaît que pour Divers, disparaît pour
+   * Prospection/Convoyage, et se sauvegarde uniquement quand le type final est Divers.
+   */
+  it("« Motif du divers » n'apparaît que pour le type Divers, et se sauvegarde avec l'opération", async () => {
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'extensive',
+        date_prospection: '2026-08-25',
+        latitude: -18.9,
+        longitude: 47.5,
+        mode_extensif: 'aerien',
+      } as any,
+      captures: [],
+    });
+
+    await render(<ExtensiveReferenceScreen />);
+    await screen.findByText('Opérations');
+
+    // Aucun type choisi au départ : pas de champ Motif.
+    expect(screen.queryByText('Motif du divers')).toBeNull();
+
+    fireEvent.press(screen.getByText('Prospection'));
+    await waitFor(() =>
+      expect(screen.getByText('Prospection').props.style).toEqual(
+        expect.arrayContaining([expect.objectContaining({ color: '#fff' })])
+      )
+    );
+    expect(screen.queryByText('Motif du divers')).toBeNull();
+
+    fireEvent.press(screen.getByText('Divers'));
+    expect(await screen.findByText('Motif du divers')).toBeVisible();
+
+    fireEvent.changeText(screen.getByPlaceholderText('Ex. Rinçage, maintenance, vérification…'), 'Rinçage');
+    expect(await screen.findByDisplayValue('Rinçage')).toBeVisible();
+
+    // Bascule vers Convoyage : le champ disparaît (mais la saisie n'est pas perdue
+    // localement — cf. commentaire de `OperationDraft.motifDivers`).
+    fireEvent.press(screen.getByText('Convoyage'));
+    await waitFor(() => expect(screen.queryByText('Motif du divers')).toBeNull());
+
+    // Retour sur Divers : le motif précédemment saisi est bien retrouvé.
+    fireEvent.press(screen.getByText('Divers'));
+    expect(await screen.findByDisplayValue('Rinçage')).toBeVisible();
+  });
+
+  /** `saveOperationsAeriennes` n'envoie `motif_divers` que si le type final est Divers. */
+  it('sauvegarde le motif du divers avec une opération déjà existante rebasculée sur Divers', async () => {
+    jest.mocked(prospectionRepository.listOperationsAeriennes).mockResolvedValue([
+      {
+        type_operation: 'prospection',
+        motif_divers: null,
+        debut_heure: '08:00',
+        debut_temperature_c: null,
+        debut_vent_ms: null,
+        fin_heure: '10:30',
+        fin_temperature_c: null,
+        fin_vent_ms: null,
+        duree_minutes: 150,
+      },
+    ]);
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'extensive',
+        date_prospection: '2026-08-25',
+        latitude: -18.9,
+        longitude: 47.5,
+        mode_extensif: 'aerien',
+      } as any,
+      captures: [],
+    });
+
+    await render(<ExtensiveReferenceScreen />);
+    await waitFor(() => expect(prospectionRepository.listOperationsAeriennes).toHaveBeenCalledWith('draft-123'));
+    await screen.findByText('08:00');
+
+    fireEvent.press(screen.getByText('Divers'));
+    expect(await screen.findByText('Motif du divers')).toBeVisible();
+    fireEvent.changeText(screen.getByPlaceholderText('Ex. Rinçage, maintenance, vérification…'), 'Rinçage');
+    expect(await screen.findByDisplayValue('Rinçage')).toBeVisible();
+
+    fireEvent.press(screen.getByText('Suivant : Imagos ›'));
+
+    await waitFor(() =>
+      expect(prospectionRepository.saveOperationsAeriennes).toHaveBeenCalledWith('draft-123', [
+        expect.objectContaining({ type_operation: 'divers', motif_divers: 'Rinçage', debut_heure: '08:00', fin_heure: '10:30' }),
+      ])
+    );
   });
 });

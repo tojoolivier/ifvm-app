@@ -22,6 +22,14 @@ jest.mock('@/lib/prospection-repository', () => ({
     derniere_pluie: '2026-08-20',
     intensite_pluie: 'forte',
   }),
+  // Vraie implémentation (pas de mock utile ici) : l'écran en dépend pour
+  // normaliser `pesticides_embarques` (0/1/null en SQLite).
+  normalizeBoolean: (value: unknown) => {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value !== 0;
+    return null;
+  },
 }));
 
 describe('ExtensiveObservationsScreen — restauration après hydratation tardive du draft', () => {
@@ -81,7 +89,7 @@ describe('ExtensiveObservationsScreen — restauration après hydratation tardiv
     await render(<ExtensiveObservationsScreen />);
     await screen.findByText('H Str Herb (m)');
 
-    fireEvent.changeText(screen.getByDisplayValue(''), '1.25');
+    fireEvent.changeText(screen.getByTestId('hauteur-herbe-input'), '1.25');
     expect(await screen.findByDisplayValue('1.25')).toBeVisible();
 
     fireEvent.press(screen.getByText('Suivant : Récapitulatif ›'));
@@ -164,5 +172,44 @@ describe('ExtensiveObservationsScreen — restauration après hydratation tardiv
         expect.objectContaining({ hauteurHerbeCm: 150 })
       )
     );
+  });
+
+  /**
+   * « Remarques » (#ux-aerien) : visible en mode TERRESTRE aussi (pas seulement
+   * aérien — réutilise `prospection.observations`, cf. commentaire de l'écran),
+   * saisie multiligne conservée telle quelle (retours à la ligne compris).
+   */
+  it('Remarques : saisie multiligne conservée (retours à la ligne compris) et restaurée à la réouverture', async () => {
+    useProspectionWizardStore.setState({
+      draft: { id: 'draft-123', type_prospection: 'extensive' } as any,
+      captures: [],
+    });
+
+    await render(<ExtensiveObservationsScreen />);
+    await screen.findByText('Remarques');
+
+    const texte = 'Première ligne.\nDeuxième ligne.';
+    fireEvent.changeText(screen.getByTestId('remarques-input'), texte);
+    expect(await screen.findByDisplayValue(texte)).toBeVisible();
+
+    fireEvent.press(screen.getByText('Suivant : Récapitulatif ›'));
+
+    await waitFor(() =>
+      expect(prospectionRepository.updateProspectionExtensiveObservations).toHaveBeenCalledWith(
+        'draft-123',
+        expect.objectContaining({ observations: texte })
+      )
+    );
+  });
+
+  it('restaure des remarques déjà enregistrées (fiche rouverte)', async () => {
+    useProspectionWizardStore.setState({
+      draft: { id: 'draft-123', type_prospection: 'extensive', observations: 'Déjà saisi précédemment.' } as any,
+      captures: [],
+    });
+
+    await render(<ExtensiveObservationsScreen />);
+
+    expect(await screen.findByDisplayValue('Déjà saisi précédemment.')).toBeVisible();
   });
 });
