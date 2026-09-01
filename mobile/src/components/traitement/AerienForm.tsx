@@ -12,11 +12,20 @@ export interface AerienFormProps {
   readOnly: boolean;
   chefsDeBase: UtilisateurEquipe[];
   pesticides: Pesticide[];
+  surfaceRestante: number | null;
+  pesticideStockRestant: number | null;
   error?: string;
 }
 
 /** Branche aérienne de l'écran C (Traitement), extraite de traitement.tsx — #91. */
-export function AerienForm({ readOnly, chefsDeBase, pesticides, error }: AerienFormProps) {
+export function AerienForm({
+  readOnly,
+  chefsDeBase,
+  pesticides,
+  surfaceRestante,
+  pesticideStockRestant,
+  error,
+}: AerienFormProps) {
   const store = useTraitementCaptureStore();
   const nbRotations = computeNbRotations(store.aerien.rotations);
   const totalPesticideAerien = computeTotalPesticideAerien(store.aerien.rotations);
@@ -58,6 +67,30 @@ export function AerienForm({ readOnly, chefsDeBase, pesticides, error }: AerienF
         value={store.aerien.consultantInternational ?? ''}
         onChangeText={(v) => store.updateAerien({ consultantInternational: v })}
       />
+      <Text style={styles.label}>Immatriculation aéronef</Text>
+      <TextInput
+        editable={!readOnly}
+        style={styles.input}
+        placeholder="Ex. 5R-ABC"
+        value={store.aerien.immatriculationAeronef ?? ''}
+        onChangeText={(v) => store.updateAerien({ immatriculationAeronef: v })}
+      />
+
+      <Text style={styles.label}>Surface traitée (ha)</Text>
+      <TextInput
+        editable={!readOnly}
+        style={styles.input}
+        placeholder="0"
+        keyboardType="numeric"
+        value={store.aerien.surfaceTraiteeHa != null ? String(store.aerien.surfaceTraiteeHa) : ''}
+        onChangeText={(v) => store.updateAerien({ surfaceTraiteeHa: v ? Number(v) : null })}
+      />
+      {surfaceRestante != null && (
+        <Card variant="derivee">
+          <Text style={styles.label}>Surface restante (ha)</Text>
+          <Text style={styles.derivedValue}>{surfaceRestante}</Text>
+        </Card>
+      )}
 
       {store.aerien.rotations.map((rotation, index) => (
         <Card key={rotation.localId} style={styles.rotationCard}>
@@ -179,6 +212,22 @@ export function AerienForm({ readOnly, chefsDeBase, pesticides, error }: AerienF
         <Text style={styles.label}>Total pesticide (l)</Text>
         <Text style={styles.derivedValue}>{totalPesticideAerien}</Text>
       </Card>
+
+      <Text style={styles.label}>Pesticide reçu (l)</Text>
+      <TextInput
+        editable={!readOnly}
+        style={styles.input}
+        placeholder="0"
+        keyboardType="numeric"
+        value={store.aerien.pesticideRecuL != null ? String(store.aerien.pesticideRecuL) : ''}
+        onChangeText={(v) => store.updateAerien({ pesticideRecuL: v ? Number(v) : null })}
+      />
+      {pesticideStockRestant != null && (
+        <Card variant="derivee">
+          <Text style={styles.label}>Reste en stock (l)</Text>
+          <Text style={styles.derivedValue}>{pesticideStockRestant}</Text>
+        </Card>
+      )}
       {error && <Text style={styles.error}>{error}</Text>}
     </Fragment>
   );

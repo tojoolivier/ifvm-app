@@ -71,6 +71,9 @@ class TraitementAerienCreate(BaseModel):
     mecanicien: str = Field(..., min_length=1, max_length=255)
     chef_de_base_id: uuid.UUID
     consultant_international: str | None = Field(None, max_length=255)
+    immatricule_aeronef: str | None = None
+    surface_traitee_ha: float | None = Field(None, ge=0)
+    pesticide_recu_l: float | None = Field(None, ge=0)
 
 
 class TraitementTerrestreCreate(BaseModel):
@@ -89,6 +92,7 @@ class TraitementTerrestreCreate(BaseModel):
     motif_surface_restante_abandonnee: str | None = None
     essence_litres: float | None = Field(None, ge=0)
     nb_piles: int | None = Field(None, ge=0)
+    pesticide_recu_l: float | None = Field(None, ge=0)
     reprise_traitement: bool = False
     traitement_origine_id: uuid.UUID | None = None
 
@@ -249,8 +253,13 @@ class TraitementAerienRead(BaseModel):
     mecanicien: str
     chef_de_base_id: uuid.UUID
     consultant_international: str | None
+    immatricule_aeronef: str | None
     nb_rotations: int
     total_pesticide_l: float | None
+    surface_traitee_ha: float | None
+    surface_restante_ha: float | None
+    pesticide_recu_l: float | None
+    pesticide_stock_restant_l: float | None
     rotations: list[RotationRead] = []
 
 
@@ -278,6 +287,8 @@ class TraitementTerrestreRead(BaseModel):
     essence_litres: float | None
     nb_piles: int | None
     total_pesticide_l: float | None
+    pesticide_recu_l: float | None
+    pesticide_stock_restant_l: float | None
     produits: list[ProduitUtiliseRead] = []
 
 
