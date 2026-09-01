@@ -373,3 +373,40 @@ export function populationRowToLarveSpeciesData(
     surfaceContamineeHa: row.surface_contaminee_ha != null ? String(row.surface_contaminee_ha) : '',
   };
 }
+
+// ==========================================
+// Mode aérien (extensif) — opérations
+// ==========================================
+
+export type TypeOperationAerienne = 'convoyage' | 'prospection' | 'divers';
+
+export const TYPE_OPERATION_OPTIONS: { value: TypeOperationAerienne; label: string }[] = [
+  { value: 'convoyage', label: 'Convoyage' },
+  { value: 'prospection', label: 'Prospection' },
+  { value: 'divers', label: 'Divers' },
+];
+
+/** `HH:MM` strict (00-23:00-59) — même contrainte que côté backend (migration 0035). */
+export const HEURE_STRICTE_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/**
+ * Durée entre deux `HH:MM`, jamais saisie par l'agent — même algorithme que
+ * `_calculer_duree_minutes` côté backend (`prospection_use_cases.py`), pour que
+ * l'affichage en direct sur l'écran corresponde exactement à ce que la synchro
+ * recalculera. Franchissement de minuit : fin < début ⇒ +24h.
+ */
+export function calculerDureeMinutes(debutHeure: string, finHeure: string): number {
+  const [heureDebut, minuteDebut] = debutHeure.split(':').map(Number);
+  const [heureFin, minuteFin] = finHeure.split(':').map(Number);
+  const debut = heureDebut * 60 + minuteDebut;
+  let fin = heureFin * 60 + minuteFin;
+  if (fin < debut) fin += 24 * 60;
+  return fin - debut;
+}
+
+/** `123` minutes → `"02:03"`. */
+export function formatDuree(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}

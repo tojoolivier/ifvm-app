@@ -37,6 +37,7 @@ const TABLE_TO_SCHEMA = {
   prospection_population: 'PopulationCreate',
   prospection_capture: 'CaptureCreate',
   prospection_infestation: 'InfestationCreate',
+  prospection_operation_aerienne: 'OperationAerienneCreate',
 };
 
 /** Les colonnes déclarées dans le `CREATE TABLE` d'une table. */

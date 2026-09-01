@@ -28,6 +28,9 @@ export interface DraftProspectionInput {
   signalementSource?: string | null;
   signalementDate?: string | null;
   signalementDescription?: string | null;
+  /** Extensif uniquement — 'terrestre' | 'aerien' | null (terrestre implicite). Fixé
+   * une fois à la création, jamais réécrit ensuite (cf. écran de choix du mode). */
+  modeExtensif?: string | null;
 }
 
 export interface DraftProspection {
@@ -54,6 +57,35 @@ export interface DraftProspection {
   signalement_date: string | null;
   signalement_description: string | null;
   conclusion_validation: string | null;
+  /** Extensif uniquement — 'terrestre' | 'aerien' | null (terrestre implicite,
+   * fiche existante comme fiche extensive sans mode choisi). */
+  mode_extensif: string | null;
+  societe: string | null;
+  immatricule_aeronef: string | null;
+  pilote: string | null;
+  mecanicien: string | null;
+  chef_de_base: string | null;
+  base: string | null;
+  base_secondaire: string | null;
+  /** Pesticides embarqués + signatures (mode aérien uniquement) — NULL en mode
+   * terrestre. `pesticides_embarques` reste la valeur SQLite brute (0/1/NULL,
+   * pas de type booléen natif) : normaliser avec `normalizeBoolean` à la lecture. */
+  pesticides_embarques: number | null;
+  pesticide_nom_commercial: string | null;
+  pesticide_quantite_disponible: number | null;
+  pesticide_quantite_recue: number | null;
+  futs_disponible: number | null;
+  futs_pleins: number | null;
+  futs_vides: number | null;
+  futs_recues: number | null;
+  signature_visa_nom: string | null;
+  signature_visa_horodatage: string | null;
+  signature_consultant_fao_nom: string | null;
+  signature_consultant_fao_horodatage: string | null;
+  signature_pilote_nom: string | null;
+  signature_pilote_horodatage: string | null;
+  signature_chef_base_nom: string | null;
+  signature_chef_base_horodatage: string | null;
   n_releve: string | null;
   n_fiche: string | null;
   n_message: string | null;
@@ -117,6 +149,16 @@ export interface ExtensiveReferenceUpdateInput {
    * l'Extensif fait déjà son acquisition GPS (contrairement à l'Intensif, qui
    * la capture sur Observations). */
   heureObservationAt: string | null;
+  /** Mode aérien uniquement — `null` en mode terrestre (colonnes inchangées, jamais
+   * réclamées). `modeExtensif` lui-même n'est PAS ici : fixé une fois à la création
+   * du brouillon (écran de choix), jamais réécrit par cet update. */
+  societe?: string | null;
+  immatriculeAeronef?: string | null;
+  pilote?: string | null;
+  mecanicien?: string | null;
+  chefDeBase?: string | null;
+  base?: string | null;
+  baseSecondaire?: string | null;
 }
 
 export interface ExtensiveObservationsUpdateInput {
@@ -125,6 +167,29 @@ export interface ExtensiveObservationsUpdateInput {
   hauteurHerbeCm: number | null;
   dernierePluie: string | null;
   intensitePluie: string | null;
+  /** Mode aérien uniquement — `null`/`undefined` en mode terrestre (colonnes
+   * jamais réclamées, comme les champs équipe/aéronef sur Référence). */
+  pesticidesEmbarques?: boolean | null;
+  pesticideNomCommercial?: string | null;
+  pesticideQuantiteDisponible?: number | null;
+  pesticideQuantiteRecue?: number | null;
+  futsDisponible?: number | null;
+  futsPleins?: number | null;
+  futsVides?: number | null;
+  futsRecues?: number | null;
+  signatureVisaNom?: string | null;
+  signatureVisaHorodatage?: string | null;
+  signatureConsultantFaoNom?: string | null;
+  signatureConsultantFaoHorodatage?: string | null;
+  signaturePiloteNom?: string | null;
+  signaturePiloteHorodatage?: string | null;
+  signatureChefBaseNom?: string | null;
+  signatureChefBaseHorodatage?: string | null;
+  /** « Remarques » (D — Observations) — les deux modes, terrestre et aérien.
+   * Réutilise la colonne `prospection.observations` déjà câblée pour l'intensif
+   * (même colonne, juste un intitulé différent à l'écran) : pas de nouvelle
+   * colonne, pas de migration. */
+  observations?: string | null;
 }
 
 export interface ObservationsUpdateInput {
@@ -299,7 +364,7 @@ const INFESTATION_COLUMNS = `
   dimension_ha
 `;
 
-function normalizeBoolean(value: unknown): boolean | null {
+export function normalizeBoolean(value: unknown): boolean | null {
   if (value === null || value === undefined) return null;
   if (typeof value === 'boolean') return value;
   if (typeof value === 'number') return value !== 0;
@@ -329,8 +394,9 @@ export async function createDraftProspection(input: DraftProspectionInput): Prom
       date_prospection, latitude, longitude, altitude,
       surface_station, surface_prospectee, surface_infestee,
       signalement_source, signalement_date, signalement_description,
+      mode_extensif,
       statut, statut_sync, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'brouillon', 'local', ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'brouillon', 'local', ?, ?)`,
     [
       input.id, input.typeProspection, input.campagneId, input.prospecteurId, input.stationId ?? null,
       input.biotope ?? null, input.region ?? null, input.district ?? null, input.commune ?? null,
@@ -338,6 +404,7 @@ export async function createDraftProspection(input: DraftProspectionInput): Prom
       input.latitude ?? null, input.longitude ?? null, input.altitude ?? null,
       input.surfaceStation ?? null, input.surfaceProspectee ?? null, input.surfaceInfestee ?? null,
       input.signalementSource ?? null, input.signalementDate ?? null, input.signalementDescription ?? null,
+      input.modeExtensif ?? null,
       now, now
     ]
   );
@@ -393,11 +460,17 @@ export async function updateProspectionExtensiveReference(id: string, input: Ext
   await db.runAsync(
     `UPDATE prospection SET
       latitude = ?, longitude = ?, station_libre = ?, type_station = ?,
-      surface_station = ?, surface_infestee = ?, n_message = ?, heure_observation_at = ?, updated_at = ?
+      surface_station = ?, surface_infestee = ?, n_message = ?, heure_observation_at = ?,
+      societe = ?, immatricule_aeronef = ?, pilote = ?, mecanicien = ?,
+      chef_de_base = ?, base = ?, base_secondaire = ?,
+      updated_at = ?
      WHERE id = ?`,
     [
       input.latitude, input.longitude, input.stationLibre, input.typeStation,
-      input.surfaceStation, input.surfaceInfestee, input.nMessage, input.heureObservationAt, now, id,
+      input.surfaceStation, input.surfaceInfestee, input.nMessage, input.heureObservationAt,
+      input.societe ?? null, input.immatriculeAeronef ?? null, input.pilote ?? null, input.mecanicien ?? null,
+      input.chefDeBase ?? null, input.base ?? null, input.baseSecondaire ?? null,
+      now, id,
     ]
   );
 
@@ -413,9 +486,38 @@ export async function updateProspectionExtensiveObservations(id: string, input: 
   await db.runAsync(
     `UPDATE prospection SET
       degats_cultures_pourcent = ?, verdure_strate = ?, hauteur_herbe_cm = ?,
-      derniere_pluie = ?, intensite_pluie = ?, updated_at = ?
+      derniere_pluie = ?, intensite_pluie = ?,
+      pesticides_embarques = ?, pesticide_nom_commercial = ?,
+      pesticide_quantite_disponible = ?, pesticide_quantite_recue = ?,
+      futs_disponible = ?, futs_pleins = ?, futs_vides = ?, futs_recues = ?,
+      signature_visa_nom = ?, signature_visa_horodatage = ?,
+      signature_consultant_fao_nom = ?, signature_consultant_fao_horodatage = ?,
+      signature_pilote_nom = ?, signature_pilote_horodatage = ?,
+      signature_chef_base_nom = ?, signature_chef_base_horodatage = ?,
+      observations = ?,
+      updated_at = ?
      WHERE id = ?`,
-    [input.degatsCulturesPourcent, input.verdureStrate, input.hauteurHerbeCm, input.dernierePluie, input.intensitePluie, now, id]
+    [
+      input.degatsCulturesPourcent, input.verdureStrate, input.hauteurHerbeCm, input.dernierePluie, input.intensitePluie,
+      input.pesticidesEmbarques == null ? null : input.pesticidesEmbarques ? 1 : 0,
+      input.pesticideNomCommercial ?? null,
+      input.pesticideQuantiteDisponible ?? null,
+      input.pesticideQuantiteRecue ?? null,
+      input.futsDisponible ?? null,
+      input.futsPleins ?? null,
+      input.futsVides ?? null,
+      input.futsRecues ?? null,
+      input.signatureVisaNom ?? null,
+      input.signatureVisaHorodatage ?? null,
+      input.signatureConsultantFaoNom ?? null,
+      input.signatureConsultantFaoHorodatage ?? null,
+      input.signaturePiloteNom ?? null,
+      input.signaturePiloteHorodatage ?? null,
+      input.signatureChefBaseNom ?? null,
+      input.signatureChefBaseHorodatage ?? null,
+      input.observations ?? null,
+      now, id,
+    ]
   );
 
   const updated = await getProspection(id);
@@ -557,6 +659,60 @@ export async function listAllProspectionCaptures(prospectionId: string): Promise
   const db = await getDb();
   return db.getAllAsync<CaptureRow>(
     `SELECT espece, categorie, sexe, phase, stade, effectif FROM prospection_capture WHERE prospection_id = ?`,
+    [prospectionId]
+  );
+}
+
+export interface OperationAerienneRow {
+  type_operation: string;
+  /** Pertinent seulement si type_operation === 'divers' — `null` sinon. */
+  motif_divers: string | null;
+  debut_heure: string;
+  debut_temperature_c: number | null;
+  debut_vent_ms: number | null;
+  fin_heure: string;
+  fin_temperature_c: number | null;
+  fin_vent_ms: number | null;
+  /** Calculée côté écran au moment de l'ajout/modification (jamais saisie) — cf.
+   * `calculerDureeMinutes` dans prospection-extensive.ts. Rejouée à l'identique côté
+   * backend à la synchronisation (jamais fait confiance à cette valeur non plus). */
+  duree_minutes: number;
+}
+
+/**
+ * Remplace toutes les opérations aériennes de la fiche — même politique que
+ * `saveProspectionCaptures` (delete scope + réinsertion) plutôt qu'un CRUD par ligne :
+ * l'écran Références tient déjà la liste complète en mémoire (comme ses autres
+ * champs), un seul enregistrement au clic Continuer, cohérent avec le reste de ce
+ * fichier. `numero` (ordre d'affichage/tri) est réassigné ici dans l'ordre du
+ * tableau — le serveur fait de même à la synchronisation (jamais fait confiance au
+ * client, cf. CreateProspection.execute côté backend).
+ */
+export async function saveOperationsAeriennes(prospectionId: string, operations: OperationAerienneRow[]): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('DELETE FROM prospection_operation_aerienne WHERE prospection_id = ?', [prospectionId]);
+  let numero = 1;
+  for (const op of operations) {
+    await db.runAsync(
+      `INSERT INTO prospection_operation_aerienne (
+        id, prospection_id, numero, type_operation, motif_divers, debut_heure,
+        debut_temperature_c, debut_vent_ms, fin_heure, fin_temperature_c, fin_vent_ms, duree_minutes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        generateId(), prospectionId, numero, op.type_operation, op.motif_divers, op.debut_heure,
+        op.debut_temperature_c, op.debut_vent_ms, op.fin_heure, op.fin_temperature_c, op.fin_vent_ms, op.duree_minutes,
+      ]
+    );
+    numero += 1;
+  }
+}
+
+export async function listOperationsAeriennes(prospectionId: string): Promise<OperationAerienneRow[]> {
+  const db = await getDb();
+  return db.getAllAsync<OperationAerienneRow>(
+    `SELECT type_operation, motif_divers, debut_heure, debut_temperature_c, debut_vent_ms,
+            fin_heure, fin_temperature_c, fin_vent_ms, duree_minutes
+     FROM prospection_operation_aerienne WHERE prospection_id = ? ORDER BY numero`,
     [prospectionId]
   );
 }
