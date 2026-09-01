@@ -5,10 +5,12 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   EspeceSelection,
   countGrilles,
+  buildGrilles,
   parseEspeceSelection,
   saveEspeceSelection,
 } from '@/lib/prospection-especes';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
+import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
@@ -27,6 +29,8 @@ export default function SpeciesScreen() {
   const draft = useProspectionWizardStore((s) => s.draft);
   const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
   const setDraft = useProspectionWizardStore((s) => s.setDraft);
+  const captures = useProspectionWizardStore((s) => s.captures);
+  const initGrilles = useProspectionCaptureStore((s) => s.initGrilles);
   const [selection, setSelection] = useState<EspeceSelection>(() =>
     parseEspeceSelection(draft?.especes ?? null)
   );
@@ -59,18 +63,17 @@ export default function SpeciesScreen() {
   const handleContinue = () =>
     run(
       async () => {
-        // Le brouillon en mémoire doit suivre la base : les slides Imagos/Larves lisent
-        // `draft.especes` pour savoir quelles grilles afficher. Jeter la valeur renvoyée le
+        // Le brouillon en mémoire doit suivre la base : l'écran de capture lit
+        // `draft.especes` pour construire ses grilles. Jeter la valeur renvoyée le
         // laissait sur l'ancienne sélection (vide sur une fiche neuve) — d'où un
         // « aucune grille à saisir » alors que la sélection venait d'être faite (#201).
         setDraft(await saveEspeceSelection(draftId, selection));
-        // Regroupement en 2 slides thématiques (Imagos/Larves) : on saute directement au
-        // premier concerné par la sélection plutôt que de repasser par une grille par
-        // grille — chaque slide gère lui-même LMC et NSE en interne.
-        router.push({
-          pathname: (selection.lmcImago || selection.nseImago ? '/(prospection)/intensive-imagos' : '/(prospection)/intensive-larves') as any,
-          params: { draftId },
-        });
+        const grilles = buildGrilles(selection);
+        initGrilles(grilles, [], captures);
+        // density.tsx gère indifféremment imagos et larves (densité diffuse/groupée par
+        // espèce + stade) : toute grille — larve comprise — y transite d'abord, sans quoi
+        // ses densités n'étaient jamais saisies (cf. même correctif dans captures.tsx).
+        router.push({ pathname: '/(prospection)/density' as any, params: { draftId, grilleIndex: '0' } });
       },
       {
         screen: 'species',
