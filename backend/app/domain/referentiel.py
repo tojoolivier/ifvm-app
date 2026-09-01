@@ -32,6 +32,29 @@ class PosteAcridienAvecStationsActivesError(Exception):
     pass
 
 
+class PosteAcridienIntrouvableError(Exception):
+    """pa_id ne référence pas un poste acridien existant."""
+
+    pass
+
+
+class PosteAcridienInactifError(Exception):
+    """Rattachement interdit : le poste est hors service.
+
+    Réciproque de `PosteAcridienAvecStationsActivesError` — celle-ci empêche de fermer
+    un poste sous des stations actives, celle-là d'accrocher une station vivante à un
+    poste déjà fermé. Ensemble, elles gardent la hiérarchie atteignable du terrain.
+    """
+
+    pass
+
+
+class CommuneInconnueError(Exception):
+    """commune_id ne référence pas une commune existante."""
+
+    pass
+
+
 @dataclass
 class ZoneAntiAcridien:
     id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -59,6 +82,17 @@ class PosteAcridien:
 
 
 @dataclass
+class Commune:
+    """Feuille de la hiérarchie géographique, avec ses libellés remontés — de quoi
+    peupler le sélecteur de commune du formulaire de station."""
+
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    nom: str = ""
+    district: str = ""
+    region: str = ""
+
+
+@dataclass
 class StationFixe:
     id: uuid.UUID = field(default_factory=uuid.uuid4)
     code: str = ""
@@ -69,6 +103,9 @@ class StationFixe:
     latitude: float = 0.0
     longitude: float = 0.0
     altitude: float | None = None
+    # `commune_id` est la donnée écrite ; `commune`/`district`/`region` sont les
+    # libellés joints, dérivés, jamais fournis par un appelant.
+    commune_id: uuid.UUID = field(default_factory=uuid.uuid4)
     commune: str = ""
     district: str = ""
     region: str = ""

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AxiosError } from 'axios'
 import { api } from '../api/client'
 import { cn } from '@/lib/utils'
@@ -392,11 +392,10 @@ const ENTITES: EntitySpec[] = [
     label: 'Stations fixes',
     table: 'station_fixe',
     addLabel: '+ Nouvelle station',
-    apiOk: false,
-    apiLabel: 'GET seulement — POST / PUT / DELETE appelés par le web mais absents du serveur',
+    apiOk: true,
+    apiLabel: 'GET · POST · PUT /stations',
     desc: 'Point de référence des prospections : code, nom, poste acridien de rattachement et coordonnées.',
-    note: 'Écart bloquant : StationPage.tsx appelle POST /stations, PUT /stations/{id} et DELETE /stations/{id}, qui ne sont pas exposés par referentiel_routes.py. Préférer une désactivation (actif=false) à la suppression, une station étant référencée par des prospections.',
-    addRoute: '/stations',
+    note: "Une station est référencée par des prospections et le pull hors-ligne ne transporte que des upserts : aucune route DELETE n'est exposée, la sortie de service passe par l'interrupteur « Actif ».",
     hasActif: true,
     rowLabel: (row) => text(row, 'code'),
     columns: [
@@ -412,23 +411,51 @@ const ENTITES: EntitySpec[] = [
             : '—',
       },
     ],
-    fields: [
-      { label: 'Code *', mono: true, value: (row) => text(row, 'code') },
-      { label: 'Nom *', value: (row) => text(row, 'nom') },
-      {
-        label: 'Latitude · longitude',
-        mono: true,
-        value: (row) =>
-          typeof row.latitude === 'number' && typeof row.longitude === 'number'
-            ? `${row.latitude.toFixed(4)} · ${row.longitude.toFixed(4)}`
-            : '—',
-      },
-      {
-        label: 'Altitude',
-        mono: true,
-        value: (row) => (typeof row.altitude === 'number' ? `${row.altitude} m` : '—'),
-      },
-    ],
+    // Panneau en lecture seule inutilisé : `write` prend le relais.
+    fields: [],
+    write: {
+      path: '/stations',
+      // `inclure_inactifs` : l'administration montre les deux états. Cette route est
+      // aussi la seule à porter `commune_id` — le pull n'en transporte que les
+      // libellés, avec lesquels on ne peut pas présélectionner la commune.
+      listPath: '/stations?inclure_inactifs=true',
+      createTitle: 'Nouvelle station',
+      fields: [
+        { name: 'code', label: 'Code', kind: 'text', mono: true, required: true },
+        { name: 'nom', label: 'Nom', kind: 'text', required: true },
+        {
+          name: 'pa_id',
+          label: 'Poste acridien',
+          kind: 'foreign-key',
+          required: true,
+          optionsFrom: {
+            path: '/postes-acridiens',
+            queryKey: 'postes-acridiens',
+            valueKey: 'id',
+            labelKey: 'nom',
+          },
+        },
+        {
+          name: 'commune_id',
+          label: 'Commune',
+          kind: 'foreign-key',
+          required: true,
+          optionsFrom: {
+            path: '/communes',
+            queryKey: 'communes',
+            valueKey: 'id',
+            labelKey: 'nom',
+          },
+        },
+        { name: 'latitude', label: 'Latitude', kind: 'number', mono: true, required: true },
+        { name: 'longitude', label: 'Longitude', kind: 'number', mono: true, required: true },
+        { name: 'altitude', label: 'Altitude (m)', kind: 'number', mono: true, nullable: true },
+      ],
+      derivedFields: [
+        { label: 'District', value: (row) => text(row, 'district') },
+        { label: 'Région', value: (row) => text(row, 'region') },
+      ],
+    },
   },
   {
     key: 'utilisateur',
@@ -553,8 +580,12 @@ function EditableInput({
   idPrefix: string
   value: string
   onChange: (value: string) => void
-  /** Options résolues pour `kind: 'foreign-key'` — ignoré pour les autres natures. */
-  foreignKeyOptions?: Row[]
+  /**
+   * Options résolues par `optionsFrom.queryKey` — ignoré hors `kind: 'foreign-key'`.
+   * Une table plutôt qu'une liste : `station_fixe` porte deux clés étrangères
+   * (`pa_id`, `commune_id`), chacune alimentée par sa propre route.
+   */
+  foreignKeyOptions?: Record<string, Row[]>
 }) {
   const id = `${idPrefix}-${field.name}`
   return (
@@ -584,7 +615,7 @@ function EditableInput({
           className={cn(inputClass, 'font-sans')}
         >
           <option value="">— Choisir —</option>
-          {(foreignKeyOptions ?? []).map((option) => (
+          {(foreignKeyOptions?.[field.optionsFrom!.queryKey] ?? []).map((option) => (
             <option
               key={String(option[field.optionsFrom!.valueKey])}
               value={String(option[field.optionsFrom!.valueKey])}
@@ -658,15 +689,23 @@ export function ReferentielsPage() {
 
   const selectedRowId = selectedRow ? String(selectedRow.id) : undefined
 
-  // Une seule clé étrangère par formulaire aujourd'hui (poste_acridien.za_id) :
-  // le hook reste inconditionnel, activé seulement quand le champ existe.
-  const foreignKeyField = writeFields.find((f) => f.kind === 'foreign-key')
-  const { data: foreignKeyOptionsData } = useQuery<Row[]>({
-    queryKey: ['referentiel-fk-options', foreignKeyField?.optionsFrom?.queryKey ?? 'none'],
-    queryFn: () => api.get(foreignKeyField!.optionsFrom!.path).then((r) => r.data),
-    enabled: Boolean(foreignKeyField),
+  // Un formulaire peut porter plusieurs clés étrangères (`station_fixe` en a deux),
+  // chacune avec sa route : `useQueries` garde un hook par source sans en fixer le
+  // nombre à l'avance.
+  const foreignKeySources = writeFields
+    .filter((f) => f.kind === 'foreign-key' && f.optionsFrom)
+    .map((f) => f.optionsFrom!)
+  const foreignKeyResults = useQueries({
+    queries: foreignKeySources.map((source) => ({
+      queryKey: ['referentiel-fk-options', source.queryKey],
+      queryFn: () => api.get(source.path).then((r) => r.data),
+    })),
   })
-  const foreignKeyOptions = Array.isArray(foreignKeyOptionsData) ? foreignKeyOptionsData : []
+  const foreignKeyOptions: Record<string, Row[]> = {}
+  foreignKeySources.forEach((source, index) => {
+    const data = foreignKeyResults[index]?.data
+    foreignKeyOptions[source.queryKey] = Array.isArray(data) ? (data as Row[]) : []
+  })
 
   // Le panneau repart de l'état serveur dès qu'on change d'entité ou de ligne :
   // une saisie non enregistrée ne doit pas déteindre sur la ligne suivante.

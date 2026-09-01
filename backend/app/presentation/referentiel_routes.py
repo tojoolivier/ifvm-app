@@ -9,11 +9,13 @@ from app.application.referentiel_use_cases import (
     CreateCodeStade,
     CreateCulture,
     CreatePosteAcridien,
+    CreateStation,
     GetCodeStade,
     GetCulture,
     GetPosteAcridien,
     GetStation,
     ListCodesStades,
+    ListCommunes,
     ListCultures,
     ListPostesAcridiens,
     ListStations,
@@ -23,18 +25,23 @@ from app.application.referentiel_use_cases import (
     UpdateCodeStade,
     UpdateCulture,
     UpdatePosteAcridien,
+    UpdateStation,
 )
 from app.auth import get_current_user
 from app.database import get_db
 from app.domain.referentiel import (
     CodeReferentielDejaPrisError,
+    CommuneInconnueError,
     GrilleDejaOccupeeError,
     PosteAcridienAvecStationsActivesError,
+    PosteAcridienInactifError,
+    PosteAcridienIntrouvableError,
     StadeInconnuError,
     ZoneAntiAcridienIntrouvableError,
 )
 from app.infrastructure.campagne_repository import CampagneRepositoryImpl
 from app.infrastructure.referentiel_repository import (
+    CommuneRepositoryImpl,
     PosteAcridienRepositoryImpl,
     StationFixeRepositoryImpl,
     ZoneAntiAcridienRepositoryImpl,
@@ -50,6 +57,7 @@ from app.presentation.referentiel_schemas import (
     CodeStadeCreate,
     CodeStadeRead,
     CodeStadeUpdate,
+    CommuneRead,
     CultureCreate,
     CultureRead,
     CultureUpdate,
@@ -58,7 +66,9 @@ from app.presentation.referentiel_schemas import (
     PosteAcridienRead,
     PosteAcridienUpdate,
     ReferentielPullResponse,
+    StationFixeCreate,
     StationFixeRead,
+    StationFixeUpdate,
     ZoneAntiAcridienRead,
 )
 
@@ -174,6 +184,15 @@ async def update_poste_acridien(
     return poste
 
 
+@router.get("/communes", response_model=list[CommuneRead])
+async def list_communes(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = ListCommunes(CommuneRepositoryImpl(db))
+    return await use_case.execute()
+
+
 @router.get("/stations", response_model=list[StationFixeRead])
 async def list_stations(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -200,6 +219,93 @@ async def get_station(
     repository = StationFixeRepositoryImpl(db)
     use_case = GetStation(repository)
     station = await use_case.execute(station_id)
+    if station is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Station non trouvée")
+    return station
+
+
+def _conflit_ecriture_station(exc: Exception, code: str | None) -> HTTPException:
+    """Les quatre refus d'écriture d'une station, en 409 avec le motif en clair."""
+    if isinstance(exc, PosteAcridienIntrouvableError):
+        detail = "Poste acridien inconnu"
+    elif isinstance(exc, PosteAcridienInactifError):
+        detail = (
+            f"Le poste acridien « {exc.args[0]} » est désactivé : "
+            "aucun nouveau rattachement possible"
+        )
+    elif isinstance(exc, CommuneInconnueError):
+        detail = "Commune inconnue"
+    else:
+        detail = f"Le code « {code} » est déjà utilisé par une autre station"
+    return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
+
+
+ERREURS_ECRITURE_STATION = (
+    PosteAcridienIntrouvableError,
+    PosteAcridienInactifError,
+    CommuneInconnueError,
+    CodeReferentielDejaPrisError,
+)
+
+
+@router.post("/stations", response_model=StationFixeRead, status_code=201)
+async def create_station(
+    body: StationFixeCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = CreateStation(
+        repository=StationFixeRepositoryImpl(db),
+        poste_repository=PosteAcridienRepositoryImpl(db),
+        commune_repository=CommuneRepositoryImpl(db),
+    )
+    try:
+        return await use_case.execute(
+            code=body.code,
+            nom=body.nom,
+            pa_id=body.pa_id,
+            latitude=body.latitude,
+            longitude=body.longitude,
+            altitude=body.altitude,
+            commune_id=body.commune_id,
+        )
+    except ERREURS_ECRITURE_STATION as exc:
+        raise _conflit_ecriture_station(exc, body.code) from exc
+
+
+# Aucune route DELETE, volontairement : `GET /referentiel/pull` ne transporte que des
+# upserts, une suppression physique resterait sur les téléphones déjà synchronisés —
+# et une station est référencée par des prospections. La désactivation logique passe
+# par `PUT` avec `actif: false` (issue #133).
+@router.put("/stations/{station_id}", response_model=StationFixeRead)
+async def update_station(
+    station_id: uuid.UUID,
+    body: StationFixeUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = UpdateStation(
+        repository=StationFixeRepositoryImpl(db),
+        poste_repository=PosteAcridienRepositoryImpl(db),
+        commune_repository=CommuneRepositoryImpl(db),
+    )
+    try:
+        station = await use_case.execute(
+            station_id=station_id,
+            code=body.code,
+            nom=body.nom,
+            pa_id=body.pa_id,
+            latitude=body.latitude,
+            longitude=body.longitude,
+            altitude=body.altitude,
+            commune_id=body.commune_id,
+            actif=body.actif,
+            # `altitude` est nullable : seul le corps reçu distingue « absent » de
+            # « mis à NULL ».
+            champs_fournis=body.model_fields_set,
+        )
+    except ERREURS_ECRITURE_STATION as exc:
+        raise _conflit_ecriture_station(exc, body.code) from exc
     if station is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Station non trouvée")
     return station
