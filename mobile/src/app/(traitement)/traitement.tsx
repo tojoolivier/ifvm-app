@@ -13,6 +13,7 @@ import {
 } from '@/lib/traitement-repository';
 import { listUtilisateursByRole, listPesticides, Pesticide, UtilisateurEquipe } from '@/lib/referentiel-db';
 import { useTraitementCaptureStore, ProduitDraft } from '@/lib/traitement-capture-store';
+import { useAuthStore } from '@/lib/auth-store';
 import { generateId } from '@/lib/id';
 import {
   computeTotalPesticideTerrestre,
@@ -35,6 +36,7 @@ export default function TraitementScreen() {
     useLocalSearchParams<{ traitementId: string; isValidationView?: string; origineId?: string }>();
   const store = useTraitementCaptureStore();
   const readOnly = isValidationView === '1';
+  const utilisateurConnecte = useAuthStore((s) => s.user);
 
   const typeTraitement = store.typeTraitement;
   const [chefsDeBase, setChefsDeBase] = useState<UtilisateurEquipe[]>([]);
@@ -132,6 +134,19 @@ export default function TraitementScreen() {
     listUtilisateursByRole('agent_encadreur').then(setAgentsEncadreurs).catch((error) => signalerChargement(error, 'listUtilisateursByRole:agent_encadreur'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Chef de base = l'utilisateur connecté sur ce téléphone par défaut (c'est
+  // lui qui fait la saisie) — seulement pour une fiche pas encore renseignée,
+  // jamais pour écraser une valeur déjà choisie ou déjà enregistrée (brouillon
+  // repris, fiche validée en lecture seule).
+  useEffect(() => {
+    if (typeTraitement !== 'AERIEN' || readOnly || store.aerien.chefDeBaseId || !utilisateurConnecte) return;
+    const chefConnecte = chefsDeBase.find((c) => c.id === utilisateurConnecte.id);
+    if (chefConnecte) {
+      store.updateAerien({ chefDeBaseId: chefConnecte.id });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [typeTraitement, readOnly, chefsDeBase, utilisateurConnecte, store.aerien.chefDeBaseId]);
 
   useEffect(() => {
     const origineId = store.terrestre.traitementOrigineId;
