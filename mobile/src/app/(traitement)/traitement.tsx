@@ -20,6 +20,7 @@ import {
   computeSurfaceCumulee,
   computeSurfaceRestante,
   validateTerrestreConditions,
+  validateRotationsHeures,
 } from '@/lib/traitement-validation';
 import { ProgressBar } from '@/components/traitement/ProgressBar';
 import { AerienForm } from '@/components/traitement/AerienForm';
@@ -76,6 +77,8 @@ export default function TraitementScreen() {
               temperature_fin_c: r.temperature_fin_c,
               vent_debut_ms: r.vent_debut_ms,
               vent_fin_ms: r.vent_fin_ms,
+              heure_debut: r.heure_debut,
+              heure_fin: r.heure_fin,
             });
           }
         }
@@ -168,6 +171,13 @@ export default function TraitementScreen() {
             setErrors({ aerien: 'Pilote, mécanicien et chef de base sont obligatoires' });
             return;
           }
+          const heuresErrors = validateRotationsHeures(
+            store.aerien.rotations.map((r) => ({ heureDebut: r.heure_debut ?? null, heureFin: r.heure_fin ?? null }))
+          );
+          if (heuresErrors.length > 0) {
+            setErrors({ aerien: heuresErrors[0].message });
+            return;
+          }
           await updateTraitementAerien(traitementId, {
             pilote: store.aerien.pilote,
             mecanicien: store.aerien.mecanicien,
@@ -183,6 +193,8 @@ export default function TraitementScreen() {
               temperature_fin_c: r.temperature_fin_c,
               vent_debut_ms: r.vent_debut_ms,
               vent_fin_ms: r.vent_fin_ms,
+              heure_debut: r.heure_debut,
+              heure_fin: r.heure_fin,
             });
           }
         } else {

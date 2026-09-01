@@ -5,6 +5,7 @@ import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import { computeNbRotations, computeTotalPesticideAerien } from '@/lib/traitement-validation';
 import { Card } from '@/components/traitement/Card';
 import { Chip } from '@/components/traitement/Chip';
+import { TimeField } from '@/components/traitement/TimeField';
 import { formStyles as styles } from '@/components/traitement/TraitementFormStyles';
 
 export interface AerienFormProps {
@@ -22,17 +23,19 @@ export function AerienForm({ readOnly, chefsDeBase, pesticides, error }: AerienF
 
   return (
     <Fragment>
+      <Text style={styles.label}>Pilote *</Text>
       <TextInput
         editable={!readOnly}
         style={styles.input}
-        placeholder="Pilote*"
+        placeholder="Nom du pilote"
         value={store.aerien.pilote ?? ''}
         onChangeText={(v) => store.updateAerien({ pilote: v })}
       />
+      <Text style={styles.label}>Mécanicien *</Text>
       <TextInput
         editable={!readOnly}
         style={styles.input}
-        placeholder="Mécanicien*"
+        placeholder="Nom du mécanicien"
         value={store.aerien.mecanicien ?? ''}
         onChangeText={(v) => store.updateAerien({ mecanicien: v })}
       />
@@ -47,10 +50,11 @@ export function AerienForm({ readOnly, chefsDeBase, pesticides, error }: AerienF
           />
         ))}
       </View>
+      <Text style={styles.label}>Consultant international</Text>
       <TextInput
         editable={!readOnly}
         style={styles.input}
-        placeholder="Consultant international"
+        placeholder="Nom du consultant (facultatif)"
         value={store.aerien.consultantInternational ?? ''}
         onChangeText={(v) => store.updateAerien({ consultantInternational: v })}
       />
@@ -65,21 +69,24 @@ export function AerienForm({ readOnly, chefsDeBase, pesticides, error }: AerienF
               </TouchableOpacity>
             )}
           </View>
+          <Text style={styles.label}>N° cuve *</Text>
           <TextInput
             editable={!readOnly}
             style={styles.input}
-            placeholder="N° cuve*"
+            placeholder="Ex. C1"
             value={rotation.numero_cuve ?? ''}
             onChangeText={(v) => store.updateRotation(rotation.localId, { numero_cuve: v })}
           />
+          <Text style={styles.label}>Quantité (l) *</Text>
           <TextInput
             editable={!readOnly}
             style={styles.input}
-            placeholder="Quantité (l)*"
+            placeholder="0"
             keyboardType="numeric"
             value={rotation.quantite_l != null ? String(rotation.quantite_l) : ''}
             onChangeText={(v) => store.updateRotation(rotation.localId, { quantite_l: v ? Number(v) : null })}
           />
+          <Text style={styles.label}>Produit *</Text>
           <View style={styles.chipRow}>
             {pesticides.map((p) => (
               <Chip
@@ -91,40 +98,70 @@ export function AerienForm({ readOnly, chefsDeBase, pesticides, error }: AerienF
             ))}
           </View>
           <View style={styles.row}>
-            <TextInput
-              editable={!readOnly}
-              style={[styles.input, styles.flex1]}
-              placeholder="T° début*"
-              keyboardType="numeric"
-              value={rotation.temperature_debut_c != null ? String(rotation.temperature_debut_c) : ''}
-              onChangeText={(v) => store.updateRotation(rotation.localId, { temperature_debut_c: v ? Number(v) : null })}
-            />
-            <TextInput
-              editable={!readOnly}
-              style={[styles.input, styles.flex1]}
-              placeholder="T° fin*"
-              keyboardType="numeric"
-              value={rotation.temperature_fin_c != null ? String(rotation.temperature_fin_c) : ''}
-              onChangeText={(v) => store.updateRotation(rotation.localId, { temperature_fin_c: v ? Number(v) : null })}
-            />
+            <View style={styles.flex1}>
+              <Text style={styles.label}>Heure début *</Text>
+              <TimeField
+                editable={!readOnly}
+                value={rotation.heure_debut ?? null}
+                onChange={(v) => store.updateRotation(rotation.localId, { heure_debut: v })}
+              />
+            </View>
+            <View style={styles.flex1}>
+              <Text style={styles.label}>Heure fin *</Text>
+              <TimeField
+                editable={!readOnly}
+                value={rotation.heure_fin ?? null}
+                onChange={(v) => store.updateRotation(rotation.localId, { heure_fin: v })}
+              />
+            </View>
           </View>
           <View style={styles.row}>
-            <TextInput
-              editable={!readOnly}
-              style={[styles.input, styles.flex1]}
-              placeholder="Vent début*"
-              keyboardType="numeric"
-              value={rotation.vent_debut_ms != null ? String(rotation.vent_debut_ms) : ''}
-              onChangeText={(v) => store.updateRotation(rotation.localId, { vent_debut_ms: v ? Number(v) : null })}
-            />
-            <TextInput
-              editable={!readOnly}
-              style={[styles.input, styles.flex1]}
-              placeholder="Vent fin*"
-              keyboardType="numeric"
-              value={rotation.vent_fin_ms != null ? String(rotation.vent_fin_ms) : ''}
-              onChangeText={(v) => store.updateRotation(rotation.localId, { vent_fin_ms: v ? Number(v) : null })}
-            />
+            <View style={styles.flex1}>
+              <Text style={styles.label}>Température début (°C) *</Text>
+              <TextInput
+                editable={!readOnly}
+                style={styles.input}
+                placeholder="0"
+                keyboardType="numeric"
+                value={rotation.temperature_debut_c != null ? String(rotation.temperature_debut_c) : ''}
+                onChangeText={(v) => store.updateRotation(rotation.localId, { temperature_debut_c: v ? Number(v) : null })}
+              />
+            </View>
+            <View style={styles.flex1}>
+              <Text style={styles.label}>Température fin (°C) *</Text>
+              <TextInput
+                editable={!readOnly}
+                style={styles.input}
+                placeholder="0"
+                keyboardType="numeric"
+                value={rotation.temperature_fin_c != null ? String(rotation.temperature_fin_c) : ''}
+                onChangeText={(v) => store.updateRotation(rotation.localId, { temperature_fin_c: v ? Number(v) : null })}
+              />
+            </View>
+          </View>
+          <View style={styles.row}>
+            <View style={styles.flex1}>
+              <Text style={styles.label}>Vitesse du vent début (m/s) *</Text>
+              <TextInput
+                editable={!readOnly}
+                style={styles.input}
+                placeholder="0"
+                keyboardType="numeric"
+                value={rotation.vent_debut_ms != null ? String(rotation.vent_debut_ms) : ''}
+                onChangeText={(v) => store.updateRotation(rotation.localId, { vent_debut_ms: v ? Number(v) : null })}
+              />
+            </View>
+            <View style={styles.flex1}>
+              <Text style={styles.label}>Vitesse du vent fin (m/s) *</Text>
+              <TextInput
+                editable={!readOnly}
+                style={styles.input}
+                placeholder="0"
+                keyboardType="numeric"
+                value={rotation.vent_fin_ms != null ? String(rotation.vent_fin_ms) : ''}
+                onChangeText={(v) => store.updateRotation(rotation.localId, { vent_fin_ms: v ? Number(v) : null })}
+              />
+            </View>
           </View>
         </Card>
       ))}

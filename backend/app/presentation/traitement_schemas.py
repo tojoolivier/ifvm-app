@@ -189,6 +189,8 @@ class RotationCreate(BaseModel):
     temperature_fin_c: float
     vent_debut_ms: float = Field(..., ge=0)
     vent_fin_ms: float = Field(..., ge=0)
+    heure_debut: time
+    heure_fin: time
 
 
 class RotationRead(BaseModel):
@@ -203,6 +205,8 @@ class RotationRead(BaseModel):
     temperature_fin_c: float
     vent_debut_ms: float
     vent_fin_ms: float
+    heure_debut: time
+    heure_fin: time
 
 
 class ProduitUtiliseCreate(BaseModel):

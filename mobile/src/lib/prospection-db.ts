@@ -59,6 +59,7 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
   await ajouterColonnesManquantes(db, 'prospection_infestation', COLONNES_INFESTATION);
   await ajouterColonnesManquantes(db, 'prospection_population', COLONNES_POPULATION);
   await ajouterColonnesManquantes(db, 'traitement', COLONNES_TRAITEMENT);
+  await ajouterColonnesManquantes(db, 'rotation', COLONNES_ROTATION);
 
   log.event('db.ouverte', { base: DB_NAME });
 
@@ -346,7 +347,9 @@ async function creerTables(db: SQLite.SQLiteDatabase): Promise<void> {
       temperature_debut_c REAL,
       temperature_fin_c REAL,
       vent_debut_ms REAL,
-      vent_fin_ms REAL
+      vent_fin_ms REAL,
+      heure_debut TEXT,
+      heure_fin TEXT
     );
 
     CREATE INDEX IF NOT EXISTS ix_rotation_traitement_aerien_id
@@ -569,4 +572,10 @@ const COLONNES_POPULATION: readonly Colonne[] = [
 /** Colonnes ajoutées à `traitement` après sa création initiale. */
 const COLONNES_TRAITEMENT: readonly Colonne[] = [
   { name: 'server_updated_at', type: 'TEXT' },
+];
+
+/** Colonnes ajoutées à `rotation` après sa création initiale. */
+const COLONNES_ROTATION: readonly Colonne[] = [
+  { name: 'heure_debut', type: 'TEXT' },
+  { name: 'heure_fin', type: 'TEXT' },
 ];

@@ -392,6 +392,8 @@ def _rotation_args(**overrides):
         temperature_fin_c=27.0,
         vent_debut_ms=2.0,
         vent_fin_ms=3.0,
+        heure_debut=time(6, 0),
+        heure_fin=time(6, 30),
     )
     args.update(overrides)
     return args
@@ -441,6 +443,18 @@ async def test_add_rotation_traitement_non_aerien():
 
 
 @pytest.mark.asyncio
+async def test_add_rotation_rejette_heure_fin_anterieure_ou_egale():
+    traitement = _traitement_aerien()
+    repo = FakeTraitementRepoRotations(traitement)
+    use_case = AddRotation(repo)
+    with pytest.raises(ValueError):
+        await use_case.execute(
+            traitement_id=traitement.id,
+            **_rotation_args(heure_debut=time(9, 0), heure_fin=time(9, 0)),
+        )
+
+
+@pytest.mark.asyncio
 async def test_update_rotation_recalcule_totaux():
     existante = _rotation(numero=1, quantite_l=10.0)
     traitement = _traitement_aerien([existante])
@@ -466,6 +480,20 @@ async def test_update_rotation_introuvable():
     with pytest.raises(RotationIntrouvableError):
         await use_case.execute(
             traitement_id=traitement.id, rotation_id=uuid.uuid4(), **_rotation_args()
+        )
+
+
+@pytest.mark.asyncio
+async def test_update_rotation_rejette_heure_fin_anterieure_ou_egale():
+    existante = _rotation(numero=1)
+    traitement = _traitement_aerien([existante])
+    repo = FakeTraitementRepoRotations(traitement)
+    use_case = UpdateRotation(repo)
+    with pytest.raises(ValueError):
+        await use_case.execute(
+            traitement_id=traitement.id,
+            rotation_id=existante.id,
+            **_rotation_args(heure_debut=time(9, 0), heure_fin=time(8, 0)),
         )
 
 
