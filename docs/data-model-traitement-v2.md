@@ -91,8 +91,13 @@ erDiagram
         string mecanicien "NOT NULL, externe"
         uuid chef_de_base_id FK "NOT NULL, doit etre agent IFVM (non verifie en DB)"
         string consultant_international "nullable, externe"
+        string immatricule_aeronef "nullable"
         int nb_rotations "DERIVE = COUNT(traitement_rotation)"
         numeric total_pesticide_l "DERIVE = SUM(traitement_rotation.quantite_l)"
+        numeric surface_traitee_ha "nullable, saisie directe (pas d'equipement a decomposer, contrairement au Terrestre)"
+        numeric surface_restante_ha "DERIVE = cible.surface_infestee_ha - surface_traitee_ha, plancher 0 ; pas de chainage (pas de traitement_origine_id cote Aerien)"
+        numeric pesticide_recu_l "nullable, saisie directe"
+        numeric pesticide_stock_restant_l "DERIVE = pesticide_recu_l - total_pesticide_l, plancher 0"
     }
 
     traitement_rotation {
@@ -131,6 +136,8 @@ erDiagram
         bool surface_restante_abandonnee "obligatoire si surface_restante_ha > 0"
         numeric essence_litres "nullable, consommable non derivable"
         int nb_piles "nullable, consommable non derivable"
+        numeric pesticide_recu_l "nullable, saisie directe"
+        numeric pesticide_stock_restant_l "DERIVE = pesticide_recu_l - total_pesticide_l, plancher 0"
     }
 
     traitement_produit_utilise {
@@ -180,6 +187,21 @@ erDiagram
   pointe vers la **fiche précédente immédiate** (liste chaînée), pas la fiche racine
   de la zone — tranché après revue le 2026-08-05. `surface_cumulee_ha` se calcule donc
   en remontant la chaîne côté application.
+- **`traitement_aerien.surface_traitee_ha`/`surface_restante_ha`** (migration `0041`) :
+  contrairement à `traitement_terrestre`, l'Aérien n'a pas d'équipement au sol à
+  décomposer (atomiseur/disque rotatif/ULVAmast) — `surface_traitee_ha` est donc une
+  saisie directe, pas une somme dérivée. Pas de `surface_cumulee_ha` ni de chaînage
+  de reprise côté Aérien (pas de `traitement_origine_id` équivalent) : `surface_restante_ha`
+  se calcule fiche par fiche (`cible.surface_infestee_ha - surface_traitee_ha`,
+  plancher 0), sans cumul inter-fiches. `immatricule_aeronef` (même sémantique que
+  `prospection.immatricule_aeronef` en mode aérien extensif) était absent alors qu'il
+  figure sur la fiche papier.
+- **`pesticide_recu_l`/`pesticide_stock_restant_l`** (migration `0041`, sur les deux
+  spécialisations) : suivi du stock par fiche, pas cumulatif par aéronef/opération
+  (ce niveau-là existe déjà côté `prospection` extensif aérien via
+  `pesticide_quantite_recue`/`pesticide_quantite_disponible`, hors périmètre ici).
+  `pesticide_stock_restant_l` est dérivé (`reçu - total_pesticide_l`, plancher 0),
+  ajouté aux deux spécialisations pour ne pas introduire d'asymétrie entre elles.
 - **`VARCHAR(n)` plutôt que `Text()` pour les colonnes bornées/à domaine contraint**
   (`type_traitement`, `statut`, `espece`, `role`, noms de personnes, etc.) — écart
   assumé par rapport à la convention `Text()` des migrations `0001`-`0009`, pour la

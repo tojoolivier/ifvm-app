@@ -133,6 +133,9 @@ async def create_traitement(
                 mecanicien=body.aerien.mecanicien,
                 chef_de_base_id=body.aerien.chef_de_base_id,
                 consultant_international=body.aerien.consultant_international,
+                immatricule_aeronef=body.aerien.immatricule_aeronef,
+                surface_traitee_ha=body.aerien.surface_traitee_ha,
+                pesticide_recu_l=body.aerien.pesticide_recu_l,
             )
         use_case_terrestre = CreateTraitementTerrestre(
             traitement_repository=repository,
@@ -156,6 +159,7 @@ async def create_traitement(
             motif_surface_restante_abandonnee=body.terrestre.motif_surface_restante_abandonnee,
             essence_litres=body.terrestre.essence_litres,
             nb_piles=body.terrestre.nb_piles,
+            pesticide_recu_l=body.terrestre.pesticide_recu_l,
             reprise_traitement=body.terrestre.reprise_traitement,
             traitement_origine_id=body.terrestre.traitement_origine_id,
         )
@@ -199,6 +203,9 @@ async def sync_traitement(
                 mecanicien=body.aerien.mecanicien,
                 chef_de_base_id=body.aerien.chef_de_base_id,
                 consultant_international=body.aerien.consultant_international,
+                immatricule_aeronef=body.aerien.immatricule_aeronef,
+                surface_traitee_ha=body.aerien.surface_traitee_ha,
+                pesticide_recu_l=body.aerien.pesticide_recu_l,
             )
         else:
             use_case_terrestre = SyncPushTraitementTerrestre(
@@ -225,6 +232,7 @@ async def sync_traitement(
                 motif_surface_restante_abandonnee=body.terrestre.motif_surface_restante_abandonnee,
                 essence_litres=body.terrestre.essence_litres,
                 nb_piles=body.terrestre.nb_piles,
+                pesticide_recu_l=body.terrestre.pesticide_recu_l,
                 reprise_traitement=body.terrestre.reprise_traitement,
                 traitement_origine_id=body.terrestre.traitement_origine_id,
             )

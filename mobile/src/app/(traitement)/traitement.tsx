@@ -17,9 +17,11 @@ import { useAuthStore } from '@/lib/auth-store';
 import { generateId } from '@/lib/id';
 import {
   computeTotalPesticideTerrestre,
+  computeTotalPesticideAerien,
   computeSurfaceTraitee,
   computeSurfaceCumulee,
   computeSurfaceRestante,
+  computePesticideStockRestant,
   validateTerrestreConditions,
   validateRotationsHeures,
 } from '@/lib/traitement-validation';
@@ -68,6 +70,9 @@ export default function TraitementScreen() {
           mecanicien: draft.aerien.mecanicien || null,
           chefDeBaseId: draft.aerien.chef_de_base_id || null,
           consultantInternational: draft.aerien.consultant_international,
+          immatriculationAeronef: draft.aerien.immatricule_aeronef,
+          surfaceTraiteeHa: draft.aerien.surface_traitee_ha,
+          pesticideRecuL: draft.aerien.pesticide_recu_l,
         });
         if (store.aerien.rotations.length === 0) {
           for (const r of draft.aerien.rotations) {
@@ -107,6 +112,7 @@ export default function TraitementScreen() {
           motifSurfaceRestanteAbandonnee: draft.terrestre.motif_surface_restante_abandonnee,
           essence_litres: draft.terrestre.essence_litres,
           nb_piles: draft.terrestre.nb_piles,
+          pesticideRecuL: draft.terrestre.pesticide_recu_l,
         });
         // Présélection reprise : uniquement sur une fiche fraîchement amorcée
         // depuis "Zones à reprendre" (draft.terrestre.reprise_traitement pas
@@ -177,6 +183,22 @@ export default function TraitementScreen() {
   const surfaceTraitee = computeSurfaceTraitee(store.terrestre);
   const surfaceCumulee = computeSurfaceCumulee(surfaceTraitee, store.terrestre.repriseTraitement, origineCumuleeHa);
   const surfaceRestante = computeSurfaceRestante(surfaceInfesteeHa, surfaceCumulee);
+  const pesticideStockRestantTerrestre = computePesticideStockRestant(
+    store.terrestre.pesticideRecuL,
+    totalPesticideTerrestre
+  );
+
+  // Pas de chaînage de reprise côté Aérien (contrairement au Terrestre) : le
+  // reste se calcule uniquement à partir de cette fiche.
+  const totalPesticideAerien = computeTotalPesticideAerien(store.aerien.rotations);
+  const surfaceRestanteAerien =
+    store.aerien.surfaceTraiteeHa != null
+      ? computeSurfaceRestante(surfaceInfesteeHa, store.aerien.surfaceTraiteeHa)
+      : null;
+  const pesticideStockRestantAerien = computePesticideStockRestant(
+    store.aerien.pesticideRecuL,
+    totalPesticideAerien
+  );
 
   const handleContinuer = () =>
     run(
@@ -198,6 +220,9 @@ export default function TraitementScreen() {
             mecanicien: store.aerien.mecanicien,
             chefDeBaseId: store.aerien.chefDeBaseId,
             consultantInternational: store.aerien.consultantInternational,
+            immatriculeAeronef: store.aerien.immatriculationAeronef,
+            surfaceTraiteeHa: store.aerien.surfaceTraiteeHa,
+            pesticideRecuL: store.aerien.pesticideRecuL,
           });
           for (const r of store.aerien.rotations) {
             await addRotation(traitementId, {
@@ -247,6 +272,7 @@ export default function TraitementScreen() {
             motifSurfaceRestanteAbandonnee: store.terrestre.motifSurfaceRestanteAbandonnee,
             essence_litres: store.terrestre.essence_litres,
             nb_piles: store.terrestre.nb_piles,
+            pesticideRecuL: store.terrestre.pesticideRecuL,
           });
           for (const p of produits) {
             await addProduitUtilise(traitementId, { produit_id: p.produit_id, quantite_l: p.quantite_l });
@@ -270,7 +296,14 @@ export default function TraitementScreen() {
         <Text style={styles.title}>Traitement</Text>
 
         {typeTraitement === 'AERIEN' && (
-          <AerienForm readOnly={readOnly} chefsDeBase={chefsDeBase} pesticides={pesticides} error={errors.aerien} />
+          <AerienForm
+            readOnly={readOnly}
+            chefsDeBase={chefsDeBase}
+            pesticides={pesticides}
+            surfaceRestante={surfaceRestanteAerien}
+            pesticideStockRestant={pesticideStockRestantAerien}
+            error={errors.aerien}
+          />
         )}
 
         {typeTraitement === 'TERRESTRE' && (
@@ -286,6 +319,7 @@ export default function TraitementScreen() {
             surfaceCumulee={surfaceCumulee}
             surfaceRestante={surfaceRestante}
             totalPesticideTerrestre={totalPesticideTerrestre}
+            pesticideStockRestant={pesticideStockRestantTerrestre}
             errors={errors}
           />
         )}

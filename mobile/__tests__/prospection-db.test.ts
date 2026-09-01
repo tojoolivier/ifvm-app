@@ -121,6 +121,15 @@ const MIGRATED_COLUMNS = [
   // Colonnes de rotation
   { name: 'heure_debut' },
   { name: 'heure_fin' },
+
+  // Colonnes de traitement_aerien
+  { name: 'immatricule_aeronef' },
+  { name: 'surface_traitee_ha' },
+  { name: 'surface_restante_ha' },
+
+  // Colonnes de traitement_aerien et traitement_terrestre (partagées)
+  { name: 'pesticide_recu_l' },
+  { name: 'pesticide_stock_restant_l' },
 ];
 
 const execAsync = jest.fn().mockResolvedValue(undefined);

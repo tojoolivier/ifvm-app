@@ -130,8 +130,13 @@ class TraitementAerienModel(Base):
         UUID(as_uuid=True), ForeignKey("utilisateur.id"), nullable=False
     )
     consultant_international: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    immatricule_aeronef: Mapped[str | None] = mapped_column(Text(), nullable=True)
     nb_rotations: Mapped[int] = mapped_column(Integer(), nullable=False, default=0)
     total_pesticide_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    surface_traitee_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    surface_restante_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    pesticide_recu_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    pesticide_stock_restant_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
 
     traitement: Mapped[TraitementModel] = relationship(back_populates="aerien")
     rotations: Mapped[list["RotationModel"]] = relationship(
@@ -202,6 +207,8 @@ class TraitementTerrestreModel(Base):
     essence_litres: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     nb_piles: Mapped[int | None] = mapped_column(Integer(), nullable=True)
     total_pesticide_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    pesticide_recu_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    pesticide_stock_restant_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
 
     traitement: Mapped[TraitementModel] = relationship(
         back_populates="terrestre", foreign_keys=[traitement_id]

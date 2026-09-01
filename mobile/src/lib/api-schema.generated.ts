@@ -2682,6 +2682,12 @@ export interface components {
             chef_de_base_id: string;
             /** Consultant International */
             consultant_international?: string | null;
+            /** Immatricule Aeronef */
+            immatricule_aeronef?: string | null;
+            /** Surface Traitee Ha */
+            surface_traitee_ha?: number | null;
+            /** Pesticide Recu L */
+            pesticide_recu_l?: number | null;
         };
         /** TraitementAerienRead */
         TraitementAerienRead: {
@@ -2696,10 +2702,20 @@ export interface components {
             chef_de_base_id: string;
             /** Consultant International */
             consultant_international: string | null;
+            /** Immatricule Aeronef */
+            immatricule_aeronef: string | null;
             /** Nb Rotations */
             nb_rotations: number;
             /** Total Pesticide L */
             total_pesticide_l: number | null;
+            /** Surface Traitee Ha */
+            surface_traitee_ha: number | null;
+            /** Surface Restante Ha */
+            surface_restante_ha: number | null;
+            /** Pesticide Recu L */
+            pesticide_recu_l: number | null;
+            /** Pesticide Stock Restant L */
+            pesticide_stock_restant_l: number | null;
             /**
              * Rotations
              * @default []
@@ -3077,6 +3093,8 @@ export interface components {
             essence_litres?: number | null;
             /** Nb Piles */
             nb_piles?: number | null;
+            /** Pesticide Recu L */
+            pesticide_recu_l?: number | null;
             /**
              * Reprise Traitement
              * @default false
@@ -3137,6 +3155,10 @@ export interface components {
             nb_piles: number | null;
             /** Total Pesticide L */
             total_pesticide_l: number | null;
+            /** Pesticide Recu L */
+            pesticide_recu_l: number | null;
+            /** Pesticide Stock Restant L */
+            pesticide_stock_restant_l: number | null;
             /**
              * Produits
              * @default []

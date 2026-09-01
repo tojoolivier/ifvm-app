@@ -183,6 +183,9 @@ class CreateTraitementAerien:
         mecanicien: str,
         chef_de_base_id: uuid.UUID,
         consultant_international: str | None = None,
+        immatricule_aeronef: str | None = None,
+        surface_traitee_ha: float | None = None,
+        pesticide_recu_l: float | None = None,
         numero_fiche: str | None = None,
         mode_traitement: str | None = None,
         region: str | None = None,
@@ -271,7 +274,12 @@ class CreateTraitementAerien:
             mecanicien=mecanicien,
             chef_de_base_id=chef_de_base_id,
             consultant_international=consultant_international,
+            immatricule_aeronef=immatricule_aeronef,
+            surface_traitee_ha=surface_traitee_ha,
+            pesticide_recu_l=pesticide_recu_l,
         )
+        traitement.aerien.recalculer_surfaces(traitement.cible.surface_infestee_ha)
+        traitement.aerien.recalculer_totaux()
 
         return await _persister_avec_numero_fiche_unique(
             self.traitement_repository,
@@ -315,6 +323,7 @@ class CreateTraitementTerrestre:
         motif_surface_restante_abandonnee: str | None = None,
         essence_litres: float | None = None,
         nb_piles: int | None = None,
+        pesticide_recu_l: float | None = None,
         reprise_traitement: bool = False,
         traitement_origine_id: uuid.UUID | None = None,
         numero_fiche: str | None = None,
@@ -443,8 +452,10 @@ class CreateTraitementTerrestre:
             motif_surface_restante_abandonnee=motif_surface_restante_abandonnee,
             essence_litres=essence_litres,
             nb_piles=nb_piles,
+            pesticide_recu_l=pesticide_recu_l,
         )
         terrestre.recalculer_surfaces(cible.surface_infestee_ha, surface_cumulee_precedente)
+        terrestre.recalculer_total_pesticide()
         if (
             terrestre.surface_restante_ha
             and terrestre.surface_restante_ha > 0
@@ -553,7 +564,11 @@ class AddRotation:
         aerien.recalculer_totaux()
 
         return await self.repository.add_rotation(
-            traitement_id, rotation, aerien.nb_rotations, aerien.total_pesticide_l
+            traitement_id,
+            rotation,
+            aerien.nb_rotations,
+            aerien.total_pesticide_l,
+            aerien.pesticide_stock_restant_l,
         )
 
 
@@ -595,7 +610,11 @@ class UpdateRotation:
         aerien.recalculer_totaux()
 
         return await self.repository.update_rotation(
-            traitement_id, rotation, aerien.nb_rotations, aerien.total_pesticide_l
+            traitement_id,
+            rotation,
+            aerien.nb_rotations,
+            aerien.total_pesticide_l,
+            aerien.pesticide_stock_restant_l,
         )
 
 
@@ -613,7 +632,11 @@ class RemoveRotation:
         aerien.recalculer_totaux()
 
         return await self.repository.remove_rotation(
-            traitement_id, rotation_id, aerien.nb_rotations, aerien.total_pesticide_l
+            traitement_id,
+            rotation_id,
+            aerien.nb_rotations,
+            aerien.total_pesticide_l,
+            aerien.pesticide_stock_restant_l,
         )
 
 
@@ -663,7 +686,10 @@ class AddProduitUtilise:
         terrestre.recalculer_total_pesticide()
 
         return await self.repository.add_produit(
-            traitement_id, produit, terrestre.total_pesticide_l
+            traitement_id,
+            produit,
+            terrestre.total_pesticide_l,
+            terrestre.pesticide_stock_restant_l,
         )
 
 
@@ -681,7 +707,10 @@ class RemoveProduitUtilise:
         terrestre.recalculer_total_pesticide()
 
         return await self.repository.remove_produit(
-            traitement_id, produit_utilise_id, terrestre.total_pesticide_l
+            traitement_id,
+            produit_utilise_id,
+            terrestre.total_pesticide_l,
+            terrestre.pesticide_stock_restant_l,
         )
 
 
@@ -735,6 +764,9 @@ class SyncPushTraitementAerien:
         mecanicien: str,
         chef_de_base_id: uuid.UUID,
         consultant_international: str | None = None,
+        immatricule_aeronef: str | None = None,
+        surface_traitee_ha: float | None = None,
+        pesticide_recu_l: float | None = None,
         numero_fiche: str | None = None,
         mode_traitement: str | None = None,
         region: str | None = None,
@@ -827,9 +859,16 @@ class SyncPushTraitementAerien:
             mecanicien=mecanicien,
             chef_de_base_id=chef_de_base_id,
             consultant_international=consultant_international,
+            immatricule_aeronef=immatricule_aeronef,
+            surface_traitee_ha=surface_traitee_ha,
+            pesticide_recu_l=pesticide_recu_l,
         )
+        candidat.aerien.recalculer_surfaces(candidat.cible.surface_infestee_ha)
 
         if existant is None:
+            # Rotations pas encore poussées (sous-ressource distincte) : le total
+            # consommé est nul, comme à la création.
+            candidat.aerien.recalculer_totaux()
             candidat.statut_sync = "synced"
             cree = await _persister_avec_numero_fiche_unique(
                 self.traitement_repository,
@@ -844,6 +883,12 @@ class SyncPushTraitementAerien:
         if existant.updated_at > base_updated_at and contenu_diverge(existant, candidat):
             marque = await self.traitement_repository.marquer_conflict(traitement_id)
             raise TraitementSyncConflitError(marque)
+
+        # nb_rotations/total_pesticide_l existants ne sont pas renvoyés par ce push
+        # (rotations = sous-ressource distincte) : on les reprend tels quels pour
+        # calculer le stock, sans jamais les écraser (update_sync ne les touche pas).
+        candidat.aerien.total_pesticide_l = existant.aerien.total_pesticide_l
+        candidat.aerien.recalculer_stock_pesticide()
 
         candidat.created_at = existant.created_at
         synced = await self.traitement_repository.update_sync(candidat)
@@ -887,6 +932,7 @@ class SyncPushTraitementTerrestre:
         motif_surface_restante_abandonnee: str | None = None,
         essence_litres: float | None = None,
         nb_piles: int | None = None,
+        pesticide_recu_l: float | None = None,
         reprise_traitement: bool = False,
         traitement_origine_id: uuid.UUID | None = None,
         numero_fiche: str | None = None,
@@ -1022,6 +1068,7 @@ class SyncPushTraitementTerrestre:
             motif_surface_restante_abandonnee=motif_surface_restante_abandonnee,
             essence_litres=essence_litres,
             nb_piles=nb_piles,
+            pesticide_recu_l=pesticide_recu_l,
         )
         terrestre.recalculer_surfaces(cible.surface_infestee_ha, surface_cumulee_precedente)
         if (
@@ -1036,6 +1083,9 @@ class SyncPushTraitementTerrestre:
         candidat.terrestre = terrestre
 
         if existant is None:
+            # Produits pas encore poussés (sous-ressource distincte) : le total
+            # consommé est nul, comme à la création.
+            candidat.terrestre.recalculer_total_pesticide()
             candidat.statut_sync = "synced"
             cree = await _persister_avec_numero_fiche_unique(
                 self.traitement_repository,
@@ -1050,6 +1100,12 @@ class SyncPushTraitementTerrestre:
         if existant.updated_at > base_updated_at and contenu_diverge(existant, candidat):
             marque = await self.traitement_repository.marquer_conflict(traitement_id)
             raise TraitementSyncConflitError(marque)
+
+        # total_pesticide_l existant n'est pas renvoyé par ce push (produits =
+        # sous-ressource distincte) : repris tel quel pour calculer le stock, sans
+        # jamais l'écraser (update_sync ne le touche pas).
+        candidat.terrestre.total_pesticide_l = existant.terrestre.total_pesticide_l
+        candidat.terrestre.recalculer_stock_pesticide()
 
         candidat.created_at = existant.created_at
         synced = await self.traitement_repository.update_sync(candidat)

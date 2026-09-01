@@ -65,6 +65,8 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
   await renommerColonneSiPresente(db, 'traitement', 'kit_boite', 'kit_botte');
   await ajouterColonnesManquantes(db, 'traitement', COLONNES_TRAITEMENT);
   await ajouterColonnesManquantes(db, 'rotation', COLONNES_ROTATION);
+  await ajouterColonnesManquantes(db, 'traitement_aerien', COLONNES_TRAITEMENT_AERIEN);
+  await ajouterColonnesManquantes(db, 'traitement_terrestre', COLONNES_TRAITEMENT_TERRESTRE);
 
   log.event('db.ouverte', { base: DB_NAME });
 
@@ -356,8 +358,13 @@ async function creerTables(db: SQLite.SQLiteDatabase): Promise<void> {
       mecanicien TEXT,
       chef_de_base_id TEXT,
       consultant_international TEXT,
+      immatricule_aeronef TEXT,
       nb_rotations INTEGER,
-      total_pesticide_l REAL
+      total_pesticide_l REAL,
+      surface_traitee_ha REAL,
+      surface_restante_ha REAL,
+      pesticide_recu_l REAL,
+      pesticide_stock_restant_l REAL
     );
 
     CREATE TABLE IF NOT EXISTS rotation (
@@ -400,7 +407,9 @@ async function creerTables(db: SQLite.SQLiteDatabase): Promise<void> {
       surface_traitee_ha REAL,
       surface_cumulee_ha REAL,
       surface_restante_ha REAL,
-      total_pesticide_l REAL
+      total_pesticide_l REAL,
+      pesticide_recu_l REAL,
+      pesticide_stock_restant_l REAL
     );
 
     CREATE TABLE IF NOT EXISTS produit_utilise (
@@ -678,4 +687,19 @@ const COLONNES_TRAITEMENT: readonly Colonne[] = [
 const COLONNES_ROTATION: readonly Colonne[] = [
   { name: 'heure_debut', type: 'TEXT' },
   { name: 'heure_fin', type: 'TEXT' },
+];
+
+/** Colonnes ajoutées à `traitement_aerien` après sa création initiale. */
+const COLONNES_TRAITEMENT_AERIEN: readonly Colonne[] = [
+  { name: 'immatricule_aeronef', type: 'TEXT' },
+  { name: 'surface_traitee_ha', type: 'REAL' },
+  { name: 'surface_restante_ha', type: 'REAL' },
+  { name: 'pesticide_recu_l', type: 'REAL' },
+  { name: 'pesticide_stock_restant_l', type: 'REAL' },
+];
+
+/** Colonnes ajoutées à `traitement_terrestre` après sa création initiale. */
+const COLONNES_TRAITEMENT_TERRESTRE: readonly Colonne[] = [
+  { name: 'pesticide_recu_l', type: 'REAL' },
+  { name: 'pesticide_stock_restant_l', type: 'REAL' },
 ];

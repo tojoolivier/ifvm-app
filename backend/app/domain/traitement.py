@@ -93,6 +93,15 @@ class TraitementSyncConflitError(Exception):
         super().__init__("Conflit de synchronisation — la version serveur fait foi")
 
 
+def _stock_pesticide_restant(recu: float | None, consomme: float | None) -> float | None:
+    """« Reste en stock » = reçu − consommé, plancher à 0 (même convention que
+    `surface_restante_ha`, CDG §9). `None` tant que « reçu » n'est pas renseigné —
+    un stock ne se déduit pas d'une consommation seule."""
+    if recu is None:
+        return None
+    return max(recu - (consomme or 0.0), 0.0)
+
+
 @dataclass
 class Cible:
     traitement_id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -127,8 +136,20 @@ class TraitementAerien:
     mecanicien: str = ""
     chef_de_base_id: uuid.UUID = field(default_factory=uuid.uuid4)
     consultant_international: str | None = None
+    immatricule_aeronef: str | None = None
     nb_rotations: int = 0
     total_pesticide_l: float | None = None
+    # Pas d'équivalent aérien aux 3 surfaces par équipement du Terrestre (pas
+    # d'engin au sol à décomposer) : saisie directe unique pour tout le vol.
+    # Pas de chaînage de reprise côté Aérien (contrairement à Terrestre) : le
+    # reste se calcule fiche par fiche, sans cumul inter-fiches.
+    surface_traitee_ha: float | None = None
+    surface_restante_ha: float | None = None
+    # Stock de pesticide par fiche (pas de suivi cumulatif par aéronef/opération) :
+    # « reçu » saisi, « consommé » = total_pesticide_l (dérivé des rotations),
+    # « reste en stock » dérivé des deux.
+    pesticide_recu_l: float | None = None
+    pesticide_stock_restant_l: float | None = None
     rotations: list[Rotation] = field(default_factory=list)
 
     def recalculer_totaux(self) -> None:
@@ -136,6 +157,30 @@ class TraitementAerien:
         self.nb_rotations = len(self.rotations)
         self.total_pesticide_l = (
             sum(r.quantite_l for r in self.rotations) if self.rotations else None
+        )
+        self.recalculer_stock_pesticide()
+
+    def recalculer_surfaces(self, surface_infestee_ha: float | None) -> None:
+        """Seul chemin d'écriture pour surface_restante_ha — jamais en lecture.
+
+        Pas de chaînage (contrairement à `TraitementTerrestre.recalculer_surfaces`) :
+        le reste se calcule uniquement à partir de cette fiche, plancher à 0 (CDG §9).
+        """
+        self.surface_restante_ha = (
+            max(surface_infestee_ha - (self.surface_traitee_ha or 0.0), 0.0)
+            if surface_infestee_ha is not None
+            else None
+        )
+
+    def recalculer_stock_pesticide(self) -> None:
+        """Seul chemin d'écriture pour pesticide_stock_restant_l — jamais en lecture.
+
+        Basé sur `total_pesticide_l` déjà à jour, pas recalculé depuis les rotations
+        directement : reste utilisable lors d'une synchronisation où les rotations
+        existantes ne sont pas rechargées (elles ne font pas partie du corps du push).
+        """
+        self.pesticide_stock_restant_l = _stock_pesticide_restant(
+            self.pesticide_recu_l, self.total_pesticide_l
         )
 
 
@@ -172,11 +217,26 @@ class TraitementTerrestre:
     essence_litres: float | None = None
     nb_piles: int | None = None
     total_pesticide_l: float | None = None
+    # Stock de pesticide par fiche — même patron que TraitementAerien.
+    pesticide_recu_l: float | None = None
+    pesticide_stock_restant_l: float | None = None
     produits: list[ProduitUtilise] = field(default_factory=list)
 
     def recalculer_total_pesticide(self) -> None:
         """Seul chemin d'écriture pour total_pesticide_l — jamais en lecture."""
         self.total_pesticide_l = sum(p.quantite_l for p in self.produits) if self.produits else None
+        self.recalculer_stock_pesticide()
+
+    def recalculer_stock_pesticide(self) -> None:
+        """Seul chemin d'écriture pour pesticide_stock_restant_l — jamais en lecture.
+
+        Voir `TraitementAerien.recalculer_stock_pesticide` : séparé de
+        `recalculer_total_pesticide` pour rester appelable seul lors d'une
+        synchronisation où les produits existants ne sont pas rechargés.
+        """
+        self.pesticide_stock_restant_l = _stock_pesticide_restant(
+            self.pesticide_recu_l, self.total_pesticide_l
+        )
 
     def recalculer_surfaces(
         self, surface_infestee_ha: float | None, surface_cumulee_precedente: float = 0.0
@@ -356,7 +416,15 @@ _CHAMPS_CONTENU_COMMUNS = (
     "mortalite_familles",
 )
 
-_CHAMPS_CONTENU_AERIEN = ("pilote", "mecanicien", "chef_de_base_id", "consultant_international")
+_CHAMPS_CONTENU_AERIEN = (
+    "pilote",
+    "mecanicien",
+    "chef_de_base_id",
+    "consultant_international",
+    "immatricule_aeronef",
+    "surface_traitee_ha",
+    "pesticide_recu_l",
+)
 
 _CHAMPS_CONTENU_TERRESTRE = (
     "heure_debut",
@@ -376,6 +444,7 @@ _CHAMPS_CONTENU_TERRESTRE = (
     "motif_surface_restante_abandonnee",
     "essence_litres",
     "nb_piles",
+    "pesticide_recu_l",
 )
 
 
