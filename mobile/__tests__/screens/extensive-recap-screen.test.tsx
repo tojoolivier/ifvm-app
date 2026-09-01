@@ -312,6 +312,64 @@ describe('ExtensiveRecapScreen — mode aérien : pesticides embarqués + signat
     expect(screen.getByText('Chef de Base')).toBeVisible();
   });
 
+  /**
+   * « Vérifier un signalement » en mode aérien (#signalement-mode-choisi) : une fois
+   * `mode_extensif` fixé sur un brouillon de vérification, le récap doit montrer le
+   * même bloc aérien qu'une fiche extensive normale — la saisie (Références/Opérations/
+   * Pesticides/Signatures) a bien lieu sur les mêmes écrans partagés (`isAerien` ne
+   * dépend jamais de `type_prospection`), donc la revue avant Confirmée/Infirmée ne
+   * doit rien en cacher.
+   */
+  it('une fiche de vérification (« Vérifier un signalement ») en mode aérien affiche aussi le bloc aérien', async () => {
+    useProspectionWizardStore.setState({
+      draft: {
+        ...DRAFT_AERIEN,
+        type_prospection: 'validation',
+        signalement_source: 'Rasoanaivo',
+        signalement_date: '2026-08-24',
+        signalement_description: 'Essaim visible près du village',
+        pesticides_embarques: 1,
+        pesticide_nom_commercial: 'Fyfanon ULV',
+      },
+      captures: [],
+    });
+
+    await render(<ExtensiveRecapScreen />);
+
+    expect(await screen.findByText('Vérification du signalement')).toBeVisible();
+    expect(screen.getByText('Références aériennes')).toBeVisible();
+    expect(screen.getByText('Air Acridien')).toBeVisible();
+    expect(screen.getByText('Opérations')).toBeVisible();
+    expect(screen.getByText('Opération 1')).toBeVisible();
+    expect(screen.getByText('Total jour')).toBeVisible();
+    expect(screen.getByText('04:45')).toBeVisible();
+    expect(screen.getAllByText('Pesticides embarqués').length).toBeGreaterThan(0);
+    expect(screen.getByText('Fyfanon ULV')).toBeVisible();
+    expect(screen.getByText('Signatures')).toBeVisible();
+    // La conclusion de vérification reste présente, inchangée par l'ajout du bloc aérien.
+    expect(screen.getByText('✓ Confirmée')).toBeVisible();
+    expect(screen.getByText('✗ Infirmée')).toBeVisible();
+  });
+
+  it('une fiche de vérification en mode terrestre (par défaut) ne montre aucun bloc aérien', async () => {
+    useProspectionWizardStore.setState({
+      draft: {
+        ...DRAFT_BASE,
+        type_prospection: 'validation',
+        signalement_source: 'Rasoanaivo',
+        signalement_date: '2026-08-24',
+        signalement_description: 'Essaim visible près du village',
+      },
+      captures: [],
+    });
+
+    await render(<ExtensiveRecapScreen />);
+
+    expect(await screen.findByText('Vérification du signalement')).toBeVisible();
+    expect(screen.queryByText('Références aériennes')).toBeNull();
+    expect(screen.queryByText('Opérations')).toBeNull();
+  });
+
   /** « Motif du divers » (#ux-aerien) : affiché uniquement pour l'opération Divers. */
   it('« Motif du divers » apparaît seulement pour l’opération de type Divers', async () => {
     jest.mocked(prospectionRepository.listOperationsAeriennes).mockResolvedValue([
