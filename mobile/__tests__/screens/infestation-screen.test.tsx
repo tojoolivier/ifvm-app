@@ -296,4 +296,96 @@ describe('InfestationScreen', () => {
 
     alertSpy.mockRestore();
   });
+
+  /**
+   * Simplification du slide Infestation (prospection intensive) : les mesures
+   * détaillées (Taille, Surface Totale, Densité min/max, Interdistance
+   * min/max/moy, Taille du groupe) ne doivent plus être demandées à l'écran —
+   * « Stade dominant » et le reste du slide restent inchangés.
+   */
+  describe('simplification des mesures détaillées', () => {
+    it('n’affiche plus Taille/Surface Totale/Densité/Interdistance/Taille du groupe, mais conserve Stade dominant (larve)', async () => {
+      jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
+        { type_cible: 'tache_larvaire', taille_min: 10, surface_totale: 5, densite_min: 1, densite_max: 3 } as any,
+      ]);
+
+      await render(<InfestationScreen />);
+      await screen.findByText('Infestation');
+
+      expect(screen.queryByText('Taille (en m)')).toBeNull();
+      expect(screen.queryByText('Surface totale')).toBeNull();
+      expect(screen.queryByText('Densité (/m²)')).toBeNull();
+      expect(screen.queryByText('Interdistance (m)')).toBeNull();
+      expect(screen.queryByText('Taille du groupe')).toBeNull();
+      // Conservé : Stade dominant et le reste du slide (larve sélectionnée).
+      expect(screen.getByText('Stade dominant')).toBeVisible();
+    });
+
+    it('n’affiche pas non plus ces mesures pour une cible aérienne (vol clair)', async () => {
+      jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
+        { type_cible: 'vol_clair', surface_totale: 12 } as any,
+      ]);
+
+      await render(<InfestationScreen />);
+      await screen.findByText('Infestation');
+
+      expect(screen.queryByText('Taille (en m)')).toBeNull();
+      expect(screen.queryByText('Surface totale')).toBeNull();
+      expect(screen.queryByText('Interdistance (m)')).toBeNull();
+    });
+
+    /**
+     * Compatibilité avec les anciennes fiches (#exigence) : des valeurs déjà
+     * enregistrées pour les champs retirés de l'écran ne doivent ni provoquer
+     * d'erreur, ni être effacées silencieusement à la prochaine sauvegarde —
+     * la colonne n'est pas supprimée, seul le formulaire ne les expose plus.
+     */
+    it('conserve les valeurs historiques des champs retirés de l’écran lors d’un nouvel enregistrement', async () => {
+      jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
+        {
+          type_cible: 'bande_larvaire',
+          taille_min: 10,
+          taille_max: 20,
+          taille_moy: 15,
+          surface_totale: 5.5,
+          densite_min: 1,
+          densite_max: 3,
+          densite_moy: 2,
+          interdistance_min: 0.5,
+          interdistance_max: 1.5,
+          interdistance_moy: 1,
+          taille_groupe_m2: 1200,
+          nb_taches_bandes: 4,
+          direction_de: 'N',
+          vent_de: 'N',
+          direction_vers: 'S',
+        } as any,
+      ]);
+
+      await render(<InfestationScreen />);
+
+      fireEvent.press(await screen.findByText('Comportement  ›'));
+      fireEvent.press(await screen.findByText('Continuer  ›'));
+
+      await waitFor(() =>
+        expect(prospectionRepository.saveProspectionInfestation).toHaveBeenCalledWith(
+          'draft-123',
+          'bande_larvaire',
+          expect.objectContaining({
+            taille_min: 10,
+            taille_max: 20,
+            taille_moy: 15,
+            surface_totale: 5.5,
+            densite_min: 1,
+            densite_max: 3,
+            densite_moy: 2,
+            interdistance_min: 0.5,
+            interdistance_max: 1.5,
+            interdistance_moy: 1,
+            taille_groupe_m2: 1200,
+          })
+        )
+      );
+    });
+  });
 });

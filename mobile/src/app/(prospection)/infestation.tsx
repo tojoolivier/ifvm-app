@@ -828,31 +828,7 @@ export default function InfestationScreen() {
 
             {tab === 'desc' && selectedTargets.length > 0 && (
               <View style={styles.card}>
-                <View style={styles.row2NoMargin}>
-                  <View style={styles.infoBox}>
-                    <Text style={styles.infoBoxLabel}>Taille (en m)</Text>
-                    <TextInput
-                      value={form.tailleMoy}
-                      onChangeText={(v) => setField('tailleMoy', v)}
-                      keyboardType="decimal-pad"
-                      style={styles.infoBoxInput}
-                    />
-                  </View>
-                  <View style={[styles.infoBox, styles.infoBoxHighlighted]}>
-                    <Text style={styles.infoBoxLabel}>Surface totale</Text>
-                    <View style={styles.infoBoxInputRow}>
-                      <TextInput
-                        value={form.surfaceTotale}
-                        onChangeText={(v) => setField('surfaceTotale', v)}
-                        keyboardType="decimal-pad"
-                        style={styles.infoBoxInput}
-                      />
-                      <Text style={styles.infoBoxUnit}>ha</Text>
-                    </View>
-                  </View>
-                </View>
-
-                {isTypeCibleAerien(currentTarget) ? (
+                {isTypeCibleAerien(currentTarget) && (
                   <>
                     <Text style={styles.sectionLabel}>Classification (questionnaire séquentiel)</Text>
                     <Text style={styles.fieldGroupLabel}>Vol spontané, non provoqué ?</Text>
@@ -957,71 +933,7 @@ export default function InfestationScreen() {
                       );
                     })()}
                   </>
-                ) : (
-                  <>
-                    <Text style={styles.sectionLabel}>Densité (/m²)</Text>
-                    <View style={styles.row3}>
-                      <View style={styles.box}>
-                        <Text style={styles.boxCaption}>min</Text>
-                        <TextInput
-                          value={form.densMin}
-                          onChangeText={(v) => setField('densMin', v)}
-                          keyboardType="decimal-pad"
-                          style={styles.boxValue}
-                        />
-                      </View>
-                      <View style={styles.box}>
-                        <Text style={styles.boxCaption}>max</Text>
-                        <TextInput
-                          value={form.densMax}
-                          onChangeText={(v) => setField('densMax', v)}
-                          keyboardType="decimal-pad"
-                          style={styles.boxValue}
-                        />
-                      </View>
-                      <View style={[styles.box, styles.boxEmphasis]}>
-                        <Text style={[styles.boxCaption, styles.boxCaptionEmphasis]}>moy</Text>
-                        <TextInput
-                          value={form.densMoy}
-                          onChangeText={(v) => setField('densMoy', v)}
-                          keyboardType="decimal-pad"
-                          style={[styles.boxValue, styles.boxValueEmphasis]}
-                        />
-                      </View>
-                    </View>
-                  </>
                 )}
-
-                <Text style={styles.sectionLabel}>Interdistance (m)</Text>
-                <View style={styles.row3}>
-                  <View style={styles.box}>
-                    <Text style={styles.boxCaption}>min</Text>
-                    <TextInput
-                      value={form.interdistanceMin}
-                      onChangeText={(v) => setField('interdistanceMin', v)}
-                      keyboardType="decimal-pad"
-                      style={styles.boxValue}
-                    />
-                  </View>
-                  <View style={styles.box}>
-                    <Text style={styles.boxCaption}>max</Text>
-                    <TextInput
-                      value={form.interdistanceMax}
-                      onChangeText={(v) => setField('interdistanceMax', v)}
-                      keyboardType="decimal-pad"
-                      style={styles.boxValue}
-                    />
-                  </View>
-                  <View style={styles.box}>
-                    <Text style={styles.boxCaption}>moy</Text>
-                    <TextInput
-                      value={form.interdistanceMoy}
-                      onChangeText={(v) => setField('interdistanceMoy', v)}
-                      keyboardType="decimal-pad"
-                      style={styles.boxValue}
-                    />
-                  </View>
-                </View>
 
                 {(currentTarget === 'tache_larvaire' || currentTarget === 'bande_larvaire') && (
                   <>
@@ -1049,21 +961,6 @@ export default function InfestationScreen() {
                           : ` → suggère ${stadeDominantLabel(dominantLarve.bucket)}`}
                       </Text>
                     )}
-
-                    <View style={styles.row2NoMargin}>
-                      <View style={styles.infoBox}>
-                        <Text style={styles.infoBoxLabel}>Taille du groupe</Text>
-                        <View style={styles.infoBoxInputRow}>
-                          <TextInput
-                            value={form.tailleGroupeM2}
-                            onChangeText={(v) => setField('tailleGroupeM2', v)}
-                            keyboardType="decimal-pad"
-                            style={styles.infoBoxInput}
-                          />
-                          <Text style={styles.infoBoxUnit}>m²</Text>
-                        </View>
-                      </View>
-                    </View>
                   </>
                 )}
 
@@ -1427,10 +1324,7 @@ const styles = StyleSheet.create({
   chipWrap: { alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, backgroundColor: INACTIVE_BG },
   box: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 11, paddingVertical: 10, paddingHorizontal: 9, minHeight: 62 },
   boxCaption: { fontSize: 10.5, fontWeight: '500', color: '#9a9484', marginBottom: 3 },
-  boxCaptionEmphasis: { color: 'rgba(255,255,255,0.75)' },
   boxValue: { fontSize: 17, fontWeight: '700', color: TEXT, padding: 0 },
-  boxValueEmphasis: { color: '#fff' },
-  boxEmphasis: { backgroundColor: GREEN, borderColor: GREEN },
   chip: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 10, backgroundColor: INACTIVE_BG },
   chipActive: { backgroundColor: GREEN },
   chipDisabled: { opacity: 0.4 },
@@ -1477,7 +1371,6 @@ const styles = StyleSheet.create({
   compassChipText: { fontSize: 11, fontWeight: '700', color: TEXT_SECONDARY },
   compassChipTextActive: { fontWeight: '800', color: '#fff' },
   infoBox: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 11, paddingVertical: 10, paddingHorizontal: 9, minHeight: 62 },
-  infoBoxHighlighted: { borderWidth: 2, borderColor: GREEN },
   infoBoxLabel: { fontSize: 10.5, fontWeight: '500', color: '#9a9484', marginBottom: 3 },
   infoBoxValue: { fontSize: 15, fontWeight: '700', color: TEXT },
   infoBoxInputRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
