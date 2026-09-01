@@ -16,8 +16,8 @@ jest.mock('expo-router', () =>
 jest.mock('@/lib/prospection-repository', () => ({
   updateProspectionExtensiveObservations: jest.fn().mockResolvedValue({
     id: 'draft-123',
-    degats_cultures_pourcent: 30,
-    verdure_strate: 'forte',
+    degats_cultures: 'forts',
+    verdissement_pourcent: 65,
     hauteur_herbe_cm: 45,
     derniere_pluie: '2026-08-20',
     intensite_pluie: 'forte',
@@ -38,7 +38,7 @@ describe('ExtensiveObservationsScreen — restauration après hydratation tardiv
     useProspectionWizardStore.setState({ draft: null, captures: [] });
   });
 
-  it("restaure dégâts/verdure/hauteur/pluie/intensité quand le draft n'est disponible qu'après le montage", async () => {
+  it("restaure dégâts/verdissement/hauteur/pluie/intensité quand le draft n'est disponible qu'après le montage", async () => {
     await render(<ExtensiveObservationsScreen />);
 
     // 45 cm affichés/saisis en mètres (0,45 m) — la colonne reste en cm (partagée avec
@@ -50,8 +50,8 @@ describe('ExtensiveObservationsScreen — restauration après hydratation tardiv
         draft: {
           id: 'draft-123',
           type_prospection: 'extensive',
-          degats_cultures_pourcent: 30,
-          verdure_strate: 'forte',
+          degats_cultures: 'forts',
+          verdissement_pourcent: 65,
           hauteur_herbe_cm: 45,
           derniere_pluie: '2026-08-20',
           intensite_pluie: 'forte',
@@ -60,9 +60,10 @@ describe('ExtensiveObservationsScreen — restauration après hydratation tardiv
       });
     });
 
-    await waitFor(() => expect(screen.getByDisplayValue('30')).toBeVisible());
+    await waitFor(() => expect(screen.getByDisplayValue('65')).toBeVisible());
     expect(screen.getByDisplayValue('0.45')).toBeVisible();
-    // « Forte » apparaît deux fois (Verdure et Intensité) : les deux doivent être actives.
+    // « Forte » apparaît deux fois (Dégâts sur les cultures et Intensité) : les
+    // deux doivent être actives.
     for (const active of screen.getAllByText('Forte')) {
       expect(active.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ color: '#fff' })]));
     }
@@ -73,8 +74,8 @@ describe('ExtensiveObservationsScreen — restauration après hydratation tardiv
       expect(prospectionRepository.updateProspectionExtensiveObservations).toHaveBeenCalledWith(
         'draft-123',
         expect.objectContaining({
-          degatsCulturesPourcent: 30,
-          verdureStrate: 'forte',
+          degatsCultures: 'forts',
+          verdissementPourcent: 65,
           hauteurHerbeCm: 45,
           dernierePluie: '2026-08-20',
           intensitePluie: 'forte',
@@ -112,8 +113,8 @@ describe('ExtensiveObservationsScreen — restauration après hydratation tardiv
       draft: {
         id: 'draft-123',
         type_prospection: 'extensive',
-        degats_cultures_pourcent: 30,
-        verdure_strate: 'forte',
+        degats_cultures: 'forts',
+        verdissement_pourcent: 65,
         hauteur_herbe_cm: 125,
         derniere_pluie: '2026-08-20',
         intensite_pluie: 'forte',
@@ -137,8 +138,8 @@ describe('ExtensiveObservationsScreen — restauration après hydratation tardiv
           // Nouvelle valeur bien enregistrée…
           hauteurHerbeCm: 150,
           // …et tous les autres champs déjà présents avant la modification survivent tels quels.
-          degatsCulturesPourcent: 30,
-          verdureStrate: 'forte',
+          degatsCultures: 'forts',
+          verdissementPourcent: 65,
           dernierePluie: '2026-08-20',
           intensitePluie: 'forte',
         })

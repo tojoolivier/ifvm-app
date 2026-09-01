@@ -21,7 +21,7 @@ import {
   larveTotalFromRow,
   typeCibleImagoLabel,
 } from '@/lib/prospection-extensive';
-import { formatHeureLocale } from '@/lib/prospection-fiche-lecture';
+import { DEGATS_OPTIONS, formatHeureLocale } from '@/lib/prospection-fiche-lecture';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
@@ -158,6 +158,15 @@ function buildReferencesAeriennesRows(draft: DraftProspection): DetailRow[] {
 
 function typeOperationLabel(value: string): string {
   return TYPE_OPERATION_OPTIONS.find((o) => o.value === value)?.label ?? value;
+}
+
+/** « Dégâts sur les cultures » (D — Observations, Terrestre + Aérien) — le même
+ * champ `degats_cultures` que l'Intensif (`DEGATS_OPTIONS`, 4 valeurs) même si
+ * l'Extensif n'en propose que 3 à la saisie : une fiche qui porterait "nuls"
+ * par un autre chemin doit rester lisible ici, pas s'afficher en brut. */
+function degatsCulturesLabel(value: string | null): string {
+  if (!value) return '—';
+  return DEGATS_OPTIONS.find((o) => o.value === value)?.label ?? value;
 }
 
 function buildOperationRows(op: OperationAerienneRow): DetailRow[] {
@@ -403,8 +412,8 @@ export default function ExtensiveRecapScreen() {
 
               <Text style={styles.detailSubtitle}>Observations</Text>
               <View style={styles.summaryCard}>
-                <Text style={styles.detailLine}>Dégâts sur les cultures : {draft.degats_cultures_pourcent ?? 0} %</Text>
-                <Text style={styles.detailLine}>Verdure strate herbeuse : {draft.verdure_strate ?? '—'}</Text>
+                <Text style={styles.detailLine}>Dégâts sur les cultures : {degatsCulturesLabel(draft.degats_cultures)}</Text>
+                <Text style={styles.detailLine}>Verdure strate herbeuse : {draft.verdissement_pourcent != null ? `${draft.verdissement_pourcent} %` : '—'}</Text>
                 <Text style={styles.detailLine}>
                   H. strate herbeuse : {draft.hauteur_herbe_cm != null ? `${(draft.hauteur_herbe_cm / 100).toFixed(2)} m` : '—'}
                 </Text>
@@ -539,11 +548,11 @@ export default function ExtensiveRecapScreen() {
               <View style={styles.checkBadge}>
                 <Text style={styles.checkBadgeText}>✓</Text>
               </View>
-              <Text style={styles.checkLabel}>D · Observations — dégâts {draft.degats_cultures_pourcent ?? 0} %</Text>
+              <Text style={styles.checkLabel}>D · Observations — dégâts {degatsCulturesLabel(draft.degats_cultures)}</Text>
             </View>
             <View style={styles.detailCard}>
-              <Text style={styles.detailLine}>Dégâts sur les cultures : {draft.degats_cultures_pourcent ?? 0} %</Text>
-              <Text style={styles.detailLine}>Verdure strate herbeuse : {draft.verdure_strate ?? '—'}</Text>
+              <Text style={styles.detailLine}>Dégâts sur les cultures : {degatsCulturesLabel(draft.degats_cultures)}</Text>
+              <Text style={styles.detailLine}>Verdure strate herbeuse : {draft.verdissement_pourcent != null ? `${draft.verdissement_pourcent} %` : '—'}</Text>
               <Text style={styles.detailLine}>
                 H. strate herbeuse : {draft.hauteur_herbe_cm != null ? `${(draft.hauteur_herbe_cm / 100).toFixed(2)} m` : '—'}
               </Text>

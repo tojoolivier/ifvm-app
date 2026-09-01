@@ -41,8 +41,8 @@ const DRAFT_BASE = {
   latitude: -18.9,
   longitude: 47.5,
   heure_observation_at: '2026-08-25T14:35:00.000Z',
-  degats_cultures_pourcent: 30,
-  verdure_strate: 'forte',
+  degats_cultures: 'moyens',
+  verdissement_pourcent: 65,
   hauteur_herbe_cm: 45,
   derniere_pluie: '2026-08-20',
   intensite_pluie: 'forte',
@@ -144,7 +144,8 @@ describe('ExtensiveRecapScreen — récapitulatif complet (#227)', () => {
 
     await render(<ExtensiveRecapScreen />);
 
-    expect(await screen.findByText(/Dégâts sur les cultures : 30 %/)).toBeVisible();
+    expect(await screen.findByText(/Dégâts sur les cultures : Moyens/)).toBeVisible();
+    expect(screen.getByText(/Verdure strate herbeuse : 65 %/)).toBeVisible();
     expect(screen.getByText(/H\. strate herbeuse : 0.45 m/)).toBeVisible();
     expect(screen.getByText(/Dernière pluie : 2026-08-20/)).toBeVisible();
   });
@@ -172,7 +173,7 @@ describe('ExtensiveRecapScreen — récapitulatif complet (#227)', () => {
     expect(screen.getAllByText('Densité diffuse')[0]).toBeVisible();
     expect(screen.getByText('8 D/ha')).toBeVisible();
     expect(screen.getByText(/L1 4 · L2 2/)).toBeVisible();
-    expect(screen.getByText(/Dégâts sur les cultures : 30 %/)).toBeVisible();
+    expect(screen.getByText(/Dégâts sur les cultures : Moyens/)).toBeVisible();
     // H STR HERB (#228) : affiché en mètres, non arrondi à l'entier (45 cm → 0.45 m).
     expect(screen.getByText(/H\. strate herbeuse : 0.45 m/)).toBeVisible();
     expect(screen.getByText(new RegExp(`Heure d.observation : ${HEURE_ATTENDUE}`))).toBeVisible();
