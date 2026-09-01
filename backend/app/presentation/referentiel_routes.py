@@ -6,15 +6,29 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.referentiel_use_cases import (
+    CreateCodeStade,
+    CreatePosteAcridien,
+    GetCodeStade,
+    GetPosteAcridien,
     GetStation,
+    ListCodesStades,
     ListPostesAcridiens,
     ListStations,
     ListZonesAntiAcridiennes,
     PullReferentiel,
     ReferentielSinceCursors,
+    UpdateCodeStade,
+    UpdatePosteAcridien,
 )
 from app.auth import get_current_user
 from app.database import get_db
+from app.domain.referentiel import (
+    CodeReferentielDejaPrisError,
+    GrilleDejaOccupeeError,
+    PosteAcridienAvecStationsActivesError,
+    StadeInconnuError,
+    ZoneAntiAcridienIntrouvableError,
+)
 from app.infrastructure.campagne_repository import CampagneRepositoryImpl
 from app.infrastructure.referentiel_repository import (
     PosteAcridienRepositoryImpl,
@@ -29,8 +43,13 @@ from app.infrastructure.referentiel_sync_repository import (
 )
 from app.models.users import Utilisateur
 from app.presentation.referentiel_schemas import (
+    CodeStadeCreate,
+    CodeStadeRead,
+    CodeStadeUpdate,
     EntityPull,
+    PosteAcridienCreate,
     PosteAcridienRead,
+    PosteAcridienUpdate,
     ReferentielPullResponse,
     StationFixeRead,
     ZoneAntiAcridienRead,
@@ -53,10 +72,99 @@ async def list_zones_anti_acridiennes(
 async def list_postes_acridiens(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Utilisateur, Depends(get_current_user)],
+    inclure_inactifs: bool = Query(
+        default=False,
+        description="Renvoie les postes des deux états — écran d'administration.",
+    ),
 ):
-    repository = PosteAcridienRepositoryImpl(db)
-    use_case = ListPostesAcridiens(repository)
-    return await use_case.execute()
+    use_case = ListPostesAcridiens(PosteAcridienRepositoryImpl(db))
+    return await use_case.execute(actif=None if inclure_inactifs else True)
+
+
+@router.get("/postes-acridiens/{pa_id}", response_model=PosteAcridienRead)
+async def get_poste_acridien(
+    pa_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = GetPosteAcridien(PosteAcridienRepositoryImpl(db))
+    poste = await use_case.execute(pa_id)
+    if poste is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Poste acridien non trouvé"
+        )
+    return poste
+
+
+@router.post("/postes-acridiens", response_model=PosteAcridienRead, status_code=201)
+async def create_poste_acridien(
+    body: PosteAcridienCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = CreatePosteAcridien(
+        repository=PosteAcridienRepositoryImpl(db),
+        zone_repository=ZoneAntiAcridienRepositoryImpl(db),
+    )
+    try:
+        return await use_case.execute(code=body.code, nom=body.nom, za_id=body.za_id)
+    except ZoneAntiAcridienIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Zone anti-acridienne inconnue",
+        ) from exc
+    except CodeReferentielDejaPrisError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Le code « {body.code} » est déjà utilisé par un autre poste acridien",
+        ) from exc
+
+
+# Aucune route DELETE, volontairement : `GET /referentiel/pull` ne transporte que des
+# upserts, une suppression physique resterait sur les téléphones déjà synchronisés.
+# La désactivation logique passe par `PUT` avec `actif: false`.
+@router.put("/postes-acridiens/{pa_id}", response_model=PosteAcridienRead)
+async def update_poste_acridien(
+    pa_id: uuid.UUID,
+    body: PosteAcridienUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = UpdatePosteAcridien(
+        repository=PosteAcridienRepositoryImpl(db),
+        zone_repository=ZoneAntiAcridienRepositoryImpl(db),
+    )
+    try:
+        poste = await use_case.execute(
+            pa_id=pa_id,
+            code=body.code,
+            nom=body.nom,
+            za_id=body.za_id,
+            actif=body.actif,
+        )
+    except ZoneAntiAcridienIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Zone anti-acridienne inconnue",
+        ) from exc
+    except CodeReferentielDejaPrisError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Le code « {body.code} » est déjà utilisé par un autre poste acridien",
+        ) from exc
+    except PosteAcridienAvecStationsActivesError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"{exc.args[0]} station(s) active(s) sont rattachées à ce poste : "
+                "désactivez-les d'abord, la désactivation ne se propage pas."
+            ),
+        ) from exc
+    if poste is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Poste acridien non trouvé"
+        )
+    return poste
 
 
 @router.get("/stations", response_model=list[StationFixeRead])
@@ -88,6 +196,101 @@ async def get_station(
     if station is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Station non trouvée")
     return station
+
+
+# --- code_stade -------------------------------------------------------------------
+#
+# Aucune route DELETE, volontairement : `GET /referentiel/pull` ne transporte que des
+# upserts, une suppression physique resterait indéfiniment sur les téléphones déjà
+# synchronisés. La sortie de service passe par `actif=false` (issue #131).
+
+
+def _conflit_code_stade(error: Exception) -> HTTPException:
+    """Les deux invariants de `code_stade` refusés en 409, avec le motif en clair."""
+    if isinstance(error, StadeInconnuError):
+        detail = f"Stade inconnu du vocabulaire : {error.args[0]}"
+    else:
+        detail = (
+            f"Une place de grille existe déjà pour {error.args[0]} (code, catégorie, sexe, espèce)"
+        )
+    return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
+
+
+@router.get("/codes-stades", response_model=list[CodeStadeRead])
+async def list_codes_stades(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+    actif: bool = Query(default=True),
+    inclure_inactifs: bool = Query(
+        default=False,
+        description="Renvoie les codes stades des deux états — écran d'administration.",
+    ),
+):
+    use_case = ListCodesStades(CodeStadeRepositoryImpl(db))
+    return await use_case.execute(actif=None if inclure_inactifs else actif)
+
+
+@router.post("/codes-stades", response_model=CodeStadeRead, status_code=201)
+async def create_code_stade(
+    body: CodeStadeCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = CreateCodeStade(CodeStadeRepositoryImpl(db))
+    try:
+        return await use_case.execute(
+            code=body.code,
+            categorie=body.categorie,
+            sexe=body.sexe,
+            espece=body.espece,
+            libelle=body.libelle,
+            ordre=body.ordre,
+        )
+    except (StadeInconnuError, GrilleDejaOccupeeError) as error:
+        raise _conflit_code_stade(error) from error
+
+
+@router.get("/codes-stades/{code_stade_id}", response_model=CodeStadeRead)
+async def get_code_stade(
+    code_stade_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = GetCodeStade(CodeStadeRepositoryImpl(db))
+    code_stade = await use_case.execute(code_stade_id)
+    if code_stade is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Code stade non trouvé")
+    return code_stade
+
+
+@router.put("/codes-stades/{code_stade_id}", response_model=CodeStadeRead)
+async def update_code_stade(
+    code_stade_id: uuid.UUID,
+    body: CodeStadeUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = UpdateCodeStade(CodeStadeRepositoryImpl(db))
+    try:
+        code_stade = await use_case.execute(
+            code_stade_id=code_stade_id,
+            code=body.code,
+            categorie=body.categorie,
+            sexe=body.sexe,
+            espece=body.espece,
+            libelle=body.libelle,
+            ordre=body.ordre,
+            actif=body.actif,
+            # `sexe`/`espece` sont nullables : seul le corps reçu distingue « absent »
+            # de « mis à NULL ».
+            champs_fournis=body.model_fields_set,
+        )
+    except (StadeInconnuError, GrilleDejaOccupeeError) as error:
+        raise _conflit_code_stade(error) from error
+
+    if code_stade is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Code stade non trouvé")
+    return code_stade
 
 
 @router.get("/referentiel/pull", response_model=ReferentielPullResponse)

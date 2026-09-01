@@ -1,8 +1,8 @@
 import uuid
 from datetime import date, datetime
-from typing import Generic, TypeVar
+from typing import Annotated, Generic, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 
 class ZoneAntiAcridienRead(BaseModel):
@@ -21,7 +21,27 @@ class PosteAcridienRead(BaseModel):
     za_id: uuid.UUID
     za_code: str
     za_nom: str
+    actif: bool
+    # Dérivé (stations actives rattachées) : lecture seule, absent des schémas d'écriture.
+    nb_stations: int
     created_at: datetime
+    updated_at: datetime
+
+
+class PosteAcridienCreate(BaseModel):
+    # `nb_stations` n'apparaît pas ici : c'est un agrégat calculé, pas une saisie.
+    code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    za_id: uuid.UUID
+
+
+class PosteAcridienUpdate(BaseModel):
+    """Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie."""
+
+    code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
+    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
+    za_id: uuid.UUID | None = None
+    actif: bool | None = None
 
 
 class StationFixeRead(BaseModel):
@@ -119,6 +139,43 @@ class CodeStadeSyncRead(BaseModel):
     ordre: int
     actif: bool
     updated_at: datetime
+
+
+class CodeStadeRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    code: str
+    categorie: str
+    sexe: str | None
+    espece: str | None
+    libelle: str
+    ordre: int
+    actif: bool
+    updated_at: datetime
+
+
+class CodeStadeCreate(BaseModel):
+    """`categorie` et `sexe` reprennent les CHECK de `code_stade` : un 422 lisible
+    plutôt qu'une IntegrityError."""
+
+    code: str = Field(min_length=1)
+    categorie: Literal["imago", "larve"]
+    sexe: Literal["F", "M"] | None = None
+    espece: str | None = None
+    libelle: str = Field(min_length=1)
+    ordre: int = 0
+
+
+class CodeStadeUpdate(BaseModel):
+    """Mise à jour partielle. Aucun champ de suppression : `actif=False` désactive."""
+
+    code: str | None = Field(default=None, min_length=1)
+    categorie: Literal["imago", "larve"] | None = None
+    sexe: Literal["F", "M"] | None = None
+    espece: str | None = None
+    libelle: str | None = Field(default=None, min_length=1)
+    ordre: int | None = None
+    actif: bool | None = None
 
 
 class CampagneSyncRead(BaseModel):

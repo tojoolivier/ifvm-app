@@ -1,3 +1,4 @@
+import os
 import uuid
 
 import pytest_asyncio
@@ -19,7 +20,12 @@ from app.main import app as fastapi_app
 from app.models.base import Base
 from app.models.users import Utilisateur
 
-TEST_DATABASE_URL = "postgresql+asyncpg://ifvm:ifvm_secret@localhost:5432/ifvm_test"
+# `db_engine` recrée le schéma à chaque test (DROP SCHEMA ... CASCADE). Deux suites
+# lancées en parallèle sur la même base se prennent donc des deadlocks de catalogue :
+# surchargez cette URL pour donner sa propre base à chaque worktree.
+TEST_DATABASE_URL = os.environ.get(
+    "TEST_DATABASE_URL", "postgresql+asyncpg://ifvm:ifvm_secret@localhost:5432/ifvm_test"
+)
 
 
 @pytest_asyncio.fixture

@@ -52,7 +52,7 @@ Chaque entité aura donc : `GET` liste (existe déjà pour `poste_acridien`/`sta
 | `utilisateur_equipe` | `POST /utilisateurs-equipe`, `PUT /utilisateurs-equipe/{id}` | Aucune route `GET` dédiée n'existe non plus — seulement via `referentiel/pull`. Prévoir une route `GET` liste si un écran de gestion doit lister sans dépendre du pull complet. |
 | `pesticide` | `POST /pesticides`, `PUT /pesticides/{id}` | Bloqué tant que l'Écart 1 (matière active / dose) n'est pas tranché côté produit — coder le CRUD sans ces champs créerait une dette immédiate. |
 | `culture` | `POST /cultures`, `PUT /cultures/{id}` | — |
-| `code_stade` | `POST /codes-stades`, `PUT /codes-stades/{id}` | — |
+| `code_stade` | ~~`POST /codes-stades`, `PUT /codes-stades/{id}`~~ | **Livré (#131)**, avec `GET` liste et `GET /{id}`. Voir « Ordre » ci-dessous. |
 
 **Écart noté en passant, hors périmètre de ce plan** : `campagne` expose un `DELETE
 /{campagne_id}` (`campagne_routes.py:87-97`) qui fait une suppression physique
@@ -67,3 +67,21 @@ Le Lot 4 reste strictement lecture côté client. Ce document sert de référenc
 sessions futures qui coderont les écritures ci-dessus, entité par entité, chacune avec sa propre
 migration Alembic (`relational-and-schema-design` avant d'écrire chaque migration) et son propre
 CRUD REST suivant le modèle `campagne_routes.py`.
+
+## Addendum #131 — la colonne « Ordre » existe déjà
+
+L'issue #131 ouvrait la question : « la maquette affiche aussi une colonne « Ordre » (ordre
+d'affichage) qui n'existe pas en base — à trancher : ajouter `ordre` à la migration, ou retirer la
+colonne de l'UI ». La prémisse était fausse : `code_stade.ordre` (`Integer`, `NOT NULL`,
+défaut `0`) est en base depuis la migration `0030_stade_capture_reference_code_stade.py`, il est
+porté par `CodeStadeModel`, par le domaine `CodeStade` et déjà exposé par `CodeStadeSyncRead` dans
+le pull hors-ligne. **Aucune migration n'était nécessaire ; la colonne reste dans l'UI**, où elle
+est désormais éditable. Le tri des grilles n'est donc pas implicite : les dépôts trient par
+`(categorie, sexe, ordre)`.
+
+Deux invariants de `code_stade` sont gardés dans le use case plutôt que laissés remonter en
+`IntegrityError` — `code` doit exister dans le vocabulaire `stade` (FK) et la place de grille
+`(code, categorie, sexe, espece)` doit être libre (index unique `uq_code_stade_grille`). Les deux
+répondent en `409`. Le schéma de lecture des routes d'administration, `CodeStadeRead`, est un
+sur-ensemble de `CodeStadeSyncRead` (il ajoute `categorie`, `sexe`, `ordre`) : l'écran de gestion a
+besoin des colonnes qui identifient la place de grille, que le pull n'a pas à détailler.

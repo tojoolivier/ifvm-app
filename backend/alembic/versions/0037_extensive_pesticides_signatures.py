@@ -19,8 +19,8 @@ extensive aérienne :
   pour l'équipe/aéronef (societe/pilote/mecanicien/chef_de_base... eux aussi
   un jeu fixe de champs nommés, pas une liste).
 
-Revision ID: 0036
-Revises: 0035
+Revision ID: 0037
+Revises: 0036
 Create Date: 2026-09-01
 
 """
@@ -29,8 +29,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0036"
-down_revision = "0035"
+revision = "0037"
+down_revision = "0036"
 branch_labels = None
 depends_on = None
 
