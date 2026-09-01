@@ -226,6 +226,9 @@ export type ProspectionPopulationInput =
 export type ProspectionInfestationInput =
   components['schemas']['InfestationCreate'];
 
+export type ProspectionOperationAerienneInput =
+  components['schemas']['OperationAerienneCreate'];
+
 export type ProspectionCreateInput =
   components['schemas']['ProspectionCreate'];
 
