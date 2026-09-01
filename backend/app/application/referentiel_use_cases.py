@@ -255,6 +255,75 @@ class UpdateCodeStade:
         return await self.repository.update(code_stade)
 
 
+class ListCultures:
+    def __init__(self, repository: CultureRepository):
+        self.repository = repository
+
+    async def execute(self, actif: bool | None = True) -> list[Culture]:
+        return await self.repository.list_all(actif=actif)
+
+
+class GetCulture:
+    def __init__(self, repository: CultureRepository):
+        self.repository = repository
+
+    async def execute(self, culture_id: uuid.UUID) -> Culture | None:
+        return await self.repository.get_by_id(culture_id)
+
+
+class CreateCulture:
+    def __init__(self, repository: CultureRepository):
+        self.repository = repository
+
+    async def execute(self, code: str, nom: str) -> Culture:
+        if await self.repository.code_pris_par_un_autre(code):
+            raise CodeReferentielDejaPrisError(code)
+
+        maintenant = datetime.now(timezone.utc)
+        return await self.repository.create(
+            Culture(
+                code=code,
+                nom=nom,
+                actif=True,
+                created_at=maintenant,
+                updated_at=maintenant,
+            )
+        )
+
+
+class UpdateCulture:
+    """Mise a jour partielle, `actif` compris. Pas de suppression : `actif=False` est
+    la seule sortie, le pull hors-ligne ne transportant que des upserts."""
+
+    def __init__(self, repository: CultureRepository):
+        self.repository = repository
+
+    async def execute(
+        self,
+        culture_id: uuid.UUID,
+        code: str | None = None,
+        nom: str | None = None,
+        actif: bool | None = None,
+    ) -> Culture | None:
+        culture = await self.repository.get_by_id(culture_id)
+        if culture is None:
+            return None
+
+        if code is not None and code != culture.code:
+            if await self.repository.code_pris_par_un_autre(code, exclude_id=culture_id):
+                raise CodeReferentielDejaPrisError(code)
+            culture.code = code
+
+        if nom is not None:
+            culture.nom = nom
+        if actif is not None:
+            culture.actif = actif
+
+        # Sans `updated_at` rehausse, le pull incremental sauterait la modification.
+        culture.updated_at = datetime.now(timezone.utc)
+        return await self.repository.update(culture)
+
+
 @dataclass
 class ReferentielSinceCursors:
     zones_anti_acridiennes: datetime | None = None
