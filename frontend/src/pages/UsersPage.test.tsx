@@ -32,12 +32,15 @@ function utilisateur(overrides: Record<string, unknown> = {}) {
 function mockApi({
   users = [utilisateur()],
   prospections = [],
+  me = null,
 }: {
   users?: ReturnType<typeof utilisateur>[]
   prospections?: { prospecteur_id: string | null }[]
+  me?: ReturnType<typeof utilisateur> | null
 } = {}) {
   mockedGet.mockImplementation((url: string) => {
     if (url === '/users/') return Promise.resolve({ data: users })
+    if (url === '/users/me') return Promise.resolve({ data: me })
     if (url === '/prospections') return Promise.resolve({ data: prospections })
     return Promise.resolve({ data: [] })
   })
@@ -150,6 +153,27 @@ describe('UsersPage — colonnes maquette (README §10, onglet Utilisateurs)', (
     await waitFor(() =>
       expect(screen.getByText('Jean Rakoto').closest('tr')).toHaveTextContent('?'),
     )
+  })
+
+  it('verrouille le rôle et l’interrupteur actif sur sa propre ligne (issue #250)', async () => {
+    mockApi({
+      users: [
+        utilisateur(),
+        utilisateur({ id: 'u2', nom: 'Soa', prenom: 'Lalao', email: 'l.soa@ifvm.mg' }),
+      ],
+      me: utilisateur(),
+    })
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Jean Rakoto')).toBeInTheDocument())
+
+    const maLigne = screen.getByText('Jean Rakoto').closest('tr')!
+    const autreLigne = screen.getByText('Lalao Soa').closest('tr')!
+
+    expect(maLigne.querySelector('select')).toBeDisabled()
+    expect(maLigne.querySelector('input[type="checkbox"]')).toBeDisabled()
+    expect(autreLigne.querySelector('select')).not.toBeDisabled()
+    expect(autreLigne.querySelector('input[type="checkbox"]')).not.toBeDisabled()
   })
 
   it("l'interrupteur actif appelle PATCH /users/{id} avec le nouvel état", async () => {
