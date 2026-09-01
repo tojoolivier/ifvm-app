@@ -42,7 +42,7 @@ export default function ExtensiveSignalementScreen() {
           signalementDescription: description.trim(),
         });
         await hydrateFromDraft(draft.id);
-        router.replace({ pathname: '/(prospection)/extensive-reference' as any, params: { draftId: draft.id } });
+        router.replace({ pathname: '/(prospection)/extensive-mode-chooser' as any, params: { draftId: draft.id } });
       },
       {
         screen: 'extensive-signalement',
@@ -116,7 +116,7 @@ export default function ExtensiveSignalementScreen() {
               disabled={!canContinue || isCreating}
               activeOpacity={0.85}
             >
-              <Text style={styles.continueButtonText}>{isCreating ? 'Création…' : 'Continuer : Références ›'}</Text>
+              <Text style={styles.continueButtonText}>{isCreating ? 'Création…' : 'Continuer : Type de prospection ›'}</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>

@@ -461,6 +461,25 @@ export async function updateProspectionEspeces(id: string, especes: string): Pro
   return updated;
 }
 
+/**
+ * Fixe `mode_extensif` sur un brouillon déjà créé — utilisé uniquement par le
+ * parcours « Vérifier un signalement » : le brouillon existe déjà (créé par
+ * `extensive-signalement.tsx` avec les champs de signalement) au moment où
+ * l'utilisateur choisit Terrestre/Aérien sur `extensive-mode-chooser.tsx`. Pas
+ * question de recréer un brouillon comme dans le cas normal (`createDraftProspection`,
+ * où `modeExtensif` est fixé une fois pour toutes à la création).
+ */
+export async function setProspectionModeExtensif(id: string, modeExtensif: string): Promise<DraftProspection> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync('UPDATE prospection SET mode_extensif = ?, updated_at = ? WHERE id = ?', [modeExtensif, now, id]);
+
+  const updated = await getProspection(id);
+  if (!updated) throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  return updated;
+}
+
 export async function updateProspectionExtensiveReference(id: string, input: ExtensiveReferenceUpdateInput): Promise<DraftProspection> {
   const db = await getDb();
   const now = new Date().toISOString();
