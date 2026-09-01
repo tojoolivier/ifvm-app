@@ -118,6 +118,29 @@ class PesticideSyncRead(BaseModel):
     updated_at: datetime
 
 
+class CultureRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    code: str
+    nom: str
+    actif: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class CultureCreate(BaseModel):
+    code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+
+class CultureUpdate(BaseModel):
+    """Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie."""
+
+    code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
+    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
+    actif: bool | None = None
+
+
 class CultureSyncRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID

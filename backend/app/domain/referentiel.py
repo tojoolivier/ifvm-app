@@ -100,10 +100,18 @@ class Pesticide:
 
 @dataclass
 class Culture:
+    """Culture exposée aux dégâts acridiens.
+
+    Jamais supprimée : le pull hors-ligne ne transporte que des upserts, une
+    ligne effacée en base resterait indéfiniment dans le SQLite des téléphones
+    déjà synchronisés. On la retire du terrain en passant `actif` à false.
+    """
+
     id: uuid.UUID = field(default_factory=uuid.uuid4)
     code: str = ""
     nom: str = ""
     actif: bool = True
+    created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
 
 

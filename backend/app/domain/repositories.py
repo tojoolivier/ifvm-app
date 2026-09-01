@@ -271,8 +271,35 @@ class PesticideRepository(ABC):
 
 
 class CultureRepository(ABC):
+    """Aucune méthode de suppression : la sortie du référentiel est `actif=false`.
+
+    Le pull hors-ligne ne transporte que des upserts — une suppression physique
+    ne serait jamais répercutée sur les téléphones déjà synchronisés.
+    """
+
     @abstractmethod
     async def list_since(self, since: datetime | None) -> list[Culture]:
+        pass
+
+    @abstractmethod
+    async def list_all(self, actif: bool | None = True) -> list[Culture]:
+        pass
+
+    @abstractmethod
+    async def get_by_id(self, culture_id: uuid.UUID) -> Culture | None:
+        pass
+
+    @abstractmethod
+    async def code_pris_par_un_autre(self, code: str, exclude_id: uuid.UUID | None = None) -> bool:
+        """`exclude_id` permet de réenregistrer une culture sans buter sur son propre code."""
+        pass
+
+    @abstractmethod
+    async def create(self, culture: Culture) -> Culture:
+        pass
+
+    @abstractmethod
+    async def update(self, culture: Culture) -> Culture:
         pass
 
 

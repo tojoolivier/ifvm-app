@@ -4,7 +4,12 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.referentiel import CodeStade, Culture, Pesticide, UtilisateurEquipe
+from app.domain.referentiel import (
+    CodeStade,
+    Culture,
+    Pesticide,
+    UtilisateurEquipe,
+)
 from app.domain.repositories import (
     CodeStadeRepository,
     CultureRepository,
@@ -68,10 +73,66 @@ class CultureRepositoryImpl(CultureRepository):
         if since is not None:
             stmt = stmt.where(CultureModel.updated_at > since)
         result = await self.session.execute(stmt)
-        return [
-            Culture(id=m.id, code=m.code, nom=m.nom, actif=m.actif, updated_at=m.updated_at)
-            for m in result.scalars().all()
-        ]
+        return [self._to_domain(m) for m in result.scalars().all()]
+
+    async def list_all(self, actif: bool | None = True) -> list[Culture]:
+        stmt = select(CultureModel).order_by(CultureModel.code)
+        # `actif=None` = pas de filtre : l'administration a besoin des deux états.
+        if actif is not None:
+            stmt = stmt.where(CultureModel.actif == actif)
+        result = await self.session.execute(stmt)
+        return [self._to_domain(m) for m in result.scalars().all()]
+
+    async def code_pris_par_un_autre(self, code: str, exclude_id: uuid.UUID | None = None) -> bool:
+        stmt = select(CultureModel.id).where(CultureModel.code == code)
+        if exclude_id is not None:
+            stmt = stmt.where(CultureModel.id != exclude_id)
+        result = await self.session.execute(stmt)
+        return result.first() is not None
+
+    async def get_by_id(self, culture_id: uuid.UUID) -> Culture | None:
+        result = await self.session.execute(
+            select(CultureModel).where(CultureModel.id == culture_id)
+        )
+        model = result.scalar_one_or_none()
+        return None if model is None else self._to_domain(model)
+
+    async def create(self, culture: Culture) -> Culture:
+        model = CultureModel(
+            id=culture.id,
+            code=culture.code,
+            nom=culture.nom,
+            actif=culture.actif,
+            created_at=culture.created_at,
+            updated_at=culture.updated_at,
+        )
+        self.session.add(model)
+        await self.session.commit()
+        await self.session.refresh(model)
+        return self._to_domain(model)
+
+    async def update(self, culture: Culture) -> Culture:
+        result = await self.session.execute(
+            select(CultureModel).where(CultureModel.id == culture.id)
+        )
+        model = result.scalar_one()
+        model.code = culture.code
+        model.nom = culture.nom
+        model.actif = culture.actif
+        model.updated_at = culture.updated_at
+        await self.session.commit()
+        await self.session.refresh(model)
+        return self._to_domain(model)
+
+    def _to_domain(self, model: CultureModel) -> Culture:
+        return Culture(
+            id=model.id,
+            code=model.code,
+            nom=model.nom,
+            actif=model.actif,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+        )
 
 
 class CodeStadeRepositoryImpl(CodeStadeRepository):

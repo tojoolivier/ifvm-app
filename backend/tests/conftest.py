@@ -30,14 +30,37 @@ TEST_DATABASE_URL = os.environ.get(
 
 @pytest_asyncio.fixture
 async def db_engine():
+    """Base vierge par test — schéma créé une fois, puis vidé par TRUNCATE.
+
+    Rejouer le DDL (`DROP SCHEMA public CASCADE` + `create_all`) avant *chaque*
+    test fait courser la réflexion SQLAlchemy avec le catalogue Postgres : selon
+    l'ordre, `create_all` recréait une table déjà présente (violation sur
+    `pg_type_typname_nsp_index`) ou `drop_all` supprimait une table déjà tombée
+    par cascade — d'où des `relation "utilisateur" does not exist` erratiques.
+    Le DDL n'est donc joué que lorsque le schéma n'est pas déjà complet.
+    """
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-    async with engine.begin() as conn:
-        await conn.execute(text("DROP SCHEMA public CASCADE"))
-        await conn.execute(text("CREATE SCHEMA public"))
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield engine
-    await engine.dispose()
+    tables = ", ".join(f'public."{table.name}"' for table in Base.metadata.sorted_tables)
+    # `try/finally` obligatoire : sans lui, une erreur pendant la préparation
+    # sortait de la fixture avant le `dispose()`, laissant une connexion « idle
+    # in transaction » qui verrouillait le schéma et faisait échouer *tous* les
+    # runs suivants, y compris après correction de l'erreur d'origine.
+    try:
+        async with engine.begin() as conn:
+            deja_en_place = (
+                await conn.execute(
+                    text("SELECT count(*) FROM pg_tables WHERE schemaname = 'public'")
+                )
+            ).scalar()
+            if deja_en_place == len(Base.metadata.tables):
+                await conn.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
+            else:
+                await conn.execute(text("DROP SCHEMA public CASCADE"))
+                await conn.execute(text("CREATE SCHEMA public"))
+                await conn.run_sync(Base.metadata.create_all)
+        yield engine
+    finally:
+        await engine.dispose()
 
 
 @pytest_asyncio.fixture

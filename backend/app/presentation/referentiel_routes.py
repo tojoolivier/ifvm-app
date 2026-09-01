@@ -7,17 +7,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.referentiel_use_cases import (
     CreateCodeStade,
+    CreateCulture,
     CreatePosteAcridien,
     GetCodeStade,
+    GetCulture,
     GetPosteAcridien,
     GetStation,
     ListCodesStades,
+    ListCultures,
     ListPostesAcridiens,
     ListStations,
     ListZonesAntiAcridiennes,
     PullReferentiel,
     ReferentielSinceCursors,
     UpdateCodeStade,
+    UpdateCulture,
     UpdatePosteAcridien,
 )
 from app.auth import get_current_user
@@ -46,6 +50,9 @@ from app.presentation.referentiel_schemas import (
     CodeStadeCreate,
     CodeStadeRead,
     CodeStadeUpdate,
+    CultureCreate,
+    CultureRead,
+    CultureUpdate,
     EntityPull,
     PosteAcridienCreate,
     PosteAcridienRead,
@@ -291,6 +298,79 @@ async def update_code_stade(
     if code_stade is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Code stade non trouvé")
     return code_stade
+
+
+# --- culture ----------------------------------------------------------------------
+#
+# Aucune route DELETE, volontairement : `GET /referentiel/pull` ne transporte que des
+# upserts, une suppression physique resterait indéfiniment sur les téléphones déjà
+# synchronisés. La sortie de service passe par `actif=false` (issue #130).
+
+
+@router.get("/cultures", response_model=list[CultureRead])
+async def list_cultures(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+    actif: bool = Query(default=True),
+    inclure_inactifs: bool = Query(
+        default=False,
+        description="Renvoie les cultures des deux états — écran d'administration.",
+    ),
+):
+    use_case = ListCultures(CultureRepositoryImpl(db))
+    return await use_case.execute(actif=None if inclure_inactifs else actif)
+
+
+@router.post("/cultures", response_model=CultureRead, status_code=201)
+async def create_culture(
+    body: CultureCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = CreateCulture(CultureRepositoryImpl(db))
+    try:
+        return await use_case.execute(code=body.code, nom=body.nom)
+    except CodeReferentielDejaPrisError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Le code « {body.code} » est déjà utilisé par une autre culture",
+        ) from exc
+
+
+@router.get("/cultures/{culture_id}", response_model=CultureRead)
+async def get_culture(
+    culture_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = GetCulture(CultureRepositoryImpl(db))
+    culture = await use_case.execute(culture_id)
+    if culture is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Culture non trouvée")
+    return culture
+
+
+@router.put("/cultures/{culture_id}", response_model=CultureRead)
+async def update_culture(
+    culture_id: uuid.UUID,
+    body: CultureUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = UpdateCulture(CultureRepositoryImpl(db))
+    try:
+        culture = await use_case.execute(
+            culture_id=culture_id, code=body.code, nom=body.nom, actif=body.actif
+        )
+    except CodeReferentielDejaPrisError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Le code « {body.code} » est déjà utilisé par une autre culture",
+        ) from exc
+
+    if culture is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Culture non trouvée")
+    return culture
 
 
 @router.get("/referentiel/pull", response_model=ReferentielPullResponse)
