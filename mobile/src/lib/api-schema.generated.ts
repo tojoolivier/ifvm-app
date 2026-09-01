@@ -195,6 +195,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/codes-stades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Codes Stades */
+        get: operations["list_codes_stades_codes_stades_get"];
+        put?: never;
+        /** Create Code Stade */
+        post: operations["create_code_stade_codes_stades_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/codes-stades/{code_stade_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Code Stade */
+        get: operations["get_code_stade_codes_stades__code_stade_id__get"];
+        /** Update Code Stade */
+        put: operations["update_code_stade_codes_stades__code_stade_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/referentiel/pull": {
         parameters: {
             query?: never;
@@ -758,6 +794,58 @@ export interface components {
             /** Surface Infestee Ha */
             surface_infestee_ha: string | number;
         };
+        /**
+         * CodeStadeCreate
+         * @description `categorie` et `sexe` reprennent les CHECK de `code_stade` : un 422 lisible
+         *     plutôt qu'une IntegrityError.
+         */
+        CodeStadeCreate: {
+            /** Code */
+            code: string;
+            /**
+             * Categorie
+             * @enum {string}
+             */
+            categorie: "imago" | "larve";
+            /** Sexe */
+            sexe?: ("F" | "M") | null;
+            /** Espece */
+            espece?: string | null;
+            /** Libelle */
+            libelle: string;
+            /**
+             * Ordre
+             * @default 0
+             */
+            ordre: number;
+        };
+        /** CodeStadeRead */
+        CodeStadeRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Code */
+            code: string;
+            /** Categorie */
+            categorie: string;
+            /** Sexe */
+            sexe: string | null;
+            /** Espece */
+            espece: string | null;
+            /** Libelle */
+            libelle: string;
+            /** Ordre */
+            ordre: number;
+            /** Actif */
+            actif: boolean;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
         /** CodeStadeSyncRead */
         CodeStadeSyncRead: {
             /**
@@ -784,6 +872,26 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /**
+         * CodeStadeUpdate
+         * @description Mise à jour partielle. Aucun champ de suppression : `actif=False` désactive.
+         */
+        CodeStadeUpdate: {
+            /** Code */
+            code?: string | null;
+            /** Categorie */
+            categorie?: ("imago" | "larve") | null;
+            /** Sexe */
+            sexe?: ("F" | "M") | null;
+            /** Espece */
+            espece?: string | null;
+            /** Libelle */
+            libelle?: string | null;
+            /** Ordre */
+            ordre?: number | null;
+            /** Actif */
+            actif?: boolean | null;
         };
         /** CommentaireCreate */
         CommentaireCreate: {
@@ -2015,6 +2123,16 @@ export interface components {
             vent_debut_ms: number;
             /** Vent Fin Ms */
             vent_fin_ms: number;
+            /**
+             * Heure Debut
+             * Format: time
+             */
+            heure_debut: string;
+            /**
+             * Heure Fin
+             * Format: time
+             */
+            heure_fin: string;
         };
         /** RotationRead */
         RotationRead: {
@@ -2042,6 +2160,16 @@ export interface components {
             vent_debut_ms: number;
             /** Vent Fin Ms */
             vent_fin_ms: number;
+            /**
+             * Heure Debut
+             * Format: time
+             */
+            heure_debut: string;
+            /**
+             * Heure Fin
+             * Format: time
+             */
+            heure_fin: string;
         };
         /**
          * Sexe
@@ -3355,6 +3483,138 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StationFixeRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_codes_stades_codes_stades_get: {
+        parameters: {
+            query?: {
+                actif?: boolean;
+                /** @description Renvoie les codes stades des deux états — écran d'administration. */
+                inclure_inactifs?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeStadeRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_code_stade_codes_stades_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeStadeCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeStadeRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_code_stade_codes_stades__code_stade_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code_stade_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeStadeRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_code_stade_codes_stades__code_stade_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code_stade_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeStadeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeStadeRead"];
                 };
             };
             /** @description Validation Error */

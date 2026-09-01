@@ -6,8 +6,10 @@ from app.domain.campagne import Campagne
 from app.domain.referentiel import (
     CodeStade,
     Culture,
+    GrilleDejaOccupeeError,
     Pesticide,
     PosteAcridien,
+    StadeInconnuError,
     StationFixe,
     UtilisateurEquipe,
     ZoneAntiAcridien,
@@ -59,6 +61,111 @@ class GetStation:
 
     async def execute(self, station_id: uuid.UUID) -> StationFixe | None:
         return await self.repository.get_by_id(station_id)
+
+
+class ListCodesStades:
+    def __init__(self, repository: CodeStadeRepository):
+        self.repository = repository
+
+    async def execute(self, actif: bool | None = True) -> list[CodeStade]:
+        return await self.repository.list_all(actif=actif)
+
+
+class GetCodeStade:
+    def __init__(self, repository: CodeStadeRepository):
+        self.repository = repository
+
+    async def execute(self, code_stade_id: uuid.UUID) -> CodeStade | None:
+        return await self.repository.get_by_id(code_stade_id)
+
+
+class CreateCodeStade:
+    def __init__(self, repository: CodeStadeRepository):
+        self.repository = repository
+
+    async def execute(
+        self,
+        code: str,
+        categorie: str,
+        sexe: str | None,
+        espece: str | None,
+        libelle: str,
+        ordre: int,
+    ) -> CodeStade:
+        if not await self.repository.code_au_vocabulaire(code):
+            raise StadeInconnuError(code)
+
+        occupant = await self.repository.grille_occupee_par(code, categorie, sexe, espece)
+        if occupant is not None:
+            raise GrilleDejaOccupeeError(code)
+
+        return await self.repository.create(
+            CodeStade(
+                code=code,
+                categorie=categorie,
+                sexe=sexe,
+                espece=espece,
+                libelle=libelle,
+                ordre=ordre,
+                actif=True,
+                updated_at=datetime.now(timezone.utc),
+            )
+        )
+
+
+class UpdateCodeStade:
+    """Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie,
+    le pull hors-ligne ne transportant que des upserts."""
+
+    def __init__(self, repository: CodeStadeRepository):
+        self.repository = repository
+
+    async def execute(
+        self,
+        code_stade_id: uuid.UUID,
+        code: str | None = None,
+        categorie: str | None = None,
+        sexe: str | None = None,
+        espece: str | None = None,
+        libelle: str | None = None,
+        ordre: int | None = None,
+        actif: bool | None = None,
+        champs_fournis: set[str] | None = None,
+    ) -> CodeStade | None:
+        # `sexe` et `espece` sont nullables : « absent du corps » et « mis à NULL » ne
+        # peuvent pas se distinguer sur la valeur seule, d'où `champs_fournis`.
+        fournis = champs_fournis if champs_fournis is not None else set()
+
+        code_stade = await self.repository.get_by_id(code_stade_id)
+        if code_stade is None:
+            return None
+
+        if code is not None:
+            code_stade.code = code
+        if categorie is not None:
+            code_stade.categorie = categorie
+        if "sexe" in fournis:
+            code_stade.sexe = sexe
+        if "espece" in fournis:
+            code_stade.espece = espece
+        if libelle is not None:
+            code_stade.libelle = libelle
+        if ordre is not None:
+            code_stade.ordre = ordre
+        if actif is not None:
+            code_stade.actif = actif
+
+        if not await self.repository.code_au_vocabulaire(code_stade.code):
+            raise StadeInconnuError(code_stade.code)
+
+        occupant = await self.repository.grille_occupee_par(
+            code_stade.code, code_stade.categorie, code_stade.sexe, code_stade.espece
+        )
+        if occupant is not None and occupant != code_stade.id:
+            raise GrilleDejaOccupeeError(code_stade.code)
+
+        code_stade.updated_at = datetime.now(timezone.utc)
+        return await self.repository.update(code_stade)
 
 
 @dataclass

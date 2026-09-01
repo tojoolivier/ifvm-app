@@ -94,3 +94,15 @@ class CodeStade:
     ordre: int = 0
     actif: bool = True
     updated_at: datetime = field(default_factory=datetime.utcnow)
+
+
+class StadeInconnuError(Exception):
+    """`code_stade.code` référence `stade.code` : le code n'est pas au vocabulaire."""
+
+    pass
+
+
+class GrilleDejaOccupeeError(Exception):
+    """(code, categorie, sexe, espece) identifie une place de grille — elle est prise."""
+
+    pass

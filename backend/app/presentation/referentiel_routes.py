@@ -6,15 +6,20 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.referentiel_use_cases import (
+    CreateCodeStade,
+    GetCodeStade,
     GetStation,
+    ListCodesStades,
     ListPostesAcridiens,
     ListStations,
     ListZonesAntiAcridiennes,
     PullReferentiel,
     ReferentielSinceCursors,
+    UpdateCodeStade,
 )
 from app.auth import get_current_user
 from app.database import get_db
+from app.domain.referentiel import GrilleDejaOccupeeError, StadeInconnuError
 from app.infrastructure.campagne_repository import CampagneRepositoryImpl
 from app.infrastructure.referentiel_repository import (
     PosteAcridienRepositoryImpl,
@@ -29,6 +34,9 @@ from app.infrastructure.referentiel_sync_repository import (
 )
 from app.models.users import Utilisateur
 from app.presentation.referentiel_schemas import (
+    CodeStadeCreate,
+    CodeStadeRead,
+    CodeStadeUpdate,
     EntityPull,
     PosteAcridienRead,
     ReferentielPullResponse,
@@ -88,6 +96,101 @@ async def get_station(
     if station is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Station non trouvée")
     return station
+
+
+# --- code_stade -------------------------------------------------------------------
+#
+# Aucune route DELETE, volontairement : `GET /referentiel/pull` ne transporte que des
+# upserts, une suppression physique resterait indéfiniment sur les téléphones déjà
+# synchronisés. La sortie de service passe par `actif=false` (issue #131).
+
+
+def _conflit_code_stade(error: Exception) -> HTTPException:
+    """Les deux invariants de `code_stade` refusés en 409, avec le motif en clair."""
+    if isinstance(error, StadeInconnuError):
+        detail = f"Stade inconnu du vocabulaire : {error.args[0]}"
+    else:
+        detail = (
+            f"Une place de grille existe déjà pour {error.args[0]} (code, catégorie, sexe, espèce)"
+        )
+    return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
+
+
+@router.get("/codes-stades", response_model=list[CodeStadeRead])
+async def list_codes_stades(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+    actif: bool = Query(default=True),
+    inclure_inactifs: bool = Query(
+        default=False,
+        description="Renvoie les codes stades des deux états — écran d'administration.",
+    ),
+):
+    use_case = ListCodesStades(CodeStadeRepositoryImpl(db))
+    return await use_case.execute(actif=None if inclure_inactifs else actif)
+
+
+@router.post("/codes-stades", response_model=CodeStadeRead, status_code=201)
+async def create_code_stade(
+    body: CodeStadeCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = CreateCodeStade(CodeStadeRepositoryImpl(db))
+    try:
+        return await use_case.execute(
+            code=body.code,
+            categorie=body.categorie,
+            sexe=body.sexe,
+            espece=body.espece,
+            libelle=body.libelle,
+            ordre=body.ordre,
+        )
+    except (StadeInconnuError, GrilleDejaOccupeeError) as error:
+        raise _conflit_code_stade(error) from error
+
+
+@router.get("/codes-stades/{code_stade_id}", response_model=CodeStadeRead)
+async def get_code_stade(
+    code_stade_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = GetCodeStade(CodeStadeRepositoryImpl(db))
+    code_stade = await use_case.execute(code_stade_id)
+    if code_stade is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Code stade non trouvé")
+    return code_stade
+
+
+@router.put("/codes-stades/{code_stade_id}", response_model=CodeStadeRead)
+async def update_code_stade(
+    code_stade_id: uuid.UUID,
+    body: CodeStadeUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = UpdateCodeStade(CodeStadeRepositoryImpl(db))
+    try:
+        code_stade = await use_case.execute(
+            code_stade_id=code_stade_id,
+            code=body.code,
+            categorie=body.categorie,
+            sexe=body.sexe,
+            espece=body.espece,
+            libelle=body.libelle,
+            ordre=body.ordre,
+            actif=body.actif,
+            # `sexe`/`espece` sont nullables : seul le corps reçu distingue « absent »
+            # de « mis à NULL ».
+            champs_fournis=body.model_fields_set,
+        )
+    except (StadeInconnuError, GrilleDejaOccupeeError) as error:
+        raise _conflit_code_stade(error) from error
+
+    if code_stade is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Code stade non trouvé")
+    return code_stade
 
 
 @router.get("/referentiel/pull", response_model=ReferentielPullResponse)
