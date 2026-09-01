@@ -33,6 +33,7 @@ import {
   listAllProspectionCaptures,
   listAllProspectionPopulations,
   listAllProspectionInfestations,
+  listOperationsAeriennes,
 } from '../src/lib/prospection-repository';
 import { apiClient } from '../src/lib/api-client';
 import { NetworkError } from '../src/lib/errors';
@@ -53,6 +54,15 @@ jest.mock('../src/lib/prospection-repository', () => ({
   listAllProspectionCaptures: jest.fn(),
   listAllProspectionPopulations: jest.fn(),
   listAllProspectionInfestations: jest.fn(),
+  listOperationsAeriennes: jest.fn(),
+  // Vraie implémentation (pas de mock utile ici) : `buildProspectionPayload`
+  // en dépend pour normaliser `pesticides_embarques` (0/1/null en SQLite).
+  normalizeBoolean: (value: unknown) => {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value !== 0;
+    return null;
+  },
 }));
 jest.mock('../src/lib/api-client', () => ({
   apiClient: { createProspection: jest.fn() },
@@ -75,6 +85,7 @@ const mockGetNetworkState = jest.mocked(Network.getNetworkStateAsync);
 const mockListAllCaptures = jest.mocked(listAllProspectionCaptures);
 const mockListAllPopulations = jest.mocked(listAllProspectionPopulations);
 const mockListAllInfestations = jest.mocked(listAllProspectionInfestations);
+const mockListOperationsAeriennes = jest.mocked(listOperationsAeriennes);
 
 function draft(overrides: Partial<DraftProspection> = {}): DraftProspection {
   return {
@@ -97,6 +108,30 @@ function draft(overrides: Partial<DraftProspection> = {}): DraftProspection {
     heure_observation_at: null,
     station_libre: null,
     type_station: null,
+    mode_extensif: null,
+    societe: null,
+    immatricule_aeronef: null,
+    pilote: null,
+    mecanicien: null,
+    chef_de_base: null,
+    base: null,
+    base_secondaire: null,
+    pesticides_embarques: null,
+    pesticide_nom_commercial: null,
+    pesticide_quantite_disponible: null,
+    pesticide_quantite_recue: null,
+    futs_disponible: null,
+    futs_pleins: null,
+    futs_vides: null,
+    futs_recues: null,
+    signature_visa_nom: null,
+    signature_visa_horodatage: null,
+    signature_consultant_fao_nom: null,
+    signature_consultant_fao_horodatage: null,
+    signature_pilote_nom: null,
+    signature_pilote_horodatage: null,
+    signature_chef_base_nom: null,
+    signature_chef_base_horodatage: null,
     verdure_strate: null,
     signalement_source: null,
     signalement_date: null,
@@ -139,6 +174,7 @@ beforeEach(() => {
   mockListAllCaptures.mockReset();
   mockListAllPopulations.mockReset().mockResolvedValue([]);
   mockListAllInfestations.mockReset().mockResolvedValue([]);
+  mockListOperationsAeriennes.mockReset().mockResolvedValue([]);
 });
 
 describe('formatChrono / chronoSeconds', () => {
