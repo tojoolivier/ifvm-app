@@ -2742,29 +2742,29 @@ export interface components {
             altitude?: number | null;
             /**
              * Kit Combinaison
-             * @default false
+             * @default 0
              */
-            kit_combinaison: boolean;
+            kit_combinaison: number;
             /**
              * Kit Gants
-             * @default false
+             * @default 0
              */
-            kit_gants: boolean;
+            kit_gants: number;
             /**
              * Kit Lunettes
-             * @default false
+             * @default 0
              */
-            kit_lunettes: boolean;
+            kit_lunettes: number;
             /**
              * Kit Masques
-             * @default false
+             * @default 0
              */
-            kit_masques: boolean;
+            kit_masques: number;
             /**
-             * Kit Boite
-             * @default false
+             * Kit Botte
+             * @default 0
              */
-            kit_boite: boolean;
+            kit_botte: number;
             /** Zones Exposees */
             zones_exposees?: {
                 [key: string]: unknown;
@@ -2852,15 +2852,15 @@ export interface components {
             /** Altitude */
             altitude: number | null;
             /** Kit Combinaison */
-            kit_combinaison: boolean;
+            kit_combinaison: number;
             /** Kit Gants */
-            kit_gants: boolean;
+            kit_gants: number;
             /** Kit Lunettes */
-            kit_lunettes: boolean;
+            kit_lunettes: number;
             /** Kit Masques */
-            kit_masques: boolean;
-            /** Kit Boite */
-            kit_boite: boolean;
+            kit_masques: number;
+            /** Kit Botte */
+            kit_botte: number;
             /** Zones Exposees */
             zones_exposees: {
                 [key: string]: unknown;
@@ -2958,29 +2958,29 @@ export interface components {
             altitude?: number | null;
             /**
              * Kit Combinaison
-             * @default false
+             * @default 0
              */
-            kit_combinaison: boolean;
+            kit_combinaison: number;
             /**
              * Kit Gants
-             * @default false
+             * @default 0
              */
-            kit_gants: boolean;
+            kit_gants: number;
             /**
              * Kit Lunettes
-             * @default false
+             * @default 0
              */
-            kit_lunettes: boolean;
+            kit_lunettes: number;
             /**
              * Kit Masques
-             * @default false
+             * @default 0
              */
-            kit_masques: boolean;
+            kit_masques: number;
             /**
-             * Kit Boite
-             * @default false
+             * Kit Botte
+             * @default 0
              */
-            kit_boite: boolean;
+            kit_botte: number;
             /** Zones Exposees */
             zones_exposees?: {
                 [key: string]: unknown;

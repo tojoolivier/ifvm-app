@@ -73,11 +73,11 @@ function buildTraitementSyncPayload(draft: DraftTraitement): components['schemas
     latitude: draft.latitude,
     longitude: draft.longitude,
     altitude: draft.altitude,
-    kit_combinaison: !!draft.kit_combinaison,
-    kit_gants: !!draft.kit_gants,
-    kit_lunettes: !!draft.kit_lunettes,
-    kit_masques: !!draft.kit_masques,
-    kit_boite: !!draft.kit_boite,
+    kit_combinaison: draft.kit_combinaison ?? 0,
+    kit_gants: draft.kit_gants ?? 0,
+    kit_lunettes: draft.kit_lunettes ?? 0,
+    kit_masques: draft.kit_masques ?? 0,
+    kit_botte: draft.kit_botte ?? 0,
     zones_exposees: parseJsonField<Record<string, boolean>>(draft.zones_exposees),
     hauteur_strate_herbeuse_m: draft.hauteur_strate_herbeuse_m,
     hauteur_strate_arboree_m: draft.hauteur_strate_arboree_m,
@@ -153,11 +153,8 @@ async function pushRotationsEtProduits(draft: DraftTraitement, token: string): P
         temperature_fin_c: rotation.temperature_fin_c ?? 0,
         vent_debut_ms: rotation.vent_debut_ms ?? 0,
         vent_fin_ms: rotation.vent_fin_ms ?? 0,
-        // Obligatoires côté serveur (RotationCuveCreate) et déjà saisies dans le
-        // brouillon : elles n'étaient simplement pas transmises. Dérive révélée par
-        // la régénération de api-schema.generated.ts (#131).
-        heure_debut: rotation.heure_debut ?? '',
-        heure_fin: rotation.heure_fin ?? '',
+        heure_debut: rotation.heure_debut ?? '00:00',
+        heure_fin: rotation.heure_fin ?? '00:01',
       });
     }
   }

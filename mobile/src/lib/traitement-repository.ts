@@ -39,11 +39,13 @@ export interface DraftTraitementRow {
   latitude: number | null;
   longitude: number | null;
   altitude: number | null;
-  kit_combinaison: boolean | null;
-  kit_gants: boolean | null;
-  kit_lunettes: boolean | null;
-  kit_masques: boolean | null;
-  kit_boite: boolean | null;
+  /** Nombre de personnes équipées de chaque matériel — plus des booléens
+   * depuis que tout l'équipage doit être équipé, pas seulement une personne. */
+  kit_combinaison: number | null;
+  kit_gants: number | null;
+  kit_lunettes: number | null;
+  kit_masques: number | null;
+  kit_botte: number | null;
   zones_exposees: string | null;
   hauteur_strate_herbeuse_m: number | null;
   hauteur_strate_arboree_m: number | null;
@@ -217,11 +219,6 @@ export interface DraftTraitement extends DraftTraitementRow {
 function normalizeTraitementRow(row: DraftTraitementRow): DraftTraitementRow {
   return {
     ...row,
-    kit_combinaison: normalizeBoolean(row.kit_combinaison),
-    kit_gants: normalizeBoolean(row.kit_gants),
-    kit_lunettes: normalizeBoolean(row.kit_lunettes),
-    kit_masques: normalizeBoolean(row.kit_masques),
-    kit_boite: normalizeBoolean(row.kit_boite),
     empoisonnement: normalizeBoolean(row.empoisonnement),
     comportement_anormal: normalizeBoolean(row.comportement_anormal),
     mortalite: normalizeBoolean(row.mortalite),
@@ -458,11 +455,11 @@ export async function updateTraitementTerrestre(
 }
 
 export interface MoyensUpdateInput {
-  kit_combinaison: boolean;
-  kit_gants: boolean;
-  kit_lunettes: boolean;
-  kit_masques: boolean;
-  kit_boite: boolean;
+  kit_combinaison: number;
+  kit_gants: number;
+  kit_lunettes: number;
+  kit_masques: number;
+  kit_botte: number;
   zones_exposees: Record<string, boolean>;
   hauteur_strate_herbeuse_m: number | null;
   hauteur_strate_arboree_m: number | null;
@@ -482,7 +479,7 @@ export async function updateTraitementMoyens(
       kit_gants = ?,
       kit_lunettes = ?,
       kit_masques = ?,
-      kit_boite = ?,
+      kit_botte = ?,
       zones_exposees = ?,
       hauteur_strate_herbeuse_m = ?,
       hauteur_strate_arboree_m = ?,
@@ -494,7 +491,7 @@ export async function updateTraitementMoyens(
       input.kit_gants,
       input.kit_lunettes,
       input.kit_masques,
-      input.kit_boite,
+      input.kit_botte,
       JSON.stringify(input.zones_exposees),
       input.hauteur_strate_herbeuse_m,
       input.hauteur_strate_arboree_m,
