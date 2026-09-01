@@ -47,6 +47,8 @@ export interface RotationDraft {
   temperature_fin_c?: number | null;
   vent_debut_ms?: number | null;
   vent_fin_ms?: number | null;
+  heure_debut?: string | null;
+  heure_fin?: string | null;
 }
 
 export interface RotationInput {
@@ -57,6 +59,8 @@ export interface RotationInput {
   temperature_fin_c?: number | null;
   vent_debut_ms?: number | null;
   vent_fin_ms?: number | null;
+  heure_debut?: string | null;
+  heure_fin?: string | null;
 }
 
 export interface AerienDraft {

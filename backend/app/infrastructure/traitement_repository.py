@@ -231,6 +231,8 @@ class TraitementRepositoryImpl(TraitementRepository):
                 temperature_fin_c=rotation.temperature_fin_c,
                 vent_debut_ms=rotation.vent_debut_ms,
                 vent_fin_ms=rotation.vent_fin_ms,
+                heure_debut=rotation.heure_debut,
+                heure_fin=rotation.heure_fin,
             )
         )
         await self._persister_totaux(traitement_id, nb_rotations, total_pesticide_l)
@@ -251,6 +253,8 @@ class TraitementRepositoryImpl(TraitementRepository):
         rotation_model.temperature_fin_c = rotation.temperature_fin_c
         rotation_model.vent_debut_ms = rotation.vent_debut_ms
         rotation_model.vent_fin_ms = rotation.vent_fin_ms
+        rotation_model.heure_debut = rotation.heure_debut
+        rotation_model.heure_fin = rotation.heure_fin
 
         await self._persister_totaux(traitement_id, nb_rotations, total_pesticide_l)
         return await self.get_by_id(traitement_id)
@@ -519,6 +523,8 @@ class TraitementRepositoryImpl(TraitementRepository):
                         temperature_fin_c=float(r.temperature_fin_c),
                         vent_debut_ms=float(r.vent_debut_ms),
                         vent_fin_ms=float(r.vent_fin_ms),
+                        heure_debut=r.heure_debut,
+                        heure_fin=r.heure_fin,
                     )
                     for r in model.aerien.rotations
                 ],

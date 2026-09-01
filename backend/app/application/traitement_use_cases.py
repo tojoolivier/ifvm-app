@@ -525,10 +525,15 @@ class AddRotation:
         temperature_fin_c: float,
         vent_debut_ms: float,
         vent_fin_ms: float,
+        heure_debut: time,
+        heure_fin: time,
     ) -> Traitement:
         traitement = await _get_traitement_aerien(self.repository, traitement_id)
         traitement.verifier_modifiable()
         aerien = traitement.aerien
+
+        if heure_fin <= heure_debut:
+            raise ValueError("heure_fin doit être postérieure à heure_debut")
 
         prochain_numero = max((r.numero for r in aerien.rotations), default=0) + 1
         rotation = Rotation(
@@ -541,6 +546,8 @@ class AddRotation:
             temperature_fin_c=temperature_fin_c,
             vent_debut_ms=vent_debut_ms,
             vent_fin_ms=vent_fin_ms,
+            heure_debut=heure_debut,
+            heure_fin=heure_fin,
         )
         aerien.rotations.append(rotation)
         aerien.recalculer_totaux()
@@ -565,11 +572,16 @@ class UpdateRotation:
         temperature_fin_c: float,
         vent_debut_ms: float,
         vent_fin_ms: float,
+        heure_debut: time,
+        heure_fin: time,
     ) -> Traitement:
         traitement = await _get_traitement_aerien(self.repository, traitement_id)
         traitement.verifier_modifiable()
         aerien = traitement.aerien
         rotation = _trouver_rotation(aerien, rotation_id)
+
+        if heure_fin <= heure_debut:
+            raise ValueError("heure_fin doit être postérieure à heure_debut")
 
         rotation.numero_cuve = numero_cuve
         rotation.produit_id = produit_id
@@ -578,6 +590,8 @@ class UpdateRotation:
         rotation.temperature_fin_c = temperature_fin_c
         rotation.vent_debut_ms = vent_debut_ms
         rotation.vent_fin_ms = vent_fin_ms
+        rotation.heure_debut = heure_debut
+        rotation.heure_fin = heure_fin
         aerien.recalculer_totaux()
 
         return await self.repository.update_rotation(

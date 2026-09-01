@@ -204,6 +204,8 @@ async def seed():
                         temperature_fin_c=30 + i,
                         vent_debut_ms=2.5,
                         vent_fin_ms=3.1,
+                        heure_debut=time(6 + i, 0),
+                        heure_fin=time(6 + i, 30),
                     )
                 )
             for role, nom in (
