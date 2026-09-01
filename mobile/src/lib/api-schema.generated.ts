@@ -1232,6 +1232,14 @@ export interface components {
          */
         MethodePopulation: "visuel" | "comptage_direct";
         /**
+         * ModeExtensif
+         * @description Axe orthogonal à TypeProspection — pertinent seulement quand
+         *     type_prospection='extensive'. Absent (None) sur une fiche existante ou une
+         *     fiche extensive terrestre : jamais None sur une fiche aérienne.
+         * @enum {string}
+         */
+        ModeExtensif: "terrestre" | "aerien";
+        /**
          * ModeTraitement
          * @enum {string}
          */
@@ -1241,6 +1249,55 @@ export interface components {
          * @enum {string}
          */
         NiveauPopulation: "neant" | "rare" | "peu" | "beaucoup" | "dominant";
+        /**
+         * OperationAerienneCreate
+         * @description Pas de `numero` (assigné côté serveur, séquence par fiche) ni de
+         *     `duree_minutes` (calculée côté serveur depuis début/fin — jamais saisie).
+         */
+        OperationAerienneCreate: {
+            type_operation: components["schemas"]["TypeOperationAerienne"];
+            /** Motif Divers */
+            motif_divers?: string | null;
+            /** Debut Heure */
+            debut_heure: string;
+            /** Debut Temperature C */
+            debut_temperature_c?: number | null;
+            /** Debut Vent Ms */
+            debut_vent_ms?: number | null;
+            /** Fin Heure */
+            fin_heure: string;
+            /** Fin Temperature C */
+            fin_temperature_c?: number | null;
+            /** Fin Vent Ms */
+            fin_vent_ms?: number | null;
+        };
+        /** OperationAerienneRead */
+        OperationAerienneRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Numero */
+            numero: number;
+            type_operation: components["schemas"]["TypeOperationAerienne"];
+            /** Motif Divers */
+            motif_divers?: string | null;
+            /** Debut Heure */
+            debut_heure: string;
+            /** Debut Temperature C */
+            debut_temperature_c: number | null;
+            /** Debut Vent Ms */
+            debut_vent_ms: number | null;
+            /** Fin Heure */
+            fin_heure: string;
+            /** Fin Temperature C */
+            fin_temperature_c: number | null;
+            /** Fin Vent Ms */
+            fin_vent_ms: number | null;
+            /** Duree Minutes */
+            duree_minutes: number;
+        };
         /** PesticideSyncRead */
         PesticideSyncRead: {
             /**
@@ -1538,6 +1595,53 @@ export interface components {
              * @default []
              */
             avertissements: string[];
+            mode_extensif?: components["schemas"]["ModeExtensif"] | null;
+            /** Societe */
+            societe?: string | null;
+            /** Immatricule Aeronef */
+            immatricule_aeronef?: string | null;
+            /** Pilote */
+            pilote?: string | null;
+            /** Mecanicien */
+            mecanicien?: string | null;
+            /** Chef De Base */
+            chef_de_base?: string | null;
+            /** Base */
+            base?: string | null;
+            /** Base Secondaire */
+            base_secondaire?: string | null;
+            /** Pesticides Embarques */
+            pesticides_embarques?: boolean | null;
+            /** Pesticide Nom Commercial */
+            pesticide_nom_commercial?: string | null;
+            /** Pesticide Quantite Disponible */
+            pesticide_quantite_disponible?: number | null;
+            /** Pesticide Quantite Recue */
+            pesticide_quantite_recue?: number | null;
+            /** Futs Disponible */
+            futs_disponible?: number | null;
+            /** Futs Pleins */
+            futs_pleins?: number | null;
+            /** Futs Vides */
+            futs_vides?: number | null;
+            /** Futs Recues */
+            futs_recues?: number | null;
+            /** Signature Visa Nom */
+            signature_visa_nom?: string | null;
+            /** Signature Visa Horodatage */
+            signature_visa_horodatage?: string | null;
+            /** Signature Consultant Fao Nom */
+            signature_consultant_fao_nom?: string | null;
+            /** Signature Consultant Fao Horodatage */
+            signature_consultant_fao_horodatage?: string | null;
+            /** Signature Pilote Nom */
+            signature_pilote_nom?: string | null;
+            /** Signature Pilote Horodatage */
+            signature_pilote_horodatage?: string | null;
+            /** Signature Chef Base Nom */
+            signature_chef_base_nom?: string | null;
+            /** Signature Chef Base Horodatage */
+            signature_chef_base_horodatage?: string | null;
             /**
              * Populations
              * @default []
@@ -1553,6 +1657,11 @@ export interface components {
              * @default []
              */
             infestations: components["schemas"]["InfestationCreate"][];
+            /**
+             * Operations Aeriennes
+             * @default []
+             */
+            operations_aeriennes: components["schemas"]["OperationAerienneCreate"][];
             /** Surface Infestee Pourcent */
             surface_infestee_pourcent?: number | null;
         };
@@ -1667,6 +1776,53 @@ export interface components {
              * @default []
              */
             avertissements: string[];
+            mode_extensif?: components["schemas"]["ModeExtensif"] | null;
+            /** Societe */
+            societe?: string | null;
+            /** Immatricule Aeronef */
+            immatricule_aeronef?: string | null;
+            /** Pilote */
+            pilote?: string | null;
+            /** Mecanicien */
+            mecanicien?: string | null;
+            /** Chef De Base */
+            chef_de_base?: string | null;
+            /** Base */
+            base?: string | null;
+            /** Base Secondaire */
+            base_secondaire?: string | null;
+            /** Pesticides Embarques */
+            pesticides_embarques?: boolean | null;
+            /** Pesticide Nom Commercial */
+            pesticide_nom_commercial?: string | null;
+            /** Pesticide Quantite Disponible */
+            pesticide_quantite_disponible?: number | null;
+            /** Pesticide Quantite Recue */
+            pesticide_quantite_recue?: number | null;
+            /** Futs Disponible */
+            futs_disponible?: number | null;
+            /** Futs Pleins */
+            futs_pleins?: number | null;
+            /** Futs Vides */
+            futs_vides?: number | null;
+            /** Futs Recues */
+            futs_recues?: number | null;
+            /** Signature Visa Nom */
+            signature_visa_nom?: string | null;
+            /** Signature Visa Horodatage */
+            signature_visa_horodatage?: string | null;
+            /** Signature Consultant Fao Nom */
+            signature_consultant_fao_nom?: string | null;
+            /** Signature Consultant Fao Horodatage */
+            signature_consultant_fao_horodatage?: string | null;
+            /** Signature Pilote Nom */
+            signature_pilote_nom?: string | null;
+            /** Signature Pilote Horodatage */
+            signature_pilote_horodatage?: string | null;
+            /** Signature Chef Base Nom */
+            signature_chef_base_nom?: string | null;
+            /** Signature Chef Base Horodatage */
+            signature_chef_base_horodatage?: string | null;
             /**
              * Populations
              * @default []
@@ -1682,6 +1838,11 @@ export interface components {
              * @default []
              */
             infestations: components["schemas"]["InfestationRead"][];
+            /**
+             * Operations Aeriennes
+             * @default []
+             */
+            operations_aeriennes: components["schemas"]["OperationAerienneRead"][];
         };
         /** ProspectionUpdate */
         ProspectionUpdate: {
@@ -1761,6 +1922,53 @@ export interface components {
             conclusion_validation?: components["schemas"]["ConclusionValidation"] | null;
             /** Avertissements */
             avertissements?: string[] | null;
+            mode_extensif?: components["schemas"]["ModeExtensif"] | null;
+            /** Societe */
+            societe?: string | null;
+            /** Immatricule Aeronef */
+            immatricule_aeronef?: string | null;
+            /** Pilote */
+            pilote?: string | null;
+            /** Mecanicien */
+            mecanicien?: string | null;
+            /** Chef De Base */
+            chef_de_base?: string | null;
+            /** Base */
+            base?: string | null;
+            /** Base Secondaire */
+            base_secondaire?: string | null;
+            /** Pesticides Embarques */
+            pesticides_embarques?: boolean | null;
+            /** Pesticide Nom Commercial */
+            pesticide_nom_commercial?: string | null;
+            /** Pesticide Quantite Disponible */
+            pesticide_quantite_disponible?: number | null;
+            /** Pesticide Quantite Recue */
+            pesticide_quantite_recue?: number | null;
+            /** Futs Disponible */
+            futs_disponible?: number | null;
+            /** Futs Pleins */
+            futs_pleins?: number | null;
+            /** Futs Vides */
+            futs_vides?: number | null;
+            /** Futs Recues */
+            futs_recues?: number | null;
+            /** Signature Visa Nom */
+            signature_visa_nom?: string | null;
+            /** Signature Visa Horodatage */
+            signature_visa_horodatage?: string | null;
+            /** Signature Consultant Fao Nom */
+            signature_consultant_fao_nom?: string | null;
+            /** Signature Consultant Fao Horodatage */
+            signature_consultant_fao_horodatage?: string | null;
+            /** Signature Pilote Nom */
+            signature_pilote_nom?: string | null;
+            /** Signature Pilote Horodatage */
+            signature_pilote_horodatage?: string | null;
+            /** Signature Chef Base Nom */
+            signature_chef_base_nom?: string | null;
+            /** Signature Chef Base Horodatage */
+            signature_chef_base_horodatage?: string | null;
         };
         /** ReferentielPullResponse */
         ReferentielPullResponse: {
@@ -2506,6 +2714,11 @@ export interface components {
          * @enum {string}
          */
         TypeLarve: "tache_larvaire" | "bande_larvaire";
+        /**
+         * TypeOperationAerienne
+         * @enum {string}
+         */
+        TypeOperationAerienne: "convoyage" | "prospection" | "divers";
         /**
          * TypeProspection
          * @enum {string}

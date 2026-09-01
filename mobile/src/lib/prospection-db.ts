@@ -58,6 +58,7 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
   await ajouterColonnesManquantes(db, 'prospection', COLONNES_PROSPECTION);
   await ajouterColonnesManquantes(db, 'prospection_infestation', COLONNES_INFESTATION);
   await ajouterColonnesManquantes(db, 'prospection_population', COLONNES_POPULATION);
+  await ajouterColonnesManquantes(db, 'prospection_operation_aerienne', COLONNES_OPERATION_AERIENNE);
   await ajouterColonnesManquantes(db, 'traitement', COLONNES_TRAITEMENT);
 
   log.event('db.ouverte', { base: DB_NAME });
@@ -271,6 +272,24 @@ async function creerTables(db: SQLite.SQLiteDatabase): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS ix_prospection_infestation_prospection_id
       ON prospection_infestation(prospection_id);
+
+    CREATE TABLE IF NOT EXISTS prospection_operation_aerienne (
+      id TEXT PRIMARY KEY NOT NULL,
+      prospection_id TEXT NOT NULL REFERENCES prospection(id) ON DELETE CASCADE,
+      numero INTEGER NOT NULL,
+      type_operation TEXT NOT NULL,
+      motif_divers TEXT,
+      debut_heure TEXT NOT NULL,
+      debut_temperature_c REAL,
+      debut_vent_ms REAL,
+      fin_heure TEXT NOT NULL,
+      fin_temperature_c REAL,
+      fin_vent_ms REAL,
+      duree_minutes INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_prospection_operation_aerienne_prospection_id
+      ON prospection_operation_aerienne(prospection_id);
 
     CREATE TABLE IF NOT EXISTS traitement (
       id TEXT PRIMARY KEY NOT NULL,
@@ -504,6 +523,34 @@ const COLONNES_PROSPECTION: readonly Colonne[] = [
   // cible d'infestation, sans lien avec le GPS). L'heure HH:mm affichée est dérivée de
   // cette valeur à la lecture, jamais stockée séparément.
   { name: 'heure_observation_at', type: 'TEXT' },
+  // Mode aérien (extensif uniquement) — NULL = terrestre, sur toute fiche existante
+  // comme sur toute nouvelle fiche terrestre. Cf. migration backend 0035.
+  { name: 'mode_extensif', type: 'TEXT' },
+  { name: 'societe', type: 'TEXT' },
+  { name: 'immatricule_aeronef', type: 'TEXT' },
+  { name: 'pilote', type: 'TEXT' },
+  { name: 'mecanicien', type: 'TEXT' },
+  { name: 'chef_de_base', type: 'TEXT' },
+  { name: 'base', type: 'TEXT' },
+  { name: 'base_secondaire', type: 'TEXT' },
+  // Pesticides embarqués + signatures (mode aérien uniquement) — NULL sur toute
+  // fiche terrestre, comme le mode aérien lui-même. Cf. migration backend 0036.
+  { name: 'pesticides_embarques', type: 'INTEGER' },
+  { name: 'pesticide_nom_commercial', type: 'TEXT' },
+  { name: 'pesticide_quantite_disponible', type: 'REAL' },
+  { name: 'pesticide_quantite_recue', type: 'REAL' },
+  { name: 'futs_disponible', type: 'INTEGER' },
+  { name: 'futs_pleins', type: 'INTEGER' },
+  { name: 'futs_vides', type: 'INTEGER' },
+  { name: 'futs_recues', type: 'INTEGER' },
+  { name: 'signature_visa_nom', type: 'TEXT' },
+  { name: 'signature_visa_horodatage', type: 'TEXT' },
+  { name: 'signature_consultant_fao_nom', type: 'TEXT' },
+  { name: 'signature_consultant_fao_horodatage', type: 'TEXT' },
+  { name: 'signature_pilote_nom', type: 'TEXT' },
+  { name: 'signature_pilote_horodatage', type: 'TEXT' },
+  { name: 'signature_chef_base_nom', type: 'TEXT' },
+  { name: 'signature_chef_base_horodatage', type: 'TEXT' },
 ];
 
 /** Colonnes ajoutées à `prospection_infestation` après sa création initiale. */
@@ -564,6 +611,12 @@ const COLONNES_POPULATION: readonly Colonne[] = [
   { name: 'etat', type: 'TEXT' },
   { name: 'essaim_en_vol', type: 'INTEGER' },
   { name: 'essaim_pose', type: 'INTEGER' },
+];
+
+/** Colonnes ajoutées à `prospection_operation_aerienne` après sa création initiale. */
+const COLONNES_OPERATION_AERIENNE: readonly Colonne[] = [
+  // Pertinent seulement si type_operation = 'divers'. Cf. migration backend 0037.
+  { name: 'motif_divers', type: 'TEXT' },
 ];
 
 /** Colonnes ajoutées à `traitement` après sa création initiale. */
