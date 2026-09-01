@@ -9,6 +9,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check-migrations:
+    # Parse statique des fichiers de migration : ni Postgres ni env applicatif.
+    runs-on: self-hosted-linux
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Historique Alembic lineaire (head unique)
+        run: python scripts/check_migration_linearity.py
+
   lint-backend:
     # "services: postgres" impose un daemon Docker dans le pod -> pool dind.
     runs-on: self-hosted-dind
