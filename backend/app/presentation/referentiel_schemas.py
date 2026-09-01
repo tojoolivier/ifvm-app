@@ -139,11 +139,14 @@ class StationFixeSyncRead(BaseModel):
 
 
 class UtilisateurEquipeSyncRead(BaseModel):
+    """L'email n'est pas transporté vers le terrain : il ne sert qu'à l'authentification
+    backend, aucun écran mobile ne l'affiche, et le pull le poussait dans le cache
+    hors-ligne de tous les téléphones sans usage (cf. ADR-015, #136)."""
+
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     nom: str
     prenom: str
-    email: str
     role: str
     pa_id: uuid.UUID | None
     actif: bool

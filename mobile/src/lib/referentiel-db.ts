@@ -256,7 +256,6 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
       id TEXT PRIMARY KEY NOT NULL,
       nom TEXT NOT NULL,
       prenom TEXT NOT NULL,
-      email TEXT NOT NULL,
       role TEXT NOT NULL,
       pa_id TEXT,
       actif INTEGER NOT NULL DEFAULT 1,
@@ -324,6 +323,36 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
     { name: 'dose_reference', type: 'TEXT' },
   ]);
   await migrateCodeStade(db);
+  await migrateUtilisateurEquipe(db);
+}
+
+/**
+ * `utilisateur_equipe` portait `email TEXT NOT NULL` : le backend ne descend plus ce
+ * champ sur le terrain (ADR-015, #136 — l'email ne sert qu'à l'authentification et
+ * aucun écran ne l'affiche). SQLite ne sait pas relâcher un NOT NULL, et la table
+ * n'est qu'un cache du référentiel : on la recrée sans `email` et on remet son
+ * curseur à zéro pour que la prochaine synchro la repeuple entièrement — même
+ * traitement que `migrateCodeStade` ci-dessus.
+ */
+async function migrateUtilisateurEquipe(db: SQLite.SQLiteDatabase): Promise<void> {
+  const colonnes = await db.getAllAsync<{ name: string }>(
+    'PRAGMA table_info(utilisateur_equipe)'
+  );
+  if (!colonnes.some((c) => c.name === 'email')) return;
+
+  await db.execAsync(`
+    DROP TABLE IF EXISTS utilisateur_equipe;
+    CREATE TABLE utilisateur_equipe (
+      id TEXT PRIMARY KEY NOT NULL,
+      nom TEXT NOT NULL,
+      prenom TEXT NOT NULL,
+      role TEXT NOT NULL,
+      pa_id TEXT,
+      actif INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL
+    );
+  `);
+  await db.runAsync("DELETE FROM referentiel_sync_meta WHERE entity_type = 'utilisateurs_equipe'");
 }
 
 /**

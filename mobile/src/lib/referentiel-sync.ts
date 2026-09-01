@@ -123,12 +123,12 @@ async function upsertUtilisateursEquipe(
 ): Promise<void> {
   for (const user of upserts) {
     await db.runAsync(
-      `INSERT INTO utilisateur_equipe (id, nom, prenom, email, role, pa_id, actif, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO utilisateur_equipe (id, nom, prenom, role, pa_id, actif, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
-         nom = excluded.nom, prenom = excluded.prenom, email = excluded.email, role = excluded.role,
+         nom = excluded.nom, prenom = excluded.prenom, role = excluded.role,
          pa_id = excluded.pa_id, actif = excluded.actif, updated_at = excluded.updated_at`,
-      [user.id, user.nom, user.prenom, user.email, user.role, user.pa_id, user.actif ? 1 : 0, user.updated_at]
+      [user.id, user.nom, user.prenom, user.role, user.pa_id, user.actif ? 1 : 0, user.updated_at]
     );
   }
 }

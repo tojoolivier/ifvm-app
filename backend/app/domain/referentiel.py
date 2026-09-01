@@ -119,7 +119,6 @@ class UtilisateurEquipe:
     id: uuid.UUID = field(default_factory=uuid.uuid4)
     nom: str = ""
     prenom: str = ""
-    email: str = ""
     role: str = ""
     pa_id: uuid.UUID | None = None
     actif: bool = True
