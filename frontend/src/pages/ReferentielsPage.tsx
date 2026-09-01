@@ -196,7 +196,6 @@ const ENTITES: EntitySpec[] = [
     apiOk: true,
     apiLabel: 'GET · POST · PUT /pesticides',
     desc: 'Alimente les chips « Produit » des rotations aériennes et des produits utilisés en terrestre.',
-    note: 'Synchronisée dans le SQLite du terrain mais aucune fonction de lecture : listPesticides() n\'existe pas dans referentiel-db.ts.',
     hasActif: true,
     rowLabel: (row) => text(row, 'code'),
     columns: [
