@@ -280,11 +280,15 @@ async def add_rotation(
             temperature_fin_c=body.temperature_fin_c,
             vent_debut_ms=body.vent_debut_ms,
             vent_fin_ms=body.vent_fin_ms,
+            heure_debut=body.heure_debut,
+            heure_fin=body.heure_fin,
         )
     except TraitementIntrouvableError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except TraitementVerrouilleError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
 
 @router.put("/{traitement_id}/rotations/{rotation_id}", response_model=TraitementRead)
@@ -307,11 +311,15 @@ async def update_rotation(
             temperature_fin_c=body.temperature_fin_c,
             vent_debut_ms=body.vent_debut_ms,
             vent_fin_ms=body.vent_fin_ms,
+            heure_debut=body.heure_debut,
+            heure_fin=body.heure_fin,
         )
     except (TraitementIntrouvableError, RotationIntrouvableError) as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except TraitementVerrouilleError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
 
 @router.delete("/{traitement_id}/rotations/{rotation_id}", response_model=TraitementRead)

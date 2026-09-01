@@ -106,6 +106,8 @@ erDiagram
         numeric temperature_fin_c "NOT NULL"
         numeric vent_debut_ms "NOT NULL"
         numeric vent_fin_ms "NOT NULL"
+        time heure_debut "NOT NULL"
+        time heure_fin "NOT NULL, > heure_debut"
     }
 
     traitement_terrestre {

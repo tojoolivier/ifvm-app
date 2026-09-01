@@ -176,6 +176,8 @@ def payload_rotation(pesticide):
             "temperature_fin_c": 27.0,
             "vent_debut_ms": 2.0,
             "vent_fin_ms": 3.0,
+            "heure_debut": "06:00:00",
+            "heure_fin": "06:30:00",
         }
         payload.update(overrides)
         return payload

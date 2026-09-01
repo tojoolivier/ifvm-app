@@ -97,6 +97,8 @@ export interface Rotation {
   temperature_fin_c: number | null;
   vent_debut_ms: number | null;
   vent_fin_ms: number | null;
+  heure_debut: string | null;
+  heure_fin: string | null;
 }
 
 export interface RotationInput {
@@ -107,6 +109,8 @@ export interface RotationInput {
   temperature_fin_c?: number | null;
   vent_debut_ms?: number | null;
   vent_fin_ms?: number | null;
+  heure_debut?: string | null;
+  heure_fin?: string | null;
 }
 
 export interface TraitementTerrestre {
@@ -602,8 +606,9 @@ export async function addRotation(
   await db.runAsync(
     `INSERT INTO rotation (
       id, traitement_aerien_id, numero_cuve, produit_id, quantite_l,
-      temperature_debut_c, temperature_fin_c, vent_debut_ms, vent_fin_ms
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      temperature_debut_c, temperature_fin_c, vent_debut_ms, vent_fin_ms,
+      heure_debut, heure_fin
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       traitementAerienId,
@@ -614,6 +619,8 @@ export async function addRotation(
       input.temperature_fin_c ?? null,
       input.vent_debut_ms ?? null,
       input.vent_fin_ms ?? null,
+      input.heure_debut ?? null,
+      input.heure_fin ?? null,
     ]
   );
 
@@ -641,7 +648,9 @@ export async function updateRotation(
       temperature_debut_c = ?,
       temperature_fin_c = ?,
       vent_debut_ms = ?,
-      vent_fin_ms = ?
+      vent_fin_ms = ?,
+      heure_debut = ?,
+      heure_fin = ?
      WHERE id = ?`,
     [
       input.numero_cuve ?? null,
@@ -651,6 +660,8 @@ export async function updateRotation(
       input.temperature_fin_c ?? null,
       input.vent_debut_ms ?? null,
       input.vent_fin_ms ?? null,
+      input.heure_debut ?? null,
+      input.heure_fin ?? null,
       rotationId,
     ]
   );

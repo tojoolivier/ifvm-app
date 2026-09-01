@@ -116,6 +116,8 @@ class Rotation:
     temperature_fin_c: float = 0.0
     vent_debut_ms: float = 0.0
     vent_fin_ms: float = 0.0
+    heure_debut: time = time(0, 0)
+    heure_fin: time = time(0, 0)
 
 
 @dataclass

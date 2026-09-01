@@ -158,11 +158,14 @@ class RotationModel(Base):
     temperature_fin_c: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
     vent_debut_ms: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
     vent_fin_ms: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    heure_debut: Mapped[time] = mapped_column(Time(), nullable=False)
+    heure_fin: Mapped[time] = mapped_column(Time(), nullable=False)
 
     aerien: Mapped[TraitementAerienModel] = relationship(back_populates="rotations")
 
     __table_args__ = (
         UniqueConstraint("traitement_aerien_id", "numero", name="uq_traitement_rotation_numero"),
+        CheckConstraint("heure_fin > heure_debut", name="ck_traitement_rotation_heures"),
     )
 
 

@@ -76,10 +76,11 @@ export function TerrestreForm({
         <Text style={styles.warningText}>⚠ L&apos;agent encadreur ne signe jamais</Text>
       </Card>
 
+      <Text style={styles.label}>Consultant international</Text>
       <TextInput
         editable={!readOnly}
         style={styles.input}
-        placeholder="Consultant international"
+        placeholder="Nom du consultant (facultatif)"
         value={store.terrestre.consultantInternational ?? ''}
         onChangeText={(v) => store.updateTerrestre({ consultantInternational: v })}
       />
@@ -104,18 +105,20 @@ export function TerrestreForm({
       </View>
       {errors.heureFin && <Text style={styles.error}>{errors.heureFin}</Text>}
 
+      <Text style={styles.label}>Vitesse du vent (m/s) *</Text>
       <TextInput
         editable={!readOnly}
         style={styles.input}
-        placeholder="Vitesse du vent (m/s)*"
+        placeholder="0"
         keyboardType="numeric"
         value={store.terrestre.vitesse_vent_ms != null ? String(store.terrestre.vitesse_vent_ms) : ''}
         onChangeText={(v) => store.updateTerrestre({ vitesse_vent_ms: v ? Number(v) : null })}
       />
+      <Text style={styles.label}>Température (°C) *</Text>
       <TextInput
         editable={!readOnly}
         style={styles.input}
-        placeholder="Température (°C)*"
+        placeholder="0"
         keyboardType="numeric"
         value={store.terrestre.temperature_c != null ? String(store.terrestre.temperature_c) : ''}
         onChangeText={(v) => store.updateTerrestre({ temperature_c: v ? Number(v) : null })}
@@ -156,26 +159,29 @@ export function TerrestreForm({
       {errors.traitementOrigineId && <Text style={styles.error}>{errors.traitementOrigineId}</Text>}
 
       <Text style={styles.label}>Moyens &amp; surfaces (ha)</Text>
+      <Text style={styles.label}>Atomiseur</Text>
       <TextInput
         editable={!readOnly}
         style={styles.input}
-        placeholder="Atomiseur"
+        placeholder="0"
         keyboardType="numeric"
         value={store.terrestre.surface_atomiseur_ha != null ? String(store.terrestre.surface_atomiseur_ha) : ''}
         onChangeText={(v) => store.updateTerrestre({ surface_atomiseur_ha: v ? Number(v) : null })}
       />
+      <Text style={styles.label}>Disque rotatif</Text>
       <TextInput
         editable={!readOnly}
         style={styles.input}
-        placeholder="Disque rotatif"
+        placeholder="0"
         keyboardType="numeric"
         value={store.terrestre.surface_disque_rotatif_ha != null ? String(store.terrestre.surface_disque_rotatif_ha) : ''}
         onChangeText={(v) => store.updateTerrestre({ surface_disque_rotatif_ha: v ? Number(v) : null })}
       />
+      <Text style={styles.label}>ULVAmast</Text>
       <TextInput
         editable={!readOnly}
         style={styles.input}
-        placeholder="ULVAmast"
+        placeholder="0"
         keyboardType="numeric"
         value={store.terrestre.surface_ulvamast_ha != null ? String(store.terrestre.surface_ulvamast_ha) : ''}
         onChangeText={(v) => store.updateTerrestre({ surface_ulvamast_ha: v ? Number(v) : null })}
@@ -215,13 +221,16 @@ export function TerrestreForm({
           </View>
           {errors.surfaceRestanteAbandonnee && <Text style={styles.error}>{errors.surfaceRestanteAbandonnee}</Text>}
           {store.terrestre.surfaceRestanteAbandonnee && (
-            <TextInput
-              editable={!readOnly}
-              style={styles.input}
-              placeholder="Motif d'abandon*"
-              value={store.terrestre.motifSurfaceRestanteAbandonnee ?? ''}
-              onChangeText={(v) => store.updateTerrestre({ motifSurfaceRestanteAbandonnee: v })}
-            />
+            <Fragment>
+              <Text style={styles.label}>Motif d&apos;abandon *</Text>
+              <TextInput
+                editable={!readOnly}
+                style={styles.input}
+                placeholder="Ex. Zone inaccessible (crue)"
+                value={store.terrestre.motifSurfaceRestanteAbandonnee ?? ''}
+                onChangeText={(v) => store.updateTerrestre({ motifSurfaceRestanteAbandonnee: v })}
+              />
+            </Fragment>
           )}
           {errors.motifSurfaceRestanteAbandonnee && <Text style={styles.error}>{errors.motifSurfaceRestanteAbandonnee}</Text>}
         </Fragment>
@@ -251,10 +260,11 @@ export function TerrestreForm({
               />
             ))}
           </View>
+          <Text style={styles.label}>Quantité (l)</Text>
           <TextInput
             editable={!readOnly}
             style={styles.input}
-            placeholder="Quantité (l)"
+            placeholder="0"
             keyboardType="numeric"
             value={produit.quantite_l != null ? String(produit.quantite_l) : ''}
             onChangeText={(v) =>
@@ -275,18 +285,20 @@ export function TerrestreForm({
         <Text style={styles.derivedValue}>{totalPesticideTerrestre}</Text>
       </Card>
 
+      <Text style={styles.label}>Essence (l)</Text>
       <TextInput
         editable={!readOnly}
         style={styles.input}
-        placeholder="Essence (l)"
+        placeholder="0"
         keyboardType="numeric"
         value={store.terrestre.essence_litres != null ? String(store.terrestre.essence_litres) : ''}
         onChangeText={(v) => store.updateTerrestre({ essence_litres: v ? Number(v) : null })}
       />
+      <Text style={styles.label}>Nombre de piles</Text>
       <TextInput
         editable={!readOnly}
         style={styles.input}
-        placeholder="Nombre de piles"
+        placeholder="0"
         keyboardType="numeric"
         value={store.terrestre.nb_piles != null ? String(store.terrestre.nb_piles) : ''}
         onChangeText={(v) => store.updateTerrestre({ nb_piles: v ? Number(v) : null })}

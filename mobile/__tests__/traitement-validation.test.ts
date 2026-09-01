@@ -7,6 +7,7 @@ import {
   computeSurfaceRestante,
   validateReferences,
   validateTerrestreConditions,
+  validateRotationsHeures,
   validateRecouvrement,
   validateEmpoisonnement,
   computeSignatureMatrix,
@@ -170,6 +171,29 @@ describe('validateTerrestreConditions', () => {
       surfaceRestanteAbandonnee: false,
     });
     expect(errors.some((e) => e.field === 'motifSurfaceRestanteAbandonnee')).toBe(false);
+  });
+});
+
+describe('validateRotationsHeures', () => {
+  it('accepts rotations whose end time is after the start time', () => {
+    expect(validateRotationsHeures([{ heureDebut: '06:00', heureFin: '06:30' }])).toEqual([]);
+  });
+
+  it('accepts an empty list', () => {
+    expect(validateRotationsHeures([])).toEqual([]);
+  });
+
+  it('accepts rotations not yet filled in', () => {
+    expect(validateRotationsHeures([{ heureDebut: null, heureFin: null }])).toEqual([]);
+  });
+
+  it('rejects an end time not after the start time, naming the offending rotation', () => {
+    const errors = validateRotationsHeures([
+      { heureDebut: '06:00', heureFin: '06:30' },
+      { heureDebut: '09:00', heureFin: '09:00' },
+    ]);
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toContain('Rotation 2');
   });
 });
 

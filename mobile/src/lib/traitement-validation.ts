@@ -104,6 +104,31 @@ export function validateReferences(input: ReferencesValidationInput): Validation
 }
 
 // ==========================================
+// ROTATIONS (écran C, branche aérienne)
+// ==========================================
+
+export interface RotationHeuresInput {
+  heureDebut: string | null;
+  heureFin: string | null;
+}
+
+/** Même règle que TerrestreConditionsInput.heureDebut/heureFin (backend :
+ * ck_traitement_rotation_heures), appliquée à chaque rotation aérienne — numérotées
+ * à partir de 1 dans le message, dans l'ordre de saisie. */
+export function validateRotationsHeures(rotations: RotationHeuresInput[]): ValidationError[] {
+  const errors: ValidationError[] = [];
+  rotations.forEach((r, index) => {
+    if (r.heureDebut && r.heureFin && r.heureFin <= r.heureDebut) {
+      errors.push({
+        field: 'rotations',
+        message: `Rotation ${index + 1} : l'heure de fin doit être postérieure à l'heure de début`,
+      });
+    }
+  });
+  return errors;
+}
+
+// ==========================================
 // CONDITIONS TERRESTRE (écran C, branche terrestre)
 // ==========================================
 
