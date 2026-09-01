@@ -3,6 +3,7 @@ import {
   apiClient,
   ProspectionCaptureInput,
   ProspectionInfestationInput,
+  ProspectionOperationAerienneInput,
   ProspectionPopulationInput,
   ProspectionCreateInput,
 } from './api-client';
@@ -10,6 +11,7 @@ import {
   CaptureRow,
   DraftProspection,
   InfestationRow,
+  OperationAerienneRow,
   PopulationRow,
   completeProspection,
   markProspectionEchec,
@@ -17,6 +19,8 @@ import {
   listAllProspectionCaptures,
   listAllProspectionPopulations,
   listAllProspectionInfestations,
+  listOperationsAeriennes,
+  normalizeBoolean,
 } from './prospection-repository';
 import { PHENOTYPES, TYPE_CIBLE_OPTIONS, formatHeureLocale } from './prospection-fiche-lecture';
 import { CaptureCounts, dominantPhenotype, rowsToCounts, totalBySexe, totalCaptures } from './prospection-capture-store';
@@ -354,7 +358,46 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
     signalement_description: draft.signalement_description || null,
     conclusion_validation: (draft.conclusion_validation || null) as ProspectionCreateInput['conclusion_validation'],
     avertissements: draft.avertissements ? JSON.parse(draft.avertissements) : [],
+    mode_extensif: (draft.mode_extensif || null) as ProspectionCreateInput['mode_extensif'],
+    societe: draft.societe || null,
+    immatricule_aeronef: draft.immatricule_aeronef || null,
+    pilote: draft.pilote || null,
+    mecanicien: draft.mecanicien || null,
+    chef_de_base: draft.chef_de_base || null,
+    base: draft.base || null,
+    base_secondaire: draft.base_secondaire || null,
+    pesticides_embarques: normalizeBoolean(draft.pesticides_embarques),
+    pesticide_nom_commercial: draft.pesticide_nom_commercial || null,
+    pesticide_quantite_disponible: draft.pesticide_quantite_disponible != null ? Number(draft.pesticide_quantite_disponible) : null,
+    pesticide_quantite_recue: draft.pesticide_quantite_recue != null ? Number(draft.pesticide_quantite_recue) : null,
+    futs_disponible: draft.futs_disponible != null ? Number(draft.futs_disponible) : null,
+    futs_pleins: draft.futs_pleins != null ? Number(draft.futs_pleins) : null,
+    futs_vides: draft.futs_vides != null ? Number(draft.futs_vides) : null,
+    futs_recues: draft.futs_recues != null ? Number(draft.futs_recues) : null,
+    signature_visa_nom: draft.signature_visa_nom || null,
+    signature_visa_horodatage: draft.signature_visa_horodatage || null,
+    signature_consultant_fao_nom: draft.signature_consultant_fao_nom || null,
+    signature_consultant_fao_horodatage: draft.signature_consultant_fao_horodatage || null,
+    signature_pilote_nom: draft.signature_pilote_nom || null,
+    signature_pilote_horodatage: draft.signature_pilote_horodatage || null,
+    signature_chef_base_nom: draft.signature_chef_base_nom || null,
+    signature_chef_base_horodatage: draft.signature_chef_base_horodatage || null,
   };
+}
+
+/** `numero`/`duree_minutes` ne sont pas envoyés : assignés/recalculés côté serveur
+ * (cf. CreateProspection.execute), jamais fait confiance à la valeur locale. */
+function buildOperationsAeriennesPayload(rows: OperationAerienneRow[]): ProspectionOperationAerienneInput[] {
+  return rows.map((row) => ({
+    type_operation: row.type_operation as ProspectionOperationAerienneInput['type_operation'],
+    motif_divers: row.motif_divers || null,
+    debut_heure: row.debut_heure,
+    debut_temperature_c: row.debut_temperature_c ?? null,
+    debut_vent_ms: row.debut_vent_ms ?? null,
+    fin_heure: row.fin_heure,
+    fin_temperature_c: row.fin_temperature_c ?? null,
+    fin_vent_ms: row.fin_vent_ms ?? null,
+  }));
 }
 
 /** Le picker affiche 'Néant'/'Rare'/'Peu'/'Beaucoup'/'Dominant' (accouplement.tsx) mais le
@@ -505,10 +548,14 @@ export async function syncOneProspection(
   token: string,
   capturesDeLEcran?: CaptureRow[]
 ): Promise<void> {
-  const [captures, populations, infestations] = await Promise.all([
+  const [captures, populations, infestations, operationsAeriennes] = await Promise.all([
     capturesDeLEcran ? Promise.resolve(capturesDeLEcran) : listAllProspectionCaptures(draft.id),
     listAllProspectionPopulations(draft.id),
     listAllProspectionInfestations(draft.id),
+    // Vide sur toute fiche non aérienne (table jamais écrite par ce mode) — inclus
+    // systématiquement plutôt que conditionné à `draft.mode_extensif`, même logique
+    // que les autres listes ci-dessus qui ne se soucient pas non plus du contenu.
+    listOperationsAeriennes(draft.id),
   ]);
 
   const payload = {
@@ -516,6 +563,7 @@ export async function syncOneProspection(
     captures: buildCapturesPayload(captures),
     populations: buildPopulationsPayload(populations),
     infestations: buildInfestationsPayload(infestations),
+    operations_aeriennes: buildOperationsAeriennesPayload(operationsAeriennes),
   };
 
   // Le `try/catch` qui entourait ce corps ne faisait que journaliser puis

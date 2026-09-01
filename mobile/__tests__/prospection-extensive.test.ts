@@ -7,7 +7,49 @@ import {
   populationRowToLarveSpeciesData,
   imagoTotalFromRow,
   larveTotalFromRow,
+  calculerDureeMinutes,
+  formatDuree,
+  HEURE_STRICTE_RE,
 } from '../src/lib/prospection-extensive';
+
+describe('calculerDureeMinutes (mode aérien)', () => {
+  it('calcule une durée simple dans la même journée', () => {
+    expect(calculerDureeMinutes('08:00', '10:30')).toBe(150);
+  });
+
+  it('franchit minuit sans passer en négatif (23:00 → 01:15 = 135 min, pas -1305)', () => {
+    expect(calculerDureeMinutes('23:00', '01:15')).toBe(135);
+  });
+
+  it('début = fin donne une durée nulle', () => {
+    expect(calculerDureeMinutes('12:00', '12:00')).toBe(0);
+  });
+
+  it('reste cohérent avec le même calcul appliqué côté backend (_calculer_duree_minutes)', () => {
+    // Même exemple que le test backend test_create_prospection_extensive_mode_aerien —
+    // les deux implémentations doivent converger sur la même valeur.
+    expect(calculerDureeMinutes('08:00', '10:30')).toBe(150);
+    expect(calculerDureeMinutes('23:00', '01:15')).toBe(135);
+  });
+});
+
+describe('formatDuree', () => {
+  it('formate en HH:MM avec zéros de tête', () => {
+    expect(formatDuree(150)).toBe('02:30');
+    expect(formatDuree(5)).toBe('00:05');
+    expect(formatDuree(0)).toBe('00:00');
+  });
+});
+
+describe('HEURE_STRICTE_RE', () => {
+  it.each(['08:30', '00:00', '23:59'])('accepte %s', (valeur) => {
+    expect(HEURE_STRICTE_RE.test(valeur)).toBe(true);
+  });
+
+  it.each(['8:30', '8h30', '24:00', '12:60', 'abc', ''])('rejette %s', (valeur) => {
+    expect(HEURE_STRICTE_RE.test(valeur)).toBe(false);
+  });
+});
 
 describe('createEmptySpeciesData (imago)', () => {
   it('démarre à zéro, sans espèce/état choisis', () => {

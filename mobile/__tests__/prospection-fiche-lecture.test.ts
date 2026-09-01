@@ -78,6 +78,7 @@ function prospection(overrides: Partial<ProspectionRead> = {}): ProspectionRead 
     populations: [],
     captures: [],
     infestations: [],
+    operations_aeriennes: [],
     region: null,
     district: null,
     commune: null,
