@@ -4,15 +4,18 @@ from datetime import datetime, timezone
 
 from app.domain.campagne import Campagne
 from app.domain.referentiel import (
+    CodeReferentielDejaPrisError,
     CodeStade,
     Culture,
     GrilleDejaOccupeeError,
     Pesticide,
     PosteAcridien,
+    PosteAcridienAvecStationsActivesError,
     StadeInconnuError,
     StationFixe,
     UtilisateurEquipe,
     ZoneAntiAcridien,
+    ZoneAntiAcridienIntrouvableError,
 )
 from app.domain.repositories import (
     CampagneRepository,
@@ -38,8 +41,92 @@ class ListPostesAcridiens:
     def __init__(self, repository: PosteAcridienRepository):
         self.repository = repository
 
-    async def execute(self) -> list[PosteAcridien]:
-        return await self.repository.list_all()
+    async def execute(self, actif: bool | None = True) -> list[PosteAcridien]:
+        return await self.repository.list_all(actif=actif)
+
+
+class GetPosteAcridien:
+    def __init__(self, repository: PosteAcridienRepository):
+        self.repository = repository
+
+    async def execute(self, pa_id: uuid.UUID) -> PosteAcridien | None:
+        return await self.repository.get_by_id(pa_id)
+
+
+class CreatePosteAcridien:
+    def __init__(
+        self,
+        repository: PosteAcridienRepository,
+        zone_repository: ZoneAntiAcridienRepository,
+    ):
+        self.repository = repository
+        self.zone_repository = zone_repository
+
+    async def execute(self, code: str, nom: str, za_id: uuid.UUID) -> PosteAcridien:
+        if not await self.zone_repository.exists(za_id):
+            raise ZoneAntiAcridienIntrouvableError(str(za_id))
+        if await self.repository.code_pris_par_un_autre(code):
+            raise CodeReferentielDejaPrisError(code)
+
+        maintenant = datetime.now(timezone.utc)
+        poste = PosteAcridien(
+            code=code,
+            nom=nom,
+            za_id=za_id,
+            actif=True,
+            created_at=maintenant,
+            updated_at=maintenant,
+        )
+        return await self.repository.create(poste)
+
+
+class UpdatePosteAcridien:
+    """Mise à jour d'un poste, `actif` compris.
+
+    Aucune suppression physique n'est offerte : le pull hors-ligne ne transporte que
+    des upserts, une ligne supprimée resterait sur les téléphones déjà synchronisés.
+    """
+
+    def __init__(
+        self,
+        repository: PosteAcridienRepository,
+        zone_repository: ZoneAntiAcridienRepository,
+    ):
+        self.repository = repository
+        self.zone_repository = zone_repository
+
+    async def execute(
+        self,
+        pa_id: uuid.UUID,
+        code: str | None = None,
+        nom: str | None = None,
+        za_id: uuid.UUID | None = None,
+        actif: bool | None = None,
+    ) -> PosteAcridien | None:
+        poste = await self.repository.get_by_id(pa_id)
+        if poste is None:
+            return None
+
+        if za_id is not None and za_id != poste.za_id:
+            if not await self.zone_repository.exists(za_id):
+                raise ZoneAntiAcridienIntrouvableError(str(za_id))
+            poste.za_id = za_id
+
+        if code is not None and code != poste.code:
+            if await self.repository.code_pris_par_un_autre(code, exclude_id=pa_id):
+                raise CodeReferentielDejaPrisError(code)
+            poste.code = code
+
+        if nom is not None:
+            poste.nom = nom
+
+        if actif is False and poste.actif and poste.nb_stations > 0:
+            raise PosteAcridienAvecStationsActivesError(poste.nb_stations)
+        if actif is not None:
+            poste.actif = actif
+
+        poste.updated_at = datetime.now(timezone.utc)
+        return await self.repository.update(poste)
 
 
 class ListStations:

@@ -154,6 +154,25 @@ export interface paths {
         /** List Postes Acridiens */
         get: operations["list_postes_acridiens_postes_acridiens_get"];
         put?: never;
+        /** Create Poste Acridien */
+        post: operations["create_poste_acridien_postes_acridiens_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/postes-acridiens/{pa_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Poste Acridien */
+        get: operations["get_poste_acridien_postes_acridiens__pa_id__get"];
+        /** Update Poste Acridien */
+        put: operations["update_poste_acridien_postes_acridiens__pa_id__put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1535,6 +1554,18 @@ export interface components {
             /** Essaim Pose */
             essaim_pose?: boolean | null;
         };
+        /** PosteAcridienCreate */
+        PosteAcridienCreate: {
+            /** Code */
+            code: string;
+            /** Nom */
+            nom: string;
+            /**
+             * Za Id
+             * Format: uuid
+             */
+            za_id: string;
+        };
         /** PosteAcridienRead */
         PosteAcridienRead: {
             /**
@@ -1555,11 +1586,20 @@ export interface components {
             za_code: string;
             /** Za Nom */
             za_nom: string;
+            /** Actif */
+            actif: boolean;
+            /** Nb Stations */
+            nb_stations: number;
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** PosteAcridienSyncRead */
         PosteAcridienSyncRead: {
@@ -1584,6 +1624,20 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /**
+         * PosteAcridienUpdate
+         * @description Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie.
+         */
+        PosteAcridienUpdate: {
+            /** Code */
+            code?: string | null;
+            /** Nom */
+            nom?: string | null;
+            /** Za Id */
+            za_id?: string | null;
+            /** Actif */
+            actif?: boolean | null;
         };
         /** ProduitUtiliseCreate */
         ProduitUtiliseCreate: {
@@ -3412,7 +3466,10 @@ export interface operations {
     };
     list_postes_acridiens_postes_acridiens_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Renvoie les postes des deux états — écran d'administration. */
+                inclure_inactifs?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3426,6 +3483,114 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PosteAcridienRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_poste_acridien_postes_acridiens_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosteAcridienCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosteAcridienRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_poste_acridien_postes_acridiens__pa_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pa_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosteAcridienRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_poste_acridien_postes_acridiens__pa_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pa_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosteAcridienUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosteAcridienRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

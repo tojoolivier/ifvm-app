@@ -168,6 +168,7 @@ describe('ReferentielsPage — maquette §11 du handoff', () => {
     expect(screen.getAllByText('Larve stade 1').length).toBeGreaterThan(0)
   })
 
+
   it('affiche le panneau « fraîcheur terrain » sur le server_time du pull', async () => {
     mockedGet.mockResolvedValue(pull())
     renderPage()
@@ -314,5 +315,145 @@ describe('ReferentielsPage — écritures code_stade (#131)', () => {
       'aria-disabled',
       'true',
     )
+  })
+})
+
+describe('ReferentielsPage — écritures poste_acridien (#132)', () => {
+  const ZONE = { id: 'za1', code: 'ZA-ZOM', nom: 'Zombitse', created_at: SERVER_TIME }
+
+  const POSTE = {
+    id: 'pa1',
+    code: 'PA-ZOM',
+    nom: 'Zombitse-Vohibasia',
+    za_id: 'za1',
+    za_code: 'ZA-ZOM',
+    za_nom: 'Zombitse',
+    actif: true,
+    nb_stations: 6,
+    created_at: SERVER_TIME,
+    updated_at: SERVER_TIME,
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  /**
+   * L'écran de poste acridien lit sa liste enrichie (`/postes-acridiens`) et non
+   * le pull : `PosteAcridienSyncRead` (le pull) ne porte que `za_id` brut, ni la
+   * jointure `za_nom` ni l'agrégat `nb_stations` que l'administration affiche.
+   */
+  function mockGetParUrl(postes: Record<string, unknown>[] = [POSTE]) {
+    mockedGet.mockImplementation((url: string) => {
+      if (url.startsWith('/postes-acridiens')) return Promise.resolve({ data: postes })
+      if (url.startsWith('/zones-anti-acridiennes')) return Promise.resolve({ data: [ZONE] })
+      return Promise.resolve(pull())
+    })
+  }
+
+  async function ouvrirPostesAcridiens(postes: Record<string, unknown>[] = [POSTE]) {
+    mockGetParUrl(postes)
+    renderPage()
+    await waitFor(() => expect(nav().getByText('poste_acridien')).toBeInTheDocument())
+    fireEvent.click(nav().getByText('poste_acridien'))
+    await screen.findByDisplayValue('PA-ZOM')
+  }
+
+  it('affiche la colonne dérivée « Stations » et le champ dérivé du panneau Modifier', async () => {
+    await ouvrirPostesAcridiens()
+
+    expect(screen.getByRole('columnheader', { name: 'Stations' })).toBeInTheDocument()
+    expect(screen.getAllByText('6').length).toBeGreaterThan(0)
+    // Champ dérivé du panneau Modifier : affiché, jamais saisissable.
+    expect(screen.getByText('Stations rattachées')).toBeInTheDocument()
+    expect(screen.getByText('dérivé')).toBeInTheDocument()
+    expect(screen.queryByDisplayValue('6')).not.toBeInTheDocument()
+  })
+
+  it('ouvre le panneau Modifier prérempli, zone anti-acridienne comprise', async () => {
+    await ouvrirPostesAcridiens()
+
+    expect(screen.getByDisplayValue('Zombitse-Vohibasia')).toBeInTheDocument()
+    expect(screen.getByLabelText('Zone anti-acridienne *')).toHaveValue('za1')
+    expect(screen.getByRole('button', { name: 'Enregistrer' })).not.toHaveAttribute('aria-disabled')
+    expect(screen.getByRole('button', { name: '+ Nouveau poste acridien' })).not.toHaveAttribute(
+      'aria-disabled',
+    )
+  })
+
+  it('enregistre une modification en PUT, actif compris', async () => {
+    mockedPut.mockResolvedValue({ data: POSTE })
+    await ouvrirPostesAcridiens()
+
+    fireEvent.change(screen.getByDisplayValue('Zombitse-Vohibasia'), {
+      target: { value: 'Zombitse renommé' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    await waitFor(() =>
+      expect(mockedPut).toHaveBeenCalledWith('/postes-acridiens/pa1', {
+        code: 'PA-ZOM',
+        nom: 'Zombitse renommé',
+        za_id: 'za1',
+        actif: true,
+      }),
+    )
+  })
+
+  it('crée un poste acridien via POST /postes-acridiens', async () => {
+    mockedPost.mockResolvedValue({ data: { ...POSTE, id: 'pa2', code: 'PA-ISA' } })
+    await ouvrirPostesAcridiens()
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Nouveau poste acridien' }))
+
+    const modal = within(screen.getByRole('dialog', { name: 'Nouveau poste acridien' }))
+    fireEvent.change(modal.getByLabelText('Code *'), { target: { value: 'PA-ISA' } })
+    fireEvent.change(modal.getByLabelText('Nom *'), { target: { value: 'Isalo' } })
+    fireEvent.change(modal.getByLabelText('Zone anti-acridienne *'), { target: { value: 'za1' } })
+    fireEvent.click(modal.getByRole('button', { name: 'Créer' }))
+
+    await waitFor(() => expect(mockedPost).toHaveBeenCalledTimes(1))
+    expect(mockedPost).toHaveBeenCalledWith('/postes-acridiens', {
+      code: 'PA-ISA',
+      nom: 'Isalo',
+      za_id: 'za1',
+    })
+  })
+
+  it('affiche le refus du backend quand des stations actives sont rattachées', async () => {
+    mockedPut.mockRejectedValue({
+      response: { data: { detail: '6 station(s) active(s) sont rattachées à ce poste' } },
+    })
+    await ouvrirPostesAcridiens()
+
+    // Le panneau Modifier porte le seul interrupteur pilotable de l'écran — celui
+    // du tableau est en lecture seule et nommé par ligne (`PA-ZOM — actif`).
+    fireEvent.click(screen.getByRole('switch', { name: 'Actif' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '6 station(s) active(s) sont rattachées à ce poste',
+    )
+    expect(mockedPut).toHaveBeenCalledWith(
+      '/postes-acridiens/pa1',
+      expect.objectContaining({ actif: false }),
+    )
+  })
+
+  it('« Annuler » revient à la valeur du serveur', async () => {
+    await ouvrirPostesAcridiens()
+
+    fireEvent.change(screen.getByDisplayValue('Zombitse-Vohibasia'), {
+      target: { value: 'Brouillon' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Annuler' }))
+
+    expect(screen.getByDisplayValue('Zombitse-Vohibasia')).toBeInTheDocument()
+  })
+
+  it('aucune affordance de suppression : le pull ne transporte que des upserts', async () => {
+    await ouvrirPostesAcridiens()
+
+    expect(screen.queryByRole('button', { name: /supprimer/i })).not.toBeInTheDocument()
   })
 })
