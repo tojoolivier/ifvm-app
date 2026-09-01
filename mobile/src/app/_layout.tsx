@@ -6,7 +6,9 @@ import { useAuthStore } from '@/lib/auth-store';
 import { useDebugStore } from '@/lib/debug-store';
 import { getDb } from '@/lib/prospection-db';
 import { useReferentielAutoSync } from '@/hooks/use-referentiel-auto-sync';
+import { useOtaAutoCheck } from '@/hooks/use-ota-auto-check';
 import { ErrorBanner } from '@/components/error-banner';
+import { BandeauOta } from '@/components/bandeau-ota';
 import { ModaleBloquante } from '@/components/erreurs/modale-bloquante';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { installGlobalErrorHandlers } from '@/lib/global-error-handler';
@@ -48,6 +50,10 @@ export default function RootLayout() {
   
   // Hook de synchronisation automatique du référentiel
   useReferentielAutoSync(token);
+
+  // Vérification automatique des mises à jour OTA (lancement + retour au premier
+  // plan), une fois l'amorçage terminé.
+  useOtaAutoCheck(isInitialized);
 
   useEffect(() => {
     // Le journal en premier, et de façon synchrone : ce qui échoue avant que
@@ -104,6 +110,7 @@ export default function RootLayout() {
         </Stack>
       </ErrorBoundary>
       <ErrorBanner />
+      <BandeauOta />
       <ModaleBloquante />
     </GestureHandlerRootView>
   );
