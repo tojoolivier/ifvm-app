@@ -224,17 +224,26 @@ const ENTITES: EntitySpec[] = [
     label: 'Cultures',
     table: 'culture',
     addLabel: '+ Nouvelle culture',
-    apiOk: false,
-    apiLabel: 'Écriture à créer — référentiel non lu par le mobile',
+    apiOk: true,
+    apiLabel: 'GET · POST · PUT /cultures',
     desc: "Doit alimenter les dégâts sur culture (prospection) et les zones exposées (traitement), aujourd'hui codés en dur.",
     note: "Synchronisée dans le SQLite du terrain mais aucune fonction de lecture : listCultures() n'existe pas dans referentiel-db.ts.",
     hasActif: true,
     rowLabel: (row) => text(row, 'code'),
     columns: [codeColumn(), { key: 'nom', header: 'Nom', render: (row) => text(row, 'nom') }],
-    fields: [
-      { label: 'Code *', mono: true, value: (row) => text(row, 'code') },
-      { label: 'Nom *', value: (row) => text(row, 'nom') },
-    ],
+    // Panneau en lecture seule inutilisé : `write` prend le relais.
+    fields: [],
+    write: {
+      path: '/cultures',
+      // `inclure_inactifs` : l'écran d'administration affiche un badge « État »,
+      // il lui faut les cultures désactivées autant que les actives.
+      listPath: '/cultures?inclure_inactifs=true',
+      createTitle: 'Nouvelle culture',
+      fields: [
+        { name: 'code', label: 'Code', kind: 'text', mono: true, required: true },
+        { name: 'nom', label: 'Nom', kind: 'text', required: true },
+      ],
+    },
   },
   {
     key: 'code_stade',

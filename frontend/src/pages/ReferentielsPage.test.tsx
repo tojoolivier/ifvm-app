@@ -76,11 +76,11 @@ describe('ReferentielsPage — maquette §11 du handoff', () => {
 
     await waitFor(() => expect(nav().getByText('7 référentiels')).toBeInTheDocument())
 
-    // 3 entités sans écriture backend : pesticide, culture, station_fixe.
-    expect(nav().getAllByText('à créer')).toHaveLength(3)
-    // 4 entités avec au moins une lecture/écriture exposée : code_stade,
-    // poste_acridien, utilisateur, campagne.
-    expect(nav().getAllByText('API')).toHaveLength(4)
+    // 2 entités sans écriture backend : pesticide, station_fixe.
+    expect(nav().getAllByText('à créer')).toHaveLength(2)
+    // 5 entités avec au moins une lecture/écriture exposée : culture (#130),
+    // code_stade, poste_acridien, utilisateur, campagne.
+    expect(nav().getAllByText('API')).toHaveLength(5)
   })
 
   it("signale l'écart matière active / dose de référence sur les pesticides", async () => {
@@ -455,5 +455,125 @@ describe('ReferentielsPage — écritures poste_acridien (#132)', () => {
     await ouvrirPostesAcridiens()
 
     expect(screen.queryByRole('button', { name: /supprimer/i })).not.toBeInTheDocument()
+  })
+})
+
+describe('ReferentielsPage — écritures culture (#130)', () => {
+  const CULTURE = {
+    id: 'cu1',
+    code: 'RIZ',
+    nom: 'Riz',
+    actif: true,
+    created_at: SERVER_TIME,
+    updated_at: SERVER_TIME,
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  /**
+   * L'administration lit `/cultures?inclure_inactifs=true` et non le pull : elle
+   * affiche un badge « État », il lui faut donc aussi les cultures désactivées.
+   */
+  function mockGetParUrl(cultures: Record<string, unknown>[] = [CULTURE]) {
+    mockedGet.mockImplementation((url: string) => {
+      if (url.startsWith('/cultures')) return Promise.resolve({ data: cultures })
+      return Promise.resolve(pull())
+    })
+  }
+
+  async function ouvrirCultures(cultures: Record<string, unknown>[] = [CULTURE]) {
+    mockGetParUrl(cultures)
+    renderPage()
+    await waitFor(() => expect(nav().getByText('culture')).toBeInTheDocument())
+    fireEvent.click(nav().getByText('culture'))
+    await screen.findByDisplayValue('RIZ')
+  }
+
+  it("expose la pastille « API » et active les affordances d'écriture", async () => {
+    await ouvrirCultures()
+
+    expect(screen.getByText('GET · POST · PUT /cultures')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '+ Nouvelle culture' })).not.toHaveAttribute(
+      'aria-disabled',
+    )
+    expect(screen.getByRole('button', { name: 'Enregistrer' })).not.toHaveAttribute('aria-disabled')
+  })
+
+  it('ouvre le panneau Modifier prérempli sur la culture sélectionnée', async () => {
+    await ouvrirCultures()
+
+    expect(screen.getByLabelText('Code *')).toHaveValue('RIZ')
+    expect(screen.getByLabelText('Nom *')).toHaveValue('Riz')
+  })
+
+  it('enregistre une modification via PUT /cultures/{id}', async () => {
+    mockedPut.mockResolvedValue({ data: { ...CULTURE, nom: 'Riz irrigué' } })
+    await ouvrirCultures()
+
+    fireEvent.change(screen.getByLabelText('Nom *'), { target: { value: 'Riz irrigué' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    await waitFor(() =>
+      expect(mockedPut).toHaveBeenCalledWith('/cultures/cu1', {
+        code: 'RIZ',
+        nom: 'Riz irrigué',
+        actif: true,
+      }),
+    )
+  })
+
+  it('crée une culture via POST /cultures', async () => {
+    mockedPost.mockResolvedValue({ data: { ...CULTURE, id: 'cu2', code: 'MAIS', nom: 'Maïs' } })
+    await ouvrirCultures()
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Nouvelle culture' }))
+
+    const modal = within(screen.getByRole('dialog', { name: 'Nouvelle culture' }))
+    fireEvent.change(modal.getByLabelText('Code *'), { target: { value: 'MAIS' } })
+    fireEvent.change(modal.getByLabelText('Nom *'), { target: { value: 'Maïs' } })
+    fireEvent.click(modal.getByRole('button', { name: 'Créer' }))
+
+    await waitFor(() => expect(mockedPost).toHaveBeenCalledTimes(1))
+    expect(mockedPost).toHaveBeenCalledWith('/cultures', { code: 'MAIS', nom: 'Maïs' })
+  })
+
+  it('désactive logiquement plutôt que de supprimer', async () => {
+    mockedPut.mockResolvedValue({ data: { ...CULTURE, actif: false } })
+    await ouvrirCultures()
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Actif' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    await waitFor(() => expect(mockedPut).toHaveBeenCalledTimes(1))
+    expect(mockedPut.mock.calls[0][1]).toMatchObject({ actif: false })
+    // Aucune affordance de suppression : le pull ne transporte que des upserts.
+    expect(screen.queryByRole('button', { name: /supprimer/i })).not.toBeInTheDocument()
+  })
+
+  it('remonte le conflit du serveur quand le code est déjà pris', async () => {
+    mockedPut.mockRejectedValue({
+      response: { data: { detail: 'Le code « RIZ » est déjà utilisé par une autre culture' } },
+    })
+    await ouvrirCultures()
+
+    fireEvent.change(screen.getByLabelText('Nom *'), { target: { value: 'Riz pluvial' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    await waitFor(() =>
+      expect(
+        screen.getByText('Le code « RIZ » est déjà utilisé par une autre culture'),
+      ).toBeInTheDocument(),
+    )
+  })
+
+  it('affiche aussi les cultures désactivées, badge « État » oblige', async () => {
+    await ouvrirCultures([
+      CULTURE,
+      { ...CULTURE, id: 'cu3', code: 'MAN', nom: 'Manioc', actif: false },
+    ])
+
+    expect(screen.getByText('MAN')).toBeInTheDocument()
   })
 })
