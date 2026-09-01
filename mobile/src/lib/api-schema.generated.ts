@@ -250,6 +250,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/cultures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Cultures */
+        get: operations["list_cultures_cultures_get"];
+        put?: never;
+        /** Create Culture */
+        post: operations["create_culture_cultures_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cultures/{culture_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Culture */
+        get: operations["get_culture_cultures__culture_id__get"];
+        /** Update Culture */
+        put: operations["update_culture_cultures__culture_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/referentiel/pull": {
         parameters: {
             query?: never;
@@ -927,6 +963,37 @@ export interface components {
          * @enum {string}
          */
         ConclusionValidation: "confirmee" | "infirmee";
+        /** CultureCreate */
+        CultureCreate: {
+            /** Code */
+            code: string;
+            /** Nom */
+            nom: string;
+        };
+        /** CultureRead */
+        CultureRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Code */
+            code: string;
+            /** Nom */
+            nom: string;
+            /** Actif */
+            actif: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
         /** CultureSyncRead */
         CultureSyncRead: {
             /**
@@ -945,6 +1012,18 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /**
+         * CultureUpdate
+         * @description Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie.
+         */
+        CultureUpdate: {
+            /** Code */
+            code?: string | null;
+            /** Nom */
+            nom?: string | null;
+            /** Actif */
+            actif?: boolean | null;
         };
         /** CumulsRead */
         CumulsRead: {
@@ -3780,6 +3859,138 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CodeStadeRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_cultures_cultures_get: {
+        parameters: {
+            query?: {
+                actif?: boolean;
+                /** @description Renvoie les cultures des deux états — écran d'administration. */
+                inclure_inactifs?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CultureRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_culture_cultures_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CultureCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CultureRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_culture_cultures__culture_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                culture_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CultureRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_culture_cultures__culture_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                culture_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CultureUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CultureRead"];
                 };
             };
             /** @description Validation Error */
