@@ -198,17 +198,35 @@ class ZoneAntiAcridienRepository(ABC):
         pass
 
     @abstractmethod
+    async def exists(self, za_id: uuid.UUID) -> bool:
+        pass
+
+    @abstractmethod
     async def list_since(self, since: datetime | None) -> list[ZoneAntiAcridien]:
         pass
 
 
 class PosteAcridienRepository(ABC):
     @abstractmethod
-    async def list_all(self) -> list[PosteAcridien]:
+    async def list_all(self, actif: bool | None = True) -> list[PosteAcridien]:
+        """`actif=None` : les deux états (écran d'administration)."""
         pass
 
     @abstractmethod
     async def get_by_id(self, pa_id: uuid.UUID) -> PosteAcridien | None:
+        pass
+
+    @abstractmethod
+    async def code_pris_par_un_autre(self, code: str, exclude_id: uuid.UUID | None = None) -> bool:
+        """`exclude_id` permet de réenregistrer un poste sans buter sur son propre code."""
+        pass
+
+    @abstractmethod
+    async def create(self, poste: PosteAcridien) -> PosteAcridien:
+        pass
+
+    @abstractmethod
+    async def update(self, poste: PosteAcridien) -> PosteAcridien:
         pass
 
     @abstractmethod

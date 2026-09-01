@@ -16,15 +16,15 @@ import { Switch } from '@/components/ui/switch'
  * Modifier / panneau Fraîcheur terrain).
  *
  * L'écran est en lecture seule là où le backend n'expose pas d'écriture
- * (#124) : pesticide, culture, poste_acridien et station_fixe. Les affordances
- * d'écriture de la maquette y sont rendues mais désactivées, avec l'état API
- * réel affiché en pastille — la consigne du handoff est de ne pas masquer ces
- * écarts.
+ * (#124) : pesticide, culture et station_fixe. Les affordances d'écriture de
+ * la maquette y sont rendues mais désactivées, avec l'état API réel affiché
+ * en pastille — la consigne du handoff est de ne pas masquer ces écarts.
  *
- * `code_stade` a ses écritures depuis #131 : `write` porte le formulaire, et la
- * sortie de service passe par `actif=false`. Aucune suppression n'est offerte —
- * `GET /referentiel/pull` ne transporte que des upserts, une ligne effacée
- * resterait indéfiniment sur les téléphones déjà synchronisés.
+ * `code_stade` a ses écritures depuis #131, `poste_acridien` depuis #132 :
+ * `write` porte le formulaire, et la sortie de service passe par
+ * `actif=false`. Aucune suppression n'est offerte — `GET /referentiel/pull`
+ * ne transporte que des upserts, une ligne effacée resterait indéfiniment sur
+ * les téléphones déjà synchronisés.
  */
 
 type Row = Record<string, unknown>
@@ -62,11 +62,22 @@ interface EditableField {
   /** Nom de colonne backend — clé du corps envoyé à l'API. */
   name: string
   label: string
-  kind: 'text' | 'number' | 'select'
+  kind: 'text' | 'number' | 'select' | 'foreign-key'
   mono?: boolean
   required?: boolean
   nullable?: boolean
   options?: { value: string; label: string }[]
+  /**
+   * Options dynamiques pour `kind: 'foreign-key'` : liste déroulante alimentée
+   * par sa propre route (clé étrangère — ex. `poste_acridien.za_id`).
+   */
+  optionsFrom?: {
+    path: string
+    queryKey: string
+    /** Valeur postée (colonne FK) et libellé affiché. */
+    valueKey: string
+    labelKey: string
+  }
   hint?: string
 }
 
@@ -76,6 +87,14 @@ interface WriteSpec {
   path: string
   createTitle: string
   fields: EditableField[]
+  /**
+   * Source de la liste, quand elle diffère du pull hors-ligne. `postes_acridiens`
+   * n'y porte que le contrat mobile (`za_id` brut, pas d'agrégat) : ni la
+   * jointure `za_nom` ni `nb_stations` que l'écran d'administration affiche.
+   */
+  listPath?: string
+  /** Champs calculés côté backend, lecture seule, affichés sous les champs éditables. */
+  derivedFields?: FieldSpec[]
 }
 
 interface EntitySpec {
@@ -303,24 +322,60 @@ const ENTITES: EntitySpec[] = [
     table: 'poste_acridien',
     addLabel: '+ Nouveau poste acridien',
     apiOk: true,
-    apiLabel: 'GET /postes-acridiens — écriture à créer',
+    apiLabel: 'GET · POST · PUT /postes-acridiens',
     desc: 'Niveau supérieur de la hiérarchie géographique : chaque station fixe et chaque agent y sont rattachés.',
+    note: "La maquette annonce une colonne « Région » : poste_acridien n'en porte pas. Son rattachement réel est la zone anti-acridienne (za_id) ; la région n'existe qu'au niveau des stations, via commune → district → région.",
     hasActif: true,
     rowLabel: (row) => text(row, 'code'),
     columns: [
       codeColumn(),
       { key: 'nom', header: 'Nom', render: (row) => text(row, 'nom') },
       {
-        key: 'region',
-        header: 'Région',
-        render: (row) => <span className="text-ifvm-text-tertiary">{text(row, 'region')}</span>,
+        key: 'za_nom',
+        header: 'Zone anti-acridienne',
+        render: (row) => <span className="text-ifvm-text-tertiary">{text(row, 'za_nom')}</span>,
+      },
+      {
+        key: 'nb_stations',
+        header: 'Stations',
+        align: 'right',
+        mono: true,
+        render: (row) => text(row, 'nb_stations'),
       },
     ],
-    fields: [
-      { label: 'Code *', mono: true, value: (row) => text(row, 'code') },
-      { label: 'Nom *', value: (row) => text(row, 'nom') },
-      { label: 'Région *', value: (row) => text(row, 'region') },
-    ],
+    // Panneau en lecture seule inutilisé : `write` prend le relais.
+    fields: [],
+    write: {
+      path: '/postes-acridiens',
+      // `inclure_inactifs` : l'écran d'administration a besoin des deux états,
+      // contrairement au sélecteur de station d'une prospection.
+      listPath: '/postes-acridiens?inclure_inactifs=true',
+      createTitle: 'Nouveau poste acridien',
+      fields: [
+        { name: 'code', label: 'Code', kind: 'text', mono: true, required: true },
+        { name: 'nom', label: 'Nom', kind: 'text', required: true },
+        {
+          name: 'za_id',
+          label: 'Zone anti-acridienne',
+          kind: 'foreign-key',
+          required: true,
+          optionsFrom: {
+            path: '/zones-anti-acridiennes',
+            queryKey: 'zones-anti-acridiennes',
+            valueKey: 'id',
+            labelKey: 'nom',
+          },
+        },
+      ],
+      derivedFields: [
+        {
+          label: 'Stations rattachées',
+          mono: true,
+          hint: 'dérivé',
+          value: (row) => text(row, 'nb_stations'),
+        },
+      ],
+    },
   },
   {
     key: 'station_fixe',
@@ -483,11 +538,14 @@ function EditableInput({
   idPrefix,
   value,
   onChange,
+  foreignKeyOptions,
 }: {
   field: EditableField
   idPrefix: string
   value: string
   onChange: (value: string) => void
+  /** Options résolues pour `kind: 'foreign-key'` — ignoré pour les autres natures. */
+  foreignKeyOptions?: Row[]
 }) {
   const id = `${idPrefix}-${field.name}`
   return (
@@ -506,6 +564,23 @@ function EditableInput({
           {field.options?.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
+            </option>
+          ))}
+        </select>
+      ) : field.kind === 'foreign-key' ? (
+        <select
+          id={id}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className={cn(inputClass, 'font-sans')}
+        >
+          <option value="">— Choisir —</option>
+          {(foreignKeyOptions ?? []).map((option) => (
+            <option
+              key={String(option[field.optionsFrom!.valueKey])}
+              value={String(option[field.optionsFrom!.valueKey])}
+            >
+              {String(option[field.optionsFrom!.labelKey])}
             </option>
           ))}
         </select>
@@ -545,7 +620,21 @@ export function ReferentielsPage() {
   })
 
   const entity = ENTITES.find((e) => e.key === selectedKey) ?? ENTITES[0]
-  const rows = useMemo(() => data?.[entity.pullKey]?.upserts ?? [], [data, entity.pullKey])
+
+  // Une entité peut lire sa liste depuis sa propre route plutôt que le pull :
+  // celui-ci ne transporte que le contrat hors-ligne du mobile (clés étrangères
+  // brutes), sans les jointures ni les champs dérivés dont l'administration a besoin.
+  const { data: writeListData, isLoading: writeListLoading } = useQuery<Row[]>({
+    queryKey: ['referentiel-write-list', entity.write?.listPath ?? 'none'],
+    queryFn: () => api.get(entity.write!.listPath!).then((r) => r.data),
+    enabled: Boolean(entity.write?.listPath),
+  })
+
+  const rows = useMemo(() => {
+    if (entity.write?.listPath) return Array.isArray(writeListData) ? writeListData : []
+    return data?.[entity.pullKey]?.upserts ?? []
+  }, [data, entity, writeListData])
+  const rowsLoading = entity.write?.listPath ? writeListLoading : isLoading
   const selectedRow = rows[selectedRowIndex] ?? rows[0]
   const serverTime = data?.[entity.pullKey]?.server_time
 
@@ -560,6 +649,16 @@ export function ReferentielsPage() {
 
   const selectedRowId = selectedRow ? String(selectedRow.id) : undefined
 
+  // Une seule clé étrangère par formulaire aujourd'hui (poste_acridien.za_id) :
+  // le hook reste inconditionnel, activé seulement quand le champ existe.
+  const foreignKeyField = writeFields.find((f) => f.kind === 'foreign-key')
+  const { data: foreignKeyOptionsData } = useQuery<Row[]>({
+    queryKey: ['referentiel-fk-options', foreignKeyField?.optionsFrom?.queryKey ?? 'none'],
+    queryFn: () => api.get(foreignKeyField!.optionsFrom!.path).then((r) => r.data),
+    enabled: Boolean(foreignKeyField),
+  })
+  const foreignKeyOptions = Array.isArray(foreignKeyOptionsData) ? foreignKeyOptionsData : []
+
   // Le panneau repart de l'état serveur dès qu'on change d'entité ou de ligne :
   // une saisie non enregistrée ne doit pas déteindre sur la ligne suivante.
   useEffect(() => {
@@ -568,10 +667,13 @@ export function ReferentielsPage() {
     setEditError('')
     // `writeFields` se redéduit de `entity` à chaque rendu : la clé d'entité suffit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entity.key, selectedRowId, data])
+  }, [entity.key, selectedRowId, data, writeListData])
 
-  function invalidatePull() {
+  function invalidateRows() {
     queryClient.invalidateQueries({ queryKey: ['referentiel-pull'] })
+    if (entity.write?.listPath) {
+      queryClient.invalidateQueries({ queryKey: ['referentiel-write-list', entity.write.listPath] })
+    }
   }
 
   const updateMutation = useMutation({
@@ -579,7 +681,7 @@ export function ReferentielsPage() {
       api.put(`${entity.write!.path}/${selectedRowId}`, payload),
     onSuccess: () => {
       setEditError('')
-      invalidatePull()
+      invalidateRows()
     },
     onError: (error) => setEditError(apiErrorMessage(error, "Enregistrement impossible.")),
   })
@@ -589,7 +691,7 @@ export function ReferentielsPage() {
     onSuccess: () => {
       setCreating(false)
       setCreateError('')
-      invalidatePull()
+      invalidateRows()
     },
     onError: (error) => setCreateError(apiErrorMessage(error, 'Création impossible.')),
   })
@@ -759,7 +861,7 @@ export function ReferentielsPage() {
             </button>
           </div>
 
-          {isLoading ? (
+          {rowsLoading ? (
             <div className="divide-y divide-[#f4efe2]">
               {Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="h-[43px] animate-pulse bg-[#faf7ef]" />
@@ -815,7 +917,26 @@ export function ReferentielsPage() {
                       onChange={(value) =>
                         setEditValues((current) => ({ ...current, [field.name]: value }))
                       }
+                      foreignKeyOptions={foreignKeyOptions}
                     />
+                  ))}
+                  {entity.write.derivedFields?.map((field) => (
+                    <div key={field.label} className="flex flex-col gap-1.5">
+                      <span className={fieldLabelClass}>{field.label}</span>
+                      <div
+                        className={cn(
+                          'flex min-h-9 items-center rounded-lg border border-[#e0d9c4] bg-[#f7f4ea] px-[11px] text-[12.5px] font-semibold text-ifvm-text-tertiary',
+                          field.mono ? 'font-mono' : 'font-sans',
+                        )}
+                      >
+                        {selectedRow ? field.value(selectedRow) : '—'}
+                      </div>
+                      {field.hint && (
+                        <span className="font-sans text-[10px] font-medium text-ifvm-text-weak">
+                          {field.hint}
+                        </span>
+                      )}
+                    </div>
                   ))}
                 </div>
 
@@ -960,6 +1081,7 @@ export function ReferentielsPage() {
                     onChange={(value) =>
                       setCreateValues((current) => ({ ...current, [field.name]: value }))
                     }
+                    foreignKeyOptions={foreignKeyOptions}
                   />
                 ))}
               </div>

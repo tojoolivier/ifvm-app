@@ -1,8 +1,8 @@
 import uuid
 from datetime import date, datetime
-from typing import Generic, Literal, TypeVar
+from typing import Annotated, Generic, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 
 class ZoneAntiAcridienRead(BaseModel):
@@ -21,7 +21,27 @@ class PosteAcridienRead(BaseModel):
     za_id: uuid.UUID
     za_code: str
     za_nom: str
+    actif: bool
+    # Dérivé (stations actives rattachées) : lecture seule, absent des schémas d'écriture.
+    nb_stations: int
     created_at: datetime
+    updated_at: datetime
+
+
+class PosteAcridienCreate(BaseModel):
+    # `nb_stations` n'apparaît pas ici : c'est un agrégat calculé, pas une saisie.
+    code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    za_id: uuid.UUID
+
+
+class PosteAcridienUpdate(BaseModel):
+    """Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie."""
+
+    code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
+    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
+    za_id: uuid.UUID | None = None
+    actif: bool | None = None
 
 
 class StationFixeRead(BaseModel):
