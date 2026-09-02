@@ -55,7 +55,7 @@ class CreateProspection:
         latitude: float | None = None,
         longitude: float | None = None,
         altitude: float | None = None,
-        biotope: str | None = None,
+        biotope: list[str] | None = None,
         surface_station: float | None = None,
         surface_prospectee: float | None = None,
         surface_infestee: float | None = None,
@@ -91,7 +91,7 @@ class CreateProspection:
         # NOUVEAUX CHAMPS - Extensif & Validation
         # ==========================================
         station_libre: str | None = None,
-        type_station: str | None = None,
+        type_station: list[str] | None = None,
         verdure_strate: str | None = None,
         signalement_source: str | None = None,
         signalement_date: str | None = None,
@@ -148,7 +148,7 @@ class CreateProspection:
             latitude=latitude,
             longitude=longitude,
             altitude=altitude,
-            biotope=biotope,
+            biotope=biotope or [],
             surface_station=surface_station,
             surface_prospectee=surface_prospectee,
             surface_infestee=surface_infestee,
@@ -186,7 +186,7 @@ class CreateProspection:
             # NOUVEAUX CHAMPS - Extensif & Validation
             # ==========================================
             station_libre=station_libre,
-            type_station=type_station,
+            type_station=type_station or [],
             verdure_strate=verdure_strate,
             signalement_source=signalement_source,
             signalement_date=signalement_date,
@@ -291,7 +291,7 @@ class UpdateProspection:
         latitude: float | None = None,
         longitude: float | None = None,
         altitude: float | None = None,
-        biotope: str | None = None,
+        biotope: list[str] | None = None,
         surface_station: float | None = None,
         surface_prospectee: float | None = None,
         surface_infestee: float | None = None,
@@ -324,7 +324,7 @@ class UpdateProspection:
         # NOUVEAUX CHAMPS - Extensif & Validation
         # ==========================================
         station_libre: str | None = None,
-        type_station: str | None = None,
+        type_station: list[str] | None = None,
         verdure_strate: str | None = None,
         signalement_source: str | None = None,
         signalement_date: str | None = None,

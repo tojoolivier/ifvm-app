@@ -120,6 +120,7 @@ async def test_create_prospection_intensive_avec_station_valide(
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
             "date_prospection": "2026-06-25",
+            "biotope": ["xerophyle"],
         },
         headers=auth_headers,
     )
@@ -139,6 +140,7 @@ async def test_create_prospection_intensive_avec_station_invalide_echoue(
             "campagne_id": str(campagne_id),
             "station_id": str(uuid.uuid4()),
             "date_prospection": "2026-06-25",
+            "biotope": ["xerophyle"],
         },
         headers=auth_headers,
     )

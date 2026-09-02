@@ -177,7 +177,7 @@ class Prospection:
     latitude: float | None = None
     longitude: float | None = None
     altitude: float | None = None
-    biotope: str | None = None
+    biotope: list[str] = field(default_factory=list)  # Multi-select (#biotope-multi)
     surface_station: float | None = None
     surface_prospectee: float | None = None
     surface_infestee: float | None = None
@@ -220,7 +220,7 @@ class Prospection:
     # NOUVEAUX CHAMPS - Extensif & Validation
     # ==========================================
     station_libre: str | None = None
-    type_station: str | None = None
+    type_station: list[str] = field(default_factory=list)  # Multi-select, reste facultatif
     verdure_strate: str | None = None
     signalement_source: str | None = None
     signalement_date: str | None = None

@@ -42,7 +42,12 @@ class ProspectionModel(Base):
     latitude: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
     longitude: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
     altitude: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
-    biotope: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    # Multi-select (migration 0041) : plusieurs biotopes simultanés, même pattern que
+    # `avertissements` ci-dessous (JSONB non nullable, défaut tableau vide) plutôt qu'une
+    # table de jonction — ensemble fermé à 3 valeurs, sans attribut propre par ligne.
+    biotope: Mapped[list[str]] = mapped_column(
+        JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb")
+    )
     surface_station: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
     surface_prospectee: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
     surface_infestee: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
@@ -103,7 +108,11 @@ class ProspectionModel(Base):
     # NOUVEAUX CHAMPS - Extensif & Validation
     # ==========================================
     station_libre: Mapped[str | None] = mapped_column(Text(), nullable=True)
-    type_station: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    # Multi-select (migration 0041), même pattern que `biotope` ci-dessus. Reste
+    # facultatif (aucune validation de présence) : seule sa cardinalité change.
+    type_station: Mapped[list[str]] = mapped_column(
+        JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb")
+    )
     verdure_strate: Mapped[str | None] = mapped_column(Text(), nullable=True)
     signalement_source: Mapped[str | None] = mapped_column(Text(), nullable=True)
     signalement_date: Mapped[str | None] = mapped_column(Text(), nullable=True)
@@ -201,11 +210,13 @@ class ProspectionModel(Base):
             name="ck_prospection_degats_cultures",
         ),
         CheckConstraint(
-            "biotope IN ('xerophyle', 'mesophyle', 'hydrophyle')",
+            "jsonb_typeof(biotope) = 'array' "
+            "AND biotope <@ '[\"xerophyle\",\"mesophyle\",\"hydrophyle\"]'::jsonb",
             name="ck_prospection_biotope",
         ),
         CheckConstraint(
-            "type_station IN ('xerophyle', 'mesophyle', 'hydrophyle')",
+            "jsonb_typeof(type_station) = 'array' "
+            "AND type_station <@ '[\"xerophyle\",\"mesophyle\",\"hydrophyle\"]'::jsonb",
             name="ck_prospection_type_station",
         ),
         CheckConstraint(
