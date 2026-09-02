@@ -76,6 +76,12 @@ function ErrorRow({ entry }: { entry: ErrorLogEntry }) {
               <Text style={styles.detailBody}>{JSON.stringify(entry.context, null, 2)}</Text>
             </>
           )}
+          {entry.cause && (
+            <>
+              <Text style={styles.detailLabel}>Cause d&apos;origine</Text>
+              <Text style={styles.detailBody}>{entry.cause}</Text>
+            </>
+          )}
           {entry.stack && (
             <>
               <Text style={styles.detailLabel}>Pile d&apos;appel</Text>

@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { useErrorStore } from '@/lib/error-store';
 import { useErrorLogStore } from '@/lib/error-log-store';
-import { PreconditionError } from '@/lib/errors';
+import { causeMessage, PreconditionError } from '@/lib/errors';
 import { toFriendlyError } from '@/lib/friendly-error';
 import type { Traitement } from '@/lib/logger';
 
@@ -19,7 +19,7 @@ interface RunOptions {
 interface AsyncActionDeps {
   /** Signale l'erreur à la couche d'affichage et renvoie le traitement déduit. */
   signaler: (error: unknown, frontiere: 'useAsyncAction', retry?: () => void) => Traitement;
-  logError: (entry: { message: string; stack?: string | null; screen: string; context?: Record<string, unknown> | null }) => void;
+  logError: (entry: { message: string; cause?: string | null; stack?: string | null; screen: string; context?: Record<string, unknown> | null }) => void;
 }
 
 /**
@@ -56,6 +56,7 @@ export async function executeAsyncAction(
     });
     deps.logError({
       message: toFriendlyError(error).message,
+      cause: causeMessage(error),
       stack: error instanceof Error ? error.stack ?? null : null,
       screen: options.screen,
       context: options.context ?? null,
