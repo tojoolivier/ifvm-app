@@ -64,6 +64,23 @@ export function isTypedError(error: unknown): error is AppError {
 }
 
 /**
+ * Message de la `cause` d'une erreur typée, pour le journal de debug.
+ *
+ * `typerLesEchecs` (prospection-db.ts) enveloppe systématiquement l'erreur
+ * SQLite d'origine dans `cause` — mais un message générique comme « runAsync
+ * a échoué sur la base locale » ne dit rien de la contrainte réellement
+ * violée. Sans ce message, un rapport d'erreur ne sert qu'à confirmer QUE ça
+ * a cassé, jamais POURQUOI.
+ */
+export function causeMessage(error: unknown): string | null {
+  if (!(error instanceof AppError)) return null;
+  const { cause } = error as { cause?: unknown };
+  if (cause === undefined) return null;
+  if (cause instanceof Error) return cause.message;
+  return String(cause);
+}
+
+/**
  * Garantit qu'une valeur attendue est présente, ou lève `PreconditionError`.
  *
  * Remplace le guard-clause muet (`if (!draftId) return;`) qui a produit le bug

@@ -5,6 +5,8 @@ const MAX_ENTRIES = 100;
 export interface ErrorLogEntry {
   id: string;
   message: string;
+  /** Message de la cause d'origine (ex. contrainte SQLite violée) — voir `causeMessage`. */
+  cause?: string | null;
   stack?: string | null;
   screen?: string | null;
   context?: Record<string, unknown> | null;

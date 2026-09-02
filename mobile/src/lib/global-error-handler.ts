@@ -2,6 +2,7 @@ import type { ErrorUtils as RNErrorUtils } from 'react-native';
 import { useErrorStore } from './error-store';
 import { useErrorLogStore } from './error-log-store';
 import { toFriendlyError } from './friendly-error';
+import { causeMessage } from './errors';
 
 declare const global: typeof globalThis & {
   ErrorUtils?: RNErrorUtils;
@@ -13,6 +14,7 @@ function reportUncaught(error: unknown, screen: string) {
   useErrorStore.getState().signaler(error, 'global');
   useErrorLogStore.getState().addEntry({
     message: toFriendlyError(error).message,
+    cause: causeMessage(error),
     stack: error instanceof Error ? error.stack ?? null : null,
     screen,
     context: null,
