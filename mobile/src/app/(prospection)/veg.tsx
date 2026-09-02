@@ -14,7 +14,9 @@ import {
   STRATE_LABELS,
   StrateKey,
   TEXTURE_OPTIONS,
+  computeSurfaceRepartitionTotal,
   defaultStrateDetail,
+  isSurfaceRepartitionValide,
 } from '@/lib/prospection-fiche-lecture';
 import { updateProspectionVegetation } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
@@ -40,8 +42,8 @@ function clampTo5(value: number, min: number, max: number): number {
 }
 
 // Champs de saisie décimale libre de la strate (Surf. rel. %, H. moy, % Verdissement,
-// % Repousse, Sol nu %) : contrairement au Recouvrement (stepper dédié par pas de 5),
-// on conserve la valeur réellement saisie — seule la borne [min, max] est appliquée
+// % Repousse) : contrairement au Recouvrement (stepper dédié par pas de 5), on
+// conserve la valeur réellement saisie — seule la borne [min, max] est appliquée
 // pour les champs qui sont des pourcentages (H. moy n'en a aucune).
 function clampPercent(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -60,8 +62,8 @@ function formatDecimalDisplay(value: number | null): string {
   return value != null ? String(value).replace('.', ',') : '';
 }
 
-/** Les cinq champs décimaux libres d'une strate — tous `number | null` dans StrateFormValues. */
-type DecimalFieldKey = 'surfRel' | 'hMoy' | 'verdissement' | 'repousse' | 'solNu';
+/** Les quatre champs décimaux libres d'une strate — tous `number | null` dans StrateFormValues. */
+type DecimalFieldKey = 'surfRel' | 'hMoy' | 'verdissement' | 'repousse';
 
 function emptyStrateForm(): StrateFormValues {
   return defaultStrateDetail();
@@ -85,10 +87,10 @@ export default function VegetationScreen() {
     }
   }, [draftId, draft?.id, hydrateFromDraft, signalerChargement]);
   const [expandedStrate, setExpandedStrate] = useState<StrateKey | null>(null);
-  // Texte brut en cours de saisie pour les 5 champs décimaux libres de chaque strate
-  // (Surf. rel. %, H. moy, % Verdissement, % Repousse, Sol nu %) — permet de taper un
-  // séparateur décimal ou un zéro de fin ("25,", "25,10") sans que le champ ne se
-  // reformate à chaque frappe (cf. `strate.xxx != null ? String(strate.xxx) : ''` sinon).
+  // Texte brut en cours de saisie pour les 4 champs décimaux libres de chaque strate
+  // (Surf. rel. %, H. moy, % Verdissement, % Repousse) — permet de taper un séparateur
+  // décimal ou un zéro de fin ("25,", "25,10") sans que le champ ne se reformate à
+  // chaque frappe (cf. `strate.xxx != null ? String(strate.xxx) : ''` sinon).
   const [decimalDrafts, setDecimalDrafts] = useState<
     Partial<Record<StrateKey, Partial<Record<DecimalFieldKey, string>>>>
   >({});
@@ -104,12 +106,20 @@ export default function VegetationScreen() {
   });
 
   // ==========================================
-  // SOL : humidité + texture, déjà enregistrés le cas échéant (fiche reprise)
+  // SOL : humidité + texture + sol nu, déjà enregistrés le cas échéant (fiche reprise)
   // ==========================================
 
   const savedSol = draft?.sol
-    ? (JSON.parse(draft.sol) as { humidite?: Humidite | null; texture?: string[] | null })
+    ? (JSON.parse(draft.sol) as { humidite?: Humidite | null; texture?: string[] | null; solNu?: number | null })
     : null;
+
+  // Sol nu (%) — au niveau de la station, pas par strate (issue #278) : avec `surfRel`
+  // des 6 strates, partitionne 100% de la surface de la station prospectée.
+  const [solNu, setSolNu] = useState<number | null>(savedSol?.solNu ?? null);
+  const [solNuDraft, setSolNuDraft] = useState<string | undefined>(undefined);
+  // N'affiche l'erreur de répartition qu'après une tentative de "Continuer" — comme
+  // humidité/texture, pas dès la première frappe sur une strate.
+  const [repartitionTouched, setRepartitionTouched] = useState(false);
 
   // ==========================================
   // TEXTURE : sélection multiple
@@ -132,6 +142,14 @@ export default function VegetationScreen() {
       scrollRef.current?.scrollToEnd({ animated: true });
     },
     onSubmit: async ({ value }) => {
+      // Sol nu + surfRel des 6 strates doivent totaliser 100% de la surface de la
+      // station (issue #278) — vérifié à la soumission, comme humidité/texture, pas
+      // en direct à chaque frappe (les valeurs intermédiaires n'ont pas à être justes).
+      if (!isSurfaceRepartitionValide({ strates, solNu })) {
+        setRepartitionTouched(true);
+        scrollRef.current?.scrollToEnd({ animated: true });
+        return;
+      }
       return run(
         async () => {
           const updated = await updateProspectionVegetation(draftId, {
@@ -139,6 +157,7 @@ export default function VegetationScreen() {
             sol: JSON.stringify({
               humidite: value.humidite,
               texture: selectedTextures.length > 0 ? selectedTextures : null,
+              solNu,
             }),
           });
           setDraft(updated);
@@ -166,18 +185,19 @@ export default function VegetationScreen() {
     vegHydratedRef.current = draft.id;
     const parsed = parseVegetationSol(draft.vegetation, draft.sol, draft.degats_cultures);
     setStrates(parsed.strates);
+    setSolNu(parsed.solNu);
     setSelectedTextures(parsed.texture);
     form.setFieldValue('humidite', parsed.humidite);
   }, [draft, draftId, form]);
 
   const setStrateField = <K extends keyof StrateFormValues>(key: StrateKey, field: K, value: StrateFormValues[K]) => {
     // Recouvrement reste par pas de 5 (stepper dédié, cf. handleRecouvrementChange). Les
-    // quatre autres pourcentages (surfRel, verdissement, repousse, solNu) sont des saisies
-    // libres décimales, seulement bornées à [0, 100] — H. moy n'a aucune contrainte connue.
+    // trois autres pourcentages (surfRel, verdissement, repousse) sont des saisies libres
+    // décimales, seulement bornées à [0, 100] — H. moy n'a aucune contrainte connue.
     let processedValue = value;
     if (typeof value === 'number' && field === 'recouvrement') {
       processedValue = clampTo5(value, 0, 100) as StrateFormValues[K];
-    } else if (typeof value === 'number' && ['surfRel', 'verdissement', 'repousse', 'solNu'].includes(field as string)) {
+    } else if (typeof value === 'number' && ['surfRel', 'verdissement', 'repousse'].includes(field as string)) {
       processedValue = clampPercent(value, 0, 100) as StrateFormValues[K];
     }
     setStrates((current) => ({ ...current, [key]: { ...current[key], [field]: processedValue } }));
@@ -190,7 +210,7 @@ export default function VegetationScreen() {
   };
 
   // ==========================================
-  // SAISIE DÉCIMALE LIBRE : Surf. rel. %, H. moy, % Verdissement, % Repousse, Sol nu %
+  // SAISIE DÉCIMALE LIBRE : Surf. rel. %, H. moy, % Verdissement, % Repousse
   // ==========================================
 
   const getDecimalDraft = (key: StrateKey, field: DecimalFieldKey): string | undefined => decimalDrafts[key]?.[field];
@@ -239,6 +259,25 @@ export default function VegetationScreen() {
     clearDecimalDraft(key, field);
   };
 
+  // Sol nu (%), au niveau de la station — même patron que les champs décimaux libres
+  // d'une strate (handleDecimalChange/Blur), mais un seul champ, pas par strate.
+  const handleSolNuChange = (raw: string) => {
+    if (raw !== '' && !/^\d*[.,]?\d*$/.test(raw)) return;
+    setSolNuDraft(raw);
+    if (raw === '') {
+      setSolNu(null);
+      return;
+    }
+    if (raw.endsWith('.') || raw.endsWith(',')) return;
+    const val = parseDecimalInput(raw);
+    if (val === null) return;
+    setSolNu(clampPercent(val, 0, 100));
+  };
+
+  const handleSolNuBlur = () => {
+    setSolNuDraft(undefined);
+  };
+
   // ==========================================
   // STEPPER : incrément/décrément par pas de 5
   // ==========================================
@@ -248,6 +287,11 @@ export default function VegetationScreen() {
     const newValue = clampTo5(current + delta, 0, 100);
     setStrateField(key, 'recouvrement', newValue);
   };
+
+  const repartitionTotal = computeSurfaceRepartitionTotal({ strates, solNu });
+  const repartitionValide = isSurfaceRepartitionValide({ strates, solNu });
+  // Affichage à une décimale : évite les artefacts flottants (86.99999999999999).
+  const repartitionTotalDisplay = Math.round(repartitionTotal * 10) / 10;
 
   return (
     <View style={styles.root}>
@@ -266,6 +310,33 @@ export default function VegetationScreen() {
 
           <ScrollView ref={scrollRef} style={styles.scroll} contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
             <Text style={styles.hint}>Recouvrement total ≥ 100%. Touchez une strate pour la détailler.</Text>
+
+            <View style={[styles.card, repartitionTouched && !repartitionValide && styles.cardError]}>
+              <Text style={styles.cardTitle}>Sol nu</Text>
+              <Text style={styles.hintSmall}>
+                Au niveau de la station, indépendant des strates et cultures ci-dessous :
+                avec leur surface relative, doit totaliser 100% de la station prospectée.
+              </Text>
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Sol nu %</Text>
+                <TextInput
+                  value={solNuDraft ?? formatDecimalDisplay(solNu)}
+                  onChangeText={handleSolNuChange}
+                  onBlur={handleSolNuBlur}
+                  keyboardType="decimal-pad"
+                  style={styles.fieldInput}
+                />
+              </View>
+              <Text style={styles.totalRepartition}>
+                Total répartition (sol nu + strates) : {repartitionTotalDisplay}%
+              </Text>
+              {repartitionTouched && !repartitionValide && (
+                <Text style={styles.errorText}>
+                  La somme sol nu + surface relative des 6 strates doit égaler 100%
+                  (actuellement {repartitionTotalDisplay}%).
+                </Text>
+              )}
+            </View>
 
             {STRATE_KEYS.map((key) => {
               const strate = strates[key];
@@ -382,15 +453,6 @@ export default function VegetationScreen() {
                           );
                         })}
                       </View>
-
-                      <Text style={styles.fieldLabel}>Sol nu %</Text>
-                      <TextInput
-                        value={getDecimalDraft(key, 'solNu') ?? formatDecimalDisplay(strate.solNu)}
-                        onChangeText={(v) => handleDecimalChange(key, 'solNu', v, { min: 0, max: 100 })}
-                        onBlur={() => handleDecimalBlur(key, 'solNu')}
-                        keyboardType="decimal-pad"
-                        style={styles.fieldInput}
-                      />
                     </View>
                   )}
                 </View>
@@ -537,6 +599,7 @@ const styles = StyleSheet.create({
   smallChipTextActive: { fontWeight: '700', color: '#fff' },
   errorText: { color: '#c0412b', fontSize: 11, marginBottom: 4 },
   totalRec: { textAlign: 'center', fontSize: 10, fontWeight: '600', color: '#9a9484', letterSpacing: 0.3, paddingVertical: 4 },
+  totalRepartition: { fontSize: 11, fontWeight: '600', color: GREEN, marginTop: 6 },
   footer: { padding: 16 },
   continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
   continueButtonText: { color: '#fff', fontWeight: '800', fontSize: 15 },
