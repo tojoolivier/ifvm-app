@@ -159,8 +159,13 @@ class TraitementRepositoryImpl(TraitementRepository):
                 mecanicien=traitement.aerien.mecanicien,
                 chef_de_base_id=traitement.aerien.chef_de_base_id,
                 consultant_international=traitement.aerien.consultant_international,
+                immatricule_aeronef=traitement.aerien.immatricule_aeronef,
                 nb_rotations=traitement.aerien.nb_rotations,
                 total_pesticide_l=traitement.aerien.total_pesticide_l,
+                surface_traitee_ha=traitement.aerien.surface_traitee_ha,
+                surface_restante_ha=traitement.aerien.surface_restante_ha,
+                pesticide_recu_l=traitement.aerien.pesticide_recu_l,
+                pesticide_stock_restant_l=traitement.aerien.pesticide_stock_restant_l,
             )
 
         if traitement.terrestre is not None:
@@ -188,6 +193,8 @@ class TraitementRepositoryImpl(TraitementRepository):
                 essence_litres=traitement.terrestre.essence_litres,
                 nb_piles=traitement.terrestre.nb_piles,
                 total_pesticide_l=traitement.terrestre.total_pesticide_l,
+                pesticide_recu_l=traitement.terrestre.pesticide_recu_l,
+                pesticide_stock_restant_l=traitement.terrestre.pesticide_stock_restant_l,
             )
 
         self.session.add(model)
@@ -218,6 +225,7 @@ class TraitementRepositoryImpl(TraitementRepository):
         rotation: Rotation,
         nb_rotations: int,
         total_pesticide_l: float | None,
+        pesticide_stock_restant_l: float | None,
     ) -> Traitement:
         self.session.add(
             RotationModel(
@@ -235,7 +243,9 @@ class TraitementRepositoryImpl(TraitementRepository):
                 heure_fin=rotation.heure_fin,
             )
         )
-        await self._persister_totaux(traitement_id, nb_rotations, total_pesticide_l)
+        await self._persister_totaux(
+            traitement_id, nb_rotations, total_pesticide_l, pesticide_stock_restant_l
+        )
         return await self.get_by_id(traitement_id)
 
     async def update_rotation(
@@ -244,6 +254,7 @@ class TraitementRepositoryImpl(TraitementRepository):
         rotation: Rotation,
         nb_rotations: int,
         total_pesticide_l: float | None,
+        pesticide_stock_restant_l: float | None,
     ) -> Traitement:
         rotation_model = await self.session.get(RotationModel, rotation.id)
         rotation_model.numero_cuve = rotation.numero_cuve
@@ -256,7 +267,9 @@ class TraitementRepositoryImpl(TraitementRepository):
         rotation_model.heure_debut = rotation.heure_debut
         rotation_model.heure_fin = rotation.heure_fin
 
-        await self._persister_totaux(traitement_id, nb_rotations, total_pesticide_l)
+        await self._persister_totaux(
+            traitement_id, nb_rotations, total_pesticide_l, pesticide_stock_restant_l
+        )
         return await self.get_by_id(traitement_id)
 
     async def remove_rotation(
@@ -265,11 +278,14 @@ class TraitementRepositoryImpl(TraitementRepository):
         rotation_id: uuid.UUID,
         nb_rotations: int,
         total_pesticide_l: float | None,
+        pesticide_stock_restant_l: float | None,
     ) -> Traitement:
         rotation_model = await self.session.get(RotationModel, rotation_id)
         await self.session.delete(rotation_model)
 
-        await self._persister_totaux(traitement_id, nb_rotations, total_pesticide_l)
+        await self._persister_totaux(
+            traitement_id, nb_rotations, total_pesticide_l, pesticide_stock_restant_l
+        )
         return await self.get_by_id(traitement_id)
 
     async def add_produit(
@@ -277,6 +293,7 @@ class TraitementRepositoryImpl(TraitementRepository):
         traitement_id: uuid.UUID,
         produit: ProduitUtilise,
         total_pesticide_l: float | None,
+        pesticide_stock_restant_l: float | None,
     ) -> Traitement:
         self.session.add(
             ProduitUtiliseModel(
@@ -287,7 +304,9 @@ class TraitementRepositoryImpl(TraitementRepository):
                 quantite_l=produit.quantite_l,
             )
         )
-        await self._persister_total_pesticide(traitement_id, total_pesticide_l)
+        await self._persister_total_pesticide(
+            traitement_id, total_pesticide_l, pesticide_stock_restant_l
+        )
         return await self.get_by_id(traitement_id)
 
     async def remove_produit(
@@ -295,11 +314,14 @@ class TraitementRepositoryImpl(TraitementRepository):
         traitement_id: uuid.UUID,
         produit_utilise_id: uuid.UUID,
         total_pesticide_l: float | None,
+        pesticide_stock_restant_l: float | None,
     ) -> Traitement:
         produit_model = await self.session.get(ProduitUtiliseModel, produit_utilise_id)
         await self.session.delete(produit_model)
 
-        await self._persister_total_pesticide(traitement_id, total_pesticide_l)
+        await self._persister_total_pesticide(
+            traitement_id, total_pesticide_l, pesticide_stock_restant_l
+        )
         return await self.get_by_id(traitement_id)
 
     async def valider(
@@ -374,6 +396,11 @@ class TraitementRepositoryImpl(TraitementRepository):
             model.aerien.mecanicien = traitement.aerien.mecanicien
             model.aerien.chef_de_base_id = traitement.aerien.chef_de_base_id
             model.aerien.consultant_international = traitement.aerien.consultant_international
+            model.aerien.immatricule_aeronef = traitement.aerien.immatricule_aeronef
+            model.aerien.surface_traitee_ha = traitement.aerien.surface_traitee_ha
+            model.aerien.surface_restante_ha = traitement.aerien.surface_restante_ha
+            model.aerien.pesticide_recu_l = traitement.aerien.pesticide_recu_l
+            model.aerien.pesticide_stock_restant_l = traitement.aerien.pesticide_stock_restant_l
 
         if traitement.terrestre is not None and model.terrestre is not None:
             t, src = model.terrestre, traitement.terrestre
@@ -397,6 +424,8 @@ class TraitementRepositoryImpl(TraitementRepository):
             t.motif_surface_restante_abandonnee = src.motif_surface_restante_abandonnee
             t.essence_litres = src.essence_litres
             t.nb_piles = src.nb_piles
+            t.pesticide_recu_l = src.pesticide_recu_l
+            t.pesticide_stock_restant_l = src.pesticide_stock_restant_l
 
         try:
             await self.session.commit()
@@ -427,9 +456,11 @@ class TraitementRepositoryImpl(TraitementRepository):
         self,
         traitement_id: uuid.UUID,
         total_pesticide_l: float | None,
+        pesticide_stock_restant_l: float | None,
     ) -> None:
         terrestre_model = await self.session.get(TraitementTerrestreModel, traitement_id)
         terrestre_model.total_pesticide_l = total_pesticide_l
+        terrestre_model.pesticide_stock_restant_l = pesticide_stock_restant_l
         await self.session.commit()
         self.session.expire(terrestre_model, ["produits"])
 
@@ -438,10 +469,12 @@ class TraitementRepositoryImpl(TraitementRepository):
         traitement_id: uuid.UUID,
         nb_rotations: int,
         total_pesticide_l: float | None,
+        pesticide_stock_restant_l: float | None,
     ) -> None:
         aerien_model = await self.session.get(TraitementAerienModel, traitement_id)
         aerien_model.nb_rotations = nb_rotations
         aerien_model.total_pesticide_l = total_pesticide_l
+        aerien_model.pesticide_stock_restant_l = pesticide_stock_restant_l
         await self.session.commit()
         self.session.expire(aerien_model, ["rotations"])
 
@@ -507,9 +540,22 @@ class TraitementRepositoryImpl(TraitementRepository):
                 mecanicien=model.aerien.mecanicien,
                 chef_de_base_id=model.aerien.chef_de_base_id,
                 consultant_international=model.aerien.consultant_international,
+                immatricule_aeronef=model.aerien.immatricule_aeronef,
                 nb_rotations=model.aerien.nb_rotations,
                 total_pesticide_l=float(model.aerien.total_pesticide_l)
                 if model.aerien.total_pesticide_l is not None
+                else None,
+                surface_traitee_ha=float(model.aerien.surface_traitee_ha)
+                if model.aerien.surface_traitee_ha is not None
+                else None,
+                surface_restante_ha=float(model.aerien.surface_restante_ha)
+                if model.aerien.surface_restante_ha is not None
+                else None,
+                pesticide_recu_l=float(model.aerien.pesticide_recu_l)
+                if model.aerien.pesticide_recu_l is not None
+                else None,
+                pesticide_stock_restant_l=float(model.aerien.pesticide_stock_restant_l)
+                if model.aerien.pesticide_stock_restant_l is not None
                 else None,
                 rotations=[
                     Rotation(
@@ -571,6 +617,12 @@ class TraitementRepositoryImpl(TraitementRepository):
                 nb_piles=model.terrestre.nb_piles,
                 total_pesticide_l=float(model.terrestre.total_pesticide_l)
                 if model.terrestre.total_pesticide_l is not None
+                else None,
+                pesticide_recu_l=float(model.terrestre.pesticide_recu_l)
+                if model.terrestre.pesticide_recu_l is not None
+                else None,
+                pesticide_stock_restant_l=float(model.terrestre.pesticide_stock_restant_l)
+                if model.terrestre.pesticide_stock_restant_l is not None
                 else None,
                 produits=[
                     ProduitUtilise(

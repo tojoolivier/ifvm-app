@@ -7,8 +7,12 @@ import {
   buildFicheLecture,
   buildInfestationSynthese,
   buildVegetationSummary,
+  computeSurfaceRepartitionTotal,
+  defaultStrateDetail,
   isFicheValidee,
+  isSurfaceRepartitionValide,
   parseVegetationSol,
+  StratesState,
 } from '../src/lib/prospection-fiche-lecture';
 
 jest.mock('../src/lib/prospection-repository', () => ({}));
@@ -215,7 +219,7 @@ describe('buildFicheLecture', () => {
 });
 
 describe('STRATE_KEYS', () => {
-  it('contient les 6 strates du handoff (cultures_hygro remplace sol_nu, qui est un champ par strate)', () => {
+  it('contient les 6 strates du handoff (sol nu est un champ station, pas une strate — #278)', () => {
     expect(STRATE_KEYS).toEqual(['arboree', 'arbustive', 'buissonneuse', 'herbeuse', 'cultures_seches', 'cultures_hygro']);
   });
 });
@@ -238,22 +242,24 @@ describe('parseVegetationSol / buildVegetationSummary (multi-strate)', () => {
   it('parse une strate complète et calcule le résumé sur le recouvrement de chaque strate renseignée', () => {
     const vegetation = JSON.stringify({
       strates: {
-        herbeuse: { surfRel: 40, hMoy: 0.3, recouvrement: 70, verdissement: 20, repousse: 10, orpad: ['Fleur'], solNu: 5 },
-        arboree: { surfRel: 10, hMoy: 4, recouvrement: 15, verdissement: 0, repousse: 0, orpad: [], solNu: 0 },
+        herbeuse: { surfRel: 40, hMoy: 0.3, recouvrement: 70, verdissement: 20, repousse: 10, orpad: ['Fleur'] },
+        arboree: { surfRel: 10, hMoy: 4, recouvrement: 15, verdissement: 0, repousse: 0, orpad: [] },
       },
     });
-    const sol = JSON.stringify({ humidite: '5_12cm', texture: 'sable_grossier' });
+    const sol = JSON.stringify({ humidite: '5_12cm', texture: 'sable_grossier', solNu: 5 });
 
     const state = parseVegetationSol(vegetation, sol, 'moyens');
 
     expect(state.strates.herbeuse).toEqual({
-      surfRel: 40, hMoy: 0.3, recouvrement: 70, verdissement: 20, repousse: 10, orpad: ['Fleur'], solNu: 5,
+      surfRel: 40, hMoy: 0.3, recouvrement: 70, verdissement: 20, repousse: 10, orpad: ['Fleur'],
     });
     expect(state.strates.buissonneuse.recouvrement).toBe(0);
+    expect(state.solNu).toBe(5);
 
     const summary = buildVegetationSummary(state);
     expect(summary).toContain('Strate herbeuse 70%');
     expect(summary).toContain('Strate arborée 15%');
+    expect(summary).toContain('Sol nu 5%');
     expect(summary).toContain('Texture Sable grossier');
     expect(summary).toContain('Dégâts culture Moyens');
   });
@@ -282,5 +288,43 @@ describe('parseVegetationSol / buildVegetationSummary (multi-strate)', () => {
     const state = parseVegetationSol(null, sol, null);
     expect(state.texture).toEqual(['sable_fin']);
     expect(buildVegetationSummary(state)).toContain('Texture Sable fin');
+  });
+});
+
+describe('computeSurfaceRepartitionTotal / isSurfaceRepartitionValide (#278)', () => {
+  function strates(surfRelParStrate: Partial<Record<(typeof STRATE_KEYS)[number], number>>): StratesState {
+    return STRATE_KEYS.reduce((acc, key) => {
+      acc[key] = { ...defaultStrateDetail(), surfRel: surfRelParStrate[key] ?? null };
+      return acc;
+    }, {} as StratesState);
+  }
+
+  it('additionne le sol nu et la surface relative des 6 strates', () => {
+    const total = computeSurfaceRepartitionTotal({
+      strates: strates({ arboree: 10, herbeuse: 60, cultures_seches: 25 }),
+      solNu: 5,
+    });
+    expect(total).toBe(100);
+  });
+
+  it('traite une surface relative ou un sol nu non renseigné comme 0, pas comme une erreur', () => {
+    const total = computeSurfaceRepartitionTotal({ strates: strates({ herbeuse: 40 }), solNu: null });
+    expect(total).toBe(40);
+  });
+
+  it('valide une répartition exactement à 100%', () => {
+    const state = { strates: strates({ herbeuse: 100 }), solNu: 0 };
+    expect(isSurfaceRepartitionValide(state)).toBe(true);
+  });
+
+  it('tolère un écart d’arrondi de saisie (0,1 point)', () => {
+    const state = { strates: strates({ herbeuse: 99.95 }), solNu: 0 };
+    expect(isSurfaceRepartitionValide(state)).toBe(true);
+  });
+
+  it('rejette une répartition qui ne totalise pas 100%', () => {
+    const state = { strates: strates({ herbeuse: 60 }), solNu: 10 };
+    expect(computeSurfaceRepartitionTotal(state)).toBe(70);
+    expect(isSurfaceRepartitionValide(state)).toBe(false);
   });
 });

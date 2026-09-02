@@ -64,6 +64,20 @@ export function computeSurfaceRestante(
   return Math.max(0, (surfaceInfesteeHa ?? 0) - surfaceCumuleeHa);
 }
 
+/**
+ * « Reste en stock » = reçu − consommé, plancher à 0 (même convention que
+ * computeSurfaceRestante) — miroir de `_stock_pesticide_restant` côté backend.
+ * `null` tant que « reçu » n'est pas renseigné : un stock ne se déduit pas
+ * d'une consommation seule.
+ */
+export function computePesticideStockRestant(
+  pesticideRecuL: number | null | undefined,
+  pesticideConsommeL: number
+): number | null {
+  if (pesticideRecuL == null) return null;
+  return Math.max(0, pesticideRecuL - pesticideConsommeL);
+}
+
 // ==========================================
 // RÉFÉRENCES (écran A)
 // ==========================================

@@ -114,6 +114,7 @@ class TraitementRepository(ABC):
         rotation: Rotation,
         nb_rotations: int,
         total_pesticide_l: float | None,
+        pesticide_stock_restant_l: float | None,
     ) -> Traitement:
         pass
 
@@ -124,6 +125,7 @@ class TraitementRepository(ABC):
         rotation: Rotation,
         nb_rotations: int,
         total_pesticide_l: float | None,
+        pesticide_stock_restant_l: float | None,
     ) -> Traitement:
         pass
 
@@ -134,6 +136,7 @@ class TraitementRepository(ABC):
         rotation_id: uuid.UUID,
         nb_rotations: int,
         total_pesticide_l: float | None,
+        pesticide_stock_restant_l: float | None,
     ) -> Traitement:
         pass
 
@@ -143,6 +146,7 @@ class TraitementRepository(ABC):
         traitement_id: uuid.UUID,
         produit: ProduitUtilise,
         total_pesticide_l: float | None,
+        pesticide_stock_restant_l: float | None,
     ) -> Traitement:
         pass
 
@@ -152,6 +156,7 @@ class TraitementRepository(ABC):
         traitement_id: uuid.UUID,
         produit_utilise_id: uuid.UUID,
         total_pesticide_l: float | None,
+        pesticide_stock_restant_l: float | None,
     ) -> Traitement:
         pass
 

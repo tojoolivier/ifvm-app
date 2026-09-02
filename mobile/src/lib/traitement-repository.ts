@@ -84,8 +84,13 @@ export interface TraitementAerien {
   mecanicien: string;
   chef_de_base_id: string;
   consultant_international: string | null;
+  immatricule_aeronef: string | null;
   nb_rotations: number | null;
   total_pesticide_l: number | null;
+  surface_traitee_ha: number | null;
+  surface_restante_ha: number | null;
+  pesticide_recu_l: number | null;
+  pesticide_stock_restant_l: number | null;
 }
 
 export interface Rotation {
@@ -138,6 +143,8 @@ export interface TraitementTerrestre {
   surface_cumulee_ha: number | null;
   surface_restante_ha: number | null;
   total_pesticide_l: number | null;
+  pesticide_recu_l: number | null;
+  pesticide_stock_restant_l: number | null;
 }
 
 export interface ProduitUtilise {
@@ -354,6 +361,9 @@ export interface AerienUpdateInput {
   mecanicien: string;
   chefDeBaseId: string;
   consultantInternational?: string | null;
+  immatriculeAeronef?: string | null;
+  surfaceTraiteeHa?: number | null;
+  pesticideRecuL?: number | null;
 }
 
 export async function updateTraitementAerien(
@@ -367,9 +377,21 @@ export async function updateTraitementAerien(
       pilote = ?,
       mecanicien = ?,
       chef_de_base_id = ?,
-      consultant_international = ?
+      consultant_international = ?,
+      immatricule_aeronef = ?,
+      surface_traitee_ha = ?,
+      pesticide_recu_l = ?
      WHERE traitement_id = ?`,
-    [input.pilote, input.mecanicien, input.chefDeBaseId, input.consultantInternational ?? null, traitementId]
+    [
+      input.pilote,
+      input.mecanicien,
+      input.chefDeBaseId,
+      input.consultantInternational ?? null,
+      input.immatriculeAeronef ?? null,
+      input.surfaceTraiteeHa ?? null,
+      input.pesticideRecuL ?? null,
+      traitementId,
+    ]
   );
 
   const updated = await getTraitement(traitementId);
@@ -397,6 +419,7 @@ export interface TerrestreUpdateInput {
   motifSurfaceRestanteAbandonnee?: string | null;
   essence_litres?: number | null;
   nb_piles?: number | null;
+  pesticideRecuL?: number | null;
 }
 
 export async function updateTraitementTerrestre(
@@ -423,7 +446,8 @@ export async function updateTraitementTerrestre(
       surface_restante_abandonnee = ?,
       motif_surface_restante_abandonnee = ?,
       essence_litres = ?,
-      nb_piles = ?
+      nb_piles = ?,
+      pesticide_recu_l = ?
      WHERE traitement_id = ?`,
     [
       input.chefEquipeId,
@@ -443,6 +467,7 @@ export async function updateTraitementTerrestre(
       input.motifSurfaceRestanteAbandonnee ?? null,
       input.essence_litres ?? null,
       input.nb_piles ?? null,
+      input.pesticideRecuL ?? null,
       traitementId,
     ]
   );
@@ -777,18 +802,31 @@ export async function listDraftTraitements(): Promise<DraftTraitementRow[]> {
   );
 }
 
-export async function listTraitementsByChefEquipe(
-  chefEquipeId: string
+/**
+ * Fiches de traitement dont l'utilisateur connecté est responsable — chef
+ * d'équipe (Terrestre) OU chef de base (Aérien).
+ *
+ * Bug #264 : la requête d'origine ne joignait que `traitement_terrestre`, donc
+ * une fiche AÉRIEN (chef_de_base_id, pas de ligne dans `traitement_terrestre`)
+ * n'apparaissait jamais dans "Mes fiches" après enregistrement, quel que soit
+ * le chef de base connecté. Les deux `LEFT JOIN` couvrent les deux
+ * spécialisations ; une fiche donnée n'a jamais de ligne que dans l'une des
+ * deux tables (disjointes par `type_traitement`), donc chaque `traitement` ne
+ * peut correspondre qu'à une seule branche du `OR` — pas de doublon possible.
+ */
+export async function listMesTraitements(
+  utilisateurId: string
 ): Promise<DraftTraitementRow[]> {
   const db = await getDb();
 
   return db.getAllAsync<DraftTraitementRow>(
     `SELECT traitement.*
      FROM traitement
-     JOIN traitement_terrestre ON traitement_terrestre.traitement_id = traitement.id
-     WHERE traitement_terrestre.chef_equipe_id = ?
+     LEFT JOIN traitement_terrestre ON traitement_terrestre.traitement_id = traitement.id
+     LEFT JOIN traitement_aerien ON traitement_aerien.traitement_id = traitement.id
+     WHERE traitement_terrestre.chef_equipe_id = ? OR traitement_aerien.chef_de_base_id = ?
      ORDER BY traitement.updated_at DESC`,
-    [chefEquipeId]
+    [utilisateurId, utilisateurId]
   );
 }
 

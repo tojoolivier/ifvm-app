@@ -238,6 +238,29 @@ async def test_creation_genere_numero_fiche_et_snapshot():
 
 
 @pytest.mark.asyncio
+async def test_creation_aerien_transmet_immatriculation_surface_et_stock_pesticide():
+    prospection = _prospection(
+        surface_infestee=100.0,
+        populations=[ProspectionPopulation(espece="LMC", categorie="imago")],
+    )
+    use_case, _ = _use_case(prospection=prospection, chef=_CHEF)
+    traitement = await use_case.execute(
+        **_args(
+            immatricule_aeronef="5R-ABC",
+            surface_traitee_ha=30.0,
+            pesticide_recu_l=200.0,
+        )
+    )
+
+    assert traitement.aerien.immatricule_aeronef == "5R-ABC"
+    assert traitement.aerien.surface_traitee_ha == 30.0
+    # Pas de rotation à la création (sous-ressource ajoutée après coup) : rien de
+    # consommé, le stock = tout le reçu.
+    assert traitement.aerien.surface_restante_ha == 70.0
+    assert traitement.aerien.pesticide_stock_restant_l == 200.0
+
+
+@pytest.mark.asyncio
 async def test_conflit_numero_fiche_ajoute_suffixe_incremental():
     use_case, repo = _use_case(prospection=_prospection(), chef=_CHEF, conflits=2)
     traitement = await use_case.execute(**_args())
@@ -343,6 +366,60 @@ def test_recalculer_totaux_derniere_suppression_repasse_a_none():
     assert aerien.total_pesticide_l is None
 
 
+def test_recalculer_surfaces_aerien_saisie_directe_pas_de_somme_equipement():
+    """Pas d'équivalent aérien aux 3 surfaces par équipement du Terrestre :
+    surface_traitee_ha est une saisie directe, recalculer_surfaces ne calcule que
+    le reste."""
+    aerien = TraitementAerien(surface_traitee_ha=30.0)
+    aerien.recalculer_surfaces(surface_infestee_ha=100.0)
+    assert aerien.surface_traitee_ha == 30.0
+    assert aerien.surface_restante_ha == 70.0
+
+
+def test_recalculer_surfaces_aerien_restante_plancher_zero_cdg_9():
+    aerien = TraitementAerien(surface_traitee_ha=80.0)
+    aerien.recalculer_surfaces(surface_infestee_ha=50.0)
+    assert aerien.surface_restante_ha == 0.0
+
+
+def test_recalculer_surfaces_aerien_infestee_none_restante_none():
+    aerien = TraitementAerien(surface_traitee_ha=30.0)
+    aerien.recalculer_surfaces(surface_infestee_ha=None)
+    assert aerien.surface_restante_ha is None
+
+
+def test_recalculer_surfaces_aerien_pas_de_chainage_contrairement_a_terrestre():
+    """Pas de traitement_origine_id côté Aérien : recalculer_surfaces ne prend
+    qu'un seul paramètre (pas de surface_cumulee_precedente)."""
+    aerien = TraitementAerien(surface_traitee_ha=10.0)
+    aerien.recalculer_surfaces(100.0)
+    assert aerien.surface_restante_ha == 90.0
+
+
+def test_recalculer_totaux_aerien_alimente_le_stock_pesticide():
+    aerien = TraitementAerien(pesticide_recu_l=200.0)
+    aerien.rotations = [_rotation(numero=1, quantite_l=60.0)]
+    aerien.recalculer_totaux()
+    assert aerien.total_pesticide_l == 60.0
+    assert aerien.pesticide_stock_restant_l == 140.0
+
+
+def test_recalculer_stock_pesticide_aerien_sans_reception_reste_none():
+    aerien = TraitementAerien()
+    aerien.rotations = [_rotation(numero=1, quantite_l=60.0)]
+    aerien.recalculer_totaux()
+    assert aerien.pesticide_stock_restant_l is None
+
+
+def test_recalculer_stock_pesticide_aerien_plancher_zero_surconsommation():
+    """Consommation > réception (ex. pesticide partagé avec une autre fiche) :
+    le stock ne descend jamais sous 0, même convention que surface_restante_ha."""
+    aerien = TraitementAerien(pesticide_recu_l=50.0)
+    aerien.rotations = [_rotation(numero=1, quantite_l=80.0)]
+    aerien.recalculer_totaux()
+    assert aerien.pesticide_stock_restant_l == 0.0
+
+
 # ==========================================
 # AddRotation / UpdateRotation / RemoveRotation (fakes en mémoire)
 # ==========================================
@@ -361,19 +438,28 @@ class FakeTraitementRepoRotations:
     async def create(self, traitement):
         return traitement
 
-    async def add_rotation(self, traitement_id, rotation, nb_rotations, total_pesticide_l):
+    async def add_rotation(
+        self, traitement_id, rotation, nb_rotations, total_pesticide_l, pesticide_stock_restant_l
+    ):
         self.traitement.aerien.nb_rotations = nb_rotations
         self.traitement.aerien.total_pesticide_l = total_pesticide_l
+        self.traitement.aerien.pesticide_stock_restant_l = pesticide_stock_restant_l
         return self.traitement
 
-    async def update_rotation(self, traitement_id, rotation, nb_rotations, total_pesticide_l):
+    async def update_rotation(
+        self, traitement_id, rotation, nb_rotations, total_pesticide_l, pesticide_stock_restant_l
+    ):
         self.traitement.aerien.nb_rotations = nb_rotations
         self.traitement.aerien.total_pesticide_l = total_pesticide_l
+        self.traitement.aerien.pesticide_stock_restant_l = pesticide_stock_restant_l
         return self.traitement
 
-    async def remove_rotation(self, traitement_id, rotation_id, nb_rotations, total_pesticide_l):
+    async def remove_rotation(
+        self, traitement_id, rotation_id, nb_rotations, total_pesticide_l, pesticide_stock_restant_l
+    ):
         self.traitement.aerien.nb_rotations = nb_rotations
         self.traitement.aerien.total_pesticide_l = total_pesticide_l
+        self.traitement.aerien.pesticide_stock_restant_l = pesticide_stock_restant_l
         return self.traitement
 
 
@@ -635,6 +721,20 @@ async def test_creation_terrestre_genere_numero_fiche_et_recalcule_surfaces():
 
 
 @pytest.mark.asyncio
+async def test_creation_terrestre_transmet_stock_pesticide():
+    prospection = _prospection(surface_infestee=100.0)
+    use_case, _ = _use_case_terrestre(prospection=prospection, chef=_CHEF_EQUIPE)
+    traitement = await use_case.execute(
+        **_args_terrestre(surface_restante_abandonnee=False, pesticide_recu_l=150.0)
+    )
+
+    assert traitement.terrestre.pesticide_recu_l == 150.0
+    # Pas de produit à la création (sous-ressource ajoutée après coup) : rien de
+    # consommé, le stock = tout le reçu.
+    assert traitement.terrestre.pesticide_stock_restant_l == 150.0
+
+
+@pytest.mark.asyncio
 async def test_terrestre_conflit_numero_fiche_ajoute_suffixe_incremental():
     use_case, repo = _use_case_terrestre(prospection=_prospection(), chef=_CHEF_EQUIPE, conflits=2)
     traitement = await use_case.execute(**_args_terrestre())
@@ -836,6 +936,27 @@ def test_recalculer_total_pesticide_derniere_suppression_repasse_a_none():
     assert terrestre.total_pesticide_l is None
 
 
+def test_recalculer_total_pesticide_terrestre_alimente_le_stock():
+    terrestre = TraitementTerrestre(pesticide_recu_l=100.0)
+    terrestre.produits = [_produit(numero=1, quantite_l=40.0)]
+    terrestre.recalculer_total_pesticide()
+    assert terrestre.pesticide_stock_restant_l == 60.0
+
+
+def test_recalculer_stock_pesticide_terrestre_sans_reception_reste_none():
+    terrestre = TraitementTerrestre()
+    terrestre.produits = [_produit(numero=1, quantite_l=40.0)]
+    terrestre.recalculer_total_pesticide()
+    assert terrestre.pesticide_stock_restant_l is None
+
+
+def test_recalculer_stock_pesticide_terrestre_plancher_zero_surconsommation():
+    terrestre = TraitementTerrestre(pesticide_recu_l=20.0)
+    terrestre.produits = [_produit(numero=1, quantite_l=40.0)]
+    terrestre.recalculer_total_pesticide()
+    assert terrestre.pesticide_stock_restant_l == 0.0
+
+
 # ==========================================
 # AddProduitUtilise / RemoveProduitUtilise (fakes en mémoire)
 # ==========================================
@@ -854,12 +975,18 @@ class FakeTraitementRepoProduits:
     async def create(self, traitement):
         return traitement
 
-    async def add_produit(self, traitement_id, produit, total_pesticide_l):
+    async def add_produit(
+        self, traitement_id, produit, total_pesticide_l, pesticide_stock_restant_l
+    ):
         self.traitement.terrestre.total_pesticide_l = total_pesticide_l
+        self.traitement.terrestre.pesticide_stock_restant_l = pesticide_stock_restant_l
         return self.traitement
 
-    async def remove_produit(self, traitement_id, produit_id, total_pesticide_l):
+    async def remove_produit(
+        self, traitement_id, produit_id, total_pesticide_l, pesticide_stock_restant_l
+    ):
         self.traitement.terrestre.total_pesticide_l = total_pesticide_l
+        self.traitement.terrestre.pesticide_stock_restant_l = pesticide_stock_restant_l
         return self.traitement
 
 
@@ -1249,6 +1376,7 @@ def _traitement_terrestre_sync(**overrides) -> Traitement:
         motif_surface_restante_abandonnee=None,
         essence_litres=None,
         nb_piles=None,
+        pesticide_recu_l=None,
     )
     for cle, valeur in overrides.items():
         if cle in terrestre_args:
@@ -1441,6 +1569,39 @@ async def test_sync_push_terrestre_renvoi_reseau_sans_conflit():
     assert cree is False
     assert traitement.statut_sync == "synced"
     assert repo.conflicts_marques == []
+
+
+@pytest.mark.asyncio
+async def test_sync_push_terrestre_conserve_stock_pesticide_existant_sans_ecraser_consommation():
+    """Les produits existants ne sont pas renvoyés par ce push (sous-ressource
+    distincte, ajoutée via son propre endpoint) : le stock doit se recalculer à
+    partir de la consommation déjà connue côté serveur, jamais depuis une liste de
+    produits vide (qui donnerait à tort stock = reçu)."""
+    fiche_id = uuid.uuid4()
+    ancien_updated_at = datetime(2026, 8, 11, 8, 0)
+    updated_at_serveur = datetime(2026, 8, 11, 9, 0)
+    args = _sync_terrestre_args(fiche_id, base_updated_at=ancien_updated_at, pesticide_recu_l=150.0)
+
+    existant = _traitement_terrestre_sync(
+        id=fiche_id,
+        prospection_id=args["prospection_id"],
+        numero_fiche=args["numero_fiche"],
+        localite=args["localite"],
+        chef_equipe_id=args["chef_equipe_id"],
+        surface_atomiseur_ha=args["surface_atomiseur_ha"],
+        surface_restante_abandonnee=args["surface_restante_abandonnee"],
+        pesticide_recu_l=150.0,
+        statut_sync="synced",
+        updated_at=updated_at_serveur,
+    )
+    existant.terrestre.total_pesticide_l = 40.0
+    use_case, repo = _sync_use_case(existant=existant)
+
+    traitement, cree = await use_case.execute(**args)
+
+    assert cree is False
+    assert traitement.terrestre.total_pesticide_l == 40.0
+    assert traitement.terrestre.pesticide_stock_restant_l == 110.0
 
 
 @pytest.mark.asyncio
