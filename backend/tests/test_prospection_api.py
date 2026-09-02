@@ -15,6 +15,7 @@ async def test_create_prospection_intensive(
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
             "date_prospection": "2026-06-25",
+            "biotope": ["xerophyle"],
         },
         headers=auth_headers,
     )
@@ -37,6 +38,7 @@ async def test_create_prospection_intensive_avec_sections(
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
             "date_prospection": "2026-06-25",
+            "biotope": ["xerophyle"],
             "captures": [
                 {
                     "espece": "LMC",
@@ -52,6 +54,7 @@ async def test_create_prospection_intensive_avec_sections(
                     "espece": "LMC",
                     "categorie": "imago",
                     "densite_diffuse": 3.5,
+                    "densite_groupee": 0.0,
                     "accouplement": "rare",
                 }
             ],
@@ -165,6 +168,7 @@ async def test_create_prospection_population_extensive_imagos_larves(
                 {
                     "espece": "LMC",
                     "categorie": "imago",
+                    "densite_groupee": 0.0,
                     "accouplement": "dominant",
                     "ponte": "rare",
                     "interdistance": 25.5,
@@ -176,6 +180,7 @@ async def test_create_prospection_population_extensive_imagos_larves(
                 {
                     "espece": "NSE",
                     "categorie": "imago",
+                    "densite_groupee": 0.0,
                     "accouplement": "neant",
                     "ponte": "beaucoup",
                     "interdistance": 40.75,
@@ -189,6 +194,7 @@ async def test_create_prospection_population_extensive_imagos_larves(
                 {
                     "espece": "LMC",
                     "categorie": "larve",
+                    "densite_groupee": 0.0,
                     "surface_contaminee_ha": 12.75,
                 },
             ],
@@ -543,6 +549,7 @@ async def test_create_prospection_population_methode_phase(
                     "espece": "LMC",
                     "categorie": "imago",
                     "densite_diffuse": 3.5,
+                    "densite_groupee": 0.0,
                     "methode": "comptage_direct",
                     "phase": "gregaire",
                 }
@@ -669,6 +676,7 @@ async def test_list_prospections_filtre_par_type(
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
             "date_prospection": "2026-06-25",
+            "biotope": ["xerophyle"],
         },
         headers=auth_headers,
     )
@@ -691,6 +699,7 @@ async def test_get_prospection_par_id(
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
             "date_prospection": "2026-06-25",
+            "biotope": ["xerophyle"],
         },
         headers=auth_headers,
     )
@@ -718,6 +727,7 @@ async def test_update_prospection_brouillon(
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
             "date_prospection": "2026-06-25",
+            "biotope": ["xerophyle"],
         },
         headers=auth_headers,
     )
@@ -816,6 +826,7 @@ async def test_update_prospection_non_brouillon_interdit(
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
             "date_prospection": "2026-06-25",
+            "biotope": ["xerophyle"],
             "statut": "en_attente",
         },
         headers=auth_headers,
@@ -841,6 +852,7 @@ async def test_delete_prospection_brouillon(
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
             "date_prospection": "2026-06-25",
+            "biotope": ["xerophyle"],
         },
         headers=auth_headers,
     )
@@ -864,6 +876,7 @@ async def test_delete_prospection_non_brouillon_interdit(
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
             "date_prospection": "2026-06-25",
+            "biotope": ["xerophyle"],
             "statut": "en_attente",
         },
         headers=auth_headers,
@@ -885,6 +898,7 @@ async def test_list_filtre_statut(
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
             "date_prospection": "2026-06-25",
+            "biotope": ["xerophyle"],
             "statut": "en_attente",
         },
         headers=auth_headers,
@@ -1024,7 +1038,7 @@ async def test_create_prospection_extensive_avec_populations_agregees(
             "station_id": str(station_id),
             "date_prospection": "2026-07-29",
             "station_libre": "Ambohimanga",
-            "type_station": "mesophyle",
+            "type_station": ["mesophyle"],
             "verdure_strate": "moyenne",
             "populations": [
                 {
@@ -1035,6 +1049,7 @@ async def test_create_prospection_extensive_avec_populations_agregees(
                     "captures_greg": 0,
                     "stade_imago": "A2",
                     "densite_diffuse": 2.4,
+                    "densite_groupee": 0.0,
                     "essaim_observe": False,
                 },
                 {
@@ -1049,6 +1064,7 @@ async def test_create_prospection_extensive_avec_populations_agregees(
                         "L6": 0,
                         "L7": 0,
                     },
+                    "densite_groupee": 0.0,
                     "tache_larvaire": True,
                     "bande_larvaire": False,
                     "interdistance": 0.6,
@@ -1061,7 +1077,7 @@ async def test_create_prospection_extensive_avec_populations_agregees(
     assert response.status_code == 201
     data = response.json()
     assert data["station_libre"] == "Ambohimanga"
-    assert data["type_station"] == "mesophyle"
+    assert data["type_station"] == ["mesophyle"]
     assert data["verdure_strate"] == "moyenne"
 
     imago = next(p for p in data["populations"] if p["categorie"] == "imago")
@@ -1139,6 +1155,7 @@ async def test_create_intensive_station_inexistante_renvoie_409(
             "campagne_id": str(campagne_id),
             "station_id": str(uuid.uuid4()),
             "date_prospection": "2026-06-25",
+            "biotope": ["xerophyle"],
         },
         headers=auth_headers,
     )
@@ -1160,9 +1177,10 @@ async def test_create_intensive_autre_violation_ne_blame_pas_la_station(
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
             "date_prospection": "2026-06-25",
+            "biotope": ["xerophyle"],
             "populations": [
-                {"espece": "LMC", "categorie": "imago", "densite_diffuse": 3.5},
-                {"espece": "LMC", "categorie": "imago", "densite_diffuse": 4.0},
+                {"espece": "LMC", "categorie": "imago", "densite_diffuse": 3.5, "densite_groupee": 0.0},
+                {"espece": "LMC", "categorie": "imago", "densite_diffuse": 4.0, "densite_groupee": 0.0},
             ],
         },
         headers=auth_headers,
@@ -1186,6 +1204,7 @@ async def test_create_capture_stade_inconnu_refuse_avant_la_base(
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
             "date_prospection": "2026-06-25",
+            "biotope": ["xerophyle"],
             "captures": [
                 {
                     "espece": "LMC",
@@ -1217,6 +1236,7 @@ async def test_create_capture_sous_stade_a3_et_male_groupe_acceptes(
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
             "date_prospection": "2026-06-25",
+            "biotope": ["xerophyle"],
             "captures": [
                 {
                     "espece": "LMC",

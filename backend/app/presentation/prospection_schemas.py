@@ -3,7 +3,7 @@ from datetime import date, datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class TypeProspection(str, Enum):
@@ -310,6 +310,16 @@ class PopulationCreate(BaseModel):
     essaim_en_vol: bool | None = None
     essaim_pose: bool | None = None
 
+    @model_validator(mode="after")
+    def _densite_groupee_obligatoire(self) -> "PopulationCreate":
+        # #densite-groupee-obligatoire : sur les 4 types de fiche. `densite_diffuse`
+        # reste typé Optional (comme avant) pour laisser passer la validation Pydantic
+        # de champ puis produire ici le message FR dédié, plutôt que le "Field
+        # required" générique qu'un `Field(...)` obligatoire aurait renvoyé.
+        if self.densite_groupee is None:
+            raise ValueError("La densité groupée (/m²) est obligatoire.")
+        return self
+
 
 class CaptureCreate(BaseModel):
     espece: EspeceAcridienne
@@ -432,7 +442,10 @@ class ProspectionCreate(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
     altitude: float | None = None
-    biotope: Biotope | None = None
+    # Multi-select (#biotope-multi) : au moins un biotope requis, cf. le validator
+    # `_biotope_obligatoire` plus bas (message FR dédié, sur le modèle des validators
+    # de traitement_schemas.py — Pydantic seul ne produirait qu'un "Field required" générique).
+    biotope: list[Biotope] = []
     surface_station: float | None = Field(None, ge=0)
     surface_prospectee: float | None = Field(None, ge=0)
     surface_infestee: float | None = Field(None, ge=0)
@@ -470,7 +483,7 @@ class ProspectionCreate(BaseModel):
     # NOUVEAUX CHAMPS - Extensif & Validation
     # ==========================================
     station_libre: str | None = None
-    type_station: TypeStation | None = None
+    type_station: list[TypeStation] = []  # Multi-select (#biotope-multi), reste facultatif.
     verdure_strate: VerdureStrate | None = None
     signalement_source: str | None = None
     signalement_date: str | None = None
@@ -516,6 +529,18 @@ class ProspectionCreate(BaseModel):
     operations_aeriennes: list[OperationAerienneCreate] = []
     surface_infestee_pourcent: float | None = Field(None, ge=0, le=100)
 
+    @model_validator(mode="after")
+    def _biotope_obligatoire(self) -> "ProspectionCreate":
+        # Multi-select (#biotope-multi) : au moins un biotope, comme avant ce
+        # changement — mais UNIQUEMENT pour l'intensif. `biotope` et `type_station`
+        # sont deux champs distincts sur ce même schéma partagé : les fiches
+        # extensif/validation ne renseignent jamais `biotope` (elles utilisent
+        # `type_station`, resté facultatif) — leur réclamer `biotope` rejetterait
+        # à tort toute fiche extensive/validation.
+        if self.type_prospection == TypeProspection.INTENSIVE and len(self.biotope) == 0:
+            raise ValueError("Le biotope est obligatoire.")
+        return self
+
 
 class ProspectionUpdate(BaseModel):
     station_id: uuid.UUID | None = None
@@ -526,7 +551,9 @@ class ProspectionUpdate(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
     altitude: float | None = None
-    biotope: Biotope | None = None
+    # Multi-select (#biotope-multi) : `None` = non modifié par cet update (distinct
+    # d'un tableau vide), même convention que `avertissements` ci-dessous.
+    biotope: list[Biotope] | None = None
     surface_station: float | None = Field(None, ge=0)
     surface_prospectee: float | None = Field(None, ge=0)
     surface_infestee: float | None = Field(None, ge=0)
@@ -562,7 +589,7 @@ class ProspectionUpdate(BaseModel):
     # NOUVEAUX CHAMPS - Extensif & Validation
     # ==========================================
     station_libre: str | None = None
-    type_station: TypeStation | None = None
+    type_station: list[TypeStation] | None = None  # None = non modifie par cet update.
     verdure_strate: VerdureStrate | None = None
     signalement_source: str | None = None
     signalement_date: str | None = None
@@ -638,7 +665,7 @@ class ProspectionRead(BaseModel):
     latitude: float | None
     longitude: float | None
     altitude: float | None
-    biotope: Biotope | None
+    biotope: list[Biotope] = []
     surface_station: float | None
     surface_prospectee: float | None
     surface_infestee: float | None
@@ -677,7 +704,7 @@ class ProspectionRead(BaseModel):
     # NOUVEAUX CHAMPS - Extensif & Validation
     # ==========================================
     station_libre: str | None = None
-    type_station: TypeStation | None = None
+    type_station: list[TypeStation] = []
     verdure_strate: VerdureStrate | None = None
     signalement_source: str | None = None
     signalement_date: str | None = None

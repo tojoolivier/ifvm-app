@@ -57,6 +57,7 @@ async def _creer_prospection(
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
             "date_prospection": "2026-06-25",
+            "biotope": ["xerophyle"],
         },
         headers=auth_headers,
     )
