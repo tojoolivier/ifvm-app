@@ -42,11 +42,18 @@ class ProspectionModel(Base):
     latitude: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
     longitude: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
     altitude: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
-    # Multi-select (migration 0041) : plusieurs biotopes simultanés, même pattern que
+    # Multi-select (migration 0042) : plusieurs biotopes simultanés, même pattern que
     # `avertissements` ci-dessous (JSONB non nullable, défaut tableau vide) plutôt qu'une
     # table de jonction — ensemble fermé à 3 valeurs, sans attribut propre par ligne.
+    # `default=list` (en plus de `server_default`) : constaté à l'usage — un
+    # `ProspectionModel(...)` construit sans passer `biotope` (cf. fixtures de
+    # test_traitement_api.py) incluait explicitement `biotope=NULL` dans l'INSERT au
+    # lieu de laisser Postgres appliquer `server_default`, et asyncpg rejetait ce NULL
+    # en le typant VARCHAR au lieu de JSONB (« column biotope is of type jsonb but
+    # expression is of type character varying »). `default=list` lève l'ambiguïté côté
+    # client plutôt que de compter sur l'omission de la colonne par SQLAlchemy.
     biotope: Mapped[list[str]] = mapped_column(
-        JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb")
+        JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb"), default=list
     )
     surface_station: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
     surface_prospectee: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
@@ -108,10 +115,11 @@ class ProspectionModel(Base):
     # NOUVEAUX CHAMPS - Extensif & Validation
     # ==========================================
     station_libre: Mapped[str | None] = mapped_column(Text(), nullable=True)
-    # Multi-select (migration 0041), même pattern que `biotope` ci-dessus. Reste
-    # facultatif (aucune validation de présence) : seule sa cardinalité change.
+    # Multi-select (migration 0042), même pattern que `biotope` ci-dessus (y compris
+    # `default=list`, même raison). Reste facultatif (aucune validation de présence) :
+    # seule sa cardinalité change.
     type_station: Mapped[list[str]] = mapped_column(
-        JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb")
+        JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb"), default=list
     )
     verdure_strate: Mapped[str | None] = mapped_column(Text(), nullable=True)
     signalement_source: Mapped[str | None] = mapped_column(Text(), nullable=True)
