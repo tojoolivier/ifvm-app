@@ -219,12 +219,12 @@ class ProspectionModel(Base):
         ),
         CheckConstraint(
             "jsonb_typeof(biotope) = 'array' "
-            "AND biotope <@ '[\"xerophyle\",\"mesophyle\",\"hydrophyle\"]'::jsonb",
+            'AND biotope <@ \'["xerophyle","mesophyle","hydrophyle"]\'::jsonb',
             name="ck_prospection_biotope",
         ),
         CheckConstraint(
             "jsonb_typeof(type_station) = 'array' "
-            "AND type_station <@ '[\"xerophyle\",\"mesophyle\",\"hydrophyle\"]'::jsonb",
+            'AND type_station <@ \'["xerophyle","mesophyle","hydrophyle"]\'::jsonb',
             name="ck_prospection_type_station",
         ),
         CheckConstraint(
