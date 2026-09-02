@@ -1179,8 +1179,18 @@ async def test_create_intensive_autre_violation_ne_blame_pas_la_station(
             "date_prospection": "2026-06-25",
             "biotope": ["xerophyle"],
             "populations": [
-                {"espece": "LMC", "categorie": "imago", "densite_diffuse": 3.5, "densite_groupee": 0.0},
-                {"espece": "LMC", "categorie": "imago", "densite_diffuse": 4.0, "densite_groupee": 0.0},
+                {
+                    "espece": "LMC",
+                    "categorie": "imago",
+                    "densite_diffuse": 3.5,
+                    "densite_groupee": 0.0,
+                },
+                {
+                    "espece": "LMC",
+                    "categorie": "imago",
+                    "densite_diffuse": 4.0,
+                    "densite_groupee": 0.0,
+                },
             ],
         },
         headers=auth_headers,
