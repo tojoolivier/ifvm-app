@@ -68,6 +68,9 @@ export interface AerienDraft {
   mecanicien?: string | null;
   chefDeBaseId?: string | null;
   consultantInternational?: string | null;
+  immatriculationAeronef?: string | null;
+  surfaceTraiteeHa?: number | null;
+  pesticideRecuL?: number | null;
   rotations: RotationDraft[];
 }
 
@@ -100,6 +103,7 @@ export interface TerrestreDraft {
   motifSurfaceRestanteAbandonnee?: string | null;
   essence_litres?: number | null;
   nb_piles?: number | null;
+  pesticideRecuL?: number | null;
   produits: ProduitDraft[];
 }
 

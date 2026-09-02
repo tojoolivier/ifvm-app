@@ -103,6 +103,9 @@ function buildTraitementSyncPayload(draft: DraftTraitement): components['schemas
         mecanicien: draft.aerien.mecanicien,
         chef_de_base_id: draft.aerien.chef_de_base_id,
         consultant_international: draft.aerien.consultant_international,
+        immatricule_aeronef: draft.aerien.immatricule_aeronef,
+        surface_traitee_ha: draft.aerien.surface_traitee_ha,
+        pesticide_recu_l: draft.aerien.pesticide_recu_l,
       },
     };
   }
@@ -126,6 +129,7 @@ function buildTraitementSyncPayload(draft: DraftTraitement): components['schemas
         motif_surface_restante_abandonnee: draft.terrestre.motif_surface_restante_abandonnee,
         essence_litres: draft.terrestre.essence_litres,
         nb_piles: draft.terrestre.nb_piles,
+        pesticide_recu_l: draft.terrestre.pesticide_recu_l,
         reprise_traitement: draft.terrestre.reprise_traitement,
         traitement_origine_id: draft.terrestre.traitement_origine_id,
       } as components['schemas']['TraitementTerrestreCreate'],

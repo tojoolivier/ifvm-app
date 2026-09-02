@@ -23,6 +23,7 @@ export interface TerrestreFormProps {
   surfaceCumulee: number;
   surfaceRestante: number;
   totalPesticideTerrestre: number;
+  pesticideStockRestant: number | null;
   errors: Record<string, string>;
 }
 
@@ -39,6 +40,7 @@ export function TerrestreForm({
   surfaceCumulee,
   surfaceRestante,
   totalPesticideTerrestre,
+  pesticideStockRestant,
   errors,
 }: TerrestreFormProps) {
   const store = useTraitementCaptureStore();
@@ -284,6 +286,22 @@ export function TerrestreForm({
         <Text style={styles.label}>Total pesticide (l)</Text>
         <Text style={styles.derivedValue}>{totalPesticideTerrestre}</Text>
       </Card>
+
+      <Text style={styles.label}>Pesticide reçu (l)</Text>
+      <TextInput
+        editable={!readOnly}
+        style={styles.input}
+        placeholder="0"
+        keyboardType="numeric"
+        value={store.terrestre.pesticideRecuL != null ? String(store.terrestre.pesticideRecuL) : ''}
+        onChangeText={(v) => store.updateTerrestre({ pesticideRecuL: v ? Number(v) : null })}
+      />
+      {pesticideStockRestant != null && (
+        <Card variant="derivee">
+          <Text style={styles.label}>Reste en stock (l)</Text>
+          <Text style={styles.derivedValue}>{pesticideStockRestant}</Text>
+        </Card>
+      )}
 
       <Text style={styles.label}>Essence (l)</Text>
       <TextInput
