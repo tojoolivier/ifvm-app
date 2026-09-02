@@ -23,6 +23,7 @@ import {
   normalizeBoolean,
 } from './prospection-repository';
 import { PHENOTYPES, TYPE_CIBLE_OPTIONS, formatHeureLocale } from './prospection-fiche-lecture';
+import { parseSelectionMultiple } from './prospection-extensive';
 import { CaptureCounts, dominantPhenotype, rowsToCounts, totalBySexe, totalCaptures } from './prospection-capture-store';
 import { CHRONO_MAX_SECONDS, capturesMaxFor, phenotypesFor } from './prospection-especes-stades';
 import { buildGrilles, parseEspeceSelection } from './prospection-especes';
@@ -327,7 +328,10 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
     latitude: draft.latitude ? Number(draft.latitude) : null,
     longitude: draft.longitude ? Number(draft.longitude) : null,
     altitude: draft.altitude ? Number(draft.altitude) : null,
-    biotope: (draft.biotope ? draft.biotope.toLowerCase() : null) as ProspectionCreateInput['biotope'],
+    // #biotope-multi : tableau, jamais `null` (le nouveau schéma ProspectionCreate a
+    // pour défaut `[]`) — `parseSelectionMultiple` absorbe aussi l'ancien format
+    // scalaire d'un brouillon local créé avant ce changement.
+    biotope: parseSelectionMultiple(draft.biotope).map((v) => v.toLowerCase()) as ProspectionCreateInput['biotope'],
     surface_station: draft.surface_station ? Number(draft.surface_station) : null,
     surface_prospectee: draft.surface_prospectee ? Number(draft.surface_prospectee) : null,
     surface_infestee: draft.surface_infestee ? Number(draft.surface_infestee) : null,
@@ -351,7 +355,7 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
     hauteur_herbe_cm: draft.hauteur_herbe_cm ? Number(draft.hauteur_herbe_cm) : null,
     heure_observation_at: draft.heure_observation_at || null,
     station_libre: draft.station_libre || null,
-    type_station: (draft.type_station || null) as ProspectionCreateInput['type_station'],
+    type_station: parseSelectionMultiple(draft.type_station) as ProspectionCreateInput['type_station'],
     verdure_strate: (draft.verdure_strate || null) as ProspectionCreateInput['verdure_strate'],
     signalement_source: draft.signalement_source || null,
     signalement_date: draft.signalement_date || null,

@@ -78,7 +78,9 @@ describe('ExtensiveReferenceScreen — restauration après hydratation tardive d
     expect(screen.getByDisplayValue('12')).toBeVisible();
     expect(screen.getByDisplayValue('3.5')).toBeVisible();
     expect(screen.getByDisplayValue('20260825-AB12')).toBeVisible();
-    expect(screen.getByText('Xerophyle').props.style).toEqual(
+    // Suffixe « ✓ » (#biotope-multi, même convention que veg.tsx : la correspondance
+    // exacte de texte échoue puisque le libellé actif porte désormais ce suffixe).
+    expect(screen.getByText(/^Xerophyle/).props.style).toEqual(
       expect.arrayContaining([expect.objectContaining({ color: '#fff' })])
     );
 
@@ -89,7 +91,9 @@ describe('ExtensiveReferenceScreen — restauration après hydratation tardive d
         'draft-123',
         expect.objectContaining({
           stationLibre: 'Andasibe',
-          typeStation: 'xerophyle',
+          // #biotope-multi : type_station scalaire pré-migration ('xerophyle') restauré
+          // via parseSelectionMultiple en ['xerophyle'], puis ré-enregistré en JSON.
+          typeStation: '["xerophyle"]',
           surfaceStation: 12,
           surfaceInfestee: 3.5,
           nMessage: '20260825-AB12',

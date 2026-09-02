@@ -179,7 +179,7 @@ export default function DashboardScreen() {
                 style={styles.logo}
                 resizeMode="contain"
               />
-              <View style={styles.headerTextContainer}>
+              <View style={styles.headerTextContainer} testID="dashboard-header">
                 <ThemedText style={styles.headerGreeting}>Bonjour</ThemedText>
                 <ThemedText style={styles.headerName}>
                   {user?.prenom} {user?.nom}

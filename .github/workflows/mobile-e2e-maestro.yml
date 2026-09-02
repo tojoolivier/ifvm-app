@@ -1,0 +1,185 @@
+name: Mobile e2e (Maestro)
+
+# Epic #193 / ticket #196 : golden path e2e V1 (login uniquement pour l'instant,
+# voir docs/adr/ADR-016-e2e-mobile-maestro.md). Declenchement manuel exclusivement
+# (workflow_dispatch) : aucune execution automatique sur push ni en gate de merge.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branche/tag a builder si aucun artifact ifvm-preview-apk reutilisable n'existe"
+        required: false
+        default: main
+
+# Groupe statique (pas ${{ github.ref }} comme mobile-build.yml/lint.yml) : ce
+# workflow est declenche manuellement et rarement en parallele sur des refs
+# differentes ; cancel-in-progress a false pour ne jamais couper un run e2e en
+# cours a cause d'un second declenchement manuel concurrent.
+concurrency:
+  group: mobile-e2e-maestro
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  # Reutilise le dernier artifact ifvm-preview-apk (mobile-build.yml) s'il existe,
+  # sinon declenche ce workflow et attend la fin du build avant de continuer.
+  #
+  # Alternative ecartee : le trigger `workflow_run` (mobile-build.yml qui
+  # notifie ce workflow a sa fin) eviterait le polling ci-dessous, mais force
+  # a scinder en deux workflows separes et ne couvre pas le cas "artifact deja
+  # disponible, ne rebuild pas" qui est le coeur de cette AC — on resterait de
+  # toute facon oblige de poller/attendre dans CE run pour enchainer sur
+  # l'emulateur. Le polling reste donc le choix le plus direct ici.
+  get-apk:
+    runs-on: self-hosted-linux
+    timeout-minutes: 75
+    outputs:
+      apk-run-id: ${{ steps.resolve.outputs.run_id }}
+    steps:
+      - name: Resout le run source de l'APK preview
+        id: resolve
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Reessaie `check` jusqu'a `tries` fois (`delayMs` entre chaque essai) et
+            // renvoie sa premiere valeur truthy, ou null si aucun essai n'a abouti.
+            async function pollUntil(check, tries, delayMs) {
+              for (let i = 0; i < tries; i++) {
+                const result = await check();
+                if (result) return result;
+                await new Promise((r) => setTimeout(r, delayMs));
+              }
+              return null;
+            }
+
+            async function findArtifactRun() {
+              const runs = await github.rest.actions.listWorkflowRuns({
+                owner, repo,
+                workflow_id: "mobile-build.yml",
+                status: "success",
+                per_page: 20,
+              });
+              for (const run of runs.data.workflow_runs) {
+                const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+                  owner, repo, run_id: run.id, per_page: 100,
+                });
+                if (artifacts.data.artifacts.some((a) => a.name === "ifvm-preview-apk" && !a.expired)) {
+                  return run.id;
+                }
+              }
+              return null;
+            }
+
+            const existingRunId = await findArtifactRun();
+            if (existingRunId) {
+              core.info(`Artifact ifvm-preview-apk reutilise depuis le run ${existingRunId}`);
+              core.setOutput("run_id", existingRunId);
+              return;
+            }
+
+            const ref = context.payload.inputs?.ref || "main";
+            core.info(`Aucun artifact ifvm-preview-apk exploitable — declenchement de mobile-build.yml sur ${ref}`);
+            const dispatchedAt = new Date();
+            await github.rest.actions.createWorkflowDispatch({
+              owner, repo,
+              workflow_id: "mobile-build.yml",
+              ref,
+            });
+
+            // L'API ne renvoie pas l'id du run declenche : on le retrouve par date de
+            // creation. Limite connue : un declenchement manuel concurrent de
+            // mobile-build.yml (par quelqu'un d'autre) dans cette meme fenetre pourrait
+            // faire matcher le mauvais run — accepte en V1, pas de correlation-id
+            // disponible sans modifier les inputs de mobile-build.yml.
+            const dispatchedRun = await pollUntil(async () => {
+              const runs = await github.rest.actions.listWorkflowRuns({
+                owner, repo,
+                workflow_id: "mobile-build.yml",
+                event: "workflow_dispatch",
+                per_page: 5,
+              });
+              return runs.data.workflow_runs.find((r) => new Date(r.created_at) >= dispatchedAt);
+            }, 30, 10000);
+            if (!dispatchedRun) {
+              core.setFailed("mobile-build.yml ne s'est pas declenche a temps (5 min).");
+              return;
+            }
+
+            core.info(`Run declenche : ${dispatchedRun.id} — attente de la fin du build (jusqu'a 1h)`);
+            const finished = await pollUntil(async () => {
+              const run = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: dispatchedRun.id });
+              return run.data.status === "completed" ? run.data : null;
+            }, 180, 20000);
+            if (!finished) {
+              core.setFailed("Le build mobile-build.yml declenche n'a pas termine dans le delai imparti (1h).");
+              return;
+            }
+            if (finished.conclusion !== "success") {
+              core.setFailed(`mobile-build.yml declenche a echoue (conclusion: ${finished.conclusion}).`);
+              return;
+            }
+            core.setOutput("run_id", String(finished.id));
+
+  # Emulateur Android + Maestro. Runner GitHub-hoste (KVM disponible, requis par
+  # l'emulateur) plutot que les runners self-hostes (android-build/self-hosted-linux
+  # servent au build, pas a l'emulation — pas de virtualisation imbriquee garantie).
+  e2e-maestro:
+    needs: get-apk
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Recupere l'APK preview (run ${{ needs.get-apk.outputs.apk-run-id }})
+        uses: actions/download-artifact@v4
+        with:
+          name: ifvm-preview-apk
+          path: mobile
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.get-apk.outputs.apk-run-id }}
+
+      - name: Installe Maestro CLI
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      # Requis par reactivecircus/android-emulator-runner sur les runners
+      # ubuntu-latest standard (accès KVM pour la virtualisation materielle) :
+      # https://github.com/ReactiveCircus/android-emulator-runner#running-hardware-accelerated-emulators-on-linux-runners
+      - name: Active KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # Le build inclut l'ABI x86_64 specifiquement pour l'emulateur (voir
+      # .github/workflows/mobile-build.yml). Compte e2e-bot seede par #194
+      # (backend/app/e2e_seed.py, docs/e2e-seed.md) — email non secret, mot de
+      # passe injecte via le secret GitHub E2E_BOT_PASSWORD.
+      #
+      # Pas d'upload du rapport Maestro (~/.maestro/tests) : il peut journaliser
+      # les valeurs textuelles saisies (inputText), donc le mot de passe en
+      # clair, dans un fichier — le masquage de secrets de GitHub Actions ne
+      # s'applique qu'aux logs de step, pas au contenu d'un artifact. Les logs
+      # de ce step (masques) suffisent pour diagnostiquer un echec (AC #196).
+      - name: Emulateur Android + flow Maestro (login)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          arch: x86_64
+          target: google_apis
+          profile: pixel_5
+          disable-animations: true
+          script: |
+            adb install -r mobile/ifvm-preview.apk
+            maestro test mobile/.maestro/login.yaml \
+              -e E2E_BOT_EMAIL=e2e-bot@e2e.ifvm.test \
+              -e E2E_BOT_PASSWORD="$E2E_BOT_PASSWORD"
+        env:
+          E2E_BOT_PASSWORD: ${{ secrets.E2E_BOT_PASSWORD }}

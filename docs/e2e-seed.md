@@ -35,7 +35,8 @@ mot de passe du compte sur la valeur attendue et **réactive** le compte s'il av
 | Défaut de dev (non secret) | `e2e-bot-local-dev` |
 
 En CI/staging, `E2E_BOT_PASSWORD` doit venir d'un secret GitHub Actions. Le workflow
-Maestro (#195) lit ce même secret pour se connecter dans le flow.
+Maestro ([`mobile-e2e-maestro.yml`](e2e-maestro-ci.md), #196) lit ce même secret
+pour se connecter dans le flow.
 
 **Garde-fou** : lancé sans `E2E_BOT_PASSWORD`, le script **refuse de tourner** (pour
 ne pas poser le mot de passe par défaut, public, sur staging). Pour l'accepter en

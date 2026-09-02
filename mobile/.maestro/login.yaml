@@ -1,0 +1,31 @@
+# Golden path e2e — étape 1 (#196) : lancement de l'app, connexion avec le
+# compte e2e-bot (#194), vérification que le dashboard s'affiche.
+#
+# Credentials injectées à l'exécution (jamais en dur) :
+#   maestro test .maestro/login.yaml \
+#     -e E2E_BOT_EMAIL=e2e-bot@e2e.ifvm.test \
+#     -e E2E_BOT_PASSWORD=***
+#
+# Voir docs/e2e-seed.md (compte/campagne seedés) et
+# docs/adr/ADR-016-e2e-mobile-maestro.md (décisions de l'épic #193).
+appId: com.anonymous.mobile
+---
+- launchApp:
+    clearState: true
+- assertVisible:
+    id: "login-email-input"
+- tapOn:
+    id: "login-email-input"
+- inputText: "${E2E_BOT_EMAIL}"
+- hideKeyboard
+- tapOn:
+    id: "login-password-input"
+- inputText:
+    text: "${E2E_BOT_PASSWORD}"
+    label: "Saisie du mot de passe e2e-bot (masqué)"
+- hideKeyboard
+- tapOn:
+    id: "login-submit-button"
+- assertVisible:
+    id: "dashboard-header"
+    timeout: 15000
