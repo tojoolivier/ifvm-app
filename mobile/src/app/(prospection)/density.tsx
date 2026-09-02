@@ -50,6 +50,7 @@ export default function DensityScreen() {
 
   const [population, setPopulation] = useState<PopulationRow | null>(null);
   const [showDensiteDiffuseError, setShowDensiteDiffuseError] = useState(false);
+  const [showDensiteGroupeeError, setShowDensiteGroupeeError] = useState(false);
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('density');
 
@@ -78,6 +79,7 @@ export default function DensityScreen() {
       .then((row) => {
         setPopulation(row ?? emptyPopulation(grille.espece, grille.categorie));
         setShowDensiteDiffuseError(false);
+        setShowDensiteGroupeeError(false);
       })
       .catch((error) =>
         // Chargement de fond, pas un geste de l'agent : la frontière est celle
@@ -116,6 +118,13 @@ export default function DensityScreen() {
     if (population.densite_diffuse == null) {
       setShowDensiteDiffuseError(true);
       Alert.alert('Densité diffuse requise', 'Veuillez renseigner la densité diffuse (D/ha).');
+      return;
+    }
+
+    // #densite-groupee-obligatoire : même traitement que la densité diffuse ci-dessus.
+    if (population.densite_groupee == null) {
+      setShowDensiteGroupeeError(true);
+      Alert.alert('Densité groupée requise', 'La densité groupée (/m²) est obligatoire.');
       return;
     }
 
@@ -167,8 +176,8 @@ export default function DensityScreen() {
                   style={styles.fieldInput}
                 />
               </View>
-              <View style={styles.field}>
-                <Text style={styles.fieldLabel}>Densité groupée (/m²)</Text>
+              <View style={[styles.field, showDensiteGroupeeError && population.densite_groupee == null && styles.fieldError]}>
+                <Text style={[styles.fieldLabel, styles.requiredLabel]}>Densité groupée (/m²) *</Text>
                 <TextInput
                   value={population.densite_groupee != null ? String(population.densite_groupee) : ''}
                   onChangeText={(text) => setField('densite_groupee', parseDensite(text))}
@@ -179,6 +188,9 @@ export default function DensityScreen() {
             </View>
             {showDensiteDiffuseError && population.densite_diffuse == null && (
               <Text style={styles.errorText}>Veuillez renseigner la densité diffuse (D/ha).</Text>
+            )}
+            {showDensiteGroupeeError && population.densite_groupee == null && (
+              <Text style={styles.errorText}>La densité groupée (/m²) est obligatoire.</Text>
             )}
 
             <Text style={styles.sectionLabel}>Méthode</Text>
