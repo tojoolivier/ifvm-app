@@ -34,26 +34,16 @@ jobs:
               - "mobile/app.json"
               - "mobile/eas.json"
 
-  test:
-    runs-on: self-hosted-linux
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: mobile/package-lock.json
-
-      - run: npm ci
-
-      - run: npm test
+  # Pas de job de test ici : main est protegee (squash-merge apres checks
+  # verts, cf. branch protection), donc le code qui arrive sur main a deja
+  # ete valide par lint-mobile (npm test inclus) dans lint.yml en PR.
+  # Relancer npm test ici serait redondant sur un contenu deja teste.
 
   # Publication OTA (expo-updates) pour les changements JS/TS purs : les apps installees
   # recuperent la mise a jour au prochain lancement, sans rebuild natif ni re-installation.
   # runtimeVersion "fingerprint" garantit qu'une update n'atteint que les binaires compatibles.
   ota-update:
-    needs: [changes, test]
+    needs: changes
     if: github.event_name == 'push' && needs.changes.outputs.native != 'true'
     runs-on: self-hosted-linux
     steps:
@@ -86,7 +76,7 @@ jobs:
         run: eas update --channel preview --message "$COMMIT_MSG" --non-interactive
 
   build:
-    needs: [changes, test]
+    needs: changes
     # Build natif complet uniquement si necessaire (changement natif ou declenchement manuel)
     if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.native == 'true'
     # Runner self-hoste (ARC) : JDK 17 + Android SDK/NDK deja preinstalles dans l'image,

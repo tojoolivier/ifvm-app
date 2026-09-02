@@ -9,8 +9,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    # Filtre par chemin : evite de solliciter le pool dind (maxRunners=1,
+    # partage avec deploy.yml) pour des PR qui ne touchent pas backend/.
+    # mobile depend aussi de backend/ : c'est ce qui declenche check:schema-drift
+    # (cf. CLAUDE.md, incident colonne "phase" jamais repercutee cote mobile).
+    runs-on: self-hosted-linux
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      mobile: ${{ steps.filter.outputs.mobile }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - "backend/**"
+            frontend:
+              - "frontend/**"
+            mobile:
+              - "mobile/**"
+              - "backend/**"
+
   check-migrations:
     # Parse statique des fichiers de migration : ni Postgres ni env applicatif.
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: self-hosted-linux
     defaults:
       run:
@@ -25,11 +51,13 @@ jobs:
       - name: Historique Alembic lineaire (head unique)
         run: python scripts/check_migration_linearity.py
 
-  lint-backend:
+  lint-backend-impl:
     # Porte aussi le rejeu des migrations : le pool dind est plafonne a
     # maxRunners=1 (runner-scale-set-dind.yaml), donc deux jobs dind dans ce
     # workflow se serialisent au lieu de tourner en parallele.
     # "services: postgres" impose un daemon Docker dans le pod -> pool dind.
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: self-hosted-dind
     defaults:
       run:
@@ -91,7 +119,27 @@ jobs:
       - run: ruff format --check .
       - run: pytest
 
-  lint-frontend:
+  # Gatekeeper : "lint-backend" est un required status check nomme sur main
+  # (branch protection). Un skip via `if:` sur ce nom ferait rester le check
+  # "expected" indefiniment et bloquerait le merge. Ce job tourne donc
+  # toujours, sur self-hosted-linux (pas de cout dind), et se contente de
+  # relayer le resultat de lint-backend-impl quand backend/ a change.
+  lint-backend:
+    needs: [changes, lint-backend-impl]
+    if: always()
+    runs-on: self-hosted-linux
+    steps:
+      - name: Verifie le resultat de lint-backend-impl
+        run: |
+          if [[ "${{ needs.changes.outputs.backend }}" == "true" && "${{ needs.lint-backend-impl.result }}" != "success" ]]; then
+            echo "lint-backend-impl a echoue ou ne s'est pas termine (result=${{ needs.lint-backend-impl.result }})"
+            exit 1
+          fi
+          echo "OK (backend modifie: ${{ needs.changes.outputs.backend }}, resultat impl: ${{ needs.lint-backend-impl.result }})"
+
+  lint-frontend-impl:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: self-hosted-linux
     defaults:
       run:
@@ -109,7 +157,26 @@ jobs:
       - run: npm run lint
       - run: npm test
 
-  lint-mobile:
+  # Gatekeeper, meme raison que lint-backend ci-dessus.
+  lint-frontend:
+    needs: [changes, lint-frontend-impl]
+    if: always()
+    runs-on: self-hosted-linux
+    steps:
+      - name: Verifie le resultat de lint-frontend-impl
+        run: |
+          if [[ "${{ needs.changes.outputs.frontend }}" == "true" && "${{ needs.lint-frontend-impl.result }}" != "success" ]]; then
+            echo "lint-frontend-impl a echoue ou ne s'est pas termine (result=${{ needs.lint-frontend-impl.result }})"
+            exit 1
+          fi
+          echo "OK (frontend modifie: ${{ needs.changes.outputs.frontend }}, resultat impl: ${{ needs.lint-frontend-impl.result }})"
+
+  lint-mobile-impl:
+    # Se declenche aussi sur backend/** (pas seulement mobile/**) : c'est ce
+    # job qui porte check:schema-drift, le garde-fou contre une derive entre
+    # le schema backend et le cache SQLite mobile (cf. CLAUDE.md).
+    needs: changes
+    if: needs.changes.outputs.mobile == 'true'
     runs-on: self-hosted-linux
     defaults:
       run:
@@ -128,3 +195,17 @@ jobs:
       - run: npm run typecheck
       - run: npm run check:schema-drift
       - run: npm test
+
+  # Gatekeeper, meme raison que lint-backend ci-dessus.
+  lint-mobile:
+    needs: [changes, lint-mobile-impl]
+    if: always()
+    runs-on: self-hosted-linux
+    steps:
+      - name: Verifie le resultat de lint-mobile-impl
+        run: |
+          if [[ "${{ needs.changes.outputs.mobile }}" == "true" && "${{ needs.lint-mobile-impl.result }}" != "success" ]]; then
+            echo "lint-mobile-impl a echoue ou ne s'est pas termine (result=${{ needs.lint-mobile-impl.result }})"
+            exit 1
+          fi
+          echo "OK (mobile/backend modifie: ${{ needs.changes.outputs.mobile }}, resultat impl: ${{ needs.lint-mobile-impl.result }})"

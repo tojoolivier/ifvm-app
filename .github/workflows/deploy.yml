@@ -14,7 +14,28 @@ env:
   FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/ifvm-app-frontend
 
 jobs:
+  changes:
+    # Filtre par chemin : un push mobile-only (frequent) ne doit pas
+    # solliciter le pool dind pour rebuild des images backend/frontend
+    # inchangees.
+    runs-on: self-hosted-linux
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - "backend/**"
+            frontend:
+              - "frontend/**"
+
   build-and-push:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
     # docker/build-push-action impose un daemon Docker dans le pod -> pool dind.
     runs-on: self-hosted-dind
     outputs:
@@ -34,6 +55,7 @@ jobs:
       - uses: docker/setup-buildx-action@v3
 
       - name: Build and push backend
+        if: needs.changes.outputs.backend == 'true'
         uses: docker/build-push-action@v6
         with:
           context: ./backend
@@ -45,6 +67,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=backend
 
       - name: Build and push frontend
+        if: needs.changes.outputs.frontend == 'true'
         uses: docker/build-push-action@v6
         with:
           context: ./frontend
@@ -57,7 +80,8 @@ jobs:
           cache-to: type=gha,mode=max,scope=frontend
 
   update-manifests:
-    needs: build-and-push
+    needs: [changes, build-and-push]
+    if: needs.build-and-push.result == 'success'
     runs-on: self-hosted-linux
     steps:
       - name: Checkout infra-k8s
@@ -69,10 +93,14 @@ jobs:
       - name: Bump image tags
         run: |
           TAG="${{ needs.build-and-push.outputs.tag }}"
-          sed -i "s|image: ghcr.io/tojoolivier/ifvm-app-backend:.*|image: ghcr.io/tojoolivier/ifvm-app-backend:${TAG}|" \
-            clusters/production/apps/ifvm-app/manifests/backend.yaml
-          sed -i "s|image: ghcr.io/tojoolivier/ifvm-app-frontend:.*|image: ghcr.io/tojoolivier/ifvm-app-frontend:${TAG}|" \
-            clusters/production/apps/ifvm-app/manifests/frontend.yaml
+          if [[ "${{ needs.changes.outputs.backend }}" == "true" ]]; then
+            sed -i "s|image: ghcr.io/tojoolivier/ifvm-app-backend:.*|image: ghcr.io/tojoolivier/ifvm-app-backend:${TAG}|" \
+              clusters/production/apps/ifvm-app/manifests/backend.yaml
+          fi
+          if [[ "${{ needs.changes.outputs.frontend }}" == "true" ]]; then
+            sed -i "s|image: ghcr.io/tojoolivier/ifvm-app-frontend:.*|image: ghcr.io/tojoolivier/ifvm-app-frontend:${TAG}|" \
+              clusters/production/apps/ifvm-app/manifests/frontend.yaml
+          fi
 
       - name: Commit and push
         run: |
