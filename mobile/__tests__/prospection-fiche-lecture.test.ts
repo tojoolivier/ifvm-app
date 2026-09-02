@@ -293,14 +293,14 @@ describe('parseVegetationSol / buildVegetationSummary (multi-strate)', () => {
 });
 
 describe('computeSurfaceRepartitionTotal / isSurfaceRepartitionValide (#278)', () => {
-  function strates(surfRelParStrate: Partial<Record<(typeof STRATE_KEYS)[number], number>>): StratesState {
+  function strates(recouvrementParStrate: Partial<Record<(typeof STRATE_KEYS)[number], number>>): StratesState {
     return STRATE_KEYS.reduce((acc, key) => {
-      acc[key] = { ...defaultStrateDetail(), surfRel: surfRelParStrate[key] ?? null };
+      acc[key] = { ...defaultStrateDetail(), recouvrement: recouvrementParStrate[key] ?? 0 };
       return acc;
     }, {} as StratesState);
   }
 
-  it('additionne le sol nu et la surface relative des 6 strates', () => {
+  it('additionne le sol nu et le recouvrement des 6 strates', () => {
     const total = computeSurfaceRepartitionTotal({
       strates: strates({ arboree: 10, herbeuse: 60, cultures_seches: 25 }),
       solNu: 5,
@@ -308,7 +308,7 @@ describe('computeSurfaceRepartitionTotal / isSurfaceRepartitionValide (#278)', (
     expect(total).toBe(100);
   });
 
-  it('traite une surface relative ou un sol nu non renseigné comme 0, pas comme une erreur', () => {
+  it('traite un sol nu non renseigné comme 0, pas comme une erreur', () => {
     const total = computeSurfaceRepartitionTotal({ strates: strates({ herbeuse: 40 }), solNu: null });
     expect(total).toBe(40);
   });

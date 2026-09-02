@@ -24,7 +24,7 @@ jest.mock('@/lib/prospection-repository', () => ({
   listAllProspectionCaptures: jest.fn().mockResolvedValue([]),
 }));
 
-// surfRel (94.5) + solNu (5.5) = 100% : répartition valide (#278), sans quoi
+// recouvrement (70) + solNu (30) = 100% : répartition valide (#278), sans quoi
 // "Continuer" serait bloqué dans les tests de réenregistrement ci-dessous.
 const EXISTING_VEGETATION = JSON.stringify({
   strates: {
@@ -32,8 +32,8 @@ const EXISTING_VEGETATION = JSON.stringify({
   },
 });
 // Sol nu (%) est un champ station, pas par strate (#278) : il vit dans `sol`, pas
-// `vegetation.strates`.
-const EXISTING_SOL = JSON.stringify({ humidite: '0_5cm', texture: ['limoneuse', 'argileuse', 'cailloux'], solNu: 5.5 });
+// `vegetation.strates`, et se saisit comme un recouvrement (stepper par pas de 5%).
+const EXISTING_SOL = JSON.stringify({ humidite: '0_5cm', texture: ['limoneuse', 'argileuse', 'cailloux'], solNu: 30 });
 
 describe('VegetationScreen — restauration des données déjà enregistrées', () => {
   afterEach(cleanup);
@@ -89,7 +89,7 @@ describe('VegetationScreen — restauration des données déjà enregistrées', 
     expect(sol.humidite).toBe('0_5cm');
     expect(sol.texture).toEqual(expect.arrayContaining(['limoneuse', 'argileuse', 'cailloux']));
     expect(sol.texture).toHaveLength(3);
-    expect(sol.solNu).toBe(5.5);
+    expect(sol.solNu).toBe(30);
   });
 
   it('recharge et réenregistre les strates, l’humidité et la texture déjà enregistrées lors de la réouverture d’une fiche (#201)', async () => {
@@ -99,12 +99,12 @@ describe('VegetationScreen — restauration des données déjà enregistrées', 
         type_prospection: 'intensive',
         vegetation: JSON.stringify({
           strates: {
-            // surfRel (90) + solNu (10) = 100% : répartition valide (#278), sans quoi
+            // recouvrement (40) + solNu (60) = 100% : répartition valide (#278), sans quoi
             // "Continuer" serait bloqué et ce test n'atteindrait jamais l'enregistrement.
             arboree: { surfRel: 90, hMoy: 8, recouvrement: 40, verdissement: 60, repousse: null, orpad: ['Fleur'] },
           },
         }),
-        sol: JSON.stringify({ humidite: 'surface', texture: ['argileuse'], solNu: 10 }),
+        sol: JSON.stringify({ humidite: 'surface', texture: ['argileuse'], solNu: 60 }),
       } as any,
       captures: [],
     });
@@ -122,13 +122,13 @@ describe('VegetationScreen — restauration des données déjà enregistrées', 
         'draft-123',
         expect.objectContaining({
           vegetation: expect.stringContaining('"recouvrement":40'),
-          sol: JSON.stringify({ humidite: 'surface', texture: ['argileuse'], solNu: 10 }),
+          sol: JSON.stringify({ humidite: 'surface', texture: ['argileuse'], solNu: 60 }),
         })
       )
     );
   });
 
-  it('accepte une saisie décimale libre (virgule) pour H. moy/Verdissement/Repousse/Sol nu, sans arrondi au pas de 5', async () => {
+  it('accepte une saisie décimale libre (virgule) pour Surf. rel./H. moy/Verdissement/Repousse, sans arrondi au pas de 5', async () => {
     // Régression : ces 4 champs étaient arrondis au multiple de 5 le plus proche
     // (clampTo5), comme le stepper Recouvrement — qui, lui, garde ce comportement.
     useProspectionWizardStore.setState({
@@ -140,14 +140,15 @@ describe('VegetationScreen — restauration des données déjà enregistrées', 
     fireEvent.press(await screen.findByText('Strate arborée'));
     await waitFor(() => expect(screen.getByText('Recouvrement')).toBeVisible());
 
-    // Une seule strate dépliée : 5 champs décimaux vides à l'écran — Sol nu % (champ
-    // station, en haut, indépendant des strates) puis Surf. rel. %, H. moy,
-    // % Verdissement, % Repousse de la strate. Peu importe lequel des 4 champs de la
-    // strate reçoit quelle valeur ci-dessous : seule compte la non-régression testée
-    // (aucun n'est arrondi à un multiple de 5, contrairement au stepper Recouvrement) —
-    // on retape après chaque frappe, l'index des champs encore vides se décalant à
-    // mesure qu'ils se remplissent.
-    fireEvent.changeText(screen.getAllByDisplayValue('')[1], '2,75');
+    // Une seule strate dépliée : 4 champs décimaux vides à l'écran (Surf. rel. %,
+    // H. moy, % Verdissement, % Repousse). Sol nu, en haut, est indépendant des
+    // strates et se saisit comme Recouvrement (stepper par pas de 5%), pas un champ
+    // texte — il n'apparaît donc pas ici. Peu importe lequel des 4 champs reçoit
+    // quelle valeur ci-dessous : seule compte la non-régression testée (aucun n'est
+    // arrondi à un multiple de 5, contrairement au stepper Recouvrement) — on retape
+    // après chaque frappe, l'index des champs encore vides se décalant à mesure
+    // qu'ils se remplissent.
+    fireEvent.changeText(screen.getAllByDisplayValue('')[0], '2,75');
     expect(await screen.findByDisplayValue('2,75')).toBeVisible();
 
     fireEvent.changeText(screen.getAllByDisplayValue('')[0], '33,5');
@@ -172,13 +173,13 @@ describe('VegetationScreen — répartition sol nu + strates = 100% (#278)', () 
     jest.mocked(prospectionRepository.updateProspectionVegetation).mockClear();
   });
 
-  it('bloque "Continuer" tant que sol nu + surface relative des 6 strates ne totalise pas 100%', async () => {
+  it('bloque "Continuer" tant que sol nu + recouvrement des 6 strates ne totalise pas 100%', async () => {
     useProspectionWizardStore.setState({
       draft: {
         id: 'draft-123',
         type_prospection: 'intensive',
-        // herbeuse.surfRel (40) + solNu (10) = 50% : loin des 100% attendus.
-        vegetation: JSON.stringify({ strates: { herbeuse: { surfRel: 40, recouvrement: 0 } } }),
+        // herbeuse.recouvrement (40) + solNu (10) = 50% : loin des 100% attendus.
+        vegetation: JSON.stringify({ strates: { herbeuse: { recouvrement: 40 } } }),
         sol: JSON.stringify({ humidite: 'surface', texture: ['limoneuse'], solNu: 10 }),
       } as any,
       captures: [],
@@ -198,7 +199,7 @@ describe('VegetationScreen — répartition sol nu + strates = 100% (#278)', () 
       draft: {
         id: 'draft-123',
         type_prospection: 'intensive',
-        vegetation: JSON.stringify({ strates: { herbeuse: { surfRel: 90, recouvrement: 0 } } }),
+        vegetation: JSON.stringify({ strates: { herbeuse: { recouvrement: 90 } } }),
         sol: JSON.stringify({ humidite: 'surface', texture: ['limoneuse'], solNu: 10 }),
       } as any,
       captures: [],
@@ -211,5 +212,27 @@ describe('VegetationScreen — répartition sol nu + strates = 100% (#278)', () 
 
     await waitFor(() => expect(prospectionRepository.updateProspectionVegetation).toHaveBeenCalled());
     expect(screen.queryByText(/doit égaler 100%/)).toBeNull();
+  });
+
+  it('se saisit par pas de 5% comme le recouvrement, pas en décimal libre', async () => {
+    useProspectionWizardStore.setState({
+      draft: { id: 'draft-123', type_prospection: 'intensive', vegetation: null, sol: null } as any,
+      captures: [],
+    });
+
+    await render(<VegetationScreen />);
+    await waitFor(() => expect(screen.getByText('Continuer  ›')).toBeVisible());
+
+    // Aucune strate dépliée par défaut : son stepper recouvrement (même glyphes −/+)
+    // n'est donc pas rendu — le seul stepper +/- visible à l'écran est celui de Sol nu.
+    const stepperPlus = screen.getByText('+');
+    fireEvent.press(stepperPlus);
+    fireEvent.press(stepperPlus);
+    fireEvent.press(stepperPlus);
+    expect(await screen.findByText('15%')).toBeVisible();
+
+    // L'ancien champ texte "Sol nu %" (saisie décimale libre) a disparu au profit du
+    // stepper — régression #278 bis.
+    expect(screen.queryByText('Sol nu %')).toBeNull();
   });
 });
