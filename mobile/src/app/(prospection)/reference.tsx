@@ -19,6 +19,7 @@ import {
   DraftProspection,
 } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
+import { parseSelectionMultiple } from '@/lib/prospection-extensive';
 import { ReferenceFormValues } from '@/lib/prospection-reference-schema';
 import { validateGpsPosition, validateAntiDoublon, DOUBLON_DELAI_SEUIL_H } from '@/lib/prospection-validation';
 import { useAsyncAction } from '@/hooks/use-async-action';
@@ -301,13 +302,25 @@ export default function ReferenceScreen() {
   // Détection du type intensif
   const isIntensive = draft?.type_prospection === 'intensive';
 
+  // Biotopes (#biotope-multi) : sélection multiple — hors du form tanstack, comme
+  // `selectedTextures` dans veg.tsx (state à part, la validation « au moins un »
+  // reste gérée dans l'objet `errors` manuel de onSubmit ci-dessous, cohérent avec
+  // le style déjà en place dans ce fichier pour biotope).
+  const [selectedBiotopes, setSelectedBiotopes] = useState<string[]>(
+    parseSelectionMultiple(draft?.biotope ?? null)
+  );
+  const toggleBiotope = (value: string) => {
+    setSelectedBiotopes((current) =>
+      current.includes(value) ? current.filter((v) => v !== value) : [...current, value]
+    );
+  };
+
   const form = useForm({
     defaultValues: {
       surfaceStation: draft?.surface_station != null ? String(draft.surface_station) : '',
       surfaceProspectee: draft?.surface_prospectee != null ? String(draft.surface_prospectee) : '',
       surfaceInfestee: draft?.surface_infestee != null ? String(draft.surface_infestee) : '',
-      biotope: draft?.biotope ?? null,
-    } as ReferenceFormValues & { biotope: string | null },
+    } as ReferenceFormValues,
     onSubmit: async ({ value }) =>
       run(
         async () => {
@@ -356,8 +369,8 @@ export default function ReferenceScreen() {
           // VALIDATION PERSONNALISÉE
           const errors: Record<string, string> = {};
 
-          // Biotope est TOUJOURS obligatoire
-          if (!value.biotope) {
+          // Biotope est TOUJOURS obligatoire (#biotope-multi : au moins un sélectionné)
+          if (selectedBiotopes.length === 0) {
             errors.biotope = 'Le type de biotope est obligatoire';
           }
 
@@ -417,7 +430,7 @@ export default function ReferenceScreen() {
             surfaceStation: Number(value.surfaceStation),
             surfaceProspectee: surfaceProspecteeValue,
             surfaceInfestee: surfaceInfesteeValue,
-            biotope: value.biotope ?? null,
+            biotope: selectedBiotopes.length > 0 ? JSON.stringify(selectedBiotopes) : null,
             nFiche,
             nReleve,
             region: adminArea.region,
@@ -670,36 +683,28 @@ export default function ReferenceScreen() {
               </form.Field>
             </View>
 
-            {/* ===== Biotope ===== */}
-            <form.Field name="biotope">
-              {(field) => (
-                <View style={styles.biotopeContainer}>
-                  <Text style={[styles.sectionLabel, styles.requiredLabel]}>Type de biotope *</Text>
-                  <View style={styles.biotopeOptions}>
-                    {BIOTOPE_OPTIONS.map((option) => (
-                      <TouchableOpacity
-                        key={option.value}
-                        style={[
-                          styles.biotopeChip,
-                          field.state.value === option.value && styles.biotopeChipActive,
-                        ]}
-                        onPress={() => field.handleChange(option.value)}
-                        activeOpacity={0.7}
-                      >
-                        <Text
-                          style={[
-                            styles.biotopeChipText,
-                            field.state.value === option.value && styles.biotopeChipTextActive,
-                          ]}
-                        >
-                          {option.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              )}
-            </form.Field>
+            {/* ===== Biotopes (#biotope-multi : sélection multiple) ===== */}
+            <View style={styles.biotopeContainer}>
+              <Text style={[styles.sectionLabel, styles.requiredLabel]}>Biotopes *</Text>
+              <View style={styles.biotopeOptions}>
+                {BIOTOPE_OPTIONS.map((option) => {
+                  const active = selectedBiotopes.includes(option.value);
+                  return (
+                    <TouchableOpacity
+                      key={option.value}
+                      style={[styles.biotopeChip, active && styles.biotopeChipActive]}
+                      onPress={() => toggleBiotope(option.value)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.biotopeChipText, active && styles.biotopeChipTextActive]}>
+                        {option.label}
+                        {active && ' ✓'}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
 
             {Object.values(formErrors).map((message) => (
               <Text key={message} style={styles.errorText}>
