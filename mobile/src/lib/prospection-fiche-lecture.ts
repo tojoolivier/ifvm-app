@@ -87,8 +87,10 @@ export type StratesState = Record<StrateKey, StrateDetail>;
 
 export interface VegetationSolState {
   strates: StratesState;
-  // Sol nu (%) — au niveau de la station, pas par strate (issue #278) : avec `surfRel`
-  // des 6 strates, partitionne 100% de la surface de la station prospectée.
+  // Sol nu (%) — au niveau de la station, pas par strate (issue #278) : avec le
+  // `recouvrement` des 6 strates, partitionne 100% de la surface de la station
+  // prospectée. Saisi comme le recouvrement (stepper par pas de 5%), pas en décimal
+  // libre — cf. veg.tsx.
   solNu: number | null;
   humidite: Humidite | null;
   // Sélection multiple (cf. veg.tsx "Texture du sol (sélection multiple)") : toujours un
@@ -154,14 +156,14 @@ export function parseVegetationSol(
 }
 
 /**
- * Répartition de la surface de la station (issue #278) : sol nu + surface relative
- * (`surfRel`) des 6 strates doit totaliser 100% (les 6 strates + le sol nu partitionnent
- * la station, contrairement au recouvrement — qui peut dépasser 100% par strates
- * superposées verticalement, ex. canopée + herbe au même endroit).
+ * Répartition de la surface de la station (issue #278) : sol nu + recouvrement des 6
+ * strates doit totaliser 100% de la station prospectée — même grandeur et même pas de
+ * saisie (stepper 5%) que le recouvrement par strate, pour que sol nu et strates
+ * s'additionnent dans la même unité.
  */
 export function computeSurfaceRepartitionTotal(state: Pick<VegetationSolState, 'strates' | 'solNu'>): number {
-  const surfRelTotal = STRATE_KEYS.reduce((sum, key) => sum + (state.strates[key].surfRel ?? 0), 0);
-  return surfRelTotal + (state.solNu ?? 0);
+  const recouvrementTotal = STRATE_KEYS.reduce((sum, key) => sum + state.strates[key].recouvrement, 0);
+  return recouvrementTotal + (state.solNu ?? 0);
 }
 
 /** Tolérance d'arrondi de saisie (dixième de pourcent) — pas d'égalité stricte à 100. */
