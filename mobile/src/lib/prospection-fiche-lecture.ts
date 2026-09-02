@@ -81,13 +81,15 @@ export interface StrateDetail {
   verdissement: number | null;
   repousse: number | null;
   orpad: string[];
-  solNu: number | null;
 }
 
 export type StratesState = Record<StrateKey, StrateDetail>;
 
 export interface VegetationSolState {
   strates: StratesState;
+  // Sol nu (%) — au niveau de la station, pas par strate (issue #278) : avec `surfRel`
+  // des 6 strates, partitionne 100% de la surface de la station prospectée.
+  solNu: number | null;
   humidite: Humidite | null;
   // Sélection multiple (cf. veg.tsx "Texture du sol (sélection multiple)") : toujours un
   // tableau, jamais une valeur scalaire — un ancien brouillon enregistré avant l'ajout du
@@ -104,7 +106,7 @@ function normalizeTextureSelection(raw: unknown): Texture[] {
 }
 
 export function defaultStrateDetail(): StrateDetail {
-  return { surfRel: null, hMoy: null, recouvrement: 0, verdissement: null, repousse: null, orpad: [], solNu: null };
+  return { surfRel: null, hMoy: null, recouvrement: 0, verdissement: null, repousse: null, orpad: [] };
 }
 
 function defaultStrates(): StratesState {
@@ -138,17 +140,35 @@ export function parseVegetationSol(
           verdissement: typeof detail.verdissement === 'number' ? detail.verdissement : null,
           repousse: typeof detail.repousse === 'number' ? detail.repousse : null,
           orpad: Array.isArray(detail.orpad) ? detail.orpad : [],
-          solNu: typeof detail.solNu === 'number' ? detail.solNu : null,
         };
       }
     }
   }
   return {
     strates,
+    solNu: typeof solParsed.solNu === 'number' ? solParsed.solNu : null,
     humidite: (solParsed.humidite as Humidite) ?? null,
     texture: normalizeTextureSelection(solParsed.texture),
     degatsCultures: (degatsCultures as DegatsCultures) ?? null,
   };
+}
+
+/**
+ * Répartition de la surface de la station (issue #278) : sol nu + surface relative
+ * (`surfRel`) des 6 strates doit totaliser 100% (les 6 strates + le sol nu partitionnent
+ * la station, contrairement au recouvrement — qui peut dépasser 100% par strates
+ * superposées verticalement, ex. canopée + herbe au même endroit).
+ */
+export function computeSurfaceRepartitionTotal(state: Pick<VegetationSolState, 'strates' | 'solNu'>): number {
+  const surfRelTotal = STRATE_KEYS.reduce((sum, key) => sum + (state.strates[key].surfRel ?? 0), 0);
+  return surfRelTotal + (state.solNu ?? 0);
+}
+
+/** Tolérance d'arrondi de saisie (dixième de pourcent) — pas d'égalité stricte à 100. */
+const TOLERANCE_REPARTITION_SURFACE = 0.1;
+
+export function isSurfaceRepartitionValide(state: Pick<VegetationSolState, 'strates' | 'solNu'>): boolean {
+  return Math.abs(computeSurfaceRepartitionTotal(state) - 100) <= TOLERANCE_REPARTITION_SURFACE;
 }
 
 export function buildVegetationSummary(state: VegetationSolState): string {
@@ -156,6 +176,9 @@ export function buildVegetationSummary(state: VegetationSolState): string {
     .map((key) => `${STRATE_LABELS[key]} ${state.strates[key].recouvrement}%`)
     .join(', ');
   const parts: string[] = [strateParts ? `Strates : ${strateParts}` : 'Strates : —'];
+  if (state.solNu != null) {
+    parts.push(`Sol nu ${state.solNu}%`);
+  }
   if (state.humidite) {
     parts.push(`Humidité ${HUMIDITE_OPTIONS.find((o) => o.value === state.humidite)?.label}`);
   }
