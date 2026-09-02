@@ -15,13 +15,10 @@ interface ConnectivityTransition {
  * ADR-007 : pull automatique dès que la connectivité revient, y compris au
  * premier check si déjà connecté.
  *
- * Dupliquée depuis `lib/referentiel-auto-sync.ts` plutôt qu'importée de là :
- * ce fichier-ci **est** le hook vivant (voir plus bas), et l'autre est un
- * jumeau mort qu'aucun écran n'importe. Importer depuis lui aurait recouplé
- * le code qui tourne à celui qui ne tourne pas, et entraîné toute sa chaîne
- * de dépendances (`auth-store` → `storage` → `expo-secure-store`) dans les
- * tests de ce module pour une seule fonction pure de 6 lignes. #187 en
- * traite le nettoyage.
+ * Fonction pure locale : ce fichier-ci **est** le hook vivant (voir plus bas).
+ * Elle a d'abord été dupliquée depuis un jumeau mort `lib/referentiel-auto-
+ * sync.ts` (supprimé en #188) plutôt qu'importée de là, pour ne pas recoupler
+ * le code qui tourne à celui qui ne tournait pas.
  */
 function shouldTriggerAutoSync({ wasConnected, isConnected }: ConnectivityTransition): boolean {
   if (!isConnected) return false;
@@ -36,9 +33,9 @@ function shouldTriggerAutoSync({ wasConnected, isConnected }: ConnectivityTransi
  * rendu — même motif qu'`executeAsyncAction`. Trouvée en revue de #173 : le
  * `catch { console.warn }` qui vivait ici était le dernier échec avalé du
  * chemin référentiel — invisible d'abord parce que rien ne l'exerçait, mais
- * surtout parce que ce fichier a un **jumeau mort**, `lib/referentiel-auto-
- * sync.ts`, qu'aucun écran n'importe et que la migration de #173 avait
- * refondu à sa place (voir #187).
+ * surtout parce que ce fichier avait un **jumeau mort**, `lib/referentiel-
+ * auto-sync.ts`, que la migration de #173 avait refondu à sa place et que
+ * #188 a supprimé.
  *
  * Tout passe par `runTask({ criticality: 'best-effort' })` : un référentiel
  * un peu vieux ne mérite pas d'interrompre l'agent, mais l'échec laisse

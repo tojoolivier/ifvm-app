@@ -91,6 +91,32 @@ async def test_list_users_reste_reserve_aux_admins(client: AsyncClient, auth_hea
 
 
 @pytest.mark.asyncio
+async def test_admin_ne_peut_pas_modifier_son_propre_compte(
+    client: AsyncClient, admin: Utilisateur, admin_headers: dict
+):
+    """Un admin qui se retire le rôle ou se désactive se verrouille dehors."""
+    response = await client.patch(
+        f"/users/{admin.id}", json={"role": "prospecteur"}, headers=admin_headers
+    )
+
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_admin_peut_modifier_un_autre_compte(
+    client: AsyncClient, admin_headers: dict, utilisateur_rattache: Utilisateur
+):
+    response = await client.patch(
+        f"/users/{utilisateur_rattache.id}",
+        json={"role": "verificateur"},
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["role"] == "verificateur"
+
+
+@pytest.mark.asyncio
 async def test_me_reste_lisible_sans_rattachement(
     client: AsyncClient, auth_headers: dict, utilisateur
 ):

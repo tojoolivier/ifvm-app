@@ -194,6 +194,49 @@ export async function listCampagnesLocal(): Promise<CampagneLocal[]> {
   );
 }
 
+export interface Culture {
+  id: string;
+  code: string;
+  nom: string;
+}
+
+/**
+ * Cultures actives du référentiel local, triées par nom. Alimente les « dégâts sur
+ * culture » (prospection) : c'est le référentiel synchronisé — et non une liste écrite
+ * en dur dans l'écran — qui décide quelles cultures existent. `culture` descend déjà
+ * dans le SQLite via `GET /referentiel/pull` mais n'était jamais relue (#135).
+ */
+export async function listCultures(): Promise<Culture[]> {
+  const db = await getReferentielDb();
+  return db.getAllAsync<Culture>(
+    'SELECT id, code, nom FROM culture WHERE actif = 1 ORDER BY nom'
+  );
+}
+
+export interface CodeStade {
+  id: string;
+  code: string;
+  categorie: string | null;
+  sexe: string | null;
+  espece: string | null;
+  libelle: string;
+  ordre: number;
+}
+
+/**
+ * Codes de stade actifs du référentiel local, dans l'ordre du référentiel. Alimente
+ * les usages qui recensent les stades/phases (zones exposées, stade dominant, phases du
+ * compteur). Contrairement à `listStadesGrille`, aucune projection espèce/sexe ici :
+ * la liste brute du référentiel, à charge à l'appelant de filtrer. `code_stade`
+ * descend déjà dans le SQLite mais n'était relu que par `listStadesGrille` (#135).
+ */
+export async function listCodesStades(): Promise<CodeStade[]> {
+  const db = await getReferentielDb();
+  return db.getAllAsync<CodeStade>(
+    'SELECT id, code, categorie, sexe, espece, libelle, ordre FROM code_stade WHERE actif = 1 ORDER BY ordre'
+  );
+}
+
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const toRad = (deg: number) => (deg * Math.PI) / 180;
   const R = 6371;
@@ -256,7 +299,6 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
       id TEXT PRIMARY KEY NOT NULL,
       nom TEXT NOT NULL,
       prenom TEXT NOT NULL,
-      email TEXT NOT NULL,
       role TEXT NOT NULL,
       pa_id TEXT,
       actif INTEGER NOT NULL DEFAULT 1,
@@ -324,6 +366,36 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
     { name: 'dose_reference', type: 'TEXT' },
   ]);
   await migrateCodeStade(db);
+  await migrateUtilisateurEquipe(db);
+}
+
+/**
+ * `utilisateur_equipe` portait `email TEXT NOT NULL` : le backend ne descend plus ce
+ * champ sur le terrain (ADR-015, #136 — l'email ne sert qu'à l'authentification et
+ * aucun écran ne l'affiche). SQLite ne sait pas relâcher un NOT NULL, et la table
+ * n'est qu'un cache du référentiel : on la recrée sans `email` et on remet son
+ * curseur à zéro pour que la prochaine synchro la repeuple entièrement — même
+ * traitement que `migrateCodeStade` ci-dessus.
+ */
+async function migrateUtilisateurEquipe(db: SQLite.SQLiteDatabase): Promise<void> {
+  const colonnes = await db.getAllAsync<{ name: string }>(
+    'PRAGMA table_info(utilisateur_equipe)'
+  );
+  if (!colonnes.some((c) => c.name === 'email')) return;
+
+  await db.execAsync(`
+    DROP TABLE IF EXISTS utilisateur_equipe;
+    CREATE TABLE utilisateur_equipe (
+      id TEXT PRIMARY KEY NOT NULL,
+      nom TEXT NOT NULL,
+      prenom TEXT NOT NULL,
+      role TEXT NOT NULL,
+      pa_id TEXT,
+      actif INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL
+    );
+  `);
+  await db.runAsync("DELETE FROM referentiel_sync_meta WHERE entity_type = 'utilisateurs_equipe'");
 }
 
 /**

@@ -1,6 +1,6 @@
 COMPOSE = docker compose
 
-.PHONY: up down build logs migrate makemigrations seed shell-db shell-backend lint format
+.PHONY: up down build logs migrate makemigrations seed seed-e2e shell-db shell-backend lint format
 
 up:
 	$(COMPOSE) up -d
@@ -25,6 +25,11 @@ downgrade:
 
 seed:
 	$(COMPOSE) exec backend python -m app.seed
+
+# Compte + campagne dédiés aux tests e2e mobile (#194). Idempotent.
+# Surcharger E2E_BOT_PASSWORD pour un vrai secret hors dev local.
+seed-e2e:
+	$(COMPOSE) exec backend python -m app.e2e_seed
 
 shell-db:
 	$(COMPOSE) exec db psql -U ifvm -d ifvm_db

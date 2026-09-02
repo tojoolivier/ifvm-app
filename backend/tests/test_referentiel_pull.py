@@ -141,8 +141,10 @@ async def test_pull_since_null_returns_full_referentiel_unscoped(
     station_codes = {s["code"] for s in body["stations_fixes"]["upserts"]}
     assert station_codes == {station_fixe.code, station_autre_pa.code}
 
-    equipe_emails = {u["email"] for u in body["utilisateurs_equipe"]["upserts"]}
-    assert equipe_emails == {utilisateur_avec_pa.email, collegue_meme_pa.email}
+    equipe_ids = {u["id"] for u in body["utilisateurs_equipe"]["upserts"]}
+    assert equipe_ids == {str(utilisateur_avec_pa.id), str(collegue_meme_pa.id)}
+    # L'email ne descend pas sur le terrain (ADR-014, #136).
+    assert all("email" not in u for u in body["utilisateurs_equipe"]["upserts"])
 
     pesticide_codes = {p["code"] for p in body["pesticides"]["upserts"]}
     assert pesticide_codes == {pesticide.code}
@@ -247,5 +249,59 @@ async def test_pull_without_pa_still_returns_all_stations_and_equipe(
     body = response.json()
     station_codes = {s["code"] for s in body["stations_fixes"]["upserts"]}
     assert station_codes == {station_fixe.code}
-    equipe_emails = {u["email"] for u in body["utilisateurs_equipe"]["upserts"]}
-    assert utilisateur_avec_pa.email in equipe_emails
+    equipe_ids = {u["id"] for u in body["utilisateurs_equipe"]["upserts"]}
+    assert str(utilisateur_avec_pa.id) in equipe_ids
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("role", ["prospecteur", "chef_de_base", "chef_equipe", "admin"])
+async def test_pull_utilisateurs_equipe_est_identique_quel_que_soit_le_role(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    poste_acridien,
+    collegue_meme_pa,
+    role: str,
+):
+    """ADR-015 : aucun scope par rôle ni par poste sur `utilisateurs_equipe` — le
+    demandeur reçoit l'annuaire complet quel que soit son rôle, sans email."""
+    from app.auth import hash_password
+    from app.models.users import Utilisateur
+
+    demandeur = Utilisateur(
+        id=uuid.uuid4(),
+        nom="Demandeur",
+        prenom=role,
+        email=f"{role}+{uuid.uuid4().hex[:6]}@test.mg",
+        password_hash=hash_password("secret"),
+        role=role,
+        pa_id=poste_acridien.id,
+        actif=True,
+    )
+    db_session.add(demandeur)
+    await db_session.commit()
+
+    token = create_access_token(demandeur.id)
+    response = await client.get("/referentiel/pull", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 200
+    upserts = response.json()["utilisateurs_equipe"]["upserts"]
+
+    assert {u["id"] for u in upserts} == {str(demandeur.id), str(collegue_meme_pa.id)}
+    assert all("email" not in u for u in upserts)
+
+
+@pytest.mark.asyncio
+async def test_pull_utilisateurs_equipe_inclut_les_comptes_inactifs(
+    client: AsyncClient, utilisateur_avec_pa, collegue_meme_pa, db_session: AsyncSession
+):
+    """Le pull ne transporte que des upserts : une désactivation ne se propage aux
+    téléphones déjà synchronisés que si la ligne `actif=false` continue de descendre
+    (ADR-015, point 4)."""
+    collegue_meme_pa.actif = False
+    db_session.add(collegue_meme_pa)
+    await db_session.commit()
+
+    token = create_access_token(utilisateur_avec_pa.id)
+    response = await client.get("/referentiel/pull", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 200
+    equipe = {u["id"]: u["actif"] for u in response.json()["utilisateurs_equipe"]["upserts"]}
+    assert equipe[str(collegue_meme_pa.id)] is False

@@ -3172,6 +3172,9 @@ export interface components {
         TypeCible: "tache_larvaire" | "bande_larvaire" | "vol_clair" | "dense" | "tres_dense";
         /**
          * TypeCibleImago
+         * @description `prospection_population.type_cible` (extensif, par espèce) : l'extensif n'a pas
+         *     d'écran Infestation séparé — sous-ensemble de TypeCible pertinent pour un imago
+         *     (pas tache_larvaire/bande_larvaire, réservées aux larves).
          * @enum {string}
          */
         TypeCibleImago: "vol_clair" | "dense" | "tres_dense";
@@ -3218,7 +3221,12 @@ export interface components {
             /** Role */
             role: string;
         };
-        /** UtilisateurEquipeSyncRead */
+        /**
+         * UtilisateurEquipeSyncRead
+         * @description L'email n'est pas transporté vers le terrain : il ne sert qu'à l'authentification
+         *     backend, aucun écran mobile ne l'affiche, et le pull le poussait dans le cache
+         *     hors-ligne de tous les téléphones sans usage (cf. ADR-015, #136).
+         */
         UtilisateurEquipeSyncRead: {
             /**
              * Id
@@ -3229,8 +3237,6 @@ export interface components {
             nom: string;
             /** Prenom */
             prenom: string;
-            /** Email */
-            email: string;
             /** Role */
             role: string;
             /** Pa Id */
