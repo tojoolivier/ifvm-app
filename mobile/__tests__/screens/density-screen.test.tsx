@@ -1,7 +1,8 @@
 /**
  * Règle métier : 4 blocs de densité indépendants — Locusta migratoria × Imagos/Larves et
- * Nomadacris × Imagos/Larves — chacun avec sa propre Densité diffuse (D/ha, obligatoire)
- * et Densité groupée (D/m², facultative), jamais partagées entre espèce/stade.
+ * Nomadacris × Imagos/Larves — chacun avec sa propre Densité diffuse (D/ha) ET Densité
+ * groupée (/m², #densite-groupee-obligatoire), toutes deux obligatoires, jamais
+ * partagées entre espèce/stade.
  */
 import { Alert } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
@@ -97,16 +98,35 @@ describe('DensityScreen — 4 blocs de densité indépendants (LMC/NSE × imago/
     await render(<DensityScreen />);
     expect(await screen.findByText('Nomadacris · densités imagos')).toBeVisible();
 
-    // Densité diffuse est le premier des deux champs vides (diffuse puis groupée).
+    // Densité diffuse est le premier des deux champs vides (diffuse puis groupée) —
+    // les deux sont désormais obligatoires (#densite-groupee-obligatoire).
     fireEvent.changeText(screen.getAllByDisplayValue('')[0], '15');
     await screen.findByDisplayValue('15');
+    fireEvent.changeText(screen.getAllByDisplayValue('')[0], '4');
+    await screen.findByDisplayValue('4');
     fireEvent.press(screen.getByText('Accouplement  ›'));
 
     await waitFor(() =>
       expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalledWith(
         'draft-123',
-        expect.objectContaining({ espece: 'NSE', categorie: 'imago', densite_diffuse: 15 })
+        expect.objectContaining({ espece: 'NSE', categorie: 'imago', densite_diffuse: 15, densite_groupee: 4 })
       )
     );
+  });
+
+  it('bloque la navigation si la densité groupée (obligatoire) est vide, même avec la densité diffuse renseignée', async () => {
+    jest.mocked(prospectionRepository.getProspectionPopulation).mockResolvedValue(null as any);
+    const alertSpy = jest.spyOn(Alert, 'alert');
+
+    await render(<DensityScreen />);
+    expect(await screen.findByText('Locusta · densités imagos')).toBeVisible();
+
+    fireEvent.changeText(screen.getAllByDisplayValue('')[0], '15');
+    await screen.findByDisplayValue('15');
+    fireEvent.press(screen.getByText('Accouplement  ›'));
+
+    expect(alertSpy).toHaveBeenCalledWith('Densité groupée requise', 'La densité groupée (/m²) est obligatoire.');
+    expect(prospectionRepository.saveProspectionPopulation).not.toHaveBeenCalled();
+    expect(await screen.findByText('La densité groupée (/m²) est obligatoire.')).toBeVisible();
   });
 });

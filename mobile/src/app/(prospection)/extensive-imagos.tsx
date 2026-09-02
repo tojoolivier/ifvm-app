@@ -13,6 +13,7 @@ import {
   createEmptySpeciesData,
   speciesDataToPopulationRow,
   populationRowToSpeciesData,
+  validerDensiteGroupeeObligatoire,
 } from '@/lib/prospection-extensive';
 import { COMPASS_DIRECTIONS, oppositeDirection } from '@/lib/prospection-infestation-insights';
 import { useAsyncAction } from '@/hooks/use-async-action';
@@ -34,6 +35,7 @@ export default function ExtensiveImagosScreen() {
 
   const [species, setSpecies] = useState<Espece>('LMC');
   const [currentSexe, setCurrentSexe] = useState<Sexe>('F');
+  const [showPopGroupError, setShowPopGroupError] = useState(false);
   
   const [speciesData, setSpeciesData] = useState<Record<Espece, ExtensiveImagoSpeciesData>>({
     LMC: createEmptySpeciesData(),
@@ -147,6 +149,16 @@ const handleContinue = () => {
       'Incohérence des phases',
       `Captures : ${data.totalCaptures}\nPhases : ${totalPhases}\n\nLa somme des phases doit être exactement égale au nombre de captures.`
     );
+    return;
+  }
+
+  // #densite-groupee-obligatoire : vérifie LMC ET NSE, pas seulement l'onglet
+  // actuellement affiché — « Continuer » enregistre toujours les deux espèces.
+  const densiteGroupeeCheck = validerDensiteGroupeeObligatoire(speciesData);
+  if (!densiteGroupeeCheck.valid) {
+    setSpecies(densiteGroupeeCheck.espece);
+    setShowPopGroupError(true);
+    Alert.alert('Densité groupée requise', 'La densité groupée (/m²) est obligatoire.');
     return;
   }
 
@@ -396,12 +408,13 @@ const handleContinue = () => {
                     placeholderTextColor={TEXT_SECONDARY}
                   />
                 </View>
-                <View style={[styles.card, styles.flex1]}>
-                  <Text style={styles.label}>Population groupée D/m²</Text>
+                <View style={[styles.card, styles.flex1, showPopGroupError && data.popGroup.trim() === '' && styles.cardError]}>
+                  <Text style={[styles.label, styles.requiredLabel]}>Population groupée D/m² *</Text>
                   <TextInput
                     value={data.popGroup}
                     onChangeText={(text) => {
                       updateSpeciesData({ popGroup: text });
+                      if (text.trim() !== '') setShowPopGroupError(false);
                     }}
                     keyboardType="decimal-pad"
                     style={styles.inputMono}
@@ -410,6 +423,9 @@ const handleContinue = () => {
                   />
                 </View>
               </View>
+              {showPopGroupError && data.popGroup.trim() === '' && (
+                <Text style={styles.errorText}>La densité groupée (/m²) est obligatoire.</Text>
+              )}
               <Text style={styles.speciesHint}>Données spécifiques à {species}</Text>
             </View>
 
@@ -749,7 +765,9 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 8, marginBottom: 0 },
   flex1: { flex: 1 },
   card: { backgroundColor: '#f6f3e9', borderRadius: 9, padding: 8 },
+  cardError: { borderWidth: 1.5, borderColor: '#d32f2f' },
   label: { fontSize: 9, fontWeight: '600', color: '#9a9484' },
+  requiredLabel: { color: '#c0412b' },
   inputMono: { fontSize: 15, fontWeight: '700', color: TEXT, fontFamily: 'monospace', padding: 0 },
   speciesHint: { fontSize: 9, color: '#9a9484', marginTop: 4, textAlign: 'center', fontStyle: 'italic' },
   
