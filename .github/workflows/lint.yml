@@ -25,44 +25,10 @@ jobs:
       - name: Historique Alembic lineaire (head unique)
         run: python scripts/check_migration_linearity.py
 
-  replay-migrations:
-    # Rejoue toute la chaine 0001..head sur une base vide : attrape ce que le
-    # parse statique ne peut pas voir (colonne ajoutee deux fois, contrainte
-    # deja posee, migration autogeneree contre une base en derive).
-    # "services: postgres" impose un daemon Docker dans le pod -> pool dind.
-    runs-on: self-hosted-dind
-    defaults:
-      run:
-        working-directory: backend
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: ifvm
-          POSTGRES_PASSWORD: ifvm_secret
-          POSTGRES_DB: ifvm_migrations
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    env:
-      DATABASE_URL: postgresql+asyncpg://ifvm:ifvm_secret@localhost:5432/ifvm_migrations
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - run: pip install -r requirements-dev.txt
-
-      - name: alembic upgrade head sur une base vide
-        run: alembic upgrade head
-
   lint-backend:
+    # Porte aussi le rejeu des migrations : le pool dind est plafonne a
+    # maxRunners=1 (runner-scale-set-dind.yaml), donc deux jobs dind dans ce
+    # workflow se serialisent au lieu de tourner en parallele.
     # "services: postgres" impose un daemon Docker dans le pod -> pool dind.
     runs-on: self-hosted-dind
     defaults:
@@ -90,6 +56,36 @@ jobs:
           python-version: "3.12"
 
       - run: pip install -r requirements-dev.txt
+
+      # Rejeu de la chaine 0001..head sur une base vierge : attrape ce que le
+      # parse statique de check-migrations ne peut pas voir (colonne ajoutee
+      # deux fois, contrainte deja posee, migration autogeneree contre une base
+      # en derive). Base dediee : pytest a la sienne (ifvm_test, cf.
+      # tests/conftest.py) et la creerait via ses propres fixtures.
+      - name: Cree une base vierge pour le rejeu
+        run: |
+          python - <<'PY'
+          import asyncio
+
+          import asyncpg
+
+
+          async def main() -> None:
+              conn = await asyncpg.connect(
+                  "postgresql://ifvm:ifvm_secret@localhost:5432/ifvm_test"
+              )
+              await conn.execute("DROP DATABASE IF EXISTS ifvm_migrations")
+              await conn.execute("CREATE DATABASE ifvm_migrations")
+              await conn.close()
+
+
+          asyncio.run(main())
+          PY
+
+      - name: alembic upgrade head sur une base vierge
+        env:
+          DATABASE_URL: postgresql+asyncpg://ifvm:ifvm_secret@localhost:5432/ifvm_migrations
+        run: alembic upgrade head
 
       - run: ruff check .
       - run: ruff format --check .
