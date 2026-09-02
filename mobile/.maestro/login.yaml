@@ -20,7 +20,9 @@ appId: com.anonymous.mobile
 - hideKeyboard
 - tapOn:
     id: "login-password-input"
-- inputText: "${E2E_BOT_PASSWORD}"
+- inputText:
+    text: "${E2E_BOT_PASSWORD}"
+    label: "Saisie du mot de passe e2e-bot (masqué)"
 - hideKeyboard
 - tapOn:
     id: "login-submit-button"

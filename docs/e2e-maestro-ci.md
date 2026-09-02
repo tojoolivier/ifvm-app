@@ -17,9 +17,11 @@ Seed / credentials : [`docs/e2e-seed.md`](e2e-seed.md).
    du build (jusqu'à 1h) avant de continuer.
 2. **`e2e-maestro`** (`ubuntu-latest`, runner GitHub-hébergé — nécessaire pour
    la virtualisation KVM de l'émulateur, absente sur les runners self-hébergés
-   qui servent au build) : télécharge cet APK, installe Maestro CLI, démarre un
-   émulateur Android (API 33, x86_64), injecte la position GPS de test, installe
-   l'APK et exécute `mobile/.maestro/login.yaml`.
+   qui servent au build) : télécharge cet APK, installe Maestro CLI, active
+   KVM (requis par `reactivecircus/android-emulator-runner` sur ce type de
+   runner), démarre un émulateur Android (API 33, x86_64) et exécute
+   `mobile/.maestro/login.yaml`. Pas d'injection GPS dans ce ticket — le
+   golden path login n'en a pas besoin (voir « Étendre le flow »).
 
 Flow Maestro : [`mobile/.maestro/login.yaml`](../mobile/.maestro/login.yaml).
 
@@ -47,9 +49,11 @@ Secret requis : `E2E_BOT_PASSWORD` (déjà utilisé par le seed backend, voir
   à temps), le message d'erreur est explicite dans les logs de ce job — le
   golden path login n'a alors même pas commencé.
 - Pas d'artifact de rapport Maestro séparé : le contenu de `~/.maestro/tests`
-  peut journaliser en clair les valeurs saisies (`inputText`), donc le mot de
-  passe e2e-bot — le masquage GitHub Actions ne protège que les logs de step,
-  pas le contenu d'un fichier uploadé. Les logs du step suffisent pour
+  peut journaliser les valeurs saisies (`inputText`) — le masquage GitHub
+  Actions ne protège que les logs de step, pas le contenu d'un fichier
+  uploadé. Le flow utilise `label:` sur la saisie du mot de passe
+  (recommandation Maestro) pour l'omettre du rapport, mais l'artifact reste
+  volontairement non publié par prudence. Les logs du step suffisent pour
   diagnostiquer un échec.
 
 ## Étendre le flow

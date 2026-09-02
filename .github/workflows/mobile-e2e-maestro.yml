@@ -26,6 +26,13 @@ permissions:
 jobs:
   # Reutilise le dernier artifact ifvm-preview-apk (mobile-build.yml) s'il existe,
   # sinon declenche ce workflow et attend la fin du build avant de continuer.
+  #
+  # Alternative ecartee : le trigger `workflow_run` (mobile-build.yml qui
+  # notifie ce workflow a sa fin) eviterait le polling ci-dessous, mais force
+  # a scinder en deux workflows separes et ne couvre pas le cas "artifact deja
+  # disponible, ne rebuild pas" qui est le coeur de cette AC — on resterait de
+  # toute facon oblige de poller/attendre dans CE run pour enchainer sur
+  # l'emulateur. Le polling reste donc le choix le plus direct ici.
   get-apk:
     runs-on: self-hosted-linux
     timeout-minutes: 75
@@ -141,6 +148,15 @@ jobs:
         run: |
           curl -fsSL "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      # Requis par reactivecircus/android-emulator-runner sur les runners
+      # ubuntu-latest standard (accès KVM pour la virtualisation materielle) :
+      # https://github.com/ReactiveCircus/android-emulator-runner#running-hardware-accelerated-emulators-on-linux-runners
+      - name: Active KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
 
       # Le build inclut l'ABI x86_64 specifiquement pour l'emulateur (voir
       # .github/workflows/mobile-build.yml). Compte e2e-bot seede par #194
