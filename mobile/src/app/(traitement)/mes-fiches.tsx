@@ -2,16 +2,16 @@ import { useCallback, useEffect, useState } from 'react';
 import { Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { listTraitementsByChefEquipe, DraftTraitementRow } from '@/lib/traitement-repository';
+import { listMesTraitements, DraftTraitementRow } from '@/lib/traitement-repository';
 import { useAuthStore } from '@/lib/auth-store';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
 import { runTask } from '@/lib/run-task';
 import { EtatVide } from '@/components/erreurs/etat-vide';
 
 /**
- * Écran "Mes fiches" (Lot 3) — fiches de traitement dont le chef d'équipe
- * connecté est responsable, à partir de la copie locale déjà synchronisée
- * (`listTraitementsByChefEquipe`, jusqu'ici inutilisée).
+ * Écran "Mes fiches" (Lot 3) — fiches de traitement dont l'utilisateur
+ * connecté est responsable (chef d'équipe Terrestre ou chef de base Aérien),
+ * à partir de la copie locale déjà synchronisée.
  */
 export default function TraitementMesFichesScreen() {
   const router = useRouter();
@@ -21,11 +21,11 @@ export default function TraitementMesFichesScreen() {
   const [erreurDeLecture, setErreurDeLecture] = useState<unknown>(null);
 
   const charger = useCallback(() => {
-    const chefEquipeId = user?.id;
-    if (!chefEquipeId) {
+    const utilisateurId = user?.id;
+    if (!utilisateurId) {
       return;
     }
-    void runTask(() => listTraitementsByChefEquipe(chefEquipeId), {
+    void runTask(() => listMesTraitements(utilisateurId), {
       name: 'traitement.mesFiches',
       criticality: 'essential',
     }).then((outcome) => {
