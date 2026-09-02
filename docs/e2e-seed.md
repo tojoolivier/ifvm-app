@@ -4,6 +4,9 @@ Provisionne un jeu de données isolé et reproductible pour les tests e2e mobile
 (Maestro, épic #193) sur l'environnement staging
 (`https://ifvm.orakotondravao.com/api`).
 
+Décisions structurantes (outil, environnement, isolation, scope, déclenchement) :
+[`docs/adr/ADR-016-e2e-mobile-maestro.md`](adr/ADR-016-e2e-mobile-maestro.md).
+
 Script : [`backend/app/e2e_seed.py`](../backend/app/e2e_seed.py).
 
 ## Ce qui est créé / mis à jour
