@@ -6,7 +6,7 @@ import { useAuthStore } from '@/lib/auth-store';
 import { loadAccueilData, loadValidatedProspections } from '@/lib/prospection-accueil';
 import { DraftProspection } from '@/lib/prospection-repository';
 import { ProspectionRead } from '@/lib/api-client';
-import { listTraitementsByChefEquipe, DraftTraitementRow } from '@/lib/traitement-repository';
+import { listMesTraitements, DraftTraitementRow } from '@/lib/traitement-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { navigateToProspectionConsult, navigateToProspectionDraft, navigateToTraitement } from '@/lib/fiche-routing';
 import { FicheCard } from '@/components/fiches/FicheCard';
@@ -92,7 +92,7 @@ export default function FichesScreen() {
             })
           : null,
         user
-          ? runTask(() => listTraitementsByChefEquipe(user.id), {
+          ? runTask(() => listMesTraitements(user.id), {
               name: 'fiches.traitements',
               criticality: 'essential',
             })
