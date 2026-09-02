@@ -90,6 +90,7 @@ export default function LoginScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Email</Text>
               <TextInput
+                testID="login-email-input"
                 style={[styles.input, email && styles.inputFilled]}
                 placeholder="votre@email.com"
                 placeholderTextColor="#9CA3AF"
@@ -109,6 +110,7 @@ export default function LoginScreen() {
               <Text style={styles.inputLabel}>Mot de passe</Text>
               <View style={styles.passwordContainer}>
                 <TextInput
+                  testID="login-password-input"
                   style={[styles.passwordInput, password && styles.inputFilled]}
                   placeholder="••••••••"
                   placeholderTextColor="#9CA3AF"
@@ -146,6 +148,7 @@ export default function LoginScreen() {
 
             {/* Bouton de connexion */}
             <TouchableOpacity
+              testID="login-submit-button"
               style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
               onPress={handleSubmit}
               disabled={isLoading}
