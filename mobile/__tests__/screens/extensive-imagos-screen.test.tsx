@@ -220,7 +220,7 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
   it('fiche Signalement (validation) : même préaffichage et même persistance du Nombre de captures que l’Extensive', async () => {
     jest.mocked(prospectionRepository.getProspectionPopulation).mockImplementation(async (_id, espece) =>
       espece === 'LMC'
-        ? ({ espece: 'LMC', categorie: 'imago', captures_nombre: 25, captures_sol: 25, captures_trans: 0, captures_greg: 0 } as any)
+        ? ({ espece: 'LMC', categorie: 'imago', captures_nombre: 25, captures_sol: 25, captures_trans: 0, captures_greg: 0, densite_groupee: 2 } as any)
         : ({ espece: 'NSE', categorie: 'imago', captures_nombre: 0 } as any)
     );
 

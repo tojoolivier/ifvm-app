@@ -102,6 +102,9 @@ describe('ExtensiveLarvesScreen', () => {
             captures_trans: 0,
             captures_greg: 0,
             densites_larve: JSON.stringify({ L1: 25, L2: 0, L3: 0, L4: 0, L5: 0 }),
+            // #densite-groupee-obligatoire : déjà enregistrée, comme le reste de cette
+            // ligne — ne doit pas non plus bloquer « Suivant » à la réouverture.
+            densite_groupee: 3,
           } as any)
         : ({ espece: 'NSE', categorie: 'larve', captures_nombre: 0 } as any)
     );
