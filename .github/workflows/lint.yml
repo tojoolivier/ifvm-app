@@ -4,6 +4,14 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  # dorny/paths-filter sur un evenement pull_request retombe sur l'API REST
+  # pour lister les fichiers changes (checkout shallow par defaut, pas de
+  # diff local possible) : necessite pull-requests: read, absent des
+  # permissions par defaut du repo (workflow default = read restrictif).
+  pull-requests: read
+
 concurrency:
   group: pr-validation-${{ github.ref }}
   cancel-in-progress: true
@@ -21,7 +29,7 @@ jobs:
       mobile: ${{ steps.filter.outputs.mobile }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
