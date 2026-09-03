@@ -134,7 +134,10 @@ export interface ExtensiveImagoSpeciesData {
   };
   popDiff: string;
   popGroup: string;
-  typeCible: TypeCibleImago;
+  /** Multi-select (#type-cible-multi-select) : plusieurs cibles simultanées possibles
+   * (ex. Vol clair + Dense), sans présélection — `[]` tant que l'utilisateur n'a rien
+   * coché. Stocké en SQLite/API comme tableau JSON, même pattern que biotope. */
+  typeCible: TypeCibleImago[];
   accouplement: string | null;
   ponte: string | null;
   interdistance: string;
@@ -195,7 +198,10 @@ export function createEmptySpeciesData(): ExtensiveImagoSpeciesData {
     },
     popDiff: '',
     popGroup: '',
-    typeCible: 'vol_clair',
+    // #type-cible-multi-select : aucune sélection par défaut, l'utilisateur doit
+    // explicitement cocher (contrairement à l'ancien comportement single-select qui
+    // présélectionnait 'vol_clair').
+    typeCible: [],
     accouplement: null,
     ponte: null,
     interdistance: '',
@@ -305,6 +311,24 @@ export function validerDensiteGroupeeObligatoire(
   return { valid: true };
 }
 
+/**
+ * Densité diffuse obligatoire (#densite-diffuse-obligatoire) — même garde et même
+ * mécanique que `validerDensiteGroupeeObligatoire` ci-dessus (LMC/NSE enregistrées
+ * ensemble en un seul « Continuer », une espèce sans capture n'a pas à porter de
+ * densité).
+ */
+export function validerDensiteDiffuseObligatoire(
+  speciesData: Record<'LMC' | 'NSE', { totalCaptures: number; popDiff: string }>
+): { valid: true } | { valid: false; espece: 'LMC' | 'NSE' } {
+  for (const espece of ['LMC', 'NSE'] as const) {
+    const data = speciesData[espece];
+    if (data.totalCaptures > 0 && data.popDiff.trim() === '') {
+      return { valid: false, espece };
+    }
+  }
+  return { valid: true };
+}
+
 export function speciesDataToPopulationRow(espece: Espece, data: ExtensiveImagoSpeciesData): PopulationRow {
   return {
     espece,
@@ -325,7 +349,9 @@ export function speciesDataToPopulationRow(espece: Espece, data: ExtensiveImagoS
     captures_solitaro_transiens: data.phases.solitaroTransiens,
     stade_imago: 'A1',
     interdistance: data.interdistance ? parseFloat(data.interdistance) : null,
-    type_cible: data.typeCible,
+    // Sérialisé en JSON (comme biotope) — la colonne SQLite reste TEXT, seul le
+    // contenu change de forme (scalaire → tableau).
+    type_cible: JSON.stringify(data.typeCible),
     direction_de: data.directionDe || null,
     direction_vers: data.directionVers || null,
     etat: data.etat,
@@ -364,7 +390,9 @@ export function populationRowToSpeciesData(row: PopulationRow | null): Extensive
     },
     popDiff: row.densite_diffuse != null ? String(row.densite_diffuse) : '',
     popGroup: row.densite_groupee != null ? String(row.densite_groupee) : '',
-    typeCible: (row.type_cible as TypeCibleImago | null) ?? 'vol_clair',
+    // Tolère l'ancien format scalaire (pré-#type-cible-multi-select) via
+    // parseSelectionMultiple, comme biotope.
+    typeCible: parseSelectionMultiple(row.type_cible) as TypeCibleImago[],
     accouplement: row.accouplement ?? null,
     ponte: row.ponte ?? null,
     interdistance: row.interdistance != null ? String(row.interdistance) : '',

@@ -58,6 +58,22 @@ export interface InfestationCibleViewModel {
   details: string[];
 }
 
+/**
+ * Détail Imagos/Larves × LMC/NSE affiché dans la carte « Infestation » du
+ * récapitulatif Intensive (#infestation-recap-intensive) : nombre de captures +
+ * densité diffuse/groupée, toujours les 4 combinaisons (jamais masquée
+ * individuellement — même règle que `DensiteViewModel`).
+ */
+export interface InfestationDetailViewModel {
+  key: string;
+  categorie: 'imago' | 'larve';
+  espece: 'LMC' | 'NSE';
+  label: string;
+  nombre: number;
+  densiteDiffuse: number | null;
+  densiteGroupee: number | null;
+}
+
 export interface RecapitulatifViewModel {
   nFiche: string;
   nReleve: string;
@@ -80,6 +96,7 @@ export interface RecapitulatifViewModel {
   comportementSummary: string;
   observationsText: string;
   densites: DensiteViewModel[];
+  infestationDetail: InfestationDetailViewModel[];
   heureObservationLabel: string;
 }
 
@@ -110,6 +127,50 @@ function buildDensitesSummary(populations: PopulationRow[]): DensiteViewModel[] 
     }
   }
   return rows;
+}
+
+/**
+ * Détail Imagos/Larves × LMC/NSE pour la carte « Infestation » du récapitulatif
+ * Intensive : nombre de captures (même calcul que `buildReviewGroups`, indépendant
+ * de la sélection d'espèces du brouillon — toujours les 4 combinaisons, une
+ * combinaison jamais ouverte vaut simplement 0, pas « non renseigné », cf.
+ * `totalCaptures` déjà affiché sans condition dans les cartes du haut) et densité
+ * diffuse/groupée (`null` si aucune ligne `prospection_population` pour cette
+ * combinaison — jamais confondu avec `0`, une valeur réellement saisie).
+ */
+function buildInfestationDetail(
+  captures: CaptureRow[],
+  populations: PopulationRow[]
+): InfestationDetailViewModel[] {
+  const especes: ('LMC' | 'NSE')[] = ['LMC', 'NSE'];
+  const categories: ('imago' | 'larve')[] = ['imago', 'larve'];
+  const rows: InfestationDetailViewModel[] = [];
+  for (const categorie of categories) {
+    for (const espece of especes) {
+      const captureRows = captures.filter((c) => c.espece === espece && c.categorie === categorie);
+      const population = populations.find((p) => p.espece === espece && p.categorie === categorie);
+      rows.push({
+        key: `${categorie}-${espece}`,
+        categorie,
+        espece,
+        label: ESPECE_LABEL[espece],
+        nombre: totalCaptures(rowsToCounts(captureRows)),
+        densiteDiffuse: population?.densite_diffuse ?? null,
+        densiteGroupee: population?.densite_groupee ?? null,
+      });
+    }
+  }
+  return rows;
+}
+
+/**
+ * Une combinaison Imagos/Larves × LMC/NSE n'a de sens à afficher que si elle a
+ * effectivement été renseignée — même règle de masquage que
+ * `imagoRowHasData`/`larveRowHasData` dans extensive-recap.tsx (masquer le bloc
+ * entier plutôt qu'une ligne à 0/—/— pour une combinaison jamais ouverte).
+ */
+export function infestationDetailHasData(d: InfestationDetailViewModel): boolean {
+  return d.nombre > 0 || d.densiteDiffuse != null || d.densiteGroupee != null;
 }
 
 function buildReviewGroups(draft: DraftProspection, captures: CaptureRow[]): ReviewGroupViewModel[] {
@@ -231,6 +292,7 @@ export function buildRecapitulatif(
     comportementSummary: buildComportementSummary(infestations),
     observationsText: draft.observations?.trim() ? draft.observations : 'Aucune observation renseignée.',
     densites: buildDensitesSummary(populations),
+    infestationDetail: buildInfestationDetail(captures, populations),
     heureObservationLabel: formatHeureLocale(draft.heure_observation_at),
   };
 }
@@ -442,7 +504,9 @@ function buildPopulationsPayload(rows: PopulationRow[]): ProspectionPopulationIn
     // deux reprises, cf. commits ca39761 et 55cdc59 qui les avaient retirés à tort — vérifié
     // sans ambiguïté par `npx tsc --noEmit`, aucune erreur sur ces champs).
     surface_contaminee_ha: row.surface_contaminee_ha ? Number(row.surface_contaminee_ha) : null,
-    type_cible: (row.type_cible || null) as ProspectionPopulationInput['type_cible'],
+    // #type-cible-multi-select : `row.type_cible` est un tableau JSON encodé (comme
+    // biotope) — jamais la string brute, le backend attend désormais un vrai tableau.
+    type_cible: parseSelectionMultiple(row.type_cible) as ProspectionPopulationInput['type_cible'],
     direction_de: row.direction_de || null,
     direction_vers: row.direction_vers || null,
     etat: (row.etat || null) as ProspectionPopulationInput['etat'],
