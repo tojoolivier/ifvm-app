@@ -180,3 +180,33 @@ class GrilleDejaOccupeeError(Exception):
     """(code, categorie, sexe, espece) identifie une place de grille — elle est prise."""
 
     pass
+
+
+TYPES_LIEU_AERIEN = ("principale", "secondaire", "stand")
+
+
+class TypeLieuAerienInvalideError(Exception):
+    """`type_lieu` n'appartient pas à `TYPES_LIEU_AERIEN`."""
+
+    pass
+
+
+@dataclass
+class LieuAerien:
+    """Base aérienne principale, base secondaire ou stand de remplissage.
+
+    Table unique typée par `type_lieu` plutôt que trois entités séparées — même
+    choix que `Prospection.type_prospection` (ADR-006). Durable, indépendant
+    de la campagne. Jamais supprimé : on le retire du terrain en passant
+    `actif` à false.
+    """
+
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    type_lieu: str = "principale"
+    nom: str = ""
+    latitude: float = 0.0
+    longitude: float = 0.0
+    altitude: float | None = None
+    actif: bool = True
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)

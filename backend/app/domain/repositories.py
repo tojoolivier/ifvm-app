@@ -8,6 +8,7 @@ from app.domain.referentiel import (
     CodeStade,
     Commune,
     Culture,
+    LieuAerien,
     Pesticide,
     PosteAcridien,
     StationFixe,
@@ -355,6 +356,28 @@ class CultureRepository(ABC):
 
     @abstractmethod
     async def update(self, culture: Culture) -> Culture:
+        pass
+
+
+class LieuAerienRepository(ABC):
+    """Aucune méthode de suppression : la sortie du référentiel est `actif=false`."""
+
+    @abstractmethod
+    async def list_all(
+        self, type_lieu: str | None = None, actif: bool | None = True
+    ) -> list[LieuAerien]:
+        pass
+
+    @abstractmethod
+    async def get_by_id(self, lieu_id: uuid.UUID) -> LieuAerien | None:
+        pass
+
+    @abstractmethod
+    async def create(self, lieu: LieuAerien) -> LieuAerien:
+        pass
+
+    @abstractmethod
+    async def update(self, lieu: LieuAerien) -> LieuAerien:
         pass
 
 
