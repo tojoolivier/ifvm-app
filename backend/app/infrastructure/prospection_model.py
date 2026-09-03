@@ -282,7 +282,15 @@ class ProspectionPopulationModel(Base):
     # ==========================================
     # NOUVEAUX CHAMPS - Extensif Imagos : Type de cible, État/Comportement (migration 0033)
     # ==========================================
-    type_cible: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    # Multi-select (migration 0044) : plusieurs cibles simultanées (ex. Vol clair +
+    # Dense), même pattern que `prospection.biotope` (migration 0042) — JSONB non
+    # nullable, défaut tableau vide plutôt qu'une table de jonction (ensemble fermé à
+    # 3 valeurs, sans attribut propre par ligne). `default=list` en plus de
+    # `server_default` : évite le bug constaté sur `biotope` où un modèle construit
+    # sans passer `type_cible` explicitement liait NULL en VARCHAR au lieu de JSONB.
+    type_cible: Mapped[list[str]] = mapped_column(
+        JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb"), default=list
+    )
     direction_de: Mapped[str | None] = mapped_column(Text(), nullable=True)
     direction_vers: Mapped[str | None] = mapped_column(Text(), nullable=True)
     etat: Mapped[str | None] = mapped_column(Text(), nullable=True)
@@ -313,7 +321,8 @@ class ProspectionPopulationModel(Base):
             name="ck_prospection_population_stade_imago",
         ),
         CheckConstraint(
-            "type_cible IN ('vol_clair','dense','tres_dense')",
+            "jsonb_typeof(type_cible) = 'array' "
+            'AND type_cible <@ \'["vol_clair","dense","tres_dense"]\'::jsonb',
             name="ck_prospection_population_type_cible",
         ),
         CheckConstraint(

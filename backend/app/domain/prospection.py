@@ -71,7 +71,7 @@ class ProspectionPopulation:
     # ==========================================
     # NOUVEAUX CHAMPS - Extensif Imagos : Type de cible, État/Comportement
     # ==========================================
-    type_cible: str | None = None
+    type_cible: list[str] = field(default_factory=list)
     direction_de: str | None = None
     direction_vers: str | None = None
     etat: str | None = None
