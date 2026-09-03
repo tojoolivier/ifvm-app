@@ -4,9 +4,11 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import { AxiosError } from 'axios'
 import { api } from '../api/client'
 import { cn } from '@/lib/utils'
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { DataTable, type DataTableColumn, type DataTableSort } from '@/components/ui/data-table'
 import { ErrorBanner } from '@/components/ui/error-banner'
 import { Switch } from '@/components/ui/switch'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 /**
  * Écran Référentiels — docs/design_handoff_web/README.md §11.
@@ -171,13 +173,52 @@ function formatDate(value: unknown): string {
   return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('fr-FR')
 }
 
+/** `sortValue` d'une colonne date : timestamp numérique, `null` si absente/invalide (voir `compareSortValues`). */
+function dateSortValue(value: unknown): number | null {
+  if (typeof value !== 'string') return null
+  const time = new Date(value).getTime()
+  return Number.isNaN(time) ? null : time
+}
+
 function codeColumn(header = 'Code'): DataTableColumn<Row> {
   return {
     key: 'code',
     header,
     mono: true,
     render: (row) => <span className={GREEN_CODE}>{text(row, 'code')}</span>,
+    sortValue: (row) => text(row, 'code'),
   }
+}
+
+const PAGE_SIZE = 15
+
+/** Recherche insensible aux accents et à la casse ("Réunion" trouvé par "reunion"). */
+function normalize(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+}
+
+/**
+ * Compare deux `sortValue` de colonne. `null` (valeur absente, « — » à
+ * l'affichage) est toujours relégué en fin de liste, quel que soit le sens du
+ * tri — sinon un tri descendant ferait remonter les lignes incomplètes en
+ * premier, ce qui n'aide personne.
+ */
+function compareSortValues(a: string | number | boolean | null, b: string | number | boolean | null): number {
+  if (a === b) return 0
+  if (a === null) return 1
+  if (b === null) return -1
+  if (typeof a === 'boolean' || typeof b === 'boolean') return Number(a) - Number(b)
+  if (typeof a === 'number' && typeof b === 'number') return a - b
+  return String(a).localeCompare(String(b), 'fr', { sensitivity: 'base', numeric: true })
+}
+
+function nextSort(current: DataTableSort | null, key: string): DataTableSort | null {
+  if (!current || current.key !== key) return { key, direction: 'asc' }
+  if (current.direction === 'asc') return { key, direction: 'desc' }
+  return null
 }
 
 /**
@@ -200,14 +241,25 @@ const ENTITES: EntitySpec[] = [
     rowLabel: (row) => text(row, 'code'),
     columns: [
       codeColumn(),
-      { key: 'nom', header: 'Nom commercial', render: (row) => text(row, 'nom') },
-      { key: 'ma', header: 'Matière active', render: (row) => text(row, 'matiere_active') || '—' },
+      {
+        key: 'nom',
+        header: 'Nom commercial',
+        render: (row) => text(row, 'nom'),
+        sortValue: (row) => text(row, 'nom'),
+      },
+      {
+        key: 'ma',
+        header: 'Matière active',
+        render: (row) => text(row, 'matiere_active') || '—',
+        sortValue: (row) => text(row, 'matiere_active'),
+      },
       {
         key: 'dose',
         header: 'Dose de référence',
         align: 'right',
         mono: true,
         render: (row) => text(row, 'dose_reference') || '—',
+        sortValue: (row) => text(row, 'dose_reference'),
       },
     ],
     fields: [],
@@ -235,7 +287,10 @@ const ENTITES: EntitySpec[] = [
     note: "Synchronisée dans le SQLite du terrain mais aucune fonction de lecture : listCultures() n'existe pas dans referentiel-db.ts.",
     hasActif: true,
     rowLabel: (row) => text(row, 'code'),
-    columns: [codeColumn(), { key: 'nom', header: 'Nom', render: (row) => text(row, 'nom') }],
+    columns: [
+      codeColumn(),
+      { key: 'nom', header: 'Nom', render: (row) => text(row, 'nom'), sortValue: (row) => text(row, 'nom') },
+    ],
     // Panneau en lecture seule inutilisé : `write` prend le relais.
     fields: [],
     write: {
@@ -268,19 +323,34 @@ const ENTITES: EntitySpec[] = [
         key: 'categorie',
         header: 'Catégorie',
         render: (row) => <span className="text-ifvm-text-tertiary">{text(row, 'categorie')}</span>,
+        sortValue: (row) => text(row, 'categorie'),
       },
       {
         key: 'sexe',
         header: 'Sexe',
         render: (row) => <span className="text-ifvm-text-tertiary">{text(row, 'sexe')}</span>,
+        sortValue: (row) => text(row, 'sexe'),
       },
       {
         key: 'espece',
         header: 'Espèce',
         render: (row) => <span className="text-ifvm-text-tertiary">{text(row, 'espece')}</span>,
+        sortValue: (row) => text(row, 'espece'),
       },
-      { key: 'libelle', header: 'Libellé', render: (row) => text(row, 'libelle') },
-      { key: 'ordre', header: 'Ordre', align: 'right', mono: true, render: (row) => text(row, 'ordre') },
+      {
+        key: 'libelle',
+        header: 'Libellé',
+        render: (row) => text(row, 'libelle'),
+        sortValue: (row) => text(row, 'libelle'),
+      },
+      {
+        key: 'ordre',
+        header: 'Ordre',
+        align: 'right',
+        mono: true,
+        render: (row) => text(row, 'ordre'),
+        sortValue: (row) => (typeof row.ordre === 'number' ? row.ordre : null),
+      },
     ],
     // Panneau en lecture seule inutilisé : `write` prend le relais.
     fields: [],
@@ -343,11 +413,12 @@ const ENTITES: EntitySpec[] = [
     rowLabel: (row) => text(row, 'code'),
     columns: [
       codeColumn(),
-      { key: 'nom', header: 'Nom', render: (row) => text(row, 'nom') },
+      { key: 'nom', header: 'Nom', render: (row) => text(row, 'nom'), sortValue: (row) => text(row, 'nom') },
       {
         key: 'za_nom',
         header: 'Zone anti-acridienne',
         render: (row) => <span className="text-ifvm-text-tertiary">{text(row, 'za_nom')}</span>,
+        sortValue: (row) => text(row, 'za_nom'),
       },
       {
         key: 'nb_stations',
@@ -355,6 +426,7 @@ const ENTITES: EntitySpec[] = [
         align: 'right',
         mono: true,
         render: (row) => text(row, 'nb_stations'),
+        sortValue: (row) => (typeof row.nb_stations === 'number' ? row.nb_stations : null),
       },
     ],
     // Panneau en lecture seule inutilisé : `write` prend le relais.
@@ -405,7 +477,7 @@ const ENTITES: EntitySpec[] = [
     rowLabel: (row) => text(row, 'code'),
     columns: [
       codeColumn(),
-      { key: 'nom', header: 'Nom', render: (row) => text(row, 'nom') },
+      { key: 'nom', header: 'Nom', render: (row) => text(row, 'nom'), sortValue: (row) => text(row, 'nom') },
       {
         key: 'coord',
         header: 'Coordonnées',
@@ -414,6 +486,9 @@ const ENTITES: EntitySpec[] = [
           typeof row.latitude === 'number' && typeof row.longitude === 'number'
             ? `${row.latitude.toFixed(4)} · ${row.longitude.toFixed(4)}`
             : '—',
+        // Trie par latitude — les coordonnées combinent deux valeurs, pas de tri
+        // parfaitement naturel possible, mais reste plus utile que rien.
+        sortValue: (row) => (typeof row.latitude === 'number' ? row.latitude : null),
       },
     ],
     // Panneau en lecture seule inutilisé : `write` prend le relais.
@@ -480,14 +555,16 @@ const ENTITES: EntitySpec[] = [
         key: 'nom',
         header: 'Nom',
         render: (row) => `${text(row, 'prenom')} ${text(row, 'nom')}`.replace('— ', '').trim(),
+        sortValue: (row) => `${text(row, 'nom')} ${text(row, 'prenom')}`,
       },
       {
         key: 'email',
         header: 'Email',
         mono: true,
         render: (row) => <span className="text-ifvm-text-tertiary">{text(row, 'email')}</span>,
+        sortValue: (row) => text(row, 'email'),
       },
-      { key: 'role', header: 'Rôle', render: (row) => text(row, 'role') },
+      { key: 'role', header: 'Rôle', render: (row) => text(row, 'role'), sortValue: (row) => text(row, 'role') },
     ],
     fields: [
       { label: 'Nom complet *', value: (row) => `${text(row, 'prenom')} ${text(row, 'nom')}`.trim() },
@@ -508,14 +585,21 @@ const ENTITES: EntitySpec[] = [
     hasActif: false,
     rowLabel: (row) => text(row, 'name'),
     columns: [
-      { key: 'name', header: 'Nom', render: (row) => text(row, 'name') },
-      { key: 'start_date', header: 'Début', mono: true, render: (row) => formatDate(row.start_date) },
+      { key: 'name', header: 'Nom', render: (row) => text(row, 'name'), sortValue: (row) => text(row, 'name') },
+      {
+        key: 'start_date',
+        header: 'Début',
+        mono: true,
+        render: (row) => formatDate(row.start_date),
+        sortValue: (row) => dateSortValue(row.start_date),
+      },
       {
         key: 'end_date',
         header: 'Fin',
         mono: true,
         render: (row) =>
           row.end_date ? formatDate(row.end_date) : <span className="text-[#bdb6a2]">—</span>,
+        sortValue: (row) => dateSortValue(row.end_date),
       },
     ],
     fields: [
@@ -790,6 +874,7 @@ export function ReferentielsPage() {
             aria-label={`${entity.rowLabel(row)} — ${row.actif ? 'actif' : 'inactif'}`}
           />
         ),
+        sortValue: (row) => Boolean(row.actif),
       })
     }
     trailing.push({
@@ -800,14 +885,62 @@ export function ReferentielsPage() {
       render: (row) => (
         <span className="whitespace-nowrap text-ifvm-text-weak">{formatDateTime(row.updated_at)}</span>
       ),
+      sortValue: (row) => dateSortValue(row.updated_at),
     })
     return [...entity.columns, ...trailing]
   }, [entity])
 
+  // Recherche, tri et pagination — remis à zéro à chaque changement d'entité :
+  // une recherche ou un tri de l'onglet précédent n'a pas de sens sur celui-ci,
+  // et une page 4 laisserait un tableau vide si la nouvelle liste est plus courte.
+  const [search, setSearch] = useState('')
+  const [sort, setSort] = useState<DataTableSort | null>(null)
+  const [page, setPage] = useState(1)
+
   function selectEntity(key: string) {
     setSelectedKey(key)
     setSelectedRowIndex(0)
+    setSearch('')
+    setSort(null)
+    setPage(1)
   }
+
+  function updateSearch(value: string) {
+    setSearch(value)
+    setPage(1)
+  }
+
+  function toggleSort(key: string) {
+    setSort((current) => nextSort(current, key))
+    setPage(1)
+  }
+
+  // Le filtrage compare le texte saisi aux `sortValue` des colonnes affichées —
+  // c'est exactement ce que l'utilisateur voit dans le tableau, ni plus (pas les
+  // identifiants internes) ni moins (une recherche sur « Nom complet » retrouve
+  // bien un utilisateur par son prénom grâce au `sortValue` combiné nom+prénom).
+  const searchQuery = normalize(search.trim())
+  const searchedRows = searchQuery
+    ? rows.filter((row) =>
+        columns.some((column) => {
+          const value = column.sortValue?.(row)
+          return value !== null && value !== undefined && normalize(String(value)).includes(searchQuery)
+        }),
+      )
+    : rows
+
+  const sortColumn = sort ? columns.find((c) => c.key === sort.key) : undefined
+  const sortedRows =
+    sort && sortColumn?.sortValue
+      ? [...searchedRows].sort((a, b) => {
+          const cmp = compareSortValues(sortColumn.sortValue!(a), sortColumn.sortValue!(b))
+          return sort.direction === 'asc' ? cmp : -cmp
+        })
+      : searchedRows
+
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const paginatedRows = sortedRows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   return (
     // Padding de contenu du handoff (README §Design tokens, « contenu 26px 28px 40px ») :
@@ -892,6 +1025,17 @@ export function ReferentielsPage() {
         <div className="overflow-hidden rounded-[11px] border border-[#e7e0cd] bg-white">
           <div className="flex items-center gap-[10px] border-b border-[#f1ecdd] px-5 py-[13px]">
             <h3 className="flex-1 font-sans text-[13px] font-bold">Enregistrements</h3>
+            <Label htmlFor="referentiel-recherche" className="sr-only">
+              Rechercher parmi {entity.label.toLowerCase()}
+            </Label>
+            <Input
+              id="referentiel-recherche"
+              type="search"
+              value={search}
+              onChange={(event) => updateSearch(event.target.value)}
+              placeholder="Rechercher…"
+              className="h-9 w-48 rounded-[8px] border-[#e0d9c4] bg-[#fffdf8] text-[12px]"
+            />
             <button
               type="button"
               aria-disabled={entity.write || entity.addRoute ? undefined : true}
@@ -923,20 +1067,56 @@ export function ReferentielsPage() {
           ) : (
             <DataTable
               columns={columns}
-              rows={rows}
+              rows={paginatedRows}
               getRowKey={(row) => String(row.id)}
               onRowClick={(row) => setSelectedRowIndex(rows.indexOf(row))}
-              rowClassName={(_, index) =>
+              // La ligne sélectionnée est repérée par son id, pas par sa position : une
+              // fois triée/paginée, la position dans `paginatedRows` ne correspond plus
+              // à `selectedRowIndex`, qui reste un index dans `rows` (la liste complète).
+              rowClassName={(row, index) =>
                 cn(
-                  index === selectedRowIndex
+                  String(row.id) === selectedRowId
                     ? 'bg-[#f7f4ea] shadow-[inset_3px_0_0_#235a36]'
                     : index % 2
                       ? 'bg-[#fffdf8]'
                       : 'bg-white',
                 )
               }
-              emptyMessage={`Aucun enregistrement pour ${entity.label.toLowerCase()}.`}
+              emptyMessage={
+                searchQuery
+                  ? `Aucun résultat pour « ${search.trim()} ».`
+                  : `Aucun enregistrement pour ${entity.label.toLowerCase()}.`
+              }
+              sort={sort ?? undefined}
+              onSortChange={toggleSort}
             />
+          )}
+
+          {!rowsLoading && totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-[#f1ecdd] px-5 py-3">
+              <span className="font-sans text-[11.5px] font-medium text-ifvm-text-weak">
+                Page {currentPage} / {totalPages} · {sortedRows.length} enregistrement
+                {sortedRows.length > 1 ? 's' : ''}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="rounded-[8px] border border-[#e0d9c4] bg-white px-3 py-2 font-sans text-[11.5px] font-semibold text-ifvm-text-tertiary disabled:opacity-50"
+                >
+                  ← Précédent
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="rounded-[8px] border border-[#e0d9c4] bg-white px-3 py-2 font-sans text-[11.5px] font-semibold text-ifvm-text-tertiary disabled:opacity-50"
+                >
+                  Suivant →
+                </button>
+              </div>
+            </div>
           )}
 
           <p className="border-t border-[#f1ecdd] px-5 py-3 font-sans text-[11.5px] font-medium text-ifvm-text-weak">

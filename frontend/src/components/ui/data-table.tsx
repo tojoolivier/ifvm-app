@@ -19,6 +19,17 @@ export interface DataTableColumn<T> {
   align?: 'left' | 'right'
   mono?: boolean
   render: (row: T) => React.ReactNode
+  /**
+   * Valeur brute comparable, utilisée pour trier la colonne — `render` ne
+   * suffit pas, il renvoie du JSX. Une colonne sans `sortValue` n'affiche pas
+   * d'en-tête cliquable, même si `sort`/`onSortChange` sont fournis.
+   */
+  sortValue?: (row: T) => string | number | boolean | null
+}
+
+export interface DataTableSort {
+  key: string
+  direction: 'asc' | 'desc'
 }
 
 interface DataTableProps<T> {
@@ -29,6 +40,10 @@ interface DataTableProps<T> {
   emptyMessage?: string
   /** Classes par ligne — sert au marqueur de ligne sélectionnée de la maquette (`inset 3px 0 0`). */
   rowClassName?: (row: T, index: number) => string | undefined
+  /** Tri courant — omis pour un tableau non triable (le comportement par défaut, inchangé). */
+  sort?: DataTableSort
+  /** Appelé avec `column.key` au clic sur un en-tête triable — bascule asc/desc/aucun tri côté appelant. */
+  onSortChange?: (key: string) => void
 }
 
 export function DataTable<T>({
@@ -38,6 +53,8 @@ export function DataTable<T>({
   onRowClick,
   emptyMessage = 'Aucune donnée.',
   rowClassName,
+  sort,
+  onSortChange,
 }: DataTableProps<T>) {
   // Padding de cellule du handoff (README §Design tokens) : 12px, porté à 20px
   // en première et dernière colonne pour aligner le contenu sur le bord de carte.
@@ -47,18 +64,39 @@ export function DataTable<T>({
     <Table>
       <TableHeader>
         <TableRow className="border-b-0 hover:bg-transparent">
-          {columns.map((column, index) => (
-            <TableHead
-              key={column.key}
-              className={cn(
-                'h-auto bg-background py-[9px] font-sans text-[9.5px] font-semibold uppercase tracking-[.8px] text-ifvm-text-weak',
-                paddingX(index),
-                column.align === 'right' && 'text-right',
-              )}
-            >
-              {column.header}
-            </TableHead>
-          ))}
+          {columns.map((column, index) => {
+            const sortable = Boolean(column.sortValue && onSortChange)
+            const active = sort?.key === column.key
+            return (
+              <TableHead
+                key={column.key}
+                aria-sort={sortable ? (active ? (sort!.direction === 'asc' ? 'ascending' : 'descending') : 'none') : undefined}
+                className={cn(
+                  'h-auto bg-background py-[9px] font-sans text-[9.5px] font-semibold uppercase tracking-[.8px] text-ifvm-text-weak',
+                  paddingX(index),
+                  column.align === 'right' && 'text-right',
+                )}
+              >
+                {sortable ? (
+                  <button
+                    type="button"
+                    onClick={() => onSortChange!(column.key)}
+                    className={cn(
+                      'inline-flex select-none items-center gap-[3px] border-0 bg-transparent p-0 font-sans text-[9.5px] font-semibold uppercase tracking-[.8px] text-inherit',
+                      column.align === 'right' && 'flex-row-reverse',
+                    )}
+                  >
+                    {column.header}
+                    <span aria-hidden="true" className="text-[8px] leading-none text-inherit opacity-70">
+                      {active ? (sort!.direction === 'asc' ? '▲' : '▼') : '↕'}
+                    </span>
+                  </button>
+                ) : (
+                  column.header
+                )}
+              </TableHead>
+            )
+          })}
         </TableRow>
       </TableHeader>
       <TableBody>
