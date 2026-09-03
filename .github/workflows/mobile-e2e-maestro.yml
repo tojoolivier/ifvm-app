@@ -158,6 +158,18 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      # Le disque système du runner ubuntu-latest n'a pas assez d'espace libre
+      # pour la partition userdata de l'image system x86_64 (echec constate en
+      # run reel : "Not enough space to create userdata partition. Available:
+      # 3407.09 MB, need 7372.80 MB"). On libere l'espace occupe par des
+      # toolchains preinstallees et non utilisees par ce job (.NET, Haskell,
+      # Android NDK pousse par defaut) — pattern documente pour ce probleme
+      # recurrent avec les emulateurs Android sur runners GitHub-heberges.
+      - name: Libere de l'espace disque pour l'emulateur
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk/ndk /opt/ghc
+          df -h /
+
       # Le build inclut l'ABI x86_64 specifiquement pour l'emulateur (voir
       # .github/workflows/mobile-build.yml). Compte e2e-bot seede par #194
       # (backend/app/e2e_seed.py, docs/e2e-seed.md) — email non secret, mot de
