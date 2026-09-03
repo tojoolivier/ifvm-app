@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 
 interface LoginResponse {
   access_token: string
+  refresh_token: string
 }
 
 interface RegisterPayload {
@@ -43,6 +44,7 @@ export function LoginPage() {
     mutationFn: () => login(email, password),
     onSuccess: (data) => {
       localStorage.setItem('access_token', data.access_token)
+      localStorage.setItem('refresh_token', data.refresh_token)
       navigate('/')
     },
   })
