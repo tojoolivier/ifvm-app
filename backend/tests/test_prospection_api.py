@@ -168,11 +168,15 @@ async def test_create_prospection_population_extensive_imagos_larves(
                 {
                     "espece": "LMC",
                     "categorie": "imago",
+                    "densite_diffuse": 8.0,
                     "densite_groupee": 0.0,
                     "accouplement": "dominant",
                     "ponte": "rare",
                     "interdistance": 25.5,
-                    "type_cible": "vol_clair",
+                    # Multi-select (#type-cible-multi-select) : Vol clair + Dense
+                    # simultanément, pour vérifier que les deux valeurs survivent au
+                    # round-trip, pas seulement une valeur scalaire unique.
+                    "type_cible": ["vol_clair", "dense"],
                     "etat": "repos",
                     "essaim_en_vol": False,
                     "essaim_pose": True,
@@ -180,11 +184,12 @@ async def test_create_prospection_population_extensive_imagos_larves(
                 {
                     "espece": "NSE",
                     "categorie": "imago",
+                    "densite_diffuse": 6.0,
                     "densite_groupee": 0.0,
                     "accouplement": "neant",
                     "ponte": "beaucoup",
                     "interdistance": 40.75,
-                    "type_cible": "tres_dense",
+                    "type_cible": ["tres_dense"],
                     "direction_de": "N",
                     "direction_vers": "S",
                     "etat": "deplacement",
@@ -194,6 +199,7 @@ async def test_create_prospection_population_extensive_imagos_larves(
                 {
                     "espece": "LMC",
                     "categorie": "larve",
+                    "densite_diffuse": 5.0,
                     "densite_groupee": 0.0,
                     "surface_contaminee_ha": 12.75,
                 },
@@ -212,7 +218,7 @@ async def test_create_prospection_population_extensive_imagos_larves(
     assert lmc_imago["accouplement"] == "dominant"
     assert lmc_imago["ponte"] == "rare"
     assert lmc_imago["interdistance"] == 25.5
-    assert lmc_imago["type_cible"] == "vol_clair"
+    assert lmc_imago["type_cible"] == ["vol_clair", "dense"]
     assert lmc_imago["etat"] == "repos"
     assert lmc_imago["essaim_en_vol"] is False
     assert lmc_imago["essaim_pose"] is True
@@ -222,7 +228,7 @@ async def test_create_prospection_population_extensive_imagos_larves(
     assert nse_imago["ponte"] == "beaucoup"
     # LMC et NSE ne doivent jamais partager la même valeur ici (indépendance par espèce).
     assert nse_imago["interdistance"] == 40.75
-    assert nse_imago["type_cible"] == "tres_dense"
+    assert nse_imago["type_cible"] == ["tres_dense"]
     assert nse_imago["direction_de"] == "N"
     assert nse_imago["direction_vers"] == "S"
     assert nse_imago["etat"] == "deplacement"
@@ -231,6 +237,35 @@ async def test_create_prospection_population_extensive_imagos_larves(
 
     lmc_larve = by_key[("LMC", "larve")]
     assert lmc_larve["surface_contaminee_ha"] == 12.75
+
+
+@pytest.mark.asyncio
+async def test_create_prospection_population_densite_diffuse_obligatoire(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+):
+    """#densite-diffuse-obligatoire : une population sans densité diffuse est
+    rejetée (422) avec le message FR dédié — même mécanisme que
+    _densite_groupee_obligatoire, aucune contrainte DB, tolérance aux anciennes
+    fiches préservée côté lecture (PopulationRead)."""
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "extensive",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-08-26",
+            "populations": [
+                {
+                    "espece": "LMC",
+                    "categorie": "imago",
+                    "densite_groupee": 4.0,
+                }
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+    assert "La densité diffuse (D/ha) est obligatoire." in response.text
 
 
 @pytest.mark.asyncio
@@ -1064,6 +1099,7 @@ async def test_create_prospection_extensive_avec_populations_agregees(
                         "L6": 0,
                         "L7": 0,
                     },
+                    "densite_diffuse": 1.8,
                     "densite_groupee": 0.0,
                     "tache_larvaire": True,
                     "bande_larvaire": False,

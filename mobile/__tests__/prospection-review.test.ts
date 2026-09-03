@@ -45,6 +45,7 @@ import {
   syncOneProspection,
   syncAllProspections,
   formatChrono,
+  infestationDetailHasData,
 } from '../src/lib/prospection-review';
 
 jest.mock('../src/lib/prospection-repository', () => ({
@@ -316,6 +317,57 @@ describe('buildRecapitulatif', () => {
     expect(recap.densites).toHaveLength(4);
     expect(recap.densites.every((d) => d.densiteDiffuse === null && d.densiteGroupee === null)).toBe(true);
   });
+
+  /** #infestation-recap-intensive : la carte « Infestation » du récapitulatif
+   * Intensive doit afficher le nombre de captures + densités réellement saisis
+   * pour Imagos/Larves × LMC/NSE — jamais de valeur fictive. */
+  it('infestationDetail combine nombre de captures et densités, toujours les 4 blocs Imagos/Larves × LMC/NSE', () => {
+    const captures: CaptureRow[] = [
+      { espece: 'LMC', categorie: 'imago', sexe: 'F', phase: 'transiens', stade: 'A1', effectif: 5 },
+      { espece: 'LMC', categorie: 'imago', sexe: 'M', phase: 'gregaire', stade: 'A1', effectif: 2 },
+      { espece: 'NSE', categorie: 'larve', sexe: null, phase: 'gregaire', stade: 'L1', effectif: 3 },
+    ];
+    const populations: PopulationRow[] = [
+      { espece: 'LMC', categorie: 'imago', densite_diffuse: 12, densite_groupee: 4, methode: null, accouplement: null, ponte: null },
+    ];
+    const recap = buildRecapitulatif(draft(), captures, '', [], populations);
+
+    expect(recap.infestationDetail).toEqual([
+      { key: 'imago-LMC', categorie: 'imago', espece: 'LMC', label: 'Locusta', nombre: 7, densiteDiffuse: 12, densiteGroupee: 4 },
+      { key: 'imago-NSE', categorie: 'imago', espece: 'NSE', label: 'Nomadacris', nombre: 0, densiteDiffuse: null, densiteGroupee: null },
+      { key: 'larve-LMC', categorie: 'larve', espece: 'LMC', label: 'Locusta', nombre: 0, densiteDiffuse: null, densiteGroupee: null },
+      { key: 'larve-NSE', categorie: 'larve', espece: 'NSE', label: 'Nomadacris', nombre: 3, densiteDiffuse: null, densiteGroupee: null },
+    ]);
+  });
+
+  it('infestationDetail : un nombre de captures à 0 (réellement enregistré) n’est pas confondu avec une absence de donnée', () => {
+    const recap = buildRecapitulatif(draft(), [], '', []);
+    expect(recap.infestationDetail).toHaveLength(4);
+    // Toujours un nombre (0 par défaut, jamais null) — seules les densités distinguent
+    // "non renseigné" (null) d'une vraie valeur.
+    expect(recap.infestationDetail.every((d) => d.nombre === 0)).toBe(true);
+    expect(recap.infestationDetail.every((d) => d.densiteDiffuse === null && d.densiteGroupee === null)).toBe(true);
+  });
+});
+
+describe('infestationDetailHasData', () => {
+  const base = { key: 'imago-LMC', categorie: 'imago' as const, espece: 'LMC' as const, label: 'Locusta' };
+
+  it('faux quand rien n’a été renseigné (nombre à 0, densités absentes)', () => {
+    expect(infestationDetailHasData({ ...base, nombre: 0, densiteDiffuse: null, densiteGroupee: null })).toBe(false);
+  });
+
+  it('vrai dès qu’il y a des captures, même sans densité', () => {
+    expect(infestationDetailHasData({ ...base, nombre: 5, densiteDiffuse: null, densiteGroupee: null })).toBe(true);
+  });
+
+  it('vrai si une densité est renseignée, même avec 0 capture', () => {
+    expect(infestationDetailHasData({ ...base, nombre: 0, densiteDiffuse: 12, densiteGroupee: null })).toBe(true);
+  });
+
+  it('une densité à 0 (réellement saisie) compte comme renseignée, pas comme absente', () => {
+    expect(infestationDetailHasData({ ...base, nombre: 0, densiteDiffuse: 0, densiteGroupee: null })).toBe(true);
+  });
 });
 
 describe('enregistrerEtSynchroniser', () => {
@@ -357,7 +409,7 @@ describe('enregistrerEtSynchroniser', () => {
     mockListAllPopulations.mockResolvedValue([
       {
         espece: 'NSE', categorie: 'imago', densite_diffuse: null, densite_groupee: null, methode: null,
-        accouplement: 'neant', ponte: 'beaucoup', interdistance: 40.75, type_cible: 'tres_dense',
+        accouplement: 'neant', ponte: 'beaucoup', interdistance: 40.75, type_cible: '["tres_dense"]',
         direction_de: 'N', direction_vers: 'S', etat: 'deplacement', essaim_en_vol: true, essaim_pose: false,
       },
       {
@@ -375,7 +427,7 @@ describe('enregistrerEtSynchroniser', () => {
         populations: [
           expect.objectContaining({
             espece: 'NSE', accouplement: 'neant', ponte: 'beaucoup', interdistance: 40.75,
-            type_cible: 'tres_dense', direction_de: 'N', direction_vers: 'S',
+            type_cible: ['tres_dense'], direction_de: 'N', direction_vers: 'S',
             etat: 'deplacement', essaim_en_vol: true, essaim_pose: false,
           }),
           expect.objectContaining({ espece: 'LMC', surface_contaminee_ha: 12.75 }),

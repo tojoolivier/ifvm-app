@@ -1711,7 +1711,11 @@ export interface components {
             deplacement?: components["schemas"]["Deplacement"] | null;
             /** Surface Contaminee Ha */
             surface_contaminee_ha?: number | null;
-            type_cible?: components["schemas"]["TypeCibleImago"] | null;
+            /**
+             * Type Cible
+             * @default []
+             */
+            type_cible: components["schemas"]["TypeCibleImago"][];
             /** Direction De */
             direction_de?: string | null;
             /** Direction Vers */
@@ -1766,7 +1770,11 @@ export interface components {
             deplacement?: components["schemas"]["Deplacement"] | null;
             /** Surface Contaminee Ha */
             surface_contaminee_ha?: number | null;
-            type_cible?: components["schemas"]["TypeCibleImago"] | null;
+            /**
+             * Type Cible
+             * @default []
+             */
+            type_cible: components["schemas"]["TypeCibleImago"][];
             /** Direction De */
             direction_de?: string | null;
             /** Direction Vers */

@@ -52,10 +52,10 @@ describe('HEURE_STRICTE_RE', () => {
 });
 
 describe('createEmptySpeciesData (imago)', () => {
-  it('démarre à zéro, sans espèce/état choisis', () => {
+  it('démarre à zéro, sans espèce/état/type de cible choisis (#type-cible-multi-select)', () => {
     const data = createEmptySpeciesData();
     expect(data.totalCaptures).toBe(0);
-    expect(data.typeCible).toBe('vol_clair');
+    expect(data.typeCible).toEqual([]);
     expect(data.etat).toBeNull();
     expect(data.comportementEssaim).toBeNull();
     expect(data.accouplement).toBeNull();
@@ -109,7 +109,7 @@ describe('speciesDataToPopulationRow / populationRowToSpeciesData — round-trip
       accouplement: 'Dominant',
       ponte: 'Beaucoup',
       interdistance: '25.5',
-      typeCible: 'tres_dense' as const,
+      typeCible: ['tres_dense' as const],
       etat: 'deplacement' as const,
       comportementEssaim: 'vol' as const,
       directionDe: 'Nord',
@@ -119,7 +119,7 @@ describe('speciesDataToPopulationRow / populationRowToSpeciesData — round-trip
     expect(row.accouplement).toBe('Dominant');
     expect(row.ponte).toBe('Beaucoup');
     expect(row.interdistance).toBe(25.5);
-    expect(row.type_cible).toBe('tres_dense');
+    expect(row.type_cible).toBe('["tres_dense"]');
     expect(row.etat).toBe('deplacement');
     expect(row.essaim_en_vol).toBe(true);
     expect(row.essaim_pose).toBe(false);
@@ -130,7 +130,7 @@ describe('speciesDataToPopulationRow / populationRowToSpeciesData — round-trip
     expect(restored.accouplement).toBe('Dominant');
     expect(restored.ponte).toBe('Beaucoup');
     expect(restored.interdistance).toBe('25.5');
-    expect(restored.typeCible).toBe('tres_dense');
+    expect(restored.typeCible).toEqual(['tres_dense']);
     expect(restored.etat).toBe('deplacement');
     expect(restored.comportementEssaim).toBe('vol');
     expect(restored.directionDe).toBe('Nord');
