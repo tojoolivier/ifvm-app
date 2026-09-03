@@ -15,10 +15,12 @@ import {
 import { enregistrerEtSynchroniser } from '@/lib/prospection-review';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import {
+  BIOTOPE_EXTENSIVE_OPTIONS,
   TYPE_OPERATION_OPTIONS,
   formatDuree,
   imagoTotalFromRow,
   larveTotalFromRow,
+  parseSelectionMultiple,
   typeCibleImagoLabel,
 } from '@/lib/prospection-extensive';
 import { DEGATS_OPTIONS, formatHeureLocale } from '@/lib/prospection-fiche-lecture';
@@ -158,6 +160,16 @@ function buildReferencesAeriennesRows(draft: DraftProspection): DetailRow[] {
 
 function typeOperationLabel(value: string): string {
   return TYPE_OPERATION_OPTIONS.find((o) => o.value === value)?.label ?? value;
+}
+
+/** Biotopes/type de station (#biotope-multi) : `draft.type_station` est un JSON
+ * encodé (`'["xerophyle","mesophyle"]'`) — jamais affiché brut. */
+function typeStationLabel(raw: string | null): string {
+  const valeurs = parseSelectionMultiple(raw);
+  if (valeurs.length === 0) return '—';
+  return valeurs
+    .map((v) => BIOTOPE_EXTENSIVE_OPTIONS.find((o) => o.value === v)?.label ?? v)
+    .join(', ');
 }
 
 /** « Dégâts sur les cultures » (D — Observations, Terrestre + Aérien) — le même
@@ -362,7 +374,7 @@ export default function ExtensiveRecapScreen() {
 
               <Text style={styles.detailSubtitle}>Référence</Text>
               <View style={styles.summaryCard}>
-                <Text style={styles.detailLine}>Station : {draft.station_libre ?? '—'} · Type : {draft.type_station ?? '—'}</Text>
+                <Text style={styles.detailLine}>Station : {draft.station_libre ?? '—'} · Type : {typeStationLabel(draft.type_station)}</Text>
                 <Text style={styles.detailLine}>
                   GPS : {draft.latitude?.toFixed(4) ?? '—'}, {draft.longitude?.toFixed(4) ?? '—'}
                 </Text>
@@ -522,7 +534,7 @@ export default function ExtensiveRecapScreen() {
 
               <Text style={[styles.detailSubtitle, { marginTop: 8 }]}>Station</Text>
               <Text style={styles.detailLine}>Station : {draft.station_libre ?? '—'}</Text>
-              <Text style={styles.detailLine}>Type de station : {draft.type_station ?? '—'}</Text>
+              <Text style={styles.detailLine}>Type de station : {typeStationLabel(draft.type_station)}</Text>
               <Text style={styles.detailLine}>
                 GPS : {draft.latitude?.toFixed(4) ?? '—'}, {draft.longitude?.toFixed(4) ?? '—'}
               </Text>

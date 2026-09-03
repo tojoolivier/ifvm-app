@@ -30,6 +30,7 @@ import {
   TypeOperationAerienne,
   calculerDureeMinutes,
   formatDuree,
+  parseSelectionMultiple,
 } from '@/lib/prospection-extensive';
 import { TimeField } from '@/components/TimeField';
 import { formatHeureLocale } from '@/lib/prospection-fiche-lecture';
@@ -180,7 +181,16 @@ export default function ExtensiveReferenceScreen() {
   const [isLoadingGps, setIsLoadingGps] = useState<boolean>(false);
   const [gpsError, setGpsError] = useState<string>('');
   const [stationLibre, setStationLibre] = useState(draft?.station_libre ?? '');
-  const [typeStation, setTypeStation] = useState(draft?.type_station ?? '');
+  // Type de station / biotope (#biotope-multi) : sélection multiple, reste
+  // facultatif (aucun contrôle « au moins un » — comportement inchangé).
+  const [selectedTypeStation, setSelectedTypeStation] = useState<string[]>(
+    parseSelectionMultiple(draft?.type_station ?? null)
+  );
+  const toggleTypeStation = (value: string) => {
+    setSelectedTypeStation((current) =>
+      current.includes(value) ? current.filter((v) => v !== value) : [...current, value]
+    );
+  };
   const [surfaceStation, setSurfaceStation] = useState(draft?.surface_station != null ? String(draft.surface_station) : '');
   const [surfaceInfestee, setSurfaceInfestee] = useState(draft?.surface_infestee != null ? String(draft.surface_infestee) : '');
   const [nMessage, setNMessage] = useState(
@@ -272,7 +282,7 @@ export default function ExtensiveReferenceScreen() {
     refHydratedRef.current = draft.id;
     void Promise.resolve().then(() => {
       setStationLibre(draft.station_libre ?? '');
-      setTypeStation(draft.type_station ?? '');
+      setSelectedTypeStation(parseSelectionMultiple(draft.type_station));
       setSurfaceStation(draft.surface_station != null ? String(draft.surface_station) : '');
       setSurfaceInfestee(draft.surface_infestee != null ? String(draft.surface_infestee) : '');
       setNMessage(draft.n_message ?? generateNumeroMessage(draft.id, draft.date_prospection));
@@ -350,16 +360,16 @@ export default function ExtensiveReferenceScreen() {
 
     return run(
       async () => {
-        // Convertit en minuscules et remplace les espaces par des underscores.
-        const normalizedTypeStation = typeStation
-          ? typeStation.toLowerCase().replace(/\s+/g, '_')
-          : null;
+        // #biotope-multi : même normalisation qu'avant (minuscules, espaces →
+        // underscores), appliquée à chaque élément du tableau plutôt qu'à une
+        // chaîne scalaire ; stocké en JSON, comme `sol.texture` (cf. veg.tsx).
+        const normalizedTypeStation = selectedTypeStation.map((v) => v.toLowerCase().replace(/\s+/g, '_'));
 
         const updated = await updateProspectionExtensiveReference(draftId, {
           latitude: latitude ? parseFloat(latitude) : null,
           longitude: longitude ? parseFloat(longitude) : null,
           stationLibre: stationLibre || null,
-          typeStation: normalizedTypeStation,
+          typeStation: normalizedTypeStation.length > 0 ? JSON.stringify(normalizedTypeStation) : null,
           surfaceStation: surfaceStation ? parseFloat(surfaceStation) : null,
           surfaceInfestee: surfaceInfestee ? parseFloat(surfaceInfestee) : null,
           nMessage: nMessage || null,
@@ -692,13 +702,16 @@ export default function ExtensiveReferenceScreen() {
               </>
             )}
 
-            <Text style={styles.sectionLabel}>Type de station (biotope)</Text>
+            <Text style={styles.sectionLabel}>Biotopes (type de station) — sélection multiple</Text>
             <View style={styles.chipsRow}>
               {BIOTOPE_EXTENSIVE_OPTIONS.map((option) => {
-                const active = option.value === typeStation;
+                const active = selectedTypeStation.includes(option.value);
                 return (
-                  <TouchableOpacity key={option.value} onPress={() => setTypeStation(option.value)} activeOpacity={0.7}>
-                    <Text style={[styles.chip, active && styles.chipActive]}>{option.label}</Text>
+                  <TouchableOpacity key={option.value} onPress={() => toggleTypeStation(option.value)} activeOpacity={0.7}>
+                    <Text style={[styles.chip, active && styles.chipActive]}>
+                      {option.label}
+                      {active && ' ✓'}
+                    </Text>
                   </TouchableOpacity>
                 );
               })}

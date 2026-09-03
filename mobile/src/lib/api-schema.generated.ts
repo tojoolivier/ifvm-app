@@ -1859,6 +1859,8 @@ export interface components {
             produit_id: string;
             /** Quantite L */
             quantite_l: number;
+            /** Nom Commercial */
+            nom_commercial?: string | null;
         };
         /** ProduitUtiliseRead */
         ProduitUtiliseRead: {
@@ -1876,6 +1878,8 @@ export interface components {
             produit_id: string;
             /** Quantite L */
             quantite_l: number;
+            /** Nom Commercial */
+            nom_commercial?: string | null;
         };
         /** ProspectionCreate */
         ProspectionCreate: {
@@ -1904,7 +1908,11 @@ export interface components {
             longitude?: number | null;
             /** Altitude */
             altitude?: number | null;
-            biotope?: components["schemas"]["Biotope"] | null;
+            /**
+             * Biotope
+             * @default []
+             */
+            biotope: components["schemas"]["Biotope"][];
             /** Surface Station */
             surface_station?: number | null;
             /** Surface Prospectee */
@@ -1954,7 +1962,11 @@ export interface components {
             heure_observation_at?: string | null;
             /** Station Libre */
             station_libre?: string | null;
-            type_station?: components["schemas"]["TypeStation"] | null;
+            /**
+             * Type Station
+             * @default []
+             */
+            type_station: components["schemas"]["TypeStation"][];
             verdure_strate?: components["schemas"]["VerdureStrate"] | null;
             /** Signalement Source */
             signalement_source?: string | null;
@@ -2075,7 +2087,11 @@ export interface components {
             longitude: number | null;
             /** Altitude */
             altitude: number | null;
-            biotope: components["schemas"]["Biotope"] | null;
+            /**
+             * Biotope
+             * @default []
+             */
+            biotope: components["schemas"]["Biotope"][];
             /** Surface Station */
             surface_station: number | null;
             /** Surface Prospectee */
@@ -2135,7 +2151,11 @@ export interface components {
             heure_observation_at?: string | null;
             /** Station Libre */
             station_libre?: string | null;
-            type_station?: components["schemas"]["TypeStation"] | null;
+            /**
+             * Type Station
+             * @default []
+             */
+            type_station: components["schemas"]["TypeStation"][];
             verdure_strate?: components["schemas"]["VerdureStrate"] | null;
             /** Signalement Source */
             signalement_source?: string | null;
@@ -2235,7 +2255,8 @@ export interface components {
             longitude?: number | null;
             /** Altitude */
             altitude?: number | null;
-            biotope?: components["schemas"]["Biotope"] | null;
+            /** Biotope */
+            biotope?: components["schemas"]["Biotope"][] | null;
             /** Surface Station */
             surface_station?: number | null;
             /** Surface Prospectee */
@@ -2284,7 +2305,8 @@ export interface components {
             heure_observation_at?: string | null;
             /** Station Libre */
             station_libre?: string | null;
-            type_station?: components["schemas"]["TypeStation"] | null;
+            /** Type Station */
+            type_station?: components["schemas"]["TypeStation"][] | null;
             verdure_strate?: components["schemas"]["VerdureStrate"] | null;
             /** Signalement Source */
             signalement_source?: string | null;
@@ -2398,6 +2420,8 @@ export interface components {
              * Format: time
              */
             heure_fin: string;
+            /** Nom Commercial */
+            nom_commercial?: string | null;
         };
         /** RotationRead */
         RotationRead: {
@@ -2435,6 +2459,8 @@ export interface components {
              * Format: time
              */
             heure_fin: string;
+            /** Nom Commercial */
+            nom_commercial?: string | null;
         };
         /**
          * Sexe

@@ -20,6 +20,23 @@ const KIT_ROWS: { key: 'kit_combinaison' | 'kit_gants' | 'kit_lunettes' | 'kit_m
   { key: 'kit_botte', label: 'Botte' },
 ];
 
+// Saisie francophone : la virgule est le séparateur décimal attendu par l'utilisateur,
+// mais JS/JSON n'utilisent que le point en interne — conversion aux deux frontières
+// (affichage → virgule, parsing → point), la valeur stockée reste un `number` standard.
+// Même paire de fonctions que (prospection)/veg.tsx — pas mutualisée, les deux écrans
+// n'ont pas de dépendance commune adaptée pour l'instant.
+function parseDecimalInput(raw: string): number | null {
+  if (raw === '') return null;
+  const val = Number(raw.replace(',', '.'));
+  return isNaN(val) ? null : val;
+}
+
+function formatDecimalDisplay(value: number | null): string {
+  return value != null ? String(value).replace('.', ',') : '';
+}
+
+type VegetationDecimalField = 'herbeuse' | 'arboree' | 'recouvrement';
+
 const ZONES = [
   { key: 'habitations', label: 'Habitations' },
   { key: 'points_eau', label: "Points d'eau" },
@@ -42,6 +59,10 @@ export default function MoyensScreen() {
   const [hauteurHerbeuse, setHauteurHerbeuse] = useState<number | null>(null);
   const [hauteurArboree, setHauteurArboree] = useState<number | null>(null);
   const [recouvrement, setRecouvrement] = useState<number | null>(null);
+  // Texte brut en cours de saisie pour les 3 champs décimaux de la végétation — permet de
+  // taper la virgule ou un zéro de fin ("1,", "1,50") sans que le champ ne se reformate à
+  // chaque frappe (cf. `formatDecimalDisplay` sinon appelé sur une valeur encore inexploitable).
+  const [decimalDrafts, setDecimalDrafts] = useState<Partial<Record<VegetationDecimalField, string>>>({});
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('moyens');
 
@@ -79,6 +100,38 @@ export default function MoyensScreen() {
   // comptage. Le nombre exact par matériel reste visible ligne par ligne.
   const nbKitFournis = KIT_ROWS.filter((row) => (kit[row.key] ?? 0) > 0).length;
   const recouvrementErrors = validateRecouvrement(recouvrement);
+
+  const vegetationFieldSetters: Record<VegetationDecimalField, (v: number | null) => void> = {
+    herbeuse: setHauteurHerbeuse,
+    arboree: setHauteurArboree,
+    recouvrement: setRecouvrement,
+  };
+
+  // Accepte "," et "." et tolère la saisie intermédiaire ("1," / "1.") sans la figer tant
+  // qu'elle n'est pas exploitable — même logique que `handleDecimalChange` de veg.tsx.
+  const handleVegetationChange = (field: VegetationDecimalField, raw: string) => {
+    if (raw !== '' && !/^\d*[.,]?\d*$/.test(raw)) return;
+    setDecimalDrafts((current) => ({ ...current, [field]: raw }));
+    if (raw === '') {
+      vegetationFieldSetters[field](null);
+      return;
+    }
+    if (raw.endsWith('.') || raw.endsWith(',')) return;
+    const val = parseDecimalInput(raw);
+    if (val === null) return;
+    vegetationFieldSetters[field](val);
+  };
+
+  // Resynchronise l'affichage sur la valeur numérique canonique (virgule) une fois la
+  // saisie terminée.
+  const handleVegetationBlur = (field: VegetationDecimalField) => {
+    setDecimalDrafts((current) => {
+      if (current[field] === undefined) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  };
 
   const handleContinuer = () =>
     run(
@@ -158,29 +211,36 @@ export default function MoyensScreen() {
         </View>
 
         <Text style={styles.label}>Végétation</Text>
+
+        <Text style={styles.fieldLabel}>Strate herbeuse (m)</Text>
         <TextInput
           editable={!readOnly}
           style={styles.input}
-          placeholder="Strate herbeuse (m)"
-          keyboardType="numeric"
-          value={hauteurHerbeuse != null ? String(hauteurHerbeuse) : ''}
-          onChangeText={(v) => setHauteurHerbeuse(v ? Number(v) : null)}
+          placeholder="Ex. 1,5"
+          keyboardType="decimal-pad"
+          value={decimalDrafts.herbeuse ?? formatDecimalDisplay(hauteurHerbeuse)}
+          onChangeText={(v) => handleVegetationChange('herbeuse', v)}
+          onBlur={() => handleVegetationBlur('herbeuse')}
         />
+        <Text style={styles.fieldLabel}>Strate arborée (m)</Text>
         <TextInput
           editable={!readOnly}
           style={styles.input}
-          placeholder="Strate arborée (m)"
-          keyboardType="numeric"
-          value={hauteurArboree != null ? String(hauteurArboree) : ''}
-          onChangeText={(v) => setHauteurArboree(v ? Number(v) : null)}
+          placeholder="Ex. 2,5"
+          keyboardType="decimal-pad"
+          value={decimalDrafts.arboree ?? formatDecimalDisplay(hauteurArboree)}
+          onChangeText={(v) => handleVegetationChange('arboree', v)}
+          onBlur={() => handleVegetationBlur('arboree')}
         />
+        <Text style={styles.fieldLabel}>Recouvrement (%)</Text>
         <TextInput
           editable={!readOnly}
           style={styles.input}
-          placeholder="Recouvrement (%)"
-          keyboardType="numeric"
-          value={recouvrement != null ? String(recouvrement) : ''}
-          onChangeText={(v) => setRecouvrement(v ? Number(v) : null)}
+          placeholder="Ex. 80"
+          keyboardType="decimal-pad"
+          value={decimalDrafts.recouvrement ?? formatDecimalDisplay(recouvrement)}
+          onChangeText={(v) => handleVegetationChange('recouvrement', v)}
+          onBlur={() => handleVegetationBlur('recouvrement')}
         />
         {recouvrementErrors.map((e) => (
           <Text key={e.field} style={styles.error}>{e.message}</Text>
@@ -225,6 +285,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   label: { fontFamily: traitementFonts.uiMedium, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
+  fieldLabel: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   input: {
     minHeight: 44,

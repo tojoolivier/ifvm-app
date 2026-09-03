@@ -2,9 +2,10 @@ import { Fragment } from 'react';
 import { View, Text, TextInput, TouchableOpacity } from 'react-native';
 import { UtilisateurEquipe, Pesticide } from '@/lib/referentiel-db';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
-import { computeNbRotations, computeTotalPesticideAerien } from '@/lib/traitement-validation';
+import { computeNbRotations, computeTotalPesticideAerien, deriveNomCommercial } from '@/lib/traitement-validation';
 import { Card } from '@/components/traitement/Card';
 import { Chip } from '@/components/traitement/Chip';
+import { ProduitSelectField } from '@/components/traitement/ProduitSelectField';
 import { TimeField } from '@/components/traitement/TimeField';
 import { formStyles as styles } from '@/components/traitement/TraitementFormStyles';
 
@@ -119,17 +120,22 @@ export function AerienForm({
             value={rotation.quantite_l != null ? String(rotation.quantite_l) : ''}
             onChangeText={(v) => store.updateRotation(rotation.localId, { quantite_l: v ? Number(v) : null })}
           />
-          <Text style={styles.label}>Produit *</Text>
-          <View style={styles.chipRow}>
-            {pesticides.map((p) => (
-              <Chip
-                key={p.id}
-                label={p.nom}
-                selected={rotation.produit_id === p.id}
-                onPress={() => !readOnly && store.updateRotation(rotation.localId, { produit_id: p.id })}
-              />
-            ))}
-          </View>
+          <Text style={styles.label}>Produit / matières actives *</Text>
+          <ProduitSelectField
+            pesticides={pesticides}
+            selectedId={rotation.produit_id}
+            readOnly={readOnly}
+            onSelect={(p) =>
+              store.updateRotation(rotation.localId, {
+                produit_id: p.id,
+                nom_commercial: deriveNomCommercial(p.nom),
+              })
+            }
+          />
+          <Card variant="derivee">
+            <Text style={styles.label}>Nom commercial</Text>
+            <Text style={styles.derivedValue}>{rotation.nom_commercial || '—'}</Text>
+          </Card>
           <View style={styles.row}>
             <View style={styles.flex1}>
               <Text style={styles.label}>Heure début *</Text>

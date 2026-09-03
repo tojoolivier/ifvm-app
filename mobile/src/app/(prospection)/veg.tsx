@@ -113,10 +113,11 @@ export default function VegetationScreen() {
     ? (JSON.parse(draft.sol) as { humidite?: Humidite | null; texture?: string[] | null; solNu?: number | null })
     : null;
 
-  // Sol nu (%) — au niveau de la station, pas par strate (issue #278) : avec `surfRel`
-  // des 6 strates, partitionne 100% de la surface de la station prospectée.
-  const [solNu, setSolNu] = useState<number | null>(savedSol?.solNu ?? null);
-  const [solNuDraft, setSolNuDraft] = useState<string | undefined>(undefined);
+  // Sol nu (%) — au niveau de la station, pas par strate (issue #278) : avec le
+  // `recouvrement` des 6 strates, partitionne 100% de la surface de la station
+  // prospectée. Même présentation de saisie que le recouvrement (stepper par pas de
+  // 5%, pas un décimal libre) — les deux s'additionnent dans la même unité.
+  const [solNu, setSolNu] = useState<number>(savedSol?.solNu ?? 0);
   // N'affiche l'erreur de répartition qu'après une tentative de "Continuer" — comme
   // humidité/texture, pas dès la première frappe sur une strate.
   const [repartitionTouched, setRepartitionTouched] = useState(false);
@@ -142,7 +143,7 @@ export default function VegetationScreen() {
       scrollRef.current?.scrollToEnd({ animated: true });
     },
     onSubmit: async ({ value }) => {
-      // Sol nu + surfRel des 6 strates doivent totaliser 100% de la surface de la
+      // Sol nu + recouvrement des 6 strates doivent totaliser 100% de la surface de la
       // station (issue #278) — vérifié à la soumission, comme humidité/texture, pas
       // en direct à chaque frappe (les valeurs intermédiaires n'ont pas à être justes).
       if (!isSurfaceRepartitionValide({ strates, solNu })) {
@@ -185,7 +186,7 @@ export default function VegetationScreen() {
     vegHydratedRef.current = draft.id;
     const parsed = parseVegetationSol(draft.vegetation, draft.sol, draft.degats_cultures);
     setStrates(parsed.strates);
-    setSolNu(parsed.solNu);
+    setSolNu(parsed.solNu ?? 0);
     setSelectedTextures(parsed.texture);
     form.setFieldValue('humidite', parsed.humidite);
   }, [draft, draftId, form]);
@@ -259,25 +260,6 @@ export default function VegetationScreen() {
     clearDecimalDraft(key, field);
   };
 
-  // Sol nu (%), au niveau de la station — même patron que les champs décimaux libres
-  // d'une strate (handleDecimalChange/Blur), mais un seul champ, pas par strate.
-  const handleSolNuChange = (raw: string) => {
-    if (raw !== '' && !/^\d*[.,]?\d*$/.test(raw)) return;
-    setSolNuDraft(raw);
-    if (raw === '') {
-      setSolNu(null);
-      return;
-    }
-    if (raw.endsWith('.') || raw.endsWith(',')) return;
-    const val = parseDecimalInput(raw);
-    if (val === null) return;
-    setSolNu(clampPercent(val, 0, 100));
-  };
-
-  const handleSolNuBlur = () => {
-    setSolNuDraft(undefined);
-  };
-
   // ==========================================
   // STEPPER : incrément/décrément par pas de 5
   // ==========================================
@@ -286,6 +268,13 @@ export default function VegetationScreen() {
     const current = strates[key].recouvrement;
     const newValue = clampTo5(current + delta, 0, 100);
     setStrateField(key, 'recouvrement', newValue);
+  };
+
+  // Sol nu (%), au niveau de la station — même stepper par pas de 5 que le
+  // recouvrement de chaque strate (handleRecouvrementChange), mais un seul champ, pas
+  // par strate : les deux s'additionnent dans la même unité (issue #278).
+  const handleSolNuChange = (delta: number) => {
+    setSolNu((current) => clampTo5(current + delta, 0, 100));
   };
 
   const repartitionTotal = computeSurfaceRepartitionTotal({ strates, solNu });
@@ -309,30 +298,38 @@ export default function VegetationScreen() {
           </View>
 
           <ScrollView ref={scrollRef} style={styles.scroll} contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
-            <Text style={styles.hint}>Recouvrement total ≥ 100%. Touchez une strate pour la détailler.</Text>
+            <Text style={styles.hint}>
+              Sol nu + recouvrement des strates doit totaliser 100%. Touchez une strate pour la détailler.
+            </Text>
 
             <View style={[styles.card, repartitionTouched && !repartitionValide && styles.cardError]}>
               <Text style={styles.cardTitle}>Sol nu</Text>
               <Text style={styles.hintSmall}>
                 Au niveau de la station, indépendant des strates et cultures ci-dessous :
-                avec leur surface relative, doit totaliser 100% de la station prospectée.
+                avec leur recouvrement, doit totaliser 100% de la station prospectée.
               </Text>
-              <View style={styles.field}>
-                <Text style={styles.fieldLabel}>Sol nu %</Text>
-                <TextInput
-                  value={solNuDraft ?? formatDecimalDisplay(solNu)}
-                  onChangeText={handleSolNuChange}
-                  onBlur={handleSolNuBlur}
-                  keyboardType="decimal-pad"
-                  style={styles.fieldInput}
-                />
+              <View style={styles.recouvrementRow}>
+                <Text style={styles.recouvrementLabel}>Sol nu</Text>
+                <Text style={styles.recouvrementValue}>{solNu}%</Text>
               </View>
+              <View style={styles.stepperRow}>
+                <TouchableOpacity style={styles.stepperButton} onPress={() => handleSolNuChange(-5)}>
+                  <Text style={styles.stepperButtonText}>−</Text>
+                </TouchableOpacity>
+                <View style={styles.recBarTrack}>
+                  <View style={[styles.recBarFill, { width: `${solNu}%` as const }]} />
+                </View>
+                <TouchableOpacity style={[styles.stepperButton, styles.stepperButtonAdd]} onPress={() => handleSolNuChange(5)}>
+                  <Text style={[styles.stepperButtonText, styles.stepperButtonAddText]}>+</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.stepHint}>par pas de 5%</Text>
               <Text style={styles.totalRepartition}>
                 Total répartition (sol nu + strates) : {repartitionTotalDisplay}%
               </Text>
               {repartitionTouched && !repartitionValide && (
                 <Text style={styles.errorText}>
-                  La somme sol nu + surface relative des 6 strates doit égaler 100%
+                  La somme sol nu + recouvrement des 6 strates doit égaler 100%
                   (actuellement {repartitionTotalDisplay}%).
                 </Text>
               )}
@@ -539,8 +536,8 @@ export default function VegetationScreen() {
             </form.Field>
           </ScrollView>
 
-          <Text style={styles.totalRec}>
-            Total recouvrement : {STRATE_KEYS.reduce((sum, key) => sum + strates[key].recouvrement, 0)}%
+          <Text style={[styles.totalRec, !repartitionValide && styles.totalRecInvalide]}>
+            Total (sol nu + strates) : {repartitionTotalDisplay}% {repartitionValide ? '✓' : '— doit égaler 100%'}
           </Text>
 
           <View style={styles.footer}>
@@ -599,6 +596,7 @@ const styles = StyleSheet.create({
   smallChipTextActive: { fontWeight: '700', color: '#fff' },
   errorText: { color: '#c0412b', fontSize: 11, marginBottom: 4 },
   totalRec: { textAlign: 'center', fontSize: 10, fontWeight: '600', color: '#9a9484', letterSpacing: 0.3, paddingVertical: 4 },
+  totalRecInvalide: { color: '#c0412b' },
   totalRepartition: { fontSize: 11, fontWeight: '600', color: GREEN, marginTop: 6 },
   footer: { padding: 16 },
   continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },

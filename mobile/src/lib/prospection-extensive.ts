@@ -1,5 +1,8 @@
 import { Espece, stadesLarvairesFor } from './prospection-especes-stades';
 import { PopulationRow } from './prospection-repository';
+import { logger } from './logger';
+
+const log = logger.child({ module: 'prospection-extensive' });
 
 export const EXTENSIVE_IMAGO_PHASES = ['A1', 'A2', 'A3', 'A4', 'A5'];
 
@@ -39,6 +42,26 @@ export const TYPE_STATION_EXTENSIVE = {
 } as const;
 
 export type TypeStationExtensive = typeof TYPE_STATION_EXTENSIVE[keyof typeof TYPE_STATION_EXTENSIVE];
+
+/**
+ * Biotopes / type de station (#biotope-multi) : ces deux colonnes sont stockées en
+ * SQLite comme une chaîne JSON encodée (`'["xerophyle","mesophyle"]'`), exactement
+ * comme `sol.texture` (cf. veg.tsx) — jamais un objet natif dans `DraftProspection`.
+ * Un brouillon créé avant ce changement contient encore l'ancienne valeur scalaire
+ * brute (`'xerophyle'`, pas de JSON) : on retombe alors sur `[raw]`.
+ */
+export function parseSelectionMultiple(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed as string[];
+  } catch (error) {
+    // Silence délibéré : ancien format scalaire (pré-multi-select), pas du JSON
+    // valide — on retombe sur [raw] ci-dessous plutôt que de perdre la valeur.
+    log.ignore(error, 'Biotope/type_station au format pré-multi-select (scalaire) — repris tel quel.');
+  }
+  return [raw];
+}
 
 export const NIVEAU_OPTIONS: { value: string; label: string }[] = [
   { value: 'faible', label: 'Faible' },
@@ -259,6 +282,27 @@ export function parseDensite(value: string | null | undefined): number | null {
   if (!value) return null;
   const parsed = parseFloat(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * Densité groupée obligatoire (#densite-groupee-obligatoire) sur les écrans
+ * Imagos/Larves extensif+validation, qui enregistrent toujours LMC et NSE
+ * ensemble en un seul « Continuer » (contrairement à l'Intensif, où `density.tsx`
+ * traite une grille espèce/catégorie à la fois). Ne réclame `popGroup` que pour
+ * une espèce ayant des captures (`totalCaptures > 0`) — même garde que la
+ * cohérence des phases déjà en place dans ces deux écrans : une espèce non
+ * observée n'a pas à porter de densité.
+ */
+export function validerDensiteGroupeeObligatoire(
+  speciesData: Record<'LMC' | 'NSE', { totalCaptures: number; popGroup: string }>
+): { valid: true } | { valid: false; espece: 'LMC' | 'NSE' } {
+  for (const espece of ['LMC', 'NSE'] as const) {
+    const data = speciesData[espece];
+    if (data.totalCaptures > 0 && data.popGroup.trim() === '') {
+      return { valid: false, espece };
+    }
+  }
+  return { valid: true };
 }
 
 export function speciesDataToPopulationRow(espece: Espece, data: ExtensiveImagoSpeciesData): PopulationRow {

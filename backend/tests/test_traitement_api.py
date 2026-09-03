@@ -178,6 +178,7 @@ def payload_rotation(pesticide):
             "vent_fin_ms": 3.0,
             "heure_debut": "06:00:00",
             "heure_fin": "06:30:00",
+            "nom_commercial": "Fyfanon",
         }
         payload.update(overrides)
         return payload
@@ -214,6 +215,9 @@ async def test_add_rotation_incremente_totaux(
     assert body["aerien"]["total_pesticide_l"] == 10.0
     assert len(body["aerien"]["rotations"]) == 1
     assert body["aerien"]["rotations"][0]["numero"] == 1
+    # #produit-nom-commercial : dérivé côté client (texte avant le premier
+    # chiffre du nom du pesticide), le backend le persiste tel quel.
+    assert body["aerien"]["rotations"][0]["nom_commercial"] == "Fyfanon"
 
 
 @pytest.mark.asyncio
@@ -255,13 +259,15 @@ async def test_update_rotation_recalcule_totaux(
 
     resp = await client.put(
         f"/traitements/{traitement_id}/rotations/{rotation_id}",
-        json=payload_rotation(quantite_l=20.0),
+        json=payload_rotation(quantite_l=20.0, nom_commercial="Nurelle"),
         headers=auth_headers,
     )
     assert resp.status_code == 200, resp.text
     aerien = resp.json()["aerien"]
     assert aerien["nb_rotations"] == 1
     assert aerien["total_pesticide_l"] == 20.0
+    # #produit-nom-commercial : bien mis à jour, pas seulement conservé.
+    assert aerien["rotations"][0]["nom_commercial"] == "Nurelle"
 
 
 @pytest.mark.asyncio
@@ -515,7 +521,7 @@ def payload_produit(pesticide):
     produit_id = str(pesticide.id)
 
     def _build(**overrides):
-        payload = {"produit_id": produit_id, "quantite_l": 10.0}
+        payload = {"produit_id": produit_id, "quantite_l": 10.0, "nom_commercial": "Fyfanon"}
         payload.update(overrides)
         return payload
 
@@ -556,6 +562,8 @@ async def test_add_produit_recalcule_total(
     assert body["terrestre"]["total_pesticide_l"] == 10.0
     assert len(body["terrestre"]["produits"]) == 1
     assert body["terrestre"]["produits"][0]["numero"] == 1
+    # #produit-nom-commercial : dérivé côté client, le backend le persiste tel quel.
+    assert body["terrestre"]["produits"][0]["nom_commercial"] == "Fyfanon"
 
 
 @pytest.mark.asyncio

@@ -290,6 +290,7 @@ async def add_rotation(
             vent_fin_ms=body.vent_fin_ms,
             heure_debut=body.heure_debut,
             heure_fin=body.heure_fin,
+            nom_commercial=body.nom_commercial,
         )
     except TraitementIntrouvableError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -321,6 +322,7 @@ async def update_rotation(
             vent_fin_ms=body.vent_fin_ms,
             heure_debut=body.heure_debut,
             heure_fin=body.heure_fin,
+            nom_commercial=body.nom_commercial,
         )
     except (TraitementIntrouvableError, RotationIntrouvableError) as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -359,6 +361,7 @@ async def add_produit(
             traitement_id=traitement_id,
             produit_id=body.produit_id,
             quantite_l=body.quantite_l,
+            nom_commercial=body.nom_commercial,
         )
     except TraitementIntrouvableError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
