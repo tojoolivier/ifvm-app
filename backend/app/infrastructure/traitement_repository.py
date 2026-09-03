@@ -241,6 +241,7 @@ class TraitementRepositoryImpl(TraitementRepository):
                 vent_fin_ms=rotation.vent_fin_ms,
                 heure_debut=rotation.heure_debut,
                 heure_fin=rotation.heure_fin,
+                nom_commercial=rotation.nom_commercial,
             )
         )
         await self._persister_totaux(
@@ -266,6 +267,7 @@ class TraitementRepositoryImpl(TraitementRepository):
         rotation_model.vent_fin_ms = rotation.vent_fin_ms
         rotation_model.heure_debut = rotation.heure_debut
         rotation_model.heure_fin = rotation.heure_fin
+        rotation_model.nom_commercial = rotation.nom_commercial
 
         await self._persister_totaux(
             traitement_id, nb_rotations, total_pesticide_l, pesticide_stock_restant_l
@@ -302,6 +304,7 @@ class TraitementRepositoryImpl(TraitementRepository):
                 numero=produit.numero,
                 produit_id=produit.produit_id,
                 quantite_l=produit.quantite_l,
+                nom_commercial=produit.nom_commercial,
             )
         )
         await self._persister_total_pesticide(
@@ -571,6 +574,7 @@ class TraitementRepositoryImpl(TraitementRepository):
                         vent_fin_ms=float(r.vent_fin_ms),
                         heure_debut=r.heure_debut,
                         heure_fin=r.heure_fin,
+                        nom_commercial=r.nom_commercial,
                     )
                     for r in model.aerien.rotations
                 ],
@@ -631,6 +635,7 @@ class TraitementRepositoryImpl(TraitementRepository):
                         numero=p.numero,
                         produit_id=p.produit_id,
                         quantite_l=float(p.quantite_l),
+                        nom_commercial=p.nom_commercial,
                     )
                     for p in model.terrestre.produits
                 ],

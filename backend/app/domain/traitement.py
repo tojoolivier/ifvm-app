@@ -127,6 +127,9 @@ class Rotation:
     vent_fin_ms: float = 0.0
     heure_debut: time = time(0, 0)
     heure_fin: time = time(0, 0)
+    # Dérivé côté client du nom du pesticide (migration 0043) — figé à la
+    # saisie, jamais recalculé à la lecture.
+    nom_commercial: str | None = None
 
 
 @dataclass
@@ -191,6 +194,9 @@ class ProduitUtilise:
     numero: int = 0
     produit_id: uuid.UUID = field(default_factory=uuid.uuid4)
     quantite_l: float = 0.0
+    # Dérivé côté client du nom du pesticide (migration 0043) — figé à la
+    # saisie, jamais recalculé à la lecture.
+    nom_commercial: str | None = None
 
 
 @dataclass

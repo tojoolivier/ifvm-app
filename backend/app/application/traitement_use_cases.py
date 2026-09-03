@@ -538,6 +538,7 @@ class AddRotation:
         vent_fin_ms: float,
         heure_debut: time,
         heure_fin: time,
+        nom_commercial: str | None = None,
     ) -> Traitement:
         traitement = await _get_traitement_aerien(self.repository, traitement_id)
         traitement.verifier_modifiable()
@@ -559,6 +560,7 @@ class AddRotation:
             vent_fin_ms=vent_fin_ms,
             heure_debut=heure_debut,
             heure_fin=heure_fin,
+            nom_commercial=nom_commercial,
         )
         aerien.rotations.append(rotation)
         aerien.recalculer_totaux()
@@ -589,6 +591,7 @@ class UpdateRotation:
         vent_fin_ms: float,
         heure_debut: time,
         heure_fin: time,
+        nom_commercial: str | None = None,
     ) -> Traitement:
         traitement = await _get_traitement_aerien(self.repository, traitement_id)
         traitement.verifier_modifiable()
@@ -607,6 +610,7 @@ class UpdateRotation:
         rotation.vent_fin_ms = vent_fin_ms
         rotation.heure_debut = heure_debut
         rotation.heure_fin = heure_fin
+        rotation.nom_commercial = nom_commercial
         aerien.recalculer_totaux()
 
         return await self.repository.update_rotation(
@@ -670,6 +674,7 @@ class AddProduitUtilise:
         traitement_id: uuid.UUID,
         produit_id: uuid.UUID,
         quantite_l: float,
+        nom_commercial: str | None = None,
     ) -> Traitement:
         traitement = await _get_traitement_terrestre(self.repository, traitement_id)
         traitement.verifier_modifiable()
@@ -681,6 +686,7 @@ class AddProduitUtilise:
             numero=prochain_numero,
             produit_id=produit_id,
             quantite_l=quantite_l,
+            nom_commercial=nom_commercial,
         )
         terrestre.produits.append(produit)
         terrestre.recalculer_total_pesticide()
