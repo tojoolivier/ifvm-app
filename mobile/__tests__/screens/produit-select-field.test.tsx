@@ -11,10 +11,10 @@ import { Pesticide } from '@/lib/referentiel-db';
 const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
 
 const PESTICIDES: Pesticide[] = [
-  { id: 'p1', code: 'chlorpyrifos', nom: 'CHLORPYRIFOS 240 ULV', matiere_active: 'Chlorpyriphos-Ethyl', dose_reference: null },
-  { id: 'p2', code: 'deltamethrine', nom: 'DELTAMETHRINE 15 IL', matiere_active: 'Deltaméthrine 15 UL', dose_reference: null },
-  { id: 'p3', code: 'fenitrothion', nom: 'FENITROTHION 200 SC', matiere_active: 'Fenitrothion', dose_reference: null },
-  { id: 'p4', code: 'green_muscle', nom: 'GREEN MUSCLE', matiere_active: 'Métarhizium', dose_reference: null },
+  { id: 'p1', code: 'chlorpyrifos', nom: 'CHLORPYRIFOS 240 ULV', matiere_active: 'Chlorpyriphos-Ethyl', dose_reference: null, type_produit: null },
+  { id: 'p2', code: 'deltamethrine', nom: 'DELTAMETHRINE 15 IL', matiere_active: 'Deltaméthrine 15 UL', dose_reference: null, type_produit: null },
+  { id: 'p3', code: 'fenitrothion', nom: 'FENITROTHION 200 SC', matiere_active: 'Fenitrothion', dose_reference: null, type_produit: null },
+  { id: 'p4', code: 'green_muscle', nom: 'GREEN MUSCLE', matiere_active: 'Métarhizium', dose_reference: null, type_produit: null },
 ];
 
 describe('ProduitSelectField', () => {

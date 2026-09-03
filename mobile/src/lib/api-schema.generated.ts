@@ -1577,7 +1577,11 @@ export interface components {
             /** Duree Minutes */
             duree_minutes: number;
         };
-        /** PesticideCreate */
+        /**
+         * PesticideCreate
+         * @description `type_produit` reprend le CHECK de `pesticide` (migration 0044) : un 422
+         *     lisible plutôt qu'une IntegrityError.
+         */
         PesticideCreate: {
             /** Code */
             code: string;
@@ -1587,6 +1591,8 @@ export interface components {
             matiere_active?: string | null;
             /** Dose Reference */
             dose_reference?: string | null;
+            /** Type Produit */
+            type_produit?: ("produit_choc" | "produit_barriere") | null;
         };
         /** PesticideRead */
         PesticideRead: {
@@ -1603,6 +1609,8 @@ export interface components {
             matiere_active: string | null;
             /** Dose Reference */
             dose_reference: string | null;
+            /** Type Produit */
+            type_produit: string | null;
             /** Actif */
             actif: boolean;
             /**
@@ -1631,6 +1639,8 @@ export interface components {
             matiere_active: string | null;
             /** Dose Reference */
             dose_reference: string | null;
+            /** Type Produit */
+            type_produit: string | null;
             /** Actif */
             actif: boolean;
             /**
@@ -1652,6 +1662,8 @@ export interface components {
             matiere_active?: string | null;
             /** Dose Reference */
             dose_reference?: string | null;
+            /** Type Produit */
+            type_produit?: ("produit_choc" | "produit_barriere") | null;
             /** Actif */
             actif?: boolean | null;
         };
