@@ -125,3 +125,58 @@ async def test_me_reste_lisible_sans_rattachement(
 
     assert response.status_code == 200
     assert response.json()["email"] == utilisateur.email
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("role", ["pilote", "mecanicien", "consultant_international"])
+async def test_creation_a_la_volee_cree_un_compte_non_authentifiable(
+    client: AsyncClient, auth_headers: dict, role: str
+):
+    response = await client.post(
+        "/users/a-la-volee",
+        json={"nom": "Rasoa", "prenom": "Mamy", "role": role},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["role"] == role
+    assert body["peut_se_connecter"] is False
+    assert body["email"]
+
+
+@pytest.mark.asyncio
+async def test_creation_a_la_volee_rejette_explicitement_chef_de_base(
+    client: AsyncClient, auth_headers: dict
+):
+    response = await client.post(
+        "/users/a-la-volee",
+        json={"nom": "Rasoa", "prenom": "Mamy", "role": "chef_de_base"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 400
+    assert "chef_de_base" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_compte_a_la_volee_ne_peut_pas_se_logger(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """Même avec le bon mot de passe, un compte `peut_se_connecter=False` est
+    refusé au login — défense en profondeur au-delà du mot de passe généré."""
+    user = Utilisateur(
+        id=uuid.uuid4(),
+        nom="Rasoa",
+        prenom="Mamy",
+        email=f"a-la-volee.{uuid.uuid4().hex[:6]}@ifvm.invalid",
+        password_hash=hash_password("secret"),
+        role="pilote",
+        peut_se_connecter=False,
+    )
+    db_session.add(user)
+    await db_session.commit()
+
+    response = await client.post("/auth/login", json={"email": user.email, "password": "secret"})
+
+    assert response.status_code == 401

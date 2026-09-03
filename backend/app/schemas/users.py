@@ -12,6 +12,15 @@ class UtilisateurCreate(BaseModel):
     role: str
 
 
+class UtilisateurCreateALaVolee(BaseModel):
+    """Création à la volée depuis le formulaire de traitement : identité seule,
+    pas d'email/mot de passe — voir `ROLES_A_LA_VOLEE`."""
+
+    nom: str
+    prenom: str
+    role: str
+
+
 class UtilisateurUpdate(BaseModel):
     role: str | None = None
     actif: bool | None = None
@@ -25,6 +34,7 @@ class UtilisateurRead(BaseModel):
     email: str
     role: str
     actif: bool
+    peut_se_connecter: bool
     created_at: datetime
     # Poste acridien de rattachement — colonne « Station » de la maquette §10.
     # `pa_code` / `pa_nom` viennent d'une jointure : ils restent optionnels pour
