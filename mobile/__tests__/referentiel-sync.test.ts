@@ -159,6 +159,47 @@ describe('pullReferentiel', () => {
     );
   });
 
+  it('upserts each pesticide avec matière active, dose de référence et type de produit (#278)', async () => {
+    // Ces trois colonnes existaient déjà en local et le pull les envoyait déjà, mais
+    // upsertPesticides ne les écrivait pas — un pesticide déjà synchronisé les gardait
+    // à NULL indéfiniment, y compris type_produit, dont dépend le filtrage du choix de
+    // pesticide par mode de traitement (BARRIERE/TOTAL/IRREGULIER).
+    mockPullReferentiel.mockResolvedValue({
+      ...emptyResponse('2026-08-02T00:00:00Z'),
+      pesticides: {
+        upserts: [
+          {
+            id: 'pest-1',
+            code: 'DELTA',
+            nom: 'Deltaméthrine',
+            matiere_active: 'Deltaméthrine',
+            dose_reference: '0.5 l/ha',
+            type_produit: 'produit_barriere',
+            actif: true,
+            updated_at: '2026-08-01T00:00:00Z',
+          },
+        ],
+        server_time: '2026-08-02T00:00:00Z',
+      },
+    });
+
+    await pullReferentiel('token-1');
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO pesticide'),
+      [
+        'pest-1',
+        'DELTA',
+        'Deltaméthrine',
+        'Deltaméthrine',
+        '0.5 l/ha',
+        'produit_barriere',
+        1,
+        '2026-08-01T00:00:00Z',
+      ]
+    );
+  });
+
   it('upserts each campagne idempotently by id', async () => {
     mockPullReferentiel.mockResolvedValue({
       ...emptyResponse('2026-08-02T00:00:00Z'),

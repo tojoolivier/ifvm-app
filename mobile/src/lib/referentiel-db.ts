@@ -152,13 +152,40 @@ export interface Pesticide {
   nom: string;
   matiere_active: string | null;
   dose_reference: string | null;
+  type_produit: string | null;
 }
 
-/** Pesticides actifs, triés par nom — alimente les chips "Produit" des rotations/produits utilisés. */
-export async function listPesticides(): Promise<Pesticide[]> {
+/**
+ * Mode de traitement -> type de produit à proposer : BARRIERE n'affiche que les
+ * produits barrière, TOTAL (couverture totale) que les produits de choc — un
+ * traitement barrière posé avec un produit de choc (et inversement) n'a pas l'effet
+ * recherché. IRREGULIER n'a pas de restriction (`null` : tous les actifs).
+ */
+export function typeProduitAttendu(
+  modeTraitement: 'TOTAL' | 'BARRIERE' | 'IRREGULIER' | null | undefined
+): 'produit_choc' | 'produit_barriere' | null {
+  if (modeTraitement === 'BARRIERE') return 'produit_barriere';
+  if (modeTraitement === 'TOTAL') return 'produit_choc';
+  return null;
+}
+
+/**
+ * Pesticides actifs, triés par nom — alimente les chips "Produit" des rotations/
+ * produits utilisés. Filtré par `modeTraitement` (cf. `typeProduitAttendu`) : un
+ * pesticide dont `type_produit` n'est pas encore renseigné au référentiel est exclu
+ * pour BARRIERE/TOTAL (ne correspond positivement à aucun des deux), mais reste
+ * proposé pour IRREGULIER (aucune restriction).
+ */
+export async function listPesticides(
+  modeTraitement?: 'TOTAL' | 'BARRIERE' | 'IRREGULIER' | null
+): Promise<Pesticide[]> {
   const db = await getReferentielDb();
+  const attendu = typeProduitAttendu(modeTraitement);
   return db.getAllAsync<Pesticide>(
-    'SELECT id, code, nom, matiere_active, dose_reference FROM pesticide WHERE actif = 1 ORDER BY nom'
+    `SELECT id, code, nom, matiere_active, dose_reference, type_produit FROM pesticide
+     WHERE actif = 1 AND (? IS NULL OR type_produit = ?)
+     ORDER BY nom`,
+    [attendu, attendu]
   );
 }
 
@@ -311,6 +338,7 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
       nom TEXT NOT NULL,
       matiere_active TEXT,
       dose_reference TEXT,
+      type_produit TEXT,
       actif INTEGER NOT NULL DEFAULT 1,
       updated_at TEXT NOT NULL
     );
@@ -364,6 +392,7 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
   await addColumnsIfMissing(db, 'pesticide', [
     { name: 'matiere_active', type: 'TEXT' },
     { name: 'dose_reference', type: 'TEXT' },
+    { name: 'type_produit', type: 'TEXT' },
   ]);
   await migrateCodeStade(db);
   await migrateUtilisateurEquipe(db);

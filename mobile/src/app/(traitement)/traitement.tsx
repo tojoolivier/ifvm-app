@@ -135,10 +135,20 @@ export default function TraitementScreen() {
         }
       }
     }).catch((error) => signalerChargement(error, 'getTraitement'));
-    listPesticides().then(setPesticides).catch((error) => signalerChargement(error, 'listPesticides'));
     listReprenableTraitements().then(setReprenables).catch((error) => signalerChargement(error, 'listReprenableTraitements'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [traitementId]);
+
+  // Pesticides proposés au choix, filtrés par mode de traitement (BARRIERE : produits
+  // barrière, TOTAL : produits de choc, IRREGULIER : tous) — séparé de l'effet
+  // ci-dessus pour se recharger si l'agent revient changer le mode sur l'écran
+  // Références sans changer de fiche (store.ref.modeTraitement, pas traitementId).
+  useEffect(() => {
+    listPesticides(store.ref.modeTraitement)
+      .then(setPesticides)
+      .catch((error) => signalerChargement(error, 'listPesticides'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [traitementId, store.ref.modeTraitement]);
 
   useEffect(() => {
     listUtilisateursByRole('chef_de_base').then(setChefsDeBase).catch((error) => signalerChargement(error, 'listUtilisateursByRole:chef_de_base'));

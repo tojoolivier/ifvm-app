@@ -195,6 +195,7 @@ class PesticideSyncRead(BaseModel):
     nom: str
     matiere_active: str | None
     dose_reference: str | None
+    type_produit: str | None
     actif: bool
     updated_at: datetime
 
