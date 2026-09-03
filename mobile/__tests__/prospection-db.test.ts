@@ -118,9 +118,10 @@ const MIGRATED_COLUMNS = [
   { name: 'surface_infestee' },
   { name: 'surface_totale' },
 
-  // Colonnes de rotation
+  // Colonnes de rotation et produit_utilise (nom_commercial partagée entre les deux)
   { name: 'heure_debut' },
   { name: 'heure_fin' },
+  { name: 'nom_commercial' },
 
   // Colonnes de traitement_aerien
   { name: 'immatricule_aeronef' },

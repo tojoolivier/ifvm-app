@@ -49,6 +49,9 @@ export interface RotationDraft {
   vent_fin_ms?: number | null;
   heure_debut?: string | null;
   heure_fin?: string | null;
+  // #produit-nom-commercial : dérivé de `produit_id` au moment de la sélection
+  // (cf. deriveNomCommercial), jamais recalculé à la lecture.
+  nom_commercial?: string | null;
 }
 
 export interface RotationInput {
@@ -61,6 +64,7 @@ export interface RotationInput {
   vent_fin_ms?: number | null;
   heure_debut?: string | null;
   heure_fin?: string | null;
+  nom_commercial?: string | null;
 }
 
 export interface AerienDraft {
@@ -78,11 +82,15 @@ export interface ProduitDraft {
   localId: string;
   produit_id?: string | null;
   quantite_l?: number | null;
+  // #produit-nom-commercial : dérivé de `produit_id` au moment de la sélection
+  // (cf. deriveNomCommercial), jamais recalculé à la lecture.
+  nom_commercial?: string | null;
 }
 
 export interface ProduitInput {
   produit_id?: string | null;
   quantite_l?: number | null;
+  nom_commercial?: string | null;
 }
 
 export interface TerrestreDraft {

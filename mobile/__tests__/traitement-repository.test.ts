@@ -391,6 +391,22 @@ describe('rotations (aerien)', () => {
     );
   });
 
+  it('adds/updates nom_commercial on a rotation (#produit-nom-commercial)', async () => {
+    getFirstAsync.mockResolvedValueOnce({ id: 'rot-1', nom_commercial: 'Fyfanon' });
+    await addRotation(AERIEN_INPUT.id, { produit_id: 'prod-1', nom_commercial: 'Fyfanon' });
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO rotation'),
+      expect.arrayContaining(['Fyfanon'])
+    );
+
+    getFirstAsync.mockResolvedValueOnce({ id: 'rot-1', nom_commercial: 'Nurelle' });
+    await updateRotation('rot-1', { produit_id: 'prod-2', nom_commercial: 'Nurelle' });
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE rotation SET'),
+      expect.arrayContaining(['Nurelle'])
+    );
+  });
+
   it('deletes a rotation by id', async () => {
     await deleteRotation('rot-1');
 
@@ -421,6 +437,17 @@ describe('produits utilisés (terrestre)', () => {
       expect.arrayContaining([TERRESTRE_INPUT.id, 'prod-2', 5])
     );
     expect(produit.produit_id).toBe('prod-2');
+  });
+
+  it('adds nom_commercial on a produit_utilise (#produit-nom-commercial)', async () => {
+    getFirstAsync.mockResolvedValueOnce({ id: 'pu-1', nom_commercial: 'Fyfanon' });
+
+    await addProduitUtilise(TERRESTRE_INPUT.id, { produit_id: 'prod-2', nom_commercial: 'Fyfanon' });
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO produit_utilise'),
+      expect.arrayContaining(['Fyfanon'])
+    );
   });
 
   it('deletes a produit_utilise by id (no PUT, delete then recreate)', async () => {

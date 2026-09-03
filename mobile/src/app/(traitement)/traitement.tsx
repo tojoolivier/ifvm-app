@@ -86,6 +86,7 @@ export default function TraitementScreen() {
               vent_fin_ms: r.vent_fin_ms,
               heure_debut: r.heure_debut,
               heure_fin: r.heure_fin,
+              nom_commercial: r.nom_commercial,
             });
           }
         }
@@ -123,7 +124,12 @@ export default function TraitementScreen() {
         if (produits.length === 0) {
           setProduits(
             draft.terrestre.produits.length > 0
-              ? draft.terrestre.produits.map((p) => ({ localId: generateId(), produit_id: p.produit_id, quantite_l: p.quantite_l }))
+              ? draft.terrestre.produits.map((p) => ({
+                  localId: generateId(),
+                  produit_id: p.produit_id,
+                  quantite_l: p.quantite_l,
+                  nom_commercial: p.nom_commercial,
+                }))
               : [{ localId: generateId() }]
           );
         }
@@ -235,6 +241,7 @@ export default function TraitementScreen() {
               vent_fin_ms: r.vent_fin_ms,
               heure_debut: r.heure_debut,
               heure_fin: r.heure_fin,
+              nom_commercial: r.nom_commercial,
             });
           }
         } else {
@@ -275,7 +282,11 @@ export default function TraitementScreen() {
             pesticideRecuL: store.terrestre.pesticideRecuL,
           });
           for (const p of produits) {
-            await addProduitUtilise(traitementId, { produit_id: p.produit_id, quantite_l: p.quantite_l });
+            await addProduitUtilise(traitementId, {
+              produit_id: p.produit_id,
+              quantite_l: p.quantite_l,
+              nom_commercial: p.nom_commercial,
+            });
           }
         }
 

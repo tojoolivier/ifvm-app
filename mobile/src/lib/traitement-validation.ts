@@ -34,6 +34,21 @@ export function computeTotalPesticideTerrestre(produits: QuantiteLike[]): number
   return sumQuantites(produits);
 }
 
+/**
+ * Nom commercial (#produit-nom-commercial) : dérivé du nom complet du pesticide
+ * sélectionné (référentiel `pesticide`, cf. `listPesticides()`) — texte avant le
+ * premier chiffre, espaces débord retirés. Ex. "Fyfanon 440 ULV" -> "Fyfanon".
+ * Si le nom ne contient aucun chiffre (ex. "GREEN MUSCLE" dans le référentiel
+ * seedé), le nom complet est utilisé tel quel plutôt que de renvoyer une chaîne
+ * vide. Valeur figée au moment de la sélection, jamais recalculée à la lecture
+ * (cf. persistance de `nom_commercial` sur la rotation/le produit utilisé).
+ */
+export function deriveNomCommercial(nomComplet: string): string {
+  const indexPremierChiffre = nomComplet.search(/\d/);
+  const nomAvantChiffre = indexPremierChiffre === -1 ? nomComplet : nomComplet.slice(0, indexPremierChiffre);
+  return nomAvantChiffre.trim();
+}
+
 export interface SurfacesMoyensTerrestre {
   surface_atomiseur_ha?: number | null;
   surface_disque_rotatif_ha?: number | null;

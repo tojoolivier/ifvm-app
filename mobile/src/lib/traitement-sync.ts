@@ -159,6 +159,7 @@ async function pushRotationsEtProduits(draft: DraftTraitement, token: string): P
         vent_fin_ms: rotation.vent_fin_ms ?? 0,
         heure_debut: rotation.heure_debut ?? '00:00',
         heure_fin: rotation.heure_fin ?? '00:01',
+        nom_commercial: rotation.nom_commercial ?? null,
       });
     }
   }
@@ -168,6 +169,7 @@ async function pushRotationsEtProduits(draft: DraftTraitement, token: string): P
       await apiClient.addProduitUtilise(token, draft.id, {
         produit_id: produit.produit_id ?? '',
         quantite_l: produit.quantite_l ?? 0,
+        nom_commercial: produit.nom_commercial ?? null,
       });
     }
   }

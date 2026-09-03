@@ -67,6 +67,7 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
   await ajouterColonnesManquantes(db, 'rotation', COLONNES_ROTATION);
   await ajouterColonnesManquantes(db, 'traitement_aerien', COLONNES_TRAITEMENT_AERIEN);
   await ajouterColonnesManquantes(db, 'traitement_terrestre', COLONNES_TRAITEMENT_TERRESTRE);
+  await ajouterColonnesManquantes(db, 'produit_utilise', COLONNES_PRODUIT_UTILISE);
 
   log.event('db.ouverte', { base: DB_NAME });
 
@@ -379,7 +380,8 @@ async function creerTables(db: SQLite.SQLiteDatabase): Promise<void> {
       vent_debut_ms REAL,
       vent_fin_ms REAL,
       heure_debut TEXT,
-      heure_fin TEXT
+      heure_fin TEXT,
+      nom_commercial TEXT
     );
 
     CREATE INDEX IF NOT EXISTS ix_rotation_traitement_aerien_id
@@ -417,7 +419,8 @@ async function creerTables(db: SQLite.SQLiteDatabase): Promise<void> {
       traitement_terrestre_id TEXT NOT NULL REFERENCES traitement_terrestre(traitement_id) ON DELETE CASCADE,
       numero INTEGER,
       produit_id TEXT,
-      quantite_l REAL
+      quantite_l REAL,
+      nom_commercial TEXT
     );
 
     CREATE INDEX IF NOT EXISTS ix_produit_utilise_traitement_terrestre_id
@@ -687,6 +690,14 @@ const COLONNES_TRAITEMENT: readonly Colonne[] = [
 const COLONNES_ROTATION: readonly Colonne[] = [
   { name: 'heure_debut', type: 'TEXT' },
   { name: 'heure_fin', type: 'TEXT' },
+  // #produit-nom-commercial
+  { name: 'nom_commercial', type: 'TEXT' },
+];
+
+/** Colonnes ajoutées à `produit_utilise` après sa création initiale. */
+const COLONNES_PRODUIT_UTILISE: readonly Colonne[] = [
+  // #produit-nom-commercial
+  { name: 'nom_commercial', type: 'TEXT' },
 ];
 
 /** Colonnes ajoutées à `traitement_aerien` après sa création initiale. */

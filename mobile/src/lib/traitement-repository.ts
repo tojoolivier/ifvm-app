@@ -106,6 +106,8 @@ export interface Rotation {
   vent_fin_ms: number | null;
   heure_debut: string | null;
   heure_fin: string | null;
+  // #produit-nom-commercial : dérivé côté client, figé à la saisie.
+  nom_commercial: string | null;
 }
 
 export interface RotationInput {
@@ -118,6 +120,7 @@ export interface RotationInput {
   vent_fin_ms?: number | null;
   heure_debut?: string | null;
   heure_fin?: string | null;
+  nom_commercial?: string | null;
 }
 
 export interface TraitementTerrestre {
@@ -153,11 +156,14 @@ export interface ProduitUtilise {
   numero: number | null;
   produit_id: string | null;
   quantite_l: number | null;
+  // #produit-nom-commercial : dérivé côté client, figé à la saisie.
+  nom_commercial: string | null;
 }
 
 export interface ProduitUtiliseInput {
   produit_id?: string | null;
   quantite_l?: number | null;
+  nom_commercial?: string | null;
 }
 
 export interface TraitementSignature {
@@ -629,8 +635,8 @@ export async function addRotation(
     `INSERT INTO rotation (
       id, traitement_aerien_id, numero_cuve, produit_id, quantite_l,
       temperature_debut_c, temperature_fin_c, vent_debut_ms, vent_fin_ms,
-      heure_debut, heure_fin
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      heure_debut, heure_fin, nom_commercial
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       traitementAerienId,
@@ -643,6 +649,7 @@ export async function addRotation(
       input.vent_fin_ms ?? null,
       input.heure_debut ?? null,
       input.heure_fin ?? null,
+      input.nom_commercial ?? null,
     ]
   );
 
@@ -672,7 +679,8 @@ export async function updateRotation(
       vent_debut_ms = ?,
       vent_fin_ms = ?,
       heure_debut = ?,
-      heure_fin = ?
+      heure_fin = ?,
+      nom_commercial = ?
      WHERE id = ?`,
     [
       input.numero_cuve ?? null,
@@ -684,6 +692,7 @@ export async function updateRotation(
       input.vent_fin_ms ?? null,
       input.heure_debut ?? null,
       input.heure_fin ?? null,
+      input.nom_commercial ?? null,
       rotationId,
     ]
   );
@@ -716,9 +725,15 @@ export async function addProduitUtilise(
 
   await db.runAsync(
     `INSERT INTO produit_utilise (
-      id, traitement_terrestre_id, produit_id, quantite_l
-    ) VALUES (?, ?, ?, ?)`,
-    [id, traitementTerrestreId, input.produit_id ?? null, input.quantite_l ?? null]
+      id, traitement_terrestre_id, produit_id, quantite_l, nom_commercial
+    ) VALUES (?, ?, ?, ?, ?)`,
+    [
+      id,
+      traitementTerrestreId,
+      input.produit_id ?? null,
+      input.quantite_l ?? null,
+      input.nom_commercial ?? null,
+    ]
   );
 
   const created = await db.getFirstAsync<ProduitUtilise>(
