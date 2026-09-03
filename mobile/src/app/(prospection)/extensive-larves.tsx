@@ -12,6 +12,7 @@ import {
   larveSpeciesDataToPopulationRow,
   populationRowToLarveSpeciesData,
   validerDensiteGroupeeObligatoire,
+  validerDensiteDiffuseObligatoire,
 } from '@/lib/prospection-extensive';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
@@ -30,6 +31,7 @@ export default function ExtensiveLarvesScreen() {
 
   const [species, setSpecies] = useState<Espece>('LMC');
   const [showPopGroupError, setShowPopGroupError] = useState(false);
+  const [showPopDiffError, setShowPopDiffError] = useState(false);
 
   const [speciesData, setSpeciesData] = useState<Record<Espece, ExtensiveLarveSpeciesData>>({
     LMC: createEmptyLarveSpeciesData('LMC'),
@@ -107,6 +109,15 @@ export default function ExtensiveLarvesScreen() {
         );
         return;
       }
+    }
+
+    // #densite-diffuse-obligatoire : même garde, vérifiée avant la densité groupée.
+    const densiteDiffuseCheck = validerDensiteDiffuseObligatoire(speciesData);
+    if (!densiteDiffuseCheck.valid) {
+      setSpecies(densiteDiffuseCheck.espece);
+      setShowPopDiffError(true);
+      Alert.alert('Densité diffuse requise', 'La densité diffuse (D/ha) est obligatoire.');
+      return;
     }
 
     // #densite-groupee-obligatoire : vérifie LMC ET NSE, pas seulement l'onglet
@@ -300,12 +311,13 @@ export default function ExtensiveLarvesScreen() {
             <View style={styles.densitySection}>
               <Text style={styles.sectionLabel}>📊 Densités</Text>
               <View style={styles.row}>
-                <View style={[styles.card, styles.flex1]}>
-                  <Text style={styles.label}>Population diffuse D/ha</Text>
+                <View style={[styles.card, styles.flex1, showPopDiffError && data.popDiff.trim() === '' && styles.cardError]}>
+                  <Text style={[styles.label, styles.requiredLabel]}>Population diffuse D/ha *</Text>
                   <TextInput
                     value={data.popDiff}
                     onChangeText={(text) => {
                       updateSpeciesData({ popDiff: text });
+                      if (text.trim() !== '') setShowPopDiffError(false);
                     }}
                     keyboardType="decimal-pad"
                     style={styles.inputMono}
@@ -328,6 +340,9 @@ export default function ExtensiveLarvesScreen() {
                   />
                 </View>
               </View>
+              {showPopDiffError && data.popDiff.trim() === '' && (
+                <Text style={styles.errorText}>La densité diffuse (D/ha) est obligatoire.</Text>
+              )}
               {showPopGroupError && data.popGroup.trim() === '' && (
                 <Text style={styles.errorText}>La densité groupée (/m²) est obligatoire.</Text>
               )}
