@@ -179,6 +179,9 @@ describe('ReferentielsPage — écritures code_stade (#131)', () => {
     vi.restoreAllMocks()
   })
 
+  // Ouvre le référentiel puis la modale « Modifier » de la ligne donnée (bouton
+  // Action) — la modale a remplacé le panneau permanent, la plupart des tests
+  // continuent d'interroger `screen` directement une fois la modale ouverte.
   async function ouvrirCodesStades(ligne: Record<string, unknown> = LIGNE) {
     mockedGet.mockResolvedValue(
       pull({ codes_stades: { upserts: [ligne], server_time: SERVER_TIME } }),
@@ -186,6 +189,7 @@ describe('ReferentielsPage — écritures code_stade (#131)', () => {
     renderPage()
     await waitFor(() => expect(nav().getByText('code_stade')).toBeInTheDocument())
     fireEvent.click(nav().getByText('code_stade'))
+    fireEvent.click(await screen.findByRole('button', { name: `Modifier ${ligne.code}` }))
   }
 
   it('active le bouton d\'ajout, la route POST existant désormais', async () => {
@@ -279,15 +283,18 @@ describe('ReferentielsPage — écritures code_stade (#131)', () => {
     expect(screen.queryByRole('button', { name: /supprimer/i })).not.toBeInTheDocument()
   })
 
-  it('« Annuler » revient à la valeur du serveur', async () => {
+  it('« Annuler » ferme la modale sans enregistrer ; rouvrir repart de la valeur serveur', async () => {
     await ouvrirCodesStades()
 
     fireEvent.change(screen.getByLabelText('Libellé *'), { target: { value: 'Brouillon' } })
     fireEvent.click(screen.getByRole('button', { name: 'Annuler' }))
 
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(mockedPut).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Modifier L1' }))
     expect(screen.getByLabelText('Libellé *')).toHaveValue('Larve stade L1')
   })
-
 })
 
 describe('ReferentielsPage — écritures poste_acridien (#132)', () => {
@@ -328,6 +335,7 @@ describe('ReferentielsPage — écritures poste_acridien (#132)', () => {
     renderPage()
     await waitFor(() => expect(nav().getByText('poste_acridien')).toBeInTheDocument())
     fireEvent.click(nav().getByText('poste_acridien'))
+    fireEvent.click(await screen.findByRole('button', { name: `Modifier ${postes[0].code}` }))
     await screen.findByDisplayValue('PA-ZOM')
   }
 
@@ -412,7 +420,7 @@ describe('ReferentielsPage — écritures poste_acridien (#132)', () => {
     )
   })
 
-  it('« Annuler » revient à la valeur du serveur', async () => {
+  it('« Annuler » ferme la modale sans enregistrer ; rouvrir repart de la valeur serveur', async () => {
     await ouvrirPostesAcridiens()
 
     fireEvent.change(screen.getByDisplayValue('Zombitse-Vohibasia'), {
@@ -420,6 +428,10 @@ describe('ReferentielsPage — écritures poste_acridien (#132)', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Annuler' }))
 
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(mockedPut).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Modifier PA-ZOM' }))
     expect(screen.getByDisplayValue('Zombitse-Vohibasia')).toBeInTheDocument()
   })
 
@@ -460,6 +472,7 @@ describe('ReferentielsPage — écritures culture (#130)', () => {
     renderPage()
     await waitFor(() => expect(nav().getByText('culture')).toBeInTheDocument())
     fireEvent.click(nav().getByText('culture'))
+    fireEvent.click(await screen.findByRole('button', { name: `Modifier ${cultures[0].code}` }))
     await screen.findByDisplayValue('RIZ')
   }
 
@@ -583,6 +596,7 @@ describe('ReferentielsPage — écritures pesticide (#129, #134)', () => {
     renderPage()
     await waitFor(() => expect(nav().getByText('pesticide')).toBeInTheDocument())
     fireEvent.click(nav().getByText('pesticide'))
+    fireEvent.click(await screen.findByRole('button', { name: `Modifier ${pesticides[0].code}` }))
     await screen.findByDisplayValue('PST-ADO4')
   }
 
@@ -620,6 +634,7 @@ describe('ReferentielsPage — écritures pesticide (#129, #134)', () => {
         nom: 'Adonis 4 UL',
         matiere_active: 'Deltaméthrine',
         dose_reference: '0.75 l/ha',
+        type_produit: null,
         actif: true,
       }),
     )
@@ -647,6 +662,7 @@ describe('ReferentielsPage — écritures pesticide (#129, #134)', () => {
       nom: 'Nouveau produit',
       matiere_active: 'Métarhizium',
       dose_reference: null,
+      type_produit: null,
     })
   })
 
@@ -689,6 +705,58 @@ describe('ReferentielsPage — écritures pesticide (#129, #134)', () => {
 
     expect(screen.getByText('PST-OFF')).toBeInTheDocument()
   })
+
+  // --- type_produit (choc / barrière) — migration backend 0044 -----------------------
+
+  it('affiche le type de produit en colonne, ou « — » si non classé', async () => {
+    await ouvrirPesticides([
+      { ...PESTICIDE, type_produit: 'produit_choc' },
+      { ...PESTICIDE, id: 'p4', code: 'PST-NC', nom: 'Non classé', type_produit: null },
+    ])
+
+    expect(within(screen.getByRole('table')).getByText('Produit de choc')).toBeInTheDocument()
+    const ligneNonClasse = screen.getByText('PST-NC').closest('tr')!
+    expect(within(ligneNonClasse).getByText('—')).toBeInTheDocument()
+  })
+
+  it('choisit le type de produit via un select, à la modification', async () => {
+    mockedPut.mockResolvedValue({ data: { ...PESTICIDE, type_produit: 'produit_barriere' } })
+    await ouvrirPesticides()
+
+    fireEvent.change(screen.getByLabelText('Type de produit'), {
+      target: { value: 'produit_barriere' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    await waitFor(() =>
+      expect(mockedPut).toHaveBeenCalledWith(
+        '/pesticides/p1',
+        expect.objectContaining({ type_produit: 'produit_barriere' }),
+      ),
+    )
+  })
+
+  it('choisit le type de produit via un select, à la création', async () => {
+    mockedPost.mockResolvedValue({
+      data: { ...PESTICIDE, id: 'p5', code: 'PST-CHOC', type_produit: 'produit_choc' },
+    })
+    await ouvrirPesticides()
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Nouveau pesticide' }))
+
+    const modal = within(screen.getByRole('dialog', { name: 'Nouveau pesticide' }))
+    fireEvent.change(modal.getByLabelText('Code *'), { target: { value: 'PST-CHOC' } })
+    fireEvent.change(modal.getByLabelText('Nom commercial *'), { target: { value: 'Choc' } })
+    fireEvent.change(modal.getByLabelText('Type de produit'), { target: { value: 'produit_choc' } })
+    fireEvent.click(modal.getByRole('button', { name: 'Créer' }))
+
+    await waitFor(() =>
+      expect(mockedPost).toHaveBeenCalledWith(
+        '/pesticides',
+        expect.objectContaining({ type_produit: 'produit_choc' }),
+      ),
+    )
+  })
 })
 
 describe('ReferentielsPage — recherche, tri, pagination', () => {
@@ -722,39 +790,45 @@ describe('ReferentielsPage — recherche, tri, pagination', () => {
     fireEvent.click(nav().getByText('pesticide'))
   }
 
-  // Le code de la ligne sélectionnée (index 0 par défaut) est affiché deux fois
-  // (cellule du tableau + sous-titre du panneau « Modifier ») — toutes les
-  // assertions sur le contenu des lignes sont donc scopées au tableau, jamais
-  // globales.
-  function table() {
-    return within(screen.getByRole('table'))
+  // Le tableau (skeleton de chargement d'abord, `<table>` ensuite) apparaît de
+  // façon asynchrone : `findByRole` attend son montage plutôt que `getByRole`,
+  // qui échouerait immédiatement si appelé avant la résolution de la requête.
+  // Sans panneau « Modifier » permanent pour une entité `write` (remplacé par la
+  // modale), plus de doublon du code de ligne à éviter — mais borner au tableau
+  // reste inoffensif et protège d'une future ambiguïté.
+  async function table() {
+    return within(await screen.findByRole('table'))
   }
 
-  function isBefore(a: string, b: string) {
-    const nodeA = table().getByText(a)
-    const nodeB = table().getByText(b)
+  async function isBefore(a: string, b: string) {
+    const scope = await table()
+    const nodeA = scope.getByText(a)
+    const nodeB = scope.getByText(b)
     return Boolean(nodeA.compareDocumentPosition(nodeB) & Node.DOCUMENT_POSITION_FOLLOWING)
   }
 
   it('pagine à 15 lignes par page au-delà de 15 enregistrements', async () => {
     await ouvrirPesticides(makePesticides(17))
 
-    await table().findByText('PST-00')
+    let scope = await table()
+    await scope.findByText('PST-00')
     expect(screen.getByText('Page 1 / 2 · 17 enregistrements')).toBeInTheDocument()
-    expect(table().getByText('PST-14')).toBeInTheDocument()
-    expect(table().queryByText('PST-15')).not.toBeInTheDocument()
+    expect(scope.getByText('PST-14')).toBeInTheDocument()
+    expect(scope.queryByText('PST-15')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Suivant →' }))
 
-    await table().findByText('PST-16')
-    expect(table().queryByText('PST-00')).not.toBeInTheDocument()
+    scope = await table()
+    await scope.findByText('PST-16')
+    expect(scope.queryByText('PST-00')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Suivant →' })).toBeDisabled()
   })
 
   it("n'affiche aucune pagination en-dessous de 15 enregistrements", async () => {
     await ouvrirPesticides(makePesticides(3))
 
-    await table().findByText('PST-00')
+    const scope = await table()
+    await scope.findByText('PST-00')
     expect(screen.queryByText(/^Page \d/)).not.toBeInTheDocument()
   })
 
@@ -763,16 +837,16 @@ describe('ReferentielsPage — recherche, tri, pagination', () => {
       { ...makePesticides(1)[0], id: 'p1', code: 'PST-B', nom: 'Bravo' },
       { ...makePesticides(1)[0], id: 'p2', code: 'PST-A', nom: 'Alpha' },
     ])
-    await table().findByText('Bravo')
+    await (await table()).findByText('Bravo')
 
     // Ordre serveur non trié au départ.
-    expect(isBefore('Bravo', 'Alpha')).toBe(true)
+    expect(await isBefore('Bravo', 'Alpha')).toBe(true)
 
     fireEvent.click(screen.getByRole('button', { name: 'Nom commercial' }))
-    await waitFor(() => expect(isBefore('Alpha', 'Bravo')).toBe(true))
+    await waitFor(async () => expect(await isBefore('Alpha', 'Bravo')).toBe(true))
 
     fireEvent.click(screen.getByRole('button', { name: 'Nom commercial' }))
-    await waitFor(() => expect(isBefore('Bravo', 'Alpha')).toBe(true))
+    await waitFor(async () => expect(await isBefore('Bravo', 'Alpha')).toBe(true))
   })
 
   it('filtre les lignes avec le champ de recherche, insensible aux accents/casse', async () => {
@@ -780,12 +854,12 @@ describe('ReferentielsPage — recherche, tri, pagination', () => {
       { ...makePesticides(1)[0], id: 'p1', code: 'PST-DEL', nom: 'Delta', matiere_active: 'Deltaméthrine' },
       { ...makePesticides(1)[0], id: 'p2', code: 'PST-CHL', nom: 'Chloro', matiere_active: 'Chlorpyrifos' },
     ])
-    await table().findByText('PST-DEL')
+    await (await table()).findByText('PST-DEL')
 
     fireEvent.change(screen.getByPlaceholderText('Rechercher…'), { target: { value: 'deltamethrine' } })
 
-    await waitFor(() => expect(table().queryByText('PST-CHL')).not.toBeInTheDocument())
-    expect(table().getByText('PST-DEL')).toBeInTheDocument()
+    await waitFor(async () => expect((await table()).queryByText('PST-CHL')).not.toBeInTheDocument())
+    expect((await table()).getByText('PST-DEL')).toBeInTheDocument()
   })
 })
 
@@ -834,6 +908,7 @@ describe('ReferentielsPage — écritures station_fixe (#133)', () => {
     renderPage()
     await waitFor(() => expect(nav().getByText('station_fixe')).toBeInTheDocument())
     fireEvent.click(nav().getByText('station_fixe'))
+    fireEvent.click(await screen.findByRole('button', { name: `Modifier ${stations[0].code}` }))
     await screen.findByDisplayValue('ST-001')
   }
 
@@ -933,12 +1008,16 @@ describe('ReferentielsPage — écritures station_fixe (#133)', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('est désactivé')
   })
 
-  it('« Annuler » revient à la valeur du serveur', async () => {
+  it('« Annuler » ferme la modale sans enregistrer ; rouvrir repart de la valeur serveur', async () => {
     await ouvrirStations()
 
     fireEvent.change(screen.getByDisplayValue('Ambovombe Nord'), { target: { value: 'Brouillon' } })
     fireEvent.click(screen.getByRole('button', { name: 'Annuler' }))
 
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(mockedPut).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Modifier ST-001' }))
     expect(screen.getByDisplayValue('Ambovombe Nord')).toBeInTheDocument()
   })
 

@@ -132,6 +132,7 @@ class Pesticide:
     nom: str = ""
     matiere_active: str | None = None
     dose_reference: str | None = None
+    type_produit: str | None = None
     actif: bool = True
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
