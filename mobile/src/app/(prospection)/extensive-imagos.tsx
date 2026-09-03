@@ -14,6 +14,7 @@ import {
   speciesDataToPopulationRow,
   populationRowToSpeciesData,
   validerDensiteGroupeeObligatoire,
+  validerDensiteDiffuseObligatoire,
 } from '@/lib/prospection-extensive';
 import { COMPASS_DIRECTIONS, oppositeDirection } from '@/lib/prospection-infestation-insights';
 import { useAsyncAction } from '@/hooks/use-async-action';
@@ -36,6 +37,7 @@ export default function ExtensiveImagosScreen() {
   const [species, setSpecies] = useState<Espece>('LMC');
   const [currentSexe, setCurrentSexe] = useState<Sexe>('F');
   const [showPopGroupError, setShowPopGroupError] = useState(false);
+  const [showPopDiffError, setShowPopDiffError] = useState(false);
   
   const [speciesData, setSpeciesData] = useState<Record<Espece, ExtensiveImagoSpeciesData>>({
     LMC: createEmptySpeciesData(),
@@ -149,6 +151,16 @@ const handleContinue = () => {
       'Incohérence des phases',
       `Captures : ${data.totalCaptures}\nPhases : ${totalPhases}\n\nLa somme des phases doit être exactement égale au nombre de captures.`
     );
+    return;
+  }
+
+  // #densite-diffuse-obligatoire : même garde, vérifiée avant la densité groupée
+  // (l'ordre d'affichage à l'écran, diffuse puis groupée).
+  const densiteDiffuseCheck = validerDensiteDiffuseObligatoire(speciesData);
+  if (!densiteDiffuseCheck.valid) {
+    setSpecies(densiteDiffuseCheck.espece);
+    setShowPopDiffError(true);
+    Alert.alert('Densité diffuse requise', 'La densité diffuse (D/ha) est obligatoire.');
     return;
   }
 
@@ -395,12 +407,13 @@ const handleContinue = () => {
             <View style={styles.densitySection}>
               <Text style={styles.sectionLabel}>📊 Densités</Text>
               <View style={styles.row}>
-                <View style={[styles.card, styles.flex1]}>
-                  <Text style={styles.label}>Population diffuse D/ha</Text>
+                <View style={[styles.card, styles.flex1, showPopDiffError && data.popDiff.trim() === '' && styles.cardError]}>
+                  <Text style={[styles.label, styles.requiredLabel]}>Population diffuse D/ha *</Text>
                   <TextInput
                     value={data.popDiff}
                     onChangeText={(text) => {
                       updateSpeciesData({ popDiff: text });
+                      if (text.trim() !== '') setShowPopDiffError(false);
                     }}
                     keyboardType="decimal-pad"
                     style={styles.inputMono}
@@ -423,6 +436,9 @@ const handleContinue = () => {
                   />
                 </View>
               </View>
+              {showPopDiffError && data.popDiff.trim() === '' && (
+                <Text style={styles.errorText}>La densité diffuse (D/ha) est obligatoire.</Text>
+              )}
               {showPopGroupError && data.popGroup.trim() === '' && (
                 <Text style={styles.errorText}>La densité groupée (/m²) est obligatoire.</Text>
               )}
@@ -489,12 +505,21 @@ const handleContinue = () => {
               <Text style={styles.commonHint}>Données spécifiques à {species}</Text>
               <View style={styles.typeRow}>
                 {TYPE_CIBLE_IMAGO_OPTIONS.map((option) => {
-                  const active = data.typeCible === option.value;
+                  // #type-cible-multi-select : cocher/décocher librement, plusieurs
+                  // valeurs actives à la fois, aucune présélection (même toggle que
+                  // les biotopes en reference.tsx).
+                  const active = data.typeCible.includes(option.value);
                   return (
                     <TouchableOpacity
                       key={option.value}
                       style={[styles.typeButton, active && styles.typeButtonActive]}
-                      onPress={() => updateSpeciesData({ typeCible: option.value })}
+                      onPress={() =>
+                        updateSpeciesData({
+                          typeCible: active
+                            ? data.typeCible.filter((v) => v !== option.value)
+                            : [...data.typeCible, option.value],
+                        })
+                      }
                     >
                       <Text style={[styles.typeButtonText, active && styles.typeButtonTextActive]}>
                         {option.label}
@@ -622,7 +647,11 @@ const handleContinue = () => {
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Type de cible :</Text>
                 <Text style={styles.summaryValue}>
-                  {TYPE_CIBLE_IMAGO_OPTIONS.find((o) => o.value === data.typeCible)?.label}
+                  {data.typeCible.length > 0
+                    ? data.typeCible
+                        .map((v) => TYPE_CIBLE_IMAGO_OPTIONS.find((o) => o.value === v)?.label)
+                        .join(', ')
+                    : '—'}
                 </Text>
               </View>
               <View style={styles.summaryRow}>

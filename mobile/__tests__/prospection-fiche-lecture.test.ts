@@ -43,6 +43,7 @@ function population(overrides: Partial<PopulationRead> = {}): PopulationRead {
     phase: null,
     accouplement: null,
     ponte: null,
+    type_cible: [],
     ...overrides,
   };
 }

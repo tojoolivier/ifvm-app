@@ -40,7 +40,8 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
     await screen.findByText('📊 Type de cible');
     await settle();
 
-    // LMC (espèce active par défaut) : Vol clair (par défaut) confirmé explicitement.
+    // LMC (espèce active par défaut) : aucune cible n'est présélectionnée
+    // (#type-cible-multi-select) — on coche explicitement Vol clair.
     fireEvent.press(screen.getAllByText('Vol clair')[0]);
     await settle();
 
@@ -62,8 +63,8 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
     const [, lmcRow] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
     const [, nseRow] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[1];
 
-    expect(lmcRow).toMatchObject({ espece: 'LMC', type_cible: 'vol_clair' });
-    expect(nseRow).toMatchObject({ espece: 'NSE', type_cible: 'dense' });
+    expect(lmcRow).toMatchObject({ espece: 'LMC', type_cible: '["vol_clair"]' });
+    expect(nseRow).toMatchObject({ espece: 'NSE', type_cible: '["dense"]' });
   });
 
   it('restaure le type de cible propre à chaque espèce depuis les lignes déjà enregistrées', async () => {
@@ -203,7 +204,7 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
       densite_groupee: 1.1,
       ponte: 'Rare',
       interdistance: 12.5,
-      type_cible: 'dense',
+      type_cible: '["dense"]',
       etat: 'repos',
       essaim_en_vol: false,
       essaim_pose: true,
@@ -220,7 +221,7 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
   it('fiche Signalement (validation) : même préaffichage et même persistance du Nombre de captures que l’Extensive', async () => {
     jest.mocked(prospectionRepository.getProspectionPopulation).mockImplementation(async (_id, espece) =>
       espece === 'LMC'
-        ? ({ espece: 'LMC', categorie: 'imago', captures_nombre: 25, captures_sol: 25, captures_trans: 0, captures_greg: 0, densite_groupee: 2 } as any)
+        ? ({ espece: 'LMC', categorie: 'imago', captures_nombre: 25, captures_sol: 25, captures_trans: 0, captures_greg: 0, densite_diffuse: 3, densite_groupee: 2 } as any)
         : ({ espece: 'NSE', categorie: 'imago', captures_nombre: 0 } as any)
     );
 
@@ -233,5 +234,82 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
     await waitFor(() => expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalledTimes(2));
     const [, lmcRow] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
     expect(lmcRow).toMatchObject({ espece: 'LMC', captures_nombre: 25 });
+  });
+
+  /** #type-cible-multi-select : aucune présélection, cochable/décochable librement,
+   * plusieurs valeurs actives simultanément. */
+  it('Type de cible : aucune sélection par défaut sur une nouvelle fiche', async () => {
+    await render(<ExtensiveImagosScreen />);
+    await screen.findByText('📊 Type de cible');
+    await settle();
+
+    fireEvent.press(screen.getByText('Suivant : Larves ›'));
+
+    await waitFor(() => expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalledTimes(2));
+    const [, lmcRow] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
+    expect(lmcRow).toMatchObject({ espece: 'LMC', type_cible: '[]' });
+  });
+
+  it('Type de cible : Vol clair et Dense peuvent être cochés simultanément, puis décochés indépendamment', async () => {
+    await render(<ExtensiveImagosScreen />);
+    await screen.findByText('📊 Type de cible');
+    await settle();
+
+    fireEvent.press(screen.getByText('Vol clair'));
+    await settle();
+    fireEvent.press(screen.getByText('Dense'));
+    await settle();
+
+    await waitFor(() => {
+      expect(screen.getByText('Vol clair').props.style).toEqual(activeStyle(screen.getByText('Vol clair')));
+      expect(screen.getByText('Dense').props.style).toEqual(activeStyle(screen.getByText('Dense')));
+    });
+
+    // Décocher Vol clair ne doit pas toucher Dense.
+    fireEvent.press(screen.getByText('Vol clair'));
+    await settle();
+
+    fireEvent.press(screen.getByText('Suivant : Larves ›'));
+
+    await waitFor(() => expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalledTimes(2));
+    const [, lmcRow] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
+    expect(lmcRow).toMatchObject({ espece: 'LMC', type_cible: '["dense"]' });
+  });
+
+  /** #densite-diffuse-obligatoire : même garde que la densité groupée, bloque
+   * « Suivant » tant qu'une espèce avec des captures n'a pas renseigné sa densité
+   * diffuse. Phases déjà cohérentes dans la fixture (captures_sol = captures_nombre)
+   * pour isoler cette règle de « Captures = Phases », vérifiée par ailleurs. */
+  it('Densité diffuse (D/ha) obligatoire dès qu’il y a des captures — bloque puis débloque « Suivant »', async () => {
+    jest.mocked(prospectionRepository.getProspectionPopulation).mockImplementation(async (_id, espece) =>
+      espece === 'LMC'
+        ? ({
+            espece: 'LMC',
+            categorie: 'imago',
+            captures_nombre: 12,
+            captures_sol: 12,
+            captures_trans: 0,
+            captures_greg: 0,
+            densite_groupee: 3,
+          } as any)
+        : ({ espece: 'NSE', categorie: 'imago', captures_nombre: 0 } as any)
+    );
+
+    await render(<ExtensiveImagosScreen />);
+    expect(await screen.findByDisplayValue('12')).toBeVisible();
+    await settle();
+
+    fireEvent.press(screen.getByText('Suivant : Larves ›'));
+    await waitFor(() => expect(screen.getByText('La densité diffuse (D/ha) est obligatoire.')).toBeVisible());
+    expect(prospectionRepository.saveProspectionPopulation).not.toHaveBeenCalled();
+
+    // popDiff est le premier champ vide (popGroup est déjà rempli par la fixture).
+    fireEvent.changeText(screen.getAllByDisplayValue('')[0], '8');
+    await settle();
+
+    fireEvent.press(screen.getByText('Suivant : Larves ›'));
+    await waitFor(() => expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalledTimes(2));
+    const [, lmcRow] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
+    expect(lmcRow).toMatchObject({ espece: 'LMC', densite_diffuse: 8, densite_groupee: 3 });
   });
 });

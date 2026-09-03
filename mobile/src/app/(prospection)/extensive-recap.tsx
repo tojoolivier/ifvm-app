@@ -65,7 +65,12 @@ function buildImagoRows(row: PopulationRow | null): DetailRow[] {
     { label: 'Accouplement', value: row?.accouplement ?? '—' },
     { label: 'Ponte', value: row?.ponte ?? '—' },
     { label: 'Interdistance (m)', value: row?.interdistance != null ? String(row.interdistance) : '—' },
-    { label: 'Type de cible', value: typeCibleImagoLabel(row?.type_cible) },
+    {
+      // #type-cible-multi-select : plusieurs cibles possibles désormais, jointes
+      // pour l'affichage — jamais de valeur inventée si rien n'a été coché.
+      label: 'Type de cible',
+      value: parseSelectionMultiple(row?.type_cible).map(typeCibleImagoLabel).join(', ') || '—',
+    },
     {
       label: 'Direction du déplacement',
       value: row?.direction_de ? `${row.direction_de} → ${row.direction_vers}` : '—',
