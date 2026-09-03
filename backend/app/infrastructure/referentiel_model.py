@@ -112,19 +112,9 @@ class PesticideModel(Base):
     nom: Mapped[str] = mapped_column(Text(), nullable=False)
     matiere_active: Mapped[str | None] = mapped_column(Text(), nullable=True)
     dose_reference: Mapped[str | None] = mapped_column(Text(), nullable=True)
-    # NULL = pesticides déjà enregistrés avant l'ajout de cette classification
-    # (#0044) — aucune valeur ne peut leur être déduite automatiquement.
-    type_produit: Mapped[str | None] = mapped_column(Text(), nullable=True)
     actif: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
-
-    __table_args__ = (
-        CheckConstraint(
-            "type_produit IN ('produit_choc', 'produit_barriere')",
-            name="ck_pesticide_type_produit",
-        ),
-    )
 
 
 class CultureModel(Base):

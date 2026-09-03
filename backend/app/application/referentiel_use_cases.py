@@ -506,7 +506,6 @@ class CreatePesticide:
         nom: str,
         matiere_active: str | None = None,
         dose_reference: str | None = None,
-        type_produit: str | None = None,
     ) -> Pesticide:
         if await self.repository.code_pris_par_un_autre(code):
             raise CodeReferentielDejaPrisError(code)
@@ -518,7 +517,6 @@ class CreatePesticide:
                 nom=nom,
                 matiere_active=matiere_active,
                 dose_reference=dose_reference,
-                type_produit=type_produit,
                 actif=True,
                 created_at=maintenant,
                 updated_at=maintenant,
@@ -540,7 +538,6 @@ class UpdatePesticide:
         nom: str | None = None,
         matiere_active: str | None = None,
         dose_reference: str | None = None,
-        type_produit: str | None = None,
         actif: bool | None = None,
     ) -> Pesticide | None:
         pesticide = await self.repository.get_by_id(pesticide_id)
@@ -558,8 +555,6 @@ class UpdatePesticide:
             pesticide.matiere_active = matiere_active
         if dose_reference is not None:
             pesticide.dose_reference = dose_reference
-        if type_produit is not None:
-            pesticide.type_produit = type_produit
         if actif is not None:
             pesticide.actif = actif
 

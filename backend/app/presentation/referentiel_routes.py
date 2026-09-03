@@ -520,7 +520,6 @@ async def create_pesticide(
             nom=body.nom,
             matiere_active=body.matiere_active,
             dose_reference=body.dose_reference,
-            type_produit=body.type_produit,
         )
     except CodeReferentielDejaPrisError as exc:
         raise HTTPException(
@@ -557,7 +556,6 @@ async def update_pesticide(
             nom=body.nom,
             matiere_active=body.matiere_active,
             dose_reference=body.dose_reference,
-            type_produit=body.type_produit,
             actif=body.actif,
         )
     except CodeReferentielDejaPrisError as exc:

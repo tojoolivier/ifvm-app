@@ -87,7 +87,6 @@ class PesticideRepositoryImpl(PesticideRepository):
             nom=pesticide.nom,
             matiere_active=pesticide.matiere_active,
             dose_reference=pesticide.dose_reference,
-            type_produit=pesticide.type_produit,
             actif=pesticide.actif,
             created_at=pesticide.created_at,
             updated_at=pesticide.updated_at,
@@ -106,7 +105,6 @@ class PesticideRepositoryImpl(PesticideRepository):
         model.nom = pesticide.nom
         model.matiere_active = pesticide.matiere_active
         model.dose_reference = pesticide.dose_reference
-        model.type_produit = pesticide.type_produit
         model.actif = pesticide.actif
         model.updated_at = pesticide.updated_at
         await self.session.commit()
@@ -120,7 +118,6 @@ class PesticideRepositoryImpl(PesticideRepository):
             nom=model.nom,
             matiere_active=model.matiere_active,
             dose_reference=model.dose_reference,
-            type_produit=model.type_produit,
             actif=model.actif,
             created_at=model.created_at,
             updated_at=model.updated_at,
