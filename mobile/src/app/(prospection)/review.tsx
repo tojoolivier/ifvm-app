@@ -10,7 +10,7 @@ import {
   listAllProspectionInfestations,
   listAllProspectionPopulations,
 } from '@/lib/prospection-repository';
-import { buildRecapitulatif, enregistrerEtSynchroniser } from '@/lib/prospection-review';
+import { buildRecapitulatif, enregistrerEtSynchroniser, infestationDetailHasData } from '@/lib/prospection-review';
 import { estToutParti, resumerEnPhrase } from '@/lib/sync-lot';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
@@ -150,16 +150,48 @@ export default function ReviewScreen() {
 
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Infestation</Text>
-            {recap.infestationCibles.length === 0 ? (
-              <Text style={styles.paragraph}>Aucune information renseignée.</Text>
-            ) : (
-              recap.infestationCibles.map((cible) => (
-                <View key={cible.key} style={styles.summaryLine}>
-                  <Text style={styles.summaryLineLabel}>• {cible.label}</Text>
-                  <Text style={styles.summaryLineValue}>{cible.details.join(' · ') || '—'}</Text>
+
+            {(['imago', 'larve'] as const).map((categorie) => {
+              const rows = recap.infestationDetail.filter(
+                (d) => d.categorie === categorie && infestationDetailHasData(d)
+              );
+              // Bloc entier masqué (titre inclus) si ni LMC ni NSE n'ont la moindre
+              // donnée pour cette catégorie — jamais une ligne isolée à 0/—/—.
+              if (rows.length === 0) return null;
+              return (
+                <View key={categorie} style={styles.infestationGroup}>
+                  <Text style={styles.infestationGroupTitle}>
+                    {categorie === 'imago' ? 'IMAGOS' : 'LARVES'}
+                  </Text>
+                  {rows.map((d) => (
+                    <View key={d.key} style={styles.summaryLine}>
+                      <Text style={styles.summaryLineLabel}>{d.label}</Text>
+                      <Text style={styles.summaryLineValue}>
+                        {d.nombre} · {d.densiteDiffuse != null ? `${d.densiteDiffuse} D/ha` : '—'} ·{' '}
+                        {d.densiteGroupee != null ? `${d.densiteGroupee} D/m²` : '—'}
+                      </Text>
+                    </View>
+                  ))}
                 </View>
-              ))
+              );
+            })}
+
+            {recap.infestationCibles.length > 0 && (
+              <View style={styles.infestationGroup}>
+                <Text style={styles.infestationGroupTitle}>CIBLES SÉLECTIONNÉES</Text>
+                {recap.infestationCibles.map((cible) => (
+                  <View key={cible.key} style={styles.summaryLine}>
+                    <Text style={styles.summaryLineLabel}>• {cible.label}</Text>
+                    <Text style={styles.summaryLineValue}>{cible.details.join(' · ') || '—'}</Text>
+                  </View>
+                ))}
+              </View>
             )}
+
+            {recap.infestationDetail.every((d) => !infestationDetailHasData(d)) &&
+              recap.infestationCibles.length === 0 && (
+                <Text style={styles.paragraph}>Aucune information renseignée.</Text>
+              )}
           </View>
 
           <View style={styles.card}>
@@ -225,6 +257,8 @@ const styles = StyleSheet.create({
   statBox: { flex: 1, backgroundColor: '#f6f3e9', borderRadius: 8, paddingVertical: 9, alignItems: 'center' },
   statValue: { fontSize: 18, fontWeight: '700', color: GREEN },
   statLabel: { fontSize: 9, color: '#9a9484' },
+  infestationGroup: { marginBottom: 4 },
+  infestationGroupTitle: { fontSize: 9, fontWeight: '800', color: '#9a9484', marginTop: 6, marginBottom: 2, letterSpacing: 0.5 },
   summaryLine: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5, borderTopWidth: 1, borderTopColor: '#f1ede1' },
   summaryLineLabel: { fontSize: 12, color: '#5c5848' },
   summaryLineValue: { fontSize: 12, fontWeight: '600', color: TEXT },
