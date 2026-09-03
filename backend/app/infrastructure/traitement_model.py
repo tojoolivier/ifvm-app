@@ -62,6 +62,14 @@ class TraitementModel(Base):
     observations: Mapped[str | None] = mapped_column(Text(), nullable=True)
     statut: Mapped[str] = mapped_column(String(30), nullable=False, default="brouillon")
     statut_sync: Mapped[str] = mapped_column(String(30), nullable=False, default="local")
+    # #traitement-cree-par-id : propriétaire réel de la fiche, dérivé du token
+    # authentifié au moment de la création (jamais du payload client — voir
+    # sync_traitement) — même rôle que prospection.prospecteur_id, absent ici
+    # jusqu'ici. Nullable : colonne additive sur une table existante, aucune
+    # fiche déjà en base ne peut être rétro-attribuée.
+    cree_par_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("utilisateur.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, default=datetime.utcnow
     )

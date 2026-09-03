@@ -338,6 +338,9 @@ class TraitementRead(BaseModel):
     observations: str | None
     statut: StatutTraitement
     statut_sync: str
+    # #traitement-cree-par-id : jamais dans TraitementCreate/TraitementSyncPush —
+    # dérivé du token authentifié côté serveur, pas du payload client.
+    cree_par_id: uuid.UUID | None = None
     created_at: datetime
     updated_at: datetime
 

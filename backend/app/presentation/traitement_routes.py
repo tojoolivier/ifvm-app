@@ -115,7 +115,7 @@ def _champs_communs(body: TraitementCreate) -> dict[str, Any]:
 async def create_traitement(
     body: TraitementCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[Utilisateur, Depends(get_current_user)],
+    current_user: Annotated[Utilisateur, Depends(get_current_user)],
 ):
     repository = get_repository(db)
     prospection_repository = ProspectionRepositoryImpl(db)
@@ -128,6 +128,7 @@ async def create_traitement(
                 utilisateur_repository=utilisateur_repository,
             )
             return await use_case.execute(
+                cree_par_id=current_user.id,
                 **_champs_communs(body),
                 pilote=body.aerien.pilote,
                 mecanicien=body.aerien.mecanicien,
@@ -143,6 +144,7 @@ async def create_traitement(
             utilisateur_repository=utilisateur_repository,
         )
         return await use_case_terrestre.execute(
+            cree_par_id=current_user.id,
             **_champs_communs(body),
             heure_debut=body.terrestre.heure_debut,
             heure_fin=body.terrestre.heure_fin,
@@ -177,7 +179,7 @@ async def create_traitement(
 async def sync_traitement(
     body: TraitementSyncPush,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[Utilisateur, Depends(get_current_user)],
+    current_user: Annotated[Utilisateur, Depends(get_current_user)],
 ):
     """Push de synchronisation offline (ADR-002 / décision #60).
 
@@ -198,6 +200,7 @@ async def sync_traitement(
             traitement, cree = await use_case.execute(
                 traitement_id=body.id,
                 base_updated_at=body.base_updated_at,
+                cree_par_id=current_user.id,
                 **_champs_communs(body),
                 pilote=body.aerien.pilote,
                 mecanicien=body.aerien.mecanicien,
@@ -216,6 +219,7 @@ async def sync_traitement(
             traitement, cree = await use_case_terrestre.execute(
                 traitement_id=body.id,
                 base_updated_at=body.base_updated_at,
+                cree_par_id=current_user.id,
                 **_champs_communs(body),
                 heure_debut=body.terrestre.heure_debut,
                 heure_fin=body.terrestre.heure_fin,

@@ -75,6 +75,9 @@ async def test_create_traitement_aerien_brouillon(
     assert body["cible"]["surface_infestee_ha"] == 120.5
     assert body["aerien"]["pilote"] == "J. Dupont"
     assert body["observations"] is None
+    # #traitement-cree-par-id : fixé automatiquement à l'utilisateur authentifié,
+    # jamais au client — payload_traitement ne l'envoie pas.
+    assert body["cree_par_id"] == str(utilisateur.id)
 
 
 @pytest.mark.asyncio
@@ -1237,6 +1240,39 @@ async def test_sync_push_cree_fiche_inconnue_201(
     body = resp.json()
     assert body["id"] == str(fiche_id)
     assert body["statut_sync"] == "synced"
+    # #traitement-cree-par-id : dérivé du token authentifié, jamais du payload
+    # (absent de _payload_sync).
+    assert body["cree_par_id"] == str(utilisateur.id)
+
+
+@pytest.mark.asyncio
+async def test_sync_push_cree_par_id_immuable_a_la_mise_a_jour(
+    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe
+):
+    """#traitement-cree-par-id : un second push (mise à jour) ne réattribue jamais
+    le créateur d'origine, même rejoué avec le même token authentifié — même
+    principe que created_at, déjà immuable après création."""
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    fiche_id = uuid.uuid4()
+    t0 = datetime.utcnow()
+    payload = _payload_sync(
+        fiche_id,
+        prospection_id,
+        base_updated_at=t0,
+        terrestre={"chef_equipe_id": str(chef_equipe.id)},
+    )
+
+    premier = await client.post("/traitements/sync", json=payload, headers=auth_headers)
+    assert premier.status_code == 201, premier.text
+    cree_par_id_initial = premier.json()["cree_par_id"]
+    assert cree_par_id_initial == str(utilisateur.id)
+
+    renvoi = copy.deepcopy(payload)
+    renvoi["base_updated_at"] = premier.json()["updated_at"]
+    renvoi["localite"] = "Ampanihy"
+    second = await client.post("/traitements/sync", json=renvoi, headers=auth_headers)
+    assert second.status_code == 200, second.text
+    assert second.json()["cree_par_id"] == cree_par_id_initial
 
 
 @pytest.mark.asyncio

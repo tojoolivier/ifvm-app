@@ -113,12 +113,14 @@ def _construire_traitement_base(
     mortalite: bool,
     mortalite_familles: dict[str, Any] | None,
     observations: str | None,
+    cree_par_id: uuid.UUID | None = None,
 ) -> Traitement:
     """Construit le `Traitement` brouillon + snapshot `Cible`, commun aux deux spécialisations."""
     now = datetime.utcnow()
     traitement = Traitement(
         id=traitement_id if traitement_id is not None else uuid.uuid4(),
         prospection_id=prospection.id,
+        cree_par_id=cree_par_id,
         numero_fiche=base_numero,
         type_traitement=type_traitement,
         mode_traitement=mode_traitement,
@@ -213,6 +215,7 @@ class CreateTraitementAerien:
         mortalite: bool = False,
         mortalite_familles: dict[str, Any] | None = None,
         observations: str | None = None,
+        cree_par_id: uuid.UUID | None = None,
     ) -> Traitement:
         _valider_dates(date_traitement, date_validation)
 
@@ -266,6 +269,7 @@ class CreateTraitementAerien:
             mortalite=mortalite,
             mortalite_familles=mortalite_familles,
             observations=observations,
+            cree_par_id=cree_par_id,
         )
 
         traitement.aerien = TraitementAerien(
@@ -353,6 +357,7 @@ class CreateTraitementTerrestre:
         mortalite: bool = False,
         mortalite_familles: dict[str, Any] | None = None,
         observations: str | None = None,
+        cree_par_id: uuid.UUID | None = None,
     ) -> Traitement:
         _valider_dates(date_traitement, date_validation)
         if heure_fin <= heure_debut:
@@ -430,6 +435,7 @@ class CreateTraitementTerrestre:
             mortalite=mortalite,
             mortalite_familles=mortalite_familles,
             observations=observations,
+            cree_par_id=cree_par_id,
         )
         cible = traitement.cible
 
@@ -800,6 +806,7 @@ class SyncPushTraitementAerien:
         mortalite: bool = False,
         mortalite_familles: dict[str, Any] | None = None,
         observations: str | None = None,
+        cree_par_id: uuid.UUID | None = None,
     ) -> tuple[Traitement, bool]:
         _valider_dates(date_traitement, date_validation)
 
@@ -858,6 +865,7 @@ class SyncPushTraitementAerien:
             mortalite=mortalite,
             mortalite_familles=mortalite_familles,
             observations=observations,
+            cree_par_id=cree_par_id,
         )
         candidat.aerien = TraitementAerien(
             traitement_id=traitement_id,
@@ -897,6 +905,9 @@ class SyncPushTraitementAerien:
         candidat.aerien.recalculer_stock_pesticide()
 
         candidat.created_at = existant.created_at
+        # #traitement-cree-par-id : immuable après création, jamais réattribué par
+        # un push ultérieur (même principe que created_at ci-dessus).
+        candidat.cree_par_id = existant.cree_par_id
         synced = await self.traitement_repository.update_sync(candidat)
         return synced, False
 
@@ -968,6 +979,7 @@ class SyncPushTraitementTerrestre:
         mortalite: bool = False,
         mortalite_familles: dict[str, Any] | None = None,
         observations: str | None = None,
+        cree_par_id: uuid.UUID | None = None,
     ) -> tuple[Traitement, bool]:
         _valider_dates(date_traitement, date_validation)
         if heure_fin <= heure_debut:
@@ -1052,6 +1064,7 @@ class SyncPushTraitementTerrestre:
             mortalite=mortalite,
             mortalite_familles=mortalite_familles,
             observations=observations,
+            cree_par_id=cree_par_id,
         )
         cible = candidat.cible
 
@@ -1114,5 +1127,7 @@ class SyncPushTraitementTerrestre:
         candidat.terrestre.recalculer_stock_pesticide()
 
         candidat.created_at = existant.created_at
+        # #traitement-cree-par-id : immuable après création, cf. SyncPushTraitementAerien.
+        candidat.cree_par_id = existant.cree_par_id
         synced = await self.traitement_repository.update_sync(candidat)
         return synced, False

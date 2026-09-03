@@ -313,6 +313,8 @@ class Traitement:
     observations: str | None = None
     statut: str = "brouillon"
     statut_sync: str = "local"
+    # #traitement-cree-par-id : cf. commentaire équivalent sur TraitementModel.
+    cree_par_id: uuid.UUID | None = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
 
