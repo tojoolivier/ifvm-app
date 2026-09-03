@@ -102,8 +102,10 @@ describe('ExtensiveLarvesScreen', () => {
             captures_trans: 0,
             captures_greg: 0,
             densites_larve: JSON.stringify({ L1: 25, L2: 0, L3: 0, L4: 0, L5: 0 }),
-            // #densite-groupee-obligatoire : déjà enregistrée, comme le reste de cette
-            // ligne — ne doit pas non plus bloquer « Suivant » à la réouverture.
+            // #densite-diffuse-obligatoire / #densite-groupee-obligatoire : déjà
+            // enregistrées, comme le reste de cette ligne — ne doivent pas non plus
+            // bloquer « Suivant » à la réouverture.
+            densite_diffuse: 5,
             densite_groupee: 3,
           } as any)
         : ({ espece: 'NSE', categorie: 'larve', captures_nombre: 0 } as any)
@@ -118,5 +120,40 @@ describe('ExtensiveLarvesScreen', () => {
     await waitFor(() => expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalledTimes(2));
     const [, lmcRow] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
     expect(lmcRow).toMatchObject({ espece: 'LMC', captures_nombre: 25 });
+  });
+
+  /** #densite-diffuse-obligatoire : même garde que sur extensive-imagos.tsx. Phases/
+   * stades déjà cohérents dans la fixture pour isoler cette seule règle. */
+  it('Densité diffuse (D/ha) obligatoire dès qu’il y a des captures — bloque puis débloque « Suivant »', async () => {
+    jest.mocked(prospectionRepository.getProspectionPopulation).mockImplementation(async (_id, espece) =>
+      espece === 'LMC'
+        ? ({
+            espece: 'LMC',
+            categorie: 'larve',
+            captures_nombre: 10,
+            captures_sol: 10,
+            captures_trans: 0,
+            captures_greg: 0,
+            densites_larve: JSON.stringify({ L1: 10, L2: 0, L3: 0, L4: 0, L5: 0 }),
+            densite_groupee: 2,
+          } as any)
+        : ({ espece: 'NSE', categorie: 'larve', captures_nombre: 0 } as any)
+    );
+
+    await render(<ExtensiveLarvesScreen />);
+    expect(await screen.findByDisplayValue('10')).toBeVisible();
+    await settle();
+
+    fireEvent.press(screen.getByText('Suivant : Observations ›'));
+    await waitFor(() => expect(screen.getByText('La densité diffuse (D/ha) est obligatoire.')).toBeVisible());
+    expect(prospectionRepository.saveProspectionPopulation).not.toHaveBeenCalled();
+
+    fireEvent.changeText(screen.getAllByDisplayValue('')[0], '6');
+    await settle();
+
+    fireEvent.press(screen.getByText('Suivant : Observations ›'));
+    await waitFor(() => expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalledTimes(2));
+    const [, lmcRow] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
+    expect(lmcRow).toMatchObject({ espece: 'LMC', densite_diffuse: 6, densite_groupee: 2 });
   });
 });

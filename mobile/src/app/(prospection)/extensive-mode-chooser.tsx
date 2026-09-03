@@ -83,7 +83,6 @@ export default function ExtensiveModeChooserScreen() {
             onPress={() => setMode('terrestre')}
             activeOpacity={0.85}
           >
-            <Text style={styles.cardIcon}>🟢</Text>
             <Text style={styles.cardTitle}>Prospection Terrestre</Text>
             <Text style={styles.cardSubtitle}>Prospection réalisée au sol.</Text>
           </TouchableOpacity>
@@ -93,7 +92,6 @@ export default function ExtensiveModeChooserScreen() {
             onPress={() => setMode('aerien')}
             activeOpacity={0.85}
           >
-            <Text style={styles.cardIcon}>🔵</Text>
             <Text style={styles.cardTitle}>Prospection Aérienne</Text>
             <Text style={styles.cardSubtitle}>Prospection réalisée à partir d&apos;un aéronef.</Text>
           </TouchableOpacity>
