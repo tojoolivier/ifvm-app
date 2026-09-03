@@ -124,16 +124,49 @@ class TraitementAerienModel(Base):
     traitement_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("traitement.id", ondelete="CASCADE"), primary_key=True
     )
-    pilote: Mapped[str] = mapped_column(String(255), nullable=False)
-    mecanicien: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Équipe : chef de base, pilote, mécanicien obligatoires et distincts
+    # (ck_traitement_aerien_roles_distincts) ; consultant facultatif. Les
+    # quatre pointent vers `utilisateur`, y compris pilote/mécanicien/
+    # consultant qui peuvent être des comptes créés à la volée
+    # (`peut_se_connecter=false`) — seul chef de base doit préexister dans le
+    # référentiel (pas de création à la volée pour ce rôle).
     chef_de_base_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("utilisateur.id"), nullable=False
     )
-    consultant_international: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    immatricule_aeronef: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    pilote_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("utilisateur.id"), nullable=False
+    )
+    mecanicien_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("utilisateur.id"), nullable=False
+    )
+    consultant_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("utilisateur.id"), nullable=True
+    )
+    # Base principale obligatoire pour tout traitement aérien (aucune
+    # exception, contrairement à la prospection généralisée). Stand nullable :
+    # NULL = ravitaillement fait directement à la base (principale ou
+    # secondaire) plutôt qu'à un stand distinct. Base secondaire facultative.
+    # Aucune des trois FK ne contraint `type_lieu` au niveau SQL (CHECK
+    # inter-table impossible en Postgres) — à valider côté application.
+    lieu_base_principale_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("lieu_aerien.id"), nullable=False
+    )
+    lieu_stand_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("lieu_aerien.id"), nullable=True
+    )
+    lieu_base_secondaire_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("lieu_aerien.id"), nullable=True
+    )
+    immatricule_aeronef: Mapped[str] = mapped_column(Text(), nullable=False)
     nb_rotations: Mapped[int] = mapped_column(Integer(), nullable=False, default=0)
-    total_pesticide_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
-    surface_traitee_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    # Deux cumuls distincts par unité (une rotation en L ne s'additionne jamais
+    # à une rotation en kg) — dérivés des rotations, recalculés à chaque
+    # écriture sur `traitement_rotation`, pas à la lecture (même philosophie
+    # que `total_pesticide_l` avant cette migration).
+    total_pesticide_l: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    total_pesticide_kg: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    # Dérivée (somme de `traitement_rotation.surface_ha`), non saisissable.
+    surface_traitee_ha: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
     surface_restante_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     pesticide_recu_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     pesticide_stock_restant_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
@@ -141,6 +174,15 @@ class TraitementAerienModel(Base):
     traitement: Mapped[TraitementModel] = relationship(back_populates="aerien")
     rotations: Mapped[list["RotationModel"]] = relationship(
         back_populates="aerien", cascade="all, delete-orphan", order_by="RotationModel.numero"
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "chef_de_base_id <> pilote_id "
+            "AND chef_de_base_id <> mecanicien_id "
+            "AND pilote_id <> mecanicien_id",
+            name="ck_traitement_aerien_roles_distincts",
+        ),
     )
 
 
@@ -154,16 +196,32 @@ class RotationModel(Base):
         nullable=False,
     )
     numero: Mapped[int] = mapped_column(Integer(), nullable=False)
+    # Dérivé de `numero` (str(numero)) côté application — plus de saisie libre
+    # (le numéro de cuve s'incrémente automatiquement par traitement, comme
+    # `numero`). Colonne conservée telle quelle pour ne pas casser l'existant.
     numero_cuve: Mapped[str] = mapped_column(String(50), nullable=False)
     produit_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("pesticide.id"), nullable=False
     )
-    quantite_l: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    # Une seule quantité par rotation avec son unité — jamais L et kg à la
+    # fois pour une même rotation (un produit a une seule forme physique).
+    quantite: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    unite: Mapped[str] = mapped_column(String(2), nullable=False)
+    # Superficie correspondant à cette rotation ; la surface totale du
+    # traitement (`traitement_aerien.surface_traitee_ha`) en est la somme.
+    surface_ha: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     temperature_debut_c: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
     temperature_fin_c: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
     vent_debut_ms: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
     vent_fin_ms: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    # heure_debut/heure_fin bornent la rotation entière (mise en place +
+    # application) ; heure_ouverture_vanne/heure_fermeture_vanne bornent
+    # l'application seule (communiquées par le pilote au chef de base). Durée
+    # d'application, durée totale et durée de mise en place s'en dérivent
+    # côté application, aucune des trois n'est stockée.
     heure_debut: Mapped[time] = mapped_column(Time(), nullable=False)
+    heure_ouverture_vanne: Mapped[time] = mapped_column(Time(), nullable=False)
+    heure_fermeture_vanne: Mapped[time] = mapped_column(Time(), nullable=False)
     heure_fin: Mapped[time] = mapped_column(Time(), nullable=False)
     # Dérivé côté client du nom du pesticide (migration 0043) — figé à la
     # saisie, jamais recalculé à la lecture.
@@ -173,7 +231,17 @@ class RotationModel(Base):
 
     __table_args__ = (
         UniqueConstraint("traitement_aerien_id", "numero", name="uq_traitement_rotation_numero"),
+        UniqueConstraint(
+            "traitement_aerien_id", "numero_cuve", name="uq_traitement_rotation_numero_cuve"
+        ),
+        CheckConstraint("unite IN ('L','kg')", name="ck_traitement_rotation_unite"),
         CheckConstraint("heure_fin > heure_debut", name="ck_traitement_rotation_heures"),
+        CheckConstraint(
+            "heure_debut <= heure_ouverture_vanne "
+            "AND heure_ouverture_vanne <= heure_fermeture_vanne "
+            "AND heure_fermeture_vanne <= heure_fin",
+            name="ck_traitement_rotation_vanne_ordre",
+        ),
     )
 
 
