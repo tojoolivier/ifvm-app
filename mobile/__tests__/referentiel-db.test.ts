@@ -85,7 +85,7 @@ describe('referentiel-db', () => {
 });
 
 describe('listPesticides', () => {
-  it('lists active pesticides ordered by name, matière active et dose de référence comprises', async () => {
+  it('lists active pesticides ordered by name, matière active, dose de référence et type de produit compris', async () => {
     // getDb() runs its own PRAGMA table_info(...) migration queries against the same
     // mocked getAllAsync — match on SQL content rather than call order.
     getAllAsync.mockImplementation((sql: string) =>
@@ -97,6 +97,7 @@ describe('listPesticides', () => {
               nom: 'Deltaméthrine',
               matiere_active: 'Deltaméthrine',
               dose_reference: '0.5 l/ha',
+              type_produit: 'produit_choc',
             },
           ])
         : Promise.resolve([])
@@ -105,7 +106,10 @@ describe('listPesticides', () => {
     const result = await listPesticides();
 
     expect(getAllAsync).toHaveBeenCalledWith(
-      'SELECT id, code, nom, matiere_active, dose_reference FROM pesticide WHERE actif = 1 ORDER BY nom'
+      expect.stringContaining(
+        'SELECT id, code, nom, matiere_active, dose_reference, type_produit FROM pesticide'
+      ),
+      [null, null]
     );
     expect(result).toEqual([
       {
@@ -114,8 +118,36 @@ describe('listPesticides', () => {
         nom: 'Deltaméthrine',
         matiere_active: 'Deltaméthrine',
         dose_reference: '0.5 l/ha',
+        type_produit: 'produit_choc',
       },
     ]);
+  });
+
+  it('sans mode de traitement (IRREGULIER ou non renseigné), ne filtre pas par type de produit', async () => {
+    getAllAsync.mockResolvedValue([]);
+
+    await listPesticides('IRREGULIER');
+
+    expect(getAllAsync).toHaveBeenCalledWith(expect.any(String), [null, null]);
+  });
+
+  it('mode BARRIERE : ne propose que les produits barrière', async () => {
+    getAllAsync.mockResolvedValue([]);
+
+    await listPesticides('BARRIERE');
+
+    expect(getAllAsync).toHaveBeenCalledWith(
+      expect.any(String),
+      ['produit_barriere', 'produit_barriere']
+    );
+  });
+
+  it('mode TOTAL (couverture totale) : ne propose que les produits de choc', async () => {
+    getAllAsync.mockResolvedValue([]);
+
+    await listPesticides('TOTAL');
+
+    expect(getAllAsync).toHaveBeenCalledWith(expect.any(String), ['produit_choc', 'produit_choc']);
   });
 });
 

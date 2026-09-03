@@ -88,7 +88,9 @@ async def station_autre_pa(db_session: AsyncSession, autre_poste_acridien, commu
 async def pesticide(db_session: AsyncSession):
     from app.infrastructure.referentiel_model import PesticideModel
 
-    p = PesticideModel(id=uuid.uuid4(), code="PEST-01", nom="Fenitrothion")
+    p = PesticideModel(
+        id=uuid.uuid4(), code="PEST-01", nom="Fenitrothion", type_produit="produit_barriere"
+    )
     db_session.add(p)
     await db_session.commit()
     return p
@@ -148,6 +150,11 @@ async def test_pull_since_null_returns_full_referentiel_unscoped(
 
     pesticide_codes = {p["code"] for p in body["pesticides"]["upserts"]}
     assert pesticide_codes == {pesticide.code}
+    # Filtrage mobile du choix de pesticide par mode_traitement (BARRIERE/TOTAL/
+    # IRREGULIER) : le pull doit descendre type_produit, sans quoi le mobile ne peut
+    # pas savoir quels pesticides proposer.
+    pesticide_sync = next(p for p in body["pesticides"]["upserts"] if p["code"] == pesticide.code)
+    assert pesticide_sync["type_produit"] == "produit_barriere"
 
     culture_codes = {c["code"] for c in body["cultures"]["upserts"]}
     assert culture_codes == {culture.code}
