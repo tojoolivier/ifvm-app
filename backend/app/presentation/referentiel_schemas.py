@@ -160,16 +160,21 @@ class PesticideRead(BaseModel):
     nom: str
     matiere_active: str | None
     dose_reference: str | None
+    type_produit: str | None
     actif: bool
     created_at: datetime
     updated_at: datetime
 
 
 class PesticideCreate(BaseModel):
+    """`type_produit` reprend le CHECK de `pesticide` (migration 0044) : un 422
+    lisible plutôt qu'une IntegrityError."""
+
     code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     matiere_active: str | None = None
     dose_reference: str | None = None
+    type_produit: Literal["produit_choc", "produit_barriere"] | None = None
 
 
 class PesticideUpdate(BaseModel):
@@ -179,6 +184,7 @@ class PesticideUpdate(BaseModel):
     nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
     matiere_active: str | None = None
     dose_reference: str | None = None
+    type_produit: Literal["produit_choc", "produit_barriere"] | None = None
     actif: bool | None = None
 
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AxiosError } from 'axios'
@@ -132,6 +132,23 @@ interface EntitySpec {
 const GREEN_CODE = 'text-[#235a36]'
 
 /**
+ * Classification pesticide (migration backend 0044) : produit de choc (action
+ * rapide, traitement d'urgence) ou produit barrière (action rémanente,
+ * prévention). Nullable côté backend — les pesticides déjà enregistrés n'ont
+ * pas cette classification — d'où l'option vide en tête de la liste déroulante.
+ */
+const TYPE_PRODUIT_LABELS: Record<string, string> = {
+  produit_choc: 'Produit de choc',
+  produit_barriere: 'Produit barrière',
+}
+
+const TYPE_PRODUIT_OPTIONS: EditableField['options'] = [
+  { value: '', label: '— Non classé —' },
+  { value: 'produit_choc', label: TYPE_PRODUIT_LABELS.produit_choc },
+  { value: 'produit_barriere', label: TYPE_PRODUIT_LABELS.produit_barriere },
+]
+
+/**
  * Les interrupteurs de cet écran affichent `actif` sans le piloter (aucune route
  * d'écriture). On neutralise l'estompage `disabled` du composant : actif/inactif
  * est une information métier qui doit rester lisible, comme dans la maquette.
@@ -261,6 +278,17 @@ const ENTITES: EntitySpec[] = [
         render: (row) => text(row, 'dose_reference') || '—',
         sortValue: (row) => text(row, 'dose_reference'),
       },
+      {
+        key: 'type_produit',
+        header: 'Type de produit',
+        render: (row) => {
+          const value = row.type_produit
+          return typeof value === 'string' && TYPE_PRODUIT_LABELS[value]
+            ? TYPE_PRODUIT_LABELS[value]
+            : '—'
+        },
+        sortValue: (row) => text(row, 'type_produit'),
+      },
     ],
     fields: [],
     write: {
@@ -272,6 +300,13 @@ const ENTITES: EntitySpec[] = [
         { name: 'nom', label: 'Nom commercial', kind: 'text', required: true },
         { name: 'matiere_active', label: 'Matière active', kind: 'text', nullable: true },
         { name: 'dose_reference', label: 'Dose de référence', kind: 'text', nullable: true },
+        {
+          name: 'type_produit',
+          label: 'Type de produit',
+          kind: 'select',
+          nullable: true,
+          options: TYPE_PRODUIT_OPTIONS,
+        },
       ],
     },
   },
@@ -741,6 +776,9 @@ export function ReferentielsPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [selectedKey, setSelectedKey] = useState(ENTITES[0].key)
+  // Ligne survolée par le panneau « Modifier » en lecture seule (utilisateur, campagne —
+  // sans `write`, donc sans bouton Action ni modale) : sélectionnée en cliquant la ligne,
+  // comme avant. Les entités avec `write` n'y touchent plus, cf. `editingRow`.
   const [selectedRowIndex, setSelectedRowIndex] = useState(0)
 
   const { data, isLoading } = useQuery<ReferentielPullResponse>({
@@ -769,6 +807,10 @@ export function ReferentielsPage() {
 
   // --- Écritures (entités portant un `write`) --------------------------------
   const writeFields = entity.write?.fields ?? []
+  // Ligne en cours de modification dans la modale « Modifier » — `null` = modale
+  // fermée. Remplace l'ancien panneau permanent : l'édition n'est plus liée à une
+  // ligne « sélectionnée » par un simple clic, mais au bouton Action de sa ligne.
+  const [editingRow, setEditingRow] = useState<Row | null>(null)
   const [editValues, setEditValues] = useState<FormValues>({})
   const [editActif, setEditActif] = useState(true)
   const [editError, setEditError] = useState('')
@@ -777,6 +819,17 @@ export function ReferentielsPage() {
   const [creating, setCreating] = useState(false)
 
   const selectedRowId = selectedRow ? String(selectedRow.id) : undefined
+
+  function openEdit(row: Row) {
+    setEditingRow(row)
+    setEditValues(toFormValues(writeFields, row))
+    setEditActif(Boolean(row.actif))
+    setEditError('')
+  }
+
+  function closeEdit() {
+    setEditingRow(null)
+  }
 
   // Un formulaire peut porter plusieurs clés étrangères (`station_fixe` en a deux),
   // chacune avec sa route : `useQueries` garde un hook par source sans en fixer le
@@ -796,16 +849,6 @@ export function ReferentielsPage() {
     foreignKeyOptions[source.queryKey] = Array.isArray(data) ? (data as Row[]) : []
   })
 
-  // Le panneau repart de l'état serveur dès qu'on change d'entité ou de ligne :
-  // une saisie non enregistrée ne doit pas déteindre sur la ligne suivante.
-  useEffect(() => {
-    setEditValues(toFormValues(writeFields, selectedRow))
-    setEditActif(selectedRow ? Boolean(selectedRow.actif) : true)
-    setEditError('')
-    // `writeFields` se redéduit de `entity` à chaque rendu : la clé d'entité suffit.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entity.key, selectedRowId, data, writeListData])
-
   function invalidateRows() {
     queryClient.invalidateQueries({ queryKey: ['referentiel-pull'] })
     if (entity.write?.listPath) {
@@ -815,9 +858,10 @@ export function ReferentielsPage() {
 
   const updateMutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) =>
-      api.put(`${entity.write!.path}/${selectedRowId}`, payload),
+      api.put(`${entity.write!.path}/${editingRow ? String(editingRow.id) : ''}`, payload),
     onSuccess: () => {
       setEditError('')
+      closeEdit()
       invalidateRows()
     },
     onError: (error) => setEditError(apiErrorMessage(error, "Enregistrement impossible.")),
@@ -851,12 +895,6 @@ export function ReferentielsPage() {
     updateMutation.mutate({ ...toPayload(writeFields, editValues), actif: editActif })
   }
 
-  function resetEdit() {
-    setEditValues(toFormValues(writeFields, selectedRow))
-    setEditActif(selectedRow ? Boolean(selectedRow.actif) : true)
-    setEditError('')
-  }
-
   const columns = useMemo<DataTableColumn<Row>[]>(() => {
     const trailing: DataTableColumn<Row>[] = []
     if (entity.hasActif) {
@@ -887,7 +925,29 @@ export function ReferentielsPage() {
       ),
       sortValue: (row) => dateSortValue(row.updated_at),
     })
+    if (entity.write) {
+      // Pas de `sortValue` : une colonne d'actions n'a rien à trier.
+      trailing.push({
+        key: 'actions',
+        header: 'Action',
+        align: 'right',
+        render: (row) => (
+          <button
+            type="button"
+            onClick={() => openEdit(row)}
+            aria-label={`Modifier ${entity.rowLabel(row)}`}
+            className="rounded-md border border-[#e0d9c4] bg-white px-2 py-1 font-sans text-[11px] font-semibold text-ifvm-text-tertiary transition-colors duration-[120ms] hover:bg-[#faf7ef]"
+          >
+            ✎ Modifier
+          </button>
+        ),
+      })
+    }
     return [...entity.columns, ...trailing]
+    // `openEdit` est recréée à chaque rendu (elle capture `writeFields`), mais ne
+    // change pas de comportement entre deux rendus pour la même entité : l'omettre
+    // évite de recalculer `columns` en boucle sans jamais changer son contenu utile.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entity])
 
   // Recherche, tri et pagination — remis à zéro à chaque changement d'entité :
@@ -903,6 +963,7 @@ export function ReferentielsPage() {
     setSearch('')
     setSort(null)
     setPage(1)
+    closeEdit()
   }
 
   function updateSearch(value: string) {
@@ -941,6 +1002,36 @@ export function ReferentielsPage() {
   const totalPages = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
   const paginatedRows = sortedRows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  // Partagé entre les deux mises en page du panneau du bas : pleine largeur pour
+  // une entité `write` (le panneau Modifier permanent a cédé la place à la
+  // modale), à côté du panneau lecture seule sinon.
+  const fraicheurTerrain = (
+    <div className="rounded-[11px] border border-ifvm-green-border bg-ifvm-green-bg px-[18px] py-4">
+      <h3 className="mb-[7px] font-sans text-[12.5px] font-bold text-ifvm-green-text">
+        Fraîcheur terrain
+      </h3>
+      <p className="font-sans text-[11.5px] font-medium leading-[1.6] text-[#3a5c43]">
+        {isLoading
+          ? 'Chargement…'
+          : serverTime
+            ? `Dernier pull terrain : ${formatDateTime(serverTime)} — ${rows.length} enregistrement${rows.length > 1 ? 's' : ''} synchronisé${rows.length > 1 ? 's' : ''}`
+            : 'Aucun pull terrain enregistré.'}
+      </p>
+      <button
+        type="button"
+        aria-disabled
+        onClick={noop}
+        title="Le suivi par agent n'est pas exposé par GET /referentiel/pull"
+        className={cn(
+          'mt-[10px] w-full rounded-lg border border-ifvm-green-border bg-white px-3 py-[9px] font-sans text-[11.5px] font-bold text-ifvm-green-text',
+          UNAVAILABLE,
+        )}
+      >
+        Voir les agents en retard
+      </button>
+    </div>
+  )
 
   return (
     // Padding de contenu du handoff (README §Design tokens, « contenu 26px 28px 40px ») :
@@ -1069,13 +1160,19 @@ export function ReferentielsPage() {
               columns={columns}
               rows={paginatedRows}
               getRowKey={(row) => String(row.id)}
-              onRowClick={(row) => setSelectedRowIndex(rows.indexOf(row))}
-              // La ligne sélectionnée est repérée par son id, pas par sa position : une
-              // fois triée/paginée, la position dans `paginatedRows` ne correspond plus
-              // à `selectedRowIndex`, qui reste un index dans `rows` (la liste complète).
+              // Avec `write`, la modification passe par le bouton Action de la colonne
+              // « Action » — plus par un clic de ligne qui « sélectionnait » la ligne pour
+              // le panneau permanent (disparu, remplacé par la modale). Sans `write`
+              // (utilisateur, campagne), le clic garde son rôle : prévisualiser la ligne
+              // dans le panneau Modifier en lecture seule.
+              onRowClick={entity.write ? undefined : (row) => setSelectedRowIndex(rows.indexOf(row))}
+              // Idem : le surlignage de la ligne « sélectionnée » ne veut plus rien dire
+              // pour une entité avec `write` (pas de sélection persistante) — seule la
+              // zébrure reste. `selectedRowIndex` est un index dans `rows` (liste complète),
+              // comparé par id plutôt que par position une fois triée/paginée.
               rowClassName={(row, index) =>
                 cn(
-                  String(row.id) === selectedRowId
+                  !entity.write && String(row.id) === selectedRowId
                     ? 'bg-[#f7f4ea] shadow-[inset_3px_0_0_#235a36]'
                     : index % 2
                       ? 'bg-[#fffdf8]'
@@ -1126,169 +1223,164 @@ export function ReferentielsPage() {
           </p>
         </div>
 
-        {/* Panneau Modifier + Fraîcheur terrain */}
-        <div className="grid grid-cols-[1fr_320px] items-start gap-4">
-          <div className="flex flex-col gap-[13px] rounded-[11px] border border-[#e7e0cd] bg-white px-5 py-[18px]">
-            <div>
-              <h3 className="font-sans text-[13px] font-bold">Modifier</h3>
-              <p className="mt-0.5 font-mono text-[11px] font-medium text-ifvm-text-weak">
-                {selectedRow ? entity.rowLabel(selectedRow) : '—'}
-              </p>
-            </div>
+        {/* Panneau Modifier (lecture seule, sans `write`) + Fraîcheur terrain.
+            Avec `write`, la modification est passée en modale (bouton Action de
+            chaque ligne) : ce panneau permanent disparaît, Fraîcheur terrain
+            occupe seule la largeur. */}
+        {entity.write ? (
+          fraicheurTerrain
+        ) : (
+          <div className="grid grid-cols-[1fr_320px] items-start gap-4">
+            <div className="flex flex-col gap-[13px] rounded-[11px] border border-[#e7e0cd] bg-white px-5 py-[18px]">
+              <div>
+                <h3 className="font-sans text-[13px] font-bold">Modifier</h3>
+                <p className="mt-0.5 font-mono text-[11px] font-medium text-ifvm-text-weak">
+                  {selectedRow ? entity.rowLabel(selectedRow) : '—'}
+                </p>
+              </div>
 
-            {entity.write ? (
-              <form onSubmit={submitEdit} className="flex flex-col gap-[13px]">
-                {editError && <ErrorBanner label="Enregistrement impossible" message={editError} />}
-
-                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                  {entity.write.fields.map((field) => (
-                    <EditableInput
-                      key={field.name}
-                      field={field}
-                      idPrefix="ref-edit"
-                      value={editValues[field.name] ?? ''}
-                      onChange={(value) =>
-                        setEditValues((current) => ({ ...current, [field.name]: value }))
-                      }
-                      foreignKeyOptions={foreignKeyOptions}
-                    />
-                  ))}
-                  {entity.write.derivedFields?.map((field) => (
-                    <div key={field.label} className="flex flex-col gap-1.5">
-                      <span className={fieldLabelClass}>{field.label}</span>
-                      <div
-                        className={cn(
-                          'flex min-h-9 items-center rounded-lg border border-[#e0d9c4] bg-[#f7f4ea] px-[11px] text-[12.5px] font-semibold text-ifvm-text-tertiary',
-                          field.mono ? 'font-mono' : 'font-sans',
-                        )}
-                      >
-                        {selectedRow ? field.value(selectedRow) : '—'}
-                      </div>
-                      {field.hint && (
-                        <span className="font-sans text-[10px] font-medium text-ifvm-text-weak">
-                          {field.hint}
-                        </span>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                {entity.fields.map((field) => (
+                  <div key={field.label} className="flex flex-col gap-1.5">
+                    <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[.8px] text-ifvm-text-weak">
+                      {field.label}
+                    </span>
+                    <div
+                      className={cn(
+                        'flex min-h-9 items-center rounded-lg border border-[#e0d9c4] bg-[#fffdf8] px-[11px] text-[12.5px] font-semibold text-[#16201a]',
+                        field.mono ? 'font-mono' : 'font-sans',
                       )}
+                    >
+                      {selectedRow ? field.value(selectedRow) : '—'}
                     </div>
-                  ))}
-                </div>
+                    {field.hint && (
+                      <span className="font-sans text-[10px] font-medium text-ifvm-amber-text">
+                        {field.hint}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
 
+              {entity.hasActif && (
                 <div className="flex items-center justify-between pt-0.5">
                   <span className="font-sans text-[11.5px] font-semibold text-[#3a3a30]">Actif</span>
-                  <Switch checked={editActif} onCheckedChange={setEditActif} aria-label="Actif" />
+                  <Switch
+                    checked={Boolean(selectedRow?.actif)}
+                    disabled
+                    className={READONLY_SWITCH}
+                    aria-label="Actif"
+                  />
                 </div>
-
-                <div className="flex gap-2">
-                  <button
-                    type="submit"
-                    disabled={!selectedRow || updateMutation.isPending}
-                    className="flex-1 rounded-[9px] bg-[#235a36] py-[11px] font-sans text-[12px] font-bold text-white transition-colors duration-[120ms] hover:bg-[#1a4429] disabled:opacity-50"
-                  >
-                    {updateMutation.isPending ? 'Enregistrement…' : 'Enregistrer'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={resetEdit}
-                    className="rounded-[9px] border border-[#e0d9c4] bg-white px-4 py-[11px] font-sans text-[12px] font-semibold text-ifvm-text-tertiary transition-colors duration-[120ms] hover:bg-[#faf7ef]"
-                  >
-                    Annuler
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                  {entity.fields.map((field) => (
-                    <div key={field.label} className="flex flex-col gap-1.5">
-                      <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[.8px] text-ifvm-text-weak">
-                        {field.label}
-                      </span>
-                      <div
-                        className={cn(
-                          'flex min-h-9 items-center rounded-lg border border-[#e0d9c4] bg-[#fffdf8] px-[11px] text-[12.5px] font-semibold text-[#16201a]',
-                          field.mono ? 'font-mono' : 'font-sans',
-                        )}
-                      >
-                        {selectedRow ? field.value(selectedRow) : '—'}
-                      </div>
-                      {field.hint && (
-                        <span className="font-sans text-[10px] font-medium text-ifvm-amber-text">
-                          {field.hint}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {entity.hasActif && (
-                  <div className="flex items-center justify-between pt-0.5">
-                    <span className="font-sans text-[11.5px] font-semibold text-[#3a3a30]">
-                      Actif
-                    </span>
-                    <Switch
-                      checked={Boolean(selectedRow?.actif)}
-                      disabled
-                      className={READONLY_SWITCH}
-                      aria-label="Actif"
-                    />
-                  </div>
-                )}
-
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    aria-disabled
-                    onClick={noop}
-                    title={`${entity.apiLabel} — enregistrement impossible tant que la route d'écriture n'existe pas`}
-                    className={cn(
-                      'flex-1 rounded-[9px] bg-[#235a36] py-[11px] font-sans text-[12px] font-bold text-white',
-                      UNAVAILABLE,
-                    )}
-                  >
-                    Enregistrer
-                  </button>
-                  <button
-                    type="button"
-                    aria-disabled
-                    onClick={noop}
-                    className={cn(
-                      'rounded-[9px] border border-[#e0d9c4] bg-white px-4 py-[11px] font-sans text-[12px] font-semibold text-ifvm-text-tertiary',
-                      UNAVAILABLE,
-                    )}
-                  >
-                    Annuler
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-
-          <div className="rounded-[11px] border border-ifvm-green-border bg-ifvm-green-bg px-[18px] py-4">
-            <h3 className="mb-[7px] font-sans text-[12.5px] font-bold text-ifvm-green-text">
-              Fraîcheur terrain
-            </h3>
-            <p className="font-sans text-[11.5px] font-medium leading-[1.6] text-[#3a5c43]">
-              {isLoading
-                ? 'Chargement…'
-                : serverTime
-                  ? `Dernier pull terrain : ${formatDateTime(serverTime)} — ${rows.length} enregistrement${rows.length > 1 ? 's' : ''} synchronisé${rows.length > 1 ? 's' : ''}`
-                  : 'Aucun pull terrain enregistré.'}
-            </p>
-            <button
-              type="button"
-              aria-disabled
-              onClick={noop}
-              title="Le suivi par agent n'est pas exposé par GET /referentiel/pull"
-              className={cn(
-                'mt-[10px] w-full rounded-lg border border-ifvm-green-border bg-white px-3 py-[9px] font-sans text-[11.5px] font-bold text-ifvm-green-text',
-                UNAVAILABLE,
               )}
-            >
-              Voir les agents en retard
-            </button>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  aria-disabled
+                  onClick={noop}
+                  title={`${entity.apiLabel} — enregistrement impossible tant que la route d'écriture n'existe pas`}
+                  className={cn(
+                    'flex-1 rounded-[9px] bg-[#235a36] py-[11px] font-sans text-[12px] font-bold text-white',
+                    UNAVAILABLE,
+                  )}
+                >
+                  Enregistrer
+                </button>
+                <button
+                  type="button"
+                  aria-disabled
+                  onClick={noop}
+                  className={cn(
+                    'rounded-[9px] border border-[#e0d9c4] bg-white px-4 py-[11px] font-sans text-[12px] font-semibold text-ifvm-text-tertiary',
+                    UNAVAILABLE,
+                  )}
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+
+            {fraicheurTerrain}
+          </div>
+        )}
+      </div>
+
+      {editingRow && entity.write && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Modifier ${entity.rowLabel(editingRow)}`}
+            className="mx-4 w-full max-w-md rounded-[11px] border border-[#e7e0cd] bg-white shadow-xl"
+          >
+            <div className="border-b border-[#f4efe2] px-6 py-4">
+              <h2 className="font-sans text-[15px] font-extrabold">Modifier</h2>
+              <p className="mt-0.5 font-mono text-[11px] font-medium text-ifvm-text-weak">
+                {entity.rowLabel(editingRow)}
+              </p>
+            </div>
+            <form onSubmit={submitEdit} className="flex flex-col gap-4 px-6 py-4">
+              {editError && <ErrorBanner label="Enregistrement impossible" message={editError} />}
+
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                {entity.write.fields.map((field) => (
+                  <EditableInput
+                    key={field.name}
+                    field={field}
+                    idPrefix="ref-edit"
+                    value={editValues[field.name] ?? ''}
+                    onChange={(value) =>
+                      setEditValues((current) => ({ ...current, [field.name]: value }))
+                    }
+                    foreignKeyOptions={foreignKeyOptions}
+                  />
+                ))}
+                {entity.write.derivedFields?.map((field) => (
+                  <div key={field.label} className="flex flex-col gap-1.5">
+                    <span className={fieldLabelClass}>{field.label}</span>
+                    <div
+                      className={cn(
+                        'flex min-h-9 items-center rounded-lg border border-[#e0d9c4] bg-[#f7f4ea] px-[11px] text-[12.5px] font-semibold text-ifvm-text-tertiary',
+                        field.mono ? 'font-mono' : 'font-sans',
+                      )}
+                    >
+                      {field.value(editingRow)}
+                    </div>
+                    {field.hint && (
+                      <span className="font-sans text-[10px] font-medium text-ifvm-text-weak">
+                        {field.hint}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between pt-0.5">
+                <span className="font-sans text-[11.5px] font-semibold text-[#3a3a30]">Actif</span>
+                <Switch checked={editActif} onCheckedChange={setEditActif} aria-label="Actif" />
+              </div>
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="submit"
+                  disabled={updateMutation.isPending}
+                  className="rounded-[9px] bg-[#235a36] px-4 py-[10px] font-sans text-[12px] font-bold text-white transition-colors duration-[120ms] hover:bg-[#1a4429] disabled:opacity-50"
+                >
+                  {updateMutation.isPending ? 'Enregistrement…' : 'Enregistrer'}
+                </button>
+                <button
+                  type="button"
+                  onClick={closeEdit}
+                  className="rounded-[9px] border border-[#e7e0cd] px-4 py-[10px] font-sans text-[12px] font-bold text-ifvm-text-tertiary transition-colors duration-[120ms] hover:bg-[#faf7ef]"
+                >
+                  Annuler
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-      </div>
+      )}
 
       {creating && entity.write && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -1320,7 +1412,7 @@ export function ReferentielsPage() {
               </div>
 
               {/* Pas de champ « Actif » : une création part active, la désactivation
-                  est un geste explicite depuis le panneau Modifier. */}
+                  est un geste explicite depuis la modale Modifier. */}
               <div className="flex gap-3 pt-1">
                 <button
                   type="submit"
