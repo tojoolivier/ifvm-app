@@ -198,7 +198,10 @@ class PopulationRead(BaseModel):
     # ==========================================
     # NOUVEAUX CHAMPS - Extensif Imagos : Type de cible, État/Comportement
     # ==========================================
-    type_cible: TypeCibleImago | None = None
+    # Multi-select (migration 0044) : plusieurs cibles simultanées (ex. Vol clair +
+    # Dense), même pattern que `biotope` (liste, tolérante aux anciennes fiches sans
+    # validator sur ce schéma de lecture).
+    type_cible: list[TypeCibleImago] = []
     direction_de: str | None = None
     direction_vers: str | None = None
     etat: ComportementInfestation | None = None
@@ -303,7 +306,9 @@ class PopulationCreate(BaseModel):
     # ==========================================
     # NOUVEAUX CHAMPS - Extensif Imagos : Type de cible, État/Comportement
     # ==========================================
-    type_cible: TypeCibleImago | None = None
+    # Multi-select (migration 0044) : plusieurs cibles simultanées (ex. Vol clair +
+    # Dense) — même pattern que `biotope`.
+    type_cible: list[TypeCibleImago] = []
     direction_de: str | None = None
     direction_vers: str | None = None
     etat: ComportementInfestation | None = None
@@ -318,6 +323,15 @@ class PopulationCreate(BaseModel):
         # required" générique qu'un `Field(...)` obligatoire aurait renvoyé.
         if self.densite_groupee is None:
             raise ValueError("La densité groupée (/m²) est obligatoire.")
+        return self
+
+    @model_validator(mode="after")
+    def _densite_diffuse_obligatoire(self) -> "PopulationCreate":
+        # #densite-diffuse-obligatoire : même mécanisme que _densite_groupee_obligatoire
+        # ci-dessus (validation applicative, aucune contrainte DB — tolérance aux
+        # fiches historiques préservée via PopulationRead, non contraint).
+        if self.densite_diffuse is None:
+            raise ValueError("La densité diffuse (D/ha) est obligatoire.")
         return self
 
 
