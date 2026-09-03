@@ -21,7 +21,11 @@ router = APIRouter()
 async def login(body: LoginRequest, db: Annotated[AsyncSession, Depends(get_db)]):
     result = await db.execute(select(Utilisateur).where(Utilisateur.email == body.email))
     user = result.scalar_one_or_none()
-    if user is None or not verify_password(body.password, user.password_hash):
+    if (
+        user is None
+        or not user.peut_se_connecter
+        or not verify_password(body.password, user.password_hash)
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Identifiants invalides"
         )

@@ -8,8 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import get_current_user, hash_password
 from app.database import get_db
 from app.infrastructure.referentiel_model import PosteAcridienModel
-from app.models.users import Utilisateur
-from app.schemas.users import UtilisateurCreate, UtilisateurRead, UtilisateurUpdate
+from app.models.users import ROLES_A_LA_VOLEE, Utilisateur
+from app.schemas.users import (
+    UtilisateurCreate,
+    UtilisateurCreateALaVolee,
+    UtilisateurRead,
+    UtilisateurUpdate,
+)
 
 router = APIRouter()
 
@@ -56,6 +61,45 @@ async def create_user(
     data = body.model_dump()
     data["password_hash"] = hash_password(data.pop("password"))
     user = Utilisateur(**data)
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
+@router.post("/a-la-volee", response_model=UtilisateurRead, status_code=201)
+async def create_user_a_la_volee(
+    body: UtilisateurCreateALaVolee,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    """Création d'identité seule (pilote/mécanicien/consultant) depuis le
+    formulaire de traitement aérien : compte non-authentifiable
+    (`peut_se_connecter=False`), email/mot de passe générés et inexploitables.
+    Chef de base explicitement exclu : il doit préexister (issue #319).
+
+    Volontairement ouvert à tout utilisateur authentifié (pas `require_admin`
+    comme `POST /` ci-dessus) : l'appelant est le personnel de terrain qui
+    remplit la fiche de traitement, pas un admin. Le compte créé ne peut de
+    toute façon ni se logger ni obtenir de droits au-delà de son rôle."""
+    if body.role not in ROLES_A_LA_VOLEE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Création à la volée impossible pour le rôle '{body.role}' : "
+                f"seuls {', '.join(ROLES_A_LA_VOLEE)} peuvent être créés ainsi "
+                "(chef de base doit préexister)."
+            ),
+        )
+    jeton = uuid.uuid4().hex
+    user = Utilisateur(
+        nom=body.nom,
+        prenom=body.prenom,
+        email=f"a-la-volee.{jeton}@ifvm.invalid",
+        password_hash=hash_password(jeton),
+        role=body.role,
+        peut_se_connecter=False,
+    )
     db.add(user)
     await db.commit()
     await db.refresh(user)
