@@ -12,7 +12,39 @@ import {
   validateEmpoisonnement,
   computeSignatureMatrix,
   aggregateRecapErrors,
+  deriveNomCommercial,
 } from '../src/lib/traitement-validation';
+
+/**
+ * #produit-nom-commercial : « texte avant le premier chiffre », vérifié contre
+ * des entrées réelles du référentiel (backend/app/pesticide_seed.py), y compris
+ * les cas limites qui n'y suivent pas le format standard "Nom NNN unité".
+ */
+describe('deriveNomCommercial', () => {
+  it('extrait le texte avant le premier chiffre, sur les exemples du prompt', () => {
+    expect(deriveNomCommercial('NomProduit 200 SC')).toBe('NomProduit');
+    expect(deriveNomCommercial('ProduitX 50 EC')).toBe('ProduitX');
+    expect(deriveNomCommercial('Exemple 100 ULV')).toBe('Exemple');
+  });
+
+  it('fonctionne sur de vraies entrées du référentiel pesticide', () => {
+    expect(deriveNomCommercial('Fyfanon 440 ULV')).toBe('Fyfanon');
+    expect(deriveNomCommercial('TEFLUBENAZUR 50 ULV')).toBe('TEFLUBENAZUR');
+    expect(deriveNomCommercial('DELTAMETHRINE 15 IL')).toBe('DELTAMETHRINE');
+  });
+
+  it('conserve plusieurs mots quand ils précèdent tous le premier chiffre', () => {
+    expect(deriveNomCommercial('NURELLE D 14/120 UL')).toBe('NURELLE D');
+  });
+
+  it('retombe sur le nom complet quand il ne contient aucun chiffre', () => {
+    expect(deriveNomCommercial('GREEN MUSCLE')).toBe('GREEN MUSCLE');
+  });
+
+  it('ne retire que les espaces, pas la ponctuation collée au chiffre', () => {
+    expect(deriveNomCommercial('SP-9')).toBe('SP-');
+  });
+});
 
 describe('computeNbRotations', () => {
   it('counts the rotations captured so far', () => {

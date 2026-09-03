@@ -1859,6 +1859,8 @@ export interface components {
             produit_id: string;
             /** Quantite L */
             quantite_l: number;
+            /** Nom Commercial */
+            nom_commercial?: string | null;
         };
         /** ProduitUtiliseRead */
         ProduitUtiliseRead: {
@@ -1876,6 +1878,8 @@ export interface components {
             produit_id: string;
             /** Quantite L */
             quantite_l: number;
+            /** Nom Commercial */
+            nom_commercial?: string | null;
         };
         /** ProspectionCreate */
         ProspectionCreate: {
@@ -2416,6 +2420,8 @@ export interface components {
              * Format: time
              */
             heure_fin: string;
+            /** Nom Commercial */
+            nom_commercial?: string | null;
         };
         /** RotationRead */
         RotationRead: {
@@ -2453,6 +2459,8 @@ export interface components {
              * Format: time
              */
             heure_fin: string;
+            /** Nom Commercial */
+            nom_commercial?: string | null;
         };
         /**
          * Sexe

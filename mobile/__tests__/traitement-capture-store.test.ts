@@ -84,6 +84,17 @@ describe('section aérien', () => {
     expect(useTraitementCaptureStore.getState().aerien.rotations[0].quantite_l).toBe(15);
   });
 
+  it('addRotation/updateRotation portent nom_commercial (#produit-nom-commercial)', () => {
+    const store = useTraitementCaptureStore.getState();
+    store.addRotation({ produit_id: 'p1', nom_commercial: 'Fyfanon' });
+    const localId = useTraitementCaptureStore.getState().aerien.rotations[0].localId;
+    expect(useTraitementCaptureStore.getState().aerien.rotations[0].nom_commercial).toBe('Fyfanon');
+
+    store.updateRotation(localId, { produit_id: 'p2', nom_commercial: 'Nurelle' });
+
+    expect(useTraitementCaptureStore.getState().aerien.rotations[0].nom_commercial).toBe('Nurelle');
+  });
+
   it('removeRotation retire la rotation ciblée', () => {
     const store = useTraitementCaptureStore.getState();
     store.addRotation({ numero_cuve: 'C1' });
@@ -112,6 +123,12 @@ describe('section terrestre', () => {
     expect(terrestre.produits).toHaveLength(1);
     expect(terrestre.produits[0].produit_id).toBe('p1');
     expect(typeof terrestre.produits[0].localId).toBe('string');
+  });
+
+  it('addProduit porte nom_commercial (#produit-nom-commercial)', () => {
+    useTraitementCaptureStore.getState().addProduit({ produit_id: 'p1', nom_commercial: 'Fyfanon' });
+
+    expect(useTraitementCaptureStore.getState().terrestre.produits[0].nom_commercial).toBe('Fyfanon');
   });
 
   it('removeProduit retire le produit ciblé', () => {

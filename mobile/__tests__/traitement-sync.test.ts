@@ -147,6 +147,43 @@ describe('enregistrerEtSynchroniserTraitement', () => {
     expect(result.reussies).toEqual(['traitement-1']);
   });
 
+  it('pousse nom_commercial avec chaque rotation lors de la synchro (#produit-nom-commercial)', async () => {
+    mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
+    mockSyncTraitement.mockResolvedValue({ status: 201, body: { id: 'traitement-1', updated_at: '2026-08-13T00:00:00.000Z' } });
+    mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
+
+    const draftAvecRotation = draft({
+      aerien: {
+        ...draft().aerien!,
+        rotations: [
+          {
+            id: 'rot-1',
+            traitement_aerien_id: 'traitement-1',
+            numero: 1,
+            numero_cuve: 'C1',
+            produit_id: 'prod-1',
+            quantite_l: 10,
+            temperature_debut_c: 25,
+            temperature_fin_c: 27,
+            vent_debut_ms: 2,
+            vent_fin_ms: 3,
+            heure_debut: '06:00',
+            heure_fin: '06:30',
+            nom_commercial: 'Fyfanon',
+          },
+        ],
+      },
+    });
+
+    await enregistrerEtSynchroniserTraitement(draftAvecRotation, 'token-1');
+
+    expect(apiClient.addRotation).toHaveBeenCalledWith(
+      'token-1',
+      'traitement-1',
+      expect.objectContaining({ produit_id: 'prod-1', nom_commercial: 'Fyfanon' })
+    );
+  });
+
   it('utilise server_updated_at comme base_updated_at quand la fiche a déjà été synchronisée', async () => {
     mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
     mockSyncTraitement.mockResolvedValue({ status: 200, body: { id: 'traitement-1' } });
