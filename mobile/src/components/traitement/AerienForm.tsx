@@ -5,6 +5,7 @@ import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import { computeNbRotations, computeTotalPesticideAerien, deriveNomCommercial } from '@/lib/traitement-validation';
 import { Card } from '@/components/traitement/Card';
 import { Chip } from '@/components/traitement/Chip';
+import { ProduitSelectField } from '@/components/traitement/ProduitSelectField';
 import { TimeField } from '@/components/traitement/TimeField';
 import { formStyles as styles } from '@/components/traitement/TraitementFormStyles';
 
@@ -120,22 +121,17 @@ export function AerienForm({
             onChangeText={(v) => store.updateRotation(rotation.localId, { quantite_l: v ? Number(v) : null })}
           />
           <Text style={styles.label}>Produit / matières actives *</Text>
-          <View style={styles.chipRow}>
-            {pesticides.map((p) => (
-              <Chip
-                key={p.id}
-                label={p.nom}
-                selected={rotation.produit_id === p.id}
-                onPress={() =>
-                  !readOnly &&
-                  store.updateRotation(rotation.localId, {
-                    produit_id: p.id,
-                    nom_commercial: deriveNomCommercial(p.nom),
-                  })
-                }
-              />
-            ))}
-          </View>
+          <ProduitSelectField
+            pesticides={pesticides}
+            selectedId={rotation.produit_id}
+            readOnly={readOnly}
+            onSelect={(p) =>
+              store.updateRotation(rotation.localId, {
+                produit_id: p.id,
+                nom_commercial: deriveNomCommercial(p.nom),
+              })
+            }
+          />
           <Card variant="derivee">
             <Text style={styles.label}>Nom commercial</Text>
             <Text style={styles.derivedValue}>{rotation.nom_commercial || '—'}</Text>
