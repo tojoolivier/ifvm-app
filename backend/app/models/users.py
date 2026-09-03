@@ -16,6 +16,7 @@ ROLES = (
     "pilote",
     "mecanicien",
     "chef_de_base",
+    "consultant_international",
     "admin",
 )
 
@@ -33,5 +34,10 @@ class Utilisateur(Base):
         UUID(as_uuid=True), ForeignKey("poste_acridien.id"), nullable=True
     )
     actif: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # False = compte créé à la volée depuis une fiche de traitement (pilote,
+    # mécanicien, consultant) pour identifier une personne sans lui ouvrir
+    # d'accès applicatif — email/password_hash restent renseignés (générés,
+    # inexploitables) pour satisfaire les contraintes existantes de la table.
+    peut_se_connecter: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
