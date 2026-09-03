@@ -223,6 +223,38 @@ class CultureUpdate(BaseModel):
     actif: bool | None = None
 
 
+class LieuAerienRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    type_lieu: Literal["principale", "secondaire", "stand"]
+    nom: str
+    latitude: float
+    longitude: float
+    altitude: float | None
+    actif: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class LieuAerienCreate(BaseModel):
+    type_lieu: Literal["principale", "secondaire", "stand"]
+    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+    altitude: float | None = None
+
+
+class LieuAerienUpdate(BaseModel):
+    """Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie."""
+
+    type_lieu: Literal["principale", "secondaire", "stand"] | None = None
+    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    altitude: float | None = None
+    actif: bool | None = None
+
+
 class CultureSyncRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
