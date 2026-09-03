@@ -1,5 +1,6 @@
 import { getDb } from './prospection-db';
 import { generateId } from './id';
+import { composerNumeroFiche } from './traitement-numero-fiche';
 
 export type TypeTraitement = 'AERIEN' | 'TERRESTRE';
 
@@ -309,6 +310,37 @@ export async function createDraftTraitementTerrestre(
 // ==========================================
 // RÉFÉRENCE
 // ==========================================
+
+const MAX_TENTATIVES_NUMERO_FICHE = 50;
+
+/**
+ * Numéro de fiche lisible, unique en local, composé via `composerNumeroFiche`
+ * (prénom du chef, type, date ISO) — même patron que `_persister_avec_numero_fiche_unique`
+ * côté backend (backend/app/application/traitement_use_cases.py) : essaie d'abord le
+ * numéro sans suffixe, puis incrémente (2, 3, …) tant qu'une autre fiche locale le porte
+ * déjà. `excludeId` écarte la fiche elle-même (regénération d'un brouillon existant).
+ */
+export async function genererNumeroFicheDisponible(
+  prenomChef: string,
+  typeTraitement: TypeTraitement,
+  dateTraitementIso: string,
+  excludeId?: string | null
+): Promise<string> {
+  const db = await getDb();
+  let suffixe: number | null = null;
+
+  for (let tentative = 0; tentative < MAX_TENTATIVES_NUMERO_FICHE; tentative++) {
+    const candidat = composerNumeroFiche(prenomChef, typeTraitement, dateTraitementIso, suffixe);
+    const existant = await db.getFirstAsync<{ id: string }>(
+      'SELECT id FROM traitement WHERE numero_fiche = ? AND (? IS NULL OR id != ?)',
+      [candidat, excludeId ?? null, excludeId ?? null]
+    );
+    if (!existant) return candidat;
+    suffixe = (suffixe ?? 1) + 1;
+  }
+
+  throw new Error(`Impossible de générer un numero_fiche unique à partir de '${prenomChef}'`);
+}
 
 export async function updateTraitementReference(
   id: string,

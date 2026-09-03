@@ -7,6 +7,7 @@ import {
   createDraftTraitementAerien,
   createDraftTraitementTerrestre,
   updateTraitementReference,
+  genererNumeroFicheDisponible,
   getTraitement,
   saveCible,
 } from '@/lib/traitement-repository';
@@ -16,6 +17,7 @@ import { STATUT_VALIDE } from '@/lib/prospection-fiche-lecture';
 import { generateId } from '@/lib/id';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import { validateReferences } from '@/lib/traitement-validation';
+import { useAuthStore } from '@/lib/auth-store';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { logger } from '@/lib/logger';
@@ -48,6 +50,7 @@ export default function ReferencesScreen() {
 
   const store = useTraitementCaptureStore();
   const typeTraitement = store.typeTraitement;
+  const utilisateurConnecte = useAuthStore((s) => s.user);
   const [traitementId, setTraitementId] = useState<string | null>(routeTraitementId ?? null);
   const [prospectionId, setProspectionId] = useState<string | null>(routeProspectionId ?? null);
   const [dateValidation, setDateValidation] = useState<string | null>(null);
@@ -113,6 +116,32 @@ export default function ReferencesScreen() {
       })
       .catch((error) => signalerChargement(error, { prospectionId }));
   }, [prospectionId, routeTraitementId, signalerChargement]);
+
+  // N° de fiche (auto) : « Prénom du chef — Type — Date ISO », suffixe en cas de
+  // collision (même composition que generer_numero_fiche() côté backend). Le chef
+  // n'est choisi qu'à l'écran suivant (traitement.tsx) — on utilise donc le prénom
+  // de l'utilisateur connecté sur ce téléphone, celui qui fait la saisie (même
+  // convention que le chef de base par défaut sur l'écran Traitement). Ne recalcule
+  // jamais un numéro déjà présent (brouillon relu, ou déjà généré) : c'est le
+  // changement de type ci-dessous qui le remet à zéro pour forcer une régénération.
+  useEffect(() => {
+    if (readOnly || store.ref.numeroFiche || !utilisateurConnecte || !typeTraitement || !store.ref.dateTraitement) return;
+    let cancelled = false;
+    genererNumeroFicheDisponible(
+      utilisateurConnecte.prenom,
+      typeTraitement,
+      store.ref.dateTraitement,
+      traitementId
+    )
+      .then((numero) => {
+        if (!cancelled) store.updateRef({ numeroFiche: numero });
+      })
+      .catch((error) => signalerChargement(error, { traitementId, source: 'genererNumeroFicheDisponible' }));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readOnly, store.ref.numeroFiche, utilisateurConnecte, typeTraitement, store.ref.dateTraitement, traitementId]);
 
   const captureGps = () =>
     runGps(
@@ -200,6 +229,20 @@ export default function ReferencesScreen() {
           }
         }
 
+        // Filet de sécurité : l'effet de génération auto tourne en tâche de fond et
+        // peut ne pas avoir résolu si l'agent enchaîne vite — on ne part jamais avec
+        // numeroFiche encore null ici.
+        let numeroFiche = store.ref.numeroFiche ?? null;
+        if (!numeroFiche && utilisateurConnecte && typeTraitement && store.ref.dateTraitement) {
+          numeroFiche = await genererNumeroFicheDisponible(
+            utilisateurConnecte.prenom,
+            typeTraitement,
+            store.ref.dateTraitement,
+            id
+          );
+          store.updateRef({ numeroFiche });
+        }
+
         await updateTraitementReference(id, {
           localite: store.ref.localite ?? null,
           region: store.ref.region ?? null,
@@ -210,7 +253,7 @@ export default function ReferencesScreen() {
           altitude: store.ref.altitude ?? null,
           dateTraitement: store.ref.dateTraitement ?? null,
           dateValidation,
-          numeroFiche: null,
+          numeroFiche,
         });
 
         router.push({ pathname: '/(traitement)/cibles' as any, params: { traitementId: id, isValidationView, origineId } });
@@ -244,7 +287,13 @@ export default function ReferencesScreen() {
                 { value: 'TERRESTRE', label: 'Terrestre' },
               ]}
               value={typeTraitement}
-              onChange={(v) => !readOnly && !traitementId && store.setTypeTraitement(v as any)}
+              onChange={(v) => {
+                if (readOnly || traitementId) return;
+                store.setTypeTraitement(v as any);
+                // Le type entre dans la composition du n° de fiche (auto) : remis à
+                // zéro pour que l'effet de génération le recalcule avec le bon type.
+                store.updateRef({ numeroFiche: null });
+              }}
             />
             {errors.typeTraitement && <Text style={styles.error}>{errors.typeTraitement}</Text>}
           </View>

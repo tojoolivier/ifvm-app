@@ -2,6 +2,7 @@ import {
   createDraftTraitementAerien,
   createDraftTraitementTerrestre,
   updateTraitementReference,
+  genererNumeroFicheDisponible,
   updateTraitementAerien,
   updateTraitementTerrestre,
   updateTraitementMoyens,
@@ -326,6 +327,51 @@ describe('updateTraitementReference', () => {
         numeroFiche: null,
       })
     ).rejects.toThrow('Échec de la mise à jour de la fiche brouillon locale');
+  });
+});
+
+describe('genererNumeroFicheDisponible', () => {
+  it('returns the base number when no local fiche already carries it', async () => {
+    getFirstAsync.mockResolvedValueOnce(null);
+
+    const numero = await genererNumeroFicheDisponible('Hery', 'AERIEN', '2026-08-11');
+
+    expect(numero).toBe('Hery-Aerien-2026-08-11');
+    expect(getFirstAsync).toHaveBeenCalledWith(
+      expect.stringContaining('SELECT id FROM traitement WHERE numero_fiche = ?'),
+      ['Hery-Aerien-2026-08-11', null, null]
+    );
+  });
+
+  it('appends an incremental suffix while the candidate collides locally', async () => {
+    getFirstAsync
+      .mockResolvedValueOnce({ id: 'autre-fiche' }) // base sans suffixe
+      .mockResolvedValueOnce({ id: 'autre-fiche' }) // suffixe 2
+      .mockResolvedValueOnce(null); // suffixe 3 libre
+
+    const numero = await genererNumeroFicheDisponible('Hery', 'TERRESTRE', '2026-08-11');
+
+    expect(numero).toBe('Hery-Terrestre-2026-08-11-3');
+  });
+
+  it('excludes the fiche itself so regenerating an existing draft does not collide with its own row', async () => {
+    getFirstAsync.mockResolvedValueOnce(null);
+
+    await genererNumeroFicheDisponible('Hery', 'AERIEN', '2026-08-11', AERIEN_INPUT.id);
+
+    expect(getFirstAsync).toHaveBeenCalledWith(expect.any(String), [
+      'Hery-Aerien-2026-08-11',
+      AERIEN_INPUT.id,
+      AERIEN_INPUT.id,
+    ]);
+  });
+
+  it('throws once every attempt up to the retry cap collides', async () => {
+    getFirstAsync.mockResolvedValue({ id: 'toujours-pris' });
+
+    await expect(genererNumeroFicheDisponible('Hery', 'AERIEN', '2026-08-11')).rejects.toThrow(
+      "Impossible de générer un numero_fiche unique à partir de 'Hery'"
+    );
   });
 });
 
