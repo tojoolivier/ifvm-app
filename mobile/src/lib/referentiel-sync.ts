@@ -138,12 +138,28 @@ async function upsertPesticides(
   upserts: PesticideSync[]
 ): Promise<void> {
   for (const pesticide of upserts) {
+    // matiere_active/dose_reference/type_produit n'étaient pas descendus ici alors que
+    // le pull les envoie déjà et que la colonne locale existe (#129/#134, migration
+    // 0044) — un pesticide déjà synchronisé les gardait à NULL indéfiniment. Nécessaire
+    // ici pour que le filtrage par mode_traitement (BARRIERE/TOTAL/IRREGULIER) dispose
+    // de type_produit en local.
     await db.runAsync(
-      `INSERT INTO pesticide (id, code, nom, actif, updated_at)
-       VALUES (?, ?, ?, ?, ?)
+      `INSERT INTO pesticide (id, code, nom, matiere_active, dose_reference, type_produit, actif, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
-         code = excluded.code, nom = excluded.nom, actif = excluded.actif, updated_at = excluded.updated_at`,
-      [pesticide.id, pesticide.code, pesticide.nom, pesticide.actif ? 1 : 0, pesticide.updated_at]
+         code = excluded.code, nom = excluded.nom, matiere_active = excluded.matiere_active,
+         dose_reference = excluded.dose_reference, type_produit = excluded.type_produit,
+         actif = excluded.actif, updated_at = excluded.updated_at`,
+      [
+        pesticide.id,
+        pesticide.code,
+        pesticide.nom,
+        pesticide.matiere_active ?? null,
+        pesticide.dose_reference ?? null,
+        pesticide.type_produit ?? null,
+        pesticide.actif ? 1 : 0,
+        pesticide.updated_at,
+      ]
     );
   }
 }

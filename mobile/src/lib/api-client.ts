@@ -292,13 +292,14 @@ export interface UtilisateurEquipeSync {
   updated_at: string;
 }
 
-export interface PesticideSync {
-  id: string;
-  code: string;
-  nom: string;
-  actif: boolean;
-  updated_at: string;
-}
+/**
+ * `matiere_active`/`dose_reference`/`type_produit` sont apparus après la première
+ * version de ce type à la main (respectivement #129/#134 et migration 0044) — chacun
+ * un oubli de sync (`upsertPesticides`) découvert après coup. Contrat OpenAPI plutôt
+ * qu'une interface recopiée à la main, pour que le prochain champ ajouté au pesticide
+ * ne se perde pas au silence de la même façon.
+ */
+export type PesticideSync = components['schemas']['PesticideSyncRead'];
 
 export interface CultureSync {
   id: string;
