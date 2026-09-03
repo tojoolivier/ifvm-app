@@ -195,6 +195,9 @@ class RotationCreate(BaseModel):
     vent_fin_ms: float = Field(..., ge=0)
     heure_debut: time
     heure_fin: time
+    # Dérivé côté client du nom du pesticide sélectionné (texte avant le
+    # premier chiffre) — figé à la saisie, jamais recalculé côté serveur.
+    nom_commercial: str | None = None
 
 
 class RotationRead(BaseModel):
@@ -211,11 +214,15 @@ class RotationRead(BaseModel):
     vent_fin_ms: float
     heure_debut: time
     heure_fin: time
+    nom_commercial: str | None = None
 
 
 class ProduitUtiliseCreate(BaseModel):
     produit_id: uuid.UUID
     quantite_l: float = Field(..., gt=0)
+    # Dérivé côté client du nom du pesticide sélectionné (texte avant le
+    # premier chiffre) — figé à la saisie, jamais recalculé côté serveur.
+    nom_commercial: str | None = None
 
 
 class ProduitUtiliseRead(BaseModel):
@@ -225,6 +232,7 @@ class ProduitUtiliseRead(BaseModel):
     numero: int
     produit_id: uuid.UUID
     quantite_l: float
+    nom_commercial: str | None = None
 
 
 class SignatureCreate(BaseModel):
