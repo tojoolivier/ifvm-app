@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { listMesTraitements, DraftTraitementRow } from '@/lib/traitement-repository';
 import { useAuthStore } from '@/lib/auth-store';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
@@ -35,9 +35,11 @@ export default function TraitementMesFichesScreen() {
     });
   }, [user?.id]);
 
-  useEffect(() => {
-    charger();
-  }, [charger]);
+  // #mes-fiches-chef-equipe : useFocusEffect (pas useEffect) — une fiche
+  // enregistrée depuis un autre écran de la pile doit apparaître dès le retour
+  // sur cet écran, même s'il n'est pas remonté depuis zéro (même pattern déjà
+  // en place côté (app)/fiches.tsx).
+  useFocusEffect(charger);
 
   const openFiche = (fiche: DraftTraitementRow) => {
     router.push({

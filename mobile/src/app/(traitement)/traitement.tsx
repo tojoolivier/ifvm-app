@@ -8,6 +8,8 @@ import {
   updateTraitementTerrestre,
   addRotation,
   addProduitUtilise,
+  deleteAllRotations,
+  deleteAllProduitsUtilises,
   listReprenableTraitements,
   DraftTraitementRow,
 } from '@/lib/traitement-repository';
@@ -170,6 +172,21 @@ export default function TraitementScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [typeTraitement, readOnly, chefsDeBase, utilisateurConnecte, store.aerien.chefDeBaseId]);
 
+  // Chef d'équipe = l'utilisateur connecté par défaut, même règle que le chef de
+  // base côté Aérien ci-dessus (#mes-fiches-chef-equipe) — sans cette
+  // présélection, chef_equipe_id ne correspond jamais à l'utilisateur connecté
+  // s'il oublie de se sélectionner manuellement, et la fiche reste invisible
+  // dans « Mes fiches » (listMesTraitements filtre par chef_equipe_id/
+  // chef_de_base_id = utilisateur connecté), bien que parfaitement enregistrée.
+  useEffect(() => {
+    if (typeTraitement !== 'TERRESTRE' || readOnly || store.terrestre.chefEquipeId || !utilisateurConnecte) return;
+    const chefConnecte = chefsEquipe.find((c) => c.id === utilisateurConnecte.id);
+    if (chefConnecte) {
+      store.updateTerrestre({ chefEquipeId: chefConnecte.id });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [typeTraitement, readOnly, chefsEquipe, utilisateurConnecte, store.terrestre.chefEquipeId]);
+
   useEffect(() => {
     const origineId = store.terrestre.traitementOrigineId;
     let cancelled = false;
@@ -240,6 +257,10 @@ export default function TraitementScreen() {
             surfaceTraiteeHa: store.aerien.surfaceTraiteeHa,
             pesticideRecuL: store.aerien.pesticideRecuL,
           });
+          // #mes-fiches-chef-equipe : purge avant réinsertion — sans ça, revisiter
+          // cet écran (retour depuis « Moyens ») duplique chaque rotation à
+          // chaque nouveau passage sur « Continuer ».
+          await deleteAllRotations(traitementId);
           for (const r of store.aerien.rotations) {
             await addRotation(traitementId, {
               numero_cuve: r.numero_cuve,
@@ -291,6 +312,8 @@ export default function TraitementScreen() {
             nb_piles: store.terrestre.nb_piles,
             pesticideRecuL: store.terrestre.pesticideRecuL,
           });
+          // #mes-fiches-chef-equipe : même purge que côté Aérien, ci-dessus.
+          await deleteAllProduitsUtilises(traitementId);
           for (const p of produits) {
             await addProduitUtilise(traitementId, {
               produit_id: p.produit_id,

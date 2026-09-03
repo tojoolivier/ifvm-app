@@ -712,6 +712,20 @@ export async function deleteRotation(rotationId: string): Promise<void> {
   await db.runAsync('DELETE FROM rotation WHERE id = ?', [rotationId]);
 }
 
+/**
+ * Purge avant réinsertion (#mes-fiches-chef-equipe) : `handleContinuer` dans
+ * traitement.tsx réécrit toutes les rotations depuis l'état courant du store à
+ * chaque passage sur cet écran — sans cette purge, revisiter l'écran (retour
+ * depuis « Moyens » puis re-« Continuer ») réinsère chaque rotation comme une
+ * nouvelle ligne au lieu de remplacer les précédentes. `traitement_aerien_id`
+ * est la clé primaire de `traitement_aerien` (table 1-1), donc égale à
+ * `traitementId` — pas de jointure supplémentaire nécessaire.
+ */
+export async function deleteAllRotations(traitementAerienId: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('DELETE FROM rotation WHERE traitement_aerien_id = ?', [traitementAerienId]);
+}
+
 // ==========================================
 // PRODUITS UTILISÉS (TERRESTRE)
 // ==========================================
@@ -750,6 +764,16 @@ export async function addProduitUtilise(
 export async function deleteProduitUtilise(produitUtiliseId: string): Promise<void> {
   const db = await getDb();
   await db.runAsync('DELETE FROM produit_utilise WHERE id = ?', [produitUtiliseId]);
+}
+
+/**
+ * Purge avant réinsertion (#mes-fiches-chef-equipe) — même raison que
+ * `deleteAllRotations` ci-dessus, côté Terrestre. `traitement_terrestre_id` est
+ * la clé primaire de `traitement_terrestre` (table 1-1), égale à `traitementId`.
+ */
+export async function deleteAllProduitsUtilises(traitementTerrestreId: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('DELETE FROM produit_utilise WHERE traitement_terrestre_id = ?', [traitementTerrestreId]);
 }
 
 // ==========================================

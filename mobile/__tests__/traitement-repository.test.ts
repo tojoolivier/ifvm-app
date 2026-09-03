@@ -9,8 +9,10 @@ import {
   addRotation,
   updateRotation,
   deleteRotation,
+  deleteAllRotations,
   addProduitUtilise,
   deleteProduitUtilise,
+  deleteAllProduitsUtilises,
   saveCible,
   getTraitement,
   listDraftTraitements,
@@ -415,6 +417,15 @@ describe('rotations (aerien)', () => {
       ['rot-1']
     );
   });
+
+  it('deletes all rotations for a traitement_aerien_id (#mes-fiches-chef-equipe, purge avant réinsertion)', async () => {
+    await deleteAllRotations(AERIEN_INPUT.id);
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('DELETE FROM rotation WHERE traitement_aerien_id'),
+      [AERIEN_INPUT.id]
+    );
+  });
 });
 
 describe('produits utilisés (terrestre)', () => {
@@ -456,6 +467,15 @@ describe('produits utilisés (terrestre)', () => {
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('DELETE FROM produit_utilise'),
       ['pu-1']
+    );
+  });
+
+  it('deletes all produits_utilises for a traitement_terrestre_id (#mes-fiches-chef-equipe, purge avant réinsertion)', async () => {
+    await deleteAllProduitsUtilises(TERRESTRE_INPUT.id);
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('DELETE FROM produit_utilise WHERE traitement_terrestre_id'),
+      [TERRESTRE_INPUT.id]
     );
   });
 });
