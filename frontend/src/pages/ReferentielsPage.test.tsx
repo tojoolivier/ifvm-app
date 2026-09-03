@@ -691,6 +691,104 @@ describe('ReferentielsPage — écritures pesticide (#129, #134)', () => {
   })
 })
 
+describe('ReferentielsPage — recherche, tri, pagination', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  function makePesticides(count: number) {
+    return Array.from({ length: count }, (_, i) => ({
+      id: `p${i}`,
+      code: `PST-${String(i).padStart(2, '0')}`,
+      nom: `Produit ${String(i).padStart(2, '0')}`,
+      matiere_active: 'Deltaméthrine',
+      dose_reference: '1 l/ha',
+      actif: true,
+      updated_at: SERVER_TIME,
+    }))
+  }
+
+  function mockGetParUrl(pesticides: Record<string, unknown>[]) {
+    mockedGet.mockImplementation((url: string) => {
+      if (url.startsWith('/pesticides')) return Promise.resolve({ data: pesticides })
+      return Promise.resolve(pull())
+    })
+  }
+
+  async function ouvrirPesticides(pesticides: Record<string, unknown>[]) {
+    mockGetParUrl(pesticides)
+    renderPage()
+    await waitFor(() => expect(nav().getByText('pesticide')).toBeInTheDocument())
+    fireEvent.click(nav().getByText('pesticide'))
+  }
+
+  // Le code de la ligne sélectionnée (index 0 par défaut) est affiché deux fois
+  // (cellule du tableau + sous-titre du panneau « Modifier ») — toutes les
+  // assertions sur le contenu des lignes sont donc scopées au tableau, jamais
+  // globales.
+  function table() {
+    return within(screen.getByRole('table'))
+  }
+
+  function isBefore(a: string, b: string) {
+    const nodeA = table().getByText(a)
+    const nodeB = table().getByText(b)
+    return Boolean(nodeA.compareDocumentPosition(nodeB) & Node.DOCUMENT_POSITION_FOLLOWING)
+  }
+
+  it('pagine à 15 lignes par page au-delà de 15 enregistrements', async () => {
+    await ouvrirPesticides(makePesticides(17))
+
+    await table().findByText('PST-00')
+    expect(screen.getByText('Page 1 / 2 · 17 enregistrements')).toBeInTheDocument()
+    expect(table().getByText('PST-14')).toBeInTheDocument()
+    expect(table().queryByText('PST-15')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Suivant →' }))
+
+    await table().findByText('PST-16')
+    expect(table().queryByText('PST-00')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Suivant →' })).toBeDisabled()
+  })
+
+  it("n'affiche aucune pagination en-dessous de 15 enregistrements", async () => {
+    await ouvrirPesticides(makePesticides(3))
+
+    await table().findByText('PST-00')
+    expect(screen.queryByText(/^Page \d/)).not.toBeInTheDocument()
+  })
+
+  it('trie les colonnes en cliquant sur leur en-tête (asc puis desc)', async () => {
+    await ouvrirPesticides([
+      { ...makePesticides(1)[0], id: 'p1', code: 'PST-B', nom: 'Bravo' },
+      { ...makePesticides(1)[0], id: 'p2', code: 'PST-A', nom: 'Alpha' },
+    ])
+    await table().findByText('Bravo')
+
+    // Ordre serveur non trié au départ.
+    expect(isBefore('Bravo', 'Alpha')).toBe(true)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Nom commercial' }))
+    await waitFor(() => expect(isBefore('Alpha', 'Bravo')).toBe(true))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Nom commercial' }))
+    await waitFor(() => expect(isBefore('Bravo', 'Alpha')).toBe(true))
+  })
+
+  it('filtre les lignes avec le champ de recherche, insensible aux accents/casse', async () => {
+    await ouvrirPesticides([
+      { ...makePesticides(1)[0], id: 'p1', code: 'PST-DEL', nom: 'Delta', matiere_active: 'Deltaméthrine' },
+      { ...makePesticides(1)[0], id: 'p2', code: 'PST-CHL', nom: 'Chloro', matiere_active: 'Chlorpyrifos' },
+    ])
+    await table().findByText('PST-DEL')
+
+    fireEvent.change(screen.getByPlaceholderText('Rechercher…'), { target: { value: 'deltamethrine' } })
+
+    await waitFor(() => expect(table().queryByText('PST-CHL')).not.toBeInTheDocument())
+    expect(table().getByText('PST-DEL')).toBeInTheDocument()
+  })
+})
+
 describe('ReferentielsPage — écritures station_fixe (#133)', () => {
   const POSTE = { id: 'pa1', code: 'PA-ZOM', nom: 'Zombitse', actif: true }
   const COMMUNE = { id: 'cm1', nom: 'Ambovombe', district: 'Androy', region: 'Anosy' }
