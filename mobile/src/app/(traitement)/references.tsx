@@ -64,6 +64,25 @@ export default function ReferencesScreen() {
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('references');
 
+  const captureGps = () =>
+    runGps(
+      async () => {
+        const pos = await getCurrentPosition();
+        store.updateRef({ latitude: pos.latitude, longitude: pos.longitude, altitude: pos.altitude });
+
+        // Géocodage inverse hors-ligne : best-effort délibéré — sans réseau ni
+        // cache, on garde les coordonnées mais pas la région/district/commune,
+        // et ça ne doit pas faire échouer la capture GPS elle-même.
+        try {
+          const area = await reverseGeocode(pos.latitude, pos.longitude);
+          store.updateRef({ region: area.region, district: area.district, commune: area.commune });
+        } catch (geoError) {
+          logger.ignore(geoError, 'géocodage inverse indisponible hors-ligne, coordonnées conservées');
+        }
+      },
+      { screen: 'references', context: { traitementId, prospectionId } }
+    );
+
   useEffect(() => {
     if (routeTraitementId) {
       store.setValidationView(readOnly);
@@ -85,6 +104,15 @@ export default function ReferencesScreen() {
             altitude: draft.altitude,
             modeTraitement: (draft.mode_traitement as 'TOTAL' | 'BARRIERE' | 'IRREGULIER' | null) ?? null,
           });
+          // Capture GPS automatique — même patron que reference.tsx/extensive-reference.tsx
+          // côté prospection (déclenchée au montage de l'écran, pas seulement au clic sur
+          // « Localiser » : c'est ce déclenchement tardif, manuel, qui laissait au GPS
+          // beaucoup moins de temps réel pour converger avant que l'agent n'abandonne).
+          // Jamais si la fiche a déjà une position enregistrée (brouillon repris) — ne
+          // l'écrase pas avec une nouvelle acquisition.
+          if (!readOnly && draft.latitude == null && draft.longitude == null) {
+            void captureGps();
+          }
         })
         .catch((error) => signalerChargement(error, { traitementId: routeTraitementId }));
     } else {
@@ -94,6 +122,7 @@ export default function ReferencesScreen() {
       // `editable={false}` plus bas) — la date de validation, elle aussi non
       // modifiable, se déduit de la fiche de prospection liée (effet suivant).
       store.updateRef({ dateTraitement: new Date().toISOString().slice(0, 10) });
+      if (!readOnly) void captureGps();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeTraitementId, signalerChargement]);
@@ -142,25 +171,6 @@ export default function ReferencesScreen() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [readOnly, store.ref.numeroFiche, utilisateurConnecte, typeTraitement, store.ref.dateTraitement, traitementId]);
-
-  const captureGps = () =>
-    runGps(
-      async () => {
-        const pos = await getCurrentPosition();
-        store.updateRef({ latitude: pos.latitude, longitude: pos.longitude, altitude: pos.altitude });
-
-        // Géocodage inverse hors-ligne : best-effort délibéré — sans réseau ni
-        // cache, on garde les coordonnées mais pas la région/district/commune,
-        // et ça ne doit pas faire échouer la capture GPS elle-même.
-        try {
-          const area = await reverseGeocode(pos.latitude, pos.longitude);
-          store.updateRef({ region: area.region, district: area.district, commune: area.commune });
-        } catch (geoError) {
-          logger.ignore(geoError, 'géocodage inverse indisponible hors-ligne, coordonnées conservées');
-        }
-      },
-      { screen: 'references', context: { traitementId, prospectionId } }
-    );
 
   const handleContinuer = () =>
     run(
