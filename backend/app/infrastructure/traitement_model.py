@@ -165,6 +165,9 @@ class RotationModel(Base):
     vent_fin_ms: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
     heure_debut: Mapped[time] = mapped_column(Time(), nullable=False)
     heure_fin: Mapped[time] = mapped_column(Time(), nullable=False)
+    # Dérivé côté client du nom du pesticide (migration 0043) — figé à la
+    # saisie, jamais recalculé à la lecture.
+    nom_commercial: Mapped[str | None] = mapped_column(Text(), nullable=True)
 
     aerien: Mapped[TraitementAerienModel] = relationship(back_populates="rotations")
 
@@ -253,6 +256,9 @@ class ProduitUtiliseModel(Base):
         UUID(as_uuid=True), ForeignKey("pesticide.id"), nullable=False
     )
     quantite_l: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    # Dérivé côté client du nom du pesticide (migration 0043) — figé à la
+    # saisie, jamais recalculé à la lecture.
+    nom_commercial: Mapped[str | None] = mapped_column(Text(), nullable=True)
 
     terrestre: Mapped[TraitementTerrestreModel] = relationship(back_populates="produits")
 
