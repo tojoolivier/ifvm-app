@@ -219,7 +219,18 @@ export function buildEspecesSynthese(
 
   return especes.map((espece) => {
     const especeCaptures = captures.filter((c) => c.espece === espece);
-    const totalCaptures = especeCaptures.reduce((sum, c) => sum + c.effectif, 0);
+    const especePopulations = populations.filter((p) => p.espece === espece);
+    // #nombre-de-capture-fiable : la Prospection Intensive enregistre ses captures
+    // dans `captures` (grille chronométrée, c.effectif) et ne renseigne jamais
+    // `population.captures_nombre` (toujours null, cf. density.tsx/accouplement.tsx) ;
+    // la Prospection Extensive fait l'inverse — un seul total par espèce/catégorie
+    // dans `population.captures_nombre`, jamais de ligne dans `captures`. Sommer les
+    // deux sources couvre les deux fiches sans double comptage ni régression pour
+    // l'une ou l'autre : un « Total capturé » à 0 malgré une fiche Extensive bien
+    // renseignée était le signe que seule la première source était lue ici.
+    const totalCaptures =
+      especeCaptures.reduce((sum, c) => sum + c.effectif, 0) +
+      especePopulations.reduce((sum, p) => sum + (p.captures_nombre ?? 0), 0);
 
     const parPhase = new Map<string, number>();
     for (const c of especeCaptures) {
@@ -234,7 +245,6 @@ export function buildEspecesSynthese(
       }
     }
 
-    const especePopulations = populations.filter((p) => p.espece === espece);
     const densiteDiffuse = especePopulations.reduce<number | null>(
       (acc, p) => (p.densite_diffuse != null ? (acc ?? 0) + p.densite_diffuse : acc),
       null

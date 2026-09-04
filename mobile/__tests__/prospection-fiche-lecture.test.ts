@@ -128,6 +128,27 @@ describe('buildEspecesSynthese', () => {
   it('retourne un tableau vide sans captures ni populations', () => {
     expect(buildEspecesSynthese([], [])).toEqual([]);
   });
+
+  /**
+   * #nombre-de-capture-fiable : régression — la Prospection Extensive ne crée jamais
+   * de ligne dans `captures` (grille chronométrée réservée à l'Intensif) ; son seul
+   * total de captures par espèce/catégorie vit dans `population.captures_nombre`.
+   * Avant ce correctif, `totalCaptures` ne lisait que `captures` et affichait
+   * toujours 0 pour une fiche Extensive pourtant correctement renseignée.
+   */
+  it('additionne aussi population.captures_nombre — cas Extensive, sans aucune ligne captures', () => {
+    const captures: CaptureRead[] = [];
+    const populations = [
+      population({ espece: 'LMC', categorie: 'imago', captures_nombre: 20, densite_diffuse: 8 }),
+      population({ espece: 'LMC', categorie: 'larve', captures_nombre: 15 }),
+    ];
+
+    const result = buildEspecesSynthese(captures, populations);
+
+    expect(result).toEqual([
+      { espece: 'LMC', totalCaptures: 35, densiteDiffuse: 8, densiteGroupee: null, phenotypeDominantLabel: '—' },
+    ]);
+  });
 });
 
 describe('buildInfestationSynthese', () => {
