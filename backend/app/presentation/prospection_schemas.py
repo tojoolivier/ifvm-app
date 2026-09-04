@@ -516,8 +516,7 @@ class ProspectionCreate(BaseModel):
     pilote: str | None = None
     mecanicien: str | None = None
     chef_de_base: str | None = None
-    base: str | None = None
-    base_secondaire: str | None = None
+    lieu_base_id: uuid.UUID | None = None
 
     # ==========================================
     # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
@@ -622,8 +621,7 @@ class ProspectionUpdate(BaseModel):
     pilote: str | None = None
     mecanicien: str | None = None
     chef_de_base: str | None = None
-    base: str | None = None
-    base_secondaire: str | None = None
+    lieu_base_id: uuid.UUID | None = None
 
     # ==========================================
     # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
@@ -737,8 +735,7 @@ class ProspectionRead(BaseModel):
     pilote: str | None = None
     mecanicien: str | None = None
     chef_de_base: str | None = None
-    base: str | None = None
-    base_secondaire: str | None = None
+    lieu_base_id: uuid.UUID | None = None
 
     # ==========================================
     # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
