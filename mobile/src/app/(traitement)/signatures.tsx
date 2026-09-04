@@ -7,7 +7,7 @@ import { useTraitementCaptureStore, SignatureRole } from '@/lib/traitement-captu
 import { computeSignatureMatrix } from '@/lib/traitement-validation';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { Card } from '@/components/traitement/Card';
-import { ProgressBar } from '@/components/traitement/ProgressBar';
+import { ProgressBar, PROGRESS_SEGMENTS_AERIEN, PROGRESS_SEGMENTS_TERRESTRE } from '@/components/traitement/ProgressBar';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
 
 const ROLE_LABELS: Record<SignatureRole, string> = {
@@ -70,7 +70,10 @@ export default function SignaturesScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <ProgressBar currentIndex={5} />
+        <ProgressBar
+          currentIndex={typeTraitement === 'TERRESTRE' ? 5 : 6}
+          segments={typeTraitement === 'TERRESTRE' ? PROGRESS_SEGMENTS_TERRESTRE : PROGRESS_SEGMENTS_AERIEN}
+        />
         <Text style={styles.title}>Signatures</Text>
 
         {matrix.map((req) => {
