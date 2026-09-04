@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Espece, accouplementOptionsFor } from '@/lib/prospection-especes-stades';
@@ -47,6 +47,13 @@ export default function ExtensiveImagosScreen() {
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('extensive-imagos');
 
+  // #nombre-de-capture-fiable — modèle Intensive (captures.tsx, écran d'attente tant
+  // que le brouillon/vocabulaire n'est pas prêt) : tant que la lecture de la ligne déjà
+  // enregistrée n'est pas terminée, ne jamais afficher le formulaire avec des valeurs
+  // par défaut (0/vide) — l'agent ne doit jamais pouvoir confondre « pas encore chargé »
+  // avec « rien n'a été saisi », qui donne l'impression trompeuse qu'une saisie a disparu.
+  const [isPopulationLoaded, setIsPopulationLoaded] = useState(false);
+
   useEffect(() => {
     if (!draftId) return;
     void Promise.all([
@@ -62,8 +69,28 @@ export default function ExtensiveImagosScreen() {
           NSE: nseData,
         });
       })
-      .catch((error) => signalerChargement(error, { draftId }));
+      .catch((error) => signalerChargement(error, { draftId }))
+      .finally(() => setIsPopulationLoaded(true));
   }, [draftId, signalerChargement]);
+
+  if (!isPopulationLoaded) {
+    return (
+      <View style={styles.root}>
+        <SafeAreaView edges={['top']} style={styles.safe}>
+          <View style={styles.headerRow}>
+            <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
+              <Text style={styles.back}>‹</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>Imagos</Text>
+          </View>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+            <ActivityIndicator color={GREEN} />
+            <Text style={{ color: TEXT_SECONDARY, fontSize: 13 }}>Chargement des données déjà enregistrées…</Text>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
 
   const data = speciesData[species];
   
