@@ -802,7 +802,7 @@ const styles = StyleSheet.create({
   operationTitle: { fontSize: 11, fontWeight: '800', color: GREEN, letterSpacing: 0.4 },
   operationRemove: { fontSize: 11, fontWeight: '700', color: '#c0412b' },
   operationSubLabel: { marginTop: 10, marginBottom: 6 },
-  operationRow: { flexDirection: 'row', gap: 8 },
+  operationRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
   operationCell: { flex: 1, backgroundColor: AUTO_BG, borderRadius: 8, padding: 8 },
   operationCellLabel: { fontSize: 8.5, fontWeight: '600', color: GREEN, textTransform: 'uppercase', marginBottom: 3 },
   operationInput: { fontSize: 13, fontWeight: '700', color: TEXT, padding: 0 },
