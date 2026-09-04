@@ -195,9 +195,10 @@ export interface UtilisateurEquipe {
   prenom: string;
 }
 
-export type RoleUtilisateurEquipe = 'chef_de_base' | 'chef_equipe' | 'agent_encadreur';
+export type RoleUtilisateurEquipe = 'chef_de_base' | 'chef_equipe' | 'agent_encadreur' | 'pilote';
 
-/** Utilisateurs actifs d'un rôle donné, triés par nom — alimente les chips de sélection des écrans traitement. */
+/** Utilisateurs actifs d'un rôle donné, triés par nom — alimente les chips de sélection des écrans
+ * traitement, ainsi que les signatures Pilote/Chef de Base de l'écran Observations (extensif aérien). */
 export async function listUtilisateursByRole(role: RoleUtilisateurEquipe): Promise<UtilisateurEquipe[]> {
   const db = await getReferentielDb();
   return db.getAllAsync<UtilisateurEquipe>(

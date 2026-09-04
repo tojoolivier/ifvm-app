@@ -30,6 +30,13 @@ jest.mock('@/lib/prospection-repository', () => ({
   },
 }));
 
+// Non exercé par ces tests (pesticides embarqués), mais listUtilisateursByRole est
+// appelée au montage en mode aérien pour les chips Pilote/Chef de Base — mocké pour
+// ne pas dépendre d'expo-sqlite.
+jest.mock('@/lib/referentiel-db', () => ({
+  listUtilisateursByRole: jest.fn().mockResolvedValue([]),
+}));
+
 describe('ExtensiveObservationsScreen — mode aérien : pesticides embarqués', () => {
   beforeEach(() => {
     // `mode_extensif: 'aerien'` conservé dans la valeur simulée : la vraie fonction

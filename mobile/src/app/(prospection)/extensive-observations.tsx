@@ -5,8 +5,10 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { normalizeBoolean, updateProspectionExtensiveObservations } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { DEGATS_CULTURES_EXTENSIF_OPTIONS, NIVEAU_OPTIONS } from '@/lib/prospection-extensive';
+import { listUtilisateursByRole, UtilisateurEquipe } from '@/lib/referentiel-db';
 import { DateField } from '@/components/DateField';
 import { useAsyncAction } from '@/hooks/use-async-action';
+import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { formatHeureLocale } from '@/lib/prospection-fiche-lecture';
 
 const GREEN = '#235a36';
@@ -75,6 +77,23 @@ const SIGNATURE_LABELS: Record<SignatureRole, string> = {
 };
 
 const SIGNATURE_ROLES: SignatureRole[] = ['visa', 'consultant_fao', 'pilote', 'chef_base'];
+
+/**
+ * VISA et Consultant FAO n'ont pas de rôle utilisateur correspondant côté backend
+ * (ROLES dans app/models/users.py) : ils restent en saisie libre (nom + bouton
+ * « Signer »). Pilote et Chef de Base, eux, correspondent à des rôles existants
+ * (`pilote`, `chef_de_base`) — même mécanisme que le Chef de base de l'écran
+ * Traitement (AerienForm.tsx) : sélectionner un agent dans la liste vaut signature
+ * immédiate (nom + horodatage), sans bouton « Signer » séparé. */
+function agentsPourRole(
+  role: SignatureRole,
+  pilotes: UtilisateurEquipe[],
+  chefsDeBase: UtilisateurEquipe[]
+): UtilisateurEquipe[] | null {
+  if (role === 'pilote') return pilotes;
+  if (role === 'chef_base') return chefsDeBase;
+  return null;
+}
 
 export default function ExtensiveObservationsScreen() {
   const router = useRouter();
@@ -146,13 +165,39 @@ export default function ExtensiveObservationsScreen() {
     chef_base: '',
   });
 
+  // Pilote/Chef de Base : agents habilités proposés en chips (cf. agentsPourRole
+  // ci-dessus), sur le modèle de listUtilisateursByRole côté Traitement
+  // (traitement.tsx, AerienForm.tsx). Chargés une seule fois, uniquement en mode
+  // aérien (seul mode où ce bloc Signatures s'affiche).
+  const [pilotes, setPilotes] = useState<UtilisateurEquipe[]>([]);
+  const [chefsDeBase, setChefsDeBase] = useState<UtilisateurEquipe[]>([]);
+
   const { run, isRunning: isSaving } = useAsyncAction();
+  const signalerChargement = useSignalerChargement('extensive-observations');
+
+  useEffect(() => {
+    if (!isAerien) return;
+    listUtilisateursByRole('pilote')
+      .then(setPilotes)
+      .catch((error) => signalerChargement(error, { draftId, source: 'listUtilisateursByRole:pilote' }));
+    listUtilisateursByRole('chef_de_base')
+      .then(setChefsDeBase)
+      .catch((error) => signalerChargement(error, { draftId, source: 'listUtilisateursByRole:chef_de_base' }));
+  }, [isAerien, draftId, signalerChargement]);
 
   const handleSigner = (role: SignatureRole) => {
     const nom = signatureDraftNoms[role];
     if (!nom) return; // Précondition imposée par le bouton désactivé — cf. signatures.tsx.
     const horodatage = new Date().toISOString();
     setSignatureNoms((current) => ({ ...current, [role]: nom }));
+    setSignatureHorodatages((current) => ({ ...current, [role]: horodatage }));
+  };
+
+  /** Pilote/Chef de Base : choisir un agent habilité vaut signature immédiate —
+   * pas de bouton « Signer » séparé (cf. commentaire sur agentsPourRole). */
+  const handleSelectSignataire = (role: SignatureRole, nomComplet: string) => {
+    const horodatage = new Date().toISOString();
+    setSignatureNoms((current) => ({ ...current, [role]: nomComplet }));
     setSignatureHorodatages((current) => ({ ...current, [role]: horodatage }));
   };
 
@@ -462,6 +507,36 @@ export default function ExtensiveObservationsScreen() {
                 <Text style={styles.sectionLabel}>Signatures</Text>
                 {SIGNATURE_ROLES.map((role) => {
                   const signe = !!signatureNoms[role];
+                  const agents = agentsPourRole(role, pilotes, chefsDeBase);
+
+                  // Pilote/Chef de Base : liste d'agents habilités, sélection = signature.
+                  if (agents) {
+                    return (
+                      <View key={role} style={[styles.card, styles.signatureRow]}>
+                        <Text style={styles.label}>{SIGNATURE_LABELS[role]}</Text>
+                        <View style={[styles.chipsRow, styles.agentChipsRow]}>
+                          {agents.map((agent) => {
+                            const nomComplet = `${agent.prenom} ${agent.nom}`;
+                            const active = signatureNoms[role] === nomComplet;
+                            return (
+                              <TouchableOpacity
+                                key={agent.id}
+                                onPress={() => handleSelectSignataire(role, nomComplet)}
+                                activeOpacity={0.7}
+                              >
+                                <Text style={[styles.chip, styles.agentChip, active && styles.chipActive]}>{nomComplet}</Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                        {signe && (
+                          <Text style={styles.signatureStamp}>Signé à {formatHeureLocale(signatureHorodatages[role])}</Text>
+                        )}
+                      </View>
+                    );
+                  }
+
+                  // VISA/Consultant FAO : pas de rôle utilisateur correspondant — saisie libre inchangée.
                   return (
                     <View key={role} style={[styles.card, styles.signatureRow]}>
                       <Text style={styles.label}>{SIGNATURE_LABELS[role]}</Text>
@@ -559,6 +634,12 @@ const styles = StyleSheet.create({
   futsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 9 },
   futsCell: { flexBasis: '47%', flexGrow: 1, marginBottom: 0 },
   signatureRow: { gap: 6 },
+  // Pilote/Chef de Base : nombre d'agents variable (contrairement aux chips à
+  // effectif fixe du reste de l'écran, dimensionnées par `flex: 1`) — la rangée
+  // doit donc pouvoir passer à la ligne, et chaque chip porte son propre padding
+  // horizontal plutôt que de compter sur le flex pour se dimensionner.
+  agentChipsRow: { flexWrap: 'wrap' },
+  agentChip: { paddingHorizontal: 12 },
   signatureValue: { fontSize: 13, fontWeight: '700', color: TEXT },
   signatureStamp: { fontSize: 10, color: TEXT_SECONDARY, fontFamily: 'monospace' },
   signButton: { backgroundColor: GREEN, borderRadius: 9, paddingVertical: 9, alignItems: 'center' },
