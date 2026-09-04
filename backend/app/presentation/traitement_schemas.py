@@ -14,6 +14,11 @@ class ModeTraitement(str, Enum):
     IRREGULIER = "IRREGULIER"
 
 
+class UniteQuantite(str, Enum):
+    L = "L"
+    KG = "KG"
+
+
 class EmpoisonnementType(str, Enum):
     AGENT = "AGENT"
     POPULATION = "POPULATION"
@@ -72,7 +77,8 @@ class TraitementAerienCreate(BaseModel):
     chef_de_base_id: uuid.UUID
     consultant_international: str | None = Field(None, max_length=255)
     immatricule_aeronef: str | None = None
-    surface_traitee_ha: float | None = Field(None, ge=0)
+    # surface_traitee_ha n'est plus une saisie directe (migration 0046) : dérivée de la
+    # somme des `surface_ha` de rotation, ajoutées après coup via /rotations.
     pesticide_recu_l: float | None = Field(None, ge=0)
 
 
@@ -186,15 +192,20 @@ class CibleRead(BaseModel):
 
 
 class RotationCreate(BaseModel):
-    numero_cuve: str = Field(..., min_length=1, max_length=50)
+    # numero_cuve n'est plus accepté en entrée (migration 0046) : dérivé côté serveur de
+    # `numero` (f"C{numero}") par AddRotation/UpdateRotation, jamais saisi.
     produit_id: uuid.UUID
-    quantite_l: float = Field(..., gt=0)
+    quantite: float = Field(..., gt=0)
+    unite: UniteQuantite
+    surface_ha: float = Field(..., ge=0)
     temperature_debut_c: float
     temperature_fin_c: float
     vent_debut_ms: float = Field(..., ge=0)
     vent_fin_ms: float = Field(..., ge=0)
     heure_debut: time
     heure_fin: time
+    heure_ouverture_vanne: time
+    heure_fermeture_vanne: time
     # Dérivé côté client du nom du pesticide sélectionné (texte avant le
     # premier chiffre) — figé à la saisie, jamais recalculé côté serveur.
     nom_commercial: str | None = None
@@ -207,13 +218,17 @@ class RotationRead(BaseModel):
     numero: int
     numero_cuve: str
     produit_id: uuid.UUID
-    quantite_l: float
+    quantite: float
+    unite: UniteQuantite
+    surface_ha: float
     temperature_debut_c: float
     temperature_fin_c: float
     vent_debut_ms: float
     vent_fin_ms: float
     heure_debut: time
     heure_fin: time
+    heure_ouverture_vanne: time
+    heure_fermeture_vanne: time
     nom_commercial: str | None = None
 
 
@@ -264,6 +279,7 @@ class TraitementAerienRead(BaseModel):
     immatricule_aeronef: str | None
     nb_rotations: int
     total_pesticide_l: float | None
+    total_pesticide_kg: float | None
     surface_traitee_ha: float | None
     surface_restante_ha: float | None
     pesticide_recu_l: float | None

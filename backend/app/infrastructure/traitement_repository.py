@@ -162,6 +162,7 @@ class TraitementRepositoryImpl(TraitementRepository):
                 immatricule_aeronef=traitement.aerien.immatricule_aeronef,
                 nb_rotations=traitement.aerien.nb_rotations,
                 total_pesticide_l=traitement.aerien.total_pesticide_l,
+                total_pesticide_kg=traitement.aerien.total_pesticide_kg,
                 surface_traitee_ha=traitement.aerien.surface_traitee_ha,
                 surface_restante_ha=traitement.aerien.surface_restante_ha,
                 pesticide_recu_l=traitement.aerien.pesticide_recu_l,
@@ -225,6 +226,9 @@ class TraitementRepositoryImpl(TraitementRepository):
         rotation: Rotation,
         nb_rotations: int,
         total_pesticide_l: float | None,
+        total_pesticide_kg: float | None,
+        surface_traitee_ha: float | None,
+        surface_restante_ha: float | None,
         pesticide_stock_restant_l: float | None,
     ) -> Traitement:
         self.session.add(
@@ -234,18 +238,28 @@ class TraitementRepositoryImpl(TraitementRepository):
                 numero=rotation.numero,
                 numero_cuve=rotation.numero_cuve,
                 produit_id=rotation.produit_id,
-                quantite_l=rotation.quantite_l,
+                quantite=rotation.quantite,
+                unite=rotation.unite,
+                surface_ha=rotation.surface_ha,
                 temperature_debut_c=rotation.temperature_debut_c,
                 temperature_fin_c=rotation.temperature_fin_c,
                 vent_debut_ms=rotation.vent_debut_ms,
                 vent_fin_ms=rotation.vent_fin_ms,
                 heure_debut=rotation.heure_debut,
                 heure_fin=rotation.heure_fin,
+                heure_ouverture_vanne=rotation.heure_ouverture_vanne,
+                heure_fermeture_vanne=rotation.heure_fermeture_vanne,
                 nom_commercial=rotation.nom_commercial,
             )
         )
         await self._persister_totaux(
-            traitement_id, nb_rotations, total_pesticide_l, pesticide_stock_restant_l
+            traitement_id,
+            nb_rotations,
+            total_pesticide_l,
+            total_pesticide_kg,
+            surface_traitee_ha,
+            surface_restante_ha,
+            pesticide_stock_restant_l,
         )
         return await self.get_by_id(traitement_id)
 
@@ -255,22 +269,35 @@ class TraitementRepositoryImpl(TraitementRepository):
         rotation: Rotation,
         nb_rotations: int,
         total_pesticide_l: float | None,
+        total_pesticide_kg: float | None,
+        surface_traitee_ha: float | None,
+        surface_restante_ha: float | None,
         pesticide_stock_restant_l: float | None,
     ) -> Traitement:
         rotation_model = await self.session.get(RotationModel, rotation.id)
         rotation_model.numero_cuve = rotation.numero_cuve
         rotation_model.produit_id = rotation.produit_id
-        rotation_model.quantite_l = rotation.quantite_l
+        rotation_model.quantite = rotation.quantite
+        rotation_model.unite = rotation.unite
+        rotation_model.surface_ha = rotation.surface_ha
         rotation_model.temperature_debut_c = rotation.temperature_debut_c
         rotation_model.temperature_fin_c = rotation.temperature_fin_c
         rotation_model.vent_debut_ms = rotation.vent_debut_ms
         rotation_model.vent_fin_ms = rotation.vent_fin_ms
         rotation_model.heure_debut = rotation.heure_debut
         rotation_model.heure_fin = rotation.heure_fin
+        rotation_model.heure_ouverture_vanne = rotation.heure_ouverture_vanne
+        rotation_model.heure_fermeture_vanne = rotation.heure_fermeture_vanne
         rotation_model.nom_commercial = rotation.nom_commercial
 
         await self._persister_totaux(
-            traitement_id, nb_rotations, total_pesticide_l, pesticide_stock_restant_l
+            traitement_id,
+            nb_rotations,
+            total_pesticide_l,
+            total_pesticide_kg,
+            surface_traitee_ha,
+            surface_restante_ha,
+            pesticide_stock_restant_l,
         )
         return await self.get_by_id(traitement_id)
 
@@ -280,13 +307,22 @@ class TraitementRepositoryImpl(TraitementRepository):
         rotation_id: uuid.UUID,
         nb_rotations: int,
         total_pesticide_l: float | None,
+        total_pesticide_kg: float | None,
+        surface_traitee_ha: float | None,
+        surface_restante_ha: float | None,
         pesticide_stock_restant_l: float | None,
     ) -> Traitement:
         rotation_model = await self.session.get(RotationModel, rotation_id)
         await self.session.delete(rotation_model)
 
         await self._persister_totaux(
-            traitement_id, nb_rotations, total_pesticide_l, pesticide_stock_restant_l
+            traitement_id,
+            nb_rotations,
+            total_pesticide_l,
+            total_pesticide_kg,
+            surface_traitee_ha,
+            surface_restante_ha,
+            pesticide_stock_restant_l,
         )
         return await self.get_by_id(traitement_id)
 
@@ -400,6 +436,7 @@ class TraitementRepositoryImpl(TraitementRepository):
             model.aerien.chef_de_base_id = traitement.aerien.chef_de_base_id
             model.aerien.consultant_international = traitement.aerien.consultant_international
             model.aerien.immatricule_aeronef = traitement.aerien.immatricule_aeronef
+            model.aerien.total_pesticide_kg = traitement.aerien.total_pesticide_kg
             model.aerien.surface_traitee_ha = traitement.aerien.surface_traitee_ha
             model.aerien.surface_restante_ha = traitement.aerien.surface_restante_ha
             model.aerien.pesticide_recu_l = traitement.aerien.pesticide_recu_l
@@ -472,11 +509,17 @@ class TraitementRepositoryImpl(TraitementRepository):
         traitement_id: uuid.UUID,
         nb_rotations: int,
         total_pesticide_l: float | None,
+        total_pesticide_kg: float | None,
+        surface_traitee_ha: float | None,
+        surface_restante_ha: float | None,
         pesticide_stock_restant_l: float | None,
     ) -> None:
         aerien_model = await self.session.get(TraitementAerienModel, traitement_id)
         aerien_model.nb_rotations = nb_rotations
         aerien_model.total_pesticide_l = total_pesticide_l
+        aerien_model.total_pesticide_kg = total_pesticide_kg
+        aerien_model.surface_traitee_ha = surface_traitee_ha
+        aerien_model.surface_restante_ha = surface_restante_ha
         aerien_model.pesticide_stock_restant_l = pesticide_stock_restant_l
         await self.session.commit()
         self.session.expire(aerien_model, ["rotations"])
@@ -548,6 +591,9 @@ class TraitementRepositoryImpl(TraitementRepository):
                 total_pesticide_l=float(model.aerien.total_pesticide_l)
                 if model.aerien.total_pesticide_l is not None
                 else None,
+                total_pesticide_kg=float(model.aerien.total_pesticide_kg)
+                if model.aerien.total_pesticide_kg is not None
+                else None,
                 surface_traitee_ha=float(model.aerien.surface_traitee_ha)
                 if model.aerien.surface_traitee_ha is not None
                 else None,
@@ -567,13 +613,17 @@ class TraitementRepositoryImpl(TraitementRepository):
                         numero=r.numero,
                         numero_cuve=r.numero_cuve,
                         produit_id=r.produit_id,
-                        quantite_l=float(r.quantite_l),
+                        quantite=float(r.quantite),
+                        unite=r.unite,
+                        surface_ha=float(r.surface_ha),
                         temperature_debut_c=float(r.temperature_debut_c),
                         temperature_fin_c=float(r.temperature_fin_c),
                         vent_debut_ms=float(r.vent_debut_ms),
                         vent_fin_ms=float(r.vent_fin_ms),
                         heure_debut=r.heure_debut,
                         heure_fin=r.heure_fin,
+                        heure_ouverture_vanne=r.heure_ouverture_vanne,
+                        heure_fermeture_vanne=r.heure_fermeture_vanne,
                         nom_commercial=r.nom_commercial,
                     )
                     for r in model.aerien.rotations

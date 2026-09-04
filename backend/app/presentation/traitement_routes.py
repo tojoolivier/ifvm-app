@@ -134,7 +134,6 @@ async def create_traitement(
                 chef_de_base_id=body.aerien.chef_de_base_id,
                 consultant_international=body.aerien.consultant_international,
                 immatricule_aeronef=body.aerien.immatricule_aeronef,
-                surface_traitee_ha=body.aerien.surface_traitee_ha,
                 pesticide_recu_l=body.aerien.pesticide_recu_l,
             )
         use_case_terrestre = CreateTraitementTerrestre(
@@ -204,7 +203,6 @@ async def sync_traitement(
                 chef_de_base_id=body.aerien.chef_de_base_id,
                 consultant_international=body.aerien.consultant_international,
                 immatricule_aeronef=body.aerien.immatricule_aeronef,
-                surface_traitee_ha=body.aerien.surface_traitee_ha,
                 pesticide_recu_l=body.aerien.pesticide_recu_l,
             )
         else:
@@ -281,15 +279,18 @@ async def add_rotation(
     try:
         return await use_case.execute(
             traitement_id=traitement_id,
-            numero_cuve=body.numero_cuve,
             produit_id=body.produit_id,
-            quantite_l=body.quantite_l,
+            quantite=body.quantite,
+            unite=body.unite.value,
+            surface_ha=body.surface_ha,
             temperature_debut_c=body.temperature_debut_c,
             temperature_fin_c=body.temperature_fin_c,
             vent_debut_ms=body.vent_debut_ms,
             vent_fin_ms=body.vent_fin_ms,
             heure_debut=body.heure_debut,
             heure_fin=body.heure_fin,
+            heure_ouverture_vanne=body.heure_ouverture_vanne,
+            heure_fermeture_vanne=body.heure_fermeture_vanne,
             nom_commercial=body.nom_commercial,
         )
     except TraitementIntrouvableError as e:
@@ -313,15 +314,18 @@ async def update_rotation(
         return await use_case.execute(
             traitement_id=traitement_id,
             rotation_id=rotation_id,
-            numero_cuve=body.numero_cuve,
             produit_id=body.produit_id,
-            quantite_l=body.quantite_l,
+            quantite=body.quantite,
+            unite=body.unite.value,
+            surface_ha=body.surface_ha,
             temperature_debut_c=body.temperature_debut_c,
             temperature_fin_c=body.temperature_fin_c,
             vent_debut_ms=body.vent_debut_ms,
             vent_fin_ms=body.vent_fin_ms,
             heure_debut=body.heure_debut,
             heure_fin=body.heure_fin,
+            heure_ouverture_vanne=body.heure_ouverture_vanne,
+            heure_fermeture_vanne=body.heure_fermeture_vanne,
             nom_commercial=body.nom_commercial,
         )
     except (TraitementIntrouvableError, RotationIntrouvableError) as e:

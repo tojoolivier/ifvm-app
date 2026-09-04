@@ -133,6 +133,9 @@ class TraitementAerienModel(Base):
     immatricule_aeronef: Mapped[str | None] = mapped_column(Text(), nullable=True)
     nb_rotations: Mapped[int] = mapped_column(Integer(), nullable=False, default=0)
     total_pesticide_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    # Migration 0046 : somme séparée des rotations dosées au kg (poudre), à côté de
+    # total_pesticide_l (rotations dosées au litre) — jamais le même total mélangé.
+    total_pesticide_kg: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     surface_traitee_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     surface_restante_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     pesticide_recu_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
@@ -158,13 +161,23 @@ class RotationModel(Base):
     produit_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("pesticide.id"), nullable=False
     )
-    quantite_l: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    # Migration 0046 : quantite_l -> quantite + unite (L/kg), pour un pesticide dosé au
+    # poids (poudre) aussi bien qu'au volume (ULV).
+    quantite: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    unite: Mapped[str] = mapped_column(String(2), nullable=False)
+    # Superficie traitée par cette rotation — traitement_aerien.surface_traitee_ha en est
+    # la somme, recalculée à l'écriture (cf. TraitementAerien.recalculer_totaux).
+    surface_ha: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     temperature_debut_c: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
     temperature_fin_c: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
     vent_debut_ms: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
     vent_fin_ms: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
     heure_debut: Mapped[time] = mapped_column(Time(), nullable=False)
     heure_fin: Mapped[time] = mapped_column(Time(), nullable=False)
+    # Bornent la phase d'épandage effective à l'intérieur de la rotation — distinctes de
+    # heure_debut/heure_fin qui bornent la rotation entière (migration 0046).
+    heure_ouverture_vanne: Mapped[time] = mapped_column(Time(), nullable=False)
+    heure_fermeture_vanne: Mapped[time] = mapped_column(Time(), nullable=False)
     # Dérivé côté client du nom du pesticide (migration 0043) — figé à la
     # saisie, jamais recalculé à la lecture.
     nom_commercial: Mapped[str | None] = mapped_column(Text(), nullable=True)
@@ -174,6 +187,11 @@ class RotationModel(Base):
     __table_args__ = (
         UniqueConstraint("traitement_aerien_id", "numero", name="uq_traitement_rotation_numero"),
         CheckConstraint("heure_fin > heure_debut", name="ck_traitement_rotation_heures"),
+        CheckConstraint("unite IN ('L', 'KG')", name="ck_traitement_rotation_unite"),
+        CheckConstraint(
+            "heure_fermeture_vanne > heure_ouverture_vanne",
+            name="ck_traitement_rotation_heures_vanne",
+        ),
     )
 
 

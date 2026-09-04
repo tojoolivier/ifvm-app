@@ -405,15 +405,19 @@ async def _rotation_reelle(
     rotation = await client.post(
         f"/traitements/{traitement.json()['id']}/rotations",
         json={
-            "numero_cuve": "C-101",
+            # numero_cuve n'est plus un champ accepté : dérivé côté serveur (migration 0046).
             "produit_id": str(pesticide.id),
-            "quantite_l": 10.0,
+            "quantite": 10.0,
+            "unite": "L",
+            "surface_ha": 5.0,
             "temperature_debut_c": 25.0,
             "temperature_fin_c": 27.0,
             "vent_debut_ms": 2.0,
             "vent_fin_ms": 3.0,
             "heure_debut": "06:00:00",
             "heure_fin": "06:30:00",
+            "heure_ouverture_vanne": "06:05:00",
+            "heure_fermeture_vanne": "06:25:00",
         },
         headers=auth_headers,
     )

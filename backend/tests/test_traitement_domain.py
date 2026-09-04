@@ -238,7 +238,7 @@ async def test_creation_genere_numero_fiche_et_snapshot():
 
 
 @pytest.mark.asyncio
-async def test_creation_aerien_transmet_immatriculation_surface_et_stock_pesticide():
+async def test_creation_aerien_transmet_immatriculation_et_stock_pesticide():
     prospection = _prospection(
         surface_infestee=100.0,
         populations=[ProspectionPopulation(espece="LMC", categorie="imago")],
@@ -247,16 +247,15 @@ async def test_creation_aerien_transmet_immatriculation_surface_et_stock_pestici
     traitement = await use_case.execute(
         **_args(
             immatricule_aeronef="5R-ABC",
-            surface_traitee_ha=30.0,
             pesticide_recu_l=200.0,
         )
     )
 
     assert traitement.aerien.immatricule_aeronef == "5R-ABC"
-    assert traitement.aerien.surface_traitee_ha == 30.0
-    # Pas de rotation à la création (sous-ressource ajoutée après coup) : rien de
-    # consommé, le stock = tout le reçu.
-    assert traitement.aerien.surface_restante_ha == 70.0
+    # surface_traitee_ha n'est plus une saisie directe (migration 0046) : dérivée des
+    # rotations, aucune à la création — rien de consommé, le stock = tout le reçu.
+    assert traitement.aerien.surface_traitee_ha is None
+    assert traitement.aerien.surface_restante_ha == 100.0
     assert traitement.aerien.pesticide_stock_restant_l == 200.0
 
 
@@ -315,7 +314,7 @@ def _rotation(**overrides) -> Rotation:
     args = dict(
         numero_cuve="C1",
         produit_id=uuid.uuid4(),
-        quantite_l=10.0,
+        quantite=10.0,
         temperature_debut_c=25.0,
         temperature_fin_c=27.0,
         vent_debut_ms=2.0,
@@ -335,18 +334,32 @@ def test_recalculer_totaux_sans_rotation():
 def test_recalculer_totaux_trois_rotations():
     aerien = TraitementAerien()
     aerien.rotations = [
-        _rotation(numero=1, quantite_l=10.0),
-        _rotation(numero=2, quantite_l=15.5),
-        _rotation(numero=3, quantite_l=8.25),
+        _rotation(numero=1, quantite=10.0),
+        _rotation(numero=2, quantite=15.5),
+        _rotation(numero=3, quantite=8.25),
     ]
     aerien.recalculer_totaux()
     assert aerien.nb_rotations == 3
     assert aerien.total_pesticide_l == 33.75
 
 
+def test_recalculer_totaux_cumuls_separes_par_unite():
+    """Migration 0046 : une rotation dosée au litre (ULV) et une au kg (poudre) ne
+    s'additionnent jamais dans le même total."""
+    aerien = TraitementAerien()
+    aerien.rotations = [
+        _rotation(numero=1, quantite=10.0, unite="L"),
+        _rotation(numero=2, quantite=15.5, unite="L"),
+        _rotation(numero=3, quantite=4.0, unite="KG"),
+    ]
+    aerien.recalculer_totaux()
+    assert aerien.total_pesticide_l == 25.5
+    assert aerien.total_pesticide_kg == 4.0
+
+
 def test_recalculer_totaux_apres_suppression():
     aerien = TraitementAerien()
-    r1, r2 = _rotation(numero=1, quantite_l=10.0), _rotation(numero=2, quantite_l=5.0)
+    r1, r2 = _rotation(numero=1, quantite=10.0), _rotation(numero=2, quantite=5.0)
     aerien.rotations = [r1, r2]
     aerien.recalculer_totaux()
     aerien.rotations.remove(r1)
@@ -357,7 +370,7 @@ def test_recalculer_totaux_apres_suppression():
 
 def test_recalculer_totaux_derniere_suppression_repasse_a_none():
     aerien = TraitementAerien()
-    r1 = _rotation(numero=1, quantite_l=10.0)
+    r1 = _rotation(numero=1, quantite=10.0)
     aerien.rotations = [r1]
     aerien.recalculer_totaux()
     aerien.rotations.remove(r1)
@@ -366,14 +379,25 @@ def test_recalculer_totaux_derniere_suppression_repasse_a_none():
     assert aerien.total_pesticide_l is None
 
 
-def test_recalculer_surfaces_aerien_saisie_directe_pas_de_somme_equipement():
-    """Pas d'équivalent aérien aux 3 surfaces par équipement du Terrestre :
-    surface_traitee_ha est une saisie directe, recalculer_surfaces ne calcule que
-    le reste."""
-    aerien = TraitementAerien(surface_traitee_ha=30.0)
+def test_recalculer_totaux_surface_traitee_somme_des_rotations():
+    """Migration 0046 : pas d'équivalent aérien aux 3 surfaces par équipement du
+    Terrestre, mais surface_traitee_ha n'est plus une saisie directe — recalculer_totaux()
+    la dérive de la somme des `surface_ha` de chaque rotation."""
+    aerien = TraitementAerien()
+    aerien.rotations = [
+        _rotation(numero=1, surface_ha=12.0),
+        _rotation(numero=2, surface_ha=8.5),
+    ]
+    aerien.recalculer_totaux()
+    assert aerien.surface_traitee_ha == 20.5
     aerien.recalculer_surfaces(surface_infestee_ha=100.0)
-    assert aerien.surface_traitee_ha == 30.0
-    assert aerien.surface_restante_ha == 70.0
+    assert aerien.surface_restante_ha == 79.5
+
+
+def test_recalculer_totaux_sans_rotation_surface_traitee_none():
+    aerien = TraitementAerien()
+    aerien.recalculer_totaux()
+    assert aerien.surface_traitee_ha is None
 
 
 def test_recalculer_surfaces_aerien_restante_plancher_zero_cdg_9():
@@ -398,7 +422,7 @@ def test_recalculer_surfaces_aerien_pas_de_chainage_contrairement_a_terrestre():
 
 def test_recalculer_totaux_aerien_alimente_le_stock_pesticide():
     aerien = TraitementAerien(pesticide_recu_l=200.0)
-    aerien.rotations = [_rotation(numero=1, quantite_l=60.0)]
+    aerien.rotations = [_rotation(numero=1, quantite=60.0)]
     aerien.recalculer_totaux()
     assert aerien.total_pesticide_l == 60.0
     assert aerien.pesticide_stock_restant_l == 140.0
@@ -406,7 +430,7 @@ def test_recalculer_totaux_aerien_alimente_le_stock_pesticide():
 
 def test_recalculer_stock_pesticide_aerien_sans_reception_reste_none():
     aerien = TraitementAerien()
-    aerien.rotations = [_rotation(numero=1, quantite_l=60.0)]
+    aerien.rotations = [_rotation(numero=1, quantite=60.0)]
     aerien.recalculer_totaux()
     assert aerien.pesticide_stock_restant_l is None
 
@@ -415,7 +439,7 @@ def test_recalculer_stock_pesticide_aerien_plancher_zero_surconsommation():
     """Consommation > réception (ex. pesticide partagé avec une autre fiche) :
     le stock ne descend jamais sous 0, même convention que surface_restante_ha."""
     aerien = TraitementAerien(pesticide_recu_l=50.0)
-    aerien.rotations = [_rotation(numero=1, quantite_l=80.0)]
+    aerien.rotations = [_rotation(numero=1, quantite=80.0)]
     aerien.recalculer_totaux()
     assert aerien.pesticide_stock_restant_l == 0.0
 
@@ -439,26 +463,59 @@ class FakeTraitementRepoRotations:
         return traitement
 
     async def add_rotation(
-        self, traitement_id, rotation, nb_rotations, total_pesticide_l, pesticide_stock_restant_l
+        self,
+        traitement_id,
+        rotation,
+        nb_rotations,
+        total_pesticide_l,
+        total_pesticide_kg,
+        surface_traitee_ha,
+        surface_restante_ha,
+        pesticide_stock_restant_l,
     ):
         self.traitement.aerien.nb_rotations = nb_rotations
         self.traitement.aerien.total_pesticide_l = total_pesticide_l
+        self.traitement.aerien.total_pesticide_kg = total_pesticide_kg
+        self.traitement.aerien.surface_traitee_ha = surface_traitee_ha
+        self.traitement.aerien.surface_restante_ha = surface_restante_ha
         self.traitement.aerien.pesticide_stock_restant_l = pesticide_stock_restant_l
         return self.traitement
 
     async def update_rotation(
-        self, traitement_id, rotation, nb_rotations, total_pesticide_l, pesticide_stock_restant_l
+        self,
+        traitement_id,
+        rotation,
+        nb_rotations,
+        total_pesticide_l,
+        total_pesticide_kg,
+        surface_traitee_ha,
+        surface_restante_ha,
+        pesticide_stock_restant_l,
     ):
         self.traitement.aerien.nb_rotations = nb_rotations
         self.traitement.aerien.total_pesticide_l = total_pesticide_l
+        self.traitement.aerien.total_pesticide_kg = total_pesticide_kg
+        self.traitement.aerien.surface_traitee_ha = surface_traitee_ha
+        self.traitement.aerien.surface_restante_ha = surface_restante_ha
         self.traitement.aerien.pesticide_stock_restant_l = pesticide_stock_restant_l
         return self.traitement
 
     async def remove_rotation(
-        self, traitement_id, rotation_id, nb_rotations, total_pesticide_l, pesticide_stock_restant_l
+        self,
+        traitement_id,
+        rotation_id,
+        nb_rotations,
+        total_pesticide_l,
+        total_pesticide_kg,
+        surface_traitee_ha,
+        surface_restante_ha,
+        pesticide_stock_restant_l,
     ):
         self.traitement.aerien.nb_rotations = nb_rotations
         self.traitement.aerien.total_pesticide_l = total_pesticide_l
+        self.traitement.aerien.total_pesticide_kg = total_pesticide_kg
+        self.traitement.aerien.surface_traitee_ha = surface_traitee_ha
+        self.traitement.aerien.surface_restante_ha = surface_restante_ha
         self.traitement.aerien.pesticide_stock_restant_l = pesticide_stock_restant_l
         return self.traitement
 
@@ -470,16 +527,21 @@ def _traitement_aerien(rotations: list[Rotation] | None = None) -> Traitement:
 
 
 def _rotation_args(**overrides):
+    # numero_cuve n'y figure pas : dérivé côté serveur (migration 0046), plus un
+    # paramètre d'AddRotation/UpdateRotation.
     args = dict(
-        numero_cuve="C1",
         produit_id=uuid.uuid4(),
-        quantite_l=10.0,
+        quantite=10.0,
+        unite="L",
+        surface_ha=5.0,
         temperature_debut_c=25.0,
         temperature_fin_c=27.0,
         vent_debut_ms=2.0,
         vent_fin_ms=3.0,
         heure_debut=time(6, 0),
         heure_fin=time(6, 30),
+        heure_ouverture_vanne=time(6, 5),
+        heure_fermeture_vanne=time(6, 25),
     )
     args.update(overrides)
     return args
@@ -499,16 +561,30 @@ async def test_add_rotation_incremente_totaux():
 
 @pytest.mark.asyncio
 async def test_add_rotation_numero_auto_incremente():
-    existante = _rotation(numero=1, quantite_l=10.0)
+    existante = _rotation(numero=1, quantite=10.0)
     traitement = _traitement_aerien([existante])
     repo = FakeTraitementRepoRotations(traitement)
     use_case = AddRotation(repo)
 
-    await use_case.execute(traitement_id=traitement.id, **_rotation_args(quantite_l=5.0))
+    await use_case.execute(traitement_id=traitement.id, **_rotation_args(quantite=5.0))
 
     assert [r.numero for r in traitement.aerien.rotations] == [1, 2]
     assert traitement.aerien.nb_rotations == 2
     assert traitement.aerien.total_pesticide_l == 15.0
+
+
+@pytest.mark.asyncio
+async def test_add_rotation_numero_cuve_derive_jamais_saisi():
+    """Migration 0046 : numero_cuve n'est plus un paramètre d'AddRotation — il est
+    toujours dérivé de numero (f"C{numero}"), quoi que le client ait pu envoyer."""
+    traitement = _traitement_aerien()
+    repo = FakeTraitementRepoRotations(traitement)
+    use_case = AddRotation(repo)
+
+    await use_case.execute(traitement_id=traitement.id, **_rotation_args())
+    await use_case.execute(traitement_id=traitement.id, **_rotation_args())
+
+    assert [r.numero_cuve for r in traitement.aerien.rotations] == ["C1", "C2"]
 
 
 @pytest.mark.asyncio
@@ -541,8 +617,20 @@ async def test_add_rotation_rejette_heure_fin_anterieure_ou_egale():
 
 
 @pytest.mark.asyncio
+async def test_add_rotation_rejette_heure_fermeture_vanne_anterieure_ou_egale():
+    traitement = _traitement_aerien()
+    repo = FakeTraitementRepoRotations(traitement)
+    use_case = AddRotation(repo)
+    with pytest.raises(ValueError):
+        await use_case.execute(
+            traitement_id=traitement.id,
+            **_rotation_args(heure_ouverture_vanne=time(9, 10), heure_fermeture_vanne=time(9, 10)),
+        )
+
+
+@pytest.mark.asyncio
 async def test_update_rotation_recalcule_totaux():
-    existante = _rotation(numero=1, quantite_l=10.0)
+    existante = _rotation(numero=1, quantite=10.0)
     traitement = _traitement_aerien([existante])
     repo = FakeTraitementRepoRotations(traitement)
     use_case = UpdateRotation(repo)
@@ -550,12 +638,12 @@ async def test_update_rotation_recalcule_totaux():
     resultat = await use_case.execute(
         traitement_id=traitement.id,
         rotation_id=existante.id,
-        **_rotation_args(quantite_l=20.0),
+        **_rotation_args(quantite=20.0),
     )
 
     assert resultat.aerien.nb_rotations == 1
     assert resultat.aerien.total_pesticide_l == 20.0
-    assert existante.quantite_l == 20.0
+    assert existante.quantite == 20.0
 
 
 @pytest.mark.asyncio
@@ -585,8 +673,8 @@ async def test_update_rotation_rejette_heure_fin_anterieure_ou_egale():
 
 @pytest.mark.asyncio
 async def test_remove_rotation_recalcule_totaux():
-    r1 = _rotation(numero=1, quantite_l=10.0)
-    r2 = _rotation(numero=2, quantite_l=5.0)
+    r1 = _rotation(numero=1, quantite=10.0)
+    r2 = _rotation(numero=2, quantite=5.0)
     traitement = _traitement_aerien([r1, r2])
     repo = FakeTraitementRepoRotations(traitement)
     use_case = RemoveRotation(repo)
