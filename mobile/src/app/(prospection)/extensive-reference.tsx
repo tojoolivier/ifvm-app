@@ -718,7 +718,7 @@ export default function ExtensiveReferenceScreen() {
             </View>
 
             <View style={[styles.card, { marginTop: 10 }]}>
-              <Text style={styles.label}>Surf. (ha)</Text>
+              <Text style={styles.label}>Surface prospectée (ha)</Text>
               <TextInput
                 value={surfaceStation}
                 onChangeText={setSurfaceStation}
