@@ -669,6 +669,26 @@ describe('getProspectionPopulation', () => {
     expect(getFirstAsync).toHaveBeenCalledWith(expect.any(String), [BASE_INPUT.id, 'LMC', 'imago']);
   });
 
+  /**
+   * #nombre-de-capture-fiable — régression réelle : POPULATION_COLUMNS omettait
+   * `captures_nombre` (et `temps_capture`) du SELECT, alors que ces deux colonnes sont
+   * bien écrites par `saveProspectionPopulation`. Résultat en usage réel (non détecté
+   * par les tests d'écran, qui mockent `getProspectionPopulation` sans jamais exécuter
+   * cette requête) : la valeur de « Nombre total de captures » était TOUJOURS
+   * `undefined` à la lecture, quelle que soit la valeur réellement enregistrée en base
+   * — donc affichée comme 0 partout (réouverture Imagos/Larves, récapitulatif, fiche
+   * de lecture). Ce test verrouille la présence de ces deux colonnes dans le SELECT.
+   */
+  it('sélectionne bien captures_nombre et temps_capture', async () => {
+    getFirstAsync.mockResolvedValueOnce(null);
+
+    await getProspectionPopulation(BASE_INPUT.id, 'LMC', 'imago');
+
+    const [sql] = getFirstAsync.mock.calls[0];
+    expect(sql).toContain('captures_nombre');
+    expect(sql).toContain('temps_capture');
+  });
+
   it('returns the matching row', async () => {
     const row = {
       espece: 'LMC',
@@ -778,6 +798,19 @@ describe('listAllProspectionPopulations', () => {
       }))
     );
     expect(getAllAsync).toHaveBeenCalledWith(expect.any(String), [BASE_INPUT.id]);
+  });
+
+  /** #nombre-de-capture-fiable — même régression que getProspectionPopulation
+   * ci-dessus, pour le SELECT utilisé par le récapitulatif de saisie et la fiche
+   * de lecture (extensive-recap.tsx, prospection-fiche-lecture.ts). */
+  it('sélectionne bien captures_nombre et temps_capture', async () => {
+    getAllAsync.mockResolvedValueOnce([]);
+
+    await listAllProspectionPopulations(BASE_INPUT.id);
+
+    const [sql] = getAllAsync.mock.calls[0];
+    expect(sql).toContain('captures_nombre');
+    expect(sql).toContain('temps_capture');
   });
 });
 
