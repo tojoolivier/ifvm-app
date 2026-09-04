@@ -312,4 +312,54 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
     const [, lmcRow] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
     expect(lmcRow).toMatchObject({ espece: 'LMC', densite_diffuse: 8, densite_groupee: 3 });
   });
+
+  /**
+   * Parcours interactif complet, fiche neuve (#nombre-de-capture-fiable) : taper le
+   * « Nombre total de captures », distribuer les phases via les compteurs +/- (pas de
+   * ligne déjà enregistrée injectée par le mock, contrairement aux autres tests de ce
+   * fichier) — vérifie que la saisie réelle à l'écran produit bien captures_nombre
+   * dans la ligne sauvegardée, pas seulement que la ré-ouverture d'une ligne déjà
+   * correcte s'affiche correctement (déjà couvert par le test #228 ci-dessus).
+   */
+  it('saisie interactive : taper 5 dans « Nombre total de captures » puis distribuer les phases sauvegarde captures_nombre = 5', async () => {
+    await render(<ExtensiveImagosScreen />);
+    await screen.findByText('📝 Nombre total de captures');
+    await settle();
+
+    fireEvent.changeText(screen.getByDisplayValue('0'), '5');
+    await settle();
+
+    // Active la phase « Solitaire » puis clique 5 fois sur « + ».
+    fireEvent.press(screen.getByText('Solitaire'));
+    await settle();
+    for (let i = 0; i < 5; i++) {
+      // Le premier « + » de l'écran est celui de la phase active (Solitaire) — la
+      // section Phases précède la section Stades dans le rendu.
+      fireEvent.press(screen.getAllByText('+')[0]);
+       
+      await settle();
+    }
+    expect(screen.getAllByText('5 ✅').length).toBeGreaterThan(0);
+
+    // Densités obligatoires dès que les captures sont > 0 (#densite-diffuse-obligatoire) :
+    // les deux seuls champs encore vides à ce stade sont Population diffuse et groupée.
+    const densiteInputs = screen.getAllByDisplayValue('');
+    fireEvent.changeText(densiteInputs[0], '4');
+    fireEvent.changeText(densiteInputs[1], '2');
+    await settle();
+
+    fireEvent.press(screen.getByText('Suivant : Larves ›'));
+
+    await waitFor(() => expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalledTimes(2));
+    const [, lmcRow] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
+    expect(lmcRow).toMatchObject({
+      espece: 'LMC',
+      captures_nombre: 5,
+      captures_sol: 5,
+      captures_trans: 0,
+      captures_greg: 0,
+      densite_diffuse: 4,
+      densite_groupee: 2,
+    });
+  });
 });

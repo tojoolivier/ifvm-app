@@ -156,4 +156,56 @@ describe('ExtensiveLarvesScreen', () => {
     const [, lmcRow] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
     expect(lmcRow).toMatchObject({ espece: 'LMC', densite_diffuse: 6, densite_groupee: 2 });
   });
+
+  /**
+   * Parcours interactif complet, fiche neuve (#nombre-de-capture-fiable), symétrique
+   * du test équivalent d'extensive-imagos.tsx : taper le « Nombre total de captures »
+   * puis distribuer phases ET stades via les compteurs +/- (contrairement aux imagos,
+   * les stades sont bien persistés pour les larves — les deux répartitions sont donc
+   * exigées ici, cf. isConsistent = isPhasesConsistent && isStadesConsistent).
+   */
+  it('saisie interactive : taper 5 dans « Nombre total de captures » puis distribuer phases et stades sauvegarde captures_nombre = 5', async () => {
+    await render(<ExtensiveLarvesScreen />);
+    await screen.findByText('📝 Nombre total de captures');
+    await settle();
+
+    fireEvent.changeText(screen.getByDisplayValue('0'), '5');
+    await settle();
+
+    // Les compteurs +/- des phases et des stades sont visibles sans activation
+    // préalable (contrairement aux imagos) : « + » Solitaire (phase, index 0) et
+    // « + » L1 (premier stade, juste après les 3 phases, index 3).
+    for (let i = 0; i < 5; i++) {
+      fireEvent.press(screen.getAllByText('+')[0]);
+       
+      await settle();
+    }
+    for (let i = 0; i < 5; i++) {
+      fireEvent.press(screen.getAllByText('+')[3]);
+       
+      await settle();
+    }
+    expect(screen.getAllByText('5 ✅').length).toBeGreaterThan(0);
+
+    // Densités obligatoires dès que les captures sont > 0.
+    const densiteInputs = screen.getAllByDisplayValue('');
+    fireEvent.changeText(densiteInputs[0], '4');
+    fireEvent.changeText(densiteInputs[1], '2');
+    await settle();
+
+    fireEvent.press(screen.getByText('Suivant : Observations ›'));
+
+    await waitFor(() => expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalledTimes(2));
+    const [, lmcRow] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
+    expect(lmcRow).toMatchObject({
+      espece: 'LMC',
+      captures_nombre: 5,
+      captures_sol: 5,
+      captures_trans: 0,
+      captures_greg: 0,
+      densite_diffuse: 4,
+      densite_groupee: 2,
+    });
+    expect(JSON.parse(lmcRow.densites_larve as string)).toMatchObject({ L1: 5 });
+  });
 });
