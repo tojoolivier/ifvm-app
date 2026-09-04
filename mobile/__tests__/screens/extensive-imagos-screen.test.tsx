@@ -314,6 +314,36 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
   });
 
   /**
+   * #stades-imago-persistance : réouverture d'une fiche existante — les compteurs de
+   * stades doivent se pré-afficher avec les valeurs déjà enregistrées, comme le fait
+   * déjà « Nombre de captures » (#228). Sexe Femelle par défaut à l'ouverture.
+   */
+  it('réouverture d’une fiche existante : la répartition par sous-stade (stades_imago) est restaurée', async () => {
+    jest.mocked(prospectionRepository.getProspectionPopulation).mockImplementation(async (_id, espece) =>
+      espece === 'LMC'
+        ? ({
+            espece: 'LMC',
+            categorie: 'imago',
+            captures_nombre: 8,
+            captures_sol: 8,
+            captures_trans: 0,
+            captures_greg: 0,
+            stades_imago: JSON.stringify({ femelleA1: 5, femelleA3: 3 }),
+            densite_diffuse: 4.2,
+            densite_groupee: 1.1,
+          } as any)
+        : ({ espece: 'NSE', categorie: 'imago', captures_nombre: 0 } as any)
+    );
+
+    await render(<ExtensiveImagosScreen />);
+    await screen.findByText('📊 Stades');
+    await settle();
+
+    expect(screen.getAllByText('5').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('3').length).toBeGreaterThan(0);
+  });
+
+  /**
    * Parcours interactif complet, fiche neuve (#nombre-de-capture-fiable) : taper le
    * « Nombre total de captures », distribuer les phases via les compteurs +/- (pas de
    * ligne déjà enregistrée injectée par le mock, contrairement aux autres tests de ce
@@ -341,6 +371,15 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
     }
     expect(screen.getAllByText('5 ✅').length).toBeGreaterThan(0);
 
+    // #stades-imago-persistance : répartition par sexe/sous-stade — 3 clics sur le
+    // « + » de la première ligne de stades (A1, sexe Femelle par défaut = femelleA1).
+    // Cette répartition n'est pas bloquante (cf. #228, seule « Captures = Phases »
+    // l'est) : pas besoin qu'elle totalise 5 pour pouvoir continuer.
+    for (let i = 0; i < 3; i++) {
+      fireEvent.press(screen.getAllByText('+')[1]);
+      await settle();
+    }
+
     // Densités obligatoires dès que les captures sont > 0 (#densite-diffuse-obligatoire) :
     // les deux seuls champs encore vides à ce stade sont Population diffuse et groupée.
     const densiteInputs = screen.getAllByDisplayValue('');
@@ -361,5 +400,6 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
       densite_diffuse: 4,
       densite_groupee: 2,
     });
+    expect(JSON.parse(lmcRow.stades_imago as string)).toMatchObject({ femelleA1: 3 });
   });
 });

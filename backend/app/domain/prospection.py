@@ -56,6 +56,7 @@ class ProspectionPopulation:
     captures_trans: int | None = None
     captures_greg: int | None = None
     stade_imago: str | None = None
+    stades_imago: dict[str, int] | None = None
     essaim_observe: bool | None = None
 
     # ==========================================

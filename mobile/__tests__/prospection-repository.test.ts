@@ -687,6 +687,8 @@ describe('getProspectionPopulation', () => {
     const [sql] = getFirstAsync.mock.calls[0];
     expect(sql).toContain('captures_nombre');
     expect(sql).toContain('temps_capture');
+    // #stades-imago-persistance : même régression, même verrou.
+    expect(sql).toContain('stades_imago');
   });
 
   it('returns the matching row', async () => {
@@ -729,6 +731,7 @@ describe('saveProspectionPopulation', () => {
     captures_greg: null,
     captures_solitaro_transiens: null,
     stade_imago: null,
+    stades_imago: null,
     essaim_observe: null,
     densites_larve: null,
     tache_larvaire: null,
@@ -760,7 +763,7 @@ describe('saveProspectionPopulation', () => {
 
     await saveProspectionPopulation(BASE_INPUT.id, ROW);
 
-    // 27 paramètres : 26 champs SET + 1 WHERE id
+    // 28 paramètres : 27 champs SET + 1 WHERE id
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE prospection_population SET'),
       [
@@ -768,7 +771,7 @@ describe('saveProspectionPopulation', () => {
         10, 2,             // densite_diffuse, densite_groupee
         'battage', 'rare', 'peu', // methode, accouplement, ponte
         null, null, null, null, // captures_sol, captures_trans, captures_greg, captures_solitaro_transiens
-        null, null,        // stade_imago, essaim_observe
+        null, null, null,  // stade_imago, stades_imago, essaim_observe
         null, null, null,  // densites_larve, tache_larvaire, bande_larvaire
         null, null,        // interdistance, deplacement
         null,              // surface_contaminee_ha
@@ -811,6 +814,8 @@ describe('listAllProspectionPopulations', () => {
     const [sql] = getAllAsync.mock.calls[0];
     expect(sql).toContain('captures_nombre');
     expect(sql).toContain('temps_capture');
+    // #stades-imago-persistance : même régression, même verrou.
+    expect(sql).toContain('stades_imago');
   });
 });
 

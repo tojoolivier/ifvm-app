@@ -56,6 +56,7 @@ const POPULATIONS = [
     captures_solitaro_transiens: 0, densite_diffuse: 8, densite_groupee: 2, essaim_observe: true,
     methode: null, accouplement: 'Dominant', ponte: 'Beaucoup', interdistance: 25.5, type_cible: 'tres_dense',
     direction_de: 'Nord', direction_vers: 'Sud', etat: 'deplacement', essaim_en_vol: true, essaim_pose: false,
+    stades_imago: JSON.stringify({ femelleA1: 5, femelleA2: 0, maleA234: 2 }),
   },
   {
     espece: 'NSE', categorie: 'imago', captures_nombre: 0, captures_sol: 0, captures_trans: 0, captures_greg: 0,
@@ -96,6 +97,11 @@ describe('ExtensiveRecapScreen — récapitulatif complet (#227)', () => {
     expect(screen.getAllByText('Nombre de captures')[0]).toBeVisible();
     expect(screen.getByText('12')).toBeVisible();
     expect(screen.getByText(/Sol\. 5 · Trans\. 4 · Sol-Trans\. 0 · Grég\. 3/)).toBeVisible();
+    // #stades-imago-persistance : répartition réelle affichée (femelleA2 = 0 omis),
+    // plus jamais le message d'indisponibilité.
+    expect(screen.getByText('Stades')).toBeVisible();
+    expect(screen.getByText(/femelleA1 5 · maleA234 2/)).toBeVisible();
+    expect(screen.queryByText(/Non conservés en base/)).toBeNull();
     expect(screen.getByText('Accouplement')).toBeVisible();
     expect(screen.getByText('Dominant')).toBeVisible();
     expect(screen.getByText('Ponte')).toBeVisible();
@@ -114,6 +120,24 @@ describe('ExtensiveRecapScreen — récapitulatif complet (#227)', () => {
     expect(screen.getByText('8 D/ha')).toBeVisible();
     expect(screen.getAllByText('Densité groupée')[0]).toBeVisible();
     expect(screen.getByText('2 D/m²')).toBeVisible();
+  });
+
+  /**
+   * #stades-imago-persistance : une fiche enregistrée avant ce correctif a
+   * `stades_imago = null` (colonne inexistante à l'époque) — la ligne « Stades »
+   * doit afficher « — », jamais le message d'indisponibilité ni planter.
+   */
+  it('Imagos LMC : « Stades » affiche « — » pour une fiche enregistrée avant le correctif (stades_imago = null)', async () => {
+    jest.mocked(prospectionRepository.listAllProspectionPopulations).mockResolvedValue([
+      { ...POPULATIONS[0], stades_imago: null },
+    ] as any);
+    useProspectionWizardStore.setState({ draft: { ...DRAFT_BASE, type_prospection: 'extensive' }, captures: [] });
+
+    await render(<ExtensiveRecapScreen />);
+    await screen.findByText('Accouplement');
+
+    expect(screen.getByText('Stades')).toBeVisible();
+    expect(screen.queryByText(/Non conservés en base/)).toBeNull();
   });
 
   it('Imagos NSE : sans aucune donnée saisie, le bloc NSE ne s’affiche pas (rien à vérifier, pas de mur de « — »)', async () => {

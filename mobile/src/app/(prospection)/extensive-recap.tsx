@@ -55,16 +55,24 @@ function buildImagoRows(row: PopulationRow | null): DetailRow[] {
   // silencieusement le nombre de captures pourtant bien conservé en base.
   const totalCaptures = row?.captures_nombre ?? 0;
 
+  // #stades-imago-persistance : répartition par sexe/sous-stade, désormais bien
+  // conservée (stades_imago) — même construction que « Stades renseignés » pour les
+  // larves (densites_larve) juste plus bas. `—` pour une fiche enregistrée avant ce
+  // correctif (colonne encore `null`) plutôt qu'un faux message d'indisponibilité.
+  let stadesValue = '—';
+  if (row?.stades_imago) {
+    const parsed = JSON.parse(row.stades_imago) as Record<string, number>;
+    const nonZero = Object.entries(parsed).filter(([, v]) => v > 0);
+    if (nonZero.length > 0) stadesValue = nonZero.map(([stade, v]) => `${stade} ${v}`).join(' · ');
+  }
+
   return [
     { label: 'Nombre de captures', value: String(totalCaptures) },
     {
       label: 'Phases',
       value: `Sol. ${row?.captures_sol ?? 0} · Trans. ${row?.captures_trans ?? 0} · Sol-Trans. ${row?.captures_solitaro_transiens ?? 0} · Grég. ${row?.captures_greg ?? 0}`,
     },
-    // Le détail des stades (femelleA1, maleA234…) n'est pas persisté pour les imagos —
-    // seule la répartition par phases l'est. Le dire explicitement plutôt que d'omettre
-    // la ligne : ne jamais laisser croire qu'une saisie a été perdue (règle #11).
-    { label: 'Stades', value: 'Non conservés en base (seule la répartition par phases l’est)' },
+    { label: 'Stades', value: stadesValue },
     { label: 'Accouplement', value: row?.accouplement ?? '—' },
     { label: 'Ponte', value: row?.ponte ?? '—' },
     { label: 'Interdistance (m)', value: row?.interdistance != null ? String(row.interdistance) : '—' },

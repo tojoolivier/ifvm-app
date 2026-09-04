@@ -183,6 +183,7 @@ class PopulationRead(BaseModel):
     captures_trans: int | None = None
     captures_greg: int | None = None
     stade_imago: StadeImago | None = None
+    stades_imago: dict[str, int] | None = None
     essaim_observe: bool | None = None
 
     # ==========================================
@@ -291,6 +292,7 @@ class PopulationCreate(BaseModel):
     captures_trans: int | None = Field(None, ge=0)
     captures_greg: int | None = Field(None, ge=0)
     stade_imago: StadeImago | None = None
+    stades_imago: dict[str, int] | None = None
     essaim_observe: bool | None = None
 
     # ==========================================

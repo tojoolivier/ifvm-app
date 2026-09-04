@@ -97,6 +97,7 @@ const MIGRATED_COLUMNS = [
   { name: 'captures_greg' },
   { name: 'captures_solitaro_transiens' }, // NOUVEAU
   { name: 'stade_imago' },
+  { name: 'stades_imago' }, // NOUVEAU (#stades-imago-persistance)
   { name: 'essaim_observe' },
   { name: 'densites_larve' },
   { name: 'tache_larvaire' },
@@ -293,6 +294,7 @@ describe('prospection-db', () => {
       'captures_greg',
       'captures_solitaro_transiens',
       'stade_imago',
+      'stades_imago',
       'essaim_observe',
       'densites_larve',
       'tache_larvaire',

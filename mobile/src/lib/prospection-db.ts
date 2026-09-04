@@ -223,6 +223,7 @@ async function creerTables(db: SQLite.SQLiteDatabase): Promise<void> {
       captures_greg INTEGER,
       captures_solitaro_transiens INTEGER,
       stade_imago TEXT,
+      stades_imago TEXT,
       essaim_observe INTEGER,
       densites_larve TEXT,
       tache_larvaire INTEGER,
@@ -657,6 +658,9 @@ const COLONNES_POPULATION: readonly Colonne[] = [
   { name: 'captures_greg', type: 'INTEGER' },
   { name: 'captures_solitaro_transiens', type: 'INTEGER' },
   { name: 'stade_imago', type: 'TEXT' },
+  // Répartition par sexe/sous-stade (femelleA1..femelleA5, maleA1, maleA234, maleA5),
+  // encodée en JSON — même pattern que densites_larve, ci-dessous, pour la larve.
+  { name: 'stades_imago', type: 'TEXT' },
   { name: 'essaim_observe', type: 'INTEGER' },
   { name: 'densites_larve', type: 'TEXT' },
   { name: 'tache_larvaire', type: 'INTEGER' },

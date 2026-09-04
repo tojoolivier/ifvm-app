@@ -267,6 +267,10 @@ class ProspectionPopulationModel(Base):
     captures_trans: Mapped[int | None] = mapped_column(Integer(), nullable=True)
     captures_greg: Mapped[int | None] = mapped_column(Integer(), nullable=True)
     stade_imago: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    # Répartition par sexe/sous-stade (femelleA1..femelleA5, maleA1, maleA234,
+    # maleA5) — migration 0046, même pattern que densites_larve (12 clés fixes
+    # côté application, pas de CHECK sur leur forme).
+    stades_imago: Mapped[dict | None] = mapped_column(JSONB(), nullable=True)
     essaim_observe: Mapped[bool | None] = mapped_column(Boolean(), nullable=True)
 
     # ==========================================
