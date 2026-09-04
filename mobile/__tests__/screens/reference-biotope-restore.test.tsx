@@ -65,11 +65,11 @@ describe('ReferenceScreen — restauration des biotopes déjà enregistrés (#bi
     );
     await waitFor(() => expect(screen.getByText('Continuer  ›')).toBeVisible());
 
-    // Pré-cochés : Xérophyle et Hydrophyle actifs, pas Mésophyle.
+    // Pré-cochés : Xérophyle et Hygrophyle actifs, pas Mésophyle.
     expect(screen.getByText(/^Xérophyle/).props.style).toEqual(
       expect.arrayContaining([expect.objectContaining({ color: '#fff' })])
     );
-    expect(screen.getByText(/^Hydrophyle/).props.style).toEqual(
+    expect(screen.getByText(/^Hygrophyle/).props.style).toEqual(
       expect.arrayContaining([expect.objectContaining({ color: '#fff' })])
     );
     expect(screen.getByText('Mésophyle')).toBeVisible();

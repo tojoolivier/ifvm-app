@@ -76,20 +76,20 @@ describe('ReferenceScreen — Biotopes à choix multiples (#biotope-multi)', () 
     // 2. Sélection multiple : Mésophyle s'ajoute, Xérophyle reste coché.
     fireEvent.press(screen.getByText('Mésophyle'));
     await settle();
-    fireEvent.press(screen.getByText('Hydrophyle'));
+    fireEvent.press(screen.getByText('Hygrophyle'));
     await settle();
     expect(screen.getByText(/^Xérophyle/).props.style).toEqual(
       expect.arrayContaining([expect.objectContaining({ color: '#fff' })])
     );
 
-    // 3. Décoche uniquement Xérophyle — Mésophyle et Hydrophyle restent cochés.
+    // 3. Décoche uniquement Xérophyle — Mésophyle et Hygrophyle restent cochés.
     fireEvent.press(screen.getByText(/^Xérophyle/));
     await settle();
     expect(screen.getByText('Xérophyle')).toBeVisible(); // sans suffixe " ✓" : redevenu inactif
     expect(screen.getByText(/^Mésophyle/).props.style).toEqual(
       expect.arrayContaining([expect.objectContaining({ color: '#fff' })])
     );
-    expect(screen.getByText(/^Hydrophyle/).props.style).toEqual(
+    expect(screen.getByText(/^Hygrophyle/).props.style).toEqual(
       expect.arrayContaining([expect.objectContaining({ color: '#fff' })])
     );
 
