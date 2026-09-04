@@ -288,8 +288,6 @@ async def test_create_prospection_extensive_mode_aerien(
             "pilote": "Jean Rakoto",
             "mecanicien": "Marc Andria",
             "chef_de_base": "Sarah Ravelo",
-            "base": "Tuléar",
-            "base_secondaire": "Ihosy",
             "operations_aeriennes": [
                 {
                     "type_operation": "prospection",
@@ -318,8 +316,6 @@ async def test_create_prospection_extensive_mode_aerien(
     assert data["pilote"] == "Jean Rakoto"
     assert data["mecanicien"] == "Marc Andria"
     assert data["chef_de_base"] == "Sarah Ravelo"
-    assert data["base"] == "Tuléar"
-    assert data["base_secondaire"] == "Ihosy"
 
     operations = data["operations_aeriennes"]
     assert len(operations) == 2
