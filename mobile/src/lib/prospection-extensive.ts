@@ -32,7 +32,7 @@ export type PhaseKey = typeof IMAGO_PHASE_ROWS[number]['key'];
 export const BIOTOPE_EXTENSIVE_OPTIONS = [
   { value: 'mesophyle', label: 'Mesophyle' },
   { value: 'xerophyle', label: 'Xerophyle' },
-  { value: 'hydrophyle', label: 'Hydrophyle' },
+  { value: 'hydrophyle', label: 'Hygrophyle' },
 ];
 
 export const TYPE_STATION_EXTENSIVE = {

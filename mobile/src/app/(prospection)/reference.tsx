@@ -43,7 +43,7 @@ const BORDER = '#e7e0cd';
 const BIOTOPE_OPTIONS = [
   { label: 'Xérophyle', value: 'xerophyle' },
   { label: 'Mésophyle', value: 'mesophyle' },
-  { label: 'Hydrophyle', value: 'hydrophyle' },
+  { label: 'Hygrophyle', value: 'hydrophyle' },
 ];
 
 function generateNumeroFiche(draftId: string, dateProspection: string): string {

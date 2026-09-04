@@ -310,15 +310,6 @@ export default function DashboardScreen() {
 
             <TouchableOpacity
               style={styles.quickTile}
-              onPress={() => navigateTo('/(app)/carte-de-zone')}
-              activeOpacity={0.85}
-            >
-              <ThemedText style={styles.quickTileIcon}>🗺️</ThemedText>
-              <ThemedText style={styles.quickTileText}>Carte de zone</ThemedText>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.quickTile}
               onPress={() => navigateTo('/(traitement)/select')}
               activeOpacity={0.85}
             >
