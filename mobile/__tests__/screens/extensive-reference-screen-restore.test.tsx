@@ -113,8 +113,8 @@ describe('ExtensiveReferenceScreen — restauration après hydratation tardive d
     await render(<ExtensiveReferenceScreen />);
     await screen.findByText('Surface infestée (ha)');
 
-    // Station (saisie libre), Surf. (ha) puis Surface infestée (ha) sont les 3 champs
-    // vides, dans cet ordre.
+    // Station (saisie libre), Surface prospectée (ha) puis Surface infestée (ha) sont
+    // les 3 champs vides, dans cet ordre.
     fireEvent.changeText(screen.getAllByDisplayValue('')[2], '0.5');
     expect(await screen.findByDisplayValue('0.5')).toBeVisible();
 
