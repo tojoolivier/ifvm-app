@@ -18,8 +18,6 @@ import {
   BIOTOPE_EXTENSIVE_OPTIONS,
   TYPE_OPERATION_OPTIONS,
   formatDuree,
-  imagoTotalFromRow,
-  larveTotalFromRow,
   parseSelectionMultiple,
   typeCibleImagoLabel,
 } from '@/lib/prospection-extensive';
@@ -49,9 +47,14 @@ interface DetailRow {
  * (elle n'a jamais été ouverte) : cf. `imagoRowHasData`/`larveRowHasData`.
  */
 function buildImagoRows(row: PopulationRow | null): DetailRow[] {
-  // ✅ CORRECTION : Le nombre de captures est la somme des phases
-  const totalCaptures = imagoTotalFromRow(row);
-  
+  // #nombre-de-capture-fiable : affiche la valeur réellement enregistrée
+  // (captures_nombre), jamais une somme recalculée à partir des phases — cette
+  // dernière peut diverger de ce que l'agent a saisi (ex. fiche déjà enregistrée
+  // avant la persistance de captures_solitaro_transiens, ou toute autre incohérence
+  // entre la saisie totale et sa répartition) et faisait alors « disparaître »
+  // silencieusement le nombre de captures pourtant bien conservé en base.
+  const totalCaptures = row?.captures_nombre ?? 0;
+
   return [
     { label: 'Nombre de captures', value: String(totalCaptures) },
     {
@@ -103,9 +106,11 @@ function imagoRowHasData(row: PopulationRow | null): boolean {
 }
 
 function buildLarveRows(row: PopulationRow | null): DetailRow[] {
-  // ✅ CORRECTION : Le nombre de captures est la somme des stades
-  const totalCaptures = larveTotalFromRow(row);
-  
+  // #nombre-de-capture-fiable : même principe que buildImagoRows — la valeur
+  // affichée est celle réellement enregistrée (captures_nombre), pas une somme
+  // recalculée à partir des stades (densites_larve), qui peut en diverger.
+  const totalCaptures = row?.captures_nombre ?? 0;
+
   let stadesValue = '—';
   if (row?.densites_larve) {
     const parsed = JSON.parse(row.densites_larve) as Record<string, number>;
@@ -286,10 +291,12 @@ export default function ExtensiveRecapScreen() {
     const larveLMCRow = findRow('LMC', 'larve');
     const larveNSERow = findRow('NSE', 'larve');
     return {
-      imagoLMC: imagoTotalFromRow(imagoLMCRow),
-      imagoNSE: imagoTotalFromRow(imagoNSERow),
-      larveLMC: larveTotalFromRow(larveLMCRow),
-      larveNSE: larveTotalFromRow(larveNSERow),
+      // #nombre-de-capture-fiable : mêmes chiffres-clés que les lignes de détail
+      // ci-dessous — la valeur réellement enregistrée, jamais un total recalculé.
+      imagoLMC: imagoLMCRow?.captures_nombre ?? 0,
+      imagoNSE: imagoNSERow?.captures_nombre ?? 0,
+      larveLMC: larveLMCRow?.captures_nombre ?? 0,
+      larveNSE: larveNSERow?.captures_nombre ?? 0,
       imagoLMCRows: imagoRowHasData(imagoLMCRow) ? buildImagoRows(imagoLMCRow) : null,
       imagoNSERows: imagoRowHasData(imagoNSERow) ? buildImagoRows(imagoNSERow) : null,
       larveLMCRows: larveRowHasData(larveLMCRow) ? buildLarveRows(larveLMCRow) : null,

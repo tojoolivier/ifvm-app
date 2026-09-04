@@ -132,11 +132,49 @@ describe('ExtensiveRecapScreen — récapitulatif complet (#227)', () => {
     await render(<ExtensiveRecapScreen />);
     await screen.findByText('Stades renseignés');
 
+    expect(screen.getByText('6')).toBeVisible(); // Nombre de captures (captures_nombre)
     expect(screen.getByText(/L1 4 · L2 2/)).toBeVisible();
     expect(screen.getByText('Surface contaminée (ha)')).toBeVisible();
     expect(screen.getByText('12.75')).toBeVisible();
     expect(screen.getByText('15')).toBeVisible(); // interdistance
     expect(screen.getByText(/Tache larvaire · Déplacement : Perchée/)).toBeVisible();
+  });
+
+  /**
+   * #nombre-de-capture-fiable : régression — le récapitulatif affichait un total
+   * recalculé à partir des phases (imago) ou des stades (larve) au lieu de la valeur
+   * réellement enregistrée (`captures_nombre`). Une fiche où ces deux nombres
+   * divergent (ex. répartition incomplète, fiche déjà enregistrée avant la
+   * persistance de `captures_solitaro_transiens`) faisait alors « disparaître » le
+   * nombre de captures pourtant bien conservé en base — reproduit ici explicitement.
+   */
+  it('Nombre de captures : affiche la valeur réellement enregistrée, même si elle diverge de la somme des phases/stades', async () => {
+    jest.mocked(prospectionRepository.listAllProspectionPopulations).mockResolvedValue([
+      {
+        espece: 'LMC', categorie: 'imago', captures_nombre: 20, captures_sol: 5, captures_trans: 4, captures_greg: 3,
+        captures_solitaro_transiens: 0, densite_diffuse: 8, densite_groupee: 2,
+        methode: null, accouplement: null, ponte: null, type_cible: null, etat: null,
+      },
+      {
+        espece: 'LMC', categorie: 'larve', captures_nombre: 15, captures_sol: 0, captures_trans: 0, captures_greg: 0,
+        densite_diffuse: null, densite_groupee: null, methode: null, accouplement: null, ponte: null,
+        densites_larve: JSON.stringify({ L1: 4, L2: 2 }), tache_larvaire: false, bande_larvaire: false,
+      },
+    ] as any);
+    useProspectionWizardStore.setState({ draft: { ...DRAFT_BASE, type_prospection: 'extensive' }, captures: [] });
+
+    await render(<ExtensiveRecapScreen />);
+    await screen.findByText('Accouplement');
+
+    // 20 (captures_nombre), pas 12 (5+4+3 = somme des phases).
+    expect(screen.getByText('20')).toBeVisible();
+    expect(screen.queryByText('12')).toBeNull();
+    // 15 (captures_nombre), pas 6 (4+2 = somme des stades).
+    expect(screen.getByText('15')).toBeVisible();
+    expect(screen.queryByText(/^6$/)).toBeNull();
+    // Bandeau chiffre-clé LMC/NSE (B · Imagos / C · Larves) : mêmes valeurs réelles.
+    expect(screen.getByText('B · Imagos — LMC 20 · NSE 0')).toBeVisible();
+    expect(screen.getByText('C · Larves — LMC 15 · NSE 0')).toBeVisible();
   });
 
   it('Observations : dégâts, verdure, hauteur en mètres et pluie', async () => {
