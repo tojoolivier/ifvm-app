@@ -1083,6 +1083,7 @@ async def test_create_prospection_extensive_avec_populations_agregees(
                     "captures_trans": 14,
                     "captures_greg": 0,
                     "stade_imago": "A2",
+                    "stades_imago": {"femelleA1": 3, "maleA234": 14},
                     "densite_diffuse": 2.4,
                     "densite_groupee": 0.0,
                     "essaim_observe": False,
@@ -1120,6 +1121,7 @@ async def test_create_prospection_extensive_avec_populations_agregees(
     assert imago["captures_sol"] == 3
     assert imago["captures_trans"] == 14
     assert imago["stade_imago"] == "A2"
+    assert imago["stades_imago"] == {"femelleA1": 3, "maleA234": 14}
     assert imago["essaim_observe"] is False
 
     larve = next(p for p in data["populations"] if p["categorie"] == "larve")

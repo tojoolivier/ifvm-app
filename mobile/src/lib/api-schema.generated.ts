@@ -1696,6 +1696,10 @@ export interface components {
             /** Captures Greg */
             captures_greg?: number | null;
             stade_imago?: components["schemas"]["StadeImago"] | null;
+            /** Stades Imago */
+            stades_imago?: {
+                [key: string]: number;
+            } | null;
             /** Essaim Observe */
             essaim_observe?: boolean | null;
             /** Densites Larve */
@@ -1755,6 +1759,10 @@ export interface components {
             /** Captures Greg */
             captures_greg?: number | null;
             stade_imago?: components["schemas"]["StadeImago"] | null;
+            /** Stades Imago */
+            stades_imago?: {
+                [key: string]: number;
+            } | null;
             /** Essaim Observe */
             essaim_observe?: boolean | null;
             /** Densites Larve */

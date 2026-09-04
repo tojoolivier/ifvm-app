@@ -242,6 +242,9 @@ export interface PopulationRow {
   captures_greg?: number | null;
   captures_solitaro_transiens?: number | null;
   stade_imago?: string | null;
+  /** Répartition par sexe/sous-stade (femelleA1..femelleA5, maleA1, maleA234,
+   * maleA5), encodée en JSON — même pattern que `densites_larve` ci-dessous. */
+  stades_imago?: string | null;
   essaim_observe?: boolean | null;
   densites_larve?: string | null;
   tache_larvaire?: boolean | null;
@@ -317,6 +320,7 @@ const POPULATION_COLUMNS = `
   captures_greg,
   captures_solitaro_transiens,
   stade_imago,
+  stades_imago,
   essaim_observe,
   densites_larve,
   tache_larvaire,
@@ -793,6 +797,7 @@ export async function saveProspectionPopulation(
         captures_greg = ?,
         captures_solitaro_transiens = ?,
         stade_imago = ?,
+        stades_imago = ?,
         essaim_observe = ?,
         densites_larve = ?,
         tache_larvaire = ?,
@@ -821,6 +826,7 @@ export async function saveProspectionPopulation(
         row.captures_greg ?? null,
         row.captures_solitaro_transiens ?? null,
         row.stade_imago ?? null,
+        row.stades_imago ?? null,
         normalizeBoolean(row.essaim_observe),
         row.densites_larve ?? null,
         normalizeBoolean(row.tache_larvaire),
@@ -860,6 +866,7 @@ export async function saveProspectionPopulation(
       captures_greg,
       captures_solitaro_transiens,
       stade_imago,
+      stades_imago,
       essaim_observe,
       densites_larve,
       tache_larvaire,
@@ -876,7 +883,7 @@ export async function saveProspectionPopulation(
     )
     VALUES (
       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
     )`,
     [
       generateId(),
@@ -896,6 +903,7 @@ export async function saveProspectionPopulation(
       row.captures_greg ?? null,
       row.captures_solitaro_transiens ?? null,
       row.stade_imago ?? null,
+      row.stades_imago ?? null,
       normalizeBoolean(row.essaim_observe),
       row.densites_larve ?? null,
       normalizeBoolean(row.tache_larvaire),

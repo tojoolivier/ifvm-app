@@ -103,6 +103,45 @@ describe('speciesDataToPopulationRow / populationRowToSpeciesData — round-trip
     expect(restored.phases.gregaire).toBe(1);
   });
 
+  /**
+   * #stades-imago-persistance : la répartition par sexe/sous-stade (femelleA1…
+   * femelleA5, maleA1, maleA234, maleA5) n'était persistée nulle part — le
+   * récapitulatif affichait un message d'indisponibilité au lieu de la vraie saisie,
+   * quelle que soit la valeur enregistrée. Même principe de non-régression que
+   * « Solitaro-Transiens » ci-dessus.
+   */
+  it('conserve la répartition par sexe/sous-stade (stades_imago) — #stades-imago-persistance', () => {
+    const data = {
+      ...createEmptySpeciesData(),
+      totalCaptures: 10,
+      stades: {
+        ...createEmptySpeciesData().stades,
+        femelleA1: 3,
+        femelleA3_1_2: 2,
+        maleA234: 5,
+      },
+    };
+    const row = speciesDataToPopulationRow('LMC', data);
+    expect(row.stades_imago).toBe(JSON.stringify(data.stades));
+
+    const restored = populationRowToSpeciesData(row);
+    expect(restored.stades.femelleA1).toBe(3);
+    expect(restored.stades.femelleA3_1_2).toBe(2);
+    expect(restored.stades.maleA234).toBe(5);
+    expect(restored.stades.femelleA2).toBe(0);
+  });
+
+  it('populationRowToSpeciesData restaure des stades à zéro pour une fiche enregistrée avant #stades-imago-persistance (stades_imago = null)', () => {
+    const data = { ...createEmptySpeciesData(), totalCaptures: 10, phases: { solitaire: 10, transiens: 0, solitaroTransiens: 0, gregaire: 0 } };
+    const row = speciesDataToPopulationRow('LMC', data);
+    row.stades_imago = null; // simule une ligne existante, jamais réenregistrée depuis ce correctif
+
+    const restored = populationRowToSpeciesData(row);
+    expect(restored.stades).toEqual(createEmptySpeciesData().stades);
+    // Le reste de la ligne (dont le nombre de captures) reste, lui, bien restauré.
+    expect(restored.totalCaptures).toBe(10);
+  });
+
   it('conserve accouplement, ponte, interdistance, type de cible, état, comportement et direction', () => {
     const data = {
       ...createEmptySpeciesData(),

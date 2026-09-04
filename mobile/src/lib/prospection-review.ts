@@ -491,6 +491,9 @@ function buildPopulationsPayload(rows: PopulationRow[]): ProspectionPopulationIn
     captures_trans: row.captures_trans ? Number(row.captures_trans) : null,
     captures_greg: row.captures_greg ? Number(row.captures_greg) : null,
     stade_imago: (row.stade_imago || null) as ProspectionPopulationInput['stade_imago'],
+    // #stades-imago-persistance : répartition par sexe/sous-stade — même traitement
+    // que densites_larve juste en dessous (JSON encodé côté SQLite, objet côté API).
+    stades_imago: row.stades_imago ? JSON.parse(row.stades_imago) : null,
     essaim_observe: row.essaim_observe != null ? Boolean(row.essaim_observe) : null,
     densites_larve: row.densites_larve ? JSON.parse(row.densites_larve) : null,
     tache_larvaire: row.tache_larvaire != null ? Boolean(row.tache_larvaire) : null,

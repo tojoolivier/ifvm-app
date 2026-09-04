@@ -349,6 +349,11 @@ export function speciesDataToPopulationRow(espece: Espece, data: ExtensiveImagoS
     // premier enregistrement.
     captures_solitaro_transiens: data.phases.solitaroTransiens,
     stade_imago: 'A1',
+    // #stades-imago-persistance : répartition par sexe/sous-stade — même pattern que
+    // densites_larve (larveSpeciesDataToPopulationRow, plus bas). Auparavant jamais
+    // sauvegardée nulle part : le récapitulatif affichait un message figé
+    // (« Non conservés en base ») au lieu de la vraie saisie.
+    stades_imago: JSON.stringify(data.stades),
     interdistance: data.interdistance ? parseFloat(data.interdistance) : null,
     // Sérialisé en JSON (comme biotope) — la colonne SQLite reste TEXT, seul le
     // contenu change de forme (scalaire → tableau).
@@ -365,7 +370,13 @@ export function speciesDataToPopulationRow(espece: Espece, data: ExtensiveImagoS
 }
 
 export function populationRowToSpeciesData(row: PopulationRow | null): ExtensiveImagoSpeciesData {
-  if (!row) return createEmptySpeciesData();
+  const empty = createEmptySpeciesData();
+  if (!row) return empty;
+  // #stades-imago-persistance : restauration depuis stades_imago (JSON), même pattern
+  // que populationRowToLarveSpeciesData/densites_larve — le merge avec `empty.stades`
+  // couvre les fiches enregistrées avant ce correctif (colonne encore `null`, retombe
+  // proprement sur des 0 partout) et une éventuelle clé manquante dans un JSON ancien.
+  const parsedStadesImago = row.stades_imago ? (JSON.parse(row.stades_imago) as Partial<ExtensiveImagoSpeciesData['stades']>) : {};
   return {
     totalCaptures: row.captures_nombre ?? 0,
     activePhase: 'solitaire',
@@ -375,20 +386,7 @@ export function populationRowToSpeciesData(row: PopulationRow | null): Extensive
       solitaroTransiens: row.captures_solitaro_transiens ?? 0,
       gregaire: row.captures_greg ?? 0,
     },
-    stades: {
-      femelleA1: 0,
-      femelleA2: 0,
-      femelleA3: 0,
-      femelleA3_1_4: 0,
-      femelleA3_1_2: 0,
-      femelleA3_3_4: 0,
-      femelleA3_4_4: 0,
-      femelleA4: 0,
-      femelleA5: 0,
-      maleA1: 0,
-      maleA234: 0,
-      maleA5: 0,
-    },
+    stades: { ...empty.stades, ...parsedStadesImago },
     popDiff: row.densite_diffuse != null ? String(row.densite_diffuse) : '',
     popGroup: row.densite_groupee != null ? String(row.densite_groupee) : '',
     // Tolère l'ancien format scalaire (pré-#type-cible-multi-select) via
