@@ -580,7 +580,7 @@ export default function ExtensiveReferenceScreen() {
                   </View>
                 </View>
 
-                <Text style={styles.sectionLabel}>Opérations</Text>
+                <Text style={styles.sectionLabel}>Informations sur les heures de vol</Text>
                 {operations.map((op, index) => {
                   const duree = dureeDeOperation(op);
                   return (
@@ -596,7 +596,11 @@ export default function ExtensiveReferenceScreen() {
 
                       <Text style={[styles.label, styles.operationSubLabel]}>Type d&apos;opération</Text>
                       <View style={styles.chipsRow}>
-                        {TYPE_OPERATION_OPTIONS.map((option) => {
+                        {/* « Convoyage » retiré définitivement de la saisie (#operations-heures-vol) —
+                         * conservé dans `TYPE_OPERATION_OPTIONS`/`TypeOperationAerienne` pour que les
+                         * opérations déjà enregistrées avec ce type continuent de s'afficher correctement
+                         * (récap, `typeOperationLabel`). Filtrage au seul point de rendu du picker. */}
+                        {TYPE_OPERATION_OPTIONS.filter((option) => option.value !== 'convoyage').map((option) => {
                           const active = option.value === op.typeOperation;
                           return (
                             <TouchableOpacity
@@ -625,60 +629,24 @@ export default function ExtensiveReferenceScreen() {
                         </View>
                       )}
 
-                      <Text style={[styles.label, styles.operationSubLabel]}>Début opération</Text>
+                      {/* Température/Vent retirés de la saisie (#operations-heures-vol) — seules les
+                       * heures début/fin restent, affichées côte à côte sur une même ligne pour une
+                       * présentation plus compacte. Les colonnes SQLite/backend correspondantes restent
+                       * nullables et inchangées : les opérations déjà enregistrées avec ces valeurs
+                       * continuent de s'afficher normalement dans le récap. */}
                       <View style={styles.operationRow}>
                         <View style={styles.operationCell}>
-                          <Text style={styles.operationCellLabel}>Heure</Text>
+                          <Text style={styles.operationCellLabel}>Heure début opération</Text>
                           <TimeField
                             value={op.debutHeure || null}
                             onChange={(v) => updateOperation(index, { debutHeure: v })}
                           />
                         </View>
                         <View style={styles.operationCell}>
-                          <Text style={styles.operationCellLabel}>Température (°C)</Text>
-                          <TextInput
-                            value={op.debutTemperature}
-                            onChangeText={(v) => updateOperation(index, { debutTemperature: v })}
-                            keyboardType="decimal-pad"
-                            style={styles.operationInput}
-                          />
-                        </View>
-                        <View style={styles.operationCell}>
-                          <Text style={styles.operationCellLabel}>Vent (m/s)</Text>
-                          <TextInput
-                            value={op.debutVent}
-                            onChangeText={(v) => updateOperation(index, { debutVent: v })}
-                            keyboardType="decimal-pad"
-                            style={styles.operationInput}
-                          />
-                        </View>
-                      </View>
-
-                      <Text style={[styles.label, styles.operationSubLabel]}>Fin opération</Text>
-                      <View style={styles.operationRow}>
-                        <View style={styles.operationCell}>
-                          <Text style={styles.operationCellLabel}>Heure</Text>
+                          <Text style={styles.operationCellLabel}>Heure fin opération</Text>
                           <TimeField
                             value={op.finHeure || null}
                             onChange={(v) => updateOperation(index, { finHeure: v })}
-                          />
-                        </View>
-                        <View style={styles.operationCell}>
-                          <Text style={styles.operationCellLabel}>Température (°C)</Text>
-                          <TextInput
-                            value={op.finTemperature}
-                            onChangeText={(v) => updateOperation(index, { finTemperature: v })}
-                            keyboardType="decimal-pad"
-                            style={styles.operationInput}
-                          />
-                        </View>
-                        <View style={styles.operationCell}>
-                          <Text style={styles.operationCellLabel}>Vent (m/s)</Text>
-                          <TextInput
-                            value={op.finVent}
-                            onChangeText={(v) => updateOperation(index, { finVent: v })}
-                            keyboardType="decimal-pad"
-                            style={styles.operationInput}
                           />
                         </View>
                       </View>

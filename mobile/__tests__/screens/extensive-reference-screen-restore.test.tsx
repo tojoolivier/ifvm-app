@@ -201,7 +201,7 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
     await screen.findByText('Surface infestée (ha)');
 
     expect(screen.queryByText('INFORMATIONS AÉRONEF / ÉQUIPE')).toBeNull();
-    expect(screen.queryByText('Opérations')).toBeNull();
+    expect(screen.queryByText('Informations sur les heures de vol')).toBeNull();
     expect(prospectionRepository.listOperationsAeriennes).not.toHaveBeenCalled();
   });
 
@@ -287,7 +287,7 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
 
   /**
    * « Motif du divers » (#ux-aerien) : n'apparaît que pour Divers, disparaît pour
-   * Prospection/Convoyage, et se sauvegarde uniquement quand le type final est Divers.
+   * Prospection, et se sauvegarde uniquement quand le type final est Divers.
    */
   it("« Motif du divers » n'apparaît que pour le type Divers, et se sauvegarde avec l'opération", async () => {
     useProspectionWizardStore.setState({
@@ -303,7 +303,15 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
     });
 
     await render(<ExtensiveReferenceScreen />);
-    await screen.findByText('Opérations');
+    await screen.findByText('Informations sur les heures de vol');
+
+    // « Convoyage » retiré définitivement de la saisie (#operations-heures-vol),
+    // et Température/Vent ne sont plus proposés — seules les heures restent.
+    expect(screen.queryByText('Convoyage')).toBeNull();
+    expect(screen.queryByText('Température (°C)')).toBeNull();
+    expect(screen.queryByText('Vent (m/s)')).toBeNull();
+    expect(screen.getByText('Heure début opération')).toBeVisible();
+    expect(screen.getByText('Heure fin opération')).toBeVisible();
 
     // Aucun type choisi au départ : pas de champ Motif.
     expect(screen.queryByText('Motif du divers')).toBeNull();
@@ -322,9 +330,11 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
     fireEvent.changeText(screen.getByPlaceholderText('Ex. Rinçage, maintenance, vérification…'), 'Rinçage');
     expect(await screen.findByDisplayValue('Rinçage')).toBeVisible();
 
-    // Bascule vers Convoyage : le champ disparaît (mais la saisie n'est pas perdue
-    // localement — cf. commentaire de `OperationDraft.motifDivers`).
-    fireEvent.press(screen.getByText('Convoyage'));
+    // Bascule vers Prospection : le champ disparaît (mais la saisie n'est pas perdue
+    // localement — cf. commentaire de `OperationDraft.motifDivers`). « Convoyage »
+    // n'est plus une option proposée (#operations-heures-vol), on retombe donc sur
+    // l'autre type non-Divers déjà disponible.
+    fireEvent.press(screen.getByText('Prospection'));
     await waitFor(() => expect(screen.queryByText('Motif du divers')).toBeNull());
 
     // Retour sur Divers : le motif précédemment saisi est bien retrouvé.
