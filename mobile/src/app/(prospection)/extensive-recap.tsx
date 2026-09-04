@@ -446,7 +446,7 @@ export default function ExtensiveRecapScreen() {
                     <DetailRows rows={buildReferencesAeriennesRows(draft)} />
                   </View>
 
-                  <Text style={styles.detailSubtitle}>Opérations</Text>
+                  <Text style={styles.detailSubtitle}>Informations sur les heures de vol</Text>
                   <View style={styles.summaryCard}>
                     {operationsAeriennes.length === 0 ? (
                       <Text style={styles.detailLine}>Aucune opération enregistrée.</Text>
@@ -627,7 +627,7 @@ export default function ExtensiveRecapScreen() {
                   <Text style={styles.detailSubtitle}>Références aériennes</Text>
                   <DetailRows rows={buildReferencesAeriennesRows(draft)} />
 
-                  <Text style={[styles.detailSubtitle, { marginTop: 8 }]}>Opérations</Text>
+                  <Text style={[styles.detailSubtitle, { marginTop: 8 }]}>Informations sur les heures de vol</Text>
                   {operationsAeriennes.length === 0 ? (
                     <Text style={styles.detailLine}>Aucune opération enregistrée.</Text>
                   ) : (

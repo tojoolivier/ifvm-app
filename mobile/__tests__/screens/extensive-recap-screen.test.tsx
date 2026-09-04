@@ -290,6 +290,16 @@ describe('ExtensiveRecapScreen — mode aérien : pesticides embarqués + signat
     expect(screen.getByText('Total jour')).toBeVisible();
     expect(screen.getByText('04:45')).toBeVisible();
 
+    // Non-régression (#operations-heures-vol) : « Convoyage » n'est plus proposé à la
+    // saisie, mais une opération déjà enregistrée avec ce type — et ses températures/
+    // vents — continue de s'afficher normalement dans le récap.
+    expect(screen.getByText('Convoyage')).toBeVisible();
+    expect(screen.getByText('Prospection')).toBeVisible();
+    expect(screen.getByText('24 °C')).toBeVisible();
+    expect(screen.getByText('3.2 m/s')).toBeVisible();
+    expect(screen.getByText('26 °C')).toBeVisible();
+    expect(screen.getByText('4.1 m/s')).toBeVisible();
+
     // Pesticides embarqués + fûts (valeurs de test 10/6/4/5 du prompt)
     expect(screen.getByText('OUI')).toBeVisible();
     expect(screen.getByText('Fyfanon ULV')).toBeVisible();
@@ -339,7 +349,7 @@ describe('ExtensiveRecapScreen — mode aérien : pesticides embarqués + signat
     expect(await screen.findByText('Vérification du signalement')).toBeVisible();
     expect(screen.getByText('Références aériennes')).toBeVisible();
     expect(screen.getByText('Air Acridien')).toBeVisible();
-    expect(screen.getByText('Opérations')).toBeVisible();
+    expect(screen.getByText('Informations sur les heures de vol')).toBeVisible();
     expect(screen.getByText('Opération 1')).toBeVisible();
     expect(screen.getByText('Total jour')).toBeVisible();
     expect(screen.getByText('04:45')).toBeVisible();
@@ -367,7 +377,7 @@ describe('ExtensiveRecapScreen — mode aérien : pesticides embarqués + signat
 
     expect(await screen.findByText('Vérification du signalement')).toBeVisible();
     expect(screen.queryByText('Références aériennes')).toBeNull();
-    expect(screen.queryByText('Opérations')).toBeNull();
+    expect(screen.queryByText('Informations sur les heures de vol')).toBeNull();
   });
 
   /** « Motif du divers » (#ux-aerien) : affiché uniquement pour l'opération Divers. */
