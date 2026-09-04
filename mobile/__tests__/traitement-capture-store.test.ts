@@ -66,22 +66,22 @@ describe('section aérien', () => {
   });
 
   it('addRotation ajoute une rotation locale avec un id généré', () => {
-    useTraitementCaptureStore.getState().addRotation({ numero_cuve: 'C1', produit_id: 'p1', quantite_l: 10 });
+    useTraitementCaptureStore.getState().addRotation({ produit_id: 'p1', quantite: 10, unite: 'L' });
 
     const { aerien } = useTraitementCaptureStore.getState();
     expect(aerien.rotations).toHaveLength(1);
-    expect(aerien.rotations[0].numero_cuve).toBe('C1');
+    expect(aerien.rotations[0].produit_id).toBe('p1');
     expect(typeof aerien.rotations[0].localId).toBe('string');
   });
 
   it('updateRotation modifie la rotation ciblée par localId', () => {
     const store = useTraitementCaptureStore.getState();
-    store.addRotation({ numero_cuve: 'C1', quantite_l: 10 });
+    store.addRotation({ quantite: 10 });
     const localId = useTraitementCaptureStore.getState().aerien.rotations[0].localId;
 
-    store.updateRotation(localId, { quantite_l: 15 });
+    store.updateRotation(localId, { quantite: 15 });
 
-    expect(useTraitementCaptureStore.getState().aerien.rotations[0].quantite_l).toBe(15);
+    expect(useTraitementCaptureStore.getState().aerien.rotations[0].quantite).toBe(15);
   });
 
   it('addRotation/updateRotation portent nom_commercial (#produit-nom-commercial)', () => {
@@ -97,7 +97,7 @@ describe('section aérien', () => {
 
   it('removeRotation retire la rotation ciblée', () => {
     const store = useTraitementCaptureStore.getState();
-    store.addRotation({ numero_cuve: 'C1' });
+    store.addRotation({ produit_id: 'p1' });
     const localId = useTraitementCaptureStore.getState().aerien.rotations[0].localId;
 
     store.removeRotation(localId);
@@ -176,7 +176,7 @@ describe('reset', () => {
     const store = useTraitementCaptureStore.getState();
     store.setScreen('terrestre');
     store.updateRef({ localite: 'Ambositra' });
-    store.addRotation({ numero_cuve: 'C1' });
+    store.addRotation({ produit_id: 'p1' });
 
     store.reset();
 

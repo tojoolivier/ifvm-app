@@ -2421,15 +2421,16 @@ export interface components {
         RoleSignature: "PILOTE" | "MECANICIEN" | "CHEF_DE_BASE" | "CHEF_EQUIPE" | "CONSULTANT_INTERNATIONAL";
         /** RotationCreate */
         RotationCreate: {
-            /** Numero Cuve */
-            numero_cuve: string;
             /**
              * Produit Id
              * Format: uuid
              */
             produit_id: string;
-            /** Quantite L */
-            quantite_l: number;
+            /** Quantite */
+            quantite: number;
+            unite: components["schemas"]["UniteQuantite"];
+            /** Surface Ha */
+            surface_ha: number;
             /** Temperature Debut C */
             temperature_debut_c: number;
             /** Temperature Fin C */
@@ -2448,6 +2449,16 @@ export interface components {
              * Format: time
              */
             heure_fin: string;
+            /**
+             * Heure Ouverture Vanne
+             * Format: time
+             */
+            heure_ouverture_vanne: string;
+            /**
+             * Heure Fermeture Vanne
+             * Format: time
+             */
+            heure_fermeture_vanne: string;
             /** Nom Commercial */
             nom_commercial?: string | null;
         };
@@ -2467,8 +2478,11 @@ export interface components {
              * Format: uuid
              */
             produit_id: string;
-            /** Quantite L */
-            quantite_l: number;
+            /** Quantite */
+            quantite: number;
+            unite: components["schemas"]["UniteQuantite"];
+            /** Surface Ha */
+            surface_ha: number;
             /** Temperature Debut C */
             temperature_debut_c: number;
             /** Temperature Fin C */
@@ -2487,6 +2501,16 @@ export interface components {
              * Format: time
              */
             heure_fin: string;
+            /**
+             * Heure Ouverture Vanne
+             * Format: time
+             */
+            heure_ouverture_vanne: string;
+            /**
+             * Heure Fermeture Vanne
+             * Format: time
+             */
+            heure_fermeture_vanne: string;
             /** Nom Commercial */
             nom_commercial?: string | null;
         };
@@ -2738,8 +2762,6 @@ export interface components {
             consultant_international?: string | null;
             /** Immatricule Aeronef */
             immatricule_aeronef?: string | null;
-            /** Surface Traitee Ha */
-            surface_traitee_ha?: number | null;
             /** Pesticide Recu L */
             pesticide_recu_l?: number | null;
         };
@@ -2762,6 +2784,8 @@ export interface components {
             nb_rotations: number;
             /** Total Pesticide L */
             total_pesticide_l: number | null;
+            /** Total Pesticide Kg */
+            total_pesticide_kg: number | null;
             /** Surface Traitee Ha */
             surface_traitee_ha: number | null;
             /** Surface Restante Ha */
@@ -3262,6 +3286,11 @@ export interface components {
          * @enum {string}
          */
         TypeTraitement: "AERIEN" | "TERRESTRE";
+        /**
+         * UniteQuantite
+         * @enum {string}
+         */
+        UniteQuantite: "L" | "KG";
         /** UtilisateurCreate */
         UtilisateurCreate: {
             /** Nom */

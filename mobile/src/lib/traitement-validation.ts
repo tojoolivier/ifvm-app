@@ -18,7 +18,7 @@ export interface QuantiteLike {
   quantite_l?: number | null;
 }
 
-export function computeNbRotations(rotations: QuantiteLike[]): number {
+export function computeNbRotations(rotations: unknown[]): number {
   return rotations.length;
 }
 
@@ -26,12 +26,105 @@ function sumQuantites(items: QuantiteLike[]): number {
   return items.reduce((total, item) => total + (item.quantite_l ?? 0), 0);
 }
 
-export function computeTotalPesticideAerien(rotations: QuantiteLike[]): number {
-  return sumQuantites(rotations);
-}
-
 export function computeTotalPesticideTerrestre(produits: QuantiteLike[]): number {
   return sumQuantites(produits);
+}
+
+/**
+ * Rotations aériennes (migration 0046) : quantite + unite (L/kg) remplace
+ * quantite_l — deux rotations d'unités différentes ne s'additionnent jamais dans le
+ * même total (une poudre en kg et un ULV en litres n'ont pas la même grandeur), d'où
+ * deux totaux séparés plutôt qu'un seul comme `computeTotalPesticideTerrestre`.
+ */
+export interface QuantiteUniteLike {
+  quantite?: number | null;
+  unite?: 'L' | 'KG' | null;
+}
+
+export function computeTotalPesticideAerienParUnite(
+  rotations: QuantiteUniteLike[]
+): { l: number; kg: number } {
+  return rotations.reduce(
+    (totaux, r) => {
+      const quantite = r.quantite ?? 0;
+      if (r.unite === 'KG') totaux.kg += quantite;
+      // Défaut L (unite non renseignée) — cohérent avec le défaut serveur.
+      else totaux.l += quantite;
+      return totaux;
+    },
+    { l: 0, kg: 0 }
+  );
+}
+
+/**
+ * traitement_aerien.surface_traitee_ha n'est plus une saisie directe (migration 0046) :
+ * dérivée de la somme des `surface_ha` de chaque rotation, même principe que
+ * computeTotalPesticideAerienParUnite ci-dessus.
+ */
+export interface SurfaceHaLike {
+  surface_ha?: number | null;
+}
+
+export function computeSurfaceTraiteeAerien(rotations: SurfaceHaLike[]): number {
+  return rotations.reduce((total, r) => total + (r.surface_ha ?? 0), 0);
+}
+
+/**
+ * Durée entre deux `HH:MM`, jamais saisie par l'agent — même algorithme que
+ * `calculerDureeMinutes` dans prospection-extensive.ts (franchissement de minuit
+ * compris). Dupliqué plutôt que mutualisé : traitement et prospection n'ont pas de
+ * dépendance commune adaptée pour l'instant (même choix que `parseDecimalInput` entre
+ * veg.tsx et moyens.tsx).
+ */
+function calculerDureeMinutes(debutHeure: string, finHeure: string): number {
+  const [heureDebut, minuteDebut] = debutHeure.split(':').map(Number);
+  const [heureFin, minuteFin] = finHeure.split(':').map(Number);
+  const debut = heureDebut * 60 + minuteDebut;
+  let fin = heureFin * 60 + minuteFin;
+  if (fin < debut) fin += 24 * 60;
+  return fin - debut;
+}
+
+/** `123` minutes → `"02:03"`. */
+export function formatDureeRotation(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+export interface RotationDureesInput {
+  heureDebut: string | null;
+  heureFin: string | null;
+  heureOuvertureVanne: string | null;
+  heureFermetureVanne: string | null;
+}
+
+export interface RotationDurees {
+  /** heure_fermeture_vanne − heure_ouverture_vanne. */
+  applicationMinutes: number | null;
+  /** heure_fin − heure_debut (borne la rotation entière). */
+  totaleMinutes: number | null;
+  /** totale − application, jamais négative (plancher à 0 en affichage). */
+  miseEnPlaceMinutes: number | null;
+}
+
+/** Les 3 durées affichées par rotation (écran Pesticides & rotations) — jamais
+ * saisies, toujours calculées depuis les 4 heures de la rotation. `null` tant que
+ * les heures nécessaires ne sont pas toutes renseignées. */
+export function computeDureesRotation(input: RotationDureesInput): RotationDurees {
+  const totaleMinutes =
+    input.heureDebut && input.heureFin
+      ? calculerDureeMinutes(input.heureDebut, input.heureFin)
+      : null;
+  const applicationMinutes =
+    input.heureOuvertureVanne && input.heureFermetureVanne
+      ? calculerDureeMinutes(input.heureOuvertureVanne, input.heureFermetureVanne)
+      : null;
+  const miseEnPlaceMinutes =
+    totaleMinutes != null && applicationMinutes != null
+      ? Math.max(0, totaleMinutes - applicationMinutes)
+      : null;
+  return { applicationMinutes, totaleMinutes, miseEnPlaceMinutes };
 }
 
 /**
@@ -139,11 +232,15 @@ export function validateReferences(input: ReferencesValidationInput): Validation
 export interface RotationHeuresInput {
   heureDebut: string | null;
   heureFin: string | null;
+  heureOuvertureVanne?: string | null;
+  heureFermetureVanne?: string | null;
 }
 
 /** Même règle que TerrestreConditionsInput.heureDebut/heureFin (backend :
- * ck_traitement_rotation_heures), appliquée à chaque rotation aérienne — numérotées
- * à partir de 1 dans le message, dans l'ordre de saisie. */
+ * ck_traitement_rotation_heures) pour heure_debut/heure_fin, et
+ * ck_traitement_rotation_heures_vanne pour heure_ouverture_vanne/heure_fermeture_vanne
+ * (migration 0046) — appliquées à chaque rotation aérienne, numérotées à partir de 1
+ * dans le message, dans l'ordre de saisie. */
 export function validateRotationsHeures(rotations: RotationHeuresInput[]): ValidationError[] {
   const errors: ValidationError[] = [];
   rotations.forEach((r, index) => {
@@ -151,6 +248,16 @@ export function validateRotationsHeures(rotations: RotationHeuresInput[]): Valid
       errors.push({
         field: 'rotations',
         message: `Rotation ${index + 1} : l'heure de fin doit être postérieure à l'heure de début`,
+      });
+    }
+    if (
+      r.heureOuvertureVanne &&
+      r.heureFermetureVanne &&
+      r.heureFermetureVanne <= r.heureOuvertureVanne
+    ) {
+      errors.push({
+        field: 'rotations',
+        message: `Rotation ${index + 1} : l'heure de fermeture de vanne doit être postérieure à l'heure d'ouverture`,
       });
     }
   });

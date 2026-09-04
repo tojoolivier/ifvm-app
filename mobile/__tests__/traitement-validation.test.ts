@@ -1,6 +1,9 @@
 import {
   computeNbRotations,
-  computeTotalPesticideAerien,
+  computeTotalPesticideAerienParUnite,
+  computeSurfaceTraiteeAerien,
+  computeDureesRotation,
+  formatDureeRotation,
   computeTotalPesticideTerrestre,
   computeSurfaceTraitee,
   computeSurfaceCumulee,
@@ -48,7 +51,7 @@ describe('deriveNomCommercial', () => {
 
 describe('computeNbRotations', () => {
   it('counts the rotations captured so far', () => {
-    expect(computeNbRotations([{ quantite_l: 10 }, { quantite_l: 5 }])).toBe(2);
+    expect(computeNbRotations([{ quantite: 10 }, { quantite: 5 }])).toBe(2);
   });
 
   it('is zero when no rotation has been added', () => {
@@ -56,13 +59,75 @@ describe('computeNbRotations', () => {
   });
 });
 
-describe('computeTotalPesticideAerien', () => {
-  it('sums the pesticide quantities across rotations', () => {
-    expect(computeTotalPesticideAerien([{ quantite_l: 10 }, { quantite_l: 5.5 }])).toBe(15.5);
+describe('computeTotalPesticideAerienParUnite', () => {
+  it('sums litre-dosed rotations separately from kg-dosed ones (migration 0046)', () => {
+    expect(
+      computeTotalPesticideAerienParUnite([
+        { quantite: 10, unite: 'L' },
+        { quantite: 5.5, unite: 'L' },
+        { quantite: 4, unite: 'KG' },
+      ])
+    ).toEqual({ l: 15.5, kg: 4 });
+  });
+
+  it('treats a missing unite as L (server default)', () => {
+    expect(computeTotalPesticideAerienParUnite([{ quantite: 10 }])).toEqual({ l: 10, kg: 0 });
   });
 
   it('ignores rotations whose quantity is not yet filled in', () => {
-    expect(computeTotalPesticideAerien([{ quantite_l: 10 }, { quantite_l: null }, {}])).toBe(10);
+    expect(computeTotalPesticideAerienParUnite([{ quantite: 10, unite: 'L' }, { quantite: null, unite: 'L' }, {}])).toEqual({
+      l: 10,
+      kg: 0,
+    });
+  });
+});
+
+describe('computeSurfaceTraiteeAerien', () => {
+  it('sums the surface_ha of every rotation (surface_traitee_ha is no longer a direct entry)', () => {
+    expect(computeSurfaceTraiteeAerien([{ surface_ha: 12 }, { surface_ha: 8.5 }])).toBe(20.5);
+  });
+
+  it('is zero when no rotation has surface_ha filled in', () => {
+    expect(computeSurfaceTraiteeAerien([{ surface_ha: null }, {}])).toBe(0);
+  });
+});
+
+describe('computeDureesRotation', () => {
+  it('computes application, totale and mise en place from the 4 rotation times', () => {
+    const durees = computeDureesRotation({
+      heureDebut: '06:00',
+      heureFin: '06:30',
+      heureOuvertureVanne: '06:05',
+      heureFermetureVanne: '06:20',
+    });
+    expect(durees).toEqual({ applicationMinutes: 15, totaleMinutes: 30, miseEnPlaceMinutes: 15 });
+  });
+
+  it('is null wherever the underlying times are not yet filled in', () => {
+    expect(computeDureesRotation({ heureDebut: null, heureFin: null, heureOuvertureVanne: null, heureFermetureVanne: null })).toEqual({
+      applicationMinutes: null,
+      totaleMinutes: null,
+      miseEnPlaceMinutes: null,
+    });
+  });
+
+  it('never reports a negative mise en place duration', () => {
+    // Heures de vanne débordant (mal saisies) au-delà de la rotation entière : la
+    // mise en place plancher à 0 plutôt qu'un nombre négatif illisible à l'écran.
+    const durees = computeDureesRotation({
+      heureDebut: '06:00',
+      heureFin: '06:10',
+      heureOuvertureVanne: '06:00',
+      heureFermetureVanne: '06:30',
+    });
+    expect(durees.miseEnPlaceMinutes).toBe(0);
+  });
+});
+
+describe('formatDureeRotation', () => {
+  it('formats minutes as HH:MM', () => {
+    expect(formatDureeRotation(15)).toBe('00:15');
+    expect(formatDureeRotation(90)).toBe('01:30');
   });
 });
 
@@ -226,6 +291,20 @@ describe('validateRotationsHeures', () => {
     ]);
     expect(errors).toHaveLength(1);
     expect(errors[0].message).toContain('Rotation 2');
+  });
+
+  it('rejects a vanne closing time not after the opening time (migration 0046)', () => {
+    const errors = validateRotationsHeures([
+      { heureDebut: '06:00', heureFin: '06:30', heureOuvertureVanne: '06:20', heureFermetureVanne: '06:10' },
+    ]);
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toContain('fermeture de vanne');
+  });
+
+  it('accepts rotations whose vanne hours are not yet filled in', () => {
+    expect(
+      validateRotationsHeures([{ heureDebut: '06:00', heureFin: '06:30', heureOuvertureVanne: null, heureFermetureVanne: null }])
+    ).toEqual([]);
   });
 });
 

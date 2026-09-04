@@ -88,6 +88,7 @@ export interface TraitementAerien {
   immatricule_aeronef: string | null;
   nb_rotations: number | null;
   total_pesticide_l: number | null;
+  total_pesticide_kg: number | null;
   surface_traitee_ha: number | null;
   surface_restante_ha: number | null;
   pesticide_recu_l: number | null;
@@ -98,29 +99,39 @@ export interface Rotation {
   id: string;
   traitement_aerien_id: string;
   numero: number | null;
+  // Dérivé côté serveur de `numero` (migration 0046) — jamais écrit par le mobile,
+  // conservé en base locale sans être maintenu à jour (colonne devenue « abandonnée mais
+  // conservée », même principe que d'autres champs de ce genre dans prospection-db.ts).
   numero_cuve: string | null;
   produit_id: string | null;
-  quantite_l: number | null;
+  quantite: number | null;
+  unite: string | null;
+  surface_ha: number | null;
   temperature_debut_c: number | null;
   temperature_fin_c: number | null;
   vent_debut_ms: number | null;
   vent_fin_ms: number | null;
   heure_debut: string | null;
   heure_fin: string | null;
+  heure_ouverture_vanne: string | null;
+  heure_fermeture_vanne: string | null;
   // #produit-nom-commercial : dérivé côté client, figé à la saisie.
   nom_commercial: string | null;
 }
 
 export interface RotationInput {
-  numero_cuve?: string | null;
   produit_id?: string | null;
-  quantite_l?: number | null;
+  quantite?: number | null;
+  unite?: string | null;
+  surface_ha?: number | null;
   temperature_debut_c?: number | null;
   temperature_fin_c?: number | null;
   vent_debut_ms?: number | null;
   vent_fin_ms?: number | null;
   heure_debut?: string | null;
   heure_fin?: string | null;
+  heure_ouverture_vanne?: string | null;
+  heure_fermeture_vanne?: string | null;
   nom_commercial?: string | null;
 }
 
@@ -400,7 +411,9 @@ export interface AerienUpdateInput {
   chefDeBaseId: string;
   consultantInternational?: string | null;
   immatriculeAeronef?: string | null;
-  surfaceTraiteeHa?: number | null;
+  // surfaceTraiteeHa n'y figure plus (migration 0046) : dérivée des rotations,
+  // même traitement que nb_rotations/total_pesticide_l — jamais mise à jour par cette
+  // fonction, seulement par la synchronisation.
   pesticideRecuL?: number | null;
 }
 
@@ -417,7 +430,6 @@ export async function updateTraitementAerien(
       chef_de_base_id = ?,
       consultant_international = ?,
       immatricule_aeronef = ?,
-      surface_traitee_ha = ?,
       pesticide_recu_l = ?
      WHERE traitement_id = ?`,
     [
@@ -426,7 +438,6 @@ export async function updateTraitementAerien(
       input.chefDeBaseId,
       input.consultantInternational ?? null,
       input.immatriculeAeronef ?? null,
-      input.surfaceTraiteeHa ?? null,
       input.pesticideRecuL ?? null,
       traitementId,
     ]
@@ -665,22 +676,25 @@ export async function addRotation(
 
   await db.runAsync(
     `INSERT INTO rotation (
-      id, traitement_aerien_id, numero_cuve, produit_id, quantite_l,
+      id, traitement_aerien_id, produit_id, quantite, unite, surface_ha,
       temperature_debut_c, temperature_fin_c, vent_debut_ms, vent_fin_ms,
-      heure_debut, heure_fin, nom_commercial
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      heure_debut, heure_fin, heure_ouverture_vanne, heure_fermeture_vanne, nom_commercial
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       traitementAerienId,
-      input.numero_cuve ?? null,
       input.produit_id ?? null,
-      input.quantite_l ?? null,
+      input.quantite ?? null,
+      input.unite ?? null,
+      input.surface_ha ?? null,
       input.temperature_debut_c ?? null,
       input.temperature_fin_c ?? null,
       input.vent_debut_ms ?? null,
       input.vent_fin_ms ?? null,
       input.heure_debut ?? null,
       input.heure_fin ?? null,
+      input.heure_ouverture_vanne ?? null,
+      input.heure_fermeture_vanne ?? null,
       input.nom_commercial ?? null,
     ]
   );
@@ -703,27 +717,33 @@ export async function updateRotation(
 
   await db.runAsync(
     `UPDATE rotation SET
-      numero_cuve = ?,
       produit_id = ?,
-      quantite_l = ?,
+      quantite = ?,
+      unite = ?,
+      surface_ha = ?,
       temperature_debut_c = ?,
       temperature_fin_c = ?,
       vent_debut_ms = ?,
       vent_fin_ms = ?,
       heure_debut = ?,
       heure_fin = ?,
+      heure_ouverture_vanne = ?,
+      heure_fermeture_vanne = ?,
       nom_commercial = ?
      WHERE id = ?`,
     [
-      input.numero_cuve ?? null,
       input.produit_id ?? null,
-      input.quantite_l ?? null,
+      input.quantite ?? null,
+      input.unite ?? null,
+      input.surface_ha ?? null,
       input.temperature_debut_c ?? null,
       input.temperature_fin_c ?? null,
       input.vent_debut_ms ?? null,
       input.vent_fin_ms ?? null,
       input.heure_debut ?? null,
       input.heure_fin ?? null,
+      input.heure_ouverture_vanne ?? null,
+      input.heure_fermeture_vanne ?? null,
       input.nom_commercial ?? null,
       rotationId,
     ]

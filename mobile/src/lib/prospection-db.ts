@@ -64,6 +64,10 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
   // ajouté à côté, au lieu de reprendre les valeurs déjà saisies.
   await renommerColonneSiPresente(db, 'traitement', 'kit_boite', 'kit_botte');
   await ajouterColonnesManquantes(db, 'traitement', COLONNES_TRAITEMENT);
+  // Migration backend 0046 : quantite_l -> quantite + unite (L/kg) sur `rotation` — même
+  // raisonnement que kit_boite -> kit_botte ci-dessus, pour ne pas perdre les quantités
+  // déjà saisies sous l'ancien nom.
+  await renommerColonneSiPresente(db, 'rotation', 'quantite_l', 'quantite');
   await ajouterColonnesManquantes(db, 'rotation', COLONNES_ROTATION);
   await ajouterColonnesManquantes(db, 'traitement_aerien', COLONNES_TRAITEMENT_AERIEN);
   await ajouterColonnesManquantes(db, 'traitement_terrestre', COLONNES_TRAITEMENT_TERRESTRE);
@@ -375,7 +379,7 @@ async function creerTables(db: SQLite.SQLiteDatabase): Promise<void> {
       numero INTEGER,
       numero_cuve TEXT,
       produit_id TEXT,
-      quantite_l REAL,
+      quantite REAL,
       temperature_debut_c REAL,
       temperature_fin_c REAL,
       vent_debut_ms REAL,
@@ -696,6 +700,13 @@ const COLONNES_ROTATION: readonly Colonne[] = [
   { name: 'heure_fin', type: 'TEXT' },
   // #produit-nom-commercial
   { name: 'nom_commercial', type: 'TEXT' },
+  // Migration backend 0046 : L/kg (quantite_l -> quantite ci-dessus, renommage),
+  // superficie traitée par la rotation, heures d'ouverture/fermeture de vanne
+  // (distinctes de heure_debut/heure_fin qui bornent la rotation entière).
+  { name: 'unite', type: 'TEXT' },
+  { name: 'surface_ha', type: 'REAL' },
+  { name: 'heure_ouverture_vanne', type: 'TEXT' },
+  { name: 'heure_fermeture_vanne', type: 'TEXT' },
 ];
 
 /** Colonnes ajoutées à `produit_utilise` après sa création initiale. */
@@ -711,6 +722,9 @@ const COLONNES_TRAITEMENT_AERIEN: readonly Colonne[] = [
   { name: 'surface_restante_ha', type: 'REAL' },
   { name: 'pesticide_recu_l', type: 'REAL' },
   { name: 'pesticide_stock_restant_l', type: 'REAL' },
+  // Migration backend 0046 : cumul séparé des rotations dosées au kg (poudre), à côté
+  // de total_pesticide_l (rotations dosées au litre).
+  { name: 'total_pesticide_kg', type: 'REAL' },
 ];
 
 /** Colonnes ajoutées à `traitement_terrestre` après sa création initiale. */

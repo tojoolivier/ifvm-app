@@ -40,30 +40,38 @@ export interface ReferenceDraft {
 
 export interface RotationDraft {
   localId: string;
-  numero_cuve?: string | null;
+  // numero_cuve n'existe plus ici : dérivé côté serveur de `numero` (migration 0046),
+  // jamais saisi ni stocké — affiché à l'écran comme C${index + 1}.
   produit_id?: string | null;
-  quantite_l?: number | null;
+  quantite?: number | null;
+  unite?: 'L' | 'KG' | null;
+  surface_ha?: number | null;
   temperature_debut_c?: number | null;
   temperature_fin_c?: number | null;
   vent_debut_ms?: number | null;
   vent_fin_ms?: number | null;
   heure_debut?: string | null;
   heure_fin?: string | null;
+  heure_ouverture_vanne?: string | null;
+  heure_fermeture_vanne?: string | null;
   // #produit-nom-commercial : dérivé de `produit_id` au moment de la sélection
   // (cf. deriveNomCommercial), jamais recalculé à la lecture.
   nom_commercial?: string | null;
 }
 
 export interface RotationInput {
-  numero_cuve?: string | null;
   produit_id?: string | null;
-  quantite_l?: number | null;
+  quantite?: number | null;
+  unite?: 'L' | 'KG' | null;
+  surface_ha?: number | null;
   temperature_debut_c?: number | null;
   temperature_fin_c?: number | null;
   vent_debut_ms?: number | null;
   vent_fin_ms?: number | null;
   heure_debut?: string | null;
   heure_fin?: string | null;
+  heure_ouverture_vanne?: string | null;
+  heure_fermeture_vanne?: string | null;
   nom_commercial?: string | null;
 }
 
@@ -73,7 +81,9 @@ export interface AerienDraft {
   chefDeBaseId?: string | null;
   consultantInternational?: string | null;
   immatriculationAeronef?: string | null;
-  surfaceTraiteeHa?: number | null;
+  // surfaceTraiteeHa n'y figure plus (migration 0046) : dérivée de la somme des
+  // `surface_ha` des rotations, calculée à l'écran via computeSurfaceTraiteeAerien
+  // (traitement-validation.ts) — jamais une saisie stockée dans le draft.
   pesticideRecuL?: number | null;
   rotations: RotationDraft[];
 }
