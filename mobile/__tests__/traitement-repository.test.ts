@@ -125,6 +125,21 @@ describe('createDraftTraitementAerien', () => {
     expect(result.type_traitement).toBe('AERIEN');
     expect(result.aerien?.pilote).toBe(AERIEN_INPUT.pilote);
   });
+
+  it('#traitement-cree-par-id : écrit cree_par_id (utilisateur connecté à la création)', async () => {
+    getFirstAsync
+      .mockResolvedValueOnce(STORED_TRAITEMENT_ROW)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ traitement_id: AERIEN_INPUT.id });
+    getAllAsync.mockResolvedValueOnce([]);
+
+    await createDraftTraitementAerien({ ...AERIEN_INPUT, creeParId: 'user-connecte-1' });
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO traitement[\s\S]*cree_par_id/),
+      expect.arrayContaining(['user-connecte-1'])
+    );
+  });
 });
 
 describe('createDraftTraitementTerrestre', () => {
@@ -170,6 +185,21 @@ describe('createDraftTraitementTerrestre', () => {
     );
     expect(result.type_traitement).toBe('TERRESTRE');
     expect(result.terrestre?.chef_equipe_id).toBe(TERRESTRE_INPUT.chefEquipeId);
+  });
+
+  it('#traitement-cree-par-id : écrit cree_par_id (utilisateur connecté à la création)', async () => {
+    getFirstAsync
+      .mockResolvedValueOnce({ ...STORED_TRAITEMENT_ROW, id: TERRESTRE_INPUT.id, type_traitement: 'TERRESTRE' })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ traitement_id: TERRESTRE_INPUT.id });
+    getAllAsync.mockResolvedValueOnce([]);
+
+    await createDraftTraitementTerrestre({ ...TERRESTRE_INPUT, creeParId: 'user-connecte-1' });
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO traitement[\s\S]*cree_par_id/),
+      expect.arrayContaining(['user-connecte-1'])
+    );
   });
 });
 
@@ -546,16 +576,29 @@ describe('listDraftTraitements', () => {
 });
 
 describe('listMesTraitements', () => {
-  it('joins traitement_terrestre et traitement_aerien, filtre sur chef_equipe_id OU chef_de_base_id', async () => {
+  it('joins traitement_terrestre et traitement_aerien, filtre sur cree_par_id OU chef_equipe_id OU chef_de_base_id', async () => {
     getAllAsync.mockResolvedValueOnce([STORED_TRAITEMENT_ROW]);
 
     const result = await listMesTraitements('utilisateur-1');
 
     expect(result).toEqual([STORED_TRAITEMENT_ROW]);
     expect(getAllAsync).toHaveBeenCalledWith(
-      expect.stringContaining('traitement_terrestre.chef_equipe_id = ? OR traitement_aerien.chef_de_base_id = ?'),
-      ['utilisateur-1', 'utilisateur-1']
+      expect.stringContaining('traitement_terrestre.chef_equipe_id = ?'),
+      ['utilisateur-1', 'utilisateur-1', 'utilisateur-1']
     );
+    const [sql] = getAllAsync.mock.calls[0];
+    expect(sql).toEqual(expect.stringContaining('traitement.cree_par_id = ?'));
+    expect(sql).toEqual(expect.stringContaining('traitement_aerien.chef_de_base_id = ?'));
+  });
+
+  it('#traitement-cree-par-id : retrouve une fiche par cree_par_id même sans chef_equipe_id/chef_de_base_id renseignés (compte absent du référentiel de rôles)', async () => {
+    getAllAsync.mockResolvedValueOnce([{ ...STORED_TRAITEMENT_ROW, cree_par_id: 'utilisateur-1' }]);
+
+    const result = await listMesTraitements('utilisateur-1');
+
+    expect(result).toEqual([{ ...STORED_TRAITEMENT_ROW, cree_par_id: 'utilisateur-1' }]);
+    // Les 3 paramètres liés sont bien le même utilisateur, un par branche du OR.
+    expect(getAllAsync.mock.calls[0][1]).toEqual(['utilisateur-1', 'utilisateur-1', 'utilisateur-1']);
   });
 
   it('utilise un LEFT JOIN (pas INNER) pour ne pas exclure les fiches AÉRIEN', async () => {

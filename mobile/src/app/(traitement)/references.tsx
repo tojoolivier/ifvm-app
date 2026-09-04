@@ -15,6 +15,7 @@ import { getProspection, listAllProspectionPopulations, listAllProspectionInfest
 import { STATUT_VALIDE } from '@/lib/prospection-fiche-lecture';
 import { generateId } from '@/lib/id';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
+import { useAuthStore } from '@/lib/auth-store';
 import { validateReferences } from '@/lib/traitement-validation';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
@@ -48,6 +49,7 @@ export default function ReferencesScreen() {
 
   const store = useTraitementCaptureStore();
   const typeTraitement = store.typeTraitement;
+  const utilisateurConnecte = useAuthStore((s) => s.user);
   const [traitementId, setTraitementId] = useState<string | null>(routeTraitementId ?? null);
   const [prospectionId, setProspectionId] = useState<string | null>(routeProspectionId ?? null);
   const [dateValidation, setDateValidation] = useState<string | null>(null);
@@ -175,12 +177,16 @@ export default function ReferencesScreen() {
                   pilote: '',
                   mecanicien: '',
                   chefDeBaseId: '',
+                  // #traitement-cree-par-id : même pattern que prospecteurId côté
+                  // Prospection — fixé une fois pour toutes, jamais réattribué.
+                  creeParId: utilisateurConnecte?.id ?? null,
                 })
               : await createDraftTraitementTerrestre({
                   id: generateId(),
                   prospectionId: prospectionId!,
                   dateTraitement: store.ref.dateTraitement,
                   chefEquipeId: '',
+                  creeParId: utilisateurConnecte?.id ?? null,
                 });
           id = created.id;
           setTraitementId(id);

@@ -2960,6 +2960,8 @@ export interface components {
             statut: components["schemas"]["StatutTraitement"];
             /** Statut Sync */
             statut_sync: string;
+            /** Cree Par Id */
+            cree_par_id?: string | null;
             /**
              * Created At
              * Format: date-time

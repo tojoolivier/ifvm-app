@@ -66,6 +66,10 @@ export interface DraftTraitementRow {
   updated_at: string;
   /** Dernier `updated_at` serveur connu (distinct de `updated_at`, modifié par toute écriture locale). */
   server_updated_at: string | null;
+  /** #traitement-cree-par-id : utilisateur connecté qui a créé la fiche, fixé une
+   * fois à la création — c'est lui que `listMesTraitements` retrouve toujours,
+   * indépendamment de chef_equipe_id/chef_de_base_id (référentiel de rôles). */
+  cree_par_id: string | null;
 }
 
 export interface Cible {
@@ -182,6 +186,8 @@ export interface DraftTraitementAerienInput {
   mecanicien: string;
   chefDeBaseId: string;
   consultantInternational?: string | null;
+  /** #traitement-cree-par-id */
+  creeParId?: string | null;
 }
 
 export interface DraftTraitementTerrestreInput {
@@ -193,6 +199,8 @@ export interface DraftTraitementTerrestreInput {
   consultantInternational?: string | null;
   repriseTraitement?: boolean;
   traitementOrigineId?: string | null;
+  /** #traitement-cree-par-id */
+  creeParId?: string | null;
 }
 
 export interface ReferenceUpdateInput {
@@ -251,9 +259,9 @@ export async function createDraftTraitementAerien(
   await db.runAsync(
     `INSERT INTO traitement (
       id, prospection_id, type_traitement, date_traitement,
-      statut, statut_sync, created_at, updated_at
-    ) VALUES (?, ?, 'AERIEN', ?, 'brouillon', 'local', ?, ?)`,
-    [input.id, input.prospectionId, input.dateTraitement ?? null, now, now]
+      statut, statut_sync, created_at, updated_at, cree_par_id
+    ) VALUES (?, ?, 'AERIEN', ?, 'brouillon', 'local', ?, ?, ?)`,
+    [input.id, input.prospectionId, input.dateTraitement ?? null, now, now, input.creeParId ?? null]
   );
 
   await db.runAsync(
@@ -279,9 +287,9 @@ export async function createDraftTraitementTerrestre(
   await db.runAsync(
     `INSERT INTO traitement (
       id, prospection_id, type_traitement, date_traitement,
-      statut, statut_sync, created_at, updated_at
-    ) VALUES (?, ?, 'TERRESTRE', ?, 'brouillon', 'local', ?, ?)`,
-    [input.id, input.prospectionId, input.dateTraitement ?? null, now, now]
+      statut, statut_sync, created_at, updated_at, cree_par_id
+    ) VALUES (?, ?, 'TERRESTRE', ?, 'brouillon', 'local', ?, ?, ?)`,
+    [input.id, input.prospectionId, input.dateTraitement ?? null, now, now, input.creeParId ?? null]
   );
 
   await db.runAsync(
@@ -842,8 +850,8 @@ export async function listDraftTraitements(): Promise<DraftTraitementRow[]> {
 }
 
 /**
- * Fiches de traitement dont l'utilisateur connecté est responsable — chef
- * d'équipe (Terrestre) OU chef de base (Aérien).
+ * Fiches de traitement dont l'utilisateur connecté est le créateur, OU dont il
+ * est responsable — chef d'équipe (Terrestre) OU chef de base (Aérien).
  *
  * Bug #264 : la requête d'origine ne joignait que `traitement_terrestre`, donc
  * une fiche AÉRIEN (chef_de_base_id, pas de ligne dans `traitement_terrestre`)
@@ -851,7 +859,16 @@ export async function listDraftTraitements(): Promise<DraftTraitementRow[]> {
  * le chef de base connecté. Les deux `LEFT JOIN` couvrent les deux
  * spécialisations ; une fiche donnée n'a jamais de ligne que dans l'une des
  * deux tables (disjointes par `type_traitement`), donc chaque `traitement` ne
- * peut correspondre qu'à une seule branche du `OR` — pas de doublon possible.
+ * peut correspondre qu'à une seule branche du `OR` sur ces jointures — pas de
+ * doublon possible.
+ *
+ * #traitement-cree-par-id : `chef_equipe_id`/`chef_de_base_id` viennent d'un
+ * référentiel de rôles (`utilisateur_equipe`) — un compte connecté qui n'y
+ * figure pas (aucune pré-sélection auto ni sélection manuelle possibles) ne
+ * pouvait jamais retrouver ses propres fiches, même parfaitement enregistrées.
+ * `traitement.cree_par_id` (fixé à la création, jamais réattribué) garantit
+ * que le créateur retrouve toujours sa fiche, indépendamment de ce
+ * référentiel — même principe que `prospection.prospecteur_id`.
  */
 export async function listMesTraitements(
   utilisateurId: string
@@ -863,9 +880,11 @@ export async function listMesTraitements(
      FROM traitement
      LEFT JOIN traitement_terrestre ON traitement_terrestre.traitement_id = traitement.id
      LEFT JOIN traitement_aerien ON traitement_aerien.traitement_id = traitement.id
-     WHERE traitement_terrestre.chef_equipe_id = ? OR traitement_aerien.chef_de_base_id = ?
+     WHERE traitement.cree_par_id = ?
+        OR traitement_terrestre.chef_equipe_id = ?
+        OR traitement_aerien.chef_de_base_id = ?
      ORDER BY traitement.updated_at DESC`,
-    [utilisateurId, utilisateurId]
+    [utilisateurId, utilisateurId, utilisateurId]
   );
 }
 

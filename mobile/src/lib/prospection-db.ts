@@ -337,7 +337,8 @@ async function creerTables(db: SQLite.SQLiteDatabase): Promise<void> {
       statut_sync TEXT NOT NULL DEFAULT 'local',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
-      server_updated_at TEXT
+      server_updated_at TEXT,
+      cree_par_id TEXT
     );
 
     CREATE INDEX IF NOT EXISTS ix_traitement_prospection_id
@@ -684,6 +685,8 @@ const COLONNES_OPERATION_AERIENNE: readonly Colonne[] = [
 /** Colonnes ajoutées à `traitement` après sa création initiale. */
 const COLONNES_TRAITEMENT: readonly Colonne[] = [
   { name: 'server_updated_at', type: 'TEXT' },
+  // #traitement-cree-par-id
+  { name: 'cree_par_id', type: 'TEXT' },
 ];
 
 /** Colonnes ajoutées à `rotation` après sa création initiale. */

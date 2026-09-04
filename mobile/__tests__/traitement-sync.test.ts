@@ -86,6 +86,7 @@ function draft(overrides: Partial<DraftTraitement> = {}): DraftTraitement {
     created_at: '2026-08-12T00:00:00.000Z',
     updated_at: '2026-08-12T00:00:00.000Z',
     server_updated_at: null,
+    cree_par_id: null,
     aerien: {
       traitement_id: 'traitement-1',
       pilote: 'Jean Dupont',

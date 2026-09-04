@@ -113,6 +113,8 @@ const MIGRATED_COLUMNS = [
 
   // Autres colonnes
   { name: 'server_updated_at' },
+  // #traitement-cree-par-id
+  { name: 'cree_par_id' },
   { name: 'surface_station' },
   { name: 'surface_prospectee' },
   { name: 'surface_infestee' },
