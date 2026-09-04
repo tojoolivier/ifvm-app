@@ -26,6 +26,13 @@ jest.mock('@/lib/prospection-repository', () => ({
   },
 }));
 
+// Un des scénarios ci-dessous rend l'écran en mode aérien (Signatures Pilote/Chef
+// de Base) — non exercé par ces tests, mais listUtilisateursByRole est appelée au
+// montage : mocké pour ne pas dépendre d'expo-sqlite.
+jest.mock('@/lib/referentiel-db', () => ({
+  listUtilisateursByRole: jest.fn().mockResolvedValue([]),
+}));
+
 beforeEach(() => {
   jest.mocked(prospectionRepository.updateProspectionExtensiveObservations).mockClear();
   useProspectionWizardStore.setState({ draft: null, captures: [] });
@@ -39,6 +46,7 @@ describe.each([
   ['Aérien', DRAFT_AERIEN],
 ])('ExtensiveObservationsScreen — Dégâts sur les cultures (%s)', (_label, draft) => {
   it.each([
+    ['Néant', 'nuls'],
     ['Faible', 'faibles'],
     ['Moyen', 'moyens'],
     ['Forte', 'forts'],
@@ -48,7 +56,8 @@ describe.each([
     await screen.findByText('Dégâts sur les cultures');
 
     // « Faible »/« Forte » existent aussi parmi les chips Intensité (NIVEAU_OPTIONS) —
-    // le chip Dégâts sur les cultures est toujours le premier de la fiche.
+    // le chip Dégâts sur les cultures est toujours le premier de la fiche. « Néant »
+    // n'existe qu'ici, sans ambiguïté.
     fireEvent.press(screen.getAllByText(chipLabel)[0]);
     await waitFor(() =>
       expect(screen.getAllByText(chipLabel)[0].props.style).toEqual(

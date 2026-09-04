@@ -36,6 +36,16 @@ jest.mock('@/lib/prospection-repository', () => ({
   },
 }));
 
+// Pilote/Chef de Base : agents habilités proposés en chips (listUtilisateursByRole),
+// même mécanisme que côté Traitement — cf. commentaire sur agentsPourRole dans l'écran.
+jest.mock('@/lib/referentiel-db', () => ({
+  listUtilisateursByRole: jest.fn((role: string) => {
+    if (role === 'pilote') return Promise.resolve([{ id: 'pilote-1', nom: 'Rakoto', prenom: 'Jean' }]);
+    if (role === 'chef_de_base') return Promise.resolve([{ id: 'chef-1', nom: 'Rabe', prenom: 'Marie' }]);
+    return Promise.resolve([]);
+  }),
+}));
+
 beforeEach(() => {
   // `mode_extensif: 'aerien'` conservé dans la valeur simulée : la vraie fonction
   // relit la ligne complète (`SELECT *`) après l'UPDATE, qui ne touche pas cette
@@ -70,7 +80,7 @@ describe('ExtensiveObservationsScreen — mode aérien : nombre de fûts (valida
   });
 });
 
-describe('ExtensiveObservationsScreen — mode aérien : signatures', () => {
+describe('ExtensiveObservationsScreen — mode aérien : signatures (VISA/Consultant FAO — texte libre)', () => {
   it('« Signer » capture le nom et un horodatage, verrouille le champ', async () => {
     useProspectionWizardStore.setState({
       draft: { id: 'draft-123', type_prospection: 'extensive', mode_extensif: 'aerien' } as any,
@@ -80,8 +90,9 @@ describe('ExtensiveObservationsScreen — mode aérien : signatures', () => {
     await render(<ExtensiveObservationsScreen />);
     await screen.findByText('Signatures');
 
-    // 4 rangées de signature (VISA/Consultant FAO/Pilote/Chef de Base) partagent le
-    // même placeholder tant qu'aucune n'est signée — VISA est la première (index 0).
+    // VISA et Consultant FAO (seuls rôles sans agent habilité référencé — cf.
+    // agentsPourRole) partagent le même placeholder tant qu'aucun n'est signé ;
+    // VISA est le premier (index 0).
     fireEvent.changeText(screen.getAllByPlaceholderText('Nom du signataire')[0], 'Rakoto V.');
     // Flush explicite avant Signer : sans lui, le bouton lirait une fermeture
     // (closure) où `signatureDraftNoms` n'a pas encore la saisie (même classe de
@@ -102,24 +113,6 @@ describe('ExtensiveObservationsScreen — mode aérien : signatures', () => {
     );
   });
 
-  it('restaure une signature déjà enregistrée (fiche rouverte) en lecture seule', async () => {
-    useProspectionWizardStore.setState({
-      draft: {
-        id: 'draft-123',
-        type_prospection: 'extensive',
-        mode_extensif: 'aerien',
-        signature_pilote_nom: 'Jean Rakoto',
-        signature_pilote_horodatage: '2026-09-01T09:10:00.000Z',
-      } as any,
-      captures: [],
-    });
-
-    await render(<ExtensiveObservationsScreen />);
-
-    expect(await screen.findByText('Jean Rakoto')).toBeVisible();
-    expect(screen.getAllByText('✓ Signé').length).toBeGreaterThan(0);
-  });
-
   it('une ancienne fiche terrestre déjà enregistrée continue de s’ouvrir sans erreur (colonnes NULL)', async () => {
     useProspectionWizardStore.setState({
       draft: {
@@ -134,6 +127,57 @@ describe('ExtensiveObservationsScreen — mode aérien : signatures', () => {
 
     await expect(render(<ExtensiveObservationsScreen />)).resolves.toBeTruthy();
     expect(await screen.findByText('Verdure strate herbeuse')).toBeVisible();
+  });
+});
+
+describe('ExtensiveObservationsScreen — mode aérien : signatures (Pilote/Chef de Base — agent habilité)', () => {
+  it('sélectionner un agent dans la liste signe immédiatement (nom + horodatage), sans bouton « Signer »', async () => {
+    useProspectionWizardStore.setState({
+      draft: { id: 'draft-123', type_prospection: 'extensive', mode_extensif: 'aerien' } as any,
+      captures: [],
+    });
+
+    await render(<ExtensiveObservationsScreen />);
+    await screen.findByText('Signatures');
+
+    // Chip issu de listUtilisateursByRole('pilote') (mocké en tête de fichier) —
+    // aucun champ texte ni bouton « Signer » pour ce rôle.
+    const chipPilote = await screen.findByText('Jean Rakoto');
+    fireEvent.press(chipPilote);
+
+    await waitFor(() =>
+      expect(chipPilote.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ color: '#fff' })]))
+    );
+    expect(await screen.findByText(/^Signé à /)).toBeVisible();
+
+    fireEvent.press(screen.getByText('Suivant : Récapitulatif ›'));
+
+    await waitFor(() =>
+      expect(prospectionRepository.updateProspectionExtensiveObservations).toHaveBeenCalledWith(
+        'draft-123',
+        expect.objectContaining({ signaturePiloteNom: 'Jean Rakoto', signaturePiloteHorodatage: expect.any(String) })
+      )
+    );
+  });
+
+  it('restaure une signature déjà enregistrée (fiche rouverte) : le chip de l’agent est actif', async () => {
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'extensive',
+        mode_extensif: 'aerien',
+        signature_pilote_nom: 'Jean Rakoto',
+        signature_pilote_horodatage: '2026-09-01T09:10:00.000Z',
+      } as any,
+      captures: [],
+    });
+
+    await render(<ExtensiveObservationsScreen />);
+
+    const chipPilote = await screen.findByText('Jean Rakoto');
+    expect(chipPilote).toBeVisible();
+    expect(chipPilote.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ color: '#fff' })]));
+    expect(screen.getByText(/^Signé à /)).toBeVisible();
   });
 });
 
