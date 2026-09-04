@@ -305,6 +305,8 @@ const POPULATION_COLUMNS = `
   espece,
   categorie,
   phase,
+  captures_nombre,
+  temps_capture,
   densite_diffuse,
   densite_groupee,
   methode,
