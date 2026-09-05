@@ -54,25 +54,27 @@ beforeEach(() => {
 });
 
 describe('RotationsScreen — numéro de cuve et unité', () => {
-  it('affiche un numéro de cuve non éditable (C1, C2, …), incrémenté à l’ajout d’une rotation', async () => {
+  it('affiche un numéro de cuve non éditable (1, 2, …), incrémenté à l’ajout d’une rotation', async () => {
     await render(<RotationsScreen />);
 
     // Une rotation vide est amorcée automatiquement (fiche neuve, aucune rotation).
-    await screen.findByText('C1');
-    expect(screen.queryByText('C2')).toBeNull();
+    // testID plutôt qu'un texte : "1" collide avec d'autres valeurs affichées (ex.
+    // Nb rotations) dès qu'il n'y a qu'une rotation.
+    expect(await screen.findByTestId('rotation-numero-cuve-0')).toHaveTextContent('1');
+    expect(screen.queryByTestId('rotation-numero-cuve-1')).toBeNull();
 
     fireEvent.press(screen.getByText('+ Ajouter une rotation'));
 
-    expect(await screen.findByText('C2')).toBeVisible();
+    expect(await screen.findByTestId('rotation-numero-cuve-1')).toHaveTextContent('2');
     // Jamais un champ de saisie : ni placeholder, ni testID d'input pour ce champ.
-    expect(screen.queryByPlaceholderText('Ex. C1')).toBeNull();
+    expect(screen.queryByPlaceholderText('Ex. 1')).toBeNull();
   });
 });
 
 describe('RotationsScreen — unité L/kg et cumuls séparés', () => {
   it('cumule les rotations en L et en kg dans deux totaux distincts', async () => {
     await render(<RotationsScreen />);
-    await screen.findByText('C1');
+    await screen.findByTestId('rotation-numero-cuve-0');
 
     fireEvent.changeText(screen.getByTestId('rotation-quantite-input-0'), '10');
     await waitFor(() => expect(screen.getByTestId('rotation-quantite-input-0').props.value).toBe('10'));
@@ -117,7 +119,7 @@ describe('RotationsScreen — durées calculées (jamais saisies)', () => {
     });
 
     await render(<RotationsScreen />);
-    await screen.findByText('C1');
+    await screen.findByTestId('rotation-numero-cuve-0');
 
     expect(await screen.findByText('00:10')).toBeVisible(); // application (06:05 -> 06:15)
     expect(screen.getByText('00:30')).toBeVisible(); // totale (06:00 -> 06:30)
@@ -147,7 +149,7 @@ describe('RotationsScreen — validation des heures de vanne', () => {
     });
 
     await render(<RotationsScreen />);
-    await screen.findByText('C1');
+    await screen.findByTestId('rotation-numero-cuve-0');
 
     fireEvent.press(screen.getByText('Continuer  ›'));
 
@@ -177,7 +179,7 @@ describe('RotationsScreen — validation des heures de vanne', () => {
     });
 
     await render(<RotationsScreen />);
-    await screen.findByText('C1');
+    await screen.findByTestId('rotation-numero-cuve-0');
 
     fireEvent.press(screen.getByText('Continuer  ›'));
 

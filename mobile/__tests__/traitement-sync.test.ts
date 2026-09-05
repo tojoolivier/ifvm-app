@@ -161,7 +161,7 @@ describe('enregistrerEtSynchroniserTraitement', () => {
             id: 'rot-1',
             traitement_aerien_id: 'traitement-1',
             numero: 1,
-            numero_cuve: 'C1',
+            numero_cuve: '1',
             produit_id: 'prod-1',
             quantite: 10,
             unite: 'L',

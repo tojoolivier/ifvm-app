@@ -38,7 +38,11 @@ export function computeTotalPesticideTerrestre(produits: QuantiteLike[]): number
  */
 export interface QuantiteUniteLike {
   quantite?: number | null;
-  unite?: 'L' | 'KG' | null;
+  // 'kg' en minuscule : c'est la valeur exacte du contrat backend
+  // (components['schemas']['UniteQuantite'], cf. api-schema.generated.ts) et de la
+  // contrainte CHECK ck_traitement_rotation_unite ("unite IN ('L','kg')") — un 'KG'
+  // majuscule est rejeté par le serveur en 422 (cf. migration 0047).
+  unite?: 'L' | 'kg' | null;
 }
 
 export function computeTotalPesticideAerienParUnite(
@@ -47,7 +51,7 @@ export function computeTotalPesticideAerienParUnite(
   return rotations.reduce(
     (totaux, r) => {
       const quantite = r.quantite ?? 0;
-      if (r.unite === 'KG') totaux.kg += quantite;
+      if (r.unite === 'kg') totaux.kg += quantite;
       // Défaut L (unite non renseignée) — cohérent avec le défaut serveur.
       else totaux.l += quantite;
       return totaux;
