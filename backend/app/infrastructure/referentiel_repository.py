@@ -4,10 +4,9 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.referentiel import Commune, LieuAerien, PosteAcridien, StationFixe, ZoneAntiAcridien
+from app.domain.referentiel import Commune, PosteAcridien, StationFixe, ZoneAntiAcridien
 from app.domain.repositories import (
     CommuneRepository,
-    LieuAerienRepository,
     PosteAcridienRepository,
     StationFixeRepository,
     ZoneAntiAcridienRepository,
@@ -15,7 +14,6 @@ from app.domain.repositories import (
 from app.infrastructure.referentiel_model import (
     CommuneModel,
     DistrictModel,
-    LieuAerienModel,
     PosteAcridienModel,
     RegionModel,
     StationFixeModel,
@@ -327,73 +325,3 @@ class CommuneRepositoryImpl(CommuneRepository):
             select(CommuneModel.id).where(CommuneModel.id == commune_id)
         )
         return result.scalar_one_or_none() is not None
-
-
-class LieuAerienRepositoryImpl(LieuAerienRepository):
-    def __init__(self, session: AsyncSession):
-        self.session = session
-
-    def _to_domain(self, model: LieuAerienModel) -> LieuAerien:
-        return LieuAerien(
-            id=model.id,
-            type_lieu=model.type_lieu,
-            nom=model.nom,
-            latitude=float(model.latitude),
-            longitude=float(model.longitude),
-            altitude=float(model.altitude) if model.altitude is not None else None,
-            actif=model.actif,
-            created_at=model.created_at,
-            updated_at=model.updated_at,
-        )
-
-    async def list_all(
-        self, type_lieu: str | None = None, actif: bool | None = True
-    ) -> list[LieuAerien]:
-        stmt = select(LieuAerienModel).order_by(LieuAerienModel.nom)
-        # `actif=None` = pas de filtre : l'administration a besoin des deux états.
-        if actif is not None:
-            stmt = stmt.where(LieuAerienModel.actif == actif)
-        if type_lieu is not None:
-            stmt = stmt.where(LieuAerienModel.type_lieu == type_lieu)
-        result = await self.session.execute(stmt)
-        return [self._to_domain(m) for m in result.scalars().all()]
-
-    async def get_by_id(self, lieu_id: uuid.UUID) -> LieuAerien | None:
-        result = await self.session.execute(
-            select(LieuAerienModel).where(LieuAerienModel.id == lieu_id)
-        )
-        model = result.scalar_one_or_none()
-        return None if model is None else self._to_domain(model)
-
-    async def create(self, lieu: LieuAerien) -> LieuAerien:
-        model = LieuAerienModel(
-            id=lieu.id,
-            type_lieu=lieu.type_lieu,
-            nom=lieu.nom,
-            latitude=lieu.latitude,
-            longitude=lieu.longitude,
-            altitude=lieu.altitude,
-            actif=lieu.actif,
-            created_at=lieu.created_at,
-            updated_at=lieu.updated_at,
-        )
-        self.session.add(model)
-        await self.session.commit()
-        await self.session.refresh(model)
-        return self._to_domain(model)
-
-    async def update(self, lieu: LieuAerien) -> LieuAerien:
-        result = await self.session.execute(
-            select(LieuAerienModel).where(LieuAerienModel.id == lieu.id)
-        )
-        model = result.scalar_one()
-        model.type_lieu = lieu.type_lieu
-        model.nom = lieu.nom
-        model.latitude = lieu.latitude
-        model.longitude = lieu.longitude
-        model.altitude = lieu.altitude
-        model.actif = lieu.actif
-        model.updated_at = lieu.updated_at
-        await self.session.commit()
-        await self.session.refresh(model)
-        return self._to_domain(model)
