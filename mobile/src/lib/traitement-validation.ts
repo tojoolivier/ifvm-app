@@ -251,10 +251,10 @@ export interface SignatureRequirement {
 }
 
 export interface AerienSignatureFields {
-  pilote?: string | null;
-  mecanicien?: string | null;
+  pilote_id?: string | null;
+  mecanicien_id?: string | null;
   chef_de_base_id?: string | null;
-  consultant_international?: string | null;
+  consultant_id?: string | null;
 }
 
 export interface TerrestreSignatureFields {
@@ -279,10 +279,10 @@ export function computeSignatureMatrix(
   const matrice: [SignatureRole, keyof (AerienSignatureFields & TerrestreSignatureFields)][] =
     typeTraitement === 'AERIEN'
       ? [
-          ['PILOTE', 'pilote'],
-          ['MECANICIEN', 'mecanicien'],
+          ['PILOTE', 'pilote_id'],
+          ['MECANICIEN', 'mecanicien_id'],
           ['CHEF_DE_BASE', 'chef_de_base_id'],
-          ['CONSULTANT_INTERNATIONAL', 'consultant_international'],
+          ['CONSULTANT_INTERNATIONAL', 'consultant_id'],
         ]
       : [
           ['CHEF_EQUIPE', 'chef_equipe_id'],

@@ -5,6 +5,7 @@ import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import { computeNbRotations, computeTotalPesticideAerien, deriveNomCommercial } from '@/lib/traitement-validation';
 import { Card } from '@/components/traitement/Card';
 import { Chip } from '@/components/traitement/Chip';
+import { UtilisateurSelectField } from '@/components/traitement/UtilisateurSelectField';
 import { ProduitSelectField } from '@/components/traitement/ProduitSelectField';
 import { TimeField } from '@/components/traitement/TimeField';
 import { formStyles as styles } from '@/components/traitement/TraitementFormStyles';
@@ -12,6 +13,12 @@ import { formStyles as styles } from '@/components/traitement/TraitementFormStyl
 export interface AerienFormProps {
   readOnly: boolean;
   chefsDeBase: UtilisateurEquipe[];
+  pilotes: UtilisateurEquipe[];
+  mecaniciens: UtilisateurEquipe[];
+  consultants: UtilisateurEquipe[];
+  onPilotesChange: (utilisateurs: UtilisateurEquipe[]) => void;
+  onMecaniciensChange: (utilisateurs: UtilisateurEquipe[]) => void;
+  onConsultantsChange: (utilisateurs: UtilisateurEquipe[]) => void;
   pesticides: Pesticide[];
   surfaceRestante: number | null;
   pesticideStockRestant: number | null;
@@ -22,6 +29,12 @@ export interface AerienFormProps {
 export function AerienForm({
   readOnly,
   chefsDeBase,
+  pilotes,
+  mecaniciens,
+  consultants,
+  onPilotesChange,
+  onMecaniciensChange,
+  onConsultantsChange,
   pesticides,
   surfaceRestante,
   pesticideStockRestant,
@@ -34,20 +47,22 @@ export function AerienForm({
   return (
     <Fragment>
       <Text style={styles.label}>Pilote *</Text>
-      <TextInput
-        editable={!readOnly}
-        style={styles.input}
-        placeholder="Nom du pilote"
-        value={store.aerien.pilote ?? ''}
-        onChangeText={(v) => store.updateAerien({ pilote: v })}
+      <UtilisateurSelectField
+        utilisateurs={pilotes}
+        selectedId={store.aerien.piloteId}
+        onSelect={(piloteId) => store.updateAerien({ piloteId })}
+        onUtilisateursChange={onPilotesChange}
+        role="pilote"
+        readOnly={readOnly}
       />
       <Text style={styles.label}>Mécanicien *</Text>
-      <TextInput
-        editable={!readOnly}
-        style={styles.input}
-        placeholder="Nom du mécanicien"
-        value={store.aerien.mecanicien ?? ''}
-        onChangeText={(v) => store.updateAerien({ mecanicien: v })}
+      <UtilisateurSelectField
+        utilisateurs={mecaniciens}
+        selectedId={store.aerien.mecanicienId}
+        onSelect={(mecanicienId) => store.updateAerien({ mecanicienId })}
+        onUtilisateursChange={onMecaniciensChange}
+        role="mecanicien"
+        readOnly={readOnly}
       />
       <Text style={styles.label}>Chef de base*</Text>
       <View style={styles.chipRow}>
@@ -61,12 +76,14 @@ export function AerienForm({
         ))}
       </View>
       <Text style={styles.label}>Consultant international</Text>
-      <TextInput
-        editable={!readOnly}
-        style={styles.input}
-        placeholder="Nom du consultant (facultatif)"
-        value={store.aerien.consultantInternational ?? ''}
-        onChangeText={(v) => store.updateAerien({ consultantInternational: v })}
+      <UtilisateurSelectField
+        utilisateurs={consultants}
+        selectedId={store.aerien.consultantId}
+        onSelect={(consultantId) => store.updateAerien({ consultantId })}
+        onUtilisateursChange={onConsultantsChange}
+        role="consultant_international"
+        facultatif
+        readOnly={readOnly}
       />
       <Text style={styles.label}>Immatriculation aéronef</Text>
       <TextInput

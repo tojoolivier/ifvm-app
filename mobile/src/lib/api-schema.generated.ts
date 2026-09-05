@@ -73,6 +73,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/users/a-la-volee": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create User A La Volee
+         * @description Création d'identité seule (pilote/mécanicien/consultant) depuis le
+         *     formulaire de traitement aérien : compte non-authentifiable
+         *     (`peut_se_connecter=False`), email/mot de passe générés et inexploitables.
+         *     Chef de base explicitement exclu : il doit préexister (issue #319).
+         *
+         *     Volontairement ouvert à tout utilisateur authentifié (pas `require_admin`
+         *     comme `POST /` ci-dessus) : l'appelant est le personnel de terrain qui
+         *     remplit la fiche de traitement, pas un admin. Le compte créé ne peut de
+         *     toute façon ni se logger ni obtenir de droits au-delà de son rôle.
+         */
+        post: operations["create_user_a_la_volee_users_a_la_volee_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users/{user_id}": {
         parameters: {
             query?: never;
@@ -298,6 +326,42 @@ export interface paths {
         get: operations["get_culture_cultures__culture_id__get"];
         /** Update Culture */
         put: operations["update_culture_cultures__culture_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/lieux-aeriens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Lieux Aeriens */
+        get: operations["list_lieux_aeriens_lieux_aeriens_get"];
+        put?: never;
+        /** Create Lieu Aerien */
+        post: operations["create_lieu_aerien_lieux_aeriens_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/lieux-aeriens/{lieu_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Lieu Aerien */
+        get: operations["get_lieu_aerien_lieux_aeriens__lieu_id__get"];
+        /** Update Lieu Aerien */
+        put: operations["update_lieu_aerien_lieux_aeriens__lieu_id__put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1498,6 +1562,73 @@ export interface components {
             /** Densite Moy Arriere Front */
             densite_moy_arriere_front?: number | null;
         };
+        /** LieuAerienCreate */
+        LieuAerienCreate: {
+            /**
+             * Type Lieu
+             * @enum {string}
+             */
+            type_lieu: "principale" | "secondaire" | "stand";
+            /** Nom */
+            nom: string;
+            /** Latitude */
+            latitude: number;
+            /** Longitude */
+            longitude: number;
+            /** Altitude */
+            altitude?: number | null;
+        };
+        /** LieuAerienRead */
+        LieuAerienRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Type Lieu
+             * @enum {string}
+             */
+            type_lieu: "principale" | "secondaire" | "stand";
+            /** Nom */
+            nom: string;
+            /** Latitude */
+            latitude: number;
+            /** Longitude */
+            longitude: number;
+            /** Altitude */
+            altitude: number | null;
+            /** Actif */
+            actif: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * LieuAerienUpdate
+         * @description Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie.
+         */
+        LieuAerienUpdate: {
+            /** Type Lieu */
+            type_lieu?: ("principale" | "secondaire" | "stand") | null;
+            /** Nom */
+            nom?: string | null;
+            /** Latitude */
+            latitude?: number | null;
+            /** Longitude */
+            longitude?: number | null;
+            /** Altitude */
+            altitude?: number | null;
+            /** Actif */
+            actif?: boolean | null;
+        };
         /** LoginRequest */
         LoginRequest: {
             /** Email */
@@ -2019,10 +2150,8 @@ export interface components {
             mecanicien?: string | null;
             /** Chef De Base */
             chef_de_base?: string | null;
-            /** Base */
-            base?: string | null;
-            /** Base Secondaire */
-            base_secondaire?: string | null;
+            /** Lieu Base Id */
+            lieu_base_id?: string | null;
             /** Pesticides Embarques */
             pesticides_embarques?: boolean | null;
             /** Pesticide Nom Commercial */
@@ -2208,10 +2337,8 @@ export interface components {
             mecanicien?: string | null;
             /** Chef De Base */
             chef_de_base?: string | null;
-            /** Base */
-            base?: string | null;
-            /** Base Secondaire */
-            base_secondaire?: string | null;
+            /** Lieu Base Id */
+            lieu_base_id?: string | null;
             /** Pesticides Embarques */
             pesticides_embarques?: boolean | null;
             /** Pesticide Nom Commercial */
@@ -2356,10 +2483,8 @@ export interface components {
             mecanicien?: string | null;
             /** Chef De Base */
             chef_de_base?: string | null;
-            /** Base */
-            base?: string | null;
-            /** Base Secondaire */
-            base_secondaire?: string | null;
+            /** Lieu Base Id */
+            lieu_base_id?: string | null;
             /** Pesticides Embarques */
             pesticides_embarques?: boolean | null;
             /** Pesticide Nom Commercial */
@@ -2421,15 +2546,16 @@ export interface components {
         RoleSignature: "PILOTE" | "MECANICIEN" | "CHEF_DE_BASE" | "CHEF_EQUIPE" | "CONSULTANT_INTERNATIONAL";
         /** RotationCreate */
         RotationCreate: {
-            /** Numero Cuve */
-            numero_cuve: string;
             /**
              * Produit Id
              * Format: uuid
              */
             produit_id: string;
-            /** Quantite L */
-            quantite_l: number;
+            /** Quantite */
+            quantite: number;
+            unite: components["schemas"]["UniteQuantite"];
+            /** Surface Ha */
+            surface_ha: number;
             /** Temperature Debut C */
             temperature_debut_c: number;
             /** Temperature Fin C */
@@ -2448,6 +2574,16 @@ export interface components {
              * Format: time
              */
             heure_fin: string;
+            /**
+             * Heure Ouverture Vanne
+             * Format: time
+             */
+            heure_ouverture_vanne: string;
+            /**
+             * Heure Fermeture Vanne
+             * Format: time
+             */
+            heure_fermeture_vanne: string;
             /** Nom Commercial */
             nom_commercial?: string | null;
         };
@@ -2467,8 +2603,11 @@ export interface components {
              * Format: uuid
              */
             produit_id: string;
-            /** Quantite L */
-            quantite_l: number;
+            /** Quantite */
+            quantite: number;
+            unite: components["schemas"]["UniteQuantite"];
+            /** Surface Ha */
+            surface_ha: number;
             /** Temperature Debut C */
             temperature_debut_c: number;
             /** Temperature Fin C */
@@ -2487,6 +2626,16 @@ export interface components {
              * Format: time
              */
             heure_fin: string;
+            /**
+             * Heure Ouverture Vanne
+             * Format: time
+             */
+            heure_ouverture_vanne: string;
+            /**
+             * Heure Fermeture Vanne
+             * Format: time
+             */
+            heure_fermeture_vanne: string;
             /** Nom Commercial */
             nom_commercial?: string | null;
         };
@@ -2725,45 +2874,75 @@ export interface components {
         };
         /** TraitementAerienCreate */
         TraitementAerienCreate: {
-            /** Pilote */
-            pilote: string;
-            /** Mecanicien */
-            mecanicien: string;
+            /**
+             * Pilote Id
+             * Format: uuid
+             */
+            pilote_id: string;
+            /**
+             * Mecanicien Id
+             * Format: uuid
+             */
+            mecanicien_id: string;
             /**
              * Chef De Base Id
              * Format: uuid
              */
             chef_de_base_id: string;
-            /** Consultant International */
-            consultant_international?: string | null;
+            /** Consultant Id */
+            consultant_id?: string | null;
+            /**
+             * Lieu Base Principale Id
+             * Format: uuid
+             */
+            lieu_base_principale_id: string;
+            /** Lieu Stand Id */
+            lieu_stand_id?: string | null;
+            /** Lieu Base Secondaire Id */
+            lieu_base_secondaire_id?: string | null;
             /** Immatricule Aeronef */
-            immatricule_aeronef?: string | null;
-            /** Surface Traitee Ha */
-            surface_traitee_ha?: number | null;
+            immatricule_aeronef: string;
             /** Pesticide Recu L */
             pesticide_recu_l?: number | null;
         };
         /** TraitementAerienRead */
         TraitementAerienRead: {
-            /** Pilote */
-            pilote: string;
-            /** Mecanicien */
-            mecanicien: string;
+            /**
+             * Pilote Id
+             * Format: uuid
+             */
+            pilote_id: string;
+            /**
+             * Mecanicien Id
+             * Format: uuid
+             */
+            mecanicien_id: string;
             /**
              * Chef De Base Id
              * Format: uuid
              */
             chef_de_base_id: string;
-            /** Consultant International */
-            consultant_international: string | null;
+            /** Consultant Id */
+            consultant_id: string | null;
+            /**
+             * Lieu Base Principale Id
+             * Format: uuid
+             */
+            lieu_base_principale_id: string;
+            /** Lieu Stand Id */
+            lieu_stand_id: string | null;
+            /** Lieu Base Secondaire Id */
+            lieu_base_secondaire_id: string | null;
             /** Immatricule Aeronef */
-            immatricule_aeronef: string | null;
+            immatricule_aeronef: string;
             /** Nb Rotations */
             nb_rotations: number;
             /** Total Pesticide L */
-            total_pesticide_l: number | null;
+            total_pesticide_l: number;
+            /** Total Pesticide Kg */
+            total_pesticide_kg: number;
             /** Surface Traitee Ha */
-            surface_traitee_ha: number | null;
+            surface_traitee_ha: number;
             /** Surface Restante Ha */
             surface_restante_ha: number | null;
             /** Pesticide Recu L */
@@ -3262,6 +3441,11 @@ export interface components {
          * @enum {string}
          */
         TypeTraitement: "AERIEN" | "TERRESTRE";
+        /**
+         * UniteQuantite
+         * @enum {string}
+         */
+        UniteQuantite: "L" | "kg";
         /** UtilisateurCreate */
         UtilisateurCreate: {
             /** Nom */
@@ -3272,6 +3456,19 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+            /** Role */
+            role: string;
+        };
+        /**
+         * UtilisateurCreateALaVolee
+         * @description Création à la volée depuis le formulaire de traitement : identité seule,
+         *     pas d'email/mot de passe — voir `ROLES_A_LA_VOLEE`.
+         */
+        UtilisateurCreateALaVolee: {
+            /** Nom */
+            nom: string;
+            /** Prenom */
+            prenom: string;
             /** Role */
             role: string;
         };
@@ -3320,6 +3517,8 @@ export interface components {
             role: string;
             /** Actif */
             actif: boolean;
+            /** Peut Se Connecter */
+            peut_se_connecter: boolean;
             /**
              * Created At
              * Format: date-time
@@ -3587,6 +3786,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["UtilisateurCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UtilisateurRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_user_a_la_volee_users_a_la_volee_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UtilisateurCreateALaVolee"];
             };
         };
         responses: {
@@ -4349,6 +4581,138 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CultureRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_lieux_aeriens_lieux_aeriens_get: {
+        parameters: {
+            query?: {
+                type_lieu?: string | null;
+                /** @description Renvoie les lieux des deux états — écran d'administration. */
+                inclure_inactifs?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LieuAerienRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_lieu_aerien_lieux_aeriens_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LieuAerienCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LieuAerienRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_lieu_aerien_lieux_aeriens__lieu_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lieu_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LieuAerienRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_lieu_aerien_lieux_aeriens__lieu_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lieu_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LieuAerienUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LieuAerienRead"];
                 };
             };
             /** @description Validation Error */

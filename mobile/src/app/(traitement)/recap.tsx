@@ -90,10 +90,10 @@ export default function RecapScreen() {
   const signatureMatrix: (ReturnType<typeof computeSignatureMatrix>[number] & { signe: boolean })[] =
     draft.type_traitement === 'AERIEN'
       ? computeSignatureMatrix('AERIEN', {
-          pilote: draft.aerien?.pilote,
-          mecanicien: draft.aerien?.mecanicien,
+          pilote_id: draft.aerien?.pilote_id,
+          mecanicien_id: draft.aerien?.mecanicien_id,
           chef_de_base_id: draft.aerien?.chef_de_base_id,
-          consultant_international: draft.aerien?.consultant_international,
+          consultant_id: draft.aerien?.consultant_id,
         }).map((r) => ({ ...r, signe: !!store.signed[r.role as SignatureRole] }))
       : computeSignatureMatrix('TERRESTRE', {
           chef_equipe_id: draft.terrestre?.chef_equipe_id,

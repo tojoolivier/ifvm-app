@@ -38,8 +38,8 @@ jest.mock('../src/lib/prospection-db', () => ({
 const AERIEN_INPUT = {
   id: '11111111-1111-1111-1111-111111111111',
   prospectionId: '22222222-2222-2222-2222-222222222222',
-  pilote: 'Jean Dupont',
-  mecanicien: 'Marc Rakoto',
+  piloteId: 'pilote-1',
+  mecanicienId: 'mecanicien-1',
   chefDeBaseId: '33333333-3333-3333-3333-333333333333',
 };
 
@@ -102,10 +102,10 @@ describe('createDraftTraitementAerien', () => {
       .mockResolvedValueOnce(null) // cible row
       .mockResolvedValueOnce({
         traitement_id: AERIEN_INPUT.id,
-        pilote: AERIEN_INPUT.pilote,
-        mecanicien: AERIEN_INPUT.mecanicien,
+        pilote_id: AERIEN_INPUT.piloteId,
+        mecanicien_id: AERIEN_INPUT.mecanicienId,
         chef_de_base_id: AERIEN_INPUT.chefDeBaseId,
-        consultant_international: null,
+        consultant_id: null,
         nb_rotations: null,
         total_pesticide_l: null,
       }); // aerien row
@@ -119,10 +119,10 @@ describe('createDraftTraitementAerien', () => {
     );
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO traitement_aerien'),
-      expect.arrayContaining([AERIEN_INPUT.id, AERIEN_INPUT.pilote, AERIEN_INPUT.mecanicien, AERIEN_INPUT.chefDeBaseId])
+      expect.arrayContaining([AERIEN_INPUT.id, AERIEN_INPUT.piloteId, AERIEN_INPUT.mecanicienId, AERIEN_INPUT.chefDeBaseId])
     );
     expect(result.type_traitement).toBe('AERIEN');
-    expect(result.aerien?.pilote).toBe(AERIEN_INPUT.pilote);
+    expect(result.aerien?.pilote_id).toBe(AERIEN_INPUT.piloteId);
   });
 });
 
@@ -177,15 +177,15 @@ describe('updateTraitementAerien', () => {
     getFirstAsync.mockResolvedValueOnce(STORED_TRAITEMENT_ROW).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
 
     await updateTraitementAerien(AERIEN_INPUT.id, {
-      pilote: 'Jean Dupont',
-      mecanicien: 'Marc Rakoto',
+      piloteId: 'pilote-1',
+      mecanicienId: 'mecanicien-1',
       chefDeBaseId: AERIEN_INPUT.chefDeBaseId,
-      consultantInternational: null,
+      consultantId: null,
     });
 
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE traitement_aerien SET'),
-      expect.arrayContaining(['Jean Dupont', 'Marc Rakoto', AERIEN_INPUT.chefDeBaseId])
+      expect.arrayContaining(['pilote-1', 'mecanicien-1', AERIEN_INPUT.chefDeBaseId])
     );
   });
 });
@@ -539,10 +539,10 @@ describe('getTraitement', () => {
       .mockResolvedValueOnce(null) // cible
       .mockResolvedValueOnce({
         traitement_id: AERIEN_INPUT.id,
-        pilote: 'Jean',
-        mecanicien: 'Marc',
+        pilote_id: 'pilote-1',
+        mecanicien_id: 'mecanicien-1',
         chef_de_base_id: 'chef-1',
-        consultant_international: null,
+        consultant_id: null,
         nb_rotations: 2,
         total_pesticide_l: 40,
       });
@@ -552,7 +552,7 @@ describe('getTraitement', () => {
 
     const result = await getTraitement(AERIEN_INPUT.id);
 
-    expect(result?.aerien?.pilote).toBe('Jean');
+    expect(result?.aerien?.pilote_id).toBe('pilote-1');
     expect(result?.aerien?.rotations).toHaveLength(1);
     expect(result?.terrestre).toBeUndefined();
   });

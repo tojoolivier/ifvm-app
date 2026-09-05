@@ -99,14 +99,14 @@ function buildTraitementSyncPayload(draft: DraftTraitement): components['schemas
     return {
       ...common,
       aerien: {
-        pilote: draft.aerien.pilote,
-        mecanicien: draft.aerien.mecanicien,
+        pilote_id: draft.aerien.pilote_id,
+        mecanicien_id: draft.aerien.mecanicien_id,
         chef_de_base_id: draft.aerien.chef_de_base_id,
-        consultant_international: draft.aerien.consultant_international,
-        immatricule_aeronef: draft.aerien.immatricule_aeronef,
+        consultant_id: draft.aerien.consultant_id,
+        immatricule_aeronef: draft.aerien.immatricule_aeronef ?? '',
         surface_traitee_ha: draft.aerien.surface_traitee_ha,
         pesticide_recu_l: draft.aerien.pesticide_recu_l,
-      },
+      } as unknown as components['schemas']['TraitementAerienCreate'],
     };
   }
 
@@ -150,15 +150,18 @@ async function pushRotationsEtProduits(draft: DraftTraitement, token: string): P
   if (draft.type_traitement === 'AERIEN' && draft.aerien) {
     for (const rotation of draft.aerien.rotations) {
       await apiClient.addRotation(token, draft.id, {
-        numero_cuve: rotation.numero_cuve ?? '',
         produit_id: rotation.produit_id ?? '',
-        quantite_l: rotation.quantite_l ?? 0,
+        quantite: rotation.quantite_l ?? 0,
+        unite: 'L',
+        surface_ha: 0,
         temperature_debut_c: rotation.temperature_debut_c ?? 0,
         temperature_fin_c: rotation.temperature_fin_c ?? 0,
         vent_debut_ms: rotation.vent_debut_ms ?? 0,
         vent_fin_ms: rotation.vent_fin_ms ?? 0,
         heure_debut: rotation.heure_debut ?? '00:00',
         heure_fin: rotation.heure_fin ?? '00:01',
+        heure_ouverture_vanne: rotation.heure_debut ?? '00:00',
+        heure_fermeture_vanne: rotation.heure_fin ?? '00:01',
         nom_commercial: rotation.nom_commercial ?? null,
       });
     }
