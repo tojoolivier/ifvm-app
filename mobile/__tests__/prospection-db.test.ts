@@ -128,6 +128,11 @@ const MIGRATED_COLUMNS = [
   { name: 'immatricule_aeronef' },
   { name: 'surface_traitee_ha' },
   { name: 'surface_restante_ha' },
+  // pilote/mecanicien/consultant_international (texte libre) -> FK utilisateur
+  // (migration backend 0047, cf. prospection-db.ts COLONNES_TRAITEMENT_AERIEN).
+  { name: 'pilote_id' },
+  { name: 'mecanicien_id' },
+  { name: 'consultant_id' },
 
   // Colonnes de traitement_aerien et traitement_terrestre (partagées)
   { name: 'pesticide_recu_l' },
