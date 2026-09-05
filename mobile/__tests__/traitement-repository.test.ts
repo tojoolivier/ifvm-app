@@ -377,13 +377,18 @@ describe('genererNumeroFicheDisponible', () => {
 
 describe('rotations (aerien)', () => {
   it('adds a rotation scoped to a traitement_aerien_id', async () => {
+    // numero_cuve n'est plus écrit par le mobile (migration 0046) : dérivé côté
+    // serveur, la colonne locale reste NULL tant que la fiche n'a pas encore
+    // synchronisé cette rotation.
     getFirstAsync.mockResolvedValueOnce({
       id: 'rot-1',
       traitement_aerien_id: AERIEN_INPUT.id,
       numero: null,
-      numero_cuve: 'C1',
+      numero_cuve: null,
       produit_id: 'prod-1',
-      quantite_l: 12.5,
+      quantite: 12.5,
+      unite: 'L',
+      surface_ha: 3.5,
       temperature_debut_c: 20,
       temperature_fin_c: 25,
       vent_debut_ms: 1.2,
@@ -391,9 +396,10 @@ describe('rotations (aerien)', () => {
     });
 
     const rotation = await addRotation(AERIEN_INPUT.id, {
-      numero_cuve: 'C1',
       produit_id: 'prod-1',
-      quantite_l: 12.5,
+      quantite: 12.5,
+      unite: 'L',
+      surface_ha: 3.5,
       temperature_debut_c: 20,
       temperature_fin_c: 25,
       vent_debut_ms: 1.2,
@@ -402,9 +408,9 @@ describe('rotations (aerien)', () => {
 
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO rotation'),
-      expect.arrayContaining([AERIEN_INPUT.id, 'C1', 'prod-1', 12.5])
+      expect.arrayContaining([AERIEN_INPUT.id, 'prod-1', 12.5, 'L', 3.5])
     );
-    expect(rotation.numero_cuve).toBe('C1');
+    expect(rotation.quantite).toBe(12.5);
   });
 
   it('updates an existing rotation by id', async () => {
@@ -412,9 +418,11 @@ describe('rotations (aerien)', () => {
       id: 'rot-1',
       traitement_aerien_id: AERIEN_INPUT.id,
       numero: null,
-      numero_cuve: 'C2',
+      numero_cuve: null,
       produit_id: 'prod-1',
-      quantite_l: 15,
+      quantite: 15,
+      unite: 'KG',
+      surface_ha: 4.0,
       temperature_debut_c: 21,
       temperature_fin_c: 26,
       vent_debut_ms: 1.1,
@@ -422,9 +430,10 @@ describe('rotations (aerien)', () => {
     });
 
     await updateRotation('rot-1', {
-      numero_cuve: 'C2',
       produit_id: 'prod-1',
-      quantite_l: 15,
+      quantite: 15,
+      unite: 'KG',
+      surface_ha: 4.0,
       temperature_debut_c: 21,
       temperature_fin_c: 26,
       vent_debut_ms: 1.1,
@@ -433,7 +442,7 @@ describe('rotations (aerien)', () => {
 
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE rotation SET'),
-      expect.arrayContaining(['C2', 'prod-1', 15, 'rot-1'])
+      expect.arrayContaining(['prod-1', 15, 'KG', 4.0, 'rot-1'])
     );
   });
 
@@ -547,7 +556,22 @@ describe('getTraitement', () => {
         total_pesticide_l: 40,
       });
     getAllAsync.mockResolvedValueOnce([
-      { id: 'rot-1', traitement_aerien_id: AERIEN_INPUT.id, numero: 1, numero_cuve: 'C1', produit_id: 'prod-1', quantite_l: 20, temperature_debut_c: null, temperature_fin_c: null, vent_debut_ms: null, vent_fin_ms: null },
+      {
+        id: 'rot-1',
+        traitement_aerien_id: AERIEN_INPUT.id,
+        numero: 1,
+        numero_cuve: 'C1',
+        produit_id: 'prod-1',
+        quantite: 20,
+        unite: 'L',
+        surface_ha: 5,
+        temperature_debut_c: null,
+        temperature_fin_c: null,
+        vent_debut_ms: null,
+        vent_fin_ms: null,
+        heure_ouverture_vanne: null,
+        heure_fermeture_vanne: null,
+      },
     ]);
 
     const result = await getTraitement(AERIEN_INPUT.id);

@@ -23,7 +23,7 @@ import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { logger } from '@/lib/logger';
 import { Card } from '@/components/traitement/Card';
 import { DateField } from '@/components/traitement/DateField';
-import { ProgressBar } from '@/components/traitement/ProgressBar';
+import { ProgressBar, PROGRESS_SEGMENTS_AERIEN, PROGRESS_SEGMENTS_TERRESTRE } from '@/components/traitement/ProgressBar';
 import { SegmentedControl } from '@/components/traitement/SegmentedControl';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
 
@@ -287,7 +287,10 @@ export default function ReferencesScreen() {
             </TouchableOpacity>
             <Text style={styles.title}>Type &amp; références</Text>
           </View>
-          <ProgressBar currentIndex={0} />
+          <ProgressBar
+            currentIndex={0}
+            segments={typeTraitement === 'TERRESTRE' ? PROGRESS_SEGMENTS_TERRESTRE : PROGRESS_SEGMENTS_AERIEN}
+          />
 
           <View style={styles.field}>
             <Text style={styles.label}>Type de traitement *</Text>

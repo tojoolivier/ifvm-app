@@ -240,7 +240,7 @@ async def test_creation_genere_numero_fiche_et_snapshot():
 
 
 @pytest.mark.asyncio
-async def test_creation_aerien_transmet_immatriculation_surface_et_stock_pesticide():
+async def test_creation_aerien_transmet_immatriculation_et_stock_pesticide():
     prospection = _prospection(
         surface_infestee=100.0,
         populations=[ProspectionPopulation(espece="LMC", categorie="imago")],
@@ -346,6 +346,20 @@ def test_recalculer_totaux_trois_rotations():
     assert aerien.total_pesticide_l == 33.75
 
 
+def test_recalculer_totaux_cumuls_separes_par_unite():
+    """Migration 0047 : une rotation dosée au litre (ULV) et une au kg (poudre) ne
+    s'additionnent jamais dans le même total."""
+    aerien = TraitementAerien()
+    aerien.rotations = [
+        _rotation(numero=1, quantite=10.0, unite="L"),
+        _rotation(numero=2, quantite=15.5, unite="L"),
+        _rotation(numero=3, quantite=4.0, unite="kg"),
+    ]
+    aerien.recalculer_totaux()
+    assert aerien.total_pesticide_l == 25.5
+    assert aerien.total_pesticide_kg == 4.0
+
+
 def test_recalculer_totaux_apres_suppression():
     aerien = TraitementAerien()
     r1, r2 = _rotation(numero=1, quantite=10.0), _rotation(numero=2, quantite=5.0)
@@ -368,14 +382,27 @@ def test_recalculer_totaux_derniere_suppression_repasse_a_none():
     assert aerien.total_pesticide_l == 0.0
 
 
-def test_recalculer_surfaces_aerien_saisie_directe_pas_de_somme_equipement():
-    """Pas d'équivalent aérien aux 3 surfaces par équipement du Terrestre :
-    surface_traitee_ha est une saisie directe, recalculer_surfaces ne calcule que
-    le reste."""
-    aerien = TraitementAerien(surface_traitee_ha=30.0)
+def test_recalculer_totaux_surface_traitee_somme_des_rotations():
+    """Migration 0046 : pas d'équivalent aérien aux 3 surfaces par équipement du
+    Terrestre, mais surface_traitee_ha n'est plus une saisie directe — recalculer_totaux()
+    la dérive de la somme des `surface_ha` de chaque rotation."""
+    aerien = TraitementAerien()
+    aerien.rotations = [
+        _rotation(numero=1, surface_ha=12.0),
+        _rotation(numero=2, surface_ha=8.5),
+    ]
+    aerien.recalculer_totaux()
+    assert aerien.surface_traitee_ha == 20.5
     aerien.recalculer_surfaces(surface_infestee_ha=100.0)
-    assert aerien.surface_traitee_ha == 30.0
-    assert aerien.surface_restante_ha == 70.0
+    assert aerien.surface_restante_ha == 79.5
+
+
+def test_recalculer_totaux_sans_rotation_surface_traitee_zero():
+    """Migration 0047 : surface_traitee_ha n'est plus nullable — sans rotation,
+    recalculer_totaux() la remet à 0.0, jamais à None."""
+    aerien = TraitementAerien()
+    aerien.recalculer_totaux()
+    assert aerien.surface_traitee_ha == 0.0
 
 
 def test_recalculer_surfaces_aerien_restante_plancher_zero_cdg_9():
@@ -505,6 +532,8 @@ def _traitement_aerien(rotations: list[Rotation] | None = None) -> Traitement:
 
 
 def _rotation_args(**overrides):
+    # numero_cuve n'y figure pas : dérivé côté serveur (migration 0047), plus un
+    # paramètre d'AddRotation/UpdateRotation.
     args = dict(
         produit_id=uuid.uuid4(),
         quantite=10.0,
@@ -550,6 +579,20 @@ async def test_add_rotation_numero_auto_incremente():
 
 
 @pytest.mark.asyncio
+async def test_add_rotation_numero_cuve_derive_jamais_saisi():
+    """Migration 0047 : numero_cuve n'est plus un paramètre d'AddRotation — il est
+    toujours dérivé de numero (str(numero)), quoi que le client ait pu envoyer."""
+    traitement = _traitement_aerien()
+    repo = FakeTraitementRepoRotations(traitement)
+    use_case = AddRotation(repo)
+
+    await use_case.execute(traitement_id=traitement.id, **_rotation_args())
+    await use_case.execute(traitement_id=traitement.id, **_rotation_args())
+
+    assert [r.numero_cuve for r in traitement.aerien.rotations] == ["1", "2"]
+
+
+@pytest.mark.asyncio
 async def test_add_rotation_traitement_introuvable():
     repo = FakeTraitementRepoRotations(None)
     use_case = AddRotation(repo)
@@ -575,6 +618,18 @@ async def test_add_rotation_rejette_heure_fin_anterieure_ou_egale():
         await use_case.execute(
             traitement_id=traitement.id,
             **_rotation_args(heure_debut=time(9, 0), heure_fin=time(9, 0)),
+        )
+
+
+@pytest.mark.asyncio
+async def test_add_rotation_rejette_heure_fermeture_vanne_anterieure_ou_egale():
+    traitement = _traitement_aerien()
+    repo = FakeTraitementRepoRotations(traitement)
+    use_case = AddRotation(repo)
+    with pytest.raises(ValueError):
+        await use_case.execute(
+            traitement_id=traitement.id,
+            **_rotation_args(heure_ouverture_vanne=time(9, 10), heure_fermeture_vanne=time(9, 10)),
         )
 
 

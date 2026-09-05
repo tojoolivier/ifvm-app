@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getTraitement, Cible } from '@/lib/traitement-repository';
 import { Card } from '@/components/traitement/Card';
-import { ProgressBar } from '@/components/traitement/ProgressBar';
+import { ProgressBar, PROGRESS_SEGMENTS_AERIEN, PROGRESS_SEGMENTS_TERRESTRE } from '@/components/traitement/ProgressBar';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
@@ -36,19 +36,28 @@ export default function CiblesScreen() {
   const { traitementId, isValidationView, origineId } =
     useLocalSearchParams<{ traitementId: string; isValidationView?: string; origineId?: string }>();
   const [cible, setCible] = useState<Cible | null>(null);
+  // Type de traitement de la fiche — décide du nombre d'étapes de ProgressBar (7 en
+  // aérien avec l'écran Rotations, 6 en terrestre sans lui).
+  const [typeTraitement, setTypeTraitement] = useState<'AERIEN' | 'TERRESTRE' | null>(null);
   const signalerChargement = useSignalerChargement('cibles');
 
   useEffect(() => {
     if (!traitementId) return;
     void getTraitement(traitementId)
-      .then((draft) => setCible(draft?.cible ?? null))
+      .then((draft) => {
+        setCible(draft?.cible ?? null);
+        setTypeTraitement(draft?.type_traitement ?? null);
+      })
       .catch((error) => signalerChargement(error, { traitementId }));
   }, [traitementId, signalerChargement]);
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <ProgressBar currentIndex={1} />
+        <ProgressBar
+          currentIndex={1}
+          segments={typeTraitement === 'TERRESTRE' ? PROGRESS_SEGMENTS_TERRESTRE : PROGRESS_SEGMENTS_AERIEN}
+        />
         <Text style={styles.title}>Cibles</Text>
 
         <Card variant="avertissement">

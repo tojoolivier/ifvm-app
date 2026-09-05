@@ -225,6 +225,74 @@ async def test_add_rotation_incremente_totaux(
     # #produit-nom-commercial : dérivé côté client (texte avant le premier
     # chiffre du nom du pesticide), le backend le persiste tel quel.
     assert body["aerien"]["rotations"][0]["nom_commercial"] == "Fyfanon"
+    # surface_traitee_ha n'est plus une saisie directe (migration 0046) : dérivée de la
+    # somme des surface_ha des rotations.
+    assert body["aerien"]["surface_traitee_ha"] == 5.0
+
+
+@pytest.mark.asyncio
+async def test_add_rotation_numero_cuve_toujours_derive(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_rotation
+):
+    """Migration 0047 : numero_cuve est toujours dérivé de numero (str(numero)),
+    jamais un champ accepté en entrée — même envoyé, il est ignoré."""
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    r1 = await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json={**payload_rotation(), "numero_cuve": "AUTRE"},
+        headers=auth_headers,
+    )
+    r2 = await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(),
+        headers=auth_headers,
+    )
+    assert r1.status_code == 201, r1.text
+    assert r2.status_code == 201, r2.text
+    numeros_cuve = [r["numero_cuve"] for r in r2.json()["aerien"]["rotations"]]
+    assert numeros_cuve == ["1", "2"]
+
+
+@pytest.mark.asyncio
+async def test_add_rotation_cumuls_separes_par_unite(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_rotation
+):
+    """Critère d'acceptation : une rotation dosée au litre et une au kg ne se
+    mélangent jamais dans le même total."""
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(quantite=10.0, unite="L"),
+        headers=auth_headers,
+    )
+    resp = await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(quantite=4.0, unite="kg"),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    aerien = resp.json()["aerien"]
+    assert aerien["total_pesticide_l"] == 10.0
+    assert aerien["total_pesticide_kg"] == 4.0
+
+
+@pytest.mark.asyncio
+async def test_add_rotation_heure_fermeture_vanne_anterieure_422(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_rotation
+):
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    resp = await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(heure_ouverture_vanne="06:20:00", heure_fermeture_vanne="06:10:00"),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 422, resp.text
 
 
 @pytest.mark.asyncio
@@ -248,6 +316,8 @@ async def test_creer_traitement_avec_trois_rotations_cdg_9(
     aerien = final.json()["aerien"]
     assert aerien["nb_rotations"] == 3
     assert aerien["total_pesticide_l"] == 33.75
+    # Chaque rotation du fixture porte surface_ha=5.0 par défaut : 3 x 5.0 = 15.0.
+    assert aerien["surface_traitee_ha"] == 15.0
 
 
 @pytest.mark.asyncio
