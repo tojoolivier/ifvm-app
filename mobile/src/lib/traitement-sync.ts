@@ -104,6 +104,13 @@ function buildTraitementSyncPayload(draft: DraftTraitement): components['schemas
         chef_de_base_id: draft.aerien.chef_de_base_id,
         consultant_id: draft.aerien.consultant_id,
         immatricule_aeronef: draft.aerien.immatricule_aeronef ?? '',
+        // Base principale/stand/base secondaire (référentiel lieu_aerien) —
+        // #equipe-slide-aerien. lieu_base_principale_id est NOT NULL côté backend
+        // (TraitementAerienCreate) : jusqu'ici absent de ce payload, la synchro
+        // échouait silencieusement en 422 pour toute fiche aérienne (bug corrigé ici).
+        lieu_base_principale_id: draft.aerien.lieu_base_principale_id,
+        lieu_stand_id: draft.aerien.lieu_stand_id,
+        lieu_base_secondaire_id: draft.aerien.lieu_base_secondaire_id,
         // surface_traitee_ha n'y figure plus (migration 0047) : dérivée des rotations
         // côté serveur, plus un champ accepté par TraitementSyncPush.
         pesticide_recu_l: draft.aerien.pesticide_recu_l,

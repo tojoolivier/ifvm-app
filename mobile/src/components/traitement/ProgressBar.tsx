@@ -1,16 +1,18 @@
 import { View, StyleSheet } from 'react-native';
 import { traitementColors } from './tokens';
 
-// « Traitement » devient « Équipe » (traitement.tsx a été scindé en deux écrans) et
-// « Rotations » s'insère juste après — aérien seulement, puisque les rotations n'ont
-// pas d'équivalent côté terrestre (produits utilisés restés sur l'écran Équipe). Les
+// « Traitement » (traitement.tsx à l'origine) devient « Équipe » — personnes, aéronef
+// et rattachement (base principale/stand/base secondaire) — et un nouveau segment
+// « Traitement » s'insère juste après (rotations.tsx : pesticides, rotations,
+// opérations) — aérien seulement, puisque les rotations n'ont pas d'équivalent côté
+// terrestre (produits utilisés restés sur l'écran Équipe). #equipe-slide-aerien. Les
 // deux flux ont donc un nombre d'étapes différent (7 vs 6) : deux listes séparées
 // plutôt qu'une seule masquant/affichant un segment selon le type.
 export const PROGRESS_SEGMENTS_AERIEN = [
   'Références',
   'Cibles',
   'Équipe',
-  'Rotations',
+  'Traitement',
   'Moyens',
   'Impacts',
   'Signatures',

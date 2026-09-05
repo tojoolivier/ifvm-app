@@ -230,6 +230,58 @@ export function validateReferences(input: ReferencesValidationInput): Validation
 }
 
 // ==========================================
+// ÉQUIPE (écran C, branche aérienne) — #equipe-slide-aerien
+// ==========================================
+
+export interface AerienEquipeValidationInput {
+  chefDeBaseId: string | null | undefined;
+  piloteId: string | null | undefined;
+  mecanicienId: string | null | undefined;
+  consultantId?: string | null | undefined;
+  immatriculeAeronef: string | null | undefined;
+  lieuBasePrincipaleId: string | null | undefined;
+}
+
+const MESSAGE_ROLE_DEJA_AFFECTE =
+  'Cette personne est déjà affectée à un autre rôle. Veuillez sélectionner une personne différente.';
+
+/**
+ * Chef de base, pilote et mécanicien sont obligatoires et deux-à-deux distincts
+ * (même personne dans deux rôles obligatoires = fiche invalide) — le consultant
+ * reste facultatif et exempté de cette règle. Reflète côté mobile la contrainte
+ * backend `ck_traitement_aerien_roles_distincts` (migration 0047).
+ */
+export function validateAerienEquipe(input: AerienEquipeValidationInput): ValidationError[] {
+  const errors: ValidationError[] = [];
+
+  if (!input.chefDeBaseId) errors.push({ field: 'chefDeBaseId', message: 'Le chef de base est obligatoire' });
+  if (!input.piloteId) errors.push({ field: 'piloteId', message: 'Le pilote est obligatoire' });
+  if (!input.mecanicienId) errors.push({ field: 'mecanicienId', message: 'Le mécanicien est obligatoire' });
+  if (!input.immatriculeAeronef || input.immatriculeAeronef.trim() === '') {
+    errors.push({ field: 'immatriculeAeronef', message: "L'immatriculation de l'aéronef est obligatoire" });
+  }
+  if (!input.lieuBasePrincipaleId) {
+    errors.push({ field: 'lieuBasePrincipaleId', message: 'La base principale est obligatoire' });
+  }
+
+  const rolesObligatoires: { field: string; id: string | null | undefined }[] = [
+    { field: 'chefDeBaseId', id: input.chefDeBaseId },
+    { field: 'piloteId', id: input.piloteId },
+    { field: 'mecanicienId', id: input.mecanicienId },
+  ];
+  for (let i = 0; i < rolesObligatoires.length; i++) {
+    for (let j = i + 1; j < rolesObligatoires.length; j++) {
+      if (rolesObligatoires[i].id && rolesObligatoires[i].id === rolesObligatoires[j].id) {
+        errors.push({ field: rolesObligatoires[i].field, message: MESSAGE_ROLE_DEJA_AFFECTE });
+        errors.push({ field: rolesObligatoires[j].field, message: MESSAGE_ROLE_DEJA_AFFECTE });
+      }
+    }
+  }
+
+  return errors;
+}
+
+// ==========================================
 // ROTATIONS (écran C, branche aérienne)
 // ==========================================
 
@@ -425,6 +477,7 @@ export interface RecapAggregateInput {
   recouvrementPercent: number | null | undefined;
   empoisonnement: EmpoisonnementValidationInput;
   terrestreConditions: TerrestreConditionsInput | null;
+  aerienEquipe: AerienEquipeValidationInput | null;
   signatureMatrix: SignatureRequirementWithState[];
 }
 
@@ -437,6 +490,10 @@ export function aggregateRecapErrors(input: RecapAggregateInput): ValidationErro
 
   if (input.typeTraitement === 'TERRESTRE' && input.terrestreConditions) {
     errors.push(...validateTerrestreConditions(input.terrestreConditions));
+  }
+
+  if (input.typeTraitement === 'AERIEN' && input.aerienEquipe) {
+    errors.push(...validateAerienEquipe(input.aerienEquipe));
   }
 
   for (const requirement of input.signatureMatrix) {

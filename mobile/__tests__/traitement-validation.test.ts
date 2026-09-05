@@ -13,6 +13,7 @@ import {
   validateRotationsHeures,
   validateRecouvrement,
   validateEmpoisonnement,
+  validateAerienEquipe,
   computeSignatureMatrix,
   aggregateRecapErrors,
   deriveNomCommercial,
@@ -383,6 +384,54 @@ describe('computeSignatureMatrix', () => {
   });
 });
 
+describe('validateAerienEquipe', () => {
+  const equipeValide = {
+    chefDeBaseId: 'chef-1',
+    piloteId: 'pilote-1',
+    mecanicienId: 'mecanicien-1',
+    consultantId: null,
+    immatriculeAeronef: '5R-ABC',
+    lieuBasePrincipaleId: 'lieu-1',
+  };
+
+  it('ne remonte aucune erreur quand chef de base/pilote/mécanicien/aéronef/base principale sont renseignés et distincts', () => {
+    expect(validateAerienEquipe(equipeValide)).toEqual([]);
+  });
+
+  it.each([
+    ['chefDeBaseId', { ...equipeValide, chefDeBaseId: null }],
+    ['piloteId', { ...equipeValide, piloteId: null }],
+    ['mecanicienId', { ...equipeValide, mecanicienId: null }],
+    ['immatriculeAeronef', { ...equipeValide, immatriculeAeronef: null }],
+    ['lieuBasePrincipaleId', { ...equipeValide, lieuBasePrincipaleId: null }],
+  ])('rapporte %s comme obligatoire quand absent', (champ, input) => {
+    const errors = validateAerienEquipe(input);
+    expect(errors.some((e) => e.field === champ)).toBe(true);
+  });
+
+  it('accepte un consultant absent (facultatif)', () => {
+    expect(validateAerienEquipe({ ...equipeValide, consultantId: null })).toEqual([]);
+  });
+
+  it.each([
+    ['chef de base et pilote', { ...equipeValide, piloteId: equipeValide.chefDeBaseId }],
+    ['chef de base et mécanicien', { ...equipeValide, mecanicienId: equipeValide.chefDeBaseId }],
+    ['pilote et mécanicien', { ...equipeValide, mecanicienId: equipeValide.piloteId }],
+  ])('bloque quand la même personne occupe deux rôles obligatoires (%s)', (_label, input) => {
+    const errors = validateAerienEquipe(input);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(
+      errors.every((e) =>
+        e.message === 'Cette personne est déjà affectée à un autre rôle. Veuillez sélectionner une personne différente.'
+      )
+    ).toBe(true);
+  });
+
+  it('le consultant peut être la même personne qu’un rôle obligatoire (exempté de la règle de distinction)', () => {
+    expect(validateAerienEquipe({ ...equipeValide, consultantId: equipeValide.piloteId })).toEqual([]);
+  });
+});
+
 describe('aggregateRecapErrors', () => {
   const validAerien = {
     typeTraitement: 'AERIEN' as const,
@@ -396,6 +445,7 @@ describe('aggregateRecapErrors', () => {
     recouvrementPercent: 50,
     empoisonnement: { empoisonnement: false, empoisonnementType: null, empoisonnementMode: null, empoisonnementAutre: null },
     terrestreConditions: null,
+    aerienEquipe: null,
     signatureMatrix: [{ role: 'PILOTE' as const, required: true, champRenseigne: true, signe: true }],
   };
 
