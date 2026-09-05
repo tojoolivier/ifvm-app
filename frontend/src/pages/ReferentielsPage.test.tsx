@@ -26,6 +26,7 @@ function pull(overrides: Record<string, unknown> = {}) {
       cultures: empty,
       codes_stades: empty,
       campagnes: empty,
+      lieux_aeriens: empty,
       ...overrides,
     },
   }
@@ -51,11 +52,11 @@ describe('ReferentielsPage — maquette §11 du handoff', () => {
     vi.restoreAllMocks()
   })
 
-  it('liste les 7 référentiels de la maquette dans la colonne de navigation', async () => {
+  it('liste les 8 référentiels de la colonne de navigation', async () => {
     mockedGet.mockResolvedValue(pull())
     renderPage()
 
-    await waitFor(() => expect(nav().getByText('7 référentiels')).toBeInTheDocument())
+    await waitFor(() => expect(nav().getByText('8 référentiels')).toBeInTheDocument())
 
     for (const table of [
       'pesticide',
@@ -63,6 +64,7 @@ describe('ReferentielsPage — maquette §11 du handoff', () => {
       'code_stade',
       'poste_acridien',
       'station_fixe',
+      'lieu_aerien',
       'utilisateur',
       'campagne',
     ]) {
@@ -74,13 +76,13 @@ describe('ReferentielsPage — maquette §11 du handoff', () => {
     mockedGet.mockResolvedValue(pull())
     renderPage()
 
-    await waitFor(() => expect(nav().getByText('7 référentiels')).toBeInTheDocument())
+    await waitFor(() => expect(nav().getByText('8 référentiels')).toBeInTheDocument())
 
-    // Les 7 référentiels exposent désormais au moins une lecture/écriture :
+    // Les 8 référentiels exposent désormais au moins une lecture/écriture :
     // culture (#130), code_stade, poste_acridien, station_fixe (#133),
-    // utilisateur, campagne, pesticide (#129, #134).
+    // utilisateur, campagne, pesticide (#129, #134), lieu_aerien (#prospection-lieu-base).
     expect(nav().queryAllByText('à créer')).toHaveLength(0)
-    expect(nav().getAllByText('API')).toHaveLength(7)
+    expect(nav().getAllByText('API')).toHaveLength(8)
   })
 
   it('affiche la matière active et la dose de référence sur les pesticides', async () => {
@@ -560,6 +562,130 @@ describe('ReferentielsPage — écritures culture (#130)', () => {
     ])
 
     expect(screen.getByText('MAN')).toBeInTheDocument()
+  })
+})
+
+describe('ReferentielsPage — écritures lieu_aerien (#prospection-lieu-base)', () => {
+  const LIEU = {
+    id: 'la1',
+    type_lieu: 'principale',
+    nom: 'Tuléar',
+    latitude: -23.35,
+    longitude: 43.68,
+    altitude: null,
+    actif: true,
+    created_at: SERVER_TIME,
+    updated_at: SERVER_TIME,
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  /**
+   * L'administration lit `/lieux-aeriens?inclure_inactifs=true` et non le pull :
+   * elle affiche un badge « État », il lui faut donc aussi les lieux désactivés.
+   */
+  function mockGetParUrl(lieux: Record<string, unknown>[] = [LIEU]) {
+    mockedGet.mockImplementation((url: string) => {
+      if (url.startsWith('/lieux-aeriens')) return Promise.resolve({ data: lieux })
+      return Promise.resolve(pull())
+    })
+  }
+
+  async function ouvrirLieuxAeriens(lieux: Record<string, unknown>[] = [LIEU]) {
+    mockGetParUrl(lieux)
+    renderPage()
+    await waitFor(() => expect(nav().getByText('lieu_aerien')).toBeInTheDocument())
+    fireEvent.click(nav().getByText('lieu_aerien'))
+    fireEvent.click(await screen.findByRole('button', { name: `Modifier ${lieux[0].nom}` }))
+    await screen.findByDisplayValue('Tuléar')
+  }
+
+  it("expose la pastille « API » et active les affordances d'écriture", async () => {
+    await ouvrirLieuxAeriens()
+
+    expect(screen.getByText('GET · POST · PUT /lieux-aeriens')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '+ Nouveau lieu aérien' })).not.toHaveAttribute(
+      'aria-disabled',
+    )
+    expect(screen.getByRole('button', { name: 'Enregistrer' })).not.toHaveAttribute('aria-disabled')
+  })
+
+  it('ouvre le panneau Modifier prérempli sur le lieu sélectionné', async () => {
+    await ouvrirLieuxAeriens()
+
+    expect(screen.getByLabelText('Nom *')).toHaveValue('Tuléar')
+    expect(screen.getByLabelText('Latitude *')).toHaveValue(-23.35)
+    expect(screen.getByLabelText('Longitude *')).toHaveValue(43.68)
+  })
+
+  it('enregistre une modification via PUT /lieux-aeriens/{id}', async () => {
+    mockedPut.mockResolvedValue({ data: { ...LIEU, nom: 'Tuléar aéroport' } })
+    await ouvrirLieuxAeriens()
+
+    fireEvent.change(screen.getByLabelText('Nom *'), { target: { value: 'Tuléar aéroport' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    await waitFor(() =>
+      expect(mockedPut).toHaveBeenCalledWith('/lieux-aeriens/la1', {
+        type_lieu: 'principale',
+        nom: 'Tuléar aéroport',
+        latitude: -23.35,
+        longitude: 43.68,
+        // `altitude` nullable en base, mais `toPayload` ne traite le vide comme
+        // NULL que pour les champs non numériques (même comportement préexistant
+        // que `station_fixe.altitude`) : un formulaire laissé vide renvoie 0.
+        altitude: 0,
+        actif: true,
+      }),
+    )
+  })
+
+  it('crée un lieu aérien via POST /lieux-aeriens', async () => {
+    mockedPost.mockResolvedValue({
+      data: { ...LIEU, id: 'la2', nom: 'Ihosy', latitude: -22.4, longitude: 46.12 },
+    })
+    await ouvrirLieuxAeriens()
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Nouveau lieu aérien' }))
+
+    const modal = within(screen.getByRole('dialog', { name: 'Nouveau lieu aérien' }))
+    fireEvent.change(modal.getByLabelText('Nom *'), { target: { value: 'Ihosy' } })
+    fireEvent.change(modal.getByLabelText('Latitude *'), { target: { value: '-22.4' } })
+    fireEvent.change(modal.getByLabelText('Longitude *'), { target: { value: '46.12' } })
+    fireEvent.click(modal.getByRole('button', { name: 'Créer' }))
+
+    await waitFor(() => expect(mockedPost).toHaveBeenCalledTimes(1))
+    expect(mockedPost).toHaveBeenCalledWith('/lieux-aeriens', {
+      type_lieu: 'principale',
+      nom: 'Ihosy',
+      latitude: -22.4,
+      longitude: 46.12,
+      altitude: 0,
+    })
+  })
+
+  it('désactive logiquement plutôt que de supprimer', async () => {
+    mockedPut.mockResolvedValue({ data: { ...LIEU, actif: false } })
+    await ouvrirLieuxAeriens()
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Actif' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    await waitFor(() => expect(mockedPut).toHaveBeenCalledTimes(1))
+    expect(mockedPut.mock.calls[0][1]).toMatchObject({ actif: false })
+    // Aucune affordance de suppression : le pull ne transporte que des upserts.
+    expect(screen.queryByRole('button', { name: /supprimer/i })).not.toBeInTheDocument()
+  })
+
+  it('affiche aussi les lieux désactivés, badge « État » oblige', async () => {
+    await ouvrirLieuxAeriens([
+      LIEU,
+      { ...LIEU, id: 'la3', type_lieu: 'stand', nom: 'Stand abandonné', actif: false },
+    ])
+
+    expect(screen.getByText('Stand abandonné')).toBeInTheDocument()
   })
 })
 
