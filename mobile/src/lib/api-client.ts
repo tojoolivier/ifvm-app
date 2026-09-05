@@ -1021,6 +1021,19 @@ export const apiClient = {
     );
   },
 
+  createUserALaVolee: async (
+    token: string,
+    body: components['schemas']['UtilisateurCreateALaVolee'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['UtilisateurRead']> => {
+    return makeRequest<components['schemas']['UtilisateurRead']>(
+      '/users/a-la-volee',
+      { method: 'POST', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
   getCampagnes: async (
     token: string,
     onUnauthorized?: OnUnauthorized

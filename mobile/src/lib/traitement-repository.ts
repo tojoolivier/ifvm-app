@@ -81,10 +81,10 @@ export interface Cible {
 
 export interface TraitementAerien {
   traitement_id: string;
-  pilote: string;
-  mecanicien: string;
+  pilote_id: string;
+  mecanicien_id: string;
   chef_de_base_id: string;
-  consultant_international: string | null;
+  consultant_id: string | null;
   immatricule_aeronef: string | null;
   nb_rotations: number | null;
   total_pesticide_l: number | null;
@@ -179,10 +179,10 @@ export interface DraftTraitementAerienInput {
   id: string;
   prospectionId: string;
   dateTraitement?: string | null;
-  pilote: string;
-  mecanicien: string;
+  piloteId: string;
+  mecanicienId: string;
   chefDeBaseId: string;
-  consultantInternational?: string | null;
+  consultantId?: string | null;
 }
 
 export interface DraftTraitementTerrestreInput {
@@ -259,9 +259,9 @@ export async function createDraftTraitementAerien(
 
   await db.runAsync(
     `INSERT INTO traitement_aerien (
-      traitement_id, pilote, mecanicien, chef_de_base_id, consultant_international
+      traitement_id, pilote_id, mecanicien_id, chef_de_base_id, consultant_id
     ) VALUES (?, ?, ?, ?, ?)`,
-    [input.id, input.pilote, input.mecanicien, input.chefDeBaseId, input.consultantInternational ?? null]
+    [input.id, input.piloteId, input.mecanicienId, input.chefDeBaseId, input.consultantId ?? null]
   );
 
   const created = await getTraitement(input.id);
@@ -395,10 +395,10 @@ export async function updateTraitementReference(
  */
 
 export interface AerienUpdateInput {
-  pilote: string;
-  mecanicien: string;
+  piloteId: string;
+  mecanicienId: string;
   chefDeBaseId: string;
-  consultantInternational?: string | null;
+  consultantId?: string | null;
   immatriculeAeronef?: string | null;
   surfaceTraiteeHa?: number | null;
   pesticideRecuL?: number | null;
@@ -412,19 +412,19 @@ export async function updateTraitementAerien(
 
   await db.runAsync(
     `UPDATE traitement_aerien SET
-      pilote = ?,
-      mecanicien = ?,
+      pilote_id = ?,
+      mecanicien_id = ?,
       chef_de_base_id = ?,
-      consultant_international = ?,
+      consultant_id = ?,
       immatricule_aeronef = ?,
       surface_traitee_ha = ?,
       pesticide_recu_l = ?
      WHERE traitement_id = ?`,
     [
-      input.pilote,
-      input.mecanicien,
+      input.piloteId,
+      input.mecanicienId,
       input.chefDeBaseId,
-      input.consultantInternational ?? null,
+      input.consultantId ?? null,
       input.immatriculeAeronef ?? null,
       input.surfaceTraiteeHa ?? null,
       input.pesticideRecuL ?? null,

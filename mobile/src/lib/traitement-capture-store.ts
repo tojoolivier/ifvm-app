@@ -68,10 +68,10 @@ export interface RotationInput {
 }
 
 export interface AerienDraft {
-  pilote?: string | null;
-  mecanicien?: string | null;
+  piloteId?: string | null;
+  mecanicienId?: string | null;
   chefDeBaseId?: string | null;
-  consultantInternational?: string | null;
+  consultantId?: string | null;
   immatriculationAeronef?: string | null;
   surfaceTraiteeHa?: number | null;
   pesticideRecuL?: number | null;

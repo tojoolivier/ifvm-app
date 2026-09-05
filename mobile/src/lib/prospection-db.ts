@@ -356,10 +356,10 @@ async function creerTables(db: SQLite.SQLiteDatabase): Promise<void> {
 
     CREATE TABLE IF NOT EXISTS traitement_aerien (
       traitement_id TEXT PRIMARY KEY NOT NULL REFERENCES traitement(id) ON DELETE CASCADE,
-      pilote TEXT,
-      mecanicien TEXT,
+      pilote_id TEXT,
+      mecanicien_id TEXT,
       chef_de_base_id TEXT,
-      consultant_international TEXT,
+      consultant_id TEXT,
       immatricule_aeronef TEXT,
       nb_rotations INTEGER,
       total_pesticide_l REAL,
@@ -711,6 +711,16 @@ const COLONNES_TRAITEMENT_AERIEN: readonly Colonne[] = [
   { name: 'surface_restante_ha', type: 'REAL' },
   { name: 'pesticide_recu_l', type: 'REAL' },
   { name: 'pesticide_stock_restant_l', type: 'REAL' },
+  // pilote/mecanicien/consultant_international (texte libre) -> FK utilisateur
+  // (migration backend 0047). Une installation existante garde ses anciennes
+  // colonnes texte, abandonnées mais non supprimées (SQLite ne sait pas migrer
+  // un nom libre vers un id référentiel) — même patron que les colonnes
+  // abandonnées ailleurs dans ce fichier (ex. `numero_cuve`, désormais dérivé
+  // côté serveur). L'agent doit resélectionner pilote/mécanicien/consultant
+  // sur tout brouillon aérien créé avant ce changement.
+  { name: 'pilote_id', type: 'TEXT' },
+  { name: 'mecanicien_id', type: 'TEXT' },
+  { name: 'consultant_id', type: 'TEXT' },
 ];
 
 /** Colonnes ajoutées à `traitement_terrestre` après sa création initiale. */

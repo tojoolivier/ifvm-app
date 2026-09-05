@@ -195,7 +195,13 @@ export interface UtilisateurEquipe {
   prenom: string;
 }
 
-export type RoleUtilisateurEquipe = 'chef_de_base' | 'chef_equipe' | 'agent_encadreur' | 'pilote';
+export type RoleUtilisateurEquipe =
+  | 'chef_de_base'
+  | 'chef_equipe'
+  | 'agent_encadreur'
+  | 'pilote'
+  | 'mecanicien'
+  | 'consultant_international';
 
 /** Utilisateurs actifs d'un rôle donné, triés par nom — alimente les chips de sélection des écrans
  * traitement, ainsi que les signatures Pilote/Chef de Base de l'écran Observations (extensif aérien). */

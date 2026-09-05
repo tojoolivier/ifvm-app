@@ -88,10 +88,10 @@ function draft(overrides: Partial<DraftTraitement> = {}): DraftTraitement {
     server_updated_at: null,
     aerien: {
       traitement_id: 'traitement-1',
-      pilote: 'Jean Dupont',
-      mecanicien: 'Marc Rakoto',
+      pilote_id: 'pilote-1',
+      mecanicien_id: 'mecanicien-1',
       chef_de_base_id: 'chef-1',
-      consultant_international: null,
+      consultant_id: null,
       immatricule_aeronef: null,
       nb_rotations: null,
       total_pesticide_l: null,
@@ -140,7 +140,7 @@ describe('enregistrerEtSynchroniserTraitement', () => {
         id: 'traitement-1',
         type_traitement: 'AERIEN',
         base_updated_at: '2026-08-12T00:00:00.000Z',
-        aerien: expect.objectContaining({ pilote: 'Jean Dupont', mecanicien: 'Marc Rakoto', chef_de_base_id: 'chef-1' }),
+        aerien: expect.objectContaining({ pilote_id: 'pilote-1', mecanicien_id: 'mecanicien-1', chef_de_base_id: 'chef-1' }),
       })
     );
     expect(mockMarkSynced).toHaveBeenCalledWith('traitement-1', '2026-08-13T00:00:00.000Z');

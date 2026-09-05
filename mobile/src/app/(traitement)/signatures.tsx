@@ -44,10 +44,10 @@ export default function SignaturesScreen() {
   const matrix =
     typeTraitement === 'AERIEN'
       ? computeSignatureMatrix('AERIEN', {
-          pilote: store.aerien.pilote,
-          mecanicien: store.aerien.mecanicien,
+          pilote_id: store.aerien.piloteId,
+          mecanicien_id: store.aerien.mecanicienId,
           chef_de_base_id: store.aerien.chefDeBaseId,
-          consultant_international: store.aerien.consultantInternational,
+          consultant_id: store.aerien.consultantId,
         })
       : typeTraitement === 'TERRESTRE'
       ? computeSignatureMatrix('TERRESTRE', {

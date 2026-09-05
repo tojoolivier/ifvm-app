@@ -268,10 +268,10 @@ describe('validateEmpoisonnement', () => {
 describe('computeSignatureMatrix', () => {
   it('lists pilote, mecanicien and chef de base as required when filled, aerien', () => {
     const matrix = computeSignatureMatrix('AERIEN', {
-      pilote: 'Jean',
-      mecanicien: 'Paul',
+      pilote_id: 'pilote-1',
+      mecanicien_id: 'mecanicien-1',
       chef_de_base_id: 'u-1',
-      consultant_international: null,
+      consultant_id: null,
     });
     expect(matrix).toEqual([
       { role: 'PILOTE', required: true, champRenseigne: true },
@@ -282,10 +282,10 @@ describe('computeSignatureMatrix', () => {
 
   it('adds consultant international only when it was filled in, aerien', () => {
     const matrix = computeSignatureMatrix('AERIEN', {
-      pilote: 'Jean',
-      mecanicien: 'Paul',
+      pilote_id: 'pilote-1',
+      mecanicien_id: 'mecanicien-1',
       chef_de_base_id: 'u-1',
-      consultant_international: 'Dr Smith',
+      consultant_id: 'consultant-1',
     });
     expect(matrix.find((r) => r.role === 'CONSULTANT_INTERNATIONAL')).toEqual({
       role: 'CONSULTANT_INTERNATIONAL',

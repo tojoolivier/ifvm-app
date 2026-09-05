@@ -42,6 +42,9 @@ export default function TraitementScreen() {
 
   const typeTraitement = store.typeTraitement;
   const [chefsDeBase, setChefsDeBase] = useState<UtilisateurEquipe[]>([]);
+  const [pilotes, setPilotes] = useState<UtilisateurEquipe[]>([]);
+  const [mecaniciens, setMecaniciens] = useState<UtilisateurEquipe[]>([]);
+  const [consultants, setConsultants] = useState<UtilisateurEquipe[]>([]);
   const [chefsEquipe, setChefsEquipe] = useState<UtilisateurEquipe[]>([]);
   const [agentsEncadreurs, setAgentsEncadreurs] = useState<UtilisateurEquipe[]>([]);
   const [pesticides, setPesticides] = useState<Pesticide[]>([]);
@@ -66,10 +69,10 @@ export default function TraitementScreen() {
       setSurfaceInfesteeHa(draft.cible?.surface_infestee_ha ?? null);
       if (draft.type_traitement === 'AERIEN' && draft.aerien) {
         store.updateAerien({
-          pilote: draft.aerien.pilote || null,
-          mecanicien: draft.aerien.mecanicien || null,
+          piloteId: draft.aerien.pilote_id || null,
+          mecanicienId: draft.aerien.mecanicien_id || null,
           chefDeBaseId: draft.aerien.chef_de_base_id || null,
-          consultantInternational: draft.aerien.consultant_international,
+          consultantId: draft.aerien.consultant_id,
           immatriculationAeronef: draft.aerien.immatricule_aeronef,
           surfaceTraiteeHa: draft.aerien.surface_traitee_ha,
           pesticideRecuL: draft.aerien.pesticide_recu_l,
@@ -152,6 +155,9 @@ export default function TraitementScreen() {
 
   useEffect(() => {
     listUtilisateursByRole('chef_de_base').then(setChefsDeBase).catch((error) => signalerChargement(error, 'listUtilisateursByRole:chef_de_base'));
+    listUtilisateursByRole('pilote').then(setPilotes).catch((error) => signalerChargement(error, 'listUtilisateursByRole:pilote'));
+    listUtilisateursByRole('mecanicien').then(setMecaniciens).catch((error) => signalerChargement(error, 'listUtilisateursByRole:mecanicien'));
+    listUtilisateursByRole('consultant_international').then(setConsultants).catch((error) => signalerChargement(error, 'listUtilisateursByRole:consultant_international'));
     listUtilisateursByRole('chef_equipe').then(setChefsEquipe).catch((error) => signalerChargement(error, 'listUtilisateursByRole:chef_equipe'));
     listUtilisateursByRole('agent_encadreur').then(setAgentsEncadreurs).catch((error) => signalerChargement(error, 'listUtilisateursByRole:agent_encadreur'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -220,7 +226,7 @@ export default function TraitementScreen() {
     run(
       async () => {
         if (typeTraitement === 'AERIEN') {
-          if (!store.aerien.pilote || !store.aerien.mecanicien || !store.aerien.chefDeBaseId) {
+          if (!store.aerien.piloteId || !store.aerien.mecanicienId || !store.aerien.chefDeBaseId) {
             setErrors({ aerien: 'Pilote, mécanicien et chef de base sont obligatoires' });
             return;
           }
@@ -232,10 +238,10 @@ export default function TraitementScreen() {
             return;
           }
           await updateTraitementAerien(traitementId, {
-            pilote: store.aerien.pilote,
-            mecanicien: store.aerien.mecanicien,
+            piloteId: store.aerien.piloteId,
+            mecanicienId: store.aerien.mecanicienId,
             chefDeBaseId: store.aerien.chefDeBaseId,
-            consultantInternational: store.aerien.consultantInternational,
+            consultantId: store.aerien.consultantId,
             immatriculeAeronef: store.aerien.immatriculationAeronef,
             surfaceTraiteeHa: store.aerien.surfaceTraiteeHa,
             pesticideRecuL: store.aerien.pesticideRecuL,
@@ -320,6 +326,12 @@ export default function TraitementScreen() {
           <AerienForm
             readOnly={readOnly}
             chefsDeBase={chefsDeBase}
+            pilotes={pilotes}
+            mecaniciens={mecaniciens}
+            consultants={consultants}
+            onPilotesChange={setPilotes}
+            onMecaniciensChange={setMecaniciens}
+            onConsultantsChange={setConsultants}
             pesticides={pesticides}
             surfaceRestante={surfaceRestanteAerien}
             pesticideStockRestant={pesticideStockRestantAerien}
