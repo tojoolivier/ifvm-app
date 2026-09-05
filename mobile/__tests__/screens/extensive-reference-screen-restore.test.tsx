@@ -283,15 +283,16 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
 
   /**
    * #prospection-lieu-base : sélection d'une base sur une fiche neuve (aucun
-   * `lieu_base_id` déjà enregistré) — un seul lieu `principale` est proposé, jamais
-   * les lieux `stand`/`secondaire` (aucune notion de base secondaire pour la
-   * prospection).
+   * `lieu_base_id` déjà enregistré) — tous les types du référentiel sont
+   * proposés (principale/secondaire/stand), chaque option affichant son type
+   * pour lever l'ambiguïté (pas de filtre par type — décision revue après
+   * retour terrain : une base « secondaire » du référentiel reste une base
+   * valide pour la prospection).
    */
-  it('Base (mode aérien) : sélectionne un lieu du référentiel, ne propose que les lieux « principale »', async () => {
+  it('Base (mode aérien) : sélectionne un lieu du référentiel, propose tous les types avec le type dans le libellé', async () => {
     jest.mocked(referentielDb.listLieuxAeriens).mockResolvedValue([
       { id: 'lieu-1', type_lieu: 'principale', nom: 'Tuléar' },
-      { id: 'lieu-2', type_lieu: 'principale', nom: 'Toliara' },
-      // Type non « principale » — jamais proposé pour la prospection.
+      { id: 'lieu-2', type_lieu: 'secondaire', nom: 'Ambovombe' },
       { id: 'lieu-3', type_lieu: 'stand', nom: 'Betioky' },
     ]);
     useProspectionWizardStore.setState({
@@ -307,19 +308,18 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
     });
 
     await render(<ExtensiveReferenceScreen />);
-    await screen.findByText('Tuléar');
+    await screen.findByText('Tuléar (Principale)');
     // Laisse l'effet de restauration tardive du brouillon (`refHydratedRef`, qui
     // réapplique lieu_base_id depuis `draft` sur un timer microtâche) se stabiliser
     // avant d'interagir — sinon il peut écraser la sélection ci-dessous.
     await settle();
 
-    // Option vide (généralisée) + les deux lieux « principale », jamais « Betioky ».
+    // Option vide (généralisée) + les trois lieux, quel que soit leur type.
     expect(screen.getByText('— Aucune (généralisée) —')).toBeVisible();
-    expect(screen.getByText('Toliara')).toBeVisible();
-    expect(screen.queryByText('Betioky')).toBeNull();
-    expect(screen.queryByText('Base secondaire')).toBeNull();
+    expect(screen.getByText('Ambovombe (Secondaire)')).toBeVisible();
+    expect(screen.getByText('Betioky (Stand)')).toBeVisible();
 
-    fireEvent.press(screen.getByText('Tuléar'));
+    fireEvent.press(screen.getByText('Tuléar (Principale)'));
     // Laisse React réconcilier avant de presser « Suivant » — sinon son gestionnaire
     // reste lié à la fermeture du rendu précédent (lieuBaseId encore `null`), comme
     // pour toute paire de `fireEvent.press` consécutifs sur cet écran.
@@ -356,7 +356,7 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
     });
 
     await render(<ExtensiveReferenceScreen />);
-    await screen.findByText('Tuléar');
+    await screen.findByText('Tuléar (Principale)');
     // Laisse l'effet de restauration tardive du brouillon se stabiliser avant
     // d'interagir (cf. commentaire du test précédent) — sinon il peut réappliquer
     // lieu_base_id APRÈS l'interaction ci-dessous et annuler la désélection.
@@ -424,7 +424,7 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
     expect(await screen.findByDisplayValue('Air Acridien')).toBeVisible();
     expect(screen.getByDisplayValue('5R-ABC')).toBeVisible();
     expect(screen.getByDisplayValue('Jean Rakoto')).toBeVisible();
-    expect(screen.getByText('Tuléar')).toBeVisible();
+    expect(screen.getByText('Tuléar (Principale)')).toBeVisible();
 
     // Opération restaurée : heures affichées, total calculé sans re-saisie.
     expect(screen.getByText('08:00')).toBeVisible();

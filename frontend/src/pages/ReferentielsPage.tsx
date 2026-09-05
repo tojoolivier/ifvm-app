@@ -599,7 +599,7 @@ const ENTITES: EntitySpec[] = [
     addLabel: '+ Nouveau lieu aérien',
     apiOk: true,
     apiLabel: 'GET · POST · PUT /lieux-aeriens',
-    desc: "Alimente le champ « Base » de la prospection extensive aérienne (mobile) — seuls les lieux de type « Principale » y sont proposés.",
+    desc: "Alimente le champ « Base » de la prospection extensive aérienne (mobile) — tous les types y sont proposés, avec le type affiché dans chaque option.",
     hasActif: true,
     rowLabel: (row) => text(row, 'nom'),
     columns: [

@@ -53,6 +53,19 @@ const INACTIVE_BG = '#efeada';
 // pas utiliser des couleurs trop fortes »).
 const FILL_BG = '#fdf6e3';
 
+/**
+ * #prospection-lieu-base : libellé affiché à côté du nom dans le sélecteur BASE,
+ * pour distinguer les lieux `principale`/`secondaire`/`stand` — les trois types
+ * du référentiel `lieu_aerien` sont proposés au choix (pas de filtre par type,
+ * cf. discussion #prospection-lieu-base : une base « secondaire » côté
+ * référentiel reste une base valide côté prospection).
+ */
+const TYPE_LIEU_LABELS: Record<string, string> = {
+  principale: 'Principale',
+  secondaire: 'Secondaire',
+  stand: 'Stand',
+};
+
 /** Auto-généré côté client comme n_fiche (cf. reference.tsx), faute de numérotation serveur pour l'extensif. */
 function generateNumeroMessage(draftId: string, dateProspection: string): string {
   const datePart = dateProspection.replace(/-/g, '');
@@ -211,12 +224,14 @@ export default function ExtensiveReferenceScreen() {
   const [pilote, setPilote] = useState(draft?.pilote ?? '');
   const [mecanicien, setMecanicien] = useState(draft?.mecanicien ?? '');
   const [chefDeBase, setChefDeBase] = useState(draft?.chef_de_base ?? '');
-  // Remplace base/base_secondaire (texte libre) — migration backend 0047. FK
-  // nullable vers le référentiel lieu_aerien : pas de base secondaire côté
-  // prospection, et une opération aérienne « généralisée » n'en a aucune.
+  // Remplace base/base_secondaire (texte libre) — migration backend 0047. Un
+  // seul champ (FK nullable vers le référentiel lieu_aerien, pas deux colonnes
+  // base/base_secondaire) ; une opération aérienne « généralisée » n'en a aucune.
   const [lieuBaseId, setLieuBaseId] = useState<string | null>(draft?.lieu_base_id ?? null);
+  // Tous les types du référentiel y figurent (principale/secondaire/stand) : le
+  // libellé de chaque option précise le type pour lever l'ambiguïté (cf.
+  // TYPE_LIEU_LABELS), plutôt que de filtrer une catégorie hors du choix.
   const [lieuxAeriens, setLieuxAeriens] = useState<LieuAerien[]>([]);
-  const lieuxBasePrincipale = lieuxAeriens.filter((lieu) => lieu.type_lieu === 'principale');
   // Label du champ actuellement focus dans le bloc aéronef/équipe (un seul à la
   // fois) — pilote uniquement l'état visuel (bordure) de `AerienField`.
   const [focusedAerienField, setFocusedAerienField] = useState<string | null>(null);
@@ -584,12 +599,13 @@ export default function ExtensiveReferenceScreen() {
 
                   <Text style={styles.aerienSubgroupLabel}>Base</Text>
                   {/* #prospection-lieu-base : remplace les 2 champs texte libre Base/Base
-                   * secondaire (migration backend 0047) — un seul sélecteur, sur le
-                   * référentiel lieu_aerien (filtré aux bases « principale », aucune notion
-                   * de base secondaire pour la prospection). Nullable : l'option de tête
-                   * (« Aucune (généralisée) ») vaut `null` — couvre l'opération aérienne
+                   * secondaire (migration backend 0047) par un seul sélecteur, sur le
+                   * référentiel lieu_aerien — tous les types y figurent (principale/
+                   * secondaire/stand), chaque option précisant son type dans le libellé
+                   * pour lever l'ambiguïté. Nullable : l'option de tête (« Aucune
+                   * (généralisée) ») vaut `null` — couvre l'opération aérienne
                    * « généralisée », non rattachée à une base. */}
-                  {lieuxBasePrincipale.length > 0 ? (
+                  {lieuxAeriens.length > 0 ? (
                     <View style={[styles.aerienFieldPickerBox, styles.aerienFieldRowSplitLast]}>
                       <Picker
                         testID="lieu-base-picker"
@@ -598,8 +614,12 @@ export default function ExtensiveReferenceScreen() {
                         style={styles.aerienFieldPicker}
                       >
                         <Picker.Item label="— Aucune (généralisée) —" value="" />
-                        {lieuxBasePrincipale.map((lieu) => (
-                          <Picker.Item key={lieu.id} label={lieu.nom} value={lieu.id} />
+                        {lieuxAeriens.map((lieu) => (
+                          <Picker.Item
+                            key={lieu.id}
+                            label={`${lieu.nom} (${TYPE_LIEU_LABELS[lieu.type_lieu] ?? lieu.type_lieu})`}
+                            value={lieu.id}
+                          />
                         ))}
                       </Picker>
                     </View>
