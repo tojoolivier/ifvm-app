@@ -12,6 +12,7 @@ import {
   StyleProp,
   ViewStyle,
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getCurrentPosition } from '@/lib/location';
@@ -33,6 +34,7 @@ import {
   parseSelectionMultiple,
 } from '@/lib/prospection-extensive';
 import { TimeField } from '@/components/TimeField';
+import { LieuAerien, listLieuxAeriens } from '@/lib/referentiel-db';
 import { formatHeureLocale } from '@/lib/prospection-fiche-lecture';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
@@ -50,6 +52,19 @@ const INACTIVE_BG = '#efeada';
 // doré que le fond de page (BG), volontairement subtil (cf. demande UX : « ne
 // pas utiliser des couleurs trop fortes »).
 const FILL_BG = '#fdf6e3';
+
+/**
+ * #prospection-lieu-base : libellé affiché à côté du nom dans le sélecteur BASE,
+ * pour distinguer les lieux `principale`/`secondaire`/`stand` — les trois types
+ * du référentiel `lieu_aerien` sont proposés au choix (pas de filtre par type,
+ * cf. discussion #prospection-lieu-base : une base « secondaire » côté
+ * référentiel reste une base valide côté prospection).
+ */
+const TYPE_LIEU_LABELS: Record<string, string> = {
+  principale: 'Principale',
+  secondaire: 'Secondaire',
+  stand: 'Stand',
+};
 
 /** Auto-généré côté client comme n_fiche (cf. reference.tsx), faute de numérotation serveur pour l'extensif. */
 function generateNumeroMessage(draftId: string, dateProspection: string): string {
@@ -209,8 +224,14 @@ export default function ExtensiveReferenceScreen() {
   const [pilote, setPilote] = useState(draft?.pilote ?? '');
   const [mecanicien, setMecanicien] = useState(draft?.mecanicien ?? '');
   const [chefDeBase, setChefDeBase] = useState(draft?.chef_de_base ?? '');
-  const [base, setBase] = useState(draft?.base ?? '');
-  const [baseSecondaire, setBaseSecondaire] = useState(draft?.base_secondaire ?? '');
+  // Remplace base/base_secondaire (texte libre) — migration backend 0047. Un
+  // seul champ (FK nullable vers le référentiel lieu_aerien, pas deux colonnes
+  // base/base_secondaire) ; une opération aérienne « généralisée » n'en a aucune.
+  const [lieuBaseId, setLieuBaseId] = useState<string | null>(draft?.lieu_base_id ?? null);
+  // Tous les types du référentiel y figurent (principale/secondaire/stand) : le
+  // libellé de chaque option précise le type pour lever l'ambiguïté (cf.
+  // TYPE_LIEU_LABELS), plutôt que de filtrer une catégorie hors du choix.
+  const [lieuxAeriens, setLieuxAeriens] = useState<LieuAerien[]>([]);
   // Label du champ actuellement focus dans le bloc aéronef/équipe (un seul à la
   // fois) — pilote uniquement l'état visuel (bordure) de `AerienField`.
   const [focusedAerienField, setFocusedAerienField] = useState<string | null>(null);
@@ -270,6 +291,25 @@ export default function ExtensiveReferenceScreen() {
     };
   }, [draft?.latitude, draft?.longitude, draft?.heure_observation_at]);
 
+  // Champ BASE (mode aérien) : référentiel synchronisé, jamais une liste écrite en
+  // dur dans l'écran — c'est le référentiel local (`GET /referentiel/pull`) qui
+  // décide quelles bases existent. Chargé inconditionnellement (lecture SQLite
+  // locale bon marché) : le bloc aérien peut apparaître après une hydratation
+  // tardive du brouillon (cf. effet plus bas), pas seulement au montage initial.
+  useEffect(() => {
+    let isMounted = true;
+    listLieuxAeriens()
+      .then((lieux) => {
+        if (isMounted) setLieuxAeriens(lieux);
+      })
+      .catch((error) => {
+        if (isMounted) signalerChargement(error);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [signalerChargement]);
+
   // Station saisie librement, type de station, surface et n° message : de simples
   // `useState(draft?.x)` d'initialisation ne se remettent jamais à jour si `draft`
   // n'est pas encore hydraté au moment du montage (deep-link, app relancée en plein
@@ -293,8 +333,7 @@ export default function ExtensiveReferenceScreen() {
       setPilote(draft.pilote ?? '');
       setMecanicien(draft.mecanicien ?? '');
       setChefDeBase(draft.chef_de_base ?? '');
-      setBase(draft.base ?? '');
-      setBaseSecondaire(draft.base_secondaire ?? '');
+      setLieuBaseId(draft.lieu_base_id ?? null);
     });
   }, [draft, draftId]);
 
@@ -379,8 +418,7 @@ export default function ExtensiveReferenceScreen() {
           pilote: isAerien ? pilote || null : null,
           mecanicien: isAerien ? mecanicien || null : null,
           chefDeBase: isAerien ? chefDeBase || null : null,
-          base: isAerien ? base || null : null,
-          baseSecondaire: isAerien ? baseSecondaire || null : null,
+          lieuBaseId: isAerien ? lieuBaseId : null,
         });
 
         if (isAerien) {
@@ -560,24 +598,41 @@ export default function ExtensiveReferenceScreen() {
                   />
 
                   <Text style={styles.aerienSubgroupLabel}>Base</Text>
-                  <View style={[styles.aerienFieldRowSplit, styles.aerienFieldRowSplitLast]}>
-                    <AerienField
-                      label="Base"
-                      value={base}
-                      onChangeText={setBase}
-                      focusedField={focusedAerienField}
-                      setFocusedField={setFocusedAerienField}
-                      style={[styles.flex1, styles.aerienFieldNoMargin]}
-                    />
-                    <AerienField
-                      label="Base secondaire"
-                      value={baseSecondaire}
-                      onChangeText={setBaseSecondaire}
-                      focusedField={focusedAerienField}
-                      setFocusedField={setFocusedAerienField}
-                      style={[styles.flex1, styles.aerienFieldNoMargin]}
-                    />
-                  </View>
+                  {/* #prospection-lieu-base : remplace les 2 champs texte libre Base/Base
+                   * secondaire (migration backend 0047) par un seul sélecteur, sur le
+                   * référentiel lieu_aerien — tous les types y figurent (principale/
+                   * secondaire/stand), chaque option précisant son type dans le libellé
+                   * pour lever l'ambiguïté. Nullable : l'option de tête (« Aucune
+                   * (généralisée) ») vaut `null` — couvre l'opération aérienne
+                   * « généralisée », non rattachée à une base. */}
+                  {lieuxAeriens.length > 0 ? (
+                    <View style={[styles.aerienFieldPickerBox, styles.aerienFieldRowSplitLast]}>
+                      <Picker
+                        testID="lieu-base-picker"
+                        selectedValue={lieuBaseId ?? ''}
+                        onValueChange={(value) => setLieuBaseId(value === '' ? null : String(value))}
+                        style={styles.aerienFieldPicker}
+                      >
+                        <Picker.Item label="— Aucune (généralisée) —" value="" />
+                        {lieuxAeriens.map((lieu) => (
+                          <Picker.Item
+                            key={lieu.id}
+                            label={`${lieu.nom} (${TYPE_LIEU_LABELS[lieu.type_lieu] ?? lieu.type_lieu})`}
+                            value={lieu.id}
+                          />
+                        ))}
+                      </Picker>
+                    </View>
+                  ) : (
+                    // Référentiel pas encore peuplé (ou pas encore synchronisé) : une liste
+                    // déroulante sans aucune option serait indiscernable d'un bug. On
+                    // l'explique et on pointe vers l'endroit où le créer — l'administration
+                    // web (aucune création de référentiel n'est possible depuis le mobile).
+                    <Text style={[styles.hintText, styles.aerienFieldRowSplitLast]}>
+                      Aucune base disponible pour le moment — à créer depuis l&apos;administration
+                      web (Référentiels → Lieux aériens), puis à synchroniser sur l&apos;appareil.
+                    </Text>
+                  )}
                 </View>
 
                 <Text style={styles.sectionLabel}>Informations sur les heures de vol</Text>
@@ -795,6 +850,18 @@ const styles = StyleSheet.create({
   aerienFieldInput: { fontSize: 13, fontWeight: '600', color: TEXT, padding: 0 },
   aerienFieldRowSplit: { flexDirection: 'row', gap: 8, marginBottom: 10 },
   aerienFieldRowSplitLast: { marginBottom: 0 },
+  // Le Picker natif porte sa propre hauteur/marge tactile (~44-50) : pas de
+  // padding vertical (contrairement à `aerienFieldBox`) pour éviter un double
+  // espacement autour du contrôle.
+  aerienFieldPickerBox: {
+    backgroundColor: FILL_BG,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    overflow: 'hidden',
+  },
+  aerienFieldPicker: { color: TEXT },
   // « Motif du divers » (#ux-aerien) : même style de zone à remplir que le bloc
   // aéronef/équipe, réutilisé ici pour rester cohérent visuellement.
   operationMotifDivers: { marginTop: 4 },

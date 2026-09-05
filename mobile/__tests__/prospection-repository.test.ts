@@ -412,9 +412,9 @@ describe('updateProspectionExtensiveReference', () => {
         REF_INPUT.nMessage,
         REF_INPUT.heureObservationAt,
         // Mode aérien uniquement — non fournis par REF_INPUT (mode terrestre implicite
-        // dans ce test), donc null : cf. les 7 champs équipe/aéronef ajoutés à
+        // dans ce test), donc null : cf. les 6 champs équipe/aéronef/base ajoutés à
         // ExtensiveReferenceUpdateInput.
-        null, null, null, null, null, null, null,
+        null, null, null, null, null, null,
         expect.any(String),
         BASE_INPUT.id,
       ]

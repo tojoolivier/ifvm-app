@@ -8,12 +8,18 @@
  * enregistrées par du vide — même classe de bug déjà corrigée côté intensif
  * (observations.tsx, veg.tsx, species.tsx).
  */
-import { fireEvent, render, screen, waitFor, act } from '@testing-library/react-native';
+import { cleanup, fireEvent, render, screen, waitFor, act } from '@testing-library/react-native';
 import ExtensiveReferenceScreen from '@/app/(prospection)/extensive-reference';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import * as prospectionRepository from '@/lib/prospection-repository';
 import * as location from '@/lib/location';
+import * as referentielDb from '@/lib/referentiel-db';
 import { formatHeureLocale } from '@/lib/prospection-fiche-lecture';
+
+/** Laisse un vrai tick s'écouler entre deux `fireEvent.press` consécutifs — un
+ * `act(async () => {})` manuel imbriqué dans celui, déjà posé par `fireEvent`,
+ * casse le suivi interne des scopes act() et corrompt les tests suivants. */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
 
 jest.mock('expo-router', () =>
   require('../test-utils/mock-expo-router').expoRouterMock({ params: { draftId: 'draft-123' } })
@@ -42,10 +48,50 @@ jest.mock('@/lib/location', () => ({
   getCurrentPosition: jest.fn().mockResolvedValue({ latitude: -18.9, longitude: 47.5, altitude: null, accuracy: 5, timestamp: Date.now() }),
 }));
 
+jest.mock('@/lib/referentiel-db', () => ({
+  listLieuxAeriens: jest.fn().mockResolvedValue([]),
+}));
+
+/**
+ * `@react-native-picker/picker` (#prospection-lieu-base) rend un contrôle natif
+ * (RNCPicker) : sous Jest, sa liste d'options n'apparaît pas dans l'arbre de
+ * rendu et il n'existe pas de moyen public de « choisir une option » comme sur
+ * l'appareil. On vérifie donc notre propre câblage (options passées, `onValueChange`)
+ * via un remplacement fidèle au contrat du vrai composant (`onValueChange`/`children`
+ * de `Picker.Item`), rendu en éléments pressables ordinaires — la sélection
+ * effectivement restaurée se vérifie via le payload envoyé à l'enregistrement
+ * (« Suivant »), pas via un rendu visuel de l'état sélectionné : le rendu et les
+ * gestes natifs du composant réel restent hors périmètre de ce test (déjà
+ * couverts par la bibliothèque elle-même).
+ */
+jest.mock('@react-native-picker/picker', () => {
+  const React = require('react');
+  const { Text, TouchableOpacity, View } = require('react-native');
+  function Picker({ onValueChange, children }: any) {
+    // `children` mélange un élément statique (l'option vide) et un tableau
+    // (`lieuxBasePrincipale.map(...)`) : deux « slots » imbriqués, pas une liste
+    // plate — `Children.toArray` aplatit les deux avant de les parcourir.
+    return (
+      <View>
+        {React.Children.toArray(children).map((item: any) => (
+          <TouchableOpacity key={item.props.value} onPress={() => onValueChange(item.props.value)}>
+            <Text>{item.props.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  }
+  Picker.Item = function PickerItem() {
+    return null;
+  };
+  return { Picker };
+});
+
 describe('ExtensiveReferenceScreen — restauration après hydratation tardive du draft', () => {
   beforeEach(() => {
     jest.mocked(prospectionRepository.updateProspectionExtensiveReference).mockClear();
     jest.mocked(location.getCurrentPosition).mockClear();
+    jest.mocked(referentielDb.listLieuxAeriens).mockClear().mockResolvedValue([]);
     useProspectionWizardStore.setState({ draft: null, captures: [] });
   });
 
@@ -184,10 +230,12 @@ describe('ExtensiveReferenceScreen — restauration après hydratation tardive d
  * depuis la base locale, et se réenregistrent avec la durée recalculée à l'identique.
  */
 describe('ExtensiveReferenceScreen — mode aérien', () => {
+  afterEach(cleanup);
   beforeEach(() => {
     jest.mocked(prospectionRepository.updateProspectionExtensiveReference).mockClear();
     jest.mocked(prospectionRepository.listOperationsAeriennes).mockClear().mockResolvedValue([]);
     jest.mocked(prospectionRepository.saveOperationsAeriennes).mockClear();
+    jest.mocked(referentielDb.listLieuxAeriens).mockClear().mockResolvedValue([]);
     useProspectionWizardStore.setState({ draft: null, captures: [] });
   });
 
@@ -205,7 +253,132 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
     expect(prospectionRepository.listOperationsAeriennes).not.toHaveBeenCalled();
   });
 
+  /**
+   * #prospection-lieu-base : référentiel `lieu_aerien` pas encore peuplé (ou pas
+   * encore synchronisé sur l'appareil) — un champ sans aucun chip serait
+   * indiscernable d'un bug. Le message doit orienter vers l'administration web,
+   * seul endroit où un lieu aérien peut être créé (aucune création de
+   * référentiel n'est possible depuis le mobile).
+   */
+  it('Base (mode aérien) : référentiel vide → message renvoyant vers l’administration web, aucun chip', async () => {
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'extensive',
+        date_prospection: '2026-08-25',
+        latitude: -18.9,
+        longitude: 47.5,
+        mode_extensif: 'aerien',
+      } as any,
+      captures: [],
+    });
+
+    await render(<ExtensiveReferenceScreen />);
+    await screen.findByText('Base');
+
+    expect(
+      screen.getByText(/Aucune base disponible.*administration web.*Lieux aériens/s)
+    ).toBeVisible();
+  });
+
+  /**
+   * #prospection-lieu-base : sélection d'une base sur une fiche neuve (aucun
+   * `lieu_base_id` déjà enregistré) — tous les types du référentiel sont
+   * proposés (principale/secondaire/stand), chaque option affichant son type
+   * pour lever l'ambiguïté (pas de filtre par type — décision revue après
+   * retour terrain : une base « secondaire » du référentiel reste une base
+   * valide pour la prospection).
+   */
+  it('Base (mode aérien) : sélectionne un lieu du référentiel, propose tous les types avec le type dans le libellé', async () => {
+    jest.mocked(referentielDb.listLieuxAeriens).mockResolvedValue([
+      { id: 'lieu-1', type_lieu: 'principale', nom: 'Tuléar' },
+      { id: 'lieu-2', type_lieu: 'secondaire', nom: 'Ambovombe' },
+      { id: 'lieu-3', type_lieu: 'stand', nom: 'Betioky' },
+    ]);
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'extensive',
+        date_prospection: '2026-08-25',
+        latitude: -18.9,
+        longitude: 47.5,
+        mode_extensif: 'aerien',
+      } as any,
+      captures: [],
+    });
+
+    await render(<ExtensiveReferenceScreen />);
+    await screen.findByText('Tuléar (Principale)');
+    // Laisse l'effet de restauration tardive du brouillon (`refHydratedRef`, qui
+    // réapplique lieu_base_id depuis `draft` sur un timer microtâche) se stabiliser
+    // avant d'interagir — sinon il peut écraser la sélection ci-dessous.
+    await settle();
+
+    // Option vide (généralisée) + les trois lieux, quel que soit leur type.
+    expect(screen.getByText('— Aucune (généralisée) —')).toBeVisible();
+    expect(screen.getByText('Ambovombe (Secondaire)')).toBeVisible();
+    expect(screen.getByText('Betioky (Stand)')).toBeVisible();
+
+    fireEvent.press(screen.getByText('Tuléar (Principale)'));
+    // Laisse React réconcilier avant de presser « Suivant » — sinon son gestionnaire
+    // reste lié à la fermeture du rendu précédent (lieuBaseId encore `null`), comme
+    // pour toute paire de `fireEvent.press` consécutifs sur cet écran.
+    await settle();
+    fireEvent.press(screen.getByText('Suivant : Imagos ›'));
+    await waitFor(() =>
+      expect(prospectionRepository.updateProspectionExtensiveReference).toHaveBeenCalledWith(
+        'draft-123',
+        expect.objectContaining({ lieuBaseId: 'lieu-1' })
+      )
+    );
+  });
+
+  /**
+   * #prospection-lieu-base : choisir l'option de tête (« Aucune (généralisée) »)
+   * désélectionne la base — couvre l'opération aérienne « généralisée », non
+   * rattachée à une base.
+   */
+  it('Base (mode aérien) : sélectionner « Aucune (généralisée) » désélectionne le lieu déjà enregistré', async () => {
+    jest.mocked(referentielDb.listLieuxAeriens).mockResolvedValue([
+      { id: 'lieu-1', type_lieu: 'principale', nom: 'Tuléar' },
+    ]);
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'extensive',
+        date_prospection: '2026-08-25',
+        latitude: -18.9,
+        longitude: 47.5,
+        mode_extensif: 'aerien',
+        lieu_base_id: 'lieu-1',
+      } as any,
+      captures: [],
+    });
+
+    await render(<ExtensiveReferenceScreen />);
+    await screen.findByText('Tuléar (Principale)');
+    // Laisse l'effet de restauration tardive du brouillon se stabiliser avant
+    // d'interagir (cf. commentaire du test précédent) — sinon il peut réappliquer
+    // lieu_base_id APRÈS l'interaction ci-dessous et annuler la désélection.
+    await settle();
+
+    fireEvent.press(screen.getByText('— Aucune (généralisée) —'));
+    // Laisse React réconcilier avant de presser « Suivant » — sinon son gestionnaire
+    // reste lié à la fermeture précédente.
+    await settle();
+    fireEvent.press(screen.getByText('Suivant : Imagos ›'));
+    await waitFor(() =>
+      expect(prospectionRepository.updateProspectionExtensiveReference).toHaveBeenCalledWith(
+        'draft-123',
+        expect.objectContaining({ lieuBaseId: null })
+      )
+    );
+  });
+
   it('restaure les infos équipe/aéronef et une opération déjà enregistrée, calcule le total, et réenregistre à l’identique', async () => {
+    jest.mocked(referentielDb.listLieuxAeriens).mockResolvedValue([
+      { id: 'lieu-1', type_lieu: 'principale', nom: 'Tuléar' },
+    ]);
     jest.mocked(prospectionRepository.listOperationsAeriennes).mockResolvedValue([
       {
         type_operation: 'prospection',
@@ -233,8 +406,7 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
         pilote: 'Jean Rakoto',
         mecanicien: 'Marc Andria',
         chef_de_base: 'Sarah Ravelo',
-        base: 'Tuléar',
-        base_secondaire: 'Ihosy',
+        lieu_base_id: 'lieu-1',
       } as any,
       captures: [],
     });
@@ -246,11 +418,13 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
     expect(screen.getByText('INFORMATIONS AÉRONEF / ÉQUIPE')).toBeVisible();
     expect(screen.getByText('Aéronef')).toBeVisible();
     expect(screen.getByText('Équipe')).toBeVisible();
-    // « Base » est à la fois le sous-groupe et le label du champ « Base » lui-même.
+    // « Base » est le sous-groupe ; le lieu déjà enregistré est présélectionné
+    // dans la liste déroulante.
     expect(screen.getAllByText('Base').length).toBeGreaterThan(0);
     expect(await screen.findByDisplayValue('Air Acridien')).toBeVisible();
     expect(screen.getByDisplayValue('5R-ABC')).toBeVisible();
     expect(screen.getByDisplayValue('Jean Rakoto')).toBeVisible();
+    expect(screen.getByText('Tuléar (Principale)')).toBeVisible();
 
     // Opération restaurée : heures affichées, total calculé sans re-saisie.
     expect(screen.getByText('08:00')).toBeVisible();
@@ -270,8 +444,7 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
           pilote: 'Jean Rakoto',
           mecanicien: 'Marc Andria',
           chefDeBase: 'Sarah Ravelo',
-          base: 'Tuléar',
-          baseSecondaire: 'Ihosy',
+          lieuBaseId: 'lieu-1',
         })
       )
     );

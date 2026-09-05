@@ -39,6 +39,7 @@ const MIGRATED_COLUMNS = [
   { name: 'chef_de_base' },
   { name: 'base' },
   { name: 'base_secondaire' },
+  { name: 'lieu_base_id' },
   { name: 'pesticides_embarques' },
   { name: 'pesticide_nom_commercial' },
   { name: 'pesticide_quantite_disponible' },

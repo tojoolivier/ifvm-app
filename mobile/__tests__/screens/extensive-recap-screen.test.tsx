@@ -9,6 +9,7 @@ import { render, screen } from '@testing-library/react-native';
 import ExtensiveRecapScreen from '@/app/(prospection)/extensive-recap';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import * as prospectionRepository from '@/lib/prospection-repository';
+import * as referentielDb from '@/lib/referentiel-db';
 import { formatHeureLocale } from '@/lib/prospection-fiche-lecture';
 
 jest.mock('expo-router', () =>
@@ -27,6 +28,10 @@ jest.mock('@/lib/prospection-repository', () => ({
     if (typeof value === 'number') return value !== 0;
     return null;
   },
+}));
+
+jest.mock('@/lib/referentiel-db', () => ({
+  listLieuxAeriens: jest.fn().mockResolvedValue([]),
 }));
 
 const DRAFT_BASE = {
@@ -258,11 +263,13 @@ describe('ExtensiveRecapScreen — mode aérien : pesticides embarqués + signat
     pilote: 'Jean Rakoto',
     mecanicien: 'Marc Andria',
     chef_de_base: 'Sarah Ravelo',
-    base: 'Tuléar',
-    base_secondaire: 'Ihosy',
+    lieu_base_id: 'lieu-1',
   };
 
   beforeEach(() => {
+    jest.mocked(referentielDb.listLieuxAeriens).mockResolvedValue([
+      { id: 'lieu-1', type_lieu: 'principale', nom: 'Tuléar' },
+    ]);
     jest.mocked(prospectionRepository.listAllProspectionPopulations).mockResolvedValue([]);
     jest.mocked(prospectionRepository.listOperationsAeriennes).mockResolvedValue([
       {
@@ -340,7 +347,8 @@ describe('ExtensiveRecapScreen — mode aérien : pesticides embarqués + signat
     // Références aériennes
     expect(screen.getByText('Air Acridien')).toBeVisible();
     expect(screen.getByText('5R-ABC')).toBeVisible();
-    expect(screen.getByText('Ihosy')).toBeVisible();
+    expect(screen.getByText('Tuléar')).toBeVisible();
+    expect(screen.queryByText('Base secondaire')).toBeNull();
 
     // Opérations + Total heure de vol par opération (150 min = 02:30, 135 min = 02:15,
     // franchissement de minuit 23:00 → 01:15 inclus) + Total jour = 285 min = 04:45.
