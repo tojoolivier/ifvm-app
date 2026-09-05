@@ -1239,6 +1239,29 @@ export const apiClient = {
   },
 
   /**
+   * POST /traitements/{id}/valider — dernier verrou avant verrouillage définitif
+   * (CDG §9) : transitionne la fiche en `validee` et persiste les signatures
+   * (nom + tracé). Jette sur toute erreur (404/403/422) — l'appelant décide du
+   * traitement, il n'y a pas de statut « à mettre en cache » comme pour syncTraitement.
+   */
+  validerTraitement: async (
+    token: string,
+    traitementId: string,
+    body: components['schemas']['ValiderTraitementRequest'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['TraitementRead']> => {
+    return makeRequest<components['schemas']['TraitementRead']>(
+      `/traitements/${traitementId}/valider`,
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      },
+      token,
+      onUnauthorized
+    );
+  },
+
+  /**
    * POST /traitements/sync
    *
    * Contrairement à makeRequest(), ne jette pas sur un

@@ -262,6 +262,10 @@ class ProduitUtiliseRead(BaseModel):
 class SignatureCreate(BaseModel):
     role: RoleSignature
     signataire_nom: str = Field(..., min_length=1, max_length=255)
+    # Tracé du pavé de signature (mobile), chemin SVG — migration 0049. Facultatif
+    # au niveau du schéma (rétrocompatibilité), la saisie mobile l'exige avant de
+    # permettre la validation d'un rôle.
+    signature_image: str | None = None
 
 
 class ValiderTraitementRequest(BaseModel):
@@ -275,6 +279,7 @@ class SignatureRead(BaseModel):
     id: uuid.UUID
     role: RoleSignature
     signataire_nom: str
+    signature_image: str | None = None
     horodatage: datetime
 
 

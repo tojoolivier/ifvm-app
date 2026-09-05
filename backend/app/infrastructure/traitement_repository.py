@@ -382,6 +382,7 @@ class TraitementRepositoryImpl(TraitementRepository):
                     traitement_id=traitement_id,
                     role=signature.role,
                     signataire_nom=signature.signataire_nom,
+                    signature_image=signature.signature_image,
                     horodatage=signature.horodatage,
                 )
             )
@@ -703,6 +704,7 @@ class TraitementRepositoryImpl(TraitementRepository):
                     traitement_id=s.traitement_id,
                     role=s.role,
                     signataire_nom=s.signataire_nom,
+                    signature_image=s.signature_image,
                     horodatage=s.horodatage,
                 )
                 for s in model.signatures

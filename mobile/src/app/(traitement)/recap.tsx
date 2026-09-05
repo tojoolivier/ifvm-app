@@ -2,11 +2,17 @@ import { useCallback, useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { getTraitement, countUnsyncedTraitements, DraftTraitement } from '@/lib/traitement-repository';
+import {
+  getTraitement,
+  countUnsyncedTraitements,
+  markTraitementValidee,
+  DraftTraitement,
+} from '@/lib/traitement-repository';
 import { enregistrerEtSynchroniserTraitement } from '@/lib/traitement-sync';
+import { apiClient } from '@/lib/api-client';
 import { estToutParti, resumerEnPhrase } from '@/lib/sync-lot';
 import { useAuthStore } from '@/lib/auth-store';
-import { useTraitementCaptureStore, SignatureRole } from '@/lib/traitement-capture-store';
+import { SignatureRole } from '@/lib/traitement-capture-store';
 import { listUtilisateursByRole, listLieuxAeriens, UtilisateurEquipe, LieuAerien } from '@/lib/referentiel-db';
 import {
   aggregateRecapErrors,
@@ -31,6 +37,48 @@ import { EtatVide } from '@/components/erreurs/etat-vide';
 const CONTROL_LABELS_AERIEN = ['Références', 'Cibles', 'Équipe', 'Traitement', 'Moyens & protection', 'Impacts & risque', 'Signatures'];
 const CONTROL_LABELS_TERRESTRE = ['Références', 'Cibles', 'Équipe', 'Moyens & protection', 'Impacts & risque', 'Signatures'];
 
+/** #signatures-auto-equipe §9 : la carte « Signatures » du récapitulatif liste
+ * chaque rôle avec le nom résolu depuis « Équipe » et son état de signature. */
+const SIGNATURE_ROLE_LABELS: Record<SignatureRole, string> = {
+  PILOTE: 'Pilote',
+  MECANICIEN: 'Mécanicien',
+  CHEF_DE_BASE: 'Chef de base',
+  CHEF_EQUIPE: "Chef d'équipe",
+  CONSULTANT_INTERNATIONAL: 'Consultant',
+};
+
+/**
+ * Dernier verrou (CDG §9) : envoie les signatures accumulées localement (nom +
+ * tracé) à `POST /traitements/{id}/valider`, puis réécrit la fiche locale avec
+ * les valeurs canoniques serveur (#signatures-auto-equipe §6) — verrouillage
+ * définitif, jamais rejoué pour une fiche déjà `validee` (appelant s'en assure).
+ */
+async function validerEtVerrouillerSurServeur(draft: DraftTraitement, token: string): Promise<void> {
+  const signatures = (draft.signatures ?? [])
+    .filter((s) => !!s.signature_image && !!s.signataire_nom)
+    .map((s) => ({
+      role: s.role as 'PILOTE' | 'MECANICIEN' | 'CHEF_DE_BASE' | 'CHEF_EQUIPE' | 'CONSULTANT_INTERNATIONAL',
+      signataire_nom: s.signataire_nom!,
+      signature_image: s.signature_image,
+    }));
+  const serveur = await apiClient.validerTraitement(token, draft.id, {
+    date_validation: draft.date_validation as string,
+    signatures,
+  });
+  await markTraitementValidee(
+    draft.id,
+    serveur.date_validation,
+    (serveur.signatures ?? []).map((s) => ({
+      id: s.id,
+      traitement_id: draft.id,
+      role: s.role,
+      signataire_nom: s.signataire_nom,
+      signature_image: s.signature_image ?? null,
+      horodatage: s.horodatage,
+    }))
+  );
+}
+
 /** Une ligne « libellé : valeur » des cartes Équipe/Traitement — « — » si absent,
  * jamais une ligne masquée (un champ facultatif vide reste visible, cf. #equipe-slide-aerien). */
 function RecapLigne({ label, value }: { label: string; value: string | null | undefined }) {
@@ -45,7 +93,6 @@ function RecapLigne({ label, value }: { label: string; value: string | null | un
 export default function RecapScreen() {
   const router = useRouter();
   const { traitementId, isValidationView } = useLocalSearchParams<{ traitementId: string; isValidationView?: string }>();
-  const store = useTraitementCaptureStore();
   const token = useAuthStore((s) => s.token);
   const toast = useTraitementToast();
   const readOnly = isValidationView === '1';
@@ -63,8 +110,12 @@ export default function RecapScreen() {
   const logError = useErrorLogStore((s) => s.addEntry);
 
   useEffect(() => {
-    if (draft?.type_traitement !== 'AERIEN') return;
-    listUtilisateursByRole('chef_de_base')
+    if (!draft) return;
+    // Chef de base (aérien) et chef d'équipe (terrestre) sont les deux seuls
+    // rôles de signature restés une FK utilisateur — résolus ici pour la carte
+    // « Signatures » (#signatures-auto-equipe), au même titre que « Équipe ».
+    const role = draft.type_traitement === 'AERIEN' ? 'chef_de_base' : 'chef_equipe';
+    listUtilisateursByRole(role)
       .then(setPersonnes)
       .catch((error) => logError({
         message: toFriendlyError(error).message,
@@ -72,14 +123,17 @@ export default function RecapScreen() {
         screen: 'recap',
         context: { traitementId, source: 'listUtilisateursByRole' },
       }));
-    listLieuxAeriens()
-      .then(setLieuxAeriens)
-      .catch((error) => logError({
-        message: toFriendlyError(error).message,
-        stack: error instanceof Error ? error.stack ?? null : null,
-        screen: 'recap',
-        context: { traitementId, source: 'listLieuxAeriens' },
-      }));
+    if (draft.type_traitement === 'AERIEN') {
+      listLieuxAeriens()
+        .then(setLieuxAeriens)
+        .catch((error) => logError({
+          message: toFriendlyError(error).message,
+          stack: error instanceof Error ? error.stack ?? null : null,
+          screen: 'recap',
+          context: { traitementId, source: 'listLieuxAeriens' },
+        }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft?.type_traitement, traitementId, logError]);
 
   const nomPersonne = (id: string | null | undefined): string | null => {
@@ -89,6 +143,22 @@ export default function RecapScreen() {
   };
   const nomLieu = (id: string | null | undefined): string | null =>
     id ? lieuxAeriens.find((l) => l.id === id)?.nom ?? null : null;
+
+  /** Nom du signataire attendu pour un rôle — même résolution que l'écran
+   * Signatures (#signatures-auto-equipe §5) : jamais une saisie indépendante. */
+  const nomPourRole = (role: SignatureRole): string | null => {
+    if (draft?.type_traitement === 'AERIEN' && draft.aerien) {
+      if (role === 'PILOTE') return draft.aerien.pilote || null;
+      if (role === 'MECANICIEN') return draft.aerien.mecanicien || null;
+      if (role === 'CHEF_DE_BASE') return nomPersonne(draft.aerien.chef_de_base_id);
+      if (role === 'CONSULTANT_INTERNATIONAL') return draft.aerien.consultant_international || null;
+    }
+    if (draft?.type_traitement === 'TERRESTRE' && draft.terrestre) {
+      if (role === 'CHEF_EQUIPE') return nomPersonne(draft.terrestre.chef_equipe_id);
+      if (role === 'CONSULTANT_INTERNATIONAL') return draft.terrestre.consultant_international || null;
+    }
+    return null;
+  };
 
   const chargerRecap = useCallback(() => {
     if (!traitementId) return;
@@ -137,6 +207,13 @@ export default function RecapScreen() {
     );
   }
 
+  // « Signé » se lit désormais dans la fiche persistée localement (SQLite,
+  // `traitement_signature`), pas dans un state éphémère (#signatures-auto-equipe
+  // §6) : une signature tracée puis « VALIDÉE » doit compter ici même après
+  // fermeture/réouverture de la fiche, avant tout envoi au serveur.
+  const estSigne = (role: SignatureRole): boolean =>
+    (draft.signatures ?? []).some((s) => s.role === role && !!s.signature_image);
+
   const signatureMatrix: (ReturnType<typeof computeSignatureMatrix>[number] & { signe: boolean })[] =
     draft.type_traitement === 'AERIEN'
       ? computeSignatureMatrix('AERIEN', {
@@ -144,12 +221,12 @@ export default function RecapScreen() {
           mecanicien: draft.aerien?.mecanicien,
           chef_de_base_id: draft.aerien?.chef_de_base_id,
           consultant_international: draft.aerien?.consultant_international,
-        }).map((r) => ({ ...r, signe: !!store.signed[r.role as SignatureRole] }))
+        }).map((r) => ({ ...r, signe: estSigne(r.role as SignatureRole) }))
       : computeSignatureMatrix('TERRESTRE', {
           chef_equipe_id: draft.terrestre?.chef_equipe_id,
           agent_encadreur_id: draft.terrestre?.agent_encadreur_id,
           consultant_international: draft.terrestre?.consultant_international,
-        }).map((r) => ({ ...r, signe: !!store.signed[r.role as SignatureRole] }));
+        }).map((r) => ({ ...r, signe: estSigne(r.role as SignatureRole) }));
 
   const surfaceTraitee = draft.terrestre ? computeSurfaceTraitee(draft.terrestre) : 0;
   const surfaceCumulee = draft.terrestre
@@ -216,6 +293,26 @@ export default function RecapScreen() {
         // peut avoir échoué. Annoncer « Fiche enregistrée » sans regarder le
         // résumé rendrait un refus 4xx ou un conflit 409 totalement muets —
         // le silence exact que #177 supprime.
+        const estPartie = resume.reussies.includes(draft.id);
+
+        // Dernier verrou (CDG §9) : n'appelle /valider qu'une fois la fiche
+        // réellement arrivée côté serveur (#signatures-auto-equipe §6) — la
+        // chaîne complète FRONTEND → API → BACKEND → BASE DE DONNÉES n'a de
+        // sens que si le traitement existe déjà côté serveur. Hors ligne, les
+        // signatures restent persistées localement (déjà écrites à chaque
+        // VALIDER sur l'écran Signatures) et la validation serveur suivra la
+        // prochaine synchronisation réussie.
+        if (estPartie && draft.statut !== 'validee') {
+          await validerEtVerrouillerSurServeur(draft, token!).catch((error) => {
+            logError({
+              message: toFriendlyError(error).message,
+              stack: error instanceof Error ? error.stack ?? null : null,
+              screen: 'recap',
+              context: { traitementId, source: 'validerTraitement' },
+            });
+          });
+        }
+
         toast.show(
           estToutParti(resume)
             ? 'Fiche enregistrée et synchronisée'
@@ -285,6 +382,19 @@ export default function RecapScreen() {
               </Text>
             </Card>
           </>
+        )}
+
+        {signatureMatrix.length > 0 && (
+          <Card>
+            <Text style={styles.sectionTitle}>Signatures</Text>
+            {signatureMatrix.map((r) => (
+              <RecapLigne
+                key={r.role}
+                label={SIGNATURE_ROLE_LABELS[r.role as SignatureRole]}
+                value={`${nomPourRole(r.role as SignatureRole) ?? '—'} — ${r.signe ? 'Signature validée' : 'Non signée'}`}
+              />
+            ))}
+          </Card>
         )}
 
         <Card variant={unsyncedCount > 0 ? 'avertissement' : 'info'}>

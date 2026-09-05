@@ -333,6 +333,9 @@ class TraitementSignatureModel(Base):
     )
     role: Mapped[str] = mapped_column(String(30), nullable=False)
     signataire_nom: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Tracé du pavé de signature (mobile), chemin SVG — migration 0049. Nullable :
+    # rétrocompatibilité avec les lignes déjà écrites avant cette migration.
+    signature_image: Mapped[str | None] = mapped_column(Text(), nullable=True)
     horodatage: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, default=datetime.utcnow
     )
