@@ -17,8 +17,8 @@ def payload_traitement(chef_de_base, pilote, mecanicien, lieu_aerien):
             "date_validation": "2026-08-10",
             "localite": "Betioky",
             "aerien": {
-                "pilote_id": str(pilote.id),
-                "mecanicien_id": str(mecanicien.id),
+                "pilote": f"{pilote.prenom} {pilote.nom}",
+                "mecanicien": f"{mecanicien.prenom} {mecanicien.nom}",
                 "chef_de_base_id": str(chef_de_base.id),
                 "lieu_base_principale_id": str(lieu_aerien.id),
                 "immatricule_aeronef": "5R-ABC",
@@ -75,7 +75,7 @@ async def test_create_traitement_aerien_brouillon(
     assert body["numero_fiche"] == "Hery-Aerien-2026-08-11"
     assert body["cible"]["espece"] == "LMC"
     assert body["cible"]["surface_infestee_ha"] == 120.5
-    assert body["aerien"]["pilote_id"] == str(pilote.id)
+    assert body["aerien"]["pilote"] == f"{pilote.prenom} {pilote.nom}"
     assert body["observations"] is None
 
 
@@ -125,6 +125,18 @@ async def test_create_rejette_mauvais_role_403(
     payload["aerien"]["chef_de_base_id"] = str(utilisateur.id)
     resp = await client.post("/traitements", json=payload, headers=auth_headers)
     assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_create_rejette_pilote_identique_au_chef_de_base_422(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+):
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    payload = payload_traitement(prospection_id)
+    payload["aerien"]["pilote"] = "Hery Andria"  # même nom que chef_de_base (fixture)
+    resp = await client.post("/traitements", json=payload, headers=auth_headers)
+    assert resp.status_code == 422
+    assert "Cette personne est déjà affectée à un autre rôle" in resp.json()["detail"]
 
 
 @pytest.mark.asyncio
@@ -1085,7 +1097,7 @@ async def test_valider_aerien_consultant_renseigne_sans_signature_422(
 ):
     prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
     payload = payload_traitement(prospection_id)
-    payload["aerien"]["consultant_id"] = str(utilisateur.id)
+    payload["aerien"]["consultant_international"] = "Dr. Smith"
     created = await client.post("/traitements", json=payload, headers=auth_headers)
     traitement_id = created.json()["id"]
 

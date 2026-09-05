@@ -81,10 +81,10 @@ export interface Cible {
 
 export interface TraitementAerien {
   traitement_id: string;
-  pilote_id: string;
-  mecanicien_id: string;
+  pilote: string;
+  mecanicien: string;
   chef_de_base_id: string;
-  consultant_id: string | null;
+  consultant_international: string | null;
   immatricule_aeronef: string | null;
   lieu_base_principale_id: string | null;
   lieu_stand_id: string | null;
@@ -193,10 +193,10 @@ export interface DraftTraitementAerienInput {
   id: string;
   prospectionId: string;
   dateTraitement?: string | null;
-  piloteId: string;
-  mecanicienId: string;
+  pilote: string;
+  mecanicien: string;
   chefDeBaseId: string;
-  consultantId?: string | null;
+  consultantInternational?: string | null;
 }
 
 export interface DraftTraitementTerrestreInput {
@@ -273,9 +273,15 @@ export async function createDraftTraitementAerien(
 
   await db.runAsync(
     `INSERT INTO traitement_aerien (
-      traitement_id, pilote_id, mecanicien_id, chef_de_base_id, consultant_id
+      traitement_id, pilote, mecanicien, chef_de_base_id, consultant_international
     ) VALUES (?, ?, ?, ?, ?)`,
-    [input.id, input.piloteId, input.mecanicienId, input.chefDeBaseId, input.consultantId ?? null]
+    [
+      input.id,
+      input.pilote,
+      input.mecanicien,
+      input.chefDeBaseId,
+      input.consultantInternational ?? null,
+    ]
   );
 
   const created = await getTraitement(input.id);
@@ -409,10 +415,10 @@ export async function updateTraitementReference(
  */
 
 export interface AerienUpdateInput {
-  piloteId: string;
-  mecanicienId: string;
+  pilote: string;
+  mecanicien: string;
   chefDeBaseId: string;
-  consultantId?: string | null;
+  consultantInternational?: string | null;
   immatriculeAeronef?: string | null;
   // Base principale/stand/base secondaire (référentiel lieu_aerien) — écran « Équipe »
   // (#equipe-slide-aerien). Base principale obligatoire (validée en amont par
@@ -430,20 +436,20 @@ export async function updateTraitementAerien(
 
   await db.runAsync(
     `UPDATE traitement_aerien SET
-      pilote_id = ?,
-      mecanicien_id = ?,
+      pilote = ?,
+      mecanicien = ?,
       chef_de_base_id = ?,
-      consultant_id = ?,
+      consultant_international = ?,
       immatricule_aeronef = ?,
       lieu_base_principale_id = ?,
       lieu_stand_id = ?,
       lieu_base_secondaire_id = ?
      WHERE traitement_id = ?`,
     [
-      input.piloteId,
-      input.mecanicienId,
+      input.pilote,
+      input.mecanicien,
       input.chefDeBaseId,
-      input.consultantId ?? null,
+      input.consultantInternational ?? null,
       input.immatriculeAeronef ?? null,
       input.lieuBasePrincipaleId ?? null,
       input.lieuStandId ?? null,

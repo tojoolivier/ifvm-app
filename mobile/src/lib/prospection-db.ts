@@ -732,15 +732,21 @@ const COLONNES_TRAITEMENT_AERIEN: readonly Colonne[] = [
   // de total_pesticide_l (rotations dosées au litre).
   { name: 'total_pesticide_kg', type: 'REAL' },
   // pilote/mecanicien/consultant_international (texte libre) -> FK utilisateur
-  // (migration backend 0047). Une installation existante garde ses anciennes
-  // colonnes texte, abandonnées mais non supprimées (SQLite ne sait pas migrer
-  // un nom libre vers un id référentiel) — même patron que les colonnes
-  // abandonnées ailleurs dans ce fichier (ex. `numero_cuve`, désormais dérivé
-  // côté serveur). L'agent doit resélectionner pilote/mécanicien/consultant
-  // sur tout brouillon aérien créé avant ce changement.
+  // (migration backend 0047), puis retour au texte libre (migration backend
+  // 0048 — décision produit revenue en arrière après livraison). Les 3 colonnes
+  // FK ci-dessous restent déclarées pour les installations qui les ont déjà
+  // (colonnes mortes, plus jamais lues/écrites) — même principe que les
+  // colonnes abandonnées ailleurs dans ce fichier (ex. `numero_cuve`).
   { name: 'pilote_id', type: 'TEXT' },
   { name: 'mecanicien_id', type: 'TEXT' },
   { name: 'consultant_id', type: 'TEXT' },
+  // pilote/mécanicien redevenus obligatoires en texte libre, consultant_international
+  // facultatif — #equipe-slide-aerien (retour arrière). Nullable ici comme toute
+  // colonne ajoutée après coup : la contrainte d'obligation n'existe que côté
+  // validation applicative (`validateAerienEquipe`), pas dans ce schéma SQLite.
+  { name: 'pilote', type: 'TEXT' },
+  { name: 'mecanicien', type: 'TEXT' },
+  { name: 'consultant_international', type: 'TEXT' },
   // Base principale/stand/base secondaire (référentiel lieu_aerien) — écran « Équipe »
   // (#equipe-slide-aerien). Base principale obligatoire côté saisie/validation, mais
   // nullable ici comme le reste des colonnes ajoutées après coup : la contrainte
