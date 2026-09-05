@@ -1,8 +1,9 @@
 /**
- * Écran « Équipe » (traitement.tsx) — #equipe-slide-aerien. Personnes (chef de base,
- * pilote, mécanicien, consultant), aéronef (immatriculation) et rattachement (base
- * principale/stand/base secondaire, référentiel lieu_aerien) — distincts du slide
- * « Traitement » (rotations.tsx) qui garde pesticides/rotations/opérations.
+ * Écran « Équipe » (traitement.tsx) — #equipe-slide-aerien, puis retour au texte
+ * libre pour pilote/mécanicien/consultant (migration backend 0048). Chef de base
+ * reste sélectionné dans le référentiel (FK) ; pilote/mécanicien/consultant sont
+ * désormais de simples champs texte ; base principale/stand/base secondaire
+ * restent sélectionnées dans le référentiel `lieu_aerien` (ticket 4), inchangé.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import TraitementScreen from '@/app/(traitement)/traitement';
@@ -77,9 +78,6 @@ const RESET_STATE = {
 };
 
 const CHEF_DE_BASE = { id: 'chef-1', nom: 'Ravelo', prenom: 'Sarah' };
-const PILOTE = { id: 'pilote-1', nom: 'Rakoto', prenom: 'Jean' };
-const MECANICIEN = { id: 'mecanicien-1', nom: 'Andria', prenom: 'Marc' };
-const CONSULTANT = { id: 'consultant-1', nom: 'Smith', prenom: 'John' };
 
 const LIEU_PRINCIPALE = { id: 'lieu-1', type_lieu: 'principale', nom: 'Tuléar' };
 const LIEU_STAND = { id: 'lieu-2', type_lieu: 'stand', nom: 'Betioky' };
@@ -87,23 +85,14 @@ const LIEU_SECONDAIRE = { id: 'lieu-3', type_lieu: 'secondaire', nom: 'Ambovombe
 
 function mockReferentiel({
   chefsDeBase = [CHEF_DE_BASE],
-  pilotes = [PILOTE],
-  mecaniciens = [MECANICIEN],
-  consultants = [CONSULTANT],
   lieuxAeriens = [LIEU_PRINCIPALE, LIEU_STAND, LIEU_SECONDAIRE],
 }: Partial<{
   chefsDeBase: typeof CHEF_DE_BASE[];
-  pilotes: typeof PILOTE[];
-  mecaniciens: typeof MECANICIEN[];
-  consultants: typeof CONSULTANT[];
   lieuxAeriens: typeof LIEU_PRINCIPALE[];
 }> = {}) {
   const referentielDb = require('@/lib/referentiel-db');
   jest.mocked(referentielDb.listUtilisateursByRole).mockImplementation((role: string) => {
     if (role === 'chef_de_base') return Promise.resolve(chefsDeBase);
-    if (role === 'pilote') return Promise.resolve(pilotes);
-    if (role === 'mecanicien') return Promise.resolve(mecaniciens);
-    if (role === 'consultant_international') return Promise.resolve(consultants);
     return Promise.resolve([]);
   });
   jest.mocked(referentielDb.listLieuxAeriens).mockResolvedValue(lieuxAeriens);
@@ -117,10 +106,10 @@ beforeEach(() => {
     type_traitement: 'AERIEN',
     cible: { surface_infestee_ha: 100 },
     aerien: {
-      pilote_id: null,
-      mecanicien_id: null,
+      pilote: null,
+      mecanicien: null,
       chef_de_base_id: null,
-      consultant_id: null,
+      consultant_international: null,
       immatricule_aeronef: null,
       lieu_base_principale_id: null,
       lieu_stand_id: null,
@@ -143,7 +132,7 @@ describe('TraitementScreen (Équipe) — champs base principale/stand/base secon
     expect(screen.getByText('Ambovombe')).toBeVisible();
   });
 
-  it('sélectionne une base principale, un stand et une base secondaire puis les enregistre', async () => {
+  it('saisit pilote/mécanicien/consultant en texte libre, sélectionne les bases puis enregistre', async () => {
     await render(<TraitementScreen />);
     await screen.findByText('Tuléar');
 
@@ -156,9 +145,9 @@ describe('TraitementScreen (Équipe) — champs base principale/stand/base secon
 
     fireEvent.press(screen.getByText('Sarah Ravelo'));
     await settle();
-    fireEvent.press(screen.getByText('Jean Rakoto'));
+    fireEvent.changeText(screen.getByPlaceholderText('Nom du pilote'), 'Jean Dupont');
     await settle();
-    fireEvent.press(screen.getByText('Marc Andria'));
+    fireEvent.changeText(screen.getByPlaceholderText('Nom du mécanicien'), 'Marc Rabe');
     await settle();
     fireEvent.changeText(screen.getByPlaceholderText('Ex. 5R-ABC'), '5R-XYZ');
     await settle();
@@ -169,6 +158,9 @@ describe('TraitementScreen (Équipe) — champs base principale/stand/base secon
       expect(traitementRepository.updateTraitementAerien).toHaveBeenCalledWith(
         'trait-1',
         expect.objectContaining({
+          pilote: 'Jean Dupont',
+          mecanicien: 'Marc Rabe',
+          chefDeBaseId: 'chef-1',
           lieuBasePrincipaleId: 'lieu-1',
           lieuStandId: 'lieu-2',
           lieuBaseSecondaireId: 'lieu-3',
@@ -183,25 +175,18 @@ describe('TraitementScreen (Équipe) — champs base principale/stand/base secon
 });
 
 describe('TraitementScreen (Équipe) — distinction obligatoire des rôles', () => {
-  it('bloque « Continuer » quand la même personne est choisie pour deux rôles obligatoires', async () => {
-    // Un seul utilisateur candidat sur tous les rôles : impossible d'éviter le
-    // conflit sans que la règle de distinction s'applique.
-    mockReferentiel({
-      chefsDeBase: [CHEF_DE_BASE],
-      pilotes: [CHEF_DE_BASE],
-      mecaniciens: [MECANICIEN],
-    });
-
+  it('bloque « Continuer » quand la même personne (par le nom) est choisie pour deux rôles obligatoires', async () => {
     await render(<TraitementScreen />);
     await screen.findByText('Tuléar');
 
     fireEvent.press(screen.getByText('Tuléar'));
     await settle();
-    fireEvent.press(screen.getAllByText('Sarah Ravelo')[0]);
+    fireEvent.press(screen.getByText('Sarah Ravelo'));
     await settle();
-    fireEvent.press(screen.getAllByText('Sarah Ravelo')[1] ?? screen.getAllByText('Sarah Ravelo')[0]);
+    // Même nom que le chef de base, saisi en texte libre pour le pilote.
+    fireEvent.changeText(screen.getByPlaceholderText('Nom du pilote'), 'Sarah Ravelo');
     await settle();
-    fireEvent.press(screen.getByText('Marc Andria'));
+    fireEvent.changeText(screen.getByPlaceholderText('Nom du mécanicien'), 'Marc Rabe');
     await settle();
     fireEvent.changeText(screen.getByPlaceholderText('Ex. 5R-ABC'), '5R-XYZ');
     await settle();
@@ -216,6 +201,31 @@ describe('TraitementScreen (Équipe) — distinction obligatoire des rôles', ()
     expect(traitementRepository.updateTraitementAerien).not.toHaveBeenCalled();
     expect(mockPush).not.toHaveBeenCalled();
   });
+
+  it('bloque « Continuer » quand pilote et mécanicien portent le même nom, casse et espaces ignorés', async () => {
+    await render(<TraitementScreen />);
+    await screen.findByText('Tuléar');
+
+    fireEvent.press(screen.getByText('Tuléar'));
+    await settle();
+    fireEvent.press(screen.getByText('Sarah Ravelo'));
+    await settle();
+    fireEvent.changeText(screen.getByPlaceholderText('Nom du pilote'), 'Jean Dupont');
+    await settle();
+    fireEvent.changeText(screen.getByPlaceholderText('Nom du mécanicien'), '  jean   DUPONT  ');
+    await settle();
+    fireEvent.changeText(screen.getByPlaceholderText('Ex. 5R-ABC'), '5R-XYZ');
+    await settle();
+
+    fireEvent.press(screen.getByText('Continuer  ›'));
+
+    expect(
+      await screen.findByText(
+        'Cette personne est déjà affectée à un autre rôle. Veuillez sélectionner une personne différente.'
+      )
+    ).toBeVisible();
+    expect(traitementRepository.updateTraitementAerien).not.toHaveBeenCalled();
+  });
 });
 
 describe('TraitementScreen (Équipe) — restauration après enregistrement', () => {
@@ -225,10 +235,10 @@ describe('TraitementScreen (Équipe) — restauration après enregistrement', ()
       type_traitement: 'AERIEN',
       cible: { surface_infestee_ha: 100 },
       aerien: {
-        pilote_id: 'pilote-1',
-        mecanicien_id: 'mecanicien-1',
+        pilote: 'Jean Dupont',
+        mecanicien: 'Marc Rabe',
         chef_de_base_id: 'chef-1',
-        consultant_id: 'consultant-1',
+        consultant_international: 'John Smith',
         immatricule_aeronef: '5R-ABC',
         lieu_base_principale_id: 'lieu-1',
         lieu_stand_id: 'lieu-2',
@@ -241,6 +251,9 @@ describe('TraitementScreen (Équipe) — restauration après enregistrement', ()
     await screen.findByText('Tuléar');
 
     expect(await screen.findByDisplayValue('5R-ABC')).toBeVisible();
+    expect(screen.getByDisplayValue('Jean Dupont')).toBeVisible();
+    expect(screen.getByDisplayValue('Marc Rabe')).toBeVisible();
+    expect(screen.getByDisplayValue('John Smith')).toBeVisible();
 
     fireEvent.press(screen.getByText('Continuer  ›'));
 
@@ -248,10 +261,10 @@ describe('TraitementScreen (Équipe) — restauration après enregistrement', ()
       expect(traitementRepository.updateTraitementAerien).toHaveBeenCalledWith(
         'trait-1',
         expect.objectContaining({
-          piloteId: 'pilote-1',
-          mecanicienId: 'mecanicien-1',
+          pilote: 'Jean Dupont',
+          mecanicien: 'Marc Rabe',
           chefDeBaseId: 'chef-1',
-          consultantId: 'consultant-1',
+          consultantInternational: 'John Smith',
           lieuBasePrincipaleId: 'lieu-1',
           lieuStandId: 'lieu-2',
           lieuBaseSecondaireId: 'lieu-3',

@@ -414,8 +414,8 @@ async def _rotation_reelle(
             "date_validation": "2026-08-10",
             "localite": "Betioky",
             "aerien": {
-                "pilote_id": str(pilote.id),
-                "mecanicien_id": str(mecanicien.id),
+                "pilote": f"{pilote.prenom} {pilote.nom}",
+                "mecanicien": f"{mecanicien.prenom} {mecanicien.nom}",
                 "chef_de_base_id": str(chef_de_base.id),
                 "lieu_base_principale_id": str(lieu_aerien.id),
                 "immatricule_aeronef": "5R-ABC",

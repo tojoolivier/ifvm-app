@@ -2913,23 +2913,17 @@ export interface components {
         };
         /** TraitementAerienCreate */
         TraitementAerienCreate: {
-            /**
-             * Pilote Id
-             * Format: uuid
-             */
-            pilote_id: string;
-            /**
-             * Mecanicien Id
-             * Format: uuid
-             */
-            mecanicien_id: string;
+            /** Pilote */
+            pilote: string;
+            /** Mecanicien */
+            mecanicien: string;
             /**
              * Chef De Base Id
              * Format: uuid
              */
             chef_de_base_id: string;
-            /** Consultant Id */
-            consultant_id?: string | null;
+            /** Consultant International */
+            consultant_international?: string | null;
             /**
              * Lieu Base Principale Id
              * Format: uuid
@@ -2946,23 +2940,17 @@ export interface components {
         };
         /** TraitementAerienRead */
         TraitementAerienRead: {
-            /**
-             * Pilote Id
-             * Format: uuid
-             */
-            pilote_id: string;
-            /**
-             * Mecanicien Id
-             * Format: uuid
-             */
-            mecanicien_id: string;
+            /** Pilote */
+            pilote: string;
+            /** Mecanicien */
+            mecanicien: string;
             /**
              * Chef De Base Id
              * Format: uuid
              */
             chef_de_base_id: string;
-            /** Consultant Id */
-            consultant_id: string | null;
+            /** Consultant International */
+            consultant_international: string | null;
             /**
              * Lieu Base Principale Id
              * Format: uuid

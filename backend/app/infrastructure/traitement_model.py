@@ -124,24 +124,20 @@ class TraitementAerienModel(Base):
     traitement_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("traitement.id", ondelete="CASCADE"), primary_key=True
     )
-    # Équipe : chef de base, pilote, mécanicien obligatoires et distincts
-    # (ck_traitement_aerien_roles_distincts) ; consultant facultatif. Les
-    # quatre pointent vers `utilisateur`, y compris pilote/mécanicien/
-    # consultant qui peuvent être des comptes créés à la volée
-    # (`peut_se_connecter=false`) — seul chef de base doit préexister dans le
-    # référentiel (pas de création à la volée pour ce rôle).
+    # Équipe : chef de base reste une FK utilisateur (référentiel), seul rôle à
+    # devoir préexister. pilote/mécanicien/consultant_international sont
+    # redevenus du texte libre (migration 0048, défait la migration 0047) :
+    # pilote/mécanicien obligatoires, consultant_international facultatif —
+    # même patron que `TraitementTerrestreModel.consultant_international`. La
+    # distinction chef/pilote/mécanicien (ex-ck_traitement_aerien_roles_distincts,
+    # impossible à exprimer en CHECK SQL entre une FK et du texte libre) est
+    # validée côté application (`valider_roles_aerien_distincts`).
     chef_de_base_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("utilisateur.id"), nullable=False
     )
-    pilote_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("utilisateur.id"), nullable=False
-    )
-    mecanicien_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("utilisateur.id"), nullable=False
-    )
-    consultant_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("utilisateur.id"), nullable=True
-    )
+    pilote: Mapped[str] = mapped_column(String(255), nullable=False)
+    mecanicien: Mapped[str] = mapped_column(String(255), nullable=False)
+    consultant_international: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # Base principale obligatoire pour tout traitement aérien (aucune
     # exception, contrairement à la prospection généralisée). Stand nullable :
     # NULL = ravitaillement fait directement à la base (principale ou
@@ -174,15 +170,6 @@ class TraitementAerienModel(Base):
     traitement: Mapped[TraitementModel] = relationship(back_populates="aerien")
     rotations: Mapped[list["RotationModel"]] = relationship(
         back_populates="aerien", cascade="all, delete-orphan", order_by="RotationModel.numero"
-    )
-
-    __table_args__ = (
-        CheckConstraint(
-            "chef_de_base_id <> pilote_id "
-            "AND chef_de_base_id <> mecanicien_id "
-            "AND pilote_id <> mecanicien_id",
-            name="ck_traitement_aerien_roles_distincts",
-        ),
     )
 
 

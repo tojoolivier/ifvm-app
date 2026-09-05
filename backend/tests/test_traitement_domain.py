@@ -24,6 +24,7 @@ from app.domain.traitement import (
     ProduitUtilise,
     ProduitUtiliseIntrouvableError,
     ProspectionIntrouvableError,
+    RolesAerienNonDistinctsError,
     Rotation,
     RotationIntrouvableError,
     SignaturesManquantesError,
@@ -209,8 +210,8 @@ def _args(**overrides):
         date_traitement=date(2026, 8, 11),
         date_validation=date(2026, 8, 10),
         localite="Betioky",
-        pilote_id=uuid.uuid4(),
-        mecanicien_id=uuid.uuid4(),
+        pilote="Jean Dupont",
+        mecanicien="Marc Rabe",
         chef_de_base_id=_CHEF.id,
         lieu_base_principale_id=uuid.uuid4(),
         immatricule_aeronef="5R-XYZ",
@@ -281,6 +282,39 @@ async def test_rejette_chef_de_base_inconnu():
     use_case, _ = _use_case(prospection=_prospection(), chef=None)
     with pytest.raises(ChefDeBaseInvalideError):
         await use_case.execute(**_args())
+
+
+@pytest.mark.asyncio
+async def test_rejette_pilote_identique_au_chef_de_base():
+    chef = UtilisateurRef(id=uuid.uuid4(), prenom="Jean", nom="Dupont", role="chef_de_base")
+    use_case, _ = _use_case(prospection=_prospection(), chef=chef)
+    with pytest.raises(RolesAerienNonDistinctsError):
+        await use_case.execute(**_args(pilote="Jean Dupont"))
+
+
+@pytest.mark.asyncio
+async def test_rejette_pilote_identique_au_chef_de_base_casse_et_espaces_ignores():
+    chef = UtilisateurRef(id=uuid.uuid4(), prenom="Jean", nom="Dupont", role="chef_de_base")
+    use_case, _ = _use_case(prospection=_prospection(), chef=chef)
+    with pytest.raises(RolesAerienNonDistinctsError):
+        await use_case.execute(**_args(pilote="  jean   DUPONT  "))
+
+
+@pytest.mark.asyncio
+async def test_rejette_pilote_identique_au_mecanicien():
+    use_case, _ = _use_case(prospection=_prospection(), chef=_CHEF)
+    with pytest.raises(RolesAerienNonDistinctsError):
+        await use_case.execute(**_args(pilote="Marc Rabe", mecanicien="Marc Rabe"))
+
+
+@pytest.mark.asyncio
+async def test_accepte_consultant_identique_au_pilote():
+    """Le consultant est exempté de la règle de distinction (facultatif, non structurant)."""
+    use_case, _ = _use_case(prospection=_prospection(), chef=_CHEF)
+    traitement = await use_case.execute(
+        **_args(pilote="Jean Dupont", consultant_international="Jean Dupont")
+    )
+    assert traitement.aerien.consultant_international == "Jean Dupont"
 
 
 @pytest.mark.asyncio
@@ -1199,10 +1233,10 @@ async def test_add_produit_sur_traitement_verrouille_leve_verrouille():
 
 def _traitement_aerien_valide(**overrides) -> Traitement:
     args = dict(
-        pilote_id=uuid.uuid4(),
-        mecanicien_id=uuid.uuid4(),
+        pilote="Jean Dupont",
+        mecanicien="Marc Rabe",
         chef_de_base_id=uuid.uuid4(),
-        consultant_id=None,
+        consultant_international=None,
     )
     args.update({k: v for k, v in overrides.items() if k in args})
     aerien = TraitementAerien(**args)
@@ -1261,7 +1295,7 @@ def test_valider_aerien_signature_manquante_pilote_bloque():
 
 
 def test_valider_aerien_consultant_renseigne_sans_signature_bloque():
-    traitement = _traitement_aerien_valide(consultant_id=uuid.uuid4())
+    traitement = _traitement_aerien_valide(consultant_international="Dr. Smith")
     with pytest.raises(SignaturesManquantesError):
         traitement.valider(
             date(2026, 8, 12),
@@ -1274,7 +1308,7 @@ def test_valider_aerien_consultant_renseigne_sans_signature_bloque():
 
 
 def test_valider_aerien_consultant_absent_aucune_signature_requise():
-    traitement = _traitement_aerien_valide(consultant_id=None)
+    traitement = _traitement_aerien_valide(consultant_international=None)
     traitement.valider(
         date(2026, 8, 12),
         [
@@ -1500,8 +1534,8 @@ def test_contenu_diverge_champ_terrestre_different():
 
 
 def test_contenu_diverge_champ_aerien_different():
-    existant = _traitement_aerien_valide(pilote_id=uuid.uuid4())
-    entrant = _traitement_aerien_valide(pilote_id=uuid.uuid4())
+    existant = _traitement_aerien_valide(pilote="Jean Dupont")
+    entrant = _traitement_aerien_valide(pilote="Marc Rabe")
     assert contenu_diverge(existant, entrant) is True
 
 

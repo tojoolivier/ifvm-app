@@ -19,4 +19,4 @@ class UtilisateurRepositoryImpl(UtilisateurRepository):
         user = result.scalar_one_or_none()
         if user is None:
             return None
-        return UtilisateurRef(id=user.id, prenom=user.prenom, role=user.role)
+        return UtilisateurRef(id=user.id, prenom=user.prenom, nom=user.nom, role=user.role)
