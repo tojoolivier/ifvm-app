@@ -124,11 +124,18 @@ const MIGRATED_COLUMNS = [
   { name: 'heure_debut' },
   { name: 'heure_fin' },
   { name: 'nom_commercial' },
+  // Migration backend 0046 (quantite_l -> quantite + unite, surface_ha, heures de vanne)
+  { name: 'unite' },
+  { name: 'surface_ha' },
+  { name: 'heure_ouverture_vanne' },
+  { name: 'heure_fermeture_vanne' },
 
   // Colonnes de traitement_aerien
   { name: 'immatricule_aeronef' },
   { name: 'surface_traitee_ha' },
   { name: 'surface_restante_ha' },
+  // Migration backend 0047 (quantite_l -> quantite + unite, surface_ha, vanne)
+  { name: 'total_pesticide_kg' },
   // pilote/mecanicien/consultant_international (texte libre) -> FK utilisateur
   // (migration backend 0047, cf. prospection-db.ts COLONNES_TRAITEMENT_AERIEN).
   { name: 'pilote_id' },
@@ -479,5 +486,42 @@ describe('prospection-db — renommage de colonne (kit_boite -> kit_botte)', () 
       .mockRejectedValueOnce(new Error('cannot rename column'));
 
     await expect(getDb()).rejects.toBeInstanceOf(LocalWriteError);
+  });
+});
+
+/*
+ * `quantite_l` -> `quantite` sur `rotation` (migration backend 0046) : même
+ * raisonnement que kit_boite -> kit_botte ci-dessus — ne pas perdre les quantités
+ * déjà saisies sous l'ancien nom sur une installation existante.
+ */
+describe('prospection-db — renommage de colonne (rotation.quantite_l -> quantite)', () => {
+  it('renomme quantite_l en quantite quand l’ancienne colonne existe encore', async () => {
+    getAllAsync
+      .mockResolvedValueOnce(MIGRATED_COLUMNS) // prospection
+      .mockResolvedValueOnce(MIGRATED_COLUMNS) // prospection_infestation
+      .mockResolvedValueOnce(MIGRATED_COLUMNS) // prospection_population
+      .mockResolvedValueOnce(MIGRATED_COLUMNS) // prospection_operation_aerienne
+      .mockResolvedValueOnce(MIGRATED_COLUMNS) // traitement (renommage kit_boite)
+      .mockResolvedValueOnce(MIGRATED_COLUMNS) // traitement (ajout de colonnes)
+      .mockResolvedValueOnce([{ name: 'quantite_l' }]); // rotation (avant renommage)
+
+    await getDb();
+
+    const renommage = execAsync.mock.calls.find(([sql]) =>
+      (sql as string).includes('RENAME COLUMN')
+    );
+    expect(renommage?.[0]).toContain(
+      'ALTER TABLE rotation RENAME COLUMN quantite_l TO quantite'
+    );
+  });
+
+  it('ne fait rien si quantite_l est déjà absente (installation neuve ou déjà migrée)', async () => {
+    // MIGRATED_COLUMNS (défaut) ne contient ni quantite_l ni quantite.
+    await getDb();
+
+    const renommage = execAsync.mock.calls.find(([sql]) =>
+      (sql as string).includes('RENAME COLUMN')
+    );
+    expect(renommage).toBeUndefined();
   });
 });

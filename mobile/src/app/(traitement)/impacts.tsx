@@ -9,7 +9,7 @@ import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { logger } from '@/lib/logger';
 import { Chip } from '@/components/traitement/Chip';
-import { ProgressBar } from '@/components/traitement/ProgressBar';
+import { ProgressBar, PROGRESS_SEGMENTS_AERIEN, PROGRESS_SEGMENTS_TERRESTRE } from '@/components/traitement/ProgressBar';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
 
 const AXES_RISQUE: { key: 'ressources_eau' | 'sol' | 'faune_non_cible' | 'abeilles'; label: string }[] = [
@@ -29,6 +29,7 @@ export default function ImpactsScreen() {
   const readOnly = isValidationView === '1';
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('impacts');
+  const typeTraitement = store.typeTraitement;
 
   useEffect(() => {
     if (!traitementId) return;
@@ -48,6 +49,9 @@ export default function ImpactsScreen() {
           // que bloquer la fiche pour une chaîne corrompue.
           logger.ignore(e, 'Impacts corrompus — repli sur des valeurs vides, re-saisissables.');
         }
+        // Défensif (indépendant des écrans visités avant celui-ci dans cette session) —
+        // même garde que signatures.tsx : décide du nombre d'étapes de ProgressBar.
+        store.setTypeTraitement(draft.type_traitement);
         store.updateImp({
           empoisonnement: draft.empoisonnement,
           empoisonnementType: draft.empoisonnement_type as any,
@@ -104,7 +108,10 @@ export default function ImpactsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <ProgressBar currentIndex={4} />
+        <ProgressBar
+          currentIndex={typeTraitement === 'TERRESTRE' ? 4 : 5}
+          segments={typeTraitement === 'TERRESTRE' ? PROGRESS_SEGMENTS_TERRESTRE : PROGRESS_SEGMENTS_AERIEN}
+        />
         <Text style={styles.title}>Impacts & risque</Text>
 
         <Text style={styles.label}>Empoisonnement</Text>

@@ -6,7 +6,6 @@ import {
   getTraitement,
   updateTraitementAerien,
   updateTraitementTerrestre,
-  addRotation,
   addProduitUtilise,
   listReprenableTraitements,
   DraftTraitementRow,
@@ -17,15 +16,13 @@ import { useAuthStore } from '@/lib/auth-store';
 import { generateId } from '@/lib/id';
 import {
   computeTotalPesticideTerrestre,
-  computeTotalPesticideAerien,
   computeSurfaceTraitee,
   computeSurfaceCumulee,
   computeSurfaceRestante,
   computePesticideStockRestant,
   validateTerrestreConditions,
-  validateRotationsHeures,
 } from '@/lib/traitement-validation';
-import { ProgressBar } from '@/components/traitement/ProgressBar';
+import { ProgressBar, PROGRESS_SEGMENTS_AERIEN, PROGRESS_SEGMENTS_TERRESTRE } from '@/components/traitement/ProgressBar';
 import { AerienForm } from '@/components/traitement/AerienForm';
 import { TerrestreForm } from '@/components/traitement/TerrestreForm';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
@@ -68,34 +65,16 @@ export default function TraitementScreen() {
       store.setTypeTraitement(draft.type_traitement);
       setSurfaceInfesteeHa(draft.cible?.surface_infestee_ha ?? null);
       if (draft.type_traitement === 'AERIEN' && draft.aerien) {
+        // Rotations non chargées ici : sous-ressource propre à l'écran « Pesticides &
+        // rotations » (rotations.tsx), qui suit après celui-ci dans le flux aérien.
         store.updateAerien({
           piloteId: draft.aerien.pilote_id || null,
           mecanicienId: draft.aerien.mecanicien_id || null,
           chefDeBaseId: draft.aerien.chef_de_base_id || null,
           consultantId: draft.aerien.consultant_id,
           immatriculationAeronef: draft.aerien.immatricule_aeronef,
-          surfaceTraiteeHa: draft.aerien.surface_traitee_ha,
           pesticideRecuL: draft.aerien.pesticide_recu_l,
         });
-        if (store.aerien.rotations.length === 0) {
-          for (const r of draft.aerien.rotations) {
-            store.addRotation({
-              numero_cuve: r.numero_cuve,
-              produit_id: r.produit_id,
-              quantite_l: r.quantite_l,
-              temperature_debut_c: r.temperature_debut_c,
-              temperature_fin_c: r.temperature_fin_c,
-              vent_debut_ms: r.vent_debut_ms,
-              vent_fin_ms: r.vent_fin_ms,
-              heure_debut: r.heure_debut,
-              heure_fin: r.heure_fin,
-              nom_commercial: r.nom_commercial,
-            });
-          }
-        }
-        if (store.aerien.rotations.length === 0 && draft.aerien.rotations.length === 0) {
-          store.addRotation({});
-        }
       }
       if (draft.type_traitement === 'TERRESTRE' && draft.terrestre) {
         store.updateTerrestre({
@@ -210,18 +189,6 @@ export default function TraitementScreen() {
     totalPesticideTerrestre
   );
 
-  // Pas de chaînage de reprise côté Aérien (contrairement au Terrestre) : le
-  // reste se calcule uniquement à partir de cette fiche.
-  const totalPesticideAerien = computeTotalPesticideAerien(store.aerien.rotations);
-  const surfaceRestanteAerien =
-    store.aerien.surfaceTraiteeHa != null
-      ? computeSurfaceRestante(surfaceInfesteeHa, store.aerien.surfaceTraiteeHa)
-      : null;
-  const pesticideStockRestantAerien = computePesticideStockRestant(
-    store.aerien.pesticideRecuL,
-    totalPesticideAerien
-  );
-
   const handleContinuer = () =>
     run(
       async () => {
@@ -230,36 +197,14 @@ export default function TraitementScreen() {
             setErrors({ aerien: 'Pilote, mécanicien et chef de base sont obligatoires' });
             return;
           }
-          const heuresErrors = validateRotationsHeures(
-            store.aerien.rotations.map((r) => ({ heureDebut: r.heure_debut ?? null, heureFin: r.heure_fin ?? null }))
-          );
-          if (heuresErrors.length > 0) {
-            setErrors({ aerien: heuresErrors[0].message });
-            return;
-          }
           await updateTraitementAerien(traitementId, {
             piloteId: store.aerien.piloteId,
             mecanicienId: store.aerien.mecanicienId,
             chefDeBaseId: store.aerien.chefDeBaseId,
             consultantId: store.aerien.consultantId,
             immatriculeAeronef: store.aerien.immatriculationAeronef,
-            surfaceTraiteeHa: store.aerien.surfaceTraiteeHa,
             pesticideRecuL: store.aerien.pesticideRecuL,
           });
-          for (const r of store.aerien.rotations) {
-            await addRotation(traitementId, {
-              numero_cuve: r.numero_cuve,
-              produit_id: r.produit_id,
-              quantite_l: r.quantite_l,
-              temperature_debut_c: r.temperature_debut_c,
-              temperature_fin_c: r.temperature_fin_c,
-              vent_debut_ms: r.vent_debut_ms,
-              vent_fin_ms: r.vent_fin_ms,
-              heure_debut: r.heure_debut,
-              heure_fin: r.heure_fin,
-              nom_commercial: r.nom_commercial,
-            });
-          }
         } else {
           const conditionErrors = validateTerrestreConditions({
             heureDebut: store.terrestre.heureDebut ?? null,
@@ -306,7 +251,13 @@ export default function TraitementScreen() {
           }
         }
 
-        router.push({ pathname: '/(traitement)/moyens' as any, params: { traitementId, isValidationView } });
+        // Aérien : « Pesticides & rotations » s'insère juste après cet écran (Équipe),
+        // avant Moyens — terrestre continue directement vers Moyens comme aujourd'hui
+        // (produits utilisés restés sur cet écran, pas de sous-ressource séparée).
+        router.push({
+          pathname: (typeTraitement === 'AERIEN' ? '/(traitement)/rotations' : '/(traitement)/moyens') as any,
+          params: { traitementId, isValidationView },
+        });
       },
       {
         screen: 'traitement',
@@ -319,8 +270,11 @@ export default function TraitementScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <ProgressBar currentIndex={2} />
-        <Text style={styles.title}>Traitement</Text>
+        <ProgressBar
+          currentIndex={2}
+          segments={typeTraitement === 'TERRESTRE' ? PROGRESS_SEGMENTS_TERRESTRE : PROGRESS_SEGMENTS_AERIEN}
+        />
+        <Text style={styles.title}>Équipe</Text>
 
         {typeTraitement === 'AERIEN' && (
           <AerienForm
@@ -332,9 +286,6 @@ export default function TraitementScreen() {
             onPilotesChange={setPilotes}
             onMecaniciensChange={setMecaniciens}
             onConsultantsChange={setConsultants}
-            pesticides={pesticides}
-            surfaceRestante={surfaceRestanteAerien}
-            pesticideStockRestant={pesticideStockRestantAerien}
             error={errors.aerien}
           />
         )}

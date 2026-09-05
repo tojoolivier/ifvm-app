@@ -9,7 +9,7 @@ import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { logger } from '@/lib/logger';
 import { Card } from '@/components/traitement/Card';
 import { Chip } from '@/components/traitement/Chip';
-import { ProgressBar } from '@/components/traitement/ProgressBar';
+import { ProgressBar, PROGRESS_SEGMENTS_AERIEN, PROGRESS_SEGMENTS_TERRESTRE } from '@/components/traitement/ProgressBar';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
 
 const KIT_ROWS: { key: 'kit_combinaison' | 'kit_gants' | 'kit_lunettes' | 'kit_masques' | 'kit_botte'; label: string }[] = [
@@ -63,6 +63,9 @@ export default function MoyensScreen() {
   // taper la virgule ou un zéro de fin ("1,", "1,50") sans que le champ ne se reformate à
   // chaque frappe (cf. `formatDecimalDisplay` sinon appelé sur une valeur encore inexploitable).
   const [decimalDrafts, setDecimalDrafts] = useState<Partial<Record<VegetationDecimalField, string>>>({});
+  // Décide du nombre d'étapes de ProgressBar (7 en aérien avec l'écran Rotations, 6 en
+  // terrestre sans lui) — même garde défensive que cibles.tsx/signatures.tsx.
+  const [typeTraitement, setTypeTraitement] = useState<'AERIEN' | 'TERRESTRE' | null>(null);
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('moyens');
 
@@ -71,6 +74,7 @@ export default function MoyensScreen() {
     getTraitement(traitementId)
       .then((draft) => {
         if (!draft) return;
+        setTypeTraitement(draft.type_traitement);
         setKit({
           kit_combinaison: draft.kit_combinaison ?? 0,
           kit_gants: draft.kit_gants ?? 0,
@@ -162,7 +166,10 @@ export default function MoyensScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <ProgressBar currentIndex={3} />
+        <ProgressBar
+          currentIndex={typeTraitement === 'TERRESTRE' ? 3 : 4}
+          segments={typeTraitement === 'TERRESTRE' ? PROGRESS_SEGMENTS_TERRESTRE : PROGRESS_SEGMENTS_AERIEN}
+        />
         <Text style={styles.title}>Moyens & protection</Text>
 
         <Card variant={nbKitFournis === 5 ? 'info' : 'avertissement'}>
