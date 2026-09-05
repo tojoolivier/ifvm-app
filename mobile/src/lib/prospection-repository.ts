@@ -65,8 +65,11 @@ export interface DraftProspection {
   pilote: string | null;
   mecanicien: string | null;
   chef_de_base: string | null;
-  base: string | null;
-  base_secondaire: string | null;
+  /** Remplace base/base_secondaire (texte libre) — migration backend 0047. FK
+   * nullable vers le référentiel lieu_aerien (`listLieuxAeriens`, referentiel-db.ts) :
+   * une prospection extensive aérienne « généralisée » n'est rattachée à aucune
+   * base. Pas de base secondaire côté prospection. */
+  lieu_base_id: string | null;
   /** Pesticides embarqués + signatures (mode aérien uniquement) — NULL en mode
    * terrestre. `pesticides_embarques` reste la valeur SQLite brute (0/1/NULL,
    * pas de type booléen natif) : normaliser avec `normalizeBoolean` à la lecture. */
@@ -157,8 +160,7 @@ export interface ExtensiveReferenceUpdateInput {
   pilote?: string | null;
   mecanicien?: string | null;
   chefDeBase?: string | null;
-  base?: string | null;
-  baseSecondaire?: string | null;
+  lieuBaseId?: string | null;
 }
 
 export interface ExtensiveObservationsUpdateInput {
@@ -495,14 +497,14 @@ export async function updateProspectionExtensiveReference(id: string, input: Ext
       latitude = ?, longitude = ?, station_libre = ?, type_station = ?,
       surface_station = ?, surface_infestee = ?, n_message = ?, heure_observation_at = ?,
       societe = ?, immatricule_aeronef = ?, pilote = ?, mecanicien = ?,
-      chef_de_base = ?, base = ?, base_secondaire = ?,
+      chef_de_base = ?, lieu_base_id = ?,
       updated_at = ?
      WHERE id = ?`,
     [
       input.latitude, input.longitude, input.stationLibre, input.typeStation,
       input.surfaceStation, input.surfaceInfestee, input.nMessage, input.heureObservationAt,
       input.societe ?? null, input.immatriculeAeronef ?? null, input.pilote ?? null, input.mecanicien ?? null,
-      input.chefDeBase ?? null, input.base ?? null, input.baseSecondaire ?? null,
+      input.chefDeBase ?? null, input.lieuBaseId ?? null,
       now, id,
     ]
   );

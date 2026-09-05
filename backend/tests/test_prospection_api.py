@@ -275,7 +275,22 @@ async def test_create_prospection_extensive_mode_aerien(
     """Mode aérien : infos équipe/aéronef + opérations, numero et duree_minutes
     assignés côté serveur (jamais fait confiance au client — OperationAerienneCreate
     ne porte d'ailleurs ni l'un ni l'autre). Deuxième opération choisie à cheval sur
-    minuit pour vérifier explicitement ce cas (23:00 → 01:15 = 135 min, pas -1305)."""
+    minuit pour vérifier explicitement ce cas (23:00 → 01:15 = 135 min, pas -1305).
+    Base rattachée au référentiel `lieu_aerien` via `lieu_base_id` (#prospection-lieu-base) :
+    plus de texte libre `base`/`base_secondaire`."""
+    lieu_response = await client.post(
+        "/lieux-aeriens",
+        json={
+            "type_lieu": "principale",
+            "nom": "Tuléar",
+            "latitude": -23.35,
+            "longitude": 43.68,
+        },
+        headers=auth_headers,
+    )
+    assert lieu_response.status_code == 201
+    lieu_id = lieu_response.json()["id"]
+
     response = await client.post(
         "/prospections",
         json={
@@ -288,8 +303,7 @@ async def test_create_prospection_extensive_mode_aerien(
             "pilote": "Jean Rakoto",
             "mecanicien": "Marc Andria",
             "chef_de_base": "Sarah Ravelo",
-            "base": "Tuléar",
-            "base_secondaire": "Ihosy",
+            "lieu_base_id": lieu_id,
             "operations_aeriennes": [
                 {
                     "type_operation": "prospection",
@@ -318,8 +332,7 @@ async def test_create_prospection_extensive_mode_aerien(
     assert data["pilote"] == "Jean Rakoto"
     assert data["mecanicien"] == "Marc Andria"
     assert data["chef_de_base"] == "Sarah Ravelo"
-    assert data["base"] == "Tuléar"
-    assert data["base_secondaire"] == "Ihosy"
+    assert data["lieu_base_id"] == lieu_id
 
     operations = data["operations_aeriennes"]
     assert len(operations) == 2
@@ -333,6 +346,35 @@ async def test_create_prospection_extensive_mode_aerien(
 
     total_jour = sum(o["duree_minutes"] for o in operations)
     assert total_jour == 285
+
+
+@pytest.mark.asyncio
+async def test_create_prospection_extensive_mode_aerien_sans_base(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+):
+    """Prospection aérienne « généralisée » (début/fin de campagne) : pas rattachée
+    à une base précise — `lieu_base_id` absent doit être accepté et rester `None`
+    en réponse, sans erreur (#prospection-lieu-base)."""
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "extensive",
+            "campagne_id": str(campagne_id),
+            "date_prospection": "2026-08-26",
+            "mode_extensif": "aerien",
+            "operations_aeriennes": [
+                {
+                    "type_operation": "prospection",
+                    "debut_heure": "08:00",
+                    "fin_heure": "10:00",
+                }
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert data["lieu_base_id"] is None
 
 
 @pytest.mark.asyncio

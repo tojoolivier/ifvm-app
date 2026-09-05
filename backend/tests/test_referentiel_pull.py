@@ -107,6 +107,22 @@ async def culture(db_session: AsyncSession):
 
 
 @pytest_asyncio.fixture
+async def lieu_aerien(db_session: AsyncSession):
+    from app.infrastructure.referentiel_model import LieuAerienModel
+
+    lieu = LieuAerienModel(
+        id=uuid.uuid4(),
+        type_lieu="principale",
+        nom="Tuléar",
+        latitude=-23.35,
+        longitude=43.68,
+    )
+    db_session.add(lieu)
+    await db_session.commit()
+    return lieu
+
+
+@pytest_asyncio.fixture
 async def code_stade(db_session: AsyncSession):
     # Le référentiel des stades est déjà semé pour toute la session (cf. conftest) :
     # `prospection_capture.stade` le référence par clé étrangère.
@@ -131,6 +147,7 @@ async def test_pull_since_null_returns_full_referentiel_unscoped(
     pesticide,
     culture,
     code_stade,
+    lieu_aerien,
 ):
     token = create_access_token(utilisateur_avec_pa.id)
     response = await client.get("/referentiel/pull", headers={"Authorization": f"Bearer {token}"})
@@ -162,6 +179,9 @@ async def test_pull_since_null_returns_full_referentiel_unscoped(
     stade_codes = {c["code"] for c in body["codes_stades"]["upserts"]}
     assert stade_codes == {code for code, _ in VOCABULAIRE}
     assert code_stade.code in stade_codes
+
+    lieu_aerien_noms = {lieu["nom"] for lieu in body["lieux_aeriens"]["upserts"]}
+    assert lieu_aerien_noms == {lieu_aerien.nom}
 
     for entity in body.values():
         assert "server_time" in entity

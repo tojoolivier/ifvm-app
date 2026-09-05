@@ -107,8 +107,7 @@ class CreateProspection:
         pilote: str | None = None,
         mecanicien: str | None = None,
         chef_de_base: str | None = None,
-        base: str | None = None,
-        base_secondaire: str | None = None,
+        lieu_base_id: uuid.UUID | None = None,
         operations_aeriennes: list[ProspectionOperationAerienne] | None = None,
         # ==========================================
         # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
@@ -202,8 +201,7 @@ class CreateProspection:
             pilote=pilote,
             mecanicien=mecanicien,
             chef_de_base=chef_de_base,
-            base=base,
-            base_secondaire=base_secondaire,
+            lieu_base_id=lieu_base_id,
             operations_aeriennes=operations_aeriennes or [],
             # ==========================================
             # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
@@ -340,8 +338,7 @@ class UpdateProspection:
         pilote: str | None = None,
         mecanicien: str | None = None,
         chef_de_base: str | None = None,
-        base: str | None = None,
-        base_secondaire: str | None = None,
+        lieu_base_id: uuid.UUID | None = None,
         # ==========================================
         # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
         # ==========================================
@@ -475,10 +472,8 @@ class UpdateProspection:
             prospection.mecanicien = mecanicien
         if chef_de_base is not None:
             prospection.chef_de_base = chef_de_base
-        if base is not None:
-            prospection.base = base
-        if base_secondaire is not None:
-            prospection.base_secondaire = base_secondaire
+        if lieu_base_id is not None:
+            prospection.lieu_base_id = lieu_base_id
 
         # ==========================================
         # Mise à jour des nouveaux champs - Extensif : pesticides embarqués + signatures

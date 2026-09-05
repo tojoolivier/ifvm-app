@@ -97,6 +97,7 @@ const TABLES_REFERENTIEL = [
   'culture',
   'code_stade',
   'campagne',
+  'lieu_aerien',
 ];
 
 /**
@@ -241,6 +242,26 @@ export async function listCultures(): Promise<Culture[]> {
   );
 }
 
+export interface LieuAerien {
+  id: string;
+  type_lieu: string;
+  nom: string;
+}
+
+/**
+ * Lieux aériens actifs du référentiel local, triés par nom. Alimente le champ « Base »
+ * de la Prospection Extensive Aérienne (`lieu_base_id`, remplace les anciens champs
+ * texte libre `base`/`base_secondaire` — migration backend 0047). Le filtre
+ * `type_lieu` n'est appliqué qu'à l'affichage (écran) : aucune notion de base
+ * secondaire pour la prospection, seuls les lieux `principale` y sont proposés.
+ */
+export async function listLieuxAeriens(): Promise<LieuAerien[]> {
+  const db = await getReferentielDb();
+  return db.getAllAsync<LieuAerien>(
+    'SELECT id, type_lieu, nom FROM lieu_aerien WHERE actif = 1 ORDER BY nom'
+  );
+}
+
 export interface CodeStade {
   id: string;
   code: string;
@@ -363,6 +384,17 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
       espece TEXT,
       libelle TEXT NOT NULL,
       ordre INTEGER NOT NULL DEFAULT 0,
+      actif INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS lieu_aerien (
+      id TEXT PRIMARY KEY NOT NULL,
+      type_lieu TEXT NOT NULL,
+      nom TEXT NOT NULL,
+      latitude REAL NOT NULL,
+      longitude REAL NOT NULL,
+      altitude REAL,
       actif INTEGER NOT NULL DEFAULT 1,
       updated_at TEXT NOT NULL
     );

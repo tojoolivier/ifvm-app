@@ -32,6 +32,7 @@ async def test_server_time_is_captured_before_issuing_any_query():
         culture_repository=InstantRepository(),
         code_stade_repository=InstantRepository(),
         campagne_repository=InstantRepository(),
+        lieu_aerien_repository=InstantRepository(),
     )
     result = await use_case.execute(cursors=ReferentielSinceCursors())
 

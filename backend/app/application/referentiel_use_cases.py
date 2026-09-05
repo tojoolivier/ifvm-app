@@ -4,12 +4,14 @@ from datetime import datetime, timezone
 
 from app.domain.campagne import Campagne
 from app.domain.referentiel import (
+    TYPES_LIEU_AERIEN,
     CodeReferentielDejaPrisError,
     CodeStade,
     Commune,
     CommuneInconnueError,
     Culture,
     GrilleDejaOccupeeError,
+    LieuAerien,
     Pesticide,
     PosteAcridien,
     PosteAcridienAvecStationsActivesError,
@@ -17,6 +19,7 @@ from app.domain.referentiel import (
     PosteAcridienIntrouvableError,
     StadeInconnuError,
     StationFixe,
+    TypeLieuAerienInvalideError,
     UtilisateurEquipe,
     ZoneAntiAcridien,
     ZoneAntiAcridienIntrouvableError,
@@ -26,6 +29,7 @@ from app.domain.repositories import (
     CodeStadeRepository,
     CommuneRepository,
     CultureRepository,
+    LieuAerienRepository,
     PesticideRepository,
     PosteAcridienRepository,
     StationFixeRepository,
@@ -480,6 +484,98 @@ class UpdateCulture:
         return await self.repository.update(culture)
 
 
+class ListLieuxAeriens:
+    def __init__(self, repository: LieuAerienRepository):
+        self.repository = repository
+
+    async def execute(
+        self, type_lieu: str | None = None, actif: bool | None = True
+    ) -> list[LieuAerien]:
+        return await self.repository.list_all(type_lieu=type_lieu, actif=actif)
+
+
+class GetLieuAerien:
+    def __init__(self, repository: LieuAerienRepository):
+        self.repository = repository
+
+    async def execute(self, lieu_id: uuid.UUID) -> LieuAerien | None:
+        return await self.repository.get_by_id(lieu_id)
+
+
+class CreateLieuAerien:
+    def __init__(self, repository: LieuAerienRepository):
+        self.repository = repository
+
+    async def execute(
+        self,
+        type_lieu: str,
+        nom: str,
+        latitude: float,
+        longitude: float,
+        altitude: float | None,
+    ) -> LieuAerien:
+        if type_lieu not in TYPES_LIEU_AERIEN:
+            raise TypeLieuAerienInvalideError(type_lieu)
+
+        maintenant = datetime.now(timezone.utc)
+        return await self.repository.create(
+            LieuAerien(
+                type_lieu=type_lieu,
+                nom=nom,
+                latitude=latitude,
+                longitude=longitude,
+                altitude=altitude,
+                actif=True,
+                created_at=maintenant,
+                updated_at=maintenant,
+            )
+        )
+
+
+class UpdateLieuAerien:
+    """Mise à jour partielle, `actif` compris. Pas de suppression : `actif=False` est
+    la seule sortie, le pull hors-ligne ne transportant que des upserts."""
+
+    def __init__(self, repository: LieuAerienRepository):
+        self.repository = repository
+
+    async def execute(
+        self,
+        lieu_id: uuid.UUID,
+        type_lieu: str | None = None,
+        nom: str | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
+        altitude: float | None = None,
+        actif: bool | None = None,
+        champs_fournis: set[str] = frozenset(),
+    ) -> LieuAerien | None:
+        lieu = await self.repository.get_by_id(lieu_id)
+        if lieu is None:
+            return None
+
+        if type_lieu is not None:
+            if type_lieu not in TYPES_LIEU_AERIEN:
+                raise TypeLieuAerienInvalideError(type_lieu)
+            lieu.type_lieu = type_lieu
+        if nom is not None:
+            lieu.nom = nom
+        if latitude is not None:
+            lieu.latitude = latitude
+        if longitude is not None:
+            lieu.longitude = longitude
+        # `altitude` est nullable : seul le corps reçu distingue « absent » de « mis à
+        # NULL » — `champs_fournis` vient de `model_fields_set` côté schéma Pydantic.
+        if "altitude" in champs_fournis:
+            lieu.altitude = altitude
+        if actif is not None:
+            lieu.actif = actif
+
+        # Sans `updated_at` rehaussé, un pull incrémental sauterait la modification.
+        lieu.updated_at = datetime.now(timezone.utc)
+        return await self.repository.update(lieu)
+
+
 class ListPesticides:
     def __init__(self, repository: PesticideRepository):
         self.repository = repository
@@ -578,6 +674,7 @@ class ReferentielSinceCursors:
     cultures: datetime | None = None
     codes_stades: datetime | None = None
     campagnes: datetime | None = None
+    lieux_aeriens: datetime | None = None
 
 
 @dataclass
@@ -590,6 +687,7 @@ class ReferentielPullResult:
     cultures: list[Culture]
     codes_stades: list[CodeStade]
     campagnes: list[Campagne]
+    lieux_aeriens: list[LieuAerien]
     server_time: datetime
 
 
@@ -604,6 +702,7 @@ class PullReferentiel:
         culture_repository: CultureRepository,
         code_stade_repository: CodeStadeRepository,
         campagne_repository: CampagneRepository,
+        lieu_aerien_repository: LieuAerienRepository,
     ):
         self.zone_repository = zone_repository
         self.poste_repository = poste_repository
@@ -613,6 +712,7 @@ class PullReferentiel:
         self.culture_repository = culture_repository
         self.code_stade_repository = code_stade_repository
         self.campagne_repository = campagne_repository
+        self.lieu_aerien_repository = lieu_aerien_repository
 
     async def execute(self, cursors: ReferentielSinceCursors) -> ReferentielPullResult:
         # Capturé avant les requêtes : une entité modifiée pendant leur exécution doit
@@ -631,5 +731,6 @@ class PullReferentiel:
             cultures=await self.culture_repository.list_since(cursors.cultures),
             codes_stades=await self.code_stade_repository.list_since(cursors.codes_stades),
             campagnes=await self.campagne_repository.list_since(cursors.campagnes),
+            lieux_aeriens=await self.lieu_aerien_repository.list_since(cursors.lieux_aeriens),
             server_time=server_time,
         )

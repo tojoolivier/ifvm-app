@@ -323,6 +323,14 @@ export interface CampagneSync {
   updated_at: string;
 }
 
+/**
+ * Base aérienne principale/secondaire ou stand, telle que le backend la publie.
+ * Contrat OpenAPI plutôt qu'une interface recopiée à la main (cf. commentaire sur
+ * `PesticideSync` ci-dessus) : ce référentiel est nouveau, autant éviter la même
+ * classe d'oubli dès le départ.
+ */
+export type LieuAerienSync = components['schemas']['LieuAerienSyncRead'];
+
 export interface ReferentielPullResponse {
   postes_acridiens: EntityPull<PosteAcridienSync>;
   stations_fixes: EntityPull<StationFixeSync>;
@@ -331,6 +339,7 @@ export interface ReferentielPullResponse {
   cultures: EntityPull<CultureSync>;
   codes_stades: EntityPull<CodeStadeSync>;
   campagnes: EntityPull<CampagneSync>;
+  lieux_aeriens: EntityPull<LieuAerienSync>;
 }
 
 /**
@@ -970,6 +979,13 @@ export const apiClient = {
       query.set(
         'since_campagnes',
         cursors.campagnes
+      );
+    }
+
+    if (cursors.lieux_aeriens) {
+      query.set(
+        'since_lieux_aeriens',
+        cursors.lieux_aeriens
       );
     }
 

@@ -305,6 +305,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/lieux-aeriens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Lieux Aeriens */
+        get: operations["list_lieux_aeriens_lieux_aeriens_get"];
+        put?: never;
+        /** Create Lieu Aerien */
+        post: operations["create_lieu_aerien_lieux_aeriens_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/lieux-aeriens/{lieu_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Lieu Aerien */
+        get: operations["get_lieu_aerien_lieux_aeriens__lieu_id__get"];
+        /** Update Lieu Aerien */
+        put: operations["update_lieu_aerien_lieux_aeriens__lieu_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pesticides": {
         parameters: {
             query?: never;
@@ -1164,6 +1200,16 @@ export interface components {
              */
             server_time: string;
         };
+        /** EntityPull[LieuAerienSyncRead] */
+        EntityPull_LieuAerienSyncRead_: {
+            /** Upserts */
+            upserts: components["schemas"]["LieuAerienSyncRead"][];
+            /**
+             * Server Time
+             * Format: date-time
+             */
+            server_time: string;
+        };
         /** EntityPull[PesticideSyncRead] */
         EntityPull_PesticideSyncRead_: {
             /** Upserts */
@@ -1497,6 +1543,101 @@ export interface components {
             densite_max_front?: number | null;
             /** Densite Moy Arriere Front */
             densite_moy_arriere_front?: number | null;
+        };
+        /** LieuAerienCreate */
+        LieuAerienCreate: {
+            /**
+             * Type Lieu
+             * @enum {string}
+             */
+            type_lieu: "principale" | "secondaire" | "stand";
+            /** Nom */
+            nom: string;
+            /** Latitude */
+            latitude: number;
+            /** Longitude */
+            longitude: number;
+            /** Altitude */
+            altitude?: number | null;
+        };
+        /** LieuAerienRead */
+        LieuAerienRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Type Lieu
+             * @enum {string}
+             */
+            type_lieu: "principale" | "secondaire" | "stand";
+            /** Nom */
+            nom: string;
+            /** Latitude */
+            latitude: number;
+            /** Longitude */
+            longitude: number;
+            /** Altitude */
+            altitude: number | null;
+            /** Actif */
+            actif: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** LieuAerienSyncRead */
+        LieuAerienSyncRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Type Lieu
+             * @enum {string}
+             */
+            type_lieu: "principale" | "secondaire" | "stand";
+            /** Nom */
+            nom: string;
+            /** Latitude */
+            latitude: number;
+            /** Longitude */
+            longitude: number;
+            /** Altitude */
+            altitude: number | null;
+            /** Actif */
+            actif: boolean;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * LieuAerienUpdate
+         * @description Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie.
+         */
+        LieuAerienUpdate: {
+            /** Type Lieu */
+            type_lieu?: ("principale" | "secondaire" | "stand") | null;
+            /** Nom */
+            nom?: string | null;
+            /** Latitude */
+            latitude?: number | null;
+            /** Longitude */
+            longitude?: number | null;
+            /** Altitude */
+            altitude?: number | null;
+            /** Actif */
+            actif?: boolean | null;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -2019,10 +2160,8 @@ export interface components {
             mecanicien?: string | null;
             /** Chef De Base */
             chef_de_base?: string | null;
-            /** Base */
-            base?: string | null;
-            /** Base Secondaire */
-            base_secondaire?: string | null;
+            /** Lieu Base Id */
+            lieu_base_id?: string | null;
             /** Pesticides Embarques */
             pesticides_embarques?: boolean | null;
             /** Pesticide Nom Commercial */
@@ -2208,10 +2347,8 @@ export interface components {
             mecanicien?: string | null;
             /** Chef De Base */
             chef_de_base?: string | null;
-            /** Base */
-            base?: string | null;
-            /** Base Secondaire */
-            base_secondaire?: string | null;
+            /** Lieu Base Id */
+            lieu_base_id?: string | null;
             /** Pesticides Embarques */
             pesticides_embarques?: boolean | null;
             /** Pesticide Nom Commercial */
@@ -2356,10 +2493,8 @@ export interface components {
             mecanicien?: string | null;
             /** Chef De Base */
             chef_de_base?: string | null;
-            /** Base */
-            base?: string | null;
-            /** Base Secondaire */
-            base_secondaire?: string | null;
+            /** Lieu Base Id */
+            lieu_base_id?: string | null;
             /** Pesticides Embarques */
             pesticides_embarques?: boolean | null;
             /** Pesticide Nom Commercial */
@@ -2403,6 +2538,7 @@ export interface components {
             cultures: components["schemas"]["EntityPull_CultureSyncRead_"];
             codes_stades: components["schemas"]["EntityPull_CodeStadeSyncRead_"];
             campagnes: components["schemas"]["EntityPull_CampagneSyncRead_"];
+            lieux_aeriens: components["schemas"]["EntityPull_LieuAerienSyncRead_"];
         };
         /** RefreshRequest */
         RefreshRequest: {
@@ -4362,6 +4498,138 @@ export interface operations {
             };
         };
     };
+    list_lieux_aeriens_lieux_aeriens_get: {
+        parameters: {
+            query?: {
+                type_lieu?: string | null;
+                /** @description Renvoie les lieux des deux états — écran d'administration. */
+                inclure_inactifs?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LieuAerienRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_lieu_aerien_lieux_aeriens_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LieuAerienCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LieuAerienRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_lieu_aerien_lieux_aeriens__lieu_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lieu_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LieuAerienRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_lieu_aerien_lieux_aeriens__lieu_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lieu_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LieuAerienUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LieuAerienRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_pesticides_pesticides_get: {
         parameters: {
             query?: {
@@ -4505,6 +4773,7 @@ export interface operations {
                 since_cultures?: string | null;
                 since_codes_stades?: string | null;
                 since_campagnes?: string | null;
+                since_lieux_aeriens?: string | null;
             };
             header?: never;
             path?: never;

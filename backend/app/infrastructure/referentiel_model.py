@@ -104,6 +104,36 @@ class StationFixeModel(Base):
     commune: Mapped["CommuneModel"] = relationship()
 
 
+class LieuAerienModel(Base):
+    """Base principale, base secondaire ou stand de remplissage.
+
+    Table unique typée par `type_lieu` plutôt que trois tables séparées : les
+    trois partagent exactement les mêmes attributs (nom, coordonnées), même
+    choix que `prospection.type_prospection` (ADR-006). Seul `prospection`
+    la référence pour l'instant (`lieu_base_id`, toujours `type_lieu =
+    'principale'` par convention applicative — pas de CHECK inter-table
+    possible en Postgres).
+    """
+
+    __tablename__ = "lieu_aerien"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    type_lieu: Mapped[str] = mapped_column(Text(), nullable=False)
+    nom: Mapped[str] = mapped_column(Text(), nullable=False)
+    latitude: Mapped[float] = mapped_column(Numeric(10, 8), nullable=False)
+    longitude: Mapped[float] = mapped_column(Numeric(11, 8), nullable=False)
+    altitude: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
+    actif: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+
+    __table_args__ = (
+        CheckConstraint(
+            "type_lieu IN ('principale','secondaire','stand')", name="ck_lieu_aerien_type"
+        ),
+    )
+
+
 class PesticideModel(Base):
     __tablename__ = "pesticide"
 

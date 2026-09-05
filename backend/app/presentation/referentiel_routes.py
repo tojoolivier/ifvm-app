@@ -8,17 +8,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application.referentiel_use_cases import (
     CreateCodeStade,
     CreateCulture,
+    CreateLieuAerien,
     CreatePesticide,
     CreatePosteAcridien,
     CreateStation,
     GetCodeStade,
     GetCulture,
+    GetLieuAerien,
     GetPesticide,
     GetPosteAcridien,
     GetStation,
     ListCodesStades,
     ListCommunes,
     ListCultures,
+    ListLieuxAeriens,
     ListPesticides,
     ListPostesAcridiens,
     ListStations,
@@ -27,6 +30,7 @@ from app.application.referentiel_use_cases import (
     ReferentielSinceCursors,
     UpdateCodeStade,
     UpdateCulture,
+    UpdateLieuAerien,
     UpdatePesticide,
     UpdatePosteAcridien,
     UpdateStation,
@@ -41,6 +45,7 @@ from app.domain.referentiel import (
     PosteAcridienInactifError,
     PosteAcridienIntrouvableError,
     StadeInconnuError,
+    TypeLieuAerienInvalideError,
     ZoneAntiAcridienIntrouvableError,
 )
 from app.infrastructure.campagne_repository import CampagneRepositoryImpl
@@ -53,6 +58,7 @@ from app.infrastructure.referentiel_repository import (
 from app.infrastructure.referentiel_sync_repository import (
     CodeStadeRepositoryImpl,
     CultureRepositoryImpl,
+    LieuAerienRepositoryImpl,
     PesticideRepositoryImpl,
     UtilisateurEquipeRepositoryImpl,
 )
@@ -66,6 +72,9 @@ from app.presentation.referentiel_schemas import (
     CultureRead,
     CultureUpdate,
     EntityPull,
+    LieuAerienCreate,
+    LieuAerienRead,
+    LieuAerienUpdate,
     PesticideCreate,
     PesticideRead,
     PesticideUpdate,
@@ -486,6 +495,91 @@ async def update_culture(
     return culture
 
 
+# --- lieu_aerien -------------------------------------------------------------------
+#
+# Aucune route DELETE, volontairement : `GET /referentiel/pull` ne transporte que des
+# upserts, une suppression physique resterait indéfiniment sur les téléphones déjà
+# synchronisés. La sortie de service passe par `actif=false`.
+
+
+@router.get("/lieux-aeriens", response_model=list[LieuAerienRead])
+async def list_lieux_aeriens(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+    type_lieu: str | None = Query(default=None),
+    inclure_inactifs: bool = Query(
+        default=False,
+        description="Renvoie les lieux des deux états — écran d'administration.",
+    ),
+):
+    use_case = ListLieuxAeriens(LieuAerienRepositoryImpl(db))
+    return await use_case.execute(type_lieu=type_lieu, actif=None if inclure_inactifs else True)
+
+
+@router.post("/lieux-aeriens", response_model=LieuAerienRead, status_code=201)
+async def create_lieu_aerien(
+    body: LieuAerienCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = CreateLieuAerien(LieuAerienRepositoryImpl(db))
+    try:
+        return await use_case.execute(
+            type_lieu=body.type_lieu,
+            nom=body.nom,
+            latitude=body.latitude,
+            longitude=body.longitude,
+            altitude=body.altitude,
+        )
+    except TypeLieuAerienInvalideError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"type_lieu invalide : {exc.args[0]}",
+        ) from exc
+
+
+@router.get("/lieux-aeriens/{lieu_id}", response_model=LieuAerienRead)
+async def get_lieu_aerien(
+    lieu_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = GetLieuAerien(LieuAerienRepositoryImpl(db))
+    lieu = await use_case.execute(lieu_id)
+    if lieu is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lieu aérien non trouvé")
+    return lieu
+
+
+@router.put("/lieux-aeriens/{lieu_id}", response_model=LieuAerienRead)
+async def update_lieu_aerien(
+    lieu_id: uuid.UUID,
+    body: LieuAerienUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = UpdateLieuAerien(LieuAerienRepositoryImpl(db))
+    try:
+        lieu = await use_case.execute(
+            lieu_id=lieu_id,
+            type_lieu=body.type_lieu,
+            nom=body.nom,
+            latitude=body.latitude,
+            longitude=body.longitude,
+            altitude=body.altitude,
+            actif=body.actif,
+            champs_fournis=body.model_fields_set,
+        )
+    except TypeLieuAerienInvalideError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"type_lieu invalide : {exc.args[0]}",
+        ) from exc
+    if lieu is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lieu aérien non trouvé")
+    return lieu
+
+
 # --- pesticide -------------------------------------------------------------------
 #
 # Aucune route DELETE, volontairement : `GET /referentiel/pull` ne transporte que des
@@ -583,6 +677,7 @@ async def pull_referentiel(
     since_cultures: datetime | None = Query(default=None),
     since_codes_stades: datetime | None = Query(default=None),
     since_campagnes: datetime | None = Query(default=None),
+    since_lieux_aeriens: datetime | None = Query(default=None),
 ):
     use_case = PullReferentiel(
         zone_repository=ZoneAntiAcridienRepositoryImpl(db),
@@ -593,6 +688,7 @@ async def pull_referentiel(
         culture_repository=CultureRepositoryImpl(db),
         code_stade_repository=CodeStadeRepositoryImpl(db),
         campagne_repository=CampagneRepositoryImpl(db),
+        lieu_aerien_repository=LieuAerienRepositoryImpl(db),
     )
     cursors = ReferentielSinceCursors(
         zones_anti_acridiennes=since_zones_anti_acridiennes,
@@ -603,6 +699,7 @@ async def pull_referentiel(
         cultures=since_cultures,
         codes_stades=since_codes_stades,
         campagnes=since_campagnes,
+        lieux_aeriens=since_lieux_aeriens,
     )
     result = await use_case.execute(cursors=cursors)
 
@@ -621,4 +718,5 @@ async def pull_referentiel(
         cultures=EntityPull(upserts=result.cultures, server_time=result.server_time),
         codes_stades=EntityPull(upserts=result.codes_stades, server_time=result.server_time),
         campagnes=EntityPull(upserts=result.campagnes, server_time=result.server_time),
+        lieux_aeriens=EntityPull(upserts=result.lieux_aeriens, server_time=result.server_time),
     )

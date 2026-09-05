@@ -33,6 +33,7 @@ import {
   parseSelectionMultiple,
 } from '@/lib/prospection-extensive';
 import { TimeField } from '@/components/TimeField';
+import { LieuAerien, listLieuxAeriens } from '@/lib/referentiel-db';
 import { formatHeureLocale } from '@/lib/prospection-fiche-lecture';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
@@ -209,8 +210,11 @@ export default function ExtensiveReferenceScreen() {
   const [pilote, setPilote] = useState(draft?.pilote ?? '');
   const [mecanicien, setMecanicien] = useState(draft?.mecanicien ?? '');
   const [chefDeBase, setChefDeBase] = useState(draft?.chef_de_base ?? '');
-  const [base, setBase] = useState(draft?.base ?? '');
-  const [baseSecondaire, setBaseSecondaire] = useState(draft?.base_secondaire ?? '');
+  // Remplace base/base_secondaire (texte libre) — migration backend 0047. FK
+  // nullable vers le référentiel lieu_aerien : pas de base secondaire côté
+  // prospection, et une opération aérienne « généralisée » n'en a aucune.
+  const [lieuBaseId, setLieuBaseId] = useState<string | null>(draft?.lieu_base_id ?? null);
+  const [lieuxAeriens, setLieuxAeriens] = useState<LieuAerien[]>([]);
   // Label du champ actuellement focus dans le bloc aéronef/équipe (un seul à la
   // fois) — pilote uniquement l'état visuel (bordure) de `AerienField`.
   const [focusedAerienField, setFocusedAerienField] = useState<string | null>(null);
@@ -270,6 +274,25 @@ export default function ExtensiveReferenceScreen() {
     };
   }, [draft?.latitude, draft?.longitude, draft?.heure_observation_at]);
 
+  // Champ BASE (mode aérien) : référentiel synchronisé, jamais une liste écrite en
+  // dur dans l'écran — c'est le référentiel local (`GET /referentiel/pull`) qui
+  // décide quelles bases existent. Chargé inconditionnellement (lecture SQLite
+  // locale bon marché) : le bloc aérien peut apparaître après une hydratation
+  // tardive du brouillon (cf. effet plus bas), pas seulement au montage initial.
+  useEffect(() => {
+    let isMounted = true;
+    listLieuxAeriens()
+      .then((lieux) => {
+        if (isMounted) setLieuxAeriens(lieux);
+      })
+      .catch((error) => {
+        if (isMounted) signalerChargement(error);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [signalerChargement]);
+
   // Station saisie librement, type de station, surface et n° message : de simples
   // `useState(draft?.x)` d'initialisation ne se remettent jamais à jour si `draft`
   // n'est pas encore hydraté au moment du montage (deep-link, app relancée en plein
@@ -293,8 +316,7 @@ export default function ExtensiveReferenceScreen() {
       setPilote(draft.pilote ?? '');
       setMecanicien(draft.mecanicien ?? '');
       setChefDeBase(draft.chef_de_base ?? '');
-      setBase(draft.base ?? '');
-      setBaseSecondaire(draft.base_secondaire ?? '');
+      setLieuBaseId(draft.lieu_base_id ?? null);
     });
   }, [draft, draftId]);
 
@@ -379,8 +401,7 @@ export default function ExtensiveReferenceScreen() {
           pilote: isAerien ? pilote || null : null,
           mecanicien: isAerien ? mecanicien || null : null,
           chefDeBase: isAerien ? chefDeBase || null : null,
-          base: isAerien ? base || null : null,
-          baseSecondaire: isAerien ? baseSecondaire || null : null,
+          lieuBaseId: isAerien ? lieuBaseId : null,
         });
 
         if (isAerien) {
@@ -560,23 +581,27 @@ export default function ExtensiveReferenceScreen() {
                   />
 
                   <Text style={styles.aerienSubgroupLabel}>Base</Text>
-                  <View style={[styles.aerienFieldRowSplit, styles.aerienFieldRowSplitLast]}>
-                    <AerienField
-                      label="Base"
-                      value={base}
-                      onChangeText={setBase}
-                      focusedField={focusedAerienField}
-                      setFocusedField={setFocusedAerienField}
-                      style={[styles.flex1, styles.aerienFieldNoMargin]}
-                    />
-                    <AerienField
-                      label="Base secondaire"
-                      value={baseSecondaire}
-                      onChangeText={setBaseSecondaire}
-                      focusedField={focusedAerienField}
-                      setFocusedField={setFocusedAerienField}
-                      style={[styles.flex1, styles.aerienFieldNoMargin]}
-                    />
+                  {/* #prospection-lieu-base : remplace les 2 champs texte libre Base/Base
+                   * secondaire (migration backend 0047) — un seul sélecteur, sur le
+                   * référentiel lieu_aerien (filtré aux bases « principale », aucune notion
+                   * de base secondaire pour la prospection). Nullable : cliquer le lieu déjà
+                   * actif le désélectionne, même pattern que l'État plus bas sur cet écran —
+                   * couvre l'opération aérienne « généralisée », non rattachée à une base. */}
+                  <View style={[styles.chipsRow, styles.aerienFieldRowSplitLast]}>
+                    {lieuxAeriens
+                      .filter((lieu) => lieu.type_lieu === 'principale')
+                      .map((lieu) => {
+                        const active = lieu.id === lieuBaseId;
+                        return (
+                          <TouchableOpacity
+                            key={lieu.id}
+                            onPress={() => setLieuBaseId(active ? null : lieu.id)}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={[styles.chip, active && styles.chipActive]}>{lieu.nom}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
                   </View>
                 </View>
 

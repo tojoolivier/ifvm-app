@@ -55,6 +55,15 @@ class CommuneInconnueError(Exception):
     pass
 
 
+TYPES_LIEU_AERIEN = ("principale", "secondaire", "stand")
+
+
+class TypeLieuAerienInvalideError(Exception):
+    """`type_lieu` n'appartient pas à `TYPES_LIEU_AERIEN`."""
+
+    pass
+
+
 @dataclass
 class ZoneAntiAcridien:
     id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -150,6 +159,27 @@ class Culture:
     id: uuid.UUID = field(default_factory=uuid.uuid4)
     code: str = ""
     nom: str = ""
+    actif: bool = True
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class LieuAerien:
+    """Base aérienne principale, base secondaire ou stand de remplissage.
+
+    Table unique typée par `type_lieu` — même choix que `Prospection.type_prospection`
+    (ADR-006). Durable, indépendant de la campagne. Jamais supprimé : on le retire du
+    terrain en passant `actif` à false (le pull hors-ligne ne transporte que des
+    upserts).
+    """
+
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    type_lieu: str = "principale"
+    nom: str = ""
+    latitude: float = 0.0
+    longitude: float = 0.0
+    altitude: float | None = None
     actif: bool = True
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)

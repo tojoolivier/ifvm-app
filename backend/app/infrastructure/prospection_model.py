@@ -146,8 +146,12 @@ class ProspectionModel(Base):
     pilote: Mapped[str | None] = mapped_column(Text(), nullable=True)
     mecanicien: Mapped[str | None] = mapped_column(Text(), nullable=True)
     chef_de_base: Mapped[str | None] = mapped_column(Text(), nullable=True)
-    base: Mapped[str | None] = mapped_column(Text(), nullable=True)
-    base_secondaire: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    # Remplace base/base_secondaire (texte libre) — migration 0047. Nullable :
+    # une prospection extensive aérienne « généralisée » n'est rattachée à
+    # aucune base. Pas de base secondaire côté prospection.
+    lieu_base_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("lieu_aerien.id"), nullable=True
+    )
 
     # ==========================================
     # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures (migration 0036)
