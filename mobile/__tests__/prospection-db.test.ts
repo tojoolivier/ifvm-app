@@ -155,6 +155,10 @@ const MIGRATED_COLUMNS = [
   // Colonnes de traitement_aerien et traitement_terrestre (partagées)
   { name: 'pesticide_recu_l' },
   { name: 'pesticide_stock_restant_l' },
+
+  // Colonne de traitement_signature — signature numérique (#signatures-auto-equipe,
+  // migration backend 0049).
+  { name: 'signature_image' },
 ];
 
 const execAsync = jest.fn().mockResolvedValue(undefined);

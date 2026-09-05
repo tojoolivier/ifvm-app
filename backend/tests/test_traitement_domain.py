@@ -1282,6 +1282,22 @@ def test_valider_aerien_toutes_signatures_presentes_transitionne_validee():
     assert traitement.signatures == signatures
 
 
+def test_valider_persiste_le_trace_de_signature_quand_fourni():
+    traitement = _traitement_aerien_valide()
+    signatures = traitement.valider(
+        date(2026, 8, 12),
+        [
+            {"role": "PILOTE", "signataire_nom": "J. Dupont", "signature_image": "M0 0 L10 10"},
+            {"role": "MECANICIEN", "signataire_nom": "M. Rabe"},
+            {"role": "CHEF_DE_BASE", "signataire_nom": "Hery"},
+        ],
+    )
+    par_role = {s.role: s for s in signatures}
+    assert par_role["PILOTE"].signature_image == "M0 0 L10 10"
+    # Rétrocompatibilité : une signature sans tracé reste acceptée (None).
+    assert par_role["MECANICIEN"].signature_image is None
+
+
 def test_valider_aerien_signature_manquante_pilote_bloque():
     traitement = _traitement_aerien_valide()
     with pytest.raises(SignaturesManquantesError):

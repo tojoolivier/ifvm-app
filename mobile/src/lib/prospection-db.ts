@@ -72,6 +72,7 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
   await ajouterColonnesManquantes(db, 'traitement_aerien', COLONNES_TRAITEMENT_AERIEN);
   await ajouterColonnesManquantes(db, 'traitement_terrestre', COLONNES_TRAITEMENT_TERRESTRE);
   await ajouterColonnesManquantes(db, 'produit_utilise', COLONNES_PRODUIT_UTILISE);
+  await ajouterColonnesManquantes(db, 'traitement_signature', COLONNES_TRAITEMENT_SIGNATURE);
 
   log.event('db.ouverte', { base: DB_NAME });
 
@@ -760,4 +761,14 @@ const COLONNES_TRAITEMENT_AERIEN: readonly Colonne[] = [
 const COLONNES_TRAITEMENT_TERRESTRE: readonly Colonne[] = [
   { name: 'pesticide_recu_l', type: 'REAL' },
   { name: 'pesticide_stock_restant_l', type: 'REAL' },
+];
+
+/**
+ * Colonnes ajoutées à `traitement_signature` après sa création initiale.
+ * `signature_image` : tracé du pavé de signature (chemin SVG), migration
+ * backend 0049 — signature numérique automatisée depuis « Équipe », remplace
+ * le bouton « Signer » qui n'enregistrait qu'un nom saisi à la main.
+ */
+const COLONNES_TRAITEMENT_SIGNATURE: readonly Colonne[] = [
+  { name: 'signature_image', type: 'TEXT' },
 ];

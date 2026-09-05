@@ -2688,6 +2688,8 @@ export interface components {
             role: components["schemas"]["RoleSignature"];
             /** Signataire Nom */
             signataire_nom: string;
+            /** Signature Image */
+            signature_image?: string | null;
         };
         /** SignatureRead */
         SignatureRead: {
@@ -2699,6 +2701,8 @@ export interface components {
             role: components["schemas"]["RoleSignature"];
             /** Signataire Nom */
             signataire_nom: string;
+            /** Signature Image */
+            signature_image?: string | null;
             /**
              * Horodatage
              * Format: date-time

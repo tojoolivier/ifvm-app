@@ -19,6 +19,9 @@ import {
   listReprenableTraitements,
   markTraitementSynced,
   markTraitementConflict,
+  markTraitementValidee,
+  saveSignatureLocal,
+  clearSignatureLocal,
   countUnsyncedTraitements,
   deleteDraftTraitement,
 } from '../src/lib/traitement-repository';
@@ -579,6 +582,97 @@ describe('getTraitement', () => {
     expect(result?.aerien?.pilote).toBe('Jean Dupont');
     expect(result?.aerien?.rotations).toHaveLength(1);
     expect(result?.terrestre).toBeUndefined();
+  });
+
+  it('attache les signatures déjà persistées localement (#signatures-auto-equipe)', async () => {
+    getFirstAsync
+      .mockResolvedValueOnce(STORED_TRAITEMENT_ROW)
+      .mockResolvedValueOnce(null) // cible
+      .mockResolvedValueOnce({ traitement_id: AERIEN_INPUT.id }); // aerien row (minimal)
+    getAllAsync
+      .mockResolvedValueOnce([]) // rotations
+      .mockResolvedValueOnce([
+        {
+          id: 'sig-1',
+          traitement_id: AERIEN_INPUT.id,
+          role: 'PILOTE',
+          signataire_nom: 'Jean Dupont',
+          signature_image: 'M0 0 L1 1',
+          horodatage: '2026-08-26T00:00:00Z',
+        },
+      ]); // signatures
+
+    const result = await getTraitement(AERIEN_INPUT.id);
+
+    expect(result?.signatures).toEqual([
+      expect.objectContaining({ role: 'PILOTE', signataire_nom: 'Jean Dupont', signature_image: 'M0 0 L1 1' }),
+    ]);
+  });
+});
+
+describe('saveSignatureLocal', () => {
+  it('remplace (delete puis insert) la signature existante d’un rôle', async () => {
+    getFirstAsync
+      .mockResolvedValueOnce(STORED_TRAITEMENT_ROW)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    getAllAsync.mockResolvedValueOnce([]);
+
+    await saveSignatureLocal(AERIEN_INPUT.id, 'PILOTE', 'Jean Dupont', 'M0 0 L1 1');
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('DELETE FROM traitement_signature'),
+      [AERIEN_INPUT.id, 'PILOTE']
+    );
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO traitement_signature'),
+      expect.arrayContaining([AERIEN_INPUT.id, 'PILOTE', 'Jean Dupont', 'M0 0 L1 1'])
+    );
+  });
+});
+
+describe('clearSignatureLocal', () => {
+  it('supprime la signature locale d’un rôle', async () => {
+    await clearSignatureLocal(AERIEN_INPUT.id, 'PILOTE');
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('DELETE FROM traitement_signature'),
+      [AERIEN_INPUT.id, 'PILOTE']
+    );
+  });
+});
+
+describe('markTraitementValidee', () => {
+  it('verrouille la fiche et réécrit les signatures avec les valeurs canoniques serveur', async () => {
+    getFirstAsync
+      .mockResolvedValueOnce({ ...STORED_TRAITEMENT_ROW, statut: 'validee' })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    getAllAsync.mockResolvedValueOnce([]);
+
+    await markTraitementValidee(AERIEN_INPUT.id, '2026-08-26', [
+      {
+        id: 'sig-serveur-1',
+        traitement_id: AERIEN_INPUT.id,
+        role: 'PILOTE',
+        signataire_nom: 'Jean Dupont',
+        signature_image: 'M0 0 L1 1',
+        horodatage: '2026-08-26T00:00:00Z',
+      },
+    ]);
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining("SET statut = 'validee'"),
+      ['2026-08-26', expect.any(String), AERIEN_INPUT.id]
+    );
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('DELETE FROM traitement_signature'),
+      [AERIEN_INPUT.id]
+    );
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO traitement_signature'),
+      ['sig-serveur-1', AERIEN_INPUT.id, 'PILOTE', 'Jean Dupont', 'M0 0 L1 1', '2026-08-26T00:00:00Z']
+    );
   });
 });
 

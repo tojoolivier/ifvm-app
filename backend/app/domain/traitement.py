@@ -315,6 +315,10 @@ class TraitementSignature:
     traitement_id: uuid.UUID = field(default_factory=uuid.uuid4)
     role: str = ""
     signataire_nom: str = ""
+    # Tracé du pavé de signature (mobile), sérialisé en chemin SVG — migration 0049.
+    # `None` pour les lignes écrites avant cette migration (rétrocompatibilité) ;
+    # le mobile exige désormais un tracé avant d'autoriser la validation d'un rôle.
+    signature_image: str | None = None
     horodatage: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -375,7 +379,7 @@ class Traitement:
             raise TraitementVerrouilleError("Seules les fiches en brouillon peuvent être modifiées")
 
     def valider(
-        self, date_validation: date, signatures: list[dict[str, str]]
+        self, date_validation: date, signatures: list[dict[str, str | None]]
     ) -> list[TraitementSignature]:
         """Applique la matrice de signatures puis transitionne vers `validee` (CDG §9).
 
@@ -390,7 +394,7 @@ class Traitement:
         specialisation = self.aerien if self.type_traitement == "AERIEN" else self.terrestre
         matrice = _MATRICE_SIGNATURES[self.type_traitement]
 
-        fournies = {s["role"]: s["signataire_nom"] for s in signatures}
+        fournies = {s["role"]: s for s in signatures}
 
         roles_invalides = set(fournies) - set(matrice)
         if roles_invalides:
@@ -423,9 +427,13 @@ class Traitement:
         now = datetime.utcnow()
         signature_objs = [
             TraitementSignature(
-                traitement_id=self.id, role=role, signataire_nom=nom, horodatage=now
+                traitement_id=self.id,
+                role=role,
+                signataire_nom=info["signataire_nom"],
+                signature_image=info.get("signature_image"),
+                horodatage=now,
             )
-            for role, nom in fournies.items()
+            for role, info in fournies.items()
         ]
 
         self.date_validation = date_validation

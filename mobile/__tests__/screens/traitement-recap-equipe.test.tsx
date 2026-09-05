@@ -151,11 +151,19 @@ describe('RecapScreen — sections Équipe et Traitement (#equipe-slide-aerien)'
     expect(await screen.findByText(/point\(s\) à corriger/)).toBeVisible();
   });
 
-  it('rendues, avec toutes les informations équipe complètes, « Enregistrer » est disponible', async () => {
-    useTraitementCaptureStore.setState({
-      ...RESET_STATE,
-      signed: { PILOTE: 'sig', MECANICIEN: 'sig', CHEF_DE_BASE: 'sig', CONSULTANT_INTERNATIONAL: 'sig' },
-    });
+  it('rendues, avec toutes les informations équipe complètes et toutes les signatures persistées, « Enregistrer » est disponible', async () => {
+    // « Signé » se lit désormais dans les signatures persistées localement
+    // (SQLite, via getTraitement), pas dans le state éphémère du store
+    // (#signatures-auto-equipe §6).
+    jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
+      ...DRAFT_AERIEN_COMPLET,
+      signatures: [
+        { id: 's1', traitement_id: 'trait-1', role: 'PILOTE', signataire_nom: 'Jean Dupont', signature_image: 'M0 0 L1 1', horodatage: '2026-08-26T00:00:00Z' },
+        { id: 's2', traitement_id: 'trait-1', role: 'MECANICIEN', signataire_nom: 'Marc Rabe', signature_image: 'M0 0 L1 1', horodatage: '2026-08-26T00:00:00Z' },
+        { id: 's3', traitement_id: 'trait-1', role: 'CHEF_DE_BASE', signataire_nom: 'Sarah Ravelo', signature_image: 'M0 0 L1 1', horodatage: '2026-08-26T00:00:00Z' },
+        { id: 's4', traitement_id: 'trait-1', role: 'CONSULTANT_INTERNATIONAL', signataire_nom: 'John Smith', signature_image: 'M0 0 L1 1', horodatage: '2026-08-26T00:00:00Z' },
+      ],
+    } as any);
 
     await render(<RecapScreen />);
 

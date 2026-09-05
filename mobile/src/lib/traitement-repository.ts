@@ -186,6 +186,9 @@ export interface TraitementSignature {
   traitement_id: string;
   role: string;
   signataire_nom: string | null;
+  // Tracé du pavé de signature (chemin SVG) — migration backend 0049. `null`
+  // tant que le rôle n'a pas encore signé numériquement.
+  signature_image: string | null;
   horodatage: string | null;
 }
 
@@ -480,6 +483,90 @@ export async function updateTraitementAerienPesticideRecu(
     `UPDATE traitement_aerien SET pesticide_recu_l = ? WHERE traitement_id = ?`,
     [pesticideRecuL ?? null, traitementId]
   );
+
+  const updated = await getTraitement(traitementId);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
+// ==========================================
+// SIGNATURES (#signatures-auto-equipe)
+// ==========================================
+
+/**
+ * Enregistre (ou remplace) la signature numérique d'un rôle — appelée dès que
+ * l'agent clique « VALIDER » sur l'écran Signatures, PAS seulement à
+ * l'enregistrement final de la fiche : une signature déjà tracée doit survivre
+ * à une fermeture/réouverture de la fiche, même avant tout envoi au serveur
+ * (cf. #signatures-auto-equipe, exigence de persistance réelle).
+ *
+ * Remplace (delete puis insert) plutôt qu'un UPDATE conditionnel : la table
+ * locale n'a pas de contrainte UNIQUE(traitement_id, role) (SQLite ne sait pas
+ * l'ajouter après coup sans recréer la table) ; ce patron couvre nativement le
+ * cas « MODIFIER » (re-signature) sans jamais laisser deux lignes pour un même
+ * rôle.
+ */
+export async function saveSignatureLocal(
+  traitementId: string,
+  role: string,
+  signataireNom: string,
+  signatureImage: string
+): Promise<void> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    'DELETE FROM traitement_signature WHERE traitement_id = ? AND role = ?',
+    [traitementId, role]
+  );
+  await db.runAsync(
+    `INSERT INTO traitement_signature (id, traitement_id, role, signataire_nom, signature_image, horodatage)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [generateId(), traitementId, role, signataireNom, signatureImage, now]
+  );
+}
+
+/** Retire la signature locale d'un rôle — utilisé quand le nom résolu depuis
+ * « Équipe » a changé depuis la signature (cf. #signatures-auto-equipe §8) :
+ * l'ancien tracé ne doit jamais être conservé pour une personne différente. */
+export async function clearSignatureLocal(traitementId: string, role: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(
+    'DELETE FROM traitement_signature WHERE traitement_id = ? AND role = ?',
+    [traitementId, role]
+  );
+}
+
+/**
+ * Écrit le résultat de `POST /traitements/{id}/valider` : la fiche est
+ * verrouillée (`statut = 'validee'`) et chaque signature est réécrite avec ses
+ * valeurs canoniques serveur (id/horodatage) — jamais de divergence entre ce
+ * que l'agent voit après enregistrement et ce que le serveur a réellement
+ * persisté.
+ */
+export async function markTraitementValidee(
+  traitementId: string,
+  dateValidation: string,
+  signatures: TraitementSignature[]
+): Promise<DraftTraitement> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    `UPDATE traitement SET statut = 'validee', date_validation = ?, updated_at = ? WHERE id = ?`,
+    [dateValidation, now, traitementId]
+  );
+
+  await db.runAsync('DELETE FROM traitement_signature WHERE traitement_id = ?', [traitementId]);
+  for (const s of signatures) {
+    await db.runAsync(
+      `INSERT INTO traitement_signature (id, traitement_id, role, signataire_nom, signature_image, horodatage)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [s.id, traitementId, s.role, s.signataire_nom, s.signature_image, s.horodatage]
+    );
+  }
 
   const updated = await getTraitement(traitementId);
   if (!updated) {
@@ -893,6 +980,14 @@ export async function getTraitement(id: string): Promise<DraftTraitement | null>
       result.terrestre = { ...terrestre, produits };
     }
   }
+
+  // Signatures numériques (#signatures-auto-equipe) : persistées localement dès
+  // la validation de chaque rôle (pas seulement au moment de l'enregistrement
+  // final), pour survivre à une fermeture/réouverture de la fiche avant envoi.
+  result.signatures = await db.getAllAsync<TraitementSignature>(
+    'SELECT * FROM traitement_signature WHERE traitement_id = ?',
+    [id]
+  );
 
   return result;
 }

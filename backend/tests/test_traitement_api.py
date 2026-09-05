@@ -1069,6 +1069,45 @@ async def test_valider_cycle_aerien_complet(
 
 
 @pytest.mark.asyncio
+async def test_valider_persiste_et_relit_le_trace_de_signature(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_rotation
+):
+    """Le tracé (chemin SVG) d'une signature doit survivre à la persistance et à
+    une relecture ultérieure (GET) — pas seulement le nom du signataire."""
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    await client.post(
+        f"/traitements/{traitement_id}/rotations", json=payload_rotation(), headers=auth_headers
+    )
+
+    resp = await client.post(
+        f"/traitements/{traitement_id}/valider",
+        json={
+            "date_validation": "2026-08-11",
+            "signatures": [
+                {"role": "PILOTE", "signataire_nom": "J. Dupont", "signature_image": "M0 0 L10 10"},
+                {"role": "MECANICIEN", "signataire_nom": "M. Rabe"},
+                {
+                    "role": "CHEF_DE_BASE",
+                    "signataire_nom": "Hery Andria",
+                    "signature_image": "M5 5 L20 20",
+                },
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200, resp.text
+
+    relecture = await client.get(f"/traitements/{traitement_id}", headers=auth_headers)
+    assert relecture.status_code == 200, relecture.text
+    par_role = {s["role"]: s for s in relecture.json()["signatures"]}
+    assert par_role["PILOTE"]["signature_image"] == "M0 0 L10 10"
+    assert par_role["CHEF_DE_BASE"]["signature_image"] == "M5 5 L20 20"
+    assert par_role["MECANICIEN"]["signature_image"] is None
+
+
+@pytest.mark.asyncio
 async def test_valider_cycle_terrestre_complet_sans_agent_encadreur(
     client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
 ):
