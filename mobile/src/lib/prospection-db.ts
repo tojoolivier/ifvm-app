@@ -594,8 +594,14 @@ const COLONNES_PROSPECTION: readonly Colonne[] = [
   { name: 'pilote', type: 'TEXT' },
   { name: 'mecanicien', type: 'TEXT' },
   { name: 'chef_de_base', type: 'TEXT' },
+  // `base`/`base_secondaire` (texte libre) remplacés par `lieu_base_id` (FK vers le
+  // référentiel lieu_aerien) — migration backend 0047. Les 2 colonnes ci-dessus
+  // restent déclarées pour les installations existantes (colonnes mortes, plus
+  // jamais lues/écrites par le code applicatif) — jamais supprimées côté SQLite
+  // mobile, cohérent avec le principe de préservation des données déjà en place.
   { name: 'base', type: 'TEXT' },
   { name: 'base_secondaire', type: 'TEXT' },
+  { name: 'lieu_base_id', type: 'TEXT' },
   // Pesticides embarqués + signatures (mode aérien uniquement) — NULL sur toute
   // fiche terrestre, comme le mode aérien lui-même. Cf. migration backend 0036.
   { name: 'pesticides_embarques', type: 'INTEGER' },

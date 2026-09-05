@@ -22,6 +22,7 @@ import {
   typeCibleImagoLabel,
 } from '@/lib/prospection-extensive';
 import { DEGATS_OPTIONS, formatHeureLocale } from '@/lib/prospection-fiche-lecture';
+import { LieuAerien, listLieuxAeriens } from '@/lib/referentiel-db';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
@@ -164,15 +165,20 @@ function larveRowHasData(row: PopulationRow | null): boolean {
  * Pesticides = NON : les champs dépendants (nom commercial, quantités, fûts)
  * sont alors omis plutôt qu'affichés à `null`, cf. `buildPesticidesRows`.
  */
-function buildReferencesAeriennesRows(draft: DraftProspection): DetailRow[] {
+/**
+ * `lieuBaseNom` est résolu par l'appelant (référentiel `lieu_aerien` local, cf.
+ * `listLieuxAeriens`) : `null` couvre aussi bien une fiche « généralisée » sans
+ * base (`lieu_base_id` NULL) qu'une fiche dont le lieu n'est plus dans le cache
+ * local (référentiel pas encore synchronisé) — jamais d'erreur, juste un « — ».
+ */
+function buildReferencesAeriennesRows(draft: DraftProspection, lieuBaseNom: string | null): DetailRow[] {
   return [
     { label: 'Société', value: draft.societe ?? '—' },
     { label: 'Immatricule Aéronef', value: draft.immatricule_aeronef ?? '—' },
     { label: 'Pilote', value: draft.pilote ?? '—' },
     { label: 'Mécanicien', value: draft.mecanicien ?? '—' },
     { label: 'Chef de base', value: draft.chef_de_base ?? '—' },
-    { label: 'Base', value: draft.base ?? '—' },
-    { label: 'Base secondaire', value: draft.base_secondaire ?? '—' },
+    { label: 'Base', value: lieuBaseNom ?? '—' },
   ];
 }
 
@@ -268,6 +274,7 @@ export default function ExtensiveRecapScreen() {
   const { run, isRunning: isSaving } = useAsyncAction();
   const [populations, setPopulations] = useState<PopulationRow[]>([]);
   const [operationsAeriennes, setOperationsAeriennes] = useState<OperationAerienneRow[]>([]);
+  const [lieuxAeriens, setLieuxAeriens] = useState<LieuAerien[]>([]);
   const signalerChargement = useSignalerChargement('extensive-recap');
   // Terrestre implicite (NULL) — même garde que sur les autres écrans du mode aérien.
   const isAerien = draft?.mode_extensif === 'aerien';
@@ -285,6 +292,17 @@ export default function ExtensiveRecapScreen() {
       .then(setOperationsAeriennes)
       .catch((error) => signalerChargement(error, { draftId: draft.id }));
   }, [draft, isAerien, signalerChargement]);
+
+  // #prospection-lieu-base : `draft.lieu_base_id` n'est qu'une FK — le libellé
+  // affiché vient du référentiel local (même source que le sélecteur de saisie).
+  useEffect(() => {
+    if (!isAerien) return;
+    listLieuxAeriens()
+      .then(setLieuxAeriens)
+      .catch((error) => signalerChargement(error));
+  }, [isAerien, signalerChargement]);
+
+  const lieuBaseNom = lieuxAeriens.find((l) => l.id === draft?.lieu_base_id)?.nom ?? null;
 
   const totalJourMinutes = useMemo(
     () => operationsAeriennes.reduce((sum, op) => sum + op.duree_minutes, 0),
@@ -458,7 +476,7 @@ export default function ExtensiveRecapScreen() {
                 <>
                   <Text style={styles.detailSubtitle}>Références aériennes</Text>
                   <View style={styles.summaryCard}>
-                    <DetailRows rows={buildReferencesAeriennesRows(draft)} />
+                    <DetailRows rows={buildReferencesAeriennesRows(draft, lieuBaseNom)} />
                   </View>
 
                   <Text style={styles.detailSubtitle}>Informations sur les heures de vol</Text>
@@ -640,7 +658,7 @@ export default function ExtensiveRecapScreen() {
                 </View>
                 <View style={styles.detailCard}>
                   <Text style={styles.detailSubtitle}>Références aériennes</Text>
-                  <DetailRows rows={buildReferencesAeriennesRows(draft)} />
+                  <DetailRows rows={buildReferencesAeriennesRows(draft, lieuBaseNom)} />
 
                   <Text style={[styles.detailSubtitle, { marginTop: 8 }]}>Informations sur les heures de vol</Text>
                   {operationsAeriennes.length === 0 ? (
