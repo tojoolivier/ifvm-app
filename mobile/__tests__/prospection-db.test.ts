@@ -141,6 +141,11 @@ const MIGRATED_COLUMNS = [
   { name: 'pilote_id' },
   { name: 'mecanicien_id' },
   { name: 'consultant_id' },
+  // Base principale/stand/base secondaire (référentiel lieu_aerien) — écran « Équipe »
+  // (#equipe-slide-aerien).
+  { name: 'lieu_base_principale_id' },
+  { name: 'lieu_stand_id' },
+  { name: 'lieu_base_secondaire_id' },
 
   // Colonnes de traitement_aerien et traitement_terrestre (partagées)
   { name: 'pesticide_recu_l' },

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Text, TextInput, TouchableOpacity, ScrollView, View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { getTraitement, addRotation } from '@/lib/traitement-repository';
+import { getTraitement, addRotation, updateTraitementAerienPesticideRecu } from '@/lib/traitement-repository';
 import { listPesticides, Pesticide } from '@/lib/referentiel-db';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import {
@@ -27,12 +27,14 @@ import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
 /**
- * Écran « Pesticides & rotations » (migration 0046, #Ticket 7) — aérien uniquement,
- * inséré juste après Équipe (traitement.tsx, dont ce bloc a été extrait) et avant
- * Moyens. Chaque rotation porte désormais quantité + unité (L/kg), une superficie
- * traitée et des heures d'ouverture/fermeture de vanne, en plus des champs déjà
- * existants (produit, températures, vent, heure_debut/heure_fin de la rotation
- * entière). N° de cuve et les 3 durées ne sont jamais saisis : dérivés à l'affichage.
+ * Écran « Traitement » (migration 0046/0047, #Ticket 7, #equipe-slide-aerien) —
+ * aérien uniquement, inséré juste après Équipe (traitement.tsx, dont ce bloc a été
+ * extrait) et avant Moyens. Chaque rotation porte désormais quantité + unité (L/kg),
+ * une superficie traitée et des heures d'ouverture/fermeture de vanne, en plus des
+ * champs déjà existants (produit, températures, vent, heure_debut/heure_fin de la
+ * rotation entière). N° de cuve et les 3 durées ne sont jamais saisis : dérivés à
+ * l'affichage. « Pesticide reçu (l) » y a été déplacé depuis Équipe : c'est une
+ * information propre au traitement (stock de pesticide), pas à l'équipe.
  */
 export default function RotationsScreen() {
   const router = useRouter();
@@ -54,6 +56,13 @@ export default function RotationsScreen() {
       .then((draft) => {
         if (!draft) return;
         setSurfaceInfesteeHa(draft.cible?.surface_infestee_ha ?? null);
+        // pesticide_recu_l chargé ici depuis #equipe-slide-aerien (déplacé depuis
+        // Équipe/traitement.tsx) — même garde ailleurs sur cet écran : recharge à
+        // chaque montage (bornée à `traitementId`), sans écraser une saisie en cours
+        // entre deux montages du même écran.
+        if (draft.type_traitement === 'AERIEN' && draft.aerien) {
+          store.updateAerien({ pesticideRecuL: draft.aerien.pesticide_recu_l });
+        }
         // Rotations chargées ici seulement (sous-ressource propre à cet écran, pas à
         // Équipe) — même garde qu'auparavant dans traitement.tsx : ne réhydrate
         // qu'une fois par fiche, jamais par-dessus une saisie déjà en cours.
@@ -119,6 +128,7 @@ export default function RotationsScreen() {
           return;
         }
         setError(undefined);
+        await updateTraitementAerienPesticideRecu(traitementId, store.aerien.pesticideRecuL);
         for (const r of store.aerien.rotations) {
           await addRotation(traitementId, {
             produit_id: r.produit_id,
@@ -150,7 +160,18 @@ export default function RotationsScreen() {
     <SafeAreaView style={chrome.container}>
       <ScrollView contentContainerStyle={chrome.content}>
         <ProgressBar currentIndex={3} segments={PROGRESS_SEGMENTS_AERIEN} />
-        <Text style={chrome.title}>Pesticides &amp; rotations</Text>
+        <Text style={chrome.title}>Traitement</Text>
+
+        <Text style={styles.label}>Pesticide reçu (l)</Text>
+        <TextInput
+          testID="pesticide-recu-input"
+          editable={!readOnly}
+          style={styles.input}
+          placeholder="0"
+          keyboardType="numeric"
+          value={store.aerien.pesticideRecuL != null ? String(store.aerien.pesticideRecuL) : ''}
+          onChangeText={(v) => store.updateAerien({ pesticideRecuL: v ? Number(v) : null })}
+        />
 
         {store.aerien.rotations.map((rotation, index) => {
           const durees = computeDureesRotation({

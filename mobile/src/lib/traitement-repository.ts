@@ -86,6 +86,9 @@ export interface TraitementAerien {
   chef_de_base_id: string;
   consultant_id: string | null;
   immatricule_aeronef: string | null;
+  lieu_base_principale_id: string | null;
+  lieu_stand_id: string | null;
+  lieu_base_secondaire_id: string | null;
   nb_rotations: number | null;
   total_pesticide_l: number | null;
   total_pesticide_kg: number | null;
@@ -411,10 +414,12 @@ export interface AerienUpdateInput {
   chefDeBaseId: string;
   consultantId?: string | null;
   immatriculeAeronef?: string | null;
-  // surfaceTraiteeHa n'y figure plus (migration 0046) : dérivée des rotations,
-  // même traitement que nb_rotations/total_pesticide_l — jamais mise à jour par cette
-  // fonction, seulement par la synchronisation.
-  pesticideRecuL?: number | null;
+  // Base principale/stand/base secondaire (référentiel lieu_aerien) — écran « Équipe »
+  // (#equipe-slide-aerien). Base principale obligatoire (validée en amont par
+  // validateAerienEquipe), stand et base secondaire facultatifs.
+  lieuBasePrincipaleId?: string | null;
+  lieuStandId?: string | null;
+  lieuBaseSecondaireId?: string | null;
 }
 
 export async function updateTraitementAerien(
@@ -430,7 +435,9 @@ export async function updateTraitementAerien(
       chef_de_base_id = ?,
       consultant_id = ?,
       immatricule_aeronef = ?,
-      pesticide_recu_l = ?
+      lieu_base_principale_id = ?,
+      lieu_stand_id = ?,
+      lieu_base_secondaire_id = ?
      WHERE traitement_id = ?`,
     [
       input.piloteId,
@@ -438,9 +445,34 @@ export async function updateTraitementAerien(
       input.chefDeBaseId,
       input.consultantId ?? null,
       input.immatriculeAeronef ?? null,
-      input.pesticideRecuL ?? null,
+      input.lieuBasePrincipaleId ?? null,
+      input.lieuStandId ?? null,
+      input.lieuBaseSecondaireId ?? null,
       traitementId,
     ]
+  );
+
+  const updated = await getTraitement(traitementId);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
+/**
+ * Pesticide reçu (l) — saisi sur l'écran « Traitement » (rotations.tsx), pas
+ * « Équipe » (#equipe-slide-aerien) : fonction dédiée plutôt qu'un champ de plus
+ * sur `AerienUpdateInput`, pour que chaque écran n'écrive que ce qui lui appartient.
+ */
+export async function updateTraitementAerienPesticideRecu(
+  traitementId: string,
+  pesticideRecuL: number | null | undefined
+): Promise<DraftTraitement> {
+  const db = await getDb();
+
+  await db.runAsync(
+    `UPDATE traitement_aerien SET pesticide_recu_l = ? WHERE traitement_id = ?`,
+    [pesticideRecuL ?? null, traitementId]
   );
 
   const updated = await getTraitement(traitementId);

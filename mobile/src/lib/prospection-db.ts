@@ -741,6 +741,13 @@ const COLONNES_TRAITEMENT_AERIEN: readonly Colonne[] = [
   { name: 'pilote_id', type: 'TEXT' },
   { name: 'mecanicien_id', type: 'TEXT' },
   { name: 'consultant_id', type: 'TEXT' },
+  // Base principale/stand/base secondaire (référentiel lieu_aerien) — écran « Équipe »
+  // (#equipe-slide-aerien). Base principale obligatoire côté saisie/validation, mais
+  // nullable ici comme le reste des colonnes ajoutées après coup : la contrainte
+  // NOT NULL n'existe que côté backend (schéma de création).
+  { name: 'lieu_base_principale_id', type: 'TEXT' },
+  { name: 'lieu_stand_id', type: 'TEXT' },
+  { name: 'lieu_base_secondaire_id', type: 'TEXT' },
 ];
 
 /** Colonnes ajoutées à `traitement_terrestre` après sa création initiale. */

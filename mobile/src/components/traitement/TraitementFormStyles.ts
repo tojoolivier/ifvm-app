@@ -23,6 +23,18 @@ export const formStyles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   error: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.label, color: traitementColors.erreurTexte },
+  // Enveloppe du <Picker> natif (référentiel lieu_aerien, #equipe-slide-aerien) —
+  // même gabarit que `input`, sans hauteur fixe : le Picker natif porte sa propre
+  // hauteur tactile (~44-50), un `minHeight` en plus créerait un double espacement
+  // (même remarque que `aerienFieldPickerBox` côté prospection extensive-reference.tsx).
+  pickerBox: {
+    borderWidth: 1,
+    borderColor: traitementColors.bordure,
+    borderRadius: traitementRadii.chip,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+  },
+  picker: { color: traitementColors.texteTitre },
   warningText: { fontFamily: traitementFonts.uiMedium, fontSize: traitementTypeSizes.corps, color: traitementColors.avertissementTexte },
   rotationCard: { gap: 8 },
   rotationHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

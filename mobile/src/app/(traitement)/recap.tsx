@@ -7,6 +7,7 @@ import { enregistrerEtSynchroniserTraitement } from '@/lib/traitement-sync';
 import { estToutParti, resumerEnPhrase } from '@/lib/sync-lot';
 import { useAuthStore } from '@/lib/auth-store';
 import { useTraitementCaptureStore, SignatureRole } from '@/lib/traitement-capture-store';
+import { listUtilisateursByRole, listLieuxAeriens, UtilisateurEquipe, LieuAerien } from '@/lib/referentiel-db';
 import {
   aggregateRecapErrors,
   computeSignatureMatrix,
@@ -23,7 +24,23 @@ import { useErrorLogStore } from '@/lib/error-log-store';
 import { toFriendlyError } from '@/lib/friendly-error';
 import { EtatVide } from '@/components/erreurs/etat-vide';
 
-const CONTROL_LABELS = ['Références', 'Cibles', 'Traitement', 'Moyens & protection', 'Impacts & risque', 'Signatures'];
+// Aérien : 7 étapes (Équipe/Traitement scindés, #equipe-slide-aerien) ; terrestre : 6
+// (équipe et pesticides restés sur un seul écran) — reflète PROGRESS_SEGMENTS_AERIEN/
+// PROGRESS_SEGMENTS_TERRESTRE (ProgressBar.tsx). Le dernier libellé est toujours
+// « Signatures » : son index se déduit de la longueur, jamais codé en dur.
+const CONTROL_LABELS_AERIEN = ['Références', 'Cibles', 'Équipe', 'Traitement', 'Moyens & protection', 'Impacts & risque', 'Signatures'];
+const CONTROL_LABELS_TERRESTRE = ['Références', 'Cibles', 'Équipe', 'Moyens & protection', 'Impacts & risque', 'Signatures'];
+
+/** Une ligne « libellé : valeur » des cartes Équipe/Traitement — « — » si absent,
+ * jamais une ligne masquée (un champ facultatif vide reste visible, cf. #equipe-slide-aerien). */
+function RecapLigne({ label, value }: { label: string; value: string | null | undefined }) {
+  return (
+    <View style={styles.recapLigne}>
+      <Text style={styles.recapLabel}>{label}</Text>
+      <Text style={styles.recapValue}>{value || '—'}</Text>
+    </View>
+  );
+}
 
 export default function RecapScreen() {
   const router = useRouter();
@@ -36,9 +53,46 @@ export default function RecapScreen() {
   const [draft, setDraft] = useState<DraftTraitement | null>(null);
   const [unsyncedCount, setUnsyncedCount] = useState(0);
   const [erreurDeLecture, setErreurDeLecture] = useState<unknown>(null);
+  // Résolution id -> nom pour l'affichage (Équipe) — le brouillon ne porte que des ids
+  // (cf. traitement-repository.ts), jamais de jointure côté lecture locale.
+  const [personnes, setPersonnes] = useState<UtilisateurEquipe[]>([]);
+  const [lieuxAeriens, setLieuxAeriens] = useState<LieuAerien[]>([]);
   const { run, isRunning: isSaving } = useAsyncAction();
   const signaler = useErrorStore((s) => s.signaler);
   const logError = useErrorLogStore((s) => s.addEntry);
+
+  useEffect(() => {
+    if (draft?.type_traitement !== 'AERIEN') return;
+    Promise.all([
+      listUtilisateursByRole('chef_de_base'),
+      listUtilisateursByRole('pilote'),
+      listUtilisateursByRole('mecanicien'),
+      listUtilisateursByRole('consultant_international'),
+    ])
+      .then((listes) => setPersonnes(listes.flat()))
+      .catch((error) => logError({
+        message: toFriendlyError(error).message,
+        stack: error instanceof Error ? error.stack ?? null : null,
+        screen: 'recap',
+        context: { traitementId, source: 'listUtilisateursByRole' },
+      }));
+    listLieuxAeriens()
+      .then(setLieuxAeriens)
+      .catch((error) => logError({
+        message: toFriendlyError(error).message,
+        stack: error instanceof Error ? error.stack ?? null : null,
+        screen: 'recap',
+        context: { traitementId, source: 'listLieuxAeriens' },
+      }));
+  }, [draft?.type_traitement, traitementId, logError]);
+
+  const nomPersonne = (id: string | null | undefined): string | null => {
+    if (!id) return null;
+    const p = personnes.find((u) => u.id === id);
+    return p ? `${p.prenom} ${p.nom}` : null;
+  };
+  const nomLieu = (id: string | null | undefined): string | null =>
+    id ? lieuxAeriens.find((l) => l.id === id)?.nom ?? null : null;
 
   const chargerRecap = useCallback(() => {
     if (!traitementId) return;
@@ -135,8 +189,22 @@ export default function RecapScreen() {
             motifSurfaceRestanteAbandonnee: draft.terrestre.motif_surface_restante_abandonnee,
           }
         : null,
+    aerienEquipe:
+      draft.type_traitement === 'AERIEN' && draft.aerien
+        ? {
+            chefDeBaseId: draft.aerien.chef_de_base_id,
+            piloteId: draft.aerien.pilote_id,
+            mecanicienId: draft.aerien.mecanicien_id,
+            consultantId: draft.aerien.consultant_id,
+            immatriculeAeronef: draft.aerien.immatricule_aeronef,
+            lieuBasePrincipaleId: draft.aerien.lieu_base_principale_id,
+          }
+        : null,
     signatureMatrix,
   });
+
+  const controlLabels = draft.type_traitement === 'AERIEN' ? CONTROL_LABELS_AERIEN : CONTROL_LABELS_TERRESTRE;
+  const indexSignatures = controlLabels.length - 1;
 
   const nbSignaturesRequises = signatureMatrix.filter((r) => r.required).length;
   const nbSignaturesFaites = signatureMatrix.filter((r) => r.signe).length;
@@ -176,27 +244,50 @@ export default function RecapScreen() {
           </Text>
         </Card>
 
-        {CONTROL_LABELS.map((label, index) => {
+        {controlLabels.map((label, index) => {
           const ok =
-            index === 5
+            index === indexSignatures
               ? nbSignaturesFaites === nbSignaturesRequises
               : errors.length === 0;
           return (
             <View key={label} style={styles.controlLine}>
               <Text style={ok ? styles.dotOk : styles.dotWarn}>{ok ? '✓' : '!'}</Text>
               <Text style={styles.controlLabel}>{label}</Text>
-              {index === 5 && <Text style={styles.controlDetail}>{nbSignaturesFaites}/{nbSignaturesRequises} signatures</Text>}
+              {index === indexSignatures && <Text style={styles.controlDetail}>{nbSignaturesFaites}/{nbSignaturesRequises} signatures</Text>}
             </View>
           );
         })}
 
-        {draft.type_traitement === 'AERIEN' && (
-          <Card variant="info">
-            <Text style={styles.label}>Rapprochement fiche de vol</Text>
-            <Text style={styles.note}>
-              À faire manuellement — pas encore de correspondance automatique par n° de cuve dans ce lot.
-            </Text>
-          </Card>
+        {draft.type_traitement === 'AERIEN' && draft.aerien && (
+          <>
+            <Card>
+              <Text style={styles.sectionTitle}>Équipe</Text>
+              <RecapLigne label="Chef de base" value={nomPersonne(draft.aerien.chef_de_base_id)} />
+              <RecapLigne label="Pilote" value={nomPersonne(draft.aerien.pilote_id)} />
+              <RecapLigne label="Mécanicien" value={nomPersonne(draft.aerien.mecanicien_id)} />
+              <RecapLigne label="Consultant" value={nomPersonne(draft.aerien.consultant_id)} />
+              <RecapLigne label="Immatriculation aéronef" value={draft.aerien.immatricule_aeronef} />
+              <RecapLigne label="Base principale" value={nomLieu(draft.aerien.lieu_base_principale_id)} />
+              <RecapLigne label="Stand" value={nomLieu(draft.aerien.lieu_stand_id)} />
+              <RecapLigne label="Base secondaire" value={nomLieu(draft.aerien.lieu_base_secondaire_id)} />
+            </Card>
+
+            <Card>
+              <Text style={styles.sectionTitle}>Traitement</Text>
+              <RecapLigne label="Nb rotations" value={draft.aerien.nb_rotations != null ? String(draft.aerien.nb_rotations) : null} />
+              <RecapLigne label="Total pesticide (l)" value={draft.aerien.total_pesticide_l != null ? String(draft.aerien.total_pesticide_l) : null} />
+              <RecapLigne label="Total pesticide (kg)" value={draft.aerien.total_pesticide_kg != null ? String(draft.aerien.total_pesticide_kg) : null} />
+              <RecapLigne label="Surface traitée (ha)" value={draft.aerien.surface_traitee_ha != null ? String(draft.aerien.surface_traitee_ha) : null} />
+              <RecapLigne label="Pesticide reçu (l)" value={draft.aerien.pesticide_recu_l != null ? String(draft.aerien.pesticide_recu_l) : null} />
+            </Card>
+
+            <Card variant="info">
+              <Text style={styles.label}>Rapprochement fiche de vol</Text>
+              <Text style={styles.note}>
+                À faire manuellement — pas encore de correspondance automatique par n° de cuve dans ce lot.
+              </Text>
+            </Card>
+          </>
         )}
 
         <Card variant={unsyncedCount > 0 ? 'avertissement' : 'info'}>
@@ -236,6 +327,10 @@ const styles = StyleSheet.create({
   dotWarn: { color: traitementColors.attente, fontFamily: traitementFonts.uiBold },
   controlLabel: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre, flex: 1 },
   controlDetail: { fontFamily: traitementFonts.mono, fontSize: traitementTypeSizes.label, color: traitementColors.texteSecondaire },
+  sectionTitle: { fontFamily: traitementFonts.uiExtraBold, fontSize: traitementTypeSizes.corps + 1, color: traitementColors.texteTitre, marginBottom: 4 },
+  recapLigne: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, paddingVertical: 2 },
+  recapLabel: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.corps, color: traitementColors.texteSecondaire, flex: 1 },
+  recapValue: { fontFamily: traitementFonts.uiSemiBold, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre, textAlign: 'right' },
   label: { fontFamily: traitementFonts.uiMedium, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
   note: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.corps, color: traitementColors.texteNote },
   saveButton: {
