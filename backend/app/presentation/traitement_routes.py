@@ -129,12 +129,14 @@ async def create_traitement(
             )
             return await use_case.execute(
                 **_champs_communs(body),
-                pilote=body.aerien.pilote,
-                mecanicien=body.aerien.mecanicien,
+                pilote_id=body.aerien.pilote_id,
+                mecanicien_id=body.aerien.mecanicien_id,
                 chef_de_base_id=body.aerien.chef_de_base_id,
-                consultant_international=body.aerien.consultant_international,
+                consultant_id=body.aerien.consultant_id,
+                lieu_base_principale_id=body.aerien.lieu_base_principale_id,
+                lieu_stand_id=body.aerien.lieu_stand_id,
+                lieu_base_secondaire_id=body.aerien.lieu_base_secondaire_id,
                 immatricule_aeronef=body.aerien.immatricule_aeronef,
-                surface_traitee_ha=body.aerien.surface_traitee_ha,
                 pesticide_recu_l=body.aerien.pesticide_recu_l,
             )
         use_case_terrestre = CreateTraitementTerrestre(
@@ -199,12 +201,14 @@ async def sync_traitement(
                 traitement_id=body.id,
                 base_updated_at=body.base_updated_at,
                 **_champs_communs(body),
-                pilote=body.aerien.pilote,
-                mecanicien=body.aerien.mecanicien,
+                pilote_id=body.aerien.pilote_id,
+                mecanicien_id=body.aerien.mecanicien_id,
                 chef_de_base_id=body.aerien.chef_de_base_id,
-                consultant_international=body.aerien.consultant_international,
+                consultant_id=body.aerien.consultant_id,
+                lieu_base_principale_id=body.aerien.lieu_base_principale_id,
+                lieu_stand_id=body.aerien.lieu_stand_id,
+                lieu_base_secondaire_id=body.aerien.lieu_base_secondaire_id,
                 immatricule_aeronef=body.aerien.immatricule_aeronef,
-                surface_traitee_ha=body.aerien.surface_traitee_ha,
                 pesticide_recu_l=body.aerien.pesticide_recu_l,
             )
         else:
@@ -281,14 +285,17 @@ async def add_rotation(
     try:
         return await use_case.execute(
             traitement_id=traitement_id,
-            numero_cuve=body.numero_cuve,
             produit_id=body.produit_id,
-            quantite_l=body.quantite_l,
+            quantite=body.quantite,
+            unite=body.unite.value,
+            surface_ha=body.surface_ha,
             temperature_debut_c=body.temperature_debut_c,
             temperature_fin_c=body.temperature_fin_c,
             vent_debut_ms=body.vent_debut_ms,
             vent_fin_ms=body.vent_fin_ms,
             heure_debut=body.heure_debut,
+            heure_ouverture_vanne=body.heure_ouverture_vanne,
+            heure_fermeture_vanne=body.heure_fermeture_vanne,
             heure_fin=body.heure_fin,
             nom_commercial=body.nom_commercial,
         )
@@ -313,14 +320,17 @@ async def update_rotation(
         return await use_case.execute(
             traitement_id=traitement_id,
             rotation_id=rotation_id,
-            numero_cuve=body.numero_cuve,
             produit_id=body.produit_id,
-            quantite_l=body.quantite_l,
+            quantite=body.quantite,
+            unite=body.unite.value,
+            surface_ha=body.surface_ha,
             temperature_debut_c=body.temperature_debut_c,
             temperature_fin_c=body.temperature_fin_c,
             vent_debut_ms=body.vent_debut_ms,
             vent_fin_ms=body.vent_fin_ms,
             heure_debut=body.heure_debut,
+            heure_ouverture_vanne=body.heure_ouverture_vanne,
+            heure_fermeture_vanne=body.heure_fermeture_vanne,
             heure_fin=body.heure_fin,
             nom_commercial=body.nom_commercial,
         )

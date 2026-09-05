@@ -66,13 +66,27 @@ class RepartitionPopulation(str, Enum):
     DIFFUSE = "DIFFUSE"
 
 
+class UniteQuantite(str, Enum):
+    L = "L"
+    KG = "kg"
+
+
 class TraitementAerienCreate(BaseModel):
-    pilote: str = Field(..., min_length=1, max_length=255)
-    mecanicien: str = Field(..., min_length=1, max_length=255)
+    # pilote/mecanicien/consultant_international (texte libre) -> FK utilisateur
+    # (migration 0047) : peuvent référencer un compte créé à la volée (POST
+    # /users/a-la-volee) aussi bien qu'un compte existant. chef_de_base_id seul
+    # doit préexister (pas de création à la volée pour ce rôle).
+    pilote_id: uuid.UUID
+    mecanicien_id: uuid.UUID
     chef_de_base_id: uuid.UUID
-    consultant_international: str | None = Field(None, max_length=255)
-    immatricule_aeronef: str | None = None
-    surface_traitee_ha: float | None = Field(None, ge=0)
+    consultant_id: uuid.UUID | None = None
+    # Bases aériennes/stands (migration 0047).
+    lieu_base_principale_id: uuid.UUID
+    lieu_stand_id: uuid.UUID | None = None
+    lieu_base_secondaire_id: uuid.UUID | None = None
+    immatricule_aeronef: str = Field(..., min_length=1)
+    # surface_traitee_ha n'y figure plus (migration 0047) : dérivée de la somme
+    # des `surface_ha` de rotation, ajoutées après coup via /rotations.
     pesticide_recu_l: float | None = Field(None, ge=0)
 
 
@@ -186,15 +200,20 @@ class CibleRead(BaseModel):
 
 
 class RotationCreate(BaseModel):
-    numero_cuve: str = Field(..., min_length=1, max_length=50)
+    # numero_cuve n'y figure pas : dérivé côté serveur de `numero` (migration
+    # 0047), jamais saisi.
     produit_id: uuid.UUID
-    quantite_l: float = Field(..., gt=0)
+    quantite: float = Field(..., gt=0)
+    unite: UniteQuantite
+    surface_ha: float = Field(..., ge=0)
     temperature_debut_c: float
     temperature_fin_c: float
     vent_debut_ms: float = Field(..., ge=0)
     vent_fin_ms: float = Field(..., ge=0)
     heure_debut: time
     heure_fin: time
+    heure_ouverture_vanne: time
+    heure_fermeture_vanne: time
     # Dérivé côté client du nom du pesticide sélectionné (texte avant le
     # premier chiffre) — figé à la saisie, jamais recalculé côté serveur.
     nom_commercial: str | None = None
@@ -207,13 +226,17 @@ class RotationRead(BaseModel):
     numero: int
     numero_cuve: str
     produit_id: uuid.UUID
-    quantite_l: float
+    quantite: float
+    unite: UniteQuantite
+    surface_ha: float
     temperature_debut_c: float
     temperature_fin_c: float
     vent_debut_ms: float
     vent_fin_ms: float
     heure_debut: time
     heure_fin: time
+    heure_ouverture_vanne: time
+    heure_fermeture_vanne: time
     nom_commercial: str | None = None
 
 
@@ -257,14 +280,18 @@ class SignatureRead(BaseModel):
 class TraitementAerienRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    pilote: str
-    mecanicien: str
+    pilote_id: uuid.UUID
+    mecanicien_id: uuid.UUID
     chef_de_base_id: uuid.UUID
-    consultant_international: str | None
-    immatricule_aeronef: str | None
+    consultant_id: uuid.UUID | None
+    lieu_base_principale_id: uuid.UUID
+    lieu_stand_id: uuid.UUID | None
+    lieu_base_secondaire_id: uuid.UUID | None
+    immatricule_aeronef: str
     nb_rotations: int
-    total_pesticide_l: float | None
-    surface_traitee_ha: float | None
+    total_pesticide_l: float
+    total_pesticide_kg: float
+    surface_traitee_ha: float
     surface_restante_ha: float | None
     pesticide_recu_l: float | None
     pesticide_stock_restant_l: float | None

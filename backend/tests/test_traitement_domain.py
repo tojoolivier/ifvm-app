@@ -209,9 +209,11 @@ def _args(**overrides):
         date_traitement=date(2026, 8, 11),
         date_validation=date(2026, 8, 10),
         localite="Betioky",
-        pilote="J. Dupont",
-        mecanicien="M. Rabe",
+        pilote_id=uuid.uuid4(),
+        mecanicien_id=uuid.uuid4(),
         chef_de_base_id=_CHEF.id,
+        lieu_base_principale_id=uuid.uuid4(),
+        immatricule_aeronef="5R-XYZ",
     )
     args.update(overrides)
     return args
@@ -247,16 +249,15 @@ async def test_creation_aerien_transmet_immatriculation_surface_et_stock_pestici
     traitement = await use_case.execute(
         **_args(
             immatricule_aeronef="5R-ABC",
-            surface_traitee_ha=30.0,
             pesticide_recu_l=200.0,
         )
     )
 
     assert traitement.aerien.immatricule_aeronef == "5R-ABC"
-    assert traitement.aerien.surface_traitee_ha == 30.0
+    assert traitement.aerien.surface_traitee_ha == 0.0
     # Pas de rotation à la création (sous-ressource ajoutée après coup) : rien de
     # consommé, le stock = tout le reçu.
-    assert traitement.aerien.surface_restante_ha == 70.0
+    assert traitement.aerien.surface_restante_ha == 100.0
     assert traitement.aerien.pesticide_stock_restant_l == 200.0
 
 
@@ -313,9 +314,10 @@ async def test_rejette_date_traitement_anterieure():
 
 def _rotation(**overrides) -> Rotation:
     args = dict(
-        numero_cuve="C1",
         produit_id=uuid.uuid4(),
-        quantite_l=10.0,
+        quantite=10.0,
+        unite="L",
+        surface_ha=1.0,
         temperature_debut_c=25.0,
         temperature_fin_c=27.0,
         vent_debut_ms=2.0,
@@ -329,15 +331,15 @@ def test_recalculer_totaux_sans_rotation():
     aerien = TraitementAerien()
     aerien.recalculer_totaux()
     assert aerien.nb_rotations == 0
-    assert aerien.total_pesticide_l is None
+    assert aerien.total_pesticide_l == 0.0
 
 
 def test_recalculer_totaux_trois_rotations():
     aerien = TraitementAerien()
     aerien.rotations = [
-        _rotation(numero=1, quantite_l=10.0),
-        _rotation(numero=2, quantite_l=15.5),
-        _rotation(numero=3, quantite_l=8.25),
+        _rotation(numero=1, quantite=10.0),
+        _rotation(numero=2, quantite=15.5),
+        _rotation(numero=3, quantite=8.25),
     ]
     aerien.recalculer_totaux()
     assert aerien.nb_rotations == 3
@@ -346,7 +348,7 @@ def test_recalculer_totaux_trois_rotations():
 
 def test_recalculer_totaux_apres_suppression():
     aerien = TraitementAerien()
-    r1, r2 = _rotation(numero=1, quantite_l=10.0), _rotation(numero=2, quantite_l=5.0)
+    r1, r2 = _rotation(numero=1, quantite=10.0), _rotation(numero=2, quantite=5.0)
     aerien.rotations = [r1, r2]
     aerien.recalculer_totaux()
     aerien.rotations.remove(r1)
@@ -357,13 +359,13 @@ def test_recalculer_totaux_apres_suppression():
 
 def test_recalculer_totaux_derniere_suppression_repasse_a_none():
     aerien = TraitementAerien()
-    r1 = _rotation(numero=1, quantite_l=10.0)
+    r1 = _rotation(numero=1, quantite=10.0)
     aerien.rotations = [r1]
     aerien.recalculer_totaux()
     aerien.rotations.remove(r1)
     aerien.recalculer_totaux()
     assert aerien.nb_rotations == 0
-    assert aerien.total_pesticide_l is None
+    assert aerien.total_pesticide_l == 0.0
 
 
 def test_recalculer_surfaces_aerien_saisie_directe_pas_de_somme_equipement():
@@ -398,7 +400,7 @@ def test_recalculer_surfaces_aerien_pas_de_chainage_contrairement_a_terrestre():
 
 def test_recalculer_totaux_aerien_alimente_le_stock_pesticide():
     aerien = TraitementAerien(pesticide_recu_l=200.0)
-    aerien.rotations = [_rotation(numero=1, quantite_l=60.0)]
+    aerien.rotations = [_rotation(numero=1, quantite=60.0)]
     aerien.recalculer_totaux()
     assert aerien.total_pesticide_l == 60.0
     assert aerien.pesticide_stock_restant_l == 140.0
@@ -406,7 +408,7 @@ def test_recalculer_totaux_aerien_alimente_le_stock_pesticide():
 
 def test_recalculer_stock_pesticide_aerien_sans_reception_reste_none():
     aerien = TraitementAerien()
-    aerien.rotations = [_rotation(numero=1, quantite_l=60.0)]
+    aerien.rotations = [_rotation(numero=1, quantite=60.0)]
     aerien.recalculer_totaux()
     assert aerien.pesticide_stock_restant_l is None
 
@@ -415,7 +417,7 @@ def test_recalculer_stock_pesticide_aerien_plancher_zero_surconsommation():
     """Consommation > réception (ex. pesticide partagé avec une autre fiche) :
     le stock ne descend jamais sous 0, même convention que surface_restante_ha."""
     aerien = TraitementAerien(pesticide_recu_l=50.0)
-    aerien.rotations = [_rotation(numero=1, quantite_l=80.0)]
+    aerien.rotations = [_rotation(numero=1, quantite=80.0)]
     aerien.recalculer_totaux()
     assert aerien.pesticide_stock_restant_l == 0.0
 
@@ -439,26 +441,59 @@ class FakeTraitementRepoRotations:
         return traitement
 
     async def add_rotation(
-        self, traitement_id, rotation, nb_rotations, total_pesticide_l, pesticide_stock_restant_l
+        self,
+        traitement_id,
+        rotation,
+        nb_rotations,
+        total_pesticide_l,
+        total_pesticide_kg,
+        surface_traitee_ha,
+        surface_restante_ha,
+        pesticide_stock_restant_l,
     ):
         self.traitement.aerien.nb_rotations = nb_rotations
         self.traitement.aerien.total_pesticide_l = total_pesticide_l
+        self.traitement.aerien.total_pesticide_kg = total_pesticide_kg
+        self.traitement.aerien.surface_traitee_ha = surface_traitee_ha
+        self.traitement.aerien.surface_restante_ha = surface_restante_ha
         self.traitement.aerien.pesticide_stock_restant_l = pesticide_stock_restant_l
         return self.traitement
 
     async def update_rotation(
-        self, traitement_id, rotation, nb_rotations, total_pesticide_l, pesticide_stock_restant_l
+        self,
+        traitement_id,
+        rotation,
+        nb_rotations,
+        total_pesticide_l,
+        total_pesticide_kg,
+        surface_traitee_ha,
+        surface_restante_ha,
+        pesticide_stock_restant_l,
     ):
         self.traitement.aerien.nb_rotations = nb_rotations
         self.traitement.aerien.total_pesticide_l = total_pesticide_l
+        self.traitement.aerien.total_pesticide_kg = total_pesticide_kg
+        self.traitement.aerien.surface_traitee_ha = surface_traitee_ha
+        self.traitement.aerien.surface_restante_ha = surface_restante_ha
         self.traitement.aerien.pesticide_stock_restant_l = pesticide_stock_restant_l
         return self.traitement
 
     async def remove_rotation(
-        self, traitement_id, rotation_id, nb_rotations, total_pesticide_l, pesticide_stock_restant_l
+        self,
+        traitement_id,
+        rotation_id,
+        nb_rotations,
+        total_pesticide_l,
+        total_pesticide_kg,
+        surface_traitee_ha,
+        surface_restante_ha,
+        pesticide_stock_restant_l,
     ):
         self.traitement.aerien.nb_rotations = nb_rotations
         self.traitement.aerien.total_pesticide_l = total_pesticide_l
+        self.traitement.aerien.total_pesticide_kg = total_pesticide_kg
+        self.traitement.aerien.surface_traitee_ha = surface_traitee_ha
+        self.traitement.aerien.surface_restante_ha = surface_restante_ha
         self.traitement.aerien.pesticide_stock_restant_l = pesticide_stock_restant_l
         return self.traitement
 
@@ -471,14 +506,17 @@ def _traitement_aerien(rotations: list[Rotation] | None = None) -> Traitement:
 
 def _rotation_args(**overrides):
     args = dict(
-        numero_cuve="C1",
         produit_id=uuid.uuid4(),
-        quantite_l=10.0,
+        quantite=10.0,
+        unite="L",
+        surface_ha=1.0,
         temperature_debut_c=25.0,
         temperature_fin_c=27.0,
         vent_debut_ms=2.0,
         vent_fin_ms=3.0,
         heure_debut=time(6, 0),
+        heure_ouverture_vanne=time(6, 5),
+        heure_fermeture_vanne=time(6, 25),
         heure_fin=time(6, 30),
     )
     args.update(overrides)
@@ -499,12 +537,12 @@ async def test_add_rotation_incremente_totaux():
 
 @pytest.mark.asyncio
 async def test_add_rotation_numero_auto_incremente():
-    existante = _rotation(numero=1, quantite_l=10.0)
+    existante = _rotation(numero=1, quantite=10.0)
     traitement = _traitement_aerien([existante])
     repo = FakeTraitementRepoRotations(traitement)
     use_case = AddRotation(repo)
 
-    await use_case.execute(traitement_id=traitement.id, **_rotation_args(quantite_l=5.0))
+    await use_case.execute(traitement_id=traitement.id, **_rotation_args(quantite=5.0))
 
     assert [r.numero for r in traitement.aerien.rotations] == [1, 2]
     assert traitement.aerien.nb_rotations == 2
@@ -542,7 +580,7 @@ async def test_add_rotation_rejette_heure_fin_anterieure_ou_egale():
 
 @pytest.mark.asyncio
 async def test_update_rotation_recalcule_totaux():
-    existante = _rotation(numero=1, quantite_l=10.0)
+    existante = _rotation(numero=1, quantite=10.0)
     traitement = _traitement_aerien([existante])
     repo = FakeTraitementRepoRotations(traitement)
     use_case = UpdateRotation(repo)
@@ -550,12 +588,12 @@ async def test_update_rotation_recalcule_totaux():
     resultat = await use_case.execute(
         traitement_id=traitement.id,
         rotation_id=existante.id,
-        **_rotation_args(quantite_l=20.0),
+        **_rotation_args(quantite=20.0),
     )
 
     assert resultat.aerien.nb_rotations == 1
     assert resultat.aerien.total_pesticide_l == 20.0
-    assert existante.quantite_l == 20.0
+    assert existante.quantite == 20.0
 
 
 @pytest.mark.asyncio
@@ -585,8 +623,8 @@ async def test_update_rotation_rejette_heure_fin_anterieure_ou_egale():
 
 @pytest.mark.asyncio
 async def test_remove_rotation_recalcule_totaux():
-    r1 = _rotation(numero=1, quantite_l=10.0)
-    r2 = _rotation(numero=2, quantite_l=5.0)
+    r1 = _rotation(numero=1, quantite=10.0)
+    r2 = _rotation(numero=2, quantite=5.0)
     traitement = _traitement_aerien([r1, r2])
     repo = FakeTraitementRepoRotations(traitement)
     use_case = RemoveRotation(repo)
@@ -1106,10 +1144,10 @@ async def test_add_produit_sur_traitement_verrouille_leve_verrouille():
 
 def _traitement_aerien_valide(**overrides) -> Traitement:
     args = dict(
-        pilote="J. Dupont",
-        mecanicien="M. Rabe",
+        pilote_id=uuid.uuid4(),
+        mecanicien_id=uuid.uuid4(),
         chef_de_base_id=uuid.uuid4(),
-        consultant_international=None,
+        consultant_id=None,
     )
     args.update({k: v for k, v in overrides.items() if k in args})
     aerien = TraitementAerien(**args)
@@ -1168,7 +1206,7 @@ def test_valider_aerien_signature_manquante_pilote_bloque():
 
 
 def test_valider_aerien_consultant_renseigne_sans_signature_bloque():
-    traitement = _traitement_aerien_valide(consultant_international="Dr. Smith")
+    traitement = _traitement_aerien_valide(consultant_id=uuid.uuid4())
     with pytest.raises(SignaturesManquantesError):
         traitement.valider(
             date(2026, 8, 12),
@@ -1181,7 +1219,7 @@ def test_valider_aerien_consultant_renseigne_sans_signature_bloque():
 
 
 def test_valider_aerien_consultant_absent_aucune_signature_requise():
-    traitement = _traitement_aerien_valide(consultant_international=None)
+    traitement = _traitement_aerien_valide(consultant_id=None)
     traitement.valider(
         date(2026, 8, 12),
         [
@@ -1407,8 +1445,8 @@ def test_contenu_diverge_champ_terrestre_different():
 
 
 def test_contenu_diverge_champ_aerien_different():
-    existant = _traitement_aerien_valide(pilote="J. Dupont")
-    entrant = _traitement_aerien_valide(pilote="Autre Pilote")
+    existant = _traitement_aerien_valide(pilote_id=uuid.uuid4())
+    entrant = _traitement_aerien_valide(pilote_id=uuid.uuid4())
     assert contenu_diverge(existant, entrant) is True
 
 

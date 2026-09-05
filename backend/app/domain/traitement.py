@@ -12,10 +12,10 @@ from app.domain.prospection import Prospection
 # 0010), qui n'énumère pas AGENT_ENCADREUR.
 _MATRICE_SIGNATURES: dict[str, dict[str, str]] = {
     "AERIEN": {
-        "PILOTE": "pilote",
-        "MECANICIEN": "mecanicien",
+        "PILOTE": "pilote_id",
+        "MECANICIEN": "mecanicien_id",
         "CHEF_DE_BASE": "chef_de_base_id",
-        "CONSULTANT_INTERNATIONAL": "consultant_international",
+        "CONSULTANT_INTERNATIONAL": "consultant_id",
     },
     "TERRESTRE": {
         "CHEF_EQUIPE": "chef_equipe_id",
@@ -118,15 +118,31 @@ class Rotation:
     id: uuid.UUID = field(default_factory=uuid.uuid4)
     traitement_aerien_id: uuid.UUID = field(default_factory=uuid.uuid4)
     numero: int = 0
+    # Dérivé de `numero` (str(numero)) côté application — plus de saisie libre
+    # (migration 0047) : le numéro de cuve s'incrémente automatiquement par
+    # traitement, comme `numero`.
     numero_cuve: str = ""
     produit_id: uuid.UUID = field(default_factory=uuid.uuid4)
-    quantite_l: float = 0.0
+    # quantite_l -> quantite + unite (migration 0047) : une seule quantité par
+    # rotation avec son unité, jamais L et kg à la fois pour une même rotation.
+    quantite: float = 0.0
+    unite: str = "L"
+    # Superficie couverte par cette rotation — traitement_aerien.surface_traitee_ha
+    # en est la somme (cf. TraitementAerien.recalculer_totaux).
+    surface_ha: float = 0.0
     temperature_debut_c: float = 0.0
     temperature_fin_c: float = 0.0
     vent_debut_ms: float = 0.0
     vent_fin_ms: float = 0.0
+    # heure_debut/heure_fin bornent la rotation entière (mise en place +
+    # application) ; heure_ouverture_vanne/heure_fermeture_vanne bornent
+    # l'application seule — distinctes depuis la migration 0047. Durée
+    # d'application, durée totale et durée de mise en place s'en dérivent côté
+    # application, aucune des trois n'est stockée.
     heure_debut: time = time(0, 0)
-    heure_fin: time = time(0, 0)
+    heure_ouverture_vanne: time = time(0, 0)
+    heure_fermeture_vanne: time = time(0, 1)
+    heure_fin: time = time(0, 1)
     # Dérivé côté client du nom du pesticide (migration 0043) — figé à la
     # saisie, jamais recalculé à la lecture.
     nom_commercial: str | None = None
@@ -135,18 +151,36 @@ class Rotation:
 @dataclass
 class TraitementAerien:
     traitement_id: uuid.UUID = field(default_factory=uuid.uuid4)
-    pilote: str = ""
-    mecanicien: str = ""
+    # pilote/mecanicien/consultant_international (texte libre) -> FK utilisateur
+    # (migration 0047) : pilote_id/mecanicien_id obligatoires et distincts de
+    # chef_de_base_id (ck_traitement_aerien_roles_distincts), consultant_id
+    # facultatif. Les trois peuvent référencer un compte créé à la volée
+    # (`peut_se_connecter=false`, POST /users/a-la-volee) ; chef_de_base_id reste
+    # seul à devoir préexister dans le référentiel (pas de création à la volée
+    # pour ce rôle).
+    pilote_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    mecanicien_id: uuid.UUID = field(default_factory=uuid.uuid4)
     chef_de_base_id: uuid.UUID = field(default_factory=uuid.uuid4)
-    consultant_international: str | None = None
+    consultant_id: uuid.UUID | None = None
+    # Bases aériennes/stands (migration 0047) : base principale obligatoire pour
+    # tout traitement aérien (aucune exception, contrairement à la prospection
+    # généralisée) ; stand nullable (NULL = ravitaillement fait directement à
+    # une base) ; base secondaire facultative.
+    lieu_base_principale_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    lieu_stand_id: uuid.UUID | None = None
+    lieu_base_secondaire_id: uuid.UUID | None = None
     immatricule_aeronef: str | None = None
     nb_rotations: int = 0
-    total_pesticide_l: float | None = None
-    # Pas d'équivalent aérien aux 3 surfaces par équipement du Terrestre (pas
-    # d'engin au sol à décomposer) : saisie directe unique pour tout le vol.
+    # Deux cumuls distincts par unité (une rotation en L ne s'additionne jamais
+    # à une rotation en kg) ; surface_traitee_ha n'est plus une saisie directe :
+    # les trois sont dérivés des rotations, recalculés à chaque écriture sur
+    # `traitement_rotation` — jamais None depuis la migration 0047 (NOT NULL,
+    # défaut 0).
     # Pas de chaînage de reprise côté Aérien (contrairement à Terrestre) : le
     # reste se calcule fiche par fiche, sans cumul inter-fiches.
-    surface_traitee_ha: float | None = None
+    total_pesticide_l: float = 0.0
+    total_pesticide_kg: float = 0.0
+    surface_traitee_ha: float = 0.0
     surface_restante_ha: float | None = None
     # Stock de pesticide par fiche (pas de suivi cumulatif par aéronef/opération) :
     # « reçu » saisi, « consommé » = total_pesticide_l (dérivé des rotations),
@@ -156,21 +190,26 @@ class TraitementAerien:
     rotations: list[Rotation] = field(default_factory=list)
 
     def recalculer_totaux(self) -> None:
-        """Seul chemin d'écriture pour nb_rotations/total_pesticide_l — jamais en lecture."""
+        """Seul chemin d'écriture pour nb_rotations/total_pesticide_l/
+        total_pesticide_kg/surface_traitee_ha — jamais en lecture."""
         self.nb_rotations = len(self.rotations)
-        self.total_pesticide_l = (
-            sum(r.quantite_l for r in self.rotations) if self.rotations else None
-        )
+        self.total_pesticide_l = sum(r.quantite for r in self.rotations if r.unite == "L")
+        self.total_pesticide_kg = sum(r.quantite for r in self.rotations if r.unite == "kg")
+        self.surface_traitee_ha = sum(r.surface_ha for r in self.rotations)
         self.recalculer_stock_pesticide()
 
     def recalculer_surfaces(self, surface_infestee_ha: float | None) -> None:
         """Seul chemin d'écriture pour surface_restante_ha — jamais en lecture.
 
+        Doit être appelée après `recalculer_totaux()` (ou après un ré-épinglage de
+        `surface_traitee_ha` en synchronisation) : c'est `self.surface_traitee_ha`,
+        dérivé des rotations, qui alimente ce calcul.
+
         Pas de chaînage (contrairement à `TraitementTerrestre.recalculer_surfaces`) :
         le reste se calcule uniquement à partir de cette fiche, plancher à 0 (CDG §9).
         """
         self.surface_restante_ha = (
-            max(surface_infestee_ha - (self.surface_traitee_ha or 0.0), 0.0)
+            max(surface_infestee_ha - self.surface_traitee_ha, 0.0)
             if surface_infestee_ha is not None
             else None
         )
@@ -423,12 +462,17 @@ _CHAMPS_CONTENU_COMMUNS = (
 )
 
 _CHAMPS_CONTENU_AERIEN = (
-    "pilote",
-    "mecanicien",
+    "pilote_id",
+    "mecanicien_id",
     "chef_de_base_id",
-    "consultant_international",
+    "consultant_id",
+    "lieu_base_principale_id",
+    "lieu_stand_id",
+    "lieu_base_secondaire_id",
     "immatricule_aeronef",
-    "surface_traitee_ha",
+    # surface_traitee_ha n'y figure plus (migration 0047) : dérivée des rotations
+    # (sous-ressource distincte, absente du payload de synchronisation), au même
+    # titre que nb_rotations/total_pesticide_l/total_pesticide_kg déjà exclus.
     "pesticide_recu_l",
 )
 

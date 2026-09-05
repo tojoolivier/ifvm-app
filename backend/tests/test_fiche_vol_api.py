@@ -170,6 +170,9 @@ async def test_validation_refusee_si_une_rotation_est_incomplete(
     utilisateur,
     chef_de_base,
     pesticide,
+    pilote,
+    mecanicien,
+    lieu_aerien,
 ):
     fiche = await _creer(client, auth_headers, payload_fiche)
     for role, nom in [
@@ -183,7 +186,16 @@ async def test_validation_refusee_si_une_rotation_est_incomplete(
             headers=auth_headers,
         )
     rotation_id = await _rotation_reelle(
-        client, auth_headers, db_session, campagne_id, utilisateur, chef_de_base, pesticide
+        client,
+        auth_headers,
+        db_session,
+        campagne_id,
+        utilisateur,
+        chef_de_base,
+        pesticide,
+        pilote,
+        mecanicien,
+        lieu_aerien,
     )
     await client.post(
         f"/fiches-vol/{fiche['id']}/vols",
@@ -370,7 +382,16 @@ async def test_fiche_inconnue_renvoie_404(client, auth_headers):
 
 
 async def _rotation_reelle(
-    client, auth_headers, db_session, campagne_id, utilisateur, chef_de_base, pesticide
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    chef_de_base,
+    pesticide,
+    pilote,
+    mecanicien,
+    lieu_aerien,
 ) -> str:
     """Crée une rotation authentique : la FK `vol.rotation_id` interdit tout UUID inventé."""
     prospection = ProspectionModel(
@@ -393,9 +414,11 @@ async def _rotation_reelle(
             "date_validation": "2026-08-10",
             "localite": "Betioky",
             "aerien": {
-                "pilote": "J. Dupont",
-                "mecanicien": "M. Rabe",
+                "pilote_id": str(pilote.id),
+                "mecanicien_id": str(mecanicien.id),
                 "chef_de_base_id": str(chef_de_base.id),
+                "lieu_base_principale_id": str(lieu_aerien.id),
+                "immatricule_aeronef": "5R-ABC",
             },
         },
         headers=auth_headers,
@@ -405,14 +428,17 @@ async def _rotation_reelle(
     rotation = await client.post(
         f"/traitements/{traitement.json()['id']}/rotations",
         json={
-            "numero_cuve": "C-101",
             "produit_id": str(pesticide.id),
-            "quantite_l": 10.0,
+            "quantite": 10.0,
+            "unite": "L",
+            "surface_ha": 5.0,
             "temperature_debut_c": 25.0,
             "temperature_fin_c": 27.0,
             "vent_debut_ms": 2.0,
             "vent_fin_ms": 3.0,
             "heure_debut": "06:00:00",
+            "heure_ouverture_vanne": "06:05:00",
+            "heure_fermeture_vanne": "06:25:00",
             "heure_fin": "06:30:00",
         },
         headers=auth_headers,
