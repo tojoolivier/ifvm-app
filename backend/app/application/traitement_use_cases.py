@@ -179,12 +179,14 @@ class CreateTraitementAerien:
         date_traitement: date,
         date_validation: date,
         localite: str,
-        pilote: str,
-        mecanicien: str,
+        pilote_id: uuid.UUID,
+        mecanicien_id: uuid.UUID,
         chef_de_base_id: uuid.UUID,
-        consultant_international: str | None = None,
-        immatricule_aeronef: str | None = None,
-        surface_traitee_ha: float | None = None,
+        lieu_base_principale_id: uuid.UUID,
+        immatricule_aeronef: str,
+        consultant_id: uuid.UUID | None = None,
+        lieu_stand_id: uuid.UUID | None = None,
+        lieu_base_secondaire_id: uuid.UUID | None = None,
         pesticide_recu_l: float | None = None,
         numero_fiche: str | None = None,
         mode_traitement: str | None = None,
@@ -270,16 +272,21 @@ class CreateTraitementAerien:
 
         traitement.aerien = TraitementAerien(
             traitement_id=traitement.id,
-            pilote=pilote,
-            mecanicien=mecanicien,
+            pilote_id=pilote_id,
+            mecanicien_id=mecanicien_id,
             chef_de_base_id=chef_de_base_id,
-            consultant_international=consultant_international,
+            consultant_id=consultant_id,
+            lieu_base_principale_id=lieu_base_principale_id,
+            lieu_stand_id=lieu_stand_id,
+            lieu_base_secondaire_id=lieu_base_secondaire_id,
             immatricule_aeronef=immatricule_aeronef,
-            surface_traitee_ha=surface_traitee_ha,
             pesticide_recu_l=pesticide_recu_l,
         )
-        traitement.aerien.recalculer_surfaces(traitement.cible.surface_infestee_ha)
+        # surface_traitee_ha est désormais dérivé des rotations (migration 0047) :
+        # aucune à la création, recalculer_totaux() avant recalculer_surfaces()
+        # (qui en dépend).
         traitement.aerien.recalculer_totaux()
+        traitement.aerien.recalculer_surfaces(traitement.cible.surface_infestee_ha)
 
         return await _persister_avec_numero_fiche_unique(
             self.traitement_repository,
@@ -522,6 +529,26 @@ def _trouver_rotation(aerien: TraitementAerien, rotation_id: uuid.UUID) -> Rotat
     return rotation
 
 
+def _surface_infestee_ha(traitement: Traitement) -> float | None:
+    """`traitement.cible` est toujours renseigné pour une fiche réellement persistée
+    (construite via `construire_cible`) — `None` seulement pour un `Traitement`
+    fabriqué à la main (tests unitaires du domaine), d'où cette garde plutôt qu'un
+    accès direct."""
+    return traitement.cible.surface_infestee_ha if traitement.cible is not None else None
+
+
+def _valider_heures_vanne(
+    heure_debut: time, heure_ouverture_vanne: time, heure_fermeture_vanne: time, heure_fin: time
+) -> None:
+    """Même règle que ck_traitement_rotation_vanne_ordre (migration 0047) : la
+    phase d'épandage (vanne) est comprise dans la rotation entière."""
+    if not (heure_debut <= heure_ouverture_vanne <= heure_fermeture_vanne <= heure_fin):
+        raise ValueError(
+            "Les heures de vanne doivent respecter heure_debut <= heure_ouverture_vanne "
+            "<= heure_fermeture_vanne <= heure_fin"
+        )
+
+
 class AddRotation:
     def __init__(self, repository: TraitementRepository):
         self.repository = repository
@@ -529,14 +556,17 @@ class AddRotation:
     async def execute(
         self,
         traitement_id: uuid.UUID,
-        numero_cuve: str,
         produit_id: uuid.UUID,
-        quantite_l: float,
+        quantite: float,
+        unite: str,
+        surface_ha: float,
         temperature_debut_c: float,
         temperature_fin_c: float,
         vent_debut_ms: float,
         vent_fin_ms: float,
         heure_debut: time,
+        heure_ouverture_vanne: time,
+        heure_fermeture_vanne: time,
         heure_fin: time,
         nom_commercial: str | None = None,
     ) -> Traitement:
@@ -546,30 +576,40 @@ class AddRotation:
 
         if heure_fin <= heure_debut:
             raise ValueError("heure_fin doit être postérieure à heure_debut")
+        _valider_heures_vanne(heure_debut, heure_ouverture_vanne, heure_fermeture_vanne, heure_fin)
 
         prochain_numero = max((r.numero for r in aerien.rotations), default=0) + 1
         rotation = Rotation(
             traitement_aerien_id=aerien.traitement_id,
             numero=prochain_numero,
-            numero_cuve=numero_cuve,
+            # Dérivé de numero, jamais saisi par le client (migration 0047).
+            numero_cuve=str(prochain_numero),
             produit_id=produit_id,
-            quantite_l=quantite_l,
+            quantite=quantite,
+            unite=unite,
+            surface_ha=surface_ha,
             temperature_debut_c=temperature_debut_c,
             temperature_fin_c=temperature_fin_c,
             vent_debut_ms=vent_debut_ms,
             vent_fin_ms=vent_fin_ms,
             heure_debut=heure_debut,
+            heure_ouverture_vanne=heure_ouverture_vanne,
+            heure_fermeture_vanne=heure_fermeture_vanne,
             heure_fin=heure_fin,
             nom_commercial=nom_commercial,
         )
         aerien.rotations.append(rotation)
         aerien.recalculer_totaux()
+        aerien.recalculer_surfaces(_surface_infestee_ha(traitement))
 
         return await self.repository.add_rotation(
             traitement_id,
             rotation,
             aerien.nb_rotations,
             aerien.total_pesticide_l,
+            aerien.total_pesticide_kg,
+            aerien.surface_traitee_ha,
+            aerien.surface_restante_ha,
             aerien.pesticide_stock_restant_l,
         )
 
@@ -582,14 +622,17 @@ class UpdateRotation:
         self,
         traitement_id: uuid.UUID,
         rotation_id: uuid.UUID,
-        numero_cuve: str,
         produit_id: uuid.UUID,
-        quantite_l: float,
+        quantite: float,
+        unite: str,
+        surface_ha: float,
         temperature_debut_c: float,
         temperature_fin_c: float,
         vent_debut_ms: float,
         vent_fin_ms: float,
         heure_debut: time,
+        heure_ouverture_vanne: time,
+        heure_fermeture_vanne: time,
         heure_fin: time,
         nom_commercial: str | None = None,
     ) -> Traitement:
@@ -600,24 +643,34 @@ class UpdateRotation:
 
         if heure_fin <= heure_debut:
             raise ValueError("heure_fin doit être postérieure à heure_debut")
+        _valider_heures_vanne(heure_debut, heure_ouverture_vanne, heure_fermeture_vanne, heure_fin)
 
-        rotation.numero_cuve = numero_cuve
+        # numero_cuve redérivé de numero (inchangé par une mise à jour) — jamais saisi.
+        rotation.numero_cuve = str(rotation.numero)
         rotation.produit_id = produit_id
-        rotation.quantite_l = quantite_l
+        rotation.quantite = quantite
+        rotation.unite = unite
+        rotation.surface_ha = surface_ha
         rotation.temperature_debut_c = temperature_debut_c
         rotation.temperature_fin_c = temperature_fin_c
         rotation.vent_debut_ms = vent_debut_ms
         rotation.vent_fin_ms = vent_fin_ms
         rotation.heure_debut = heure_debut
+        rotation.heure_ouverture_vanne = heure_ouverture_vanne
+        rotation.heure_fermeture_vanne = heure_fermeture_vanne
         rotation.heure_fin = heure_fin
         rotation.nom_commercial = nom_commercial
         aerien.recalculer_totaux()
+        aerien.recalculer_surfaces(_surface_infestee_ha(traitement))
 
         return await self.repository.update_rotation(
             traitement_id,
             rotation,
             aerien.nb_rotations,
             aerien.total_pesticide_l,
+            aerien.total_pesticide_kg,
+            aerien.surface_traitee_ha,
+            aerien.surface_restante_ha,
             aerien.pesticide_stock_restant_l,
         )
 
@@ -634,12 +687,16 @@ class RemoveRotation:
 
         aerien.rotations.remove(rotation)
         aerien.recalculer_totaux()
+        aerien.recalculer_surfaces(_surface_infestee_ha(traitement))
 
         return await self.repository.remove_rotation(
             traitement_id,
             rotation_id,
             aerien.nb_rotations,
             aerien.total_pesticide_l,
+            aerien.total_pesticide_kg,
+            aerien.surface_traitee_ha,
+            aerien.surface_restante_ha,
             aerien.pesticide_stock_restant_l,
         )
 
@@ -766,12 +823,14 @@ class SyncPushTraitementAerien:
         date_traitement: date,
         date_validation: date,
         localite: str,
-        pilote: str,
-        mecanicien: str,
+        pilote_id: uuid.UUID,
+        mecanicien_id: uuid.UUID,
         chef_de_base_id: uuid.UUID,
-        consultant_international: str | None = None,
-        immatricule_aeronef: str | None = None,
-        surface_traitee_ha: float | None = None,
+        lieu_base_principale_id: uuid.UUID,
+        immatricule_aeronef: str,
+        consultant_id: uuid.UUID | None = None,
+        lieu_stand_id: uuid.UUID | None = None,
+        lieu_base_secondaire_id: uuid.UUID | None = None,
         pesticide_recu_l: float | None = None,
         numero_fiche: str | None = None,
         mode_traitement: str | None = None,
@@ -861,20 +920,24 @@ class SyncPushTraitementAerien:
         )
         candidat.aerien = TraitementAerien(
             traitement_id=traitement_id,
-            pilote=pilote,
-            mecanicien=mecanicien,
+            pilote_id=pilote_id,
+            mecanicien_id=mecanicien_id,
             chef_de_base_id=chef_de_base_id,
-            consultant_international=consultant_international,
+            consultant_id=consultant_id,
+            lieu_base_principale_id=lieu_base_principale_id,
+            lieu_stand_id=lieu_stand_id,
+            lieu_base_secondaire_id=lieu_base_secondaire_id,
             immatricule_aeronef=immatricule_aeronef,
-            surface_traitee_ha=surface_traitee_ha,
             pesticide_recu_l=pesticide_recu_l,
         )
-        candidat.aerien.recalculer_surfaces(candidat.cible.surface_infestee_ha)
 
         if existant is None:
             # Rotations pas encore poussées (sous-ressource distincte) : le total
-            # consommé est nul, comme à la création.
+            # consommé est nul, comme à la création — surface_traitee_ha aussi
+            # (migration 0047, dérivée des rotations). recalculer_totaux() avant
+            # recalculer_surfaces() (qui en dépend).
             candidat.aerien.recalculer_totaux()
+            candidat.aerien.recalculer_surfaces(candidat.cible.surface_infestee_ha)
             candidat.statut_sync = "synced"
             cree = await _persister_avec_numero_fiche_unique(
                 self.traitement_repository,
@@ -890,10 +953,16 @@ class SyncPushTraitementAerien:
             marque = await self.traitement_repository.marquer_conflict(traitement_id)
             raise TraitementSyncConflitError(marque)
 
-        # nb_rotations/total_pesticide_l existants ne sont pas renvoyés par ce push
-        # (rotations = sous-ressource distincte) : on les reprend tels quels pour
-        # calculer le stock, sans jamais les écraser (update_sync ne les touche pas).
+        # nb_rotations/total_pesticide_l/total_pesticide_kg/surface_traitee_ha
+        # existants ne sont pas renvoyés par ce push (rotations = sous-ressource
+        # distincte) : on les reprend tels quels, sans jamais les écraser
+        # (update_sync ne les touche pas), puis on recalcule ce qui en dépend
+        # (surface_restante_ha, stock de pesticide).
+        candidat.aerien.nb_rotations = existant.aerien.nb_rotations
         candidat.aerien.total_pesticide_l = existant.aerien.total_pesticide_l
+        candidat.aerien.total_pesticide_kg = existant.aerien.total_pesticide_kg
+        candidat.aerien.surface_traitee_ha = existant.aerien.surface_traitee_ha
+        candidat.aerien.recalculer_surfaces(candidat.cible.surface_infestee_ha)
         candidat.aerien.recalculer_stock_pesticide()
 
         candidat.created_at = existant.created_at

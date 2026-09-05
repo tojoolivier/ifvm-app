@@ -140,6 +140,59 @@ async def chef_de_base(db_session: AsyncSession) -> Utilisateur:
 
 
 @pytest_asyncio.fixture
+async def pilote(db_session: AsyncSession) -> Utilisateur:
+    user = Utilisateur(
+        id=uuid.uuid4(),
+        nom="Dupont",
+        prenom="Jean",
+        email=f"jean.dupont+{uuid.uuid4().hex[:6]}@test.mg",
+        password_hash=hash_password("secret"),
+        role="pilote",
+        actif=True,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
+async def mecanicien(db_session: AsyncSession) -> Utilisateur:
+    user = Utilisateur(
+        id=uuid.uuid4(),
+        nom="Rabe",
+        prenom="Marc",
+        email=f"marc.rabe+{uuid.uuid4().hex[:6]}@test.mg",
+        password_hash=hash_password("secret"),
+        role="mecanicien",
+        actif=True,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
+async def lieu_aerien(db_session: AsyncSession):
+    from app.infrastructure.referentiel_model import LieuAerienModel
+
+    lieu = LieuAerienModel(
+        id=uuid.uuid4(),
+        type_lieu="principale",
+        nom="Base Betioky",
+        latitude=-23.7167,
+        longitude=44.3833,
+        altitude=100.0,
+        actif=True,
+    )
+    db_session.add(lieu)
+    await db_session.commit()
+    await db_session.refresh(lieu)
+    return lieu
+
+
+@pytest_asyncio.fixture
 async def chef_equipe(db_session: AsyncSession) -> Utilisateur:
     user = Utilisateur(
         id=uuid.uuid4(),

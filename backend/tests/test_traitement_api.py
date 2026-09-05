@@ -9,7 +9,7 @@ from app.infrastructure.prospection_model import ProspectionModel, ProspectionPo
 
 
 @pytest.fixture
-def payload_traitement(chef_de_base):
+def payload_traitement(chef_de_base, pilote, mecanicien, lieu_aerien):
     def _build(prospection_id, **overrides):
         payload = {
             "prospection_id": str(prospection_id),
@@ -17,9 +17,11 @@ def payload_traitement(chef_de_base):
             "date_validation": "2026-08-10",
             "localite": "Betioky",
             "aerien": {
-                "pilote": "J. Dupont",
-                "mecanicien": "M. Rabe",
+                "pilote_id": str(pilote.id),
+                "mecanicien_id": str(mecanicien.id),
                 "chef_de_base_id": str(chef_de_base.id),
+                "lieu_base_principale_id": str(lieu_aerien.id),
+                "immatricule_aeronef": "5R-ABC",
             },
         }
         payload.update(overrides)
@@ -54,7 +56,7 @@ async def _creer_prospection(
 
 @pytest.mark.asyncio
 async def test_create_traitement_aerien_brouillon(
-    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, pilote
 ):
     prospection_id = await _creer_prospection(
         db_session,
@@ -73,7 +75,7 @@ async def test_create_traitement_aerien_brouillon(
     assert body["numero_fiche"] == "Hery-Aerien-2026-08-11"
     assert body["cible"]["espece"] == "LMC"
     assert body["cible"]["surface_infestee_ha"] == 120.5
-    assert body["aerien"]["pilote"] == "J. Dupont"
+    assert body["aerien"]["pilote_id"] == str(pilote.id)
     assert body["observations"] is None
 
 
@@ -168,15 +170,20 @@ def payload_rotation(pesticide):
     produit_id = str(pesticide.id)
 
     def _build(**overrides):
+        # numero_cuve n'y figure pas : dérivé côté serveur de `numero` (migration
+        # 0047), plus un champ accepté par RotationCreate.
         payload = {
-            "numero_cuve": "C1",
             "produit_id": produit_id,
-            "quantite_l": 10.0,
+            "quantite": 10.0,
+            "unite": "L",
+            "surface_ha": 5.0,
             "temperature_debut_c": 25.0,
             "temperature_fin_c": 27.0,
             "vent_debut_ms": 2.0,
             "vent_fin_ms": 3.0,
             "heure_debut": "06:00:00",
+            "heure_ouverture_vanne": "06:05:00",
+            "heure_fermeture_vanne": "06:20:00",
             "heure_fin": "06:30:00",
             "nom_commercial": "Fyfanon",
         }
@@ -231,7 +238,7 @@ async def test_creer_traitement_avec_trois_rotations_cdg_9(
     for quantite in (10.0, 15.5, 8.25):
         resp = await client.post(
             f"/traitements/{traitement_id}/rotations",
-            json=payload_rotation(quantite_l=quantite),
+            json=payload_rotation(quantite=quantite),
             headers=auth_headers,
         )
         assert resp.status_code == 201, resp.text
@@ -252,14 +259,14 @@ async def test_update_rotation_recalcule_totaux(
     )
     created = await client.post(
         f"/traitements/{traitement_id}/rotations",
-        json=payload_rotation(quantite_l=10.0),
+        json=payload_rotation(quantite=10.0),
         headers=auth_headers,
     )
     rotation_id = created.json()["aerien"]["rotations"][0]["id"]
 
     resp = await client.put(
         f"/traitements/{traitement_id}/rotations/{rotation_id}",
-        json=payload_rotation(quantite_l=20.0, nom_commercial="Nurelle"),
+        json=payload_rotation(quantite=20.0, nom_commercial="Nurelle"),
         headers=auth_headers,
     )
     assert resp.status_code == 200, resp.text
@@ -279,12 +286,12 @@ async def test_delete_rotation_recalcule_totaux(
     )
     r1 = await client.post(
         f"/traitements/{traitement_id}/rotations",
-        json=payload_rotation(quantite_l=10.0),
+        json=payload_rotation(quantite=10.0),
         headers=auth_headers,
     )
     r2 = await client.post(
         f"/traitements/{traitement_id}/rotations",
-        json=payload_rotation(quantite_l=5.0),
+        json=payload_rotation(quantite=5.0),
         headers=auth_headers,
     )
     rotation_id_1 = r1.json()["aerien"]["rotations"][0]["id"]
@@ -1008,7 +1015,7 @@ async def test_valider_aerien_consultant_renseigne_sans_signature_422(
 ):
     prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
     payload = payload_traitement(prospection_id)
-    payload["aerien"]["consultant_international"] = "Dr. Smith"
+    payload["aerien"]["consultant_id"] = str(utilisateur.id)
     created = await client.post("/traitements", json=payload, headers=auth_headers)
     traitement_id = created.json()["id"]
 
