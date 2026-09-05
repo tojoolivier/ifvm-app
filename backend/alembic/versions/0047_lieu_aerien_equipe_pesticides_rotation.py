@@ -52,8 +52,13 @@ silence. `quantite`/`unite` sur `traitement_rotation` sont, elles,
 back-fillées automatiquement (`quantite = quantite_l`, `unite = 'L'`) car
 toutes les rotations existantes étaient implicitement en litres.
 
-Revision ID: 0046
-Revises: 0045
+Renumérotée 0046 -> 0047 lors du rebase sur main : collision avec
+0046_prospection_population_stades_imago.py fusionnée entre-temps (deux
+branches parties de 0045 en parallèle) — rechaînée dessus (down_revision =
+0046). Aucun changement de contenu, table concernée disjointe.
+
+Revision ID: 0047
+Revises: 0046
 Create Date: 2026-09-03
 
 """
@@ -63,8 +68,8 @@ from sqlalchemy.dialects.postgresql import UUID
 
 from alembic import context, op
 
-revision = "0046"
-down_revision = "0045"
+revision = "0047"
+down_revision = "0046"
 branch_labels = None
 depends_on = None
 
