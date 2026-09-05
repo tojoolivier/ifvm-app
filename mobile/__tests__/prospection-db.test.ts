@@ -137,10 +137,15 @@ const MIGRATED_COLUMNS = [
   // Migration backend 0047 (quantite_l -> quantite + unite, surface_ha, vanne)
   { name: 'total_pesticide_kg' },
   // pilote/mecanicien/consultant_international (texte libre) -> FK utilisateur
-  // (migration backend 0047, cf. prospection-db.ts COLONNES_TRAITEMENT_AERIEN).
+  // (migration backend 0047), puis retour au texte libre (migration backend 0048,
+  // cf. prospection-db.ts COLONNES_TRAITEMENT_AERIEN) — les 3 colonnes FK restent
+  // déclarées (mortes) pour les installations qui les ont déjà.
   { name: 'pilote_id' },
   { name: 'mecanicien_id' },
   { name: 'consultant_id' },
+  { name: 'pilote' },
+  { name: 'mecanicien' },
+  { name: 'consultant_international' },
   // Base principale/stand/base secondaire (référentiel lieu_aerien) — écran « Équipe »
   // (#equipe-slide-aerien).
   { name: 'lieu_base_principale_id' },

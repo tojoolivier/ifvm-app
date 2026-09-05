@@ -28,6 +28,7 @@ from app.domain.traitement import (
     construire_cible,
     contenu_diverge,
     generer_numero_fiche,
+    valider_roles_aerien_distincts,
 )
 
 _MAX_TENTATIVES_NUMERO_FICHE = 50
@@ -179,12 +180,12 @@ class CreateTraitementAerien:
         date_traitement: date,
         date_validation: date,
         localite: str,
-        pilote_id: uuid.UUID,
-        mecanicien_id: uuid.UUID,
+        pilote: str,
+        mecanicien: str,
         chef_de_base_id: uuid.UUID,
         lieu_base_principale_id: uuid.UUID,
         immatricule_aeronef: str,
-        consultant_id: uuid.UUID | None = None,
+        consultant_international: str | None = None,
         lieu_stand_id: uuid.UUID | None = None,
         lieu_base_secondaire_id: uuid.UUID | None = None,
         pesticide_recu_l: float | None = None,
@@ -230,6 +231,7 @@ class CreateTraitementAerien:
                 f"chef_de_base_id {chef_de_base_id} ne référence pas un utilisateur "
                 "avec le rôle 'chef_de_base'"
             )
+        valider_roles_aerien_distincts(f"{chef.prenom} {chef.nom}", pilote, mecanicien)
 
         base_numero = _generer_et_valider_numero_fiche(
             numero_fiche, chef.prenom, date_traitement, "Aerien"
@@ -272,10 +274,10 @@ class CreateTraitementAerien:
 
         traitement.aerien = TraitementAerien(
             traitement_id=traitement.id,
-            pilote_id=pilote_id,
-            mecanicien_id=mecanicien_id,
+            pilote=pilote,
+            mecanicien=mecanicien,
             chef_de_base_id=chef_de_base_id,
-            consultant_id=consultant_id,
+            consultant_international=consultant_international,
             lieu_base_principale_id=lieu_base_principale_id,
             lieu_stand_id=lieu_stand_id,
             lieu_base_secondaire_id=lieu_base_secondaire_id,
@@ -823,12 +825,12 @@ class SyncPushTraitementAerien:
         date_traitement: date,
         date_validation: date,
         localite: str,
-        pilote_id: uuid.UUID,
-        mecanicien_id: uuid.UUID,
+        pilote: str,
+        mecanicien: str,
         chef_de_base_id: uuid.UUID,
         lieu_base_principale_id: uuid.UUID,
         immatricule_aeronef: str,
-        consultant_id: uuid.UUID | None = None,
+        consultant_international: str | None = None,
         lieu_stand_id: uuid.UUID | None = None,
         lieu_base_secondaire_id: uuid.UUID | None = None,
         pesticide_recu_l: float | None = None,
@@ -878,6 +880,7 @@ class SyncPushTraitementAerien:
                 f"chef_de_base_id {chef_de_base_id} ne référence pas un utilisateur "
                 "avec le rôle 'chef_de_base'"
             )
+        valider_roles_aerien_distincts(f"{chef.prenom} {chef.nom}", pilote, mecanicien)
 
         base_numero = _generer_et_valider_numero_fiche(
             numero_fiche, chef.prenom, date_traitement, "Aerien"
@@ -920,10 +923,10 @@ class SyncPushTraitementAerien:
         )
         candidat.aerien = TraitementAerien(
             traitement_id=traitement_id,
-            pilote_id=pilote_id,
-            mecanicien_id=mecanicien_id,
+            pilote=pilote,
+            mecanicien=mecanicien,
             chef_de_base_id=chef_de_base_id,
-            consultant_id=consultant_id,
+            consultant_international=consultant_international,
             lieu_base_principale_id=lieu_base_principale_id,
             lieu_stand_id=lieu_stand_id,
             lieu_base_secondaire_id=lieu_base_secondaire_id,

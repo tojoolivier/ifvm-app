@@ -53,8 +53,9 @@ export default function RecapScreen() {
   const [draft, setDraft] = useState<DraftTraitement | null>(null);
   const [unsyncedCount, setUnsyncedCount] = useState(0);
   const [erreurDeLecture, setErreurDeLecture] = useState<unknown>(null);
-  // Résolution id -> nom pour l'affichage (Équipe) — le brouillon ne porte que des ids
-  // (cf. traitement-repository.ts), jamais de jointure côté lecture locale.
+  // Résolution id -> nom pour l'affichage du chef de base — seul rôle resté une FK
+  // (pilote/mécanicien/consultant sont redevenus du texte libre, migration backend
+  // 0048, affichés directement sans jointure).
   const [personnes, setPersonnes] = useState<UtilisateurEquipe[]>([]);
   const [lieuxAeriens, setLieuxAeriens] = useState<LieuAerien[]>([]);
   const { run, isRunning: isSaving } = useAsyncAction();
@@ -63,13 +64,8 @@ export default function RecapScreen() {
 
   useEffect(() => {
     if (draft?.type_traitement !== 'AERIEN') return;
-    Promise.all([
-      listUtilisateursByRole('chef_de_base'),
-      listUtilisateursByRole('pilote'),
-      listUtilisateursByRole('mecanicien'),
-      listUtilisateursByRole('consultant_international'),
-    ])
-      .then((listes) => setPersonnes(listes.flat()))
+    listUtilisateursByRole('chef_de_base')
+      .then(setPersonnes)
       .catch((error) => logError({
         message: toFriendlyError(error).message,
         stack: error instanceof Error ? error.stack ?? null : null,
@@ -144,10 +140,10 @@ export default function RecapScreen() {
   const signatureMatrix: (ReturnType<typeof computeSignatureMatrix>[number] & { signe: boolean })[] =
     draft.type_traitement === 'AERIEN'
       ? computeSignatureMatrix('AERIEN', {
-          pilote_id: draft.aerien?.pilote_id,
-          mecanicien_id: draft.aerien?.mecanicien_id,
+          pilote: draft.aerien?.pilote,
+          mecanicien: draft.aerien?.mecanicien,
           chef_de_base_id: draft.aerien?.chef_de_base_id,
-          consultant_id: draft.aerien?.consultant_id,
+          consultant_international: draft.aerien?.consultant_international,
         }).map((r) => ({ ...r, signe: !!store.signed[r.role as SignatureRole] }))
       : computeSignatureMatrix('TERRESTRE', {
           chef_equipe_id: draft.terrestre?.chef_equipe_id,
@@ -193,9 +189,10 @@ export default function RecapScreen() {
       draft.type_traitement === 'AERIEN' && draft.aerien
         ? {
             chefDeBaseId: draft.aerien.chef_de_base_id,
-            piloteId: draft.aerien.pilote_id,
-            mecanicienId: draft.aerien.mecanicien_id,
-            consultantId: draft.aerien.consultant_id,
+            chefDeBaseNom: nomPersonne(draft.aerien.chef_de_base_id),
+            pilote: draft.aerien.pilote,
+            mecanicien: draft.aerien.mecanicien,
+            consultantInternational: draft.aerien.consultant_international,
             immatriculeAeronef: draft.aerien.immatricule_aeronef,
             lieuBasePrincipaleId: draft.aerien.lieu_base_principale_id,
           }
@@ -263,9 +260,9 @@ export default function RecapScreen() {
             <Card>
               <Text style={styles.sectionTitle}>Équipe</Text>
               <RecapLigne label="Chef de base" value={nomPersonne(draft.aerien.chef_de_base_id)} />
-              <RecapLigne label="Pilote" value={nomPersonne(draft.aerien.pilote_id)} />
-              <RecapLigne label="Mécanicien" value={nomPersonne(draft.aerien.mecanicien_id)} />
-              <RecapLigne label="Consultant" value={nomPersonne(draft.aerien.consultant_id)} />
+              <RecapLigne label="Pilote" value={draft.aerien.pilote} />
+              <RecapLigne label="Mécanicien" value={draft.aerien.mecanicien} />
+              <RecapLigne label="Consultant" value={draft.aerien.consultant_international} />
               <RecapLigne label="Immatriculation aéronef" value={draft.aerien.immatricule_aeronef} />
               <RecapLigne label="Base principale" value={nomLieu(draft.aerien.lieu_base_principale_id)} />
               <RecapLigne label="Stand" value={nomLieu(draft.aerien.lieu_stand_id)} />

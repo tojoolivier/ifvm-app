@@ -72,14 +72,15 @@ class UniteQuantite(str, Enum):
 
 
 class TraitementAerienCreate(BaseModel):
-    # pilote/mecanicien/consultant_international (texte libre) -> FK utilisateur
-    # (migration 0047) : peuvent référencer un compte créé à la volée (POST
-    # /users/a-la-volee) aussi bien qu'un compte existant. chef_de_base_id seul
-    # doit préexister (pas de création à la volée pour ce rôle).
-    pilote_id: uuid.UUID
-    mecanicien_id: uuid.UUID
+    # pilote/mecanicien/consultant_international redevenus texte libre
+    # (migration 0048, défait la migration 0047) : pilote/mécanicien
+    # obligatoires, consultant_international facultatif — même patron que
+    # `TraitementTerrestreCreate.consultant_international`. chef_de_base_id
+    # reste seul en FK utilisateur (référentiel).
+    pilote: str = Field(..., min_length=1)
+    mecanicien: str = Field(..., min_length=1)
     chef_de_base_id: uuid.UUID
-    consultant_id: uuid.UUID | None = None
+    consultant_international: str | None = Field(None, max_length=255)
     # Bases aériennes/stands (migration 0047).
     lieu_base_principale_id: uuid.UUID
     lieu_stand_id: uuid.UUID | None = None
@@ -280,10 +281,10 @@ class SignatureRead(BaseModel):
 class TraitementAerienRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    pilote_id: uuid.UUID
-    mecanicien_id: uuid.UUID
+    pilote: str
+    mecanicien: str
     chef_de_base_id: uuid.UUID
-    consultant_id: uuid.UUID | None
+    consultant_international: str | None
     lieu_base_principale_id: uuid.UUID
     lieu_stand_id: uuid.UUID | None
     lieu_base_secondaire_id: uuid.UUID | None

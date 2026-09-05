@@ -155,10 +155,10 @@ class TraitementRepositoryImpl(TraitementRepository):
 
         if traitement.aerien is not None:
             model.aerien = TraitementAerienModel(
-                pilote_id=traitement.aerien.pilote_id,
-                mecanicien_id=traitement.aerien.mecanicien_id,
+                pilote=traitement.aerien.pilote,
+                mecanicien=traitement.aerien.mecanicien,
                 chef_de_base_id=traitement.aerien.chef_de_base_id,
-                consultant_id=traitement.aerien.consultant_id,
+                consultant_international=traitement.aerien.consultant_international,
                 lieu_base_principale_id=traitement.aerien.lieu_base_principale_id,
                 lieu_stand_id=traitement.aerien.lieu_stand_id,
                 lieu_base_secondaire_id=traitement.aerien.lieu_base_secondaire_id,
@@ -434,10 +434,10 @@ class TraitementRepositoryImpl(TraitementRepository):
             model.cible.surface_infestee_ha = traitement.cible.surface_infestee_ha
 
         if traitement.aerien is not None and model.aerien is not None:
-            model.aerien.pilote_id = traitement.aerien.pilote_id
-            model.aerien.mecanicien_id = traitement.aerien.mecanicien_id
+            model.aerien.pilote = traitement.aerien.pilote
+            model.aerien.mecanicien = traitement.aerien.mecanicien
             model.aerien.chef_de_base_id = traitement.aerien.chef_de_base_id
-            model.aerien.consultant_id = traitement.aerien.consultant_id
+            model.aerien.consultant_international = traitement.aerien.consultant_international
             model.aerien.lieu_base_principale_id = traitement.aerien.lieu_base_principale_id
             model.aerien.lieu_stand_id = traitement.aerien.lieu_stand_id
             model.aerien.lieu_base_secondaire_id = traitement.aerien.lieu_base_secondaire_id
@@ -590,10 +590,10 @@ class TraitementRepositoryImpl(TraitementRepository):
             else None,
             aerien=TraitementAerien(
                 traitement_id=model.aerien.traitement_id,
-                pilote_id=model.aerien.pilote_id,
-                mecanicien_id=model.aerien.mecanicien_id,
+                pilote=model.aerien.pilote,
+                mecanicien=model.aerien.mecanicien,
                 chef_de_base_id=model.aerien.chef_de_base_id,
-                consultant_id=model.aerien.consultant_id,
+                consultant_international=model.aerien.consultant_international,
                 lieu_base_principale_id=model.aerien.lieu_base_principale_id,
                 lieu_stand_id=model.aerien.lieu_stand_id,
                 lieu_base_secondaire_id=model.aerien.lieu_base_secondaire_id,

@@ -4,19 +4,12 @@ import { Picker } from '@react-native-picker/picker';
 import { LieuAerien, UtilisateurEquipe } from '@/lib/referentiel-db';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import { Chip } from '@/components/traitement/Chip';
-import { UtilisateurSelectField } from '@/components/traitement/UtilisateurSelectField';
 import { formStyles as styles } from '@/components/traitement/TraitementFormStyles';
 
 export interface AerienFormProps {
   readOnly: boolean;
   chefsDeBase: UtilisateurEquipe[];
-  pilotes: UtilisateurEquipe[];
-  mecaniciens: UtilisateurEquipe[];
-  consultants: UtilisateurEquipe[];
   lieuxAeriens: LieuAerien[];
-  onPilotesChange: (utilisateurs: UtilisateurEquipe[]) => void;
-  onMecaniciensChange: (utilisateurs: UtilisateurEquipe[]) => void;
-  onConsultantsChange: (utilisateurs: UtilisateurEquipe[]) => void;
   error?: string;
 }
 
@@ -78,26 +71,16 @@ function LieuPicker({
  * dérivée des rotations plutôt qu'une saisie directe, et donc affichée là-bas
  * plutôt qu'ici.
  *
- * Pilote/mécanicien/consultant international sont sélectionnés parmi les
- * utilisateurs du référentiel (avec création à la volée) via `UtilisateurSelectField`
- * (ticket 5), et base principale/stand/base secondaire parmi le référentiel
- * `lieu_aerien` (ticket 4) — jamais de champ texte libre lorsque le référentiel
- * correspondant existe. Chef de base/pilote/mécanicien doivent être deux-à-deux
- * distincts, validé par `validateAerienEquipe` (traitement-validation.ts) avant de
- * continuer — le consultant reste facultatif et exempté de cette règle.
+ * Pilote/mécanicien/consultant international sont redevenus du texte libre
+ * (migration backend 0048 — retour en arrière après livraison de la sélection
+ * référentiel, ticket 5) : pilote/mécanicien obligatoires, consultant facultatif.
+ * Base principale/stand/base secondaire restent sélectionnées dans le référentiel
+ * `lieu_aerien` (ticket 4), inchangé. Chef de base/pilote/mécanicien doivent être
+ * deux-à-deux distincts (comparaison par nom, plus par id), validé par
+ * `validateAerienEquipe` (traitement-validation.ts) avant de continuer — le
+ * consultant reste facultatif et exempté de cette règle.
  */
-export function AerienForm({
-  readOnly,
-  chefsDeBase,
-  pilotes,
-  mecaniciens,
-  consultants,
-  lieuxAeriens,
-  onPilotesChange,
-  onMecaniciensChange,
-  onConsultantsChange,
-  error,
-}: AerienFormProps) {
+export function AerienForm({ readOnly, chefsDeBase, lieuxAeriens, error }: AerienFormProps) {
   const store = useTraitementCaptureStore();
 
   return (
@@ -114,32 +97,28 @@ export function AerienForm({
         ))}
       </View>
       <Text style={styles.label}>Pilote *</Text>
-      <UtilisateurSelectField
-        utilisateurs={pilotes}
-        selectedId={store.aerien.piloteId}
-        onSelect={(piloteId) => store.updateAerien({ piloteId })}
-        onUtilisateursChange={onPilotesChange}
-        role="pilote"
-        readOnly={readOnly}
+      <TextInput
+        editable={!readOnly}
+        style={styles.input}
+        placeholder="Nom du pilote"
+        value={store.aerien.pilote ?? ''}
+        onChangeText={(v) => store.updateAerien({ pilote: v })}
       />
       <Text style={styles.label}>Mécanicien *</Text>
-      <UtilisateurSelectField
-        utilisateurs={mecaniciens}
-        selectedId={store.aerien.mecanicienId}
-        onSelect={(mecanicienId) => store.updateAerien({ mecanicienId })}
-        onUtilisateursChange={onMecaniciensChange}
-        role="mecanicien"
-        readOnly={readOnly}
+      <TextInput
+        editable={!readOnly}
+        style={styles.input}
+        placeholder="Nom du mécanicien"
+        value={store.aerien.mecanicien ?? ''}
+        onChangeText={(v) => store.updateAerien({ mecanicien: v })}
       />
       <Text style={styles.label}>Consultant</Text>
-      <UtilisateurSelectField
-        utilisateurs={consultants}
-        selectedId={store.aerien.consultantId}
-        onSelect={(consultantId) => store.updateAerien({ consultantId })}
-        onUtilisateursChange={onConsultantsChange}
-        role="consultant_international"
-        facultatif
-        readOnly={readOnly}
+      <TextInput
+        editable={!readOnly}
+        style={styles.input}
+        placeholder="Nom du consultant (facultatif)"
+        value={store.aerien.consultantInternational ?? ''}
+        onChangeText={(v) => store.updateAerien({ consultantInternational: v || null })}
       />
       {error && <Text style={styles.error}>{error}</Text>}
 

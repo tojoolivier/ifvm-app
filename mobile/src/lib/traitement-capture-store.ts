@@ -78,10 +78,10 @@ export interface RotationInput {
 }
 
 export interface AerienDraft {
-  piloteId?: string | null;
-  mecanicienId?: string | null;
+  pilote?: string | null;
+  mecanicien?: string | null;
   chefDeBaseId?: string | null;
-  consultantId?: string | null;
+  consultantInternational?: string | null;
   immatriculationAeronef?: string | null;
   // Base principale/stand/base secondaire (référentiel lieu_aerien) — écran « Équipe »
   // (#equipe-slide-aerien). Base principale obligatoire, stand et base secondaire

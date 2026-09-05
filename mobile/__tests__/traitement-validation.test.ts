@@ -348,10 +348,10 @@ describe('validateEmpoisonnement', () => {
 describe('computeSignatureMatrix', () => {
   it('lists pilote, mecanicien and chef de base as required when filled, aerien', () => {
     const matrix = computeSignatureMatrix('AERIEN', {
-      pilote_id: 'pilote-1',
-      mecanicien_id: 'mecanicien-1',
+      pilote: 'Jean Dupont',
+      mecanicien: 'Marc Rabe',
       chef_de_base_id: 'u-1',
-      consultant_id: null,
+      consultant_international: null,
     });
     expect(matrix).toEqual([
       { role: 'PILOTE', required: true, champRenseigne: true },
@@ -362,10 +362,10 @@ describe('computeSignatureMatrix', () => {
 
   it('adds consultant international only when it was filled in, aerien', () => {
     const matrix = computeSignatureMatrix('AERIEN', {
-      pilote_id: 'pilote-1',
-      mecanicien_id: 'mecanicien-1',
+      pilote: 'Jean Dupont',
+      mecanicien: 'Marc Rabe',
       chef_de_base_id: 'u-1',
-      consultant_id: 'consultant-1',
+      consultant_international: 'Dr. Smith',
     });
     expect(matrix.find((r) => r.role === 'CONSULTANT_INTERNATIONAL')).toEqual({
       role: 'CONSULTANT_INTERNATIONAL',
@@ -387,9 +387,10 @@ describe('computeSignatureMatrix', () => {
 describe('validateAerienEquipe', () => {
   const equipeValide = {
     chefDeBaseId: 'chef-1',
-    piloteId: 'pilote-1',
-    mecanicienId: 'mecanicien-1',
-    consultantId: null,
+    chefDeBaseNom: 'Sarah Ravelo',
+    pilote: 'Jean Dupont',
+    mecanicien: 'Marc Rabe',
+    consultantInternational: null,
     immatriculeAeronef: '5R-ABC',
     lieuBasePrincipaleId: 'lieu-1',
   };
@@ -400,8 +401,8 @@ describe('validateAerienEquipe', () => {
 
   it.each([
     ['chefDeBaseId', { ...equipeValide, chefDeBaseId: null }],
-    ['piloteId', { ...equipeValide, piloteId: null }],
-    ['mecanicienId', { ...equipeValide, mecanicienId: null }],
+    ['pilote', { ...equipeValide, pilote: null }],
+    ['mecanicien', { ...equipeValide, mecanicien: null }],
     ['immatriculeAeronef', { ...equipeValide, immatriculeAeronef: null }],
     ['lieuBasePrincipaleId', { ...equipeValide, lieuBasePrincipaleId: null }],
   ])('rapporte %s comme obligatoire quand absent', (champ, input) => {
@@ -410,13 +411,13 @@ describe('validateAerienEquipe', () => {
   });
 
   it('accepte un consultant absent (facultatif)', () => {
-    expect(validateAerienEquipe({ ...equipeValide, consultantId: null })).toEqual([]);
+    expect(validateAerienEquipe({ ...equipeValide, consultantInternational: null })).toEqual([]);
   });
 
   it.each([
-    ['chef de base et pilote', { ...equipeValide, piloteId: equipeValide.chefDeBaseId }],
-    ['chef de base et mécanicien', { ...equipeValide, mecanicienId: equipeValide.chefDeBaseId }],
-    ['pilote et mécanicien', { ...equipeValide, mecanicienId: equipeValide.piloteId }],
+    ['chef de base et pilote', { ...equipeValide, pilote: equipeValide.chefDeBaseNom }],
+    ['chef de base et mécanicien', { ...equipeValide, mecanicien: equipeValide.chefDeBaseNom }],
+    ['pilote et mécanicien', { ...equipeValide, mecanicien: equipeValide.pilote }],
   ])('bloque quand la même personne occupe deux rôles obligatoires (%s)', (_label, input) => {
     const errors = validateAerienEquipe(input);
     expect(errors.length).toBeGreaterThan(0);
@@ -427,8 +428,13 @@ describe('validateAerienEquipe', () => {
     ).toBe(true);
   });
 
+  it('détecte une collision malgré une casse et des espaces différents', () => {
+    const errors = validateAerienEquipe({ ...equipeValide, mecanicien: '  jean   DUPONT  ' });
+    expect(errors.some((e) => e.field === 'pilote')).toBe(true);
+  });
+
   it('le consultant peut être la même personne qu’un rôle obligatoire (exempté de la règle de distinction)', () => {
-    expect(validateAerienEquipe({ ...equipeValide, consultantId: equipeValide.piloteId })).toEqual([]);
+    expect(validateAerienEquipe({ ...equipeValide, consultantInternational: equipeValide.pilote })).toEqual([]);
   });
 });
 

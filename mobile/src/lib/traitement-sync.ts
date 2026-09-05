@@ -99,10 +99,10 @@ function buildTraitementSyncPayload(draft: DraftTraitement): components['schemas
     return {
       ...common,
       aerien: {
-        pilote_id: draft.aerien.pilote_id,
-        mecanicien_id: draft.aerien.mecanicien_id,
+        pilote: draft.aerien.pilote,
+        mecanicien: draft.aerien.mecanicien,
         chef_de_base_id: draft.aerien.chef_de_base_id,
-        consultant_id: draft.aerien.consultant_id,
+        consultant_international: draft.aerien.consultant_international,
         immatricule_aeronef: draft.aerien.immatricule_aeronef ?? '',
         // Base principale/stand/base secondaire (référentiel lieu_aerien) —
         // #equipe-slide-aerien. lieu_base_principale_id est NOT NULL côté backend

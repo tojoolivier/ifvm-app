@@ -235,9 +235,14 @@ export function validateReferences(input: ReferencesValidationInput): Validation
 
 export interface AerienEquipeValidationInput {
   chefDeBaseId: string | null | undefined;
-  piloteId: string | null | undefined;
-  mecanicienId: string | null | undefined;
-  consultantId?: string | null | undefined;
+  // Nom complet résolu du chef de base (via le référentiel utilisateur) — le chef
+  // reste un id (FK), mais pilote/mécanicien sont redevenus du texte libre
+  // (migration backend 0048) : la distinction ne peut plus se faire par id, elle
+  // compare des noms (cf. `normaliserNom`).
+  chefDeBaseNom: string | null | undefined;
+  pilote: string | null | undefined;
+  mecanicien: string | null | undefined;
+  consultantInternational?: string | null | undefined;
   immatriculeAeronef: string | null | undefined;
   lieuBasePrincipaleId: string | null | undefined;
 }
@@ -245,18 +250,31 @@ export interface AerienEquipeValidationInput {
 const MESSAGE_ROLE_DEJA_AFFECTE =
   'Cette personne est déjà affectée à un autre rôle. Veuillez sélectionner une personne différente.';
 
+/** Espaces superflus et casse ignorés — le texte libre ne garantit pas l'identité
+ * comme un id, mais « Jean RAKOTO » et « jean   rakoto » doivent être reconnus
+ * comme la même personne. Miroir de `_normaliser_nom` côté backend. */
+function normaliserNom(valeur: string): string {
+  return valeur.trim().split(/\s+/).join(' ').toLowerCase();
+}
+
 /**
  * Chef de base, pilote et mécanicien sont obligatoires et deux-à-deux distincts
  * (même personne dans deux rôles obligatoires = fiche invalide) — le consultant
- * reste facultatif et exempté de cette règle. Reflète côté mobile la contrainte
- * backend `ck_traitement_aerien_roles_distincts` (migration 0047).
+ * reste facultatif et exempté de cette règle. Reflète côté mobile la validation
+ * applicative backend `valider_roles_aerien_distincts` (migration 0048 — la
+ * contrainte SQL `ck_traitement_aerien_roles_distincts` n'existe plus, pilote/
+ * mécanicien n'étant plus des FK comparables par id).
  */
 export function validateAerienEquipe(input: AerienEquipeValidationInput): ValidationError[] {
   const errors: ValidationError[] = [];
 
   if (!input.chefDeBaseId) errors.push({ field: 'chefDeBaseId', message: 'Le chef de base est obligatoire' });
-  if (!input.piloteId) errors.push({ field: 'piloteId', message: 'Le pilote est obligatoire' });
-  if (!input.mecanicienId) errors.push({ field: 'mecanicienId', message: 'Le mécanicien est obligatoire' });
+  if (!input.pilote || input.pilote.trim() === '') {
+    errors.push({ field: 'pilote', message: 'Le pilote est obligatoire' });
+  }
+  if (!input.mecanicien || input.mecanicien.trim() === '') {
+    errors.push({ field: 'mecanicien', message: 'Le mécanicien est obligatoire' });
+  }
   if (!input.immatriculeAeronef || input.immatriculeAeronef.trim() === '') {
     errors.push({ field: 'immatriculeAeronef', message: "L'immatriculation de l'aéronef est obligatoire" });
   }
@@ -264,14 +282,16 @@ export function validateAerienEquipe(input: AerienEquipeValidationInput): Valida
     errors.push({ field: 'lieuBasePrincipaleId', message: 'La base principale est obligatoire' });
   }
 
-  const rolesObligatoires: { field: string; id: string | null | undefined }[] = [
-    { field: 'chefDeBaseId', id: input.chefDeBaseId },
-    { field: 'piloteId', id: input.piloteId },
-    { field: 'mecanicienId', id: input.mecanicienId },
+  const rolesObligatoires: { field: string; nom: string | null | undefined }[] = [
+    { field: 'chefDeBaseId', nom: input.chefDeBaseNom },
+    { field: 'pilote', nom: input.pilote },
+    { field: 'mecanicien', nom: input.mecanicien },
   ];
   for (let i = 0; i < rolesObligatoires.length; i++) {
     for (let j = i + 1; j < rolesObligatoires.length; j++) {
-      if (rolesObligatoires[i].id && rolesObligatoires[i].id === rolesObligatoires[j].id) {
+      const nomA = rolesObligatoires[i].nom;
+      const nomB = rolesObligatoires[j].nom;
+      if (nomA && nomB && normaliserNom(nomA) === normaliserNom(nomB)) {
         errors.push({ field: rolesObligatoires[i].field, message: MESSAGE_ROLE_DEJA_AFFECTE });
         errors.push({ field: rolesObligatoires[j].field, message: MESSAGE_ROLE_DEJA_AFFECTE });
       }
@@ -414,10 +434,10 @@ export interface SignatureRequirement {
 }
 
 export interface AerienSignatureFields {
-  pilote_id?: string | null;
-  mecanicien_id?: string | null;
+  pilote?: string | null;
+  mecanicien?: string | null;
   chef_de_base_id?: string | null;
-  consultant_id?: string | null;
+  consultant_international?: string | null;
 }
 
 export interface TerrestreSignatureFields {
@@ -442,10 +462,10 @@ export function computeSignatureMatrix(
   const matrice: [SignatureRole, keyof (AerienSignatureFields & TerrestreSignatureFields)][] =
     typeTraitement === 'AERIEN'
       ? [
-          ['PILOTE', 'pilote_id'],
-          ['MECANICIEN', 'mecanicien_id'],
+          ['PILOTE', 'pilote'],
+          ['MECANICIEN', 'mecanicien'],
           ['CHEF_DE_BASE', 'chef_de_base_id'],
-          ['CONSULTANT_INTERNATIONAL', 'consultant_id'],
+          ['CONSULTANT_INTERNATIONAL', 'consultant_international'],
         ]
       : [
           ['CHEF_EQUIPE', 'chef_equipe_id'],

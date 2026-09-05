@@ -12,10 +12,10 @@ from app.domain.prospection import Prospection
 # 0010), qui n'énumère pas AGENT_ENCADREUR.
 _MATRICE_SIGNATURES: dict[str, dict[str, str]] = {
     "AERIEN": {
-        "PILOTE": "pilote_id",
-        "MECANICIEN": "mecanicien_id",
+        "PILOTE": "pilote",
+        "MECANICIEN": "mecanicien",
         "CHEF_DE_BASE": "chef_de_base_id",
-        "CONSULTANT_INTERNATIONAL": "consultant_id",
+        "CONSULTANT_INTERNATIONAL": "consultant_international",
     },
     "TERRESTRE": {
         "CHEF_EQUIPE": "chef_equipe_id",
@@ -38,6 +38,11 @@ class ChefEquipeInvalideError(PermissionError):
 
 class NumeroFicheConflitError(Exception):
     """Le numero_fiche viole la contrainte UNIQUE — l'appelant doit réessayer avec un suffixe."""
+
+
+class RolesAerienNonDistinctsError(ValueError):
+    """Chef de base, pilote et mécanicien (aérien) ne désignent pas trois personnes
+    distinctes — migration 0048 (retour de pilote/mécanicien en texte libre)."""
 
 
 class TraitementIntrouvableError(LookupError):
@@ -151,17 +156,18 @@ class Rotation:
 @dataclass
 class TraitementAerien:
     traitement_id: uuid.UUID = field(default_factory=uuid.uuid4)
-    # pilote/mecanicien/consultant_international (texte libre) -> FK utilisateur
-    # (migration 0047) : pilote_id/mecanicien_id obligatoires et distincts de
-    # chef_de_base_id (ck_traitement_aerien_roles_distincts), consultant_id
-    # facultatif. Les trois peuvent référencer un compte créé à la volée
-    # (`peut_se_connecter=false`, POST /users/a-la-volee) ; chef_de_base_id reste
-    # seul à devoir préexister dans le référentiel (pas de création à la volée
-    # pour ce rôle).
-    pilote_id: uuid.UUID = field(default_factory=uuid.uuid4)
-    mecanicien_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    # pilote/mecanicien/consultant_international sont redevenus du texte libre
+    # (migration 0048) : le passage en FK utilisateur (migration 0047) a été
+    # défait à la demande — pilote/mécanicien restent obligatoires,
+    # consultant_international facultatif, comme `TraitementTerrestre.
+    # consultant_international` déjà. chef_de_base_id reste seul en FK
+    # (référentiel utilisateur), donc seul comparable par id ; la distinction
+    # avec pilote/mécanicien se fait par nom (cf. `valider_roles_aerien_distincts`),
+    # le texte libre ne garantissant pas l'identité comme un id.
+    pilote: str = ""
+    mecanicien: str = ""
     chef_de_base_id: uuid.UUID = field(default_factory=uuid.uuid4)
-    consultant_id: uuid.UUID | None = None
+    consultant_international: str | None = None
     # Bases aériennes/stands (migration 0047) : base principale obligatoire pour
     # tout traitement aérien (aucune exception, contrairement à la prospection
     # généralisée) ; stand nullable (NULL = ravitaillement fait directement à
@@ -461,11 +467,35 @@ _CHAMPS_CONTENU_COMMUNS = (
     "mortalite_familles",
 )
 
+
+def _normaliser_nom(valeur: str) -> str:
+    """Espaces superflus et casse ignorés — le texte libre ne garantit pas
+    l'identité comme un id, mais « Jean RAKOTO » et « jean   rakoto » doivent
+    être reconnus comme la même personne."""
+    return " ".join(valeur.split()).casefold()
+
+
+def valider_roles_aerien_distincts(chef_nom: str, pilote: str, mecanicien: str) -> None:
+    """Chef de base, pilote et mécanicien doivent désigner trois personnes
+    distinctes (migration 0048) — le consultant est exempté (facultatif, rôle
+    non structurant, cf. spec #equipe-slide-aerien)."""
+    roles = {"chef de base": chef_nom, "pilote": pilote, "mécanicien": mecanicien}
+    normalises = {role: _normaliser_nom(nom) for role, nom in roles.items()}
+    noms = list(normalises.items())
+    for i in range(len(noms)):
+        for j in range(i + 1, len(noms)):
+            if noms[i][1] == noms[j][1]:
+                raise RolesAerienNonDistinctsError(
+                    "Cette personne est déjà affectée à un autre rôle. "
+                    "Veuillez sélectionner une personne différente."
+                )
+
+
 _CHAMPS_CONTENU_AERIEN = (
-    "pilote_id",
-    "mecanicien_id",
+    "pilote",
+    "mecanicien",
     "chef_de_base_id",
-    "consultant_id",
+    "consultant_international",
     "lieu_base_principale_id",
     "lieu_stand_id",
     "lieu_base_secondaire_id",

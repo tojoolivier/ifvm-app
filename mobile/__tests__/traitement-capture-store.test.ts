@@ -57,12 +57,12 @@ describe('updateRef', () => {
 
 describe('section aérien', () => {
   it('updateAerien fusionne pilote/mécanicien/chef de base', () => {
-    useTraitementCaptureStore.getState().updateAerien({ piloteId: 'pilote-1' });
-    useTraitementCaptureStore.getState().updateAerien({ mecanicienId: 'mecanicien-1' });
+    useTraitementCaptureStore.getState().updateAerien({ pilote: 'Jean Dupont' });
+    useTraitementCaptureStore.getState().updateAerien({ mecanicien: 'Marc Rabe' });
 
     const { aerien } = useTraitementCaptureStore.getState();
-    expect(aerien.piloteId).toBe('pilote-1');
-    expect(aerien.mecanicienId).toBe('mecanicien-1');
+    expect(aerien.pilote).toBe('Jean Dupont');
+    expect(aerien.mecanicien).toBe('Marc Rabe');
   });
 
   it('addRotation ajoute une rotation locale avec un id généré', () => {

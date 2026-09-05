@@ -1,8 +1,9 @@
 /**
  * Récapitulatif (traitement) — sections « Équipe » et « Traitement » distinctes
  * (#equipe-slide-aerien) : personnes/aéronef/rattachement d'un côté, pesticides/
- * rotations de l'autre, chacune avec ses propres champs, résolus en noms lisibles
- * depuis les référentiels (pas les ids bruts du brouillon).
+ * rotations de l'autre. Chef de base reste résolu depuis le référentiel (FK) ;
+ * pilote/mécanicien/consultant sont redevenus du texte libre (migration backend
+ * 0048) et s'affichent directement, sans jointure.
  */
 import { render, screen, waitFor } from '@testing-library/react-native';
 import RecapScreen from '@/app/(traitement)/recap';
@@ -30,9 +31,6 @@ jest.mock('@/lib/referentiel-db', () => ({
   listUtilisateursByRole: jest.fn().mockImplementation((role: string) => {
     const parRole: Record<string, { id: string; nom: string; prenom: string }[]> = {
       chef_de_base: [{ id: 'chef-1', nom: 'Ravelo', prenom: 'Sarah' }],
-      pilote: [{ id: 'pilote-1', nom: 'Rakoto', prenom: 'Jean' }],
-      mecanicien: [{ id: 'mecanicien-1', nom: 'Andria', prenom: 'Marc' }],
-      consultant_international: [{ id: 'consultant-1', nom: 'Smith', prenom: 'John' }],
     };
     return Promise.resolve(parRole[role] ?? []);
   }),
@@ -75,10 +73,10 @@ const DRAFT_AERIEN_COMPLET = {
   terrestre: null,
   aerien: {
     traitement_id: 'trait-1',
-    pilote_id: 'pilote-1',
-    mecanicien_id: 'mecanicien-1',
+    pilote: 'Jean Dupont',
+    mecanicien: 'Marc Rabe',
     chef_de_base_id: 'chef-1',
-    consultant_id: 'consultant-1',
+    consultant_international: 'John Smith',
     immatricule_aeronef: '5R-ABC',
     lieu_base_principale_id: 'lieu-1',
     lieu_stand_id: 'lieu-2',
@@ -111,8 +109,8 @@ describe('RecapScreen — sections Équipe et Traitement (#equipe-slide-aerien)'
     // détaillée ci-dessous — jamais une seule occurrence exacte à cibler.
     await waitFor(() => expect(screen.getAllByText('Équipe').length).toBeGreaterThanOrEqual(2));
     expect(screen.getByText('Sarah Ravelo')).toBeVisible();
-    expect(screen.getByText('Jean Rakoto')).toBeVisible();
-    expect(screen.getByText('Marc Andria')).toBeVisible();
+    expect(screen.getByText('Jean Dupont')).toBeVisible();
+    expect(screen.getByText('Marc Rabe')).toBeVisible();
     expect(screen.getByText('John Smith')).toBeVisible();
     expect(screen.getByText('5R-ABC')).toBeVisible();
     expect(screen.getByText('Tuléar')).toBeVisible();
@@ -130,7 +128,7 @@ describe('RecapScreen — sections Équipe et Traitement (#equipe-slide-aerien)'
       ...DRAFT_AERIEN_COMPLET,
       aerien: {
         ...DRAFT_AERIEN_COMPLET.aerien,
-        consultant_id: null,
+        consultant_international: null,
         lieu_stand_id: null,
         lieu_base_secondaire_id: null,
       },

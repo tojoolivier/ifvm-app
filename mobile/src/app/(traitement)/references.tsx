@@ -211,8 +211,8 @@ export default function ReferencesScreen() {
                   id: generateId(),
                   prospectionId: prospectionId!,
                   dateTraitement: store.ref.dateTraitement,
-                  piloteId: '',
-                  mecanicienId: '',
+                  pilote: '',
+                  mecanicien: '',
                   chefDeBaseId: '',
                 })
               : await createDraftTraitementTerrestre({

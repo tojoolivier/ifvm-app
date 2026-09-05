@@ -40,9 +40,6 @@ export default function TraitementScreen() {
 
   const typeTraitement = store.typeTraitement;
   const [chefsDeBase, setChefsDeBase] = useState<UtilisateurEquipe[]>([]);
-  const [pilotes, setPilotes] = useState<UtilisateurEquipe[]>([]);
-  const [mecaniciens, setMecaniciens] = useState<UtilisateurEquipe[]>([]);
-  const [consultants, setConsultants] = useState<UtilisateurEquipe[]>([]);
   const [chefsEquipe, setChefsEquipe] = useState<UtilisateurEquipe[]>([]);
   const [agentsEncadreurs, setAgentsEncadreurs] = useState<UtilisateurEquipe[]>([]);
   const [lieuxAeriens, setLieuxAeriens] = useState<LieuAerien[]>([]);
@@ -70,10 +67,10 @@ export default function TraitementScreen() {
         // Rotations non chargées ici : sous-ressource propre à l'écran « Pesticides &
         // rotations » (rotations.tsx), qui suit après celui-ci dans le flux aérien.
         store.updateAerien({
-          piloteId: draft.aerien.pilote_id || null,
-          mecanicienId: draft.aerien.mecanicien_id || null,
+          pilote: draft.aerien.pilote || null,
+          mecanicien: draft.aerien.mecanicien || null,
           chefDeBaseId: draft.aerien.chef_de_base_id || null,
-          consultantId: draft.aerien.consultant_id,
+          consultantInternational: draft.aerien.consultant_international,
           immatriculationAeronef: draft.aerien.immatricule_aeronef,
           lieuBasePrincipaleId: draft.aerien.lieu_base_principale_id,
           lieuStandId: draft.aerien.lieu_stand_id,
@@ -140,9 +137,6 @@ export default function TraitementScreen() {
 
   useEffect(() => {
     listUtilisateursByRole('chef_de_base').then(setChefsDeBase).catch((error) => signalerChargement(error, 'listUtilisateursByRole:chef_de_base'));
-    listUtilisateursByRole('pilote').then(setPilotes).catch((error) => signalerChargement(error, 'listUtilisateursByRole:pilote'));
-    listUtilisateursByRole('mecanicien').then(setMecaniciens).catch((error) => signalerChargement(error, 'listUtilisateursByRole:mecanicien'));
-    listUtilisateursByRole('consultant_international').then(setConsultants).catch((error) => signalerChargement(error, 'listUtilisateursByRole:consultant_international'));
     listUtilisateursByRole('chef_equipe').then(setChefsEquipe).catch((error) => signalerChargement(error, 'listUtilisateursByRole:chef_equipe'));
     listUtilisateursByRole('agent_encadreur').then(setAgentsEncadreurs).catch((error) => signalerChargement(error, 'listUtilisateursByRole:agent_encadreur'));
     listLieuxAeriens().then(setLieuxAeriens).catch((error) => signalerChargement(error, 'listLieuxAeriens'));
@@ -200,11 +194,13 @@ export default function TraitementScreen() {
     run(
       async () => {
         if (typeTraitement === 'AERIEN') {
+          const chefDeBase = chefsDeBase.find((c) => c.id === store.aerien.chefDeBaseId);
           const equipeErrors = validateAerienEquipe({
             chefDeBaseId: store.aerien.chefDeBaseId,
-            piloteId: store.aerien.piloteId,
-            mecanicienId: store.aerien.mecanicienId,
-            consultantId: store.aerien.consultantId,
+            chefDeBaseNom: chefDeBase ? `${chefDeBase.prenom} ${chefDeBase.nom}` : null,
+            pilote: store.aerien.pilote,
+            mecanicien: store.aerien.mecanicien,
+            consultantInternational: store.aerien.consultantInternational,
             immatriculeAeronef: store.aerien.immatriculationAeronef,
             lieuBasePrincipaleId: store.aerien.lieuBasePrincipaleId,
           });
@@ -213,10 +209,10 @@ export default function TraitementScreen() {
             return;
           }
           await updateTraitementAerien(traitementId, {
-            piloteId: store.aerien.piloteId!,
-            mecanicienId: store.aerien.mecanicienId!,
+            pilote: store.aerien.pilote!,
+            mecanicien: store.aerien.mecanicien!,
             chefDeBaseId: store.aerien.chefDeBaseId!,
-            consultantId: store.aerien.consultantId,
+            consultantInternational: store.aerien.consultantInternational,
             immatriculeAeronef: store.aerien.immatriculationAeronef,
             lieuBasePrincipaleId: store.aerien.lieuBasePrincipaleId,
             lieuStandId: store.aerien.lieuStandId,
@@ -298,13 +294,7 @@ export default function TraitementScreen() {
           <AerienForm
             readOnly={readOnly}
             chefsDeBase={chefsDeBase}
-            pilotes={pilotes}
-            mecaniciens={mecaniciens}
-            consultants={consultants}
             lieuxAeriens={lieuxAeriens}
-            onPilotesChange={setPilotes}
-            onMecaniciensChange={setMecaniciens}
-            onConsultantsChange={setConsultants}
             error={errors.aerien}
           />
         )}
