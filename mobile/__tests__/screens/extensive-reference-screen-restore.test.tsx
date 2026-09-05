@@ -219,6 +219,34 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
   });
 
   /**
+   * #prospection-lieu-base : référentiel `lieu_aerien` pas encore peuplé (ou pas
+   * encore synchronisé sur l'appareil) — un champ sans aucun chip serait
+   * indiscernable d'un bug. Le message doit orienter vers l'administration web,
+   * seul endroit où un lieu aérien peut être créé (aucune création de
+   * référentiel n'est possible depuis le mobile).
+   */
+  it('Base (mode aérien) : référentiel vide → message renvoyant vers l’administration web, aucun chip', async () => {
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'extensive',
+        date_prospection: '2026-08-25',
+        latitude: -18.9,
+        longitude: 47.5,
+        mode_extensif: 'aerien',
+      } as any,
+      captures: [],
+    });
+
+    await render(<ExtensiveReferenceScreen />);
+    await screen.findByText('Base');
+
+    expect(
+      screen.getByText(/Aucune base disponible.*administration web.*Lieux aériens/s)
+    ).toBeVisible();
+  });
+
+  /**
    * #prospection-lieu-base : sélection d'une base sur une fiche neuve (aucun
    * `lieu_base_id` déjà enregistré) — un seul lieu `principale` est proposé, jamais
    * les lieux `stand`/`secondaire` (aucune notion de base secondaire pour la

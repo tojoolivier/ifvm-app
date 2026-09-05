@@ -215,6 +215,7 @@ export default function ExtensiveReferenceScreen() {
   // prospection, et une opération aérienne « généralisée » n'en a aucune.
   const [lieuBaseId, setLieuBaseId] = useState<string | null>(draft?.lieu_base_id ?? null);
   const [lieuxAeriens, setLieuxAeriens] = useState<LieuAerien[]>([]);
+  const lieuxBasePrincipale = lieuxAeriens.filter((lieu) => lieu.type_lieu === 'principale');
   // Label du champ actuellement focus dans le bloc aéronef/équipe (un seul à la
   // fois) — pilote uniquement l'état visuel (bordure) de `AerienField`.
   const [focusedAerienField, setFocusedAerienField] = useState<string | null>(null);
@@ -587,10 +588,9 @@ export default function ExtensiveReferenceScreen() {
                    * de base secondaire pour la prospection). Nullable : cliquer le lieu déjà
                    * actif le désélectionne, même pattern que l'État plus bas sur cet écran —
                    * couvre l'opération aérienne « généralisée », non rattachée à une base. */}
-                  <View style={[styles.chipsRow, styles.aerienFieldRowSplitLast]}>
-                    {lieuxAeriens
-                      .filter((lieu) => lieu.type_lieu === 'principale')
-                      .map((lieu) => {
+                  {lieuxBasePrincipale.length > 0 ? (
+                    <View style={[styles.chipsRow, styles.aerienFieldRowSplitLast]}>
+                      {lieuxBasePrincipale.map((lieu) => {
                         const active = lieu.id === lieuBaseId;
                         return (
                           <TouchableOpacity
@@ -602,7 +602,17 @@ export default function ExtensiveReferenceScreen() {
                           </TouchableOpacity>
                         );
                       })}
-                  </View>
+                    </View>
+                  ) : (
+                    // Référentiel pas encore peuplé (ou pas encore synchronisé) : un champ
+                    // sans aucun chip serait indiscernable d'un bug. On l'explique et on
+                    // pointe vers l'endroit où le créer — l'administration web (aucune
+                    // création de référentiel n'est possible depuis le mobile).
+                    <Text style={[styles.hintText, styles.aerienFieldRowSplitLast]}>
+                      Aucune base disponible pour le moment — à créer depuis l&apos;administration
+                      web (Référentiels → Lieux aériens), puis à synchroniser sur l&apos;appareil.
+                    </Text>
+                  )}
                 </View>
 
                 <Text style={styles.sectionLabel}>Informations sur les heures de vol</Text>
