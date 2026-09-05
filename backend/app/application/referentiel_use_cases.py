@@ -674,6 +674,7 @@ class ReferentielSinceCursors:
     cultures: datetime | None = None
     codes_stades: datetime | None = None
     campagnes: datetime | None = None
+    lieux_aeriens: datetime | None = None
 
 
 @dataclass
@@ -686,6 +687,7 @@ class ReferentielPullResult:
     cultures: list[Culture]
     codes_stades: list[CodeStade]
     campagnes: list[Campagne]
+    lieux_aeriens: list[LieuAerien]
     server_time: datetime
 
 
@@ -700,6 +702,7 @@ class PullReferentiel:
         culture_repository: CultureRepository,
         code_stade_repository: CodeStadeRepository,
         campagne_repository: CampagneRepository,
+        lieu_aerien_repository: LieuAerienRepository,
     ):
         self.zone_repository = zone_repository
         self.poste_repository = poste_repository
@@ -709,6 +712,7 @@ class PullReferentiel:
         self.culture_repository = culture_repository
         self.code_stade_repository = code_stade_repository
         self.campagne_repository = campagne_repository
+        self.lieu_aerien_repository = lieu_aerien_repository
 
     async def execute(self, cursors: ReferentielSinceCursors) -> ReferentielPullResult:
         # Capturé avant les requêtes : une entité modifiée pendant leur exécution doit
@@ -727,5 +731,6 @@ class PullReferentiel:
             cultures=await self.culture_repository.list_since(cursors.cultures),
             codes_stades=await self.code_stade_repository.list_since(cursors.codes_stades),
             campagnes=await self.campagne_repository.list_since(cursors.campagnes),
+            lieux_aeriens=await self.lieu_aerien_repository.list_since(cursors.lieux_aeriens),
             server_time=server_time,
         )
