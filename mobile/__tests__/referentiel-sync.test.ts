@@ -37,6 +37,7 @@ function emptyResponse(serverTime: string) {
     cultures: { upserts: [], server_time: serverTime },
     codes_stades: { upserts: [], server_time: serverTime },
     campagnes: { upserts: [], server_time: serverTime },
+    lieux_aeriens: { upserts: [], server_time: serverTime },
   };
 }
 
@@ -56,6 +57,7 @@ describe('pullReferentiel', () => {
         cultures: null,
         codes_stades: null,
         campagnes: null,
+        lieux_aeriens: null,
       },
       undefined
     );
@@ -103,6 +105,7 @@ describe('pullReferentiel', () => {
         cultures: null,
         codes_stades: null,
         campagnes: null,
+        lieux_aeriens: null,
       },
       undefined
     );
@@ -124,6 +127,34 @@ describe('pullReferentiel', () => {
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO poste_acridien'),
       ['pa-1', 'PA-01', 'Bekily', 'za-1', 1, '2026-08-01T00:00:00Z']
+    );
+  });
+
+  it('upserts each lieu aérien idempotently by id (#prospection-lieu-base)', async () => {
+    mockPullReferentiel.mockResolvedValue({
+      ...emptyResponse('2026-08-02T00:00:00Z'),
+      lieux_aeriens: {
+        upserts: [
+          {
+            id: 'lieu-1',
+            type_lieu: 'principale',
+            nom: 'Tuléar',
+            latitude: -23.35,
+            longitude: 43.67,
+            altitude: 8,
+            actif: true,
+            updated_at: '2026-08-01T00:00:00Z',
+          },
+        ],
+        server_time: '2026-08-02T00:00:00Z',
+      },
+    });
+
+    await pullReferentiel('token-1');
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO lieu_aerien'),
+      ['lieu-1', 'principale', 'Tuléar', -23.35, 43.67, 8, 1, '2026-08-01T00:00:00Z']
     );
   });
 

@@ -1228,6 +1228,16 @@ export interface components {
              */
             server_time: string;
         };
+        /** EntityPull[LieuAerienSyncRead] */
+        EntityPull_LieuAerienSyncRead_: {
+            /** Upserts */
+            upserts: components["schemas"]["LieuAerienSyncRead"][];
+            /**
+             * Server Time
+             * Format: date-time
+             */
+            server_time: string;
+        };
         /** EntityPull[PesticideSyncRead] */
         EntityPull_PesticideSyncRead_: {
             /** Upserts */
@@ -1605,6 +1615,34 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** LieuAerienSyncRead */
+        LieuAerienSyncRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Type Lieu
+             * @enum {string}
+             */
+            type_lieu: "principale" | "secondaire" | "stand";
+            /** Nom */
+            nom: string;
+            /** Latitude */
+            latitude: number;
+            /** Longitude */
+            longitude: number;
+            /** Altitude */
+            altitude: number | null;
+            /** Actif */
+            actif: boolean;
             /**
              * Updated At
              * Format: date-time
@@ -2528,6 +2566,7 @@ export interface components {
             cultures: components["schemas"]["EntityPull_CultureSyncRead_"];
             codes_stades: components["schemas"]["EntityPull_CodeStadeSyncRead_"];
             campagnes: components["schemas"]["EntityPull_CampagneSyncRead_"];
+            lieux_aeriens: components["schemas"]["EntityPull_LieuAerienSyncRead_"];
         };
         /** RefreshRequest */
         RefreshRequest: {
@@ -4869,6 +4908,7 @@ export interface operations {
                 since_cultures?: string | null;
                 since_codes_stades?: string | null;
                 since_campagnes?: string | null;
+                since_lieux_aeriens?: string | null;
             };
             header?: never;
             path?: never;

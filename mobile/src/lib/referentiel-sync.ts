@@ -3,6 +3,7 @@ import {
   CampagneSync,
   CodeStadeSync,
   CultureSync,
+  LieuAerienSync,
   PesticideSync,
   PosteAcridienSync,
   ReferentielPullResponse,
@@ -22,6 +23,7 @@ const ENTITY_TYPES: EntityType[] = [
   'cultures',
   'codes_stades',
   'campagnes',
+  'lieux_aeriens',
 ];
 
 const TABLE_PAR_ENTITE: Record<EntityType, string> = {
@@ -32,6 +34,7 @@ const TABLE_PAR_ENTITE: Record<EntityType, string> = {
   cultures: 'culture',
   codes_stades: 'code_stade',
   campagnes: 'campagne',
+  lieux_aeriens: 'lieu_aerien',
 };
 
 /**
@@ -179,6 +182,32 @@ async function upsertCultures(
   }
 }
 
+async function upsertLieuxAeriens(
+  db: Awaited<ReturnType<typeof getReferentielDb>>,
+  upserts: LieuAerienSync[]
+): Promise<void> {
+  for (const lieu of upserts) {
+    await db.runAsync(
+      `INSERT INTO lieu_aerien (id, type_lieu, nom, latitude, longitude, altitude, actif, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         type_lieu = excluded.type_lieu, nom = excluded.nom, latitude = excluded.latitude,
+         longitude = excluded.longitude, altitude = excluded.altitude, actif = excluded.actif,
+         updated_at = excluded.updated_at`,
+      [
+        lieu.id,
+        lieu.type_lieu,
+        lieu.nom,
+        lieu.latitude,
+        lieu.longitude,
+        lieu.altitude,
+        lieu.actif ? 1 : 0,
+        lieu.updated_at,
+      ]
+    );
+  }
+}
+
 async function upsertCodesStades(
   db: Awaited<ReturnType<typeof getReferentielDb>>,
   upserts: CodeStadeSync[]
@@ -259,6 +288,7 @@ export async function pullReferentiel(token: string, onUnauthorized?: () => void
   await upsertCultures(db, response.cultures.upserts);
   await upsertCodesStades(db, response.codes_stades.upserts);
   await upsertCampagnes(db, response.campagnes.upserts);
+  await upsertLieuxAeriens(db, response.lieux_aeriens.upserts);
 
   for (const entityType of ENTITY_TYPES) {
     await updateSyncCursor(db, entityType, response[entityType].server_time);
