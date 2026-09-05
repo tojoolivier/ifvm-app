@@ -363,6 +363,10 @@ class LieuAerienRepository(ABC):
     """Aucune méthode de suppression : la sortie du référentiel est `actif=false`."""
 
     @abstractmethod
+    async def list_since(self, since: datetime | None) -> list[LieuAerien]:
+        pass
+
+    @abstractmethod
     async def list_all(
         self, type_lieu: str | None = None, actif: bool | None = True
     ) -> list[LieuAerien]:

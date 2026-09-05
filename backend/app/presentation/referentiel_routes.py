@@ -51,7 +51,6 @@ from app.domain.referentiel import (
 from app.infrastructure.campagne_repository import CampagneRepositoryImpl
 from app.infrastructure.referentiel_repository import (
     CommuneRepositoryImpl,
-    LieuAerienRepositoryImpl,
     PosteAcridienRepositoryImpl,
     StationFixeRepositoryImpl,
     ZoneAntiAcridienRepositoryImpl,
@@ -59,6 +58,7 @@ from app.infrastructure.referentiel_repository import (
 from app.infrastructure.referentiel_sync_repository import (
     CodeStadeRepositoryImpl,
     CultureRepositoryImpl,
+    LieuAerienRepositoryImpl,
     PesticideRepositoryImpl,
     UtilisateurEquipeRepositoryImpl,
 )
@@ -679,6 +679,7 @@ async def pull_referentiel(
     since_cultures: datetime | None = Query(default=None),
     since_codes_stades: datetime | None = Query(default=None),
     since_campagnes: datetime | None = Query(default=None),
+    since_lieux_aeriens: datetime | None = Query(default=None),
 ):
     use_case = PullReferentiel(
         zone_repository=ZoneAntiAcridienRepositoryImpl(db),
@@ -689,6 +690,7 @@ async def pull_referentiel(
         culture_repository=CultureRepositoryImpl(db),
         code_stade_repository=CodeStadeRepositoryImpl(db),
         campagne_repository=CampagneRepositoryImpl(db),
+        lieu_aerien_repository=LieuAerienRepositoryImpl(db),
     )
     cursors = ReferentielSinceCursors(
         zones_anti_acridiennes=since_zones_anti_acridiennes,
@@ -699,6 +701,7 @@ async def pull_referentiel(
         cultures=since_cultures,
         codes_stades=since_codes_stades,
         campagnes=since_campagnes,
+        lieux_aeriens=since_lieux_aeriens,
     )
     result = await use_case.execute(cursors=cursors)
 
@@ -717,4 +720,5 @@ async def pull_referentiel(
         cultures=EntityPull(upserts=result.cultures, server_time=result.server_time),
         codes_stades=EntityPull(upserts=result.codes_stades, server_time=result.server_time),
         campagnes=EntityPull(upserts=result.campagnes, server_time=result.server_time),
+        lieux_aeriens=EntityPull(upserts=result.lieux_aeriens, server_time=result.server_time),
     )

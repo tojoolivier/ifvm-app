@@ -264,6 +264,18 @@ class CultureSyncRead(BaseModel):
     updated_at: datetime
 
 
+class LieuAerienSyncRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    type_lieu: Literal["principale", "secondaire", "stand"]
+    nom: str
+    latitude: float
+    longitude: float
+    altitude: float | None
+    actif: bool
+    updated_at: datetime
+
+
 class CodeStadeSyncRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
@@ -341,3 +353,4 @@ class ReferentielPullResponse(BaseModel):
     cultures: EntityPull[CultureSyncRead]
     codes_stades: EntityPull[CodeStadeSyncRead]
     campagnes: EntityPull[CampagneSyncRead]
+    lieux_aeriens: EntityPull[LieuAerienSyncRead]
