@@ -12,6 +12,7 @@ import {
   StyleProp,
   ViewStyle,
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getCurrentPosition } from '@/lib/location';
@@ -585,29 +586,28 @@ export default function ExtensiveReferenceScreen() {
                   {/* #prospection-lieu-base : remplace les 2 champs texte libre Base/Base
                    * secondaire (migration backend 0047) — un seul sélecteur, sur le
                    * référentiel lieu_aerien (filtré aux bases « principale », aucune notion
-                   * de base secondaire pour la prospection). Nullable : cliquer le lieu déjà
-                   * actif le désélectionne, même pattern que l'État plus bas sur cet écran —
-                   * couvre l'opération aérienne « généralisée », non rattachée à une base. */}
+                   * de base secondaire pour la prospection). Nullable : l'option de tête
+                   * (« Aucune (généralisée) ») vaut `null` — couvre l'opération aérienne
+                   * « généralisée », non rattachée à une base. */}
                   {lieuxBasePrincipale.length > 0 ? (
-                    <View style={[styles.chipsRow, styles.aerienFieldRowSplitLast]}>
-                      {lieuxBasePrincipale.map((lieu) => {
-                        const active = lieu.id === lieuBaseId;
-                        return (
-                          <TouchableOpacity
-                            key={lieu.id}
-                            onPress={() => setLieuBaseId(active ? null : lieu.id)}
-                            activeOpacity={0.7}
-                          >
-                            <Text style={[styles.chip, active && styles.chipActive]}>{lieu.nom}</Text>
-                          </TouchableOpacity>
-                        );
-                      })}
+                    <View style={[styles.aerienFieldPickerBox, styles.aerienFieldRowSplitLast]}>
+                      <Picker
+                        testID="lieu-base-picker"
+                        selectedValue={lieuBaseId ?? ''}
+                        onValueChange={(value) => setLieuBaseId(value === '' ? null : String(value))}
+                        style={styles.aerienFieldPicker}
+                      >
+                        <Picker.Item label="— Aucune (généralisée) —" value="" />
+                        {lieuxBasePrincipale.map((lieu) => (
+                          <Picker.Item key={lieu.id} label={lieu.nom} value={lieu.id} />
+                        ))}
+                      </Picker>
                     </View>
                   ) : (
-                    // Référentiel pas encore peuplé (ou pas encore synchronisé) : un champ
-                    // sans aucun chip serait indiscernable d'un bug. On l'explique et on
-                    // pointe vers l'endroit où le créer — l'administration web (aucune
-                    // création de référentiel n'est possible depuis le mobile).
+                    // Référentiel pas encore peuplé (ou pas encore synchronisé) : une liste
+                    // déroulante sans aucune option serait indiscernable d'un bug. On
+                    // l'explique et on pointe vers l'endroit où le créer — l'administration
+                    // web (aucune création de référentiel n'est possible depuis le mobile).
                     <Text style={[styles.hintText, styles.aerienFieldRowSplitLast]}>
                       Aucune base disponible pour le moment — à créer depuis l&apos;administration
                       web (Référentiels → Lieux aériens), puis à synchroniser sur l&apos;appareil.
@@ -830,6 +830,18 @@ const styles = StyleSheet.create({
   aerienFieldInput: { fontSize: 13, fontWeight: '600', color: TEXT, padding: 0 },
   aerienFieldRowSplit: { flexDirection: 'row', gap: 8, marginBottom: 10 },
   aerienFieldRowSplitLast: { marginBottom: 0 },
+  // Le Picker natif porte sa propre hauteur/marge tactile (~44-50) : pas de
+  // padding vertical (contrairement à `aerienFieldBox`) pour éviter un double
+  // espacement autour du contrôle.
+  aerienFieldPickerBox: {
+    backgroundColor: FILL_BG,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    overflow: 'hidden',
+  },
+  aerienFieldPicker: { color: TEXT },
   // « Motif du divers » (#ux-aerien) : même style de zone à remplir que le bloc
   // aéronef/équipe, réutilisé ici pour rester cohérent visuellement.
   operationMotifDivers: { marginTop: 4 },

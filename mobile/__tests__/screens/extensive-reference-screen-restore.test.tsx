@@ -52,6 +52,41 @@ jest.mock('@/lib/referentiel-db', () => ({
   listLieuxAeriens: jest.fn().mockResolvedValue([]),
 }));
 
+/**
+ * `@react-native-picker/picker` (#prospection-lieu-base) rend un contrôle natif
+ * (RNCPicker) : sous Jest, sa liste d'options n'apparaît pas dans l'arbre de
+ * rendu et il n'existe pas de moyen public de « choisir une option » comme sur
+ * l'appareil. On vérifie donc notre propre câblage (options passées, `onValueChange`)
+ * via un remplacement fidèle au contrat du vrai composant (`onValueChange`/`children`
+ * de `Picker.Item`), rendu en éléments pressables ordinaires — la sélection
+ * effectivement restaurée se vérifie via le payload envoyé à l'enregistrement
+ * (« Suivant »), pas via un rendu visuel de l'état sélectionné : le rendu et les
+ * gestes natifs du composant réel restent hors périmètre de ce test (déjà
+ * couverts par la bibliothèque elle-même).
+ */
+jest.mock('@react-native-picker/picker', () => {
+  const React = require('react');
+  const { Text, TouchableOpacity, View } = require('react-native');
+  function Picker({ onValueChange, children }: any) {
+    // `children` mélange un élément statique (l'option vide) et un tableau
+    // (`lieuxBasePrincipale.map(...)`) : deux « slots » imbriqués, pas une liste
+    // plate — `Children.toArray` aplatit les deux avant de les parcourir.
+    return (
+      <View>
+        {React.Children.toArray(children).map((item: any) => (
+          <TouchableOpacity key={item.props.value} onPress={() => onValueChange(item.props.value)}>
+            <Text>{item.props.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  }
+  Picker.Item = function PickerItem() {
+    return null;
+  };
+  return { Picker };
+});
+
 describe('ExtensiveReferenceScreen — restauration après hydratation tardive du draft', () => {
   beforeEach(() => {
     jest.mocked(prospectionRepository.updateProspectionExtensiveReference).mockClear();
@@ -278,6 +313,8 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
     // avant d'interagir — sinon il peut écraser la sélection ci-dessous.
     await settle();
 
+    // Option vide (généralisée) + les deux lieux « principale », jamais « Betioky ».
+    expect(screen.getByText('— Aucune (généralisée) —')).toBeVisible();
     expect(screen.getByText('Toliara')).toBeVisible();
     expect(screen.queryByText('Betioky')).toBeNull();
     expect(screen.queryByText('Base secondaire')).toBeNull();
@@ -297,10 +334,11 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
   });
 
   /**
-   * #prospection-lieu-base : recliquer le lieu déjà actif le désélectionne — couvre
-   * l'opération aérienne « généralisée », non rattachée à une base.
+   * #prospection-lieu-base : choisir l'option de tête (« Aucune (généralisée) »)
+   * désélectionne la base — couvre l'opération aérienne « généralisée », non
+   * rattachée à une base.
    */
-  it('Base (mode aérien) : recliquer le lieu déjà enregistré le désélectionne (fiche généralisée)', async () => {
+  it('Base (mode aérien) : sélectionner « Aucune (généralisée) » désélectionne le lieu déjà enregistré', async () => {
     jest.mocked(referentielDb.listLieuxAeriens).mockResolvedValue([
       { id: 'lieu-1', type_lieu: 'principale', nom: 'Tuléar' },
     ]);
@@ -321,10 +359,10 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
     await screen.findByText('Tuléar');
     // Laisse l'effet de restauration tardive du brouillon se stabiliser avant
     // d'interagir (cf. commentaire du test précédent) — sinon il peut réappliquer
-    // lieu_base_id APRÈS le clic ci-dessous et annuler la désélection.
+    // lieu_base_id APRÈS l'interaction ci-dessous et annuler la désélection.
     await settle();
 
-    fireEvent.press(screen.getByText('Tuléar'));
+    fireEvent.press(screen.getByText('— Aucune (généralisée) —'));
     // Laisse React réconcilier avant de presser « Suivant » — sinon son gestionnaire
     // reste lié à la fermeture précédente.
     await settle();
@@ -380,7 +418,8 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
     expect(screen.getByText('INFORMATIONS AÉRONEF / ÉQUIPE')).toBeVisible();
     expect(screen.getByText('Aéronef')).toBeVisible();
     expect(screen.getByText('Équipe')).toBeVisible();
-    // « Base » est le sous-groupe ; le chip du lieu déjà enregistré est présélectionné.
+    // « Base » est le sous-groupe ; le lieu déjà enregistré est présélectionné
+    // dans la liste déroulante.
     expect(screen.getAllByText('Base').length).toBeGreaterThan(0);
     expect(await screen.findByDisplayValue('Air Acridien')).toBeVisible();
     expect(screen.getByDisplayValue('5R-ABC')).toBeVisible();
