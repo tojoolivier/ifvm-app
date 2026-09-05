@@ -44,6 +44,7 @@ interface ReferentielPullResponse {
   cultures: EntityPull
   codes_stades: EntityPull
   campagnes: EntityPull
+  lieux_aeriens: EntityPull
 }
 
 type PullKey = keyof ReferentielPullResponse
@@ -146,6 +147,24 @@ const TYPE_PRODUIT_OPTIONS: EditableField['options'] = [
   { value: '', label: '— Non classé —' },
   { value: 'produit_choc', label: TYPE_PRODUIT_LABELS.produit_choc },
   { value: 'produit_barriere', label: TYPE_PRODUIT_LABELS.produit_barriere },
+]
+
+/**
+ * `lieu_aerien.type_lieu` — #prospection-lieu-base. Le sélecteur BASE de la
+ * prospection extensive aérienne (mobile) ne filtre que sur « principale » ;
+ * « secondaire »/« stand » restent des types valides du référentiel partagé,
+ * utiles au Traitement (hors périmètre de cet écran, non consommés ici).
+ */
+const TYPE_LIEU_AERIEN_LABELS: Record<string, string> = {
+  principale: 'Principale',
+  secondaire: 'Secondaire',
+  stand: 'Stand',
+}
+
+const TYPE_LIEU_AERIEN_OPTIONS: EditableField['options'] = [
+  { value: 'principale', label: TYPE_LIEU_AERIEN_LABELS.principale },
+  { value: 'secondaire', label: TYPE_LIEU_AERIEN_LABELS.secondaire },
+  { value: 'stand', label: TYPE_LIEU_AERIEN_LABELS.stand },
 ]
 
 /**
@@ -569,6 +588,72 @@ const ENTITES: EntitySpec[] = [
       derivedFields: [
         { label: 'District', value: (row) => text(row, 'district') },
         { label: 'Région', value: (row) => text(row, 'region') },
+      ],
+    },
+  },
+  {
+    key: 'lieu_aerien',
+    pullKey: 'lieux_aeriens',
+    label: 'Lieux aériens',
+    table: 'lieu_aerien',
+    addLabel: '+ Nouveau lieu aérien',
+    apiOk: true,
+    apiLabel: 'GET · POST · PUT /lieux-aeriens',
+    desc: "Alimente le champ « Base » de la prospection extensive aérienne (mobile) — seuls les lieux de type « Principale » y sont proposés.",
+    hasActif: true,
+    rowLabel: (row) => text(row, 'nom'),
+    columns: [
+      {
+        key: 'type_lieu',
+        header: 'Type',
+        render: (row) => {
+          const value = row.type_lieu
+          return typeof value === 'string' && TYPE_LIEU_AERIEN_LABELS[value]
+            ? TYPE_LIEU_AERIEN_LABELS[value]
+            : '—'
+        },
+        sortValue: (row) => text(row, 'type_lieu'),
+      },
+      { key: 'nom', header: 'Nom', render: (row) => text(row, 'nom'), sortValue: (row) => text(row, 'nom') },
+      {
+        key: 'coord',
+        header: 'Coordonnées',
+        mono: true,
+        render: (row) =>
+          typeof row.latitude === 'number' && typeof row.longitude === 'number'
+            ? `${row.latitude.toFixed(4)} · ${row.longitude.toFixed(4)}`
+            : '—',
+        sortValue: (row) => (typeof row.latitude === 'number' ? row.latitude : null),
+      },
+      {
+        key: 'altitude',
+        header: 'Altitude (m)',
+        align: 'right',
+        mono: true,
+        render: (row) => text(row, 'altitude'),
+        sortValue: (row) => (typeof row.altitude === 'number' ? row.altitude : null),
+      },
+    ],
+    // Panneau en lecture seule inutilisé : `write` prend le relais.
+    fields: [],
+    write: {
+      path: '/lieux-aeriens',
+      // `inclure_inactifs` : l'administration montre les deux états, comme les
+      // autres référentiels avec badge « État ».
+      listPath: '/lieux-aeriens?inclure_inactifs=true',
+      createTitle: 'Nouveau lieu aérien',
+      fields: [
+        {
+          name: 'type_lieu',
+          label: 'Type',
+          kind: 'select',
+          required: true,
+          options: TYPE_LIEU_AERIEN_OPTIONS,
+        },
+        { name: 'nom', label: 'Nom', kind: 'text', required: true },
+        { name: 'latitude', label: 'Latitude', kind: 'number', mono: true, required: true },
+        { name: 'longitude', label: 'Longitude', kind: 'number', mono: true, required: true },
+        { name: 'altitude', label: 'Altitude (m)', kind: 'number', mono: true, nullable: true },
       ],
     },
   },
