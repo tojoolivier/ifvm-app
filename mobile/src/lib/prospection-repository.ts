@@ -1081,10 +1081,35 @@ export async function listRecentProspections(limit = 20): Promise<DraftProspecti
   return db.getAllAsync<DraftProspection>(`SELECT * FROM prospection ORDER BY updated_at DESC LIMIT ?`, [limit]);
 }
 
+/**
+ * Fiches de prospection éligibles au sélecteur de « Nouvelle fiche de traitement »
+ * (traitement-picker.tsx) — exclut désormais celles dont la surface infestée est
+ * déjà intégralement couverte par une fiche de traitement existante (Aérien ou
+ * Terrestre, peu importe le type qui a traité en premier — les deux consomment
+ * la même surface_infestee_ha). `surface_restante_ha` n'est renseignée en local
+ * qu'une fois la fiche synchronisée au moins une fois (calculée côté serveur,
+ * jamais côté mobile) : une prospection déjà épuisée peut donc rester visible
+ * ici tant que l'appareil qui a traité en dernier n'a pas encore resynchronisé —
+ * imprécision déjà acceptée pour listReprenableTraitements(), même logique.
+ */
 export async function listValidatedProspections(): Promise<DraftProspection[]> {
   const db = await getDb();
   return db.getAllAsync<DraftProspection>(
-    `SELECT * FROM prospection WHERE type_prospection IN ('extensive', 'validation') AND statut_sync = 'synced' ORDER BY updated_at DESC`
+    `SELECT * FROM prospection p
+     WHERE p.type_prospection IN ('extensive', 'validation') AND p.statut_sync = 'synced'
+       AND NOT EXISTS (
+         SELECT 1 FROM traitement t
+         JOIN traitement_terrestre tt ON tt.traitement_id = t.id
+         WHERE t.prospection_id = p.id
+           AND tt.surface_restante_ha IS NOT NULL AND tt.surface_restante_ha <= 0
+       )
+       AND NOT EXISTS (
+         SELECT 1 FROM traitement t
+         JOIN traitement_aerien ta ON ta.traitement_id = t.id
+         WHERE t.prospection_id = p.id
+           AND ta.surface_restante_ha IS NOT NULL AND ta.surface_restante_ha <= 0
+       )
+     ORDER BY p.updated_at DESC`
   );
 }
 

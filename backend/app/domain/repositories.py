@@ -109,6 +109,14 @@ class TraitementRepository(ABC):
         pass
 
     @abstractmethod
+    async def origine_deja_utilisee_aerien(
+        self, traitement_origine_id: uuid.UUID, exclude_traitement_id: uuid.UUID | None = None
+    ) -> bool:
+        """Mirroir de `origine_deja_utilisee` (migration 0050) pour le chaînage de
+        reprise généralisé à l'Aérien."""
+        pass
+
+    @abstractmethod
     async def add_rotation(
         self,
         traitement_id: uuid.UUID,

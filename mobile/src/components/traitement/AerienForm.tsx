@@ -2,6 +2,7 @@ import { Fragment } from 'react';
 import { View, Text, TextInput } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { LieuAerien, UtilisateurEquipe } from '@/lib/referentiel-db';
+import { DraftTraitementRow } from '@/lib/traitement-repository';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import { Chip } from '@/components/traitement/Chip';
 import { formStyles as styles } from '@/components/traitement/TraitementFormStyles';
@@ -10,7 +11,9 @@ export interface AerienFormProps {
   readOnly: boolean;
   chefsDeBase: UtilisateurEquipe[];
   lieuxAeriens: LieuAerien[];
-  error?: string;
+  // Chaînage de reprise (migration backend 0050) — mirroir de TerrestreFormProps.
+  reprenables: DraftTraitementRow[];
+  errors: Record<string, string>;
 }
 
 /**
@@ -80,7 +83,13 @@ function LieuPicker({
  * `validateAerienEquipe` (traitement-validation.ts) avant de continuer — le
  * consultant reste facultatif et exempté de cette règle.
  */
-export function AerienForm({ readOnly, chefsDeBase, lieuxAeriens, error }: AerienFormProps) {
+export function AerienForm({
+  readOnly,
+  chefsDeBase,
+  lieuxAeriens,
+  reprenables,
+  errors,
+}: AerienFormProps) {
   const store = useTraitementCaptureStore();
 
   return (
@@ -120,7 +129,7 @@ export function AerienForm({ readOnly, chefsDeBase, lieuxAeriens, error }: Aerie
         value={store.aerien.consultantInternational ?? ''}
         onChangeText={(v) => store.updateAerien({ consultantInternational: v || null })}
       />
-      {error && <Text style={styles.error}>{error}</Text>}
+      {errors.aerien && <Text style={styles.error}>{errors.aerien}</Text>}
 
       <Text style={styles.label}>Immatriculation aéronef *</Text>
       <TextInput
@@ -159,6 +168,31 @@ export function AerienForm({ readOnly, chefsDeBase, lieuxAeriens, error }: Aerie
         readOnly={readOnly}
         facultatif
       />
+
+      {/* Chaînage de reprise (migration backend 0050) — mirroir exact du bloc
+          équivalent dans TerrestreForm. */}
+      <Text style={styles.label}>Reprise de traitement</Text>
+      <View style={styles.chipRow}>
+        <Chip
+          label="Non"
+          selected={!store.aerien.repriseTraitement}
+          onPress={() => !readOnly && store.updateAerien({ repriseTraitement: false, traitementOrigineId: null })}
+        />
+        <Chip label="Oui" selected={!!store.aerien.repriseTraitement} onPress={() => !readOnly && store.updateAerien({ repriseTraitement: true })} />
+      </View>
+      {store.aerien.repriseTraitement && (
+        <View style={styles.chipRow}>
+          {reprenables.map((r) => (
+            <Chip
+              key={r.id}
+              label={r.numero_fiche ?? r.id.slice(0, 8)}
+              selected={store.aerien.traitementOrigineId === r.id}
+              onPress={() => !readOnly && store.updateAerien({ traitementOrigineId: r.id })}
+            />
+          ))}
+        </View>
+      )}
+      {errors.traitementOrigineId && <Text style={styles.error}>{errors.traitementOrigineId}</Text>}
     </Fragment>
   );
 }

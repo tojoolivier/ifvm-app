@@ -2941,6 +2941,13 @@ export interface components {
             immatricule_aeronef: string;
             /** Pesticide Recu L */
             pesticide_recu_l?: number | null;
+            /**
+             * Reprise Traitement
+             * @default false
+             */
+            reprise_traitement: boolean;
+            /** Traitement Origine Id */
+            traitement_origine_id?: string | null;
         };
         /** TraitementAerienRead */
         TraitementAerienRead: {
@@ -2974,6 +2981,12 @@ export interface components {
             total_pesticide_kg: number;
             /** Surface Traitee Ha */
             surface_traitee_ha: number;
+            /** Reprise Traitement */
+            reprise_traitement: boolean;
+            /** Traitement Origine Id */
+            traitement_origine_id: string | null;
+            /** Surface Cumulee Ha */
+            surface_cumulee_ha: number;
             /** Surface Restante Ha */
             surface_restante_ha: number | null;
             /** Pesticide Recu L */

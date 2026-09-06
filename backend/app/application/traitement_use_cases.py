@@ -189,6 +189,8 @@ class CreateTraitementAerien:
         lieu_stand_id: uuid.UUID | None = None,
         lieu_base_secondaire_id: uuid.UUID | None = None,
         pesticide_recu_l: float | None = None,
+        reprise_traitement: bool = False,
+        traitement_origine_id: uuid.UUID | None = None,
         numero_fiche: str | None = None,
         mode_traitement: str | None = None,
         region: str | None = None,
@@ -218,6 +220,31 @@ class CreateTraitementAerien:
         observations: str | None = None,
     ) -> Traitement:
         _valider_dates(date_traitement, date_validation)
+
+        # Chaînage de reprise (migration 0050) — mirroir exact de
+        # CreateTraitementTerrestre : une prospection partiellement traitée par
+        # une première fiche aérienne peut être reprise par une fiche suivante.
+        surface_cumulee_precedente = 0.0
+        if reprise_traitement:
+            if traitement_origine_id is None:
+                raise ValueError(
+                    "traitement_origine_id est obligatoire lorsque reprise_traitement=True"
+                )
+            origine = await self.traitement_repository.get_by_id(traitement_origine_id)
+            if origine is None or origine.aerien is None:
+                raise TraitementOrigineIntrouvableError(
+                    f"Fiche d'origine {traitement_origine_id} introuvable ou non aérienne"
+                )
+            if await self.traitement_repository.origine_deja_utilisee_aerien(traitement_origine_id):
+                raise TraitementOrigineDejaUtiliseeError(
+                    f"La fiche {traitement_origine_id} est déjà désignée comme origine "
+                    "par une autre fiche"
+                )
+            surface_cumulee_precedente = origine.aerien.surface_cumulee_ha or 0.0
+        elif traitement_origine_id is not None:
+            raise ValueError(
+                "traitement_origine_id ne peut être renseigné que si reprise_traitement=True"
+            )
 
         prospection = await self.prospection_repository.get_by_id(prospection_id)
         if prospection is None:
@@ -283,12 +310,16 @@ class CreateTraitementAerien:
             lieu_base_secondaire_id=lieu_base_secondaire_id,
             immatricule_aeronef=immatricule_aeronef,
             pesticide_recu_l=pesticide_recu_l,
+            reprise_traitement=reprise_traitement,
+            traitement_origine_id=traitement_origine_id,
         )
         # surface_traitee_ha est désormais dérivé des rotations (migration 0047) :
         # aucune à la création, recalculer_totaux() avant recalculer_surfaces()
         # (qui en dépend).
         traitement.aerien.recalculer_totaux()
-        traitement.aerien.recalculer_surfaces(traitement.cible.surface_infestee_ha)
+        traitement.aerien.recalculer_surfaces(
+            traitement.cible.surface_infestee_ha, surface_cumulee_precedente
+        )
 
         return await _persister_avec_numero_fiche_unique(
             self.traitement_repository,
@@ -600,9 +631,14 @@ class AddRotation:
             heure_fin=heure_fin,
             nom_commercial=nom_commercial,
         )
+        # Chaînage de reprise (migration 0050) : la part cumulée héritée de la
+        # fiche d'origine (0.0 si fiche indépendante) se déduit de l'invariant
+        # surface_cumulee_ha == precedente + surface_traitee_ha, valable avant
+        # que recalculer_totaux() ne change surface_traitee_ha ci-dessous.
+        surface_cumulee_precedente = aerien.surface_cumulee_ha - aerien.surface_traitee_ha
         aerien.rotations.append(rotation)
         aerien.recalculer_totaux()
-        aerien.recalculer_surfaces(_surface_infestee_ha(traitement))
+        aerien.recalculer_surfaces(_surface_infestee_ha(traitement), surface_cumulee_precedente)
 
         return await self.repository.add_rotation(
             traitement_id,
@@ -611,6 +647,7 @@ class AddRotation:
             aerien.total_pesticide_l,
             aerien.total_pesticide_kg,
             aerien.surface_traitee_ha,
+            aerien.surface_cumulee_ha,
             aerien.surface_restante_ha,
             aerien.pesticide_stock_restant_l,
         )
@@ -662,8 +699,9 @@ class UpdateRotation:
         rotation.heure_fermeture_vanne = heure_fermeture_vanne
         rotation.heure_fin = heure_fin
         rotation.nom_commercial = nom_commercial
+        surface_cumulee_precedente = aerien.surface_cumulee_ha - aerien.surface_traitee_ha
         aerien.recalculer_totaux()
-        aerien.recalculer_surfaces(_surface_infestee_ha(traitement))
+        aerien.recalculer_surfaces(_surface_infestee_ha(traitement), surface_cumulee_precedente)
 
         return await self.repository.update_rotation(
             traitement_id,
@@ -672,6 +710,7 @@ class UpdateRotation:
             aerien.total_pesticide_l,
             aerien.total_pesticide_kg,
             aerien.surface_traitee_ha,
+            aerien.surface_cumulee_ha,
             aerien.surface_restante_ha,
             aerien.pesticide_stock_restant_l,
         )
@@ -687,9 +726,10 @@ class RemoveRotation:
         aerien = traitement.aerien
         rotation = _trouver_rotation(aerien, rotation_id)
 
+        surface_cumulee_precedente = aerien.surface_cumulee_ha - aerien.surface_traitee_ha
         aerien.rotations.remove(rotation)
         aerien.recalculer_totaux()
-        aerien.recalculer_surfaces(_surface_infestee_ha(traitement))
+        aerien.recalculer_surfaces(_surface_infestee_ha(traitement), surface_cumulee_precedente)
 
         return await self.repository.remove_rotation(
             traitement_id,
@@ -698,6 +738,7 @@ class RemoveRotation:
             aerien.total_pesticide_l,
             aerien.total_pesticide_kg,
             aerien.surface_traitee_ha,
+            aerien.surface_cumulee_ha,
             aerien.surface_restante_ha,
             aerien.pesticide_stock_restant_l,
         )
@@ -834,6 +875,8 @@ class SyncPushTraitementAerien:
         lieu_stand_id: uuid.UUID | None = None,
         lieu_base_secondaire_id: uuid.UUID | None = None,
         pesticide_recu_l: float | None = None,
+        reprise_traitement: bool = False,
+        traitement_origine_id: uuid.UUID | None = None,
         numero_fiche: str | None = None,
         mode_traitement: str | None = None,
         region: str | None = None,
@@ -867,6 +910,34 @@ class SyncPushTraitementAerien:
         existant = await self.traitement_repository.get_by_id(traitement_id)
         if existant is not None and existant.statut != "brouillon":
             raise TraitementValideeSyncRejeteError(existant)
+
+        # Chaînage de reprise (migration 0050) — revalidé à chaque push (création
+        # ou mise à jour), mirroir exact de SyncPushTraitementTerrestre :
+        # `exclude_traitement_id` évite qu'une fiche déjà elle-même désignée comme
+        # utilisant cette origine ne se voie rejetée en se resynchronisant.
+        surface_cumulee_precedente = 0.0
+        if reprise_traitement:
+            if traitement_origine_id is None:
+                raise ValueError(
+                    "traitement_origine_id est obligatoire lorsque reprise_traitement=True"
+                )
+            origine = await self.traitement_repository.get_by_id(traitement_origine_id)
+            if origine is None or origine.aerien is None:
+                raise TraitementOrigineIntrouvableError(
+                    f"Fiche d'origine {traitement_origine_id} introuvable ou non aérienne"
+                )
+            if await self.traitement_repository.origine_deja_utilisee_aerien(
+                traitement_origine_id, exclude_traitement_id=traitement_id
+            ):
+                raise TraitementOrigineDejaUtiliseeError(
+                    f"La fiche {traitement_origine_id} est déjà désignée comme origine "
+                    "par une autre fiche"
+                )
+            surface_cumulee_precedente = origine.aerien.surface_cumulee_ha or 0.0
+        elif traitement_origine_id is not None:
+            raise ValueError(
+                "traitement_origine_id ne peut être renseigné que si reprise_traitement=True"
+            )
 
         prospection = await self.prospection_repository.get_by_id(prospection_id)
         if prospection is None:
@@ -932,6 +1003,8 @@ class SyncPushTraitementAerien:
             lieu_base_secondaire_id=lieu_base_secondaire_id,
             immatricule_aeronef=immatricule_aeronef,
             pesticide_recu_l=pesticide_recu_l,
+            reprise_traitement=reprise_traitement,
+            traitement_origine_id=traitement_origine_id,
         )
 
         if existant is None:
@@ -940,7 +1013,9 @@ class SyncPushTraitementAerien:
             # (migration 0047, dérivée des rotations). recalculer_totaux() avant
             # recalculer_surfaces() (qui en dépend).
             candidat.aerien.recalculer_totaux()
-            candidat.aerien.recalculer_surfaces(candidat.cible.surface_infestee_ha)
+            candidat.aerien.recalculer_surfaces(
+                candidat.cible.surface_infestee_ha, surface_cumulee_precedente
+            )
             candidat.statut_sync = "synced"
             cree = await _persister_avec_numero_fiche_unique(
                 self.traitement_repository,
@@ -965,7 +1040,9 @@ class SyncPushTraitementAerien:
         candidat.aerien.total_pesticide_l = existant.aerien.total_pesticide_l
         candidat.aerien.total_pesticide_kg = existant.aerien.total_pesticide_kg
         candidat.aerien.surface_traitee_ha = existant.aerien.surface_traitee_ha
-        candidat.aerien.recalculer_surfaces(candidat.cible.surface_infestee_ha)
+        candidat.aerien.recalculer_surfaces(
+            candidat.cible.surface_infestee_ha, surface_cumulee_precedente
+        )
         candidat.aerien.recalculer_stock_pesticide()
 
         candidat.created_at = existant.created_at

@@ -93,6 +93,11 @@ export interface TraitementAerien {
   total_pesticide_l: number | null;
   total_pesticide_kg: number | null;
   surface_traitee_ha: number | null;
+  // Chaînage de reprise (migration backend 0050) — mirroir de TraitementTerrestre,
+  // généralisé à l'Aérien.
+  reprise_traitement: boolean | null;
+  traitement_origine_id: string | null;
+  surface_cumulee_ha: number | null;
   surface_restante_ha: number | null;
   pesticide_recu_l: number | null;
   pesticide_stock_restant_l: number | null;
@@ -200,6 +205,10 @@ export interface DraftTraitementAerienInput {
   mecanicien: string;
   chefDeBaseId: string;
   consultantInternational?: string | null;
+  // Chaînage de reprise (migration backend 0050) — mirroir de
+  // DraftTraitementTerrestreInput, généralisé à l'Aérien.
+  repriseTraitement?: boolean;
+  traitementOrigineId?: string | null;
 }
 
 export interface DraftTraitementTerrestreInput {
@@ -276,14 +285,17 @@ export async function createDraftTraitementAerien(
 
   await db.runAsync(
     `INSERT INTO traitement_aerien (
-      traitement_id, pilote, mecanicien, chef_de_base_id, consultant_international
-    ) VALUES (?, ?, ?, ?, ?)`,
+      traitement_id, pilote, mecanicien, chef_de_base_id, consultant_international,
+      reprise_traitement, traitement_origine_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
       input.id,
       input.pilote,
       input.mecanicien,
       input.chefDeBaseId,
       input.consultantInternational ?? null,
+      input.repriseTraitement ?? null,
+      input.traitementOrigineId ?? null,
     ]
   );
 
@@ -429,6 +441,14 @@ export interface AerienUpdateInput {
   lieuBasePrincipaleId?: string | null;
   lieuStandId?: string | null;
   lieuBaseSecondaireId?: string | null;
+  // surfaceTraiteeHa n'y figure plus (migration 0046) : dérivée des rotations,
+  // même traitement que nb_rotations/total_pesticide_l — jamais mise à jour par cette
+  // fonction, seulement par la synchronisation.
+  pesticideRecuL?: number | null;
+  // Chaînage de reprise (migration backend 0050) — mirroir de TerrestreUpdateInput,
+  // généralisé à l'Aérien.
+  repriseTraitement?: boolean | null;
+  traitementOrigineId?: string | null;
 }
 
 export async function updateTraitementAerien(
@@ -446,7 +466,10 @@ export async function updateTraitementAerien(
       immatricule_aeronef = ?,
       lieu_base_principale_id = ?,
       lieu_stand_id = ?,
-      lieu_base_secondaire_id = ?
+      lieu_base_secondaire_id = ?,
+      pesticide_recu_l = ?,
+      reprise_traitement = ?,
+      traitement_origine_id = ?
      WHERE traitement_id = ?`,
     [
       input.pilote,
@@ -457,6 +480,9 @@ export async function updateTraitementAerien(
       input.lieuBasePrincipaleId ?? null,
       input.lieuStandId ?? null,
       input.lieuBaseSecondaireId ?? null,
+      input.pesticideRecuL ?? null,
+      input.repriseTraitement ?? null,
+      input.traitementOrigineId ?? null,
       traitementId,
     ]
   );
@@ -1046,6 +1072,11 @@ export async function listMesTraitements(
  * cross-session, surface restante tenue à jour), il pourra remplacer cette
  * requête passthrough sans changer la signature.
  */
+/**
+ * Migration backend 0050 : le chaînage de reprise, jusqu'ici Terrestre uniquement,
+ * est généralisé à l'Aérien — chaque type a sa propre chaîne (indépendante l'une de
+ * l'autre), d'où deux blocs symétriques réunis par UNION plutôt qu'un JOIN unique.
+ */
 export async function listReprenableTraitements(): Promise<DraftTraitementRow[]> {
   const db = await getDb();
 
@@ -1058,7 +1089,16 @@ export async function listReprenableTraitements(): Promise<DraftTraitementRow[]>
        AND traitement.id NOT IN (
          SELECT traitement_origine_id FROM traitement_terrestre WHERE traitement_origine_id IS NOT NULL
        )
-     ORDER BY traitement.updated_at DESC`
+     UNION
+     SELECT traitement.*
+     FROM traitement
+     JOIN traitement_aerien ON traitement_aerien.traitement_id = traitement.id
+     WHERE traitement.statut = 'validee'
+       AND (traitement_aerien.surface_restante_ha IS NULL OR traitement_aerien.surface_restante_ha > 0)
+       AND traitement.id NOT IN (
+         SELECT traitement_origine_id FROM traitement_aerien WHERE traitement_origine_id IS NOT NULL
+       )
+     ORDER BY updated_at DESC`
   );
 }
 

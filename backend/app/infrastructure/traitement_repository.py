@@ -1,7 +1,7 @@
 import uuid
 from datetime import date
 
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -69,23 +69,49 @@ class TraitementRepositoryImpl(TraitementRepository):
         if prospection_id is not None:
             stmt = stmt.where(TraitementModel.prospection_id == prospection_id)
         if chef_equipe_id is not None or reprenable:
-            stmt = stmt.join(
+            # outerjoin (pas join) dès `reprenable` : une fiche AERIEN n'a pas de
+            # ligne traitement_terrestre — un join simple l'exclurait avant même
+            # d'atteindre le OR type-aware ci-dessous.
+            join_terrestre = stmt.outerjoin if reprenable else stmt.join
+            stmt = join_terrestre(
                 TraitementTerrestreModel,
                 TraitementTerrestreModel.traitement_id == TraitementModel.id,
             )
         if chef_equipe_id is not None:
             stmt = stmt.where(TraitementTerrestreModel.chef_equipe_id == chef_equipe_id)
         if reprenable:
-            origines_utilisees = select(TraitementTerrestreModel.traitement_origine_id).where(
-                TraitementTerrestreModel.traitement_origine_id.is_not(None)
+            # Migration 0050 : le chaînage de reprise, jusqu'ici Terrestre
+            # uniquement, est généralisé à l'Aérien — chaque type a sa propre
+            # chaîne (traitement_origine_id sur sa propre table), jamais mélangées.
+            stmt = stmt.outerjoin(
+                TraitementAerienModel,
+                TraitementAerienModel.traitement_id == TraitementModel.id,
+            )
+            origines_utilisees_terrestre = select(
+                TraitementTerrestreModel.traitement_origine_id
+            ).where(TraitementTerrestreModel.traitement_origine_id.is_not(None))
+            origines_utilisees_aerien = select(TraitementAerienModel.traitement_origine_id).where(
+                TraitementAerienModel.traitement_origine_id.is_not(None)
             )
             stmt = stmt.where(
-                TraitementModel.type_traitement == "TERRESTRE",
                 or_(
-                    TraitementTerrestreModel.surface_restante_ha.is_(None),
-                    TraitementTerrestreModel.surface_restante_ha > 0,
-                ),
-                TraitementModel.id.not_in(origines_utilisees),
+                    and_(
+                        TraitementModel.type_traitement == "TERRESTRE",
+                        or_(
+                            TraitementTerrestreModel.surface_restante_ha.is_(None),
+                            TraitementTerrestreModel.surface_restante_ha > 0,
+                        ),
+                        TraitementModel.id.not_in(origines_utilisees_terrestre),
+                    ),
+                    and_(
+                        TraitementModel.type_traitement == "AERIEN",
+                        or_(
+                            TraitementAerienModel.surface_restante_ha.is_(None),
+                            TraitementAerienModel.surface_restante_ha > 0,
+                        ),
+                        TraitementModel.id.not_in(origines_utilisees_aerien),
+                    ),
+                )
             )
         stmt = stmt.order_by(TraitementModel.date_traitement.desc())
         result = await self.session.execute(stmt)
@@ -99,6 +125,19 @@ class TraitementRepositoryImpl(TraitementRepository):
         )
         if exclude_traitement_id is not None:
             stmt = stmt.where(TraitementTerrestreModel.traitement_id != exclude_traitement_id)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none() is not None
+
+    async def origine_deja_utilisee_aerien(
+        self, traitement_origine_id: uuid.UUID, exclude_traitement_id: uuid.UUID | None = None
+    ) -> bool:
+        """Mirroir de `origine_deja_utilisee` (migration 0050), pour le chaînage de
+        reprise généralisé à l'Aérien."""
+        stmt = select(TraitementAerienModel.traitement_id).where(
+            TraitementAerienModel.traitement_origine_id == traitement_origine_id
+        )
+        if exclude_traitement_id is not None:
+            stmt = stmt.where(TraitementAerienModel.traitement_id != exclude_traitement_id)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none() is not None
 
@@ -167,6 +206,9 @@ class TraitementRepositoryImpl(TraitementRepository):
                 total_pesticide_l=traitement.aerien.total_pesticide_l,
                 total_pesticide_kg=traitement.aerien.total_pesticide_kg,
                 surface_traitee_ha=traitement.aerien.surface_traitee_ha,
+                reprise_traitement=traitement.aerien.reprise_traitement,
+                traitement_origine_id=traitement.aerien.traitement_origine_id,
+                surface_cumulee_ha=traitement.aerien.surface_cumulee_ha,
                 surface_restante_ha=traitement.aerien.surface_restante_ha,
                 pesticide_recu_l=traitement.aerien.pesticide_recu_l,
                 pesticide_stock_restant_l=traitement.aerien.pesticide_stock_restant_l,
@@ -220,6 +262,11 @@ class TraitementRepositoryImpl(TraitementRepository):
                     f"La fiche {traitement.terrestre.traitement_origine_id} est déjà "
                     "désignée comme origine par une autre fiche"
                 ) from e
+            if constraint_name == "uq_traitement_aerien_origine_id":
+                raise TraitementOrigineDejaUtiliseeError(
+                    f"La fiche {traitement.aerien.traitement_origine_id} est déjà "
+                    "désignée comme origine par une autre fiche"
+                ) from e
             raise
         return await self.get_by_id(model.id)
 
@@ -231,6 +278,7 @@ class TraitementRepositoryImpl(TraitementRepository):
         total_pesticide_l: float,
         total_pesticide_kg: float,
         surface_traitee_ha: float,
+        surface_cumulee_ha: float,
         surface_restante_ha: float | None,
         pesticide_stock_restant_l: float | None,
     ) -> Traitement:
@@ -261,6 +309,7 @@ class TraitementRepositoryImpl(TraitementRepository):
             total_pesticide_l,
             total_pesticide_kg,
             surface_traitee_ha,
+            surface_cumulee_ha,
             surface_restante_ha,
             pesticide_stock_restant_l,
         )
@@ -274,6 +323,7 @@ class TraitementRepositoryImpl(TraitementRepository):
         total_pesticide_l: float,
         total_pesticide_kg: float,
         surface_traitee_ha: float,
+        surface_cumulee_ha: float,
         surface_restante_ha: float | None,
         pesticide_stock_restant_l: float | None,
     ) -> Traitement:
@@ -299,6 +349,7 @@ class TraitementRepositoryImpl(TraitementRepository):
             total_pesticide_l,
             total_pesticide_kg,
             surface_traitee_ha,
+            surface_cumulee_ha,
             surface_restante_ha,
             pesticide_stock_restant_l,
         )
@@ -312,6 +363,7 @@ class TraitementRepositoryImpl(TraitementRepository):
         total_pesticide_l: float,
         total_pesticide_kg: float,
         surface_traitee_ha: float,
+        surface_cumulee_ha: float,
         surface_restante_ha: float | None,
         pesticide_stock_restant_l: float | None,
     ) -> Traitement:
@@ -324,6 +376,7 @@ class TraitementRepositoryImpl(TraitementRepository):
             total_pesticide_l,
             total_pesticide_kg,
             surface_traitee_ha,
+            surface_cumulee_ha,
             surface_restante_ha,
             pesticide_stock_restant_l,
         )
@@ -492,6 +545,11 @@ class TraitementRepositoryImpl(TraitementRepository):
                     f"La fiche {traitement.terrestre.traitement_origine_id} est déjà "
                     "désignée comme origine par une autre fiche"
                 ) from e
+            if constraint_name == "uq_traitement_aerien_origine_id":
+                raise TraitementOrigineDejaUtiliseeError(
+                    f"La fiche {traitement.aerien.traitement_origine_id} est déjà "
+                    "désignée comme origine par une autre fiche"
+                ) from e
             raise
         return await self.get_by_id(traitement.id)
 
@@ -520,6 +578,7 @@ class TraitementRepositoryImpl(TraitementRepository):
         total_pesticide_l: float,
         total_pesticide_kg: float,
         surface_traitee_ha: float,
+        surface_cumulee_ha: float,
         surface_restante_ha: float | None,
         pesticide_stock_restant_l: float | None,
     ) -> None:
@@ -528,6 +587,10 @@ class TraitementRepositoryImpl(TraitementRepository):
         aerien_model.total_pesticide_l = total_pesticide_l
         aerien_model.total_pesticide_kg = total_pesticide_kg
         aerien_model.surface_traitee_ha = surface_traitee_ha
+        # Chaînage de reprise (migration 0050) : surface_cumulee_ha suit le même
+        # sort que surface_traitee_ha dont elle dérive — seul chemin d'écriture,
+        # recalculée à chaque mutation de rotation.
+        aerien_model.surface_cumulee_ha = surface_cumulee_ha
         aerien_model.surface_restante_ha = surface_restante_ha
         aerien_model.pesticide_stock_restant_l = pesticide_stock_restant_l
         await self.session.commit()
@@ -603,6 +666,9 @@ class TraitementRepositoryImpl(TraitementRepository):
                 total_pesticide_l=float(model.aerien.total_pesticide_l),
                 total_pesticide_kg=float(model.aerien.total_pesticide_kg),
                 surface_traitee_ha=float(model.aerien.surface_traitee_ha),
+                reprise_traitement=model.aerien.reprise_traitement,
+                traitement_origine_id=model.aerien.traitement_origine_id,
+                surface_cumulee_ha=float(model.aerien.surface_cumulee_ha),
                 surface_restante_ha=float(model.aerien.surface_restante_ha)
                 if model.aerien.surface_restante_ha is not None
                 else None,

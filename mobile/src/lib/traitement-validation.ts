@@ -382,6 +382,26 @@ export function validateTerrestreConditions(input: TerrestreConditionsInput): Va
   return errors;
 }
 
+/**
+ * Migration backend 0050 : chaînage de reprise généralisé à l'Aérien — même règle
+ * que `validateTerrestreConditions` (reprise=true impose une fiche d'origine),
+ * extraite pour être partagée par les deux types plutôt que dupliquée.
+ */
+export function validateRepriseTraitement(
+  repriseTraitement: boolean | null | undefined,
+  traitementOrigineId: string | null | undefined
+): ValidationError[] {
+  if (repriseTraitement && !traitementOrigineId) {
+    return [
+      {
+        field: 'traitementOrigineId',
+        message: 'La fiche précédente immédiate est obligatoire en cas de reprise',
+      },
+    ];
+  }
+  return [];
+}
+
 // ==========================================
 // VÉGÉTATION (écran D)
 // ==========================================

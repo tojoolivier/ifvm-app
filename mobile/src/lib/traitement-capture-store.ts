@@ -94,6 +94,10 @@ export interface AerienDraft {
   // (traitement-validation.ts) — jamais une saisie stockée dans le draft.
   // Saisi sur l'écran « Traitement » (rotations.tsx), pas « Équipe » — #equipe-slide-aerien.
   pesticideRecuL?: number | null;
+  // Chaînage de reprise (migration backend 0050) — mirroir de TerrestreDraft,
+  // généralisé à l'Aérien.
+  repriseTraitement?: boolean;
+  traitementOrigineId?: string | null;
   rotations: RotationDraft[];
 }
 

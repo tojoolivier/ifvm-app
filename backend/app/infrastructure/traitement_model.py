@@ -73,7 +73,15 @@ class TraitementModel(Base):
         back_populates="traitement", cascade="all, delete-orphan", uselist=False
     )
     aerien: Mapped["TraitementAerienModel | None"] = relationship(
-        back_populates="traitement", cascade="all, delete-orphan", uselist=False
+        back_populates="traitement",
+        cascade="all, delete-orphan",
+        uselist=False,
+        # Nécessaire depuis la migration 0050 : traitement_aerien porte désormais
+        # deux FK vers traitement.id (traitement_id, sa PK, et
+        # traitement_origine_id) — sans ceci SQLAlchemy ne peut plus déterminer
+        # laquelle porte cette relation (AmbiguousForeignKeysError), même
+        # ambiguïté déjà résolue côté Terrestre ci-dessous.
+        foreign_keys="TraitementAerienModel.traitement_id",
     )
     terrestre: Mapped["TraitementTerrestreModel | None"] = relationship(
         back_populates="traitement",
@@ -166,10 +174,40 @@ class TraitementAerienModel(Base):
     surface_restante_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     pesticide_recu_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     pesticide_stock_restant_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    # Chaînage de reprise (migration 0050) — mirroir de TraitementTerrestreModel,
+    # généralisé à l'Aérien : une prospection partiellement traitée par une
+    # première fiche aérienne peut être reprise par une fiche suivante plutôt
+    # que de bloquer ou de perdre le suivi du cumul déjà traité.
+    reprise_traitement: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=False)
+    traitement_origine_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("traitement.id"), nullable=True
+    )
+    # NOT NULL défaut 0, contrairement à son équivalent Terrestre (nullable) —
+    # même choix que les autres champs dérivés de traitement_aerien depuis la
+    # migration 0047 : single-writer, jamais NULL.
+    surface_cumulee_ha: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
 
-    traitement: Mapped[TraitementModel] = relationship(back_populates="aerien")
+    traitement: Mapped[TraitementModel] = relationship(
+        back_populates="aerien", foreign_keys=[traitement_id]
+    )
     rotations: Mapped[list["RotationModel"]] = relationship(
         back_populates="aerien", cascade="all, delete-orphan", order_by="RotationModel.numero"
+    )
+
+    __table_args__ = (
+        # ck_traitement_aerien_roles_distincts supprimée (migration 0048_..._texte_libre) :
+        # comparait trois FK UUID, impossible à exprimer en SQL une fois pilote/mécanicien
+        # en texte libre — validée côté application (valider_roles_aerien_distincts).
+        CheckConstraint(
+            "NOT reprise_traitement OR traitement_origine_id IS NOT NULL",
+            name="ck_traitement_aerien_reprise",
+        ),
+        Index(
+            "uq_traitement_aerien_origine_id",
+            "traitement_origine_id",
+            unique=True,
+            postgresql_where=text("traitement_origine_id IS NOT NULL"),
+        ),
     )
 
 

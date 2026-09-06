@@ -451,12 +451,23 @@ def test_recalculer_surfaces_aerien_infestee_none_restante_none():
     assert aerien.surface_restante_ha is None
 
 
-def test_recalculer_surfaces_aerien_pas_de_chainage_contrairement_a_terrestre():
-    """Pas de traitement_origine_id côté Aérien : recalculer_surfaces ne prend
-    qu'un seul paramètre (pas de surface_cumulee_precedente)."""
+def test_recalculer_surfaces_aerien_sans_cumul_precedent_par_defaut():
+    """Migration 0050 : surface_cumulee_precedente est optionnel (0.0 par défaut,
+    fiche indépendante) — surface_cumulee_ha vaut alors simplement surface_traitee_ha."""
     aerien = TraitementAerien(surface_traitee_ha=10.0)
     aerien.recalculer_surfaces(100.0)
+    assert aerien.surface_cumulee_ha == 10.0
     assert aerien.surface_restante_ha == 90.0
+
+
+def test_recalculer_surfaces_aerien_avec_cumul_precedent():
+    """Migration 0050 : chaînage de reprise généralisé à l'Aérien, mirroir de
+    test_recalculer_surfaces_avec_cumul_precedent (Terrestre)."""
+    aerien = TraitementAerien(surface_traitee_ha=10.0)
+    aerien.recalculer_surfaces(surface_infestee_ha=100.0, surface_cumulee_precedente=30.0)
+    assert aerien.surface_traitee_ha == 10.0
+    assert aerien.surface_cumulee_ha == 40.0
+    assert aerien.surface_restante_ha == 60.0
 
 
 def test_recalculer_totaux_aerien_alimente_le_stock_pesticide():
@@ -509,6 +520,7 @@ class FakeTraitementRepoRotations:
         total_pesticide_l,
         total_pesticide_kg,
         surface_traitee_ha,
+        surface_cumulee_ha,
         surface_restante_ha,
         pesticide_stock_restant_l,
     ):
@@ -516,6 +528,7 @@ class FakeTraitementRepoRotations:
         self.traitement.aerien.total_pesticide_l = total_pesticide_l
         self.traitement.aerien.total_pesticide_kg = total_pesticide_kg
         self.traitement.aerien.surface_traitee_ha = surface_traitee_ha
+        self.traitement.aerien.surface_cumulee_ha = surface_cumulee_ha
         self.traitement.aerien.surface_restante_ha = surface_restante_ha
         self.traitement.aerien.pesticide_stock_restant_l = pesticide_stock_restant_l
         return self.traitement
@@ -528,6 +541,7 @@ class FakeTraitementRepoRotations:
         total_pesticide_l,
         total_pesticide_kg,
         surface_traitee_ha,
+        surface_cumulee_ha,
         surface_restante_ha,
         pesticide_stock_restant_l,
     ):
@@ -535,6 +549,7 @@ class FakeTraitementRepoRotations:
         self.traitement.aerien.total_pesticide_l = total_pesticide_l
         self.traitement.aerien.total_pesticide_kg = total_pesticide_kg
         self.traitement.aerien.surface_traitee_ha = surface_traitee_ha
+        self.traitement.aerien.surface_cumulee_ha = surface_cumulee_ha
         self.traitement.aerien.surface_restante_ha = surface_restante_ha
         self.traitement.aerien.pesticide_stock_restant_l = pesticide_stock_restant_l
         return self.traitement
@@ -547,6 +562,7 @@ class FakeTraitementRepoRotations:
         total_pesticide_l,
         total_pesticide_kg,
         surface_traitee_ha,
+        surface_cumulee_ha,
         surface_restante_ha,
         pesticide_stock_restant_l,
     ):
@@ -554,6 +570,7 @@ class FakeTraitementRepoRotations:
         self.traitement.aerien.total_pesticide_l = total_pesticide_l
         self.traitement.aerien.total_pesticide_kg = total_pesticide_kg
         self.traitement.aerien.surface_traitee_ha = surface_traitee_ha
+        self.traitement.aerien.surface_cumulee_ha = surface_cumulee_ha
         self.traitement.aerien.surface_restante_ha = surface_restante_ha
         self.traitement.aerien.pesticide_stock_restant_l = pesticide_stock_restant_l
         return self.traitement
