@@ -95,7 +95,9 @@ describe('Auth guard logic', () => {
   });
 
   it('should become authenticated after successful init', async () => {
-    mockStorage.getItem.mockResolvedValueOnce(TEST_TOKEN);
+    mockStorage.getItem
+      .mockResolvedValueOnce(TEST_TOKEN) // auth_token
+      .mockResolvedValueOnce(null); // auth_user
     mockApiClient.getProfile.mockResolvedValueOnce(TEST_USER);
 
     await useAuthStore.getState().init();

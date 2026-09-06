@@ -1,13 +1,53 @@
 import { create } from 'zustand';
 import { apiClient, User } from './api-client';
 import { storage } from './storage';
-import { LocalReadError } from './errors';
+import { AuthError, LocalReadError } from './errors';
 import { logger } from './logger';
 
 const log = logger.child({ module: 'auth-store' });
 
 const tokenKey = 'auth_token';
 const refreshTokenKey = 'refresh_token';
+// Dernier profil connu, mis en cache pour qu'un démarrage hors ligne affiche
+// autre chose que `null` (#offline-apres-premiere-connexion) — ex. l'auto-
+// remplissage "chef de base = utilisateur connecté" sur l'écran Équipe.
+const userKey = 'auth_user';
+
+function lireUserCache(): Promise<User | null> {
+  return storage.getItem(userKey).then((raw) => {
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as User;
+    } catch (error) {
+      // Silence délibéré : un cache de profil corrompu n'est qu'un confort
+      // d'affichage perdu, jamais une raison de bloquer la restauration de
+      // session — `getProfile()` le regénérera dès que le réseau reviendra.
+      log.ignore(error, 'Cache de profil illisible — ignoré, sans conséquence sur la session.');
+      return null;
+    }
+  });
+}
+
+function ecrireUserCache(user: User): Promise<void> {
+  return storage.setItem(userKey, JSON.stringify(user));
+}
+
+/**
+ * Efface les trois clés de session locales. N'est appelée que pour une vraie
+ * raison de déconnexion (jeton corrompu, ou rejeté explicitement par le
+ * serveur) — jamais pour une simple panne réseau. Échec d'effacement toléré :
+ * l'état mémoire est déjà à jour, et le disque ne change rien à ce que
+ * l'agent peut faire dans l'immédiat.
+ */
+async function deconnecterLocalement(): Promise<void> {
+  for (const key of [tokenKey, refreshTokenKey, userKey]) {
+    try {
+      await storage.deleteItem(key);
+    } catch (error) {
+      log.ignore(error, `Effacement de ${key} impossible — sans conséquence pour l’agent.`);
+    }
+  }
+}
 
 const B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 const B64_LOOKUP: Record<number, number> = {};
@@ -71,39 +111,69 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
   isInitialized: false,
 
   init: async () => {
+    let token: string | null;
     try {
-      const token = await storage.getItem(tokenKey);
-      if (token) {
-        const payload = decodeJwtPayload(token);
-        const userId = payload.sub ?? payload.user_id;
-        if (typeof userId === 'string' || typeof userId === 'number') {
-          const user = await apiClient.getProfile(token);
-          set({ token, user, isAuthenticated: true, isInitialized: true });
-          return;
-        }
-      }
-      set({ isInitialized: true });
+      token = await storage.getItem(tokenKey);
     } catch (error) {
-      // `failure` et non `throw` : `init()` est appelée derrière `runTask` au
-      // démarrage, et un jeton illisible n'a qu'une conséquence — l'agent se
-      // reconnecte. Ce qui manquait, c'est la trace : le compte se
-      // déconnectait tout seul sans que rien ne dise pourquoi.
+      // Magasin illisible : aucun jeton exploitable, quelle qu'en soit la
+      // raison. Pas de nettoyage à tenter ici (on ne sait même pas lire).
       log.failure('auth.init.failed', error);
-
-      try {
-        await storage.deleteItem(tokenKey);
-      } catch (erreurNettoyage) {
-        // Silence délibéré, l'un des quatre du mobile : le jeton est déjà
-        // écarté en mémoire, et échouer à l'effacer du disque ne change rien à
-        // ce que l'agent peut faire. La raison va dans le journal plutôt que
-        // dans ce commentaire, pour que le support la voie.
-        log.ignore(
-          erreurNettoyage,
-          'Jeton déjà écarté en mémoire — son effacement disque ne change rien pour l’agent.'
-        );
-      }
-
       set({ isInitialized: true });
+      return;
+    }
+
+    if (!token) {
+      set({ isInitialized: true });
+      return;
+    }
+
+    let userId: unknown;
+    try {
+      const payload = decodeJwtPayload(token);
+      userId = payload.sub ?? payload.user_id;
+    } catch (error) {
+      // Jeton stocké corrompu (pas décodable) : une vraie raison de
+      // déconnexion, indépendante du réseau.
+      log.failure('auth.init.failed', error);
+      await deconnecterLocalement();
+      set({ isInitialized: true });
+      return;
+    }
+
+    if (typeof userId !== 'string' && typeof userId !== 'number') {
+      // Jeton structurellement invalide (pas de sujet) : même raisonnement.
+      await deconnecterLocalement();
+      set({ isInitialized: true });
+      return;
+    }
+
+    // Le jeton stocké est structurellement valide : la session est restaurée
+    // immédiatement, SANS attendre le réseau (#offline-apres-premiere-connexion)
+    // — un appareil qui rouvre l'app hors couverture ne doit jamais se
+    // retrouver éjecté vers l'écran de connexion. Le profil affiché est
+    // d'abord le dernier connu en cache local, en attendant mieux.
+    const userEnCache = await lireUserCache();
+    set({ token, user: userEnCache, isAuthenticated: true, isInitialized: true });
+
+    try {
+      const user = await apiClient.getProfile(token);
+      set({ user });
+      await ecrireUserCache(user);
+    } catch (error) {
+      if (error instanceof AuthError) {
+        // Ici, et seulement ici, le serveur a explicitement rejeté ce jeton
+        // (expiré/révoqué, rafraîchissement lui-même refusé) : la déconnexion
+        // est justifiée — ce n'est plus une panne réseau.
+        log.failure('auth.init.failed', error);
+        await deconnecterLocalement();
+        set({ token: null, user: null, isAuthenticated: false });
+      } else {
+        // `NetworkError` (hors ligne) ou toute autre panne transitoire :
+        // la session reste ouverte avec le profil en cache. `getProfile`
+        // sera retenté à la prochaine ouverture, ou via la resynchro
+        // automatique du référentiel dès que le réseau revient.
+        log.ignore(error, 'Profil indisponible au démarrage (hors ligne ?) — session conservée.');
+      }
     }
   },
 
@@ -117,6 +187,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
       let user = null;
       try {
         user = await apiClient.getProfile(token);
+        await ecrireUserCache(user);
       } catch (erreurProfil) {
         // Silence délibéré : la session est ouverte et le jeton posé. Le
         // profil n'est qu'un confort d'affichage, et il sera relu au prochain
@@ -140,8 +211,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
   },
 
   logout: async () => {
-    await storage.deleteItem(tokenKey);
-    await storage.deleteItem(refreshTokenKey);
+    await deconnecterLocalement();
     set({ token: null, user: null, isAuthenticated: false });
   },
 
