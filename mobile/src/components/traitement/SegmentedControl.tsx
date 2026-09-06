@@ -48,6 +48,13 @@ const styles = StyleSheet.create({
     fontFamily: traitementFonts.uiSemiBold,
     fontSize: traitementTypeSizes.corps,
     color: traitementColors.texteSecondaire,
+    // Un libellé plus long ("Couvertures totales") passe sur deux lignes dans
+    // un segment `flex: 1` partagé à trois — sans `textAlign`, ces lignes
+    // restent calées à gauche de leur bloc de texte pendant que "Barrières"/
+    // "Irrégulier", tenant sur une seule ligne, semblaient déjà centrés (leur
+    // bloc épouse le texte). Centrage explicite, valable quelle que soit la
+    // longueur du libellé.
+    textAlign: 'center',
   },
   labelSelected: { color: '#fff' },
 });

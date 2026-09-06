@@ -85,7 +85,7 @@ export default function CiblesScreen() {
           <Text style={styles.value}>{display(cible?.repartition_population)}</Text>
         </View>
 
-        <Card variant="derivee">
+        <Card variant="derivee" style={styles.deriveeCentree}>
           <Text style={styles.label}>Surface infestée (ha)</Text>
           <Text style={styles.derivedValue}>{display(cible?.surface_infestee_ha)}</Text>
         </Card>
@@ -108,10 +108,39 @@ const styles = StyleSheet.create({
   content: { padding: 16, gap: 12 },
   title: { fontFamily: traitementFonts.uiExtraBold, fontSize: traitementTypeSizes.titreEcran, color: traitementColors.texteTitre },
   warningText: { fontFamily: traitementFonts.uiMedium, fontSize: traitementTypeSizes.corps, color: traitementColors.avertissementTexte },
-  field: { gap: 3 },
-  label: { fontFamily: traitementFonts.uiMedium, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
-  value: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre },
-  derivedValue: { fontFamily: traitementFonts.monoBold, fontSize: traitementTypeSizes.valeurDerivee, color: traitementColors.vertPrincipal },
+  // `alignItems: 'center'` centre le bloc de chaque Text (titre puis valeur)
+  // dans la largeur de l'écran, quelle que soit sa longueur ; combiné au
+  // `textAlign: 'center'` ci-dessous, une valeur qui retourne à la ligne
+  // reste centrée ligne par ligne, pas seulement en bloc.
+  field: { gap: 4, alignItems: 'center' },
+  // Légèrement agrandi par rapport au reste de l'app (traitementTypeSizes.label,
+  // 9) — amélioration de lisibilité ciblée à cet écran seulement, sans toucher
+  // au token partagé ni aux autres slides qui l'utilisent.
+  label: {
+    fontFamily: traitementFonts.uiSemiBold,
+    fontSize: traitementTypeSizes.corps + 1,
+    color: traitementColors.texteLabel,
+    textAlign: 'center',
+  },
+  // Valeur plus visible que le titre (hiérarchie titre → valeur), mais toujours
+  // nettement en retrait de `derivedValue` (Surface infestée, seule valeur
+  // "vedette" de cet écran) pour ne pas aplatir cette hiérarchie-là.
+  value: {
+    fontFamily: traitementFonts.uiBold,
+    fontSize: traitementTypeSizes.corps + 3,
+    color: traitementColors.texteTitre,
+    textAlign: 'center',
+  },
+  derivedValue: {
+    fontFamily: traitementFonts.monoBold,
+    fontSize: traitementTypeSizes.valeurDerivee,
+    color: traitementColors.vertPrincipal,
+    textAlign: 'center',
+  },
+  // Override local, propre à cet écran : centre le contenu de cette carte
+  // "derivee" précise sans toucher au composant `Card` partagé (utilisé tel
+  // quel, non centré, par d'autres écrans de la fiche de traitement).
+  deriveeCentree: { alignItems: 'center' },
   continueButton: {
     minHeight: 44,
     justifyContent: 'center',
