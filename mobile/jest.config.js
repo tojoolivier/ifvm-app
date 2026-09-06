@@ -33,6 +33,7 @@ module.exports = {
       testMatch: ['**/*.test.tsx'],
       moduleNameMapper,
       setupFiles: ['<rootDir>/jest.setup.js'],
+      setupFilesAfterEnv: ['<rootDir>/jest.setup.after-env.js'],
     },
   ],
 };
