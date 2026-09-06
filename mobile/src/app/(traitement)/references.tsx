@@ -266,7 +266,12 @@ export default function ReferencesScreen() {
           numeroFiche,
         });
 
-        router.push({ pathname: '/(traitement)/cibles' as any, params: { traitementId: id, isValidationView, origineId } });
+        // Aérien : « Cibles » devient « Synthèse » et s'enrichit de la végétation
+        // (#326) — le terrestre garde son flux actuel, inchangé.
+        router.push({
+          pathname: (typeTraitement === 'AERIEN' ? '/(traitement)/synthese' : '/(traitement)/cibles') as any,
+          params: { traitementId: id, isValidationView, origineId },
+        });
       },
       { screen: 'references', context: { traitementId, prospectionId } }
     );
@@ -415,7 +420,9 @@ export default function ReferencesScreen() {
 
           {!readOnly && (
             <TouchableOpacity style={styles.continueButton} onPress={handleContinuer} disabled={isSaving}>
-              <Text style={styles.continueButtonText}>{isSaving ? 'Enregistrement…' : 'Continuer — Cibles ›'}</Text>
+              <Text style={styles.continueButtonText}>
+                {isSaving ? 'Enregistrement…' : `Continuer — ${typeTraitement === 'AERIEN' ? 'Synthèse' : 'Cibles'} ›`}
+              </Text>
             </TouchableOpacity>
           )}
         </ScrollView>

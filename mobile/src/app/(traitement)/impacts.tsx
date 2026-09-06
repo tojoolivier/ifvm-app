@@ -95,7 +95,12 @@ export default function ImpactsScreen() {
           mortalite_familles: store.imp.mortaliteFamilles ?? [],
           observations: store.observations,
         });
-        router.push({ pathname: '/(traitement)/signatures' as any, params: { traitementId, isValidationView } });
+        // Aérien : nouvelle étape « Surface traitée » s'insère avant Signatures
+        // (#326) — le terrestre garde son flux actuel, inchangé.
+        router.push({
+          pathname: (typeTraitement === 'AERIEN' ? '/(traitement)/surface-traitee' : '/(traitement)/signatures') as any,
+          params: { traitementId, isValidationView },
+        });
       },
       {
         screen: 'impacts',

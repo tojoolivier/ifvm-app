@@ -30,11 +30,13 @@ import { useErrorLogStore } from '@/lib/error-log-store';
 import { toFriendlyError } from '@/lib/friendly-error';
 import { EtatVide } from '@/components/erreurs/etat-vide';
 
-// Aérien : 7 étapes (Équipe/Traitement scindés, #equipe-slide-aerien) ; terrestre : 6
-// (équipe et pesticides restés sur un seul écran) — reflète PROGRESS_SEGMENTS_AERIEN/
-// PROGRESS_SEGMENTS_TERRESTRE (ProgressBar.tsx). Le dernier libellé est toujours
-// « Signatures » : son index se déduit de la longueur, jamais codé en dur.
-const CONTROL_LABELS_AERIEN = ['Références', 'Cibles', 'Équipe', 'Traitement', 'Moyens & protection', 'Impacts & risque', 'Signatures'];
+// Aérien : 8 étapes (Équipe/Pesticides & rotations scindés, #equipe-slide-aerien ;
+// Cibles fusionnée en Synthèse + Surface traitée ajoutée avant Signatures, #326) ;
+// terrestre : 6 (équipe et pesticides restés sur un seul écran, flux inchangé) —
+// reflète PROGRESS_SEGMENTS_AERIEN/PROGRESS_SEGMENTS_TERRESTRE (ProgressBar.tsx).
+// Le dernier libellé est toujours « Signatures » : son index se déduit de la
+// longueur, jamais codé en dur.
+const CONTROL_LABELS_AERIEN = ['Références', 'Synthèse', 'Équipe', 'Pesticides & rotations', 'Moyens & protection', 'Impacts & risque', 'Surface traitée', 'Signatures'];
 const CONTROL_LABELS_TERRESTRE = ['Références', 'Cibles', 'Équipe', 'Moyens & protection', 'Impacts & risque', 'Signatures'];
 
 /** #signatures-auto-equipe §9 : la carte « Signatures » du récapitulatif liste
@@ -367,7 +369,7 @@ export default function RecapScreen() {
             </Card>
 
             <Card>
-              <Text style={styles.sectionTitle}>Traitement</Text>
+              <Text style={styles.sectionTitle}>Pesticides & rotations</Text>
               <RecapLigne label="Nb rotations" value={draft.aerien.nb_rotations != null ? String(draft.aerien.nb_rotations) : null} />
               <RecapLigne label="Total pesticide (l)" value={draft.aerien.total_pesticide_l != null ? String(draft.aerien.total_pesticide_l) : null} />
               <RecapLigne label="Total pesticide (kg)" value={draft.aerien.total_pesticide_kg != null ? String(draft.aerien.total_pesticide_kg) : null} />

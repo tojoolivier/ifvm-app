@@ -1,9 +1,10 @@
 /**
- * Récapitulatif (traitement) — sections « Équipe » et « Traitement » distinctes
- * (#equipe-slide-aerien) : personnes/aéronef/rattachement d'un côté, pesticides/
- * rotations de l'autre. Chef de base reste résolu depuis le référentiel (FK) ;
- * pilote/mécanicien/consultant sont redevenus du texte libre (migration backend
- * 0048) et s'affichent directement, sans jointure.
+ * Récapitulatif (traitement) — sections « Équipe » et « Pesticides & rotations »
+ * distinctes (#equipe-slide-aerien, section renommée depuis « Traitement » par
+ * #326) : personnes/aéronef/rattachement d'un côté, pesticides/rotations de
+ * l'autre. Chef de base reste résolu depuis le référentiel (FK) ; pilote/
+ * mécanicien/consultant sont redevenus du texte libre (migration backend 0048)
+ * et s'affichent directement, sans jointure.
  */
 import { render, screen, waitFor } from '@testing-library/react-native';
 import RecapScreen from '@/app/(traitement)/recap';
@@ -100,13 +101,14 @@ beforeEach(() => {
   useAuthStore.setState({ user: { id: 'user-1' } as any, token: 'token-1' } as any);
 });
 
-describe('RecapScreen — sections Équipe et Traitement (#equipe-slide-aerien)', () => {
-  it('affiche les personnes/aéronef/bases sous « Équipe », séparément des pesticides/rotations sous « Traitement »', async () => {
+describe('RecapScreen — sections Équipe et Pesticides & rotations (#equipe-slide-aerien)', () => {
+  it('affiche les personnes/aéronef/bases sous « Équipe », séparément des pesticides/rotations sous « Pesticides & rotations »', async () => {
     await render(<RecapScreen />);
 
-    // « Équipe » et « Traitement » apparaissent chacun deux fois : une fois dans le
-    // checklist de contrôle (libellé d'étape), une fois comme titre de la carte
-    // détaillée ci-dessous — jamais une seule occurrence exacte à cibler.
+    // « Équipe » et « Pesticides & rotations » apparaissent chacun deux fois : une
+    // fois dans le checklist de contrôle (libellé d'étape, #326), une fois comme
+    // titre de la carte détaillée ci-dessous — jamais une seule occurrence exacte
+    // à cibler.
     await waitFor(() => expect(screen.getAllByText('Équipe').length).toBeGreaterThanOrEqual(2));
     expect(screen.getByText('Sarah Ravelo')).toBeVisible();
     expect(screen.getByText('Jean Dupont')).toBeVisible();
@@ -117,7 +119,7 @@ describe('RecapScreen — sections Équipe et Traitement (#equipe-slide-aerien)'
     expect(screen.getByText('Betioky')).toBeVisible();
     expect(screen.getByText('Ambovombe')).toBeVisible();
 
-    expect(screen.getAllByText('Traitement').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText('Pesticides & rotations').length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText('2')).toBeVisible(); // Nb rotations
     expect(screen.getByText('90')).toBeVisible(); // Total pesticide (l)
     expect(screen.getByText('100')).toBeVisible(); // Pesticide reçu (l)
