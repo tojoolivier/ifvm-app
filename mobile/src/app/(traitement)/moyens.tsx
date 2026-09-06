@@ -217,41 +217,50 @@ export default function MoyensScreen() {
           ))}
         </View>
 
-        <Text style={styles.label}>Végétation</Text>
+        {/* Végétation (#326) : déplacée sur l'écran « Synthèse », amont dans le
+            nouveau flux Aérien — cet écran continue de charger/réécrire ces 3
+            champs tels quels (round-trip, cf. commentaire de synthese.tsx) mais
+            ne les affiche/édite plus ici. Le Terrestre garde son flux actuel,
+            inchangé : la section reste visible telle quelle. */}
+        {typeTraitement !== 'AERIEN' && (
+          <>
+            <Text style={styles.label}>Végétation</Text>
 
-        <Text style={styles.fieldLabel}>Strate herbeuse (m)</Text>
-        <TextInput
-          editable={!readOnly}
-          style={styles.input}
-          placeholder="Ex. 1,5"
-          keyboardType="decimal-pad"
-          value={decimalDrafts.herbeuse ?? formatDecimalDisplay(hauteurHerbeuse)}
-          onChangeText={(v) => handleVegetationChange('herbeuse', v)}
-          onBlur={() => handleVegetationBlur('herbeuse')}
-        />
-        <Text style={styles.fieldLabel}>Strate arborée (m)</Text>
-        <TextInput
-          editable={!readOnly}
-          style={styles.input}
-          placeholder="Ex. 2,5"
-          keyboardType="decimal-pad"
-          value={decimalDrafts.arboree ?? formatDecimalDisplay(hauteurArboree)}
-          onChangeText={(v) => handleVegetationChange('arboree', v)}
-          onBlur={() => handleVegetationBlur('arboree')}
-        />
-        <Text style={styles.fieldLabel}>Recouvrement (%)</Text>
-        <TextInput
-          editable={!readOnly}
-          style={styles.input}
-          placeholder="Ex. 80"
-          keyboardType="decimal-pad"
-          value={decimalDrafts.recouvrement ?? formatDecimalDisplay(recouvrement)}
-          onChangeText={(v) => handleVegetationChange('recouvrement', v)}
-          onBlur={() => handleVegetationBlur('recouvrement')}
-        />
-        {recouvrementErrors.map((e) => (
-          <Text key={e.field} style={styles.error}>{e.message}</Text>
-        ))}
+            <Text style={styles.fieldLabel}>Strate herbeuse (m)</Text>
+            <TextInput
+              editable={!readOnly}
+              style={styles.input}
+              placeholder="Ex. 1,5"
+              keyboardType="decimal-pad"
+              value={decimalDrafts.herbeuse ?? formatDecimalDisplay(hauteurHerbeuse)}
+              onChangeText={(v) => handleVegetationChange('herbeuse', v)}
+              onBlur={() => handleVegetationBlur('herbeuse')}
+            />
+            <Text style={styles.fieldLabel}>Strate arborée (m)</Text>
+            <TextInput
+              editable={!readOnly}
+              style={styles.input}
+              placeholder="Ex. 2,5"
+              keyboardType="decimal-pad"
+              value={decimalDrafts.arboree ?? formatDecimalDisplay(hauteurArboree)}
+              onChangeText={(v) => handleVegetationChange('arboree', v)}
+              onBlur={() => handleVegetationBlur('arboree')}
+            />
+            <Text style={styles.fieldLabel}>Recouvrement (%)</Text>
+            <TextInput
+              editable={!readOnly}
+              style={styles.input}
+              placeholder="Ex. 80"
+              keyboardType="decimal-pad"
+              value={decimalDrafts.recouvrement ?? formatDecimalDisplay(recouvrement)}
+              onChangeText={(v) => handleVegetationChange('recouvrement', v)}
+              onBlur={() => handleVegetationBlur('recouvrement')}
+            />
+            {recouvrementErrors.map((e) => (
+              <Text key={e.field} style={styles.error}>{e.message}</Text>
+            ))}
+          </>
+        )}
 
         {!readOnly && (
           <TouchableOpacity style={styles.continueButton} onPress={handleContinuer} disabled={isSaving}>

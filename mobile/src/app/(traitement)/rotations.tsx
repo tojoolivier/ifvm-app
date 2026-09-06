@@ -28,8 +28,9 @@ import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
 /**
- * Écran « Traitement » (migration 0046/0047, #Ticket 7, #equipe-slide-aerien) —
- * aérien uniquement, inséré juste après Équipe (traitement.tsx, dont ce bloc a été
+ * Écran « Pesticides & rotations » (migration 0046/0047, #Ticket 7,
+ * #equipe-slide-aerien ; renommé depuis « Traitement » par #326) — aérien
+ * uniquement, inséré juste après Équipe (traitement.tsx, dont ce bloc a été
  * extrait) et avant Moyens. Chaque rotation porte désormais quantité + unité (L/kg),
  * une superficie traitée et des heures d'ouverture/fermeture de vanne, en plus des
  * champs déjà existants (produit, températures, vent, heure_debut/heure_fin de la
@@ -188,7 +189,7 @@ export default function RotationsScreen() {
     <SafeAreaView style={chrome.container}>
       <ScrollView contentContainerStyle={chrome.content}>
         <ProgressBar currentIndex={3} segments={PROGRESS_SEGMENTS_AERIEN} />
-        <Text style={chrome.title}>Traitement</Text>
+        <Text style={chrome.title}>Pesticides & rotations</Text>
 
         <Text style={styles.label}>Pesticide reçu (l)</Text>
         <TextInput

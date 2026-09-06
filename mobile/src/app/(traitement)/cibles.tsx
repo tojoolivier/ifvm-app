@@ -23,6 +23,11 @@ function displayVolsClairsEssaims(value: number | null | undefined): string {
 /**
  * Écran B — Cibles (snapshot figé à la création).
  *
+ * Terrestre uniquement depuis #326 : côté Aérien, cet écran est remplacé par
+ * « Synthèse » (synthese.tsx), qui reprend le même contenu de cible en lecture
+ * seule et y ajoute la végétation (déplacée depuis Moyens) — `references.tsx`
+ * route vers l'un ou l'autre selon `type_traitement`.
+ *
  * La cible est calculée une seule fois, à la création de la fiche de traitement
  * (references.tsx, via `construireCible` dans traitement-cible.ts — même logique que
  * `construire_cible()` côté backend), à partir des populations/infestations de la
