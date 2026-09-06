@@ -8,7 +8,13 @@ const moduleNameMapper = {
 };
 
 module.exports = {
-  
+  // Runner CI partagé (pool dind mutualisé, cf. .github/workflows/lint.yml) :
+  // le nombre de workers par défaut de Jest (cœurs disponibles - 1) sur-souscrit
+  // largement le peu de CPU réellement alloué, ce qui a déjà produit des
+  // timeouts sporadiques (findBy*/waitFor) et un entrelacement de la sortie
+  // console entre workers rendant les logs d'échec illisibles/trompeurs.
+  // Fixe et modeste : priorise la stabilité sur la vitesse en CI comme en local.
+  maxWorkers: 2,
   testTimeout: 15000,
   projects: [
     {
