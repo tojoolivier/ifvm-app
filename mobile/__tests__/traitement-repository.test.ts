@@ -421,7 +421,7 @@ describe('rotations (aerien)', () => {
       numero_cuve: null,
       produit_id: 'prod-1',
       quantite: 15,
-      unite: 'KG',
+      unite: 'kg',
       surface_ha: 4.0,
       temperature_debut_c: 21,
       temperature_fin_c: 26,
@@ -432,7 +432,7 @@ describe('rotations (aerien)', () => {
     await updateRotation('rot-1', {
       produit_id: 'prod-1',
       quantite: 15,
-      unite: 'KG',
+      unite: 'kg',
       surface_ha: 4.0,
       temperature_debut_c: 21,
       temperature_fin_c: 26,
@@ -442,7 +442,7 @@ describe('rotations (aerien)', () => {
 
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE rotation SET'),
-      expect.arrayContaining(['prod-1', 15, 'KG', 4.0, 'rot-1'])
+      expect.arrayContaining(['prod-1', 15, 'kg', 4.0, 'rot-1'])
     );
   });
 
@@ -560,7 +560,7 @@ describe('getTraitement', () => {
         id: 'rot-1',
         traitement_aerien_id: AERIEN_INPUT.id,
         numero: 1,
-        numero_cuve: 'C1',
+        numero_cuve: '1',
         produit_id: 'prod-1',
         quantite: 20,
         unite: 'L',

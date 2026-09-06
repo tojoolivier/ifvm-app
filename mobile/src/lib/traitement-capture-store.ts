@@ -40,11 +40,13 @@ export interface ReferenceDraft {
 
 export interface RotationDraft {
   localId: string;
-  // numero_cuve n'existe plus ici : dérivé côté serveur de `numero` (migration 0046),
-  // jamais saisi ni stocké — affiché à l'écran comme C${index + 1}.
+  // numero_cuve n'existe plus ici : dérivé côté serveur de `numero` (migration 0047),
+  // jamais saisi ni stocké — affiché à l'écran comme ${index + 1}, à l'identique du
+  // format serveur (str(numero), sans préfixe).
   produit_id?: string | null;
   quantite?: number | null;
-  unite?: 'L' | 'KG' | null;
+  // 'kg' en minuscule : contrat backend (UniteQuantite), cf. traitement-validation.ts.
+  unite?: 'L' | 'kg' | null;
   surface_ha?: number | null;
   temperature_debut_c?: number | null;
   temperature_fin_c?: number | null;
@@ -62,7 +64,7 @@ export interface RotationDraft {
 export interface RotationInput {
   produit_id?: string | null;
   quantite?: number | null;
-  unite?: 'L' | 'KG' | null;
+  unite?: 'L' | 'kg' | null;
   surface_ha?: number | null;
   temperature_debut_c?: number | null;
   temperature_fin_c?: number | null;

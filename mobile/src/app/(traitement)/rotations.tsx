@@ -71,7 +71,7 @@ export default function RotationsScreen() {
             store.addRotation({
               produit_id: r.produit_id,
               quantite: r.quantite,
-              unite: (r.unite as 'L' | 'KG' | null) ?? 'L',
+              unite: (r.unite as 'L' | 'kg' | null) ?? 'L',
               surface_ha: r.surface_ha,
               temperature_debut_c: r.temperature_debut_c,
               temperature_fin_c: r.temperature_fin_c,
@@ -195,16 +195,23 @@ export default function RotationsScreen() {
 
               <Card variant="derivee">
                 <Text style={styles.label}>N° cuve</Text>
-                <Text style={styles.derivedValue}>{`C${index + 1}`}</Text>
+                {/* Format aligné sur le serveur (str(numero), migration 0047) : pas de
+                    préfixe "C" — sinon l'aperçu ici divergerait de ce qu'affichent le
+                    web admin et toute relecture de la fiche synchronisée. testID plutôt
+                    qu'un texte unique : "1" collide avec d'autres valeurs affichées
+                    (ex. Nb rotations) dès qu'il n'y a qu'une rotation. */}
+                <Text testID={`rotation-numero-cuve-${index}`} style={styles.derivedValue}>
+                  {String(index + 1)}
+                </Text>
               </Card>
 
               <Text style={styles.label}>Unité *</Text>
               <View style={styles.chipRow}>
                 <Chip label="Litres (L)" selected={unite === 'L'} onPress={() => !readOnly && store.updateRotation(rotation.localId, { unite: 'L' })} />
-                <Chip label="Kilos (kg)" selected={unite === 'KG'} onPress={() => !readOnly && store.updateRotation(rotation.localId, { unite: 'KG' })} />
+                <Chip label="Kilos (kg)" selected={unite === 'kg'} onPress={() => !readOnly && store.updateRotation(rotation.localId, { unite: 'kg' })} />
               </View>
 
-              <Text style={styles.label}>{`Quantité (${unite === 'KG' ? 'kg' : 'l'}) *`}</Text>
+              <Text style={styles.label}>{`Quantité (${unite === 'kg' ? 'kg' : 'l'}) *`}</Text>
               <TextInput
                 testID={`rotation-quantite-input-${index}`}
                 editable={!readOnly}

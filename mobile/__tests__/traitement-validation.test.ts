@@ -66,7 +66,7 @@ describe('computeTotalPesticideAerienParUnite', () => {
       computeTotalPesticideAerienParUnite([
         { quantite: 10, unite: 'L' },
         { quantite: 5.5, unite: 'L' },
-        { quantite: 4, unite: 'KG' },
+        { quantite: 4, unite: 'kg' },
       ])
     ).toEqual({ l: 15.5, kg: 4 });
   });
