@@ -230,7 +230,7 @@ describe('RotationsScreen — pesticide reçu (déplacé depuis Équipe)', () =>
 
   it('saisit puis enregistre une nouvelle valeur de pesticide reçu', async () => {
     await render(<RotationsScreen />);
-    await screen.findByText('C1');
+    await screen.findByTestId('rotation-numero-cuve-0');
 
     fireEvent.changeText(screen.getByTestId('pesticide-recu-input'), '150');
     await settle();
