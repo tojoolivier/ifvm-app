@@ -9,6 +9,7 @@ import {
   computeNbRotations,
   computeTotalPesticideAerienParUnite,
   computeSurfaceTraiteeAerien,
+  computeSurfaceCumulee,
   computeSurfaceRestante,
   computePesticideStockRestant,
   computeDureesRotation,
@@ -44,6 +45,7 @@ export default function RotationsScreen() {
 
   const [pesticides, setPesticides] = useState<Pesticide[]>([]);
   const [surfaceInfesteeHa, setSurfaceInfesteeHa] = useState<number | null>(null);
+  const [origineCumuleeHa, setOrigineCumuleeHa] = useState<number | null>(null);
   const [error, setError] = useState<string | undefined>();
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargementBase = useSignalerChargement('rotations');
@@ -102,12 +104,38 @@ export default function RotationsScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [traitementId, store.ref.modeTraitement]);
 
+  // Chaînage de reprise (migration backend 0050, mirroir de l'effet équivalent dans
+  // traitement.tsx côté Terrestre) : la surface déjà traitée par la chaîne avant
+  // cette fiche, pour que l'aperçu de surface restante ici ne surestime pas ce qui
+  // reste réellement à traiter — le serveur recalcule de toute façon la valeur
+  // définitive à l'enregistrement, ceci n'est qu'un aperçu.
+  useEffect(() => {
+    const origineId = store.aerien.traitementOrigineId;
+    let cancelled = false;
+    if (store.aerien.repriseTraitement && origineId) {
+      void getTraitement(origineId)
+        .then((draft) => {
+          if (!cancelled) setOrigineCumuleeHa(draft?.aerien?.surface_cumulee_ha ?? null);
+        })
+        .catch((error) => {
+          if (!cancelled) signalerChargement(error, 'getTraitement:origine');
+        });
+    } else {
+      void Promise.resolve().then(() => {
+        if (!cancelled) setOrigineCumuleeHa(null);
+      });
+    }
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.aerien.repriseTraitement, store.aerien.traitementOrigineId]);
+
   const nbRotations = computeNbRotations(store.aerien.rotations);
   const totauxPesticide = computeTotalPesticideAerienParUnite(store.aerien.rotations);
   const surfaceTraitee = computeSurfaceTraiteeAerien(store.aerien.rotations);
-  // Pas de chaînage de reprise côté Aérien (contrairement au Terrestre) : le reste se
-  // calcule uniquement à partir de cette fiche.
-  const surfaceRestante = computeSurfaceRestante(surfaceInfesteeHa, surfaceTraitee);
+  const surfaceCumulee = computeSurfaceCumulee(surfaceTraitee, store.aerien.repriseTraitement, origineCumuleeHa);
+  const surfaceRestante = computeSurfaceRestante(surfaceInfesteeHa, surfaceCumulee);
   // Le stock reçu (pesticide_recu_l) est en litres : seule la consommation en litres
   // s'en déduit, jamais celle en kg (grandeurs différentes, cf. total_pesticide_kg).
   const pesticideStockRestant = computePesticideStockRestant(store.aerien.pesticideRecuL, totauxPesticide.l);
@@ -385,6 +413,12 @@ export default function RotationsScreen() {
           <Text style={styles.label}>Surface traitée (ha)</Text>
           <Text style={styles.derivedValue}>{surfaceTraitee}</Text>
         </Card>
+        {store.aerien.repriseTraitement && (
+          <Card variant="derivee">
+            <Text style={styles.label}>Surface cumulée (ha)</Text>
+            <Text style={styles.derivedValue}>{surfaceCumulee}</Text>
+          </Card>
+        )}
         <Card variant="derivee">
           <Text style={styles.label}>Surface restante (ha)</Text>
           <Text style={styles.derivedValue}>{surfaceRestante}</Text>

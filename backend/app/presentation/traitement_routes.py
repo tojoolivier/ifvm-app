@@ -138,6 +138,8 @@ async def create_traitement(
                 lieu_base_secondaire_id=body.aerien.lieu_base_secondaire_id,
                 immatricule_aeronef=body.aerien.immatricule_aeronef,
                 pesticide_recu_l=body.aerien.pesticide_recu_l,
+                reprise_traitement=body.aerien.reprise_traitement,
+                traitement_origine_id=body.aerien.traitement_origine_id,
             )
         use_case_terrestre = CreateTraitementTerrestre(
             traitement_repository=repository,
@@ -210,6 +212,8 @@ async def sync_traitement(
                 lieu_base_secondaire_id=body.aerien.lieu_base_secondaire_id,
                 immatricule_aeronef=body.aerien.immatricule_aeronef,
                 pesticide_recu_l=body.aerien.pesticide_recu_l,
+                reprise_traitement=body.aerien.reprise_traitement,
+                traitement_origine_id=body.aerien.traitement_origine_id,
             )
         else:
             use_case_terrestre = SyncPushTraitementTerrestre(

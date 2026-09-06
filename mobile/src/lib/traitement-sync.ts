@@ -114,6 +114,10 @@ function buildTraitementSyncPayload(draft: DraftTraitement): components['schemas
         // surface_traitee_ha n'y figure plus (migration 0047) : dérivée des rotations
         // côté serveur, plus un champ accepté par TraitementSyncPush.
         pesticide_recu_l: draft.aerien.pesticide_recu_l,
+        // Chaînage de reprise (migration backend 0050) — mirroir de la branche
+        // terrestre ci-dessous, généralisé à l'Aérien.
+        reprise_traitement: draft.aerien.reprise_traitement,
+        traitement_origine_id: draft.aerien.traitement_origine_id,
       } as unknown as components['schemas']['TraitementAerienCreate'],
     };
   }

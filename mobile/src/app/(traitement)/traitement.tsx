@@ -22,6 +22,7 @@ import {
   computePesticideStockRestant,
   validateTerrestreConditions,
   validateAerienEquipe,
+  validateRepriseTraitement,
 } from '@/lib/traitement-validation';
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN, PROGRESS_SEGMENTS_TERRESTRE } from '@/components/traitement/ProgressBar';
 import { AerienForm } from '@/components/traitement/AerienForm';
@@ -77,7 +78,15 @@ export default function TraitementScreen() {
           lieuBaseSecondaireId: draft.aerien.lieu_base_secondaire_id,
           // pesticide_recu_l n'est plus hydraté ici : saisi sur l'écran « Traitement »
           // (rotations.tsx, #equipe-slide-aerien), qui charge ce champ lui-même.
+          repriseTraitement: draft.aerien.reprise_traitement ?? false,
+          traitementOrigineId: draft.aerien.traitement_origine_id,
         });
+        // Présélection reprise (migration backend 0050, mirroir du bloc Terrestre
+        // ci-dessous) : uniquement sur une fiche fraîchement amorcée depuis "Zones
+        // à reprendre" — n'écrase jamais un choix déjà enregistré.
+        if (origineId && !draft.aerien.reprise_traitement && !draft.aerien.traitement_origine_id) {
+          store.updateAerien({ repriseTraitement: true, traitementOrigineId: origineId });
+        }
       }
       if (draft.type_traitement === 'TERRESTRE' && draft.terrestre) {
         store.updateTerrestre({
@@ -208,6 +217,14 @@ export default function TraitementScreen() {
             setErrors({ aerien: equipeErrors[0].message });
             return;
           }
+          const repriseErrors = validateRepriseTraitement(
+            store.aerien.repriseTraitement,
+            store.aerien.traitementOrigineId
+          );
+          if (repriseErrors.length > 0) {
+            setErrors({ traitementOrigineId: repriseErrors[0].message });
+            return;
+          }
           await updateTraitementAerien(traitementId, {
             pilote: store.aerien.pilote!,
             mecanicien: store.aerien.mecanicien!,
@@ -217,6 +234,8 @@ export default function TraitementScreen() {
             lieuBasePrincipaleId: store.aerien.lieuBasePrincipaleId,
             lieuStandId: store.aerien.lieuStandId,
             lieuBaseSecondaireId: store.aerien.lieuBaseSecondaireId,
+            repriseTraitement: store.aerien.repriseTraitement,
+            traitementOrigineId: store.aerien.traitementOrigineId,
           });
         } else {
           const conditionErrors = validateTerrestreConditions({
@@ -281,6 +300,12 @@ export default function TraitementScreen() {
       }
     );
 
+  // Migration backend 0050 : listReprenableTraitements() couvre désormais les deux
+  // chaînes (Aérien et Terrestre) — chaque type ne doit reprendre que sa propre
+  // chaîne (la fiche d'origine doit être du même type, cf. validation backend).
+  const reprenablesAerien = reprenables.filter((r) => r.type_traitement === 'AERIEN');
+  const reprenablesTerrestre = reprenables.filter((r) => r.type_traitement === 'TERRESTRE');
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -295,7 +320,8 @@ export default function TraitementScreen() {
             readOnly={readOnly}
             chefsDeBase={chefsDeBase}
             lieuxAeriens={lieuxAeriens}
-            error={errors.aerien}
+            reprenables={reprenablesAerien}
+            errors={errors}
           />
         )}
 
@@ -304,7 +330,7 @@ export default function TraitementScreen() {
             readOnly={readOnly}
             chefsEquipe={chefsEquipe}
             agentsEncadreurs={agentsEncadreurs}
-            reprenables={reprenables}
+            reprenables={reprenablesTerrestre}
             pesticides={pesticides}
             produits={produits}
             setProduits={setProduits}

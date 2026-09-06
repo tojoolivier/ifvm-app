@@ -174,10 +174,26 @@ describe('listValidatedProspections', () => {
 
     expect(result).toEqual([eligibleRow]);
     expect(getAllAsync).toHaveBeenCalledWith(
-      expect.stringContaining("WHERE type_prospection IN ('extensive', 'validation')")
+      expect.stringContaining("p.type_prospection IN ('extensive', 'validation')")
     );
-    expect(getAllAsync).toHaveBeenCalledWith(expect.stringContaining("AND statut_sync = 'synced'"));
-    expect(getAllAsync).toHaveBeenCalledWith(expect.stringContaining('ORDER BY updated_at DESC'));
+    expect(getAllAsync).toHaveBeenCalledWith(expect.stringContaining("AND p.statut_sync = 'synced'"));
+    expect(getAllAsync).toHaveBeenCalledWith(expect.stringContaining('ORDER BY p.updated_at DESC'));
+  });
+
+  it('excludes prospections whose surface infestée is already fully treated (Aérien ou Terrestre)', async () => {
+    // Le "vrai" filtrage se joue en SQL (non exécuté par ce mock) — ce test garde
+    // seulement une trace de non-régression sur la présence des deux clauses
+    // d'exclusion (une par type de traitement), ajoutées avec le chaînage de
+    // reprise généralisé à l’Aérien (migration backend 0050).
+    getAllAsync.mockResolvedValueOnce([]);
+
+    await listValidatedProspections();
+
+    const [query] = getAllAsync.mock.calls[0];
+    expect(query).toContain('JOIN traitement_terrestre tt ON tt.traitement_id = t.id');
+    expect(query).toContain('tt.surface_restante_ha IS NOT NULL AND tt.surface_restante_ha <= 0');
+    expect(query).toContain('JOIN traitement_aerien ta ON ta.traitement_id = t.id');
+    expect(query).toContain('ta.surface_restante_ha IS NOT NULL AND ta.surface_restante_ha <= 0');
   });
 });
 

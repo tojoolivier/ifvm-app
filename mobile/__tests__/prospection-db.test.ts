@@ -151,6 +151,10 @@ const MIGRATED_COLUMNS = [
   { name: 'lieu_base_principale_id' },
   { name: 'lieu_stand_id' },
   { name: 'lieu_base_secondaire_id' },
+  // Chaînage de reprise (migration backend 0050), généralisé depuis le Terrestre.
+  { name: 'reprise_traitement' },
+  { name: 'traitement_origine_id' },
+  { name: 'surface_cumulee_ha' },
 
   // Colonnes de traitement_aerien et traitement_terrestre (partagées)
   { name: 'pesticide_recu_l' },

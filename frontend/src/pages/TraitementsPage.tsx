@@ -20,7 +20,16 @@ interface Traitement {
   date_traitement: string
   localite: string
   statut: string
-  aerien: { pilote: string } | null
+  // `pilote` : champ legacy, plus jamais renvoyé par l'API depuis le passage à
+  // pilote_id (migration 0047) — conservé ici uniquement parce que
+  // `responsableTraitement` (traitement-fiche.ts) l'attend encore dans son
+  // repli sans chef signataire ; ce repli est mort en pratique (bug préexistant,
+  // hors périmètre de cette modification).
+  aerien: {
+    pilote: string
+    surface_traitee_ha: number | null
+    surface_restante_ha: number | null
+  } | null
   terrestre: { surface_traitee_ha: number | null; surface_restante_ha: number | null } | null
   signatures: { role: string; signataire_nom: string }[]
 }
@@ -95,7 +104,7 @@ export function TraitementsPage() {
       header: 'Traitée (ha)',
       align: 'right',
       mono: true,
-      render: (t) => formatSurface(t.terrestre?.surface_traitee_ha),
+      render: (t) => formatSurface(t.terrestre?.surface_traitee_ha ?? t.aerien?.surface_traitee_ha),
     },
     {
       key: 'restante',
@@ -103,9 +112,11 @@ export function TraitementsPage() {
       align: 'right',
       mono: true,
       // Ambre dès qu'il reste de la surface — c'est le signal « fiche
-      // reprenable » de la maquette (prototype : `restColor`).
+      // reprenable » de la maquette (prototype : `restColor`). Le chaînage de
+      // reprise (migration 0050) couvre désormais aussi l'Aérien : chaque
+      // fiche n'a qu'une seule des deux spécialisations renseignée.
       render: (t) => {
-        const restante = t.terrestre?.surface_restante_ha
+        const restante = t.terrestre?.surface_restante_ha ?? t.aerien?.surface_restante_ha
         const enAlerte = restante != null && Number(restante) > 0
         return (
           <span className={enAlerte ? 'text-ifvm-amber-text' : 'text-[#16201a]'}>

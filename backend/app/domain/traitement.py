@@ -182,12 +182,18 @@ class TraitementAerien:
     # les trois sont dérivés des rotations, recalculés à chaque écriture sur
     # `traitement_rotation` — jamais None depuis la migration 0047 (NOT NULL,
     # défaut 0).
-    # Pas de chaînage de reprise côté Aérien (contrairement à Terrestre) : le
-    # reste se calcule fiche par fiche, sans cumul inter-fiches.
     total_pesticide_l: float = 0.0
     total_pesticide_kg: float = 0.0
     surface_traitee_ha: float = 0.0
     surface_restante_ha: float | None = None
+    # Chaînage de reprise (migration 0050) — mirroir de TraitementTerrestre,
+    # généralisé à l'Aérien : une prospection partiellement traitée par une
+    # première fiche aérienne peut être reprise par une fiche suivante.
+    reprise_traitement: bool = False
+    traitement_origine_id: uuid.UUID | None = None
+    # NOT NULL défaut 0, contrairement à son équivalent Terrestre (nullable) —
+    # même choix que les autres champs dérivés ci-dessus.
+    surface_cumulee_ha: float = 0.0
     # Stock de pesticide par fiche (pas de suivi cumulatif par aéronef/opération) :
     # « reçu » saisi, « consommé » = total_pesticide_l (dérivé des rotations),
     # « reste en stock » dérivé des deux.
@@ -204,18 +210,24 @@ class TraitementAerien:
         self.surface_traitee_ha = sum(r.surface_ha for r in self.rotations)
         self.recalculer_stock_pesticide()
 
-    def recalculer_surfaces(self, surface_infestee_ha: float | None) -> None:
-        """Seul chemin d'écriture pour surface_restante_ha — jamais en lecture.
+    def recalculer_surfaces(
+        self, surface_infestee_ha: float | None, surface_cumulee_precedente: float = 0.0
+    ) -> None:
+        """Seul chemin d'écriture pour surface_cumulee_ha/surface_restante_ha — jamais
+        en lecture.
 
         Doit être appelée après `recalculer_totaux()` (ou après un ré-épinglage de
         `surface_traitee_ha` en synchronisation) : c'est `self.surface_traitee_ha`,
         dérivé des rotations, qui alimente ce calcul.
 
-        Pas de chaînage (contrairement à `TraitementTerrestre.recalculer_surfaces`) :
-        le reste se calcule uniquement à partir de cette fiche, plancher à 0 (CDG §9).
+        `surface_cumulee_precedente` (migration 0050) : chaînage de reprise,
+        mirroir de `TraitementTerrestre.recalculer_surfaces` — 0.0 par défaut
+        (fiche indépendante, pas de reprise), sinon `surface_cumulee_ha` de la
+        fiche d'origine. Plancher à 0 (CDG §9).
         """
+        self.surface_cumulee_ha = surface_cumulee_precedente + self.surface_traitee_ha
         self.surface_restante_ha = (
-            max(surface_infestee_ha - self.surface_traitee_ha, 0.0)
+            max(surface_infestee_ha - self.surface_cumulee_ha, 0.0)
             if surface_infestee_ha is not None
             else None
         )

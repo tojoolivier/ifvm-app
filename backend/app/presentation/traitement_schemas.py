@@ -89,6 +89,21 @@ class TraitementAerienCreate(BaseModel):
     # surface_traitee_ha n'y figure plus (migration 0047) : dérivée de la somme
     # des `surface_ha` de rotation, ajoutées après coup via /rotations.
     pesticide_recu_l: float | None = Field(None, ge=0)
+    # Chaînage de reprise (migration 0050) — mirroir de TraitementTerrestreCreate.
+    reprise_traitement: bool = False
+    traitement_origine_id: uuid.UUID | None = None
+
+    @model_validator(mode="after")
+    def _origine_requise_si_reprise(self) -> "TraitementAerienCreate":
+        if self.reprise_traitement and self.traitement_origine_id is None:
+            raise ValueError(
+                "traitement_origine_id est obligatoire lorsque reprise_traitement=True"
+            )
+        if not self.reprise_traitement and self.traitement_origine_id is not None:
+            raise ValueError(
+                "traitement_origine_id ne peut être renseigné que si reprise_traitement=True"
+            )
+        return self
 
 
 class TraitementTerrestreCreate(BaseModel):
@@ -298,6 +313,10 @@ class TraitementAerienRead(BaseModel):
     total_pesticide_l: float
     total_pesticide_kg: float
     surface_traitee_ha: float
+    # Chaînage de reprise (migration 0050) — mirroir de TraitementTerrestreRead.
+    reprise_traitement: bool
+    traitement_origine_id: uuid.UUID | None
+    surface_cumulee_ha: float
     surface_restante_ha: float | None
     pesticide_recu_l: float | None
     pesticide_stock_restant_l: float | None

@@ -755,6 +755,12 @@ const COLONNES_TRAITEMENT_AERIEN: readonly Colonne[] = [
   { name: 'lieu_base_principale_id', type: 'TEXT' },
   { name: 'lieu_stand_id', type: 'TEXT' },
   { name: 'lieu_base_secondaire_id', type: 'TEXT' },
+  // Chaînage de reprise (migration backend 0050) — généralise à l'Aérien ce qui
+  // existait déjà côté Terrestre depuis l'origine (cf. CREATE TABLE
+  // traitement_terrestre ci-dessus, où ces 3 colonnes figurent nativement).
+  { name: 'reprise_traitement', type: 'INTEGER' },
+  { name: 'traitement_origine_id', type: 'TEXT' },
+  { name: 'surface_cumulee_ha', type: 'REAL' },
 ];
 
 /** Colonnes ajoutées à `traitement_terrestre` après sa création initiale. */

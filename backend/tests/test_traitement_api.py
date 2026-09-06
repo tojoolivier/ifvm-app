@@ -989,6 +989,161 @@ async def test_list_traitements_reprenable_exclut_origine_deja_utilisee_et_surfa
     assert ids == {maillon_reprenable["id"], reprenable["id"]}
 
 
+async def _creer_fiche_aerien_chainee(
+    client,
+    auth_headers,
+    base_payload: dict,
+    payload_rotation,
+    *,
+    surface_ha: float,
+    traitement_origine_id=None,
+):
+    """Mirroir de `_creer_fiche_terrestre_chainee` (migration 0050) : le chaînage de
+    reprise est désormais aussi disponible côté Aérien. `surface_traitee_ha` n'étant
+    pas une saisie directe côté Aérien (contrairement à `surface_atomiseur_ha` en
+    Terrestre), une rotation est ajoutée après coup pour porter `surface_ha`."""
+    payload = copy.deepcopy(base_payload)
+    if traitement_origine_id is not None:
+        payload["aerien"]["reprise_traitement"] = True
+        payload["aerien"]["traitement_origine_id"] = str(traitement_origine_id)
+    resp = await client.post("/traitements", json=payload, headers=auth_headers)
+    assert resp.status_code == 201, resp.text
+    traitement_id = resp.json()["id"]
+
+    rot_resp = await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(surface_ha=surface_ha),
+        headers=auth_headers,
+    )
+    assert rot_resp.status_code == 201, rot_resp.text
+    return rot_resp.json()
+
+
+@pytest.mark.asyncio
+async def test_reprise_chaine_a_plusieurs_maillons_aerien(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_rotation
+):
+    """Mirroir de test_reprise_chaine_a_plusieurs_maillons, côté Aérien (migration 0050) :
+    chaque maillon reprend surface_cumulee_ha du précédent, via ses rotations."""
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surface_infestee=200.0
+    )
+    base_payload = payload_traitement(prospection_id)
+
+    maillon_1 = await _creer_fiche_aerien_chainee(
+        client, auth_headers, base_payload, payload_rotation, surface_ha=30.0
+    )
+    assert maillon_1["aerien"]["surface_cumulee_ha"] == 30.0
+
+    maillon_2 = await _creer_fiche_aerien_chainee(
+        client,
+        auth_headers,
+        base_payload,
+        payload_rotation,
+        surface_ha=20.0,
+        traitement_origine_id=maillon_1["id"],
+    )
+    assert maillon_2["aerien"]["surface_cumulee_ha"] == 50.0
+    assert maillon_2["aerien"]["reprise_traitement"] is True
+    assert maillon_2["aerien"]["traitement_origine_id"] == maillon_1["id"]
+
+    maillon_3 = await _creer_fiche_aerien_chainee(
+        client,
+        auth_headers,
+        base_payload,
+        payload_rotation,
+        surface_ha=25.0,
+        traitement_origine_id=maillon_2["id"],
+    )
+    assert maillon_3["aerien"]["surface_cumulee_ha"] == 75.0
+    assert maillon_3["aerien"]["surface_restante_ha"] == 125.0
+
+
+@pytest.mark.asyncio
+async def test_reprise_aerien_origine_deja_utilisee_409(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_rotation
+):
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surface_infestee=200.0
+    )
+    base_payload = payload_traitement(prospection_id)
+
+    maillon_1 = await _creer_fiche_aerien_chainee(
+        client, auth_headers, base_payload, payload_rotation, surface_ha=30.0
+    )
+    await _creer_fiche_aerien_chainee(
+        client,
+        auth_headers,
+        base_payload,
+        payload_rotation,
+        surface_ha=20.0,
+        traitement_origine_id=maillon_1["id"],
+    )
+
+    payload = copy.deepcopy(base_payload)
+    payload["aerien"]["reprise_traitement"] = True
+    payload["aerien"]["traitement_origine_id"] = maillon_1["id"]
+    resp = await client.post("/traitements", json=payload, headers=auth_headers)
+    assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_reprise_aerien_origine_introuvable_404(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+):
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    payload = payload_traitement(prospection_id)
+    payload["aerien"]["reprise_traitement"] = True
+    payload["aerien"]["traitement_origine_id"] = str(uuid.uuid4())
+    resp = await client.post("/traitements", json=payload, headers=auth_headers)
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_reprise_aerien_sans_origine_id_422(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+):
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    payload = payload_traitement(prospection_id)
+    payload["aerien"]["reprise_traitement"] = True
+    resp = await client.post("/traitements", json=payload, headers=auth_headers)
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_list_traitements_reprenable_inclut_aerien_sans_filtre_de_type(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement,
+    payload_rotation,
+):
+    """Migration 0050 : `reprenable=true` sans filtre de type couvre désormais
+    aussi l'Aérien (jusqu'ici Terrestre uniquement) — chaque type a sa propre
+    chaîne, une fiche épuisée ou déjà désignée comme origine dans SA propre
+    chaîne n'affecte pas l'autre type (cf. test_list_traitements_reprenable_
+    exclut_origine_deja_utilisee_et_surface_epuisee pour le Terrestre)."""
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surface_infestee=100.0
+    )
+    base_payload = payload_traitement(prospection_id)
+    epuisee = await _creer_fiche_aerien_chainee(
+        client, auth_headers, base_payload, payload_rotation, surface_ha=100.0
+    )
+    assert epuisee["aerien"]["surface_restante_ha"] == 0.0
+    reprenable = await _creer_fiche_aerien_chainee(
+        client, auth_headers, base_payload, payload_rotation, surface_ha=5.0
+    )
+
+    resp = await client.get("/traitements", params={"reprenable": "true"}, headers=auth_headers)
+    assert resp.status_code == 200
+    ids = {t["id"] for t in resp.json()}
+    assert reprenable["id"] in ids
+    assert epuisee["id"] not in ids
+
+
 @pytest.mark.asyncio
 async def test_list_traitements_filtre_chef_equipe_id(
     client,
