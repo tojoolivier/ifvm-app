@@ -42,6 +42,11 @@ async def validateur(db_session: AsyncSession) -> Utilisateur:
     return await _create_user(db_session, "validation_finale")
 
 
+@pytest.fixture
+async def admin(db_session: AsyncSession) -> Utilisateur:
+    return await _create_user(db_session, "admin")
+
+
 # ---------------------------------------------------------------------------
 # Helper : créer une prospection et la mettre dans un statut donné
 # ---------------------------------------------------------------------------
@@ -168,6 +173,55 @@ async def test_transition_verifiee_rejetee(
     await _changer_statut(client, pid, "verifiee", _headers(verificateur))
     code = await _changer_statut(client, pid, "rejetee", _headers(validateur))
     assert code == 200
+
+
+# ---------------------------------------------------------------------------
+# Admin — se substitue à verificateur/validation_finale sur tous les
+# déploiements où ces comptes dédiés n'existent pas encore ou ne sont pas
+# utilisés (déblocage demandé après confusion : le compte admin ne voyait
+# aucun bouton Vérifier/Valider côté web).
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_admin_peut_verifier(
+    client: AsyncClient,
+    utilisateur: Utilisateur,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    admin: Utilisateur,
+):
+    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
+    await _changer_statut(client, pid, "en_attente", auth_headers)
+    code = await _changer_statut(client, pid, "verifiee", _headers(admin))
+    assert code == 200
+
+    resp = await client.get(f"/prospections/{pid}", headers=auth_headers)
+    body = resp.json()
+    assert body["statut"] == "verifiee"
+    assert body["verified_by"] == str(admin.id)
+
+
+@pytest.mark.asyncio
+async def test_admin_peut_valider(
+    client: AsyncClient,
+    utilisateur: Utilisateur,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    admin: Utilisateur,
+):
+    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
+    await _changer_statut(client, pid, "en_attente", auth_headers)
+    await _changer_statut(client, pid, "verifiee", _headers(admin))
+    code = await _changer_statut(client, pid, "validee", _headers(admin))
+    assert code == 200
+
+    resp = await client.get(f"/prospections/{pid}", headers=auth_headers)
+    body = resp.json()
+    assert body["statut"] == "validee"
+    assert body["validated_by"] == str(admin.id)
 
 
 # ---------------------------------------------------------------------------
