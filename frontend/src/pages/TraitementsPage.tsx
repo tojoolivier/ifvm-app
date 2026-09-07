@@ -55,16 +55,23 @@ export function TraitementsPage() {
   // émis par la fiche de prospection, il doit continuer de fonctionner.
   const filtreType = searchParams.get('type_traitement') ?? ''
   const filtreReprenable = searchParams.get('reprenable') ?? ''
+  const filtreStatut = searchParams.get('statut') ?? ''
   const filtreProspectionId = searchParams.get('prospection_id') ?? ''
 
+  // Lot D : 3 sous-sections nommées, miroir de ce qui existe déjà côté mobile
+  // (« Consulter une fiche validée » / « Mes fiches » / « Zones à reprendre »).
+  const onglet =
+    filtreStatut === 'brouillon' ? 'brouillons' : filtreReprenable === 'true' ? 'reprendre' : 'toutes'
+
   const { data: traitements = [], isLoading, isError, error } = useQuery<Traitement[]>({
-    queryKey: ['traitements', filtreType, filtreReprenable, filtreProspectionId],
+    queryKey: ['traitements', filtreType, filtreReprenable, filtreStatut, filtreProspectionId],
     queryFn: () =>
       api
         .get('/traitements', {
           params: {
             type_traitement: filtreType || undefined,
             reprenable: filtreReprenable || undefined,
+            statut: filtreStatut || undefined,
             prospection_id: filtreProspectionId || undefined,
           },
         })
@@ -153,8 +160,20 @@ export function TraitementsPage() {
     <div className="flex flex-col gap-4 px-7 pb-10 pt-[26px]">
       <div className="flex items-center gap-2">
         <NavTabs
-          ariaLabel="Vues des traitements"
-          items={[{ label: 'Liste des fiches', to: '/traitements', active: true }]}
+          ariaLabel="Sections des fiches de traitement"
+          items={[
+            { label: 'Toutes les fiches', to: '/traitements', active: onglet === 'toutes' },
+            {
+              label: 'Zones à reprendre',
+              to: '/traitements?reprenable=true',
+              active: onglet === 'reprendre',
+            },
+            {
+              label: 'Brouillons',
+              to: '/traitements?statut=brouillon',
+              active: onglet === 'brouillons',
+            },
+          ]}
         />
         <div className="flex-1" />
         <p className="font-sans text-[11.5px] font-medium text-ifvm-text-weak">
