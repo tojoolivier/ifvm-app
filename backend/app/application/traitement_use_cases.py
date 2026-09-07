@@ -535,12 +535,14 @@ class ListTraitements:
         prospection_id: uuid.UUID | None = None,
         chef_equipe_id: uuid.UUID | None = None,
         reprenable: bool | None = None,
+        statut: str | None = None,
     ) -> list[Traitement]:
         return await self.repository.list_by_filters(
             type_traitement=type_traitement,
             prospection_id=prospection_id,
             chef_equipe_id=chef_equipe_id,
             reprenable=reprenable,
+            statut=statut,
         )
 
 

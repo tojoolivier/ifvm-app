@@ -64,6 +64,7 @@ async def list_traitements(
     prospection_id: uuid.UUID | None = Query(default=None),
     chef_equipe_id: uuid.UUID | None = Query(default=None),
     reprenable: bool | None = Query(default=None),
+    statut: str | None = Query(default=None),
 ):
     repository = get_repository(db)
     use_case = ListTraitements(repository)
@@ -72,6 +73,7 @@ async def list_traitements(
         prospection_id=prospection_id,
         chef_equipe_id=chef_equipe_id,
         reprenable=reprenable,
+        statut=statut,
     )
 
 

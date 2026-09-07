@@ -1145,6 +1145,48 @@ async def test_list_traitements_reprenable_inclut_aerien_sans_filtre_de_type(
 
 
 @pytest.mark.asyncio
+async def test_list_traitements_filtre_statut(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement,
+    payload_traitement_terrestre,
+):
+    """Lot D : l'onglet « Brouillons » de la page web « Fiches de traitement »
+    doit pouvoir isoler les fiches non encore validées côté serveur."""
+    brouillon_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    validee_id = await _creer_traitement_terrestre(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+    )
+    valider = await client.post(
+        f"/traitements/{validee_id}/valider",
+        json={
+            "date_validation": "2026-08-11",
+            "signatures": [{"role": "CHEF_EQUIPE", "signataire_nom": "Hery Rasoa"}],
+        },
+        headers=auth_headers,
+    )
+    assert valider.status_code == 200, valider.text
+
+    brouillons = await client.get(
+        "/traitements", params={"statut": "brouillon"}, headers=auth_headers
+    )
+    assert brouillons.status_code == 200
+    ids_brouillons = {t["id"] for t in brouillons.json()}
+    assert brouillon_id in ids_brouillons
+    assert validee_id not in ids_brouillons
+
+    validees = await client.get("/traitements", params={"statut": "validee"}, headers=auth_headers)
+    ids_validees = {t["id"] for t in validees.json()}
+    assert validee_id in ids_validees
+    assert brouillon_id not in ids_validees
+
+
+@pytest.mark.asyncio
 async def test_list_traitements_filtre_chef_equipe_id(
     client,
     auth_headers,

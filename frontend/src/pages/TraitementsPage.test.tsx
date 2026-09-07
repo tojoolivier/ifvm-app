@@ -47,11 +47,11 @@ function traitementTerrestreAvecRestante() {
   }
 }
 
-function renderPage() {
+function renderPage(initialEntry = '/traitements') {
   const queryClient = new QueryClient()
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={['/traitements']}>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <TraitementsPage />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -154,5 +154,65 @@ describe('TraitementsPage — colonnes maquette (README §7)', () => {
     await waitFor(() => expect(screen.getByText('Solde-01')).toBeInTheDocument())
     const restante = screen.getByText('0')
     expect(restante.className).not.toMatch(/ifvm-amber-text/)
+  })
+})
+
+describe('TraitementsPage — 3 sous-sections (Lot D)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('« Toutes les fiches » est actif par défaut et ne filtre pas par statut/reprenable', async () => {
+    mockedGet.mockResolvedValue({ data: [traitementAerien()] })
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+
+    expect(screen.getByRole('link', { name: 'Toutes les fiches' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    expect(screen.getByRole('link', { name: 'Zones à reprendre' })).not.toHaveAttribute(
+      'aria-current',
+    )
+    expect(screen.getByRole('link', { name: 'Brouillons' })).not.toHaveAttribute('aria-current')
+
+    const [, params] = mockedGet.mock.calls[0]
+    expect(params.params.reprenable).toBeUndefined()
+    expect(params.params.statut).toBeUndefined()
+  })
+
+  it('« Zones à reprendre » active l’onglet et transmet reprenable=true à l’API', async () => {
+    mockedGet.mockResolvedValue({ data: [] })
+    renderPage('/traitements?reprenable=true')
+
+    await waitFor(() => expect(mockedGet).toHaveBeenCalled())
+
+    expect(screen.getByRole('link', { name: 'Zones à reprendre' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    expect(screen.getByRole('link', { name: 'Toutes les fiches' })).not.toHaveAttribute(
+      'aria-current',
+    )
+    const [, params] = mockedGet.mock.calls[0]
+    expect(params.params.reprenable).toBe('true')
+  })
+
+  it('« Brouillons » active l’onglet et transmet statut=brouillon à l’API', async () => {
+    mockedGet.mockResolvedValue({ data: [] })
+    renderPage('/traitements?statut=brouillon')
+
+    await waitFor(() => expect(mockedGet).toHaveBeenCalled())
+
+    expect(screen.getByRole('link', { name: 'Brouillons' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    expect(screen.getByRole('link', { name: 'Toutes les fiches' })).not.toHaveAttribute(
+      'aria-current',
+    )
+    const [, params] = mockedGet.mock.calls[0]
+    expect(params.params.statut).toBe('brouillon')
   })
 })

@@ -91,6 +91,7 @@ class TraitementRepository(ABC):
         prospection_id: uuid.UUID | None = None,
         chef_equipe_id: uuid.UUID | None = None,
         reprenable: bool | None = None,
+        statut: str | None = None,
     ) -> list[Traitement]:
         pass
 
