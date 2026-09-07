@@ -3,13 +3,16 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any
 
-# Qui peut déclencher quelle transition
+# Qui peut déclencher quelle transition — `admin` peut se substituer à
+# verificateur/validation_finale sur toutes les fiches (déploiements où ces
+# rôles dédiés n'existent pas encore ou ne sont pas utilisés). `prospecteur`
+# reste strictement le seul à pouvoir soumettre son propre brouillon.
 _TRANSITIONS: dict[str, dict[str, list[str]]] = {
     "brouillon": {"en_attente": ["prospecteur"]},
-    "en_attente": {"verifiee": ["verificateur"]},
+    "en_attente": {"verifiee": ["verificateur", "admin"]},
     "verifiee": {
-        "validee": ["validation_finale"],
-        "rejetee": ["validation_finale"],
+        "validee": ["validation_finale", "admin"],
+        "rejetee": ["validation_finale", "admin"],
     },
 }
 

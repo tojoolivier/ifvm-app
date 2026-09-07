@@ -383,8 +383,12 @@ export function ProspectionDetailPage() {
   const role = currentUser?.role ?? ''
   const statut = prospection?.statut ?? ''
 
-  const canVerifier = statut === 'en_attente' && role === 'verificateur'
-  const canValiderOuRejeter = statut === 'verifiee' && role === 'validation_finale'
+  // `admin` peut se substituer à verificateur/validation_finale (mêmes rôles
+  // acceptés côté backend, _TRANSITIONS dans prospection.py) — déploiements où
+  // ces comptes dédiés n'existent pas encore ou ne sont pas utilisés.
+  const canVerifier = statut === 'en_attente' && (role === 'verificateur' || role === 'admin')
+  const canValiderOuRejeter =
+    statut === 'verifiee' && (role === 'validation_finale' || role === 'admin')
   const ficheValidee = isFicheValidee(statut)
 
   const validationEntry = auditLogSorted.find((entry) => entry.action === 'validation')
@@ -651,7 +655,7 @@ export function ProspectionDetailPage() {
           )}
         </Carte>
 
-        {/* Actions — gating de rôle inchangé */}
+        {/* Actions — verificateur/validation_finale, ou admin en substitution */}
         <Carte className="flex flex-col gap-[9px] px-5 py-[18px]">
           <h2 className="font-sans text-[13px] font-bold">Actions</h2>
           {canVerifier && (
