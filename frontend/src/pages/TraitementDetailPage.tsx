@@ -1,9 +1,11 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ErrorBanner } from '@/components/ui/error-banner'
 import { NavTabs } from '@/components/ui/nav-tabs'
 import { PILL_TONES, Pill } from '@/components/ui/pill'
@@ -64,6 +66,7 @@ interface TraitementDetail {
     mecanicien: string
     nb_rotations: number
     total_pesticide_l: number | null
+    surface_restante_ha: number | null
     rotations: Rotation[]
   } | null
   terrestre: {
@@ -192,6 +195,27 @@ export function TraitementDetailPage() {
     queryFn: () => api.get('/referentiel/pull').then((r) => r.data),
   })
 
+  // « Demander une reprise » (Lot C) : purement informatif — on réutilise le
+  // filtre `reprenable` déjà servi par GET /traitements (surface_restante_ha
+  // > 0, fiche non déjà utilisée comme origine) plutôt que de dupliquer cette
+  // règle côté front. Une fiche déjà « reprenable » l'est automatiquement
+  // pour l'app mobile (écran « Zones à reprendre ») ; ce bouton n'écrit rien.
+  const { data: reprenables } = useQuery<{ id: string }[]>({
+    queryKey: ['traitements-reprenables', traitement?.prospection_id, traitement?.type_traitement],
+    queryFn: () =>
+      api
+        .get('/traitements', {
+          params: {
+            prospection_id: traitement?.prospection_id,
+            type_traitement: traitement?.type_traitement,
+            reprenable: true,
+          },
+        })
+        .then((r) => r.data),
+    enabled: !!traitement,
+  })
+  const [reprisePromptOuvert, setReprisePromptOuvert] = useState(false)
+
   const pesticideNoms = useMemo(() => {
     const map = new Map<string, string>()
     for (const p of pesticidePull?.pesticides.upserts ?? []) map.set(p.id, p.nom)
@@ -313,6 +337,8 @@ export function TraitementDetailPage() {
   const empoisonnementLabel = libelleImpact(traitement.empoisonnement, empoisonnementDetail)
   const surfaceInfestee = traitement.cible?.surface_infestee_ha
   const restante = traitement.terrestre?.surface_restante_ha
+  const restanteGenerique = traitement.terrestre?.surface_restante_ha ?? traitement.aerien?.surface_restante_ha
+  const estReprenable = (reprenables ?? []).some((t) => t.id === traitement.id)
   const totalRotations = traitement.aerien
     ? [
         `${traitement.aerien.nb_rotations} rotation${traitement.aerien.nb_rotations > 1 ? 's' : ''}`,
@@ -559,9 +585,44 @@ export function TraitementDetailPage() {
               )}
               Une seule reprise possible par fiche d'origine.
             </p>
+            {estReprenable && (
+              <button
+                type="button"
+                onClick={() => setReprisePromptOuvert(true)}
+                className="mt-3 w-full rounded-[8px] border border-ifvm-amber-border bg-ifvm-amber-bg px-3 py-2 font-sans text-[11.5px] font-semibold text-ifvm-amber-text"
+              >
+                Demander une reprise
+              </button>
+            )}
           </Carte>
         </div>
       </div>
+
+      {reprisePromptOuvert && (
+        <Dialog
+          open
+          onOpenChange={(open: boolean) => {
+            if (!open) setReprisePromptOuvert(false)
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Demander une reprise</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              Surface restante à traiter : <b>{formatSurface(restanteGenerique)} ha</b>. Cette
+              fiche apparaît déjà automatiquement dans « Zones à reprendre » sur l'application
+              mobile des agents de terrain — aucune action supplémentaire n'est nécessaire ici :
+              un agent peut lancer la reprise directement depuis le terrain.
+            </p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setReprisePromptOuvert(false)}>
+                Fermer
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }
