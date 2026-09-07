@@ -73,15 +73,15 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "f7c2eb8f-bf2f-40bd-a46a-bf6d602f11d9"
+        "projectId": "f8545969-4f4c-46d6-b44a-ce33fe98f251"
       }
     },
-    "owner": "olivier_winkler",
     "runtimeVersion": {
       "policy": "fingerprint"
     },
     "updates": {
-      "url": "https://u.expo.dev/f7c2eb8f-bf2f-40bd-a46a-bf6d602f11d9"
-    }
+      "url": "https://u.expo.dev/f8545969-4f4c-46d6-b44a-ce33fe98f251"
+    },
+    "owner": "lilieoo"
   }
 }
