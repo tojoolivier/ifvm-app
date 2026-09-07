@@ -358,6 +358,33 @@ describe('API Client', () => {
         onUnauthorized
       ).toHaveBeenCalledTimes(1);
     });
+
+    it('lève NetworkError (pas AuthError) quand /auth/refresh échoue par panne réseau, pas par refus serveur', async () => {
+      // Bug réel : un agent qui retrouve la connexion et tape "Synchroniser"
+      // pouvait voir « Session expirée — reconnectez-vous » alors que son
+      // jeton était parfaitement valide, simplement parce que le tout premier
+      // appel réseau (le refresh préventif d'un jeton local expiré) tombait
+      // sur un accroc de connexion transitoire. `refreshAccessToken()`
+      // avalait alors l'échec de `fetch` dans un simple `null`, indiscernable
+      // d'un jeton de rafraîchissement réellement invalide.
+      const expiredToken = createJwt(
+        Math.floor(Date.now() / 1000) - 60
+      );
+
+      const onUnauthorized = jest.fn();
+
+      mockFetch.mockRejectedValueOnce(
+        new Error('Network request failed')
+      );
+
+      const erreur = await apiClient
+        .getProfile(expiredToken, onUnauthorized)
+        .catch((e: unknown) => e);
+
+      expect(erreur).toBeInstanceOf(NetworkError);
+      expect(erreur).not.toBeInstanceOf(AuthError);
+      expect(onUnauthorized).not.toHaveBeenCalled();
+    });
   });
 
   describe('401 handling', () => {
@@ -507,6 +534,34 @@ describe('API Client', () => {
       expect(
         onUnauthorized
       ).toHaveBeenCalledTimes(1);
+    });
+
+    it('lève NetworkError (pas AuthError) quand /auth/refresh échoue par panne réseau après un 401 en vol', async () => {
+      const token = createJwt(
+        Math.floor(Date.now() / 1000) + 3600
+      );
+
+      const onUnauthorized = jest.fn();
+
+      mockFetch
+        .mockResolvedValueOnce(
+          mockJsonResponse({
+            ok: false,
+            status: 401,
+            json: async () => ({ detail: 'Unauthorized' }),
+          })
+        )
+        .mockRejectedValueOnce(
+          new Error('Network request failed')
+        );
+
+      const erreur = await apiClient
+        .getProfile(token, onUnauthorized)
+        .catch((e: unknown) => e);
+
+      expect(erreur).toBeInstanceOf(NetworkError);
+      expect(erreur).not.toBeInstanceOf(AuthError);
+      expect(onUnauthorized).not.toHaveBeenCalled();
     });
 
     it('does not trigger onUnauthorized on non-401 errors', async () => {

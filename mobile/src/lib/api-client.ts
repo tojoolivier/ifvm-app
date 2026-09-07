@@ -473,21 +473,23 @@ export function isTokenExpired(
  * Utiliser refreshAccessTokenSingleFlight().
  */
 async function refreshAccessToken(): Promise<string | null> {
+  const refreshToken =
+    await AsyncStorage.getItem(
+      REFRESH_TOKEN_KEY
+    );
+
+  if (!refreshToken) {
+    log.event('auth.refresh.absent');
+
+    return null;
+  }
+
+  const baseUrl = getBaseUrl();
+
+  let response: Response;
+
   try {
-    const refreshToken =
-      await AsyncStorage.getItem(
-        REFRESH_TOKEN_KEY
-      );
-
-    if (!refreshToken) {
-      log.event('auth.refresh.absent');
-
-      return null;
-    }
-
-    const baseUrl = getBaseUrl();
-
-    const response = await fetch(
+    response = await fetch(
       `${baseUrl}/auth/refresh`,
       {
         method: 'POST',
@@ -499,44 +501,46 @@ async function refreshAccessToken(): Promise<string | null> {
         }),
       }
     );
-
-    if (!response.ok) {
-      log.event('auth.refresh.refuse', {
-        status: response.status,
-      });
-
-      return null;
-    }
-
-    const data =
-      (await response.json()) as RefreshResponse;
-
-    if (!data.access_token) {
-      log.event('auth.refresh.sans-jeton');
-
-      return null;
-    }
-
-    await AsyncStorage.setItem(
-      TOKEN_KEY,
-      data.access_token
-    );
-
-    return data.access_token;
   } catch (error) {
-    // Seul `failure` du module : l'erreur s'arrête ici. Partout ailleurs
-    // api-client relance du typé, et c'est la frontière qui journalise —
-    // journaliser des deux côtés doublerait chaque ligne.
-    log.failure(
-      'auth.refresh.failed',
-      new NetworkError(
-        'Rafraîchissement du jeton impossible',
-        { cause: error }
-      )
+    // `fetch` qui échoue ici, c'est une panne de transport (serveur injoignable,
+    // coupure juste après le retour en couverture réseau) — PAS un refus du
+    // serveur. Avaler ce cas dans un simple `null`, comme avant, le rendait
+    // indiscernable d'un jeton de rafraîchissement réellement invalide : le
+    // moindre accroc réseau au moment de synchroniser affichait « Session
+    // expirée — reconnectez-vous » à la place de « Connexion au serveur
+    // impossible ». On relance donc une `NetworkError` typée : elle traverse
+    // refreshAccessTokenSingleFlight() (conçue pour la laisser passer) et
+    // makeRequest() (qui ne l'intercepte pas ici) telle quelle jusqu'à
+    // l'appelant, sans jamais atteindre la branche AuthError.
+    throw new NetworkError(
+      'Rafraîchissement du jeton impossible — serveur injoignable',
+      { cause: error }
     );
+  }
+
+  if (!response.ok) {
+    log.event('auth.refresh.refuse', {
+      status: response.status,
+    });
 
     return null;
   }
+
+  const data =
+    (await response.json()) as RefreshResponse;
+
+  if (!data.access_token) {
+    log.event('auth.refresh.sans-jeton');
+
+    return null;
+  }
+
+  await AsyncStorage.setItem(
+    TOKEN_KEY,
+    data.access_token
+  );
+
+  return data.access_token;
 }
 
 /**
