@@ -256,6 +256,7 @@ class ListProspections:
         campagne_id: uuid.UUID | None = None,
         station_id: uuid.UUID | None = None,
         prospecteur_id: uuid.UUID | None = None,
+        disponible_pour_traitement: bool = False,
     ) -> list[Prospection]:
         return await self.repository.list_by_filters(
             type_prospection=type_prospection,
@@ -263,6 +264,7 @@ class ListProspections:
             campagne_id=campagne_id,
             station_id=station_id,
             prospecteur_id=prospecteur_id,
+            disponible_pour_traitement=disponible_pour_traitement,
         )
 
 
@@ -550,7 +552,7 @@ class ChangerStatut:
             raise LookupError("Prospection non trouvée")
 
         statut_precedent = prospection.statut
-        action = prospection.apply_transition(nouveau_statut, acteur_role)
+        action = prospection.apply_transition(nouveau_statut, acteur_role, acteur_id)
 
         updated = await self.prospection_repo.update(prospection)
 

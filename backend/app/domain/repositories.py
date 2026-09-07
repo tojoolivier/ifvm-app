@@ -58,6 +58,7 @@ class ProspectionRepository(ABC):
         campagne_id: uuid.UUID | None = None,
         station_id: uuid.UUID | None = None,
         prospecteur_id: uuid.UUID | None = None,
+        disponible_pour_traitement: bool = False,
     ) -> list[Prospection]:
         pass
 

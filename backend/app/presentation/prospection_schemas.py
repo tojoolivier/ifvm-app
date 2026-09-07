@@ -698,6 +698,21 @@ class ProspectionRead(BaseModel):
     updated_at: datetime
 
     # ==========================================
+    # Traçabilité vérification/validation (#fiches-validees-multi-utilisateurs) —
+    # colonnes déjà présentes en base mais jamais exposées ni renseignées avant
+    # ce chantier (cf. Prospection.apply_transition côté domaine).
+    # ==========================================
+    verified_by: uuid.UUID | None = None
+    verified_at: datetime | None = None
+    validated_by: uuid.UUID | None = None
+    validated_at: datetime | None = None
+    # Champs dérivés (jointure `utilisateur`, jamais stockés) — évite à chaque
+    # client de résoudre lui-même id -> nom pour l'affichage.
+    prospecteur_nom: str | None = None
+    verified_by_nom: str | None = None
+    validated_by_nom: str | None = None
+
+    # ==========================================
     # NOUVEAUX CHAMPS - Références (A)
     # ==========================================
     region: str | None = None

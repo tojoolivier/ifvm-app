@@ -2,25 +2,41 @@ import { useCallback, useEffect, useState } from 'react';
 import { Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { listValidatedProspections, DraftProspection } from '@/lib/prospection-repository';
+import { ProspectionRead } from '@/lib/api-client';
+import { loadFichesDisponiblesPourTraitement, assurerProspectionDisponibleLocalement } from '@/lib/prospection-accueil';
+import { useAuthStore } from '@/lib/auth-store';
+import { useAsyncAction } from '@/hooks/use-async-action';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
 import { runTask } from '@/lib/run-task';
 import { EtatVide } from '@/components/erreurs/etat-vide';
 
+const LIBELLE_TYPE: Record<string, string> = {
+  extensive: 'Extensive',
+  intensive: 'Intensive',
+  validation: 'Signalement',
+};
+
 /**
- * Sélecteur de fiche de prospection à lier (point ouvert du Lot 2, fermé au
- * Lot 3 — #91). Seules les fiches extensives ou de vérification de
- * signalement, déjà synchronisées, sont proposées — condition affichée en
- * lecture seule à l'écran Références une fois liée.
+ * « Fiches de traitement → Consulter une fiche validée » (#fiches-validees-
+ * multi-utilisateurs) — remplace le sélecteur mono-utilisateur d'origine
+ * (Lot 2/3, #91) : les fiches validées PAR N'IMPORTE QUEL agent, des trois
+ * types (extensive/intensive/signalement — même table, même workflow de
+ * statut), pas encore transformées en traitement. Toujours un appel serveur
+ * direct (jamais le cache SQLite local, qui ne connaît que les fiches créées
+ * sur CET appareil) — « la disponibilité globale des fiches est une
+ * opération serveur ».
  */
 export default function TraitementProspectionPickerScreen() {
   const router = useRouter();
-  const [prospections, setProspections] = useState<DraftProspection[]>([]);
+  const token = useAuthStore((s) => s.token);
+  const [prospections, setProspections] = useState<ProspectionRead[]>([]);
   const [loading, setLoading] = useState(true);
   const [erreurDeLecture, setErreurDeLecture] = useState<unknown>(null);
+  const { run, isRunning: isSelectionEnCours } = useAsyncAction();
 
   const charger = useCallback(() => {
-    void runTask(() => listValidatedProspections(), {
+    if (!token) return;
+    void runTask(() => loadFichesDisponiblesPourTraitement(token), {
       name: 'traitement.prospectionPicker',
       criticality: 'essential',
     }).then((outcome) => {
@@ -28,22 +44,29 @@ export default function TraitementProspectionPickerScreen() {
       if (outcome.ok) setProspections(outcome.value);
       setLoading(false);
     });
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     charger();
   }, [charger]);
 
-  const choisir = (prospection: DraftProspection) => {
-    router.push({
-      pathname: '/(traitement)/references' as any,
-      params: { prospectionId: prospection.id },
-    });
-  };
+  const choisir = (prospection: ProspectionRead) =>
+    run(
+      async () => {
+        // Rapatrie la fiche en local si elle vient d'un autre agent — sans
+        // quoi l'écran Références (lecture locale) ne trouverait rien.
+        await assurerProspectionDisponibleLocalement(prospection);
+        router.push({
+          pathname: '/(traitement)/references' as any,
+          params: { prospectionId: prospection.id },
+        });
+      },
+      { screen: 'prospection-picker', context: { prospectionId: prospection.id } }
+    );
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Choisir une fiche de prospection</Text>
+      <Text style={styles.title}>Consulter une fiche validée</Text>
 
       {loading ? (
         <Text style={styles.emptyText}>Chargement…</Text>
@@ -55,19 +78,28 @@ export default function TraitementProspectionPickerScreen() {
           ListEmptyComponent={
             <EtatVide
               erreur={erreurDeLecture}
-              titreVide="Aucune fiche de prospection éligible pour le moment."
+              titreVide="Aucune fiche validée disponible pour le moment."
               onReessayer={charger}
             />
           }
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.row} onPress={() => choisir(item)}>
+            <TouchableOpacity
+              style={styles.row}
+              onPress={() => choisir(item)}
+              disabled={isSelectionEnCours}
+            >
               <Text style={styles.rowTitle}>
-                {item.n_message ?? 'Fiche sans numéro'} · {item.date_prospection?.slice(0, 10) ?? 'date inconnue'}
+                {LIBELLE_TYPE[item.type_prospection] ?? item.type_prospection} · {item.n_fiche ?? item.n_releve ?? item.n_message ?? 'sans référence'}
               </Text>
               <Text style={styles.rowSubtitle}>
+                {item.date_prospection?.slice(0, 10) ?? 'date inconnue'} ·{' '}
                 {[item.region, item.district, item.commune].filter(Boolean).join(' · ') || 'localisation non renseignée'}
               </Text>
-              <Text style={styles.rowDetail}>{item.id}</Text>
+              <Text style={styles.rowDetail}>
+                Créée par {item.prospecteur_nom ?? '—'}
+                {item.validated_by_nom ? ` · Validée par ${item.validated_by_nom}` : ''}
+                {item.validated_at ? ` le ${item.validated_at.slice(0, 10)}` : ''}
+              </Text>
             </TouchableOpacity>
           )}
         />
@@ -98,9 +130,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     gap: 2,
   },
-  rowTitle: { fontFamily: traitementFonts.mono, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre },
+  rowTitle: { fontFamily: traitementFonts.uiSemiBold, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre },
   rowSubtitle: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.label, color: traitementColors.texteSecondaire },
-  rowDetail: { fontFamily: traitementFonts.mono, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
+  rowDetail: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
   backLink: {
     borderWidth: 1,
     borderStyle: 'dashed',

@@ -2326,6 +2326,20 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Verified By */
+            verified_by?: string | null;
+            /** Verified At */
+            verified_at?: string | null;
+            /** Validated By */
+            validated_by?: string | null;
+            /** Validated At */
+            validated_at?: string | null;
+            /** Prospecteur Nom */
+            prospecteur_nom?: string | null;
+            /** Verified By Nom */
+            verified_by_nom?: string | null;
+            /** Validated By Nom */
+            validated_by_nom?: string | null;
             /** Region */
             region?: string | null;
             /** District */
@@ -4949,6 +4963,8 @@ export interface operations {
                 campagne_id?: string | null;
                 station_id?: string | null;
                 prospecteur_id?: string | null;
+                /** @description N'inclut que les fiches sans traitement associé — « Fiches de traitement → Consulter une fiche validée » (mobile), combiné à statut=validee. */
+                disponible_pour_traitement?: boolean;
             };
             header?: never;
             path?: never;
