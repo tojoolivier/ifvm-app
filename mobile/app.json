@@ -73,15 +73,15 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "f8545969-4f4c-46d6-b44a-ce33fe98f251"
+        "projectId": "4edea973-7cf6-44e3-818f-bc060e2f7db4"
       }
     },
     "runtimeVersion": {
       "policy": "fingerprint"
     },
     "updates": {
-      "url": "https://u.expo.dev/f8545969-4f4c-46d6-b44a-ce33fe98f251"
+      "url": "https://u.expo.dev/4edea973-7cf6-44e3-818f-bc060e2f7db4"
     },
-    "owner": "lilieoo"
+    "owner": "geekexpo0ronaldo"
   }
 }
