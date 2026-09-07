@@ -18,6 +18,7 @@ const ROLES = [
   'pilote',
   'mecanicien',
   'chef_de_base',
+  'consultant_international',
   'admin',
 ]
 
@@ -36,6 +37,7 @@ const ROLE_TONES: Record<string, string> = {
   chef_equipe: 'bg-ifvm-green-bg text-ifvm-green-text border-ifvm-green-border',
   chef_de_base: 'bg-ifvm-green-bg text-ifvm-green-text border-ifvm-green-border',
   agent_encadreur: 'bg-ifvm-green-bg text-ifvm-green-text border-ifvm-green-border',
+  consultant_international: 'bg-ifvm-brouillon-bg text-ifvm-brouillon-text border-ifvm-brouillon-border',
   admin: 'bg-ifvm-blue-bg text-ifvm-blue-text border-ifvm-blue-border',
 }
 
@@ -48,6 +50,7 @@ const ROLE_LABELS: Record<string, string> = {
   pilote: 'Pilote',
   mecanicien: 'Mécanicien',
   chef_de_base: 'Chef de base',
+  consultant_international: 'Consultant international',
   admin: 'Administrateur',
 }
 
