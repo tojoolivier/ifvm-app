@@ -46,12 +46,16 @@ function baseProspection(statut: string) {
   }
 }
 
-function renderPage(statut: string, overrides: Partial<ReturnType<typeof baseProspection>> = {}) {
+function renderPage(
+  statut: string,
+  overrides: Partial<ReturnType<typeof baseProspection>> = {},
+  role = 'validation_finale',
+) {
   mockedGet.mockImplementation((url: string) => {
     if (url === '/prospections/p1')
       return Promise.resolve({ data: { ...baseProspection(statut), ...overrides } })
     if (url === '/prospections/p1/audit-log') return Promise.resolve({ data: [] })
-    if (url === '/users/me') return Promise.resolve({ data: { id: 'u1', nom: 'Test', role: 'validation_finale' } })
+    if (url === '/users/me') return Promise.resolve({ data: { id: 'u1', nom: 'Test', role } })
     if (url === '/campagnes') return Promise.resolve({ data: [] })
     return Promise.resolve({ data: [] })
   })
@@ -190,5 +194,33 @@ describe('ProspectionDetailPage — maquette §5 du handoff', () => {
     expect(
       screen.getByRole('button', { name: 'Créer une fiche de traitement' }),
     ).toBeInTheDocument()
+  })
+})
+
+describe('ProspectionDetailPage — admin se substitue à verificateur/validation_finale', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('affiche « Vérifier la fiche » pour un compte admin sur une fiche en_attente', async () => {
+    renderPage('en_attente', {}, 'admin')
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'F-001' })).toBeInTheDocument())
+
+    expect(screen.getByRole('button', { name: 'Vérifier la fiche' })).toBeInTheDocument()
+  })
+
+  it('affiche « Valider la fiche » et « Rejeter avec motif » pour un compte admin sur une fiche verifiee', async () => {
+    renderPage('verifiee', {}, 'admin')
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'F-001' })).toBeInTheDocument())
+
+    expect(screen.getByRole('button', { name: 'Valider la fiche' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Rejeter avec motif' })).toBeInTheDocument()
+  })
+
+  it("masque « Vérifier la fiche » pour un compte prospecteur, y compris en_attente", async () => {
+    renderPage('en_attente', {}, 'prospecteur')
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'F-001' })).toBeInTheDocument())
+
+    expect(screen.queryByRole('button', { name: 'Vérifier la fiche' })).not.toBeInTheDocument()
   })
 })
