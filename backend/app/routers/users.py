@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user, hash_password
@@ -17,6 +18,36 @@ from app.schemas.users import (
 )
 
 router = APIRouter()
+
+
+def _contrainte_violee(exc: IntegrityError) -> str | None:
+    """Nom de la contrainte violée — même mécanique que
+    `prospection_repository._contrainte_violee` : `exc.orig` est l'erreur
+    asyncpg, qui porte `constraint_name` un cran plus bas."""
+    erreur: BaseException | None = getattr(exc, "orig", None)
+    while erreur is not None:
+        nom = getattr(erreur, "constraint_name", None)
+        if nom:
+            return str(nom)
+        erreur = erreur.__cause__
+    return None
+
+
+def _detail_creation_utilisateur(exc: IntegrityError) -> str:
+    """Traduit l'IntegrityError en message actionnable pour le formulaire web.
+
+    Sans ça, `create_user` laissait l'exception remonter telle quelle :
+    Starlette la rend en 500 texte brut (pas de champ `detail` JSON), que le
+    front (`UsersPage.tsx`) ne sait afficher que comme « Erreur lors de la
+    création » — un email dupliqué ou un rôle refusé par
+    `ck_utilisateur_role` (cf. migration 0051) restaient donc muets pour
+    l'agent, alors même que la cause est connue côté serveur."""
+    contrainte = _contrainte_violee(exc)
+    if contrainte == "utilisateur_email_key":
+        return "Un utilisateur avec cet email existe déjà."
+    if contrainte == "ck_utilisateur_role":
+        return "Ce rôle n'est pas autorisé."
+    return "La création viole une contrainte de la base."
 
 
 @router.get("/me", response_model=UtilisateurRead)
@@ -62,7 +93,14 @@ async def create_user(
     data["password_hash"] = hash_password(data.pop("password"))
     user = Utilisateur(**data)
     db.add(user)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_detail_creation_utilisateur(exc),
+        ) from exc
     await db.refresh(user)
     return user
 
