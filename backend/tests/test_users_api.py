@@ -12,30 +12,8 @@ import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import create_access_token, hash_password
+from app.auth import hash_password
 from app.models.users import Utilisateur
-
-
-@pytest_asyncio.fixture
-async def admin(db_session: AsyncSession) -> Utilisateur:
-    user = Utilisateur(
-        id=uuid.uuid4(),
-        nom="Soa",
-        prenom="Lalao",
-        email=f"lalao.soa+{uuid.uuid4().hex[:6]}@test.mg",
-        password_hash=hash_password("secret"),
-        role="admin",
-        actif=True,
-    )
-    db_session.add(user)
-    await db_session.commit()
-    await db_session.refresh(user)
-    return user
-
-
-@pytest_asyncio.fixture
-async def admin_headers(admin: Utilisateur) -> dict:
-    return {"Authorization": f"Bearer {create_access_token(admin.id)}"}
 
 
 @pytest_asyncio.fixture
