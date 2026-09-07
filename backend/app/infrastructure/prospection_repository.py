@@ -25,6 +25,8 @@ from app.infrastructure.prospection_model import (
     ProspectionPopulationModel,
 )
 from app.infrastructure.referentiel_model import StadeModel
+from app.infrastructure.traitement_model import TraitementModel
+from app.models.users import Utilisateur
 
 # La clé étrangère `prospection.station_id` porte le nom donné par la migration 0004, ou
 # celui qu'engendre Postgres quand le schéma est créé depuis les métadonnées (en test).
@@ -87,7 +89,9 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         model = result.scalar_one_or_none()
         if model is None:
             return None
-        return self._to_domain(model)
+        prospection = self._to_domain(model)
+        await self._resoudre_noms([prospection])
+        return prospection
 
     async def list_by_filters(
         self,
@@ -96,6 +100,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         campagne_id: uuid.UUID | None = None,
         station_id: uuid.UUID | None = None,
         prospecteur_id: uuid.UUID | None = None,
+        disponible_pour_traitement: bool = False,
     ) -> list[Prospection]:
         stmt = select(ProspectionModel).options(
             selectinload(ProspectionModel.populations),
@@ -118,9 +123,50 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             stmt = stmt.where(ProspectionModel.station_id == station_id)
         if prospecteur_id is not None:
             stmt = stmt.where(ProspectionModel.prospecteur_id == prospecteur_id)
+        if disponible_pour_traitement:
+            # « Fiches de traitement → Consulter une fiche validée » (#fiches-
+            # validees-multi-utilisateurs) : une fiche déjà transformée en
+            # traitement (par n'importe quel utilisateur, sur n'importe quel
+            # appareil) ne doit plus être proposée à la sélection — sans pour
+            # autant la supprimer (elle garde son historique). La réservation
+            # atomique anti-double-sélection (empêcher DEUX utilisateurs de
+            # sélectionner la MÊME fiche au MÊME instant) reste un chantier
+            # séparé, à ce filtre d'exclusion "après coup".
+            sous_requete = select(TraitementModel.id).where(
+                TraitementModel.prospection_id == ProspectionModel.id
+            )
+            stmt = stmt.where(~sous_requete.exists())
         stmt = stmt.order_by(ProspectionModel.date_prospection.desc())
         result = await self.session.execute(stmt)
-        return [self._to_domain(m) for m in result.scalars().all()]
+        prospections = [self._to_domain(m) for m in result.scalars().all()]
+        await self._resoudre_noms(prospections)
+        return prospections
+
+    async def _resoudre_noms(self, prospections: list[Prospection]) -> None:
+        """Peuple `prospecteur_nom`/`verified_by_nom`/`validated_by_nom` par une
+        seule requête groupée, plutôt qu'un aller-retour par fiche et par rôle
+        (#fiches-validees-multi-utilisateurs) — la liste « Consulter une fiche
+        validée » peut afficher plusieurs dizaines de fiches à la fois.
+        """
+        ids: set[uuid.UUID] = set()
+        for p in prospections:
+            ids.add(p.prospecteur_id)
+            if p.verified_by:
+                ids.add(p.verified_by)
+            if p.validated_by:
+                ids.add(p.validated_by)
+        if not ids:
+            return
+        result = await self.session.execute(
+            select(Utilisateur.id, Utilisateur.prenom, Utilisateur.nom).where(
+                Utilisateur.id.in_(ids)
+            )
+        )
+        noms = {row.id: f"{row.prenom} {row.nom}" for row in result.all()}
+        for p in prospections:
+            p.prospecteur_nom = noms.get(p.prospecteur_id)
+            p.verified_by_nom = noms.get(p.verified_by) if p.verified_by else None
+            p.validated_by_nom = noms.get(p.validated_by) if p.validated_by else None
 
     async def stades_inconnus(self, codes: set[str]) -> set[str]:
         if not codes:
@@ -351,6 +397,12 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         model.observations = prospection.observations
         model.statut = prospection.statut
         model.updated_at = prospection.updated_at
+        # Colonnes présentes depuis l'origine mais jamais écrites avant
+        # #fiches-validees-multi-utilisateurs — cf. Prospection.apply_transition().
+        model.verified_by = prospection.verified_by
+        model.verified_at = prospection.verified_at
+        model.validated_by = prospection.validated_by
+        model.validated_at = prospection.validated_at
 
         # ==========================================
         # NOUVEAUX CHAMPS - Références (A)

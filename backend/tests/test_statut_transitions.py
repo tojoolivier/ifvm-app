@@ -119,7 +119,13 @@ async def test_transition_en_attente_verifiee(
     assert code == 200
 
     resp = await client.get(f"/prospections/{pid}", headers=auth_headers)
-    assert resp.json()["statut"] == "verifiee"
+    body = resp.json()
+    assert body["statut"] == "verifiee"
+    # #fiches-validees-multi-utilisateurs : colonnes présentes de longue date,
+    # jamais renseignées avant ce chantier.
+    assert body["verified_by"] == str(verificateur.id)
+    assert body["verified_at"] is not None
+    assert body["verified_by_nom"] == f"{verificateur.prenom} {verificateur.nom}"
 
 
 @pytest.mark.asyncio
@@ -139,7 +145,12 @@ async def test_transition_verifiee_validee(
     assert code == 200
 
     resp = await client.get(f"/prospections/{pid}", headers=auth_headers)
-    assert resp.json()["statut"] == "validee"
+    body = resp.json()
+    assert body["statut"] == "validee"
+    assert body["validated_by"] == str(validateur.id)
+    assert body["validated_at"] is not None
+    assert body["validated_by_nom"] == f"{validateur.prenom} {validateur.nom}"
+    assert body["prospecteur_nom"] == f"{utilisateur.prenom} {utilisateur.nom}"
 
 
 @pytest.mark.asyncio
@@ -299,3 +310,79 @@ async def test_ajouter_commentaire(
 async def test_audit_log_prospection_inexistante(client: AsyncClient, auth_headers: dict):
     resp = await client.get(f"/prospections/{uuid.uuid4()}/audit-log", headers=auth_headers)
     assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Test disponible_pour_traitement — #fiches-validees-multi-utilisateurs
+# ---------------------------------------------------------------------------
+
+
+async def _valider_prospection(
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    verificateur: Utilisateur,
+    validateur: Utilisateur,
+) -> str:
+    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
+    await _changer_statut(client, pid, "en_attente", auth_headers)
+    await _changer_statut(client, pid, "verifiee", _headers(verificateur))
+    await _changer_statut(client, pid, "validee", _headers(validateur))
+    return pid
+
+
+@pytest.mark.asyncio
+async def test_disponible_pour_traitement_exclut_une_fiche_deja_traitee(
+    client: AsyncClient,
+    utilisateur: Utilisateur,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    verificateur: Utilisateur,
+    validateur: Utilisateur,
+    chef_equipe: Utilisateur,
+):
+    """« Consulter une fiche validée » (mobile) : une fiche validée mais pas
+    encore transformée en traitement doit apparaître ; une fiche déjà
+    transformée (par n'importe quel utilisateur) doit en disparaître — sans
+    être supprimée (elle garde son historique, cf. GET /prospections/{id})."""
+    pid_disponible = await _valider_prospection(
+        client, auth_headers, campagne_id, station_id, verificateur, validateur
+    )
+    pid_deja_traitee = await _valider_prospection(
+        client, auth_headers, campagne_id, station_id, verificateur, validateur
+    )
+    creation = await client.post(
+        "/traitements",
+        json={
+            "prospection_id": pid_deja_traitee,
+            "date_traitement": "2026-08-11",
+            "date_validation": "2026-08-10",
+            "localite": "Betioky",
+            "terrestre": {
+                "heure_debut": "06:00:00",
+                "heure_fin": "09:00:00",
+                "vitesse_vent_ms": 1.5,
+                "temperature_c": 24.0,
+                "chef_equipe_id": str(chef_equipe.id),
+            },
+        },
+        headers=auth_headers,
+    )
+    assert creation.status_code == 201, creation.text
+
+    resp = await client.get(
+        "/prospections",
+        params={"statut": "validee", "disponible_pour_traitement": "true"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    ids = [p["id"] for p in resp.json()]
+    assert pid_disponible in ids
+    assert pid_deja_traitee not in ids
+
+    # La fiche déjà traitée n'est pas supprimée : toujours lisible individuellement.
+    relecture = await client.get(f"/prospections/{pid_deja_traitee}", headers=auth_headers)
+    assert relecture.status_code == 200
+    assert relecture.json()["statut"] == "validee"

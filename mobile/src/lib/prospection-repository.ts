@@ -430,6 +430,57 @@ export async function createDraftProspection(input: DraftProspectionInput): Prom
   return created;
 }
 
+/**
+ * Matérialise en local une fiche déjà VALIDÉE côté serveur, créée par
+ * n'importe quel utilisateur — pas seulement celui de cet appareil
+ * (#fiches-validees-multi-utilisateurs). Distinct de `createDraftProspection`
+ * (toujours `brouillon`/`local`, réservé à une saisie qui démarre ici) :
+ * celle-ci écrit `statut`/`statut_sync` tels que fournis par le serveur.
+ *
+ * `INSERT OR REPLACE` — idempotent, rejouable sans effet de bord si l'agent
+ * rouvre plusieurs fois « Consulter une fiche validée » avant de choisir :
+ * `PRAGMA foreign_keys = ON` (actif sur cette base, cf. openAndMigrate) fait
+ * cascader la suppression des populations/infestations déjà écrites lors d'un
+ * appel précédent — sans conséquence puisque l'appelant les réécrit aussitôt
+ * après (mêmes données, fraîches).
+ */
+export interface ProspectionValideeInput {
+  id: string;
+  typeProspection: string;
+  campagneId: string;
+  prospecteurId: string;
+  dateProspection: string;
+  surfaceInfestee: number | null;
+  nFiche: string | null;
+  nReleve: string | null;
+  nMessage: string | null;
+  region: string | null;
+  district: string | null;
+  commune: string | null;
+  observations: string | null;
+  statut: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function materialiserProspectionValidee(input: ProspectionValideeInput): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(
+    `INSERT OR REPLACE INTO prospection (
+      id, type_prospection, campagne_id, prospecteur_id,
+      date_prospection, surface_infestee, n_fiche, n_releve, n_message,
+      region, district, commune, observations,
+      statut, statut_sync, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?)`,
+    [
+      input.id, input.typeProspection, input.campagneId, input.prospecteurId,
+      input.dateProspection, input.surfaceInfestee, input.nFiche, input.nReleve, input.nMessage,
+      input.region, input.district, input.commune, input.observations,
+      input.statut, input.createdAt, input.updatedAt,
+    ]
+  );
+}
+
 export async function updateProspectionReference(id: string, input: ReferenceUpdateInput): Promise<DraftProspection> {
   const db = await getDb();
   const now = new Date().toISOString();

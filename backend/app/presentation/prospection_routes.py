@@ -53,6 +53,14 @@ async def list_prospections(
     campagne_id: uuid.UUID | None = Query(default=None),
     station_id: uuid.UUID | None = Query(default=None),
     prospecteur_id: uuid.UUID | None = Query(default=None),
+    disponible_pour_traitement: bool = Query(
+        default=False,
+        description=(
+            "N'inclut que les fiches sans traitement associé — "
+            "« Fiches de traitement → Consulter une fiche validée » (mobile), "
+            "combiné à statut=validee."
+        ),
+    ),
 ):
     repository = get_repository(db)
     use_case = ListProspections(repository)
@@ -62,6 +70,7 @@ async def list_prospections(
         campagne_id=campagne_id,
         station_id=station_id,
         prospecteur_id=prospecteur_id,
+        disponible_pour_traitement=disponible_pour_traitement,
     )
 
 

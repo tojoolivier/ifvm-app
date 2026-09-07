@@ -5,6 +5,10 @@ import {
   listDraftProspections,
   listRecentProspections,
   deleteProspection,
+  materialiserProspectionValidee,
+  saveProspectionPopulation,
+  saveProspectionInfestation,
+  getProspection,
   DraftProspection,
 } from '../src/lib/prospection-repository';
 import { listCampagnesLocal } from '../src/lib/referentiel-db';
@@ -17,6 +21,8 @@ import {
 import {
   loadAccueilData,
   loadValidatedProspections,
+  loadFichesDisponiblesPourTraitement,
+  assurerProspectionDisponibleLocalement,
   pickCurrentCampagneId,
   startNewProspection,
   deleteDraftProspection,
@@ -34,6 +40,10 @@ jest.mock('../src/lib/prospection-repository', () => ({
   listDraftProspections: jest.fn(),
   listRecentProspections: jest.fn(),
   deleteProspection: jest.fn(),
+  materialiserProspectionValidee: jest.fn(),
+  saveProspectionPopulation: jest.fn(),
+  saveProspectionInfestation: jest.fn(),
+  getProspection: jest.fn(),
 }));
 
 jest.mock('../src/lib/referentiel-db', () => ({
@@ -47,6 +57,10 @@ const mockListDrafts = jest.mocked(listDraftProspections);
 const mockListRecent = jest.mocked(listRecentProspections);
 const mockDeleteLocal = jest.mocked(deleteProspection);
 const mockListCampagnesLocal = jest.mocked(listCampagnesLocal);
+const mockMaterialiser = jest.mocked(materialiserProspectionValidee);
+const mockSavePopulation = jest.mocked(saveProspectionPopulation);
+const mockSaveInfestation = jest.mocked(saveProspectionInfestation);
+const mockGetProspection = jest.mocked(getProspection);
 
 const STORED_ROW: DraftProspection = {
   id: '11111111-1111-1111-1111-111111111111',
@@ -272,6 +286,72 @@ describe('loadValidatedProspections', () => {
 
     await expect(loadValidatedProspections('tok', 'p1')).rejects.toBeInstanceOf(
       NetworkError
+    );
+  });
+});
+
+// #fiches-validees-multi-utilisateurs
+describe('loadFichesDisponiblesPourTraitement', () => {
+  it('interroge le serveur avec statut=validee et disponible_pour_traitement=true, sans filtre par utilisateur', async () => {
+    mockApiClient.listProspections.mockResolvedValueOnce([]);
+
+    await loadFichesDisponiblesPourTraitement('tok');
+
+    expect(mockApiClient.listProspections).toHaveBeenCalledWith('tok', {
+      statut: 'validee',
+      disponible_pour_traitement: true,
+    });
+  });
+});
+
+describe('assurerProspectionDisponibleLocalement', () => {
+  const FICHE_SERVEUR = {
+    id: 'presp-autre-agent',
+    type_prospection: 'extensive',
+    campagne_id: 'camp-1',
+    prospecteur_id: 'autre-agent',
+    date_prospection: '2026-08-01',
+    surface_infestee: 12.5,
+    n_fiche: 'F-001',
+    n_releve: null,
+    n_message: null,
+    region: 'Atsimo-Andrefana',
+    district: 'Toliara II',
+    commune: 'Betsinjaka',
+    observations: null,
+    statut: 'validee',
+    created_at: '2026-08-01T00:00:00Z',
+    updated_at: '2026-08-02T00:00:00Z',
+    populations: [{ espece: 'LMC', categorie: 'imago' }],
+    infestations: [{ type_cible: 'GENERALISEE', espece: 'LMC' }],
+  } as any;
+
+  it('ne fait rien si la fiche existe déjà en local (cas courant : propre fiche de l’agent)', async () => {
+    mockGetProspection.mockResolvedValueOnce({ id: FICHE_SERVEUR.id } as any);
+
+    await assurerProspectionDisponibleLocalement(FICHE_SERVEUR);
+
+    expect(mockMaterialiser).not.toHaveBeenCalled();
+    expect(mockSavePopulation).not.toHaveBeenCalled();
+    expect(mockSaveInfestation).not.toHaveBeenCalled();
+  });
+
+  it('rapatrie la fiche et ses populations/infestations si elle vient d’un autre agent', async () => {
+    mockGetProspection.mockResolvedValueOnce(null);
+
+    await assurerProspectionDisponibleLocalement(FICHE_SERVEUR);
+
+    expect(mockMaterialiser).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'presp-autre-agent', statut: 'validee', surfaceInfestee: 12.5 })
+    );
+    expect(mockSavePopulation).toHaveBeenCalledWith(
+      'presp-autre-agent',
+      expect.objectContaining({ espece: 'LMC', categorie: 'imago' })
+    );
+    expect(mockSaveInfestation).toHaveBeenCalledWith(
+      'presp-autre-agent',
+      'GENERALISEE',
+      expect.objectContaining({ type_cible: 'GENERALISEE' })
     );
   });
 });

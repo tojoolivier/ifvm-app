@@ -1,5 +1,6 @@
 import {
   createDraftProspection,
+  materialiserProspectionValidee,
   getProspection,
   listDraftProspections,
   listRecentProspections,
@@ -104,6 +105,37 @@ describe('createDraftProspection', () => {
 
     await expect(createDraftProspection(BASE_INPUT)).rejects.toThrow(
       'Échec de la création de la fiche brouillon locale'
+    );
+  });
+});
+
+// #fiches-validees-multi-utilisateurs
+describe('materialiserProspectionValidee', () => {
+  const FICHE_VALIDEE_AUTRE_AGENT = {
+    id: 'presp-autre-agent',
+    typeProspection: 'extensive',
+    campagneId: 'camp-1',
+    prospecteurId: 'autre-agent',
+    dateProspection: '2026-08-01',
+    surfaceInfestee: 12.5,
+    nFiche: 'F-001',
+    nReleve: null,
+    nMessage: null,
+    region: 'Atsimo-Andrefana',
+    district: 'Toliara II',
+    commune: 'Betsinjaka',
+    observations: null,
+    statut: 'validee',
+    createdAt: '2026-08-01T00:00:00Z',
+    updatedAt: '2026-08-02T00:00:00Z',
+  };
+
+  it('écrit la fiche avec le statut et statut_sync=synced fournis par le serveur (pas brouillon/local)', async () => {
+    await materialiserProspectionValidee(FICHE_VALIDEE_AUTRE_AGENT);
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT OR REPLACE INTO prospection[\s\S]*'synced'/),
+      expect.arrayContaining(['presp-autre-agent', 'extensive', 'validee'])
     );
   });
 });

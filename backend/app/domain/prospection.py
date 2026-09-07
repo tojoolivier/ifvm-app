@@ -269,10 +269,26 @@ class Prospection:
     infestations: list[ProspectionInfestation] = field(default_factory=list)
     operations_aeriennes: list[ProspectionOperationAerienne] = field(default_factory=list)
 
-    def apply_transition(self, nouveau_statut: str, acteur_role: str) -> str:
+    # ==========================================
+    # Champs dérivés, non stockés (#fiches-validees-multi-utilisateurs) — résolus
+    # par le repository (jointure sur `utilisateur`) pour l'affichage de la liste
+    # « Consulter une fiche validée » : évite un aller-retour supplémentaire par
+    # fiche pour résoudre prospecteur_id/verified_by/validated_by en noms.
+    # ==========================================
+    prospecteur_nom: str | None = None
+    verified_by_nom: str | None = None
+    validated_by_nom: str | None = None
+
+    def apply_transition(self, nouveau_statut: str, acteur_role: str, acteur_id: uuid.UUID) -> str:
         """Valide et applique une transition de statut. Retourne l'action d'audit.
 
         Raises ValueError pour transition inexistante, PermissionError pour rôle non autorisé.
+
+        `verified_by`/`verified_at` et `validated_by`/`validated_at` existaient déjà
+        sur le modèle (colonnes + dataclass) mais n'étaient renseignés nulle part —
+        colonnes mortes depuis leur ajout. Les peupler ici, au seul endroit qui fait
+        transitionner le statut, plutôt que d'ajouter une nouvelle migration/colonne
+        pour « qui a validé, quand » (déjà présent, juste jamais écrit).
         """
         transitions = _TRANSITIONS.get(self.statut, {})
         if nouveau_statut not in transitions:
@@ -284,7 +300,14 @@ class Prospection:
                 f"'{self.statut}' à '{nouveau_statut}'"
             )
         self.statut = nouveau_statut
-        self.updated_at = datetime.utcnow()
+        now = datetime.utcnow()
+        self.updated_at = now
+        if nouveau_statut == "verifiee":
+            self.verified_by = acteur_id
+            self.verified_at = now
+        elif nouveau_statut == "validee":
+            self.validated_by = acteur_id
+            self.validated_at = now
         return _ACTION_MAP[nouveau_statut]
 
 

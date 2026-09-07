@@ -8,8 +8,14 @@ import {
   deleteProspection as deleteLocalProspection,
   listDraftProspections,
   listRecentProspections,
+  materialiserProspectionValidee,
+  saveProspectionPopulation,
+  saveProspectionInfestation,
+  getProspection,
   DraftProspection,
   TypeProspection,
+  PopulationRow,
+  InfestationRow,
 } from './prospection-repository';
 import { validateProspectionDate } from './prospection-validation';
 import { PreconditionError, ReferentialError } from './errors';
@@ -60,6 +66,67 @@ export async function loadValidatedProspections(
     statut: STATUT_VALIDE,
     prospecteur_id: prospecteurId,
   });
+}
+
+/**
+ * « Fiches de traitement → Consulter une fiche validée » (#fiches-validees-
+ * multi-utilisateurs) : les fiches validées PAR N'IMPORTE QUEL UTILISATEUR
+ * (pas seulement celles de l'agent connecté — contrairement à
+ * `loadValidatedProspections` ci-dessus, qui reste réservée à l'écran
+ * Accueil/Mes fiches), pas encore transformées en traitement. Toujours un
+ * appel serveur direct, jamais un cache local : « la disponibilité globale
+ * des fiches est une opération serveur » (aucune fiche d'un autre agent
+ * n'existe dans la base SQLite locale de cet appareil).
+ */
+export async function loadFichesDisponiblesPourTraitement(
+  token: string
+): Promise<ProspectionRead[]> {
+  return apiClient.listProspections(token, {
+    statut: STATUT_VALIDE,
+    disponible_pour_traitement: true,
+  });
+}
+
+/**
+ * Rapatrie en local une fiche choisie dans « Consulter une fiche validée »
+ * (#fiches-validees-multi-utilisateurs) — sans quoi `references.tsx`
+ * (`getTraitement`/`construireCible`, tous deux en lecture locale) ne
+ * trouverait rien pour une fiche créée sur un AUTRE appareil.
+ *
+ * Sans effet si la fiche existe déjà en local (cas courant : l'agent choisit
+ * l'une de ses propres fiches, déjà là depuis sa création) — jamais
+ * n'écrase silencieusement une fiche locale potentiellement en cours d'usage
+ * ailleurs (brouillon de traitement déjà démarré dessus, par ex.).
+ */
+export async function assurerProspectionDisponibleLocalement(fiche: ProspectionRead): Promise<void> {
+  const dejaLocale = await getProspection(fiche.id);
+  if (dejaLocale) return;
+
+  await materialiserProspectionValidee({
+    id: fiche.id,
+    typeProspection: fiche.type_prospection,
+    campagneId: fiche.campagne_id,
+    prospecteurId: fiche.prospecteur_id,
+    dateProspection: fiche.date_prospection,
+    surfaceInfestee: fiche.surface_infestee ?? null,
+    nFiche: fiche.n_fiche ?? null,
+    nReleve: fiche.n_releve ?? null,
+    nMessage: fiche.n_message ?? null,
+    region: fiche.region ?? null,
+    district: fiche.district ?? null,
+    commune: fiche.commune ?? null,
+    observations: fiche.observations ?? null,
+    statut: fiche.statut,
+    createdAt: fiche.created_at,
+    updatedAt: fiche.updated_at,
+  });
+
+  for (const population of fiche.populations ?? []) {
+    await saveProspectionPopulation(fiche.id, population as unknown as PopulationRow);
+  }
+  for (const infestation of fiche.infestations ?? []) {
+    await saveProspectionInfestation(fiche.id, infestation.type_cible, infestation as unknown as InfestationRow);
+  }
 }
 
 /** Supprime une fiche brouillon en local. Refuse toute fiche déjà complétée (elle n'existe alors que côté serveur, où le backend applique la même règle). */

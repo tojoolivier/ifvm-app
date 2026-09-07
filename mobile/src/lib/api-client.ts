@@ -251,6 +251,14 @@ export type ProspectionRead =
 export interface ListProspectionsParams {
   statut?: string;
   prospecteur_id?: string;
+  /**
+   * N'inclut que les fiches sans traitement associé — « Fiches de traitement
+   * → Consulter une fiche validée » (#fiches-validees-multi-utilisateurs),
+   * combiné à `statut: 'validee'`. Aucun filtre `type` ici : les trois types
+   * (extensive/intensive/validation-signalement) partagent la même table et
+   * le même workflow de statut, jamais restreint à un sous-ensemble.
+   */
+  disponible_pour_traitement?: boolean;
 }
 
 export interface EntityPull<T> {
@@ -1103,6 +1111,13 @@ export const apiClient = {
       query.set(
         'prospecteur_id',
         params.prospecteur_id
+      );
+    }
+
+    if (params.disponible_pour_traitement) {
+      query.set(
+        'disponible_pour_traitement',
+        'true'
       );
     }
 
