@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { api } from '../api/client'
@@ -98,10 +98,14 @@ function traitementAerien(overrides: Record<string, unknown> = {}) {
   }
 }
 
-function renderPage(traitement: ReturnType<typeof traitementAerien>) {
+function renderPage(
+  traitement: ReturnType<typeof traitementAerien>,
+  reprenables: { id: string }[] = [],
+) {
   mockedGet.mockImplementation((url: string) => {
     if (url === '/traitements/t1') return Promise.resolve({ data: traitement })
     if (url === '/referentiel/pull') return Promise.resolve(pesticidePull)
+    if (url === '/traitements') return Promise.resolve({ data: reprenables })
     return Promise.resolve({ data: [] })
   })
 
@@ -317,5 +321,41 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
       'href',
       '/traitements/origine-1',
     )
+  })
+
+  it("n'affiche pas « Demander une reprise » quand la fiche n'est pas reprenable", async () => {
+    renderPage(traitementAerien())
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+
+    expect(screen.queryByRole('button', { name: 'Demander une reprise' })).not.toBeInTheDocument()
+  })
+
+  it('affiche « Demander une reprise » et une info purement lecture seule quand la fiche est reprenable', async () => {
+    renderPage(
+      traitementAerien({
+        aerien: {
+          pilote: 'Jean Rakoto',
+          mecanicien: 'Paul Randria',
+          nb_rotations: 2,
+          total_pesticide_l: 530,
+          surface_restante_ha: 12.5,
+          rotations: [],
+        },
+      }),
+      [{ id: 't1' }],
+    )
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+
+    const bouton = await screen.findByRole('button', { name: 'Demander une reprise' })
+    const appelsAvantClic = mockedGet.mock.calls.length
+    fireEvent.click(bouton)
+
+    const modale = within(await screen.findByRole('dialog', { name: 'Demander une reprise' }))
+    expect(modale.getByText(/Surface restante à traiter/)).toHaveTextContent('12,5 ha')
+    // Purement informatif (choix explicite) : ouvrir/fermer la modale n'appelle aucune API.
+    expect(mockedGet.mock.calls.length).toBe(appelsAvantClic)
+
+    fireEvent.click(modale.getByRole('button', { name: 'Fermer' }))
+    expect(screen.queryByRole('dialog', { name: 'Demander une reprise' })).not.toBeInTheDocument()
   })
 })
