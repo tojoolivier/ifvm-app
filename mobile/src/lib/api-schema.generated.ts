@@ -3048,15 +3048,12 @@ export interface components {
             chef_de_base_id: string;
             /** Consultant International */
             consultant_international?: string | null;
-            /**
-             * Lieu Base Principale Id
-             * Format: uuid
-             */
-            lieu_base_principale_id: string;
-            /** Lieu Stand Id */
-            lieu_stand_id?: string | null;
-            /** Lieu Base Secondaire Id */
-            lieu_base_secondaire_id?: string | null;
+            /** Base Principale */
+            base_principale: string;
+            /** Stand */
+            stand?: string | null;
+            /** Base Secondaire */
+            base_secondaire?: string | null;
             /** Immatricule Aeronef */
             immatricule_aeronef: string;
             /** Pesticide Recu L */
@@ -3082,15 +3079,12 @@ export interface components {
             chef_de_base_id: string;
             /** Consultant International */
             consultant_international: string | null;
-            /**
-             * Lieu Base Principale Id
-             * Format: uuid
-             */
-            lieu_base_principale_id: string;
-            /** Lieu Stand Id */
-            lieu_stand_id: string | null;
-            /** Lieu Base Secondaire Id */
-            lieu_base_secondaire_id: string | null;
+            /** Base Principale */
+            base_principale: string;
+            /** Stand */
+            stand: string | null;
+            /** Base Secondaire */
+            base_secondaire: string | null;
             /** Immatricule Aeronef */
             immatricule_aeronef: string;
             /** Nb Rotations */

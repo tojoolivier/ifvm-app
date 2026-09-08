@@ -244,7 +244,7 @@ export interface AerienEquipeValidationInput {
   mecanicien: string | null | undefined;
   consultantInternational?: string | null | undefined;
   immatriculeAeronef: string | null | undefined;
-  lieuBasePrincipaleId: string | null | undefined;
+  basePrincipale: string | null | undefined;
 }
 
 const MESSAGE_ROLE_DEJA_AFFECTE =
@@ -278,8 +278,8 @@ export function validateAerienEquipe(input: AerienEquipeValidationInput): Valida
   if (!input.immatriculeAeronef || input.immatriculeAeronef.trim() === '') {
     errors.push({ field: 'immatriculeAeronef', message: "L'immatriculation de l'aéronef est obligatoire" });
   }
-  if (!input.lieuBasePrincipaleId) {
-    errors.push({ field: 'lieuBasePrincipaleId', message: 'La base principale est obligatoire' });
+  if (!input.basePrincipale || input.basePrincipale.trim() === '') {
+    errors.push({ field: 'basePrincipale', message: 'La base principale est obligatoire' });
   }
 
   const rolesObligatoires: { field: string; nom: string | null | undefined }[] = [

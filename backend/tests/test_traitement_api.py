@@ -9,7 +9,7 @@ from app.infrastructure.prospection_model import ProspectionModel, ProspectionPo
 
 
 @pytest.fixture
-def payload_traitement(chef_de_base, pilote, mecanicien, lieu_aerien):
+def payload_traitement(chef_de_base, pilote, mecanicien):
     def _build(prospection_id, **overrides):
         payload = {
             "prospection_id": str(prospection_id),
@@ -20,7 +20,10 @@ def payload_traitement(chef_de_base, pilote, mecanicien, lieu_aerien):
                 "pilote": f"{pilote.prenom} {pilote.nom}",
                 "mecanicien": f"{mecanicien.prenom} {mecanicien.nom}",
                 "chef_de_base_id": str(chef_de_base.id),
-                "lieu_base_principale_id": str(lieu_aerien.id),
+                # Texte libre (#traitement-aerien-base-texte-libre) — une valeur
+                # absente du référentiel lieu_aerien doit être acceptée telle
+                # quelle, jamais résolue/validée contre celui-ci.
+                "base_principale": "Base Betioky",
                 "immatricule_aeronef": "5R-ABC",
             },
         }

@@ -13,7 +13,7 @@ import { apiClient } from '@/lib/api-client';
 import { estToutParti, resumerEnPhrase } from '@/lib/sync-lot';
 import { useAuthStore } from '@/lib/auth-store';
 import { SignatureRole } from '@/lib/traitement-capture-store';
-import { listUtilisateursByRole, listLieuxAeriens, UtilisateurEquipe, LieuAerien } from '@/lib/referentiel-db';
+import { listUtilisateursByRole, UtilisateurEquipe } from '@/lib/referentiel-db';
 import {
   aggregateRecapErrors,
   computeSignatureMatrix,
@@ -106,7 +106,6 @@ export default function RecapScreen() {
   // (pilote/mécanicien/consultant sont redevenus du texte libre, migration backend
   // 0048, affichés directement sans jointure).
   const [personnes, setPersonnes] = useState<UtilisateurEquipe[]>([]);
-  const [lieuxAeriens, setLieuxAeriens] = useState<LieuAerien[]>([]);
   const { run, isRunning: isSaving } = useAsyncAction();
   const signaler = useErrorStore((s) => s.signaler);
   const logError = useErrorLogStore((s) => s.addEntry);
@@ -125,16 +124,6 @@ export default function RecapScreen() {
         screen: 'recap',
         context: { traitementId, source: 'listUtilisateursByRole' },
       }));
-    if (draft.type_traitement === 'AERIEN') {
-      listLieuxAeriens()
-        .then(setLieuxAeriens)
-        .catch((error) => logError({
-          message: toFriendlyError(error).message,
-          stack: error instanceof Error ? error.stack ?? null : null,
-          screen: 'recap',
-          context: { traitementId, source: 'listLieuxAeriens' },
-        }));
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft?.type_traitement, traitementId, logError]);
 
@@ -143,9 +132,6 @@ export default function RecapScreen() {
     const p = personnes.find((u) => u.id === id);
     return p ? `${p.prenom} ${p.nom}` : null;
   };
-  const nomLieu = (id: string | null | undefined): string | null =>
-    id ? lieuxAeriens.find((l) => l.id === id)?.nom ?? null : null;
-
   /** Nom du signataire attendu pour un rôle — même résolution que l'écran
    * Signatures (#signatures-auto-equipe §5) : jamais une saisie indépendante. */
   const nomPourRole = (role: SignatureRole): string | null => {
@@ -273,7 +259,7 @@ export default function RecapScreen() {
             mecanicien: draft.aerien.mecanicien,
             consultantInternational: draft.aerien.consultant_international,
             immatriculeAeronef: draft.aerien.immatricule_aeronef,
-            lieuBasePrincipaleId: draft.aerien.lieu_base_principale_id,
+            basePrincipale: draft.aerien.base_principale,
           }
         : null,
     signatureMatrix,
@@ -363,9 +349,9 @@ export default function RecapScreen() {
               <RecapLigne label="Mécanicien" value={draft.aerien.mecanicien} />
               <RecapLigne label="Consultant" value={draft.aerien.consultant_international} />
               <RecapLigne label="Immatriculation aéronef" value={draft.aerien.immatricule_aeronef} />
-              <RecapLigne label="Base principale" value={nomLieu(draft.aerien.lieu_base_principale_id)} />
-              <RecapLigne label="Stand" value={nomLieu(draft.aerien.lieu_stand_id)} />
-              <RecapLigne label="Base secondaire" value={nomLieu(draft.aerien.lieu_base_secondaire_id)} />
+              <RecapLigne label="Base principale" value={draft.aerien.base_principale} />
+              <RecapLigne label="Stand" value={draft.aerien.stand} />
+              <RecapLigne label="Base secondaire" value={draft.aerien.base_secondaire} />
             </Card>
 
             <Card>

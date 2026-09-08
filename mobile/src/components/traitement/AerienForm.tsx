@@ -1,7 +1,6 @@
 import { Fragment } from 'react';
 import { View, Text, TextInput } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
-import { LieuAerien, UtilisateurEquipe } from '@/lib/referentiel-db';
+import { UtilisateurEquipe } from '@/lib/referentiel-db';
 import { DraftTraitementRow } from '@/lib/traitement-repository';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import { Chip } from '@/components/traitement/Chip';
@@ -10,58 +9,9 @@ import { formStyles as styles } from '@/components/traitement/TraitementFormStyl
 export interface AerienFormProps {
   readOnly: boolean;
   chefsDeBase: UtilisateurEquipe[];
-  lieuxAeriens: LieuAerien[];
   // Chaînage de reprise (migration backend 0050) — mirroir de TerrestreFormProps.
   reprenables: DraftTraitementRow[];
   errors: Record<string, string>;
-}
-
-/**
- * Type de lieu du référentiel `lieu_aerien` -> le champ qu'il alimente sur cet
- * écran. Contrairement au sélecteur BASE de la prospection extensive aérienne
- * (une seule FK, tous les types confondus), le traitement porte trois FK
- * distinctes — chacune filtrée sur le type de lieu qui lui correspond.
- */
-const HINT_VIDE: Record<string, string> = {
-  principale: 'Aucune base principale disponible — à créer depuis l’administration web (Référentiels → Lieux aériens).',
-  stand: 'Aucun stand disponible — à créer depuis l’administration web (Référentiels → Lieux aériens).',
-  secondaire: 'Aucune base secondaire disponible — à créer depuis l’administration web (Référentiels → Lieux aériens).',
-};
-
-function LieuPicker({
-  typeLieu,
-  lieuxAeriens,
-  selectedId,
-  onSelect,
-  readOnly,
-  facultatif,
-}: {
-  typeLieu: 'principale' | 'stand' | 'secondaire';
-  lieuxAeriens: LieuAerien[];
-  selectedId: string | null | undefined;
-  onSelect: (id: string | null) => void;
-  readOnly: boolean;
-  facultatif?: boolean;
-}) {
-  const options = lieuxAeriens.filter((lieu) => lieu.type_lieu === typeLieu);
-  if (options.length === 0) {
-    return <Text style={styles.error}>{HINT_VIDE[typeLieu]}</Text>;
-  }
-  return (
-    <View style={styles.pickerBox}>
-      <Picker
-        enabled={!readOnly}
-        selectedValue={selectedId ?? ''}
-        onValueChange={(value) => onSelect(value === '' ? null : String(value))}
-        style={styles.picker}
-      >
-        {facultatif && <Picker.Item label="— Aucun —" value="" />}
-        {options.map((lieu) => (
-          <Picker.Item key={lieu.id} label={lieu.nom} value={lieu.id} />
-        ))}
-      </Picker>
-    </View>
-  );
 }
 
 /**
@@ -77,16 +27,18 @@ function LieuPicker({
  * Pilote/mécanicien/consultant international sont redevenus du texte libre
  * (migration backend 0048 — retour en arrière après livraison de la sélection
  * référentiel, ticket 5) : pilote/mécanicien obligatoires, consultant facultatif.
- * Base principale/stand/base secondaire restent sélectionnées dans le référentiel
- * `lieu_aerien` (ticket 4), inchangé. Chef de base/pilote/mécanicien doivent être
- * deux-à-deux distincts (comparaison par nom, plus par id), validé par
- * `validateAerienEquipe` (traitement-validation.ts) avant de continuer — le
- * consultant reste facultatif et exempté de cette règle.
+ * Base principale/stand/base secondaire redeviennent elles aussi du texte libre
+ * (migration backend 0054, #traitement-aerien-base-texte-libre — même retour en
+ * arrière, ticket 4 cette fois) : base principale obligatoire, stand et base
+ * secondaire facultatifs, aucune dépendance au référentiel `lieu_aerien` (qui
+ * reste utilisé par la prospection extensive aérienne, inchangée). Chef de
+ * base/pilote/mécanicien doivent être deux-à-deux distincts (comparaison par
+ * nom, plus par id), validé par `validateAerienEquipe` (traitement-validation.ts)
+ * avant de continuer — le consultant reste facultatif et exempté de cette règle.
  */
 export function AerienForm({
   readOnly,
   chefsDeBase,
-  lieuxAeriens,
   reprenables,
   errors,
 }: AerienFormProps) {
@@ -141,32 +93,30 @@ export function AerienForm({
       />
 
       <Text style={styles.label}>Base principale *</Text>
-      <LieuPicker
-        typeLieu="principale"
-        lieuxAeriens={lieuxAeriens}
-        selectedId={store.aerien.lieuBasePrincipaleId}
-        onSelect={(id) => store.updateAerien({ lieuBasePrincipaleId: id })}
-        readOnly={readOnly}
+      <TextInput
+        editable={!readOnly}
+        style={styles.input}
+        placeholder="Nom de la base principale"
+        value={store.aerien.basePrincipale ?? ''}
+        onChangeText={(v) => store.updateAerien({ basePrincipale: v })}
       />
 
       <Text style={styles.label}>Stand</Text>
-      <LieuPicker
-        typeLieu="stand"
-        lieuxAeriens={lieuxAeriens}
-        selectedId={store.aerien.lieuStandId}
-        onSelect={(id) => store.updateAerien({ lieuStandId: id })}
-        readOnly={readOnly}
-        facultatif
+      <TextInput
+        editable={!readOnly}
+        style={styles.input}
+        placeholder="Nom du stand (facultatif)"
+        value={store.aerien.stand ?? ''}
+        onChangeText={(v) => store.updateAerien({ stand: v || null })}
       />
 
       <Text style={styles.label}>Base secondaire</Text>
-      <LieuPicker
-        typeLieu="secondaire"
-        lieuxAeriens={lieuxAeriens}
-        selectedId={store.aerien.lieuBaseSecondaireId}
-        onSelect={(id) => store.updateAerien({ lieuBaseSecondaireId: id })}
-        readOnly={readOnly}
-        facultatif
+      <TextInput
+        editable={!readOnly}
+        style={styles.input}
+        placeholder="Nom de la base secondaire (facultatif)"
+        value={store.aerien.baseSecondaire ?? ''}
+        onChangeText={(v) => store.updateAerien({ baseSecondaire: v || null })}
       />
 
       {/* Chaînage de reprise (migration backend 0050) — mirroir exact du bloc

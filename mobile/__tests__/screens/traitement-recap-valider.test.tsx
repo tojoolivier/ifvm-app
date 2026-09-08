@@ -38,7 +38,6 @@ jest.mock('@/lib/api-client', () => ({
 
 jest.mock('@/lib/referentiel-db', () => ({
   listUtilisateursByRole: jest.fn().mockResolvedValue([{ id: 'chef-1', nom: 'Ravelo', prenom: 'Sarah' }]),
-  listLieuxAeriens: jest.fn().mockResolvedValue([{ id: 'lieu-1', type_lieu: 'principale', nom: 'Tuléar' }]),
 }));
 
 const DRAFT_PRET_A_ENREGISTRER = {
@@ -65,9 +64,9 @@ const DRAFT_PRET_A_ENREGISTRER = {
     chef_de_base_id: 'chef-1',
     consultant_international: null,
     immatricule_aeronef: '5R-ABC',
-    lieu_base_principale_id: 'lieu-1',
-    lieu_stand_id: null,
-    lieu_base_secondaire_id: null,
+    base_principale: 'Tuléar',
+    stand: null,
+    base_secondaire: null,
     nb_rotations: 1,
     total_pesticide_l: 10,
     total_pesticide_kg: null,

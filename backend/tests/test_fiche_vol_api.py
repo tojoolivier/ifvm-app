@@ -172,7 +172,6 @@ async def test_validation_refusee_si_une_rotation_est_incomplete(
     pesticide,
     pilote,
     mecanicien,
-    lieu_aerien,
 ):
     fiche = await _creer(client, auth_headers, payload_fiche)
     for role, nom in [
@@ -195,7 +194,6 @@ async def test_validation_refusee_si_une_rotation_est_incomplete(
         pesticide,
         pilote,
         mecanicien,
-        lieu_aerien,
     )
     await client.post(
         f"/fiches-vol/{fiche['id']}/vols",
@@ -391,7 +389,6 @@ async def _rotation_reelle(
     pesticide,
     pilote,
     mecanicien,
-    lieu_aerien,
 ) -> str:
     """Crée une rotation authentique : la FK `vol.rotation_id` interdit tout UUID inventé."""
     prospection = ProspectionModel(
@@ -417,7 +414,7 @@ async def _rotation_reelle(
                 "pilote": f"{pilote.prenom} {pilote.nom}",
                 "mecanicien": f"{mecanicien.prenom} {mecanicien.nom}",
                 "chef_de_base_id": str(chef_de_base.id),
-                "lieu_base_principale_id": str(lieu_aerien.id),
+                "base_principale": "Base Betioky",
                 "immatricule_aeronef": "5R-ABC",
             },
         },

@@ -146,21 +146,17 @@ class TraitementAerienModel(Base):
     pilote: Mapped[str] = mapped_column(String(255), nullable=False)
     mecanicien: Mapped[str] = mapped_column(String(255), nullable=False)
     consultant_international: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    # Base principale obligatoire pour tout traitement aérien (aucune
-    # exception, contrairement à la prospection généralisée). Stand nullable :
-    # NULL = ravitaillement fait directement à la base (principale ou
-    # secondaire) plutôt qu'à un stand distinct. Base secondaire facultative.
-    # Aucune des trois FK ne contraint `type_lieu` au niveau SQL (CHECK
-    # inter-table impossible en Postgres) — à valider côté application.
-    lieu_base_principale_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("lieu_aerien.id"), nullable=False
-    )
-    lieu_stand_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("lieu_aerien.id"), nullable=True
-    )
-    lieu_base_secondaire_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("lieu_aerien.id"), nullable=True
-    )
+    # Base principale/stand/base secondaire : texte libre (migration 0054),
+    # même patron que pilote/mécanicien/consultant_international ci-dessus —
+    # saisie directe par l'utilisateur, sans dépendre du référentiel
+    # `lieu_aerien` (qui reste utilisé par la prospection extensive aérienne,
+    # inchangée). Base principale obligatoire pour tout traitement aérien
+    # (aucune exception, contrairement à la prospection généralisée) ; stand
+    # facultatif (vide = ravitaillement fait directement à une base) ; base
+    # secondaire facultative.
+    base_principale: Mapped[str] = mapped_column(String(255), nullable=False)
+    stand: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    base_secondaire: Mapped[str | None] = mapped_column(String(255), nullable=True)
     immatricule_aeronef: Mapped[str] = mapped_column(Text(), nullable=False)
     nb_rotations: Mapped[int] = mapped_column(Integer(), nullable=False, default=0)
     # Deux cumuls distincts par unité (une rotation en L ne s'additionne jamais

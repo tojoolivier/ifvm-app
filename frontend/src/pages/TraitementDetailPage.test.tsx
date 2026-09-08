@@ -49,9 +49,9 @@ function traitementAerien(overrides: Record<string, unknown> = {}) {
       mecanicien: 'Paul Randria',
       chef_de_base_id: 'u-chef',
       consultant_international: 'Marc Dupuis',
-      lieu_base_principale_id: 'lieu-1',
-      lieu_stand_id: null,
-      lieu_base_secondaire_id: null,
+      base_principale: 'Base Betioky',
+      stand: null,
+      base_secondaire: null,
       immatricule_aeronef: '5R-ABC',
       nb_rotations: 2,
       total_pesticide_l: 530,
@@ -126,13 +126,12 @@ function traitementAerien(overrides: Record<string, unknown> = {}) {
 function renderPage(
   traitement: ReturnType<typeof traitementAerien>,
   reprenables: { id: string }[] = [],
-  referentiel: { lieuxAeriens?: { id: string; nom: string }[]; utilisateurs?: { id: string; nom: string; role: string }[] } = {},
+  referentiel: { utilisateurs?: { id: string; nom: string; role: string }[] } = {},
 ) {
   mockedGet.mockImplementation((url: string) => {
     if (url === '/traitements/t1') return Promise.resolve({ data: traitement })
     if (url === '/referentiel/pull') return Promise.resolve(pesticidePull)
     if (url === '/traitements') return Promise.resolve({ data: reprenables })
-    if (url === '/referentiel/lieux-aeriens') return Promise.resolve({ data: referentiel.lieuxAeriens ?? [] })
     if (url === '/users/') return Promise.resolve({ data: referentiel.utilisateurs ?? [] })
     return Promise.resolve({ data: [] })
   })
@@ -381,9 +380,9 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
           mecanicien: 'Paul Randria',
           chef_de_base_id: null,
           consultant_international: null,
-          lieu_base_principale_id: null,
-          lieu_stand_id: null,
-          lieu_base_secondaire_id: null,
+          base_principale: null,
+          stand: null,
+          base_secondaire: null,
           immatricule_aeronef: null,
           nb_rotations: 1,
           total_pesticide_l: 200,
@@ -430,14 +429,19 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
     expect(screen.getByText(/RAS, conditions favorables/)).toBeInTheDocument()
   })
 
-  it("affiche l'équipe et l'aéronef d'une fiche aérienne, chef de base et bases résolus par nom", async () => {
+  it("affiche l'équipe et l'aéronef d'une fiche aérienne — chef de base résolu par nom, bases en texte libre (#traitement-aerien-base-texte-libre)", async () => {
     renderPage(
-      traitementAerien(),
+      traitementAerien({
+        aerien: {
+          ...traitementAerien().aerien,
+          // Valeur volontairement absente de tout référentiel — aucun appel
+          // /referentiel/lieux-aeriens n'est mocké dans ce test : la carte
+          // doit l'afficher telle quelle, sans jointure.
+          base_principale: 'Piste improvisée 12',
+        },
+      }),
       [],
-      {
-        utilisateurs: [{ id: 'u-chef', nom: 'Marie Rabe', role: 'chef_de_base' }],
-        lieuxAeriens: [{ id: 'lieu-1', nom: 'Base Betioky' }],
-      },
+      { utilisateurs: [{ id: 'u-chef', nom: 'Marie Rabe', role: 'chef_de_base' }] },
     )
     await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
 
@@ -445,7 +449,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
     // (rôle CHEF_DE_BASE) — deux endroits distincts pour la même personne.
     const carte = within(screen.getByText('Équipe & aéronef').closest('section')!)
     expect(await carte.findByText('Marie Rabe')).toBeInTheDocument()
-    expect(await carte.findByText('Base Betioky')).toBeInTheDocument()
+    expect(await carte.findByText('Piste improvisée 12')).toBeInTheDocument()
     expect(carte.getByText('5R-ABC')).toBeInTheDocument()
     expect(carte.getByText('Marc Dupuis')).toBeInTheDocument()
   })

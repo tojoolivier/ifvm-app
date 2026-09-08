@@ -83,12 +83,13 @@ export interface AerienDraft {
   chefDeBaseId?: string | null;
   consultantInternational?: string | null;
   immatriculationAeronef?: string | null;
-  // Base principale/stand/base secondaire (référentiel lieu_aerien) — écran « Équipe »
-  // (#equipe-slide-aerien). Base principale obligatoire, stand et base secondaire
-  // facultatifs (cf. traitement-validation.ts:validateAerienEquipe).
-  lieuBasePrincipaleId?: string | null;
-  lieuStandId?: string | null;
-  lieuBaseSecondaireId?: string | null;
+  // Base principale/stand/base secondaire : texte libre (migration backend
+  // 0054, #traitement-aerien-base-texte-libre — saisie directe, sans
+  // dépendre du référentiel lieu_aerien). Base principale obligatoire, stand
+  // et base secondaire facultatifs (cf. traitement-validation.ts:validateAerienEquipe).
+  basePrincipale?: string | null;
+  stand?: string | null;
+  baseSecondaire?: string | null;
   // surfaceTraiteeHa n'y figure plus (migration 0046) : dérivée de la somme des
   // `surface_ha` des rotations, calculée à l'écran via computeSurfaceTraiteeAerien
   // (traitement-validation.ts) — jamais une saisie stockée dans le draft.

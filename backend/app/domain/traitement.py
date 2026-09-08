@@ -168,13 +168,16 @@ class TraitementAerien:
     mecanicien: str = ""
     chef_de_base_id: uuid.UUID = field(default_factory=uuid.uuid4)
     consultant_international: str | None = None
-    # Bases aériennes/stands (migration 0047) : base principale obligatoire pour
-    # tout traitement aérien (aucune exception, contrairement à la prospection
-    # généralisée) ; stand nullable (NULL = ravitaillement fait directement à
-    # une base) ; base secondaire facultative.
-    lieu_base_principale_id: uuid.UUID = field(default_factory=uuid.uuid4)
-    lieu_stand_id: uuid.UUID | None = None
-    lieu_base_secondaire_id: uuid.UUID | None = None
+    # Bases aériennes/stands : texte libre (migration 0054, défait la partie
+    # "lieux" de la migration 0047 — même retour en arrière que pilote/
+    # mécanicien/consultant en 0048, cf. #traitement-aerien-base-texte-libre).
+    # Base principale obligatoire pour tout traitement aérien (aucune
+    # exception, contrairement à la prospection généralisée) ; stand facultatif
+    # (vide = ravitaillement fait directement à une base) ; base secondaire
+    # facultative.
+    base_principale: str = ""
+    stand: str | None = None
+    base_secondaire: str | None = None
     immatricule_aeronef: str | None = None
     nb_rotations: int = 0
     # Deux cumuls distincts par unité (une rotation en L ne s'additionne jamais
@@ -526,9 +529,9 @@ _CHAMPS_CONTENU_AERIEN = (
     "mecanicien",
     "chef_de_base_id",
     "consultant_international",
-    "lieu_base_principale_id",
-    "lieu_stand_id",
-    "lieu_base_secondaire_id",
+    "base_principale",
+    "stand",
+    "base_secondaire",
     "immatricule_aeronef",
     # surface_traitee_ha n'y figure plus (migration 0047) : dérivée des rotations
     # (sous-ressource distincte, absente du payload de synchronisation), au même
