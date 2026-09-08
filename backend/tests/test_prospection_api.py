@@ -1163,8 +1163,11 @@ async def test_create_prospection_validation_avec_signalement_et_conclusion(
     assert data["signalement_date"] == "25/06"
     assert data["signalement_description"].startswith("Beaucoup de criquets")
     assert data["conclusion_validation"] == "confirmee"
-    # Statut brouillon standard : la conclusion n'implique aucun état d'approbation intermédiaire.
-    assert data["statut"] == "brouillon"
+    # Une fiche de validation/signalement est exploitable pour le traitement dès sa
+    # création : elle ne passe pas par la chaîne administrative en_attente ->
+    # verifiee -> validee réservée aux prospections intensive et extensive
+    # (cf. CreateProspection.execute, #signalements-treatment-ready).
+    assert data["statut"] == "validee"
 
 
 @pytest.mark.asyncio
