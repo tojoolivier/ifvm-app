@@ -46,3 +46,9 @@ class Utilisateur(Base):
     peut_se_connecter: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+    # Curseur du centre de notifications (mobile : statut de mes fiches ; web :
+    # nouvelles fiches / actions) — cf. migration 0052. `NULL` = jamais consulté,
+    # tout est alors non-lu.
+    notifications_lues_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )

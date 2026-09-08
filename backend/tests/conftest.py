@@ -145,6 +145,40 @@ async def admin_headers(admin: Utilisateur) -> dict:
 
 
 @pytest_asyncio.fixture
+async def verificateur(db_session: AsyncSession) -> Utilisateur:
+    user = Utilisateur(
+        id=uuid.uuid4(),
+        nom="Test",
+        prenom="Verificateur",
+        email=f"verificateur+{uuid.uuid4().hex[:6]}@test.mg",
+        password_hash=hash_password("secret"),
+        role="verificateur",
+        actif=True,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
+async def validateur(db_session: AsyncSession) -> Utilisateur:
+    user = Utilisateur(
+        id=uuid.uuid4(),
+        nom="Test",
+        prenom="Validateur",
+        email=f"validateur+{uuid.uuid4().hex[:6]}@test.mg",
+        password_hash=hash_password("secret"),
+        role="validation_finale",
+        actif=True,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
 async def chef_de_base(db_session: AsyncSession) -> Utilisateur:
     user = Utilisateur(
         id=uuid.uuid4(),

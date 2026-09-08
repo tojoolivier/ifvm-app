@@ -2,9 +2,8 @@ import uuid
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import create_access_token, hash_password
+from app.auth import create_access_token
 from app.models.users import Utilisateur
 
 # ---------------------------------------------------------------------------
@@ -12,39 +11,12 @@ from app.models.users import Utilisateur
 # ---------------------------------------------------------------------------
 
 
-async def _create_user(db_session: AsyncSession, role: str) -> Utilisateur:
-    user = Utilisateur(
-        id=uuid.uuid4(),
-        nom="Test",
-        prenom=role.capitalize(),
-        email=f"{role}+{uuid.uuid4().hex[:6]}@test.mg",
-        password_hash=hash_password("secret"),
-        role=role,
-        actif=True,
-    )
-    db_session.add(user)
-    await db_session.commit()
-    await db_session.refresh(user)
-    return user
-
-
 def _headers(user: Utilisateur) -> dict:
     return {"Authorization": f"Bearer {create_access_token(user.id)}"}
 
 
-@pytest.fixture
-async def verificateur(db_session: AsyncSession) -> Utilisateur:
-    return await _create_user(db_session, "verificateur")
-
-
-@pytest.fixture
-async def validateur(db_session: AsyncSession) -> Utilisateur:
-    return await _create_user(db_session, "validation_finale")
-
-
-@pytest.fixture
-async def admin(db_session: AsyncSession) -> Utilisateur:
-    return await _create_user(db_session, "admin")
+# `verificateur`, `validateur` et `admin` sont désormais des fixtures partagées
+# (tests/conftest.py) — réutilisées telles quelles par test_notifications_api.py.
 
 
 # ---------------------------------------------------------------------------
@@ -329,6 +301,34 @@ async def test_audit_log_plusieurs_transitions(
     resp = await client.get(f"/prospections/{pid}/audit-log", headers=auth_headers)
     logs = resp.json()
     assert len(logs) >= 2
+
+
+@pytest.mark.asyncio
+async def test_rejet_conserve_le_motif_dans_le_log_audit(
+    client: AsyncClient,
+    utilisateur: Utilisateur,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    verificateur: Utilisateur,
+    validateur: Utilisateur,
+):
+    """`StatutChange.commentaire` (modale « Rejeter avec motif » côté web)
+    transitait déjà jusqu'à l'API mais `ChangerStatut.execute()` l'ignorait :
+    la fiche changeait bien de statut, le motif saisi disparaissait sans
+    jamais être stocké — impossible de l'afficher ensuite (#toutes-les-donnees)."""
+    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
+    await _changer_statut(client, pid, "en_attente", auth_headers)
+    await _changer_statut(client, pid, "verifiee", _headers(verificateur))
+    code = await _changer_statut(
+        client, pid, "rejetee", _headers(validateur), commentaire="Coordonnées GPS incohérentes."
+    )
+    assert code == 200
+
+    resp = await client.get(f"/prospections/{pid}/audit-log", headers=auth_headers)
+    logs = resp.json()
+    rejet = next(log for log in logs if log["action"] == "rejet")
+    assert rejet["details"]["commentaire"] == "Coordonnées GPS incohérentes."
 
 
 # ---------------------------------------------------------------------------
