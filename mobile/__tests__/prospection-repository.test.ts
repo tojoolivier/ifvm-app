@@ -13,6 +13,7 @@ import {
   updateProspectionObservations,
   updateProspectionExtensiveReference,
   updateProspectionExtensiveObservations,
+  completeProspection,
   concludeValidation,
   startCaptureTimer,
   saveProspectionCaptures,
@@ -643,6 +644,44 @@ describe('concludeValidation', () => {
     getFirstAsync.mockResolvedValueOnce(null);
 
     await expect(concludeValidation(BASE_INPUT.id, 'infirmee')).rejects.toThrow(
+      'Échec de la mise à jour de la fiche brouillon locale'
+    );
+  });
+});
+
+describe('completeProspection', () => {
+  it('bascule une fiche de validation/signalement directement en validee, n_fiche aligné sur n_message', async () => {
+    getFirstAsync.mockResolvedValueOnce({
+      ...STORED_ROW,
+      type_prospection: 'validation',
+      statut: 'validee',
+      n_fiche: '20260711-ABCD',
+    });
+
+    await completeProspection(BASE_INPUT.id);
+
+    // La bascule se joue en SQL (CASE WHEN type_prospection = 'validation'),
+    // pas en JS : un signalement saute la chaîne administrative en_attente ->
+    // verifiee -> validee réservée à l'intensif/extensif, et reprend comme n°
+    // de fiche définitif le n° de message déjà généré à la Référence — jamais
+    // un second numéro. Le mock ne rejoue pas le CASE lui-même, cette
+    // assertion garde seulement une trace de non-régression sur sa présence.
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining("CASE WHEN type_prospection = 'validation' THEN 'validee' ELSE 'en_attente' END"),
+      [expect.any(String), BASE_INPUT.id]
+    );
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "CASE WHEN type_prospection = 'validation' AND n_message IS NOT NULL THEN n_message ELSE n_fiche END"
+      ),
+      [expect.any(String), BASE_INPUT.id]
+    );
+  });
+
+  it('throws if the row cannot be read back after the update', async () => {
+    getFirstAsync.mockResolvedValueOnce(null);
+
+    await expect(completeProspection(BASE_INPUT.id)).rejects.toThrow(
       'Échec de la mise à jour de la fiche brouillon locale'
     );
   });
