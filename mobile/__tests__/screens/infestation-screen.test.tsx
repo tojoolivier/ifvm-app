@@ -11,7 +11,7 @@
  * un test d'écran isolé.
  */
 import { Alert } from 'react-native';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import InfestationScreen from '@/app/(prospection)/infestation';
 import { ErrorBanner } from '@/components/error-banner';
 import { useErrorStore } from '@/lib/error-store';
@@ -61,7 +61,8 @@ describe('InfestationScreen', () => {
     );
 
     // La ligne mockée pré-remplit "Tache larvaire" comme cible déjà sélectionnée.
-    fireEvent.press(await screen.findByText('Comportement  ›'));
+    // Cible larvaire : pas d'onglet Comportement (#infestation-comportement-cible-larvaire),
+    // "Continuer" enregistre directement.
     fireEvent.press(await screen.findByText('Continuer  ›'));
 
     // `new Error('boom')` n'appartient pas au jeu fermé : c'est un bug, et
@@ -78,9 +79,15 @@ describe('InfestationScreen', () => {
 
     await render(<InfestationScreen />);
 
-    fireEvent.press(await screen.findByText('Comportement  ›'));
+    // La bascule a lieu au chargement (avant toute interaction) — vérifiée ici via
+    // la puce sélectionnée (✓), plutôt que via l'ex-titre "Comportement · Bande
+    // larvaire" : cible larvaire, donc plus d'onglet Comportement
+    // (#infestation-comportement-cible-larvaire) pour porter ce titre.
+    const bandeChip = (await screen.findByText('Bande larvaire')).parent;
+    expect(within(bandeChip!).getByText('✓')).toBeVisible();
 
-    expect(await screen.findByText('Comportement · Bande larvaire')).toBeVisible();
+    const tacheChip = screen.getByText('Tache larvaire').parent;
+    expect(within(tacheChip!).queryByText('✓')).toBeNull();
   });
 
   it('conserve "nb_taches_bandes" à la sauvegarde d’une bande larvaire (#103)', async () => {
@@ -101,7 +108,7 @@ describe('InfestationScreen', () => {
 
     await render(<InfestationScreen />);
 
-    fireEvent.press(await screen.findByText('Comportement  ›'));
+    // Cible larvaire : pas d'onglet Comportement (#infestation-comportement-cible-larvaire).
     fireEvent.press(await screen.findByText('Continuer  ›'));
 
     await waitFor(() =>
@@ -252,7 +259,7 @@ describe('InfestationScreen', () => {
 
     await render(<InfestationScreen />);
 
-    fireEvent.press(await screen.findByText('Comportement  ›'));
+    // Cible larvaire : pas d'onglet Comportement (#infestation-comportement-cible-larvaire).
     fireEvent.press(await screen.findByText('Continuer  ›'));
 
     await waitFor(() =>
@@ -286,7 +293,7 @@ describe('InfestationScreen', () => {
 
     await render(<InfestationScreen />);
 
-    fireEvent.press(await screen.findByText('Comportement  ›'));
+    // Cible larvaire : pas d'onglet Comportement (#infestation-comportement-cible-larvaire).
     fireEvent.press(await screen.findByText('Continuer  ›'));
 
     await waitFor(() => expect(prospectionRepository.saveProspectionInfestation).toHaveBeenCalled());
@@ -295,5 +302,31 @@ describe('InfestationScreen', () => {
     expect(alertSpy).not.toHaveBeenCalledWith('À vérifier', expect.stringContaining('Écart important'));
 
     alertSpy.mockRestore();
+  });
+
+  describe('#infestation-comportement-cible-larvaire', () => {
+    it("masque l'onglet Comportement pour une cible larvaire (rien à y saisir)", async () => {
+      jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
+        { type_cible: 'tache_larvaire', surface_totale: 12 } as any,
+      ]);
+
+      await render(<InfestationScreen />);
+      await screen.findByText('Infestation');
+
+      expect(screen.queryByText('Comportement')).toBeNull();
+      expect(screen.queryByText('Comportement  ›')).toBeNull();
+      expect(await screen.findByText('Continuer  ›')).toBeVisible();
+    });
+
+    it("garde l'onglet Comportement pour une cible aérienne (données réelles à y saisir)", async () => {
+      jest.mocked(prospectionRepository.listAllProspectionInfestations).mockResolvedValueOnce([
+        { type_cible: 'vol_clair', surface_totale: 12 } as any,
+      ]);
+
+      await render(<InfestationScreen />);
+
+      expect(await screen.findByText('Comportement')).toBeVisible();
+      expect(await screen.findByText('Comportement  ›')).toBeVisible();
+    });
   });
 });
