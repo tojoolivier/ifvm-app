@@ -1082,7 +1082,17 @@ export async function completeProspection(id: string): Promise<DraftProspection>
   const db = await getDb();
   const now = new Date().toISOString();
 
-  await db.runAsync(`UPDATE prospection SET statut = 'en_attente', updated_at = ? WHERE id = ?`, [now, id]);
+  // Signalisation : validée pour traitement dès l'enregistrement local, tout
+  // en restant dans la file Offline-First. Intensive/Extensive conservent le
+  // parcours administratif normal.
+  await db.runAsync(
+    `UPDATE prospection
+       SET statut = CASE WHEN type_prospection = 'validation' THEN 'validee' ELSE 'en_attente' END,
+           n_fiche = CASE WHEN type_prospection = 'validation' AND n_message IS NOT NULL THEN n_message ELSE n_fiche END,
+           updated_at = ?
+     WHERE id = ?`,
+    [now, id]
+  );
 
   const updated = await getProspection(id);
   if (!updated) throw new Error('Échec de la mise à jour de la fiche brouillon locale');
