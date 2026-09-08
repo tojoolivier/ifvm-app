@@ -428,8 +428,12 @@ export default function InfestationScreen() {
   // Stade dominant Larves : pré-rempli automatiquement depuis les captures déjà saisies
   // (règle demandée), tout en restant modifiable manuellement — jamais écrasé si déjà
   // renseigné (rechargé depuis la base, ou déjà corrigé par le prospecteur).
+  // #infestation-comportement-cible-larvaire : ce pré-remplissage se déclenchait à
+  // l'entrée sur l'onglet Comportement (désormais masqué pour les cibles larvaires,
+  // le champ Stade dominant vit dans Description) — retiré de la condition, il se
+  // déclenche donc dès que la cible/les captures le permettent, sans dépendre de `tab`.
   useEffect(() => {
-    if (!forms || tab !== 'comport' || !dominantLarve) return;
+    if (!forms || !dominantLarve) return;
     const target = selectedTargets.length > 0 ? selectedTargets[0] : null;
     if (target !== 'tache_larvaire' && target !== 'bande_larvaire') return;
     if (forms[target]?.stadeDominant) return;
@@ -441,7 +445,18 @@ export default function InfestationScreen() {
           : current
       );
     });
-  }, [forms, tab, selectedTargets, dominantLarve]);
+  }, [forms, selectedTargets, dominantLarve]);
+
+  // #infestation-comportement-cible-larvaire : si l'onglet Comportement était affiché
+  // pour une cible aérienne puis que la sélection change pour une cible larvaire (où cet
+  // onglet est masqué), on retombe sur Description plutôt que de rester bloqué sur un
+  // onglet qui n'est plus accessible depuis son bouton.
+  useEffect(() => {
+    if (tab !== 'comport') return;
+    const target = selectedTargets.length > 0 ? selectedTargets[0] : null;
+    if (!target || isTypeCibleAerien(target)) return;
+    void Promise.resolve().then(() => setTab('desc'));
+  }, [tab, selectedTargets]);
 
   if (!forms) {
     return (
@@ -626,11 +641,11 @@ export default function InfestationScreen() {
 
   const handleFooterPress = () => {
     // La section Infestation est entièrement facultative : ne rien sélectionner ne doit
-    // jamais bloquer la navigation. Sans cible sélectionnée, il n'y a rien à configurer
-    // dans l'onglet Comportement (masqué dans ce cas, cf. `tab === 'comport' &&
-    // selectedTargets.length > 0` plus bas) — on saute donc directement l'étape et on
-    // enregistre (aucune ligne à persister) avant de continuer.
-    if (tab === 'desc' && selectedTargets.length > 0) {
+    // jamais bloquer la navigation. Sans cible sélectionnée, ou pour une cible larvaire
+    // (#infestation-comportement-cible-larvaire : onglet Comportement masqué, rien à y
+    // configurer), on saute directement à l'enregistrement plutôt que de proposer un
+    // second onglet vide.
+    if (tab === 'desc' && selectedTargets.length > 0 && isTypeCibleAerien(currentTarget)) {
       setTab('comport');
       return;
     }
@@ -781,14 +796,22 @@ export default function InfestationScreen() {
           <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
             {tab === 'desc' && (
               <>
-                <View style={styles.toggleTrack}>
-                  <TouchableOpacity onPress={() => setTab('desc')} activeOpacity={0.7} style={styles.toggleSegmentTouchable}>
-                    <Text style={[styles.toggleSegment, tab === 'desc' && styles.toggleSegmentActive]}>Description</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setTab('comport')} activeOpacity={0.7} style={styles.toggleSegmentTouchable}>
-                    <Text style={styles.toggleSegment}>Comportement</Text>
-                  </TouchableOpacity>
-                </View>
+                {/* #infestation-comportement-cible-larvaire : pour une cible larvaire
+                    (tache/bande), l'onglet Comportement n'a rien à afficher (seul
+                    l'État aurait pu y figurer, et il est redondant avec "Type de
+                    cible" côté Description) — masqué plutôt que de mener à un
+                    onglet vide. Conservé tel quel pour les cibles aériennes, qui y
+                    saisissent des données réelles (essaim, heure, dimensions). */}
+                {isTypeCibleAerien(currentTarget) && (
+                  <View style={styles.toggleTrack}>
+                    <TouchableOpacity onPress={() => setTab('desc')} activeOpacity={0.7} style={styles.toggleSegmentTouchable}>
+                      <Text style={[styles.toggleSegment, tab === 'desc' && styles.toggleSegmentActive]}>Description</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setTab('comport')} activeOpacity={0.7} style={styles.toggleSegmentTouchable}>
+                      <Text style={styles.toggleSegment}>Comportement</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
 
                 <Text style={styles.sectionLabel}>Type de cible</Text>
                 
@@ -1118,7 +1141,7 @@ export default function InfestationScreen() {
               </View>
             )}
 
-            {tab === 'comport' && selectedTargets.length > 0 && (
+            {tab === 'comport' && selectedTargets.length > 0 && isTypeCibleAerien(currentTarget) && (
               <View style={styles.card}>
                 <Text style={styles.fieldGroupLabel}>État</Text>
                 <View style={styles.row2}>
@@ -1342,7 +1365,9 @@ export default function InfestationScreen() {
               activeOpacity={0.85}
             >
               <Text style={styles.continueButtonText}>
-                {tab === 'desc' && selectedTargets.length > 0 ? 'Comportement  ›' : 'Continuer  ›'}
+                {tab === 'desc' && selectedTargets.length > 0 && isTypeCibleAerien(currentTarget)
+                  ? 'Comportement  ›'
+                  : 'Continuer  ›'}
               </Text>
             </TouchableOpacity>
           </View>
