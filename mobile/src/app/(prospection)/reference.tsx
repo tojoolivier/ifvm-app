@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform, FlatList, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useForm } from '@tanstack/react-form';
@@ -63,6 +63,103 @@ function formatDateHeure(date: Date): string {
   return `${p(date.getDate())}/${p(date.getMonth() + 1)} ${p(date.getHours())}:${p(date.getMinutes())}`;
 }
 
+interface OptionReferentiel {
+  id: string;
+  nom: string;
+}
+
+/**
+ * Sélecteur PA/Station en mode Manuel (Prospection Intensive uniquement,
+ * #manuel-referentiel-pa-station) — déclencheur + modale de recherche, sur le
+ * même modèle que `ProduitSelectField` (traitement), mais avec les tokens de
+ * style déjà utilisés par cet écran plutôt que ceux du module traitement.
+ */
+function SelecteurReferentiel<T extends OptionReferentiel>({
+  valeur,
+  options,
+  onSelect,
+  placeholder,
+  desactive,
+  messageDesactive,
+}: {
+  valeur: T | null;
+  options: T[];
+  onSelect: (item: T) => void;
+  placeholder: string;
+  desactive?: boolean;
+  messageDesactive?: string;
+}) {
+  const [ouvert, setOuvert] = useState(false);
+  const [recherche, setRecherche] = useState('');
+
+  const filtres = useMemo(() => {
+    const q = recherche.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter((o) => o.nom.toLowerCase().includes(q));
+  }, [options, recherche]);
+
+  function fermer() {
+    setOuvert(false);
+    setRecherche('');
+  }
+
+  return (
+    <View>
+      <TouchableOpacity
+        disabled={desactive}
+        accessibilityRole="button"
+        onPress={() => setOuvert(true)}
+        style={[styles.manualInput, styles.selectTrigger, desactive && styles.selectTriggerDisabled]}
+      >
+        <Text
+          style={[styles.selectTriggerText, !valeur && styles.selectTriggerPlaceholder]}
+          numberOfLines={1}
+        >
+          {valeur ? valeur.nom : desactive && messageDesactive ? messageDesactive : placeholder}
+        </Text>
+        <Text style={styles.selectChevron}>▾</Text>
+      </TouchableOpacity>
+
+      <Modal transparent animationType="fade" visible={ouvert} onRequestClose={fermer}>
+        <View style={styles.selectVoile}>
+          <View style={styles.selectCarte}>
+            <TextInput
+              style={styles.manualInput}
+              placeholder="Rechercher…"
+              placeholderTextColor={INACTIVE_TEXT}
+              value={recherche}
+              onChangeText={setRecherche}
+              autoFocus
+            />
+            <FlatList
+              data={filtres}
+              keyExtractor={(o) => o.id}
+              style={styles.selectListe}
+              keyboardShouldPersistTaps="handled"
+              ListEmptyComponent={<Text style={styles.selectVide}>Aucun résultat.</Text>}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={styles.selectLigne}
+                  onPress={() => {
+                    onSelect(item);
+                    fermer();
+                  }}
+                >
+                  <Text style={styles.selectLigneTexte}>{item.nom}</Text>
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity accessibilityRole="button" onPress={fermer}>
+              <Text style={styles.selectLien}>Fermer</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
 export default function ReferenceScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -113,6 +210,42 @@ export default function ReferenceScreen() {
   const [stationManualNom, setStationManualNom] = useState('');
   const [autoPa, setAutoPa] = useState<PosteAcridien | null>(null);
   const [autoStation, setAutoStation] = useState<StationFixe | null>(null);
+
+  // Référentiel pour le sélecteur manuel intensif (#manuel-referentiel-pa-station) —
+  // indépendant de `autoPa`/`autoStation` (résultat du calcul GPS « plus proche »),
+  // ce sont ici toutes les options que l'agent peut choisir à la main.
+  const [postesReferentiel, setPostesReferentiel] = useState<PosteAcridien[]>([]);
+  const [stationsReferentiel, setStationsReferentiel] = useState<StationFixe[]>([]);
+
+  useEffect(() => {
+    let isActive = true;
+    void listPostesAcridiens()
+      .then((postes) => {
+        if (isActive) setPostesReferentiel(postes);
+      })
+      .catch((error) => signalerChargement(error, { step: 'listPostesAcridiens' }));
+    return () => {
+      isActive = false;
+    };
+  }, [signalerChargement]);
+
+  useEffect(() => {
+    if (!pa) return;
+    let isActive = true;
+    void listStationsByPoste(pa.id)
+      .then((stations) => {
+        if (isActive) setStationsReferentiel(stations);
+      })
+      .catch((error) => signalerChargement(error, { step: 'listStationsByPoste', paId: pa.id }));
+    return () => {
+      isActive = false;
+    };
+  }, [pa, signalerChargement]);
+
+  // Sans PA choisi, aucune station n'est proposable (pa_id est une FK non-nullable
+  // côté référentiel) — dérivé au rendu plutôt que par un setState dans l'effet
+  // ci-dessus, qui ne doit s'occuper que du fetch asynchrone.
+  const stationsDisponibles = pa ? stationsReferentiel : [];
 
   const paModeRef = useRef<SelectMode>('auto');
   const stationModeRef = useRef<SelectMode>('auto');
@@ -275,8 +408,15 @@ export default function ReferenceScreen() {
     };
   }, [draft]);
 
+  // #manuel-referentiel-pa-station (§8) : un changement de PA invalide toute
+  // station déjà choisie qui ne lui est plus rattachée — qu'il s'agisse d'un
+  // changement via GPS (auto) ou via le sélecteur manuel (intensif), les deux
+  // passent par cette même fonction. Sans effet sur les flux existants (auto,
+  // restauration de brouillon) : PA et station y sont toujours déjà cohérents
+  // avant l'appel, donc la vérification ci-dessous ne change jamais rien pour eux.
   function applyPa(poste: PosteAcridien): void {
     setPa(poste);
+    setStation((current) => (current && current.paId === poste.id ? current : null));
   }
 
   function setPaAuto() {
@@ -301,6 +441,13 @@ export default function ReferenceScreen() {
 
   // Détection du type intensif
   const isIntensive = draft?.type_prospection === 'intensive';
+
+  // #manuel-referentiel-pa-station : en intensif, le mode Manuel choisit un
+  // PA/une Station du référentiel (comme l'auto) — `pa`/`station` restent de
+  // vrais objets référentiel dans les deux modes. Seul l'extensif garde la
+  // saisie libre historique (`paManualNom`/`stationManualNom`).
+  const paEstSaisieLibre = paMode === 'manuel' && !isIntensive;
+  const stationEstSaisieLibre = stationMode === 'manuel' && !isIntensive;
 
   // Biotopes (#biotope-multi) : sélection multiple — hors du form tanstack, comme
   // `selectedTextures` dans veg.tsx (state à part, la validation « au moins un »
@@ -417,7 +564,7 @@ export default function ReferenceScreen() {
 
           const dateProspection = draft?.date_prospection ?? new Date().toISOString().slice(0, 10);
           const nFiche = generateNumeroFiche(draftId, dateProspection);
-          const nReleve = generateNumeroReleve(stationMode === 'manuel' ? null : station?.id ?? null, dateProspection);
+          const nReleve = generateNumeroReleve(stationEstSaisieLibre ? null : station?.id ?? null, dateProspection);
 
           // Préparer les données avec des valeurs par défaut (0 pour intensif)
           const surfaceProspecteeValue = value.surfaceProspectee ? Number(value.surfaceProspectee) : 0;
@@ -436,12 +583,10 @@ export default function ReferenceScreen() {
             region: adminArea.region,
             district: adminArea.district,
             commune: adminArea.commune,
-            // Mode manuel : saisie libre, sans code du référentiel (pas un poste connu).
-            pa_code: paMode === 'manuel' ? null : pa?.code ?? null,
-            pa_nom: paMode === 'manuel' ? (paManualNom.trim() || null) : pa?.nom ?? null,
-            // Mode manuel : saisie libre, sans id du référentiel (pas une station connue).
-            stationId: stationMode === 'manuel' ? null : station?.id ?? null,
-            station_nom: stationMode === 'manuel' ? (stationManualNom.trim() || null) : station?.nom ?? null,
+            pa_code: paEstSaisieLibre ? null : pa?.code ?? null,
+            pa_nom: paEstSaisieLibre ? (paManualNom.trim() || null) : pa?.nom ?? null,
+            stationId: stationEstSaisieLibre ? null : station?.id ?? null,
+            station_nom: stationEstSaisieLibre ? (stationManualNom.trim() || null) : station?.nom ?? null,
           });
 
           setDraft(updated);
@@ -458,7 +603,7 @@ export default function ReferenceScreen() {
 
   const nFichePreview = draftId ? generateNumeroFiche(draftId, draft?.date_prospection ?? '') : '—';
   const nRelevePreview = generateNumeroReleve(
-    stationMode === 'manuel' ? null : station?.id ?? null,
+    stationEstSaisieLibre ? null : station?.id ?? null,
     draft?.date_prospection ?? ''
   );
 
@@ -568,6 +713,13 @@ export default function ReferenceScreen() {
                     <Text style={styles.gpsBadgeText}>📡 via GPS</Text>
                   </View>
                 </View>
+              ) : isIntensive ? (
+                <SelecteurReferentiel
+                  valeur={pa}
+                  options={postesReferentiel}
+                  onSelect={applyPa}
+                  placeholder="Sélectionner un poste acridien"
+                />
               ) : (
                 <TextInput
                   value={paManualNom}
@@ -603,6 +755,15 @@ export default function ReferenceScreen() {
                     <Text style={styles.gpsBadgeText}>📡 via GPS</Text>
                   </View>
                 </View>
+              ) : isIntensive ? (
+                <SelecteurReferentiel
+                  valeur={station}
+                  options={stationsDisponibles}
+                  onSelect={setStation}
+                  placeholder="Sélectionner une station"
+                  desactive={!pa}
+                  messageDesactive="Choisissez d'abord un poste acridien"
+                />
               ) : (
                 <TextInput
                   value={stationManualNom}
@@ -843,6 +1004,28 @@ const styles = StyleSheet.create({
   },
   gpsBadge: { backgroundColor: GPS_BADGE_BG, borderRadius: 20, paddingHorizontal: 7, paddingVertical: 2 },
   gpsBadgeText: { fontSize: 9, fontWeight: '600', color: GREEN },
+  selectTrigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  selectTriggerDisabled: { opacity: 0.55 },
+  selectTriggerText: { flex: 1, fontSize: 15, fontWeight: '700', color: TEXT },
+  selectTriggerPlaceholder: { color: INACTIVE_TEXT, fontWeight: '600' },
+  selectChevron: { fontSize: 13, color: TEXT_SECONDARY, marginLeft: 8 },
+  selectVoile: { flex: 1, backgroundColor: 'rgba(22,32,26,0.5)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  selectCarte: {
+    width: '100%',
+    maxWidth: 380,
+    maxHeight: '75%',
+    backgroundColor: '#fff',
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: 16,
+    gap: 10,
+  },
+  selectListe: { flexGrow: 0 },
+  selectVide: { fontSize: 12.5, color: TEXT_SECONDARY, padding: 12 },
+  selectLigne: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: BORDER },
+  selectLigneTexte: { fontSize: 14, fontWeight: '600', color: TEXT },
+  selectLien: { color: TEXT_SECONDARY, fontSize: 13, fontWeight: '700', textAlign: 'center', paddingVertical: 8 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: {
     fontSize: 12,
