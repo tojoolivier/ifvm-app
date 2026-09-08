@@ -159,7 +159,7 @@ export default function ExtensiveObservationsScreen() {
   // `signatureNoms`/`Horodatages` : nom du signataire choisi + horodatage de
   // validation. `signatureImages` : tracé SVG (`SignaturePad`), la signature
   // réelle — un rôle n'est considéré « signé » que lorsqu'elle est non nulle
-  // (un nom seul, hérité d'une ancienne fiche pré-migration 0052, ne suffit
+  // (un nom seul, hérité d'une ancienne fiche pré-migration 0053, ne suffit
   // plus : l'écran repasse en édition tant qu'aucun tracé n'a été validé).
   const [signatureNoms, setSignatureNoms] = useState<Record<SignatureRole, string | null>>({
     consultant_fao: draft?.signature_consultant_fao_nom ?? null,

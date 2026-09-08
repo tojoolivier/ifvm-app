@@ -185,7 +185,7 @@ class ProspectionModel(Base):
     signature_consultant_fao_horodatage: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
-    # `_image` (migration 0052) : tracé SVG du pavé de signature, même format
+    # `_image` (migration 0053) : tracé SVG du pavé de signature, même format
     # que `TraitementSignatureModel.signature_image` — Consultant FAO, Pilote
     # et Chef de Base ont désormais une vraie signature numérique, pas
     # seulement un nom + horodatage.
