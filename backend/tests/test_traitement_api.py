@@ -36,14 +36,17 @@ async def _creer_prospection(
     utilisateur,
     surface_infestee=None,
     populations=(),
+    type_prospection="extensive",
+    n_fiche=None,
 ) -> uuid.UUID:
     p = ProspectionModel(
         id=uuid.uuid4(),
-        type_prospection="extensive",
+        type_prospection=type_prospection,
         campagne_id=campagne_id,
         prospecteur_id=utilisateur.id,
         date_prospection=date(2026, 8, 1),
         surface_infestee=surface_infestee,
+        n_fiche=n_fiche,
         statut="brouillon",
         statut_sync="local",
     )
@@ -77,6 +80,73 @@ async def test_create_traitement_aerien_brouillon(
     assert body["cible"]["surface_infestee_ha"] == 120.5
     assert body["aerien"]["pilote"] == f"{pilote.prenom} {pilote.nom}"
     assert body["observations"] is None
+
+
+@pytest.mark.asyncio
+async def test_traitement_aerien_expose_le_numero_de_fiche_prospection_liee(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_rotation
+):
+    """#numero-fiche-prospection-liee : le champ est dérivé automatiquement de
+    prospection_id (jamais saisi, jamais une seconde relation) et survit à une
+    modification du traitement (ici : ajout d'une rotation)."""
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, type_prospection="intensive", n_fiche="EXT-2026-00125"
+    )
+    resp = await client.post(
+        "/traitements", json=payload_traitement(prospection_id), headers=auth_headers
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["prospection_n_fiche"] == "EXT-2026-00125"
+
+    # Persistance après reouverture (GET).
+    relu = await client.get(f"/traitements/{body['id']}", headers=auth_headers)
+    assert relu.json()["prospection_n_fiche"] == "EXT-2026-00125"
+
+    # Une modification du traitement (ajout d'une rotation) ne change jamais
+    # le numéro de la fiche de prospection liée.
+    modifie = await client.post(
+        f"/traitements/{body['id']}/rotations",
+        json=payload_rotation(),
+        headers=auth_headers,
+    )
+    assert modifie.status_code == 201, modifie.text
+    assert modifie.json()["prospection_n_fiche"] == "EXT-2026-00125"
+
+
+@pytest.mark.asyncio
+async def test_traitement_terrestre_expose_le_numero_de_fiche_prospection_liee(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+):
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, type_prospection="extensive", n_fiche="EXT-2026-00126"
+    )
+    resp = await client.post(
+        "/traitements", json=payload_traitement_terrestre(prospection_id), headers=auth_headers
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["prospection_n_fiche"] == "EXT-2026-00126"
+
+
+@pytest.mark.asyncio
+async def test_traitement_depuis_signalement_expose_le_meme_numero_que_le_message(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+):
+    """Cas particulier (#signalements-treatment-ready) : une fiche de
+    Validation/Signalisation a déjà son n_fiche aligné sur n_message dès sa
+    création — le traitement doit reprendre exactement cette même valeur."""
+    prospection_id = await _creer_prospection(
+        db_session,
+        campagne_id,
+        utilisateur,
+        type_prospection="validation",
+        n_fiche="SIG-2026-00045",
+    )
+    resp = await client.post(
+        "/traitements", json=payload_traitement_terrestre(prospection_id), headers=auth_headers
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["prospection_n_fiche"] == "SIG-2026-00045"
 
 
 @pytest.mark.asyncio

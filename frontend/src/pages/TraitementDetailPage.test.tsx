@@ -180,6 +180,21 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
     )
   })
 
+  it('affiche le numéro métier de la fiche de prospection liée (pas son UUID) — #numero-fiche-prospection-liee', async () => {
+    renderPage(traitementAerien({ prospection_n_fiche: 'EXT-2026-00125' }))
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+
+    const lien = screen.getByRole('link', { name: 'EXT-2026-00125' })
+    expect(lien).toHaveAttribute('href', '/prospections/p1')
+  })
+
+  it('retombe sur l’UUID technique si le backend ne renvoie pas encore le numéro métier', async () => {
+    renderPage(traitementAerien({ prospection_n_fiche: null }))
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+
+    expect(screen.getByRole('link', { name: 'p1' })).toHaveAttribute('href', '/prospections/p1')
+  })
+
   it('affiche le tableau des rotations avec le nom du produit résolu et le total', async () => {
     renderPage(traitementAerien())
     await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())

@@ -57,6 +57,11 @@ export default function ReferencesScreen() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [prospectionStatut, setProspectionStatut] = useState<string | null>(null);
   const [prospectionUpdatedAt, setProspectionUpdatedAt] = useState<string | null>(null);
+  // Numéro métier (#numero-fiche-prospection-liee) — jamais l'UUID technique
+  // `prospectionId` affiché tel quel : dérivé de la fiche de prospection liée,
+  // même ordre de priorité que « Consulter une fiche validée »
+  // (prospection-picker.tsx : n_fiche, puis n_releve, puis n_message).
+  const [prospectionNFiche, setProspectionNFiche] = useState<string | null>(null);
 
   const readOnly = isValidationView === '1';
   const hasGps = store.ref.latitude != null && store.ref.longitude != null;
@@ -134,6 +139,7 @@ export default function ReferencesScreen() {
         if (!prospection) return;
         setProspectionStatut(prospection.statut);
         setProspectionUpdatedAt(prospection.updated_at);
+        setProspectionNFiche(prospection.n_fiche ?? prospection.n_releve ?? prospection.n_message ?? null);
         // Nouvelle fiche seulement (une fiche déjà créée garde sa date de
         // validation enregistrée, restaurée par l'effet précédent) : la date de
         // validation — non modifiable — est celle de la fiche de prospection liée,
@@ -360,7 +366,7 @@ export default function ReferencesScreen() {
             {prospectionId ? (
               <Card variant="default" style={styles.prospectionCard}>
                 <Text style={styles.label}>N° fiche de prospection</Text>
-                <Text style={styles.prospectionText}>{prospectionId}</Text>
+                <Text style={styles.prospectionText}>{prospectionNFiche ?? '(numéro non renseigné)'}</Text>
                 <Text style={styles.note}>
                   {prospectionStatut === STATUT_VALIDE && prospectionUpdatedAt
                     ? `Validée le ${formatDateFr(prospectionUpdatedAt)} · lecture seule`
