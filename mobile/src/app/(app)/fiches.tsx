@@ -3,7 +3,7 @@ import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
-import { loadAccueilData, loadValidatedProspections } from '@/lib/prospection-accueil';
+import { loadAccueilData, loadMesProspectionsServeur } from '@/lib/prospection-accueil';
 import { DraftProspection } from '@/lib/prospection-repository';
 import { ProspectionRead } from '@/lib/api-client';
 import { listMesTraitements, DraftTraitementRow } from '@/lib/traitement-repository';
@@ -23,6 +23,7 @@ import {
   TRAITEMENT_SUBTYPE_BADGE_CONFIG,
   TYPE_BADGE_CONFIG,
 } from '@/components/fiches/tokens';
+import { statutFicheAffiche } from '@/lib/prospection-statut';
 
 type FilterKey = 'TOUS' | 'PROSPECTION' | 'CRT' | 'METEO';
 
@@ -86,8 +87,8 @@ export default function FichesScreen() {
       const lectures = await Promise.all([
         runTask(() => loadAccueilData(), { name: 'fiches.brouillons', criticality: 'essential' }),
         user && token
-          ? runTask(() => loadValidatedProspections(token, user.id), {
-              name: 'fiches.validees',
+          ? runTask(() => loadMesProspectionsServeur(token, user.id), {
+              name: 'fiches.statut-serveur',
               criticality: 'essential',
             })
           : null,
@@ -130,7 +131,9 @@ export default function FichesScreen() {
         meta: `${stationLabel(draft)} · ${draft.date_prospection}`,
         typeBadge: TYPE_BADGE_CONFIG.PROSPECTION,
         subTypeBadge: PROSPECTION_SUBTYPE_BADGE_CONFIG[draft.type_prospection] ?? null,
-        statutBadge: STATUT_BADGE_CONFIG[draft.statut] ?? STATUT_BADGE_CONFIG.brouillon,
+        statutBadge:
+          STATUT_BADGE_CONFIG[statutFicheAffiche(draft.statut, draft.statut_sync)] ??
+          STATUT_BADGE_CONFIG.brouillon,
         date: draft.date_prospection,
         onPress: () => navigateToProspectionDraft(router, hydrateFromDraft, draft),
       }));
@@ -142,7 +145,7 @@ export default function FichesScreen() {
       meta: `${stationLabel(prospection)} · ${prospection.date_prospection}`,
       typeBadge: TYPE_BADGE_CONFIG.PROSPECTION,
       subTypeBadge: PROSPECTION_SUBTYPE_BADGE_CONFIG[prospection.type_prospection] ?? null,
-      statutBadge: STATUT_BADGE_CONFIG.validee,
+      statutBadge: STATUT_BADGE_CONFIG[statutFicheAffiche(prospection.statut, 'synced')],
       date: prospection.date_prospection,
       onPress: () => navigateToProspectionConsult(router, prospection),
     }));

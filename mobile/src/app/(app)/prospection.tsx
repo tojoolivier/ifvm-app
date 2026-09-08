@@ -5,7 +5,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Network from 'expo-network';
 import { useAuthStore } from '@/lib/auth-store';
-import { loadAccueilData, loadValidatedProspections, deleteDraftProspection, AccueilViewModel } from '@/lib/prospection-accueil';
+import { loadAccueilData, loadMesProspectionsServeur, deleteDraftProspection, AccueilViewModel } from '@/lib/prospection-accueil';
 import { syncAllProspections } from '@/lib/prospection-review';
 import { estDansLaFile, estToutParti, resumerEnPhrase } from '@/lib/sync-lot';
 import { DraftProspection } from '@/lib/prospection-repository';
@@ -22,17 +22,20 @@ import {
   PROSPECTION_SUBTYPE_BADGE_CONFIG,
   STATUT_BADGE_CONFIG,
 } from '@/components/fiches/tokens';
+import { statutFicheAffiche, StatutFicheAffiche } from '@/lib/prospection-statut';
 
 const EMPTY_DATA: AccueilViewModel = { unsyncedCount: 0, activeDraft: null, recent: [], validated: [] };
 
-type BadgeKind = 'a_synchro' | 'synchro' | 'validee';
-type FilterKey = 'TOUS' | 'a_synchro' | 'synchro' | 'validee';
+type BadgeKind = StatutFicheAffiche;
+type FilterKey = 'TOUS' | StatutFicheAffiche;
 
 const FILTERS: FilterOption<FilterKey>[] = [
   { value: 'TOUS', label: 'Toutes' },
   { value: 'a_synchro', label: 'À synchro' },
-  { value: 'synchro', label: 'Synchronisées' },
+  { value: 'en_attente', label: 'En attente' },
+  { value: 'verifiee', label: 'Vérifiées' },
   { value: 'validee', label: 'Validées' },
+  { value: 'rejetee', label: 'Rejetées' },
 ];
 
 /**
@@ -91,12 +94,15 @@ export default function ProspectionScreen() {
       if (accueil.ok) setData(accueil.value);
 
       if (user && token) {
-        const validees = await runTask(() => loadValidatedProspections(token, user.id), {
-          name: 'prospection.validees',
+        const fichesServeur = await runTask(() => loadMesProspectionsServeur(token, user.id), {
+          name: 'prospection.statut-serveur',
           criticality: 'essential',
         });
-        if (validees.ok) {
-          setData((current) => ({ ...current, validated: validees.value }));
+        if (fichesServeur.ok) {
+          // Le champ historique `validated` contient désormais les fiches du
+          // serveur, tous statuts confondus. Cela évite un changement de
+          // schéma local tout en faisant primer l'état de revue officiel.
+          setData((current) => ({ ...current, validated: fichesServeur.value }));
         }
       }
 
@@ -154,30 +160,30 @@ export default function ProspectionScreen() {
   };
 
   const items = useMemo<FicheListItem[]>(() => {
-    const validatedIds = new Set(data.validated.map((item) => item.id));
+    const serverIds = new Set(data.validated.map((item) => item.id));
     const draftItems: FicheListItem[] = data.recent
-      .filter((item) => !validatedIds.has(item.id))
+      .filter((item) => !serverIds.has(item.id))
       .map((item) => ({
       id: item.id,
       title: stationLabel(item),
       nFiche: item.n_fiche,
       date: item.date_prospection,
-      badge: item.statut_sync === 'synced' ? 'synchro' : 'a_synchro',
+      badge: statutFicheAffiche(item.statut, item.statut_sync),
       typeProspection: item.type_prospection,
       onPress: () => resumeDraft(item),
       draft: item.statut === 'brouillon' ? item : null,
     }));
-    const validatedItems: FicheListItem[] = data.validated.map((item) => ({
+    const serverItems: FicheListItem[] = data.validated.map((item) => ({
       id: item.id,
       title: stationLabel(item),
       nFiche: item.n_fiche,
       date: item.date_prospection,
-      badge: 'validee',
+      badge: statutFicheAffiche(item.statut, 'synced'),
       typeProspection: item.type_prospection,
       onPress: () => openFicheLecture(item),
       draft: null,
     }));
-    return [...draftItems, ...validatedItems].sort((a, b) => b.date.localeCompare(a.date));
+    return [...draftItems, ...serverItems].sort((a, b) => b.date.localeCompare(a.date));
   }, [data.recent, data.validated]);
 
   const filteredItems = useMemo(() => {
