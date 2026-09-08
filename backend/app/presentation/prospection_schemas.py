@@ -533,10 +533,13 @@ class ProspectionCreate(BaseModel):
     signature_visa_horodatage: datetime | None = None
     signature_consultant_fao_nom: str | None = None
     signature_consultant_fao_horodatage: datetime | None = None
+    signature_consultant_fao_image: str | None = None
     signature_pilote_nom: str | None = None
     signature_pilote_horodatage: datetime | None = None
+    signature_pilote_image: str | None = None
     signature_chef_base_nom: str | None = None
     signature_chef_base_horodatage: datetime | None = None
+    signature_chef_base_image: str | None = None
 
     populations: list[PopulationCreate] = []
     captures: list[CaptureCreate] = []
@@ -638,10 +641,13 @@ class ProspectionUpdate(BaseModel):
     signature_visa_horodatage: datetime | None = None
     signature_consultant_fao_nom: str | None = None
     signature_consultant_fao_horodatage: datetime | None = None
+    signature_consultant_fao_image: str | None = None
     signature_pilote_nom: str | None = None
     signature_pilote_horodatage: datetime | None = None
+    signature_pilote_image: str | None = None
     signature_chef_base_nom: str | None = None
     signature_chef_base_horodatage: datetime | None = None
+    signature_chef_base_image: str | None = None
 
 
 class StatutChange(BaseModel):
@@ -767,10 +773,13 @@ class ProspectionRead(BaseModel):
     signature_visa_horodatage: datetime | None = None
     signature_consultant_fao_nom: str | None = None
     signature_consultant_fao_horodatage: datetime | None = None
+    signature_consultant_fao_image: str | None = None
     signature_pilote_nom: str | None = None
     signature_pilote_horodatage: datetime | None = None
+    signature_pilote_image: str | None = None
     signature_chef_base_nom: str | None = None
     signature_chef_base_horodatage: datetime | None = None
+    signature_chef_base_image: str | None = None
 
     populations: list[PopulationRead] = []
     captures: list[CaptureRead] = []

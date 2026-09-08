@@ -394,6 +394,8 @@ describe('ExtensiveRecapScreen — mode aérien : pesticides embarqués + signat
         futs_pleins: 6,
         futs_vides: 4,
         futs_recues: 5,
+        // VISA retiré (#signatures-numeriques-extensif-aerien) : ces colonnes
+        // restent en base (historique) mais ne sont plus jamais affichées.
         signature_visa_nom: 'Rakoto V.',
         signature_visa_horodatage: '2026-09-01T09:00:00.000Z',
         signature_pilote_nom: 'Jean Rakoto',
@@ -445,8 +447,10 @@ describe('ExtensiveRecapScreen — mode aérien : pesticides embarqués + signat
     expect(screen.getByText('Fûts — Reçues')).toBeVisible();
     expect(screen.getByText('5')).toBeVisible();
 
-    // Signatures
-    expect(screen.getByText(`Rakoto V. — ${formatHeureLocale('2026-09-01T09:00:00.000Z')}`)).toBeVisible();
+    // Signatures — VISA n'apparaît plus (donnée historique préservée en base,
+    // jamais réaffichée) ; Rakoto V. n'était que sa valeur, pas Pilote.
+    expect(screen.queryByText('VISA')).toBeNull();
+    expect(screen.queryByText(`Rakoto V. — ${formatHeureLocale('2026-09-01T09:00:00.000Z')}`)).toBeNull();
     expect(screen.getByText(`Jean Rakoto — ${formatHeureLocale('2026-09-01T09:10:00.000Z')}`)).toBeVisible();
     // Consultant FAO et Chef de Base non signés : ligne présente avec « — », pas absente.
     expect(screen.getByText('Consultant FAO')).toBeVisible();

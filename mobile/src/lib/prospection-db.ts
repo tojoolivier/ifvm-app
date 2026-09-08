@@ -621,10 +621,15 @@ const COLONNES_PROSPECTION: readonly Colonne[] = [
   { name: 'signature_visa_horodatage', type: 'TEXT' },
   { name: 'signature_consultant_fao_nom', type: 'TEXT' },
   { name: 'signature_consultant_fao_horodatage', type: 'TEXT' },
+  // Tracé SVG (#signatures-digitales-extensif-aerien) — même principe que
+  // traitement_signature.signature_image, cf. migration backend 0052.
+  { name: 'signature_consultant_fao_image', type: 'TEXT' },
   { name: 'signature_pilote_nom', type: 'TEXT' },
   { name: 'signature_pilote_horodatage', type: 'TEXT' },
+  { name: 'signature_pilote_image', type: 'TEXT' },
   { name: 'signature_chef_base_nom', type: 'TEXT' },
   { name: 'signature_chef_base_horodatage', type: 'TEXT' },
+  { name: 'signature_chef_base_image', type: 'TEXT' },
 ];
 
 /** Colonnes ajoutées à `prospection_infestation` après sa création initiale. */

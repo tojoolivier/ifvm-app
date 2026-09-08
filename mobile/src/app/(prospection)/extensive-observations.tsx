@@ -2,11 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { normalizeBoolean, updateProspectionExtensiveObservations } from '@/lib/prospection-repository';
+import {
+  ExtensiveObservationsUpdateInput,
+  normalizeBoolean,
+  updateProspectionExtensiveObservations,
+} from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { DEGATS_CULTURES_EXTENSIF_OPTIONS, NIVEAU_OPTIONS } from '@/lib/prospection-extensive';
 import { listUtilisateursByRole, UtilisateurEquipe } from '@/lib/referentiel-db';
 import { DateField } from '@/components/DateField';
+import { SignaturePad } from '@/components/traitement/SignaturePad';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { formatHeureLocale } from '@/lib/prospection-fiche-lecture';
@@ -67,32 +72,38 @@ function validerPourcentage(raw: string, label: string): { value: number | null;
   return { value: parsed, erreur: null };
 }
 
-type SignatureRole = 'visa' | 'consultant_fao' | 'pilote' | 'chef_base';
+// VISA a été entièrement retiré (#signatures-numeriques-extensif-aerien) — les
+// colonnes backend `signature_visa_nom`/`_horodatage` (migration 0036) restent en
+// base pour préserver l'historique déjà enregistré, mais plus aucune UI ne les lit
+// ni ne les écrit à partir d'ici.
+type SignatureRole = 'consultant_fao' | 'pilote' | 'chef_base';
 
 const SIGNATURE_LABELS: Record<SignatureRole, string> = {
-  visa: 'VISA',
   consultant_fao: 'Consultant FAO',
   pilote: 'Pilote',
   chef_base: 'Chef de Base',
 };
 
-const SIGNATURE_ROLES: SignatureRole[] = ['visa', 'consultant_fao', 'pilote', 'chef_base'];
+const SIGNATURE_ROLES: SignatureRole[] = ['consultant_fao', 'pilote', 'chef_base'];
 
 /**
- * VISA et Consultant FAO n'ont pas de rôle utilisateur correspondant côté backend
- * (ROLES dans app/models/users.py) : ils restent en saisie libre (nom + bouton
- * « Signer »). Pilote et Chef de Base, eux, correspondent à des rôles existants
- * (`pilote`, `chef_de_base`) — même mécanisme que le Chef de base de l'écran
- * Traitement (AerienForm.tsx) : sélectionner un agent dans la liste vaut signature
- * immédiate (nom + horodatage), sans bouton « Signer » séparé. */
+ * Les 3 rôles restants correspondent chacun à un rôle utilisateur du référentiel
+ * backend (ROLES dans app/models/users.py : `pilote`, `chef_de_base`,
+ * `consultant_international`) — même mécanisme que le Chef de base de l'écran
+ * Traitement (AerienForm.tsx) : on choisit la personne dans une liste d'agents
+ * habilités (chips), on ne ressaisit jamais un nom à la main. Le Consultant FAO
+ * rejoint ce mécanisme ici (il était auparavant en saisie libre) — c'est le même
+ * référentiel `consultant_international` que Traitement/signatures.tsx utilise
+ * déjà pour son propre Consultant international. */
 function agentsPourRole(
   role: SignatureRole,
   pilotes: UtilisateurEquipe[],
-  chefsDeBase: UtilisateurEquipe[]
-): UtilisateurEquipe[] | null {
+  chefsDeBase: UtilisateurEquipe[],
+  consultants: UtilisateurEquipe[]
+): UtilisateurEquipe[] {
   if (role === 'pilote') return pilotes;
   if (role === 'chef_base') return chefsDeBase;
-  return null;
+  return consultants;
 }
 
 export default function ExtensiveObservationsScreen() {
@@ -143,34 +154,66 @@ export default function ExtensiveObservationsScreen() {
   const [futsVides, setFutsVides] = useState(draft?.futs_vides != null ? String(draft.futs_vides) : '');
   const [futsRecues, setFutsRecues] = useState(draft?.futs_recues != null ? String(draft.futs_recues) : '');
 
-  // Signatures — indépendantes du choix Pesticides, toujours affichées en mode
-  // aérien. Même mécanisme que (traitement)/signatures.tsx : nom saisi + horodatage
-  // capturé au moment du "Signer", jamais un tracé manuscrit.
+  // Signatures numériques (#signatures-numeriques-extensif-aerien) —
+  // indépendantes du choix Pesticides, toujours affichées en mode aérien.
+  // `signatureNoms`/`Horodatages` : nom du signataire choisi + horodatage de
+  // validation. `signatureImages` : tracé SVG (`SignaturePad`), la signature
+  // réelle — un rôle n'est considéré « signé » que lorsqu'elle est non nulle
+  // (un nom seul, hérité d'une ancienne fiche pré-migration 0052, ne suffit
+  // plus : l'écran repasse en édition tant qu'aucun tracé n'a été validé).
   const [signatureNoms, setSignatureNoms] = useState<Record<SignatureRole, string | null>>({
-    visa: draft?.signature_visa_nom ?? null,
     consultant_fao: draft?.signature_consultant_fao_nom ?? null,
     pilote: draft?.signature_pilote_nom ?? null,
     chef_base: draft?.signature_chef_base_nom ?? null,
   });
   const [signatureHorodatages, setSignatureHorodatages] = useState<Record<SignatureRole, string | null>>({
-    visa: draft?.signature_visa_horodatage ?? null,
     consultant_fao: draft?.signature_consultant_fao_horodatage ?? null,
     pilote: draft?.signature_pilote_horodatage ?? null,
     chef_base: draft?.signature_chef_base_horodatage ?? null,
   });
-  const [signatureDraftNoms, setSignatureDraftNoms] = useState<Record<SignatureRole, string>>({
-    visa: '',
+  const [signatureImages, setSignatureImages] = useState<Record<SignatureRole, string | null>>({
+    consultant_fao: draft?.signature_consultant_fao_image ?? null,
+    pilote: draft?.signature_pilote_image ?? null,
+    chef_base: draft?.signature_chef_base_image ?? null,
+  });
+  // Identifiant de l'agent associé à `signatureNoms[role]` — la relation
+  // « qui a signé » se base sur cet id, jamais sur le seul nom affiché (§8) :
+  // un changement de personne dans les chips invalide immédiatement toute
+  // signature déjà validée pour l'ancien id. Résolu par appariement de nom
+  // au chargement (effet plus bas) pour une fiche déjà signée avant relecture,
+  // faute d'une colonne d'id côté backend (même limite que traitement_signature).
+  const [signatureAgentIds, setSignatureAgentIds] = useState<Record<SignatureRole, string | null>>({
+    consultant_fao: null,
+    pilote: null,
+    chef_base: null,
+  });
+  // Tracé en cours (avant VALIDER) — jamais persisté tant que VALIDER n'a pas
+  // été pressé. `resetTicks` force le remontage du SignaturePad (non contrôlé,
+  // cf. SignaturePad.tsx) pour repartir d'un tracé vierge après MODIFIER ou un
+  // changement de personne.
+  const [pendingPaths, setPendingPaths] = useState<Record<SignatureRole, string>>({
     consultant_fao: '',
     pilote: '',
     chef_base: '',
   });
+  const [resetTicks, setResetTicks] = useState<Record<SignatureRole, number>>({
+    consultant_fao: 0,
+    pilote: 0,
+    chef_base: 0,
+  });
+  // Rôles actuellement en édition (chips + pavé affichés) — un rôle jamais
+  // signé y est implicitement (cf. rendu : `enEdition = editingRoles.has(role)
+  // || !signatureImages[role]`), celui-ci ne sert qu'à rouvrir l'édition d'une
+  // signature déjà validée (MODIFIER).
+  const [editingRoles, setEditingRoles] = useState<Set<SignatureRole>>(new Set());
 
-  // Pilote/Chef de Base : agents habilités proposés en chips (cf. agentsPourRole
-  // ci-dessus), sur le modèle de listUtilisateursByRole côté Traitement
-  // (traitement.tsx, AerienForm.tsx). Chargés une seule fois, uniquement en mode
-  // aérien (seul mode où ce bloc Signatures s'affiche).
+  // Pilote/Chef de Base/Consultant FAO : agents habilités proposés en chips (cf.
+  // agentsPourRole ci-dessus), sur le modèle de listUtilisateursByRole côté
+  // Traitement (traitement.tsx, AerienForm.tsx). Chargés une seule fois,
+  // uniquement en mode aérien (seul mode où ce bloc Signatures s'affiche).
   const [pilotes, setPilotes] = useState<UtilisateurEquipe[]>([]);
   const [chefsDeBase, setChefsDeBase] = useState<UtilisateurEquipe[]>([]);
+  const [consultants, setConsultants] = useState<UtilisateurEquipe[]>([]);
 
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('extensive-observations');
@@ -183,22 +226,73 @@ export default function ExtensiveObservationsScreen() {
     listUtilisateursByRole('chef_de_base')
       .then(setChefsDeBase)
       .catch((error) => signalerChargement(error, { draftId, source: 'listUtilisateursByRole:chef_de_base' }));
+    listUtilisateursByRole('consultant_international')
+      .then(setConsultants)
+      .catch((error) => signalerChargement(error, { draftId, source: 'listUtilisateursByRole:consultant_international' }));
   }, [isAerien, draftId, signalerChargement]);
 
-  const handleSigner = (role: SignatureRole) => {
-    const nom = signatureDraftNoms[role];
-    if (!nom) return; // Précondition imposée par le bouton désactivé — cf. signatures.tsx.
-    const horodatage = new Date().toISOString();
-    setSignatureNoms((current) => ({ ...current, [role]: nom }));
-    setSignatureHorodatages((current) => ({ ...current, [role]: horodatage }));
-  };
+  // Résolution best-effort de l'id associé à un nom déjà enregistré (fiche
+  // relue) — ne touche jamais un id déjà connu (sélection explicite ou match
+  // précédent), cf. commentaire sur `signatureAgentIds` plus haut.
+  useEffect(() => {
+    const listesParRole: Record<SignatureRole, UtilisateurEquipe[]> = {
+      consultant_fao: consultants,
+      pilote: pilotes,
+      chef_base: chefsDeBase,
+    };
+    // Différé au micro-tour suivant, comme l'effet d'hydratation plus haut —
+    // évite un setState synchrone dans le corps de l'effet (react-hooks/set-state-in-effect).
+    void Promise.resolve().then(() => {
+      setSignatureAgentIds((current) => {
+        let changed = false;
+        const next = { ...current };
+        (Object.keys(listesParRole) as SignatureRole[]).forEach((role) => {
+          if (next[role] != null) return;
+          const nom = signatureNoms[role];
+          if (!nom) return;
+          const match = listesParRole[role].find((agent) => `${agent.prenom} ${agent.nom}` === nom);
+          if (match) {
+            next[role] = match.id;
+            changed = true;
+          }
+        });
+        return changed ? next : current;
+      });
+    });
+  }, [consultants, pilotes, chefsDeBase, signatureNoms]);
 
-  /** Pilote/Chef de Base : choisir un agent habilité vaut signature immédiate —
-   * pas de bouton « Signer » séparé (cf. commentaire sur agentsPourRole). */
-  const handleSelectSignataire = (role: SignatureRole, nomComplet: string) => {
-    const horodatage = new Date().toISOString();
+  /** Choisir un agent habilité désigne le signataire à venir — la signature
+   * elle-même n'est enregistrée qu'au VALIDER (cf. handleValider). Changer de
+   * personne alors qu'une signature était déjà validée pour l'ancienne l'efface
+   * immédiatement : elle ne doit jamais être attribuée à la nouvelle (§8). */
+  const handleSelectSignataire = (role: SignatureRole, agentId: string, nomComplet: string) => {
     setSignatureNoms((current) => ({ ...current, [role]: nomComplet }));
-    setSignatureHorodatages((current) => ({ ...current, [role]: horodatage }));
+    if (signatureAgentIds[role] !== agentId) {
+      setSignatureAgentIds((current) => ({ ...current, [role]: agentId }));
+      setSignatureImages((current) => ({ ...current, [role]: null }));
+      setSignatureHorodatages((current) => ({ ...current, [role]: null }));
+      setPendingPaths((current) => ({ ...current, [role]: '' }));
+      setResetTicks((current) => ({ ...current, [role]: (current[role] ?? 0) + 1 }));
+      setEditingRoles((current) => new Set(current).add(role));
+      // La rupture du lien avec l'ancien signataire est persistée tout de suite :
+      // une fermeture de l'application avant « Suivant » ne doit jamais laisser
+      // son tracé attribué à la personne nouvellement sélectionnée.
+      void run(
+        async () => {
+          const updated = await updateProspectionExtensiveObservations(
+            draftId,
+            buildPayload({ [role]: { nom: nomComplet, horodatage: null, image: null } })
+          );
+          setDraft(updated);
+        },
+        {
+          screen: 'extensive-observations',
+          precondition: !!draftId,
+          preconditionMessage: 'Session de saisie perdue — revenez à l’écran précédent et réessayez.',
+          context: { draftId, role, agentId, action: 'change-signataire' },
+        }
+      );
+    }
   };
 
   // Même garde que sur extensive-reference.tsx : ces `useState(draft?.x)` d'initialisation
@@ -225,28 +319,132 @@ export default function ExtensiveObservationsScreen() {
       setFutsVides(draft.futs_vides != null ? String(draft.futs_vides) : '');
       setFutsRecues(draft.futs_recues != null ? String(draft.futs_recues) : '');
       setSignatureNoms({
-        visa: draft.signature_visa_nom ?? null,
         consultant_fao: draft.signature_consultant_fao_nom ?? null,
         pilote: draft.signature_pilote_nom ?? null,
         chef_base: draft.signature_chef_base_nom ?? null,
       });
       setSignatureHorodatages({
-        visa: draft.signature_visa_horodatage ?? null,
         consultant_fao: draft.signature_consultant_fao_horodatage ?? null,
         pilote: draft.signature_pilote_horodatage ?? null,
         chef_base: draft.signature_chef_base_horodatage ?? null,
       });
+      setSignatureImages({
+        consultant_fao: draft.signature_consultant_fao_image ?? null,
+        pilote: draft.signature_pilote_image ?? null,
+        chef_base: draft.signature_chef_base_image ?? null,
+      });
+      // Un rechargement de fiche repart d'une édition fermée (lecture seule +
+      // MODIFIER) pour tout rôle déjà signé — cf. `editingRoles` plus haut.
+      setEditingRoles(new Set());
     });
   }, [draft, draftId]);
+
+  /**
+   * Construit l'intégralité du payload d'enregistrement à partir de l'état
+   * courant de l'écran — utilisé aussi bien par VALIDER (une seule signature)
+   * que par « Suivant » (tous les champs). `overrides` permet à VALIDER de
+   * fournir la signature qu'il vient de capturer sans attendre le prochain
+   * rendu (le `setState` correspondant n'est pas encore reflété dans les
+   * fermetures `signatureNoms`/`signatureHorodatages`/`signatureImages` au
+   * moment de l'appel).
+   */
+  const buildPayload = (
+    overrides?: Partial<Record<SignatureRole, { nom: string | null; horodatage: string | null; image: string | null }>>
+  ): ExtensiveObservationsUpdateInput => {
+    const noms = { ...signatureNoms };
+    const horodatages = { ...signatureHorodatages };
+    const images = { ...signatureImages };
+    if (overrides) {
+      (Object.keys(overrides) as SignatureRole[]).forEach((role) => {
+        const o = overrides[role];
+        if (!o) return;
+        noms[role] = o.nom;
+        horodatages[role] = o.horodatage;
+        images[role] = o.image;
+      });
+    }
+    const futsActifs = isAerien && pesticidesEmbarques === true;
+    return {
+      degatsCultures: degatsCultures || null,
+      verdissementPourcent: validerPourcentage(verdissement, 'Verdure strate herbeuse').value,
+      hauteurHerbeCm: hauteurMInputToCm(hauteur),
+      dernierePluie: dernierePluie || null,
+      intensitePluie: intensite || null,
+      pesticidesEmbarques: isAerien ? pesticidesEmbarques : null,
+      pesticideNomCommercial: futsActifs ? pesticideNomCommercial || null : null,
+      pesticideQuantiteDisponible: futsActifs && pesticideQuantiteDisponible ? parseFloat(pesticideQuantiteDisponible) : null,
+      pesticideQuantiteRecue: futsActifs && pesticideQuantiteRecue ? parseFloat(pesticideQuantiteRecue) : null,
+      futsDisponible: futsActifs ? validerEntierPositif(futsDisponible, 'Fûts disponibles').value : null,
+      futsPleins: futsActifs ? validerEntierPositif(futsPleins, 'Fûts pleins').value : null,
+      futsVides: futsActifs ? validerEntierPositif(futsVides, 'Fûts vides').value : null,
+      futsRecues: futsActifs ? validerEntierPositif(futsRecues, 'Fûts reçues').value : null,
+      // VISA retiré de l'UI mais jamais réécrit à `null` : on renvoie tel quel
+      // ce que la fiche portait déjà (historique préservé, cf. commentaire sur
+      // SignatureRole plus haut).
+      signatureVisaNom: draft?.signature_visa_nom ?? null,
+      signatureVisaHorodatage: draft?.signature_visa_horodatage ?? null,
+      signatureConsultantFaoNom: isAerien ? noms.consultant_fao : null,
+      signatureConsultantFaoHorodatage: isAerien ? horodatages.consultant_fao : null,
+      signatureConsultantFaoImage: isAerien ? images.consultant_fao : null,
+      signaturePiloteNom: isAerien ? noms.pilote : null,
+      signaturePiloteHorodatage: isAerien ? horodatages.pilote : null,
+      signaturePiloteImage: isAerien ? images.pilote : null,
+      signatureChefBaseNom: isAerien ? noms.chef_base : null,
+      signatureChefBaseHorodatage: isAerien ? horodatages.chef_base : null,
+      signatureChefBaseImage: isAerien ? images.chef_base : null,
+      observations: remarques || null,
+    };
+  };
+
+  /**
+   * VALIDER — capture définitivement le tracé en cours pour ce rôle. Persisté
+   * immédiatement (SQLite local via updateProspectionExtensiveObservations),
+   * pas seulement gardé en state React : fermer l'app avant d'atteindre
+   * « Suivant » ne perd jamais une signature déjà validée (§9 offline-first).
+   */
+  const handleValider = (role: SignatureRole) => {
+    const nom = signatureNoms[role];
+    const trace = pendingPaths[role];
+    if (!nom || !trace) return; // Précondition déjà imposée par le bouton désactivé.
+    const horodatage = new Date().toISOString();
+    return run(
+      async () => {
+        const updated = await updateProspectionExtensiveObservations(
+          draftId,
+          buildPayload({ [role]: { nom, horodatage, image: trace } })
+        );
+        setDraft(updated);
+        setSignatureImages((current) => ({ ...current, [role]: trace }));
+        setSignatureHorodatages((current) => ({ ...current, [role]: horodatage }));
+        setEditingRoles((current) => {
+          const next = new Set(current);
+          next.delete(role);
+          return next;
+        });
+      },
+      {
+        screen: 'extensive-observations',
+        precondition: !!draftId,
+        preconditionMessage: 'Session de saisie perdue — revenez à l’écran précédent et réessayez.',
+        context: { draftId, role },
+      }
+    );
+  };
+
+  /** MODIFIER — repart d'un tracé vierge pour ce rôle ; la signature déjà
+   * validée n'est remplacée qu'au prochain VALIDER, jamais avant (annuler
+   * en quittant l'écran sans revalider la conserve intacte). */
+  const handleModifier = (role: SignatureRole) => {
+    setPendingPaths((current) => ({ ...current, [role]: '' }));
+    setResetTicks((current) => ({ ...current, [role]: (current[role] ?? 0) + 1 }));
+    setEditingRoles((current) => new Set(current).add(role));
+  };
 
   const handleContinue = () => {
     // Verdure strate herbeuse : validée avant tout enregistrement, comme les
     // fûts plus bas — message d'erreur nommant le champ, rien de bloquant si
     // laissé vide.
-    const { value: verdissementValeur, erreur: verdissementErreur } = validerPourcentage(
-      verdissement,
-      'Verdure strate herbeuse'
-    );
+    const { erreur: verdissementErreur } = validerPourcentage(verdissement, 'Verdure strate herbeuse');
     if (verdissementErreur) {
       Alert.alert('Pourcentage invalide', verdissementErreur);
       return;
@@ -269,42 +467,10 @@ export default function ExtensiveObservationsScreen() {
       Alert.alert('Nombre de fûts invalide', futErreur.erreur!);
       return;
     }
-    const [futsDisponibleValeur, futsPleinsValeur, futsVidesValeur, futsRecuesValeur] = futsSaisis.length
-      ? futsSaisis.map((f) => f.value)
-      : [null, null, null, null];
 
     return run(
       async () => {
-        const updated = await updateProspectionExtensiveObservations(draftId, {
-          degatsCultures: degatsCultures || null,
-          verdissementPourcent: verdissementValeur,
-          hauteurHerbeCm: hauteurMInputToCm(hauteur),
-          dernierePluie: dernierePluie || null,
-          intensitePluie: intensite || null,
-          pesticidesEmbarques: isAerien ? pesticidesEmbarques : null,
-          pesticideNomCommercial: isAerien && pesticidesEmbarques === true ? pesticideNomCommercial || null : null,
-          pesticideQuantiteDisponible:
-            isAerien && pesticidesEmbarques === true && pesticideQuantiteDisponible
-              ? parseFloat(pesticideQuantiteDisponible)
-              : null,
-          pesticideQuantiteRecue:
-            isAerien && pesticidesEmbarques === true && pesticideQuantiteRecue
-              ? parseFloat(pesticideQuantiteRecue)
-              : null,
-          futsDisponible: isAerien && pesticidesEmbarques === true ? futsDisponibleValeur : null,
-          futsPleins: isAerien && pesticidesEmbarques === true ? futsPleinsValeur : null,
-          futsVides: isAerien && pesticidesEmbarques === true ? futsVidesValeur : null,
-          futsRecues: isAerien && pesticidesEmbarques === true ? futsRecuesValeur : null,
-          signatureVisaNom: isAerien ? signatureNoms.visa : null,
-          signatureVisaHorodatage: isAerien ? signatureHorodatages.visa : null,
-          signatureConsultantFaoNom: isAerien ? signatureNoms.consultant_fao : null,
-          signatureConsultantFaoHorodatage: isAerien ? signatureHorodatages.consultant_fao : null,
-          signaturePiloteNom: isAerien ? signatureNoms.pilote : null,
-          signaturePiloteHorodatage: isAerien ? signatureHorodatages.pilote : null,
-          signatureChefBaseNom: isAerien ? signatureNoms.chef_base : null,
-          signatureChefBaseHorodatage: isAerien ? signatureHorodatages.chef_base : null,
-          observations: remarques || null,
-        });
+        const updated = await updateProspectionExtensiveObservations(draftId, buildPayload());
         setDraft(updated);
         router.push({ pathname: '/(prospection)/extensive-recap' as any, params: { draftId } });
       },
@@ -506,62 +672,59 @@ export default function ExtensiveObservationsScreen() {
 
                 <Text style={styles.sectionLabel}>Signatures</Text>
                 {SIGNATURE_ROLES.map((role) => {
-                  const signe = !!signatureNoms[role];
-                  const agents = agentsPourRole(role, pilotes, chefsDeBase);
+                  const image = signatureImages[role];
+                  const enEdition = editingRoles.has(role) || !image;
+                  const agents = agentsPourRole(role, pilotes, chefsDeBase, consultants);
+                  const trace = pendingPaths[role] ?? '';
 
-                  // Pilote/Chef de Base : liste d'agents habilités, sélection = signature.
-                  if (agents) {
-                    return (
-                      <View key={role} style={[styles.card, styles.signatureRow]}>
-                        <Text style={styles.label}>{SIGNATURE_LABELS[role]}</Text>
-                        <View style={[styles.chipsRow, styles.agentChipsRow]}>
-                          {agents.map((agent) => {
-                            const nomComplet = `${agent.prenom} ${agent.nom}`;
-                            const active = signatureNoms[role] === nomComplet;
-                            return (
-                              <TouchableOpacity
-                                key={agent.id}
-                                onPress={() => handleSelectSignataire(role, nomComplet)}
-                                activeOpacity={0.7}
-                              >
-                                <Text style={[styles.chip, styles.agentChip, active && styles.chipActive]}>{nomComplet}</Text>
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </View>
-                        {signe && (
-                          <Text style={styles.signatureStamp}>Signé à {formatHeureLocale(signatureHorodatages[role])}</Text>
-                        )}
-                      </View>
-                    );
-                  }
-
-                  // VISA/Consultant FAO : pas de rôle utilisateur correspondant — saisie libre inchangée.
                   return (
                     <View key={role} style={[styles.card, styles.signatureRow]}>
                       <Text style={styles.label}>{SIGNATURE_LABELS[role]}</Text>
-                      {!signe ? (
-                        <TextInput
-                          value={signatureDraftNoms[role]}
-                          onChangeText={(v) => setSignatureDraftNoms((current) => ({ ...current, [role]: v }))}
-                          placeholder="Nom du signataire"
-                          placeholderTextColor={TEXT_SECONDARY}
-                          style={styles.input}
-                        />
+
+                      {enEdition ? (
+                        <>
+                          <View style={[styles.chipsRow, styles.agentChipsRow]}>
+                            {agents.map((agent) => {
+                              const nomComplet = `${agent.prenom} ${agent.nom}`;
+                              const active = signatureAgentIds[role] === agent.id;
+                              return (
+                                <TouchableOpacity
+                                  key={agent.id}
+                                  onPress={() => handleSelectSignataire(role, agent.id, nomComplet)}
+                                  activeOpacity={0.7}
+                                >
+                                  <Text style={[styles.chip, styles.agentChip, active && styles.chipActive]}>{nomComplet}</Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+                          {signatureNoms[role] && (
+                            <SignaturePad
+                              key={`${role}-${resetTicks[role] ?? 0}`}
+                              testID={`signature-pad-${role}`}
+                              value={null}
+                              onChange={(p) => setPendingPaths((current) => ({ ...current, [role]: p }))}
+                            />
+                          )}
+                          <TouchableOpacity
+                            style={[styles.signButton, (!signatureNoms[role] || !trace) && styles.signButtonDone]}
+                            onPress={() => handleValider(role)}
+                            disabled={!signatureNoms[role] || !trace}
+                            activeOpacity={0.85}
+                          >
+                            <Text style={styles.signButtonText}>VALIDER</Text>
+                          </TouchableOpacity>
+                        </>
                       ) : (
                         <>
                           <Text style={styles.signatureValue}>{signatureNoms[role]}</Text>
-                          <Text style={styles.signatureStamp}>{formatHeureLocale(signatureHorodatages[role])}</Text>
+                          <SignaturePad testID={`signature-pad-${role}`} value={image} onChange={() => {}} readOnly />
+                          <Text style={styles.signatureStamp}>Signé à {formatHeureLocale(signatureHorodatages[role])}</Text>
+                          <TouchableOpacity style={styles.modifyButton} onPress={() => handleModifier(role)} activeOpacity={0.85}>
+                            <Text style={styles.modifyButtonText}>MODIFIER</Text>
+                          </TouchableOpacity>
                         </>
                       )}
-                      <TouchableOpacity
-                        style={[styles.signButton, signe && styles.signButtonDone]}
-                        onPress={() => handleSigner(role)}
-                        disabled={signe || !signatureDraftNoms[role]}
-                        activeOpacity={0.85}
-                      >
-                        <Text style={styles.signButtonText}>{signe ? '✓ Signé' : 'Signer'}</Text>
-                      </TouchableOpacity>
                     </View>
                   );
                 })}
@@ -645,6 +808,8 @@ const styles = StyleSheet.create({
   signButton: { backgroundColor: GREEN, borderRadius: 9, paddingVertical: 9, alignItems: 'center' },
   signButtonDone: { backgroundColor: '#9a9484' },
   signButtonText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  modifyButton: { borderWidth: 1, borderColor: BORDER, borderRadius: 9, paddingVertical: 9, alignItems: 'center' },
+  modifyButtonText: { color: TEXT, fontWeight: '800', fontSize: 12 },
   // ===== Remarques (terrestre + aérien) =====
   remarquesCard: { marginBottom: 9 },
   remarquesInput: { minHeight: 90, fontFamily: 'System', fontWeight: '500' },

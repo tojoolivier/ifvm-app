@@ -240,9 +240,11 @@ function buildPesticidesRows(draft: DraftProspection): DetailRow[] {
   ];
 }
 
+// VISA retiré (#signatures-numeriques-extensif-aerien) — les colonnes backend
+// `signature_visa_nom`/`_horodatage` restent en base (historique préservé) mais
+// ne sont plus affichées nulle part, y compris ici.
 function buildSignaturesRows(draft: DraftProspection): DetailRow[] {
   const roles: [string, string | null, string | null][] = [
-    ['VISA', draft.signature_visa_nom, draft.signature_visa_horodatage],
     ['Consultant FAO', draft.signature_consultant_fao_nom, draft.signature_consultant_fao_horodatage],
     ['Pilote', draft.signature_pilote_nom, draft.signature_pilote_horodatage],
     ['Chef de Base', draft.signature_chef_base_nom, draft.signature_chef_base_horodatage],

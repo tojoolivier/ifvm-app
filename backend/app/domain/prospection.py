@@ -262,10 +262,13 @@ class Prospection:
     signature_visa_horodatage: datetime | None = None
     signature_consultant_fao_nom: str | None = None
     signature_consultant_fao_horodatage: datetime | None = None
+    signature_consultant_fao_image: str | None = None
     signature_pilote_nom: str | None = None
     signature_pilote_horodatage: datetime | None = None
+    signature_pilote_image: str | None = None
     signature_chef_base_nom: str | None = None
     signature_chef_base_horodatage: datetime | None = None
+    signature_chef_base_image: str | None = None
 
     populations: list[ProspectionPopulation] = field(default_factory=list)
     captures: list[ProspectionCapture] = field(default_factory=list)

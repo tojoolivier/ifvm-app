@@ -552,10 +552,13 @@ describe('updateProspectionExtensiveObservations', () => {
         null, // signatureVisaHorodatage
         null, // signatureConsultantFaoNom
         null, // signatureConsultantFaoHorodatage
+        null, // signatureConsultantFaoImage
         null, // signaturePiloteNom
         null, // signaturePiloteHorodatage
+        null, // signaturePiloteImage
         null, // signatureChefBaseNom
         null, // signatureChefBaseHorodatage
+        null, // signatureChefBaseImage
         null, // observations (Remarques)
         expect.any(String),
         BASE_INPUT.id,
@@ -580,10 +583,13 @@ describe('updateProspectionExtensiveObservations', () => {
       signatureVisaHorodatage: '2026-09-01T09:00:00.000Z',
       signatureConsultantFaoNom: 'John Smith',
       signatureConsultantFaoHorodatage: '2026-09-01T09:05:00.000Z',
+      signatureConsultantFaoImage: 'M0 0 L1 1',
       signaturePiloteNom: 'Jean Rakoto',
       signaturePiloteHorodatage: '2026-09-01T09:10:00.000Z',
+      signaturePiloteImage: 'M2 2 L3 3',
       signatureChefBaseNom: 'Sarah Ravelo',
       signatureChefBaseHorodatage: '2026-09-01T09:15:00.000Z',
+      signatureChefBaseImage: 'M4 4 L5 5',
     });
 
     expect(runAsync).toHaveBeenCalledWith(
@@ -606,10 +612,13 @@ describe('updateProspectionExtensiveObservations', () => {
         '2026-09-01T09:00:00.000Z',
         'John Smith',
         '2026-09-01T09:05:00.000Z',
+        'M0 0 L1 1',
         'Jean Rakoto',
         '2026-09-01T09:10:00.000Z',
+        'M2 2 L3 3',
         'Sarah Ravelo',
         '2026-09-01T09:15:00.000Z',
+        'M4 4 L5 5',
         null, // observations (Remarques)
         expect.any(String),
         BASE_INPUT.id,

@@ -124,10 +124,13 @@ class CreateProspection:
         signature_visa_horodatage: datetime | None = None,
         signature_consultant_fao_nom: str | None = None,
         signature_consultant_fao_horodatage: datetime | None = None,
+        signature_consultant_fao_image: str | None = None,
         signature_pilote_nom: str | None = None,
         signature_pilote_horodatage: datetime | None = None,
+        signature_pilote_image: str | None = None,
         signature_chef_base_nom: str | None = None,
         signature_chef_base_horodatage: datetime | None = None,
+        signature_chef_base_image: str | None = None,
     ) -> Prospection:
         if type_prospection == "intensive" and station_id is None:
             raise ValueError("station_id est obligatoire pour une prospection intensive")
@@ -218,10 +221,13 @@ class CreateProspection:
             signature_visa_horodatage=signature_visa_horodatage,
             signature_consultant_fao_nom=signature_consultant_fao_nom,
             signature_consultant_fao_horodatage=signature_consultant_fao_horodatage,
+            signature_consultant_fao_image=signature_consultant_fao_image,
             signature_pilote_nom=signature_pilote_nom,
             signature_pilote_horodatage=signature_pilote_horodatage,
+            signature_pilote_image=signature_pilote_image,
             signature_chef_base_nom=signature_chef_base_nom,
             signature_chef_base_horodatage=signature_chef_base_horodatage,
+            signature_chef_base_image=signature_chef_base_image,
         )
 
         for child in prospection.populations:
@@ -356,10 +362,13 @@ class UpdateProspection:
         signature_visa_horodatage: datetime | None = None,
         signature_consultant_fao_nom: str | None = None,
         signature_consultant_fao_horodatage: datetime | None = None,
+        signature_consultant_fao_image: str | None = None,
         signature_pilote_nom: str | None = None,
         signature_pilote_horodatage: datetime | None = None,
+        signature_pilote_image: str | None = None,
         signature_chef_base_nom: str | None = None,
         signature_chef_base_horodatage: datetime | None = None,
+        signature_chef_base_image: str | None = None,
     ) -> Prospection | None:
         prospection = await self.repository.get_by_id(prospection_id)
         if prospection is None:
@@ -504,14 +513,20 @@ class UpdateProspection:
             prospection.signature_consultant_fao_nom = signature_consultant_fao_nom
         if signature_consultant_fao_horodatage is not None:
             prospection.signature_consultant_fao_horodatage = signature_consultant_fao_horodatage
+        if signature_consultant_fao_image is not None:
+            prospection.signature_consultant_fao_image = signature_consultant_fao_image
         if signature_pilote_nom is not None:
             prospection.signature_pilote_nom = signature_pilote_nom
         if signature_pilote_horodatage is not None:
             prospection.signature_pilote_horodatage = signature_pilote_horodatage
+        if signature_pilote_image is not None:
+            prospection.signature_pilote_image = signature_pilote_image
         if signature_chef_base_nom is not None:
             prospection.signature_chef_base_nom = signature_chef_base_nom
         if signature_chef_base_horodatage is not None:
             prospection.signature_chef_base_horodatage = signature_chef_base_horodatage
+        if signature_chef_base_image is not None:
+            prospection.signature_chef_base_image = signature_chef_base_image
 
         prospection.updated_at = datetime.utcnow()
 
