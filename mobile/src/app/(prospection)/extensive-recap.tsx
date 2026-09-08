@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
 import {
+  alignerNumeroFicheSurNumeroMessage,
   concludeValidation,
   DraftProspection,
   listAllProspectionPopulations,
@@ -343,7 +344,11 @@ export default function ExtensiveRecapScreen() {
   const handleSave = () =>
     run(
       async () => {
-        await enregistrerEtSynchroniser(draft, [], token!);
+        // #numero-fiche-extensive-egal-n-message : uniquement ici (Extensif,
+        // pas la branche Signalisation/handleConclude ci-dessous) — le N° de
+        // fiche définitif reprend le N° de message déjà affiché à l'agent.
+        const draftAvecNFiche = await alignerNumeroFicheSurNumeroMessage(draft.id);
+        await enregistrerEtSynchroniser(draftAvecNFiche, [], token!);
         resetWizard();
         router.replace({ pathname: '/(app)/prospection' as any, params: { justSaved: '1' } });
       },
