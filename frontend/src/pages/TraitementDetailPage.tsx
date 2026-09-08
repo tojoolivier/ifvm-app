@@ -21,17 +21,24 @@ import {
   resumeEspeces,
   zonesExposeesLabels,
 } from '@/lib/traitement-fiche'
+import { shortId, useAnnuaire } from '@/lib/use-annuaire'
 
 interface Rotation {
   id: string
   numero: number
   numero_cuve: string
   produit_id: string
-  quantite_l: number
+  quantite: number
+  unite: 'L' | 'kg'
+  surface_ha: number | null
   temperature_debut_c: number
   temperature_fin_c: number
   vent_debut_ms: number
   vent_fin_ms: number
+  heure_debut: string | null
+  heure_fin: string | null
+  heure_ouverture_vanne: string | null
+  heure_fermeture_vanne: string | null
 }
 
 interface ProduitUtilise {
@@ -47,6 +54,55 @@ interface Cible {
   surface_infestee_ha: number | string | null
 }
 
+interface TraitementAerien {
+  pilote: string
+  mecanicien: string
+  chef_de_base_id: string | null
+  consultant_international: string | null
+  lieu_base_principale_id: string | null
+  lieu_stand_id: string | null
+  lieu_base_secondaire_id: string | null
+  immatricule_aeronef: string | null
+  nb_rotations: number
+  total_pesticide_l: number | null
+  total_pesticide_kg: number | null
+  surface_traitee_ha: number | null
+  reprise_traitement: boolean
+  traitement_origine_id: string | null
+  surface_cumulee_ha: number | null
+  surface_restante_ha: number | null
+  pesticide_recu_l: number | null
+  pesticide_stock_restant_l: number | null
+  rotations: Rotation[]
+}
+
+interface TraitementTerrestre {
+  chef_equipe_id: string | null
+  agent_encadreur_id: string | null
+  consultant_international: string | null
+  heure_debut: string
+  heure_fin: string
+  vitesse_vent_ms: number
+  direction_vent: string | null
+  temperature_c: number | null
+  reprise_traitement: boolean
+  traitement_origine_id: string | null
+  surface_atomiseur_ha: number | null
+  surface_disque_rotatif_ha: number | null
+  surface_ulvamast_ha: number | null
+  surface_traitee_ha: number | null
+  surface_cumulee_ha: number | null
+  surface_restante_ha: number | null
+  surface_restante_abandonnee: boolean | null
+  motif_surface_restante_abandonnee: string | null
+  essence_litres: number | null
+  nb_piles: number | null
+  total_pesticide_l: number | null
+  pesticide_recu_l: number | null
+  pesticide_stock_restant_l: number | null
+  produits: ProduitUtilise[]
+}
+
 interface TraitementDetail {
   id: string
   prospection_id: string
@@ -59,35 +115,25 @@ interface TraitementDetail {
   region: string | null
   district: string | null
   commune: string | null
+  latitude: number | null
+  longitude: number | null
+  altitude: number | null
   statut: string
+  statut_sync: string
+  created_at: string
+  updated_at: string
   cible: Cible | null
-  aerien: {
-    pilote: string
-    mecanicien: string
-    nb_rotations: number
-    total_pesticide_l: number | null
-    surface_restante_ha: number | null
-    rotations: Rotation[]
-  } | null
-  terrestre: {
-    heure_debut: string
-    heure_fin: string
-    vitesse_vent_ms: number
-    reprise_traitement: boolean
-    traitement_origine_id: string | null
-    surface_traitee_ha: number | null
-    surface_cumulee_ha: number | null
-    surface_restante_ha: number | null
-    surface_restante_abandonnee: boolean | null
-    motif_surface_restante_abandonnee: string | null
-    produits: ProduitUtilise[]
-  } | null
-  kit_combinaison: boolean
-  kit_gants: boolean
-  kit_lunettes: boolean
-  kit_masques: boolean
-  kit_boite: boolean
+  aerien: TraitementAerien | null
+  terrestre: TraitementTerrestre | null
+  kit_combinaison: number
+  kit_gants: number
+  kit_lunettes: number
+  kit_masques: number
+  kit_botte: number
   zones_exposees: Record<string, unknown> | null
+  hauteur_strate_herbeuse_m: number | null
+  hauteur_strate_arboree_m: number | null
+  recouvrement_percent: number | null
   empoisonnement: boolean
   empoisonnement_type: string | null
   empoisonnement_mode: string | null
@@ -97,6 +143,7 @@ interface TraitementDetail {
   comportement_non_cibles: Record<string, unknown> | null
   mortalite: boolean
   mortalite_familles: Record<string, unknown> | null
+  observations: string | null
   signatures: { id: string; role: string; signataire_nom: string; horodatage: string }[]
 }
 
@@ -107,6 +154,11 @@ interface PesticideSync {
 
 interface ReferentielPullResponse {
   pesticides: { upserts: PesticideSync[] }
+}
+
+interface LieuAerien {
+  id: string
+  nom: string
 }
 
 /** Carte blanche de la maquette : `#fff`, bordure `#e7e0cd`, rayon `11px`. */
@@ -139,6 +191,23 @@ function PastilleEpi({ actif }: { actif: boolean }) {
     >
       {actif ? '✓' : '✕'}
     </span>
+  )
+}
+
+/** `-22,4021 · 44,3167` — même notation que la fiche de prospection. */
+function formatCoordonnees(t: { latitude: number | null; longitude: number | null }): string | null {
+  if (t.latitude == null || t.longitude == null) return null
+  const fr = (v: number) => v.toFixed(4).replace('.', ',')
+  return `${fr(t.latitude)} · ${fr(t.longitude)}`
+}
+
+/** Ligne clé/valeur des cartes « Informations complémentaires ». */
+function Champ({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <span className="font-sans text-[11.5px] font-medium text-ifvm-text-tertiary">{label}</span>
+      <span className="font-mono text-[12px] font-semibold text-[#16201a]">{value ?? '—'}</span>
+    </div>
   )
 }
 
@@ -216,6 +285,18 @@ export function TraitementDetailPage() {
   })
   const [reprisePromptOuvert, setReprisePromptOuvert] = useState(false)
 
+  const { nomAgent } = useAnnuaire()
+
+  // Résolution des bases aériennes (chef de base logé côté `utilisateur`, mais
+  // les bases sont un référentiel à part — cf. GET /referentiel/lieux-aeriens).
+  const { data: lieuxAeriens = [] } = useQuery<LieuAerien[]>({
+    queryKey: ['lieux-aeriens'],
+    queryFn: () => api.get('/referentiel/lieux-aeriens', { params: { inclure_inactifs: true } }).then((r) => r.data),
+    enabled: !!traitement?.aerien,
+  })
+  const nomLieu = (id: string | null | undefined) =>
+    lieuxAeriens.find((l) => l.id === id)?.nom ?? shortId(id)
+
   const pesticideNoms = useMemo(() => {
     const map = new Map<string, string>()
     for (const p of pesticidePull?.pesticides.upserts ?? []) map.set(p.id, p.nom)
@@ -239,10 +320,25 @@ export function TraitementDetailPage() {
       { key: 'produit', header: 'Produit', render: (r) => pesticideNoms.get(r.produit_id) ?? '—' },
       {
         key: 'quantite',
-        header: 'Quantité (l)',
+        header: 'Quantité',
         align: 'right',
         mono: true,
-        render: (r) => r.quantite_l,
+        render: (r) => `${r.quantite} ${r.unite}`,
+      },
+      {
+        key: 'surface',
+        header: 'Surface (ha)',
+        align: 'right',
+        mono: true,
+        render: (r) => (r.surface_ha == null ? '—' : r.surface_ha),
+      },
+      {
+        key: 'heures',
+        header: 'Heures (rotation · vanne)',
+        align: 'right',
+        mono: true,
+        render: (r) =>
+          `${formatHeure(r.heure_debut)} → ${formatHeure(r.heure_fin)} · ${formatHeure(r.heure_ouverture_vanne)} → ${formatHeure(r.heure_fermeture_vanne)}`,
       },
       {
         key: 'temperature',
@@ -336,8 +432,18 @@ export function TraitementDetailPage() {
     .join(' / ')
   const empoisonnementLabel = libelleImpact(traitement.empoisonnement, empoisonnementDetail)
   const surfaceInfestee = traitement.cible?.surface_infestee_ha
-  const restante = traitement.terrestre?.surface_restante_ha
+  // Surfaces portées par aerien ET terrestre (mêmes noms de champs, migration
+  // 0050 a généralisé le chaînage de reprise à l'Aérien) : le panneau
+  // « Surfaces » ne doit pas rester muet sur les trois lignes du bas pour une
+  // fiche aérienne, comme c'était le cas en ne lisant que `terrestre`.
+  const surfaceTraitee = traitement.terrestre?.surface_traitee_ha ?? traitement.aerien?.surface_traitee_ha
+  const surfaceCumulee = traitement.terrestre?.surface_cumulee_ha ?? traitement.aerien?.surface_cumulee_ha
   const restanteGenerique = traitement.terrestre?.surface_restante_ha ?? traitement.aerien?.surface_restante_ha
+  const repriseFiche = traitement.terrestre?.reprise_traitement
+    ? traitement.terrestre
+    : traitement.aerien?.reprise_traitement
+    ? traitement.aerien
+    : null
   const estReprenable = (reprenables ?? []).some((t) => t.id === traitement.id)
   const totalRotations = traitement.aerien
     ? [
@@ -440,12 +546,19 @@ export function TraitementDetailPage() {
               <TitreSection>Moyens &amp; protection</TitreSection>
               <ul className="flex flex-col gap-2">
                 {KITS_EPI.map((kit) => {
-                  const actif = traitement[kit.key]
+                  // Migration backend 0040 : les 5 colonnes sont passées de
+                  // booléen à un nombre de personnes équipées — la pastille
+                  // reste dérivée de « > 0 » mais le compte réel s'affiche.
+                  const nombre = traitement[kit.key] ?? 0
+                  const actif = nombre > 0
                   return (
                     <li key={kit.key} className="flex items-center gap-[9px]">
                       <PastilleEpi actif={actif} />
                       <span className="font-sans text-[12px] font-medium text-[#3a3a30]">
                         {kit.label}
+                      </span>
+                      <span className="ml-auto font-mono text-[11px] font-semibold text-ifvm-text-tertiary">
+                        {nombre}
                       </span>
                       <span className="sr-only">{actif ? 'présent' : 'absent'}</span>
                     </li>
@@ -502,6 +615,149 @@ export function TraitementDetailPage() {
               </div>
             </Carte>
           </div>
+
+          {/* Informations complémentaires — champs jusqu'ici absents de la fiche
+              de lecture web (position GPS, strates, observations, traçabilité). */}
+          <Carte className="px-5 py-[18px]">
+            <TitreSection>Informations complémentaires</TitreSection>
+            <div className="grid grid-cols-1 gap-x-6 gap-y-2 md:grid-cols-2">
+              <Champ label="Position GPS" value={formatCoordonnees(traitement)} />
+              <Champ
+                label="Altitude"
+                value={traitement.altitude == null ? null : `${formatSurface(traitement.altitude)} m`}
+              />
+              <Champ
+                label="Strate herbeuse"
+                value={
+                  traitement.hauteur_strate_herbeuse_m == null
+                    ? null
+                    : `${formatSurface(traitement.hauteur_strate_herbeuse_m)} m`
+                }
+              />
+              <Champ
+                label="Strate arborée"
+                value={
+                  traitement.hauteur_strate_arboree_m == null
+                    ? null
+                    : `${formatSurface(traitement.hauteur_strate_arboree_m)} m`
+                }
+              />
+              <Champ
+                label="Recouvrement"
+                value={
+                  traitement.recouvrement_percent == null
+                    ? null
+                    : `${traitement.recouvrement_percent} %`
+                }
+              />
+              <Champ label="Statut de synchronisation" value={traitement.statut_sync} />
+              <Champ label="Créée le" value={formatHorodatage(traitement.created_at)} />
+              <Champ label="Mise à jour le" value={formatHorodatage(traitement.updated_at)} />
+            </div>
+            {traitement.observations && (
+              <p className="mt-3 border-t border-[#f1ecdd] pt-3 font-sans text-[11.5px] font-medium leading-[1.5] text-ifvm-text-tertiary">
+                Observations : <span className="text-[#3a3a30]">{traitement.observations}</span>
+              </p>
+            )}
+          </Carte>
+
+          {traitement.aerien && (
+            <Carte className="px-5 py-[18px]">
+              <TitreSection>Équipe &amp; aéronef</TitreSection>
+              <div className="grid grid-cols-1 gap-x-6 gap-y-2 md:grid-cols-2">
+                <Champ label="Pilote" value={traitement.aerien.pilote} />
+                <Champ label="Mécanicien" value={traitement.aerien.mecanicien} />
+                <Champ label="Chef de base" value={nomAgent(traitement.aerien.chef_de_base_id)} />
+                <Champ
+                  label="Consultant international"
+                  value={traitement.aerien.consultant_international}
+                />
+                <Champ label="Immatriculation aéronef" value={traitement.aerien.immatricule_aeronef} />
+                <Champ label="Base principale" value={nomLieu(traitement.aerien.lieu_base_principale_id)} />
+                <Champ label="Stand" value={nomLieu(traitement.aerien.lieu_stand_id)} />
+                <Champ label="Base secondaire" value={nomLieu(traitement.aerien.lieu_base_secondaire_id)} />
+                <Champ
+                  label="Total pesticide"
+                  value={
+                    traitement.aerien.total_pesticide_kg == null
+                      ? null
+                      : `${formatSurface(traitement.aerien.total_pesticide_kg)} kg`
+                  }
+                />
+                <Champ
+                  label="Pesticide reçu"
+                  value={
+                    traitement.aerien.pesticide_recu_l == null
+                      ? null
+                      : `${formatSurface(traitement.aerien.pesticide_recu_l)} l`
+                  }
+                />
+                <Champ
+                  label="Stock restant"
+                  value={
+                    traitement.aerien.pesticide_stock_restant_l == null
+                      ? null
+                      : `${formatSurface(traitement.aerien.pesticide_stock_restant_l)} l`
+                  }
+                />
+              </div>
+            </Carte>
+          )}
+
+          {traitement.terrestre && (
+            <Carte className="px-5 py-[18px]">
+              <TitreSection>Équipe &amp; matériel</TitreSection>
+              <div className="grid grid-cols-1 gap-x-6 gap-y-2 md:grid-cols-2">
+                <Champ label="Chef d'équipe" value={nomAgent(traitement.terrestre.chef_equipe_id)} />
+                <Champ
+                  label="Agent encadreur"
+                  value={
+                    traitement.terrestre.agent_encadreur_id
+                      ? nomAgent(traitement.terrestre.agent_encadreur_id)
+                      : null
+                  }
+                />
+                <Champ
+                  label="Consultant international"
+                  value={traitement.terrestre.consultant_international}
+                />
+                <Champ label="Direction du vent" value={traitement.terrestre.direction_vent} />
+                <Champ
+                  label="Essence"
+                  value={
+                    traitement.terrestre.essence_litres == null
+                      ? null
+                      : `${formatSurface(traitement.terrestre.essence_litres)} l`
+                  }
+                />
+                <Champ label="Piles" value={traitement.terrestre.nb_piles} />
+                <Champ
+                  label="Total pesticide"
+                  value={
+                    traitement.terrestre.total_pesticide_l == null
+                      ? null
+                      : `${formatSurface(traitement.terrestre.total_pesticide_l)} l`
+                  }
+                />
+                <Champ
+                  label="Pesticide reçu"
+                  value={
+                    traitement.terrestre.pesticide_recu_l == null
+                      ? null
+                      : `${formatSurface(traitement.terrestre.pesticide_recu_l)} l`
+                  }
+                />
+                <Champ
+                  label="Stock restant"
+                  value={
+                    traitement.terrestre.pesticide_stock_restant_l == null
+                      ? null
+                      : `${formatSurface(traitement.terrestre.pesticide_stock_restant_l)} l`
+                  }
+                />
+              </div>
+            </Carte>
+          )}
         </div>
 
         {/* Colonne latérale 320px */}
@@ -509,18 +765,12 @@ export function TraitementDetailPage() {
           <section className="flex flex-col gap-[10px] rounded-[11px] border border-ifvm-green-border bg-ifvm-green-bg px-[18px] py-4">
             <h2 className="font-sans text-[12.5px] font-bold text-ifvm-green-text">Surfaces (ha)</h2>
             <LigneSurface label="Infestée (snapshot)" valeur={formatSurface(surfaceInfestee)} />
-            <LigneSurface
-              label="Traitée"
-              valeur={formatSurface(traitement.terrestre?.surface_traitee_ha)}
-            />
-            <LigneSurface
-              label="Cumulée (reprises)"
-              valeur={formatSurface(traitement.terrestre?.surface_cumulee_ha)}
-            />
+            <LigneSurface label="Traitée" valeur={formatSurface(surfaceTraitee)} />
+            <LigneSurface label="Cumulée (reprises)" valeur={formatSurface(surfaceCumulee)} />
             <LigneSurface
               label="Restante"
-              valeur={formatSurface(restante)}
-              alerte={restante != null && Number(restante) > 0}
+              valeur={formatSurface(restanteGenerique)}
+              alerte={restanteGenerique != null && Number(restanteGenerique) > 0}
               detache
             />
             {traitement.terrestre?.surface_restante_abandonnee && (
@@ -568,14 +818,10 @@ export function TraitementDetailPage() {
           <Carte className="px-[18px] py-4">
             <h2 className="mb-2 font-sans text-[12.5px] font-bold">Chaîne de reprise</h2>
             <p className="font-sans text-[11.5px] font-medium leading-[1.6] text-ifvm-text-tertiary">
-              {traitement.terrestre?.reprise_traitement &&
-              traitement.terrestre.traitement_origine_id ? (
+              {repriseFiche?.traitement_origine_id ? (
                 <>
                   Origine :{' '}
-                  <Link
-                    to={`/traitements/${traitement.terrestre.traitement_origine_id}`}
-                    className="underline"
-                  >
+                  <Link to={`/traitements/${repriseFiche.traitement_origine_id}`} className="underline">
                     fiche d'origine
                   </Link>{' '}
                   → cette fiche.{' '}

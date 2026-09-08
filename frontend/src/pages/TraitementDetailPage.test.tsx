@@ -47,39 +47,64 @@ function traitementAerien(overrides: Record<string, unknown> = {}) {
     aerien: {
       pilote: 'Jean Rakoto',
       mecanicien: 'Paul Randria',
+      chef_de_base_id: 'u-chef',
+      consultant_international: 'Marc Dupuis',
+      lieu_base_principale_id: 'lieu-1',
+      lieu_stand_id: null,
+      lieu_base_secondaire_id: null,
+      immatricule_aeronef: '5R-ABC',
       nb_rotations: 2,
       total_pesticide_l: 530,
+      total_pesticide_kg: null,
+      surface_traitee_ha: 320,
+      reprise_traitement: false,
+      traitement_origine_id: null,
+      surface_cumulee_ha: 320,
+      pesticide_recu_l: 600,
+      pesticide_stock_restant_l: 70,
       rotations: [
         {
           id: 'r1',
           numero: 1,
           numero_cuve: 'CUVE-01',
           produit_id: 'pest-1',
-          quantite_l: 265,
+          quantite: 265,
+          unite: 'L',
+          surface_ha: 40,
           temperature_debut_c: 29,
           temperature_fin_c: 31,
           vent_debut_ms: 2.5,
           vent_fin_ms: 3.1,
+          heure_debut: '08:00:00',
+          heure_fin: '08:20:00',
+          heure_ouverture_vanne: '08:05:00',
+          heure_fermeture_vanne: '08:18:00',
         },
         {
           id: 'r2',
           numero: 2,
           numero_cuve: 'CUVE-02',
           produit_id: 'pest-1',
-          quantite_l: 265,
+          quantite: 265,
+          unite: 'L',
+          surface_ha: 40,
           temperature_debut_c: 30,
           temperature_fin_c: 32,
           vent_debut_ms: 2.5,
           vent_fin_ms: 3.1,
+          heure_debut: '08:25:00',
+          heure_fin: '08:45:00',
+          heure_ouverture_vanne: '08:30:00',
+          heure_fermeture_vanne: '08:43:00',
         },
       ],
     },
     terrestre: null,
-    kit_combinaison: true,
-    kit_gants: true,
-    kit_lunettes: true,
-    kit_masques: true,
-    kit_boite: false,
+    kit_combinaison: 4,
+    kit_gants: 4,
+    kit_lunettes: 4,
+    kit_masques: 4,
+    kit_botte: 0,
     empoisonnement: false,
     empoisonnement_type: null,
     empoisonnement_mode: null,
@@ -101,11 +126,14 @@ function traitementAerien(overrides: Record<string, unknown> = {}) {
 function renderPage(
   traitement: ReturnType<typeof traitementAerien>,
   reprenables: { id: string }[] = [],
+  referentiel: { lieuxAeriens?: { id: string; nom: string }[]; utilisateurs?: { id: string; nom: string; role: string }[] } = {},
 ) {
   mockedGet.mockImplementation((url: string) => {
     if (url === '/traitements/t1') return Promise.resolve({ data: traitement })
     if (url === '/referentiel/pull') return Promise.resolve(pesticidePull)
     if (url === '/traitements') return Promise.resolve({ data: reprenables })
+    if (url === '/referentiel/lieux-aeriens') return Promise.resolve({ data: referentiel.lieuxAeriens ?? [] })
+    if (url === '/users/') return Promise.resolve({ data: referentiel.utilisateurs ?? [] })
     return Promise.resolve({ data: [] })
   })
 
@@ -159,6 +187,9 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
     expect(screen.getByText('2 rotations · 530 l')).toBeInTheDocument()
     expect(screen.getByText('CUVE-01')).toBeInTheDocument()
     expect(screen.getAllByText('Fenitrothion')).toHaveLength(2)
+    // Régression : `RotationRead` porte `quantite`+`unite` depuis la migration
+    // 0047, pas `quantite_l` — le web lisait un champ qui n'existe plus.
+    expect(screen.getAllByText('265 L')).toHaveLength(2)
   })
 
   it('affiche le tableau des produits utilisés pour une fiche terrestre', async () => {
@@ -196,10 +227,12 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
     )
     await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
 
-    // `kit_boite: false` dans la fixture, les quatre autres à true : c'est
-    // l'état lu par un lecteur d'écran qui compte, pas la teinte de la pastille.
-    expect(screen.getByText('Boîte à pharmacie').parentElement).toHaveTextContent('absent')
+    // `kit_botte: 0` dans la fixture, les quatre autres à 4 : c'est l'état lu
+    // par un lecteur d'écran qui compte, pas la teinte de la pastille — et le
+    // nombre de personnes équipées est affiché à côté (migration 0040).
+    expect(screen.getByText('Botte').parentElement).toHaveTextContent('absent')
     expect(screen.getByText('Combinaison').parentElement).toHaveTextContent('présent')
+    expect(screen.getByText('Combinaison').parentElement).toHaveTextContent('4')
     expect(screen.getByText('Habitations, Ruchers')).toBeInTheDocument()
   })
 
@@ -321,6 +354,121 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
       'href',
       '/traitements/origine-1',
     )
+  })
+
+  it("affiche la chaîne de reprise d'une fiche aérienne (migration 0050, pas seulement terrestre)", async () => {
+    // Avant #toutes-les-donnees : la carte ne lisait que `terrestre.reprise_traitement`,
+    // une fiche aérienne en reprise affichait donc toujours « n'est pas une reprise ».
+    renderPage(
+      traitementAerien({
+        aerien: {
+          pilote: 'Jean Rakoto',
+          mecanicien: 'Paul Randria',
+          chef_de_base_id: null,
+          consultant_international: null,
+          lieu_base_principale_id: null,
+          lieu_stand_id: null,
+          lieu_base_secondaire_id: null,
+          immatricule_aeronef: null,
+          nb_rotations: 1,
+          total_pesticide_l: 200,
+          total_pesticide_kg: null,
+          surface_traitee_ha: 100,
+          reprise_traitement: true,
+          traitement_origine_id: 'origine-aerien-1',
+          surface_cumulee_ha: 250,
+          pesticide_recu_l: null,
+          pesticide_stock_restant_l: null,
+          rotations: [],
+        },
+      }),
+    )
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+
+    expect(screen.getByRole('link', { name: "fiche d'origine" })).toHaveAttribute(
+      'href',
+      '/traitements/origine-aerien-1',
+    )
+  })
+
+  it('affiche les informations complémentaires (position GPS, strates, observations, traçabilité)', async () => {
+    renderPage(
+      traitementAerien({
+        latitude: -22.4021,
+        longitude: 44.3167,
+        altitude: 120,
+        hauteur_strate_herbeuse_m: 0.4,
+        hauteur_strate_arboree_m: 3,
+        recouvrement_percent: 65,
+        observations: 'RAS, conditions favorables.',
+        statut_sync: 'synced',
+        created_at: '2026-08-12T07:00:00Z',
+        updated_at: '2026-08-13T09:00:00Z',
+      }),
+    )
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+
+    expect(screen.getByText('Informations complémentaires')).toBeInTheDocument()
+    expect(screen.getByText('-22,4021 · 44,3167')).toBeInTheDocument()
+    expect(screen.getByText('120 m')).toBeInTheDocument()
+    expect(screen.getByText('65 %')).toBeInTheDocument()
+    expect(screen.getByText(/RAS, conditions favorables/)).toBeInTheDocument()
+  })
+
+  it("affiche l'équipe et l'aéronef d'une fiche aérienne, chef de base et bases résolus par nom", async () => {
+    renderPage(
+      traitementAerien(),
+      [],
+      {
+        utilisateurs: [{ id: 'u-chef', nom: 'Marie Rabe', role: 'chef_de_base' }],
+        lieuxAeriens: [{ id: 'lieu-1', nom: 'Base Betioky' }],
+      },
+    )
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+
+    // `within` la carte : « Marie Rabe » apparaît aussi dans les Signatures
+    // (rôle CHEF_DE_BASE) — deux endroits distincts pour la même personne.
+    const carte = within(screen.getByText('Équipe & aéronef').closest('section')!)
+    expect(await carte.findByText('Marie Rabe')).toBeInTheDocument()
+    expect(await carte.findByText('Base Betioky')).toBeInTheDocument()
+    expect(carte.getByText('5R-ABC')).toBeInTheDocument()
+    expect(carte.getByText('Marc Dupuis')).toBeInTheDocument()
+  })
+
+  it("affiche l'équipe et le matériel d'une fiche terrestre", async () => {
+    renderPage(
+      traitementAerien({
+        type_traitement: 'TERRESTRE',
+        aerien: null,
+        terrestre: {
+          chef_equipe_id: 'u-chef-equipe',
+          agent_encadreur_id: null,
+          consultant_international: 'Alain Petit',
+          heure_debut: '06:00:00',
+          heure_fin: '10:00:00',
+          vitesse_vent_ms: 1.8,
+          direction_vent: 'NE',
+          reprise_traitement: false,
+          traitement_origine_id: null,
+          essence_litres: 12,
+          nb_piles: 8,
+          total_pesticide_l: 180,
+          pesticide_recu_l: 200,
+          pesticide_stock_restant_l: 20,
+          produits: [],
+        },
+      }),
+      [],
+      { utilisateurs: [{ id: 'u-chef-equipe', nom: 'Soa Lalao', role: 'chef_equipe' }] },
+    )
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+
+    expect(screen.getByText('Équipe & matériel')).toBeInTheDocument()
+    expect(await screen.findByText('Soa Lalao')).toBeInTheDocument()
+    expect(screen.getByText('Alain Petit')).toBeInTheDocument()
+    expect(screen.getByText('NE')).toBeInTheDocument()
+    expect(screen.getByText('12 l')).toBeInTheDocument()
+    expect(screen.getByText('20 l')).toBeInTheDocument()
   })
 
   it("n'affiche pas « Demander une reprise » quand la fiche n'est pas reprenable", async () => {
