@@ -341,6 +341,84 @@ describe('ExtensiveObservationsScreen — mode aérien : signatures numériques 
 
     expect(screen.getAllByText('VALIDER')[INDEX_CONSULTANT_FAO]).toBeTruthy();
   });
+
+  it('Consultant FAO facultatif : « Suivant » fonctionne sans qu’aucune signature ne soit exigée pour ce rôle', async () => {
+    useProspectionWizardStore.setState({
+      draft: { id: 'draft-123', type_prospection: 'extensive', mode_extensif: 'aerien' } as any,
+      captures: [],
+    });
+
+    await render(<ExtensiveObservationsScreen />);
+    await screen.findByText('Signatures');
+
+    // Aucune interaction avec la ligne Consultant FAO — seul « Suivant » est pressé.
+    fireEvent.press(screen.getByText('Suivant : Récapitulatif ›'));
+
+    await waitFor(() =>
+      expect(prospectionRepository.updateProspectionExtensiveObservations).toHaveBeenCalledWith(
+        'draft-123',
+        expect.objectContaining({
+          signatureConsultantFaoNom: null,
+          signatureConsultantFaoImage: null,
+          signatureConsultantFaoHorodatage: null,
+        })
+      )
+    );
+  });
+
+  it('changer de Consultant FAO alors qu’une signature était déjà validée efface l’ancienne — jamais attribuée au nouveau consultant (§8)', async () => {
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'extensive',
+        mode_extensif: 'aerien',
+        signature_consultant_fao_nom: 'John Smith',
+        signature_consultant_fao_horodatage: '2026-09-01T09:10:00.000Z',
+        signature_consultant_fao_image: 'M9 9 L8 8',
+      } as any,
+      captures: [],
+    });
+
+    // Un second consultant habilité, distinct de celui déjà signé.
+    const referentielDb = require('@/lib/referentiel-db');
+    jest.mocked(referentielDb.listUtilisateursByRole).mockImplementation((role: string) => {
+      if (role === 'pilote') return Promise.resolve([{ id: 'pilote-1', nom: 'Rakoto', prenom: 'Jean' }]);
+      if (role === 'chef_de_base') return Promise.resolve([{ id: 'chef-1', nom: 'Rabe', prenom: 'Marie' }]);
+      if (role === 'consultant_international')
+        return Promise.resolve([
+          { id: 'consultant-1', nom: 'Smith', prenom: 'John' },
+          { id: 'consultant-2', nom: 'Dupont', prenom: 'Alice' },
+        ]);
+      return Promise.resolve([]);
+    });
+
+    await render(<ExtensiveObservationsScreen />);
+    await screen.findByText('John Smith');
+    expect(screen.getByTestId('signature-pad-consultant_fao')).toHaveTextContent('trace:M9 9 L8 8');
+    expect(screen.queryByText('Alice Dupont')).toBeNull();
+
+    fireEvent.press(screen.getAllByText('MODIFIER')[0]);
+    await settle();
+
+    const chipNouveauConsultant = await screen.findByText('Alice Dupont');
+    fireEvent.press(chipNouveauConsultant);
+
+    // L'ancienne signature (image + horodatage) est effacée immédiatement.
+    await waitFor(() => expect(screen.getByTestId('signature-pad-consultant_fao')).toHaveTextContent('dessiner'));
+    expect(screen.queryByText(/^Signé à /)).toBeNull();
+
+    fireEvent.press(screen.getByText('Suivant : Récapitulatif ›'));
+    await waitFor(() =>
+      expect(prospectionRepository.updateProspectionExtensiveObservations).toHaveBeenCalledWith(
+        'draft-123',
+        expect.objectContaining({
+          signatureConsultantFaoNom: 'Alice Dupont',
+          signatureConsultantFaoImage: null,
+          signatureConsultantFaoHorodatage: null,
+        })
+      )
+    );
+  });
 });
 
 describe('ExtensiveObservationsScreen — mode aérien : nombre de fûts (valeurs)', () => {
