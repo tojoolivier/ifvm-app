@@ -21,6 +21,7 @@ import {
 import {
   loadAccueilData,
   loadValidatedProspections,
+  loadMesProspectionsServeur,
   loadFichesDisponiblesPourTraitement,
   assurerProspectionDisponibleLocalement,
   pickCurrentCampagneId,
@@ -287,6 +288,18 @@ describe('loadValidatedProspections', () => {
     await expect(loadValidatedProspections('tok', 'p1')).rejects.toBeInstanceOf(
       NetworkError
     );
+  });
+});
+
+describe('loadMesProspectionsServeur', () => {
+  it('récupère tous les statuts serveur de l’utilisateur pour rafraîchir les fiches mobiles', async () => {
+    mockApiClient.listProspections.mockResolvedValueOnce([]);
+
+    await loadMesProspectionsServeur('tok', 'p1');
+
+    expect(mockApiClient.listProspections).toHaveBeenCalledWith('tok', {
+      prospecteur_id: 'p1',
+    });
   });
 });
 
