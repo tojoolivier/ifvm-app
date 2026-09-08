@@ -135,6 +135,16 @@ class CreateProspection:
         if type_prospection == "intensive" and station_id is None:
             raise ValueError("station_id est obligatoire pour une prospection intensive")
 
+        # Une fiche de validation / signalisation est exploitable pour le
+        # traitement dès sa synchronisation : elle ne passe pas par la chaîne
+        # administrative en_attente -> verifiee -> validee réservée aux
+        # prospections intensive et extensive. Le client ne décide donc pas de
+        # ce statut métier. Son numéro visible est celui du message créé à la
+        # référence, jamais un second numéro généré au serveur.
+        if type_prospection == "validation":
+            statut = "validee"
+            n_fiche = n_message
+
         await _verifier_stades(self.repository, captures)
 
         now = datetime.utcnow()
