@@ -425,10 +425,13 @@ async def test_create_prospection_extensive_pesticides_embarques_oui(
             "signature_visa_horodatage": "2026-08-26T09:00:00Z",
             "signature_consultant_fao_nom": "John Smith",
             "signature_consultant_fao_horodatage": "2026-08-26T09:05:00Z",
+            "signature_consultant_fao_image": "M0 0 L10 10",
             "signature_pilote_nom": "Jean Rakoto",
             "signature_pilote_horodatage": "2026-08-26T09:10:00Z",
+            "signature_pilote_image": "M1 1 L11 11",
             "signature_chef_base_nom": "Sarah Ravelo",
             "signature_chef_base_horodatage": "2026-08-26T09:15:00Z",
+            "signature_chef_base_image": "M2 2 L12 12",
         },
         headers=auth_headers,
     )
@@ -445,8 +448,11 @@ async def test_create_prospection_extensive_pesticides_embarques_oui(
     assert data["futs_recues"] == 5
     assert data["signature_visa_nom"] == "Rakoto V."
     assert data["signature_consultant_fao_nom"] == "John Smith"
+    assert data["signature_consultant_fao_image"] == "M0 0 L10 10"
     assert data["signature_pilote_nom"] == "Jean Rakoto"
+    assert data["signature_pilote_image"] == "M1 1 L11 11"
     assert data["signature_chef_base_nom"] == "Sarah Ravelo"
+    assert data["signature_chef_base_image"] == "M2 2 L12 12"
 
     # Round-trip GET : la relecture renvoie exactement ce qui a été enregistré.
     get_response = await client.get(f"/prospections/{data['id']}", headers=auth_headers)
@@ -457,6 +463,9 @@ async def test_create_prospection_extensive_pesticides_embarques_oui(
     assert reread["futs_vides"] == 4
     assert reread["futs_recues"] == 5
     assert reread["signature_visa_nom"] == "Rakoto V."
+    assert reread["signature_pilote_image"] == "M1 1 L11 11"
+    assert reread["signature_chef_base_image"] == "M2 2 L12 12"
+    assert reread["signature_consultant_fao_image"] == "M0 0 L10 10"
 
 
 @pytest.mark.asyncio

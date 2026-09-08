@@ -173,6 +173,10 @@ class ProspectionModel(Base):
     # Signatures — indépendantes du choix Pesticides. Même principe nom +
     # horodatage que `TraitementSignatureModel`, en colonnes nommées à plat
     # (4 rôles fixes, jamais une liste ouverte comme côté traitement).
+    # `signature_visa_*` : le champ Visa est retiré du formulaire mobile
+    # (#signatures-digitales-extensif-aerien) mais ces 2 colonnes restent —
+    # historique des fiches déjà signées, jamais de DROP COLUMN pour un
+    # simple retrait d'usage applicatif.
     signature_visa_nom: Mapped[str | None] = mapped_column(Text(), nullable=True)
     signature_visa_horodatage: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
@@ -181,14 +185,21 @@ class ProspectionModel(Base):
     signature_consultant_fao_horodatage: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
+    # `_image` (migration 0052) : tracé SVG du pavé de signature, même format
+    # que `TraitementSignatureModel.signature_image` — Consultant FAO, Pilote
+    # et Chef de Base ont désormais une vraie signature numérique, pas
+    # seulement un nom + horodatage.
+    signature_consultant_fao_image: Mapped[str | None] = mapped_column(Text(), nullable=True)
     signature_pilote_nom: Mapped[str | None] = mapped_column(Text(), nullable=True)
     signature_pilote_horodatage: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
+    signature_pilote_image: Mapped[str | None] = mapped_column(Text(), nullable=True)
     signature_chef_base_nom: Mapped[str | None] = mapped_column(Text(), nullable=True)
     signature_chef_base_horodatage: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
+    signature_chef_base_image: Mapped[str | None] = mapped_column(Text(), nullable=True)
 
     populations: Mapped[list["ProspectionPopulationModel"]] = relationship(
         back_populates="prospection", cascade="all, delete-orphan"

@@ -169,10 +169,13 @@ async def create_prospection(
             signature_visa_horodatage=body.signature_visa_horodatage,
             signature_consultant_fao_nom=body.signature_consultant_fao_nom,
             signature_consultant_fao_horodatage=body.signature_consultant_fao_horodatage,
+            signature_consultant_fao_image=body.signature_consultant_fao_image,
             signature_pilote_nom=body.signature_pilote_nom,
             signature_pilote_horodatage=body.signature_pilote_horodatage,
+            signature_pilote_image=body.signature_pilote_image,
             signature_chef_base_nom=body.signature_chef_base_nom,
             signature_chef_base_horodatage=body.signature_chef_base_horodatage,
+            signature_chef_base_image=body.signature_chef_base_image,
         )
 
         # 👇 AJOUTE CETTE VÉRIFICATION POUR ÉVITER L'ERREUR 500

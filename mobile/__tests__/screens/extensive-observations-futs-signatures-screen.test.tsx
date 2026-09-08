@@ -36,15 +36,42 @@ jest.mock('@/lib/prospection-repository', () => ({
   },
 }));
 
-// Pilote/Chef de Base : agents habilités proposés en chips (listUtilisateursByRole),
-// même mécanisme que côté Traitement — cf. commentaire sur agentsPourRole dans l'écran.
+// Consultant FAO/Pilote/Chef de Base : agents habilités proposés en chips
+// (listUtilisateursByRole), même mécanisme que côté Traitement — cf. commentaire
+// sur agentsPourRole dans l'écran.
 jest.mock('@/lib/referentiel-db', () => ({
   listUtilisateursByRole: jest.fn((role: string) => {
     if (role === 'pilote') return Promise.resolve([{ id: 'pilote-1', nom: 'Rakoto', prenom: 'Jean' }]);
     if (role === 'chef_de_base') return Promise.resolve([{ id: 'chef-1', nom: 'Rabe', prenom: 'Marie' }]);
+    if (role === 'consultant_international') return Promise.resolve([{ id: 'consultant-1', nom: 'Smith', prenom: 'John' }]);
     return Promise.resolve([]);
   }),
 }));
+
+/**
+ * `SignaturePad` s'appuie sur `PanResponder` (gestes tactiles bruts) — hors de
+ * portée d'une simulation RNTL fidèle. Même remplacement que
+ * traitement-signatures-screen.test.tsx : un bouton pressable simule un tracé
+ * complet en un geste, en respectant le contrat réel (`value`/`onChange`/
+ * `readOnly`/`testID`).
+ */
+jest.mock('@/components/traitement/SignaturePad', () => {
+  const React = require('react');
+  const { Text, TouchableOpacity } = require('react-native');
+  function SignaturePad({ value, onChange, readOnly, testID }: any) {
+    if (readOnly) {
+      return <Text testID={testID}>{`trace:${value}`}</Text>;
+    }
+    return (
+      <TouchableOpacity testID={testID} onPress={() => onChange('M0 0 L1 1')}>
+        <Text>dessiner</Text>
+      </TouchableOpacity>
+    );
+  }
+  return { SignaturePad };
+});
+
+const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
 
 beforeEach(() => {
   // `mode_extensif: 'aerien'` conservé dans la valeur simulée : la vraie fonction
@@ -80,8 +107,14 @@ describe('ExtensiveObservationsScreen — mode aérien : nombre de fûts (valida
   });
 });
 
-describe('ExtensiveObservationsScreen — mode aérien : signatures (VISA/Consultant FAO — texte libre)', () => {
-  it('« Signer » capture le nom et un horodatage, verrouille le champ', async () => {
+// SIGNATURE_ROLES = ['consultant_fao', 'pilote', 'chef_base'] dans l'écran —
+// ordre de rendu des 3 blocs Signatures, donc des `getAllByText('VALIDER')[i]`
+// ci-dessous.
+const INDEX_CONSULTANT_FAO = 0;
+const INDEX_PILOTE = 1;
+
+describe('ExtensiveObservationsScreen — VISA retiré', () => {
+  it('n’affiche plus VISA nulle part sur cet écran', async () => {
     useProspectionWizardStore.setState({
       draft: { id: 'draft-123', type_prospection: 'extensive', mode_extensif: 'aerien' } as any,
       captures: [],
@@ -90,25 +123,189 @@ describe('ExtensiveObservationsScreen — mode aérien : signatures (VISA/Consul
     await render(<ExtensiveObservationsScreen />);
     await screen.findByText('Signatures');
 
-    // VISA et Consultant FAO (seuls rôles sans agent habilité référencé — cf.
-    // agentsPourRole) partagent le même placeholder tant qu'aucun n'est signé ;
-    // VISA est le premier (index 0).
-    fireEvent.changeText(screen.getAllByPlaceholderText('Nom du signataire')[0], 'Rakoto V.');
-    // Flush explicite avant Signer : sans lui, le bouton lirait une fermeture
-    // (closure) où `signatureDraftNoms` n'a pas encore la saisie (même classe de
-    // piège que les autres champs de cet écran — cf. commentaires plus haut).
-    expect(await screen.findByDisplayValue('Rakoto V.')).toBeVisible();
-    fireEvent.press(screen.getAllByText('Signer')[0]);
+    expect(screen.queryByText('VISA')).toBeNull();
+  });
+});
 
-    expect(await screen.findByText('Rakoto V.')).toBeVisible();
-    expect(screen.getAllByText('✓ Signé').length).toBeGreaterThan(0);
+describe('ExtensiveObservationsScreen — mode aérien : signatures numériques (Consultant FAO/Pilote/Chef de Base — agent habilité + tracé)', () => {
+  it('sélectionner un agent affiche un pavé de signature ; VALIDER capture nom + tracé + horodatage et persiste immédiatement (pas seulement au clic sur Suivant)', async () => {
+    useProspectionWizardStore.setState({
+      draft: { id: 'draft-123', type_prospection: 'extensive', mode_extensif: 'aerien' } as any,
+      captures: [],
+    });
 
-    fireEvent.press(screen.getByText('Suivant : Récapitulatif ›'));
+    await render(<ExtensiveObservationsScreen />);
+    await screen.findByText('Signatures');
+
+    // Chip issu de listUtilisateursByRole('pilote') (mocké en tête de fichier) —
+    // choisir l'agent ne signe plus immédiatement : il désigne le signataire à
+    // venir, le pavé de signature apparaît.
+    const chipPilote = await screen.findByText('Jean Rakoto');
+    fireEvent.press(chipPilote);
+
+    const pad = await screen.findByTestId('signature-pad-pilote');
+    fireEvent.press(pad);
+    await settle();
+
+    fireEvent.press(screen.getAllByText('VALIDER')[INDEX_PILOTE]);
+
+    // Persisté dès VALIDER — avant même « Suivant : Récapitulatif ».
+    await waitFor(() =>
+      expect(prospectionRepository.updateProspectionExtensiveObservations).toHaveBeenCalledWith(
+        'draft-123',
+        expect.objectContaining({
+          signaturePiloteNom: 'Jean Rakoto',
+          signaturePiloteHorodatage: expect.any(String),
+          signaturePiloteImage: 'M0 0 L1 1',
+        })
+      )
+    );
+    expect(await screen.findByText(/^Signé à /)).toBeVisible();
+    expect(screen.getAllByText('MODIFIER').length).toBeGreaterThan(0);
+  });
+
+  it('le bouton VALIDER reste désactivé tant qu’aucun tracé n’a été dessiné', async () => {
+    useProspectionWizardStore.setState({
+      draft: { id: 'draft-123', type_prospection: 'extensive', mode_extensif: 'aerien' } as any,
+      captures: [],
+    });
+
+    await render(<ExtensiveObservationsScreen />);
+    await screen.findByText('Signatures');
+
+    const chipPilote = await screen.findByText('Jean Rakoto');
+    fireEvent.press(chipPilote);
+    await screen.findByTestId('signature-pad-pilote');
+
+    const valider = screen.getAllByText('VALIDER')[INDEX_PILOTE];
+    fireEvent.press(valider);
+    await settle();
+
+    // Le changement de personne invalide toute signature précédente tout de
+    // suite ; le bouton désactivé ne crée toutefois aucun tracé numérique.
+    await waitFor(() =>
+      expect(prospectionRepository.updateProspectionExtensiveObservations).toHaveBeenCalledWith(
+        'draft-123',
+        expect.objectContaining({
+          signaturePiloteNom: 'Jean Rakoto',
+          signaturePiloteImage: null,
+          signaturePiloteHorodatage: null,
+        })
+      )
+    );
+  });
+
+  it('restaure une signature déjà enregistrée (fiche rouverte) : affichage lecture seule + MODIFIER, pavé pré-rempli', async () => {
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'extensive',
+        mode_extensif: 'aerien',
+        signature_pilote_nom: 'Jean Rakoto',
+        signature_pilote_horodatage: '2026-09-01T09:10:00.000Z',
+        signature_pilote_image: 'M9 9 L8 8',
+      } as any,
+      captures: [],
+    });
+
+    await render(<ExtensiveObservationsScreen />);
+
+    expect(await screen.findByText('Jean Rakoto')).toBeVisible();
+    expect(screen.getByTestId('signature-pad-pilote')).toHaveTextContent('trace:M9 9 L8 8');
+    expect(screen.getByText(/^Signé à /)).toBeVisible();
+    expect(screen.getAllByText('MODIFIER').length).toBeGreaterThan(0);
+  });
+
+  it('MODIFIER rouvre un pavé vierge puis VALIDER remplace correctement l’ancienne signature (jamais conservée par erreur)', async () => {
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'extensive',
+        mode_extensif: 'aerien',
+        signature_pilote_nom: 'Jean Rakoto',
+        signature_pilote_horodatage: '2026-09-01T09:10:00.000Z',
+        signature_pilote_image: 'M9 9 L8 8',
+      } as any,
+      captures: [],
+    });
+
+    await render(<ExtensiveObservationsScreen />);
+    await screen.findByText('Jean Rakoto');
+
+    fireEvent.press(screen.getAllByText('MODIFIER')[0]);
+    await settle();
+
+    const pad = await screen.findByTestId('signature-pad-pilote');
+    fireEvent.press(pad);
+    await settle();
+    fireEvent.press(screen.getAllByText('VALIDER')[INDEX_PILOTE]);
 
     await waitFor(() =>
       expect(prospectionRepository.updateProspectionExtensiveObservations).toHaveBeenCalledWith(
         'draft-123',
-        expect.objectContaining({ signatureVisaNom: 'Rakoto V.', signatureVisaHorodatage: expect.any(String) })
+        expect.objectContaining({
+          signaturePiloteNom: 'Jean Rakoto',
+          signaturePiloteImage: 'M0 0 L1 1',
+        })
+      )
+    );
+  });
+
+  it('changer d’agent alors qu’une signature était déjà validée efface l’ancienne — jamais attribuée au nouveau signataire (§8)', async () => {
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'extensive',
+        mode_extensif: 'aerien',
+        signature_pilote_nom: 'Jean Rakoto',
+        signature_pilote_horodatage: '2026-09-01T09:10:00.000Z',
+        signature_pilote_image: 'M9 9 L8 8',
+      } as any,
+      captures: [],
+    });
+
+    // Un second pilote habilité, distinct de celui déjà signé.
+    const referentielDb = require('@/lib/referentiel-db');
+    jest.mocked(referentielDb.listUtilisateursByRole).mockImplementation((role: string) => {
+      if (role === 'pilote')
+        return Promise.resolve([
+          { id: 'pilote-1', nom: 'Rakoto', prenom: 'Jean' },
+          { id: 'pilote-2', nom: 'Rabe', prenom: 'Paul' },
+        ]);
+      if (role === 'chef_de_base') return Promise.resolve([{ id: 'chef-1', nom: 'Rabe', prenom: 'Marie' }]);
+      if (role === 'consultant_international') return Promise.resolve([{ id: 'consultant-1', nom: 'Smith', prenom: 'John' }]);
+      return Promise.resolve([]);
+    });
+
+    await render(<ExtensiveObservationsScreen />);
+    await screen.findByText('Jean Rakoto');
+    // Signature initiale déjà là : mode lecture seule, pas de chip visible tant
+    // que MODIFIER n'a pas été pressé.
+    expect(screen.getByTestId('signature-pad-pilote')).toHaveTextContent('trace:M9 9 L8 8');
+    expect(screen.queryByText('Paul Rabe')).toBeNull();
+
+    fireEvent.press(screen.getAllByText('MODIFIER')[0]);
+    await settle();
+
+    const chipNouveauPilote = await screen.findByText('Paul Rabe');
+    fireEvent.press(chipNouveauPilote);
+
+    // L'ancienne signature (image + horodatage) est effacée immédiatement — le
+    // pavé redevient éditable (vierge), plus de « Signé à » pour ce rôle.
+    await waitFor(() => expect(screen.getByTestId('signature-pad-pilote')).toHaveTextContent('dessiner'));
+    expect(screen.queryByText(/^Signé à /)).toBeNull();
+
+    // Sans redessiner pour le nouveau signataire, « Suivant » ne doit jamais
+    // envoyer l'ancien tracé sous le nouveau nom (§8).
+    fireEvent.press(screen.getByText('Suivant : Récapitulatif ›'));
+    await waitFor(() =>
+      expect(prospectionRepository.updateProspectionExtensiveObservations).toHaveBeenCalledWith(
+        'draft-123',
+        expect.objectContaining({
+          signaturePiloteNom: 'Paul Rabe',
+          signaturePiloteImage: null,
+          signaturePiloteHorodatage: null,
+        })
       )
     );
   });
@@ -120,7 +317,6 @@ describe('ExtensiveObservationsScreen — mode aérien : signatures (VISA/Consul
         type_prospection: 'extensive',
         mode_extensif: null,
         pesticides_embarques: null,
-        signature_visa_nom: null,
       } as any,
       captures: [],
     });
@@ -128,10 +324,8 @@ describe('ExtensiveObservationsScreen — mode aérien : signatures (VISA/Consul
     await expect(render(<ExtensiveObservationsScreen />)).resolves.toBeTruthy();
     expect(await screen.findByText('Verdure strate herbeuse')).toBeVisible();
   });
-});
 
-describe('ExtensiveObservationsScreen — mode aérien : signatures (Pilote/Chef de Base — agent habilité)', () => {
-  it('sélectionner un agent dans la liste signe immédiatement (nom + horodatage), sans bouton « Signer »', async () => {
+  it('le Consultant FAO utilise désormais le même référentiel (chip) que Pilote/Chef de Base — plus de saisie libre', async () => {
     useProspectionWizardStore.setState({
       draft: { id: 'draft-123', type_prospection: 'extensive', mode_extensif: 'aerien' } as any,
       captures: [],
@@ -140,44 +334,12 @@ describe('ExtensiveObservationsScreen — mode aérien : signatures (Pilote/Chef
     await render(<ExtensiveObservationsScreen />);
     await screen.findByText('Signatures');
 
-    // Chip issu de listUtilisateursByRole('pilote') (mocké en tête de fichier) —
-    // aucun champ texte ni bouton « Signer » pour ce rôle.
-    const chipPilote = await screen.findByText('Jean Rakoto');
-    fireEvent.press(chipPilote);
+    expect(screen.queryByPlaceholderText('Nom du signataire')).toBeNull();
+    const chipConsultant = await screen.findByText('John Smith');
+    fireEvent.press(chipConsultant);
+    await screen.findByTestId('signature-pad-consultant_fao');
 
-    await waitFor(() =>
-      expect(chipPilote.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ color: '#fff' })]))
-    );
-    expect(await screen.findByText(/^Signé à /)).toBeVisible();
-
-    fireEvent.press(screen.getByText('Suivant : Récapitulatif ›'));
-
-    await waitFor(() =>
-      expect(prospectionRepository.updateProspectionExtensiveObservations).toHaveBeenCalledWith(
-        'draft-123',
-        expect.objectContaining({ signaturePiloteNom: 'Jean Rakoto', signaturePiloteHorodatage: expect.any(String) })
-      )
-    );
-  });
-
-  it('restaure une signature déjà enregistrée (fiche rouverte) : le chip de l’agent est actif', async () => {
-    useProspectionWizardStore.setState({
-      draft: {
-        id: 'draft-123',
-        type_prospection: 'extensive',
-        mode_extensif: 'aerien',
-        signature_pilote_nom: 'Jean Rakoto',
-        signature_pilote_horodatage: '2026-09-01T09:10:00.000Z',
-      } as any,
-      captures: [],
-    });
-
-    await render(<ExtensiveObservationsScreen />);
-
-    const chipPilote = await screen.findByText('Jean Rakoto');
-    expect(chipPilote).toBeVisible();
-    expect(chipPilote.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ color: '#fff' })]));
-    expect(screen.getByText(/^Signé à /)).toBeVisible();
+    expect(screen.getAllByText('VALIDER')[INDEX_CONSULTANT_FAO]).toBeTruthy();
   });
 });
 

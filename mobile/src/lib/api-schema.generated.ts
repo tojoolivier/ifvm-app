@@ -2214,14 +2214,20 @@ export interface components {
             signature_consultant_fao_nom?: string | null;
             /** Signature Consultant Fao Horodatage */
             signature_consultant_fao_horodatage?: string | null;
+            /** Signature Consultant Fao Image */
+            signature_consultant_fao_image?: string | null;
             /** Signature Pilote Nom */
             signature_pilote_nom?: string | null;
             /** Signature Pilote Horodatage */
             signature_pilote_horodatage?: string | null;
+            /** Signature Pilote Image */
+            signature_pilote_image?: string | null;
             /** Signature Chef Base Nom */
             signature_chef_base_nom?: string | null;
             /** Signature Chef Base Horodatage */
             signature_chef_base_horodatage?: string | null;
+            /** Signature Chef Base Image */
+            signature_chef_base_image?: string | null;
             /**
              * Populations
              * @default []
@@ -2415,14 +2421,20 @@ export interface components {
             signature_consultant_fao_nom?: string | null;
             /** Signature Consultant Fao Horodatage */
             signature_consultant_fao_horodatage?: string | null;
+            /** Signature Consultant Fao Image */
+            signature_consultant_fao_image?: string | null;
             /** Signature Pilote Nom */
             signature_pilote_nom?: string | null;
             /** Signature Pilote Horodatage */
             signature_pilote_horodatage?: string | null;
+            /** Signature Pilote Image */
+            signature_pilote_image?: string | null;
             /** Signature Chef Base Nom */
             signature_chef_base_nom?: string | null;
             /** Signature Chef Base Horodatage */
             signature_chef_base_horodatage?: string | null;
+            /** Signature Chef Base Image */
+            signature_chef_base_image?: string | null;
             /**
              * Populations
              * @default []
@@ -2561,14 +2573,20 @@ export interface components {
             signature_consultant_fao_nom?: string | null;
             /** Signature Consultant Fao Horodatage */
             signature_consultant_fao_horodatage?: string | null;
+            /** Signature Consultant Fao Image */
+            signature_consultant_fao_image?: string | null;
             /** Signature Pilote Nom */
             signature_pilote_nom?: string | null;
             /** Signature Pilote Horodatage */
             signature_pilote_horodatage?: string | null;
+            /** Signature Pilote Image */
+            signature_pilote_image?: string | null;
             /** Signature Chef Base Nom */
             signature_chef_base_nom?: string | null;
             /** Signature Chef Base Horodatage */
             signature_chef_base_horodatage?: string | null;
+            /** Signature Chef Base Image */
+            signature_chef_base_image?: string | null;
         };
         /** ReferentielPullResponse */
         ReferentielPullResponse: {
@@ -5228,6 +5246,7 @@ export interface operations {
                 prospection_id?: string | null;
                 chef_equipe_id?: string | null;
                 reprenable?: boolean | null;
+                statut?: string | null;
             };
             header?: never;
             path?: never;

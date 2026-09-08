@@ -265,10 +265,13 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             signature_visa_horodatage=prospection.signature_visa_horodatage,
             signature_consultant_fao_nom=prospection.signature_consultant_fao_nom,
             signature_consultant_fao_horodatage=prospection.signature_consultant_fao_horodatage,
+            signature_consultant_fao_image=prospection.signature_consultant_fao_image,
             signature_pilote_nom=prospection.signature_pilote_nom,
             signature_pilote_horodatage=prospection.signature_pilote_horodatage,
+            signature_pilote_image=prospection.signature_pilote_image,
             signature_chef_base_nom=prospection.signature_chef_base_nom,
             signature_chef_base_horodatage=prospection.signature_chef_base_horodatage,
+            signature_chef_base_image=prospection.signature_chef_base_image,
         )
 
         model.populations = [
@@ -459,10 +462,13 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         model.signature_visa_horodatage = prospection.signature_visa_horodatage
         model.signature_consultant_fao_nom = prospection.signature_consultant_fao_nom
         model.signature_consultant_fao_horodatage = prospection.signature_consultant_fao_horodatage
+        model.signature_consultant_fao_image = prospection.signature_consultant_fao_image
         model.signature_pilote_nom = prospection.signature_pilote_nom
         model.signature_pilote_horodatage = prospection.signature_pilote_horodatage
+        model.signature_pilote_image = prospection.signature_pilote_image
         model.signature_chef_base_nom = prospection.signature_chef_base_nom
         model.signature_chef_base_horodatage = prospection.signature_chef_base_horodatage
+        model.signature_chef_base_image = prospection.signature_chef_base_image
 
         # Mise à jour des infestations
         await self.session.execute(
@@ -764,10 +770,13 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             signature_visa_horodatage=model.signature_visa_horodatage,
             signature_consultant_fao_nom=model.signature_consultant_fao_nom,
             signature_consultant_fao_horodatage=model.signature_consultant_fao_horodatage,
+            signature_consultant_fao_image=model.signature_consultant_fao_image,
             signature_pilote_nom=model.signature_pilote_nom,
             signature_pilote_horodatage=model.signature_pilote_horodatage,
+            signature_pilote_image=model.signature_pilote_image,
             signature_chef_base_nom=model.signature_chef_base_nom,
             signature_chef_base_horodatage=model.signature_chef_base_horodatage,
+            signature_chef_base_image=model.signature_chef_base_image,
             # ==========================================
             # RELATIONSHIPS
             # ==========================================

@@ -85,10 +85,13 @@ export interface DraftProspection {
   signature_visa_horodatage: string | null;
   signature_consultant_fao_nom: string | null;
   signature_consultant_fao_horodatage: string | null;
+  signature_consultant_fao_image: string | null;
   signature_pilote_nom: string | null;
   signature_pilote_horodatage: string | null;
+  signature_pilote_image: string | null;
   signature_chef_base_nom: string | null;
   signature_chef_base_horodatage: string | null;
+  signature_chef_base_image: string | null;
   n_releve: string | null;
   n_fiche: string | null;
   n_message: string | null;
@@ -191,10 +194,15 @@ export interface ExtensiveObservationsUpdateInput {
   signatureVisaHorodatage?: string | null;
   signatureConsultantFaoNom?: string | null;
   signatureConsultantFaoHorodatage?: string | null;
+  /** Tracé SVG du pavé de signature (#signatures-digitales-extensif-aerien) —
+   * même principe que `traitement_signature.signature_image`. */
+  signatureConsultantFaoImage?: string | null;
   signaturePiloteNom?: string | null;
   signaturePiloteHorodatage?: string | null;
+  signaturePiloteImage?: string | null;
   signatureChefBaseNom?: string | null;
   signatureChefBaseHorodatage?: string | null;
+  signatureChefBaseImage?: string | null;
   /** « Remarques » (D — Observations) — les deux modes, terrestre et aérien.
    * Réutilise la colonne `prospection.observations` déjà câblée pour l'intensif
    * (même colonne, juste un intitulé différent à l'écran) : pas de nouvelle
@@ -577,9 +585,9 @@ export async function updateProspectionExtensiveObservations(id: string, input: 
       pesticide_quantite_disponible = ?, pesticide_quantite_recue = ?,
       futs_disponible = ?, futs_pleins = ?, futs_vides = ?, futs_recues = ?,
       signature_visa_nom = ?, signature_visa_horodatage = ?,
-      signature_consultant_fao_nom = ?, signature_consultant_fao_horodatage = ?,
-      signature_pilote_nom = ?, signature_pilote_horodatage = ?,
-      signature_chef_base_nom = ?, signature_chef_base_horodatage = ?,
+      signature_consultant_fao_nom = ?, signature_consultant_fao_horodatage = ?, signature_consultant_fao_image = ?,
+      signature_pilote_nom = ?, signature_pilote_horodatage = ?, signature_pilote_image = ?,
+      signature_chef_base_nom = ?, signature_chef_base_horodatage = ?, signature_chef_base_image = ?,
       observations = ?,
       updated_at = ?
      WHERE id = ?`,
@@ -597,10 +605,13 @@ export async function updateProspectionExtensiveObservations(id: string, input: 
       input.signatureVisaHorodatage ?? null,
       input.signatureConsultantFaoNom ?? null,
       input.signatureConsultantFaoHorodatage ?? null,
+      input.signatureConsultantFaoImage ?? null,
       input.signaturePiloteNom ?? null,
       input.signaturePiloteHorodatage ?? null,
+      input.signaturePiloteImage ?? null,
       input.signatureChefBaseNom ?? null,
       input.signatureChefBaseHorodatage ?? null,
+      input.signatureChefBaseImage ?? null,
       input.observations ?? null,
       now, id,
     ]

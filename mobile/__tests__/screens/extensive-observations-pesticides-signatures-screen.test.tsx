@@ -84,8 +84,11 @@ describe('ExtensiveObservationsScreen — mode aérien : pesticides embarqués',
     expect(screen.queryByText('Nom Commercial')).toBeNull();
     expect(screen.queryByText('Nombre de fûts')).toBeNull();
     // Signatures indépendantes du choix Pesticides — toujours affichées en aérien.
+    // VISA a été retiré (#signatures-numeriques-extensif-aerien) : Consultant FAO
+    // est désormais le premier rôle affiché.
     expect(screen.getByText('Signatures')).toBeVisible();
-    expect(screen.getByText('VISA')).toBeVisible();
+    expect(screen.getByText('Consultant FAO')).toBeVisible();
+    expect(screen.queryByText('VISA')).toBeNull();
 
     fireEvent.press(screen.getByText('Suivant : Récapitulatif ›'));
 

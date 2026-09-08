@@ -52,10 +52,13 @@ const MIGRATED_COLUMNS = [
   { name: 'signature_visa_horodatage' },
   { name: 'signature_consultant_fao_nom' },
   { name: 'signature_consultant_fao_horodatage' },
+  { name: 'signature_consultant_fao_image' },
   { name: 'signature_pilote_nom' },
   { name: 'signature_pilote_horodatage' },
+  { name: 'signature_pilote_image' },
   { name: 'signature_chef_base_nom' },
   { name: 'signature_chef_base_horodatage' },
+  { name: 'signature_chef_base_image' },
 
   // Colonnes de prospection_operation_aerienne
   { name: 'motif_divers' },

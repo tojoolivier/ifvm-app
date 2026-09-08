@@ -443,10 +443,13 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
     signature_visa_horodatage: draft.signature_visa_horodatage || null,
     signature_consultant_fao_nom: draft.signature_consultant_fao_nom || null,
     signature_consultant_fao_horodatage: draft.signature_consultant_fao_horodatage || null,
+    signature_consultant_fao_image: draft.signature_consultant_fao_image || null,
     signature_pilote_nom: draft.signature_pilote_nom || null,
     signature_pilote_horodatage: draft.signature_pilote_horodatage || null,
+    signature_pilote_image: draft.signature_pilote_image || null,
     signature_chef_base_nom: draft.signature_chef_base_nom || null,
     signature_chef_base_horodatage: draft.signature_chef_base_horodatage || null,
+    signature_chef_base_image: draft.signature_chef_base_image || null,
   };
 }
 
