@@ -5,10 +5,12 @@
  * afficher une donnée inventée » et « ne jamais masquer silencieusement une donnée
  * renseignée ».
  */
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import ExtensiveRecapScreen from '@/app/(prospection)/extensive-recap';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
+import { useAuthStore } from '@/lib/auth-store';
 import * as prospectionRepository from '@/lib/prospection-repository';
+import * as prospectionReview from '@/lib/prospection-review';
 import * as referentielDb from '@/lib/referentiel-db';
 import { formatHeureLocale } from '@/lib/prospection-fiche-lecture';
 
@@ -20,6 +22,7 @@ jest.mock('@/lib/prospection-repository', () => ({
   listAllProspectionPopulations: jest.fn().mockResolvedValue([]),
   listOperationsAeriennes: jest.fn().mockResolvedValue([]),
   concludeValidation: jest.fn(),
+  alignerNumeroFicheSurNumeroMessage: jest.fn(),
   // Vraie implémentation (pas de mock utile ici) : `buildPesticidesRows` en dépend
   // pour normaliser `pesticides_embarques` (0/1/null en SQLite).
   normalizeBoolean: (value: unknown) => {
@@ -28,6 +31,10 @@ jest.mock('@/lib/prospection-repository', () => ({
     if (typeof value === 'number') return value !== 0;
     return null;
   },
+}));
+
+jest.mock('@/lib/prospection-review', () => ({
+  enregistrerEtSynchroniser: jest.fn().mockResolvedValue({ envoyees: [], echouees: [], conflits: [] }),
 }));
 
 jest.mock('@/lib/referentiel-db', () => ({
@@ -244,6 +251,60 @@ describe('ExtensiveRecapScreen — récapitulatif complet (#227)', () => {
     // H STR HERB (#228) : affiché en mètres, non arrondi à l'entier (45 cm → 0.45 m).
     expect(screen.getByText(/H\. strate herbeuse : 0.45 m/)).toBeVisible();
     expect(screen.getByText(new RegExp(`Heure d.observation : ${HEURE_ATTENDUE}`))).toBeVisible();
+  });
+});
+
+/**
+ * #numero-fiche-extensive-egal-n-message : le N° de fiche définitif doit
+ * reprendre le N° de message déjà affiché pendant la saisie — bouton
+ * « Enregistrer (hors-ligne) » uniquement (pas la branche Vérification de
+ * signalement, `handleConclude`, hors périmètre de cette demande).
+ */
+describe('ExtensiveRecapScreen — N° de fiche = N° de message à l’enregistrement', () => {
+  beforeEach(() => {
+    useAuthStore.setState({ token: 'tok-1' });
+    jest.mocked(prospectionRepository.listAllProspectionPopulations).mockResolvedValue([]);
+    jest.mocked(prospectionRepository.alignerNumeroFicheSurNumeroMessage).mockClear();
+  });
+
+  it('aligne n_fiche sur n_message avant de synchroniser, pour une fiche Extensive', async () => {
+    const draftAvecNFiche = { ...DRAFT_BASE, type_prospection: 'extensive', n_fiche: DRAFT_BASE.n_message };
+    jest.mocked(prospectionRepository.alignerNumeroFicheSurNumeroMessage).mockResolvedValueOnce(draftAvecNFiche as any);
+    useProspectionWizardStore.setState({ draft: { ...DRAFT_BASE, type_prospection: 'extensive' }, captures: [] });
+
+    await render(<ExtensiveRecapScreen />);
+
+    fireEvent.press(await screen.findByText('Enregistrer (hors-ligne) ✓'));
+
+    await waitFor(() =>
+      expect(prospectionRepository.alignerNumeroFicheSurNumeroMessage).toHaveBeenCalledWith(DRAFT_BASE.id)
+    );
+    // La fiche synchronisée est bien celle RENVOYÉE par l'alignement (avec n_fiche
+    // désormais posé) — pas l'ancien brouillon du store, dont n_fiche est encore null.
+    await waitFor(() =>
+      expect(prospectionReview.enregistrerEtSynchroniser).toHaveBeenCalledWith(draftAvecNFiche, [], 'tok-1')
+    );
+  });
+
+  it("n'aligne rien pour une fiche de vérification de signalement (handleConclude, hors périmètre)", async () => {
+    useProspectionWizardStore.setState({
+      draft: {
+        ...DRAFT_BASE,
+        type_prospection: 'validation',
+        signalement_source: 'Rasoanaivo',
+        signalement_date: '2026-08-24',
+        signalement_description: 'Essaim visible près du village',
+      },
+      captures: [],
+    });
+
+    await render(<ExtensiveRecapScreen />);
+    await screen.findByText('Vérification du signalement');
+
+    fireEvent.press(screen.getByText('✓ Confirmée'));
+
+    await waitFor(() => expect(prospectionRepository.concludeValidation).toHaveBeenCalled());
+    expect(prospectionRepository.alignerNumeroFicheSurNumeroMessage).not.toHaveBeenCalled();
   });
 });
 

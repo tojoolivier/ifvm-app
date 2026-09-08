@@ -1078,6 +1078,32 @@ export async function completeProspection(id: string): Promise<DraftProspection>
   return updated;
 }
 
+/**
+ * #numero-fiche-extensive-egal-n-message : la Prospection Extensive n'a pas de
+ * génération de n_fiche propre (contrairement à l'Intensif, dont
+ * `reference.tsx` pose `n_fiche` dès sa propre soumission) — n_fiche restait
+ * donc `null` toute la vie de la fiche, alors que le N° de message (saisi/
+ * généré sur extensive-reference.tsx) était déjà affiché à l'agent pendant le
+ * remplissage. Plutôt qu'inventer une numérotation séparée pour n_fiche, on
+ * réutilise le N° de message existant comme numéro métier définitif — appelé
+ * une seule fois, à l'enregistrement final (extensive-recap.tsx), et
+ * exclusivement pour l'Extensif : ni l'Intensif (déjà correct), ni la
+ * Signalisation/Vérification (numérotation hors périmètre de cette demande).
+ */
+export async function alignerNumeroFicheSurNumeroMessage(id: string): Promise<DraftProspection> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    `UPDATE prospection SET n_fiche = n_message, updated_at = ? WHERE id = ? AND n_message IS NOT NULL`,
+    [now, id]
+  );
+
+  const updated = await getProspection(id);
+  if (!updated) throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  return updated;
+}
+
 export async function markProspectionSynced(id: string): Promise<DraftProspection> {
   const db = await getDb();
   const now = new Date().toISOString();

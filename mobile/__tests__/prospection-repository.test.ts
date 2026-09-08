@@ -1,4 +1,5 @@
 import {
+  alignerNumeroFicheSurNumeroMessage,
   createDraftProspection,
   materialiserProspectionValidee,
   getProspection,
@@ -473,6 +474,45 @@ describe('updateProspectionExtensiveReference', () => {
     getFirstAsync.mockResolvedValueOnce(null);
 
     await expect(updateProspectionExtensiveReference(BASE_INPUT.id, REF_INPUT)).rejects.toThrow(
+      'Échec de la mise à jour de la fiche brouillon locale'
+    );
+  });
+});
+
+// #numero-fiche-extensive-egal-n-message
+describe('alignerNumeroFicheSurNumeroMessage', () => {
+  it('copies n_message into n_fiche, only for rows where n_message is set', async () => {
+    getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW, n_message: '20260711-1111', n_fiche: '20260711-1111' });
+
+    await alignerNumeroFicheSurNumeroMessage(BASE_INPUT.id);
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE prospection SET n_fiche = n_message'),
+      [expect.any(String), BASE_INPUT.id]
+    );
+    // La clause WHERE protège les fiches sans n_message (n_fiche resterait inchangé,
+    // pas écrasé par NULL) — vérifié ici sur le texte de la requête plutôt que sur son
+    // exécution : `runAsync` est un mock, seul SQLite ferait réellement respecter le filtre.
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('n_message IS NOT NULL'),
+      expect.any(Array)
+    );
+  });
+
+  it('returns the updated row (n_fiche now equal to n_message) read back from local storage', async () => {
+    const updated = { ...STORED_ROW, n_message: '20260711-1111', n_fiche: '20260711-1111' };
+    getFirstAsync.mockResolvedValueOnce(updated);
+
+    const result = await alignerNumeroFicheSurNumeroMessage(BASE_INPUT.id);
+
+    expect(result.n_fiche).toBe('20260711-1111');
+    expect(result.n_fiche).toBe(result.n_message);
+  });
+
+  it('throws if the row cannot be read back after the update', async () => {
+    getFirstAsync.mockResolvedValueOnce(null);
+
+    await expect(alignerNumeroFicheSurNumeroMessage(BASE_INPUT.id)).rejects.toThrow(
       'Échec de la mise à jour de la fiche brouillon locale'
     );
   });
