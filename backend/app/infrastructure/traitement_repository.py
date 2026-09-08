@@ -145,9 +145,7 @@ class TraitementRepositoryImpl(TraitementRepository):
                 ProspectionModel.n_message,
             ).where(ProspectionModel.id.in_(ids))
         )
-        numeros = {
-            row.id: row.n_fiche or row.n_releve or row.n_message for row in result.all()
-        }
+        numeros = {row.id: row.n_fiche or row.n_releve or row.n_message for row in result.all()}
         for t in traitements:
             t.prospection_n_fiche = numeros.get(t.prospection_id)
 
