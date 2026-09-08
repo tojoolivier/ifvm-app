@@ -39,8 +39,16 @@ def _calculer_duree_minutes(debut_heure: str, fin_heure: str) -> int:
 
 
 class CreateProspection:
-    def __init__(self, repository: ProspectionRepository):
+    def __init__(
+        self,
+        repository: ProspectionRepository,
+        audit_repo: AuditLogRepository | None = None,
+    ):
         self.repository = repository
+        # Optionnel, rétrocompatible : seule la route l'a toujours fourni en
+        # pratique. `None` reste accepté pour ne pas casser un appelant qui ne
+        # se soucierait pas des notifications (ex. import de masse).
+        self.audit_repo = audit_repo
 
     async def execute(
         self,
@@ -258,6 +266,21 @@ class CreateProspection:
         created = await self.repository.create(prospection)
         if created is None:
             raise ValueError("Impossible de récupérer la prospection créée")
+
+        # « Nouvelle fiche » côté centre de notifications web (#toutes-les-donnees) :
+        # `ActionAudit.CREATION` existait déjà dans l'énumération mais n'était
+        # écrit nulle part — une fiche fraîchement créée était invisible du
+        # centre de notifications tant qu'aucune transition de statut n'avait
+        # eu lieu.
+        if self.audit_repo is not None:
+            await self.audit_repo.create(
+                AuditLog(
+                    fiche_type=created.type_prospection,
+                    fiche_id=created.id,
+                    auteur_id=created.prospecteur_id,
+                    action="creation",
+                )
+            )
         return created
 
 
@@ -571,6 +594,7 @@ class ChangerStatut:
         nouveau_statut: str,
         acteur_id: uuid.UUID,
         acteur_role: str,
+        commentaire: str | None = None,
     ) -> Prospection:
         prospection = await self.prospection_repo.get_by_id(prospection_id)
         if prospection is None:
@@ -581,13 +605,25 @@ class ChangerStatut:
 
         updated = await self.prospection_repo.update(prospection)
 
+        details: dict[str, Any] = {
+            "statut_precedent": statut_precedent,
+            "nouveau_statut": nouveau_statut,
+        }
+        # Le motif de rejet (et tout commentaire accompagnant une vérification/
+        # validation) transitait déjà par `StatutChange.commentaire` côté web
+        # (modale « Rejeter avec motif ») mais n'était jamais lu ici : la fiche
+        # changeait bien de statut, mais le motif saisi disparaissait — le
+        # centre de notifications ne peut afficher que ce qui est stocké.
+        if commentaire:
+            details["commentaire"] = commentaire
+
         await self.audit_repo.create(
             AuditLog(
                 fiche_type=prospection.type_prospection,
                 fiche_id=prospection_id,
                 auteur_id=acteur_id,
                 action=action,
-                details={"statut_precedent": statut_precedent, "nouveau_statut": nouveau_statut},
+                details=details,
             )
         )
 
