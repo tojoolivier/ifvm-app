@@ -18,6 +18,7 @@ from app.domain.traitement import (
     TraitementSignature,
     TraitementTerrestre,
 )
+from app.infrastructure.prospection_model import ProspectionModel
 from app.infrastructure.traitement_model import (
     CibleModel,
     ProduitUtiliseModel,
@@ -49,7 +50,9 @@ class TraitementRepositoryImpl(TraitementRepository):
         model = result.scalar_one_or_none()
         if model is None:
             return None
-        return self._to_domain(model)
+        traitement = self._to_domain(model)
+        await self._resoudre_prospection_n_fiche([traitement])
+        return traitement
 
     async def list_by_filters(
         self,
@@ -118,7 +121,35 @@ class TraitementRepositoryImpl(TraitementRepository):
             )
         stmt = stmt.order_by(TraitementModel.date_traitement.desc())
         result = await self.session.execute(stmt)
-        return [self._to_domain(m) for m in result.scalars().all()]
+        traitements = [self._to_domain(m) for m in result.scalars().all()]
+        await self._resoudre_prospection_n_fiche(traitements)
+        return traitements
+
+    async def _resoudre_prospection_n_fiche(self, traitements: list[Traitement]) -> None:
+        """Peuple `Traitement.prospection_n_fiche` par une seule requête groupée
+        (#numero-fiche-prospection-liee), même pattern que
+        `ProspectionRepositoryImpl._resoudre_noms` : `prospection_id` reste
+        l'unique relation entre les deux fiches, ce champ n'en est qu'une
+        lecture dérivée, jamais une seconde relation ni une colonne dupliquée.
+        Fallback n_releve/n_message si n_fiche n'est pas encore renseigné,
+        même ordre de priorité que l'écran mobile « Consulter une fiche
+        validée » (prospection-picker.tsx)."""
+        ids = {t.prospection_id for t in traitements}
+        if not ids:
+            return
+        result = await self.session.execute(
+            select(
+                ProspectionModel.id,
+                ProspectionModel.n_fiche,
+                ProspectionModel.n_releve,
+                ProspectionModel.n_message,
+            ).where(ProspectionModel.id.in_(ids))
+        )
+        numeros = {
+            row.id: row.n_fiche or row.n_releve or row.n_message for row in result.all()
+        }
+        for t in traitements:
+            t.prospection_n_fiche = numeros.get(t.prospection_id)
 
     async def origine_deja_utilisee(
         self, traitement_origine_id: uuid.UUID, exclude_traitement_id: uuid.UUID | None = None

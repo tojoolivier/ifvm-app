@@ -106,6 +106,9 @@ interface TraitementTerrestre {
 interface TraitementDetail {
   id: string
   prospection_id: string
+  // Dérivé côté backend (#numero-fiche-prospection-liee) à partir de
+  // prospection_id — jamais une seconde relation, jamais saisi ici.
+  prospection_n_fiche: string | null
   numero_fiche: string
   type_traitement: 'AERIEN' | 'TERRESTRE'
   mode_traitement: string | null
@@ -485,6 +488,19 @@ export function TraitementDetailPage() {
           </span>
         )}
       </header>
+
+      {/* N° fiche prospection liée (#numero-fiche-prospection-liee) — dérivé de
+          prospection_id côté backend, jamais saisi ici, toujours visible (pas
+          seulement quand un snapshot de cible existe, cf. bandeau ambre plus bas). */}
+      <p className="font-sans text-[12px] text-ifvm-text-tertiary">
+        N° fiche prospection liée :{' '}
+        <Link
+          to={`/prospections/${traitement.prospection_id}`}
+          className="font-mono font-semibold underline"
+        >
+          {traitement.prospection_n_fiche ?? traitement.prospection_id}
+        </Link>
+      </p>
 
       {/* Bandeau ambre : le snapshot des cibles est figé à la création */}
       {traitement.cible && (

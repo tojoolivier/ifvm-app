@@ -440,6 +440,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/prospections/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Notifications
+         * @description Centre de notifications — dérivé de `audit_log` (aucune table dédiée) :
+         *     admin/vérificateur/validation_finale voient toutes les fiches et actions
+         *     (nouvelle fiche comprise) ; un prospecteur ne voit que les transitions de
+         *     statut sur ses propres fiches. `lu` compare `created_at` au curseur
+         *     `utilisateur.notifications_lues_at` (migration 0052) — NULL veut dire
+         *     « jamais consulté », donc tout est non-lu.
+         *
+         *     IMPORTANT : déclarée avant `GET /{prospection_id}` ci-dessous — sinon
+         *     FastAPI essaierait de parser "notifications" comme un UUID (422) plutôt
+         *     que d'atteindre cette route, l'ordre de déclaration faisant la priorité.
+         */
+        get: operations["get_notifications_prospections_notifications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/prospections/notifications/vu": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Marquer Notifications Vues */
+        post: operations["marquer_notifications_vues_prospections_notifications_vu_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/prospections/{prospection_id}": {
         parameters: {
             query?: never;
@@ -1697,6 +1743,48 @@ export interface components {
          * @enum {string}
          */
         NiveauPopulation: "neant" | "rare" | "peu" | "beaucoup" | "dominant";
+        /**
+         * NotificationRead
+         * @description Ligne du centre de notifications — dérivée de `audit_log`, jointe à
+         *     `prospection` (n_fiche, type) et `utilisateur` (auteur). Pas de nouvelle
+         *     table d'événements : voir migration 0052 pour le curseur de lecture.
+         */
+        NotificationRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            action: components["schemas"]["ActionAudit"];
+            /**
+             * Fiche Id
+             * Format: uuid
+             */
+            fiche_id: string;
+            fiche_type: components["schemas"]["FicheType"];
+            /** N Fiche */
+            n_fiche: string | null;
+            /** Auteur Nom */
+            auteur_nom: string | null;
+            /** Details */
+            details: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Lu */
+            lu: boolean;
+        };
+        /** NotificationsResponse */
+        NotificationsResponse: {
+            /** Items */
+            items: components["schemas"]["NotificationRead"][];
+            /** Non Lues */
+            non_lues: number;
+        };
         /**
          * OperationAerienneCreate
          * @description Pas de `numero` (assigné côté serveur, séquence par fiche) ni de
@@ -3241,6 +3329,8 @@ export interface components {
              * @default []
              */
             signatures: components["schemas"]["SignatureRead"][];
+            /** Prospection N Fiche */
+            prospection_n_fiche?: string | null;
         };
         /**
          * TraitementSyncPush
@@ -5040,6 +5130,55 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    get_notifications_prospections_notifications_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    marquer_notifications_vues_prospections_notifications_vu_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

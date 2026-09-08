@@ -397,3 +397,9 @@ class TraitementRead(BaseModel):
     aerien: TraitementAerienRead | None
     terrestre: TraitementTerrestreRead | None
     signatures: list[SignatureRead] = []
+
+    # Champ dérivé, non stocké (#numero-fiche-prospection-liee) — résolu par
+    # TraitementRepositoryImpl à partir de `prospection_id`, jamais accepté en
+    # entrée (absent de TraitementCreate/Update) : la seule relation entre les
+    # deux fiches reste `prospection_id`, ce champ n'en est qu'une lecture.
+    prospection_n_fiche: str | None = None

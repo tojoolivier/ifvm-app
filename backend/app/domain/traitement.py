@@ -382,6 +382,16 @@ class Traitement:
     terrestre: TraitementTerrestre | None = None
     signatures: list[TraitementSignature] = field(default_factory=list)
 
+    # ==========================================
+    # Champ dérivé, non stocké (#numero-fiche-prospection-liee) — résolu par le
+    # repository (jointure sur `prospection_id`, même pattern que
+    # Prospection.prospecteur_nom) : le numéro métier (`prospection.n_fiche`,
+    # déjà aligné sur n_message pour un signalement) de la fiche de prospection
+    # d'origine, jamais recalculé/dupliqué en colonne — `prospection_id` reste
+    # l'unique relation entre les deux fiches, ce champ n'en est qu'une lecture.
+    # ==========================================
+    prospection_n_fiche: str | None = None
+
     def verifier_modifiable(self) -> None:
         """Garde commune, réutilisée par tous les writes (rotations, produits, validation).
 
