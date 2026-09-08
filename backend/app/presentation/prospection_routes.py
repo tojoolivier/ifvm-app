@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -31,6 +32,8 @@ from app.models.users import Utilisateur
 from app.presentation.prospection_schemas import (
     AuditLogRead,
     CommentaireCreate,
+    NotificationRead,
+    NotificationsResponse,
     ProspectionCreate,
     ProspectionRead,
     ProspectionUpdate,
@@ -81,7 +84,7 @@ async def create_prospection(
     current_user: Annotated[Utilisateur, Depends(get_current_user)],
 ):
     repository = get_repository(db)
-    use_case = CreateProspection(repository)
+    use_case = CreateProspection(repository, AuditLogRepositoryImpl(db))
     try:
         prospection = await use_case.execute(
             type_prospection=body.type_prospection,
@@ -187,6 +190,44 @@ async def create_prospection(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     except (ProspectionIntegriteError, StadeInconnuError) as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+
+
+@router.get("/notifications", response_model=NotificationsResponse)
+async def get_notifications(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[Utilisateur, Depends(get_current_user)],
+    limit: int = Query(default=50, ge=1, le=200),
+):
+    """Centre de notifications — dérivé de `audit_log` (aucune table dédiée) :
+    admin/vérificateur/validation_finale voient toutes les fiches et actions
+    (nouvelle fiche comprise) ; un prospecteur ne voit que les transitions de
+    statut sur ses propres fiches. `lu` compare `created_at` au curseur
+    `utilisateur.notifications_lues_at` (migration 0052) — NULL veut dire
+    « jamais consulté », donc tout est non-lu.
+
+    IMPORTANT : déclarée avant `GET /{prospection_id}` ci-dessous — sinon
+    FastAPI essaierait de parser "notifications" comme un UUID (422) plutôt
+    que d'atteindre cette route, l'ordre de déclaration faisant la priorité.
+    """
+    audit_repo = AuditLogRepositoryImpl(db)
+    lignes = await audit_repo.list_notifications(
+        role=current_user.role, utilisateur_id=current_user.id, limit=limit
+    )
+    vu_a = current_user.notifications_lues_at
+    items = [
+        NotificationRead(**ligne, lu=vu_a is not None and ligne["created_at"] <= vu_a)
+        for ligne in lignes
+    ]
+    return NotificationsResponse(items=items, non_lues=sum(1 for i in items if not i.lu))
+
+
+@router.post("/notifications/vu", status_code=204)
+async def marquer_notifications_vues(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    current_user.notifications_lues_at = datetime.now(timezone.utc)
+    await db.commit()
 
 
 @router.get("/{prospection_id}", response_model=ProspectionRead)
@@ -309,6 +350,7 @@ async def changer_statut(
             nouveau_statut=body.statut,
             acteur_id=current_user.id,
             acteur_role=current_user.role,
+            commentaire=body.commentaire,
         )
     except LookupError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

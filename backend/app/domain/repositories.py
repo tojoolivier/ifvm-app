@@ -1,6 +1,7 @@
 import uuid
 from abc import ABC, abstractmethod
 from datetime import date, datetime
+from typing import Any
 
 from app.domain.campagne import Campagne
 from app.domain.prospection import AuditLog, Prospection
@@ -206,6 +207,16 @@ class AuditLogRepository(ABC):
 
     @abstractmethod
     async def list_by_fiche(self, fiche_id: uuid.UUID) -> list[AuditLog]:
+        pass
+
+    @abstractmethod
+    async def list_notifications(
+        self, role: str, utilisateur_id: uuid.UUID, limit: int = 50
+    ) -> list[dict[str, Any]]:
+        """Projection jointe (prospection, utilisateur) pour le centre de
+        notifications — pas des `AuditLog` bruts, d'où le retour en dict plutôt
+        que de forcer le domaine à porter des champs qui ne lui appartiennent
+        pas (n_fiche, auteur_nom)."""
         pass
 
 

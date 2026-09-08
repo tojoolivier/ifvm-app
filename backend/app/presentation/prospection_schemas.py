@@ -664,6 +664,27 @@ class AuditLogRead(BaseModel):
     created_at: datetime
 
 
+class NotificationRead(BaseModel):
+    """Ligne du centre de notifications — dérivée de `audit_log`, jointe à
+    `prospection` (n_fiche, type) et `utilisateur` (auteur). Pas de nouvelle
+    table d'événements : voir migration 0052 pour le curseur de lecture."""
+
+    id: uuid.UUID
+    action: ActionAudit
+    fiche_id: uuid.UUID
+    fiche_type: FicheType
+    n_fiche: str | None
+    auteur_nom: str | None
+    details: dict[str, Any] | None
+    created_at: datetime
+    lu: bool
+
+
+class NotificationsResponse(BaseModel):
+    items: list[NotificationRead]
+    non_lues: int
+
+
 class ProspectionRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
