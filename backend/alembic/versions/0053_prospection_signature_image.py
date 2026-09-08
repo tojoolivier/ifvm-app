@@ -33,8 +33,8 @@ la signature, pas une contrainte de schéma. Même niveau de rigueur que
 l'existant (`traitement_signature.signataire_nom`), pas un système parallèle
 plus strict inventé pour l'occasion.
 
-Revision ID: 0052
-Revises: 0051
+Revision ID: 0053
+Revises: 0052
 Create Date: 2026-09-08
 
 """
@@ -43,8 +43,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0052"
-down_revision = "0051"
+revision = "0053"
+down_revision = "0052"
 branch_labels = None
 depends_on = None
 
