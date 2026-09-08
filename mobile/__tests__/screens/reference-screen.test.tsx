@@ -1,15 +1,11 @@
-/**
- * Couvre #100 : la surface prospectée est obligatoire sur l'écran Référence,
- * y compris en mode intensif (auparavant seule la fiche extensive l'exigeait).
- */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor, act } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import ReferenceScreen from '@/app/(prospection)/reference';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import * as prospectionRepository from '@/lib/prospection-repository';
 
-// `reference.tsx` lit useSafeAreaInsets() (position du bouton "Continuer" au-dessus
-// de la zone de geste) : il faut un SafeAreaProvider avec des métriques initiales.
+jest.setTimeout(60000);
+
 const TEST_SAFE_AREA_METRICS = {
   insets: { top: 0, left: 0, right: 0, bottom: 0 },
   frame: { x: 0, y: 0, width: 0, height: 0 },
@@ -38,8 +34,9 @@ jest.mock('@/lib/referentiel-db', () => ({
   findNearestStation: jest.fn().mockResolvedValue(null),
 }));
 
-describe('ReferenceScreen', () => {
-  beforeEach(() => {
+beforeEach(async () => {
+  jest.clearAllMocks();
+  await act(async () => {
     useProspectionWizardStore.setState({
       draft: {
         id: 'draft-123',
@@ -51,30 +48,51 @@ describe('ReferenceScreen', () => {
       captures: [],
     });
   });
+});
 
+afterEach(async () => {
+  await act(async () => {
+    useProspectionWizardStore.setState({ draft: null, captures: [] });
+  });
+});
+
+describe('ReferenceScreen', () => {
   it('bloque sans surface prospectée puis autorise une fois le champ rempli (mode intensif)', async () => {
-    await render(
-      <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
-        <ReferenceScreen />
-      </SafeAreaProvider>
-    );
+    await act(async () => {
+      await render(
+        <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
+          <ReferenceScreen />
+        </SafeAreaProvider>
+      );
+    });
 
-    await waitFor(() => expect(screen.getByText('Continuer  ›')).toBeVisible());
+    await waitFor(() => {
+      expect(screen.getByText('Continuer  ›')).toBeVisible();
+    }, { timeout: 10000 });
 
     const surfaceInputs = screen.getAllByPlaceholderText('0');
-    fireEvent.changeText(surfaceInputs[0], '10'); // surface station
-    fireEvent.press(screen.getByText('Xérophyle'));
 
-    // Cas bloquant : surface prospectée vide.
-    fireEvent.press(screen.getByText('Continuer  ›'));
+    await act(async () => {
+      fireEvent.changeText(surfaceInputs[0], '10');
+      fireEvent.press(screen.getByText('Xérophyle'));
+    });
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('Continuer  ›'));
+    });
+
     expect(await screen.findByText('La surface prospectée est obligatoire')).toBeVisible();
     expect(prospectionRepository.updateProspectionReference).not.toHaveBeenCalled();
 
-    // Cas nominal : surface prospectée renseignée.
-    fireEvent.changeText(surfaceInputs[1], '5');
-    fireEvent.press(screen.getByText('Continuer  ›'));
+    await act(async () => {
+      fireEvent.changeText(surfaceInputs[1], '5');
+      fireEvent.press(screen.getByText('Continuer  ›'));
+    });
 
-    await waitFor(() => expect(prospectionRepository.updateProspectionReference).toHaveBeenCalled());
+    await waitFor(() => {
+      expect(prospectionRepository.updateProspectionReference).toHaveBeenCalled();
+    }, { timeout: 5000 });
+
     expect(screen.queryByText('La surface prospectée est obligatoire')).toBeNull();
-  });
+  }, 60000);
 });

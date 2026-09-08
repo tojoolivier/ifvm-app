@@ -1062,6 +1062,30 @@ export const apiClient = {
     );
   },
 
+  getNotifications: async (
+    token: string,
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['NotificationsResponse']> => {
+    return makeRequest<components['schemas']['NotificationsResponse']>(
+      '/prospections/notifications',
+      { method: 'GET' },
+      token,
+      onUnauthorized
+    );
+  },
+
+  marquerNotificationsVues: async (
+    token: string,
+    onUnauthorized?: OnUnauthorized
+  ): Promise<void> => {
+    return makeRequest<void>(
+      '/prospections/notifications/vu',
+      { method: 'POST' },
+      token,
+      onUnauthorized
+    );
+  },
+
   getCampagnes: async (
     token: string,
     onUnauthorized?: OnUnauthorized

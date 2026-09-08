@@ -112,8 +112,10 @@ interface ProspectionDetail {
   // Traçabilité vérification/validation
   verified_by: string | null
   verified_at: string | null
+  verified_by_nom?: string | null
   validated_by: string | null
   validated_at: string | null
+  validated_by_nom?: string | null
   // Extensif & validation
   type_station: string[]
   verdure_strate: string | null
@@ -503,6 +505,8 @@ export function ProspectionDetailPage() {
   const ficheValidee = isFicheValidee(statut)
 
   const validationEntry = auditLogSorted.find((entry) => entry.action === 'validation')
+  const rejectionEntry = auditLogSorted.find((entry) => entry.action === 'rejet')
+  const motifRejet = rejectionEntry?.details?.commentaire
 
   useEffect(() => {
     if (!showPrintView) return
@@ -773,8 +777,9 @@ export function ProspectionDetailPage() {
               champ('Source du signalement', prospection.signalement_source ?? TIRET),
               champ('Date du signalement', prospection.signalement_date ?? TIRET),
               champ('Conclusion de validation', humaniser(prospection.conclusion_validation)),
-              champ('Vérifiée par', prospection.verified_by ? nomAgent(prospection.verified_by) : TIRET),
-              champ('Validée par', prospection.validated_by ? nomAgent(prospection.validated_by) : TIRET),
+              champ('Vérifiée par', prospection.verified_by_nom ?? (prospection.verified_by ? nomAgent(prospection.verified_by) : TIRET)),
+              champ('Validée par', prospection.validated_by_nom ?? (prospection.validated_by ? nomAgent(prospection.validated_by) : TIRET)),
+              champ('Motif du rejet', typeof motifRejet === 'string' && motifRejet.trim() ? motifRejet : TIRET),
               champ('Dernière mise à jour', formatDate(prospection.updated_at)),
             ].map((l) => (
               <LigneCle key={l.k} ligne={l} />

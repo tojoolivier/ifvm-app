@@ -19,6 +19,9 @@ import { NewFicheFab } from '@/components/fiches/NewFicheFab';
 import * as Network from 'expo-network';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { logger } from '@/lib/logger';
+import { statutFicheAffiche } from '@/lib/prospection-statut';
+import { STATUT_BADGE_CONFIG } from '@/components/fiches/tokens';
+import { useNotifications } from '@/hooks/use-notifications';
 
 // ============================================
 // CONSTANTES - PALETTE CLAIRE
@@ -26,7 +29,6 @@ import { logger } from '@/lib/logger';
 
 const IFVM_GREEN = '#1B5E1B';
 const IFVM_GREEN_LIGHT = '#4CAF50';
-const IFVM_GREEN_BG = '#E8F5E9';
 const IFVM_BG_LIGHT = '#F0F2F5';
 const CARD_BG = '#FFFFFF';
 const IFVM_ORANGE = '#E67E22';
@@ -47,6 +49,8 @@ const WEEK_LABELS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
 export default function DashboardScreen() {
   const user = useAuthStore((s) => s.user);
+  const notifToken = useAuthStore((s) => s.token);
+  const { nonLues: nonLuesNotifications } = useNotifications(notifToken);
   const router = useRouter();
 
   const [prospections, setProspections] = useState<DraftProspection[]>([]);
@@ -186,6 +190,26 @@ export default function DashboardScreen() {
                 </ThemedText>
                 <ThemedText style={styles.headerRole}>Agent de terrain</ThemedText>
               </View>
+              <TouchableOpacity
+                onPress={() => navigateTo('/(app)/notifications')}
+                activeOpacity={0.7}
+                style={styles.bellButton}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  nonLuesNotifications > 0
+                    ? `Notifications, ${nonLuesNotifications} non lue(s)`
+                    : 'Notifications'
+                }
+              >
+                <ThemedText style={styles.gearIcon}>🔔</ThemedText>
+                {nonLuesNotifications > 0 && (
+                  <View style={styles.bellBadge}>
+                    <ThemedText style={styles.bellBadgeText}>
+                      {nonLuesNotifications > 9 ? '9+' : nonLuesNotifications}
+                    </ThemedText>
+                  </View>
+                )}
+              </TouchableOpacity>
               <TouchableOpacity onPress={() => navigateTo('/(app)/profile')} activeOpacity={0.7}>
                 <ThemedText style={styles.gearIcon}>⚙️</ThemedText>
               </TouchableOpacity>
@@ -254,7 +278,10 @@ export default function DashboardScreen() {
               </TouchableOpacity>
             </View>
             {prospections.slice(0, 5).map((fiche, index) => {
-              const synced = fiche.statut_sync === 'synced';
+              // Auparavant réduit à synchro/à-synchro (statut_sync seul) : une
+              // fiche vérifiée/validée/rejetée s'affichait comme n'importe
+              // quelle autre fiche déjà envoyée — cf. prospection-statut.ts.
+              const badge = STATUT_BADGE_CONFIG[statutFicheAffiche(fiche.statut, fiche.statut_sync)];
               return (
                 <TouchableOpacity
                   key={fiche.id}
@@ -268,16 +295,9 @@ export default function DashboardScreen() {
                       N°{fiche.n_fiche ?? '—'} · {fiche.date_prospection}
                     </ThemedText>
                   </View>
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      { backgroundColor: synced ? IFVM_GREEN_BG : IFVM_ORANGE_BG },
-                    ]}
-                  >
-                    <ThemedText
-                      style={[styles.statusBadgeText, { color: synced ? IFVM_GREEN_LIGHT : IFVM_ORANGE }]}
-                    >
-                      {synced ? 'SYNCHRO ✓' : 'À SYNCHRO'}
+                  <View style={[styles.statusBadge, { backgroundColor: badge.bg }]}>
+                    <ThemedText style={[styles.statusBadgeText, { color: badge.color }]}>
+                      {badge.label}
                     </ThemedText>
                   </View>
                 </TouchableOpacity>
@@ -405,6 +425,26 @@ const styles = StyleSheet.create({
   },
   gearIcon: {
     fontSize: 18,
+  },
+  bellButton: {
+    marginRight: 14,
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -6,
+    minWidth: 15,
+    height: 15,
+    borderRadius: 8,
+    backgroundColor: '#E67E22',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  bellBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
   },
   headerContent: {
     flexDirection: 'row',

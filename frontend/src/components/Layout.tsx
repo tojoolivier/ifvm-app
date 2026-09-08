@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Outlet, NavLink, useNavigate, useMatches } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useCurrentUser } from '../hooks/useCurrentUser'
@@ -7,6 +8,29 @@ import { campagneActive, type CampagneDatee } from '../lib/campagne-active'
 type RouteHandle = { title?: string; parent?: string; crumb?: string }
 
 type Campagne = CampagneDatee
+
+type Notification = {
+  id: string
+  action: string
+  fiche_id: string
+  n_fiche: string | null
+  auteur_nom: string | null
+  details: Record<string, unknown> | null
+  created_at: string
+  lu: boolean
+}
+
+type NotificationsResponse = { items: Notification[]; non_lues: number }
+
+const NOTIFICATION_LABELS: Record<string, string> = {
+  creation: 'Nouvelle fiche',
+  modification: 'Fiche modifiée',
+  soumission: 'Fiche soumise',
+  verification: 'Fiche vérifiée',
+  validation: 'Fiche validée',
+  rejet: 'Fiche rejetée',
+  commentaire: 'Nouveau commentaire',
+}
 
 const baseNavItems = [
   { to: '/', label: 'Tableau de bord' },
@@ -51,6 +75,7 @@ export function Layout() {
   const matches = useMatches()
   const handle = matches[matches.length - 1]?.handle as RouteHandle | undefined
   const title = handle?.title ?? ''
+  const [notificationsOuvertes, setNotificationsOuvertes] = useState(false)
 
   function logout() {
     localStorage.removeItem('access_token')
@@ -79,6 +104,26 @@ export function Layout() {
   const nbEnAttente = useCount(['prospections', 'en_attente'], '/prospections', { statut: 'en_attente' }, !!role)
   const nbTraitements = useCount(['traitements'], '/traitements', undefined, canTraitements)
   const nbUsers = useCount(['users'], '/users/', undefined, role === 'admin')
+  const notifications = useQuery<NotificationsResponse>({
+    queryKey: ['notifications'],
+    queryFn: () => api.get('/prospections/notifications').then((r) => r.data),
+    enabled: !!role,
+    // In-app par polling (pas de canal temps réel) : rafraîchit le badge même
+    // si personne ne rouvre le panneau — sans ça, une action d'un collègue ne
+    // se verrait qu'au prochain rechargement de page.
+    refetchInterval: 30_000,
+  })
+
+  // Le « vu » se marque à la FERMETURE, pas à l'ouverture : sinon la mise en
+  // évidence des non-lues (bg-ifvm-amber-bg) disparaîtrait avant même que
+  // l'utilisateur ait pu voir lesquelles étaient nouvelles.
+  const toggleNotifications = () => {
+    const seFerme = notificationsOuvertes
+    setNotificationsOuvertes((ouverte) => !ouverte)
+    if (seFerme && (notifications.data?.non_lues ?? 0) > 0) {
+      void api.post('/prospections/notifications/vu').then(() => notifications.refetch())
+    }
+  }
 
   const campagne = campagneActive(campagnes)
 
@@ -186,7 +231,7 @@ export function Layout() {
               {title}
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="relative flex items-center gap-2 shrink-0">
             {campagne && (
               <span className="rounded-[20px] bg-ifvm-green-bg border border-ifvm-green-border px-[9px] py-[3px] text-[10.5px] font-semibold text-ifvm-green-text truncate max-w-[220px]">
                 {campagne.name}
@@ -197,6 +242,52 @@ export function Layout() {
                 <span className="h-[6px] w-[6px] shrink-0 rounded-full bg-ifvm-amber" />
                 {nbEnAttente} fiches en attente
               </span>
+            )}
+            <button
+              type="button"
+              onClick={toggleNotifications}
+              aria-label={`Notifications${notifications.data?.non_lues ? `, ${notifications.data.non_lues} non lues` : ''}`}
+              className="relative rounded-[8px] border border-[#e0d9c4] bg-card px-2 py-1 text-sm text-ifvm-green-text hover:bg-ifvm-green-bg"
+            >
+              🔔
+              {(notifications.data?.non_lues ?? 0) > 0 && (
+                <span className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full bg-ifvm-danger px-1 text-center text-[9px] font-bold text-white">
+                  {notifications.data!.non_lues > 9 ? '9+' : notifications.data!.non_lues}
+                </span>
+              )}
+            </button>
+            {notificationsOuvertes && (
+              <div className="absolute right-0 top-10 z-20 w-80 overflow-hidden rounded-[10px] border border-[#e0d9c4] bg-card shadow-lg">
+                <div className="border-b border-[#f1ecdd] px-3 py-2 text-xs font-bold text-foreground">Notifications</div>
+                {(notifications.data?.items.length ?? 0) === 0 ? (
+                  <p className="px-3 py-4 text-xs text-ifvm-text-weak">Aucune notification.</p>
+                ) : (
+                  <ul className="max-h-80 overflow-auto">
+                    {notifications.data!.items.map((notification) => {
+                      const motif = notification.action === 'rejet' ? notification.details?.commentaire : null
+                      return (
+                        <li key={notification.id}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNotificationsOuvertes(false)
+                              if ((notifications.data?.non_lues ?? 0) > 0) {
+                                void api.post('/prospections/notifications/vu').then(() => notifications.refetch())
+                              }
+                              navigate(`/prospections/${notification.fiche_id}`)
+                            }}
+                            className={`block w-full border-b border-[#f1ecdd] px-3 py-2.5 text-left text-xs hover:bg-ifvm-brouillon-bg ${!notification.lu ? 'bg-ifvm-amber-bg' : ''}`}
+                          >
+                            <p className="font-bold text-foreground">{NOTIFICATION_LABELS[notification.action] ?? notification.action}</p>
+                            <p className="mt-0.5 text-ifvm-text-tertiary">Fiche {notification.n_fiche ?? '—'}{notification.auteur_nom ? ` · ${notification.auteur_nom}` : ''}</p>
+                            {typeof motif === 'string' && motif && <p className="mt-1 text-ifvm-danger-text">Motif : {motif}</p>}
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
             )}
           </div>
         </header>
