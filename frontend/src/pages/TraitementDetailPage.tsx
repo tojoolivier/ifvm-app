@@ -148,6 +148,16 @@ interface TraitementDetail {
   mortalite_familles: Record<string, unknown> | null
   observations: string | null
   signatures: { id: string; role: string; signataire_nom: string; horodatage: string }[]
+  // « Impact et risque → Évaluation du risque pour la population »
+  // (#evaluation-risque-population, migration backend 0055) — liste
+  // dynamique, commune à Aérien et Terrestre, déjà triée par `ordre`.
+  evaluations_risque_population: {
+    id: string
+    ordre: number
+    habitat_proche: string | null
+    distance_km: number | null
+    sensibilisation: boolean | null
+  }[]
 }
 
 interface PesticideSync {
@@ -614,6 +624,37 @@ export function TraitementDetailPage() {
                   </b>
                 </p>
               </div>
+
+              {(traitement.evaluations_risque_population ?? []).length > 0 && (
+                <div className="mt-3 border-t border-[#f1ecdd] pt-3">
+                  <p className="mb-2 font-sans text-[11px] font-bold uppercase tracking-wide text-ifvm-text-tertiary">
+                    Évaluation du risque pour la population
+                  </p>
+                  <ul className="flex flex-col gap-2">
+                    {traitement.evaluations_risque_population.map((evaluation, index) => (
+                      <li
+                        key={evaluation.id}
+                        className="rounded-[8px] border border-[#f1ecdd] px-3 py-2 font-sans text-[11.5px] font-medium text-[#3a3a30]"
+                      >
+                        <p className="font-bold text-ifvm-text-tertiary">{`Évaluation ${index + 1}`}</p>
+                        <p>Habitats les plus proches : {evaluation.habitat_proche || 'non renseigné'}</p>
+                        <p>
+                          Distance :{' '}
+                          {evaluation.distance_km == null ? 'non renseignée' : `${evaluation.distance_km} km`}
+                        </p>
+                        <p>
+                          Sensibilisation :{' '}
+                          {evaluation.sensibilisation == null
+                            ? 'non renseignée'
+                            : evaluation.sensibilisation
+                              ? 'Oui'
+                              : 'Non'}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </Carte>
           </div>
 

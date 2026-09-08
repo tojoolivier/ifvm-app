@@ -93,6 +93,16 @@ function buildTraitementSyncPayload(draft: DraftTraitement): components['schemas
     mortalite_familles: especesArrayToDict(draft.mortalite_familles),
     observations: draft.observations,
     statut: draft.statut,
+    // « Évaluation du risque pour la population » (#evaluation-risque-population,
+    // migration backend 0055) — commune à Aérien et Terrestre, remplacée en bloc
+    // à chaque synchronisation (même sémantique que le local, cf.
+    // updateTraitementImpacts). `ordre` n'y figure pas : dérivé côté backend de
+    // la position dans le tableau — l'ordre local (déjà trié) est donc décisif.
+    evaluations_risque_population: (draft.evaluations_risque_population ?? []).map((e) => ({
+      habitat_proche: e.habitat_proche,
+      distance_km: e.distance_km,
+      sensibilisation: e.sensibilisation === null ? null : !!e.sensibilisation,
+    })),
   };
 
   if (draft.type_traitement === 'AERIEN' && draft.aerien) {

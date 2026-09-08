@@ -146,6 +146,22 @@ export interface EnvironnementDraft {
   recouvrement_percent?: number | null;
 }
 
+/**
+ * « Impact et risque → Évaluation du risque pour la population »
+ * (#evaluation-risque-population, migration backend 0055) — liste dynamique
+ * ("+"), commune à Aérien et Terrestre, juste au-dessus d'Observations.
+ * `id` généré côté client (`generateId()`, comme `traitementId`) : sert de
+ * clé stable en local (React + SQLite) avant toute synchronisation, jamais
+ * lu/imposé par le serveur (l'API dérive `ordre` de la position dans la
+ * liste envoyée, cf. traitement-sync.ts).
+ */
+export interface EvaluationRisquePopulationDraft {
+  id: string;
+  habitatProche?: string | null;
+  distanceKm?: number | null;
+  sensibilisation?: boolean | null;
+}
+
 export interface ImpactDraft {
   empoisonnement?: boolean | null;
   empoisonnementType?: 'AGENT' | 'POPULATION' | null;
@@ -161,6 +177,7 @@ export interface ImpactDraft {
   comportementNonCibles?: string[];
   mortalite?: boolean | null;
   mortaliteFamilles?: string[];
+  evaluationsRisquePopulation?: EvaluationRisquePopulationDraft[];
 }
 
 interface TraitementCaptureState {

@@ -25,6 +25,7 @@ from app.database import get_db
 from app.domain.traitement import (
     ChefDeBaseInvalideError,
     ChefEquipeInvalideError,
+    EvaluationRisquePopulation,
     NumeroFicheConflitError,
     ProduitUtiliseIntrouvableError,
     ProspectionIntrouvableError,
@@ -110,6 +111,13 @@ def _champs_communs(body: TraitementCreate) -> dict[str, Any]:
         mortalite=body.mortalite,
         mortalite_familles=body.mortalite_familles,
         observations=body.observations,
+        # « Évaluation du risque pour la population » (migration 0055) —
+        # `ordre` dérivé de la position dans la liste envoyée, jamais saisi
+        # par le client (cf. EvaluationRisquePopulationCreate).
+        evaluations_risque_population=[
+            EvaluationRisquePopulation(ordre=i, **e.model_dump())
+            for i, e in enumerate(body.evaluations_risque_population)
+        ],
     )
 
 

@@ -153,6 +153,87 @@ async def test_traitement_depuis_signalement_expose_le_meme_numero_que_le_messag
 
 
 @pytest.mark.asyncio
+async def test_traitement_aerien_conserve_plusieurs_evaluations_risque_population(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+):
+    """#evaluation-risque-population : liste dynamique ("+"), commune à Aérien et
+    Terrestre, conservée avec son ordre après création et relecture."""
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    resp = await client.post(
+        "/traitements",
+        json=payload_traitement(
+            prospection_id,
+            evaluations_risque_population=[
+                {
+                    "habitat_proche": "Rizière communale",
+                    "distance_km": 1.5,
+                    "sensibilisation": True,
+                },
+                {
+                    "habitat_proche": "Zone humide protégée",
+                    "distance_km": 0.8,
+                    "sensibilisation": False,
+                },
+            ],
+        ),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    evaluations = body["evaluations_risque_population"]
+    assert len(evaluations) == 2
+    assert evaluations[0]["ordre"] == 0
+    assert evaluations[0]["habitat_proche"] == "Rizière communale"
+    assert evaluations[0]["distance_km"] == 1.5
+    assert evaluations[0]["sensibilisation"] is True
+    assert evaluations[1]["ordre"] == 1
+    assert evaluations[1]["habitat_proche"] == "Zone humide protégée"
+    assert evaluations[1]["sensibilisation"] is False
+
+    # Persistance après réouverture (GET), ordre conservé.
+    relu = await client.get(f"/traitements/{body['id']}", headers=auth_headers)
+    assert [e["habitat_proche"] for e in relu.json()["evaluations_risque_population"]] == [
+        "Rizière communale",
+        "Zone humide protégée",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_traitement_terrestre_accepte_une_seule_evaluation_risque_population(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+):
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    resp = await client.post(
+        "/traitements",
+        json=payload_traitement_terrestre(
+            prospection_id,
+            evaluations_risque_population=[
+                {"habitat_proche": "Forêt classée", "distance_km": 2.0, "sensibilisation": True}
+            ],
+        ),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    evaluations = resp.json()["evaluations_risque_population"]
+    assert len(evaluations) == 1
+    assert evaluations[0]["habitat_proche"] == "Forêt classée"
+    assert evaluations[0]["distance_km"] == 2.0
+
+
+@pytest.mark.asyncio
+async def test_traitement_sans_evaluation_risque_population_renvoie_liste_vide(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+):
+    """Section facultative — aucune évaluation ajoutée ne bloque jamais l'enregistrement."""
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    resp = await client.post(
+        "/traitements", json=payload_traitement(prospection_id), headers=auth_headers
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["evaluations_risque_population"] == []
+
+
+@pytest.mark.asyncio
 async def test_create_traitement_avec_observations(
     client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
 ):
@@ -1760,3 +1841,46 @@ async def test_sync_renvoi_reseau_contenu_identique_traite_synced_sans_conflit(
 
     assert resp.status_code == 200, resp.text
     assert resp.json()["statut_sync"] == "synced"
+
+
+@pytest.mark.asyncio
+async def test_sync_renvoi_remplace_les_evaluations_risque_population(
+    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe
+):
+    """#evaluation-risque-population, mode Offline-First : une fiche créée hors
+    ligne (premier sync) puis rouverte et modifiée (deuxième sync, même id) voit
+    ses évaluations remplacées en bloc — ajout, modification et suppression
+    indifférenciés côté client, comme prospection_population."""
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    fiche_id = uuid.uuid4()
+    t0 = datetime.utcnow()
+    payload = _payload_sync(
+        fiche_id,
+        prospection_id,
+        base_updated_at=t0,
+        terrestre={"chef_equipe_id": str(chef_equipe.id)},
+        evaluations_risque_population=[
+            {"habitat_proche": "Rizière", "distance_km": 1.0, "sensibilisation": False}
+        ],
+    )
+    premier = await client.post("/traitements/sync", json=payload, headers=auth_headers)
+    assert premier.status_code == 201, premier.text
+    assert len(premier.json()["evaluations_risque_population"]) == 1
+
+    renvoi = payload.copy()
+    renvoi["base_updated_at"] = premier.json()["updated_at"]
+    renvoi["evaluations_risque_population"] = [
+        {"habitat_proche": "Rizière modifiée", "distance_km": 1.2, "sensibilisation": True},
+        {"habitat_proche": "Zone humide", "distance_km": 3.0, "sensibilisation": False},
+    ]
+    resp = await client.post("/traitements/sync", json=renvoi, headers=auth_headers)
+    assert resp.status_code == 200, resp.text
+    evaluations = resp.json()["evaluations_risque_population"]
+    assert len(evaluations) == 2
+    assert evaluations[0]["habitat_proche"] == "Rizière modifiée"
+    assert evaluations[0]["sensibilisation"] is True
+    assert evaluations[1]["habitat_proche"] == "Zone humide"
+
+    # Relecture indépendante : la liste remplacée est bien celle persistée.
+    relu = await client.get(f"/traitements/{fiche_id}", headers=auth_headers)
+    assert len(relu.json()["evaluations_risque_population"]) == 2

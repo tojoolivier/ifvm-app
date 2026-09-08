@@ -92,6 +92,11 @@ class TraitementModel(Base):
     signatures: Mapped[list["TraitementSignatureModel"]] = relationship(
         back_populates="traitement", cascade="all, delete-orphan"
     )
+    evaluations_risque_population: Mapped[list["EvaluationRisquePopulationModel"]] = relationship(
+        back_populates="traitement",
+        cascade="all, delete-orphan",
+        order_by="EvaluationRisquePopulationModel.ordre",
+    )
 
     __table_args__ = (
         CheckConstraint("type_traitement IN ('AERIEN','TERRESTRE')", name="ck_traitement_type"),
@@ -383,4 +388,38 @@ class TraitementSignatureModel(Base):
             name="ck_traitement_signature_role",
         ),
         UniqueConstraint("traitement_id", "role", name="uq_traitement_signature"),
+    )
+
+
+class EvaluationRisquePopulationModel(Base):
+    """« Impact et risque → Évaluation du risque pour la population » (migration
+    0055) — liée directement à `traitement` (pas à aerien/terrestre), comme
+    `TraitementSignatureModel` : le slide est identique pour les deux types.
+    Liste dynamique ("+"), remplacée en bloc à chaque enregistrement de la
+    fiche (même sémantique que `ProspectionModel.populations` côté prospection)
+    plutôt qu'une sous-ressource à endpoints dédiés (cf. `RotationModel`) —
+    plus simple, suffisant ici (pas de contrainte d'unicité ni de valeur
+    dérivée entre lignes)."""
+
+    __tablename__ = "traitement_evaluation_risque_population"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    traitement_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("traitement.id", ondelete="CASCADE"), nullable=False
+    )
+    # Position dans la liste (« Évaluation 1 », « Évaluation 2 »...), jamais
+    # déduite de l'ordre de retour SQL seul.
+    ordre: Mapped[int] = mapped_column(Integer(), nullable=False)
+    habitat_proche: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    distance_km: Mapped[float | None] = mapped_column(Numeric(6, 2), nullable=True)
+    sensibilisation: Mapped[bool | None] = mapped_column(Boolean(), nullable=True)
+
+    traitement: Mapped[TraitementModel] = relationship(
+        back_populates="evaluations_risque_population"
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "traitement_id", "ordre", name="uq_traitement_evaluation_risque_population_ordre"
+        ),
     )

@@ -197,6 +197,18 @@ export interface TraitementSignature {
   horodatage: string | null;
 }
 
+/** « Impact et risque → Évaluation du risque pour la population »
+ * (#evaluation-risque-population, migration backend 0055) — liste dynamique
+ * ("+"), commune à Aérien et Terrestre. */
+export interface EvaluationRisquePopulation {
+  id: string;
+  traitement_id: string;
+  ordre: number;
+  habitat_proche: string | null;
+  distance_km: number | null;
+  sensibilisation: number | null;
+}
+
 export interface DraftTraitementAerienInput {
   id: string;
   prospectionId: string;
@@ -254,6 +266,7 @@ export interface DraftTraitement extends DraftTraitementRow {
   aerien?: (TraitementAerien & { rotations: Rotation[] }) | null;
   terrestre?: (TraitementTerrestre & { produits: ProduitUtilise[] }) | null;
   signatures?: TraitementSignature[];
+  evaluations_risque_population?: EvaluationRisquePopulation[];
 }
 
 function normalizeTraitementRow(row: DraftTraitementRow): DraftTraitementRow {
@@ -734,6 +747,16 @@ export async function updateTraitementMoyens(
   return updated;
 }
 
+/** « Impact et risque → Évaluation du risque pour la population »
+ * (#evaluation-risque-population) — pas d'`ordre` explicite en entrée :
+ * dérivé de la position dans le tableau, comme côté API (traitement-sync.ts). */
+export interface EvaluationRisquePopulationInput {
+  id: string;
+  habitat_proche: string | null;
+  distance_km: number | null;
+  sensibilisation: boolean | null;
+}
+
 export interface ImpactsUpdateInput {
   empoisonnement: boolean;
   empoisonnement_type: string | null;
@@ -745,6 +768,7 @@ export interface ImpactsUpdateInput {
   mortalite: boolean;
   mortalite_familles: string[];
   observations: string | null;
+  evaluationsRisquePopulation: EvaluationRisquePopulationInput[];
 }
 
 export async function updateTraitementImpacts(
@@ -783,6 +807,25 @@ export async function updateTraitementImpacts(
       traitementId,
     ]
   );
+
+  // Liste dynamique remplacée en bloc à chaque enregistrement de l'écran —
+  // même sémantique que côté backend (update_sync) : DELETE puis INSERT,
+  // jamais un diff ligne à ligne. `id` fourni par l'appelant (généré
+  // localement, cf. EvaluationRisquePopulationDraft) : stable d'un
+  // enregistrement à l'autre tant que la ligne n'est pas retirée côté écran.
+  await db.runAsync(
+    'DELETE FROM traitement_evaluation_risque_population WHERE traitement_id = ?',
+    [traitementId]
+  );
+  for (let i = 0; i < input.evaluationsRisquePopulation.length; i++) {
+    const e = input.evaluationsRisquePopulation[i];
+    await db.runAsync(
+      `INSERT INTO traitement_evaluation_risque_population
+        (id, traitement_id, ordre, habitat_proche, distance_km, sensibilisation)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [e.id, traitementId, i, e.habitat_proche, e.distance_km, e.sensibilisation]
+    );
+  }
 
   const updated = await getTraitement(traitementId);
   if (!updated) {
@@ -1013,6 +1056,13 @@ export async function getTraitement(id: string): Promise<DraftTraitement | null>
   // final), pour survivre à une fermeture/réouverture de la fiche avant envoi.
   result.signatures = await db.getAllAsync<TraitementSignature>(
     'SELECT * FROM traitement_signature WHERE traitement_id = ?',
+    [id]
+  );
+
+  // Impact et risque → Évaluation du risque pour la population
+  // (#evaluation-risque-population) : commune à Aérien et Terrestre.
+  result.evaluations_risque_population = await db.getAllAsync<EvaluationRisquePopulation>(
+    'SELECT * FROM traitement_evaluation_risque_population WHERE traitement_id = ? ORDER BY ordre',
     [id]
   );
 

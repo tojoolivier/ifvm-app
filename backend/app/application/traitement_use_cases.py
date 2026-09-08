@@ -11,6 +11,7 @@ from app.domain.repositories import (
 from app.domain.traitement import (
     ChefDeBaseInvalideError,
     ChefEquipeInvalideError,
+    EvaluationRisquePopulation,
     NumeroFicheConflitError,
     ProduitUtilise,
     ProduitUtiliseIntrouvableError,
@@ -114,6 +115,7 @@ def _construire_traitement_base(
     mortalite: bool,
     mortalite_familles: dict[str, Any] | None,
     observations: str | None,
+    evaluations_risque_population: list[EvaluationRisquePopulation] | None = None,
 ) -> Traitement:
     """Construit le `Traitement` brouillon + snapshot `Cible`, commun aux deux spécialisations."""
     now = datetime.utcnow()
@@ -154,6 +156,7 @@ def _construire_traitement_base(
         statut="brouillon",
         created_at=now,
         updated_at=now,
+        evaluations_risque_population=evaluations_risque_population or [],
     )
 
     cible = construire_cible(prospection)
@@ -218,6 +221,7 @@ class CreateTraitementAerien:
         mortalite: bool = False,
         mortalite_familles: dict[str, Any] | None = None,
         observations: str | None = None,
+        evaluations_risque_population: list[EvaluationRisquePopulation] | None = None,
     ) -> Traitement:
         _valider_dates(date_traitement, date_validation)
 
@@ -297,6 +301,7 @@ class CreateTraitementAerien:
             mortalite=mortalite,
             mortalite_familles=mortalite_familles,
             observations=observations,
+            evaluations_risque_population=evaluations_risque_population,
         )
 
         traitement.aerien = TraitementAerien(
@@ -393,6 +398,7 @@ class CreateTraitementTerrestre:
         mortalite: bool = False,
         mortalite_familles: dict[str, Any] | None = None,
         observations: str | None = None,
+        evaluations_risque_population: list[EvaluationRisquePopulation] | None = None,
     ) -> Traitement:
         _valider_dates(date_traitement, date_validation)
         if heure_fin <= heure_debut:
@@ -470,6 +476,7 @@ class CreateTraitementTerrestre:
             mortalite=mortalite,
             mortalite_familles=mortalite_familles,
             observations=observations,
+            evaluations_risque_population=evaluations_risque_population,
         )
         cible = traitement.cible
 
@@ -906,6 +913,7 @@ class SyncPushTraitementAerien:
         mortalite: bool = False,
         mortalite_familles: dict[str, Any] | None = None,
         observations: str | None = None,
+        evaluations_risque_population: list[EvaluationRisquePopulation] | None = None,
     ) -> tuple[Traitement, bool]:
         _valider_dates(date_traitement, date_validation)
 
@@ -993,6 +1001,7 @@ class SyncPushTraitementAerien:
             mortalite=mortalite,
             mortalite_familles=mortalite_familles,
             observations=observations,
+            evaluations_risque_population=evaluations_risque_population,
         )
         candidat.aerien = TraitementAerien(
             traitement_id=traitement_id,
@@ -1119,6 +1128,7 @@ class SyncPushTraitementTerrestre:
         mortalite: bool = False,
         mortalite_familles: dict[str, Any] | None = None,
         observations: str | None = None,
+        evaluations_risque_population: list[EvaluationRisquePopulation] | None = None,
     ) -> tuple[Traitement, bool]:
         _valider_dates(date_traitement, date_validation)
         if heure_fin <= heure_debut:
@@ -1203,6 +1213,7 @@ class SyncPushTraitementTerrestre:
             mortalite=mortalite,
             mortalite_familles=mortalite_familles,
             observations=observations,
+            evaluations_risque_population=evaluations_risque_population,
         )
         cible = candidat.cible
 
