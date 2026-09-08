@@ -31,6 +31,7 @@ import {
   buildReferenceRows,
   findImago,
   findLarve,
+  formatHeure,
   formatNombre,
   humaniser,
   NUMERO_FICHE,
@@ -54,6 +55,20 @@ type Capture = CaptureRead & { sexe?: string | null }
 /** La fiche de lecture exploite la spécialisation larve/imago, plus riche que `InfestationRead`. */
 type Infestation = InfestationRead & InfestationFiche
 
+interface OperationAerienne {
+  id: string
+  numero: number
+  type_operation: string
+  motif_divers: string | null
+  debut_heure: string
+  debut_temperature_c: number | null
+  debut_vent_ms: number | null
+  fin_heure: string
+  fin_temperature_c: number | null
+  fin_vent_ms: number | null
+  duree_minutes: number
+}
+
 interface ProspectionDetail {
   id: string
   type_prospection: string
@@ -65,27 +80,76 @@ interface ProspectionDetail {
   statut_sync: string
   n_fiche: string | null
   n_releve: string | null
+  n_message: string | null
   created_at: string
+  updated_at: string
   latitude: number | null
   longitude: number | null
   altitude: number | null
   region: string | null
   district: string | null
   commune: string | null
+  za: string | null
+  pa_code: string | null
   station_libre: string | null
+  biotope: string[]
   surface_station: number | null
   surface_prospectee: number | null
   surface_infestee: number | null
   hauteur_herbe_cm: number | null
   hauteur_strate: number | null
+  verdissement: number | null
   verdissement_pourcent: number | null
+  degats_cultures_pourcent: number | null
+  derniere_pluie: string | null
+  intensite_pluie: string | null
+  ennemis_naturels: string | null
+  observations: string | null
   vegetation: Record<string, unknown> | null
   sol: Record<string, unknown> | null
   degats_cultures: string | null
   avertissements: string[]
+  // Traçabilité vérification/validation
+  verified_by: string | null
+  verified_at: string | null
+  validated_by: string | null
+  validated_at: string | null
+  // Extensif & validation
+  type_station: string[]
+  verdure_strate: string | null
+  signalement_source: string | null
+  signalement_date: string | null
+  signalement_description: string | null
+  conclusion_validation: string | null
+  // Extensif : mode aérien
+  mode_extensif: string | null
+  societe: string | null
+  immatricule_aeronef: string | null
+  pilote: string | null
+  mecanicien: string | null
+  chef_de_base: string | null
+  lieu_base_id: string | null
+  // Extensif : pesticides embarqués + signatures
+  pesticides_embarques: boolean | null
+  pesticide_nom_commercial: string | null
+  pesticide_quantite_disponible: number | null
+  pesticide_quantite_recue: number | null
+  futs_disponible: number | null
+  futs_pleins: number | null
+  futs_vides: number | null
+  futs_recues: number | null
+  signature_visa_nom: string | null
+  signature_visa_horodatage: string | null
+  signature_consultant_fao_nom: string | null
+  signature_consultant_fao_horodatage: string | null
+  signature_pilote_nom: string | null
+  signature_pilote_horodatage: string | null
+  signature_chef_base_nom: string | null
+  signature_chef_base_horodatage: string | null
   populations: Population[]
   captures: Capture[]
   infestations: Infestation[]
+  operations_aeriennes: OperationAerienne[]
 }
 
 interface AuditLogEntry {
@@ -200,6 +264,12 @@ function Tuile({ label, value }: { label: string; value: string }) {
   )
 }
 
+/** Même convention que `ligne()` de prospection-fiche-maquette.ts (non exportée) : une
+ * valeur absente est grisée plutôt que masquée. */
+function champ(k: string, v: string): LigneFiche {
+  return v === TIRET ? { k, v, muted: true } : { k, v }
+}
+
 const captureColumns: DataTableColumn<LigneCapture>[] = [
   {
     key: 'phase',
@@ -225,6 +295,37 @@ const captureColumns: DataTableColumn<LigneCapture>[] = [
     mono: true,
     render: (l) => <span className="text-ifvm-green-text">{l.densite}</span>,
   },
+]
+
+const operationColumns: DataTableColumn<OperationAerienne>[] = [
+  { key: 'numero', header: 'N°', mono: true, render: (o) => o.numero },
+  {
+    key: 'type',
+    header: 'Type',
+    render: (o) => (
+      <span className="font-semibold">
+        {humaniser(o.type_operation)}
+        {o.motif_divers ? ` — ${o.motif_divers}` : ''}
+      </span>
+    ),
+  },
+  {
+    key: 'debut',
+    header: 'Début',
+    align: 'right',
+    mono: true,
+    render: (o) =>
+      `${formatHeure(o.debut_heure)} · ${formatNombre(o.debut_temperature_c)} °C · ${formatNombre(o.debut_vent_ms)} m/s`,
+  },
+  {
+    key: 'fin',
+    header: 'Fin',
+    align: 'right',
+    mono: true,
+    render: (o) =>
+      `${formatHeure(o.fin_heure)} · ${formatNombre(o.fin_temperature_c)} °C · ${formatNombre(o.fin_vent_ms)} m/s`,
+  },
+  { key: 'duree', header: 'Durée (min)', align: 'right', mono: true, render: (o) => o.duree_minutes },
 ]
 
 function formatDate(iso: string): string {
@@ -350,6 +451,16 @@ export function ProspectionDetailPage() {
   })
 
   const { nomAgent } = useAnnuaire()
+
+  // Base aérienne (extensif, mode aérien) — référentiel distinct de la station.
+  const { data: lieuxAeriens = [] } = useQuery<{ id: string; nom: string }[]>({
+    queryKey: ['lieux-aeriens'],
+    queryFn: () =>
+      api.get('/referentiel/lieux-aeriens', { params: { inclure_inactifs: true } }).then((r) => r.data),
+    enabled: !!prospection?.lieu_base_id,
+  })
+  const nomLieu = (lieuId: string | null | undefined) =>
+    lieuxAeriens.find((l) => l.id === lieuId)?.nom ?? shortId(lieuId)
 
   const campagneName = campagnes.find((c) => c.id === prospection?.campagne_id)?.name
 
@@ -617,6 +728,167 @@ export function ProspectionDetailPage() {
             />
           </div>
         </Carte>
+
+        {/* Autres observations — champs jusqu'ici absents de la fiche de
+            lecture web (issue « afficher toutes les données ») */}
+        <Carte className="px-5 py-[18px]">
+          <div className="mb-3">
+            <BlocLabel>Autres observations</BlocLabel>
+          </div>
+          <div className="grid grid-cols-1 gap-x-6 gap-y-[9px] md:grid-cols-2">
+            {[
+              champ('N° message', prospection.n_message ?? TIRET),
+              champ('Biotope', prospection.biotope?.map((b) => humaniser(b)).join(', ') || TIRET),
+              champ(
+                'Dégâts sur cultures',
+                prospection.degats_cultures_pourcent != null
+                  ? `${humaniser(prospection.degats_cultures)} · ${prospection.degats_cultures_pourcent} %`
+                  : humaniser(prospection.degats_cultures),
+              ),
+              champ('Verdissement', prospection.verdissement_pourcent == null ? TIRET : `${prospection.verdissement_pourcent} %`),
+              champ('Dernière pluie', prospection.derniere_pluie ?? TIRET),
+              champ('Intensité de pluie', prospection.intensite_pluie ?? TIRET),
+              champ('Ennemis naturels', prospection.ennemis_naturels ?? TIRET),
+              champ('Zone anti-acridienne / poste', [prospection.za, prospection.pa_code].filter(Boolean).join(' / ') || TIRET),
+              champ('Type de station', prospection.type_station?.map((t) => humaniser(t)).join(', ') || TIRET),
+              champ('Verdure de la strate', humaniser(prospection.verdure_strate)),
+            ].map((l) => (
+              <LigneCle key={l.k} ligne={l} />
+            ))}
+          </div>
+          {prospection.observations && (
+            <p className="mt-3 border-t border-[#f1ecdd] pt-3 font-sans text-[11.5px] font-medium leading-[1.5] text-ifvm-text-tertiary">
+              Observations : <span className="text-foreground">{prospection.observations}</span>
+            </p>
+          )}
+        </Carte>
+
+        {/* Signalement & traçabilité de la validation */}
+        <Carte className="px-5 py-[18px]">
+          <div className="mb-3">
+            <BlocLabel>Signalement &amp; traçabilité</BlocLabel>
+          </div>
+          <div className="grid grid-cols-1 gap-x-6 gap-y-[9px] md:grid-cols-2">
+            {[
+              champ('Source du signalement', prospection.signalement_source ?? TIRET),
+              champ('Date du signalement', prospection.signalement_date ?? TIRET),
+              champ('Conclusion de validation', humaniser(prospection.conclusion_validation)),
+              champ('Vérifiée par', prospection.verified_by ? nomAgent(prospection.verified_by) : TIRET),
+              champ('Validée par', prospection.validated_by ? nomAgent(prospection.validated_by) : TIRET),
+              champ('Dernière mise à jour', formatDate(prospection.updated_at)),
+            ].map((l) => (
+              <LigneCle key={l.k} ligne={l} />
+            ))}
+          </div>
+          {prospection.signalement_description && (
+            <p className="mt-3 border-t border-[#f1ecdd] pt-3 font-sans text-[11.5px] font-medium leading-[1.5] text-ifvm-text-tertiary">
+              {prospection.signalement_description}
+            </p>
+          )}
+        </Carte>
+
+        {/* Extensif — mode aérien : équipe, aéronef, base (pilote/mécanicien/chef de
+            base sont du texte libre depuis le retour en arrière de la migration 0048,
+            même patron que traitement_aerien). N'apparaît que si la fiche est extensive
+            aérienne — inutile d'afficher une carte pleine de tirets sur une intensive. */}
+        {prospection.mode_extensif && (
+          <Carte className="px-5 py-[18px]">
+            <div className="mb-3">
+              <BlocLabel>Extensif — équipe &amp; aéronef</BlocLabel>
+            </div>
+            <div className="grid grid-cols-1 gap-x-6 gap-y-[9px] md:grid-cols-2">
+              {[
+                champ('Mode', humaniser(prospection.mode_extensif)),
+                champ('Société', prospection.societe ?? TIRET),
+                champ('Immatriculation aéronef', prospection.immatricule_aeronef ?? TIRET),
+                champ('Pilote', prospection.pilote ?? TIRET),
+                champ('Mécanicien', prospection.mecanicien ?? TIRET),
+                champ('Chef de base', prospection.chef_de_base ?? TIRET),
+                champ('Base', nomLieu(prospection.lieu_base_id)),
+              ].map((l) => (
+                <LigneCle key={l.k} ligne={l} />
+              ))}
+            </div>
+          </Carte>
+        )}
+
+        {/* Extensif — pesticides embarqués (fûts, quantités) */}
+        {prospection.pesticides_embarques != null && (
+          <Carte className="px-5 py-[18px]">
+            <div className="mb-3">
+              <BlocLabel>Extensif — pesticides embarqués</BlocLabel>
+            </div>
+            <div className="grid grid-cols-1 gap-x-6 gap-y-[9px] md:grid-cols-2">
+              {[
+                champ('Pesticides embarqués', prospection.pesticides_embarques ? 'Oui' : 'Non'),
+                champ('Nom commercial', prospection.pesticide_nom_commercial ?? TIRET),
+                champ('Quantité disponible', formatNombre(prospection.pesticide_quantite_disponible)),
+                champ('Quantité reçue', formatNombre(prospection.pesticide_quantite_recue)),
+                champ('Fûts disponibles', formatNombre(prospection.futs_disponible)),
+                champ('Fûts pleins', formatNombre(prospection.futs_pleins)),
+                champ('Fûts vides', formatNombre(prospection.futs_vides)),
+                champ('Fûts reçus', formatNombre(prospection.futs_recues)),
+              ].map((l) => (
+                <LigneCle key={l.k} ligne={l} />
+              ))}
+            </div>
+          </Carte>
+        )}
+
+        {/* Extensif — signatures (visa, consultant FAO, pilote, chef de base) */}
+        {(prospection.signature_visa_nom ||
+          prospection.signature_consultant_fao_nom ||
+          prospection.signature_pilote_nom ||
+          prospection.signature_chef_base_nom) && (
+          <Carte className="px-5 py-[18px]">
+            <div className="mb-3">
+              <BlocLabel>Extensif — signatures</BlocLabel>
+            </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {(
+                [
+                  ['Visa', prospection.signature_visa_nom, prospection.signature_visa_horodatage],
+                  [
+                    'Consultant FAO',
+                    prospection.signature_consultant_fao_nom,
+                    prospection.signature_consultant_fao_horodatage,
+                  ],
+                  ['Pilote', prospection.signature_pilote_nom, prospection.signature_pilote_horodatage],
+                  [
+                    'Chef de base',
+                    prospection.signature_chef_base_nom,
+                    prospection.signature_chef_base_horodatage,
+                  ],
+                ] as [string, string | null, string | null][]
+              ).map(([label, nom, horodatage]) => (
+                <div key={label} className="rounded-[9px] bg-background px-[14px] py-3">
+                  <div className="font-sans text-[10.5px] font-medium text-ifvm-text-weak">{label}</div>
+                  <div className="font-mono text-[12.5px] font-bold text-foreground">{nom ?? TIRET}</div>
+                  {horodatage && (
+                    <div className="font-mono text-[10px] font-medium text-ifvm-text-weak">
+                      {formatDate(horodatage)}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Carte>
+        )}
+
+        {/* Extensif (mode aérien) — opérations aériennes 1-N */}
+        {(prospection.operations_aeriennes ?? []).length > 0 && (
+          <Carte className="overflow-hidden">
+            <div className="border-b border-[#f1ecdd] px-5 py-4">
+              <h2 className="font-sans text-[14px] font-bold">Opérations aériennes</h2>
+            </div>
+            <DataTable
+              columns={operationColumns}
+              rows={prospection.operations_aeriennes}
+              getRowKey={(o) => o.id}
+              emptyMessage="Aucune opération aérienne."
+            />
+          </Carte>
+        )}
       </div>
 
       <aside className="flex min-w-0 flex-col gap-[14px]">

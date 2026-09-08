@@ -33,15 +33,24 @@ export type KitEpiKey =
   | 'kit_gants'
   | 'kit_lunettes'
   | 'kit_masques'
-  | 'kit_boite'
+  | 'kit_botte'
 
-/** Kits EPI — libellés de la maquette (« Boîte à pharmacie », pas « de protection »). */
+/**
+ * Kits EPI — `kit_boite` (boîte à pharmacie) a été renommée `kit_botte`
+ * (bottes) par la migration backend 0040, à la demande du métier ; le web
+ * gardait l'ancien nom, donc `traitement.kit_boite` valait toujours
+ * `undefined` et la pastille restait rouge quoi qu'il arrive.
+ *
+ * Migration 0040 fait aussi passer les 5 colonnes de booléen à un nombre de
+ * personnes équipées — la pastille reste dérivée de « > 0 » mais le compte
+ * réel est affiché à côté (cf. TraitementDetailPage).
+ */
 export const KITS_EPI: { key: KitEpiKey; label: string }[] = [
   { key: 'kit_combinaison', label: 'Combinaison' },
   { key: 'kit_gants', label: 'Gants' },
   { key: 'kit_lunettes', label: 'Lunettes' },
   { key: 'kit_masques', label: 'Masques' },
-  { key: 'kit_boite', label: 'Boîte à pharmacie' },
+  { key: 'kit_botte', label: 'Botte' },
 ]
 
 /**
