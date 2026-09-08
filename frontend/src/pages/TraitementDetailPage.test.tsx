@@ -119,6 +119,7 @@ function traitementAerien(overrides: Record<string, unknown> = {}) {
       { id: 's2', role: 'MECANICIEN', signataire_nom: 'Paul Randria', horodatage: '2026-08-13T08:00:00Z' },
       { id: 's3', role: 'CHEF_DE_BASE', signataire_nom: 'Marie Rabe', horodatage: '2026-08-13T08:00:00Z' },
     ],
+    evaluations_risque_population: [],
     ...overrides,
   }
 }
@@ -192,6 +193,30 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
     await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
 
     expect(screen.getByRole('link', { name: 'p1' })).toHaveAttribute('href', '/prospections/p1')
+  })
+
+  it('affiche les évaluations du risque pour la population, dans leur ordre — #evaluation-risque-population', async () => {
+    renderPage(
+      traitementAerien({
+        evaluations_risque_population: [
+          { id: 'eval-1', ordre: 0, habitat_proche: 'Rizière communale', distance_km: 1.5, sensibilisation: true },
+          { id: 'eval-2', ordre: 1, habitat_proche: 'Zone humide protégée', distance_km: 0.8, sensibilisation: false },
+        ],
+      }),
+    )
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+
+    expect(screen.getByText('Évaluation du risque pour la population')).toBeInTheDocument()
+    expect(screen.getByText(/Rizière communale/)).toBeInTheDocument()
+    expect(screen.getByText(/1.5 km/)).toBeInTheDocument()
+    expect(screen.getByText(/Zone humide protégée/)).toBeInTheDocument()
+  })
+
+  it('n’affiche pas la section quand aucune évaluation du risque pour la population n’a été saisie', async () => {
+    renderPage(traitementAerien({ evaluations_risque_population: [] }))
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+
+    expect(screen.queryByText('Évaluation du risque pour la population')).not.toBeInTheDocument()
   })
 
   it('affiche le tableau des rotations avec le nom du produit résolu et le total', async () => {

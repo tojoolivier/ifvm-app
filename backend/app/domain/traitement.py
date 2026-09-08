@@ -338,6 +338,21 @@ class TraitementSignature:
 
 
 @dataclass
+class EvaluationRisquePopulation:
+    """« Impact et risque → Évaluation du risque pour la population » (migration
+    0055). Liste dynamique liée à la fiche de traitement (Aérien et Terrestre
+    identiques), remplacée en bloc à chaque enregistrement — cf. commentaire
+    sur `EvaluationRisquePopulationModel`."""
+
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    traitement_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    ordre: int = 0
+    habitat_proche: str | None = None
+    distance_km: float | None = None
+    sensibilisation: bool | None = None
+
+
+@dataclass
 class Traitement:
     id: uuid.UUID = field(default_factory=uuid.uuid4)
     prospection_id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -384,6 +399,7 @@ class Traitement:
     aerien: TraitementAerien | None = None
     terrestre: TraitementTerrestre | None = None
     signatures: list[TraitementSignature] = field(default_factory=list)
+    evaluations_risque_population: list[EvaluationRisquePopulation] = field(default_factory=list)
 
     # ==========================================
     # Champ dérivé, non stocké (#numero-fiche-prospection-liee) — résolu par le

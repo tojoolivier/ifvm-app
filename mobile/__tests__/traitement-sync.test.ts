@@ -81,6 +81,9 @@ function draft(overrides: Partial<DraftTraitement> = {}): DraftTraitement {
     mortalite: null,
     mortalite_familles: null,
     observations: null,
+    evaluations_risque_population: [
+      { id: 'eval-1', traitement_id: 'traitement-1', ordre: 0, habitat_proche: 'Rizière', distance_km: 1.5, sensibilisation: 1 },
+    ],
     statut: 'brouillon',
     statut_sync: 'local',
     created_at: '2026-08-12T00:00:00.000Z',
@@ -147,6 +150,12 @@ describe('enregistrerEtSynchroniserTraitement', () => {
         id: 'traitement-1',
         type_traitement: 'AERIEN',
         base_updated_at: '2026-08-12T00:00:00.000Z',
+        // #evaluation-risque-population : envoyée dans le payload principal
+        // (commune à Aérien et Terrestre), sensibilisation normalisée en
+        // vrai booléen (0/1/NULL en SQLite local).
+        evaluations_risque_population: [
+          { habitat_proche: 'Rizière', distance_km: 1.5, sensibilisation: true },
+        ],
         aerien: expect.objectContaining({
           pilote: 'Jean Dupont',
           mecanicien: 'Marc Rabe',

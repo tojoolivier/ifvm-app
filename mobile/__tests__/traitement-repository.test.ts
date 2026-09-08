@@ -253,11 +253,51 @@ describe('updateTraitementImpacts', () => {
       mortalite: false,
       mortalite_familles: [],
       observations: 'RAS',
+      evaluationsRisquePopulation: [
+        { id: 'eval-1', habitat_proche: 'Rizière', distance_km: 1.5, sensibilisation: true },
+      ],
     });
 
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE traitement SET'),
       expect.arrayContaining(['AGENT', 'INGESTION', JSON.stringify({ sol: 'FAIBLE' }), 'RAS'])
+    );
+    // #evaluation-risque-population : remplacée en bloc (DELETE puis INSERT),
+    // jamais un diff ligne à ligne.
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('DELETE FROM traitement_evaluation_risque_population'),
+      [AERIEN_INPUT.id]
+    );
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO traitement_evaluation_risque_population'),
+      ['eval-1', AERIEN_INPUT.id, 0, 'Rizière', 1.5, true]
+    );
+  });
+
+  it('replaces the population risk evaluations list on every save, including clearing it', async () => {
+    getFirstAsync.mockResolvedValueOnce(STORED_TRAITEMENT_ROW).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+
+    await updateTraitementImpacts(AERIEN_INPUT.id, {
+      empoisonnement: false,
+      empoisonnement_type: null,
+      empoisonnement_mode: null,
+      empoisonnement_autre: null,
+      evaluation_risque: {},
+      comportement_anormal: false,
+      comportement_non_cibles: [],
+      mortalite: false,
+      mortalite_familles: [],
+      observations: null,
+      evaluationsRisquePopulation: [],
+    });
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('DELETE FROM traitement_evaluation_risque_population'),
+      [AERIEN_INPUT.id]
+    );
+    expect(runAsync).not.toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO traitement_evaluation_risque_population'),
+      expect.anything()
     );
   });
 });
@@ -606,6 +646,31 @@ describe('getTraitement', () => {
 
     expect(result?.signatures).toEqual([
       expect.objectContaining({ role: 'PILOTE', signataire_nom: 'Jean Dupont', signature_image: 'M0 0 L1 1' }),
+    ]);
+  });
+
+  it('attache les évaluations du risque pour la population, ordonnées (#evaluation-risque-population)', async () => {
+    getFirstAsync
+      .mockResolvedValueOnce(STORED_TRAITEMENT_ROW)
+      .mockResolvedValueOnce(null) // cible
+      .mockResolvedValueOnce({ traitement_id: AERIEN_INPUT.id }); // aerien row (minimal)
+    getAllAsync
+      .mockResolvedValueOnce([]) // rotations
+      .mockResolvedValueOnce([]) // signatures
+      .mockResolvedValueOnce([
+        { id: 'eval-1', traitement_id: AERIEN_INPUT.id, ordre: 0, habitat_proche: 'Rizière', distance_km: 1.5, sensibilisation: 1 },
+        { id: 'eval-2', traitement_id: AERIEN_INPUT.id, ordre: 1, habitat_proche: 'Forêt', distance_km: 3, sensibilisation: 0 },
+      ]); // evaluations_risque_population
+
+    const result = await getTraitement(AERIEN_INPUT.id);
+
+    expect(getAllAsync).toHaveBeenCalledWith(
+      expect.stringContaining('FROM traitement_evaluation_risque_population'),
+      [AERIEN_INPUT.id]
+    );
+    expect(result?.evaluations_risque_population).toEqual([
+      expect.objectContaining({ id: 'eval-1', habitat_proche: 'Rizière' }),
+      expect.objectContaining({ id: 'eval-2', habitat_proche: 'Forêt' }),
     ]);
   });
 });

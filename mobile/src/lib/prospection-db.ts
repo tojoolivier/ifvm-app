@@ -442,6 +442,25 @@ async function creerTables(db: SQLite.SQLiteDatabase): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS ix_traitement_signature_traitement_id
       ON traitement_signature(traitement_id);
+
+    -- « Impact et risque → Évaluation du risque pour la population »
+    -- (#evaluation-risque-population, migration backend 0055) : liste
+    -- dynamique ("+"), commune à Aérien et Terrestre — liée directement à
+    -- traitement, même patron que traitement_signature ci-dessus.
+    CREATE TABLE IF NOT EXISTS traitement_evaluation_risque_population (
+      id TEXT PRIMARY KEY NOT NULL,
+      traitement_id TEXT NOT NULL REFERENCES traitement(id) ON DELETE CASCADE,
+      ordre INTEGER NOT NULL,
+      habitat_proche TEXT,
+      distance_km REAL,
+      -- SQLite n'a pas de type booléen natif : 0/1/NULL, comme les autres
+      -- booléens facultatifs de ce schéma (ex. sensibilisation à défaut nul
+      -- tant que l'utilisateur n'a pas choisi OUI/NON).
+      sensibilisation INTEGER
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_traitement_evaluation_risque_population_traitement_id
+      ON traitement_evaluation_risque_population(traitement_id);
     `);
   } catch (error) {
     throw new LocalWriteError(

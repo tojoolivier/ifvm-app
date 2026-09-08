@@ -1345,6 +1345,38 @@ export interface components {
          */
         EspeceCible: "LMC" | "NSE" | "MELANGE";
         /**
+         * EvaluationRisquePopulationCreate
+         * @description « Impact et risque → Évaluation du risque pour la population » (migration
+         *     0055). `ordre` n'y figure pas : dérivé de la position dans la liste (index),
+         *     jamais saisi par le client — même principe que `numero_cuve` pour les
+         *     rotations. Tous les champs sont facultatifs : une évaluation ajoutée puis
+         *     partiellement remplie reste valide, seule la section entière est facultative.
+         */
+        EvaluationRisquePopulationCreate: {
+            /** Habitat Proche */
+            habitat_proche?: string | null;
+            /** Distance Km */
+            distance_km?: number | null;
+            /** Sensibilisation */
+            sensibilisation?: boolean | null;
+        };
+        /** EvaluationRisquePopulationRead */
+        EvaluationRisquePopulationRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Ordre */
+            ordre: number;
+            /** Habitat Proche */
+            habitat_proche: string | null;
+            /** Distance Km */
+            distance_km: number | null;
+            /** Sensibilisation */
+            sensibilisation: boolean | null;
+        };
+        /**
          * FicheType
          * @enum {string}
          */
@@ -3215,6 +3247,11 @@ export interface components {
             } | null;
             /** Observations */
             observations?: string | null;
+            /**
+             * Evaluations Risque Population
+             * @default []
+             */
+            evaluations_risque_population: components["schemas"]["EvaluationRisquePopulationCreate"][];
             aerien?: components["schemas"]["TraitementAerienCreate"] | null;
             terrestre?: components["schemas"]["TraitementTerrestreCreate"] | null;
         };
@@ -3323,6 +3360,11 @@ export interface components {
              * @default []
              */
             signatures: components["schemas"]["SignatureRead"][];
+            /**
+             * Evaluations Risque Population
+             * @default []
+             */
+            evaluations_risque_population: components["schemas"]["EvaluationRisquePopulationRead"][];
             /** Prospection N Fiche */
             prospection_n_fiche?: string | null;
         };
@@ -3433,6 +3475,11 @@ export interface components {
             } | null;
             /** Observations */
             observations?: string | null;
+            /**
+             * Evaluations Risque Population
+             * @default []
+             */
+            evaluations_risque_population: components["schemas"]["EvaluationRisquePopulationCreate"][];
             aerien?: components["schemas"]["TraitementAerienCreate"] | null;
             terrestre?: components["schemas"]["TraitementTerrestreCreate"] | null;
             /**

@@ -142,6 +142,18 @@ class TraitementTerrestreCreate(BaseModel):
         return self
 
 
+class EvaluationRisquePopulationCreate(BaseModel):
+    """« Impact et risque → Évaluation du risque pour la population » (migration
+    0055). `ordre` n'y figure pas : dérivé de la position dans la liste (index),
+    jamais saisi par le client — même principe que `numero_cuve` pour les
+    rotations. Tous les champs sont facultatifs : une évaluation ajoutée puis
+    partiellement remplie reste valide, seule la section entière est facultative."""
+
+    habitat_proche: str | None = Field(None, max_length=500)
+    distance_km: float | None = Field(None, ge=0)
+    sensibilisation: bool | None = None
+
+
 class TraitementCreate(BaseModel):
     prospection_id: uuid.UUID
     numero_fiche: str | None = Field(None, max_length=50)
@@ -174,6 +186,12 @@ class TraitementCreate(BaseModel):
     mortalite: bool = False
     mortalite_familles: dict[str, Any] | None = None
     observations: str | None = None
+    # « Évaluation du risque pour la population » (migration 0055) — liste
+    # dynamique ("+"), commune à Aérien et Terrestre (au même titre que
+    # empoisonnement/evaluation_risque/observations ci-dessus), remplacée en
+    # bloc à chaque enregistrement — jamais une sous-ressource à endpoints
+    # séparés (cf. EvaluationRisquePopulationModel).
+    evaluations_risque_population: list[EvaluationRisquePopulationCreate] = []
 
     aerien: TraitementAerienCreate | None = None
     terrestre: TraitementTerrestreCreate | None = None
@@ -301,6 +319,16 @@ class SignatureRead(BaseModel):
     horodatage: datetime
 
 
+class EvaluationRisquePopulationRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    ordre: int
+    habitat_proche: str | None
+    distance_km: float | None
+    sensibilisation: bool | None
+
+
 class TraitementAerienRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -400,6 +428,7 @@ class TraitementRead(BaseModel):
     aerien: TraitementAerienRead | None
     terrestre: TraitementTerrestreRead | None
     signatures: list[SignatureRead] = []
+    evaluations_risque_population: list[EvaluationRisquePopulationRead] = []
 
     # Champ dérivé, non stocké (#numero-fiche-prospection-liee) — résolu par
     # TraitementRepositoryImpl à partir de `prospection_id`, jamais accepté en

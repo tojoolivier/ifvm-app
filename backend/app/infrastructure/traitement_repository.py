@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.domain.repositories import TraitementRepository
 from app.domain.traitement import (
     Cible,
+    EvaluationRisquePopulation,
     NumeroFicheConflitError,
     ProduitUtilise,
     Rotation,
@@ -21,6 +22,7 @@ from app.domain.traitement import (
 from app.infrastructure.prospection_model import ProspectionModel
 from app.infrastructure.traitement_model import (
     CibleModel,
+    EvaluationRisquePopulationModel,
     ProduitUtiliseModel,
     RotationModel,
     TraitementAerienModel,
@@ -45,6 +47,7 @@ class TraitementRepositoryImpl(TraitementRepository):
                     TraitementTerrestreModel.produits
                 ),
                 selectinload(TraitementModel.signatures),
+                selectinload(TraitementModel.evaluations_risque_population),
             )
         )
         model = result.scalar_one_or_none()
@@ -67,6 +70,7 @@ class TraitementRepositoryImpl(TraitementRepository):
             selectinload(TraitementModel.aerien).selectinload(TraitementAerienModel.rotations),
             selectinload(TraitementModel.terrestre).selectinload(TraitementTerrestreModel.produits),
             selectinload(TraitementModel.signatures),
+            selectinload(TraitementModel.evaluations_risque_population),
         )
         if type_traitement is not None:
             stmt = stmt.where(TraitementModel.type_traitement == type_traitement)
@@ -274,6 +278,17 @@ class TraitementRepositoryImpl(TraitementRepository):
                 pesticide_recu_l=traitement.terrestre.pesticide_recu_l,
                 pesticide_stock_restant_l=traitement.terrestre.pesticide_stock_restant_l,
             )
+
+        model.evaluations_risque_population = [
+            EvaluationRisquePopulationModel(
+                traitement_id=model.id,
+                ordre=e.ordre,
+                habitat_proche=e.habitat_proche,
+                distance_km=e.distance_km,
+                sensibilisation=e.sensibilisation,
+            )
+            for e in traitement.evaluations_risque_population
+        ]
 
         self.session.add(model)
         try:
@@ -561,6 +576,28 @@ class TraitementRepositoryImpl(TraitementRepository):
             t.pesticide_recu_l = src.pesticide_recu_l
             t.pesticide_stock_restant_l = src.pesticide_stock_restant_l
 
+        # Liste dynamique remplacée en bloc à chaque enregistrement (ajout/
+        # modification/suppression indifférenciés côté client) — même
+        # sémantique que `ProspectionModel.populations`, cf. commentaire sur
+        # `EvaluationRisquePopulationModel`. Vidée puis flushée avant
+        # réinsertion : sans ce flush intermédiaire, SQLAlchemy peut émettre
+        # les INSERT de la nouvelle liste avant les DELETE des anciennes
+        # lignes dans le même flush, violant la contrainte UNIQUE
+        # (traitement_id, ordre) dès qu'un même `ordre` réapparaît (ex. 0/1
+        # à chaque resynchronisation).
+        model.evaluations_risque_population = []
+        await self.session.flush()
+        model.evaluations_risque_population = [
+            EvaluationRisquePopulationModel(
+                traitement_id=model.id,
+                ordre=e.ordre,
+                habitat_proche=e.habitat_proche,
+                distance_km=e.distance_km,
+                sensibilisation=e.sensibilisation,
+            )
+            for e in traitement.evaluations_risque_population
+        ]
+
         try:
             await self.session.commit()
         except IntegrityError as e:
@@ -806,5 +843,16 @@ class TraitementRepositoryImpl(TraitementRepository):
                     horodatage=s.horodatage,
                 )
                 for s in model.signatures
+            ],
+            evaluations_risque_population=[
+                EvaluationRisquePopulation(
+                    id=e.id,
+                    traitement_id=e.traitement_id,
+                    ordre=e.ordre,
+                    habitat_proche=e.habitat_proche,
+                    distance_km=e.distance_km,
+                    sensibilisation=e.sensibilisation,
+                )
+                for e in model.evaluations_risque_population
             ],
         )

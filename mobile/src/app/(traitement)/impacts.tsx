@@ -3,11 +3,12 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getTraitement, updateTraitementImpacts } from '@/lib/traitement-repository';
-import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
+import { useTraitementCaptureStore, EvaluationRisquePopulationDraft } from '@/lib/traitement-capture-store';
 import { validateEmpoisonnement } from '@/lib/traitement-validation';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { logger } from '@/lib/logger';
+import { generateId } from '@/lib/id';
 import { Chip } from '@/components/traitement/Chip';
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN, PROGRESS_SEGMENTS_TERRESTRE } from '@/components/traitement/ProgressBar';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
@@ -52,6 +53,17 @@ export default function ImpactsScreen() {
         // Défensif (indépendant des écrans visités avant celui-ci dans cette session) —
         // même garde que signatures.tsx : décide du nombre d'étapes de ProgressBar.
         store.setTypeTraitement(draft.type_traitement);
+        // « Évaluation du risque pour la population » (#evaluation-risque-population) :
+        // id local conservé tel quel (clé stable), sensibilisation normalisée en
+        // booléen (0/1/NULL en SQLite, comme empoisonnement/mortalite ci-dessus).
+        const evaluationsRisquePopulation: EvaluationRisquePopulationDraft[] = (
+          draft.evaluations_risque_population ?? []
+        ).map((e) => ({
+          id: e.id,
+          habitatProche: e.habitat_proche,
+          distanceKm: e.distance_km,
+          sensibilisation: e.sensibilisation === null ? null : !!e.sensibilisation,
+        }));
         store.updateImp({
           empoisonnement: draft.empoisonnement,
           empoisonnementType: draft.empoisonnement_type as any,
@@ -62,6 +74,7 @@ export default function ImpactsScreen() {
           comportementNonCibles,
           mortalite: draft.mortalite,
           mortaliteFamilles,
+          evaluationsRisquePopulation,
         });
         store.setObservations(draft.observations);
       })
@@ -94,6 +107,12 @@ export default function ImpactsScreen() {
           mortalite: !!store.imp.mortalite,
           mortalite_familles: store.imp.mortaliteFamilles ?? [],
           observations: store.observations,
+          evaluationsRisquePopulation: (store.imp.evaluationsRisquePopulation ?? []).map((e) => ({
+            id: e.id,
+            habitat_proche: e.habitatProche ?? null,
+            distance_km: e.distanceKm ?? null,
+            sensibilisation: e.sensibilisation ?? null,
+          })),
         });
         // Aérien : nouvelle étape « Surface traitée » s'insère avant Signatures
         // (#326) — le terrestre garde son flux actuel, inchangé.
@@ -218,6 +237,84 @@ export default function ImpactsScreen() {
           </View>
         )}
 
+        <Text style={styles.label}>Évaluation du risque pour la population</Text>
+        {(store.imp.evaluationsRisquePopulation ?? []).map((evaluation, index) => (
+          <View key={evaluation.id} testID={`evaluation-risque-population-${index}`} style={styles.evaluationCard}>
+            <Text style={styles.evaluationTitle}>{`Évaluation ${index + 1}`}</Text>
+            <Text style={styles.label}>Habitats les plus proches</Text>
+            <TextInput
+              editable={!readOnly}
+              style={styles.input}
+              placeholder="Ex. Rizière, zone humide…"
+              value={evaluation.habitatProche ?? ''}
+              onChangeText={(v) =>
+                !readOnly &&
+                store.updateImp({
+                  evaluationsRisquePopulation: (store.imp.evaluationsRisquePopulation ?? []).map((e) =>
+                    e.id === evaluation.id ? { ...e, habitatProche: v } : e
+                  ),
+                })
+              }
+            />
+            <Text style={styles.label}>Distance (km)</Text>
+            <TextInput
+              editable={!readOnly}
+              style={styles.input}
+              keyboardType="decimal-pad"
+              placeholder="0.0"
+              value={evaluation.distanceKm != null ? String(evaluation.distanceKm) : ''}
+              onChangeText={(v) => {
+                if (readOnly) return;
+                // Saisie décimale (même tolérance virgule/point que le reste des
+                // champs numériques du wizard) — jamais transformée au-delà de la
+                // conversion en nombre : la valeur saisie est conservée telle quelle.
+                const normalise = v.replace(',', '.');
+                const valeur = normalise === '' ? null : Number(normalise);
+                store.updateImp({
+                  evaluationsRisquePopulation: (store.imp.evaluationsRisquePopulation ?? []).map((e) =>
+                    e.id === evaluation.id
+                      ? { ...e, distanceKm: valeur === null || Number.isNaN(valeur) ? null : valeur }
+                      : e
+                  ),
+                });
+              }}
+            />
+            <Text style={styles.label}>Sensibilisation</Text>
+            <View style={styles.chipRow}>
+              {([true, false] as const).map((v) => (
+                <Chip
+                  key={String(v)}
+                  label={v ? 'Oui' : 'Non'}
+                  selected={evaluation.sensibilisation === v}
+                  onPress={() =>
+                    !readOnly &&
+                    store.updateImp({
+                      evaluationsRisquePopulation: (store.imp.evaluationsRisquePopulation ?? []).map((e) =>
+                        e.id === evaluation.id ? { ...e, sensibilisation: v } : e
+                      ),
+                    })
+                  }
+                />
+              ))}
+            </View>
+          </View>
+        ))}
+        {!readOnly && (
+          <TouchableOpacity
+            style={styles.addEvaluationButton}
+            onPress={() =>
+              store.updateImp({
+                evaluationsRisquePopulation: [
+                  ...(store.imp.evaluationsRisquePopulation ?? []),
+                  { id: generateId(), habitatProche: null, distanceKm: null, sensibilisation: null },
+                ],
+              })
+            }
+          >
+            <Text style={styles.addEvaluationButtonText}>+ Ajouter une évaluation</Text>
+          </TouchableOpacity>
+        )}
+
         <Text style={styles.label}>Observations</Text>
         <TextInput
           editable={!readOnly}
@@ -267,6 +364,25 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   continueButtonText: { fontFamily: traitementFonts.uiBold, color: '#fff', fontSize: traitementTypeSizes.corps + 1 },
+  evaluationCard: {
+    borderWidth: 1,
+    borderColor: traitementColors.bordure,
+    borderRadius: traitementRadii.chip,
+    padding: 10,
+    gap: 6,
+    backgroundColor: '#fff',
+  },
+  evaluationTitle: { fontFamily: traitementFonts.uiSemiBold, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre },
+  addEvaluationButton: {
+    minHeight: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: traitementColors.vertPrincipal,
+    borderRadius: traitementRadii.chip,
+  },
+  addEvaluationButtonText: { fontFamily: traitementFonts.uiSemiBold, color: traitementColors.vertPrincipal, fontSize: traitementTypeSizes.corps },
 });
 
 /**
