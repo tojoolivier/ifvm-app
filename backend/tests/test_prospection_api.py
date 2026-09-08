@@ -1171,6 +1171,127 @@ async def test_create_prospection_validation_avec_signalement_et_conclusion(
 
 
 @pytest.mark.asyncio
+async def test_create_prospection_validation_numero_fiche_reprend_numero_message(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+):
+    """Le n° de fiche définitif d'un signalement est exactement le n° de message
+    généré à la Référence — jamais un second numéro (#signalements-treatment-ready)."""
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "validation",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-07-29",
+            "n_message": "20260729-AB12",
+            "signalement_source": "Rasoanaivo (habitant)",
+            "signalement_description": "Beaucoup de criquets près du champ de riz",
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert data["n_message"] == "20260729-AB12"
+    assert data["n_fiche"] == data["n_message"]
+
+
+@pytest.mark.asyncio
+async def test_create_prospection_validation_disponible_immediatement_pour_traitement(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+):
+    """Critère d'acceptation central (#signalements-treatment-ready) : une fiche de
+    validation/signalement fraîchement créée apparaît tout de suite dans « Consulter
+    une fiche validée » (GET /prospections?statut=validee&disponible_pour_traitement=true),
+    sans passer par la chaîne administrative en_attente -> verifiee -> validee ni
+    attendre une action de l'administrateur Web."""
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "validation",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-07-29",
+            "signalement_source": "Rasoanaivo (habitant)",
+            "signalement_description": "Beaucoup de criquets près du champ de riz",
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    prospection_id = response.json()["id"]
+
+    resp = await client.get(
+        "/prospections",
+        params={"statut": "validee", "disponible_pour_traitement": "true"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    ids = [p["id"] for p in resp.json()]
+    assert prospection_id in ids
+
+
+@pytest.mark.asyncio
+async def test_traitement_depuis_prospection_validation_conserve_le_lien_et_la_masque(
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    chef_equipe,
+):
+    """Test 7 (#signalements-treatment-ready) : une fois sélectionnée pour traitement,
+    une fiche de validation/signalement se comporte exactement comme une fiche
+    intensive/extensive déjà validée — le traitement créé reste lié à la fiche
+    d'origine (toutes les données de celle-ci restent lisibles via prospection_id),
+    et la fiche disparaît de « Consulter une fiche validée » sans être supprimée."""
+    creation = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "validation",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-07-29",
+            "signalement_source": "Rasoanaivo (habitant)",
+            "signalement_description": "Beaucoup de criquets près du champ de riz",
+        },
+        headers=auth_headers,
+    )
+    assert creation.status_code == 201
+    prospection_id = creation.json()["id"]
+
+    traitement = await client.post(
+        "/traitements",
+        json={
+            "prospection_id": prospection_id,
+            "date_traitement": "2026-08-11",
+            "date_validation": "2026-08-10",
+            "localite": "Betioky",
+            "terrestre": {
+                "heure_debut": "06:00:00",
+                "heure_fin": "09:00:00",
+                "vitesse_vent_ms": 1.5,
+                "temperature_c": 24.0,
+                "chef_equipe_id": str(chef_equipe.id),
+            },
+        },
+        headers=auth_headers,
+    )
+    assert traitement.status_code == 201, traitement.text
+    assert traitement.json()["prospection_id"] == prospection_id
+
+    # La fiche de prospection d'origine reste consultable, avec toutes ses
+    # données (rien n'est supprimé ni écrasé par la création du traitement).
+    relue = await client.get(f"/prospections/{prospection_id}", headers=auth_headers)
+    assert relue.status_code == 200
+    assert relue.json()["signalement_source"] == "Rasoanaivo (habitant)"
+
+    disponibles = await client.get(
+        "/prospections",
+        params={"statut": "validee", "disponible_pour_traitement": "true"},
+        headers=auth_headers,
+    )
+    assert prospection_id not in [p["id"] for p in disponibles.json()]
+
+
+@pytest.mark.asyncio
 async def test_create_prospection_conclusion_invalide_echoue(
     client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
 ):
