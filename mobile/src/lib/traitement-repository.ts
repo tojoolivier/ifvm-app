@@ -86,9 +86,9 @@ export interface TraitementAerien {
   chef_de_base_id: string;
   consultant_international: string | null;
   immatricule_aeronef: string | null;
-  lieu_base_principale_id: string | null;
-  lieu_stand_id: string | null;
-  lieu_base_secondaire_id: string | null;
+  base_principale: string | null;
+  stand: string | null;
+  base_secondaire: string | null;
   nb_rotations: number | null;
   total_pesticide_l: number | null;
   total_pesticide_kg: number | null;
@@ -435,12 +435,13 @@ export interface AerienUpdateInput {
   chefDeBaseId: string;
   consultantInternational?: string | null;
   immatriculeAeronef?: string | null;
-  // Base principale/stand/base secondaire (référentiel lieu_aerien) — écran « Équipe »
-  // (#equipe-slide-aerien). Base principale obligatoire (validée en amont par
-  // validateAerienEquipe), stand et base secondaire facultatifs.
-  lieuBasePrincipaleId?: string | null;
-  lieuStandId?: string | null;
-  lieuBaseSecondaireId?: string | null;
+  // Base principale/stand/base secondaire : texte libre (migration backend
+  // 0054, #traitement-aerien-base-texte-libre). Base principale obligatoire
+  // (validée en amont par validateAerienEquipe), stand et base secondaire
+  // facultatifs.
+  basePrincipale?: string | null;
+  stand?: string | null;
+  baseSecondaire?: string | null;
   // surfaceTraiteeHa n'y figure plus (migration 0046) : dérivée des rotations,
   // même traitement que nb_rotations/total_pesticide_l — jamais mise à jour par cette
   // fonction, seulement par la synchronisation.
@@ -464,9 +465,9 @@ export async function updateTraitementAerien(
       chef_de_base_id = ?,
       consultant_international = ?,
       immatricule_aeronef = ?,
-      lieu_base_principale_id = ?,
-      lieu_stand_id = ?,
-      lieu_base_secondaire_id = ?,
+      base_principale = ?,
+      stand = ?,
+      base_secondaire = ?,
       pesticide_recu_l = ?,
       reprise_traitement = ?,
       traitement_origine_id = ?
@@ -477,9 +478,9 @@ export async function updateTraitementAerien(
       input.chefDeBaseId,
       input.consultantInternational ?? null,
       input.immatriculeAeronef ?? null,
-      input.lieuBasePrincipaleId ?? null,
-      input.lieuStandId ?? null,
-      input.lieuBaseSecondaireId ?? null,
+      input.basePrincipale ?? null,
+      input.stand ?? null,
+      input.baseSecondaire ?? null,
       input.pesticideRecuL ?? null,
       input.repriseTraitement ?? null,
       input.traitementOrigineId ?? null,

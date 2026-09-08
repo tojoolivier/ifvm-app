@@ -21,7 +21,7 @@ import {
   resumeEspeces,
   zonesExposeesLabels,
 } from '@/lib/traitement-fiche'
-import { shortId, useAnnuaire } from '@/lib/use-annuaire'
+import { useAnnuaire } from '@/lib/use-annuaire'
 
 interface Rotation {
   id: string
@@ -59,9 +59,9 @@ interface TraitementAerien {
   mecanicien: string
   chef_de_base_id: string | null
   consultant_international: string | null
-  lieu_base_principale_id: string | null
-  lieu_stand_id: string | null
-  lieu_base_secondaire_id: string | null
+  base_principale: string | null
+  stand: string | null
+  base_secondaire: string | null
   immatricule_aeronef: string | null
   nb_rotations: number
   total_pesticide_l: number | null
@@ -157,11 +157,6 @@ interface PesticideSync {
 
 interface ReferentielPullResponse {
   pesticides: { upserts: PesticideSync[] }
-}
-
-interface LieuAerien {
-  id: string
-  nom: string
 }
 
 /** Carte blanche de la maquette : `#fff`, bordure `#e7e0cd`, rayon `11px`. */
@@ -289,16 +284,6 @@ export function TraitementDetailPage() {
   const [reprisePromptOuvert, setReprisePromptOuvert] = useState(false)
 
   const { nomAgent } = useAnnuaire()
-
-  // Résolution des bases aériennes (chef de base logé côté `utilisateur`, mais
-  // les bases sont un référentiel à part — cf. GET /referentiel/lieux-aeriens).
-  const { data: lieuxAeriens = [] } = useQuery<LieuAerien[]>({
-    queryKey: ['lieux-aeriens'],
-    queryFn: () => api.get('/referentiel/lieux-aeriens', { params: { inclure_inactifs: true } }).then((r) => r.data),
-    enabled: !!traitement?.aerien,
-  })
-  const nomLieu = (id: string | null | undefined) =>
-    lieuxAeriens.find((l) => l.id === id)?.nom ?? shortId(id)
 
   const pesticideNoms = useMemo(() => {
     const map = new Map<string, string>()
@@ -689,9 +674,9 @@ export function TraitementDetailPage() {
                   value={traitement.aerien.consultant_international}
                 />
                 <Champ label="Immatriculation aéronef" value={traitement.aerien.immatricule_aeronef} />
-                <Champ label="Base principale" value={nomLieu(traitement.aerien.lieu_base_principale_id)} />
-                <Champ label="Stand" value={nomLieu(traitement.aerien.lieu_stand_id)} />
-                <Champ label="Base secondaire" value={nomLieu(traitement.aerien.lieu_base_secondaire_id)} />
+                <Champ label="Base principale" value={traitement.aerien.base_principale} />
+                <Champ label="Stand" value={traitement.aerien.stand} />
+                <Champ label="Base secondaire" value={traitement.aerien.base_secondaire} />
                 <Champ
                   label="Total pesticide"
                   value={

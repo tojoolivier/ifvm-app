@@ -753,13 +753,21 @@ const COLONNES_TRAITEMENT_AERIEN: readonly Colonne[] = [
   { name: 'pilote', type: 'TEXT' },
   { name: 'mecanicien', type: 'TEXT' },
   { name: 'consultant_international', type: 'TEXT' },
-  // Base principale/stand/base secondaire (référentiel lieu_aerien) — écran « Équipe »
-  // (#equipe-slide-aerien). Base principale obligatoire côté saisie/validation, mais
-  // nullable ici comme le reste des colonnes ajoutées après coup : la contrainte
-  // NOT NULL n'existe que côté backend (schéma de création).
+  // Base principale/stand/base secondaire : référentiel lieu_aerien (FK) ->
+  // texte libre (migration backend 0054, même retour en arrière que pilote/
+  // mécanicien/consultant_international ci-dessus, migration 0048).
+  // #traitement-aerien-base-texte-libre. Les 3 colonnes FK ci-dessous restent
+  // déclarées pour les installations qui les ont déjà (colonnes mortes, plus
+  // jamais lues/écrites), même principe que pilote_id/mecanicien_id/consultant_id.
   { name: 'lieu_base_principale_id', type: 'TEXT' },
   { name: 'lieu_stand_id', type: 'TEXT' },
   { name: 'lieu_base_secondaire_id', type: 'TEXT' },
+  // Base principale obligatoire côté saisie/validation, mais nullable ici
+  // comme le reste des colonnes ajoutées après coup : la contrainte NOT NULL
+  // n'existe que côté backend (schéma de création).
+  { name: 'base_principale', type: 'TEXT' },
+  { name: 'stand', type: 'TEXT' },
+  { name: 'base_secondaire', type: 'TEXT' },
   // Chaînage de reprise (migration backend 0050) — généralise à l'Aérien ce qui
   // existait déjà côté Terrestre depuis l'origine (cf. CREATE TABLE
   // traitement_terrestre ci-dessus, où ces 3 colonnes figurent nativement).

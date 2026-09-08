@@ -213,7 +213,7 @@ def _args(**overrides):
         pilote="Jean Dupont",
         mecanicien="Marc Rabe",
         chef_de_base_id=_CHEF.id,
-        lieu_base_principale_id=uuid.uuid4(),
+        base_principale="Base Betioky",
         immatricule_aeronef="5R-XYZ",
     )
     args.update(overrides)

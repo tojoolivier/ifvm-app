@@ -35,11 +35,6 @@ jest.mock('@/lib/referentiel-db', () => ({
     };
     return Promise.resolve(parRole[role] ?? []);
   }),
-  listLieuxAeriens: jest.fn().mockResolvedValue([
-    { id: 'lieu-1', type_lieu: 'principale', nom: 'Tuléar' },
-    { id: 'lieu-2', type_lieu: 'stand', nom: 'Betioky' },
-    { id: 'lieu-3', type_lieu: 'secondaire', nom: 'Ambovombe' },
-  ]),
 }));
 
 const RESET_STATE = {
@@ -79,9 +74,9 @@ const DRAFT_AERIEN_COMPLET = {
     chef_de_base_id: 'chef-1',
     consultant_international: 'John Smith',
     immatricule_aeronef: '5R-ABC',
-    lieu_base_principale_id: 'lieu-1',
-    lieu_stand_id: 'lieu-2',
-    lieu_base_secondaire_id: 'lieu-3',
+    base_principale: 'Tuléar',
+    stand: 'Betioky',
+    base_secondaire: 'Ambovombe',
     nb_rotations: 2,
     total_pesticide_l: 90,
     total_pesticide_kg: null,
@@ -131,8 +126,8 @@ describe('RecapScreen — sections Équipe et Pesticides & rotations (#equipe-sl
       aerien: {
         ...DRAFT_AERIEN_COMPLET.aerien,
         consultant_international: null,
-        lieu_stand_id: null,
-        lieu_base_secondaire_id: null,
+        stand: null,
+        base_secondaire: null,
       },
     } as any);
 
@@ -145,7 +140,7 @@ describe('RecapScreen — sections Équipe et Pesticides & rotations (#equipe-sl
   it("bloque « Enregistrer » quand un champ obligatoire de l'équipe manque (ex. base principale)", async () => {
     jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
       ...DRAFT_AERIEN_COMPLET,
-      aerien: { ...DRAFT_AERIEN_COMPLET.aerien, lieu_base_principale_id: null },
+      aerien: { ...DRAFT_AERIEN_COMPLET.aerien, base_principale: null },
     } as any);
 
     await render(<RecapScreen />);

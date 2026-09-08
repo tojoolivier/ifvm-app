@@ -149,11 +149,16 @@ const MIGRATED_COLUMNS = [
   { name: 'pilote' },
   { name: 'mecanicien' },
   { name: 'consultant_international' },
-  // Base principale/stand/base secondaire (référentiel lieu_aerien) — écran « Équipe »
-  // (#equipe-slide-aerien).
+  // Base principale/stand/base secondaire : référentiel lieu_aerien (FK) ->
+  // texte libre (migration backend 0054, #traitement-aerien-base-texte-libre)
+  // — les 3 colonnes FK restent déclarées (mortes) pour les installations qui
+  // les ont déjà.
   { name: 'lieu_base_principale_id' },
   { name: 'lieu_stand_id' },
   { name: 'lieu_base_secondaire_id' },
+  { name: 'base_principale' },
+  { name: 'stand' },
+  { name: 'base_secondaire' },
   // Chaînage de reprise (migration backend 0050), généralisé depuis le Terrestre.
   { name: 'reprise_traitement' },
   { name: 'traitement_origine_id' },

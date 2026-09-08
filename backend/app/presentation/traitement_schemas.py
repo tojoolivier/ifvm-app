@@ -81,10 +81,13 @@ class TraitementAerienCreate(BaseModel):
     mecanicien: str = Field(..., min_length=1)
     chef_de_base_id: uuid.UUID
     consultant_international: str | None = Field(None, max_length=255)
-    # Bases aériennes/stands (migration 0047).
-    lieu_base_principale_id: uuid.UUID
-    lieu_stand_id: uuid.UUID | None = None
-    lieu_base_secondaire_id: uuid.UUID | None = None
+    # Base principale/stand/base secondaire : texte libre (migration 0054,
+    # défait la partie "lieux" de la migration 0047 — même retour en arrière
+    # que pilote/mécanicien/consultant_international ci-dessus, migration
+    # 0048). Base principale obligatoire, stand/base secondaire facultatifs.
+    base_principale: str = Field(..., min_length=1, max_length=255)
+    stand: str | None = Field(None, max_length=255)
+    base_secondaire: str | None = Field(None, max_length=255)
     immatricule_aeronef: str = Field(..., min_length=1)
     # surface_traitee_ha n'y figure plus (migration 0047) : dérivée de la somme
     # des `surface_ha` de rotation, ajoutées après coup via /rotations.
@@ -305,9 +308,9 @@ class TraitementAerienRead(BaseModel):
     mecanicien: str
     chef_de_base_id: uuid.UUID
     consultant_international: str | None
-    lieu_base_principale_id: uuid.UUID
-    lieu_stand_id: uuid.UUID | None
-    lieu_base_secondaire_id: uuid.UUID | None
+    base_principale: str
+    stand: str | None
+    base_secondaire: str | None
     immatricule_aeronef: str
     nb_rotations: int
     total_pesticide_l: float

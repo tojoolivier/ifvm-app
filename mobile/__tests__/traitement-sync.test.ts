@@ -93,9 +93,9 @@ function draft(overrides: Partial<DraftTraitement> = {}): DraftTraitement {
       chef_de_base_id: 'chef-1',
       consultant_international: null,
       immatricule_aeronef: null,
-      lieu_base_principale_id: null,
-      lieu_stand_id: null,
-      lieu_base_secondaire_id: null,
+      base_principale: 'Base Betioky',
+      stand: null,
+      base_secondaire: null,
       nb_rotations: null,
       total_pesticide_l: null,
       total_pesticide_kg: null,
@@ -147,7 +147,14 @@ describe('enregistrerEtSynchroniserTraitement', () => {
         id: 'traitement-1',
         type_traitement: 'AERIEN',
         base_updated_at: '2026-08-12T00:00:00.000Z',
-        aerien: expect.objectContaining({ pilote: 'Jean Dupont', mecanicien: 'Marc Rabe', chef_de_base_id: 'chef-1' }),
+        aerien: expect.objectContaining({
+          pilote: 'Jean Dupont',
+          mecanicien: 'Marc Rabe',
+          chef_de_base_id: 'chef-1',
+          // #traitement-aerien-base-texte-libre : envoyée telle quelle,
+          // jamais résolue contre le référentiel lieu_aerien.
+          base_principale: 'Base Betioky',
+        }),
       })
     );
     expect(mockMarkSynced).toHaveBeenCalledWith('traitement-1', '2026-08-13T00:00:00.000Z');

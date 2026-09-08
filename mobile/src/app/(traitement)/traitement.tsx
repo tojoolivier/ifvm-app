@@ -10,7 +10,7 @@ import {
   listReprenableTraitements,
   DraftTraitementRow,
 } from '@/lib/traitement-repository';
-import { listUtilisateursByRole, listPesticides, listLieuxAeriens, Pesticide, UtilisateurEquipe, LieuAerien } from '@/lib/referentiel-db';
+import { listUtilisateursByRole, listPesticides, Pesticide, UtilisateurEquipe } from '@/lib/referentiel-db';
 import { useTraitementCaptureStore, ProduitDraft } from '@/lib/traitement-capture-store';
 import { useAuthStore } from '@/lib/auth-store';
 import { generateId } from '@/lib/id';
@@ -43,7 +43,6 @@ export default function TraitementScreen() {
   const [chefsDeBase, setChefsDeBase] = useState<UtilisateurEquipe[]>([]);
   const [chefsEquipe, setChefsEquipe] = useState<UtilisateurEquipe[]>([]);
   const [agentsEncadreurs, setAgentsEncadreurs] = useState<UtilisateurEquipe[]>([]);
-  const [lieuxAeriens, setLieuxAeriens] = useState<LieuAerien[]>([]);
   const [pesticides, setPesticides] = useState<Pesticide[]>([]);
   const [reprenables, setReprenables] = useState<DraftTraitementRow[]>([]);
   const [surfaceInfesteeHa, setSurfaceInfesteeHa] = useState<number | null>(null);
@@ -73,9 +72,9 @@ export default function TraitementScreen() {
           chefDeBaseId: draft.aerien.chef_de_base_id || null,
           consultantInternational: draft.aerien.consultant_international,
           immatriculationAeronef: draft.aerien.immatricule_aeronef,
-          lieuBasePrincipaleId: draft.aerien.lieu_base_principale_id,
-          lieuStandId: draft.aerien.lieu_stand_id,
-          lieuBaseSecondaireId: draft.aerien.lieu_base_secondaire_id,
+          basePrincipale: draft.aerien.base_principale || null,
+          stand: draft.aerien.stand,
+          baseSecondaire: draft.aerien.base_secondaire,
           // pesticide_recu_l n'est plus hydraté ici : saisi sur l'écran « Traitement »
           // (rotations.tsx, #equipe-slide-aerien), qui charge ce champ lui-même.
           repriseTraitement: draft.aerien.reprise_traitement ?? false,
@@ -148,7 +147,6 @@ export default function TraitementScreen() {
     listUtilisateursByRole('chef_de_base').then(setChefsDeBase).catch((error) => signalerChargement(error, 'listUtilisateursByRole:chef_de_base'));
     listUtilisateursByRole('chef_equipe').then(setChefsEquipe).catch((error) => signalerChargement(error, 'listUtilisateursByRole:chef_equipe'));
     listUtilisateursByRole('agent_encadreur').then(setAgentsEncadreurs).catch((error) => signalerChargement(error, 'listUtilisateursByRole:agent_encadreur'));
-    listLieuxAeriens().then(setLieuxAeriens).catch((error) => signalerChargement(error, 'listLieuxAeriens'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -211,7 +209,7 @@ export default function TraitementScreen() {
             mecanicien: store.aerien.mecanicien,
             consultantInternational: store.aerien.consultantInternational,
             immatriculeAeronef: store.aerien.immatriculationAeronef,
-            lieuBasePrincipaleId: store.aerien.lieuBasePrincipaleId,
+            basePrincipale: store.aerien.basePrincipale,
           });
           if (equipeErrors.length > 0) {
             setErrors({ aerien: equipeErrors[0].message });
@@ -231,9 +229,9 @@ export default function TraitementScreen() {
             chefDeBaseId: store.aerien.chefDeBaseId!,
             consultantInternational: store.aerien.consultantInternational,
             immatriculeAeronef: store.aerien.immatriculationAeronef,
-            lieuBasePrincipaleId: store.aerien.lieuBasePrincipaleId,
-            lieuStandId: store.aerien.lieuStandId,
-            lieuBaseSecondaireId: store.aerien.lieuBaseSecondaireId,
+            basePrincipale: store.aerien.basePrincipale!,
+            stand: store.aerien.stand,
+            baseSecondaire: store.aerien.baseSecondaire,
             repriseTraitement: store.aerien.repriseTraitement,
             traitementOrigineId: store.aerien.traitementOrigineId,
           });
@@ -319,7 +317,6 @@ export default function TraitementScreen() {
           <AerienForm
             readOnly={readOnly}
             chefsDeBase={chefsDeBase}
-            lieuxAeriens={lieuxAeriens}
             reprenables={reprenablesAerien}
             errors={errors}
           />

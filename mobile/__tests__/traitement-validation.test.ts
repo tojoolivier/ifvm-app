@@ -392,7 +392,7 @@ describe('validateAerienEquipe', () => {
     mecanicien: 'Marc Rabe',
     consultantInternational: null,
     immatriculeAeronef: '5R-ABC',
-    lieuBasePrincipaleId: 'lieu-1',
+    basePrincipale: 'Base Betioky',
   };
 
   it('ne remonte aucune erreur quand chef de base/pilote/mécanicien/aéronef/base principale sont renseignés et distincts', () => {
@@ -404,7 +404,8 @@ describe('validateAerienEquipe', () => {
     ['pilote', { ...equipeValide, pilote: null }],
     ['mecanicien', { ...equipeValide, mecanicien: null }],
     ['immatriculeAeronef', { ...equipeValide, immatriculeAeronef: null }],
-    ['lieuBasePrincipaleId', { ...equipeValide, lieuBasePrincipaleId: null }],
+    ['basePrincipale', { ...equipeValide, basePrincipale: null }],
+    ['basePrincipale', { ...equipeValide, basePrincipale: '   ' }],
   ])('rapporte %s comme obligatoire quand absent', (champ, input) => {
     const errors = validateAerienEquipe(input);
     expect(errors.some((e) => e.field === champ)).toBe(true);

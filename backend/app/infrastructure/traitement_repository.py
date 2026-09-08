@@ -230,9 +230,9 @@ class TraitementRepositoryImpl(TraitementRepository):
                 mecanicien=traitement.aerien.mecanicien,
                 chef_de_base_id=traitement.aerien.chef_de_base_id,
                 consultant_international=traitement.aerien.consultant_international,
-                lieu_base_principale_id=traitement.aerien.lieu_base_principale_id,
-                lieu_stand_id=traitement.aerien.lieu_stand_id,
-                lieu_base_secondaire_id=traitement.aerien.lieu_base_secondaire_id,
+                base_principale=traitement.aerien.base_principale,
+                stand=traitement.aerien.stand,
+                base_secondaire=traitement.aerien.base_secondaire,
                 immatricule_aeronef=traitement.aerien.immatricule_aeronef,
                 nb_rotations=traitement.aerien.nb_rotations,
                 total_pesticide_l=traitement.aerien.total_pesticide_l,
@@ -524,9 +524,9 @@ class TraitementRepositoryImpl(TraitementRepository):
             model.aerien.mecanicien = traitement.aerien.mecanicien
             model.aerien.chef_de_base_id = traitement.aerien.chef_de_base_id
             model.aerien.consultant_international = traitement.aerien.consultant_international
-            model.aerien.lieu_base_principale_id = traitement.aerien.lieu_base_principale_id
-            model.aerien.lieu_stand_id = traitement.aerien.lieu_stand_id
-            model.aerien.lieu_base_secondaire_id = traitement.aerien.lieu_base_secondaire_id
+            model.aerien.base_principale = traitement.aerien.base_principale
+            model.aerien.stand = traitement.aerien.stand
+            model.aerien.base_secondaire = traitement.aerien.base_secondaire
             model.aerien.immatricule_aeronef = traitement.aerien.immatricule_aeronef
             # nb_rotations/total_pesticide_l/total_pesticide_kg/surface_traitee_ha n'y
             # figurent pas : sous-ressource distincte (rotations), jamais écrasés par
@@ -690,9 +690,9 @@ class TraitementRepositoryImpl(TraitementRepository):
                 mecanicien=model.aerien.mecanicien,
                 chef_de_base_id=model.aerien.chef_de_base_id,
                 consultant_international=model.aerien.consultant_international,
-                lieu_base_principale_id=model.aerien.lieu_base_principale_id,
-                lieu_stand_id=model.aerien.lieu_stand_id,
-                lieu_base_secondaire_id=model.aerien.lieu_base_secondaire_id,
+                base_principale=model.aerien.base_principale,
+                stand=model.aerien.stand,
+                base_secondaire=model.aerien.base_secondaire,
                 immatricule_aeronef=model.aerien.immatricule_aeronef,
                 nb_rotations=model.aerien.nb_rotations,
                 total_pesticide_l=float(model.aerien.total_pesticide_l),
