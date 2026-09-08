@@ -69,6 +69,19 @@ export async function loadValidatedProspections(
 }
 
 /**
+ * Récupère l'état de revue de toutes les fiches du prospecteur. Après leur
+ * envoi, les fiches restent dans SQLite avec leur dernier état local ; sans
+ * cette lecture serveur, une fiche vérifiée ou rejetée continuait donc à être
+ * affichée « En attente » sur le téléphone.
+ */
+export async function loadMesProspectionsServeur(
+  token: string,
+  prospecteurId: string
+): Promise<ProspectionRead[]> {
+  return apiClient.listProspections(token, { prospecteur_id: prospecteurId });
+}
+
+/**
  * « Fiches de traitement → Consulter une fiche validée » (#fiches-validees-
  * multi-utilisateurs) : les fiches validées PAR N'IMPORTE QUEL UTILISATEUR
  * (pas seulement celles de l'agent connecté — contrairement à
