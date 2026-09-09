@@ -20,6 +20,7 @@ jest.mock('expo-router', () => ({
 jest.mock('@/lib/traitement-repository', () => ({
   getTraitement: jest.fn(),
   addRotation: jest.fn().mockResolvedValue({}),
+  deleteAllRotationsForTraitementAerien: jest.fn().mockResolvedValue(undefined),
   updateTraitementAerienPesticideRecu: jest.fn().mockResolvedValue({}),
 }));
 
@@ -51,6 +52,7 @@ beforeEach(() => {
     aerien: { pesticide_recu_l: null, rotations: [] },
   } as any);
   jest.mocked(traitementRepository.addRotation).mockClear().mockResolvedValue({} as any);
+  jest.mocked(traitementRepository.deleteAllRotationsForTraitementAerien).mockClear().mockResolvedValue(undefined);
   jest.mocked(traitementRepository.updateTraitementAerienPesticideRecu).mockClear().mockResolvedValue({} as any);
   useTraitementCaptureStore.setState(RESET_STATE);
 });
@@ -201,6 +203,21 @@ describe('RotationsScreen — validation des heures de vanne', () => {
         expect.objectContaining({ pathname: '/(traitement)/moyens' })
       )
     );
+  });
+
+  it('purge les rotations déjà enregistrées avant de repousser la liste actuelle, pour ne pas les dupliquer à un nouveau passage sur cet écran (#persistance-fiches-traitement)', async () => {
+    await render(<RotationsScreen />);
+    await screen.findByTestId('rotation-numero-cuve-0');
+
+    fireEvent.press(screen.getByText('Continuer  ›'));
+
+    await waitFor(() =>
+      expect(traitementRepository.deleteAllRotationsForTraitementAerien).toHaveBeenCalledWith('trait-1')
+    );
+    const ordrePurge = jest.mocked(traitementRepository.deleteAllRotationsForTraitementAerien).mock
+      .invocationCallOrder[0];
+    const ordreAjout = jest.mocked(traitementRepository.addRotation).mock.invocationCallOrder[0];
+    expect(ordrePurge).toBeLessThan(ordreAjout);
   });
 });
 

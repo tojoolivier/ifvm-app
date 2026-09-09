@@ -7,6 +7,7 @@ import {
   updateTraitementAerien,
   updateTraitementTerrestre,
   addProduitUtilise,
+  deleteAllProduitsForTraitementTerrestre,
   listReprenableTraitements,
   DraftTraitementRow,
 } from '@/lib/traitement-repository';
@@ -276,6 +277,12 @@ export default function TraitementScreen() {
             nb_piles: store.terrestre.nb_piles,
             pesticideRecuL: store.terrestre.pesticideRecuL,
           });
+          // Purge avant re-création (#persistance-fiches-traitement) : même
+          // raison que côté Aérien (rotations.tsx) — le store ne porte pas
+          // d'id stable côté DB, sans quoi ré-enregistrer une fiche déjà
+          // sauvegardée dupliquait tous ses produits utilisés à chaque passage
+          // sur cet écran.
+          await deleteAllProduitsForTraitementTerrestre(traitementId);
           for (const p of produits) {
             await addProduitUtilise(traitementId, {
               produit_id: p.produit_id,
