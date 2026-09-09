@@ -1211,18 +1211,6 @@ export async function listValidatedProspections(): Promise<DraftProspection[]> {
   );
 }
 
-export async function listProspectionsRecentesAutresProspecteurs(
-  prospecteurId: string,
-  sinceIso: string
-): Promise<{ prospecteur_id: string; latitude: number; longitude: number; updated_at: string }[]> {
-  const db = await getDb();
-  return db.getAllAsync<{ prospecteur_id: string; latitude: number; longitude: number; updated_at: string }>(
-    `SELECT prospecteur_id, latitude, longitude, updated_at FROM prospection
-     WHERE prospecteur_id != ? AND updated_at >= ? AND latitude IS NOT NULL AND longitude IS NOT NULL`,
-    [prospecteurId, sinceIso]
-  );
-}
-
 export async function getDerniereDensiteMemeSite(stationId: string, typeCible: string, excludeProspectionId: string): Promise<number | null> {
   const db = await getDb();
   const row = await db.getFirstAsync<{ densite_moy: number | null }>(

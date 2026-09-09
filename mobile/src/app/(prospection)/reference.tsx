@@ -13,15 +13,11 @@ import {
   PosteAcridien,
   StationFixe,
 } from '@/lib/referentiel-db';
-import {
-  updateProspectionReference,
-  listProspectionsRecentesAutresProspecteurs,
-  DraftProspection,
-} from '@/lib/prospection-repository';
+import { updateProspectionReference, DraftProspection } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { parseSelectionMultiple } from '@/lib/prospection-extensive';
 import { ReferenceFormValues } from '@/lib/prospection-reference-schema';
-import { validateGpsPosition, validateAntiDoublon, DOUBLON_DELAI_SEUIL_H } from '@/lib/prospection-validation';
+import { validateGpsPosition } from '@/lib/prospection-validation';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { useErrorLogStore } from '@/lib/error-log-store';
@@ -491,26 +487,6 @@ export default function ReferenceScreen() {
           if (gpsBlocages.length > 0) {
             Alert.alert('⚠️ Position GPS invalide', gpsBlocages.join('\n'));
             return;
-          }
-
-          if (draft?.prospecteur_id) {
-            const sinceIso = new Date(Date.now() - DOUBLON_DELAI_SEUIL_H * 3_600_000).toISOString();
-            const fichesProches = await listProspectionsRecentesAutresProspecteurs(draft.prospecteur_id, sinceIso);
-            const { avertissements: avertissementsDoublon } = validateAntiDoublon({
-              prospecteurId: draft.prospecteur_id,
-              latitude: position.latitude,
-              longitude: position.longitude,
-              timestamp: new Date().toISOString(),
-              fichesProches: fichesProches.map((f) => ({
-                prospecteurId: f.prospecteur_id,
-                latitude: f.latitude,
-                longitude: f.longitude,
-                timestamp: f.updated_at,
-              })),
-            });
-            if (avertissementsDoublon.length > 0) {
-              Alert.alert('⚠️ À vérifier', avertissementsDoublon.join('\n'));
-            }
           }
 
           // VALIDATION PERSONNALISÉE

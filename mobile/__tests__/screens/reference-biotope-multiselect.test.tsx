@@ -29,7 +29,6 @@ jest.mock('@/lib/prospection-repository', () => ({
   updateProspectionReference: jest.fn().mockResolvedValue({ id: 'draft-123' }),
   getProspection: jest.fn(),
   listAllProspectionCaptures: jest.fn().mockResolvedValue([]),
-  listProspectionsRecentesAutresProspecteurs: jest.fn().mockResolvedValue([]),
 }));
 
 jest.mock('@/lib/location', () => ({
