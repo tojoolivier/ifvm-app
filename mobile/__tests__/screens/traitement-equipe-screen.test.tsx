@@ -25,6 +25,7 @@ jest.mock('@/lib/traitement-repository', () => ({
   updateTraitementAerien: jest.fn().mockResolvedValue({}),
   updateTraitementTerrestre: jest.fn().mockResolvedValue({}),
   addProduitUtilise: jest.fn().mockResolvedValue({}),
+  deleteAllProduitsForTraitementTerrestre: jest.fn().mockResolvedValue(undefined),
   listReprenableTraitements: jest.fn().mockResolvedValue([]),
 }));
 
@@ -298,6 +299,62 @@ describe('TraitementScreen (Équipe) — restauration après enregistrement', ()
         })
       )
     );
+  });
+});
+
+describe('TraitementScreen (Équipe, Terrestre) — persistance des produits utilisés (#persistance-fiches-traitement)', () => {
+  it('purge les produits déjà enregistrés avant de repousser la liste actuelle, pour ne pas les dupliquer à un nouveau passage sur cet écran', async () => {
+    jest.mocked(traitementRepository.addProduitUtilise).mockClear();
+    jest.mocked(traitementRepository.deleteAllProduitsForTraitementTerrestre).mockClear();
+    mockRouteParams = { traitementId: 'trait-1' };
+    jest.mocked(traitementRepository.getTraitement).mockReset().mockResolvedValue({
+      id: 'trait-1',
+      type_traitement: 'TERRESTRE',
+      // 0 plutôt que non renseigné : évite de déclencher la validation "surface
+      // restante abandonnée ?", hors périmètre de ce test.
+      cible: { surface_infestee_ha: 0 },
+      terrestre: {
+        chef_equipe_id: 'chef-equipe-1',
+        agent_encadreur_id: null,
+        consultant_international: null,
+        heure_debut: null,
+        heure_fin: null,
+        vitesse_vent_ms: null,
+        direction_vent: null,
+        temperature_c: null,
+        reprise_traitement: false,
+        traitement_origine_id: null,
+        surface_atomiseur_ha: null,
+        surface_disque_rotatif_ha: null,
+        surface_ulvamast_ha: null,
+        surface_restante_abandonnee: null,
+        motif_surface_restante_abandonnee: null,
+        essence_litres: null,
+        nb_piles: null,
+        pesticide_recu_l: null,
+        produits: [{ produit_id: 'prod-1', quantite_l: 5, nom_commercial: 'Fyfanon' }],
+      },
+    } as any);
+    useTraitementCaptureStore.setState({ ...RESET_STATE, typeTraitement: 'TERRESTRE' });
+
+    await render(<TraitementScreen />);
+    await waitFor(() => expect(useTraitementCaptureStore.getState().terrestre.chefEquipeId).toBe('chef-equipe-1'));
+
+    fireEvent.press(screen.getByText('Continuer  ›'));
+
+    await waitFor(() =>
+      expect(traitementRepository.deleteAllProduitsForTraitementTerrestre).toHaveBeenCalledWith('trait-1')
+    );
+    await waitFor(() =>
+      expect(traitementRepository.addProduitUtilise).toHaveBeenCalledWith(
+        'trait-1',
+        expect.objectContaining({ produit_id: 'prod-1' })
+      )
+    );
+    const ordrePurge = jest.mocked(traitementRepository.deleteAllProduitsForTraitementTerrestre).mock
+      .invocationCallOrder[0];
+    const ordreAjout = jest.mocked(traitementRepository.addProduitUtilise).mock.invocationCallOrder[0];
+    expect(ordrePurge).toBeLessThan(ordreAjout);
   });
 });
 

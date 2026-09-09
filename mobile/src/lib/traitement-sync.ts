@@ -173,9 +173,26 @@ function buildTraitementSyncPayload(draft: DraftTraitement): components['schemas
  * sous-ressources avec leurs propres endpoints (POST /traitements/{id}/rotations,
  * /produits). On les pousse après le sync principal, une fois qu'on est sûr
  * que le traitement existe côté serveur avec le même id.
+ *
+ * Bug corrigé (#persistance-fiches-traitement) : `serveur` porte les
+ * rotations/produits déjà enregistrés côté serveur (renvoyés par la réponse du
+ * sync principal, sans aller-retour réseau supplémentaire) — on les supprime
+ * d'abord, puis on repousse la liste locale actuelle en intégralité. Sans
+ * cette étape, chaque synchronisation (y compris un simple ré-appui sur
+ * "Synchroniser" sans rien changer, ou une resynchronisation automatique)
+ * ré-ajoutait toutes les rotations/produits déjà présents, les dupliquant à
+ * l'infini — même principe que le remplacement en masse
+ * d'evaluations_risque_population côté backend (update_sync()).
  */
-async function pushRotationsEtProduits(draft: DraftTraitement, token: string): Promise<void> {
+async function pushRotationsEtProduits(
+  draft: DraftTraitement,
+  token: string,
+  serveur: ServerTraitement | null | undefined
+): Promise<void> {
   if (draft.type_traitement === 'AERIEN' && draft.aerien) {
+    for (const rotationServeur of serveur?.aerien?.rotations ?? []) {
+      await apiClient.removeRotation(token, draft.id, rotationServeur.id);
+    }
     for (const rotation of draft.aerien.rotations) {
       // numero_cuve n'y figure pas : dérivé côté serveur de numero (migration 0046),
       // plus un champ accepté par RotationCreate.
@@ -198,6 +215,9 @@ async function pushRotationsEtProduits(draft: DraftTraitement, token: string): P
   }
 
   if (draft.type_traitement === 'TERRESTRE' && draft.terrestre) {
+    for (const produitServeur of serveur?.terrestre?.produits ?? []) {
+      await apiClient.removeProduitUtilise(token, draft.id, produitServeur.id);
+    }
     for (const produit of draft.terrestre.produits) {
       await apiClient.addProduitUtilise(token, draft.id, {
         produit_id: produit.produit_id ?? '',
@@ -229,7 +249,7 @@ export async function syncOneTraitement(draft: DraftTraitement, token: string): 
     );
   }
 
-  await pushRotationsEtProduits(draft, token);
+  await pushRotationsEtProduits(draft, token, body as ServerTraitement);
   await markTraitementSynced(draft.id, (body as ServerTraitement)?.updated_at);
 }
 

@@ -23,7 +23,13 @@ jest.mock('../src/lib/api-client', () => {
   // vraies implémentations, sans effet de bord, plutôt qu'un stub qui mentirait.
   const { NetworkError } = jest.requireActual('../src/lib/errors');
   return {
-    apiClient: { syncTraitement: jest.fn(), addRotation: jest.fn(), addProduitUtilise: jest.fn() },
+    apiClient: {
+      syncTraitement: jest.fn(),
+      addRotation: jest.fn(),
+      removeRotation: jest.fn(),
+      addProduitUtilise: jest.fn(),
+      removeProduitUtilise: jest.fn(),
+    },
     statutHttpDe: (error: unknown) => {
       const statut = (error as { status?: number } | null)?.status;
       return typeof statut === 'number' ? statut : null;
@@ -123,6 +129,10 @@ beforeEach(() => {
   mockSyncTraitement.mockReset();
   mockGetNetworkState.mockReset();
   mockMarkEchec.mockReset();
+  jest.mocked(apiClient.addRotation).mockClear();
+  jest.mocked(apiClient.removeRotation).mockClear();
+  jest.mocked(apiClient.addProduitUtilise).mockClear();
+  jest.mocked(apiClient.removeProduitUtilise).mockClear();
 });
 
 describe('enregistrerEtSynchroniserTraitement', () => {
@@ -242,6 +252,42 @@ describe('enregistrerEtSynchroniserTraitement', () => {
       'traitement-1',
       expect.objectContaining({ produit_id: 'prod-1', nom_commercial: 'Fyfanon' })
     );
+  });
+
+  it('supprime les rotations déjà côté serveur avant de repousser la liste locale, pour ne pas les dupliquer à chaque synchronisation (#persistance-fiches-traitement)', async () => {
+    mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
+    // La réponse du sync principal porte les rotations déjà enregistrées côté
+    // serveur (id serveur "rot-server-1") — distinctes de l'id local ("rot-1"),
+    // qui n'a aucune signification côté serveur.
+    mockSyncTraitement.mockResolvedValue({
+      status: 200,
+      body: {
+        id: 'traitement-1',
+        updated_at: '2026-08-13T00:00:00.000Z',
+        aerien: { rotations: [{ id: 'rot-server-1' }] },
+      },
+    });
+    mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
+
+    const draftAvecRotation = draft({
+      aerien: {
+        ...draft().aerien!,
+        rotations: [{ id: 'rot-1', traitement_aerien_id: 'traitement-1', numero: 1, numero_cuve: '1', produit_id: 'prod-1', quantite: 10, unite: 'L', surface_ha: 5, temperature_debut_c: 25, temperature_fin_c: 27, vent_debut_ms: 2, vent_fin_ms: 3, heure_debut: '06:00', heure_fin: '06:30', heure_ouverture_vanne: '06:05', heure_fermeture_vanne: '06:25', nom_commercial: 'Fyfanon' }],
+      },
+    });
+
+    await enregistrerEtSynchroniserTraitement(draftAvecRotation, 'token-1');
+
+    expect(apiClient.removeRotation).toHaveBeenCalledWith('token-1', 'traitement-1', 'rot-server-1');
+    expect(apiClient.addRotation).toHaveBeenCalledWith(
+      'token-1',
+      'traitement-1',
+      expect.objectContaining({ produit_id: 'prod-1' })
+    );
+    // La suppression précède le ré-ajout : sinon la fenêtre de duplication existe encore.
+    const ordreAppelsRemove = jest.mocked(apiClient.removeRotation).mock.invocationCallOrder[0];
+    const ordreAppelsAdd = jest.mocked(apiClient.addRotation).mock.invocationCallOrder[0];
+    expect(ordreAppelsRemove).toBeLessThan(ordreAppelsAdd);
   });
 
   it('utilise server_updated_at comme base_updated_at quand la fiche a déjà été synchronisée', async () => {
@@ -365,6 +411,64 @@ describe('enregistrerEtSynchroniserTraitement', () => {
         terrestre: expect.objectContaining({ chef_equipe_id: 'chef-equipe-1', vitesse_vent_ms: 2 }),
       })
     );
+  });
+
+  it('supprime les produits déjà côté serveur avant de repousser la liste locale, pour ne pas les dupliquer à chaque synchronisation (#persistance-fiches-traitement)', async () => {
+    mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
+    mockSyncTraitement.mockResolvedValue({
+      status: 200,
+      body: {
+        id: 'traitement-2',
+        updated_at: '2026-08-13T00:00:00.000Z',
+        terrestre: { produits: [{ id: 'produit-server-1' }] },
+      },
+    });
+    mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
+
+    const terrestreDraft = draft({
+      id: 'traitement-2',
+      type_traitement: 'TERRESTRE',
+      aerien: undefined,
+      terrestre: {
+        traitement_id: 'traitement-2',
+        heure_debut: '08:00:00',
+        heure_fin: '10:00:00',
+        vitesse_vent_ms: 2,
+        direction_vent: 'N',
+        temperature_c: 25,
+        reprise_traitement: false,
+        traitement_origine_id: null,
+        chef_equipe_id: 'chef-equipe-1',
+        agent_encadreur_id: null,
+        consultant_international: null,
+        surface_atomiseur_ha: 3,
+        surface_disque_rotatif_ha: null,
+        surface_ulvamast_ha: null,
+        surface_restante_abandonnee: null,
+        motif_surface_restante_abandonnee: null,
+        essence_litres: 10,
+        nb_piles: 2,
+        surface_traitee_ha: null,
+        surface_cumulee_ha: null,
+        surface_restante_ha: null,
+        total_pesticide_l: null,
+        pesticide_recu_l: null,
+        pesticide_stock_restant_l: null,
+        produits: [{ id: 'produit-local-1', traitement_terrestre_id: 'traitement-2', numero: 1, produit_id: 'prod-1', quantite_l: 5, nom_commercial: 'Fyfanon' }],
+      },
+    });
+
+    await enregistrerEtSynchroniserTraitement(terrestreDraft, 'token-1');
+
+    expect(apiClient.removeProduitUtilise).toHaveBeenCalledWith('token-1', 'traitement-2', 'produit-server-1');
+    expect(apiClient.addProduitUtilise).toHaveBeenCalledWith(
+      'token-1',
+      'traitement-2',
+      expect.objectContaining({ produit_id: 'prod-1' })
+    );
+    const ordreRemove = jest.mocked(apiClient.removeProduitUtilise).mock.invocationCallOrder[0];
+    const ordreAdd = jest.mocked(apiClient.addProduitUtilise).mock.invocationCallOrder[0];
+    expect(ordreRemove).toBeLessThan(ordreAdd);
   });
 });
 

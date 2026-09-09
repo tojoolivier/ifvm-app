@@ -2,7 +2,12 @@ import { useEffect, useState } from 'react';
 import { Text, TextInput, TouchableOpacity, ScrollView, View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { getTraitement, addRotation, updateTraitementAerienPesticideRecu } from '@/lib/traitement-repository';
+import {
+  getTraitement,
+  addRotation,
+  deleteAllRotationsForTraitementAerien,
+  updateTraitementAerienPesticideRecu,
+} from '@/lib/traitement-repository';
 import { listPesticides, Pesticide } from '@/lib/referentiel-db';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import {
@@ -158,6 +163,12 @@ export default function RotationsScreen() {
         }
         setError(undefined);
         await updateTraitementAerienPesticideRecu(traitementId, store.aerien.pesticideRecuL);
+        // Purge avant re-création (#persistance-fiches-traitement) : le store
+        // ne porte pas d'id stable côté DB pour distinguer une rotation déjà
+        // enregistrée d'une nouvelle — sans cette purge, ré-enregistrer une
+        // fiche déjà sauvegardée dupliquait toutes ses rotations à chaque
+        // passage sur cet écran.
+        await deleteAllRotationsForTraitementAerien(traitementId);
         for (const r of store.aerien.rotations) {
           await addRotation(traitementId, {
             produit_id: r.produit_id,
