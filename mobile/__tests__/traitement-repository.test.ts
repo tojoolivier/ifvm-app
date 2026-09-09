@@ -191,6 +191,31 @@ describe('updateTraitementAerien', () => {
       expect.arrayContaining(['Jean Dupont', 'Marc Rabe', AERIEN_INPUT.chefDeBaseId])
     );
   });
+
+  it('persists stand/base secondaire dates d\'installation, indépendamment l\'une de l\'autre (#stand-base-secondaire-date-installation)', async () => {
+    getFirstAsync.mockResolvedValueOnce(STORED_TRAITEMENT_ROW).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+
+    await updateTraitementAerien(AERIEN_INPUT.id, {
+      pilote: 'Jean Dupont',
+      mecanicien: 'Marc Rabe',
+      chefDeBaseId: AERIEN_INPUT.chefDeBaseId,
+      stand: 'Stand Betioky',
+      standDateInstallation: '2026-07-01',
+      // Base secondaire vide alors que sa date est renseignée : les deux
+      // couples (texte libre, date) sont indépendants.
+      baseSecondaire: null,
+      baseSecondaireDateInstallation: '2026-07-15',
+    });
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('stand_date_installation = ?'),
+      expect.arrayContaining(['Stand Betioky', '2026-07-01', null, '2026-07-15'])
+    );
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('base_secondaire_date_installation = ?'),
+      expect.anything()
+    );
+  });
 });
 
 describe('updateTraitementTerrestre', () => {

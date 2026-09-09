@@ -787,6 +787,13 @@ const COLONNES_TRAITEMENT_AERIEN: readonly Colonne[] = [
   { name: 'base_principale', type: 'TEXT' },
   { name: 'stand', type: 'TEXT' },
   { name: 'base_secondaire', type: 'TEXT' },
+  // Date d'installation du Stand / de la Base secondaire (migration backend
+  // 0056, #stand-base-secondaire-date-installation) — facultative et
+  // indépendante du texte libre lui-même. Aucun équivalent pour
+  // base_principale : hors périmètre de cette demande. Stockée en ISO (yyyy-MM-dd),
+  // comme les autres champs date de ce fichier.
+  { name: 'stand_date_installation', type: 'TEXT' },
+  { name: 'base_secondaire_date_installation', type: 'TEXT' },
   // Chaînage de reprise (migration backend 0050) — généralise à l'Aérien ce qui
   // existait déjà côté Terrestre depuis l'origine (cf. CREATE TABLE
   // traitement_terrestre ci-dessus, où ces 3 colonnes figurent nativement).

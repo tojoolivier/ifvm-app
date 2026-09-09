@@ -86,6 +86,66 @@ async def test_create_traitement_aerien_brouillon(
 
 
 @pytest.mark.asyncio
+async def test_traitement_aerien_stand_et_base_secondaire_avec_date_installation(
+    client, auth_headers, db_session, campagne_id, utilisateur, chef_de_base, pilote, mecanicien
+):
+    """#stand-base-secondaire-date-installation : Stand/Base secondaire restent
+    du texte libre, la date d'installation de chacun est facultative et
+    independante — aucun champ equivalent pour base_principale."""
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    resp = await client.post(
+        "/traitements",
+        json={
+            "prospection_id": str(prospection_id),
+            "date_traitement": "2026-08-11",
+            "date_validation": "2026-08-10",
+            "localite": "Betioky",
+            "aerien": {
+                "pilote": f"{pilote.prenom} {pilote.nom}",
+                "mecanicien": f"{mecanicien.prenom} {mecanicien.nom}",
+                "chef_de_base_id": str(chef_de_base.id),
+                "base_principale": "Base Betioky",
+                "stand": "Stand Ihosy",
+                "stand_date_installation": "2026-07-01",
+                "base_secondaire": "Base Ambovombe",
+                "base_secondaire_date_installation": "2026-07-15",
+                "immatricule_aeronef": "5R-ABC",
+            },
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    aerien = resp.json()["aerien"]
+    assert aerien["stand"] == "Stand Ihosy"
+    assert aerien["stand_date_installation"] == "2026-07-01"
+    assert aerien["base_secondaire"] == "Base Ambovombe"
+    assert aerien["base_secondaire_date_installation"] == "2026-07-15"
+
+    # Persistance après réouverture.
+    relu = await client.get(f"/traitements/{resp.json()['id']}", headers=auth_headers)
+    assert relu.json()["aerien"]["stand_date_installation"] == "2026-07-01"
+    assert relu.json()["aerien"]["base_secondaire_date_installation"] == "2026-07-15"
+
+
+@pytest.mark.asyncio
+async def test_traitement_aerien_stand_et_base_secondaire_dates_facultatives(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+):
+    """Stand/Base secondaire et leurs dates sont facultatifs, indépendamment les
+    uns des autres — aucun des quatre cas ne bloque l'enregistrement."""
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    resp = await client.post(
+        "/traitements", json=payload_traitement(prospection_id), headers=auth_headers
+    )
+    assert resp.status_code == 201, resp.text
+    aerien = resp.json()["aerien"]
+    assert aerien["stand"] is None
+    assert aerien["stand_date_installation"] is None
+    assert aerien["base_secondaire"] is None
+    assert aerien["base_secondaire_date_installation"] is None
+
+
+@pytest.mark.asyncio
 async def test_traitement_aerien_expose_le_numero_de_fiche_prospection_liee(
     client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_rotation
 ):

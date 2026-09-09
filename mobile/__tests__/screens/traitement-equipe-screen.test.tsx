@@ -33,6 +33,26 @@ jest.mock('@/lib/referentiel-db', () => ({
   listPesticides: jest.fn().mockResolvedValue([]),
 }));
 
+/**
+ * `@react-native-community/datetimepicker` (#stand-base-secondaire-date-installation)
+ * rend un calendrier natif : comme pour `@react-native-picker/picker` ci-dessus
+ * (extensive-reference-screen-restore.test.tsx), aucun moyen public de « choisir
+ * une date » dans l'arbre de rendu Jest. Remplacement minimal qui, une fois
+ * affiché (après avoir pressé le champ `DateField`), déclenche `onValueChange`
+ * avec une date fixe — le geste natif de sélection reste hors périmètre.
+ */
+jest.mock('@react-native-community/datetimepicker', () => {
+  const React = require('react');
+  const { Text, TouchableOpacity } = require('react-native');
+  return function MockDateTimePicker({ onValueChange }: any) {
+    return (
+      <TouchableOpacity testID="mock-date-picker" onPress={() => onValueChange({}, new Date(2026, 6, 1))}>
+        <Text>mock-date-picker</Text>
+      </TouchableOpacity>
+    );
+  };
+});
+
 const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
 
 const RESET_STATE = {
@@ -74,7 +94,9 @@ beforeEach(() => {
       immatricule_aeronef: null,
       base_principale: null,
       stand: null,
+      stand_date_installation: null,
       base_secondaire: null,
+      base_secondaire_date_installation: null,
       rotations: [],
     },
   } as any);
@@ -276,5 +298,143 @@ describe('TraitementScreen (Équipe) — restauration après enregistrement', ()
         })
       )
     );
+  });
+});
+
+describe('TraitementScreen (Équipe) — date d\'installation du Stand/de la Base secondaire (#stand-base-secondaire-date-installation)', () => {
+  it('restaure les dates d\'installation déjà enregistrées, indépendamment du texte libre associé', async () => {
+    jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
+      id: 'trait-1',
+      type_traitement: 'AERIEN',
+      cible: { surface_infestee_ha: 100 },
+      aerien: {
+        pilote: 'Jean Dupont',
+        mecanicien: 'Marc Rabe',
+        chef_de_base_id: 'chef-1',
+        consultant_international: null,
+        immatricule_aeronef: '5R-ABC',
+        base_principale: 'Piste 12',
+        stand: 'Stand Betioky',
+        stand_date_installation: '2026-07-01',
+        // Base secondaire vide alors que sa date est renseignée : les deux
+        // champs sont indépendants l'un de l'autre.
+        base_secondaire: null,
+        base_secondaire_date_installation: '2026-07-15',
+        rotations: [],
+      },
+    } as any);
+
+    await render(<TraitementScreen />);
+    await screen.findByText('Sarah Ravelo');
+
+    expect(await screen.findByText('01/07/2026')).toBeVisible();
+    expect(screen.getByText('15/07/2026')).toBeVisible();
+  });
+
+  it('enregistre une date d\'installation du Stand choisie via le sélecteur, sans toucher à la Base secondaire', async () => {
+    await render(<TraitementScreen />);
+    await screen.findByText('Sarah Ravelo');
+
+    fireEvent.changeText(screen.getByPlaceholderText('Nom de la base principale'), 'Base Betioky');
+    await settle();
+    fireEvent.changeText(screen.getByPlaceholderText('Nom du stand (facultatif)'), 'Stand Betioky');
+    await settle();
+
+    // Les deux DateField vides partagent le même placeholder ; celui du Stand
+    // est le premier rendu (rangée Stand avant rangée Base secondaire).
+    fireEvent.press(screen.getAllByLabelText('JJ/MM/AAAA')[0]);
+    await settle();
+    fireEvent.press(await screen.findByTestId('mock-date-picker'));
+    await settle();
+
+    expect(await screen.findByText('01/07/2026')).toBeVisible();
+    // Base secondaire reste vide : la date d'installation du Stand est
+    // indépendante du champ Base secondaire.
+    expect(screen.getAllByLabelText('JJ/MM/AAAA')).toHaveLength(1);
+
+    fireEvent.press(screen.getByText('Sarah Ravelo'));
+    await settle();
+    fireEvent.changeText(screen.getByPlaceholderText('Nom du pilote'), 'Jean Dupont');
+    await settle();
+    fireEvent.changeText(screen.getByPlaceholderText('Nom du mécanicien'), 'Marc Rabe');
+    await settle();
+    fireEvent.changeText(screen.getByPlaceholderText('Ex. 5R-ABC'), '5R-XYZ');
+    await settle();
+
+    fireEvent.press(screen.getByText('Continuer  ›'));
+
+    await waitFor(() =>
+      expect(traitementRepository.updateTraitementAerien).toHaveBeenCalledWith(
+        'trait-1',
+        expect.objectContaining({
+          stand: 'Stand Betioky',
+          standDateInstallation: '2026-07-01',
+          baseSecondaire: null,
+          baseSecondaireDateInstallation: null,
+        })
+      )
+    );
+  });
+
+  it('accepte l\'enregistrement quand Stand/Base secondaire et leurs dates sont tous vides', async () => {
+    await render(<TraitementScreen />);
+    await screen.findByText('Sarah Ravelo');
+
+    fireEvent.changeText(screen.getByPlaceholderText('Nom de la base principale'), 'Base Betioky');
+    await settle();
+    fireEvent.press(screen.getByText('Sarah Ravelo'));
+    await settle();
+    fireEvent.changeText(screen.getByPlaceholderText('Nom du pilote'), 'Jean Dupont');
+    await settle();
+    fireEvent.changeText(screen.getByPlaceholderText('Nom du mécanicien'), 'Marc Rabe');
+    await settle();
+    fireEvent.changeText(screen.getByPlaceholderText('Ex. 5R-ABC'), '5R-XYZ');
+    await settle();
+    // Stand, Base secondaire et leurs deux dates d'installation laissés vides.
+
+    fireEvent.press(screen.getByText('Continuer  ›'));
+
+    await waitFor(() =>
+      expect(traitementRepository.updateTraitementAerien).toHaveBeenCalledWith(
+        'trait-1',
+        expect.objectContaining({
+          stand: null,
+          standDateInstallation: null,
+          baseSecondaire: null,
+          baseSecondaireDateInstallation: null,
+        })
+      )
+    );
+    expect(mockPush).toHaveBeenCalled();
+  });
+
+  it('ne crée jamais de champ « Base principale »-like pour les dates : seuls stand/base secondaire en portent une', async () => {
+    jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
+      id: 'trait-1',
+      type_traitement: 'AERIEN',
+      cible: { surface_infestee_ha: 100 },
+      aerien: {
+        pilote: 'Jean Dupont',
+        mecanicien: 'Marc Rabe',
+        chef_de_base_id: 'chef-1',
+        consultant_international: null,
+        immatricule_aeronef: '5R-ABC',
+        base_principale: 'Piste 12',
+        stand: 'Stand Betioky',
+        stand_date_installation: '2026-07-01',
+        base_secondaire: 'Ambovombe',
+        base_secondaire_date_installation: '2026-07-15',
+        rotations: [],
+      },
+    } as any);
+
+    await render(<TraitementScreen />);
+    await screen.findByText('Sarah Ravelo');
+
+    // Exactement 2 DateField affichées (Stand + Base secondaire) : aucune
+    // troisième pour Base principale, qui reste hors périmètre.
+    expect(await screen.findByText('01/07/2026')).toBeVisible();
+    expect(screen.getByText('15/07/2026')).toBeVisible();
+    expect(screen.getAllByText(/date d.installation/i)).toHaveLength(2);
   });
 });

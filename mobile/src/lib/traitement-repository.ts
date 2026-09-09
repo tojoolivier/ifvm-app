@@ -88,7 +88,9 @@ export interface TraitementAerien {
   immatricule_aeronef: string | null;
   base_principale: string | null;
   stand: string | null;
+  stand_date_installation: string | null;
   base_secondaire: string | null;
+  base_secondaire_date_installation: string | null;
   nb_rotations: number | null;
   total_pesticide_l: number | null;
   total_pesticide_kg: number | null;
@@ -454,7 +456,12 @@ export interface AerienUpdateInput {
   // facultatifs.
   basePrincipale?: string | null;
   stand?: string | null;
+  // Date d'installation (migration backend 0056, #stand-base-secondaire-date-installation)
+  // — facultative et indépendante du texte libre lui-même. Rien d'équivalent
+  // pour basePrincipale : hors périmètre.
+  standDateInstallation?: string | null;
   baseSecondaire?: string | null;
+  baseSecondaireDateInstallation?: string | null;
   // surfaceTraiteeHa n'y figure plus (migration 0046) : dérivée des rotations,
   // même traitement que nb_rotations/total_pesticide_l — jamais mise à jour par cette
   // fonction, seulement par la synchronisation.
@@ -480,7 +487,9 @@ export async function updateTraitementAerien(
       immatricule_aeronef = ?,
       base_principale = ?,
       stand = ?,
+      stand_date_installation = ?,
       base_secondaire = ?,
+      base_secondaire_date_installation = ?,
       pesticide_recu_l = ?,
       reprise_traitement = ?,
       traitement_origine_id = ?
@@ -493,7 +502,9 @@ export async function updateTraitementAerien(
       input.immatriculeAeronef ?? null,
       input.basePrincipale ?? null,
       input.stand ?? null,
+      input.standDateInstallation ?? null,
       input.baseSecondaire ?? null,
+      input.baseSecondaireDateInstallation ?? null,
       input.pesticideRecuL ?? null,
       input.repriseTraitement ?? null,
       input.traitementOrigineId ?? null,

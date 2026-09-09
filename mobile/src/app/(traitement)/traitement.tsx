@@ -74,7 +74,9 @@ export default function TraitementScreen() {
           immatriculationAeronef: draft.aerien.immatricule_aeronef,
           basePrincipale: draft.aerien.base_principale || null,
           stand: draft.aerien.stand,
+          standDateInstallation: draft.aerien.stand_date_installation,
           baseSecondaire: draft.aerien.base_secondaire,
+          baseSecondaireDateInstallation: draft.aerien.base_secondaire_date_installation,
           // pesticide_recu_l n'est plus hydraté ici : saisi sur l'écran « Traitement »
           // (rotations.tsx, #equipe-slide-aerien), qui charge ce champ lui-même.
           repriseTraitement: draft.aerien.reprise_traitement ?? false,
@@ -231,7 +233,9 @@ export default function TraitementScreen() {
             immatriculeAeronef: store.aerien.immatriculationAeronef,
             basePrincipale: store.aerien.basePrincipale!,
             stand: store.aerien.stand,
+            standDateInstallation: store.aerien.standDateInstallation,
             baseSecondaire: store.aerien.baseSecondaire,
+            baseSecondaireDateInstallation: store.aerien.baseSecondaireDateInstallation,
             repriseTraitement: store.aerien.repriseTraitement,
             traitementOrigineId: store.aerien.traitementOrigineId,
           });

@@ -4,6 +4,7 @@ import { UtilisateurEquipe } from '@/lib/referentiel-db';
 import { DraftTraitementRow } from '@/lib/traitement-repository';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import { Chip } from '@/components/traitement/Chip';
+import { DateField } from '@/components/traitement/DateField';
 import { formStyles as styles } from '@/components/traitement/TraitementFormStyles';
 
 export interface AerienFormProps {
@@ -101,23 +102,52 @@ export function AerienForm({
         onChangeText={(v) => store.updateAerien({ basePrincipale: v })}
       />
 
-      <Text style={styles.label}>Stand</Text>
-      <TextInput
-        editable={!readOnly}
-        style={styles.input}
-        placeholder="Nom du stand (facultatif)"
-        value={store.aerien.stand ?? ''}
-        onChangeText={(v) => store.updateAerien({ stand: v || null })}
-      />
+      {/* Date d'installation (migration backend 0056,
+          #stand-base-secondaire-date-installation) — facultative et indépendante
+          du texte libre du Stand/de la Base secondaire lui-même : chacune des 4
+          combinaisons (renseigné/vide croisé) est acceptée. Aucun champ
+          équivalent pour Base principale, hors périmètre de cette demande. */}
+      <View style={styles.row}>
+        <View style={styles.flex1}>
+          <Text style={styles.label}>Stand</Text>
+          <TextInput
+            editable={!readOnly}
+            style={styles.input}
+            placeholder="Nom du stand (facultatif)"
+            value={store.aerien.stand ?? ''}
+            onChangeText={(v) => store.updateAerien({ stand: v || null })}
+          />
+        </View>
+        <View style={styles.flex1}>
+          <Text style={styles.label}>Date d’installation</Text>
+          <DateField
+            editable={!readOnly}
+            value={store.aerien.standDateInstallation ?? null}
+            onChange={(v) => store.updateAerien({ standDateInstallation: v })}
+          />
+        </View>
+      </View>
 
-      <Text style={styles.label}>Base secondaire</Text>
-      <TextInput
-        editable={!readOnly}
-        style={styles.input}
-        placeholder="Nom de la base secondaire (facultatif)"
-        value={store.aerien.baseSecondaire ?? ''}
-        onChangeText={(v) => store.updateAerien({ baseSecondaire: v || null })}
-      />
+      <View style={styles.row}>
+        <View style={styles.flex1}>
+          <Text style={styles.label}>Base secondaire</Text>
+          <TextInput
+            editable={!readOnly}
+            style={styles.input}
+            placeholder="Nom de la base secondaire (facultatif)"
+            value={store.aerien.baseSecondaire ?? ''}
+            onChangeText={(v) => store.updateAerien({ baseSecondaire: v || null })}
+          />
+        </View>
+        <View style={styles.flex1}>
+          <Text style={styles.label}>Date d’installation</Text>
+          <DateField
+            editable={!readOnly}
+            value={store.aerien.baseSecondaireDateInstallation ?? null}
+            onChange={(v) => store.updateAerien({ baseSecondaireDateInstallation: v })}
+          />
+        </View>
+      </View>
 
       {/* Chaînage de reprise (migration backend 0050) — mirroir exact du bloc
           équivalent dans TerrestreForm. */}

@@ -120,7 +120,13 @@ function buildTraitementSyncPayload(draft: DraftTraitement): components['schemas
         // quelle, jamais résolue/remplacée par une valeur du référentiel.
         base_principale: draft.aerien.base_principale,
         stand: draft.aerien.stand,
+        // Date d'installation (migration backend 0056,
+        // #stand-base-secondaire-date-installation) — facultative et
+        // indépendante du texte libre lui-même. Rien d'équivalent pour
+        // base_principale : hors périmètre.
+        stand_date_installation: draft.aerien.stand_date_installation,
         base_secondaire: draft.aerien.base_secondaire,
+        base_secondaire_date_installation: draft.aerien.base_secondaire_date_installation,
         // surface_traitee_ha n'y figure plus (migration 0047) : dérivée des rotations
         // côté serveur, plus un champ accepté par TraitementSyncPush.
         pesticide_recu_l: draft.aerien.pesticide_recu_l,
