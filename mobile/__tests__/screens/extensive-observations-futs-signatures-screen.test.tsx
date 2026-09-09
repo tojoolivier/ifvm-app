@@ -36,14 +36,13 @@ jest.mock('@/lib/prospection-repository', () => ({
   },
 }));
 
-// Consultant FAO/Pilote/Chef de Base : agents habilités proposés en chips
-// (listUtilisateursByRole), même mécanisme que côté Traitement — cf. commentaire
-// sur agentsPourRole dans l'écran.
+// Chef de Base seul reste sur les agents habilités proposés en chips
+// (listUtilisateursByRole), même mécanisme que côté Traitement. Pilote (auto-
+// rempli depuis Référence) et Consultant FAO (saisie libre) n'en ont plus
+// besoin (#consultant-fao-pilote-auto).
 jest.mock('@/lib/referentiel-db', () => ({
   listUtilisateursByRole: jest.fn((role: string) => {
-    if (role === 'pilote') return Promise.resolve([{ id: 'pilote-1', nom: 'Rakoto', prenom: 'Jean' }]);
     if (role === 'chef_de_base') return Promise.resolve([{ id: 'chef-1', nom: 'Rabe', prenom: 'Marie' }]);
-    if (role === 'consultant_international') return Promise.resolve([{ id: 'consultant-1', nom: 'Smith', prenom: 'John' }]);
     return Promise.resolve([]);
   }),
 }));
@@ -127,26 +126,46 @@ describe('ExtensiveObservationsScreen — VISA retiré', () => {
   });
 });
 
-describe('ExtensiveObservationsScreen — mode aérien : signatures numériques (Consultant FAO/Pilote/Chef de Base — agent habilité + tracé)', () => {
-  it('sélectionner un agent affiche un pavé de signature ; VALIDER capture nom + tracé + horodatage et persiste immédiatement (pas seulement au clic sur Suivant)', async () => {
+describe('ExtensiveObservationsScreen — mode aérien : Pilote auto-rempli depuis Référence (#consultant-fao-pilote-auto)', () => {
+  it('affiche automatiquement le nom du pilote saisi sur Référence, sans aucune sélection manuelle', async () => {
     useProspectionWizardStore.setState({
-      draft: { id: 'draft-123', type_prospection: 'extensive', mode_extensif: 'aerien' } as any,
+      draft: { id: 'draft-123', type_prospection: 'extensive', mode_extensif: 'aerien', pilote: 'Jean Rakoto' } as any,
       captures: [],
     });
 
     await render(<ExtensiveObservationsScreen />);
     await screen.findByText('Signatures');
 
-    // Chip issu de listUtilisateursByRole('pilote') (mocké en tête de fichier) —
-    // choisir l'agent ne signe plus immédiatement : il désigne le signataire à
-    // venir, le pavé de signature apparaît.
-    const chipPilote = await screen.findByText('Jean Rakoto');
-    fireEvent.press(chipPilote);
+    expect(await screen.findByText('Jean Rakoto')).toBeVisible();
+    // Jamais de chip à choisir pour ce rôle désormais.
+    expect(screen.queryByText('Rakoto Jean')).toBeNull();
+  });
+
+  it('VALIDER n’apparaît pas tant qu’aucun pilote n’est renseigné sur Référence', async () => {
+    useProspectionWizardStore.setState({
+      draft: { id: 'draft-123', type_prospection: 'extensive', mode_extensif: 'aerien', pilote: null } as any,
+      captures: [],
+    });
+
+    await render(<ExtensiveObservationsScreen />);
+    await screen.findByText('Signatures');
+
+    expect(screen.getByText('Pilote non renseigné (voir Référence)')).toBeVisible();
+    expect(screen.queryByTestId('signature-pad-pilote')).toBeNull();
+  });
+
+  it('signer capture le nom (issu de Référence) + le tracé + l’horodatage, et persiste immédiatement (pas seulement au clic sur Suivant)', async () => {
+    useProspectionWizardStore.setState({
+      draft: { id: 'draft-123', type_prospection: 'extensive', mode_extensif: 'aerien', pilote: 'Jean Rakoto' } as any,
+      captures: [],
+    });
+
+    await render(<ExtensiveObservationsScreen />);
+    await screen.findByText('Signatures');
 
     const pad = await screen.findByTestId('signature-pad-pilote');
     fireEvent.press(pad);
     await settle();
-
     fireEvent.press(screen.getAllByText('VALIDER')[INDEX_PILOTE]);
 
     // Persisté dès VALIDER — avant même « Suivant : Récapitulatif ».
@@ -164,43 +183,13 @@ describe('ExtensiveObservationsScreen — mode aérien : signatures numériques 
     expect(screen.getAllByText('MODIFIER').length).toBeGreaterThan(0);
   });
 
-  it('le bouton VALIDER reste désactivé tant qu’aucun tracé n’a été dessiné', async () => {
-    useProspectionWizardStore.setState({
-      draft: { id: 'draft-123', type_prospection: 'extensive', mode_extensif: 'aerien' } as any,
-      captures: [],
-    });
-
-    await render(<ExtensiveObservationsScreen />);
-    await screen.findByText('Signatures');
-
-    const chipPilote = await screen.findByText('Jean Rakoto');
-    fireEvent.press(chipPilote);
-    await screen.findByTestId('signature-pad-pilote');
-
-    const valider = screen.getAllByText('VALIDER')[INDEX_PILOTE];
-    fireEvent.press(valider);
-    await settle();
-
-    // Le changement de personne invalide toute signature précédente tout de
-    // suite ; le bouton désactivé ne crée toutefois aucun tracé numérique.
-    await waitFor(() =>
-      expect(prospectionRepository.updateProspectionExtensiveObservations).toHaveBeenCalledWith(
-        'draft-123',
-        expect.objectContaining({
-          signaturePiloteNom: 'Jean Rakoto',
-          signaturePiloteImage: null,
-          signaturePiloteHorodatage: null,
-        })
-      )
-    );
-  });
-
-  it('restaure une signature déjà enregistrée (fiche rouverte) : affichage lecture seule + MODIFIER, pavé pré-rempli', async () => {
+  it('restaure une signature déjà enregistrée pour le même pilote (fiche rouverte) : lecture seule + MODIFIER, pavé pré-rempli', async () => {
     useProspectionWizardStore.setState({
       draft: {
         id: 'draft-123',
         type_prospection: 'extensive',
         mode_extensif: 'aerien',
+        pilote: 'Jean Rakoto',
         signature_pilote_nom: 'Jean Rakoto',
         signature_pilote_horodatage: '2026-09-01T09:10:00.000Z',
         signature_pilote_image: 'M9 9 L8 8',
@@ -222,6 +211,7 @@ describe('ExtensiveObservationsScreen — mode aérien : signatures numériques 
         id: 'draft-123',
         type_prospection: 'extensive',
         mode_extensif: 'aerien',
+        pilote: 'Jean Rakoto',
         signature_pilote_nom: 'Jean Rakoto',
         signature_pilote_horodatage: '2026-09-01T09:10:00.000Z',
         signature_pilote_image: 'M9 9 L8 8',
@@ -251,12 +241,13 @@ describe('ExtensiveObservationsScreen — mode aérien : signatures numériques 
     );
   });
 
-  it('changer d’agent alors qu’une signature était déjà validée efface l’ancienne — jamais attribuée au nouveau signataire (§8)', async () => {
+  it('changer le pilote sur Référence (retour à Signature dans la même session) invalide l’ancienne signature — jamais attribuée au nouveau pilote (§4)', async () => {
     useProspectionWizardStore.setState({
       draft: {
         id: 'draft-123',
         type_prospection: 'extensive',
         mode_extensif: 'aerien',
+        pilote: 'Jean Rakoto',
         signature_pilote_nom: 'Jean Rakoto',
         signature_pilote_horodatage: '2026-09-01T09:10:00.000Z',
         signature_pilote_image: 'M9 9 L8 8',
@@ -264,40 +255,40 @@ describe('ExtensiveObservationsScreen — mode aérien : signatures numériques 
       captures: [],
     });
 
-    // Un second pilote habilité, distinct de celui déjà signé.
-    const referentielDb = require('@/lib/referentiel-db');
-    jest.mocked(referentielDb.listUtilisateursByRole).mockImplementation((role: string) => {
-      if (role === 'pilote')
-        return Promise.resolve([
-          { id: 'pilote-1', nom: 'Rakoto', prenom: 'Jean' },
-          { id: 'pilote-2', nom: 'Rabe', prenom: 'Paul' },
-        ]);
-      if (role === 'chef_de_base') return Promise.resolve([{ id: 'chef-1', nom: 'Rabe', prenom: 'Marie' }]);
-      if (role === 'consultant_international') return Promise.resolve([{ id: 'consultant-1', nom: 'Smith', prenom: 'John' }]);
-      return Promise.resolve([]);
-    });
-
     await render(<ExtensiveObservationsScreen />);
     await screen.findByText('Jean Rakoto');
-    // Signature initiale déjà là : mode lecture seule, pas de chip visible tant
-    // que MODIFIER n'a pas été pressé.
     expect(screen.getByTestId('signature-pad-pilote')).toHaveTextContent('trace:M9 9 L8 8');
-    expect(screen.queryByText('Paul Rabe')).toBeNull();
 
-    fireEvent.press(screen.getAllByText('MODIFIER')[0]);
-    await settle();
+    // La persistance automatique de la rupture (setDraft(updated)) doit
+    // recevoir en retour une ligne complète (comme le fait la vraie
+    // implémentation locale, un SELECT * après l'UPDATE) — un mock générique
+    // sans `pilote` ferait disparaître ce champ du store global et
+    // redéclencherait l'effet en cascade avec un nom vide.
+    jest.mocked(prospectionRepository.updateProspectionExtensiveObservations).mockResolvedValue({
+      id: 'draft-123',
+      mode_extensif: 'aerien',
+      pilote: 'Paul Rabe',
+      signature_pilote_nom: 'Paul Rabe',
+      signature_pilote_horodatage: null,
+      signature_pilote_image: null,
+    } as any);
 
-    const chipNouveauPilote = await screen.findByText('Paul Rabe');
-    fireEvent.press(chipNouveauPilote);
+    // Simule le retour depuis Référence après avoir changé le pilote — cet
+    // écran de Signature reste monté (expo-router ne le démonte pas en
+    // repassant par "précédent"), seul le `draft` partagé change.
+    useProspectionWizardStore.setState((current) => ({
+      draft: { ...(current.draft as any), pilote: 'Paul Rabe' },
+    }));
 
     // L'ancienne signature (image + horodatage) est effacée immédiatement — le
     // pavé redevient éditable (vierge), plus de « Signé à » pour ce rôle.
     await waitFor(() => expect(screen.getByTestId('signature-pad-pilote')).toHaveTextContent('dessiner'));
+    expect(screen.getByText('Paul Rabe')).toBeVisible();
+    expect(screen.queryByText('Jean Rakoto')).toBeNull();
     expect(screen.queryByText(/^Signé à /)).toBeNull();
 
-    // Sans redessiner pour le nouveau signataire, « Suivant » ne doit jamais
-    // envoyer l'ancien tracé sous le nouveau nom (§8).
-    fireEvent.press(screen.getByText('Suivant : Récapitulatif ›'));
+    // La rupture est persistée tout de suite, sans attendre « Suivant » :
+    // jamais attribuée au nouveau pilote (§4).
     await waitFor(() =>
       expect(prospectionRepository.updateProspectionExtensiveObservations).toHaveBeenCalledWith(
         'draft-123',
@@ -308,6 +299,41 @@ describe('ExtensiveObservationsScreen — mode aérien : signatures numériques 
         })
       )
     );
+  });
+
+  it('une fiche rouverte après un changement de pilote fait ailleurs (sans repasser par Signature) n’attribue pas l’ancienne signature au nouveau pilote', async () => {
+    // `draft.pilote` diverge de `draft.signature_pilote_nom` dès le premier
+    // rendu — ni chip ni retour depuis Référence dans cette session, juste une
+    // fiche rouverte directement dans cet état incohérent.
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'extensive',
+        mode_extensif: 'aerien',
+        pilote: 'Paul Rabe',
+        signature_pilote_nom: 'Jean Rakoto',
+        signature_pilote_horodatage: '2026-09-01T09:10:00.000Z',
+        signature_pilote_image: 'M9 9 L8 8',
+      } as any,
+      captures: [],
+    });
+    // Même raison que le test précédent : la persistance automatique de la
+    // rupture doit recevoir en retour une ligne complète, `pilote` compris.
+    jest.mocked(prospectionRepository.updateProspectionExtensiveObservations).mockResolvedValue({
+      id: 'draft-123',
+      mode_extensif: 'aerien',
+      pilote: 'Paul Rabe',
+      signature_pilote_nom: 'Paul Rabe',
+      signature_pilote_horodatage: null,
+      signature_pilote_image: null,
+    } as any);
+
+    await render(<ExtensiveObservationsScreen />);
+
+    expect(await screen.findByText('Paul Rabe')).toBeVisible();
+    expect(screen.queryByText('Jean Rakoto')).toBeNull();
+    expect(screen.queryByText(/^Signé à /)).toBeNull();
+    await waitFor(() => expect(screen.getByTestId('signature-pad-pilote')).toHaveTextContent('dessiner'));
   });
 
   it('une ancienne fiche terrestre déjà enregistrée continue de s’ouvrir sans erreur (colonnes NULL)', async () => {
@@ -324,8 +350,10 @@ describe('ExtensiveObservationsScreen — mode aérien : signatures numériques 
     await expect(render(<ExtensiveObservationsScreen />)).resolves.toBeTruthy();
     expect(await screen.findByText('Verdure strate herbeuse')).toBeVisible();
   });
+});
 
-  it('le Consultant FAO utilise désormais le même référentiel (chip) que Pilote/Chef de Base — plus de saisie libre', async () => {
+describe('ExtensiveObservationsScreen — mode aérien : Consultant FAO en saisie libre (#consultant-fao-pilote-auto)', () => {
+  it('permet de saisir librement le nom du Consultant FAO, sans chip à choisir', async () => {
     useProspectionWizardStore.setState({
       draft: { id: 'draft-123', type_prospection: 'extensive', mode_extensif: 'aerien' } as any,
       captures: [],
@@ -334,11 +362,10 @@ describe('ExtensiveObservationsScreen — mode aérien : signatures numériques 
     await render(<ExtensiveObservationsScreen />);
     await screen.findByText('Signatures');
 
-    expect(screen.queryByPlaceholderText('Nom du signataire')).toBeNull();
-    const chipConsultant = await screen.findByText('John Smith');
-    fireEvent.press(chipConsultant);
-    await screen.findByTestId('signature-pad-consultant_fao');
+    fireEvent.changeText(screen.getByTestId('signature-consultant-fao-nom-input'), 'John Smith');
+    await settle();
 
+    expect(await screen.findByTestId('signature-pad-consultant_fao')).toBeTruthy();
     expect(screen.getAllByText('VALIDER')[INDEX_CONSULTANT_FAO]).toBeTruthy();
   });
 
@@ -366,7 +393,36 @@ describe('ExtensiveObservationsScreen — mode aérien : signatures numériques 
     );
   });
 
-  it('changer de Consultant FAO alors qu’une signature était déjà validée efface l’ancienne — jamais attribuée au nouveau consultant (§8)', async () => {
+  it('signer capture le nom saisi + le tracé + l’horodatage, et persiste immédiatement', async () => {
+    useProspectionWizardStore.setState({
+      draft: { id: 'draft-123', type_prospection: 'extensive', mode_extensif: 'aerien' } as any,
+      captures: [],
+    });
+
+    await render(<ExtensiveObservationsScreen />);
+    await screen.findByText('Signatures');
+
+    fireEvent.changeText(screen.getByTestId('signature-consultant-fao-nom-input'), 'John Smith');
+    await settle();
+    const pad = await screen.findByTestId('signature-pad-consultant_fao');
+    fireEvent.press(pad);
+    await settle();
+    fireEvent.press(screen.getAllByText('VALIDER')[INDEX_CONSULTANT_FAO]);
+
+    await waitFor(() =>
+      expect(prospectionRepository.updateProspectionExtensiveObservations).toHaveBeenCalledWith(
+        'draft-123',
+        expect.objectContaining({
+          signatureConsultantFaoNom: 'John Smith',
+          signatureConsultantFaoHorodatage: expect.any(String),
+          signatureConsultantFaoImage: 'M0 0 L1 1',
+        })
+      )
+    );
+    expect(await screen.findByText(/^Signé à /)).toBeVisible();
+  });
+
+  it('restaure le nom et la signature déjà enregistrés (fiche rouverte)', async () => {
     useProspectionWizardStore.setState({
       draft: {
         id: 'draft-123',
@@ -379,29 +435,36 @@ describe('ExtensiveObservationsScreen — mode aérien : signatures numériques 
       captures: [],
     });
 
-    // Un second consultant habilité, distinct de celui déjà signé.
-    const referentielDb = require('@/lib/referentiel-db');
-    jest.mocked(referentielDb.listUtilisateursByRole).mockImplementation((role: string) => {
-      if (role === 'pilote') return Promise.resolve([{ id: 'pilote-1', nom: 'Rakoto', prenom: 'Jean' }]);
-      if (role === 'chef_de_base') return Promise.resolve([{ id: 'chef-1', nom: 'Rabe', prenom: 'Marie' }]);
-      if (role === 'consultant_international')
-        return Promise.resolve([
-          { id: 'consultant-1', nom: 'Smith', prenom: 'John' },
-          { id: 'consultant-2', nom: 'Dupont', prenom: 'Alice' },
-        ]);
-      return Promise.resolve([]);
+    await render(<ExtensiveObservationsScreen />);
+
+    expect(await screen.findByText('John Smith')).toBeVisible();
+    expect(screen.getByTestId('signature-pad-consultant_fao')).toHaveTextContent('trace:M9 9 L8 8');
+    expect(screen.getByText(/^Signé à /)).toBeVisible();
+  });
+
+  it('changer le nom du Consultant FAO alors qu’une signature était déjà validée efface l’ancienne — jamais attribuée à quelqu’un d’autre (§1)', async () => {
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'extensive',
+        mode_extensif: 'aerien',
+        signature_consultant_fao_nom: 'John Smith',
+        signature_consultant_fao_horodatage: '2026-09-01T09:10:00.000Z',
+        signature_consultant_fao_image: 'M9 9 L8 8',
+      } as any,
+      captures: [],
     });
 
     await render(<ExtensiveObservationsScreen />);
     await screen.findByText('John Smith');
     expect(screen.getByTestId('signature-pad-consultant_fao')).toHaveTextContent('trace:M9 9 L8 8');
-    expect(screen.queryByText('Alice Dupont')).toBeNull();
 
     fireEvent.press(screen.getAllByText('MODIFIER')[0]);
     await settle();
 
-    const chipNouveauConsultant = await screen.findByText('Alice Dupont');
-    fireEvent.press(chipNouveauConsultant);
+    const input = await screen.findByTestId('signature-consultant-fao-nom-input');
+    fireEvent.changeText(input, 'Alice Dupont');
+    await settle();
 
     // L'ancienne signature (image + horodatage) est effacée immédiatement.
     await waitFor(() => expect(screen.getByTestId('signature-pad-consultant_fao')).toHaveTextContent('dessiner'));
