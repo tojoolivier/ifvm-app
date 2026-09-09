@@ -6,6 +6,7 @@ import { useAuthStore } from '@/lib/auth-store';
 import { useDebugStore } from '@/lib/debug-store';
 import { getDb } from '@/lib/prospection-db';
 import { useReferentielAutoSync } from '@/hooks/use-referentiel-auto-sync';
+import { useFichesAutoSync } from '@/hooks/use-fiches-auto-sync';
 import { useOtaAutoCheck } from '@/hooks/use-ota-auto-check';
 import { ErrorBanner } from '@/components/error-banner';
 import { BandeauOta } from '@/components/bandeau-ota';
@@ -50,6 +51,11 @@ export default function RootLayout() {
   
   // Hook de synchronisation automatique du référentiel
   useReferentielAutoSync(token);
+
+  // Synchronisation automatique des fiches de prospection/traitement en
+  // attente dès que la connectivité revient (#synchronisation-automatique) —
+  // même déclencheur que le référentiel ci-dessus, sens inverse (montant).
+  useFichesAutoSync(token);
 
   // Vérification automatique des mises à jour OTA (lancement + retour au premier
   // plan), une fois l'amorçage terminé.

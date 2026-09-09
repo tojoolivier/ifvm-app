@@ -1180,6 +1180,26 @@ export async function listRecentProspections(limit = 20): Promise<DraftProspecti
 }
 
 /**
+ * Fiches réellement en attente d'envoi, sans la limite d'affichage de
+ * `listRecentProspections` (#synchronisation-automatique) — une fiche
+ * au-delà des 20 plus récentes ne doit jamais rester hors de portée d'une
+ * synchronisation, automatique ou manuelle : seul l'écran d'accueil borne sa
+ * liste affichée, jamais la file d'envoi elle-même. `statut = 'en_attente'`
+ * exclut les brouillons encore en cours de saisie (même filtre que
+ * `pendingSync` sur l'écran Prospection) ; `statut_sync` exclut les fiches
+ * déjà parties et celles en `'echec'` (refusées par le serveur, à corriger
+ * manuellement plutôt qu'à renvoyer à l'identique).
+ */
+export async function listUnsyncedProspections(): Promise<DraftProspection[]> {
+  const db = await getDb();
+  return db.getAllAsync<DraftProspection>(
+    `SELECT * FROM prospection
+     WHERE statut = 'en_attente' AND (statut_sync = 'local' OR statut_sync = 'conflict')
+     ORDER BY updated_at DESC`
+  );
+}
+
+/**
  * Fiches de prospection éligibles au sélecteur de « Nouvelle fiche de traitement »
  * (traitement-picker.tsx) — exclut désormais celles dont la surface infestée est
  * déjà intégralement couverte par une fiche de traitement existante (Aérien ou

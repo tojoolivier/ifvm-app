@@ -8,6 +8,7 @@ import {
   deleteProspection as deleteLocalProspection,
   listDraftProspections,
   listRecentProspections,
+  listUnsyncedProspections,
   materialiserProspectionValidee,
   saveProspectionPopulation,
   saveProspectionInfestation,
@@ -28,14 +29,21 @@ export interface AccueilViewModel {
   activeDraft: DraftProspection | null;
   recent: DraftProspection[];
   validated: ProspectionRead[];
+  /**
+   * File d'envoi réelle (#synchronisation-automatique), distincte de `recent`
+   * qui plafonne à 20 fiches pour l'affichage — une fiche en attente au-delà
+   * de ces 20 ne doit jamais être exclue d'une synchronisation.
+   */
+  pendingSync: DraftProspection[];
 }
 
 /** Charge les données de l'écran Accueil depuis le store local — aucune dépendance réseau. */
 export async function loadAccueilData(): Promise<AccueilViewModel> {
-  const [drafts, recent, unsyncedCount] = await Promise.all([
+  const [drafts, recent, unsyncedCount, pendingSync] = await Promise.all([
     listDraftProspections(),
     listRecentProspections(),
     countUnsyncedProspections(),
+    listUnsyncedProspections(),
   ]);
 
   return {
@@ -43,6 +51,7 @@ export async function loadAccueilData(): Promise<AccueilViewModel> {
     activeDraft: drafts[0] ?? null,
     recent,
     validated: [],
+    pendingSync,
   };
 }
 

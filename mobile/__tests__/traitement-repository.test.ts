@@ -17,6 +17,7 @@ import {
   saveCible,
   getTraitement,
   listDraftTraitements,
+  listUnsyncedTraitements,
   listMesTraitements,
   listReprenableTraitements,
   markTraitementSynced,
@@ -825,6 +826,37 @@ describe('listDraftTraitements', () => {
     expect(getAllAsync).toHaveBeenCalledWith(
       expect.stringContaining("WHERE statut = 'brouillon'")
     );
+  });
+});
+
+describe('listUnsyncedTraitements (#synchronisation-automatique)', () => {
+  it('n\'exclut pas les fiches encore "brouillon" — une fiche complète coincée hors ligne à la validation finale ne passe jamais à "validee"', async () => {
+    getAllAsync.mockResolvedValueOnce([{ id: STORED_TRAITEMENT_ROW.id }]); // liste des ids en attente
+    getFirstAsync
+      .mockResolvedValueOnce(STORED_TRAITEMENT_ROW) // ligne traitement (getTraitement)
+      .mockResolvedValueOnce(null) // cible
+      .mockResolvedValueOnce(null); // traitement_aerien (pas de rotations à charger ensuite)
+    getAllAsync
+      .mockResolvedValueOnce([]) // signatures
+      .mockResolvedValueOnce([]); // evaluations_risque_population
+
+    const result = await listUnsyncedTraitements();
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe(STORED_TRAITEMENT_ROW.id);
+    const [sql] = getAllAsync.mock.calls[0];
+    expect(sql).toContain("statut_sync = 'local'");
+    expect(sql).toContain("statut_sync = 'conflict'");
+    expect(sql).not.toContain("statut = 'validee'");
+  });
+
+  it('ne retourne rien quand aucune fiche n\'est en attente', async () => {
+    getAllAsync.mockResolvedValueOnce([]);
+
+    const result = await listUnsyncedTraitements();
+
+    expect(result).toEqual([]);
+    expect(getFirstAsync).not.toHaveBeenCalled();
   });
 });
 

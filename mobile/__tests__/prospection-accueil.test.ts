@@ -4,6 +4,7 @@ import {
   countUnsyncedProspections,
   listDraftProspections,
   listRecentProspections,
+  listUnsyncedProspections,
   deleteProspection,
   materialiserProspectionValidee,
   saveProspectionPopulation,
@@ -40,6 +41,7 @@ jest.mock('../src/lib/prospection-repository', () => ({
   countUnsyncedProspections: jest.fn(),
   listDraftProspections: jest.fn(),
   listRecentProspections: jest.fn(),
+  listUnsyncedProspections: jest.fn(),
   deleteProspection: jest.fn(),
   materialiserProspectionValidee: jest.fn(),
   saveProspectionPopulation: jest.fn(),
@@ -56,6 +58,7 @@ const mockCreateDraft = jest.mocked(createDraftProspection);
 const mockCountUnsynced = jest.mocked(countUnsyncedProspections);
 const mockListDrafts = jest.mocked(listDraftProspections);
 const mockListRecent = jest.mocked(listRecentProspections);
+const mockListUnsynced = jest.mocked(listUnsyncedProspections);
 const mockDeleteLocal = jest.mocked(deleteProspection);
 const mockListCampagnesLocal = jest.mocked(listCampagnesLocal);
 const mockMaterialiser = jest.mocked(materialiserProspectionValidee);
@@ -150,22 +153,38 @@ describe('loadAccueilData', () => {
     mockListDrafts.mockResolvedValueOnce([]);
     mockListRecent.mockResolvedValueOnce([]);
     mockCountUnsynced.mockResolvedValueOnce(0);
+    mockListUnsynced.mockResolvedValueOnce([]);
 
     const result = await loadAccueilData();
 
-    expect(result).toEqual({ unsyncedCount: 0, activeDraft: null, recent: [], validated: [] });
+    expect(result).toEqual({ unsyncedCount: 0, activeDraft: null, recent: [], validated: [], pendingSync: [] });
   });
 
   it('surfaces the most recent draft and the unsynced count', async () => {
     mockListDrafts.mockResolvedValueOnce([STORED_ROW]);
     mockListRecent.mockResolvedValueOnce([STORED_ROW]);
     mockCountUnsynced.mockResolvedValueOnce(1);
+    mockListUnsynced.mockResolvedValueOnce([STORED_ROW]);
 
     const result = await loadAccueilData();
 
     expect(result.activeDraft).toEqual(STORED_ROW);
     expect(result.recent).toEqual([STORED_ROW]);
     expect(result.unsyncedCount).toBe(1);
+    expect(result.pendingSync).toEqual([STORED_ROW]);
+  });
+
+  it('la file d\'envoi n\'est pas plafonnée à 20 fiches, contrairement à `recent` (#synchronisation-automatique)', async () => {
+    const fichesAuDelaDe20 = Array.from({ length: 25 }, (_, i) => ({ ...STORED_ROW, id: `fiche-${i}` }));
+    mockListDrafts.mockResolvedValueOnce([]);
+    mockListRecent.mockResolvedValueOnce(fichesAuDelaDe20.slice(0, 20));
+    mockCountUnsynced.mockResolvedValueOnce(25);
+    mockListUnsynced.mockResolvedValueOnce(fichesAuDelaDe20);
+
+    const result = await loadAccueilData();
+
+    expect(result.recent).toHaveLength(20);
+    expect(result.pendingSync).toHaveLength(25);
   });
 });
 

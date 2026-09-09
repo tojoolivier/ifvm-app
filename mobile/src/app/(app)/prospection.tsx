@@ -7,7 +7,7 @@ import * as Network from 'expo-network';
 import { useAuthStore } from '@/lib/auth-store';
 import { loadAccueilData, loadMesProspectionsServeur, deleteDraftProspection, AccueilViewModel } from '@/lib/prospection-accueil';
 import { syncAllProspections } from '@/lib/prospection-review';
-import { estDansLaFile, estToutParti, resumerEnPhrase } from '@/lib/sync-lot';
+import { estToutParti, resumerEnPhrase } from '@/lib/sync-lot';
 import { DraftProspection } from '@/lib/prospection-repository';
 import { ProspectionRead } from '@/lib/api-client';
 import { navigateToProspectionConsult, navigateToProspectionDraft } from '@/lib/fiche-routing';
@@ -24,7 +24,7 @@ import {
 } from '@/components/fiches/tokens';
 import { statutFicheAffiche, StatutFicheAffiche } from '@/lib/prospection-statut';
 
-const EMPTY_DATA: AccueilViewModel = { unsyncedCount: 0, activeDraft: null, recent: [], validated: [] };
+const EMPTY_DATA: AccueilViewModel = { unsyncedCount: 0, activeDraft: null, recent: [], validated: [], pendingSync: [] };
 
 type BadgeKind = StatutFicheAffiche;
 type FilterKey = 'TOUS' | StatutFicheAffiche;
@@ -197,13 +197,14 @@ export default function ProspectionScreen() {
     });
   }, [items, searchQuery, filterKey]);
 
-  // `estDansLaFile` exclut les fiches en `'echec'` : le serveur les a refusées,
-  // les renvoyer à l'identique reproduirait le refus. Elles se relancent depuis
-  // l'écran de synchronisation, qui montre leur motif (#177).
-  const pendingSync = useMemo(
-    () => data.recent.filter((item) => item.statut === 'en_attente' && estDansLaFile(item.statut_sync)),
-    [data.recent]
-  );
+  // File d'envoi réelle (#synchronisation-automatique) — distincte de
+  // `data.recent`, plafonné à 20 fiches pour l'affichage : une fiche en
+  // attente au-delà de ces 20 ne doit jamais être exclue d'une
+  // synchronisation. Déjà filtrée par `loadAccueilData` (statut = 'en_attente',
+  // hors 'echec' — le serveur a refusé ces dernières, les renvoyer à
+  // l'identique reproduirait le refus ; elles se relancent depuis l'écran de
+  // synchronisation, qui montre leur motif, #177).
+  const pendingSync = data.pendingSync;
 
   const handleNewProspection = () => {
     router.push('/(prospection)/type-chooser' as any);
