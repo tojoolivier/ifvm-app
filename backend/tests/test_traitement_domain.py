@@ -130,6 +130,58 @@ def test_cible_essaim_observe():
     assert construire_cible(p).vols_clairs_essaims == "oui"
 
 
+def test_cible_essaim_en_vol_extensif_imagos_migration_0033():
+    """essaim_observe a été remplacé par essaim_en_vol/essaim_pose pour l'Extensif
+    Imagos (migration 0033) — jamais renseigné pour ces fiches-là, d'où
+    "Vols/essaims" toujours "non renseigné" en Synthèse de traitement avant ce
+    correctif, alors même que l'essaim était bien saisi (État Repos/Déplacement,
+    cf. extensive-recap.tsx côté mobile)."""
+    p = _prospection(
+        populations=[
+            ProspectionPopulation(
+                espece="LMC",
+                categorie="imago",
+                essaim_observe=None,
+                essaim_en_vol=True,
+                essaim_pose=False,
+            )
+        ]
+    )
+    assert construire_cible(p).vols_clairs_essaims == "oui"
+
+
+def test_cible_essaim_pose_extensif_imagos_migration_0033():
+    p = _prospection(
+        populations=[
+            ProspectionPopulation(
+                espece="LMC",
+                categorie="imago",
+                essaim_observe=None,
+                essaim_en_vol=False,
+                essaim_pose=True,
+            )
+        ]
+    )
+    assert construire_cible(p).vols_clairs_essaims == "oui"
+
+
+def test_cible_essaim_ni_observe_ni_en_vol_pose_reste_non_renseigne():
+    """Extensif Imagos sans État sélectionné : aucun des deux modèles n'est
+    renseigné, le champ reste `None` (« non renseigné »), comme avant."""
+    p = _prospection(
+        populations=[
+            ProspectionPopulation(
+                espece="LMC",
+                categorie="imago",
+                essaim_observe=None,
+                essaim_en_vol=None,
+                essaim_pose=None,
+            )
+        ]
+    )
+    assert construire_cible(p).vols_clairs_essaims is None
+
+
 def test_cible_surface_infestee_reprise():
     p = _prospection(surface_infestee=42.5)
     assert construire_cible(p).surface_infestee_ha == 42.5

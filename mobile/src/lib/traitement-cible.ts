@@ -75,12 +75,29 @@ function deriveLarves(populations: PopulationRow[]): { petites_larves: number | 
   return { petites_larves: renseignees ? petites : null, grandes_larves: renseignees ? grandes : null };
 }
 
-/** 1 = oui (au moins une population avec essaim_observe=true), 0 = non (au moins une
- * population renseignée, mais aucune à true), null = jamais renseigné. */
+/**
+ * 1 = oui (au moins une population avec essaim observé), 0 = non (au moins une
+ * population renseignée, mais aucune à true), null = jamais renseigné.
+ *
+ * `essaim_observe` (booléen à 2 états) reste lu pour les prospections
+ * antérieures à la migration backend 0033 ; pour l'Extensif Imagos (0033+), il
+ * a été remplacé par essaim_en_vol/essaim_pose (cf. le commentaire sur
+ * PopulationRow) — jamais renseigné pour ces fiches-là, d'où "Vols/essaims"
+ * toujours "non renseigné" en Synthèse de traitement avant ce correctif, alors
+ * même que l'essaim était bien saisi (État Repos/Déplacement, cf.
+ * extensive-recap.tsx). Pas de "non" explicite dans le nouveau modèle (aucun
+ * bouton ne le permet) : une ligne sans essaim_observe ni essaim_en_vol/pose
+ * reste exclue, comme avant.
+ */
 function deriveVolsClairsEssaims(populations: PopulationRow[]): number | null {
-  const essaims = populations
-    .map((p) => p.essaim_observe)
-    .filter((v): v is boolean => v !== null && v !== undefined);
+  const essaims: boolean[] = [];
+  for (const p of populations) {
+    if (p.essaim_observe !== null && p.essaim_observe !== undefined) {
+      essaims.push(p.essaim_observe);
+    } else if (p.essaim_en_vol || p.essaim_pose) {
+      essaims.push(true);
+    }
+  }
   if (essaims.length === 0) return null;
   return essaims.some(Boolean) ? 1 : 0;
 }

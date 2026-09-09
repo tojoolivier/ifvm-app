@@ -650,7 +650,21 @@ def construire_cible(prospection: Prospection) -> Cible:
             else:
                 grandes_total += densite
 
-    essaims = [p.essaim_observe for p in prospection.populations if p.essaim_observe is not None]
+    # `essaim_observe` (booléen à 2 états) reste lu pour les prospections
+    # antérieures à la migration 0033 ; pour l'Extensif Imagos (0033+), il a été
+    # remplacé par essaim_en_vol/essaim_pose (cf. le même commentaire côté
+    # PopulationCreate) — jamais renseigné pour ces fiches-là, d'où
+    # "Vols/essaims" toujours "non renseigné" en Synthèse de traitement avant
+    # ce correctif, alors même que l'essaim était bien saisi (État Repos/
+    # Déplacement). Pas de "non" explicite dans le nouveau modèle (aucun bouton
+    # ne le permet) : une ligne sans essaim_observe ni essaim_en_vol/pose reste
+    # exclue, comme avant.
+    essaims: list[bool] = []
+    for p in prospection.populations:
+        if p.essaim_observe is not None:
+            essaims.append(p.essaim_observe)
+        elif p.essaim_en_vol or p.essaim_pose:
+            essaims.append(True)
     if any(essaims):
         vols_clairs_essaims = "oui"
     elif essaims:

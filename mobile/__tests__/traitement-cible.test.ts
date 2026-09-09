@@ -130,6 +130,33 @@ describe('construireCible', () => {
     expect(cible.vols_clairs_essaims).toBeNull();
   });
 
+  it('vols_clairs_essaims = 1 pour une population Extensif Imagos (essaim_en_vol, migration 0033 — essaim_observe non renseigné)', () => {
+    const cible = construireCible(
+      { surface_infestee: null },
+      [population({ essaim_observe: null, essaim_en_vol: true, essaim_pose: false })],
+      []
+    );
+    expect(cible.vols_clairs_essaims).toBe(1);
+  });
+
+  it('vols_clairs_essaims = 1 pour une population Extensif Imagos (essaim_pose, migration 0033)', () => {
+    const cible = construireCible(
+      { surface_infestee: null },
+      [population({ essaim_observe: null, essaim_en_vol: false, essaim_pose: true })],
+      []
+    );
+    expect(cible.vols_clairs_essaims).toBe(1);
+  });
+
+  it('vols_clairs_essaims = null quand essaim_observe et essaim_en_vol/pose sont tous non renseignés (Extensif Imagos sans État sélectionné)', () => {
+    const cible = construireCible(
+      { surface_infestee: null },
+      [population({ essaim_observe: null, essaim_en_vol: null, essaim_pose: null })],
+      []
+    );
+    expect(cible.vols_clairs_essaims).toBeNull();
+  });
+
   it('répartition groupée prioritaire sur diffuse', () => {
     const cible = construireCible(
       { surface_infestee: null },
