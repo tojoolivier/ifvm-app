@@ -1337,6 +1337,35 @@ export async function countUnsyncedTraitements(): Promise<number> {
   return row?.count ?? 0;
 }
 
+/**
+ * Fiches de traitement réellement en attente d'envoi (#synchronisation-
+ * automatique). N'exclut PAS les fiches encore `statut = 'brouillon'` : une
+ * fiche entièrement remplie dont l'enregistrement final (recap.tsx) a échoué
+ * faute de réseau reste `'brouillon'` pour toujours — `/valider` (qui seul la
+ * fait passer à `'validee'`) n'est appelé qu'après un push réussi. La
+ * restreindre à `statut = 'validee'` la laisserait donc hors de portée de
+ * toute synchronisation ultérieure, automatique ou manuelle.
+ *
+ * `getTraitement` reconstruit la fiche complète (aerien/terrestre/rotations/
+ * produits/signatures) — nécessaire pour repousser autre chose qu'une ligne
+ * partielle.
+ */
+export async function listUnsyncedTraitements(): Promise<DraftTraitement[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<{ id: string }>(
+    `SELECT id FROM traitement
+     WHERE statut_sync = 'local' OR statut_sync = 'conflict'
+     ORDER BY updated_at DESC`
+  );
+
+  const drafts: DraftTraitement[] = [];
+  for (const row of rows) {
+    const draft = await getTraitement(row.id);
+    if (draft) drafts.push(draft);
+  }
+  return drafts;
+}
+
 // ==========================================
 // SUPPRESSION
 // ==========================================

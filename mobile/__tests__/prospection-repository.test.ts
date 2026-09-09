@@ -5,6 +5,7 @@ import {
   getProspection,
   listDraftProspections,
   listRecentProspections,
+  listUnsyncedProspections,
   listValidatedProspections,
   countUnsyncedProspections,
   updateProspectionReference,
@@ -196,6 +197,31 @@ describe('listRecentProspections', () => {
     await listRecentProspections();
 
     expect(getAllAsync).toHaveBeenCalledWith(expect.any(String), [20]);
+  });
+});
+
+describe('listUnsyncedProspections (#synchronisation-automatique)', () => {
+  it('n\'est pas plafonnée (contrairement à listRecentProspections) : aucune LIMIT dans la requête', async () => {
+    getAllAsync.mockResolvedValueOnce([STORED_ROW]);
+
+    const result = await listUnsyncedProspections();
+
+    expect(result).toEqual([STORED_ROW]);
+    const [sql, params] = getAllAsync.mock.calls[0];
+    expect(sql).not.toMatch(/LIMIT/i);
+    expect(params).toBeUndefined();
+  });
+
+  it('ne retient que les fiches en_attente non encore synchronisées (hors échec)', async () => {
+    getAllAsync.mockResolvedValueOnce([]);
+
+    await listUnsyncedProspections();
+
+    const [sql] = getAllAsync.mock.calls[0];
+    expect(sql).toContain("statut = 'en_attente'");
+    expect(sql).toContain("statut_sync = 'local'");
+    expect(sql).toContain("statut_sync = 'conflict'");
+    expect(sql).not.toContain("'echec'");
   });
 });
 

@@ -38,7 +38,7 @@ const isTablet = SCREEN_WIDTH >= 768;
 const IFVM_GREEN = '#1B5E1B';
 const IFVM_GREEN_DARK = '#163F16';
 
-const EMPTY_DATA: AccueilViewModel = { unsyncedCount: 0, activeDraft: null, recent: [], validated: [] };
+const EMPTY_DATA: AccueilViewModel = { unsyncedCount: 0, activeDraft: null, recent: [], validated: [], pendingSync: [] };
 
 /**
  * Le badge d'état d'une fiche. Sa valeur vient de `statut_sync`, en base : il
