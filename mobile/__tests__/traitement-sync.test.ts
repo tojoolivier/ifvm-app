@@ -98,7 +98,9 @@ function draft(overrides: Partial<DraftTraitement> = {}): DraftTraitement {
       immatricule_aeronef: null,
       base_principale: 'Base Betioky',
       stand: null,
+      stand_date_installation: null,
       base_secondaire: null,
+      base_secondaire_date_installation: null,
       nb_rotations: null,
       total_pesticide_l: null,
       total_pesticide_kg: null,
@@ -168,6 +170,37 @@ describe('enregistrerEtSynchroniserTraitement', () => {
     );
     expect(mockMarkSynced).toHaveBeenCalledWith('traitement-1', '2026-08-13T00:00:00.000Z');
     expect(result.reussies).toEqual(['traitement-1']);
+  });
+
+  it('envoie les dates d\'installation du Stand/de la Base secondaire, indépendamment l\'une de l\'autre (#stand-base-secondaire-date-installation)', async () => {
+    mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
+    mockSyncTraitement.mockResolvedValue({ status: 201, body: { id: 'traitement-1', updated_at: '2026-08-13T00:00:00.000Z' } });
+    mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
+
+    const draftAvecDates = draft({
+      aerien: {
+        ...draft().aerien!,
+        stand: 'Stand Betioky',
+        stand_date_installation: '2026-07-01',
+        // Base secondaire vide alors que sa date est renseignée.
+        base_secondaire: null,
+        base_secondaire_date_installation: '2026-07-15',
+      },
+    });
+
+    await enregistrerEtSynchroniserTraitement(draftAvecDates, 'token-1');
+
+    expect(apiClient.syncTraitement).toHaveBeenCalledWith(
+      'token-1',
+      expect.objectContaining({
+        aerien: expect.objectContaining({
+          stand: 'Stand Betioky',
+          stand_date_installation: '2026-07-01',
+          base_secondaire: null,
+          base_secondaire_date_installation: '2026-07-15',
+        }),
+      })
+    );
   });
 
   it('pousse nom_commercial avec chaque rotation lors de la synchro (#produit-nom-commercial)', async () => {

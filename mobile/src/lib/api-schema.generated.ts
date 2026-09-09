@@ -3084,8 +3084,12 @@ export interface components {
             base_principale: string;
             /** Stand */
             stand?: string | null;
+            /** Stand Date Installation */
+            stand_date_installation?: string | null;
             /** Base Secondaire */
             base_secondaire?: string | null;
+            /** Base Secondaire Date Installation */
+            base_secondaire_date_installation?: string | null;
             /** Immatricule Aeronef */
             immatricule_aeronef: string;
             /** Pesticide Recu L */
@@ -3115,8 +3119,12 @@ export interface components {
             base_principale: string;
             /** Stand */
             stand: string | null;
+            /** Stand Date Installation */
+            stand_date_installation: string | null;
             /** Base Secondaire */
             base_secondaire: string | null;
+            /** Base Secondaire Date Installation */
+            base_secondaire_date_installation: string | null;
             /** Immatricule Aeronef */
             immatricule_aeronef: string;
             /** Nb Rotations */

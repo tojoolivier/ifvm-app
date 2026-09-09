@@ -87,7 +87,12 @@ class TraitementAerienCreate(BaseModel):
     # 0048). Base principale obligatoire, stand/base secondaire facultatifs.
     base_principale: str = Field(..., min_length=1, max_length=255)
     stand: str | None = Field(None, max_length=255)
+    # Date d'installation (migration 0056) — facultative et indépendante du
+    # texte libre lui-même. Rien d'équivalent pour base_principale (hors
+    # périmètre, #stand-base-secondaire-date-installation).
+    stand_date_installation: date | None = None
     base_secondaire: str | None = Field(None, max_length=255)
+    base_secondaire_date_installation: date | None = None
     immatricule_aeronef: str = Field(..., min_length=1)
     # surface_traitee_ha n'y figure plus (migration 0047) : dérivée de la somme
     # des `surface_ha` de rotation, ajoutées après coup via /rotations.
@@ -338,7 +343,9 @@ class TraitementAerienRead(BaseModel):
     consultant_international: str | None
     base_principale: str
     stand: str | None
+    stand_date_installation: date | None
     base_secondaire: str | None
+    base_secondaire_date_installation: date | None
     immatricule_aeronef: str
     nb_rotations: int
     total_pesticide_l: float

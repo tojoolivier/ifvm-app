@@ -51,7 +51,9 @@ function traitementAerien(overrides: Record<string, unknown> = {}) {
       consultant_international: 'Marc Dupuis',
       base_principale: 'Base Betioky',
       stand: null,
+      stand_date_installation: null,
       base_secondaire: null,
+      base_secondaire_date_installation: null,
       immatricule_aeronef: '5R-ABC',
       nb_rotations: 2,
       total_pesticide_l: 530,
@@ -407,7 +409,9 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
           consultant_international: null,
           base_principale: null,
           stand: null,
+          stand_date_installation: null,
           base_secondaire: null,
+          base_secondaire_date_installation: null,
           immatricule_aeronef: null,
           nb_rotations: 1,
           total_pesticide_l: 200,
@@ -477,6 +481,28 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
     expect(await carte.findByText('Piste improvisée 12')).toBeInTheDocument()
     expect(carte.getByText('5R-ABC')).toBeInTheDocument()
     expect(carte.getByText('Marc Dupuis')).toBeInTheDocument()
+  })
+
+  it("affiche les dates d'installation du Stand/de la Base secondaire, indépendamment l'une de l'autre (#stand-base-secondaire-date-installation)", async () => {
+    renderPage(
+      traitementAerien({
+        aerien: {
+          ...traitementAerien().aerien,
+          stand: 'Stand Ihosy',
+          stand_date_installation: '2026-07-01',
+          // Base secondaire vide alors que sa date est renseignée : les deux
+          // couples (texte libre, date) sont indépendants l'un de l'autre.
+          base_secondaire: null,
+          base_secondaire_date_installation: '2026-07-15',
+        },
+      }),
+    )
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+
+    const carte = within(screen.getByText('Équipe & aéronef').closest('section')!)
+    expect(await carte.findByText('Stand Ihosy')).toBeInTheDocument()
+    expect(carte.getByText('01/07/2026')).toBeInTheDocument()
+    expect(carte.getByText('15/07/2026')).toBeInTheDocument()
   })
 
   it("affiche l'équipe et le matériel d'une fiche terrestre", async () => {

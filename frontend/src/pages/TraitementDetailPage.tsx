@@ -61,7 +61,13 @@ interface TraitementAerien {
   consultant_international: string | null
   base_principale: string | null
   stand: string | null
+  // Date d'installation (migration backend 0056,
+  // #stand-base-secondaire-date-installation) — facultative et indépendante
+  // du texte libre lui-même. Rien d'équivalent pour base_principale : hors
+  // périmètre.
+  stand_date_installation: string | null
   base_secondaire: string | null
+  base_secondaire_date_installation: string | null
   immatricule_aeronef: string | null
   nb_rotations: number
   total_pesticide_l: number | null
@@ -207,6 +213,13 @@ function formatCoordonnees(t: { latitude: number | null; longitude: number | nul
   if (t.latitude == null || t.longitude == null) return null
   const fr = (v: number) => v.toFixed(4).replace('.', ',')
   return `${fr(t.latitude)} · ${fr(t.longitude)}`
+}
+
+/** Date ISO ("AAAA-MM-JJ") -> "JJ/MM/AAAA", même convention que le DateField mobile. */
+function formatDateJour(iso: string | null): string | null {
+  if (!iso) return null
+  const [year, month, day] = iso.split('T')[0].split('-')
+  return year && month && day ? `${day}/${month}/${year}` : iso
 }
 
 /** Ligne clé/valeur des cartes « Informations complémentaires ». */
@@ -717,7 +730,15 @@ export function TraitementDetailPage() {
                 <Champ label="Immatriculation aéronef" value={traitement.aerien.immatricule_aeronef} />
                 <Champ label="Base principale" value={traitement.aerien.base_principale} />
                 <Champ label="Stand" value={traitement.aerien.stand} />
+                <Champ
+                  label="Date d'installation (Stand)"
+                  value={formatDateJour(traitement.aerien.stand_date_installation)}
+                />
                 <Champ label="Base secondaire" value={traitement.aerien.base_secondaire} />
+                <Champ
+                  label="Date d'installation (Base secondaire)"
+                  value={formatDateJour(traitement.aerien.base_secondaire_date_installation)}
+                />
                 <Champ
                   label="Total pesticide"
                   value={

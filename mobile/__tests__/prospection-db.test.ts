@@ -159,6 +159,11 @@ const MIGRATED_COLUMNS = [
   { name: 'base_principale' },
   { name: 'stand' },
   { name: 'base_secondaire' },
+  // Date d'installation du Stand/de la Base secondaire (migration backend
+  // 0056, #stand-base-secondaire-date-installation) — rien d'équivalent pour
+  // base_principale.
+  { name: 'stand_date_installation' },
+  { name: 'base_secondaire_date_installation' },
   // Chaînage de reprise (migration backend 0050), généralisé depuis le Terrestre.
   { name: 'reprise_traitement' },
   { name: 'traitement_origine_id' },

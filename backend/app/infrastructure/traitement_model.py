@@ -162,6 +162,12 @@ class TraitementAerienModel(Base):
     base_principale: Mapped[str] = mapped_column(String(255), nullable=False)
     stand: Mapped[str | None] = mapped_column(String(255), nullable=True)
     base_secondaire: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Date d'installation (migration 0056) — facultative, indépendante de
+    # celle du Stand/de la Base secondaire elle-même : un lieu peut être
+    # renseigné sans date connue, ou vice-versa. Aucun champ équivalent pour
+    # base_principale (hors périmètre, #stand-base-secondaire-date-installation).
+    stand_date_installation: Mapped[date | None] = mapped_column(Date(), nullable=True)
+    base_secondaire_date_installation: Mapped[date | None] = mapped_column(Date(), nullable=True)
     immatricule_aeronef: Mapped[str] = mapped_column(Text(), nullable=False)
     nb_rotations: Mapped[int] = mapped_column(Integer(), nullable=False, default=0)
     # Deux cumuls distincts par unité (une rotation en L ne s'additionne jamais

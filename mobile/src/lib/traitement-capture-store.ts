@@ -90,6 +90,12 @@ export interface AerienDraft {
   basePrincipale?: string | null;
   stand?: string | null;
   baseSecondaire?: string | null;
+  // Date d'installation (migration backend 0056, #stand-base-secondaire-date-installation)
+  // — facultative et indépendante du texte libre lui-même (un lieu peut être
+  // renseigné sans date connue, ou inversement). Rien d'équivalent pour
+  // basePrincipale : hors périmètre.
+  standDateInstallation?: string | null;
+  baseSecondaireDateInstallation?: string | null;
   // surfaceTraiteeHa n'y figure plus (migration 0046) : dérivée de la somme des
   // `surface_ha` des rotations, calculée à l'écran via computeSurfaceTraiteeAerien
   // (traitement-validation.ts) — jamais une saisie stockée dans le draft.

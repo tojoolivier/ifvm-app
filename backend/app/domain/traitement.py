@@ -178,6 +178,12 @@ class TraitementAerien:
     base_principale: str = ""
     stand: str | None = None
     base_secondaire: str | None = None
+    # Date d'installation (migration 0056) — facultative et indépendante du
+    # texte libre lui-même : un lieu peut être renseigné sans date connue, ou
+    # inversement. Rien d'équivalent pour base_principale (hors périmètre,
+    # #stand-base-secondaire-date-installation).
+    stand_date_installation: date | None = None
+    base_secondaire_date_installation: date | None = None
     immatricule_aeronef: str | None = None
     nb_rotations: int = 0
     # Deux cumuls distincts par unité (une rotation en L ne s'additionne jamais
@@ -547,7 +553,9 @@ _CHAMPS_CONTENU_AERIEN = (
     "consultant_international",
     "base_principale",
     "stand",
+    "stand_date_installation",
     "base_secondaire",
+    "base_secondaire_date_installation",
     "immatricule_aeronef",
     # surface_traitee_ha n'y figure plus (migration 0047) : dérivée des rotations
     # (sous-ressource distincte, absente du payload de synchronisation), au même
