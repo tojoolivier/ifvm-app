@@ -244,6 +244,17 @@ export interface ReferenceUpdateInput {
   latitude: number | null;
   longitude: number | null;
   altitude: number | null;
+  /**
+   * Bug corrigé (#persistance-fiches-traitement) : le sélecteur « Mode de
+   * traitement » de l'écran Références restait modifiable sur une fiche déjà
+   * créée (contrairement au type de traitement, verrouillé une fois
+   * `traitementId` posé — cf. references.tsx), mais la valeur changée n'était
+   * jamais transmise ici : `updateTraitementReference` ne l'écrivait pas en
+   * SQLite local, donc la modification disparaissait silencieusement au
+   * prochain "Continuer" (et n'atteignait jamais le payload de synchronisation,
+   * qui relit cette même colonne locale).
+   */
+  modeTraitement: string | null;
   dateTraitement: string | null;
   /**
    * Ajout minimal Lot 2 : le formulaire "Références" (écran A) doit pouvoir saisir
@@ -408,6 +419,7 @@ export async function updateTraitementReference(
       latitude = ?,
       longitude = ?,
       altitude = ?,
+      mode_traitement = ?,
       date_traitement = ?,
       date_validation = ?,
       numero_fiche = ?,
@@ -421,6 +433,7 @@ export async function updateTraitementReference(
       input.latitude,
       input.longitude,
       input.altitude,
+      input.modeTraitement,
       input.dateTraitement,
       input.dateValidation,
       input.numeroFiche,
@@ -970,6 +983,21 @@ export async function deleteRotation(rotationId: string): Promise<void> {
   await db.runAsync('DELETE FROM rotation WHERE id = ?', [rotationId]);
 }
 
+/**
+ * Bug corrigé (#persistance-fiches-traitement) : rotations.tsx ré-ajoute
+ * l'intégralité de `store.aerien.rotations` à chaque "Continuer" (le store ne
+ * porte pas d'id stable côté DB pour distinguer une rotation déjà enregistrée
+ * d'une nouvelle — `addRotation` génère toujours un `localId` frais). Sans
+ * purge préalable, rouvrir puis ré-enregistrer une fiche (ou simplement
+ * naviguer Équipe → Rotations → précédent → suivant) dupliquait toutes les
+ * rotations déjà présentes à chaque passage. Remplacement en masse — même
+ * principe que le remplacement d'evaluations_risque_population côté backend.
+ */
+export async function deleteAllRotationsForTraitementAerien(traitementAerienId: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('DELETE FROM rotation WHERE traitement_aerien_id = ?', [traitementAerienId]);
+}
+
 // ==========================================
 // PRODUITS UTILISÉS (TERRESTRE)
 // ==========================================
@@ -1008,6 +1036,17 @@ export async function addProduitUtilise(
 export async function deleteProduitUtilise(produitUtiliseId: string): Promise<void> {
   const db = await getDb();
   await db.runAsync('DELETE FROM produit_utilise WHERE id = ?', [produitUtiliseId]);
+}
+
+/**
+ * Bug corrigé (#persistance-fiches-traitement) : même problème que
+ * `deleteAllRotationsForTraitementAerien` côté Aérien, pour les produits
+ * utilisés (Terrestre) ré-ajoutés en intégralité à chaque "Continuer" sur
+ * l'écran Équipe.
+ */
+export async function deleteAllProduitsForTraitementTerrestre(traitementTerrestreId: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('DELETE FROM produit_utilise WHERE traitement_terrestre_id = ?', [traitementTerrestreId]);
 }
 
 // ==========================================
@@ -1205,6 +1244,12 @@ export interface ServerTraitement {
   altitude?: number | null;
   statut?: string | null;
   updated_at?: string | null;
+  // Rotations/produits déjà enregistrés côté serveur au moment de la réponse
+  // (#persistance-fiches-traitement) — utilisé pour les supprimer avant de
+  // repousser la liste locale actuelle, plutôt que de l'ajouter par-dessus à
+  // chaque synchronisation (cf. pushRotationsEtProduits, traitement-sync.ts).
+  aerien?: { rotations?: { id: string }[] } | null;
+  terrestre?: { produits?: { id: string }[] } | null;
   [key: string]: unknown;
 }
 

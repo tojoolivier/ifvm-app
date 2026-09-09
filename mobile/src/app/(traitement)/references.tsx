@@ -267,6 +267,11 @@ export default function ReferencesScreen() {
           latitude: store.ref.latitude ?? null,
           longitude: store.ref.longitude ?? null,
           altitude: store.ref.altitude ?? null,
+          // Bug corrigé (#persistance-fiches-traitement) : jamais transmis ici
+          // auparavant, alors que le sélecteur ci-dessous reste modifiable sur
+          // une fiche déjà créée — la modification disparaissait donc au
+          // prochain enregistrement.
+          modeTraitement: store.ref.modeTraitement ?? null,
           dateTraitement: store.ref.dateTraitement ?? null,
           dateValidation,
           numeroFiche,

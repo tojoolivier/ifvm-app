@@ -10,8 +10,10 @@ import {
   addRotation,
   updateRotation,
   deleteRotation,
+  deleteAllRotationsForTraitementAerien,
   addProduitUtilise,
   deleteProduitUtilise,
+  deleteAllProduitsForTraitementTerrestre,
   saveCible,
   getTraitement,
   listDraftTraitements,
@@ -342,6 +344,7 @@ describe('updateTraitementReference', () => {
       latitude: -20.5,
       longitude: 47.2,
       altitude: 1200,
+      modeTraitement: 'BARRIERE',
       dateTraitement: '2026-08-12',
       dateValidation: null,
       numeroFiche: 'TR-20260812-1',
@@ -350,6 +353,32 @@ describe('updateTraitementReference', () => {
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE traitement SET'),
       expect.arrayContaining(['Ambositra', -20.5, 47.2])
+    );
+  });
+
+  it('persiste un changement de mode de traitement sur une fiche déjà créée (#persistance-fiches-traitement — auparavant jamais écrit ici, la modification disparaissait au prochain enregistrement)', async () => {
+    getFirstAsync
+      .mockResolvedValueOnce({ ...STORED_TRAITEMENT_ROW, mode_traitement: 'TOTAL' })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+
+    await updateTraitementReference(AERIEN_INPUT.id, {
+      localite: 'Ambositra',
+      region: null,
+      district: null,
+      commune: null,
+      latitude: null,
+      longitude: null,
+      altitude: null,
+      modeTraitement: 'TOTAL',
+      dateTraitement: '2026-08-12',
+      dateValidation: null,
+      numeroFiche: null,
+    });
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('mode_traitement = ?'),
+      expect.arrayContaining(['TOTAL'])
     );
   });
 
@@ -367,6 +396,7 @@ describe('updateTraitementReference', () => {
       latitude: null,
       longitude: null,
       altitude: null,
+      modeTraitement: null,
       dateTraitement: '2026-08-12',
       dateValidation: '2026-08-13',
       numeroFiche: null,
@@ -390,6 +420,7 @@ describe('updateTraitementReference', () => {
         latitude: null,
         longitude: null,
         altitude: null,
+        modeTraitement: null,
         dateTraitement: null,
         dateValidation: null,
         numeroFiche: null,
@@ -538,6 +569,15 @@ describe('rotations (aerien)', () => {
       ['rot-1']
     );
   });
+
+  it('deletes all rotations of a traitement_aerien_id (#persistance-fiches-traitement — purge avant re-création, sans quoi rotations.tsx duplique à chaque "Continuer")', async () => {
+    await deleteAllRotationsForTraitementAerien(AERIEN_INPUT.id);
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('DELETE FROM rotation WHERE traitement_aerien_id = ?'),
+      [AERIEN_INPUT.id]
+    );
+  });
 });
 
 describe('produits utilisés (terrestre)', () => {
@@ -579,6 +619,15 @@ describe('produits utilisés (terrestre)', () => {
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('DELETE FROM produit_utilise'),
       ['pu-1']
+    );
+  });
+
+  it('deletes all produits of a traitement_terrestre_id (#persistance-fiches-traitement — purge avant re-création, sans quoi traitement.tsx duplique à chaque "Continuer")', async () => {
+    await deleteAllProduitsForTraitementTerrestre(TERRESTRE_INPUT.id);
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('DELETE FROM produit_utilise WHERE traitement_terrestre_id = ?'),
+      [TERRESTRE_INPUT.id]
     );
   });
 });

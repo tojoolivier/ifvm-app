@@ -4,6 +4,8 @@
  * « Cibles »), et continue de router vers « Cibles » pour le Terrestre, inchangé.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+
+const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
 import ReferencesScreen from '@/app/(traitement)/references';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import * as traitementRepository from '@/lib/traitement-repository';
@@ -112,6 +114,26 @@ describe('ReferencesScreen — routage post-Continuer selon le type (#326)', () 
     await waitFor(() =>
       expect(mockPush).toHaveBeenCalledWith(
         expect.objectContaining({ pathname: '/(traitement)/cibles' })
+      )
+    );
+  });
+});
+
+describe('ReferencesScreen — persistance du Mode de traitement (#persistance-fiches-traitement)', () => {
+  it("persiste un changement de « Mode de traitement » sur une fiche déjà créée, non lecture seule — auparavant jamais transmis à updateTraitementReference, la modification disparaissait au prochain enregistrement", async () => {
+    jest.mocked(traitementRepository.getTraitement).mockResolvedValue(draftDejaLocalise('AERIEN'));
+
+    await render(<ReferencesScreen />);
+    await waitFor(() => expect(useTraitementCaptureStore.getState().ref.localite).toBe('Andasibe'));
+
+    fireEvent.press(screen.getByText('Barrières'));
+    await settle();
+    fireEvent.press(screen.getByText('Continuer — Synthèse ›'));
+
+    await waitFor(() =>
+      expect(traitementRepository.updateTraitementReference).toHaveBeenCalledWith(
+        'trait-1',
+        expect.objectContaining({ modeTraitement: 'BARRIERE' })
       )
     );
   });
