@@ -57,17 +57,18 @@ export default function TraitementSelectScreen() {
         <Text style={styles.primaryCardText}>Nouvelle fiche de traitement</Text>
       </TouchableOpacity>
 
+      {/* Anciennement « Consulter une fiche validée » — renommé en « Mes fiches »
+          (le seul bouton « Mes fiches » de cet écran désormais) : même
+          comportement fonctionnel exact (bascule la liste locale des
+          brouillons via `listDraftTraitements`), seul le libellé change.
+          L'ancien bouton « Mes fiches » (qui pointait vers l'écran
+          /(traitement)/mes-fiches) est supprimé pour ne plus laisser de
+          doublon. Ne pas confondre avec le slide interne « Consulter une
+          fiche validée » de prospection-picker.tsx (atteint depuis
+          « Nouvelle fiche de traitement »), qui reste inchangé. */}
       <TouchableOpacity
         style={styles.secondaryCard}
         onPress={() => setShowList((v) => !v)}
-        accessibilityRole="button"
-      >
-        <Text style={styles.secondaryCardText}>Consulter une fiche validée</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.secondaryCard}
-        onPress={() => router.push('/(traitement)/mes-fiches' as any)}
         accessibilityRole="button"
       >
         <Text style={styles.secondaryCardText}>Mes fiches</Text>
