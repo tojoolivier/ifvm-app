@@ -1,9 +1,23 @@
 /**
- * #biotope-multi : « Biotopes » reste obligatoire (au moins un) après le passage en
- * choix multiples — fichier séparé de reference-biotope-multiselect.test.tsx (un seul
- * montage d'écran par fichier, cf. commentaire de ce dernier).
+ * #prospection-distance-200m — la règle anti-doublon par proximité (#107,
+ * §2.2 point 16 du manuel : moins de 200 m et 2 h d'une fiche soumise par un
+ * autre prospecteur) est supprimée, pas seulement débloquée. Avant ce
+ * correctif, elle n'empêchait déjà pas l'enregistrement (simple avertissement
+ * non bloquant, cf. l'ancien test « ne bloque jamais l'enregistrement » sur
+ * validateAntiDoublon) — mais elle reste désormais totalement absente : plus
+ * aucune recherche de fiches proches, plus aucun avertissement à ce sujet, à
+ * quelque distance que ce soit.
+ *
+ * Fichier séparé de reference-screen.test.tsx : ce dernier a un état encore
+ * en observation avec plusieurs tests successifs (fireEvent + attente d'un
+ * enregistrement réel) qui peut laisser des effets asynchrones du montage
+ * (capture GPS) se résoudre après le démontage et perturber le rendu du test
+ * suivant dans le même fichier — même prudence que les autres écrans de
+ * prospection déjà scindés en plusieurs fichiers pour cette raison
+ * (reference-gps-precision.test.tsx, reference-biotope-restore.test.tsx, etc.).
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { Alert } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import ReferenceScreen from '@/app/(prospection)/reference';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
@@ -36,7 +50,7 @@ jest.mock('@/lib/referentiel-db', () => ({
   findNearestStation: jest.fn().mockResolvedValue(null),
 }));
 
-describe('ReferenceScreen — Biotopes reste obligatoire (#biotope-multi)', () => {
+describe('ReferenceScreen — plus aucune règle de distance entre prospections', () => {
   beforeEach(() => {
     useProspectionWizardStore.setState({
       draft: {
@@ -50,20 +64,25 @@ describe('ReferenceScreen — Biotopes reste obligatoire (#biotope-multi)', () =
     });
   });
 
-  it('bloque « Continuer » si aucun biotope n’est sélectionné', async () => {
+  it('enregistre sans aucun avertissement de proximité — aucune recherche de fiche proche n’est même effectuée', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert');
+
     await render(
       <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
         <ReferenceScreen />
       </SafeAreaProvider>
     );
+
     await waitFor(() => expect(screen.getByText('Continuer  ›')).toBeVisible());
 
     const surfaceInputs = screen.getAllByPlaceholderText('0');
     fireEvent.changeText(surfaceInputs[0], '10');
     fireEvent.changeText(surfaceInputs[1], '5');
+    fireEvent.press(screen.getByText('Xérophyle'));
     fireEvent.press(screen.getByText('Continuer  ›'));
 
-    expect(await screen.findByText('Le type de biotope est obligatoire')).toBeVisible();
-    expect(prospectionRepository.updateProspectionReference).not.toHaveBeenCalled();
+    await waitFor(() => expect(prospectionRepository.updateProspectionReference).toHaveBeenCalled());
+    expect(alertSpy).not.toHaveBeenCalledWith(expect.stringContaining('vérifier'), expect.anything());
+    expect(alertSpy).not.toHaveBeenCalledWith(expect.anything(), expect.stringContaining('Doublon'));
   });
 });
