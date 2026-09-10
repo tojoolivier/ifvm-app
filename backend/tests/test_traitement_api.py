@@ -1262,8 +1262,21 @@ async def test_list_traitements_reprenable_exclut_origine_deja_utilisee_et_surfa
     prospection est plafonnée à sa surface infestée — les combiner sur une seule
     aurait fait dépasser 100 ha (10+10+100+5) et échoué à la création, pour une
     raison sans rapport avec ce que ce test vérifie (la logique de listage
-    « reprenable », pas la cohérence des surfaces entre elles)."""
+    « reprenable », pas la cohérence des surfaces entre elles).
+
+    Les trois `_creer_prospection` sont appelés d'affilée, AVANT toute requête HTTP
+    (comme test_list_traitements_filtres juste au-dessus) : `utilisateur` est un
+    objet ORM chargé sur `db_session`, expiré par le `commit()` de
+    `_creer_prospection` — un appel HTTP intercalé entre deux `_creer_prospection`
+    déclenche alors un rechargement paresseux hors contexte greenlet
+    (`MissingGreenlet`)."""
     prospection_chaine_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surface_infestee=100.0
+    )
+    prospection_epuisee_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surface_infestee=100.0
+    )
+    prospection_reprenable_id = await _creer_prospection(
         db_session, campagne_id, utilisateur, surface_infestee=100.0
     )
     base_payload_chaine = payload_traitement_terrestre(prospection_chaine_id)
@@ -1287,9 +1300,6 @@ async def test_list_traitements_reprenable_exclut_origine_deja_utilisee_et_surfa
 
     # fiche à surface_restante_ha = 0 -> exclue (prospection dédiée : consomme à
     # elle seule toute la surface infestée).
-    prospection_epuisee_id = await _creer_prospection(
-        db_session, campagne_id, utilisateur, surface_infestee=100.0
-    )
     epuisee = await _creer_fiche_terrestre_chainee(
         client,
         auth_headers,
@@ -1299,9 +1309,6 @@ async def test_list_traitements_reprenable_exclut_origine_deja_utilisee_et_surfa
     assert epuisee["terrestre"]["surface_restante_ha"] == 0.0
 
     # fiche indépendante encore reprenable (prospection dédiée elle aussi).
-    prospection_reprenable_id = await _creer_prospection(
-        db_session, campagne_id, utilisateur, surface_infestee=100.0
-    )
     reprenable = await _creer_fiche_terrestre_chainee(
         client,
         auth_headers,
@@ -1459,8 +1466,15 @@ async def test_list_traitements_reprenable_inclut_aerien_sans_filtre_de_type(
     Deux prospections distinctes (une par fiche) — depuis la refonte surfaces
     (§8/§12), les combiner sur une seule aurait fait dépasser sa surface
     infestée (100+5 ha) et échoué à la création, sans rapport avec ce que ce
-    test vérifie (la logique de listage « reprenable »)."""
+    test vérifie (la logique de listage « reprenable »).
+
+    Les deux `_creer_prospection` sont appelés d'affilée, AVANT toute requête
+    HTTP — cf. commentaire de test_list_traitements_reprenable_exclut_origine_
+    deja_utilisee_et_surface_epuisee (MissingGreenlet sinon)."""
     prospection_epuisee_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surface_infestee=100.0
+    )
+    prospection_reprenable_id = await _creer_prospection(
         db_session, campagne_id, utilisateur, surface_infestee=100.0
     )
     epuisee = await _creer_fiche_aerien_chainee(
@@ -1472,9 +1486,6 @@ async def test_list_traitements_reprenable_inclut_aerien_sans_filtre_de_type(
     )
     assert epuisee["aerien"]["surface_restante_ha"] == 0.0
 
-    prospection_reprenable_id = await _creer_prospection(
-        db_session, campagne_id, utilisateur, surface_infestee=100.0
-    )
     reprenable = await _creer_fiche_aerien_chainee(
         client,
         auth_headers,
