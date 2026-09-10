@@ -121,7 +121,7 @@ class TraitementTerrestreCreate(BaseModel):
     direction_vent: DirectionVent | None = None
     temperature_c: float
     chef_equipe_id: uuid.UUID
-    agent_encadreur_id: uuid.UUID | None = None
+    agent_encadreur: str | None = Field(None, max_length=255)
     consultant_international: str | None = Field(None, max_length=255)
     surface_atomiseur_ha: float | None = Field(None, ge=0)
     surface_disque_rotatif_ha: float | None = Field(None, ge=0)
@@ -372,7 +372,7 @@ class TraitementTerrestreRead(BaseModel):
     reprise_traitement: bool
     traitement_origine_id: uuid.UUID | None
     chef_equipe_id: uuid.UUID
-    agent_encadreur_id: uuid.UUID | None
+    agent_encadreur: str | None
     consultant_international: str | None
     surface_atomiseur_ha: float | None
     surface_disque_rotatif_ha: float | None

@@ -147,7 +147,7 @@ describe('createDraftTraitementTerrestre', () => {
         reprise_traitement: null,
         traitement_origine_id: null,
         chef_equipe_id: TERRESTRE_INPUT.chefEquipeId,
-        agent_encadreur_id: null,
+        agent_encadreur: null,
         consultant_international: null,
         surface_atomiseur_ha: null,
         surface_disque_rotatif_ha: null,

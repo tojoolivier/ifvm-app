@@ -295,9 +295,9 @@ class TraitementTerrestreModel(Base):
     chef_equipe_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("utilisateur.id"), nullable=False
     )
-    agent_encadreur_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("utilisateur.id"), nullable=True
-    )
+    # Texte libre (migration 0057, défait le passage en FK utilisateur) — même
+    # patron que consultant_international ci-dessous.
+    agent_encadreur: Mapped[str | None] = mapped_column(String(255), nullable=True)
     consultant_international: Mapped[str | None] = mapped_column(String(255), nullable=True)
     surface_atomiseur_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     surface_disque_rotatif_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
