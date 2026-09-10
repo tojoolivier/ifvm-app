@@ -120,6 +120,27 @@ class TraitementRepository(ABC):
         pass
 
     @abstractmethod
+    async def verrouiller_prospection(self, prospection_id: uuid.UUID) -> None:
+        """Verrou transactionnel (`SELECT ... FOR UPDATE` sur la ligne `prospection`) —
+        sérialise les créations/mises à jour concurrentes de traitement sur la même
+        prospection, pour empêcher un dépassement de `surface_infestee` en cas de
+        créations simultanées (deux appareils/agents). Doit être appelée dans la même
+        transaction que la lecture-agrégat (`sommer_surface_traitee_prospection`) et
+        l'écriture qui suivent, avant elles."""
+        pass
+
+    @abstractmethod
+    async def sommer_surface_traitee_prospection(
+        self, prospection_id: uuid.UUID, exclude_traitement_id: uuid.UUID | None = None
+    ) -> float:
+        """Somme `surface_traitee_ha` de TOUTES les fiches (Terrestre + Aérien, statut
+        brouillon ou validée) liées à cette prospection, `exclude_traitement_id` mis à
+        part — source de vérité pour le plafond de surface, indépendante du chaînage de
+        reprise (qui ne capture qu'UNE chaîne, pas d'éventuelles fiches indépendantes sur
+        la même prospection)."""
+        pass
+
+    @abstractmethod
     async def add_rotation(
         self,
         traitement_id: uuid.UUID,

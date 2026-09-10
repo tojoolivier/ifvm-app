@@ -1,7 +1,7 @@
 import uuid
 from datetime import date
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -176,6 +176,43 @@ class TraitementRepositoryImpl(TraitementRepository):
             stmt = stmt.where(TraitementAerienModel.traitement_id != exclude_traitement_id)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none() is not None
+
+    async def verrouiller_prospection(self, prospection_id: uuid.UUID) -> None:
+        # Verrou de ligne (pas de lecture de colonnes utile ici) — sérialise les
+        # transactions concurrentes visant la même prospection ; voir docstring de
+        # l'interface (domain/repositories.py). Pas d'effet si la prospection
+        # n'existe pas (aucune ligne à verrouiller) : l'appelant vérifie son
+        # existence séparément (ProspectionIntrouvableError).
+        await self.session.execute(
+            select(ProspectionModel.id)
+            .where(ProspectionModel.id == prospection_id)
+            .with_for_update()
+        )
+
+    async def sommer_surface_traitee_prospection(
+        self, prospection_id: uuid.UUID, exclude_traitement_id: uuid.UUID | None = None
+    ) -> float:
+        stmt_terrestre = (
+            select(func.coalesce(func.sum(TraitementTerrestreModel.surface_traitee_ha), 0.0))
+            .select_from(TraitementModel)
+            .join(
+                TraitementTerrestreModel,
+                TraitementTerrestreModel.traitement_id == TraitementModel.id,
+            )
+            .where(TraitementModel.prospection_id == prospection_id)
+        )
+        stmt_aerien = (
+            select(func.coalesce(func.sum(TraitementAerienModel.surface_traitee_ha), 0.0))
+            .select_from(TraitementModel)
+            .join(TraitementAerienModel, TraitementAerienModel.traitement_id == TraitementModel.id)
+            .where(TraitementModel.prospection_id == prospection_id)
+        )
+        if exclude_traitement_id is not None:
+            stmt_terrestre = stmt_terrestre.where(TraitementModel.id != exclude_traitement_id)
+            stmt_aerien = stmt_aerien.where(TraitementModel.id != exclude_traitement_id)
+        total_terrestre = (await self.session.execute(stmt_terrestre)).scalar_one()
+        total_aerien = (await self.session.execute(stmt_aerien)).scalar_one()
+        return float(total_terrestre) + float(total_aerien)
 
     async def create(self, traitement: Traitement) -> Traitement:
         model = TraitementModel(

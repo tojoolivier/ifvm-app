@@ -20,6 +20,7 @@ import {
   computeSurfaceTraitee,
   computeSurfaceCumulee,
   computeSurfaceRestante,
+  validateSurfacePlafond,
   computePesticideStockRestant,
   validateTerrestreConditions,
   validateAerienEquipe,
@@ -250,10 +251,14 @@ export default function TraitementScreen() {
             surfaceRestanteAbandonnee: store.terrestre.surfaceRestanteAbandonnee ?? null,
             motifSurfaceRestanteAbandonnee: store.terrestre.motifSurfaceRestanteAbandonnee ?? null,
           });
-          if (!store.terrestre.chefEquipeId || conditionErrors.length > 0) {
+          // §3 : pré-validation optimiste — le backend reste seul juge final (il voit
+          // aussi les éventuelles fiches sœurs indépendantes, cf. validateSurfacePlafond).
+          const surfaceErrors = validateSurfacePlafond(surfaceInfesteeHa, surfaceTraitee, origineCumuleeHa);
+          if (!store.terrestre.chefEquipeId || conditionErrors.length > 0 || surfaceErrors.length > 0) {
             const byField: Record<string, string> = {};
             if (!store.terrestre.chefEquipeId) byField.chefEquipeId = "Le chef d'équipe est obligatoire";
             for (const e of conditionErrors) byField[e.field] = e.message;
+            for (const e of surfaceErrors) byField[e.field] = e.message;
             setErrors(byField);
             return;
           }

@@ -6,7 +6,6 @@ import {
   listDraftProspections,
   listRecentProspections,
   listUnsyncedProspections,
-  listValidatedProspections,
   countUnsyncedProspections,
   updateProspectionReference,
   updateProspectionEspeces,
@@ -225,37 +224,6 @@ describe('listUnsyncedProspections (#synchronisation-automatique)', () => {
   });
 });
 
-describe('listValidatedProspections', () => {
-  it('lists only extensive/validation rows synced with the server, ordered by most recently updated', async () => {
-    const eligibleRow = { ...STORED_ROW, type_prospection: 'extensive', statut_sync: 'synced' };
-    getAllAsync.mockResolvedValueOnce([eligibleRow]);
-
-    const result = await listValidatedProspections();
-
-    expect(result).toEqual([eligibleRow]);
-    expect(getAllAsync).toHaveBeenCalledWith(
-      expect.stringContaining("p.type_prospection IN ('extensive', 'validation')")
-    );
-    expect(getAllAsync).toHaveBeenCalledWith(expect.stringContaining("AND p.statut_sync = 'synced'"));
-    expect(getAllAsync).toHaveBeenCalledWith(expect.stringContaining('ORDER BY p.updated_at DESC'));
-  });
-
-  it('excludes prospections whose surface infestée is already fully treated (Aérien ou Terrestre)', async () => {
-    // Le "vrai" filtrage se joue en SQL (non exécuté par ce mock) — ce test garde
-    // seulement une trace de non-régression sur la présence des deux clauses
-    // d'exclusion (une par type de traitement), ajoutées avec le chaînage de
-    // reprise généralisé à l’Aérien (migration backend 0050).
-    getAllAsync.mockResolvedValueOnce([]);
-
-    await listValidatedProspections();
-
-    const [query] = getAllAsync.mock.calls[0];
-    expect(query).toContain('JOIN traitement_terrestre tt ON tt.traitement_id = t.id');
-    expect(query).toContain('tt.surface_restante_ha IS NOT NULL AND tt.surface_restante_ha <= 0');
-    expect(query).toContain('JOIN traitement_aerien ta ON ta.traitement_id = t.id');
-    expect(query).toContain('ta.surface_restante_ha IS NOT NULL AND ta.surface_restante_ha <= 0');
-  });
-});
 
 describe('updateProspectionReference', () => {
   const REFERENCE_INPUT = {

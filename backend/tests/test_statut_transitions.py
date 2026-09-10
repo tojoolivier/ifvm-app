@@ -440,3 +440,130 @@ async def test_disponible_pour_traitement_exclut_une_fiche_deja_traitee(
     relecture = await client.get(f"/prospections/{pid_deja_traitee}", headers=auth_headers)
     assert relecture.status_code == 200
     assert relecture.json()["statut"] == "validee"
+
+
+@pytest.mark.asyncio
+async def test_disponible_pour_traitement_reste_visible_si_partiellement_traitee(
+    client: AsyncClient,
+    utilisateur: Utilisateur,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    verificateur: Utilisateur,
+    validateur: Utilisateur,
+    chef_equipe: Utilisateur,
+):
+    """Refonte surfaces (§7) : `disponible_pour_traitement` était devenu "exclut dès
+    qu'une fiche existe", contredisant « une prospection non encore ENTIÈREMENT
+    traitée reste dans Fiches validées ». Ici, `surface_infestee=100` et une seule
+    fiche à 30 ha (surface_restante=70>0) : la prospection doit rester visible — la
+    continuation passe par « Zone à reprendre », mais "Fiches validées" doit rester
+    exacte."""
+    resp_creation = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "intensive",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-06-25",
+            "biotope": ["xerophyle"],
+            "surface_infestee": 100.0,
+        },
+        headers=auth_headers,
+    )
+    assert resp_creation.status_code == 201
+    pid = resp_creation.json()["id"]
+    await _changer_statut(client, pid, "en_attente", auth_headers)
+    await _changer_statut(client, pid, "verifiee", _headers(verificateur))
+    await _changer_statut(client, pid, "validee", _headers(validateur))
+
+    creation_traitement = await client.post(
+        "/traitements",
+        json={
+            "prospection_id": pid,
+            "date_traitement": "2026-08-11",
+            "date_validation": "2026-08-10",
+            "localite": "Betioky",
+            "terrestre": {
+                "heure_debut": "06:00:00",
+                "heure_fin": "09:00:00",
+                "vitesse_vent_ms": 1.5,
+                "temperature_c": 24.0,
+                "chef_equipe_id": str(chef_equipe.id),
+                "surface_atomiseur_ha": 30.0,
+                "surface_restante_abandonnee": True,
+                "motif_surface_restante_abandonnee": "reprise ultérieure",
+            },
+        },
+        headers=auth_headers,
+    )
+    assert creation_traitement.status_code == 201, creation_traitement.text
+
+    resp = await client.get(
+        "/prospections",
+        params={"statut": "validee", "disponible_pour_traitement": "true"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    assert pid in [p["id"] for p in resp.json()]
+
+
+@pytest.mark.asyncio
+async def test_disponible_pour_traitement_exclut_si_integralement_couverte(
+    client: AsyncClient,
+    utilisateur: Utilisateur,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    verificateur: Utilisateur,
+    validateur: Utilisateur,
+    chef_equipe: Utilisateur,
+):
+    """Miroir du test précédent : une fois la surface infestée intégralement couverte
+    (100 ha traités sur 100 ha infestés), la prospection disparaît bien de « Fiches
+    validées » — le nouveau calcul par somme n'affaiblit pas l'exclusion d'origine."""
+    resp_creation = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "intensive",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-06-25",
+            "biotope": ["xerophyle"],
+            "surface_infestee": 100.0,
+        },
+        headers=auth_headers,
+    )
+    assert resp_creation.status_code == 201
+    pid = resp_creation.json()["id"]
+    await _changer_statut(client, pid, "en_attente", auth_headers)
+    await _changer_statut(client, pid, "verifiee", _headers(verificateur))
+    await _changer_statut(client, pid, "validee", _headers(validateur))
+
+    creation_traitement = await client.post(
+        "/traitements",
+        json={
+            "prospection_id": pid,
+            "date_traitement": "2026-08-11",
+            "date_validation": "2026-08-10",
+            "localite": "Betioky",
+            "terrestre": {
+                "heure_debut": "06:00:00",
+                "heure_fin": "09:00:00",
+                "vitesse_vent_ms": 1.5,
+                "temperature_c": 24.0,
+                "chef_equipe_id": str(chef_equipe.id),
+                "surface_atomiseur_ha": 100.0,
+            },
+        },
+        headers=auth_headers,
+    )
+    assert creation_traitement.status_code == 201, creation_traitement.text
+
+    resp = await client.get(
+        "/prospections",
+        params={"statut": "validee", "disponible_pour_traitement": "true"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    assert pid not in [p["id"] for p in resp.json()]

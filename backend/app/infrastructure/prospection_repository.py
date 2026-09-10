@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import delete, select
+from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -25,12 +25,19 @@ from app.infrastructure.prospection_model import (
     ProspectionPopulationModel,
 )
 from app.infrastructure.referentiel_model import StadeModel
-from app.infrastructure.traitement_model import TraitementModel
+from app.infrastructure.traitement_model import (
+    TraitementAerienModel,
+    TraitementModel,
+    TraitementTerrestreModel,
+)
 from app.models.users import Utilisateur
 
 # La clé étrangère `prospection.station_id` porte le nom donné par la migration 0004, ou
 # celui qu'engendre Postgres quand le schéma est créé depuis les métadonnées (en test).
 CONTRAINTES_STATION_FK = frozenset({"fk_prospection_station_id", "prospection_station_id_fkey"})
+# Cf. `_TOLERANCE_SURFACE_HA` (traitement_use_cases.py) — même tolérance, même raison
+# (arrondi flottant sur des `Numeric(10,2)`).
+_TOLERANCE_SURFACE_HA = 1e-6
 
 
 def _contrainte_violee(exc: IntegrityError) -> str | None:
@@ -125,17 +132,63 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             stmt = stmt.where(ProspectionModel.prospecteur_id == prospecteur_id)
         if disponible_pour_traitement:
             # « Fiches de traitement → Consulter une fiche validée » (#fiches-
-            # validees-multi-utilisateurs) : une fiche déjà transformée en
-            # traitement (par n'importe quel utilisateur, sur n'importe quel
-            # appareil) ne doit plus être proposée à la sélection — sans pour
-            # autant la supprimer (elle garde son historique). La réservation
-            # atomique anti-double-sélection (empêcher DEUX utilisateurs de
-            # sélectionner la MÊME fiche au MÊME instant) reste un chantier
-            # séparé, à ce filtre d'exclusion "après coup".
-            sous_requete = select(TraitementModel.id).where(
+            # validees-multi-utilisateurs, affiné au §7 de la refonte surfaces) :
+            # une prospection reste proposée à la sélection tant que sa surface
+            # infestée n'est pas *intégralement* couverte par la somme des fiches
+            # de traitement déjà liées (Terrestre + Aérien, toutes chaînes de
+            # reprise confondues) — pas dès qu'UNE fiche existe. Une prospection
+            # partiellement traitée continue donc d'apparaître ici comme dans
+            # « Zone à reprendre » (`listReprenableTraitements`, côté traitement),
+            # plutôt que de disparaître prématurément. Rien n'est jamais supprimé
+            # (historique conservé). La réservation atomique anti-double-sélection
+            # (empêcher DEUX utilisateurs de sélectionner la MÊME fiche au MÊME
+            # instant) reste un chantier séparé, à ce filtre d'exclusion "après
+            # coup".
+            #
+            # Repli sur l'ancien comportement ("exclut dès qu'une fiche existe")
+            # quand `surface_infestee` est inconnue (`None`) : le plafond est alors
+            # incalculable, pas 0 — même convention que `recalculer_surfaces`
+            # (domain/traitement.py) et `_disponible_pour_prospection`
+            # (traitement_use_cases.py), pour ne pas rouvrir par erreur une
+            # prospection historique sans cette donnée.
+            somme_terrestre = (
+                select(func.coalesce(func.sum(TraitementTerrestreModel.surface_traitee_ha), 0.0))
+                .select_from(TraitementModel)
+                .join(
+                    TraitementTerrestreModel,
+                    TraitementTerrestreModel.traitement_id == TraitementModel.id,
+                )
+                .where(TraitementModel.prospection_id == ProspectionModel.id)
+                .correlate(ProspectionModel)
+                .scalar_subquery()
+            )
+            somme_aerien = (
+                select(func.coalesce(func.sum(TraitementAerienModel.surface_traitee_ha), 0.0))
+                .select_from(TraitementModel)
+                .join(
+                    TraitementAerienModel,
+                    TraitementAerienModel.traitement_id == TraitementModel.id,
+                )
+                .where(TraitementModel.prospection_id == ProspectionModel.id)
+                .correlate(ProspectionModel)
+                .scalar_subquery()
+            )
+            sous_requete_any = select(TraitementModel.id).where(
                 TraitementModel.prospection_id == ProspectionModel.id
             )
-            stmt = stmt.where(~sous_requete.exists())
+            stmt = stmt.where(
+                or_(
+                    and_(
+                        ProspectionModel.surface_infestee.is_not(None),
+                        (somme_terrestre + somme_aerien)
+                        < ProspectionModel.surface_infestee - _TOLERANCE_SURFACE_HA,
+                    ),
+                    and_(
+                        ProspectionModel.surface_infestee.is_(None),
+                        ~sous_requete_any.exists(),
+                    ),
+                )
+            )
         stmt = stmt.order_by(ProspectionModel.date_prospection.desc())
         result = await self.session.execute(stmt)
         prospections = [self._to_domain(m) for m in result.scalars().all()]

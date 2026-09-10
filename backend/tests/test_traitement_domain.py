@@ -19,6 +19,7 @@ from app.domain.prospection import Prospection, ProspectionPopulation
 from app.domain.traitement import (
     ChefDeBaseInvalideError,
     ChefEquipeInvalideError,
+    Cible,
     MotifAbandonManquantError,
     NumeroFicheConflitError,
     ProduitUtilise,
@@ -28,6 +29,7 @@ from app.domain.traitement import (
     Rotation,
     RotationIntrouvableError,
     SignaturesManquantesError,
+    SurfaceTraiteeDepasseeError,
     Traitement,
     TraitementAerien,
     TraitementIntrouvableError,
@@ -198,11 +200,16 @@ class FakeTraitementRepo:
         conflits: int = 0,
         traitements_par_id: dict | None = None,
         origines_deja_utilisees: set | None = None,
+        surface_deja_traitee_ailleurs: float = 0.0,
     ):
         self.conflits = conflits
         self.crees: list[Traitement] = []
         self.traitements_par_id = traitements_par_id or {}
         self.origines_deja_utilisees = origines_deja_utilisees or set()
+        # Simule la somme des `surface_traitee_ha` d'AUTRES fiches déjà liées à la
+        # même prospection (§12) — 0.0 par défaut (aucune fiche sœur), à surcharger
+        # pour exercer le rejet de `_disponible_pour_prospection`.
+        self.surface_deja_traitee_ailleurs = surface_deja_traitee_ailleurs
 
     async def create(self, traitement: Traitement) -> Traitement:
         if self.conflits > 0:
@@ -217,8 +224,23 @@ class FakeTraitementRepo:
     async def list_by_filters(self, **kwargs):
         return []
 
-    async def origine_deja_utilisee(self, traitement_origine_id) -> bool:
+    async def origine_deja_utilisee(
+        self, traitement_origine_id, exclude_traitement_id=None
+    ) -> bool:
         return traitement_origine_id in self.origines_deja_utilisees
+
+    async def origine_deja_utilisee_aerien(
+        self, traitement_origine_id, exclude_traitement_id=None
+    ) -> bool:
+        return traitement_origine_id in self.origines_deja_utilisees
+
+    async def verrouiller_prospection(self, prospection_id) -> None:
+        pass
+
+    async def sommer_surface_traitee_prospection(
+        self, prospection_id, exclude_traitement_id=None
+    ) -> float:
+        return self.surface_deja_traitee_ailleurs
 
 
 class FakeProspectionRepo:
@@ -312,6 +334,27 @@ async def test_creation_aerien_transmet_immatriculation_et_stock_pesticide():
     # consommé, le stock = tout le reçu.
     assert traitement.aerien.surface_restante_ha == 100.0
     assert traitement.aerien.pesticide_stock_restant_l == 200.0
+
+
+@pytest.mark.asyncio
+async def test_creation_aerien_rejette_prospection_deja_entierement_traitee():
+    """§6/§12 (refonte surfaces) : une fiche fraîche (0 rotation) ne peut même pas être
+    créée si d'autres fiches déjà liées à la prospection en couvrent déjà toute la
+    surface infestée — pas besoin d'attendre l'ajout d'une rotation pour le détecter."""
+    prospection = _prospection(surface_infestee=100.0)
+    use_case, repo = _use_case(prospection=prospection, chef=_CHEF)
+    repo.surface_deja_traitee_ailleurs = 100.0
+    with pytest.raises(SurfaceTraiteeDepasseeError):
+        await use_case.execute(**_args())
+
+
+@pytest.mark.asyncio
+async def test_creation_aerien_accepte_quand_de_la_surface_reste_disponible():
+    prospection = _prospection(surface_infestee=100.0)
+    use_case, repo = _use_case(prospection=prospection, chef=_CHEF)
+    repo.surface_deja_traitee_ailleurs = 60.0
+    traitement = await use_case.execute(**_args())
+    assert traitement.aerien.surface_traitee_ha == 0.0
 
 
 @pytest.mark.asyncio
@@ -552,8 +595,10 @@ def test_recalculer_stock_pesticide_aerien_plancher_zero_surconsommation():
 
 
 class FakeTraitementRepoRotations:
-    def __init__(self, traitement: Traitement | None):
+    def __init__(self, traitement: Traitement | None, surface_deja_traitee_ailleurs: float = 0.0):
         self.traitement = traitement
+        # Cf. FakeTraitementRepo.surface_deja_traitee_ailleurs — même rôle.
+        self.surface_deja_traitee_ailleurs = surface_deja_traitee_ailleurs
 
     async def get_by_id(self, traitement_id):
         return self.traitement
@@ -563,6 +608,14 @@ class FakeTraitementRepoRotations:
 
     async def create(self, traitement):
         return traitement
+
+    async def verrouiller_prospection(self, prospection_id) -> None:
+        pass
+
+    async def sommer_surface_traitee_prospection(
+        self, prospection_id, exclude_traitement_id=None
+    ) -> float:
+        return self.surface_deja_traitee_ailleurs
 
     async def add_rotation(
         self,
@@ -628,10 +681,15 @@ class FakeTraitementRepoRotations:
         return self.traitement
 
 
-def _traitement_aerien(rotations: list[Rotation] | None = None) -> Traitement:
+def _traitement_aerien(
+    rotations: list[Rotation] | None = None, surface_infestee_ha: float | None = None
+) -> Traitement:
     aerien = TraitementAerien()
     aerien.rotations = rotations or []
-    return Traitement(aerien=aerien)
+    cible = (
+        Cible(surface_infestee_ha=surface_infestee_ha) if surface_infestee_ha is not None else None
+    )
+    return Traitement(aerien=aerien, cible=cible)
 
 
 def _rotation_args(**overrides):
@@ -665,6 +723,44 @@ async def test_add_rotation_incremente_totaux():
 
     assert resultat.aerien.nb_rotations == 1
     assert resultat.aerien.total_pesticide_l == 10.0
+
+
+@pytest.mark.asyncio
+async def test_add_rotation_rejette_surface_qui_depasse_le_plafond():
+    """§3/§12 (refonte surfaces) : c'est ici, à l'ajout d'une rotation (seul point
+    d'écriture réel de `surface_traitee_ha` côté Aérien), que le plafond se vérifie —
+    pas à la création de la fiche, où `surface_traitee_ha` vaut toujours 0."""
+    traitement = _traitement_aerien(surface_infestee_ha=5.0)
+    repo = FakeTraitementRepoRotations(traitement)
+    use_case = AddRotation(repo)
+
+    with pytest.raises(SurfaceTraiteeDepasseeError, match="reste seulement 5"):
+        await use_case.execute(traitement_id=traitement.id, **_rotation_args(surface_ha=6.0))
+
+
+@pytest.mark.asyncio
+async def test_add_rotation_rejette_en_tenant_compte_dune_autre_fiche_deja_liee():
+    """§8/§12 : le plafond tient compte des AUTRES fiches déjà liées à la même
+    prospection (`sommer_surface_traitee_prospection`), pas seulement de la chaîne de
+    reprise de la fiche en cours d'édition."""
+    traitement = _traitement_aerien(surface_infestee_ha=10.0)
+    repo = FakeTraitementRepoRotations(traitement, surface_deja_traitee_ailleurs=8.0)
+    use_case = AddRotation(repo)
+
+    with pytest.raises(SurfaceTraiteeDepasseeError, match="reste seulement 2"):
+        await use_case.execute(traitement_id=traitement.id, **_rotation_args(surface_ha=3.0))
+
+
+@pytest.mark.asyncio
+async def test_add_rotation_accepte_exactement_la_surface_restante():
+    """Cas 6 : la surface restante exacte est acceptée (égalité, pas dépassement)."""
+    traitement = _traitement_aerien(surface_infestee_ha=5.0)
+    repo = FakeTraitementRepoRotations(traitement)
+    use_case = AddRotation(repo)
+
+    resultat = await use_case.execute(traitement_id=traitement.id, **_rotation_args(surface_ha=5.0))
+    assert resultat.aerien.surface_traitee_ha == 5.0
+    assert resultat.aerien.surface_restante_ha == 0.0
 
 
 @pytest.mark.asyncio
@@ -986,10 +1082,62 @@ async def test_terrestre_rejette_surface_restante_positive_sans_abandonnee():
 
 @pytest.mark.asyncio
 async def test_terrestre_accepte_surface_restante_nulle_sans_abandonnee():
+    """Cas 6 (refonte surfaces) : surface saisie == surface infestée exactement —
+    accepté, surface_restante_ha tombe à 0 sans déclencher le rejet de
+    `_verifier_surface_traitee` (égalité, pas dépassement)."""
     prospection = _prospection(surface_infestee=10.0)
     use_case, _ = _use_case_terrestre(prospection=prospection, chef=_CHEF_EQUIPE)
-    traitement = await use_case.execute(**_args_terrestre(surface_atomiseur_ha=25.0))
+    traitement = await use_case.execute(**_args_terrestre(surface_atomiseur_ha=10.0))
     assert traitement.terrestre.surface_restante_ha == 0.0
+
+
+@pytest.mark.asyncio
+async def test_terrestre_rejette_surface_traitee_qui_depasse_la_surface_infestee():
+    """Cas 5 (refonte surfaces, §3/§12) : une surface saisie qui dépasserait la surface
+    infestée est désormais REJETÉE — `recalculer_surfaces` continue de planchonner
+    `surface_restante_ha` à 0 pour l'affichage, mais la persistance elle-même est
+    bloquée par `SurfaceTraiteeDepasseeError`, plus le floor silencieux d'avant."""
+    prospection = _prospection(surface_infestee=10.0)
+    use_case, _ = _use_case_terrestre(prospection=prospection, chef=_CHEF_EQUIPE)
+    with pytest.raises(SurfaceTraiteeDepasseeError, match="reste seulement 10"):
+        await use_case.execute(
+            **_args_terrestre(surface_atomiseur_ha=25.0, surface_restante_abandonnee=False)
+        )
+
+
+@pytest.mark.asyncio
+async def test_terrestre_rejette_creation_sur_prospection_deja_entierement_traitee():
+    """Cas 3+6 (refonte surfaces, §6) : une AUTRE fiche a déjà couvert toute la surface
+    infestée — la nouvelle fiche est rejetée avant même de regarder ses propres
+    champs de surface, quelle que soit la valeur saisie."""
+    prospection = _prospection(surface_infestee=10.0)
+    use_case, repo = _use_case_terrestre(prospection=prospection, chef=_CHEF_EQUIPE)
+    repo.surface_deja_traitee_ailleurs = 10.0
+    with pytest.raises(SurfaceTraiteeDepasseeError):
+        await use_case.execute(
+            **_args_terrestre(surface_atomiseur_ha=1.0, surface_restante_abandonnee=False)
+        )
+
+
+@pytest.mark.asyncio
+async def test_terrestre_accepte_surface_traitee_sous_le_plafond_malgre_une_autre_fiche_deja_liee():
+    """Cas 4 (refonte surfaces, §8) : la somme de TOUTES les fiches déjà liées à la
+    prospection (pas seulement la chaîne de reprise de la fiche en cours) fait foi pour
+    le GATE de validation — une fiche indépendante (`reprise_traitement=False`) est
+    acceptée tant qu'elle ne fait pas dépasser ce total, même sans lien de chaîne avec
+    la fiche sœur. `surface_restante_ha` (champ d'AFFICHAGE, `recalculer_surfaces`)
+    reste en revanche calculé par chaîne seule — ici sans reprise, il ignore donc la
+    fiche sœur (75.0) et vaut naïvement 100 - 25 = 75.0, pas 0 : la correction du §8
+    ajoute un plafond de VALIDATION, elle ne réécrit pas ce calcul d'affichage
+    préexistant (portée volontairement minimale, cf. plan validé)."""
+    prospection = _prospection(surface_infestee=100.0)
+    use_case, repo = _use_case_terrestre(prospection=prospection, chef=_CHEF_EQUIPE)
+    repo.surface_deja_traitee_ailleurs = 75.0
+    traitement = await use_case.execute(
+        **_args_terrestre(surface_atomiseur_ha=25.0, surface_restante_abandonnee=False)
+    )
+    assert traitement.terrestre.surface_traitee_ha == 25.0
+    assert traitement.terrestre.surface_restante_ha == 75.0
 
 
 # ==========================================
@@ -1638,11 +1786,15 @@ def test_contenu_diverge_ignore_statut_sync_et_updated_at():
 
 
 class FakeTraitementRepoSync:
-    def __init__(self, existant: Traitement | None = None):
+    def __init__(
+        self, existant: Traitement | None = None, surface_deja_traitee_ailleurs: float = 0.0
+    ):
         self.existant = existant
         self.crees: list[Traitement] = []
         self.synced: list[Traitement] = []
         self.conflicts_marques: list[uuid.UUID] = []
+        # Cf. FakeTraitementRepo.surface_deja_traitee_ailleurs — même rôle.
+        self.surface_deja_traitee_ailleurs = surface_deja_traitee_ailleurs
 
     async def get_by_id(self, traitement_id):
         if self.existant is not None and traitement_id == self.existant.id:
@@ -1658,6 +1810,17 @@ class FakeTraitementRepoSync:
 
     async def origine_deja_utilisee(self, traitement_origine_id, exclude_traitement_id=None):
         return False
+
+    async def origine_deja_utilisee_aerien(self, traitement_origine_id, exclude_traitement_id=None):
+        return False
+
+    async def verrouiller_prospection(self, prospection_id) -> None:
+        pass
+
+    async def sommer_surface_traitee_prospection(
+        self, prospection_id, exclude_traitement_id=None
+    ) -> float:
+        return self.surface_deja_traitee_ailleurs
 
     async def update_sync(self, traitement: Traitement) -> Traitement:
         traitement.statut_sync = "synced"

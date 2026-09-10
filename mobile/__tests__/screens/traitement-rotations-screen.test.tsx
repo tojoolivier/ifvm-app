@@ -222,6 +222,46 @@ describe('RotationsScreen — validation des heures de vanne', () => {
 });
 
 /**
+ * Refonte surfaces (§3) — bloque « Continuer » si la somme des rotations dépasse la
+ * surface infestée (100 ha, cf. mock `getTraitement` par défaut), avant même
+ * d'appeler `addRotation` : pré-validation optimiste côté mobile, miroir du
+ * garde-fou backend (`_verifier_surface_traitee`).
+ */
+describe('RotationsScreen — plafond de surface traitée (§3)', () => {
+  it('bloque « Continuer » si la somme des rotations dépasse la surface infestée, avec le message attendu', async () => {
+    useTraitementCaptureStore.setState({
+      ...RESET_STATE,
+      aerien: {
+        rotations: [
+          {
+            localId: 'r1',
+            produit_id: 'p1',
+            quantite: 10,
+            unite: 'L',
+            surface_ha: 120,
+            heure_debut: '06:00',
+            heure_fin: '06:30',
+            heure_ouverture_vanne: '06:05',
+            heure_fermeture_vanne: '06:20',
+          },
+        ],
+      },
+    });
+
+    await render(<RotationsScreen />);
+    await screen.findByTestId('rotation-numero-cuve-0');
+
+    fireEvent.press(screen.getByText('Continuer  ›'));
+
+    expect(
+      await screen.findByText("Impossible d'enregistrer cette surface. Il reste seulement 100 ha à traiter.")
+    ).toBeVisible();
+    expect(traitementRepository.addRotation).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+});
+
+/**
  * « Pesticide reçu (l) » a été déplacé depuis l'écran Équipe (traitement.tsx) vers
  * celui-ci — #equipe-slide-aerien : c'est une information propre au traitement
  * (stock de pesticide), pas à l'équipe.

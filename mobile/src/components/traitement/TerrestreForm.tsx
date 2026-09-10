@@ -203,6 +203,7 @@ export function TerrestreForm({
         <Text style={styles.label}>Restante (ha)</Text>
         <Text style={styles.derivedValue}>{surfaceRestante}</Text>
       </Card>
+      {errors.surfaceTraitee && <Text style={styles.error}>{errors.surfaceTraitee}</Text>}
 
       {surfaceRestante > 0 && (
         <Fragment>

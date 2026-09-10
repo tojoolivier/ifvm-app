@@ -457,6 +457,59 @@ async def test_add_rotation_incremente_totaux(
 
 
 @pytest.mark.asyncio
+async def test_add_rotation_rejette_surface_qui_depasse_linfestee_422(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_rotation
+):
+    """§3/§12 (refonte surfaces) : c'est ici, à l'ajout d'une rotation (seul point
+    d'écriture réel de surface_traitee_ha côté Aérien), que le plafond se vérifie —
+    422 avec la surface restante réelle dans le message, pas un plancher silencieux."""
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surface_infestee=3.0
+    )
+    resp_creation = await client.post(
+        "/traitements", json=payload_traitement(prospection_id), headers=auth_headers
+    )
+    assert resp_creation.status_code == 201, resp_creation.text
+    traitement_id = resp_creation.json()["id"]
+
+    resp = await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(surface_ha=5.0),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 422, resp.text
+    assert "3" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_create_traitement_aerien_rejette_prospection_deja_entierement_traitee_422(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement,
+    payload_traitement_terrestre,
+):
+    """§6/§12 : une fiche Aérien fraîche (0 rotation) ne peut pas non plus être créée
+    sur une prospection dont une AUTRE fiche (Terrestre ici — tous types confondus,
+    §8) a déjà couvert toute la surface infestée."""
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surface_infestee=10.0
+    )
+    premiere = payload_traitement_terrestre(prospection_id)
+    premiere["terrestre"]["surface_atomiseur_ha"] = 10.0
+    premiere["terrestre"]["surface_restante_abandonnee"] = False
+    resp1 = await client.post("/traitements", json=premiere, headers=auth_headers)
+    assert resp1.status_code == 201, resp1.text
+
+    resp2 = await client.post(
+        "/traitements", json=payload_traitement(prospection_id), headers=auth_headers
+    )
+    assert resp2.status_code == 422, resp2.text
+
+
+@pytest.mark.asyncio
 async def test_add_rotation_numero_cuve_toujours_derive(
     client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_rotation
 ):
@@ -734,18 +787,66 @@ async def test_create_traitement_terrestre_brouillon(
 async def test_create_traitement_terrestre_surface_restante_plancher_zero(
     client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
 ):
-    """Critère d'acceptation CDG §9: surface_restante_ha ne descend jamais sous 0."""
+    """Critère d'acceptation CDG §9 : surface_restante_ha ne descend jamais sous 0 —
+    exercé ici à l'égalité exacte (10 traités == 10 infestés), le seul cas qui atteint
+    encore ce plancher sans déclencher le rejet ajouté par la refonte surfaces (§3/§12,
+    cf. test_create_traitement_terrestre_rejette_surface_qui_depasse_linfestee_422)."""
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surface_infestee=10.0
+    )
+    payload = payload_traitement_terrestre(prospection_id)
+    payload["terrestre"]["surface_atomiseur_ha"] = 10.0
+    payload["terrestre"]["surface_restante_abandonnee"] = False
+
+    resp = await client.post("/traitements", json=payload, headers=auth_headers)
+    assert resp.status_code == 201, resp.text
+    terrestre = resp.json()["terrestre"]
+    assert terrestre["surface_traitee_ha"] == 10.0
+    assert terrestre["surface_restante_ha"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_create_traitement_terrestre_rejette_surface_qui_depasse_linfestee_422(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+):
+    """§3/§12 (refonte surfaces) : une surface saisie qui dépasserait la surface
+    infestée est rejetée (422, message nommant la surface restante réelle) plutôt que
+    silencieusement plafonnée à 0 comme avant."""
     prospection_id = await _creer_prospection(
         db_session, campagne_id, utilisateur, surface_infestee=10.0
     )
     payload = payload_traitement_terrestre(prospection_id)
     payload["terrestre"]["surface_atomiseur_ha"] = 25.0
+    payload["terrestre"]["surface_restante_abandonnee"] = False
 
     resp = await client.post("/traitements", json=payload, headers=auth_headers)
-    assert resp.status_code == 201, resp.text
-    terrestre = resp.json()["terrestre"]
-    assert terrestre["surface_traitee_ha"] == 25.0
-    assert terrestre["surface_restante_ha"] == 0.0
+    assert resp.status_code == 422, resp.text
+    assert "10" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_create_traitement_terrestre_rejette_en_tenant_compte_dune_autre_fiche_deja_liee_422(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+):
+    """§8/§12 : le plafond tient compte de TOUTES les fiches déjà liées à la même
+    prospection, pas seulement d'une chaîne de reprise explicite — une deuxième fiche
+    indépendante ne peut pas faire dépasser la surface infestée."""
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surface_infestee=10.0
+    )
+    premiere = payload_traitement_terrestre(prospection_id)
+    premiere["terrestre"]["surface_atomiseur_ha"] = 7.0
+    premiere["terrestre"]["surface_restante_abandonnee"] = True
+    premiere["terrestre"]["motif_surface_restante_abandonnee"] = "reprise ultérieure"
+    resp1 = await client.post("/traitements", json=premiere, headers=auth_headers)
+    assert resp1.status_code == 201, resp1.text
+
+    deuxieme = payload_traitement_terrestre(prospection_id)
+    deuxieme["terrestre"]["surface_atomiseur_ha"] = 5.0
+    deuxieme["terrestre"]["surface_restante_abandonnee"] = False
+    resp2 = await client.post("/traitements", json=deuxieme, headers=auth_headers)
+    assert resp2.status_code == 422, resp2.text
+    assert "3" in resp2.json()["detail"]
 
 
 @pytest.mark.asyncio

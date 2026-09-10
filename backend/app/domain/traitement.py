@@ -65,6 +65,14 @@ class TraitementOrigineDejaUtiliseeError(Exception):
     """La fiche d'origine est déjà désignée comme origine par une autre fiche (chaîne linéaire)."""
 
 
+class SurfaceTraiteeDepasseeError(ValueError):
+    """La surface traitée de cette fiche (cumulée aux autres fiches déjà liées à la même
+    prospection, chaînées ou non) dépasserait `surface_infestee` — rejet plutôt que
+    plancher silencieux à 0 (cf. `recalculer_surfaces`, qui reste un plancher d'affichage,
+    pas une validation). Levée aussi bien à la création (surface déjà entièrement
+    couverte par d'autres fiches) qu'à l'ajout/la modification d'une rotation aérienne."""
+
+
 class TraitementVerrouilleError(PermissionError):
     """La fiche n'est plus `brouillon` — verrouillage post-validation."""
 

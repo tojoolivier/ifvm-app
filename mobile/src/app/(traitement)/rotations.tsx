@@ -20,6 +20,7 @@ import {
   computeDureesRotation,
   formatDureeRotation,
   validateRotationsHeures,
+  validateSurfacePlafond,
   deriveNomCommercial,
 } from '@/lib/traitement-validation';
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN } from '@/components/traitement/ProgressBar';
@@ -159,6 +160,13 @@ export default function RotationsScreen() {
         );
         if (heuresErrors.length > 0) {
           setError(heuresErrors[0].message);
+          return;
+        }
+        // §3 : pré-validation optimiste — le backend reste seul juge final (il voit
+        // aussi les éventuelles fiches sœurs indépendantes, cf. validateSurfacePlafond).
+        const surfaceErrors = validateSurfacePlafond(surfaceInfesteeHa, surfaceTraitee, origineCumuleeHa);
+        if (surfaceErrors.length > 0) {
+          setError(surfaceErrors[0].message);
           return;
         }
         setError(undefined);

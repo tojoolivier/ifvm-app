@@ -18,6 +18,7 @@ from app.domain.traitement import (
     ProspectionIntrouvableError,
     Rotation,
     RotationIntrouvableError,
+    SurfaceTraiteeDepasseeError,
     Traitement,
     TraitementAerien,
     TraitementIntrouvableError,
@@ -34,6 +35,62 @@ from app.domain.traitement import (
 
 _MAX_TENTATIVES_NUMERO_FICHE = 50
 _NUMERO_FICHE_MAX_LENGTH = 50  # doit rester aligné avec traitement.numero_fiche String(50)
+# Tolérance de comparaison en hectares — les surfaces sont des `Numeric(10,2)` en base
+# (2 décimales), mais transitent en `float` côté Python : une tolérance plus fine que
+# la précision réellement stockée évite qu'un artefact d'arrondi flottant (ex.
+# 99.99999999999999 au lieu de 100.0) ne déclenche un rejet à tort.
+_TOLERANCE_SURFACE_HA = 1e-6
+
+
+async def _disponible_pour_prospection(
+    traitement_repository: TraitementRepository,
+    prospection_id: uuid.UUID,
+    surface_infestee_ha: float | None,
+    exclude_traitement_id: uuid.UUID | None = None,
+) -> float | None:
+    """Verrouille la prospection (`FOR UPDATE`, tient pour le reste de la transaction —
+    §12.7, sérialise les créations/mises à jour concurrentes) puis retourne la surface
+    encore disponible = `surface_infestee_ha` moins la somme des `surface_traitee_ha` de
+    TOUTES les autres fiches déjà liées à cette prospection (`exclude_traitement_id`
+    écarte la fiche elle-même lors d'une mise à jour/sync) — tous types de traitement et
+    toutes chaînes de reprise confondus, pas seulement celle de la fiche en cours.
+
+    Retourne `None` si `surface_infestee_ha` est inconnue : le plafond est alors
+    incalculable, pas 0 — même convention que `recalculer_surfaces`, pour ne pas
+    bloquer les prospections historiques sans cette donnée.
+    """
+    if surface_infestee_ha is None:
+        return None
+    await traitement_repository.verrouiller_prospection(prospection_id)
+    deja_ailleurs = await traitement_repository.sommer_surface_traitee_prospection(
+        prospection_id, exclude_traitement_id=exclude_traitement_id
+    )
+    return surface_infestee_ha - deja_ailleurs
+
+
+def _verifier_surface_traitee(disponible: float | None, surface_traitee_ha: float) -> None:
+    """Rejette (plutôt que le plancher silencieux à 0 de `recalculer_surfaces`) si
+    `surface_traitee_ha` dépasse ce qui est réellement `disponible` (cf.
+    `_disponible_pour_prospection`) — `None` = plafond inconnu, rien à vérifier."""
+    if disponible is None:
+        return
+    if surface_traitee_ha > disponible + _TOLERANCE_SURFACE_HA:
+        raise SurfaceTraiteeDepasseeError(
+            "Impossible d'enregistrer cette surface. Il reste seulement "
+            f"{max(round(disponible, 2), 0.0)} ha à traiter."
+        )
+
+
+def _verifier_prospection_traitable(disponible: float | None) -> None:
+    """§6 : une prospection déjà entièrement traitée ne doit jamais recevoir de
+    nouvelle fiche — y compris une fiche Aérien fraîchement créée, dont
+    `surface_traitee_ha` démarre à 0 (rotations ajoutées après coup via
+    `/rotations`) et ne déclencherait donc jamais `_verifier_surface_traitee` seule."""
+    if disponible is not None and disponible <= _TOLERANCE_SURFACE_HA:
+        raise SurfaceTraiteeDepasseeError(
+            "Impossible de créer une nouvelle fiche : la surface infestée de cette "
+            "prospection est déjà entièrement traitée."
+        )
 
 
 async def _persister_avec_numero_fiche_unique(
@@ -330,6 +387,15 @@ class CreateTraitementAerien:
             traitement.cible.surface_infestee_ha, surface_cumulee_precedente
         )
 
+        # §6/§12 : garde-fou backend, indépendant du filtre `disponible_pour_traitement`
+        # côté sélecteur mobile — une fiche fraîche démarre à 0 rotation, donc seul le
+        # gate "plus rien à traiter du tout" s'applique ici (les rotations, ajoutées
+        # ensuite via /rotations, revérifient le plafond réel à chaque écriture).
+        disponible = await _disponible_pour_prospection(
+            self.traitement_repository, prospection_id, traitement.cible.surface_infestee_ha
+        )
+        _verifier_prospection_traitable(disponible)
+
         return await _persister_avec_numero_fiche_unique(
             self.traitement_repository,
             traitement,
@@ -507,6 +573,16 @@ class CreateTraitementTerrestre:
         )
         terrestre.recalculer_surfaces(cible.surface_infestee_ha, surface_cumulee_precedente)
         terrestre.recalculer_total_pesticide()
+
+        # §3/§12 : garde-fou backend — contrairement à l'Aérien (surface dérivée des
+        # rotations, ajoutées après coup), la surface Terrestre est connue dès la
+        # création (atomiseur/disque rotatif/ulvamast) : le plafond se vérifie donc ici,
+        # sur la valeur définitive.
+        disponible = await _disponible_pour_prospection(
+            self.traitement_repository, prospection_id, cible.surface_infestee_ha
+        )
+        _verifier_surface_traitee(disponible, terrestre.surface_traitee_ha)
+
         if (
             terrestre.surface_restante_ha
             and terrestre.surface_restante_ha > 0
@@ -653,6 +729,16 @@ class AddRotation:
         aerien.recalculer_totaux()
         aerien.recalculer_surfaces(_surface_infestee_ha(traitement), surface_cumulee_precedente)
 
+        # §3/§12 : point d'écriture réel de surface_traitee_ha côté Aérien — c'est ici,
+        # pas à la création de la fiche (0 rotation), que le plafond se vérifie.
+        disponible = await _disponible_pour_prospection(
+            self.repository,
+            traitement.prospection_id,
+            _surface_infestee_ha(traitement),
+            exclude_traitement_id=traitement_id,
+        )
+        _verifier_surface_traitee(disponible, aerien.surface_traitee_ha)
+
         return await self.repository.add_rotation(
             traitement_id,
             rotation,
@@ -715,6 +801,15 @@ class UpdateRotation:
         surface_cumulee_precedente = aerien.surface_cumulee_ha - aerien.surface_traitee_ha
         aerien.recalculer_totaux()
         aerien.recalculer_surfaces(_surface_infestee_ha(traitement), surface_cumulee_precedente)
+
+        # §3/§12 — cf. AddRotation.
+        disponible = await _disponible_pour_prospection(
+            self.repository,
+            traitement.prospection_id,
+            _surface_infestee_ha(traitement),
+            exclude_traitement_id=traitement_id,
+        )
+        _verifier_surface_traitee(disponible, aerien.surface_traitee_ha)
 
         return await self.repository.update_rotation(
             traitement_id,
@@ -1035,6 +1130,14 @@ class SyncPushTraitementAerien:
             candidat.aerien.recalculer_surfaces(
                 candidat.cible.surface_infestee_ha, surface_cumulee_precedente
             )
+
+            # §6/§12 — cf. CreateTraitementAerien : fiche fraîche, 0 rotation encore
+            # poussée, seul le gate "plus rien à traiter du tout" s'applique ici.
+            disponible = await _disponible_pour_prospection(
+                self.traitement_repository, prospection_id, candidat.cible.surface_infestee_ha
+            )
+            _verifier_prospection_traitable(disponible)
+
             candidat.statut_sync = "synced"
             cree = await _persister_avec_numero_fiche_unique(
                 self.traitement_repository,
@@ -1247,6 +1350,18 @@ class SyncPushTraitementTerrestre:
             pesticide_recu_l=pesticide_recu_l,
         )
         terrestre.recalculer_surfaces(cible.surface_infestee_ha, surface_cumulee_precedente)
+
+        # §3/§12 — cf. CreateTraitementTerrestre. `exclude_traitement_id=traitement_id`
+        # est un no-op pour un push de création (aucune ligne n'existe encore sous cet
+        # id) et exclut correctement la fiche elle-même pour un push de mise à jour.
+        disponible = await _disponible_pour_prospection(
+            self.traitement_repository,
+            prospection_id,
+            cible.surface_infestee_ha,
+            exclude_traitement_id=traitement_id,
+        )
+        _verifier_surface_traitee(disponible, terrestre.surface_traitee_ha)
+
         if (
             terrestre.surface_restante_ha
             and terrestre.surface_restante_ha > 0

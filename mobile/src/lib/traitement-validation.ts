@@ -177,6 +177,40 @@ export function computeSurfaceRestante(
 }
 
 /**
+ * Refonte surfaces (§3) — pré-validation optimiste côté mobile, miroir du garde-fou
+ * backend (`_verifier_surface_traitee`, traitement_use_cases.py) : la surface saisie
+ * pour CETTE fiche ne doit pas dépasser ce qu'il reste réellement disponible avant
+ * elle (`surfaceInfesteeHa - origineSurfaceCumuleeHa`, 0 si fiche indépendante).
+ *
+ * N'a connaissance que de la chaîne de reprise de la fiche en cours — pas des
+ * éventuelles fiches sœurs indépendantes sur la même prospection (§8), que seul le
+ * backend peut voir (agrégat toutes fiches confondues, verrouillé en transaction) :
+ * un blocage ici est un signal précoce pour l'agent, jamais la seule ligne de
+ * défense — le backend reste seul juge final et peut encore rejeter à l'enregistrement.
+ *
+ * Aucune vérification si `surfaceInfesteeHa` est inconnue — même convention que
+ * `computeSurfaceRestante`/le backend.
+ */
+export function validateSurfacePlafond(
+  surfaceInfesteeHa: number | null | undefined,
+  surfaceTraiteeHa: number,
+  origineSurfaceCumuleeHa: number | null | undefined
+): ValidationError[] {
+  if (surfaceInfesteeHa == null) return [];
+  const disponible = surfaceInfesteeHa - (origineSurfaceCumuleeHa ?? 0);
+  if (surfaceTraiteeHa > disponible + 1e-6) {
+    const restant = Math.max(Math.round(disponible * 100) / 100, 0);
+    return [
+      {
+        field: 'surfaceTraitee',
+        message: `Impossible d'enregistrer cette surface. Il reste seulement ${restant} ha à traiter.`,
+      },
+    ];
+  }
+  return [];
+}
+
+/**
  * « Reste en stock » = reçu − consommé, plancher à 0 (même convention que
  * computeSurfaceRestante) — miroir de `_stock_pesticide_restant` côté backend.
  * `null` tant que « reçu » n'est pas renseigné : un stock ne se déduit pas

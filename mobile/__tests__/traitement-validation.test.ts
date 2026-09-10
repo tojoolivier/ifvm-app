@@ -8,6 +8,7 @@ import {
   computeSurfaceTraitee,
   computeSurfaceCumulee,
   computeSurfaceRestante,
+  validateSurfacePlafond,
   validateReferences,
   validateTerrestreConditions,
   validateRotationsHeures,
@@ -185,6 +186,42 @@ describe('computeSurfaceRestante', () => {
 
   it('is zero when the infested surface is unknown', () => {
     expect(computeSurfaceRestante(null, 4)).toBe(0);
+  });
+});
+
+/**
+ * Refonte surfaces (§3) — miroir mobile du garde-fou backend
+ * (`_verifier_surface_traitee`, traitement_use_cases.py). Cas 1-6 du prompt.
+ */
+describe('validateSurfacePlafond', () => {
+  it('accepts a surface strictly under what remains available (cas 2 : traitement partiel)', () => {
+    expect(validateSurfacePlafond(100, 40, 0)).toEqual([]);
+  });
+
+  it('accepts a surface exactly equal to what remains available (cas 6 : plafond exact)', () => {
+    expect(validateSurfacePlafond(100, 100, 0)).toEqual([]);
+  });
+
+  it('rejects a surface that exceeds what remains available, naming the exact remainder (cas 5 : dépassement)', () => {
+    const errors = validateSurfacePlafond(100, 25, 80);
+    expect(errors).toHaveLength(1);
+    expect(errors[0].field).toBe('surfaceTraitee');
+    expect(errors[0].message).toBe("Impossible d'enregistrer cette surface. Il reste seulement 20 ha à traiter.");
+  });
+
+  it('accounts for the reprise chain’s already-cumulated surface (cas 4 : plusieurs traitements)', () => {
+    // 100 infestés, 75 déjà cumulés par la chaîne d'origine — il ne reste que 25.
+    expect(validateSurfacePlafond(100, 25, 75)).toEqual([]);
+    expect(validateSurfacePlafond(100, 26, 75)).toHaveLength(1);
+  });
+
+  it('never reports a negative remainder in the message (floors at 0)', () => {
+    const errors = validateSurfacePlafond(10, 5, 15);
+    expect(errors[0].message).toContain('Il reste seulement 0 ha à traiter.');
+  });
+
+  it('skips validation entirely when the infested surface is unknown', () => {
+    expect(validateSurfacePlafond(null, 1000, 0)).toEqual([]);
   });
 });
 
