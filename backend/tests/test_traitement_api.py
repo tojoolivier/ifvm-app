@@ -493,19 +493,22 @@ async def test_create_traitement_aerien_rejette_prospection_deja_entierement_tra
 ):
     """§6/§12 : une fiche Aérien fraîche (0 rotation) ne peut pas non plus être créée
     sur une prospection dont une AUTRE fiche (Terrestre ici — tous types confondus,
-    §8) a déjà couvert toute la surface infestée."""
+    §8) a déjà couvert toute la surface infestée.
+
+    Les deux payloads sont construits d'affilée, AVANT toute requête HTTP
+    (MissingGreenlet sinon — cf. commentaire de test_list_traitements_reprenable_
+    exclut_origine_deja_utilisee_et_surface_epuisee)."""
     prospection_id = await _creer_prospection(
         db_session, campagne_id, utilisateur, surface_infestee=10.0
     )
     premiere = payload_traitement_terrestre(prospection_id)
+    deuxieme = payload_traitement(prospection_id)
     premiere["terrestre"]["surface_atomiseur_ha"] = 10.0
     premiere["terrestre"]["surface_restante_abandonnee"] = False
     resp1 = await client.post("/traitements", json=premiere, headers=auth_headers)
     assert resp1.status_code == 201, resp1.text
 
-    resp2 = await client.post(
-        "/traitements", json=payload_traitement(prospection_id), headers=auth_headers
-    )
+    resp2 = await client.post("/traitements", json=deuxieme, headers=auth_headers)
     assert resp2.status_code == 422, resp2.text
 
 
@@ -830,18 +833,25 @@ async def test_create_traitement_terrestre_rejette_en_tenant_compte_dune_autre_f
 ):
     """§8/§12 : le plafond tient compte de TOUTES les fiches déjà liées à la même
     prospection, pas seulement d'une chaîne de reprise explicite — une deuxième fiche
-    indépendante ne peut pas faire dépasser la surface infestée."""
+    indépendante ne peut pas faire dépasser la surface infestée.
+
+    `deuxieme` est un `copy.deepcopy` de `premiere` (même prospection_id) plutôt
+    qu'un second appel à `payload_traitement_terrestre` : ce dernier relit
+    `chef_equipe.id`, un objet ORM chargé sur `db_session` — un second accès après
+    une requête HTTP intercalée déclenche un rechargement paresseux hors contexte
+    greenlet (`MissingGreenlet`, cf. commentaire de test_list_traitements_
+    reprenable_exclut_origine_deja_utilisee_et_surface_epuisee)."""
     prospection_id = await _creer_prospection(
         db_session, campagne_id, utilisateur, surface_infestee=10.0
     )
     premiere = payload_traitement_terrestre(prospection_id)
+    deuxieme = copy.deepcopy(premiere)
     premiere["terrestre"]["surface_atomiseur_ha"] = 7.0
     premiere["terrestre"]["surface_restante_abandonnee"] = True
     premiere["terrestre"]["motif_surface_restante_abandonnee"] = "reprise ultérieure"
     resp1 = await client.post("/traitements", json=premiere, headers=auth_headers)
     assert resp1.status_code == 201, resp1.text
 
-    deuxieme = payload_traitement_terrestre(prospection_id)
     deuxieme["terrestre"]["surface_atomiseur_ha"] = 5.0
     deuxieme["terrestre"]["surface_restante_abandonnee"] = False
     resp2 = await client.post("/traitements", json=deuxieme, headers=auth_headers)
@@ -1264,12 +1274,11 @@ async def test_list_traitements_reprenable_exclut_origine_deja_utilisee_et_surfa
     raison sans rapport avec ce que ce test vérifie (la logique de listage
     « reprenable », pas la cohérence des surfaces entre elles).
 
-    Les trois `_creer_prospection` sont appelés d'affilée, AVANT toute requête HTTP
-    (comme test_list_traitements_filtres juste au-dessus) : `utilisateur` est un
-    objet ORM chargé sur `db_session`, expiré par le `commit()` de
-    `_creer_prospection` — un appel HTTP intercalé entre deux `_creer_prospection`
-    déclenche alors un rechargement paresseux hors contexte greenlet
-    (`MissingGreenlet`)."""
+    `payload_traitement_terrestre(...)` n'est appelé qu'UNE SEULE fois (les deux
+    autres payloads en sont des `copy.deepcopy`, prospection_id substitué) : cette
+    fixture relit `chef_equipe.id`, un objet ORM chargé sur `db_session` — un
+    second accès après une requête HTTP intercalée déclenche un rechargement
+    paresseux hors contexte greenlet (`MissingGreenlet`)."""
     prospection_chaine_id = await _creer_prospection(
         db_session, campagne_id, utilisateur, surface_infestee=100.0
     )
@@ -1280,6 +1289,10 @@ async def test_list_traitements_reprenable_exclut_origine_deja_utilisee_et_surfa
         db_session, campagne_id, utilisateur, surface_infestee=100.0
     )
     base_payload_chaine = payload_traitement_terrestre(prospection_chaine_id)
+    base_payload_epuisee = copy.deepcopy(base_payload_chaine)
+    base_payload_epuisee["prospection_id"] = str(prospection_epuisee_id)
+    base_payload_reprenable = copy.deepcopy(base_payload_chaine)
+    base_payload_reprenable["prospection_id"] = str(prospection_reprenable_id)
 
     # racine déjà utilisée comme origine par un autre maillon -> exclue, même si sa
     # propre surface_restante_ha > 0
@@ -1303,7 +1316,7 @@ async def test_list_traitements_reprenable_exclut_origine_deja_utilisee_et_surfa
     epuisee = await _creer_fiche_terrestre_chainee(
         client,
         auth_headers,
-        payload_traitement_terrestre(prospection_epuisee_id),
+        base_payload_epuisee,
         surface_atomiseur_ha=100.0,
     )
     assert epuisee["terrestre"]["surface_restante_ha"] == 0.0
@@ -1312,7 +1325,7 @@ async def test_list_traitements_reprenable_exclut_origine_deja_utilisee_et_surfa
     reprenable = await _creer_fiche_terrestre_chainee(
         client,
         auth_headers,
-        payload_traitement_terrestre(prospection_reprenable_id),
+        base_payload_reprenable,
         surface_atomiseur_ha=5.0,
     )
 
@@ -1468,19 +1481,24 @@ async def test_list_traitements_reprenable_inclut_aerien_sans_filtre_de_type(
     infestée (100+5 ha) et échoué à la création, sans rapport avec ce que ce
     test vérifie (la logique de listage « reprenable »).
 
-    Les deux `_creer_prospection` sont appelés d'affilée, AVANT toute requête
-    HTTP — cf. commentaire de test_list_traitements_reprenable_exclut_origine_
-    deja_utilisee_et_surface_epuisee (MissingGreenlet sinon)."""
+    `payload_traitement(...)` n'est appelé qu'UNE SEULE fois (le second payload en
+    est un `copy.deepcopy`, prospection_id substitué) — cf. commentaire de
+    test_list_traitements_reprenable_exclut_origine_deja_utilisee_et_surface_
+    epuisee (MissingGreenlet sinon)."""
     prospection_epuisee_id = await _creer_prospection(
         db_session, campagne_id, utilisateur, surface_infestee=100.0
     )
     prospection_reprenable_id = await _creer_prospection(
         db_session, campagne_id, utilisateur, surface_infestee=100.0
     )
+    base_payload_epuisee = payload_traitement(prospection_epuisee_id)
+    base_payload_reprenable = copy.deepcopy(base_payload_epuisee)
+    base_payload_reprenable["prospection_id"] = str(prospection_reprenable_id)
+
     epuisee = await _creer_fiche_aerien_chainee(
         client,
         auth_headers,
-        payload_traitement(prospection_epuisee_id),
+        base_payload_epuisee,
         payload_rotation,
         surface_ha=100.0,
     )
@@ -1489,7 +1507,7 @@ async def test_list_traitements_reprenable_inclut_aerien_sans_filtre_de_type(
     reprenable = await _creer_fiche_aerien_chainee(
         client,
         auth_headers,
-        payload_traitement(prospection_reprenable_id),
+        base_payload_reprenable,
         payload_rotation,
         surface_ha=5.0,
     )
