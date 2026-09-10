@@ -32,6 +32,7 @@ type FilterKey = 'TOUS' | StatutFicheAffiche;
 const FILTERS: FilterOption<FilterKey>[] = [
   { value: 'TOUS', label: 'Toutes' },
   { value: 'a_synchro', label: 'À synchro' },
+  { value: 'echec_synchro', label: 'Échec envoi' },
   { value: 'en_attente', label: 'En attente' },
   { value: 'verifiee', label: 'Vérifiées' },
   { value: 'validee', label: 'Validées' },
