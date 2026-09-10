@@ -434,7 +434,7 @@ export default function VegetationScreen() {
                         </View>
                       </View>
 
-                      <Text style={styles.smallLabel}>Stade ORPAD</Text>
+                      <Text style={styles.smallLabel}>ORPAD</Text>
                       <View style={styles.chipsRow}>
                         {ORPAD_STAGES.map((stage) => {
                           const active = strate.orpad.includes(stage);

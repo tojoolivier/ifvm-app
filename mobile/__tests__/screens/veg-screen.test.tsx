@@ -28,7 +28,7 @@ jest.mock('@/lib/prospection-repository', () => ({
 // "Continuer" serait bloqué dans les tests de réenregistrement ci-dessous.
 const EXISTING_VEGETATION = JSON.stringify({
   strates: {
-    herbeuse: { surfRel: 94.5, hMoy: 2.75, recouvrement: 70, verdissement: 33.5, repousse: 12.25, orpad: ['Fleur'] },
+    herbeuse: { surfRel: 94.5, hMoy: 2.75, recouvrement: 70, verdissement: 33.5, repousse: 12.25, orpad: ['Rare'] },
   },
 });
 // Sol nu (%) est un champ station, pas par strate (#278) : il vit dans `sol`, pas
@@ -101,7 +101,7 @@ describe('VegetationScreen — restauration des données déjà enregistrées', 
           strates: {
             // recouvrement (40) + solNu (60) = 100% : répartition valide (#278), sans quoi
             // "Continuer" serait bloqué et ce test n'atteindrait jamais l'enregistrement.
-            arboree: { surfRel: 90, hMoy: 8, recouvrement: 40, verdissement: 60, repousse: null, orpad: ['Fleur'] },
+            arboree: { surfRel: 90, hMoy: 8, recouvrement: 40, verdissement: 60, repousse: null, orpad: ['Rare'] },
           },
         }),
         sol: JSON.stringify({ humidite: 'surface', texture: ['argileuse'], solNu: 60 }),

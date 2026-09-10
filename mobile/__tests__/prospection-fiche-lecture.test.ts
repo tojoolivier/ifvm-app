@@ -265,7 +265,7 @@ describe('parseVegetationSol / buildVegetationSummary (multi-strate)', () => {
   it('parse une strate complète et calcule le résumé sur le recouvrement de chaque strate renseignée', () => {
     const vegetation = JSON.stringify({
       strates: {
-        herbeuse: { surfRel: 40, hMoy: 0.3, recouvrement: 70, verdissement: 20, repousse: 10, orpad: ['Fleur'] },
+        herbeuse: { surfRel: 40, hMoy: 0.3, recouvrement: 70, verdissement: 20, repousse: 10, orpad: ['Rare'] },
         arboree: { surfRel: 10, hMoy: 4, recouvrement: 15, verdissement: 0, repousse: 0, orpad: [] },
       },
     });
@@ -274,7 +274,7 @@ describe('parseVegetationSol / buildVegetationSummary (multi-strate)', () => {
     const state = parseVegetationSol(vegetation, sol, 'moyens');
 
     expect(state.strates.herbeuse).toEqual({
-      surfRel: 40, hMoy: 0.3, recouvrement: 70, verdissement: 20, repousse: 10, orpad: ['Fleur'],
+      surfRel: 40, hMoy: 0.3, recouvrement: 70, verdissement: 20, repousse: 10, orpad: ['Rare'],
     });
     expect(state.strates.buissonneuse.recouvrement).toBe(0);
     expect(state.solNu).toBe(5);
