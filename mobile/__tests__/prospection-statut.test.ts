@@ -5,7 +5,11 @@ describe('statutFicheAffiche', () => {
   it('affiche « à synchroniser » tant que la fiche est locale, quel que soit son statut serveur', () => {
     expect(statutFicheAffiche('en_attente', 'local')).toBe('a_synchro');
     expect(statutFicheAffiche('verifiee', 'local')).toBe('a_synchro');
-    expect(statutFicheAffiche('brouillon', 'echec')).toBe('a_synchro');
+  });
+
+  it('distingue « échec d’envoi » (le serveur a refusé) de « à synchro » (attend juste le réseau) — sinon une fiche définitivement bloquée est indiscernable d’une fiche qui partira au prochain passage réseau', () => {
+    expect(statutFicheAffiche('en_attente', 'echec')).toBe('echec_synchro');
+    expect(statutFicheAffiche('brouillon', 'echec')).toBe('echec_synchro');
   });
 
   it('affiche « en attente » pour une fiche synchronisée en attente de vérification', () => {

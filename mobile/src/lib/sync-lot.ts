@@ -126,6 +126,18 @@ function estConflit(error: unknown): boolean {
 }
 
 /**
+ * Un rejet de validation (4xx hors 401/409) : le serveur a compris la requête
+ * et refusé le **contenu** de la fiche — pas un problème de connexion.
+ * `extractErrorMessage` (api-client.ts) a déjà mis le motif exact du serveur
+ * (souvent en français, ex. « densite_groupee: La densité groupée (/m²) est
+ * obligatoire. ») dans `error.message` ; il ne reste qu'à ne pas le jeter.
+ */
+function estRejetValidation(error: unknown): boolean {
+  const statut = statutHttpDe(error);
+  return statut !== null && statut >= 400 && statut < 500 && statut !== 401 && statut !== 409;
+}
+
+/**
  * Ce que l'agent lit, et ce qu'on lui propose.
  *
  * Le conflit est traité **avant** `toFriendlyError` : il voyage en
@@ -134,6 +146,13 @@ function estConflit(error: unknown): boolean {
  * Or réessayer à l'identique est exactement ce qui ne peut pas marcher : le
  * serveur a une version plus récente. Le statut joint le distingue, comme il
  * distingue déjà 4xx de 5xx.
+ *
+ * Un rejet de validation (422 typiquement) voyage pour la même raison en
+ * `NetworkError` et hériterait du même « Connexion impossible » — un mensonge
+ * cette fois : la connexion a réussi, c'est la fiche que le serveur refuse, et
+ * réessayer sans la corriger reproduira le refus à l'identique. D'où le même
+ * traitement qu'`estConflit` : montrer le motif réel (déjà en `error.message`,
+ * cf. `extractErrorMessage`) plutôt que le message générique de la classe.
  */
 function affichageDe(error: unknown): { message: string; action: ActionErreur | null } {
   if (estConflit(error)) {
@@ -141,6 +160,14 @@ function affichageDe(error: unknown): { message: string; action: ActionErreur | 
       message:
         'Cette fiche a été modifiée sur le serveur. Votre version est conservée sur l’appareil.',
       action: 'signaler-support',
+    };
+  }
+
+  if (estRejetValidation(error)) {
+    const motif = error instanceof Error ? error.message : null;
+    return {
+      message: motif || 'Cette fiche a été refusée par le serveur — corrigez-la avant de réessayer.',
+      action: null,
     };
   }
 
