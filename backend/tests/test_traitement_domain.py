@@ -1320,7 +1320,7 @@ def _traitement_aerien_valide(**overrides) -> Traitement:
 def _traitement_terrestre_valide(**overrides) -> Traitement:
     args = dict(
         chef_equipe_id=uuid.uuid4(),
-        agent_encadreur_id=None,
+        agent_encadreur=None,
         consultant_international=None,
         surface_restante_abandonnee=None,
         motif_surface_restante_abandonnee=None,
@@ -1406,13 +1406,13 @@ def test_valider_aerien_consultant_absent_aucune_signature_requise():
 
 
 def test_valider_terrestre_sans_agent_encadreur_reste_validable():
-    traitement = _traitement_terrestre_valide(agent_encadreur_id=None)
+    traitement = _traitement_terrestre_valide(agent_encadreur=None)
     traitement.valider(date(2026, 8, 12), [{"role": "CHEF_EQUIPE", "signataire_nom": "Hery"}])
     assert traitement.statut == "validee"
 
 
 def test_valider_terrestre_agent_encadreur_renseigne_ne_signe_jamais():
-    traitement = _traitement_terrestre_valide(agent_encadreur_id=uuid.uuid4())
+    traitement = _traitement_terrestre_valide(agent_encadreur="Rakoto Jean")
     traitement.valider(date(2026, 8, 12), [{"role": "CHEF_EQUIPE", "signataire_nom": "Hery"}])
     assert traitement.statut == "validee"
     assert {s.role for s in traitement.signatures} == {"CHEF_EQUIPE"}
@@ -1579,7 +1579,7 @@ def _traitement_terrestre_sync(**overrides) -> Traitement:
         reprise_traitement=False,
         traitement_origine_id=None,
         chef_equipe_id=uuid.uuid4(),
-        agent_encadreur_id=None,
+        agent_encadreur=None,
         consultant_international=None,
         surface_atomiseur_ha=10.0,
         surface_disque_rotatif_ha=None,

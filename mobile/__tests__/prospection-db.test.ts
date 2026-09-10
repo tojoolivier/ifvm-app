@@ -172,6 +172,10 @@ const MIGRATED_COLUMNS = [
   // Colonnes de traitement_aerien et traitement_terrestre (partagées)
   { name: 'pesticide_recu_l' },
   { name: 'pesticide_stock_restant_l' },
+  // agent_encadreur_id (FK utilisateur) -> texte libre (migration backend 0057,
+  // même retour en arrière que pilote/mecanicien/consultant_international
+  // ci-dessus, migration 0048).
+  { name: 'agent_encadreur' },
 
   // Colonne de traitement_signature — signature numérique (#signatures-auto-equipe,
   // migration backend 0049).

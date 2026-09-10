@@ -147,9 +147,20 @@ export default function ReferencesScreen() {
         // reprendre, entrée directe par prospectionId).
         if (!routeTraitementId) {
           setDateValidation(prospection.date_prospection.slice(0, 10));
+          // Localité pré-remplie depuis la fiche de prospection extensive liée
+          // (`station_libre`, « nom du lieu-dit / repère local ») — modifiable
+          // ensuite (filet de sécurité, notamment sur une prospection intensive
+          // qui n'a pas ce champ). N'écrase jamais une saisie déjà présente : lu
+          // via getState() (pas la variable `store` de ce render, obsolète —
+          // cet effet ne dépend pas de `store` et ne se rejoue pas si l'agent a
+          // déjà tapé quelque chose pendant que cette requête était en vol).
+          if (prospection.station_libre && !useTraitementCaptureStore.getState().ref.localite) {
+            store.updateRef({ localite: prospection.station_libre });
+          }
         }
       })
       .catch((error) => signalerChargement(error, { prospectionId }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prospectionId, routeTraitementId, signalerChargement]);
 
   // N° de fiche (auto) : « Prénom du chef — Type — Date ISO », suffixe en cas de
@@ -417,7 +428,7 @@ export default function ReferencesScreen() {
             </Card>
 
             <View style={styles.field}>
-              <Text style={styles.label}>Localité * (saisie manuelle)</Text>
+              <Text style={styles.label}>Localité * (pré-remplie, modifiable)</Text>
               <TextInput
                 editable={!readOnly}
                 style={styles.input}

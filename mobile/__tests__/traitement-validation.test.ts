@@ -377,7 +377,7 @@ describe('computeSignatureMatrix', () => {
   it('requires only chef equipe for terrestre, never agent encadreur', () => {
     const matrix = computeSignatureMatrix('TERRESTRE', {
       chef_equipe_id: 'u-2',
-      agent_encadreur_id: 'u-3',
+      agent_encadreur: 'u-3',
       consultant_international: null,
     });
     expect(matrix).toEqual([{ role: 'CHEF_EQUIPE', required: true, champRenseigne: true }]);

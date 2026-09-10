@@ -43,7 +43,6 @@ export default function TraitementScreen() {
   const typeTraitement = store.typeTraitement;
   const [chefsDeBase, setChefsDeBase] = useState<UtilisateurEquipe[]>([]);
   const [chefsEquipe, setChefsEquipe] = useState<UtilisateurEquipe[]>([]);
-  const [agentsEncadreurs, setAgentsEncadreurs] = useState<UtilisateurEquipe[]>([]);
   const [pesticides, setPesticides] = useState<Pesticide[]>([]);
   const [reprenables, setReprenables] = useState<DraftTraitementRow[]>([]);
   const [surfaceInfesteeHa, setSurfaceInfesteeHa] = useState<number | null>(null);
@@ -93,7 +92,7 @@ export default function TraitementScreen() {
       if (draft.type_traitement === 'TERRESTRE' && draft.terrestre) {
         store.updateTerrestre({
           chefEquipeId: draft.terrestre.chef_equipe_id || null,
-          agentEncadreurId: draft.terrestre.agent_encadreur_id,
+          agentEncadreur: draft.terrestre.agent_encadreur,
           consultantInternational: draft.terrestre.consultant_international,
           heureDebut: draft.terrestre.heure_debut,
           heureFin: draft.terrestre.heure_fin,
@@ -149,7 +148,6 @@ export default function TraitementScreen() {
   useEffect(() => {
     listUtilisateursByRole('chef_de_base').then(setChefsDeBase).catch((error) => signalerChargement(error, 'listUtilisateursByRole:chef_de_base'));
     listUtilisateursByRole('chef_equipe').then(setChefsEquipe).catch((error) => signalerChargement(error, 'listUtilisateursByRole:chef_equipe'));
-    listUtilisateursByRole('agent_encadreur').then(setAgentsEncadreurs).catch((error) => signalerChargement(error, 'listUtilisateursByRole:agent_encadreur'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -259,7 +257,7 @@ export default function TraitementScreen() {
           }
           await updateTraitementTerrestre(traitementId, {
             chefEquipeId: store.terrestre.chefEquipeId,
-            agentEncadreurId: store.terrestre.agentEncadreurId,
+            agentEncadreur: store.terrestre.agentEncadreur,
             consultantInternational: store.terrestre.consultantInternational,
             heureDebut: store.terrestre.heureDebut,
             heureFin: store.terrestre.heureFin,
@@ -337,7 +335,6 @@ export default function TraitementScreen() {
           <TerrestreForm
             readOnly={readOnly}
             chefsEquipe={chefsEquipe}
-            agentsEncadreurs={agentsEncadreurs}
             reprenables={reprenablesTerrestre}
             pesticides={pesticides}
             produits={produits}

@@ -806,6 +806,12 @@ const COLONNES_TRAITEMENT_AERIEN: readonly Colonne[] = [
 const COLONNES_TRAITEMENT_TERRESTRE: readonly Colonne[] = [
   { name: 'pesticide_recu_l', type: 'REAL' },
   { name: 'pesticide_stock_restant_l', type: 'REAL' },
+  // agent_encadreur_id (FK utilisateur) -> texte libre (migration backend 0057,
+  // même retour en arrière que pilote/mécanicien/consultant_international côté
+  // Aérien, migration 0048). agent_encadreur_id ci-dessus (dans le CREATE TABLE)
+  // reste déclarée pour les installations qui l'ont déjà (colonne morte, plus
+  // jamais lue/écrite), même principe que pilote_id/mecanicien_id/consultant_id.
+  { name: 'agent_encadreur', type: 'TEXT' },
 ];
 
 /**
