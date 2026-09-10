@@ -13,10 +13,25 @@
  * `statut_sync` prime : tant que le serveur n'a pas la fiche, son `statut`
  * réel n'a pas de sens pour l'agent (il ne peut rien avoir été vérifié côté
  * serveur). Au-delà, on lit `statut` tel quel.
+ *
+ * `'echec'` (le serveur a refusé la fiche, cf. sync-lot.ts `sortDeLEchec`) est
+ * distingué de `'local'`/`'conflict'` (simplement en attente de réseau) : les
+ * deux tombaient sur le même badge « À SYNCHRO », rendant une fiche
+ * définitivement bloquée indiscernable d'une fiche qui partira au prochain
+ * passage réseau — l'agent n'avait alors aucun signal, sur cette liste, qu'une
+ * fiche ne partirait jamais sans action de sa part (cf. l'écran
+ * Synchronisation, qui lit `statut_sync` séparément).
  */
-export type StatutFicheAffiche = 'a_synchro' | 'en_attente' | 'verifiee' | 'validee' | 'rejetee';
+export type StatutFicheAffiche =
+  | 'a_synchro'
+  | 'echec_synchro'
+  | 'en_attente'
+  | 'verifiee'
+  | 'validee'
+  | 'rejetee';
 
 export function statutFicheAffiche(statut: string, statutSync: string): StatutFicheAffiche {
+  if (statutSync === 'echec') return 'echec_synchro';
   if (statutSync !== 'synced') return 'a_synchro';
   switch (statut) {
     case 'verifiee':
