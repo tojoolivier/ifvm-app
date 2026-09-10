@@ -1257,40 +1257,55 @@ async def test_reprise_traitement_sans_origine_id_422(
 async def test_list_traitements_reprenable_exclut_origine_deja_utilisee_et_surface_epuisee(
     client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
 ):
-    prospection_id = await _creer_prospection(
+    """Trois prospections distinctes (une par scénario) plutôt qu'une seule partagée :
+    depuis la refonte surfaces (§8/§12), la somme des fiches liées à UNE MÊME
+    prospection est plafonnée à sa surface infestée — les combiner sur une seule
+    aurait fait dépasser 100 ha (10+10+100+5) et échoué à la création, pour une
+    raison sans rapport avec ce que ce test vérifie (la logique de listage
+    « reprenable », pas la cohérence des surfaces entre elles)."""
+    prospection_chaine_id = await _creer_prospection(
         db_session, campagne_id, utilisateur, surface_infestee=100.0
     )
-    base_payload = payload_traitement_terrestre(prospection_id)
+    base_payload_chaine = payload_traitement_terrestre(prospection_chaine_id)
 
     # racine déjà utilisée comme origine par un autre maillon -> exclue, même si sa
     # propre surface_restante_ha > 0
     origine_utilisee = await _creer_fiche_terrestre_chainee(
         client,
         auth_headers,
-        base_payload,
+        base_payload_chaine,
         surface_atomiseur_ha=10.0,
     )
     # cette reprise n'est elle-même l'origine de personne -> reste reprenable
     maillon_reprenable = await _creer_fiche_terrestre_chainee(
         client,
         auth_headers,
-        base_payload,
+        base_payload_chaine,
         surface_atomiseur_ha=10.0,
         traitement_origine_id=origine_utilisee["id"],
     )
-    # fiche à surface_restante_ha = 0 -> exclue
+
+    # fiche à surface_restante_ha = 0 -> exclue (prospection dédiée : consomme à
+    # elle seule toute la surface infestée).
+    prospection_epuisee_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surface_infestee=100.0
+    )
     epuisee = await _creer_fiche_terrestre_chainee(
         client,
         auth_headers,
-        base_payload,
+        payload_traitement_terrestre(prospection_epuisee_id),
         surface_atomiseur_ha=100.0,
     )
     assert epuisee["terrestre"]["surface_restante_ha"] == 0.0
-    # fiche indépendante encore reprenable
+
+    # fiche indépendante encore reprenable (prospection dédiée elle aussi).
+    prospection_reprenable_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surface_infestee=100.0
+    )
     reprenable = await _creer_fiche_terrestre_chainee(
         client,
         auth_headers,
-        base_payload,
+        payload_traitement_terrestre(prospection_reprenable_id),
         surface_atomiseur_ha=5.0,
     )
 
@@ -1439,17 +1454,33 @@ async def test_list_traitements_reprenable_inclut_aerien_sans_filtre_de_type(
     aussi l'Aérien (jusqu'ici Terrestre uniquement) — chaque type a sa propre
     chaîne, une fiche épuisée ou déjà désignée comme origine dans SA propre
     chaîne n'affecte pas l'autre type (cf. test_list_traitements_reprenable_
-    exclut_origine_deja_utilisee_et_surface_epuisee pour le Terrestre)."""
-    prospection_id = await _creer_prospection(
+    exclut_origine_deja_utilisee_et_surface_epuisee pour le Terrestre).
+
+    Deux prospections distinctes (une par fiche) — depuis la refonte surfaces
+    (§8/§12), les combiner sur une seule aurait fait dépasser sa surface
+    infestée (100+5 ha) et échoué à la création, sans rapport avec ce que ce
+    test vérifie (la logique de listage « reprenable »)."""
+    prospection_epuisee_id = await _creer_prospection(
         db_session, campagne_id, utilisateur, surface_infestee=100.0
     )
-    base_payload = payload_traitement(prospection_id)
     epuisee = await _creer_fiche_aerien_chainee(
-        client, auth_headers, base_payload, payload_rotation, surface_ha=100.0
+        client,
+        auth_headers,
+        payload_traitement(prospection_epuisee_id),
+        payload_rotation,
+        surface_ha=100.0,
     )
     assert epuisee["aerien"]["surface_restante_ha"] == 0.0
+
+    prospection_reprenable_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surface_infestee=100.0
+    )
     reprenable = await _creer_fiche_aerien_chainee(
-        client, auth_headers, base_payload, payload_rotation, surface_ha=5.0
+        client,
+        auth_headers,
+        payload_traitement(prospection_reprenable_id),
+        payload_rotation,
+        surface_ha=5.0,
     )
 
     resp = await client.get("/traitements", params={"reprenable": "true"}, headers=auth_headers)
