@@ -124,6 +124,22 @@ def _valider_dates(date_traitement: date, date_validation: date) -> None:
         raise ValueError("date_traitement doit être postérieure ou égale à date_validation")
 
 
+def _sans_fuseau(instant: datetime) -> datetime:
+    """Neutralise un datetime *aware* en le ramenant à un naïf (heure UTC conservée) —
+    correctif ciblé, pas une migration de ce module vers des datetimes aware partout
+    (hors périmètre ici, `datetime.utcnow()` — naïf — reste utilisé ailleurs, ex.
+    `_construire_traitement_base`).
+
+    `existant.updated_at`, relu depuis une colonne `TIMESTAMP(timezone=True)`, revient
+    toujours *aware* via asyncpg ; `base_updated_at` (repoussé tel quel par le client
+    après une première lecture de `updated_at` côté réponse JSON, elle-même construite
+    à partir d'un `datetime.utcnow()` naïf jamais repassé par Postgres) revient, lui,
+    naïf. Sans cette normalisation, comparer les deux lève `TypeError: can't compare
+    offset-naive and offset-aware datetimes` à chaque synchronisation d'une fiche
+    déjà existante."""
+    return instant.replace(tzinfo=None) if instant.tzinfo is not None else instant
+
+
 def _generer_et_valider_numero_fiche(
     numero_fiche: str | None, prenom_chef: str, date_traitement: date, type_libelle: str
 ) -> str:
@@ -1149,7 +1165,9 @@ class SyncPushTraitementAerien:
             )
             return cree, True
 
-        if existant.updated_at > base_updated_at and contenu_diverge(existant, candidat):
+        if _sans_fuseau(existant.updated_at) > _sans_fuseau(base_updated_at) and contenu_diverge(
+            existant, candidat
+        ):
             marque = await self.traitement_repository.marquer_conflict(traitement_id)
             raise TraitementSyncConflitError(marque)
 
@@ -1388,7 +1406,9 @@ class SyncPushTraitementTerrestre:
             )
             return cree, True
 
-        if existant.updated_at > base_updated_at and contenu_diverge(existant, candidat):
+        if _sans_fuseau(existant.updated_at) > _sans_fuseau(base_updated_at) and contenu_diverge(
+            existant, candidat
+        ):
             marque = await self.traitement_repository.marquer_conflict(traitement_id)
             raise TraitementSyncConflitError(marque)
 
