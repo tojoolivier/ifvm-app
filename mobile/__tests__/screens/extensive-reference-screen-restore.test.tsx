@@ -46,6 +46,7 @@ jest.mock('@/lib/prospection-repository', () => ({
 
 jest.mock('@/lib/location', () => ({
   getCurrentPosition: jest.fn().mockResolvedValue({ latitude: -18.9, longitude: 47.5, altitude: null, accuracy: 5, timestamp: Date.now() }),
+  reverseGeocode: jest.fn().mockResolvedValue({ region: null, district: null, commune: null }),
 }));
 
 jest.mock('@/lib/referentiel-db', () => ({
