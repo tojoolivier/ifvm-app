@@ -15,7 +15,7 @@ import {
 import { Picker } from '@react-native-picker/picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getCurrentPosition } from '@/lib/location';
+import { getCurrentPosition, reverseGeocode } from '@/lib/location';
 import { useAuthStore } from '@/lib/auth-store';
 import {
   OperationAerienneRow,
@@ -196,6 +196,10 @@ export default function ExtensiveReferenceScreen() {
   const [isLoadingGps, setIsLoadingGps] = useState<boolean>(false);
   const [gpsError, setGpsError] = useState<string>('');
   const [stationLibre, setStationLibre] = useState(draft?.station_libre ?? '');
+  // #station-gps-auto : indicateur du géocodage inverse en cours, distinct de
+  // `isLoadingGps` (l'acquisition GPS elle-même) — le champ Station reste
+  // éditable pendant ce temps, ce n'est qu'un texte informatif sous le champ.
+  const [isDetectingStation, setIsDetectingStation] = useState<boolean>(false);
   // Type de station / biotope (#biotope-multi) : sélection multiple, reste
   // facultatif (aucun contrôle « au moins un » — comportement inchangé).
   const [selectedTypeStation, setSelectedTypeStation] = useState<string[]>(
@@ -270,9 +274,33 @@ export default function ExtensiveReferenceScreen() {
           setHeureObservationAt(new Date(position.timestamp).toISOString());
           setGpsError('');
         }
+
+        // #station-gps-auto : localité auto-détectée depuis les coordonnées qu'on
+        // vient d'acquérir — uniquement sur une acquisition FRAÎCHE (jamais sur
+        // une fiche rouverte, cf. le retour anticipé ci-dessus quand
+        // `draft.latitude`/`draft.longitude` existent déjà), et jamais si la
+        // fiche a été fermée entre-temps (`isMounted`).
+        //
+        // `reverseGeocode` (lib/location.ts) est le même best-effort déjà
+        // utilisé par reference.tsx (Intensif) et (traitement)/references.tsx :
+        // il ne lève jamais, rend des null en cas d'échec (hors ligne, service
+        // indisponible, localité indéterminable) — la fiche continue alors
+        // normalement, Station restant à saisir à la main comme aujourd'hui.
+        //
+        // `current || localite` ne remplit que si le champ est encore vide au
+        // moment où la réponse arrive : jamais d'écrasement d'une saisie
+        // manuelle déjà commencée pendant l'attente, ni de la valeur restaurée
+        // par l'effet d'hydratation d'une fiche existante.
+        if (isMounted) setIsDetectingStation(true);
+        const zone = await reverseGeocode(position.latitude, position.longitude);
+        const localite = zone.commune || zone.district || zone.region;
+        if (isMounted) {
+          if (localite) setStationLibre((current) => current || localite);
+          setIsDetectingStation(false);
+        }
       } catch (error) {
         // Best-effort délibéré : déjà visible via `gpsError`, l'agent peut
-        // saisir les coordonnées à la main.
+        // saisir les coordonnées — et la station — à la main.
         logger.ignore(error, 'position GPS indisponible, saisie manuelle possible');
         if (isMounted) {
           setGpsError('Impossible de récupérer la position GPS');
@@ -499,9 +527,10 @@ export default function ExtensiveReferenceScreen() {
             </View>
 
             <View style={styles.card}>
-              {/* Prospection extensive = pas de station fixe du référentiel : nom saisi
-                  librement sur place, ses coordonnées restant récupérées automatiquement
-                  par GPS ci-dessous (contrairement à l'intensif, cf. reference.tsx). */}
+              {/* Prospection extensive = pas de station fixe du référentiel : nom pré-rempli
+                  par géocodage inverse dès que le GPS ci-dessous obtient un fix
+                  (#station-gps-auto), mais reste un champ texte librement modifiable —
+                  contrairement à l'intensif (station_id, référentiel, cf. reference.tsx). */}
               <Text style={styles.label}>Station (saisie libre)</Text>
               <TextInput
                 value={stationLibre}
@@ -510,6 +539,9 @@ export default function ExtensiveReferenceScreen() {
                 placeholderTextColor={TEXT_SECONDARY}
                 style={styles.input}
               />
+              {isDetectingStation ? (
+                <Text style={styles.stationAutoHint}>Détection automatique de la localité…</Text>
+              ) : null}
             </View>
 
             <View style={styles.row}>
@@ -830,6 +862,12 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#d32f2f',
     marginTop: 2
+  },
+  stationAutoHint: {
+    fontSize: 10,
+    color: TEXT_SECONDARY,
+    fontStyle: 'italic',
+    marginTop: 4,
   },
   // ===== Mode aérien =====
   // Bloc « Informations aéronef / équipe » (#ux-aerien) : un conteneur visuel
