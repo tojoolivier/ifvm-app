@@ -31,11 +31,11 @@ export const TYPE_CIBLE_OPTIONS: { value: TypeCible; label: string }[] = [
 export type Humidite = 'surface' | '0_5cm' | '5_12cm' | '12_30cm' | 'gt_30cm';
 export type Texture = 'limoneuse' | 'argileuse' | 'sable_fin' | 'sable_grossier' | 'gravier' | 'cailloux' | 'bloc';
 export type DegatsCultures = 'nuls' | 'faibles' | 'moyens' | 'forts';
-/** Stades ORPAD (PDF cols f-j) : multi-select par strate, pas exclusif. */
-export type OrpadStage = 'Germ.' | 'Feuille' | 'Fleur' | 'Fruit' | 'Sec';
+/** Niveaux ORPAD (PDF cols f-j) : multi-select par strate, pas exclusif. */
+export type OrpadStage = 'Néant' | 'Rare' | 'Beaucoup';
 export type StrateKey = 'arboree' | 'arbustive' | 'buissonneuse' | 'herbeuse' | 'cultures_seches' | 'cultures_hygro';
 
-export const ORPAD_STAGES: OrpadStage[] = ['Germ.', 'Feuille', 'Fleur', 'Fruit', 'Sec'];
+export const ORPAD_STAGES: OrpadStage[] = ['Néant', 'Rare', 'Beaucoup'];
 
 /** Les 6 strates du PDF (rows 37-42). "Sol nu" n'est pas une strate : c'est un champ (`solNu`) à l'intérieur de chaque strate (col k). */
 export const STRATE_KEYS: StrateKey[] = ['arboree', 'arbustive', 'buissonneuse', 'herbeuse', 'cultures_seches', 'cultures_hygro'];
