@@ -314,9 +314,14 @@ class TraitementTerrestreModel(Base):
     # patron que consultant_international ci-dessous.
     agent_encadreur: Mapped[str | None] = mapped_column(String(255), nullable=True)
     consultant_international: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # "Atomiseur" -> "Atomiseur à dos" (migration 0060, renommage pur, colonne
+    # inchangée) ; ULVAmast remplacé par "Atomiseur autoporté" (nouvelle
+    # colonne, remap des valeurs déjà saisies en ULVAmast à la migration).
     surface_atomiseur_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     surface_disque_rotatif_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
-    surface_ulvamast_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    surface_atomiseur_autoporte_ha: Mapped[float | None] = mapped_column(
+        Numeric(10, 2), nullable=True
+    )
     surface_traitee_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     surface_cumulee_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     surface_restante_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)

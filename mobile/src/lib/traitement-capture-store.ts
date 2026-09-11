@@ -147,7 +147,7 @@ export interface TerrestreDraft {
   traitementOrigineId?: string | null;
   surface_atomiseur_ha?: number | null;
   surface_disque_rotatif_ha?: number | null;
-  surface_ulvamast_ha?: number | null;
+  surface_atomiseur_autoporte_ha?: number | null;
   surfaceRestanteAbandonnee?: boolean | null;
   motifSurfaceRestanteAbandonnee?: string | null;
   essence_litres?: number | null;

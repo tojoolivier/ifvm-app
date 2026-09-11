@@ -160,7 +160,7 @@ function buildTraitementSyncPayload(draft: DraftTraitement): components['schemas
         consultant_international: draft.terrestre.consultant_international,
         surface_atomiseur_ha: draft.terrestre.surface_atomiseur_ha,
         surface_disque_rotatif_ha: draft.terrestre.surface_disque_rotatif_ha,
-        surface_ulvamast_ha: draft.terrestre.surface_ulvamast_ha,
+        surface_atomiseur_autoporte_ha: draft.terrestre.surface_atomiseur_autoporte_ha,
         surface_restante_abandonnee: draft.terrestre.surface_restante_abandonnee,
         motif_surface_restante_abandonnee: draft.terrestre.motif_surface_restante_abandonnee,
         essence_litres: draft.terrestre.essence_litres,
