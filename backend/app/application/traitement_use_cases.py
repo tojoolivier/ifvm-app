@@ -194,6 +194,9 @@ class CreateTraitementAerien:
         base_secondaire: str | None = None,
         base_secondaire_date_installation: date | None = None,
         pesticide_recu_l: float | None = None,
+        taux_mortalite_pourcent: float | None = None,
+        evaluation_efficacite_heures_apres: float | None = None,
+        methode_evaluation_efficacite: str | None = None,
         reprise_traitement: bool = False,
         traitement_origine_id: uuid.UUID | None = None,
         numero_fiche: str | None = None,
@@ -319,6 +322,9 @@ class CreateTraitementAerien:
             base_secondaire_date_installation=base_secondaire_date_installation,
             immatricule_aeronef=immatricule_aeronef,
             pesticide_recu_l=pesticide_recu_l,
+            taux_mortalite_pourcent=taux_mortalite_pourcent,
+            evaluation_efficacite_heures_apres=evaluation_efficacite_heures_apres,
+            methode_evaluation_efficacite=methode_evaluation_efficacite,
             reprise_traitement=reprise_traitement,
             traitement_origine_id=traitement_origine_id,
         )
@@ -373,6 +379,9 @@ class CreateTraitementTerrestre:
         essence_litres: float | None = None,
         nb_piles: int | None = None,
         pesticide_recu_l: float | None = None,
+        taux_mortalite_pourcent: float | None = None,
+        evaluation_efficacite_heures_apres: float | None = None,
+        methode_evaluation_efficacite: str | None = None,
         reprise_traitement: bool = False,
         traitement_origine_id: uuid.UUID | None = None,
         numero_fiche: str | None = None,
@@ -504,6 +513,9 @@ class CreateTraitementTerrestre:
             essence_litres=essence_litres,
             nb_piles=nb_piles,
             pesticide_recu_l=pesticide_recu_l,
+            taux_mortalite_pourcent=taux_mortalite_pourcent,
+            evaluation_efficacite_heures_apres=evaluation_efficacite_heures_apres,
+            methode_evaluation_efficacite=methode_evaluation_efficacite,
         )
         terrestre.recalculer_surfaces(cible.surface_infestee_ha, surface_cumulee_precedente)
         terrestre.recalculer_total_pesticide()
@@ -890,6 +902,9 @@ class SyncPushTraitementAerien:
         base_secondaire: str | None = None,
         base_secondaire_date_installation: date | None = None,
         pesticide_recu_l: float | None = None,
+        taux_mortalite_pourcent: float | None = None,
+        evaluation_efficacite_heures_apres: float | None = None,
+        methode_evaluation_efficacite: str | None = None,
         reprise_traitement: bool = False,
         traitement_origine_id: uuid.UUID | None = None,
         numero_fiche: str | None = None,
@@ -1022,6 +1037,9 @@ class SyncPushTraitementAerien:
             base_secondaire_date_installation=base_secondaire_date_installation,
             immatricule_aeronef=immatricule_aeronef,
             pesticide_recu_l=pesticide_recu_l,
+            taux_mortalite_pourcent=taux_mortalite_pourcent,
+            evaluation_efficacite_heures_apres=evaluation_efficacite_heures_apres,
+            methode_evaluation_efficacite=methode_evaluation_efficacite,
             reprise_traitement=reprise_traitement,
             traitement_origine_id=traitement_origine_id,
         )
@@ -1107,6 +1125,9 @@ class SyncPushTraitementTerrestre:
         essence_litres: float | None = None,
         nb_piles: int | None = None,
         pesticide_recu_l: float | None = None,
+        taux_mortalite_pourcent: float | None = None,
+        evaluation_efficacite_heures_apres: float | None = None,
+        methode_evaluation_efficacite: str | None = None,
         reprise_traitement: bool = False,
         traitement_origine_id: uuid.UUID | None = None,
         numero_fiche: str | None = None,
@@ -1245,6 +1266,9 @@ class SyncPushTraitementTerrestre:
             essence_litres=essence_litres,
             nb_piles=nb_piles,
             pesticide_recu_l=pesticide_recu_l,
+            taux_mortalite_pourcent=taux_mortalite_pourcent,
+            evaluation_efficacite_heures_apres=evaluation_efficacite_heures_apres,
+            methode_evaluation_efficacite=methode_evaluation_efficacite,
         )
         terrestre.recalculer_surfaces(cible.surface_infestee_ha, surface_cumulee_precedente)
         if (

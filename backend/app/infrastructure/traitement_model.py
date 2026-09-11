@@ -181,6 +181,14 @@ class TraitementAerienModel(Base):
     surface_restante_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     pesticide_recu_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     pesticide_stock_restant_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    # Efficacité (migration 0058, fiche CRT papier section "Traitement") : une
+    # seule évaluation par fiche (après l'ensemble des rotations), pas par
+    # rotation individuelle — même patron que TraitementTerrestreModel ci-dessous.
+    taux_mortalite_pourcent: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    evaluation_efficacite_heures_apres: Mapped[float | None] = mapped_column(
+        Numeric(5, 2), nullable=True
+    )
+    methode_evaluation_efficacite: Mapped[str | None] = mapped_column(String(50), nullable=True)
     # Chaînage de reprise (migration 0050) — mirroir de TraitementTerrestreModel,
     # généralisé à l'Aérien : une prospection partiellement traitée par une
     # première fiche aérienne peut être reprise par une fiche suivante plutôt
@@ -288,6 +296,13 @@ class TraitementTerrestreModel(Base):
     vitesse_vent_ms: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
     direction_vent: Mapped[str | None] = mapped_column(String(2), nullable=True)
     temperature_c: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    # Efficacité (migration 0058, fiche CRT papier section "Traitement", juste
+    # après Condition de traitement) — même patron que TraitementAerienModel.
+    taux_mortalite_pourcent: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    evaluation_efficacite_heures_apres: Mapped[float | None] = mapped_column(
+        Numeric(5, 2), nullable=True
+    )
+    methode_evaluation_efficacite: Mapped[str | None] = mapped_column(String(50), nullable=True)
     reprise_traitement: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=False)
     traitement_origine_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("traitement.id"), nullable=True

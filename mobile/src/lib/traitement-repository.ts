@@ -103,6 +103,12 @@ export interface TraitementAerien {
   surface_restante_ha: number | null;
   pesticide_recu_l: number | null;
   pesticide_stock_restant_l: number | null;
+  // Efficacité (migration backend 0058) : une seule évaluation par fiche
+  // (après l'ensemble des rotations), pas par rotation individuelle — même
+  // patron que TraitementTerrestre ci-dessous.
+  taux_mortalite_pourcent: number | null;
+  evaluation_efficacite_heures_apres: number | null;
+  methode_evaluation_efficacite: string | null;
 }
 
 export interface Rotation {
@@ -152,6 +158,11 @@ export interface TraitementTerrestre {
   vitesse_vent_ms: number | null;
   direction_vent: string | null;
   temperature_c: number | null;
+  // Efficacité (migration backend 0058, fiche CRT papier section "Traitement",
+  // juste après Condition de traitement) — même patron que TraitementAerien.
+  taux_mortalite_pourcent: number | null;
+  evaluation_efficacite_heures_apres: number | null;
+  methode_evaluation_efficacite: string | null;
   reprise_traitement: boolean | null;
   traitement_origine_id: string | null;
   chef_equipe_id: string;
@@ -555,6 +566,45 @@ export async function updateTraitementAerienPesticideRecu(
   return updated;
 }
 
+/**
+ * Efficacité (migration backend 0058, fiche CRT papier section "Traitement") —
+ * même écran que pesticide reçu ci-dessus (rotations.tsx), même raison :
+ * information propre au traitement (résultat, pas équipe), fonction dédiée
+ * plutôt qu'un champ de plus sur `AerienUpdateInput`.
+ */
+export interface AerienEfficaciteInput {
+  tauxMortalitePourcent?: number | null;
+  evaluationEfficaciteHeuresApres?: number | null;
+  methodeEvaluationEfficacite?: string | null;
+}
+
+export async function updateTraitementAerienEfficacite(
+  traitementId: string,
+  input: AerienEfficaciteInput
+): Promise<DraftTraitement> {
+  const db = await getDb();
+
+  await db.runAsync(
+    `UPDATE traitement_aerien SET
+      taux_mortalite_pourcent = ?,
+      evaluation_efficacite_heures_apres = ?,
+      methode_evaluation_efficacite = ?
+     WHERE traitement_id = ?`,
+    [
+      input.tauxMortalitePourcent ?? null,
+      input.evaluationEfficaciteHeuresApres ?? null,
+      input.methodeEvaluationEfficacite ?? null,
+      traitementId,
+    ]
+  );
+
+  const updated = await getTraitement(traitementId);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
 // ==========================================
 // SIGNATURES (#signatures-auto-equipe)
 // ==========================================
@@ -648,6 +698,11 @@ export interface TerrestreUpdateInput {
   vitesse_vent_ms?: number | null;
   direction_vent?: string | null;
   temperature_c?: number | null;
+  // Efficacité (migration backend 0058, fiche CRT papier section "Traitement",
+  // juste après Condition de traitement).
+  taux_mortalite_pourcent?: number | null;
+  evaluation_efficacite_heures_apres?: number | null;
+  methode_evaluation_efficacite?: string | null;
   repriseTraitement?: boolean | null;
   traitementOrigineId?: string | null;
   surface_atomiseur_ha?: number | null;
@@ -676,6 +731,9 @@ export async function updateTraitementTerrestre(
       vitesse_vent_ms = ?,
       direction_vent = ?,
       temperature_c = ?,
+      taux_mortalite_pourcent = ?,
+      evaluation_efficacite_heures_apres = ?,
+      methode_evaluation_efficacite = ?,
       reprise_traitement = ?,
       traitement_origine_id = ?,
       surface_atomiseur_ha = ?,
@@ -696,6 +754,9 @@ export async function updateTraitementTerrestre(
       input.vitesse_vent_ms ?? null,
       input.direction_vent ?? null,
       input.temperature_c ?? null,
+      input.taux_mortalite_pourcent ?? null,
+      input.evaluation_efficacite_heures_apres ?? null,
+      input.methode_evaluation_efficacite ?? null,
       input.repriseTraitement ?? null,
       input.traitementOrigineId ?? null,
       input.surface_atomiseur_ha ?? null,

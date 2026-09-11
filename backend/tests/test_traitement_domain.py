@@ -315,6 +315,26 @@ async def test_creation_aerien_transmet_immatriculation_et_stock_pesticide():
 
 
 @pytest.mark.asyncio
+async def test_creation_aerien_transmet_efficacite():
+    prospection = _prospection(
+        surface_infestee=100.0,
+        populations=[ProspectionPopulation(espece="LMC", categorie="imago")],
+    )
+    use_case, _ = _use_case(prospection=prospection, chef=_CHEF)
+    traitement = await use_case.execute(
+        **_args(
+            taux_mortalite_pourcent=92.0,
+            evaluation_efficacite_heures_apres=24.0,
+            methode_evaluation_efficacite="ESTIMATION_VISUELLE",
+        )
+    )
+
+    assert traitement.aerien.taux_mortalite_pourcent == 92.0
+    assert traitement.aerien.evaluation_efficacite_heures_apres == 24.0
+    assert traitement.aerien.methode_evaluation_efficacite == "ESTIMATION_VISUELLE"
+
+
+@pytest.mark.asyncio
 async def test_conflit_numero_fiche_ajoute_suffixe_incremental():
     use_case, repo = _use_case(prospection=_prospection(), chef=_CHEF, conflits=2)
     traitement = await use_case.execute(**_args())
@@ -928,6 +948,35 @@ async def test_creation_terrestre_transmet_stock_pesticide():
     # Pas de produit à la création (sous-ressource ajoutée après coup) : rien de
     # consommé, le stock = tout le reçu.
     assert traitement.terrestre.pesticide_stock_restant_l == 150.0
+
+
+@pytest.mark.asyncio
+async def test_creation_terrestre_transmet_efficacite():
+    prospection = _prospection(surface_infestee=100.0)
+    use_case, _ = _use_case_terrestre(prospection=prospection, chef=_CHEF_EQUIPE)
+    traitement = await use_case.execute(
+        **_args_terrestre(
+            surface_restante_abandonnee=False,
+            taux_mortalite_pourcent=87.5,
+            evaluation_efficacite_heures_apres=6.0,
+            methode_evaluation_efficacite="COMPTAGES_PRE_POST",
+        )
+    )
+
+    assert traitement.terrestre.taux_mortalite_pourcent == 87.5
+    assert traitement.terrestre.evaluation_efficacite_heures_apres == 6.0
+    assert traitement.terrestre.methode_evaluation_efficacite == "COMPTAGES_PRE_POST"
+
+
+@pytest.mark.asyncio
+async def test_creation_terrestre_efficacite_facultative():
+    prospection = _prospection(surface_infestee=100.0)
+    use_case, _ = _use_case_terrestre(prospection=prospection, chef=_CHEF_EQUIPE)
+    traitement = await use_case.execute(**_args_terrestre(surface_restante_abandonnee=False))
+
+    assert traitement.terrestre.taux_mortalite_pourcent is None
+    assert traitement.terrestre.evaluation_efficacite_heures_apres is None
+    assert traitement.terrestre.methode_evaluation_efficacite is None
 
 
 @pytest.mark.asyncio

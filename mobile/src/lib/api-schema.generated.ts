@@ -1753,6 +1753,11 @@ export interface components {
             password: string;
         };
         /**
+         * MethodeEvaluationEfficacite
+         * @enum {string}
+         */
+        MethodeEvaluationEfficacite: "ESTIMATION_VISUELLE" | "COMPTAGES_PRE_POST";
+        /**
          * MethodePopulation
          * @enum {string}
          */
@@ -3094,6 +3099,11 @@ export interface components {
             immatricule_aeronef: string;
             /** Pesticide Recu L */
             pesticide_recu_l?: number | null;
+            /** Taux Mortalite Pourcent */
+            taux_mortalite_pourcent?: number | null;
+            /** Evaluation Efficacite Heures Apres */
+            evaluation_efficacite_heures_apres?: number | null;
+            methode_evaluation_efficacite?: components["schemas"]["MethodeEvaluationEfficacite"] | null;
             /**
              * Reprise Traitement
              * @default false
@@ -3147,6 +3157,11 @@ export interface components {
             pesticide_recu_l: number | null;
             /** Pesticide Stock Restant L */
             pesticide_stock_restant_l: number | null;
+            /** Taux Mortalite Pourcent */
+            taux_mortalite_pourcent: number | null;
+            /** Evaluation Efficacite Heures Apres */
+            evaluation_efficacite_heures_apres: number | null;
+            methode_evaluation_efficacite: components["schemas"]["MethodeEvaluationEfficacite"] | null;
             /**
              * Rotations
              * @default []
@@ -3518,6 +3533,11 @@ export interface components {
             direction_vent?: components["schemas"]["DirectionVent"] | null;
             /** Temperature C */
             temperature_c: number;
+            /** Taux Mortalite Pourcent */
+            taux_mortalite_pourcent?: number | null;
+            /** Evaluation Efficacite Heures Apres */
+            evaluation_efficacite_heures_apres?: number | null;
+            methode_evaluation_efficacite?: components["schemas"]["MethodeEvaluationEfficacite"] | null;
             /**
              * Chef Equipe Id
              * Format: uuid
@@ -3568,6 +3588,11 @@ export interface components {
             direction_vent: components["schemas"]["DirectionVent"] | null;
             /** Temperature C */
             temperature_c: number;
+            /** Taux Mortalite Pourcent */
+            taux_mortalite_pourcent: number | null;
+            /** Evaluation Efficacite Heures Apres */
+            evaluation_efficacite_heures_apres: number | null;
+            methode_evaluation_efficacite: components["schemas"]["MethodeEvaluationEfficacite"] | null;
             /** Reprise Traitement */
             reprise_traitement: boolean;
             /** Traitement Origine Id */

@@ -71,6 +71,11 @@ class UniteQuantite(str, Enum):
     KG = "kg"
 
 
+class MethodeEvaluationEfficacite(str, Enum):
+    ESTIMATION_VISUELLE = "ESTIMATION_VISUELLE"
+    COMPTAGES_PRE_POST = "COMPTAGES_PRE_POST"
+
+
 class TraitementAerienCreate(BaseModel):
     # pilote/mecanicien/consultant_international redevenus texte libre
     # (migration 0048, défait la migration 0047) : pilote/mécanicien
@@ -97,6 +102,13 @@ class TraitementAerienCreate(BaseModel):
     # surface_traitee_ha n'y figure plus (migration 0047) : dérivée de la somme
     # des `surface_ha` de rotation, ajoutées après coup via /rotations.
     pesticide_recu_l: float | None = Field(None, ge=0)
+    # Efficacité (migration 0058, fiche CRT papier section "Traitement") : une
+    # seule évaluation par fiche, après l'ensemble des rotations — pas de
+    # contrainte de cohérence entre les 3 champs, chacun facultatif
+    # indépendamment (même esprit que TraitementTerrestreCreate ci-dessous).
+    taux_mortalite_pourcent: float | None = Field(None, ge=0, le=100)
+    evaluation_efficacite_heures_apres: float | None = Field(None, ge=0)
+    methode_evaluation_efficacite: MethodeEvaluationEfficacite | None = None
     # Chaînage de reprise (migration 0050) — mirroir de TraitementTerrestreCreate.
     reprise_traitement: bool = False
     traitement_origine_id: uuid.UUID | None = None
@@ -120,6 +132,11 @@ class TraitementTerrestreCreate(BaseModel):
     vitesse_vent_ms: float = Field(..., ge=0)
     direction_vent: DirectionVent | None = None
     temperature_c: float
+    # Efficacité (migration 0058, fiche CRT papier section "Traitement", juste
+    # après Condition de traitement) — même patron que TraitementAerienCreate.
+    taux_mortalite_pourcent: float | None = Field(None, ge=0, le=100)
+    evaluation_efficacite_heures_apres: float | None = Field(None, ge=0)
+    methode_evaluation_efficacite: MethodeEvaluationEfficacite | None = None
     chef_equipe_id: uuid.UUID
     agent_encadreur: str | None = Field(None, max_length=255)
     consultant_international: str | None = Field(None, max_length=255)
@@ -358,6 +375,9 @@ class TraitementAerienRead(BaseModel):
     surface_restante_ha: float | None
     pesticide_recu_l: float | None
     pesticide_stock_restant_l: float | None
+    taux_mortalite_pourcent: float | None
+    evaluation_efficacite_heures_apres: float | None
+    methode_evaluation_efficacite: MethodeEvaluationEfficacite | None
     rotations: list[RotationRead] = []
 
 
@@ -369,6 +389,9 @@ class TraitementTerrestreRead(BaseModel):
     vitesse_vent_ms: float
     direction_vent: DirectionVent | None
     temperature_c: float
+    taux_mortalite_pourcent: float | None
+    evaluation_efficacite_heures_apres: float | None
+    methode_evaluation_efficacite: MethodeEvaluationEfficacite | None
     reprise_traitement: bool
     traitement_origine_id: uuid.UUID | None
     chef_equipe_id: uuid.UUID

@@ -101,6 +101,12 @@ export interface AerienDraft {
   // (traitement-validation.ts) — jamais une saisie stockée dans le draft.
   // Saisi sur l'écran « Traitement » (rotations.tsx), pas « Équipe » — #equipe-slide-aerien.
   pesticideRecuL?: number | null;
+  // Efficacité (migration backend 0058, fiche CRT papier section "Traitement") :
+  // une seule évaluation par fiche, après l'ensemble des rotations — saisie
+  // sur le même écran que pesticideRecuL ci-dessus (rotations.tsx).
+  tauxMortalitePourcent?: number | null;
+  evaluationEfficaciteHeuresApres?: number | null;
+  methodeEvaluationEfficacite?: 'ESTIMATION_VISUELLE' | 'COMPTAGES_PRE_POST' | null;
   // Chaînage de reprise (migration backend 0050) — mirroir de TerrestreDraft,
   // généralisé à l'Aérien.
   repriseTraitement?: boolean;
@@ -132,6 +138,11 @@ export interface TerrestreDraft {
   vitesse_vent_ms?: number | null;
   direction_vent?: string | null;
   temperature_c?: number | null;
+  // Efficacité (migration backend 0058, fiche CRT papier section "Traitement",
+  // juste après Condition de traitement) — même patron que AerienDraft.
+  taux_mortalite_pourcent?: number | null;
+  evaluation_efficacite_heures_apres?: number | null;
+  methode_evaluation_efficacite?: 'ESTIMATION_VISUELLE' | 'COMPTAGES_PRE_POST' | null;
   repriseTraitement?: boolean;
   traitementOrigineId?: string | null;
   surface_atomiseur_ha?: number | null;

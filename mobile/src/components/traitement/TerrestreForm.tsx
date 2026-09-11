@@ -131,6 +131,53 @@ export function TerrestreForm({
         ))}
       </View>
 
+      <Text style={styles.label}>Efficacité</Text>
+      <Text style={styles.label}>Taux de mortalité (%)</Text>
+      <TextInput
+        editable={!readOnly}
+        style={styles.input}
+        placeholder="0"
+        keyboardType="numeric"
+        value={
+          store.terrestre.taux_mortalite_pourcent != null
+            ? String(store.terrestre.taux_mortalite_pourcent)
+            : ''
+        }
+        onChangeText={(v) => store.updateTerrestre({ taux_mortalite_pourcent: v ? Number(v) : null })}
+      />
+      <Text style={styles.label}>Évalué après traitement (heures)</Text>
+      <TextInput
+        editable={!readOnly}
+        style={styles.input}
+        placeholder="0"
+        keyboardType="numeric"
+        value={
+          store.terrestre.evaluation_efficacite_heures_apres != null
+            ? String(store.terrestre.evaluation_efficacite_heures_apres)
+            : ''
+        }
+        onChangeText={(v) =>
+          store.updateTerrestre({ evaluation_efficacite_heures_apres: v ? Number(v) : null })
+        }
+      />
+      <Text style={styles.label}>Méthode d&apos;évaluation</Text>
+      <View style={styles.chipRow}>
+        <Chip
+          label="Estimation visuelle"
+          selected={store.terrestre.methode_evaluation_efficacite === 'ESTIMATION_VISUELLE'}
+          onPress={() =>
+            !readOnly && store.updateTerrestre({ methode_evaluation_efficacite: 'ESTIMATION_VISUELLE' })
+          }
+        />
+        <Chip
+          label="Comptages pré/post-traitement"
+          selected={store.terrestre.methode_evaluation_efficacite === 'COMPTAGES_PRE_POST'}
+          onPress={() =>
+            !readOnly && store.updateTerrestre({ methode_evaluation_efficacite: 'COMPTAGES_PRE_POST' })
+          }
+        />
+      </View>
+
       <Text style={styles.label}>Reprise de traitement</Text>
       <View style={styles.chipRow}>
         <Chip

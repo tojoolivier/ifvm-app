@@ -800,6 +800,12 @@ const COLONNES_TRAITEMENT_AERIEN: readonly Colonne[] = [
   { name: 'reprise_traitement', type: 'INTEGER' },
   { name: 'traitement_origine_id', type: 'TEXT' },
   { name: 'surface_cumulee_ha', type: 'REAL' },
+  // Efficacité (migration backend 0058, fiche CRT papier section "Traitement") :
+  // une seule évaluation par fiche (après l'ensemble des rotations), pas par
+  // rotation individuelle — même patron que COLONNES_TRAITEMENT_TERRESTRE.
+  { name: 'taux_mortalite_pourcent', type: 'REAL' },
+  { name: 'evaluation_efficacite_heures_apres', type: 'REAL' },
+  { name: 'methode_evaluation_efficacite', type: 'TEXT' },
 ];
 
 /** Colonnes ajoutées à `traitement_terrestre` après sa création initiale. */
@@ -812,6 +818,12 @@ const COLONNES_TRAITEMENT_TERRESTRE: readonly Colonne[] = [
   // reste déclarée pour les installations qui l'ont déjà (colonne morte, plus
   // jamais lue/écrite), même principe que pilote_id/mecanicien_id/consultant_id.
   { name: 'agent_encadreur', type: 'TEXT' },
+  // Efficacité (migration backend 0058, fiche CRT papier section "Traitement",
+  // juste après Condition de traitement) — même patron que
+  // COLONNES_TRAITEMENT_AERIEN ci-dessus.
+  { name: 'taux_mortalite_pourcent', type: 'REAL' },
+  { name: 'evaluation_efficacite_heures_apres', type: 'REAL' },
+  { name: 'methode_evaluation_efficacite', type: 'TEXT' },
 ];
 
 /**
