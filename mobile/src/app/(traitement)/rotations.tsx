@@ -40,7 +40,8 @@ import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
  * une superficie traitée et des heures d'ouverture/fermeture de vanne, en plus des
  * champs déjà existants (produit, températures, vent, heure_debut/heure_fin de la
  * rotation entière). N° de cuve et les 3 durées ne sont jamais saisis : dérivés à
- * l'affichage. « Pesticide reçu (l) » y a été déplacé depuis Équipe : c'est une
+ * l'affichage. « Pesticide reçu (l) » (libellé affiché « Approvisionnement (l) »)
+ * y a été déplacé depuis Équipe : c'est une
  * information propre au traitement (stock de pesticide), pas à l'équipe.
  */
 export default function RotationsScreen() {
@@ -202,7 +203,7 @@ export default function RotationsScreen() {
         <ProgressBar currentIndex={3} segments={PROGRESS_SEGMENTS_AERIEN} />
         <Text style={chrome.title}>Pesticides & rotations</Text>
 
-        <Text style={styles.label}>Pesticide reçu (l)</Text>
+        <Text style={styles.label}>Approvisionnement (l)</Text>
         <TextInput
           testID="pesticide-recu-input"
           editable={!readOnly}
@@ -251,7 +252,7 @@ export default function RotationsScreen() {
                 <Chip label="Kilos (kg)" selected={unite === 'kg'} onPress={() => !readOnly && store.updateRotation(rotation.localId, { unite: 'kg' })} />
               </View>
 
-              <Text style={styles.label}>{`Quantité (${unite === 'kg' ? 'kg' : 'l'}) *`}</Text>
+              <Text style={styles.label}>{`Pesticides consommés (${unite === 'kg' ? 'kg' : 'l'}) *`}</Text>
               <TextInput
                 testID={`rotation-quantite-input-${index}`}
                 editable={!readOnly}
