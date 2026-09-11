@@ -1,9 +1,9 @@
 /**
- * Efficacité (migration backend 0058, fiche CRT papier section "Traitement",
- * juste après Condition de traitement) : taux de mortalité observé quelques
- * heures après le traitement, délai de l'évaluation et méthode. Côté Terrestre,
- * saisi sur le même écran « Équipe » (traitement.tsx) que le reste des
- * conditions de traitement (heure/vent/température).
+ * Section « Moyens & surfaces » du Terrestre (écran Équipe, TerrestreForm.tsx) :
+ * « Atomiseur » devient « Atomiseur à dos » (colonne surface_atomiseur_ha
+ * inchangée, pur renommage) ; ULVAmast est remplacé par « Atomiseur autoporté »
+ * (nouvelle colonne surface_atomiseur_autoporte_ha, migration backend 0060).
+ * « Disque rotatif » est inchangé.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import TraitementScreen from '@/app/(traitement)/traitement';
@@ -70,14 +70,31 @@ const TERRESTRE_DRAFT = {
   produits: [],
 };
 
-describe('TraitementScreen (Équipe, Terrestre) — efficacité (taux de mortalité)', () => {
+describe('TraitementScreen (Équipe, Terrestre) — Atomiseur à dos / autoporté / Disque rotatif', () => {
   beforeEach(() => {
     mockRouteParams = { traitementId: 'trait-1' };
     jest.mocked(traitementRepository.updateTraitementTerrestre).mockClear().mockResolvedValue({} as any);
     useTraitementCaptureStore.setState({ ...RESET_STATE });
   });
 
-  it('saisit et enregistre le taux de mortalité, le délai et la méthode', async () => {
+  it('affiche les 3 nouveaux choix, jamais ULVAmast ni « Atomiseur » seul', async () => {
+    jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
+      id: 'trait-1',
+      type_traitement: 'TERRESTRE',
+      cible: { surface_infestee_ha: 0 },
+      terrestre: TERRESTRE_DRAFT,
+    } as any);
+
+    await render(<TraitementScreen />);
+    await waitFor(() => expect(screen.getByText('Atomiseur à dos')).toBeVisible());
+
+    expect(screen.getByText('Atomiseur autoporté')).toBeVisible();
+    expect(screen.getByText('Disque rotatif')).toBeVisible();
+    expect(screen.queryByText('ULVAmast')).toBeNull();
+    expect(screen.queryByText('Atomiseur')).toBeNull();
+  });
+
+  it('saisit les 3 surfaces et les enregistre sous les bons champs', async () => {
     jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
       id: 'trait-1',
       type_traitement: 'TERRESTRE',
@@ -88,21 +105,15 @@ describe('TraitementScreen (Équipe, Terrestre) — efficacité (taux de mortali
     await render(<TraitementScreen />);
     await waitFor(() => expect(useTraitementCaptureStore.getState().terrestre.chefEquipeId).toBe('chef-equipe-1'));
 
-    // Plusieurs champs partagent le placeholder "0" (vitesse du vent, température,
-    // taux de mortalité, délai d'évaluation, …) : ordre de rendu de TerrestreForm.tsx
-    // — vitesse_vent_ms (0), temperature_c (1), taux_mortalite_pourcent (2).
-    fireEvent.changeText(screen.getAllByPlaceholderText('0')[2], '87.5');
-    // Laisse React réconcilier avant l'interaction suivante — sinon son
-    // gestionnaire reste lié à la fermeture du rendu précédent (valeur encore
-    // vide), même prudence que les autres écrans de ce module.
-    expect(await screen.findByDisplayValue('87.5')).toBeVisible();
-
-    fireEvent.press(screen.getByText('Comptages pré/post-traitement'));
-    await waitFor(() =>
-      expect(screen.getByText('Comptages pré/post-traitement').props.style).toEqual(
-        expect.arrayContaining([expect.objectContaining({ color: '#fff' })])
-      )
-    );
+    // Ordre de rendu : vitesse du vent (0), température (1), taux de mortalité (2),
+    // délai d'évaluation (3), atomiseur à dos (4), atomiseur autoporté (5),
+    // disque rotatif (6).
+    fireEvent.changeText(screen.getAllByPlaceholderText('0')[4], '10');
+    expect(await screen.findByDisplayValue('10')).toBeVisible();
+    fireEvent.changeText(screen.getAllByPlaceholderText('0')[5], '3');
+    expect(await screen.findByDisplayValue('3')).toBeVisible();
+    fireEvent.changeText(screen.getAllByPlaceholderText('0')[6], '5');
+    expect(await screen.findByDisplayValue('5')).toBeVisible();
 
     fireEvent.press(screen.getByText('Continuer  ›'));
 
@@ -110,36 +121,27 @@ describe('TraitementScreen (Équipe, Terrestre) — efficacité (taux de mortali
       expect(traitementRepository.updateTraitementTerrestre).toHaveBeenCalledWith(
         'trait-1',
         expect.objectContaining({
-          taux_mortalite_pourcent: 87.5,
-          methode_evaluation_efficacite: 'COMPTAGES_PRE_POST',
+          surface_atomiseur_ha: 10,
+          surface_atomiseur_autoporte_ha: 3,
+          surface_disque_rotatif_ha: 5,
         })
       )
     );
   });
 
-  it('restaure une évaluation déjà enregistrée', async () => {
+  it('restaure une surface autoportée déjà enregistrée', async () => {
     jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
       id: 'trait-1',
       type_traitement: 'TERRESTRE',
       cible: { surface_infestee_ha: 0 },
-      terrestre: {
-        ...TERRESTRE_DRAFT,
-        taux_mortalite_pourcent: 92,
-        evaluation_efficacite_heures_apres: 6,
-        methode_evaluation_efficacite: 'ESTIMATION_VISUELLE',
-      },
+      terrestre: { ...TERRESTRE_DRAFT, surface_atomiseur_autoporte_ha: 7.5 },
     } as any);
 
     await render(<TraitementScreen />);
 
     await waitFor(() =>
-      expect(useTraitementCaptureStore.getState().terrestre.taux_mortalite_pourcent).toBe(92)
+      expect(useTraitementCaptureStore.getState().terrestre.surface_atomiseur_autoporte_ha).toBe(7.5)
     );
-    expect(useTraitementCaptureStore.getState().terrestre.evaluation_efficacite_heures_apres).toBe(6);
-    expect(useTraitementCaptureStore.getState().terrestre.methode_evaluation_efficacite).toBe(
-      'ESTIMATION_VISUELLE'
-    );
-    expect(screen.getByDisplayValue('92')).toBeVisible();
-    expect(screen.getByDisplayValue('6')).toBeVisible();
+    expect(screen.getByDisplayValue('7.5')).toBeVisible();
   });
 });

@@ -170,7 +170,7 @@ export interface TraitementTerrestre {
   consultant_international: string | null;
   surface_atomiseur_ha: number | null;
   surface_disque_rotatif_ha: number | null;
-  surface_ulvamast_ha: number | null;
+  surface_atomiseur_autoporte_ha: number | null;
   surface_restante_abandonnee: boolean | null;
   motif_surface_restante_abandonnee: string | null;
   essence_litres: number | null;
@@ -708,7 +708,7 @@ export interface TerrestreUpdateInput {
   traitementOrigineId?: string | null;
   surface_atomiseur_ha?: number | null;
   surface_disque_rotatif_ha?: number | null;
-  surface_ulvamast_ha?: number | null;
+  surface_atomiseur_autoporte_ha?: number | null;
   surfaceRestanteAbandonnee?: boolean | null;
   motifSurfaceRestanteAbandonnee?: string | null;
   essence_litres?: number | null;
@@ -739,7 +739,7 @@ export async function updateTraitementTerrestre(
       traitement_origine_id = ?,
       surface_atomiseur_ha = ?,
       surface_disque_rotatif_ha = ?,
-      surface_ulvamast_ha = ?,
+      surface_atomiseur_autoporte_ha = ?,
       surface_restante_abandonnee = ?,
       motif_surface_restante_abandonnee = ?,
       essence_litres = ?,
@@ -762,7 +762,7 @@ export async function updateTraitementTerrestre(
       input.traitementOrigineId ?? null,
       input.surface_atomiseur_ha ?? null,
       input.surface_disque_rotatif_ha ?? null,
-      input.surface_ulvamast_ha ?? null,
+      input.surface_atomiseur_autoporte_ha ?? null,
       input.surfaceRestanteAbandonnee ?? null,
       input.motifSurfaceRestanteAbandonnee ?? null,
       input.essence_litres ?? null,
@@ -848,7 +848,8 @@ export interface ImpactsUpdateInput {
   empoisonnement_type: string | null;
   empoisonnement_mode: string | null;
   empoisonnement_autre: string | null;
-  evaluation_risque: Record<string, string>;
+  // Réduit à Oui/Non par axe (retour arrière — était FAIBLE/MOYEN/ÉLEVÉ).
+  evaluation_risque: Record<string, boolean>;
   comportement_anormal: boolean;
   comportement_non_cibles: string[];
   mortalite: boolean;

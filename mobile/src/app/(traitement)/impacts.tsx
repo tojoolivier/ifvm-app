@@ -19,7 +19,6 @@ const AXES_RISQUE: { key: 'ressources_eau' | 'sol' | 'faune_non_cible' | 'abeill
   { key: 'faune_non_cible', label: 'Faune non cible' },
   { key: 'abeilles', label: 'Abeilles/pollinisateurs' },
 ];
-const NIVEAUX = ['FAIBLE', 'MOYEN', 'ELEVE'] as const;
 const ESPECES_NON_CIBLES = ['Oiseaux', 'Reptiles', 'Poissons', 'Insectes utiles', 'Mammifères'];
 const FAMILLES_MORTALITE = ['Oiseaux', 'Poissons', 'Abeilles', 'Reptiles', 'Mammifères'];
 
@@ -37,7 +36,7 @@ export default function ImpactsScreen() {
     getTraitement(traitementId)
       .then((draft) => {
         if (!draft) return;
-        let evaluationRisque: Record<string, string> = {};
+        let evaluationRisque: Record<string, boolean> = {};
         let comportementNonCibles: string[] = [];
         let mortaliteFamilles: string[] = [];
         try {
@@ -174,21 +173,32 @@ export default function ImpactsScreen() {
         )}
 
         <Text style={styles.label}>Évaluation du risque</Text>
-        {AXES_RISQUE.map((axe) => (
-          <View key={axe.key} style={styles.axeRow}>
-            <Text style={styles.axeLabel}>{axe.label}</Text>
-            <View style={styles.chipRow}>
-              {NIVEAUX.map((n) => (
+        {AXES_RISQUE.map((axe) => {
+          const valeur = store.imp.evaluationRisque?.[axe.key];
+          return (
+            <View key={axe.key} style={styles.axeRow}>
+              <Text style={styles.axeLabel}>{axe.label}</Text>
+              <View style={styles.chipRow}>
                 <Chip
-                  key={n}
-                  label={n[0] + n.slice(1).toLowerCase()}
-                  selected={store.imp.evaluationRisque?.[axe.key] === n}
-                  onPress={() => !readOnly && store.updateImp({ evaluationRisque: { ...store.imp.evaluationRisque, [axe.key]: n } })}
+                  label="Non"
+                  selected={valeur === false}
+                  onPress={() =>
+                    !readOnly &&
+                    store.updateImp({ evaluationRisque: { ...store.imp.evaluationRisque, [axe.key]: false } })
+                  }
                 />
-              ))}
+                <Chip
+                  label="Oui"
+                  selected={valeur === true}
+                  onPress={() =>
+                    !readOnly &&
+                    store.updateImp({ evaluationRisque: { ...store.imp.evaluationRisque, [axe.key]: true } })
+                  }
+                />
+              </View>
             </View>
-          </View>
-        ))}
+          );
+        })}
 
         <Text style={styles.label}>Comportement anormal</Text>
         <View style={styles.chipRow}>

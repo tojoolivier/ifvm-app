@@ -297,9 +297,12 @@ class TraitementTerrestre:
     # même patron que consultant_international ci-dessous.
     agent_encadreur: str | None = None
     consultant_international: str | None = None
+    # Migration 0060 : "Atomiseur" -> "Atomiseur à dos" (renommage pur, colonne
+    # inchangée) ; ULVAmast remplacé par "Atomiseur autoporté" (nouvelle
+    # colonne, remap des valeurs déjà saisies en ULVAmast à la migration).
     surface_atomiseur_ha: float | None = None
     surface_disque_rotatif_ha: float | None = None
-    surface_ulvamast_ha: float | None = None
+    surface_atomiseur_autoporte_ha: float | None = None
     surface_traitee_ha: float | None = None
     surface_cumulee_ha: float | None = None
     surface_restante_ha: float | None = None
@@ -339,7 +342,7 @@ class TraitementTerrestre:
         self.surface_traitee_ha = (
             (self.surface_atomiseur_ha or 0.0)
             + (self.surface_disque_rotatif_ha or 0.0)
-            + (self.surface_ulvamast_ha or 0.0)
+            + (self.surface_atomiseur_autoporte_ha or 0.0)
         )
         self.surface_cumulee_ha = surface_cumulee_precedente + self.surface_traitee_ha
         self.surface_restante_ha = (
@@ -601,7 +604,7 @@ _CHAMPS_CONTENU_TERRESTRE = (
     "consultant_international",
     "surface_atomiseur_ha",
     "surface_disque_rotatif_ha",
-    "surface_ulvamast_ha",
+    "surface_atomiseur_autoporte_ha",
     "surface_restante_abandonnee",
     "motif_surface_restante_abandonnee",
     "essence_litres",

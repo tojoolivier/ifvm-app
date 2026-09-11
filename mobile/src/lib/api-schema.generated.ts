@@ -3551,8 +3551,8 @@ export interface components {
             surface_atomiseur_ha?: number | null;
             /** Surface Disque Rotatif Ha */
             surface_disque_rotatif_ha?: number | null;
-            /** Surface Ulvamast Ha */
-            surface_ulvamast_ha?: number | null;
+            /** Surface Atomiseur Autoporte Ha */
+            surface_atomiseur_autoporte_ha?: number | null;
             /** Surface Restante Abandonnee */
             surface_restante_abandonnee?: boolean | null;
             /** Motif Surface Restante Abandonnee */
@@ -3610,8 +3610,8 @@ export interface components {
             surface_atomiseur_ha: number | null;
             /** Surface Disque Rotatif Ha */
             surface_disque_rotatif_ha: number | null;
-            /** Surface Ulvamast Ha */
-            surface_ulvamast_ha: number | null;
+            /** Surface Atomiseur Autoporte Ha */
+            surface_atomiseur_autoporte_ha: number | null;
             /** Surface Traitee Ha */
             surface_traitee_ha: number | null;
             /** Surface Cumulee Ha */

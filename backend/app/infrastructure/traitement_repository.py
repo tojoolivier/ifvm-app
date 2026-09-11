@@ -278,7 +278,7 @@ class TraitementRepositoryImpl(TraitementRepository):
                 consultant_international=traitement.terrestre.consultant_international,
                 surface_atomiseur_ha=traitement.terrestre.surface_atomiseur_ha,
                 surface_disque_rotatif_ha=traitement.terrestre.surface_disque_rotatif_ha,
-                surface_ulvamast_ha=traitement.terrestre.surface_ulvamast_ha,
+                surface_atomiseur_autoporte_ha=traitement.terrestre.surface_atomiseur_autoporte_ha,
                 surface_traitee_ha=traitement.terrestre.surface_traitee_ha,
                 surface_cumulee_ha=traitement.terrestre.surface_cumulee_ha,
                 surface_restante_ha=traitement.terrestre.surface_restante_ha,
@@ -593,7 +593,7 @@ class TraitementRepositoryImpl(TraitementRepository):
             t.consultant_international = src.consultant_international
             t.surface_atomiseur_ha = src.surface_atomiseur_ha
             t.surface_disque_rotatif_ha = src.surface_disque_rotatif_ha
-            t.surface_ulvamast_ha = src.surface_ulvamast_ha
+            t.surface_atomiseur_autoporte_ha = src.surface_atomiseur_autoporte_ha
             t.surface_traitee_ha = src.surface_traitee_ha
             t.surface_cumulee_ha = src.surface_cumulee_ha
             t.surface_restante_ha = src.surface_restante_ha
@@ -829,8 +829,8 @@ class TraitementRepositoryImpl(TraitementRepository):
                 surface_disque_rotatif_ha=float(model.terrestre.surface_disque_rotatif_ha)
                 if model.terrestre.surface_disque_rotatif_ha is not None
                 else None,
-                surface_ulvamast_ha=float(model.terrestre.surface_ulvamast_ha)
-                if model.terrestre.surface_ulvamast_ha is not None
+                surface_atomiseur_autoporte_ha=float(model.terrestre.surface_atomiseur_autoporte_ha)
+                if model.terrestre.surface_atomiseur_autoporte_ha is not None
                 else None,
                 surface_traitee_ha=float(model.terrestre.surface_traitee_ha)
                 if model.terrestre.surface_traitee_ha is not None

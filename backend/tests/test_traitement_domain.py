@@ -830,7 +830,9 @@ async def test_remove_rotation_introuvable():
 
 def test_recalculer_surfaces_somme_trois_materiels():
     terrestre = TraitementTerrestre(
-        surface_atomiseur_ha=10.0, surface_disque_rotatif_ha=5.5, surface_ulvamast_ha=2.25
+        surface_atomiseur_ha=10.0,
+        surface_disque_rotatif_ha=5.5,
+        surface_atomiseur_autoporte_ha=2.25,
     )
     terrestre.recalculer_surfaces(surface_infestee_ha=100.0)
     assert terrestre.surface_traitee_ha == 17.75
@@ -1632,7 +1634,7 @@ def _traitement_terrestre_sync(**overrides) -> Traitement:
         consultant_international=None,
         surface_atomiseur_ha=10.0,
         surface_disque_rotatif_ha=None,
-        surface_ulvamast_ha=None,
+        surface_atomiseur_autoporte_ha=None,
         surface_restante_abandonnee=None,
         motif_surface_restante_abandonnee=None,
         essence_litres=None,
