@@ -10,7 +10,26 @@ import {
   calculerDureeMinutes,
   formatDuree,
   HEURE_STRICTE_RE,
+  IMAGO_PHASE_ROWS,
+  LARVE_PHASE_ROWS,
 } from '../src/lib/prospection-extensive';
+
+// #phase-ordre-affichage : Solitaire → Solitaro-Transiens → Transiens → Grégaire
+// (écrans extensive-imagos.tsx / extensive-larves.tsx, Prospection Extensive).
+describe('IMAGO_PHASE_ROWS / LARVE_PHASE_ROWS — ordre d’affichage du champ Phase', () => {
+  it('IMAGO_PHASE_ROWS : Solitaire, Solitaro-Transiens, Transiens, Grégaire', () => {
+    expect(IMAGO_PHASE_ROWS.map((row) => row.label)).toEqual([
+      'Solitaire',
+      'Solitaro-Transiens',
+      'Transiens',
+      'Grégaire',
+    ]);
+  });
+
+  it('LARVE_PHASE_ROWS (sans Solitaro-Transiens) : Solitaire, Transiens, Grégaire', () => {
+    expect(LARVE_PHASE_ROWS.map((row) => row.label)).toEqual(['Solitaire', 'Transiens', 'Grégaire']);
+  });
+});
 
 describe('calculerDureeMinutes (mode aérien)', () => {
   it('calcule une durée simple dans la même journée', () => {
