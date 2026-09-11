@@ -18,6 +18,13 @@ import { loadAccueilData, AccueilViewModel } from '@/lib/prospection-accueil';
 import { syncAllProspections } from '@/lib/prospection-review';
 import { DraftProspection } from '@/lib/prospection-repository';
 import {
+  DraftTraitementRow,
+  getTraitement,
+  listRecentTraitements,
+} from '@/lib/traitement-repository';
+import { syncAllTraitements } from '@/lib/traitement-sync';
+import { TRAITEMENT_SUBTYPE_BADGE_CONFIG } from '@/components/fiches/tokens';
+import {
   LIBELLE_STATUT_FICHE,
   estDansLaFile,
   estToutParti,
@@ -56,6 +63,11 @@ export default function SyncScreen() {
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
   const [data, setData] = useState<AccueilViewModel>(EMPTY_DATA);
+  // Domaine « traitement » (#erreur-sync-fiche-introuvable) — absent de cet
+  // écran jusqu'ici : ni affiché, ni envoyé par le bouton « Synchroniser »,
+  // d'où une fiche de traitement complète signalée indéfiniment « Aucune
+  // fiche à synchroniser ».
+  const [traitements, setTraitements] = useState<DraftTraitementRow[]>([]);
   const [resume, setResume] = useState<ResumeSync | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
@@ -69,6 +81,7 @@ export default function SyncScreen() {
 
   const refresh = useCallback(() => {
     void loadAccueilData().then(setData).catch((error) => signalerChargement(error));
+    void listRecentTraitements().then(setTraitements).catch((error) => signalerChargement(error));
     // « Synchro réussie » ne dit pas ce qui a atterri : on montre le contenu réel.
     void compterReferentielLocal()
       .then(setEtatReferentiel)
@@ -83,10 +96,17 @@ export default function SyncScreen() {
   );
   const syncedFiches = data.recent.filter((item) => item.statut_sync === 'synced');
 
+  // Pendant du filtrage ci-dessus, côté traitement — sans le filtre
+  // `statut === 'en_attente'` : une fiche de traitement reste `'brouillon'`
+  // jusqu'à son premier envoi réussi (cf. listUnsyncedTraitements), donc
+  // l'exiger ici l'aurait rendue hors de portée de toute synchronisation.
+  const pendingTraitements = traitements.filter((item) => item.statut_sync !== 'synced');
+  const syncedTraitements = traitements.filter((item) => item.statut_sync === 'synced');
+
   const stats = {
-    total: data.recent.length,
-    pending: pendingFiches.length,
-    synced: syncedFiches.length,
+    total: data.recent.length + traitements.length,
+    pending: pendingFiches.length + pendingTraitements.length,
+    synced: syncedFiches.length + syncedTraitements.length,
   };
 
   /**
@@ -102,8 +122,12 @@ export default function SyncScreen() {
    */
   const aEnvoyer = pendingFiches.filter((item) => estDansLaFile(item.statut_sync));
   const enEchec = pendingFiches.filter((item) => statutFicheDe(item.statut_sync) === 'echec');
+  const aEnvoyerTraitements = pendingTraitements.filter((item) => estDansLaFile(item.statut_sync));
+  const enEchecTraitements = pendingTraitements.filter(
+    (item) => statutFicheDe(item.statut_sync) === 'echec'
+  );
 
-  const synchroniser = (drafts: DraftProspection[]) =>
+  const synchroniser = (drafts: DraftProspection[], draftsTraitements: DraftTraitementRow[] = []) =>
     run(
       async () => {
         setReferentielError(null);
@@ -117,11 +141,26 @@ export default function SyncScreen() {
           setReferentielError(toFriendlyError(error).message);
         }
 
+        // `getTraitement` reconstruit la fiche complète (aerien/terrestre/
+        // rotations/produits) — `listRecentTraitements` ne rend que la ligne à
+        // plat, insuffisante pour `syncOneTraitement` (cf. traitement-sync.ts).
+        const traitementsComplets = (
+          await Promise.all(draftsTraitements.map((row) => getTraitement(row.id)))
+        ).filter((t): t is NonNullable<typeof t> => t !== null);
+
         // `syncAll` ne lève pas : un lot partiellement parti est un état du
         // terrain, pas une erreur. L'`Alert` modale qui l'annonçait
         // interrompait l'agent pour lui dire « réessayez » sans lui dire quoi
-        // (ADR-012 décision 9).
-        setResume(await syncAllProspections(drafts, token!));
+        // (ADR-012 décision 9). Les deux domaines sont indépendants — un échec
+        // de lecture/synchronisation des traitements ne doit jamais empêcher
+        // celle des prospections (et inversement, cf. use-fiches-auto-sync.ts).
+        const resumeProspections = await syncAllProspections(drafts, token!);
+        const resumeTraitements = await syncAllTraitements(traitementsComplets, token!);
+        setResume({
+          reussies: [...resumeProspections.reussies, ...resumeTraitements.reussies],
+          echouees: [...resumeProspections.echouees, ...resumeTraitements.echouees],
+          conflits: [...resumeProspections.conflits, ...resumeTraitements.conflits],
+        });
         setLastSync(new Date());
         refresh();
       },
@@ -129,7 +168,7 @@ export default function SyncScreen() {
         screen: 'sync',
         precondition: !!token,
         preconditionMessage: 'Session expirée — reconnectez-vous pour synchroniser.',
-        context: { nbFiches: drafts.length },
+        context: { nbFiches: drafts.length + draftsTraitements.length },
       }
     );
 
@@ -228,14 +267,18 @@ export default function SyncScreen() {
           sur l'écran — alors qu'un bouton rendu depuis `resume` disparaîtrait
           avec lui (#177, « Réessayer les N en échec »).
         */}
-        {enEchec.length > 0 && !isSyncing && (
+        {(enEchec.length > 0 || enEchecTraitements.length > 0) && !isSyncing && (
           <TouchableOpacity
             style={styles.retryCible}
-            onPress={() => void synchroniser(enEchec)}
+            onPress={() => void synchroniser(enEchec, enEchecTraitements)}
             activeOpacity={0.85}
           >
             <Text style={styles.retryCibleText}>
-              Réessayer {enEchec.length === 1 ? 'la fiche' : `les ${enEchec.length} fiches`} en échec
+              Réessayer{' '}
+              {enEchec.length + enEchecTraitements.length === 1
+                ? 'la fiche'
+                : `les ${enEchec.length + enEchecTraitements.length} fiches`}{' '}
+              en échec
             </Text>
           </TouchableOpacity>
         )}
@@ -274,43 +317,71 @@ export default function SyncScreen() {
           </View>
         )}
 
-        {/* Liste des fiches à synchroniser */}
+        {/* Liste des fiches à synchroniser — prospection ET traitement (#erreur-sync-fiche-introuvable) */}
         <View style={styles.syncListContainer}>
           <View style={styles.syncListHeader}>
             <Text style={styles.syncListTitle}>Fiches en attente</Text>
-            <Text style={styles.syncListCount}>{pendingFiches.length}</Text>
+            <Text style={styles.syncListCount}>{pendingFiches.length + pendingTraitements.length}</Text>
           </View>
 
-          {pendingFiches.length === 0 ? (
+          {pendingFiches.length === 0 && pendingTraitements.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyIcon}>📭</Text>
               <Text style={styles.emptyTitle}>Aucune fiche en attente</Text>
-              <Text style={styles.emptySub}>Toutes vos prospections sont synchronisées</Text>
+              <Text style={styles.emptySub}>Toutes vos fiches sont synchronisées</Text>
             </View>
           ) : (
-            pendingFiches.map((draft) => {
-              const statut = statutFicheDe(draft.statut_sync);
-              const { icone, couleur } = STYLE_STATUT[statut];
-              return (
-                <View key={draft.id} style={styles.syncItem}>
-                  <View style={styles.syncItemLeft}>
-                    <View style={[styles.typeBadge, { backgroundColor: '#DBEAFE' }]}>
-                      <Text style={[styles.typeBadgeText, { color: '#2563EB' }]}>🔍 PRO</Text>
+            <>
+              {pendingFiches.map((draft) => {
+                const statut = statutFicheDe(draft.statut_sync);
+                const { icone, couleur } = STYLE_STATUT[statut];
+                return (
+                  <View key={draft.id} style={styles.syncItem}>
+                    <View style={styles.syncItemLeft}>
+                      <View style={[styles.typeBadge, { backgroundColor: '#DBEAFE' }]}>
+                        <Text style={[styles.typeBadgeText, { color: '#2563EB' }]}>🔍 PRO</Text>
+                      </View>
+                      <View style={styles.syncItemInfo}>
+                        <Text style={styles.syncItemCode}>{draft.n_fiche ?? '—'}</Text>
+                        <Text style={styles.syncItemDate}>{draft.date_prospection}</Text>
+                      </View>
                     </View>
-                    <View style={styles.syncItemInfo}>
-                      <Text style={styles.syncItemCode}>{draft.n_fiche ?? '—'}</Text>
-                      <Text style={styles.syncItemDate}>{draft.date_prospection}</Text>
+                    <View style={styles.syncItemRight}>
+                      <Text style={[styles.syncItemStatus, { color: couleur }]}>{icone}</Text>
+                      <Text style={[styles.syncItemStatusLabel, { color: couleur }]}>
+                        {LIBELLE_STATUT_FICHE[statut]}
+                      </Text>
                     </View>
                   </View>
-                  <View style={styles.syncItemRight}>
-                    <Text style={[styles.syncItemStatus, { color: couleur }]}>{icone}</Text>
-                    <Text style={[styles.syncItemStatusLabel, { color: couleur }]}>
-                      {LIBELLE_STATUT_FICHE[statut]}
-                    </Text>
+                );
+              })}
+              {pendingTraitements.map((draft) => {
+                const statut = statutFicheDe(draft.statut_sync);
+                const { icone, couleur } = STYLE_STATUT[statut];
+                const badge = TRAITEMENT_SUBTYPE_BADGE_CONFIG[draft.type_traitement];
+                return (
+                  <View key={draft.id} style={styles.syncItem}>
+                    <View style={styles.syncItemLeft}>
+                      <View style={[styles.typeBadge, { backgroundColor: badge.bg }]}>
+                        <Text style={[styles.typeBadgeText, { color: badge.color }]}>
+                          {badge.icon} {badge.label}
+                        </Text>
+                      </View>
+                      <View style={styles.syncItemInfo}>
+                        <Text style={styles.syncItemCode}>{draft.numero_fiche ?? '—'}</Text>
+                        <Text style={styles.syncItemDate}>{draft.date_traitement ?? '—'}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.syncItemRight}>
+                      <Text style={[styles.syncItemStatus, { color: couleur }]}>{icone}</Text>
+                      <Text style={[styles.syncItemStatusLabel, { color: couleur }]}>
+                        {LIBELLE_STATUT_FICHE[statut]}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              );
-            })
+                );
+              })}
+            </>
           )}
         </View>
 
@@ -322,7 +393,7 @@ export default function SyncScreen() {
         */}
         <TouchableOpacity
           style={[styles.syncButton, isSyncing && styles.syncButtonDisabled]}
-          onPress={() => void synchroniser(aEnvoyer)}
+          onPress={() => void synchroniser(aEnvoyer, aEnvoyerTraitements)}
           disabled={isSyncing}
           activeOpacity={0.85}
         >
@@ -333,8 +404,8 @@ export default function SyncScreen() {
             </View>
           ) : (
             <Text style={styles.syncButtonText}>
-              {aEnvoyer.length > 0
-                ? `🔄 Synchroniser (${aEnvoyer.length})`
+              {aEnvoyer.length + aEnvoyerTraitements.length > 0
+                ? `🔄 Synchroniser (${aEnvoyer.length + aEnvoyerTraitements.length})`
                 : '🔄 Mettre à jour le référentiel'}
             </Text>
           )}

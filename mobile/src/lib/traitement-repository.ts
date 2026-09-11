@@ -1401,6 +1401,28 @@ export async function countUnsyncedTraitements(): Promise<number> {
 }
 
 /**
+ * Fiches de traitement récentes, tous statuts confondus — pendant de
+ * `listRecentProspections()` côté prospection, pour l'écran Synchronisation
+ * (#erreur-sync-fiche-introuvable). Avant cette fonction, le domaine
+ * « traitement » n'existait pas sur cet écran : ni affiché dans « Fiches en
+ * attente », ni inclus dans le lot envoyé par le bouton « Synchroniser » —
+ * une fiche de traitement complète restait donc indéfiniment signalée
+ * « Aucune fiche à synchroniser », quel que soit le nombre de tentatives.
+ *
+ * Volontairement sans filtre sur `statut_sync` (contrairement à
+ * `listUnsyncedTraitements`) : l'écran a besoin de voir aussi les fiches déjà
+ * synchronisées (compteur "Synchronisé") et celles en échec (badge ❌), pas
+ * seulement celles qui repartiront au prochain envoi.
+ */
+export async function listRecentTraitements(limit = 20): Promise<DraftTraitementRow[]> {
+  const db = await getDb();
+  return db.getAllAsync<DraftTraitementRow>(
+    `SELECT * FROM traitement ORDER BY updated_at DESC LIMIT ?`,
+    [limit]
+  );
+}
+
+/**
  * Fiches de traitement réellement en attente d'envoi (#synchronisation-
  * automatique). N'exclut PAS les fiches encore `statut = 'brouillon'` : une
  * fiche entièrement remplie dont l'enregistrement final (recap.tsx) a échoué
