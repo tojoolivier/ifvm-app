@@ -33,7 +33,13 @@ const EXISTING_VEGETATION = JSON.stringify({
 });
 // Sol nu (%) est un champ station, pas par strate (#278) : il vit dans `sol`, pas
 // `vegetation.strates`, et se saisit comme un recouvrement (stepper par pas de 5%).
-const EXISTING_SOL = JSON.stringify({ humidite: '0_5cm', texture: ['limoneuse', 'argileuse', 'cailloux'], solNu: 30 });
+// Humidité (#humidite-multiselect) : 2 valeurs, comme la texture ci-dessous (3 valeurs)
+// — vérifie que la sélection multiple n'est pas réduite à la première au passage.
+const EXISTING_SOL = JSON.stringify({
+  humidite: ['0_5cm', 'gt_30cm'],
+  texture: ['limoneuse', 'argileuse', 'cailloux'],
+  solNu: 30,
+});
 
 describe('VegetationScreen — restauration des données déjà enregistrées', () => {
   afterEach(cleanup);
@@ -51,7 +57,7 @@ describe('VegetationScreen — restauration des données déjà enregistrées', 
     });
   });
 
-  it('affiche le recouvrement, l’humidité et les 3 textures déjà enregistrés dès le montage', async () => {
+  it('affiche le recouvrement, l’humidité (sélection multiple) et les 3 textures déjà enregistrés dès le montage', async () => {
     await render(<VegetationScreen />);
 
     await waitFor(() => expect(screen.getByText('Continuer  ›')).toBeVisible());
@@ -60,12 +66,15 @@ describe('VegetationScreen — restauration des données déjà enregistrées', 
     // d'ouvrir le détail — preuve que `strates` n'est plus vide au montage.
     expect(screen.getAllByText('70%').length).toBeGreaterThan(0);
 
-    // Humidité et les 3 textures apparaissent sélectionnées (fond vert = `chipActive`).
-    expect(screen.getByText('0,5 cm').props.style).toEqual(
-      expect.arrayContaining([expect.objectContaining({ color: '#fff' })])
-    );
+    // Les 2 humidités et les 3 textures apparaissent sélectionnées (fond vert =
+    // `chipActive`) — le libellé actif porte un suffixe " ✓" (cf. veg.tsx) : correspondance
+    // par préfixe pour les deux champs, désormais tous deux en sélection multiple.
+    for (const label of ['0,5 cm', '>30']) {
+      expect(screen.getByText(new RegExp(`^${label}`)).props.style).toEqual(
+        expect.arrayContaining([expect.objectContaining({ color: '#fff' })])
+      );
+    }
     for (const label of ['Limoneuse', 'Argileuse', 'Cailloux']) {
-      // Le libellé actif porte un suffixe " ✓" (cf. veg.tsx) : correspondance par préfixe.
       expect(screen.getByText(new RegExp(`^${label}`)).props.style).toEqual(
         expect.arrayContaining([expect.objectContaining({ color: '#fff' })])
       );
@@ -86,7 +95,8 @@ describe('VegetationScreen — restauration des données déjà enregistrées', 
     expect(vegetation.strates.herbeuse).toMatchObject({ recouvrement: 70, verdissement: 33.5, hMoy: 2.75 });
 
     const sol = JSON.parse(payload.sol);
-    expect(sol.humidite).toBe('0_5cm');
+    expect(sol.humidite).toEqual(expect.arrayContaining(['0_5cm', 'gt_30cm']));
+    expect(sol.humidite).toHaveLength(2);
     expect(sol.texture).toEqual(expect.arrayContaining(['limoneuse', 'argileuse', 'cailloux']));
     expect(sol.texture).toHaveLength(3);
     expect(sol.solNu).toBe(30);
@@ -104,7 +114,7 @@ describe('VegetationScreen — restauration des données déjà enregistrées', 
             arboree: { surfRel: 90, hMoy: 8, recouvrement: 40, verdissement: 60, repousse: null, orpad: ['Rare'] },
           },
         }),
-        sol: JSON.stringify({ humidite: 'surface', texture: ['argileuse'], solNu: 60 }),
+        sol: JSON.stringify({ humidite: ['surface'], texture: ['argileuse'], solNu: 60 }),
       } as any,
       captures: [],
     });
@@ -122,7 +132,7 @@ describe('VegetationScreen — restauration des données déjà enregistrées', 
         'draft-123',
         expect.objectContaining({
           vegetation: expect.stringContaining('"recouvrement":40'),
-          sol: JSON.stringify({ humidite: 'surface', texture: ['argileuse'], solNu: 60 }),
+          sol: JSON.stringify({ humidite: ['surface'], texture: ['argileuse'], solNu: 60 }),
         })
       )
     );

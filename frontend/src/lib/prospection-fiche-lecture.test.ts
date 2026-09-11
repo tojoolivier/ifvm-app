@@ -88,6 +88,20 @@ describe('buildVegetationSummary', () => {
       .replace('arboree', 'Arborée'))
   })
 
+  it('liste TOUTES les humidités d’une sélection multiple (mobile veg.tsx, #humidite-multiselect), pas seulement la première', () => {
+    const summary = buildVegetationSummary(
+      { strates: {} },
+      { humidite: ['surface', '0_5cm', 'gt_30cm'], texture: 'limoneuse' },
+      null,
+    )
+    expect(summary).toContain('Humidité Surf., 0,5 cm, >30')
+  })
+
+  it('reconnaît encore une ancienne fiche enregistrée avec une humidité scalaire (avant le multi-select)', () => {
+    const summary = buildVegetationSummary({ strates: {} }, { humidite: 'surface', texture: 'limoneuse' }, null)
+    expect(summary).toContain('Humidité Surf.')
+  })
+
   it('liste TOUTES les textures d’une sélection multiple (mobile veg.tsx), pas seulement la première', () => {
     // Régression : `sol.texture` était traité comme une simple string alors que le mobile
     // enregistre un tableau ("sélection multiple") — la texture disparaissait donc
