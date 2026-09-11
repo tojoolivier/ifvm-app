@@ -716,7 +716,7 @@ async def test_create_traitement_terrestre_brouillon(
     payload = payload_traitement_terrestre(prospection_id)
     payload["terrestre"]["surface_atomiseur_ha"] = 10.0
     payload["terrestre"]["surface_disque_rotatif_ha"] = 5.0
-    payload["terrestre"]["surface_ulvamast_ha"] = 2.0
+    payload["terrestre"]["surface_atomiseur_autoporte_ha"] = 2.0
     payload["terrestre"]["surface_restante_abandonnee"] = False
 
     resp = await client.post("/traitements", json=payload, headers=auth_headers)

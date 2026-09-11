@@ -70,7 +70,7 @@ describe('TraitementScreen (Équipe, Terrestre) — libellés Pesticides', () =>
         traitement_origine_id: null,
         surface_atomiseur_ha: null,
         surface_disque_rotatif_ha: null,
-        surface_ulvamast_ha: null,
+        surface_atomiseur_autoporte_ha: null,
         surface_restante_abandonnee: null,
         motif_surface_restante_abandonnee: null,
         essence_litres: null,

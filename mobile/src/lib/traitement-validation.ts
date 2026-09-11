@@ -149,14 +149,14 @@ export function deriveNomCommercial(nomComplet: string): string {
 export interface SurfacesMoyensTerrestre {
   surface_atomiseur_ha?: number | null;
   surface_disque_rotatif_ha?: number | null;
-  surface_ulvamast_ha?: number | null;
+  surface_atomiseur_autoporte_ha?: number | null;
 }
 
 export function computeSurfaceTraitee(surfaces: SurfacesMoyensTerrestre): number {
   return (
     (surfaces.surface_atomiseur_ha ?? 0) +
     (surfaces.surface_disque_rotatif_ha ?? 0) +
-    (surfaces.surface_ulvamast_ha ?? 0)
+    (surfaces.surface_atomiseur_autoporte_ha ?? 0)
   );
 }
 

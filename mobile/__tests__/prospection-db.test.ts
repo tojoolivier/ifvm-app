@@ -183,6 +183,9 @@ const MIGRATED_COLUMNS = [
   { name: 'taux_mortalite_pourcent' },
   { name: 'evaluation_efficacite_heures_apres' },
   { name: 'methode_evaluation_efficacite' },
+  // "Atomiseur" -> "Atomiseur à dos" (migration backend 0060, renommage pur) ;
+  // ULVAmast remplacé par "Atomiseur autoporté" (nouvelle colonne).
+  { name: 'surface_atomiseur_autoporte_ha' },
 
   // Colonne de traitement_signature — signature numérique (#signatures-auto-equipe,
   // migration backend 0049).
