@@ -312,6 +312,23 @@ describe('parseVegetationSol / buildVegetationSummary (multi-strate)', () => {
     expect(state.texture).toEqual(['sable_fin']);
     expect(buildVegetationSummary(state)).toContain('Texture Sable fin');
   });
+
+  // #humidite-multiselect : même mécanisme que la texture ci-dessus.
+  it('conserve TOUTES les humidités d’une sélection multiple, pas seulement la première', () => {
+    const sol = JSON.stringify({ humidite: ['surface', '0_5cm', 'gt_30cm'], texture: [] });
+    const state = parseVegetationSol(null, sol, null);
+    expect(state.humidite).toEqual(['surface', '0_5cm', 'gt_30cm']);
+
+    const summary = buildVegetationSummary(state);
+    expect(summary).toContain('Humidité Surf., 0,5 cm, >30');
+  });
+
+  it('reconnaît encore une ancienne fiche enregistrée avec une humidité scalaire (avant le multi-select)', () => {
+    const sol = JSON.stringify({ humidite: 'surface', texture: [] });
+    const state = parseVegetationSol(null, sol, null);
+    expect(state.humidite).toEqual(['surface']);
+    expect(buildVegetationSummary(state)).toContain('Humidité Surf.');
+  });
 });
 
 describe('computeSurfaceRepartitionTotal / isSurfaceRepartitionValide (#278)', () => {

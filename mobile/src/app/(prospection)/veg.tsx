@@ -7,7 +7,6 @@ import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import {
   HUMIDITE_OPTIONS,
-  Humidite,
   ORPAD_STAGES,
   parseVegetationSol,
   STRATE_KEYS,
@@ -110,7 +109,7 @@ export default function VegetationScreen() {
   // ==========================================
 
   const savedSol = draft?.sol
-    ? (JSON.parse(draft.sol) as { humidite?: Humidite | null; texture?: string[] | null; solNu?: number | null })
+    ? (JSON.parse(draft.sol) as { humidite?: string[] | null; texture?: string[] | null; solNu?: number | null })
     : null;
 
   // Sol nu (%) — au niveau de la station, pas par strate (issue #278) : avec le
@@ -121,6 +120,20 @@ export default function VegetationScreen() {
   // N'affiche l'erreur de répartition qu'après une tentative de "Continuer" — comme
   // humidité/texture, pas dès la première frappe sur une strate.
   const [repartitionTouched, setRepartitionTouched] = useState(false);
+
+  // ==========================================
+  // HUMIDITÉ : sélection multiple (#humidite-multiselect, même mécanisme que Texture
+  // juste en dessous — un champ `form.Field` factice sert uniquement au suivi
+  // touched/erreur, la sélection réelle vit dans cet état local)
+  // ==========================================
+
+  const [selectedHumidites, setSelectedHumidites] = useState<string[]>(savedSol?.humidite ?? []);
+
+  const toggleHumidite = (value: string) => {
+    setSelectedHumidites((current) =>
+      current.includes(value) ? current.filter((h) => h !== value) : [...current, value]
+    );
+  };
 
   // ==========================================
   // TEXTURE : sélection multiple
@@ -136,7 +149,7 @@ export default function VegetationScreen() {
 
   const form = useForm({
     defaultValues: {
-      humidite: savedSol?.humidite ?? null,
+      humidite: null,
       texture: null,
     } as VegetationFormValues,
     onSubmitInvalid: () => {
@@ -156,7 +169,7 @@ export default function VegetationScreen() {
           const updated = await updateProspectionVegetation(draftId, {
             vegetation: JSON.stringify({ strates }),
             sol: JSON.stringify({
-              humidite: value.humidite,
+              humidite: selectedHumidites.length > 0 ? selectedHumidites : null,
               texture: selectedTextures.length > 0 ? selectedTextures : null,
               solNu,
             }),
@@ -187,8 +200,8 @@ export default function VegetationScreen() {
     const parsed = parseVegetationSol(draft.vegetation, draft.sol, draft.degats_cultures);
     setStrates(parsed.strates);
     setSolNu(parsed.solNu ?? 0);
+    setSelectedHumidites(parsed.humidite);
     setSelectedTextures(parsed.texture);
-    form.setFieldValue('humidite', parsed.humidite);
   }, [draft, draftId, form]);
 
   const setStrateField = <K extends keyof StrateFormValues>(key: StrateKey, field: K, value: StrateFormValues[K]) => {
@@ -459,33 +472,42 @@ export default function VegetationScreen() {
             <form.Field
               name="humidite"
               validators={{
-                onChange: ({ value }) => (value ? undefined : 'Humidité du sol requise'),
-                onBlur: ({ value }) => (value ? undefined : 'Humidité du sol requise'),
+                onChange: () => (selectedHumidites.length > 0 ? undefined : 'Humidité du sol requise'),
+                onBlur: () => (selectedHumidites.length > 0 ? undefined : 'Humidité du sol requise'),
               }}
             >
               {(field) => {
-                const showError = field.state.meta.isTouched && !field.state.meta.isValid;
+                const showError = field.state.meta.isTouched && selectedHumidites.length === 0;
                 return (
                   <View style={[styles.card, showError && styles.cardError]}>
-                    <Text style={styles.cardTitle}>Humidité du sol</Text>
+                    <Text style={styles.cardTitle}>Humidité du sol (sélection multiple)</Text>
+                    <Text style={styles.hintSmall}>Touchez pour sélectionner/désélectionner</Text>
                     <View style={styles.chipsRow}>
                       {HUMIDITE_OPTIONS.map((option) => {
-                        const active = option.value === field.state.value;
+                        const active = selectedHumidites.includes(option.value);
                         return (
                           <TouchableOpacity
                             key={option.value}
                             style={[styles.smallChip, active && styles.smallChipActive]}
                             onPress={() => {
-                              field.handleChange(option.value);
+                              toggleHumidite(option.value);
                               field.handleBlur();
                             }}
                           >
-                            <Text style={[styles.smallChipText, active && styles.smallChipTextActive]}>{option.label}</Text>
+                            <Text style={[styles.smallChipText, active && styles.smallChipTextActive]}>
+                              {option.label}
+                              {active && ' ✓'}
+                            </Text>
                           </TouchableOpacity>
                         );
                       })}
                     </View>
-                    {showError && <Text style={styles.errorText}>{field.state.meta.errors[0]}</Text>}
+                    {selectedHumidites.length > 0 && (
+                      <Text style={styles.selectionInfo}>
+                        {selectedHumidites.length} modalité{selectedHumidites.length > 1 ? 's' : ''} d&apos;humidité sélectionnée{selectedHumidites.length > 1 ? 's' : ''}
+                      </Text>
+                    )}
+                    {showError && <Text style={styles.errorText}>Humidité du sol requise</Text>}
                   </View>
                 );
               }}

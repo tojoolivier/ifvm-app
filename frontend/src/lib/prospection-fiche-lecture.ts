@@ -174,13 +174,21 @@ export function buildVegetationSummary(
   const total = Object.values(strates).reduce((sum, detail) => sum + (detail?.recouvrement ?? 0), 0)
 
   const parts: string[] = [`Strates (${total}%) : ${strateParts || '—'}`]
-  const humidite = sol?.humidite as string | undefined
+  // Sélection multiple côté mobile (veg.tsx, #humidite-multiselect) : `sol.humidite`
+  // est désormais un tableau. Un ancien brouillon enregistré avant le passage au
+  // multi-select peut encore porter une simple string — les deux formats sont
+  // acceptés pour ne pas faire disparaître l'humidité (même règle que la texture,
+  // déjà passée au multi-select juste en dessous).
+  const humiditeRaw = sol?.humidite as string | string[] | undefined
+  const humidites = Array.isArray(humiditeRaw) ? humiditeRaw : humiditeRaw ? [humiditeRaw] : []
   // Sélection multiple côté mobile (veg.tsx) : `sol.texture` est un tableau. Un ancien
   // brouillon enregistré avant l'ajout du multi-select peut encore porter une simple
   // string — les deux formats sont acceptés pour ne pas faire disparaître la texture.
   const textureRaw = sol?.texture as string | string[] | undefined
   const textures = Array.isArray(textureRaw) ? textureRaw : textureRaw ? [textureRaw] : []
-  if (humidite) parts.push(`Humidité ${HUMIDITE_LABELS[humidite] ?? humidite}`)
+  if (humidites.length > 0) {
+    parts.push(`Humidité ${humidites.map((h) => HUMIDITE_LABELS[h] ?? h).join(', ')}`)
+  }
   if (textures.length > 0) {
     parts.push(`Texture ${textures.map((t) => TEXTURE_LABELS[t] ?? t).join(', ')}`)
   }

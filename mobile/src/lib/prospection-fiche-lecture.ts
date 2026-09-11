@@ -92,12 +92,23 @@ export interface VegetationSolState {
   // prospectée. Saisi comme le recouvrement (stepper par pas de 5%), pas en décimal
   // libre — cf. veg.tsx.
   solNu: number | null;
-  humidite: Humidite | null;
+  // Sélection multiple (#humidite-multiselect, même mécanisme que Texture juste en
+  // dessous) : toujours un tableau, jamais une valeur scalaire — un ancien brouillon
+  // enregistré avant le passage au multi-select peut encore porter une simple string,
+  // normalisée en tableau à un élément.
+  humidite: Humidite[];
   // Sélection multiple (cf. veg.tsx "Texture du sol (sélection multiple)") : toujours un
   // tableau, jamais une valeur scalaire — un ancien brouillon enregistré avant l'ajout du
   // multi-select peut encore porter une simple string, normalisée en tableau à un élément.
   texture: Texture[];
   degatsCultures: DegatsCultures | null;
+}
+
+/** Accepte le format actuel (tableau) et l'ancien format scalaire d'un brouillon antérieur. */
+function normalizeHumiditeSelection(raw: unknown): Humidite[] {
+  if (Array.isArray(raw)) return raw.filter((h): h is Humidite => typeof h === 'string');
+  if (typeof raw === 'string' && raw) return [raw as Humidite];
+  return [];
 }
 
 /** Accepte le format actuel (tableau) et l'ancien format scalaire d'un brouillon antérieur. */
@@ -149,7 +160,7 @@ export function parseVegetationSol(
   return {
     strates,
     solNu: typeof solParsed.solNu === 'number' ? solParsed.solNu : null,
-    humidite: (solParsed.humidite as Humidite) ?? null,
+    humidite: normalizeHumiditeSelection(solParsed.humidite),
     texture: normalizeTextureSelection(solParsed.texture),
     degatsCultures: (degatsCultures as DegatsCultures) ?? null,
   };
@@ -181,8 +192,12 @@ export function buildVegetationSummary(state: VegetationSolState): string {
   if (state.solNu != null) {
     parts.push(`Sol nu ${state.solNu}%`);
   }
-  if (state.humidite) {
-    parts.push(`Humidité ${HUMIDITE_OPTIONS.find((o) => o.value === state.humidite)?.label}`);
+  if (state.humidite.length > 0) {
+    // Sélection multiple : tous les niveaux cochés apparaissent, pas seulement le premier.
+    const labels = state.humidite
+      .map((h) => HUMIDITE_OPTIONS.find((o) => o.value === h)?.label ?? h)
+      .join(', ');
+    parts.push(`Humidité ${labels}`);
   }
   if (state.texture.length > 0) {
     // Sélection multiple : toutes les textures cochées apparaissent, pas seulement la première.
