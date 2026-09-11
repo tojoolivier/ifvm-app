@@ -38,13 +38,11 @@ function formatDecimalDisplay(value: number | null): string {
 
 type VegetationDecimalField = 'herbeuse' | 'arboree' | 'recouvrement';
 
+// Réduit à Cultures/Pâturages — Habitations, Points d'eau, Aire protégée et
+// Ruchers retirés du choix (décision produit).
 const ZONES = [
-  { key: 'habitations', label: 'Habitations' },
-  { key: 'points_eau', label: "Points d'eau" },
   { key: 'cultures', label: 'Cultures' },
   { key: 'paturages', label: 'Pâturages' },
-  { key: 'aire_protegee', label: 'Aire protégée' },
-  { key: 'ruchers', label: 'Ruchers' },
 ];
 
 export default function MoyensScreen() {
