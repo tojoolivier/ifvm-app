@@ -3523,8 +3523,8 @@ export interface components {
              * Format: uuid
              */
             chef_equipe_id: string;
-            /** Agent Encadreur Id */
-            agent_encadreur_id?: string | null;
+            /** Agent Encadreur */
+            agent_encadreur?: string | null;
             /** Consultant International */
             consultant_international?: string | null;
             /** Surface Atomiseur Ha */
@@ -3577,8 +3577,8 @@ export interface components {
              * Format: uuid
              */
             chef_equipe_id: string;
-            /** Agent Encadreur Id */
-            agent_encadreur_id: string | null;
+            /** Agent Encadreur */
+            agent_encadreur: string | null;
             /** Consultant International */
             consultant_international: string | null;
             /** Surface Atomiseur Ha */

@@ -24,6 +24,10 @@ export interface BadgeStyle {
 export const STATUT_BADGE_CONFIG: Record<string, BadgeStyle> = {
   brouillon: { label: 'Brouillon', color: '#6B7280', bg: '#F3F4F6' },
   a_synchro: { label: 'À SYNCHRO', color: '#92400E', bg: '#FEF3C7' },
+  // Distinct de `a_synchro` : le serveur a refusé la fiche (422/400…), la
+  // renvoyer à l'identique reproduirait le refus — contrairement à `a_synchro`
+  // qui n'attend que le réseau. Voir prospection-statut.ts.
+  echec_synchro: { label: 'ÉCHEC ENVOI', color: '#DC2626', bg: '#FEE2E2' },
   synchro: { label: 'SYNCHRO ✓', color: '#15803D', bg: '#DCFCE7' },
   en_attente: { label: 'En attente', color: '#D97706', bg: '#FEF3C7' },
   verifiee: { label: 'Vérifiée', color: '#2563EB', bg: '#DBEAFE' },

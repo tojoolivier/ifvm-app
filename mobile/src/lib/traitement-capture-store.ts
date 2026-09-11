@@ -125,7 +125,7 @@ export interface ProduitInput {
 
 export interface TerrestreDraft {
   chefEquipeId?: string | null;
-  agentEncadreurId?: string | null;
+  agentEncadreur?: string | null;
   consultantInternational?: string | null;
   heureDebut?: string | null;
   heureFin?: string | null;

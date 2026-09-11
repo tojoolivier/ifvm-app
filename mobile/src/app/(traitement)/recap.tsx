@@ -212,7 +212,7 @@ export default function RecapScreen() {
         }).map((r) => ({ ...r, signe: estSigne(r.role as SignatureRole) }))
       : computeSignatureMatrix('TERRESTRE', {
           chef_equipe_id: draft.terrestre?.chef_equipe_id,
-          agent_encadreur_id: draft.terrestre?.agent_encadreur_id,
+          agent_encadreur: draft.terrestre?.agent_encadreur,
           consultant_international: draft.terrestre?.consultant_international,
         }).map((r) => ({ ...r, signe: estSigne(r.role as SignatureRole) }));
 

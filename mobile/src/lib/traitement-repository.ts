@@ -155,7 +155,7 @@ export interface TraitementTerrestre {
   reprise_traitement: boolean | null;
   traitement_origine_id: string | null;
   chef_equipe_id: string;
-  agent_encadreur_id: string | null;
+  agent_encadreur: string | null;
   consultant_international: string | null;
   surface_atomiseur_ha: number | null;
   surface_disque_rotatif_ha: number | null;
@@ -230,7 +230,7 @@ export interface DraftTraitementTerrestreInput {
   prospectionId: string;
   dateTraitement?: string | null;
   chefEquipeId: string;
-  agentEncadreurId?: string | null;
+  agentEncadreur?: string | null;
   consultantInternational?: string | null;
   repriseTraitement?: boolean;
   traitementOrigineId?: string | null;
@@ -348,13 +348,13 @@ export async function createDraftTraitementTerrestre(
 
   await db.runAsync(
     `INSERT INTO traitement_terrestre (
-      traitement_id, chef_equipe_id, agent_encadreur_id, consultant_international,
+      traitement_id, chef_equipe_id, agent_encadreur, consultant_international,
       reprise_traitement, traitement_origine_id
     ) VALUES (?, ?, ?, ?, ?, ?)`,
     [
       input.id,
       input.chefEquipeId,
-      input.agentEncadreurId ?? null,
+      input.agentEncadreur ?? null,
       input.consultantInternational ?? null,
       input.repriseTraitement ?? null,
       input.traitementOrigineId ?? null,
@@ -641,7 +641,7 @@ export async function markTraitementValidee(
 
 export interface TerrestreUpdateInput {
   chefEquipeId: string;
-  agentEncadreurId?: string | null;
+  agentEncadreur?: string | null;
   consultantInternational?: string | null;
   heureDebut?: string | null;
   heureFin?: string | null;
@@ -669,7 +669,7 @@ export async function updateTraitementTerrestre(
   await db.runAsync(
     `UPDATE traitement_terrestre SET
       chef_equipe_id = ?,
-      agent_encadreur_id = ?,
+      agent_encadreur = ?,
       consultant_international = ?,
       heure_debut = ?,
       heure_fin = ?,
@@ -689,7 +689,7 @@ export async function updateTraitementTerrestre(
      WHERE traitement_id = ?`,
     [
       input.chefEquipeId,
-      input.agentEncadreurId ?? null,
+      input.agentEncadreur ?? null,
       input.consultantInternational ?? null,
       input.heureDebut ?? null,
       input.heureFin ?? null,

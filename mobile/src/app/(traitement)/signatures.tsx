@@ -100,7 +100,7 @@ export default function SignaturesScreen() {
       .then((draft) => {
         if (!draft) return;
         store.setTypeTraitement(draft.type_traitement);
-        setAgentEncadreurRenseigne(draft.type_traitement === 'TERRESTRE' && !!draft.terrestre?.agent_encadreur_id);
+        setAgentEncadreurRenseigne(draft.type_traitement === 'TERRESTRE' && !!draft.terrestre?.agent_encadreur);
 
         const parRole: Record<string, { nom: string; image: string }> = {};
         for (const s of draft.signatures ?? []) {
@@ -149,7 +149,7 @@ export default function SignaturesScreen() {
       : typeTraitement === 'TERRESTRE'
       ? computeSignatureMatrix('TERRESTRE', {
           chef_equipe_id: store.terrestre.chefEquipeId,
-          agent_encadreur_id: store.terrestre.agentEncadreurId,
+          agent_encadreur: store.terrestre.agentEncadreur,
           consultant_international: store.terrestre.consultantInternational,
         })
       : [];

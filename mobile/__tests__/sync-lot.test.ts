@@ -26,6 +26,13 @@ function erreurHttp(status: number): Error {
   return erreur;
 }
 
+/** Même fabrique, avec le motif que rendrait `extractErrorMessage` (api-client.ts). */
+function erreurHttpAvecMessage(status: number, message: string): Error {
+  const erreur = new NetworkError(message);
+  (erreur as unknown as { status: number }).status = status;
+  return erreur;
+}
+
 interface Fiche {
   id: string;
   label: string;
@@ -139,6 +146,27 @@ describe('syncAll — le lot résume, il ne lève pas', () => {
     expect(marquerEchec).toHaveBeenCalledTimes(1);
     expect(marquerEchec).toHaveBeenCalledWith('a');
     expect(resume.echouees.map((e) => e.sort)).toEqual(['echec', 'file']);
+  });
+
+  it('montre le motif réel du serveur sur un rejet de validation (422), pas « Connexion impossible »', async () => {
+    // #synchro-motif-visible : un 422 voyage en `NetworkError` (comme le 409),
+    // mais son message porte déjà le motif exact du serveur
+    // (`extractErrorMessage`, api-client.ts) — le jeter au profit du message
+    // générique de la classe dirait « problème de connexion » sur une fiche que
+    // la connexion a très bien atteinte, et proposerait « Réessayer » alors que
+    // rien ne changera sans corriger la fiche.
+    const syncOne = jest.fn(async () => {
+      throw erreurHttpAvecMessage(422, 'densite_groupee: La densité groupée (/m²) est obligatoire.');
+    });
+
+    const resume = await syncAll([fiche('a')], 'token', lot({ syncOne }));
+
+    expect(resume.echouees[0].message).toBe(
+      'densite_groupee: La densité groupée (/m²) est obligatoire.'
+    );
+    expect(resume.echouees[0].message).not.toContain('Connexion');
+    expect(resume.echouees[0].action).toBeNull();
+    expect(resume.echouees[0].sort).toBe('echec');
   });
 
   it('conserve la version serveur d’un conflit au lieu de l’aplatir', async () => {

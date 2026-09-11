@@ -315,7 +315,7 @@ describe('TraitementScreen (Équipe, Terrestre) — persistance des produits uti
       cible: { surface_infestee_ha: 0 },
       terrestre: {
         chef_equipe_id: 'chef-equipe-1',
-        agent_encadreur_id: null,
+        agent_encadreur: null,
         consultant_international: null,
         heure_debut: null,
         heure_fin: null,
