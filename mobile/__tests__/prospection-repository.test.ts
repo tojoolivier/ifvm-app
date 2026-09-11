@@ -861,7 +861,7 @@ describe('getProspectionPopulation', () => {
       densite_groupee: 2,
       methode: 'battage',
       accouplement: 'rare',
-      ponte: 'peu',
+      ponte: 'beaucoup',
     };
     getFirstAsync.mockResolvedValueOnce(row);
 
@@ -886,7 +886,7 @@ describe('saveProspectionPopulation', () => {
     densite_groupee: 2,
     methode: 'battage',
     accouplement: 'rare',
-    ponte: 'peu',
+    ponte: 'beaucoup',
     // Colonnes extensives ajoutées
     captures_sol: null,
     captures_trans: null,
@@ -916,7 +916,7 @@ describe('saveProspectionPopulation', () => {
 
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO prospection_population'),
-      expect.arrayContaining([BASE_INPUT.id, 'LMC', 'imago', 10, 2, 'battage', 'rare', 'peu'])
+      expect.arrayContaining([BASE_INPUT.id, 'LMC', 'imago', 10, 2, 'battage', 'rare', 'beaucoup'])
     );
   });
 
@@ -931,7 +931,7 @@ describe('saveProspectionPopulation', () => {
       [
         null, null, null, // phase, captures_nombre, temps_capture
         10, 2,             // densite_diffuse, densite_groupee
-        'battage', 'rare', 'peu', // methode, accouplement, ponte
+        'battage', 'rare', 'beaucoup', // methode, accouplement, ponte
         null, null, null, null, // captures_sol, captures_trans, captures_greg, captures_solitaro_transiens
         null, null, null,  // stade_imago, stades_imago, essaim_observe
         null, null, null,  // densites_larve, tache_larvaire, bande_larvaire

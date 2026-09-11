@@ -71,9 +71,9 @@ describe('phenotypesFor', () => {
 });
 
 describe('options accouplement/ponte', () => {
-  it('LMC inclut Dominant, NSE non (PDF 11 vs PDF 16)', () => {
-    expect(ACCOUPLEMENT_OPTIONS_LMC).toEqual(['Néant', 'Rare', 'Peu', 'Beaucoup', 'Dominant']);
-    expect(ACCOUPLEMENT_OPTIONS_NSE).toEqual(['Néant', 'Rare', 'Peu', 'Beaucoup']);
+  it('LMC et NSE partagent la même échelle à 3 niveaux', () => {
+    expect(ACCOUPLEMENT_OPTIONS_LMC).toEqual(['Néant', 'Rare', 'Beaucoup']);
+    expect(ACCOUPLEMENT_OPTIONS_NSE).toEqual(['Néant', 'Rare', 'Beaucoup']);
   });
 });
 
