@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getTraitement, updateTraitementMoyens, Cible } from '@/lib/traitement-repository';
+import { getProspection } from '@/lib/prospection-repository';
 import { validateRecouvrement } from '@/lib/traitement-validation';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
@@ -72,6 +73,7 @@ export default function SyntheseScreen() {
   // Cf. handleVegetationChange/Blur ci-dessous — même garde de saisie intermédiaire
   // ("1," / "1.") que moyens.tsx.
   const [decimalDrafts, setDecimalDrafts] = useState<Partial<Record<VegetationDecimalField, string>>>({});
+  const [prospectionId, setProspectionId] = useState<string | null>(null);
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('synthese');
 
@@ -81,6 +83,7 @@ export default function SyntheseScreen() {
       .then((draft) => {
         if (!draft) return;
         setCible(draft.cible ?? null);
+        setProspectionId(draft.prospection_id ?? null);
         setKit({
           kit_combinaison: draft.kit_combinaison ?? 0,
           kit_gants: draft.kit_gants ?? 0,
@@ -101,6 +104,30 @@ export default function SyntheseScreen() {
       })
       .catch((error) => signalerChargement(error, { traitementId }));
   }, [traitementId, signalerChargement]);
+
+  // Pré-remplit Strate herbeuse/Recouvrement depuis la fiche de prospection liée
+  // (déjà renseignés là — intensive ou extensive, `hauteur_herbe_cm`/
+  // `verdissement_pourcent` sont des champs communs aux deux) — même patron que
+  // moyens.tsx côté Terrestre. Modifiable ensuite, jamais d'écrasement d'une
+  // valeur déjà présente. Strate arborée n'a pas d'équivalent sur la
+  // prospection : reste en saisie manuelle. N'anticipe pas #325 (lecture seule
+  // de la cible/population depuis la prospection, bloqué par le ticket 6) —
+  // seule la végétation est concernée ici, et reste modifiable.
+  useEffect(() => {
+    if (!prospectionId) return;
+    getProspection(prospectionId)
+      .then((prospection) => {
+        if (!prospection) return;
+        if (prospection.hauteur_herbe_cm != null) {
+          const herbeuseM = Math.round((prospection.hauteur_herbe_cm / 100) * 100) / 100;
+          setHauteurHerbeuse((current) => (current == null ? herbeuseM : current));
+        }
+        if (prospection.verdissement_pourcent != null) {
+          setRecouvrement((current) => (current == null ? prospection.verdissement_pourcent : current));
+        }
+      })
+      .catch((error) => signalerChargement(error, { prospectionId }));
+  }, [prospectionId, signalerChargement]);
 
   const recouvrementErrors = validateRecouvrement(recouvrement);
 
@@ -195,7 +222,7 @@ export default function SyntheseScreen() {
 
         <Text style={styles.sectionLabel}>Végétation</Text>
 
-        <Text style={styles.fieldLabel}>Strate herbeuse (m)</Text>
+        <Text style={styles.fieldLabel}>Strate herbeuse (m) — pré-remplie, modifiable</Text>
         <TextInput
           editable={!readOnly}
           style={styles.input}
@@ -215,7 +242,7 @@ export default function SyntheseScreen() {
           onChangeText={(v) => handleVegetationChange('arboree', v)}
           onBlur={() => handleVegetationBlur('arboree')}
         />
-        <Text style={styles.fieldLabel}>Recouvrement (%)</Text>
+        <Text style={styles.fieldLabel}>Recouvrement (%) — pré-rempli, modifiable</Text>
         <TextInput
           editable={!readOnly}
           style={styles.input}
