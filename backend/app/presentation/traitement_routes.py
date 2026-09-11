@@ -150,6 +150,9 @@ async def create_traitement(
                 base_secondaire_date_installation=body.aerien.base_secondaire_date_installation,
                 immatricule_aeronef=body.aerien.immatricule_aeronef,
                 pesticide_recu_l=body.aerien.pesticide_recu_l,
+                taux_mortalite_pourcent=body.aerien.taux_mortalite_pourcent,
+                evaluation_efficacite_heures_apres=body.aerien.evaluation_efficacite_heures_apres,
+                methode_evaluation_efficacite=body.aerien.methode_evaluation_efficacite,
                 reprise_traitement=body.aerien.reprise_traitement,
                 traitement_origine_id=body.aerien.traitement_origine_id,
             )
@@ -176,6 +179,9 @@ async def create_traitement(
             essence_litres=body.terrestre.essence_litres,
             nb_piles=body.terrestre.nb_piles,
             pesticide_recu_l=body.terrestre.pesticide_recu_l,
+            taux_mortalite_pourcent=body.terrestre.taux_mortalite_pourcent,
+            evaluation_efficacite_heures_apres=body.terrestre.evaluation_efficacite_heures_apres,
+            methode_evaluation_efficacite=body.terrestre.methode_evaluation_efficacite,
             reprise_traitement=body.terrestre.reprise_traitement,
             traitement_origine_id=body.terrestre.traitement_origine_id,
         )
@@ -226,6 +232,9 @@ async def sync_traitement(
                 base_secondaire_date_installation=body.aerien.base_secondaire_date_installation,
                 immatricule_aeronef=body.aerien.immatricule_aeronef,
                 pesticide_recu_l=body.aerien.pesticide_recu_l,
+                taux_mortalite_pourcent=body.aerien.taux_mortalite_pourcent,
+                evaluation_efficacite_heures_apres=body.aerien.evaluation_efficacite_heures_apres,
+                methode_evaluation_efficacite=body.aerien.methode_evaluation_efficacite,
                 reprise_traitement=body.aerien.reprise_traitement,
                 traitement_origine_id=body.aerien.traitement_origine_id,
             )
@@ -255,6 +264,9 @@ async def sync_traitement(
                 essence_litres=body.terrestre.essence_litres,
                 nb_piles=body.terrestre.nb_piles,
                 pesticide_recu_l=body.terrestre.pesticide_recu_l,
+                taux_mortalite_pourcent=body.terrestre.taux_mortalite_pourcent,
+                evaluation_efficacite_heures_apres=body.terrestre.evaluation_efficacite_heures_apres,
+                methode_evaluation_efficacite=body.terrestre.methode_evaluation_efficacite,
                 reprise_traitement=body.terrestre.reprise_traitement,
                 traitement_origine_id=body.terrestre.traitement_origine_id,
             )

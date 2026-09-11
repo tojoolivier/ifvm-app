@@ -99,6 +99,12 @@ export default function TraitementScreen() {
           vitesse_vent_ms: draft.terrestre.vitesse_vent_ms,
           direction_vent: draft.terrestre.direction_vent,
           temperature_c: draft.terrestre.temperature_c,
+          taux_mortalite_pourcent: draft.terrestre.taux_mortalite_pourcent,
+          evaluation_efficacite_heures_apres: draft.terrestre.evaluation_efficacite_heures_apres,
+          methode_evaluation_efficacite: draft.terrestre.methode_evaluation_efficacite as
+            | 'ESTIMATION_VISUELLE'
+            | 'COMPTAGES_PRE_POST'
+            | null,
           repriseTraitement: draft.terrestre.reprise_traitement ?? false,
           traitementOrigineId: draft.terrestre.traitement_origine_id,
           surface_atomiseur_ha: draft.terrestre.surface_atomiseur_ha,
@@ -264,6 +270,9 @@ export default function TraitementScreen() {
             vitesse_vent_ms: store.terrestre.vitesse_vent_ms,
             direction_vent: store.terrestre.direction_vent,
             temperature_c: store.terrestre.temperature_c,
+            taux_mortalite_pourcent: store.terrestre.taux_mortalite_pourcent,
+            evaluation_efficacite_heures_apres: store.terrestre.evaluation_efficacite_heures_apres,
+            methode_evaluation_efficacite: store.terrestre.methode_evaluation_efficacite,
             repriseTraitement: store.terrestre.repriseTraitement,
             traitementOrigineId: store.terrestre.traitementOrigineId,
             surface_atomiseur_ha: store.terrestre.surface_atomiseur_ha,

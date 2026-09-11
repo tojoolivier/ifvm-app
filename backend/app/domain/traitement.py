@@ -208,6 +208,13 @@ class TraitementAerien:
     # « reste en stock » dérivé des deux.
     pesticide_recu_l: float | None = None
     pesticide_stock_restant_l: float | None = None
+    # Efficacité (fiche CRT papier, section "Traitement") : taux de mortalité
+    # observé, quelques heures après le traitement — une seule évaluation par
+    # fiche (après l'ensemble des rotations), pas par rotation individuelle,
+    # même patron que TraitementTerrestre ci-dessous.
+    taux_mortalite_pourcent: float | None = None
+    evaluation_efficacite_heures_apres: float | None = None
+    methode_evaluation_efficacite: str | None = None
     rotations: list[Rotation] = field(default_factory=list)
 
     def recalculer_totaux(self) -> None:
@@ -273,6 +280,15 @@ class TraitementTerrestre:
     vitesse_vent_ms: float = 0.0
     direction_vent: str | None = None
     temperature_c: float = 0.0
+    # Efficacité (fiche CRT papier, section "Traitement" juste après Condition de
+    # traitement) : taux de mortalité observé, quelques heures après le
+    # traitement — jamais recalculé, jamais validé contre une source externe,
+    # simple saisie terrain comme le reste de cette section. Les 3 champs sont
+    # facultatifs indépendamment les uns des autres (une estimation visuelle
+    # sans délai précis reste une saisie valide).
+    taux_mortalite_pourcent: float | None = None
+    evaluation_efficacite_heures_apres: float | None = None
+    methode_evaluation_efficacite: str | None = None
     reprise_traitement: bool = False
     traitement_origine_id: uuid.UUID | None = None
     chef_equipe_id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -564,6 +580,9 @@ _CHAMPS_CONTENU_AERIEN = (
     # (sous-ressource distincte, absente du payload de synchronisation), au même
     # titre que nb_rotations/total_pesticide_l/total_pesticide_kg déjà exclus.
     "pesticide_recu_l",
+    "taux_mortalite_pourcent",
+    "evaluation_efficacite_heures_apres",
+    "methode_evaluation_efficacite",
 )
 
 _CHAMPS_CONTENU_TERRESTRE = (
@@ -572,6 +591,9 @@ _CHAMPS_CONTENU_TERRESTRE = (
     "vitesse_vent_ms",
     "direction_vent",
     "temperature_c",
+    "taux_mortalite_pourcent",
+    "evaluation_efficacite_heures_apres",
+    "methode_evaluation_efficacite",
     "reprise_traitement",
     "traitement_origine_id",
     "chef_equipe_id",

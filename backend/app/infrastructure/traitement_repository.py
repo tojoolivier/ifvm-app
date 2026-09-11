@@ -252,6 +252,11 @@ class TraitementRepositoryImpl(TraitementRepository):
                 surface_restante_ha=traitement.aerien.surface_restante_ha,
                 pesticide_recu_l=traitement.aerien.pesticide_recu_l,
                 pesticide_stock_restant_l=traitement.aerien.pesticide_stock_restant_l,
+                taux_mortalite_pourcent=traitement.aerien.taux_mortalite_pourcent,
+                evaluation_efficacite_heures_apres=(
+                    traitement.aerien.evaluation_efficacite_heures_apres
+                ),
+                methode_evaluation_efficacite=traitement.aerien.methode_evaluation_efficacite,
             )
 
         if traitement.terrestre is not None:
@@ -261,6 +266,11 @@ class TraitementRepositoryImpl(TraitementRepository):
                 vitesse_vent_ms=traitement.terrestre.vitesse_vent_ms,
                 direction_vent=traitement.terrestre.direction_vent,
                 temperature_c=traitement.terrestre.temperature_c,
+                taux_mortalite_pourcent=traitement.terrestre.taux_mortalite_pourcent,
+                evaluation_efficacite_heures_apres=(
+                    traitement.terrestre.evaluation_efficacite_heures_apres
+                ),
+                methode_evaluation_efficacite=traitement.terrestre.methode_evaluation_efficacite,
                 reprise_traitement=traitement.terrestre.reprise_traitement,
                 traitement_origine_id=traitement.terrestre.traitement_origine_id,
                 chef_equipe_id=traitement.terrestre.chef_equipe_id,
@@ -558,6 +568,13 @@ class TraitementRepositoryImpl(TraitementRepository):
             model.aerien.surface_restante_ha = traitement.aerien.surface_restante_ha
             model.aerien.pesticide_recu_l = traitement.aerien.pesticide_recu_l
             model.aerien.pesticide_stock_restant_l = traitement.aerien.pesticide_stock_restant_l
+            model.aerien.taux_mortalite_pourcent = traitement.aerien.taux_mortalite_pourcent
+            model.aerien.evaluation_efficacite_heures_apres = (
+                traitement.aerien.evaluation_efficacite_heures_apres
+            )
+            model.aerien.methode_evaluation_efficacite = (
+                traitement.aerien.methode_evaluation_efficacite
+            )
 
         if traitement.terrestre is not None and model.terrestre is not None:
             t, src = model.terrestre, traitement.terrestre
@@ -566,6 +583,9 @@ class TraitementRepositoryImpl(TraitementRepository):
             t.vitesse_vent_ms = src.vitesse_vent_ms
             t.direction_vent = src.direction_vent
             t.temperature_c = src.temperature_c
+            t.taux_mortalite_pourcent = src.taux_mortalite_pourcent
+            t.evaluation_efficacite_heures_apres = src.evaluation_efficacite_heures_apres
+            t.methode_evaluation_efficacite = src.methode_evaluation_efficacite
             t.reprise_traitement = src.reprise_traitement
             t.traitement_origine_id = src.traitement_origine_id
             t.chef_equipe_id = src.chef_equipe_id
@@ -757,6 +777,15 @@ class TraitementRepositoryImpl(TraitementRepository):
                 pesticide_stock_restant_l=float(model.aerien.pesticide_stock_restant_l)
                 if model.aerien.pesticide_stock_restant_l is not None
                 else None,
+                taux_mortalite_pourcent=float(model.aerien.taux_mortalite_pourcent)
+                if model.aerien.taux_mortalite_pourcent is not None
+                else None,
+                evaluation_efficacite_heures_apres=(
+                    float(model.aerien.evaluation_efficacite_heures_apres)
+                    if model.aerien.evaluation_efficacite_heures_apres is not None
+                    else None
+                ),
+                methode_evaluation_efficacite=model.aerien.methode_evaluation_efficacite,
                 rotations=[
                     Rotation(
                         id=r.id,
@@ -829,6 +858,15 @@ class TraitementRepositoryImpl(TraitementRepository):
                 pesticide_stock_restant_l=float(model.terrestre.pesticide_stock_restant_l)
                 if model.terrestre.pesticide_stock_restant_l is not None
                 else None,
+                taux_mortalite_pourcent=float(model.terrestre.taux_mortalite_pourcent)
+                if model.terrestre.taux_mortalite_pourcent is not None
+                else None,
+                evaluation_efficacite_heures_apres=(
+                    float(model.terrestre.evaluation_efficacite_heures_apres)
+                    if model.terrestre.evaluation_efficacite_heures_apres is not None
+                    else None
+                ),
+                methode_evaluation_efficacite=model.terrestre.methode_evaluation_efficacite,
                 produits=[
                     ProduitUtilise(
                         id=p.id,

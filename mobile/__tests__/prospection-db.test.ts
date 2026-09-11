@@ -176,6 +176,13 @@ const MIGRATED_COLUMNS = [
   // même retour en arrière que pilote/mecanicien/consultant_international
   // ci-dessus, migration 0048).
   { name: 'agent_encadreur' },
+  // Efficacité (migration backend 0058, fiche CRT papier section "Traitement") :
+  // taux de mortalité, délai d'évaluation, méthode — colonnes partagées entre
+  // traitement_aerien et traitement_terrestre, même titre que pesticide_recu_l
+  // ci-dessus.
+  { name: 'taux_mortalite_pourcent' },
+  { name: 'evaluation_efficacite_heures_apres' },
+  { name: 'methode_evaluation_efficacite' },
 
   // Colonne de traitement_signature — signature numérique (#signatures-auto-equipe,
   // migration backend 0049).

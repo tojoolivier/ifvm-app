@@ -130,6 +130,11 @@ function buildTraitementSyncPayload(draft: DraftTraitement): components['schemas
         // surface_traitee_ha n'y figure plus (migration 0047) : dérivée des rotations
         // côté serveur, plus un champ accepté par TraitementSyncPush.
         pesticide_recu_l: draft.aerien.pesticide_recu_l,
+        // Efficacité (migration backend 0058) — une seule évaluation par
+        // fiche, après l'ensemble des rotations.
+        taux_mortalite_pourcent: draft.aerien.taux_mortalite_pourcent,
+        evaluation_efficacite_heures_apres: draft.aerien.evaluation_efficacite_heures_apres,
+        methode_evaluation_efficacite: draft.aerien.methode_evaluation_efficacite,
         // Chaînage de reprise (migration backend 0050) — mirroir de la branche
         // terrestre ci-dessous, généralisé à l'Aérien.
         reprise_traitement: draft.aerien.reprise_traitement,
@@ -147,6 +152,9 @@ function buildTraitementSyncPayload(draft: DraftTraitement): components['schemas
         vitesse_vent_ms: draft.terrestre.vitesse_vent_ms,
         direction_vent: draft.terrestre.direction_vent,
         temperature_c: draft.terrestre.temperature_c,
+        taux_mortalite_pourcent: draft.terrestre.taux_mortalite_pourcent,
+        evaluation_efficacite_heures_apres: draft.terrestre.evaluation_efficacite_heures_apres,
+        methode_evaluation_efficacite: draft.terrestre.methode_evaluation_efficacite,
         chef_equipe_id: draft.terrestre.chef_equipe_id,
         agent_encadreur: draft.terrestre.agent_encadreur,
         consultant_international: draft.terrestre.consultant_international,
