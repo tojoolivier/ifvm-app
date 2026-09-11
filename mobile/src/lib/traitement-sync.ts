@@ -148,7 +148,7 @@ function buildTraitementSyncPayload(draft: DraftTraitement): components['schemas
         direction_vent: draft.terrestre.direction_vent,
         temperature_c: draft.terrestre.temperature_c,
         chef_equipe_id: draft.terrestre.chef_equipe_id,
-        agent_encadreur_id: draft.terrestre.agent_encadreur_id,
+        agent_encadreur: draft.terrestre.agent_encadreur,
         consultant_international: draft.terrestre.consultant_international,
         surface_atomiseur_ha: draft.terrestre.surface_atomiseur_ha,
         surface_disque_rotatif_ha: draft.terrestre.surface_disque_rotatif_ha,

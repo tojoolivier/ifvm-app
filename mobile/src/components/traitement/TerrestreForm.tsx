@@ -16,7 +16,6 @@ const DIRECTIONS_VENT = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
 export interface TerrestreFormProps {
   readOnly: boolean;
   chefsEquipe: UtilisateurEquipe[];
-  agentsEncadreurs: UtilisateurEquipe[];
   reprenables: DraftTraitementRow[];
   pesticides: Pesticide[];
   produits: ProduitDraft[];
@@ -33,7 +32,6 @@ export interface TerrestreFormProps {
 export function TerrestreForm({
   readOnly,
   chefsEquipe,
-  agentsEncadreurs,
   reprenables,
   pesticides,
   produits,
@@ -63,19 +61,13 @@ export function TerrestreForm({
       {errors.chefEquipeId && <Text style={styles.error}>{errors.chefEquipeId}</Text>}
 
       <Text style={styles.label}>Agent encadreur</Text>
-      <View style={styles.chipRow}>
-        {agentsEncadreurs.map((a) => (
-          <Chip
-            key={a.id}
-            label={`${a.prenom} ${a.nom}`}
-            selected={store.terrestre.agentEncadreurId === a.id}
-            onPress={() =>
-              !readOnly &&
-              store.updateTerrestre({ agentEncadreurId: store.terrestre.agentEncadreurId === a.id ? null : a.id })
-            }
-          />
-        ))}
-      </View>
+      <TextInput
+        editable={!readOnly}
+        style={styles.input}
+        placeholder="Nom de l'agent encadreur (facultatif)"
+        value={store.terrestre.agentEncadreur ?? ''}
+        onChangeText={(v) => store.updateTerrestre({ agentEncadreur: v })}
+      />
       <Card variant="avertissement">
         <Text style={styles.warningText}>⚠ L&apos;agent encadreur ne signe jamais</Text>
       </Card>

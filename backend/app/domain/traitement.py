@@ -276,7 +276,10 @@ class TraitementTerrestre:
     reprise_traitement: bool = False
     traitement_origine_id: uuid.UUID | None = None
     chef_equipe_id: uuid.UUID = field(default_factory=uuid.uuid4)
-    agent_encadreur_id: uuid.UUID | None = None
+    # Texte libre (migration 0057, défait le passage en FK utilisateur) : jamais
+    # validé contre le référentiel (aucune ChefEquipeInvalideError équivalente),
+    # même patron que consultant_international ci-dessous.
+    agent_encadreur: str | None = None
     consultant_international: str | None = None
     surface_atomiseur_ha: float | None = None
     surface_disque_rotatif_ha: float | None = None
@@ -572,7 +575,7 @@ _CHAMPS_CONTENU_TERRESTRE = (
     "reprise_traitement",
     "traitement_origine_id",
     "chef_equipe_id",
-    "agent_encadreur_id",
+    "agent_encadreur",
     "consultant_international",
     "surface_atomiseur_ha",
     "surface_disque_rotatif_ha",

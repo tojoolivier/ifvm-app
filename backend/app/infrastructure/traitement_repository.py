@@ -264,7 +264,7 @@ class TraitementRepositoryImpl(TraitementRepository):
                 reprise_traitement=traitement.terrestre.reprise_traitement,
                 traitement_origine_id=traitement.terrestre.traitement_origine_id,
                 chef_equipe_id=traitement.terrestre.chef_equipe_id,
-                agent_encadreur_id=traitement.terrestre.agent_encadreur_id,
+                agent_encadreur=traitement.terrestre.agent_encadreur,
                 consultant_international=traitement.terrestre.consultant_international,
                 surface_atomiseur_ha=traitement.terrestre.surface_atomiseur_ha,
                 surface_disque_rotatif_ha=traitement.terrestre.surface_disque_rotatif_ha,
@@ -569,7 +569,7 @@ class TraitementRepositoryImpl(TraitementRepository):
             t.reprise_traitement = src.reprise_traitement
             t.traitement_origine_id = src.traitement_origine_id
             t.chef_equipe_id = src.chef_equipe_id
-            t.agent_encadreur_id = src.agent_encadreur_id
+            t.agent_encadreur = src.agent_encadreur
             t.consultant_international = src.consultant_international
             t.surface_atomiseur_ha = src.surface_atomiseur_ha
             t.surface_disque_rotatif_ha = src.surface_disque_rotatif_ha
@@ -792,7 +792,7 @@ class TraitementRepositoryImpl(TraitementRepository):
                 reprise_traitement=model.terrestre.reprise_traitement,
                 traitement_origine_id=model.terrestre.traitement_origine_id,
                 chef_equipe_id=model.terrestre.chef_equipe_id,
-                agent_encadreur_id=model.terrestre.agent_encadreur_id,
+                agent_encadreur=model.terrestre.agent_encadreur,
                 consultant_international=model.terrestre.consultant_international,
                 surface_atomiseur_ha=float(model.terrestre.surface_atomiseur_ha)
                 if model.terrestre.surface_atomiseur_ha is not None

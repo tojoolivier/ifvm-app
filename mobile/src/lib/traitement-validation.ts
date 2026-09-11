@@ -462,7 +462,7 @@ export interface AerienSignatureFields {
 
 export interface TerrestreSignatureFields {
   chef_equipe_id?: string | null;
-  agent_encadreur_id?: string | null;
+  agent_encadreur?: string | null;
   consultant_international?: string | null;
 }
 
