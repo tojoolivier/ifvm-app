@@ -66,7 +66,7 @@ const POPULATIONS = [
   {
     espece: 'LMC', categorie: 'imago', captures_nombre: 12, captures_sol: 5, captures_trans: 4, captures_greg: 3,
     captures_solitaro_transiens: 0, densite_diffuse: 8, densite_groupee: 2, essaim_observe: true,
-    methode: null, accouplement: 'Dominant', ponte: 'Beaucoup', interdistance: 25.5, type_cible: 'tres_dense',
+    methode: null, accouplement: 'Rare', ponte: 'Beaucoup', interdistance: 25.5, type_cible: 'tres_dense',
     direction_de: 'Nord', direction_vers: 'Sud', etat: 'deplacement', essaim_en_vol: true, essaim_pose: false,
     stades_imago: JSON.stringify({ femelleA1: 5, femelleA2: 0, maleA234: 2 }),
   },
@@ -115,7 +115,7 @@ describe('ExtensiveRecapScreen — récapitulatif complet (#227)', () => {
     expect(screen.getByText(/femelleA1 5 · maleA234 2/)).toBeVisible();
     expect(screen.queryByText(/Non conservés en base/)).toBeNull();
     expect(screen.getByText('Accouplement')).toBeVisible();
-    expect(screen.getByText('Dominant')).toBeVisible();
+    expect(screen.getByText('Rare')).toBeVisible();
     expect(screen.getByText('Ponte')).toBeVisible();
     expect(screen.getByText('Beaucoup')).toBeVisible();
     expect(screen.getAllByText('Interdistance (m)')[0]).toBeVisible();

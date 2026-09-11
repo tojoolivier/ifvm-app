@@ -170,7 +170,7 @@ async def test_create_prospection_population_extensive_imagos_larves(
                     "categorie": "imago",
                     "densite_diffuse": 8.0,
                     "densite_groupee": 0.0,
-                    "accouplement": "dominant",
+                    "accouplement": "beaucoup",
                     "ponte": "rare",
                     "interdistance": 25.5,
                     # Multi-select (#type-cible-multi-select) : Vol clair + Dense
@@ -215,7 +215,7 @@ async def test_create_prospection_population_extensive_imagos_larves(
     by_key = {(p["espece"], p["categorie"]): p for p in data["populations"]}
 
     lmc_imago = by_key[("LMC", "imago")]
-    assert lmc_imago["accouplement"] == "dominant"
+    assert lmc_imago["accouplement"] == "beaucoup"
     assert lmc_imago["ponte"] == "rare"
     assert lmc_imago["interdistance"] == 25.5
     assert lmc_imago["type_cible"] == ["vol_clair", "dense"]

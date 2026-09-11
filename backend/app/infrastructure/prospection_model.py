@@ -325,11 +325,11 @@ class ProspectionPopulationModel(Base):
             "categorie IN ('imago','larve')", name="ck_prospection_population_categorie"
         ),
         CheckConstraint(
-            "accouplement IN ('neant','rare','peu','beaucoup','dominant')",
+            "accouplement IN ('neant','rare','beaucoup')",
             name="ck_prospection_population_accouplement",
         ),
         CheckConstraint(
-            "ponte IN ('neant','rare','peu','beaucoup','dominant')",
+            "ponte IN ('neant','rare','beaucoup')",
             name="ck_prospection_population_ponte",
         ),
         CheckConstraint(

@@ -1779,7 +1779,7 @@ export interface components {
          * NiveauPopulation
          * @enum {string}
          */
-        NiveauPopulation: "neant" | "rare" | "peu" | "beaucoup" | "dominant";
+        NiveauPopulation: "neant" | "rare" | "beaucoup";
         /**
          * NotificationRead
          * @description Ligne du centre de notifications — dérivée de `audit_log`, jointe à
