@@ -411,6 +411,16 @@ export default function ExtensiveReferenceScreen() {
   const operationsRenseignees = operations.filter((op) => !operationEstVide(op));
 
   const handleContinue = () => {
+    // Surface infestée obligatoire pour toute prospection non intensive
+    // (extensive comme validation, seules à passer par cet écran) — valeur
+    // unique de la fiche, commune à LMC et NSE (une observation de terrain ne
+    // porte que sur une seule espèce à la fois, cf. CONTEXT.md). Pour
+    // l'intensive (reference.tsx), la surface infestée reste facultative.
+    if (!surfaceInfestee || Number(surfaceInfestee) <= 0) {
+      Alert.alert('Surface infestée requise', 'Renseignez la surface infestée (ha) avant de continuer.');
+      return;
+    }
+
     if (isAerien) {
       for (let i = 0; i < operationsRenseignees.length; i++) {
         const op = operationsRenseignees[i];
@@ -783,7 +793,7 @@ export default function ExtensiveReferenceScreen() {
             </View>
 
             <View style={[styles.card, { marginTop: 8 }]}>
-              <Text style={styles.label}>Surface infestée (ha)</Text>
+              <Text style={styles.label}>Surface infestée (ha) *</Text>
               <TextInput
                 value={surfaceInfestee}
                 onChangeText={setSurfaceInfestee}
