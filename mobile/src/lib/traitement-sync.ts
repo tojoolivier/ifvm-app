@@ -86,7 +86,7 @@ function buildTraitementSyncPayload(draft: DraftTraitement): components['schemas
     empoisonnement_type: draft.empoisonnement_type as components['schemas']['TraitementSyncPush']['empoisonnement_type'],
     empoisonnement_mode: draft.empoisonnement_mode as components['schemas']['TraitementSyncPush']['empoisonnement_mode'],
     empoisonnement_autre: draft.empoisonnement_autre,
-    evaluation_risque: parseJsonField<Record<string, string>>(draft.evaluation_risque),
+    evaluation_risque: parseJsonField<Record<string, boolean>>(draft.evaluation_risque),
     comportement_anormal: !!draft.comportement_anormal,
     comportement_non_cibles: especesArrayToDict(draft.comportement_non_cibles),
     mortalite: !!draft.mortalite,

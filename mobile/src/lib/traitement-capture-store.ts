@@ -184,11 +184,13 @@ export interface ImpactDraft {
   empoisonnementType?: 'AGENT' | 'POPULATION' | null;
   empoisonnementMode?: 'INGESTION' | 'INHALATION' | 'CONTACT' | 'AUTRE' | null;
   empoisonnementAutre?: string | null;
+  // Réduit à Oui/Non par axe (retour arrière — était FAIBLE/MOYEN/ÉLEVÉ) : simple
+  // indicateur d'impact constaté, sans graduation de sévérité.
   evaluationRisque?: {
-    ressources_eau?: 'FAIBLE' | 'MOYEN' | 'ELEVE';
-    sol?: 'FAIBLE' | 'MOYEN' | 'ELEVE';
-    faune_non_cible?: 'FAIBLE' | 'MOYEN' | 'ELEVE';
-    abeilles?: 'FAIBLE' | 'MOYEN' | 'ELEVE';
+    ressources_eau?: boolean;
+    sol?: boolean;
+    faune_non_cible?: boolean;
+    abeilles?: boolean;
   };
   comportementAnormal?: boolean | null;
   comportementNonCibles?: string[];

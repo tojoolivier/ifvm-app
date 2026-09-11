@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getTraitement, updateTraitementMoyens } from '@/lib/traitement-repository';
+import { getProspection } from '@/lib/prospection-repository';
 import { validateRecouvrement } from '@/lib/traitement-validation';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
@@ -66,6 +67,7 @@ export default function MoyensScreen() {
   // Décide du nombre d'étapes de ProgressBar (7 en aérien avec l'écran Rotations, 6 en
   // terrestre sans lui) — même garde défensive que cibles.tsx/signatures.tsx.
   const [typeTraitement, setTypeTraitement] = useState<'AERIEN' | 'TERRESTRE' | null>(null);
+  const [prospectionId, setProspectionId] = useState<string | null>(null);
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('moyens');
 
@@ -75,6 +77,7 @@ export default function MoyensScreen() {
       .then((draft) => {
         if (!draft) return;
         setTypeTraitement(draft.type_traitement);
+        setProspectionId(draft.prospection_id ?? null);
         setKit({
           kit_combinaison: draft.kit_combinaison ?? 0,
           kit_gants: draft.kit_gants ?? 0,
@@ -98,6 +101,31 @@ export default function MoyensScreen() {
       })
       .catch((error) => signalerChargement(error, { traitementId }));
   }, [traitementId, signalerChargement]);
+
+  // Pré-remplit Strate herbeuse/Recouvrement depuis la fiche de prospection liée
+  // (déjà renseignés là — intensive ou extensive, `hauteur_herbe_cm`/
+  // `verdissement_pourcent` sont des champs communs aux deux) — modifiable
+  // ensuite, jamais d'écrasement d'une valeur déjà présente (fiche reprise, ou
+  // agent déjà passé sur cet écran). Strate arborée n'a pas d'équivalent sur la
+  // prospection : reste en saisie manuelle. Setters fonctionnels : lisent l'état
+  // vivant au moment de l'écriture, pas la fermeture (obsolète) de cet effet.
+  useEffect(() => {
+    if (!prospectionId) return;
+    getProspection(prospectionId)
+      .then((prospection) => {
+        if (!prospection) return;
+        if (prospection.hauteur_herbe_cm != null) {
+          // cm -> m, arrondi à 2 décimales — même conversion que
+          // extensive-observations.tsx (hauteurCmToMInput).
+          const herbeuseM = Math.round((prospection.hauteur_herbe_cm / 100) * 100) / 100;
+          setHauteurHerbeuse((current) => (current == null ? herbeuseM : current));
+        }
+        if (prospection.verdissement_pourcent != null) {
+          setRecouvrement((current) => (current == null ? prospection.verdissement_pourcent : current));
+        }
+      })
+      .catch((error) => signalerChargement(error, { prospectionId }));
+  }, [prospectionId, signalerChargement]);
 
   // Un matériel est considéré fourni dès qu'au moins une personne en a un
   // (compteur > 0) — même seuil que l'ancienne case à cocher, généralisé au
@@ -226,7 +254,7 @@ export default function MoyensScreen() {
           <>
             <Text style={styles.label}>Végétation</Text>
 
-            <Text style={styles.fieldLabel}>Strate herbeuse (m)</Text>
+            <Text style={styles.fieldLabel}>Strate herbeuse (m) — pré-remplie, modifiable</Text>
             <TextInput
               editable={!readOnly}
               style={styles.input}
@@ -246,7 +274,7 @@ export default function MoyensScreen() {
               onChangeText={(v) => handleVegetationChange('arboree', v)}
               onBlur={() => handleVegetationBlur('arboree')}
             />
-            <Text style={styles.fieldLabel}>Recouvrement (%)</Text>
+            <Text style={styles.fieldLabel}>Recouvrement (%) — pré-rempli, modifiable</Text>
             <TextInput
               editable={!readOnly}
               style={styles.input}

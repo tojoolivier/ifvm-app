@@ -848,7 +848,8 @@ export interface ImpactsUpdateInput {
   empoisonnement_type: string | null;
   empoisonnement_mode: string | null;
   empoisonnement_autre: string | null;
-  evaluation_risque: Record<string, string>;
+  // Réduit à Oui/Non par axe (retour arrière — était FAIBLE/MOYEN/ÉLEVÉ).
+  evaluation_risque: Record<string, boolean>;
   comportement_anormal: boolean;
   comportement_non_cibles: string[];
   mortalite: boolean;

@@ -275,7 +275,7 @@ describe('updateTraitementImpacts', () => {
       empoisonnement_type: 'AGENT',
       empoisonnement_mode: 'INGESTION',
       empoisonnement_autre: null,
-      evaluation_risque: { sol: 'FAIBLE' },
+      evaluation_risque: { sol: true },
       comportement_anormal: false,
       comportement_non_cibles: [],
       mortalite: false,
@@ -288,7 +288,7 @@ describe('updateTraitementImpacts', () => {
 
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE traitement SET'),
-      expect.arrayContaining(['AGENT', 'INGESTION', JSON.stringify({ sol: 'FAIBLE' }), 'RAS'])
+      expect.arrayContaining(['AGENT', 'INGESTION', JSON.stringify({ sol: true }), 'RAS'])
     );
     // #evaluation-risque-population : remplacée en bloc (DELETE puis INSERT),
     // jamais un diff ligne à ligne.
