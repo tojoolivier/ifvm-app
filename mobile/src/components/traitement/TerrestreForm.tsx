@@ -309,7 +309,7 @@ export function TerrestreForm({
             <Text style={styles.label}>Nom commercial</Text>
             <Text style={styles.derivedValue}>{produit.nom_commercial || '—'}</Text>
           </Card>
-          <Text style={styles.label}>Quantité (l)</Text>
+          <Text style={styles.label}>Pesticides consommés (l)</Text>
           <TextInput
             editable={!readOnly}
             style={styles.input}
@@ -334,7 +334,7 @@ export function TerrestreForm({
         <Text style={styles.derivedValue}>{totalPesticideTerrestre}</Text>
       </Card>
 
-      <Text style={styles.label}>Pesticide reçu (l)</Text>
+      <Text style={styles.label}>Approvisionnement (l)</Text>
       <TextInput
         editable={!readOnly}
         style={styles.input}

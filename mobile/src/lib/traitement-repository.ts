@@ -544,9 +544,10 @@ export async function updateTraitementAerien(
 }
 
 /**
- * Pesticide reçu (l) — saisi sur l'écran « Traitement » (rotations.tsx), pas
- * « Équipe » (#equipe-slide-aerien) : fonction dédiée plutôt qu'un champ de plus
- * sur `AerienUpdateInput`, pour que chaque écran n'écrive que ce qui lui appartient.
+ * Pesticide reçu (l) — libellé affiché « Approvisionnement (l) » — saisi sur
+ * l'écran « Traitement » (rotations.tsx), pas « Équipe » (#equipe-slide-aerien) :
+ * fonction dédiée plutôt qu'un champ de plus sur `AerienUpdateInput`, pour que
+ * chaque écran n'écrive que ce qui lui appartient.
  */
 export async function updateTraitementAerienPesticideRecu(
   traitementId: string,
