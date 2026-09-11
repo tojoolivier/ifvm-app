@@ -56,9 +56,14 @@ export function capturesMaxFor(espece: Espece, categorie: Categorie): number {
 
 export const CHRONO_MAX_SECONDS = 30 * 60;
 
-/** Options Accouplement/Ponte : Nomadacris n'a pas le niveau "Dominant" (PDF 11 vs PDF 16). */
-export const ACCOUPLEMENT_OPTIONS_LMC = ['Néant', 'Rare', 'Peu', 'Beaucoup', 'Dominant'];
-export const ACCOUPLEMENT_OPTIONS_NSE = ['Néant', 'Rare', 'Peu', 'Beaucoup'];
+/**
+ * Options Accouplement/Ponte — réduites à 3 niveaux communs LMC/NSE (migration
+ * backend 0059, remplace les 5/4 niveaux d'origine issus du PDF papier : LMC
+ * avait "Peu"/"Dominant" en plus, Nomadacris n'avait déjà pas "Dominant"
+ * (PDF 11 vs PDF 16) — les deux espèces partagent désormais la même échelle.
+ */
+export const ACCOUPLEMENT_OPTIONS_LMC = ['Néant', 'Rare', 'Beaucoup'];
+export const ACCOUPLEMENT_OPTIONS_NSE = ['Néant', 'Rare', 'Beaucoup'];
 
 export function accouplementOptionsFor(espece: Espece): string[] {
   return espece === 'LMC' ? ACCOUPLEMENT_OPTIONS_LMC : ACCOUPLEMENT_OPTIONS_NSE;

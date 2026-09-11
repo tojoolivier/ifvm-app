@@ -468,8 +468,8 @@ function buildOperationsAeriennesPayload(rows: OperationAerienneRow[]): Prospect
   }));
 }
 
-/** Le picker affiche 'Néant'/'Rare'/'Peu'/'Beaucoup'/'Dominant' (accouplement.tsx) mais le
- * backend n'accepte que l'ASCII minuscule ('neant'/'rare'/'peu'/'beaucoup'/'dominant'). */
+/** Le picker affiche 'Néant'/'Rare'/'Beaucoup' (accouplement.tsx) mais le
+ * backend n'accepte que l'ASCII minuscule ('neant'/'rare'/'beaucoup'). */
 const COMBINING_DIACRITICS_RE = new RegExp('[̀-ͯ]', 'g');
 
 function normalizeIntensite(value: string | null): string | null {

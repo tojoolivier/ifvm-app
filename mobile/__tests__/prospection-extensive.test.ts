@@ -164,7 +164,7 @@ describe('speciesDataToPopulationRow / populationRowToSpeciesData — round-trip
   it('conserve accouplement, ponte, interdistance, type de cible, état, comportement et direction', () => {
     const data = {
       ...createEmptySpeciesData(),
-      accouplement: 'Dominant',
+      accouplement: 'Rare',
       ponte: 'Beaucoup',
       interdistance: '25.5',
       typeCible: ['tres_dense' as const],
@@ -174,7 +174,7 @@ describe('speciesDataToPopulationRow / populationRowToSpeciesData — round-trip
       directionVers: 'Sud',
     };
     const row = speciesDataToPopulationRow('LMC', data);
-    expect(row.accouplement).toBe('Dominant');
+    expect(row.accouplement).toBe('Rare');
     expect(row.ponte).toBe('Beaucoup');
     expect(row.interdistance).toBe(25.5);
     expect(row.type_cible).toBe('["tres_dense"]');
@@ -185,7 +185,7 @@ describe('speciesDataToPopulationRow / populationRowToSpeciesData — round-trip
     expect(row.direction_vers).toBe('Sud');
 
     const restored = populationRowToSpeciesData(row);
-    expect(restored.accouplement).toBe('Dominant');
+    expect(restored.accouplement).toBe('Rare');
     expect(restored.ponte).toBe('Beaucoup');
     expect(restored.interdistance).toBe('25.5');
     expect(restored.typeCible).toEqual(['tres_dense']);

@@ -83,11 +83,12 @@ class CategorieCapture(str, Enum):
 
 
 class NiveauPopulation(str, Enum):
+    """Accouplement/Ponte — réduit à 3 niveaux communs LMC/NSE (migration 0059,
+    remplace les 5/4 niveaux d'origine issus du PDF papier)."""
+
     NEANT = "neant"
     RARE = "rare"
-    PEU = "peu"
     BEAUCOUP = "beaucoup"
-    DOMINANT = "dominant"
 
 
 class MethodePopulation(str, Enum):

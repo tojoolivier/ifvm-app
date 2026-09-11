@@ -21,8 +21,8 @@ describe('accouplementInsight', () => {
   });
 
   it('flags a reproduction signal for grégaire dominant phénotype', () => {
-    expect(accouplementInsight('Dominant', 'gregaire')).toBe(
-      'Ponte Dominant + phase Grégaires → signal de reproduction à surveiller.'
+    expect(accouplementInsight('Rare', 'gregaire')).toBe(
+      'Ponte Rare + phase Grégaires → signal de reproduction à surveiller.'
     );
   });
 });
