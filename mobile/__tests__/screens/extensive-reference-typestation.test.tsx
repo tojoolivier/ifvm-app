@@ -39,6 +39,7 @@ describe('ExtensiveReferenceScreen — Type de station à choix multiples (#biot
         id: 'draft-123',
         type_prospection: 'extensive',
         date_prospection: '2026-08-25',
+        surface_infestee: 3.5,
       } as any,
       captures: [],
     });

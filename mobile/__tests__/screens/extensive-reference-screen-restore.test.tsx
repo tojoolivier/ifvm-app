@@ -158,7 +158,7 @@ describe('ExtensiveReferenceScreen — restauration après hydratation tardive d
     });
 
     await render(<ExtensiveReferenceScreen />);
-    await screen.findByText('Surface infestée (ha)');
+    await screen.findByText('Surface infestée (ha) *');
 
     // Station (saisie libre), Surface prospectée (ha) puis Surface infestée (ha) sont
     // les 3 champs vides, dans cet ordre.
@@ -186,7 +186,7 @@ describe('ExtensiveReferenceScreen — restauration après hydratation tardive d
       latitude: -18.9, longitude: 47.5, altitude: null, accuracy: 5, timestamp: timestampGps,
     });
     useProspectionWizardStore.setState({
-      draft: { id: 'draft-123', type_prospection: 'extensive', date_prospection: '2026-08-25', latitude: null, longitude: null } as any,
+      draft: { id: 'draft-123', type_prospection: 'extensive', date_prospection: '2026-08-25', latitude: null, longitude: null, surface_infestee: 3.5 } as any,
       captures: [],
     });
 
@@ -247,7 +247,7 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
     });
 
     await render(<ExtensiveReferenceScreen />);
-    await screen.findByText('Surface infestée (ha)');
+    await screen.findByText('Surface infestée (ha) *');
 
     expect(screen.queryByText('INFORMATIONS AÉRONEF / ÉQUIPE')).toBeNull();
     expect(screen.queryByText('Informations sur les heures de vol')).toBeNull();
@@ -304,6 +304,7 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
         latitude: -18.9,
         longitude: 47.5,
         mode_extensif: 'aerien',
+        surface_infestee: 3.5,
       } as any,
       captures: [],
     });
@@ -352,6 +353,7 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
         longitude: 47.5,
         mode_extensif: 'aerien',
         lieu_base_id: 'lieu-1',
+        surface_infestee: 3.5,
       } as any,
       captures: [],
     });
@@ -408,6 +410,7 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
         mecanicien: 'Marc Andria',
         chef_de_base: 'Sarah Ravelo',
         lieu_base_id: 'lieu-1',
+        surface_infestee: 3.5,
       } as any,
       captures: [],
     });
@@ -539,6 +542,7 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
         latitude: -18.9,
         longitude: 47.5,
         mode_extensif: 'aerien',
+        surface_infestee: 3.5,
       } as any,
       captures: [],
     });

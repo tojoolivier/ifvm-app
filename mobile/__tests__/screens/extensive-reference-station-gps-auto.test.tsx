@@ -47,6 +47,10 @@ const freshDraft = () => ({
   id: 'draft-123',
   type_prospection: 'extensive',
   date_prospection: '2026-08-25',
+  // Surface infestée obligatoire (#prospection-surface-infestee-obligatoire) —
+  // sans lien avec ce que ce fichier teste (géocodage de la Station), mais
+  // requise pour que « Suivant » ne soit pas bloqué dans le premier test.
+  surface_infestee: 3.5,
 });
 
 describe('ExtensiveReferenceScreen — Station auto-remplie par géocodage inverse (#station-gps-auto)', () => {
