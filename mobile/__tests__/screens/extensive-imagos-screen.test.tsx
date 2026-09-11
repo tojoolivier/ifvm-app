@@ -115,16 +115,16 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
     await screen.findByText('📊 Accouplement');
     await settle();
 
-    // « Dominant » apparaît deux fois (Accouplement puis Ponte, mêmes options) : le
+    // « Beaucoup » apparaît deux fois (Accouplement puis Ponte, mêmes options) : le
     // premier est celui d'Accouplement.
-    fireEvent.press(screen.getAllByText('Dominant')[0]);
+    fireEvent.press(screen.getAllByText('Beaucoup')[0]);
     await settle();
 
     fireEvent.press(screen.getByText('Suivant : Larves ›'));
 
     await waitFor(() => expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalledTimes(2));
     const [, lmcRow] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
-    expect(lmcRow).toMatchObject({ espece: 'LMC', accouplement: 'Dominant' });
+    expect(lmcRow).toMatchObject({ espece: 'LMC', accouplement: 'Beaucoup' });
   });
 
   it('État = Repos détermine automatiquement Comportement de l’essaim = Posé, et inversement pour Déplacement', async () => {
@@ -189,7 +189,7 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
     await settle();
 
     // Modifie l'Accouplement (champ indépendant, non soumis à la règle Captures = Phases).
-    fireEvent.press(screen.getAllByText('Peu')[0]);
+    fireEvent.press(screen.getAllByText('Néant')[0]);
     await settle();
 
     fireEvent.press(screen.getByText('Suivant : Larves ›'));
@@ -197,7 +197,7 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
     await waitFor(() => expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalledTimes(2));
     const [, lmcRow] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
     // Nombre de captures : toujours 25, jamais réinitialisé par la modification d'Accouplement.
-    expect(lmcRow).toMatchObject({ espece: 'LMC', captures_nombre: 25, accouplement: 'Peu' });
+    expect(lmcRow).toMatchObject({ espece: 'LMC', captures_nombre: 25, accouplement: 'Néant' });
     // …et tous les autres champs déjà présents avant la modification survivent tels quels.
     expect(lmcRow).toMatchObject({
       densite_diffuse: 4.2,

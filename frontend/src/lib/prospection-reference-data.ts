@@ -15,12 +15,12 @@ export const PHASES = [
   { value: 'gregaire', label: 'Grégaire' },
 ]
 
+// Accouplement/Ponte — 3 niveaux communs LMC/NSE (migration backend 0059,
+// remplace les 5 niveaux d'origine issus du PDF papier).
 export const ABONDANCE = [
   { value: 'neant', label: 'Néant' },
   { value: 'rare', label: 'Rare' },
-  { value: 'peu', label: 'Peu' },
   { value: 'beaucoup', label: 'Beaucoup' },
-  { value: 'dominant', label: 'Dominant' },
 ]
 
 export const TYPES_INFESTATION = [
