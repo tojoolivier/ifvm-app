@@ -14,10 +14,11 @@ export const PHENOTYPE_ROWS: { key: PhenotypeKey; label: string }[] = [
   { key: 'greg', label: 'Greg.' },
 ];
 
+// #phase-ordre-affichage : Solitaire → Solitaro-Transiens → Transiens → Grégaire.
 export const IMAGO_PHASE_ROWS = [
   { key: 'solitaire', label: 'Solitaire' },
-  { key: 'transiens', label: 'Transiens' },
   { key: 'solitaroTransiens', label: 'Solitaro-Transiens' },
+  { key: 'transiens', label: 'Transiens' },
   { key: 'gregaire', label: 'Grégaire' },
 ] as const;
 

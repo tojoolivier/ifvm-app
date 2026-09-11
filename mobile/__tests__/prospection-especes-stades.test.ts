@@ -6,6 +6,7 @@ import {
   ACCOUPLEMENT_OPTIONS_LMC,
   ACCOUPLEMENT_OPTIONS_NSE,
   capturesMaxFor,
+  phasesFor,
   phenotypesFor,
   grilleKeyFromString,
   grilleKeyToString,
@@ -37,6 +38,23 @@ describe('capturesMaxFor', () => {
     expect(capturesMaxFor('LMC', 'larve')).toBe(65);
     expect(capturesMaxFor('NSE', 'imago')).toBe(30);
     expect(capturesMaxFor('NSE', 'larve')).toBe(75);
+  });
+});
+
+// #phase-ordre-affichage : Solitaire → Solitaro-trans → Transiens → Grégaire,
+// l'ordre demandé pour le champ Phase — cf. `phenotypesFor` ci-dessous
+// (`PHENOTYPES`) et frontend/src/lib/prospection-reference-data.ts (`PHASES`),
+// déjà dans cet ordre ; c'était `phasesFor` (écran captures.tsx, Prospection
+// Intensive et Validation/Signalisation) qui divergeait.
+describe('phasesFor', () => {
+  it('ordonne Solitaire, Solitaro-trans, Transiens, Grégaire (LMC, et NSE imago)', () => {
+    expect(phasesFor('LMC', 'imago')).toEqual(['solitaire', 'solitaro_trans', 'transiens', 'gregaire']);
+    expect(phasesFor('LMC', 'larve')).toEqual(['solitaire', 'solitaro_trans', 'transiens', 'gregaire']);
+    expect(phasesFor('NSE', 'imago')).toEqual(['solitaire', 'solitaro_trans', 'transiens', 'gregaire']);
+  });
+
+  it('NSE larve reste sans Solitaro-trans (PDF), ordre Solitaire, Transiens, Grégaire', () => {
+    expect(phasesFor('NSE', 'larve')).toEqual(['solitaire', 'transiens', 'gregaire']);
   });
 });
 

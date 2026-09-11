@@ -27,7 +27,10 @@ export function grilleKeyFromString(value: string): GrilleKey {
 export const LMC_LARVE_STADES = ['L1', 'L2', 'L3', 'L4', 'L5'];
 export const NSE_LARVE_STADES = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'];
 
-export const PHASES_LMC = ['solitaire', 'transiens', 'solitaro_trans', 'gregaire'];
+// #phase-ordre-affichage : Solitaire → Solitaro-trans → Transiens → Grégaire —
+// même ordre que `PHENOTYPES` (prospection-fiche-lecture.ts) et `PHASES`
+// (frontend/src/lib/prospection-reference-data.ts), qui l'avaient déjà.
+export const PHASES_LMC = ['solitaire', 'solitaro_trans', 'transiens', 'gregaire'];
 /** Nomadacris larvaire ne distingue pas le solitaro-transiens (PDF 16). */
 export const PHASES_NSE_LARVE = ['solitaire', 'transiens', 'gregaire'];
 
