@@ -129,9 +129,9 @@ describe('ExtensiveRecapScreen — récapitulatif complet (#227)', () => {
     expect(screen.getByText('Comportement de l’essaim')).toBeVisible();
     expect(screen.getByText('En vol')).toBeVisible();
     expect(screen.getAllByText('Densité diffuse')[0]).toBeVisible();
-    expect(screen.getByText('8 D/ha')).toBeVisible();
+    expect(screen.getByText('8 ind./ha')).toBeVisible();
     expect(screen.getAllByText('Densité groupée')[0]).toBeVisible();
-    expect(screen.getByText('2 D/m²')).toBeVisible();
+    expect(screen.getByText('2 ind./m²')).toBeVisible();
   });
 
   /**
@@ -245,7 +245,7 @@ describe('ExtensiveRecapScreen — récapitulatif complet (#227)', () => {
     expect(screen.getAllByText('Nombre de captures')[0]).toBeVisible();
     expect(screen.getByText('12')).toBeVisible();
     expect(screen.getAllByText('Densité diffuse')[0]).toBeVisible();
-    expect(screen.getByText('8 D/ha')).toBeVisible();
+    expect(screen.getByText('8 ind./ha')).toBeVisible();
     expect(screen.getByText(/L1 4 · L2 2/)).toBeVisible();
     expect(screen.getByText(/Dégâts sur les cultures : Moyens/)).toBeVisible();
     // H STR HERB (#228) : affiché en mètres, non arrondi à l'entier (45 cm → 0.45 m).

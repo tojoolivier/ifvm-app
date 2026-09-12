@@ -129,7 +129,7 @@ function estConflit(error: unknown): boolean {
  * Un rejet de validation (4xx hors 401/409) : le serveur a compris la requête
  * et refusé le **contenu** de la fiche — pas un problème de connexion.
  * `extractErrorMessage` (api-client.ts) a déjà mis le motif exact du serveur
- * (souvent en français, ex. « densite_groupee: La densité groupée (/m²) est
+ * (souvent en français, ex. « densite_groupee: La densité groupée (ind./m²) est
  * obligatoire. ») dans `error.message` ; il ne reste qu'à ne pas le jeter.
  */
 function estRejetValidation(error: unknown): boolean {

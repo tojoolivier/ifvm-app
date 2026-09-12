@@ -265,7 +265,7 @@ async def test_create_prospection_population_densite_diffuse_obligatoire(
         headers=auth_headers,
     )
     assert response.status_code == 422
-    assert "La densité diffuse (D/ha) est obligatoire." in response.text
+    assert "La densité diffuse (ind./ha) est obligatoire." in response.text
 
 
 @pytest.mark.asyncio

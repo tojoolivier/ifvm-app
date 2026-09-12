@@ -156,13 +156,13 @@ describe('syncAll — le lot résume, il ne lève pas', () => {
     // la connexion a très bien atteinte, et proposerait « Réessayer » alors que
     // rien ne changera sans corriger la fiche.
     const syncOne = jest.fn(async () => {
-      throw erreurHttpAvecMessage(422, 'densite_groupee: La densité groupée (/m²) est obligatoire.');
+      throw erreurHttpAvecMessage(422, 'densite_groupee: La densité groupée (ind./m²) est obligatoire.');
     });
 
     const resume = await syncAll([fiche('a')], 'token', lot({ syncOne }));
 
     expect(resume.echouees[0].message).toBe(
-      'densite_groupee: La densité groupée (/m²) est obligatoire.'
+      'densite_groupee: La densité groupée (ind./m²) est obligatoire.'
     );
     expect(resume.echouees[0].message).not.toContain('Connexion');
     expect(resume.echouees[0].action).toBeNull();

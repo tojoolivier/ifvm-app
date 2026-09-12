@@ -124,7 +124,7 @@ describe('ExtensiveLarvesScreen', () => {
 
   /** #densite-diffuse-obligatoire : même garde que sur extensive-imagos.tsx. Phases/
    * stades déjà cohérents dans la fixture pour isoler cette seule règle. */
-  it('Densité diffuse (D/ha) obligatoire dès qu’il y a des captures — bloque puis débloque « Suivant »', async () => {
+  it('Densité diffuse (ind./ha) obligatoire dès qu’il y a des captures — bloque puis débloque « Suivant »', async () => {
     jest.mocked(prospectionRepository.getProspectionPopulation).mockImplementation(async (_id, espece) =>
       espece === 'LMC'
         ? ({
@@ -145,7 +145,7 @@ describe('ExtensiveLarvesScreen', () => {
     await settle();
 
     fireEvent.press(screen.getByText('Suivant : Observations ›'));
-    await waitFor(() => expect(screen.getByText('La densité diffuse (D/ha) est obligatoire.')).toBeVisible());
+    await waitFor(() => expect(screen.getByText('La densité diffuse (ind./ha) est obligatoire.')).toBeVisible());
     expect(prospectionRepository.saveProspectionPopulation).not.toHaveBeenCalled();
 
     fireEvent.changeText(screen.getAllByDisplayValue('')[0], '6');

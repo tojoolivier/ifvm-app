@@ -325,7 +325,7 @@ class PopulationCreate(BaseModel):
         # de champ puis produire ici le message FR dédié, plutôt que le "Field
         # required" générique qu'un `Field(...)` obligatoire aurait renvoyé.
         if self.densite_groupee is None:
-            raise ValueError("La densité groupée (/m²) est obligatoire.")
+            raise ValueError("La densité groupée (ind./m²) est obligatoire.")
         return self
 
     @model_validator(mode="after")
@@ -334,7 +334,7 @@ class PopulationCreate(BaseModel):
         # ci-dessus (validation applicative, aucune contrainte DB — tolérance aux
         # fiches historiques préservée via PopulationRead, non contraint).
         if self.densite_diffuse is None:
-            raise ValueError("La densité diffuse (D/ha) est obligatoire.")
+            raise ValueError("La densité diffuse (ind./ha) est obligatoire.")
         return self
 
 

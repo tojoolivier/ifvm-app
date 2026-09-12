@@ -137,7 +137,7 @@ export default function ReviewScreen() {
               <View key={d.key} style={styles.summaryLine}>
                 <Text style={styles.summaryLineLabel}>{d.label}</Text>
                 <Text style={styles.summaryLineValue}>
-                  {d.densiteDiffuse ?? '—'} D/ha · {d.densiteGroupee ?? '—'} D/m²
+                  {d.densiteDiffuse ?? '—'} ind./ha · {d.densiteGroupee ?? '—'} ind./m²
                 </Text>
               </View>
             ))}
@@ -167,8 +167,8 @@ export default function ReviewScreen() {
                     <View key={d.key} style={styles.summaryLine}>
                       <Text style={styles.summaryLineLabel}>{d.label}</Text>
                       <Text style={styles.summaryLineValue}>
-                        {d.nombre} · {d.densiteDiffuse != null ? `${d.densiteDiffuse} D/ha` : '—'} ·{' '}
-                        {d.densiteGroupee != null ? `${d.densiteGroupee} D/m²` : '—'}
+                        {d.nombre} · {d.densiteDiffuse != null ? `${d.densiteDiffuse} ind./ha` : '—'} ·{' '}
+                        {d.densiteGroupee != null ? `${d.densiteGroupee} ind./m²` : '—'}
                       </Text>
                     </View>
                   ))}

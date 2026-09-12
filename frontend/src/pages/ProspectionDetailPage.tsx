@@ -1035,8 +1035,8 @@ function FicheImprimable({
           <tr className="border-b bg-muted/50">
             <th className="text-left px-2 py-1">Espèce</th>
             <th className="text-right px-2 py-1">Capturés</th>
-            <th className="text-right px-2 py-1">Densité diffuse /ha</th>
-            <th className="text-right px-2 py-1">Densité groupée /ha</th>
+            <th className="text-right px-2 py-1">Densité diffuse ind./ha</th>
+            <th className="text-right px-2 py-1">Densité groupée ind./m²</th>
             <th className="text-left px-2 py-1">Phénotype dominant</th>
           </tr>
         </thead>
