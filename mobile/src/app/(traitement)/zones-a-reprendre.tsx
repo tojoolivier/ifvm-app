@@ -2,21 +2,24 @@ import { useCallback, useEffect, useState } from 'react';
 import { Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { listReprenableTraitements, DraftTraitementRow } from '@/lib/traitement-repository';
+import { listReprenableTraitements, ReprenableTraitementRow } from '@/lib/traitement-repository';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
 import { runTask } from '@/lib/run-task';
 import { EtatVide } from '@/components/erreurs/etat-vide';
 
 /**
- * Écran "Zones à reprendre" (Lot 3) — fiches terrestres validées dont la
- * surface restante est encore positive (`listReprenableTraitements`,
- * jusqu'ici inutilisée). Amorce une nouvelle fiche sur la même prospection
- * d'origine, avec `origineId` propagé jusqu'à l'écran C (`traitement.tsx`)
- * pour présélectionner automatiquement la reprise sur cette fiche.
+ * Écran "Zones à reprendre" (Lot 3) — fiches (terrestres et aériennes)
+ * validées dont la surface restante est encore positive ou pas encore
+ * connue (`listReprenableTraitements`). Chaque ligne affiche la surface
+ * disponible à traiter pour la reprise : c'est la surface restante de
+ * CETTE fiche (l'ancien traitement), pas une nouvelle saisie. Amorce une
+ * nouvelle fiche sur la même prospection d'origine, avec `origineId`
+ * propagé jusqu'à l'écran C (`traitement.tsx`) pour présélectionner
+ * automatiquement la reprise sur cette fiche.
  */
 export default function TraitementZonesAReprendreScreen() {
   const router = useRouter();
-  const [fiches, setFiches] = useState<DraftTraitementRow[]>([]);
+  const [fiches, setFiches] = useState<ReprenableTraitementRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [erreurDeLecture, setErreurDeLecture] = useState<unknown>(null);
 
@@ -35,7 +38,7 @@ export default function TraitementZonesAReprendreScreen() {
     charger();
   }, [charger]);
 
-  const openFiche = (fiche: DraftTraitementRow) => {
+  const openFiche = (fiche: ReprenableTraitementRow) => {
     router.push({
       pathname: '/(traitement)/references' as any,
       params: { prospectionId: fiche.prospection_id, origineId: fiche.id },
@@ -61,6 +64,13 @@ export default function TraitementZonesAReprendreScreen() {
               <Text style={styles.rowTitle}>{item.numero_fiche ?? 'généré à l’enregistrement'}</Text>
               <Text style={styles.rowSubtitle}>
                 {item.type_traitement} · {item.localite ?? 'localité non renseignée'}
+              </Text>
+              {/* Surface disponible à traiter pour la reprise = surface restante de
+                  CETTE fiche (l'ancien traitement) : `null` tant qu'aucun pull ne
+                  l'a rapatriée depuis le serveur (cf. ReprenableTraitementRow). */}
+              <Text style={styles.rowSurface}>
+                Surface disponible à traiter :{' '}
+                {item.surface_restante_ha != null ? `${item.surface_restante_ha} ha` : 'non communiquée'}
               </Text>
             </TouchableOpacity>
           )}
@@ -94,6 +104,11 @@ const styles = StyleSheet.create({
   },
   rowTitle: { fontFamily: traitementFonts.mono, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre },
   rowSubtitle: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.label, color: traitementColors.texteSecondaire },
+  rowSurface: {
+    fontFamily: traitementFonts.uiMedium,
+    fontSize: traitementTypeSizes.label,
+    color: traitementColors.texteTitre,
+  },
   backLink: {
     borderWidth: 1,
     borderStyle: 'dashed',

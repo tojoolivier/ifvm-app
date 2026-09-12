@@ -909,6 +909,32 @@ describe('listReprenableTraitements', () => {
     expect(sql).toEqual(expect.stringContaining('NOT IN'));
     expect(sql).toEqual(expect.stringContaining('traitement_origine_id'));
   });
+
+  it('selects surface_restante_ha (surface disponible à traiter pour la reprise) pour les deux types', async () => {
+    getAllAsync.mockResolvedValueOnce([]);
+
+    await listReprenableTraitements();
+
+    const [sql] = getAllAsync.mock.calls[0];
+    expect(sql).toEqual(
+      expect.stringContaining('traitement_terrestre.surface_restante_ha AS surface_restante_ha')
+    );
+    expect(sql).toEqual(
+      expect.stringContaining('traitement_aerien.surface_restante_ha AS surface_restante_ha')
+    );
+  });
+
+  it('renvoie surface_restante_ha telle que stockée localement (y compris null)', async () => {
+    getAllAsync.mockResolvedValueOnce([
+      { id: 'trait-1', numero_fiche: 'F-1', type_traitement: 'TERRESTRE', surface_restante_ha: 3.5 },
+      { id: 'trait-2', numero_fiche: 'F-2', type_traitement: 'AERIEN', surface_restante_ha: null },
+    ]);
+
+    const fiches = await listReprenableTraitements();
+
+    expect(fiches[0].surface_restante_ha).toBe(3.5);
+    expect(fiches[1].surface_restante_ha).toBeNull();
+  });
 });
 
 describe('markTraitementSynced', () => {
