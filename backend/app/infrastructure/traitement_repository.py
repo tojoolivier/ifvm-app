@@ -515,6 +515,15 @@ class TraitementRepositoryImpl(TraitementRepository):
         # traitement_use_cases.py) — jamais garanti par ce module lui-même,
         # et source de `sqlalchemy.exc.MissingGreenlet` dès que ce n'est pas
         # le cas.
+        #
+        # `evaluations_risque_population` y figure aussi : `cascade="all,
+        # delete-orphan"` (traitement_model.py) — la réassignation en bloc
+        # plus bas (`model.evaluations_risque_population = [...]`) doit
+        # calculer la différence avec la collection *actuelle* pour émettre
+        # les DELETE des lignes orphelines, ce qui exige qu'elle soit déjà
+        # chargée. Sans ce chargement explicite, l'accès en écriture
+        # déclenche lui-même un lazy-load synchrone — même risque que les
+        # trois relations ci-dessus, pour la même raison.
         model = await self.session.get(
             TraitementModel,
             traitement.id,
@@ -522,6 +531,7 @@ class TraitementRepositoryImpl(TraitementRepository):
                 selectinload(TraitementModel.cible),
                 selectinload(TraitementModel.aerien),
                 selectinload(TraitementModel.terrestre),
+                selectinload(TraitementModel.evaluations_risque_population),
             ],
         )
         model.prospection_id = traitement.prospection_id
