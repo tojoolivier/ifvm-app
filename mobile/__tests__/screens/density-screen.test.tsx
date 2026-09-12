@@ -5,7 +5,7 @@
  * partagées entre espèce/stade.
  */
 import { Alert } from 'react-native';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import DensityScreen from '@/app/(prospection)/density';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
@@ -13,6 +13,14 @@ import * as prospectionRepository from '@/lib/prospection-repository';
 
 /** Grille demandée : mutable, comme captures-screen.test.tsx. */
 const params: { draftId: string; grilleIndex: string } = { draftId: 'draft-123', grilleIndex: '0' };
+
+/** Laisse `useAsyncAction` (setIsRunning(false) après le `saveProspectionPopulation`
+ * attendu) se terminer avant que le test suivant ne monte son propre écran — sinon ce
+ * reliquat asynchrone s'exécute au tout début du rendu suivant et le perturbe (même
+ * mécanisme que veg-screen.test.tsx). */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+
+afterEach(cleanup);
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: () => true }),
@@ -128,5 +136,107 @@ describe('DensityScreen — 4 blocs de densité indépendants (LMC/NSE × imago/
     expect(alertSpy).toHaveBeenCalledWith('Densité groupée requise', 'La densité groupée (ind./m²) est obligatoire.');
     expect(prospectionRepository.saveProspectionPopulation).not.toHaveBeenCalled();
     expect(await screen.findByText('La densité groupée (ind./m²) est obligatoire.')).toBeVisible();
+  });
+});
+
+/**
+ * #methode-supprime-visuel : « Visuel » retiré du choix proposé pour toute
+ * nouvelle saisie de Méthode (Prospection Intensive) — seul « Comptage
+ * direct » reste sélectionnable. Une fiche historique dont `methode` vaut
+ * déjà "visuel" doit rester intacte tant que l'agent ne retouche pas ce
+ * champ (aucune conversion/perte automatique).
+ */
+describe('DensityScreen — Méthode : "Visuel" retiré, seul "Comptage direct" proposé', () => {
+  beforeEach(() => {
+    useProspectionCaptureStore.getState().reset();
+    jest.mocked(prospectionRepository.saveProspectionPopulation).mockClear();
+    useProspectionWizardStore.setState({
+      draft: {
+        id: 'draft-123',
+        type_prospection: 'intensive',
+        especes: JSON.stringify({ lmcImago: true, lmcLarve: false, nseImago: false, nseLarve: false }),
+      } as any,
+      captures: [],
+    });
+    params.grilleIndex = '0';
+  });
+
+  it('ne propose plus « Visuel », seul « Comptage direct » est affiché', async () => {
+    jest.mocked(prospectionRepository.getProspectionPopulation).mockResolvedValue(null as any);
+
+    await render(<DensityScreen />);
+    expect(await screen.findByText('Locusta · densités imagos')).toBeVisible();
+
+    expect(screen.queryByText('Visuel')).toBeNull();
+    expect(screen.getByText('Comptage direct')).toBeVisible();
+  });
+
+  it('sélectionne « Comptage direct » et l’enregistre', async () => {
+    // Densités déjà valides (mock) : seule l'interaction sur le chip Méthode
+    // est sous test ici — la saisie interactive des densités est déjà
+    // couverte par les tests dédiés à leur caractère obligatoire ci-dessus.
+    jest.mocked(prospectionRepository.getProspectionPopulation).mockResolvedValue({
+      espece: 'LMC',
+      categorie: 'imago',
+      densite_diffuse: 10,
+      densite_groupee: 2,
+      methode: null,
+      accouplement: null,
+      ponte: null,
+    } as any);
+
+    await render(<DensityScreen />);
+    await screen.findByText('Locusta · densités imagos');
+
+    fireEvent.press(screen.getByText('Comptage direct'));
+    await waitFor(() =>
+      expect(screen.getByText('Comptage direct').props.style).toEqual(
+        expect.arrayContaining([expect.objectContaining({ color: '#fff' })])
+      )
+    );
+
+    fireEvent.press(screen.getByText('Accouplement  ›'));
+
+    await waitFor(() =>
+      expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalledWith(
+        'draft-123',
+        expect.objectContaining({ methode: 'comptage_direct' })
+      )
+    );
+    await settle();
+  });
+
+  it('une fiche historique avec methode "visuel" n’affiche aucun chip actif, mais conserve la valeur si l’agent ne la retouche pas', async () => {
+    jest.mocked(prospectionRepository.getProspectionPopulation).mockResolvedValue({
+      espece: 'LMC',
+      categorie: 'imago',
+      densite_diffuse: 12,
+      densite_groupee: 3,
+      methode: 'visuel',
+      accouplement: null,
+      ponte: null,
+    } as any);
+
+    await render(<DensityScreen />);
+    await screen.findByText('Locusta · densités imagos');
+
+    // Aucun chip ne doit apparaître sélectionné : "Visuel" n'existe plus, et
+    // "Comptage direct" ne correspond pas à la valeur enregistrée.
+    expect(screen.queryByText('Visuel')).toBeNull();
+    expect(screen.getByText('Comptage direct').props.style).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ color: '#fff' })])
+    );
+
+    // L'agent ne touche pas Méthode et enregistre : la valeur historique "visuel"
+    // repart telle quelle, jamais convertie ou effacée automatiquement.
+    fireEvent.press(screen.getByText('Accouplement  ›'));
+
+    await waitFor(() =>
+      expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalledWith(
+        'draft-123',
+        expect.objectContaining({ methode: 'visuel' })
+      )
+    );
+    await settle();
   });
 });

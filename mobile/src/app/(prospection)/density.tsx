@@ -195,7 +195,12 @@ export default function DensityScreen() {
 
             <Text style={styles.sectionLabel}>Méthode</Text>
             <View style={styles.chipsRow}>
-              {(['visuel', 'comptage_direct'] as const).map((option) => {
+              {/* #methode-supprime-visuel : « Visuel » retiré du choix proposé pour toute
+                  nouvelle saisie — une ancienne fiche dont `methode` vaut encore "visuel"
+                  (donnée historique, jamais convertie automatiquement) n'affiche alors
+                  simplement aucun chip actif ici, sans que sa valeur enregistrée ne soit
+                  perdue ou modifiée tant que l'agent ne retouche pas ce champ. */}
+              {(['comptage_direct'] as const).map((option) => {
                 const active = option === population.methode;
                 return (
                   <TouchableOpacity
@@ -204,9 +209,7 @@ export default function DensityScreen() {
                     style={[styles.chip, active && styles.chipActive]}
                     activeOpacity={0.8}
                   >
-                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                      {option === 'visuel' ? 'Visuel' : 'Comptage direct'}
-                    </Text>
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>Comptage direct</Text>
                   </TouchableOpacity>
                 );
               })}
