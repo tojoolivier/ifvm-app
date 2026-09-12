@@ -142,7 +142,7 @@ class TraitementTerrestreCreate(BaseModel):
     consultant_international: str | None = Field(None, max_length=255)
     surface_atomiseur_ha: float | None = Field(None, ge=0)
     surface_disque_rotatif_ha: float | None = Field(None, ge=0)
-    surface_ulvamast_ha: float | None = Field(None, ge=0)
+    surface_atomiseur_autoporte_ha: float | None = Field(None, ge=0)
     surface_restante_abandonnee: bool | None = None
     motif_surface_restante_abandonnee: str | None = None
     essence_litres: float | None = Field(None, ge=0)
@@ -399,7 +399,7 @@ class TraitementTerrestreRead(BaseModel):
     consultant_international: str | None
     surface_atomiseur_ha: float | None
     surface_disque_rotatif_ha: float | None
-    surface_ulvamast_ha: float | None
+    surface_atomiseur_autoporte_ha: float | None
     surface_traitee_ha: float | None
     surface_cumulee_ha: float | None
     surface_restante_ha: float | None

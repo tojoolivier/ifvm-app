@@ -148,14 +148,14 @@ describe('computeSurfaceTraitee', () => {
       computeSurfaceTraitee({
         surface_atomiseur_ha: 2,
         surface_disque_rotatif_ha: 1.5,
-        surface_ulvamast_ha: 0.5,
+        surface_atomiseur_autoporte_ha: 0.5,
       })
     ).toBe(4);
   });
 
   it('treats missing surfaces as zero', () => {
     expect(
-      computeSurfaceTraitee({ surface_atomiseur_ha: 3, surface_disque_rotatif_ha: null, surface_ulvamast_ha: undefined })
+      computeSurfaceTraitee({ surface_atomiseur_ha: 3, surface_disque_rotatif_ha: null, surface_atomiseur_autoporte_ha: undefined })
     ).toBe(3);
   });
 });

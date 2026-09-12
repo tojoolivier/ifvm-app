@@ -824,6 +824,13 @@ const COLONNES_TRAITEMENT_TERRESTRE: readonly Colonne[] = [
   { name: 'taux_mortalite_pourcent', type: 'REAL' },
   { name: 'evaluation_efficacite_heures_apres', type: 'REAL' },
   { name: 'methode_evaluation_efficacite', type: 'TEXT' },
+  // "Atomiseur" -> "Atomiseur à dos" (migration backend 0060, renommage pur,
+  // colonne surface_atomiseur_ha inchangée) ; ULVAmast remplacé par
+  // "Atomiseur autoporté" (nouvelle colonne). surface_ulvamast_ha ci-dessus
+  // (dans le CREATE TABLE) reste déclarée pour les installations qui l'ont
+  // déjà (colonne morte, plus jamais lue/écrite), même principe
+  // qu'agent_encadreur_id ci-dessus.
+  { name: 'surface_atomiseur_autoporte_ha', type: 'REAL' },
 ];
 
 /**

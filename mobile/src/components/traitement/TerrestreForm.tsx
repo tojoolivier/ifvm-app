@@ -202,7 +202,7 @@ export function TerrestreForm({
       {errors.traitementOrigineId && <Text style={styles.error}>{errors.traitementOrigineId}</Text>}
 
       <Text style={styles.label}>Moyens &amp; surfaces (ha)</Text>
-      <Text style={styles.label}>Atomiseur</Text>
+      <Text style={styles.label}>Atomiseur à dos</Text>
       <TextInput
         editable={!readOnly}
         style={styles.input}
@@ -210,6 +210,21 @@ export function TerrestreForm({
         keyboardType="numeric"
         value={store.terrestre.surface_atomiseur_ha != null ? String(store.terrestre.surface_atomiseur_ha) : ''}
         onChangeText={(v) => store.updateTerrestre({ surface_atomiseur_ha: v ? Number(v) : null })}
+      />
+      <Text style={styles.label}>Atomiseur autoporté</Text>
+      <TextInput
+        editable={!readOnly}
+        style={styles.input}
+        placeholder="0"
+        keyboardType="numeric"
+        value={
+          store.terrestre.surface_atomiseur_autoporte_ha != null
+            ? String(store.terrestre.surface_atomiseur_autoporte_ha)
+            : ''
+        }
+        onChangeText={(v) =>
+          store.updateTerrestre({ surface_atomiseur_autoporte_ha: v ? Number(v) : null })
+        }
       />
       <Text style={styles.label}>Disque rotatif</Text>
       <TextInput
@@ -219,15 +234,6 @@ export function TerrestreForm({
         keyboardType="numeric"
         value={store.terrestre.surface_disque_rotatif_ha != null ? String(store.terrestre.surface_disque_rotatif_ha) : ''}
         onChangeText={(v) => store.updateTerrestre({ surface_disque_rotatif_ha: v ? Number(v) : null })}
-      />
-      <Text style={styles.label}>ULVAmast</Text>
-      <TextInput
-        editable={!readOnly}
-        style={styles.input}
-        placeholder="0"
-        keyboardType="numeric"
-        value={store.terrestre.surface_ulvamast_ha != null ? String(store.terrestre.surface_ulvamast_ha) : ''}
-        onChangeText={(v) => store.updateTerrestre({ surface_ulvamast_ha: v ? Number(v) : null })}
       />
 
       <Card variant="derivee">

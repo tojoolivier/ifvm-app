@@ -147,7 +147,7 @@ export interface TerrestreDraft {
   traitementOrigineId?: string | null;
   surface_atomiseur_ha?: number | null;
   surface_disque_rotatif_ha?: number | null;
-  surface_ulvamast_ha?: number | null;
+  surface_atomiseur_autoporte_ha?: number | null;
   surfaceRestanteAbandonnee?: boolean | null;
   motifSurfaceRestanteAbandonnee?: string | null;
   essence_litres?: number | null;
@@ -184,11 +184,13 @@ export interface ImpactDraft {
   empoisonnementType?: 'AGENT' | 'POPULATION' | null;
   empoisonnementMode?: 'INGESTION' | 'INHALATION' | 'CONTACT' | 'AUTRE' | null;
   empoisonnementAutre?: string | null;
+  // Réduit à Oui/Non par axe (retour arrière — était FAIBLE/MOYEN/ÉLEVÉ) : simple
+  // indicateur d'impact constaté, sans graduation de sévérité.
   evaluationRisque?: {
-    ressources_eau?: 'FAIBLE' | 'MOYEN' | 'ELEVE';
-    sol?: 'FAIBLE' | 'MOYEN' | 'ELEVE';
-    faune_non_cible?: 'FAIBLE' | 'MOYEN' | 'ELEVE';
-    abeilles?: 'FAIBLE' | 'MOYEN' | 'ELEVE';
+    ressources_eau?: boolean;
+    sol?: boolean;
+    faune_non_cible?: boolean;
+    abeilles?: boolean;
   };
   comportementAnormal?: boolean | null;
   comportementNonCibles?: string[];
