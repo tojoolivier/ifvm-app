@@ -35,7 +35,6 @@ class ProspectionModel(Base):
         ForeignKey("station_fixe.id", deferrable=True, initially="deferred"),
         nullable=True,
     )
-    n_releve: Mapped[str | None] = mapped_column(Text(), nullable=True)
     n_fiche: Mapped[str | None] = mapped_column(Text(), nullable=True)
     n_message: Mapped[str | None] = mapped_column(Text(), nullable=True)
     date_prospection: Mapped[date] = mapped_column(Date(), nullable=False)

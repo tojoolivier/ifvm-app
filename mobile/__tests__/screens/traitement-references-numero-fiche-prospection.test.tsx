@@ -4,8 +4,8 @@
  * technique brut (`prospectionId`), pas le numéro métier de la fiche de
  * prospection sélectionnée — l'utilisateur n'a aucun moyen de le lire tel
  * quel. Verrouille l'affichage du numéro métier (n_fiche, avec le même
- * ordre de repli que « Consulter une fiche validée » : n_releve puis
- * n_message), jamais l'UUID, et jamais un champ saisissable.
+ * ordre de repli que « Consulter une fiche validée » : n_message), jamais
+ * l'UUID, et jamais un champ saisissable.
  */
 import { render, screen, waitFor } from '@testing-library/react-native';
 import ReferencesScreen from '@/app/(traitement)/references';
@@ -67,7 +67,6 @@ describe('ReferencesScreen (traitement) — N° fiche de prospection liée', () 
       updated_at: '2026-08-10T00:00:00.000Z',
       date_prospection: '2026-08-10',
       n_fiche: 'EXT-2026-00125',
-      n_releve: null,
       n_message: null,
     } as any);
 
@@ -77,30 +76,13 @@ describe('ReferencesScreen (traitement) — N° fiche de prospection liée', () 
     expect(screen.queryByText('prosp-1')).toBeNull();
   });
 
-  it('reprend n_releve si n_fiche est absent, même ordre de repli que « Consulter une fiche validée »', async () => {
+  it('reprend n_message pour une fiche de Validation/Signalisation (n_fiche absent)', async () => {
     jest.mocked(prospectionRepository.getProspection).mockResolvedValue({
       id: 'prosp-1',
       statut: 'validee',
       updated_at: '2026-08-10T00:00:00.000Z',
       date_prospection: '2026-08-10',
       n_fiche: null,
-      n_releve: 'REL-2026-042',
-      n_message: null,
-    } as any);
-
-    render(<ReferencesScreen />);
-
-    await waitFor(() => expect(screen.getByText('REL-2026-042')).toBeTruthy());
-  });
-
-  it('reprend n_message pour une fiche de Validation/Signalisation (n_fiche/n_releve absents)', async () => {
-    jest.mocked(prospectionRepository.getProspection).mockResolvedValue({
-      id: 'prosp-1',
-      statut: 'validee',
-      updated_at: '2026-08-10T00:00:00.000Z',
-      date_prospection: '2026-08-10',
-      n_fiche: null,
-      n_releve: null,
       n_message: 'SIG-2026-00045',
     } as any);
 

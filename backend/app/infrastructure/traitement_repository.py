@@ -135,9 +135,9 @@ class TraitementRepositoryImpl(TraitementRepository):
         `ProspectionRepositoryImpl._resoudre_noms` : `prospection_id` reste
         l'unique relation entre les deux fiches, ce champ n'en est qu'une
         lecture dérivée, jamais une seconde relation ni une colonne dupliquée.
-        Fallback n_releve/n_message si n_fiche n'est pas encore renseigné,
-        même ordre de priorité que l'écran mobile « Consulter une fiche
-        validée » (prospection-picker.tsx)."""
+        Fallback n_message si n_fiche n'est pas encore renseigné, même ordre
+        de priorité que l'écran mobile « Consulter une fiche validée »
+        (prospection-picker.tsx)."""
         ids = {t.prospection_id for t in traitements}
         if not ids:
             return
@@ -145,11 +145,10 @@ class TraitementRepositoryImpl(TraitementRepository):
             select(
                 ProspectionModel.id,
                 ProspectionModel.n_fiche,
-                ProspectionModel.n_releve,
                 ProspectionModel.n_message,
             ).where(ProspectionModel.id.in_(ids))
         )
-        numeros = {row.id: row.n_fiche or row.n_releve or row.n_message for row in result.all()}
+        numeros = {row.id: row.n_fiche or row.n_message for row in result.all()}
         for t in traitements:
             t.prospection_n_fiche = numeros.get(t.prospection_id)
 
@@ -505,7 +504,36 @@ class TraitementRepositoryImpl(TraitementRepository):
         return await self.get_by_id(traitement_id)
 
     async def update_sync(self, traitement: Traitement) -> Traitement:
-        model = await self.session.get(TraitementModel, traitement.id)
+        # `options=` explicite (même jeu que `get_by_id`) : `cible`/`aerien`/
+        # `terrestre` n'ont pas de `lazy="selectin"` au niveau du mapping,
+        # donc un `session.get()` nu laisse ces relations en lazy-load
+        # `select` (synchrone) par défaut. Lu ci-dessous sans `await`
+        # (`model.cible is not None`, etc.) : sans le chargement explicite,
+        # cet accès ne tenait que par un effet de bord — la même identité
+        # d'objet éventuellement déjà en cache dans la session depuis un
+        # `get_by_id()` antérieur du même appelant (`existant`, cf.
+        # traitement_use_cases.py) — jamais garanti par ce module lui-même,
+        # et source de `sqlalchemy.exc.MissingGreenlet` dès que ce n'est pas
+        # le cas.
+        #
+        # `evaluations_risque_population` y figure aussi : `cascade="all,
+        # delete-orphan"` (traitement_model.py) — la réassignation en bloc
+        # plus bas (`model.evaluations_risque_population = [...]`) doit
+        # calculer la différence avec la collection *actuelle* pour émettre
+        # les DELETE des lignes orphelines, ce qui exige qu'elle soit déjà
+        # chargée. Sans ce chargement explicite, l'accès en écriture
+        # déclenche lui-même un lazy-load synchrone — même risque que les
+        # trois relations ci-dessus, pour la même raison.
+        model = await self.session.get(
+            TraitementModel,
+            traitement.id,
+            options=[
+                selectinload(TraitementModel.cible),
+                selectinload(TraitementModel.aerien),
+                selectinload(TraitementModel.terrestre),
+                selectinload(TraitementModel.evaluations_risque_population),
+            ],
+        )
         model.prospection_id = traitement.prospection_id
         model.numero_fiche = traitement.numero_fiche
         model.mode_traitement = traitement.mode_traitement

@@ -102,9 +102,7 @@ export default function ReviewScreen() {
 
         <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16 }}>
           <View style={styles.headerCard}>
-            <Text style={styles.headerCardLabel}>
-              Fiche {recap.nFiche} · relevé {recap.nReleve}
-            </Text>
+            <Text style={styles.headerCardLabel}>Fiche {recap.nFiche}</Text>
             <Text style={styles.headerCardTitle}>{recap.station}</Text>
             <Text style={styles.headerCardMeta}>
               {recap.dateProspection} · {user ? `${user.prenom} ${user.nom}`.trim() : '—'}

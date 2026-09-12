@@ -92,7 +92,6 @@ async def create_prospection(
             prospecteur_id=current_user.id,
             date_prospection=body.date_prospection,
             station_id=body.station_id,
-            n_releve=body.n_releve,
             n_fiche=body.n_fiche,
             n_message=body.n_message,
             latitude=body.latitude,
@@ -260,7 +259,6 @@ async def update_prospection(
         prospection = await use_case.execute(
             prospection_id=prospection_id,
             station_id=body.station_id,
-            n_releve=body.n_releve,
             n_fiche=body.n_fiche,
             n_message=body.n_message,
             date_prospection=body.date_prospection,

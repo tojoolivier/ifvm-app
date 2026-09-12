@@ -22,7 +22,6 @@ function baseProspection(statut: string) {
     statut,
     statut_sync: 'synced',
     n_fiche: 'F-001',
-    n_releve: null,
     n_message: null as string | null,
     created_at: '2026-07-01T10:00:00Z',
     updated_at: '2026-07-02T08:00:00Z',

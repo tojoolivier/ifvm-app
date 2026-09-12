@@ -92,7 +92,6 @@ export interface DraftProspection {
   signature_chef_base_nom: string | null;
   signature_chef_base_horodatage: string | null;
   signature_chef_base_image: string | null;
-  n_releve: string | null;
   n_fiche: string | null;
   n_message: string | null;
   especes: string | null;
@@ -131,7 +130,6 @@ export interface ReferenceUpdateInput {
   surfaceInfestee: number;
   biotope?: string | null;
   nFiche: string;
-  nReleve?: string | null;
   region?: string | null;
   district?: string | null;
   commune?: string | null;
@@ -460,7 +458,6 @@ export interface ProspectionValideeInput {
   dateProspection: string;
   surfaceInfestee: number | null;
   nFiche: string | null;
-  nReleve: string | null;
   nMessage: string | null;
   region: string | null;
   district: string | null;
@@ -476,13 +473,13 @@ export async function materialiserProspectionValidee(input: ProspectionValideeIn
   await db.runAsync(
     `INSERT OR REPLACE INTO prospection (
       id, type_prospection, campagne_id, prospecteur_id,
-      date_prospection, surface_infestee, n_fiche, n_releve, n_message,
+      date_prospection, surface_infestee, n_fiche, n_message,
       region, district, commune, observations,
       statut, statut_sync, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?)`,
     [
       input.id, input.typeProspection, input.campagneId, input.prospecteurId,
-      input.dateProspection, input.surfaceInfestee, input.nFiche, input.nReleve, input.nMessage,
+      input.dateProspection, input.surfaceInfestee, input.nFiche, input.nMessage,
       input.region, input.district, input.commune, input.observations,
       input.statut, input.createdAt, input.updatedAt,
     ]
@@ -497,14 +494,14 @@ export async function updateProspectionReference(id: string, input: ReferenceUpd
     `UPDATE prospection SET
       latitude = ?, longitude = ?, altitude = ?,
       surface_station = ?, surface_prospectee = ?, surface_infestee = ?,
-      biotope = ?, n_fiche = ?, n_releve = ?,
+      biotope = ?, n_fiche = ?,
       region = ?, district = ?, commune = ?, za = ?, pa_code = ?, pa_nom = ?,
       station_id = ?, station_nom = ?, updated_at = ?
      WHERE id = ?`,
     [
       input.latitude, input.longitude, input.altitude,
       input.surfaceStation, input.surfaceProspectee, input.surfaceInfestee,
-      input.biotope ?? null, input.nFiche, input.nReleve ?? null,
+      input.biotope ?? null, input.nFiche,
       input.region ?? null, input.district ?? null, input.commune ?? null,
       input.za ?? null, input.pa_code ?? null, input.pa_nom ?? null,
       input.stationId ?? null, input.station_nom ?? null,
