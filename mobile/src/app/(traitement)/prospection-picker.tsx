@@ -4,6 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ProspectionRead } from '@/lib/api-client';
 import { loadFichesDisponiblesPourTraitement, assurerProspectionDisponibleLocalement } from '@/lib/prospection-accueil';
+import { listProspectionsDisponiblesPourTraitementLocal } from '@/lib/prospection-repository';
+import { NetworkError } from '@/lib/errors';
 import { useAuthStore } from '@/lib/auth-store';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
@@ -17,21 +19,47 @@ const LIBELLE_TYPE: Record<string, string> = {
 };
 
 /**
+ * Champs affichés par cet écran, communs à `ProspectionRead` (serveur, en
+ * ligne) et `DraftProspection` (repli local, hors ligne — cf. `horsLigne`
+ * ci-dessous) : ni l'un ni l'autre n'est retaillé, cette interface ne fait
+ * que documenter le sous-ensemble réellement lu par `renderItem`.
+ */
+interface FichePickable {
+  id: string;
+  type_prospection: string;
+  n_fiche?: string | null;
+  n_message?: string | null;
+  date_prospection?: string | null;
+  region?: string | null;
+  district?: string | null;
+  commune?: string | null;
+  prospecteur_nom?: string | null;
+  validated_by_nom?: string | null;
+  validated_at?: string | null;
+}
+
+/**
  * « Fiches de traitement → Consulter une fiche validée » (#fiches-validees-
  * multi-utilisateurs) — remplace le sélecteur mono-utilisateur d'origine
  * (Lot 2/3, #91) : les fiches validées PAR N'IMPORTE QUEL agent, des trois
  * types (extensive/intensive/signalement — même table, même workflow de
- * statut), pas encore transformées en traitement. Toujours un appel serveur
- * direct (jamais le cache SQLite local, qui ne connaît que les fiches créées
- * sur CET appareil) — « la disponibilité globale des fiches est une
- * opération serveur ».
+ * statut), pas encore transformées en traitement.
+ *
+ * En ligne, toujours un appel serveur direct (jamais le cache SQLite local,
+ * qui ne connaît que les fiches créées sur CET appareil) — « la disponibilité
+ * globale des fiches est une opération serveur ». Hors ligne, un écran
+ * bloqué empêcherait de démarrer toute fiche de traitement terrain — on
+ * bascule donc sur `listProspectionsDisponiblesPourTraitementLocal`
+ * (prospection-repository.ts), une approximation locale volontairement
+ * signalée par un bandeau (`horsLigne`), jamais silencieuse.
  */
 export default function TraitementProspectionPickerScreen() {
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
-  const [prospections, setProspections] = useState<ProspectionRead[]>([]);
+  const [prospections, setProspections] = useState<FichePickable[]>([]);
   const [loading, setLoading] = useState(true);
   const [erreurDeLecture, setErreurDeLecture] = useState<unknown>(null);
+  const [horsLigne, setHorsLigne] = useState(false);
   const { run, isRunning: isSelectionEnCours } = useAsyncAction();
 
   const charger = useCallback(() => {
@@ -39,9 +67,25 @@ export default function TraitementProspectionPickerScreen() {
     void runTask(() => loadFichesDisponiblesPourTraitement(token), {
       name: 'traitement.prospectionPicker',
       criticality: 'essential',
-    }).then((outcome) => {
-      setErreurDeLecture(outcome.ok ? null : outcome.error);
-      if (outcome.ok) setProspections(outcome.value);
+    }).then(async (outcome) => {
+      if (outcome.ok) {
+        setHorsLigne(false);
+        setErreurDeLecture(null);
+        setProspections(outcome.value);
+        setLoading(false);
+        return;
+      }
+      if (!(outcome.error instanceof NetworkError)) {
+        // Panne serveur, auth, etc. : reste bloquant, comme avant — seule
+        // l'indisponibilité RÉSEAU justifie le repli local (approximatif).
+        setErreurDeLecture(outcome.error);
+        setLoading(false);
+        return;
+      }
+      const locales = await listProspectionsDisponiblesPourTraitementLocal();
+      setHorsLigne(true);
+      setErreurDeLecture(null);
+      setProspections(locales);
       setLoading(false);
     });
   }, [token]);
@@ -50,23 +94,35 @@ export default function TraitementProspectionPickerScreen() {
     charger();
   }, [charger]);
 
-  const choisir = (prospection: ProspectionRead) =>
+  const choisir = (prospection: FichePickable) =>
     run(
       async () => {
-        // Rapatrie la fiche en local si elle vient d'un autre agent — sans
-        // quoi l'écran Références (lecture locale) ne trouverait rien.
-        await assurerProspectionDisponibleLocalement(prospection);
+        // En ligne : rapatrie la fiche en local si elle vient d'un autre
+        // agent, sans quoi l'écran Références (lecture locale) ne trouverait
+        // rien. Hors ligne, `prospection` vient déjà du cache local — inutile
+        // (et l'objet n'a de toute façon pas la forme `ProspectionRead`
+        // complète qu'attend `assurerProspectionDisponibleLocalement`).
+        if (!horsLigne) {
+          await assurerProspectionDisponibleLocalement(prospection as ProspectionRead);
+        }
         router.push({
           pathname: '/(traitement)/references' as any,
           params: { prospectionId: prospection.id },
         });
       },
-      { screen: 'prospection-picker', context: { prospectionId: prospection.id } }
+      { screen: 'prospection-picker', context: { prospectionId: prospection.id, horsLigne } }
     );
 
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>Consulter une fiche validée</Text>
+
+      {horsLigne && !loading && (
+        <Text style={styles.bandeauHorsLigne}>
+          Hors ligne — liste limitée aux fiches déjà synchronisées sur cet appareil,
+          pas forcément à jour ni exhaustive (fiches des autres agents non comprises).
+        </Text>
+      )}
 
       {loading ? (
         <Text style={styles.emptyText}>Chargement…</Text>
@@ -121,6 +177,16 @@ const styles = StyleSheet.create({
   },
   list: { flex: 1 },
   emptyText: { fontFamily: traitementFonts.ui, color: traitementColors.texteLabel, textAlign: 'center', marginTop: 20 },
+  bandeauHorsLigne: {
+    fontFamily: traitementFonts.ui,
+    fontSize: traitementTypeSizes.label,
+    color: traitementColors.avertissementTexte,
+    backgroundColor: traitementColors.avertissementFond,
+    borderWidth: 1,
+    borderColor: traitementColors.avertissementBordure,
+    borderRadius: traitementRadii.carte,
+    padding: 10,
+  },
   row: {
     backgroundColor: '#fff',
     borderWidth: 1,

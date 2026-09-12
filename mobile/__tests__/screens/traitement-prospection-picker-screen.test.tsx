@@ -9,6 +9,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import TraitementProspectionPickerScreen from '@/app/(traitement)/prospection-picker';
 import { useAuthStore } from '@/lib/auth-store';
 import * as prospectionAccueil from '@/lib/prospection-accueil';
+import * as prospectionRepository from '@/lib/prospection-repository';
+import { NetworkError } from '@/lib/errors';
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
@@ -20,6 +22,10 @@ jest.mock('expo-router', () => ({
 jest.mock('@/lib/prospection-accueil', () => ({
   loadFichesDisponiblesPourTraitement: jest.fn(),
   assurerProspectionDisponibleLocalement: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('@/lib/prospection-repository', () => ({
+  listProspectionsDisponiblesPourTraitementLocal: jest.fn(),
 }));
 
 const FICHE_PROPRE_AGENT = {
@@ -55,6 +61,7 @@ beforeEach(() => {
   mockBack.mockClear();
   jest.mocked(prospectionAccueil.loadFichesDisponiblesPourTraitement).mockReset();
   jest.mocked(prospectionAccueil.assurerProspectionDisponibleLocalement).mockClear().mockResolvedValue(undefined);
+  jest.mocked(prospectionRepository.listProspectionsDisponiblesPourTraitementLocal).mockReset();
   useAuthStore.setState({ user: { id: 'moi' } as any, token: 'token-1' } as any);
 });
 
@@ -101,6 +108,78 @@ describe('TraitementProspectionPickerScreen — sélection', () => {
         })
       )
     );
+  });
+});
+
+describe('TraitementProspectionPickerScreen — hors ligne', () => {
+  it("bascule sur le cache local (surface infestée connue) quand le serveur est injoignable, avec un bandeau explicite", async () => {
+    jest.mocked(prospectionAccueil.loadFichesDisponiblesPourTraitement).mockRejectedValue(
+      new NetworkError('Connexion au serveur impossible pour le moment.')
+    );
+    jest.mocked(prospectionRepository.listProspectionsDisponiblesPourTraitementLocal).mockResolvedValue([
+      {
+        id: 'presp-locale',
+        type_prospection: 'extensive',
+        n_fiche: 'F-200',
+        n_message: null,
+        date_prospection: '2026-09-01',
+        region: 'Atsimo-Andrefana',
+        district: 'Betioky',
+        commune: 'Ambatry',
+      } as any,
+    ]);
+
+    await render(<TraitementProspectionPickerScreen />);
+
+    expect(await screen.findByText(/F-200/)).toBeVisible();
+    expect(screen.getByText(/Hors ligne/)).toBeVisible();
+    // Pas de « Créée par »/« Validée par » : ces champs n'existent pas côté
+    // cache local (dénormalisés serveur uniquement) — pas de valeur inventée.
+    expect(screen.getByText('Créée par —')).toBeVisible();
+  });
+
+  it("ne rapatrie pas la fiche (déjà locale) en sélectionnant depuis le repli hors ligne", async () => {
+    jest.mocked(prospectionAccueil.loadFichesDisponiblesPourTraitement).mockRejectedValue(
+      new NetworkError('Connexion au serveur impossible pour le moment.')
+    );
+    jest.mocked(prospectionRepository.listProspectionsDisponiblesPourTraitementLocal).mockResolvedValue([
+      {
+        id: 'presp-locale',
+        type_prospection: 'extensive',
+        n_fiche: 'F-200',
+        n_message: null,
+        date_prospection: '2026-09-01',
+        region: 'Atsimo-Andrefana',
+        district: 'Betioky',
+        commune: 'Ambatry',
+      } as any,
+    ]);
+
+    await render(<TraitementProspectionPickerScreen />);
+    fireEvent.press(await screen.findByText(/F-200/));
+
+    await waitFor(() =>
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(traitement)/references',
+          params: expect.objectContaining({ prospectionId: 'presp-locale' }),
+        })
+      )
+    );
+    expect(prospectionAccueil.assurerProspectionDisponibleLocalement).not.toHaveBeenCalled();
+  });
+
+  it("reste bloquant (pas de repli) sur une erreur qui n'est pas un problème réseau", async () => {
+    jest.mocked(prospectionAccueil.loadFichesDisponiblesPourTraitement).mockRejectedValue(
+      new Error('boom')
+    );
+
+    await render(<TraitementProspectionPickerScreen />);
+
+    await waitFor(() =>
+      expect(prospectionRepository.listProspectionsDisponiblesPourTraitementLocal).not.toHaveBeenCalled()
+    );
+    expect(screen.queryByText(/Hors ligne/)).toBeNull();
   });
 });
 
