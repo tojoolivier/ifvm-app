@@ -578,10 +578,6 @@ export default function ReferenceScreen() {
   });
 
   const nFichePreview = draftId ? generateNumeroFiche(draftId, draft?.date_prospection ?? '') : '—';
-  const nRelevePreview = generateNumeroReleve(
-    stationEstSaisieLibre ? null : station?.id ?? null,
-    draft?.date_prospection ?? ''
-  );
 
   return (
     <View style={styles.root}>
@@ -756,10 +752,6 @@ export default function ReferenceScreen() {
               <View style={styles.metaField}>
                 <Text style={styles.metaLabel}>N° Fiche ⟳</Text>
                 <Text style={styles.metaValue}>{nFichePreview}</Text>
-              </View>
-              <View style={styles.metaField}>
-                <Text style={styles.metaLabel}>N° relevé ⟳</Text>
-                <Text style={styles.metaValue}>{nRelevePreview}</Text>
               </View>
               <View style={styles.metaField}>
                 <Text style={styles.metaLabel}>Date/heure ⟳</Text>
