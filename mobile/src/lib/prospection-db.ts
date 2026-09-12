@@ -168,7 +168,6 @@ async function creerTables(db: SQLite.SQLiteDatabase): Promise<void> {
       campagne_id TEXT NOT NULL,
       prospecteur_id TEXT NOT NULL,
       station_id TEXT,
-      n_releve TEXT,
       n_fiche TEXT,
       n_message TEXT,
       especes TEXT,

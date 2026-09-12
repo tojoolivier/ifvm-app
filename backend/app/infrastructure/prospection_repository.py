@@ -186,7 +186,6 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             station_id=(
                 None if prospection.type_prospection == "extensive" else prospection.station_id
             ),
-            n_releve=prospection.n_releve,
             n_fiche=prospection.n_fiche,
             n_message=prospection.n_message,
             date_prospection=prospection.date_prospection,
@@ -378,7 +377,6 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         model = result.scalar_one()
 
         model.station_id = prospection.station_id
-        model.n_releve = prospection.n_releve
         model.n_fiche = prospection.n_fiche
         model.n_message = prospection.n_message
         model.date_prospection = prospection.date_prospection
@@ -677,7 +675,6 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             campagne_id=model.campagne_id,
             prospecteur_id=model.prospecteur_id,
             station_id=model.station_id,
-            n_releve=model.n_releve,
             n_fiche=model.n_fiche,
             n_message=model.n_message,
             date_prospection=model.date_prospection,

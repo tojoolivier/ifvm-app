@@ -57,7 +57,6 @@ class CreateProspection:
         prospecteur_id: uuid.UUID,
         date_prospection: date,
         station_id: uuid.UUID | None = None,
-        n_releve: str | None = None,
         n_fiche: str | None = None,
         n_message: str | None = None,
         latitude: float | None = None,
@@ -162,7 +161,6 @@ class CreateProspection:
             prospecteur_id=prospecteur_id,
             station_id=station_id,
             date_prospection=date_prospection,
-            n_releve=n_releve,
             n_fiche=n_fiche,
             n_message=n_message,
             latitude=latitude,
@@ -323,7 +321,6 @@ class UpdateProspection:
         self,
         prospection_id: uuid.UUID,
         station_id: uuid.UUID | None = None,
-        n_releve: str | None = None,
         n_fiche: str | None = None,
         n_message: str | None = None,
         date_prospection: date | None = None,
@@ -412,8 +409,6 @@ class UpdateProspection:
 
         if station_id is not None:
             prospection.station_id = station_id
-        if n_releve is not None:
-            prospection.n_releve = n_releve
         if n_fiche is not None:
             prospection.n_fiche = n_fiche
         if n_message is not None:

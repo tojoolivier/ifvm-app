@@ -68,7 +68,6 @@ describe('ReferencesScreen (traitement) — localité pré-remplie depuis la pro
       updated_at: '2026-08-10T00:00:00.000Z',
       date_prospection: '2026-08-10',
       n_fiche: 'EXT-2026-00125',
-      n_releve: null,
       n_message: null,
       station_libre: 'Andasibe-Village',
     } as any);
@@ -86,7 +85,6 @@ describe('ReferencesScreen (traitement) — localité pré-remplie depuis la pro
       updated_at: '2026-08-10T00:00:00.000Z',
       date_prospection: '2026-08-10',
       n_fiche: 'EXT-2026-00125',
-      n_releve: null,
       n_message: null,
       station_libre: 'Andasibe-Village',
     } as any);
@@ -125,7 +123,6 @@ describe('ReferencesScreen (traitement) — localité pré-remplie depuis la pro
       updated_at: '2026-08-10T00:00:00.000Z',
       date_prospection: '2026-08-10',
       n_fiche: 'EXT-2026-00125',
-      n_releve: null,
       n_message: null,
       station_libre: 'Andasibe-Village',
     } as any);
@@ -145,7 +142,6 @@ describe('ReferencesScreen (traitement) — localité pré-remplie depuis la pro
       updated_at: '2026-08-10T00:00:00.000Z',
       date_prospection: '2026-08-10',
       n_fiche: 'INT-2026-00087',
-      n_releve: null,
       n_message: null,
       station_libre: null,
     } as any);

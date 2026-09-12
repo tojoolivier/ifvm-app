@@ -79,7 +79,6 @@ interface ProspectionDetail {
   statut: string
   statut_sync: string
   n_fiche: string | null
-  n_releve: string | null
   n_message: string | null
   created_at: string
   updated_at: string

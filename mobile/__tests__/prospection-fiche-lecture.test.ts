@@ -55,7 +55,6 @@ function prospection(overrides: Partial<ProspectionRead> = {}): ProspectionRead 
     campagne_id: 'c-1',
     prospecteur_id: 'u-1',
     station_id: 'station-1',
-    n_releve: null,
     n_fiche: 'F-001',
     n_message: null,
     date_prospection: '2026-07-01',

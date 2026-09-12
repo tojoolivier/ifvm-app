@@ -135,9 +135,9 @@ class TraitementRepositoryImpl(TraitementRepository):
         `ProspectionRepositoryImpl._resoudre_noms` : `prospection_id` reste
         l'unique relation entre les deux fiches, ce champ n'en est qu'une
         lecture dérivée, jamais une seconde relation ni une colonne dupliquée.
-        Fallback n_releve/n_message si n_fiche n'est pas encore renseigné,
-        même ordre de priorité que l'écran mobile « Consulter une fiche
-        validée » (prospection-picker.tsx)."""
+        Fallback n_message si n_fiche n'est pas encore renseigné, même ordre
+        de priorité que l'écran mobile « Consulter une fiche validée »
+        (prospection-picker.tsx)."""
         ids = {t.prospection_id for t in traitements}
         if not ids:
             return
@@ -145,11 +145,10 @@ class TraitementRepositoryImpl(TraitementRepository):
             select(
                 ProspectionModel.id,
                 ProspectionModel.n_fiche,
-                ProspectionModel.n_releve,
                 ProspectionModel.n_message,
             ).where(ProspectionModel.id.in_(ids))
         )
-        numeros = {row.id: row.n_fiche or row.n_releve or row.n_message for row in result.all()}
+        numeros = {row.id: row.n_fiche or row.n_message for row in result.all()}
         for t in traitements:
             t.prospection_n_fiche = numeros.get(t.prospection_id)
 
