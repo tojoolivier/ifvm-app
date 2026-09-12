@@ -1,12 +1,13 @@
 /**
- * La localité de la fiche de traitement est générée automatiquement à partir
- * de la localité de la fiche de prospection extensive correspondante
- * (`station_libre`, « nom du lieu-dit / repère local ») — mais reste
- * modifiable ensuite (filet de sécurité, notamment sur une prospection
- * intensive qui n'a pas ce champ). N'écrase jamais une saisie déjà présente
- * (reprise d'un brouillon déjà localisé).
+ * La localité de la fiche de traitement est conservée depuis la fiche de
+ * prospection déjà validée qui lui est liée — extensive (`station_libre`,
+ * « nom du lieu-dit / repère local ») ou intensive (`station_nom`, nom de la
+ * station du référentiel) — pour ne plus jamais être ressaisie
+ * (#localite-traitement-conservee-prospection). Reste modifiable ensuite
+ * (filet de sécurité, pour la fiche rare sans aucun des deux champs). N'écrase
+ * jamais une saisie déjà présente (reprise d'un brouillon déjà localisé).
  */
-import { render, screen, waitFor } from '@testing-library/react-native';
+import { cleanup, render, screen, waitFor } from '@testing-library/react-native';
 import ReferencesScreen from '@/app/(traitement)/references';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import * as prospectionRepository from '@/lib/prospection-repository';
@@ -54,6 +55,8 @@ const RESET_STATE = {
 };
 
 describe('ReferencesScreen (traitement) — localité pré-remplie depuis la prospection liée', () => {
+  afterEach(cleanup);
+
   beforeEach(() => {
     mockRouteParams = { prospectionId: 'prosp-1' };
     jest.mocked(prospectionRepository.getProspection).mockReset();
@@ -72,7 +75,7 @@ describe('ReferencesScreen (traitement) — localité pré-remplie depuis la pro
       station_libre: 'Andasibe-Village',
     } as any);
 
-    render(<ReferencesScreen />);
+    await render(<ReferencesScreen />);
 
     await waitFor(() => expect(useTraitementCaptureStore.getState().ref.localite).toBe('Andasibe-Village'));
     expect(screen.getByDisplayValue('Andasibe-Village')).toBeTruthy();
@@ -89,7 +92,7 @@ describe('ReferencesScreen (traitement) — localité pré-remplie depuis la pro
       station_libre: 'Andasibe-Village',
     } as any);
 
-    render(<ReferencesScreen />);
+    await render(<ReferencesScreen />);
 
     await waitFor(() => expect(screen.getByDisplayValue('Andasibe-Village')).toBeTruthy());
     expect(screen.getByDisplayValue('Andasibe-Village').props.editable).not.toBe(false);
@@ -127,7 +130,7 @@ describe('ReferencesScreen (traitement) — localité pré-remplie depuis la pro
       station_libre: 'Andasibe-Village',
     } as any);
 
-    render(<ReferencesScreen />);
+    await render(<ReferencesScreen />);
 
     await waitFor(() => expect(traitementRepository.getTraitement).toHaveBeenCalledWith('trait-1'));
     await waitFor(() => expect(prospectionRepository.getProspection).toHaveBeenCalled());
@@ -135,7 +138,7 @@ describe('ReferencesScreen (traitement) — localité pré-remplie depuis la pro
     expect(screen.queryByDisplayValue('Andasibe-Village')).toBeNull();
   });
 
-  it('laisse la localité vide (saisie manuelle requise) quand la prospection liée est intensive, sans station_libre', async () => {
+  it('pré-remplit la localité avec station_nom pour une prospection intensive (sans station_libre)', async () => {
     jest.mocked(prospectionRepository.getProspection).mockResolvedValue({
       id: 'prosp-1',
       statut: 'validee',
@@ -144,9 +147,30 @@ describe('ReferencesScreen (traitement) — localité pré-remplie depuis la pro
       n_fiche: 'INT-2026-00087',
       n_message: null,
       station_libre: null,
+      station_nom: 'Station Ambatondrazaka',
     } as any);
 
-    render(<ReferencesScreen />);
+    await render(<ReferencesScreen />);
+
+    await waitFor(() =>
+      expect(useTraitementCaptureStore.getState().ref.localite).toBe('Station Ambatondrazaka')
+    );
+    expect(screen.getByDisplayValue('Station Ambatondrazaka')).toBeTruthy();
+  });
+
+  it('laisse la localité vide (saisie manuelle requise) quand ni station_nom ni station_libre ne sont renseignés', async () => {
+    jest.mocked(prospectionRepository.getProspection).mockResolvedValue({
+      id: 'prosp-1',
+      statut: 'validee',
+      updated_at: '2026-08-10T00:00:00.000Z',
+      date_prospection: '2026-08-10',
+      n_fiche: 'INT-2026-00087',
+      n_message: null,
+      station_libre: null,
+      station_nom: null,
+    } as any);
+
+    await render(<ReferencesScreen />);
 
     await waitFor(() => expect(prospectionRepository.getProspection).toHaveBeenCalled());
     expect(useTraitementCaptureStore.getState().ref.localite ?? '').toBe('');
