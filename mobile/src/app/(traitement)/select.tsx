@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
+import { Text, TouchableOpacity, FlatList, StyleSheet, Alert } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { listDraftTraitements, DraftTraitementRow } from '@/lib/traitement-repository';
+import { listDraftTraitements, deleteDraftTraitement, DraftTraitementRow } from '@/lib/traitement-repository';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
 import { runTask } from '@/lib/run-task';
+import { useAsyncAction } from '@/hooks/use-async-action';
 import { EtatVide } from '@/components/erreurs/etat-vide';
 
 /**
@@ -19,6 +21,7 @@ export default function TraitementSelectScreen() {
   const [showList, setShowList] = useState(false);
   const [drafts, setDrafts] = useState<DraftTraitementRow[]>([]);
   const [erreurDeLecture, setErreurDeLecture] = useState<unknown>(null);
+  const { run: runDelete } = useAsyncAction();
 
   const charger = useCallback(() => {
     void runTask(() => listDraftTraitements(), {
@@ -47,6 +50,35 @@ export default function TraitementSelectScreen() {
       pathname: '/(traitement)/references' as any,
       params: { traitementId: draft.id, isValidationView: '1' },
     });
+  };
+
+  /**
+   * Fiches restées bloquées « ÉCHEC ENVOI » sans espoir d'aboutir (brouillon
+   * abandonné avec des champs obligatoires jamais remplis) : jusqu'ici sans
+   * issue, `deleteDraftTraitement` refuse toute fiche déjà `'validee'` (même
+   * garde que `deleteDraftProspection`, prospection.tsx), donc rien de connu
+   * du serveur ne peut être perdu par ce geste.
+   */
+  const handleDelete = (draft: DraftTraitementRow) => {
+    Alert.alert(
+      'Supprimer la fiche ?',
+      'Cette fiche brouillon sera définitivement supprimée.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: () =>
+            runDelete(
+              async () => {
+                await deleteDraftTraitement(draft);
+                charger();
+              },
+              { screen: 'traitement.select', context: { draftId: draft.id } }
+            ),
+        },
+      ]
+    );
   };
 
   return (
@@ -90,14 +122,37 @@ export default function TraitementSelectScreen() {
           ListEmptyComponent={
             <EtatVide erreur={erreurDeLecture} titreVide="Aucune fiche pour le moment." onReessayer={charger} />
           }
-          renderItem={({ item }) => (
-            <TouchableOpacity style={styles.row} onPress={() => openFiche(item)}>
-              <Text style={styles.rowTitle}>{item.numero_fiche ?? 'généré à l’enregistrement'}</Text>
-              <Text style={styles.rowSubtitle}>
-                {item.type_traitement} · {item.localite ?? 'localité non renseignée'}
-              </Text>
-            </TouchableOpacity>
-          )}
+          renderItem={({ item }) => {
+            const row = (
+              <TouchableOpacity style={styles.row} onPress={() => openFiche(item)}>
+                <Text style={styles.rowTitle}>{item.numero_fiche ?? 'généré à l’enregistrement'}</Text>
+                <Text style={styles.rowSubtitle}>
+                  {item.type_traitement} · {item.localite ?? 'localité non renseignée'}
+                </Text>
+              </TouchableOpacity>
+            );
+
+            // Swipe-to-delete réservé aux brouillons : une fiche déjà validée
+            // n'est de toute façon pas supprimable (garde dans
+            // `deleteDraftTraitement`) — autant ne pas proposer le geste.
+            if (item.statut !== 'brouillon') return row;
+
+            return (
+              <Swipeable
+                renderRightActions={() => (
+                  <TouchableOpacity
+                    style={styles.deleteAction}
+                    onPress={() => handleDelete(item)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.deleteActionText}>Supprimer</Text>
+                  </TouchableOpacity>
+                )}
+              >
+                {row}
+              </Swipeable>
+            );
+          }}
         />
       )}
 
@@ -150,6 +205,15 @@ const styles = StyleSheet.create({
   },
   rowTitle: { fontFamily: traitementFonts.mono, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre },
   rowSubtitle: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.label, color: traitementColors.texteSecondaire },
+  deleteAction: {
+    backgroundColor: '#DC2626',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    borderRadius: traitementRadii.carte,
+    marginBottom: 8,
+  },
+  deleteActionText: { fontFamily: traitementFonts.uiBold, color: '#FFFFFF', fontSize: traitementTypeSizes.label },
   backLink: {
     borderWidth: 1,
     borderStyle: 'dashed',

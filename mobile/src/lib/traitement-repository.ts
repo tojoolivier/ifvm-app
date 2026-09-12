@@ -1,6 +1,7 @@
 import { getDb } from './prospection-db';
 import { generateId } from './id';
 import { composerNumeroFiche } from './traitement-numero-fiche';
+import { PreconditionError } from './errors';
 
 export type TypeTraitement = 'AERIEN' | 'TERRESTRE';
 
@@ -1467,11 +1468,22 @@ export async function listUnsyncedTraitements(): Promise<DraftTraitement[]> {
 // SUPPRESSION
 // ==========================================
 
-/** Suppression physique d'un brouillon local (les tables enfants sont en CASCADE). */
-export async function deleteDraftTraitement(id: string): Promise<boolean> {
+/**
+ * Suppression physique d'un brouillon local (les tables enfants sont en
+ * CASCADE). Garde-fou identique à `deleteDraftProspection`
+ * (prospection-accueil.ts) : `statut` ne passe à `'validee'` qu'après un
+ * `/valider` réussi (cf. commentaire de `listUnsyncedTraitements` ci-dessus),
+ * donc une fiche encore `'brouillon'` n'a jamais été acceptée par le serveur
+ * — la supprimer ne perd aucune donnée qu'il connaît déjà.
+ */
+export async function deleteDraftTraitement(draft: Pick<DraftTraitementRow, 'id' | 'statut'>): Promise<boolean> {
+  if (draft.statut !== 'brouillon') {
+    throw new PreconditionError('Seules les fiches en brouillon peuvent être supprimées.');
+  }
+
   const db = await getDb();
 
-  const result = await db.runAsync('DELETE FROM traitement WHERE id = ?', [id]);
+  const result = await db.runAsync('DELETE FROM traitement WHERE id = ?', [draft.id]);
 
   return result.changes > 0;
 }

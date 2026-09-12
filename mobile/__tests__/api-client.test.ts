@@ -937,6 +937,43 @@ describe('API Client', () => {
       );
     });
 
+    it('garde le préfixe d\'index quand `loc` se termine par 0 (ex. populations[0]) — 0 est un index valide, pas une absence', async () => {
+      const token =
+        createJwt(
+          Math.floor(
+            Date.now() / 1000
+          ) + 3600
+        );
+
+      mockFetch.mockResolvedValueOnce(
+        mockJsonResponse({
+          ok: false,
+          status: 422,
+          json: async () => ({
+            detail: [
+              {
+                loc: ['body', 'populations', 0],
+                msg: 'Value error, La densité groupée (ind./m²) est obligatoire.',
+                type: 'value_error',
+              },
+              {
+                loc: ['body', 'populations', 1],
+                msg: 'Value error, La densité groupée (ind./m²) est obligatoire.',
+                type: 'value_error',
+              },
+            ],
+          }),
+        })
+      );
+
+      await expect(
+        apiClient.getProfile(token)
+      ).rejects.toThrow(
+        '0: Value error, La densité groupée (ind./m²) est obligatoire.; ' +
+          '1: Value error, La densité groupée (ind./m²) est obligatoire.'
+      );
+    });
+
     it('falls back to HTTP status', async () => {
       const token =
         createJwt(

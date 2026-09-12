@@ -1034,12 +1034,20 @@ describe('countUnsyncedTraitements', () => {
 
 describe('deleteDraftTraitement', () => {
   it('hard-deletes a local-only draft (children cascade)', async () => {
-    const result = await deleteDraftTraitement(AERIEN_INPUT.id);
+    const result = await deleteDraftTraitement({ id: AERIEN_INPUT.id, statut: 'brouillon' });
 
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('DELETE FROM traitement'),
       [AERIEN_INPUT.id]
     );
     expect(result).toBe(true);
+  });
+
+  it('refuse de supprimer une fiche déjà validée (même garde que deleteDraftProspection)', async () => {
+    await expect(
+      deleteDraftTraitement({ id: AERIEN_INPUT.id, statut: 'validee' })
+    ).rejects.toThrow('Seules les fiches en brouillon peuvent être supprimées.');
+
+    expect(runAsync).not.toHaveBeenCalled();
   });
 });
