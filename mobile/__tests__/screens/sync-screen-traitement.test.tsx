@@ -1,0 +1,106 @@
+/**
+ * Écran Synchronisation ((app)/sync.tsx) — le domaine « traitement » y était
+ * absent : ni affiché dans « Fiches en attente », ni inclus dans le lot
+ * envoyé par le bouton « Synchroniser ». Une fiche de traitement complète en
+ * attente d'envoi était donc signalée indéfiniment « Aucune fiche en attente »
+ * / « Aucune fiche à synchroniser », quel que soit le nombre de tentatives
+ * (#erreur-sync-fiche-introuvable).
+ */
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import SyncScreen from '@/app/(app)/sync';
+import { useAuthStore } from '@/lib/auth-store';
+import * as prospectionAccueil from '@/lib/prospection-accueil';
+import * as prospectionReview from '@/lib/prospection-review';
+import * as referentielSync from '@/lib/referentiel-sync';
+import * as referentielDb from '@/lib/referentiel-db';
+import * as traitementRepository from '@/lib/traitement-repository';
+import * as traitementSync from '@/lib/traitement-sync';
+
+jest.mock('expo-router', () => ({
+  ...require('../test-utils/mock-expo-router').expoRouterMock(),
+  useFocusEffect: (effect: () => void) => effect(),
+}));
+
+jest.mock('@/lib/prospection-accueil', () => ({
+  loadAccueilData: jest.fn(),
+}));
+
+jest.mock('@/lib/prospection-review', () => ({
+  syncAllProspections: jest.fn(),
+}));
+
+jest.mock('@/lib/referentiel-sync', () => ({
+  pullReferentiel: jest.fn(),
+}));
+
+jest.mock('@/lib/referentiel-db', () => ({
+  compterReferentielLocal: jest.fn(),
+}));
+
+jest.mock('@/lib/traitement-repository', () => ({
+  getTraitement: jest.fn(),
+  listRecentTraitements: jest.fn(),
+}));
+
+jest.mock('@/lib/traitement-sync', () => ({
+  syncAllTraitements: jest.fn(),
+}));
+
+const EMPTY_ACCUEIL = { unsyncedCount: 0, activeDraft: null, recent: [], validated: [], pendingSync: [] };
+
+const TRAITEMENT_EN_ATTENTE = {
+  id: 'trait-1',
+  prospection_id: 'prosp-1',
+  numero_fiche: 'TRAIT-2026-00042',
+  type_traitement: 'TERRESTRE',
+  date_traitement: '2026-09-01',
+  statut: 'brouillon',
+  statut_sync: 'local',
+  updated_at: '2026-09-01T10:00:00Z',
+} as any;
+
+describe('SyncScreen — fiches de traitement en attente', () => {
+  beforeEach(() => {
+    useAuthStore.setState({ token: 'token-test' } as any);
+
+    jest.mocked(prospectionAccueil.loadAccueilData).mockReset().mockResolvedValue(EMPTY_ACCUEIL);
+    jest.mocked(prospectionReview.syncAllProspections)
+      .mockReset()
+      .mockResolvedValue({ reussies: [], echouees: [], conflits: [] });
+    jest.mocked(referentielSync.pullReferentiel).mockReset().mockResolvedValue(undefined);
+    jest.mocked(referentielDb.compterReferentielLocal).mockReset().mockResolvedValue([]);
+    jest.mocked(traitementRepository.listRecentTraitements)
+      .mockReset()
+      .mockResolvedValue([TRAITEMENT_EN_ATTENTE]);
+    jest.mocked(traitementRepository.getTraitement)
+      .mockReset()
+      .mockResolvedValue(TRAITEMENT_EN_ATTENTE);
+    jest.mocked(traitementSync.syncAllTraitements)
+      .mockReset()
+      .mockResolvedValue({ reussies: ['trait-1'], echouees: [], conflits: [] });
+  });
+
+  it('affiche la fiche de traitement en attente, pas « Aucune fiche en attente »', async () => {
+    await render(<SyncScreen />);
+
+    await waitFor(() => expect(screen.getByText('TRAIT-2026-00042')).toBeVisible());
+    expect(screen.queryByText('Aucune fiche en attente')).toBeNull();
+    expect(screen.getByText('🔄 Synchroniser (1)')).toBeVisible();
+  });
+
+  it('« Synchroniser » envoie la fiche de traitement — le résumé n\'affiche plus « Aucune fiche à synchroniser »', async () => {
+    await render(<SyncScreen />);
+    await screen.findByText('TRAIT-2026-00042');
+
+    fireEvent.press(screen.getByText('🔄 Synchroniser (1)'));
+
+    await waitFor(() =>
+      expect(traitementSync.syncAllTraitements).toHaveBeenCalledWith(
+        [TRAITEMENT_EN_ATTENTE],
+        'token-test'
+      )
+    );
+    expect(screen.queryByText('Aucune fiche à synchroniser')).toBeNull();
+    await waitFor(() => expect(screen.getByText(/synchronisée/)).toBeVisible());
+  });
+});
