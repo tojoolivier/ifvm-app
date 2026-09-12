@@ -504,7 +504,26 @@ class TraitementRepositoryImpl(TraitementRepository):
         return await self.get_by_id(traitement_id)
 
     async def update_sync(self, traitement: Traitement) -> Traitement:
-        model = await self.session.get(TraitementModel, traitement.id)
+        # `options=` explicite (même jeu que `get_by_id`) : `cible`/`aerien`/
+        # `terrestre` n'ont pas de `lazy="selectin"` au niveau du mapping,
+        # donc un `session.get()` nu laisse ces relations en lazy-load
+        # `select` (synchrone) par défaut. Lu ci-dessous sans `await`
+        # (`model.cible is not None`, etc.) : sans le chargement explicite,
+        # cet accès ne tenait que par un effet de bord — la même identité
+        # d'objet éventuellement déjà en cache dans la session depuis un
+        # `get_by_id()` antérieur du même appelant (`existant`, cf.
+        # traitement_use_cases.py) — jamais garanti par ce module lui-même,
+        # et source de `sqlalchemy.exc.MissingGreenlet` dès que ce n'est pas
+        # le cas.
+        model = await self.session.get(
+            TraitementModel,
+            traitement.id,
+            options=[
+                selectinload(TraitementModel.cible),
+                selectinload(TraitementModel.aerien),
+                selectinload(TraitementModel.terrestre),
+            ],
+        )
         model.prospection_id = traitement.prospection_id
         model.numero_fiche = traitement.numero_fiche
         model.mode_traitement = traitement.mode_traitement
