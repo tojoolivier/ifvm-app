@@ -16,7 +16,6 @@ export interface DashboardProspection {
   prospecteur_id: string
   statut: string
   n_fiche: string | null
-  n_releve: string | null
   date_prospection: string
   surface_infestee: number | null
   created_at: string
@@ -240,7 +239,7 @@ export function buildActiviteRecente(
   const lignes: LigneActivite[] = [
     ...prospections.map((p) => ({
       id: p.id,
-      numero: p.n_fiche ?? p.n_releve ?? p.id.slice(0, 8) + '…',
+      numero: p.n_fiche ?? p.id.slice(0, 8) + '…',
       type: TYPE_PROSPECTION_LABELS[p.type_prospection] ?? p.type_prospection,
       agent: nomAgent(p.prospecteur_id),
       lieu: libelleStation(p.station_id),

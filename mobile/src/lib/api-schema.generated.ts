@@ -2213,8 +2213,6 @@ export interface components {
             campagne_id: string;
             /** Station Id */
             station_id?: string | null;
-            /** N Releve */
-            n_releve?: string | null;
             /** N Fiche */
             n_fiche?: string | null;
             /** N Message */
@@ -2396,8 +2394,6 @@ export interface components {
             prospecteur_id: string;
             /** Station Id */
             station_id: string | null;
-            /** N Releve */
-            n_releve: string | null;
             /** N Fiche */
             n_fiche: string | null;
             /** N Message */
@@ -2585,8 +2581,6 @@ export interface components {
         ProspectionUpdate: {
             /** Station Id */
             station_id?: string | null;
-            /** N Releve */
-            n_releve?: string | null;
             /** N Fiche */
             n_fiche?: string | null;
             /** N Message */

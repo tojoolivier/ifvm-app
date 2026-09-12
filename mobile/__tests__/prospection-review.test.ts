@@ -140,7 +140,6 @@ function draft(overrides: Partial<DraftProspection> = {}): DraftProspection {
     signalement_date: null,
     signalement_description: null,
     conclusion_validation: null,
-    n_releve: null,
     n_fiche: 'FI-20260802-ABC123',
     n_message: null,
     especes: null,
@@ -393,7 +392,6 @@ describe('enregistrerEtSynchroniser', () => {
     expect(mockCreateProspection).toHaveBeenCalledWith(
       'token-1',
       expect.objectContaining({
-        n_releve: null,
         populations: [expect.objectContaining({ espece: 'LMC', categorie: 'imago', densite_diffuse: 5 })],
         infestations: [expect.objectContaining({ type_cible: 'dense', surface_totale: 5 })],
       })

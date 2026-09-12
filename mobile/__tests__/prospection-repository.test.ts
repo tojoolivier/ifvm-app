@@ -122,7 +122,6 @@ describe('materialiserProspectionValidee', () => {
     dateProspection: '2026-08-01',
     surfaceInfestee: 12.5,
     nFiche: 'F-001',
-    nReleve: null,
     nMessage: null,
     region: 'Atsimo-Andrefana',
     district: 'Toliara II',
@@ -304,16 +303,6 @@ describe('updateProspectionReference', () => {
     );
   });
 
-  it('persists n° relevé quand fourni', async () => {
-    getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW, ...REFERENCE_INPUT, n_releve: 'REL-STA1-20260711' });
-
-    await updateProspectionReference(BASE_INPUT.id, { ...REFERENCE_INPUT, nReleve: 'REL-STA1-20260711' });
-
-    expect(runAsync).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE prospection SET'),
-      expect.arrayContaining(['REL-STA1-20260711'])
-    );
-  });
 });
 
 describe('updateProspectionEspeces', () => {

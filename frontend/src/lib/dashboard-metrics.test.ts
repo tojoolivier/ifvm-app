@@ -21,7 +21,6 @@ function prospection(over: Partial<DashboardProspection> = {}): DashboardProspec
     prospecteur_id: 'u1',
     statut: 'validee',
     n_fiche: 'PR-2026-0148-INT',
-    n_releve: null,
     date_prospection: '2026-08-16',
     surface_infestee: 100,
     created_at: '2026-08-16T08:00:00Z',

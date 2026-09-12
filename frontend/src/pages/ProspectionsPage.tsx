@@ -25,7 +25,6 @@ interface Prospection {
   date_prospection: string
   statut: string
   n_fiche: string | null
-  n_releve: string | null
   surface_infestee: number | null
 }
 
@@ -100,7 +99,7 @@ export function ProspectionsPage() {
 
   const agentLabel = (p: Prospection) => nomAgent(p.prospecteur_id)
 
-  const ficheLabel = (p: Prospection) => p.n_fiche ?? p.n_releve ?? shortId(p.id)
+  const ficheLabel = (p: Prospection) => p.n_fiche ?? shortId(p.id)
 
   // Recalculé à chaque rendu : les libellés dépendent de trois requêtes et le
   // volume est déjà borné par la pagination.

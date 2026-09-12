@@ -132,7 +132,6 @@ export async function assurerProspectionDisponibleLocalement(fiche: ProspectionR
     dateProspection: fiche.date_prospection,
     surfaceInfestee: fiche.surface_infestee ?? null,
     nFiche: fiche.n_fiche ?? null,
-    nReleve: fiche.n_releve ?? null,
     nMessage: fiche.n_message ?? null,
     region: fiche.region ?? null,
     district: fiche.district ?? null,
