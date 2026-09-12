@@ -1221,6 +1221,18 @@ export async function listMesTraitements(
 }
 
 /**
+ * Ligne `listReprenableTraitements` : la fiche d'origine (validée, surface
+ * restante nulle ou positive), avec `surface_restante_ha` — surface encore
+ * infestée non traitée par cette fiche, donc surface disponible à traiter
+ * pour la reprise. `null` tant qu'aucune synchronisation n'a rapatrié cette
+ * valeur depuis le serveur (cf. commentaire de la requête ci-dessous) — à
+ * afficher comme « non communiquée », pas comme 0 ha.
+ */
+export interface ReprenableTraitementRow extends DraftTraitementRow {
+  surface_restante_ha: number | null;
+}
+
+/**
  * Décision : pas de cache séparé du dernier pull `reprenable=true` pour ce lot.
  * On interroge directement la copie locale des fiches déjà validées, en
  * reproduisant les deux conditions serveur (`TraitementRepository.list_by_filters`,
@@ -1241,11 +1253,11 @@ export async function listMesTraitements(
  * est généralisé à l'Aérien — chaque type a sa propre chaîne (indépendante l'une de
  * l'autre), d'où deux blocs symétriques réunis par UNION plutôt qu'un JOIN unique.
  */
-export async function listReprenableTraitements(): Promise<DraftTraitementRow[]> {
+export async function listReprenableTraitements(): Promise<ReprenableTraitementRow[]> {
   const db = await getDb();
 
-  return db.getAllAsync<DraftTraitementRow>(
-    `SELECT traitement.*
+  return db.getAllAsync<ReprenableTraitementRow>(
+    `SELECT traitement.*, traitement_terrestre.surface_restante_ha AS surface_restante_ha
      FROM traitement
      JOIN traitement_terrestre ON traitement_terrestre.traitement_id = traitement.id
      WHERE traitement.statut = 'validee'
@@ -1254,7 +1266,7 @@ export async function listReprenableTraitements(): Promise<DraftTraitementRow[]>
          SELECT traitement_origine_id FROM traitement_terrestre WHERE traitement_origine_id IS NOT NULL
        )
      UNION
-     SELECT traitement.*
+     SELECT traitement.*, traitement_aerien.surface_restante_ha AS surface_restante_ha
      FROM traitement
      JOIN traitement_aerien ON traitement_aerien.traitement_id = traitement.id
      WHERE traitement.statut = 'validee'
