@@ -307,7 +307,7 @@ export default function VegetationScreen() {
             <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
               <Text style={styles.back}>‹</Text>
             </TouchableOpacity>
-            <Text style={styles.title}>Strates</Text>
+            <Text style={styles.title}>Végétation & Sol</Text>
           </View>
 
           <ScrollView ref={scrollRef} style={styles.scroll} contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>

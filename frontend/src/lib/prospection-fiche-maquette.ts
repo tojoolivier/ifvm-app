@@ -67,7 +67,6 @@ export interface InfestationFiche {
 
 export interface ProspectionFiche {
   n_fiche: string | null
-  n_releve: string | null
   type_prospection: string
   date_prospection: string
   created_at: string
@@ -122,8 +121,8 @@ function ligne(k: string, v: string): LigneFiche {
   return v === TIRET ? { k, v, muted: true } : { k, v }
 }
 
-export const NUMERO_FICHE = (p: Pick<ProspectionFiche, 'n_fiche' | 'n_releve'>): string =>
-  p.n_fiche ?? p.n_releve ?? TIRET
+export const NUMERO_FICHE = (p: Pick<ProspectionFiche, 'n_fiche'>): string =>
+  p.n_fiche ?? TIRET
 
 // ---------------------------------------------------------------------------
 // Bloc A — Référence & localisation

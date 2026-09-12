@@ -48,12 +48,6 @@ function generateNumeroFiche(draftId: string, dateProspection: string): string {
   return `FI-${datePart}-${idPart}`;
 }
 
-function generateNumeroReleve(stationId: string | null, dateProspection: string): string {
-  const datePart = dateProspection.replace(/-/g, '');
-  const stationPart = (stationId ?? 'XXX').replace(/-/g, '').slice(0, 6).toUpperCase();
-  return `REL-${stationPart}-${datePart}`;
-}
-
 function formatDateHeure(date: Date): string {
   const p = (n: number) => String(n).padStart(2, '0');
   return `${p(date.getDate())}/${p(date.getMonth() + 1)} ${p(date.getHours())}:${p(date.getMinutes())}`;
@@ -540,7 +534,6 @@ export default function ReferenceScreen() {
 
           const dateProspection = draft?.date_prospection ?? new Date().toISOString().slice(0, 10);
           const nFiche = generateNumeroFiche(draftId, dateProspection);
-          const nReleve = generateNumeroReleve(stationEstSaisieLibre ? null : station?.id ?? null, dateProspection);
 
           // Préparer les données avec des valeurs par défaut (0 pour intensif)
           const surfaceProspecteeValue = value.surfaceProspectee ? Number(value.surfaceProspectee) : 0;
@@ -555,7 +548,6 @@ export default function ReferenceScreen() {
             surfaceInfestee: surfaceInfesteeValue,
             biotope: selectedBiotopes.length > 0 ? JSON.stringify(selectedBiotopes) : null,
             nFiche,
-            nReleve,
             region: adminArea.region,
             district: adminArea.district,
             commune: adminArea.commune,
@@ -578,10 +570,6 @@ export default function ReferenceScreen() {
   });
 
   const nFichePreview = draftId ? generateNumeroFiche(draftId, draft?.date_prospection ?? '') : '—';
-  const nRelevePreview = generateNumeroReleve(
-    stationEstSaisieLibre ? null : station?.id ?? null,
-    draft?.date_prospection ?? ''
-  );
 
   return (
     <View style={styles.root}>
@@ -756,10 +744,6 @@ export default function ReferenceScreen() {
               <View style={styles.metaField}>
                 <Text style={styles.metaLabel}>N° Fiche ⟳</Text>
                 <Text style={styles.metaValue}>{nFichePreview}</Text>
-              </View>
-              <View style={styles.metaField}>
-                <Text style={styles.metaLabel}>N° relevé ⟳</Text>
-                <Text style={styles.metaValue}>{nRelevePreview}</Text>
               </View>
               <View style={styles.metaField}>
                 <Text style={styles.metaLabel}>Date/heure ⟳</Text>

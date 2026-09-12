@@ -452,7 +452,6 @@ class ProspectionCreate(BaseModel):
     type_prospection: TypeProspection
     campagne_id: uuid.UUID
     station_id: uuid.UUID | None = None
-    n_releve: str | None = None
     n_fiche: str | None = None
     n_message: str | None = None
     date_prospection: date
@@ -563,7 +562,6 @@ class ProspectionCreate(BaseModel):
 
 class ProspectionUpdate(BaseModel):
     station_id: uuid.UUID | None = None
-    n_releve: str | None = None
     n_fiche: str | None = None
     n_message: str | None = None
     date_prospection: date | None = None
@@ -700,7 +698,6 @@ class ProspectionRead(BaseModel):
     campagne_id: uuid.UUID
     prospecteur_id: uuid.UUID
     station_id: uuid.UUID | None
-    n_releve: str | None
     n_fiche: str | None
     n_message: str | None
     date_prospection: date

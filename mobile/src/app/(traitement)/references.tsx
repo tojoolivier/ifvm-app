@@ -60,7 +60,7 @@ export default function ReferencesScreen() {
   // Numéro métier (#numero-fiche-prospection-liee) — jamais l'UUID technique
   // `prospectionId` affiché tel quel : dérivé de la fiche de prospection liée,
   // même ordre de priorité que « Consulter une fiche validée »
-  // (prospection-picker.tsx : n_fiche, puis n_releve, puis n_message).
+  // (prospection-picker.tsx : n_fiche, puis n_message).
   const [prospectionNFiche, setProspectionNFiche] = useState<string | null>(null);
 
   const readOnly = isValidationView === '1';
@@ -139,7 +139,7 @@ export default function ReferencesScreen() {
         if (!prospection) return;
         setProspectionStatut(prospection.statut);
         setProspectionUpdatedAt(prospection.updated_at);
-        setProspectionNFiche(prospection.n_fiche ?? prospection.n_releve ?? prospection.n_message ?? null);
+        setProspectionNFiche(prospection.n_fiche ?? prospection.n_message ?? null);
         // Nouvelle fiche seulement (une fiche déjà créée garde sa date de
         // validation enregistrée, restaurée par l'effet précédent) : la date de
         // validation — non modifiable — est celle de la fiche de prospection liée,

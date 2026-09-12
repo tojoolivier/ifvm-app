@@ -33,7 +33,6 @@ function fiche(over: Record<string, unknown> = {}) {
     prospecteur_id: 'u1',
     statut: 'validee',
     n_fiche: 'PR-2026-0148-INT',
-    n_releve: null,
     date_prospection: '2026-08-17',
     surface_infestee: 100,
     created_at: new Date('2026-08-17T09:40:00').toISOString(),

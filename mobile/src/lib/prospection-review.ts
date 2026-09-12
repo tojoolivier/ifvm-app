@@ -76,7 +76,6 @@ export interface InfestationDetailViewModel {
 
 export interface RecapitulatifViewModel {
   nFiche: string;
-  nReleve: string;
   dateProspection: string;
   totalCaptures: number;
   totalFemelles: number;
@@ -272,7 +271,6 @@ export function buildRecapitulatif(
 
   return {
     nFiche: draft.n_fiche ?? '—',
-    nReleve: draft.n_releve ?? '—',
     dateProspection: draft.date_prospection,
     totalCaptures: totalCaptures(counts),
     totalFemelles: totalBySexe(counts, 'F'),
@@ -383,7 +381,6 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
     campagne_id: draft.campagne_id,
     // 🔑 station_id = null pour extensive, la valeur pour intensive
     station_id: draft.type_prospection === 'extensive' ? null : stationId,
-    n_releve: draft.n_releve || null,
     n_fiche: draft.n_fiche || null,
     n_message: draft.n_message || null,
     date_prospection: draft.date_prospection,
