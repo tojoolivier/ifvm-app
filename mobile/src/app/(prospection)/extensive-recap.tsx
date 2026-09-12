@@ -93,8 +93,8 @@ function buildImagoRows(row: PopulationRow | null): DetailRow[] {
       label: 'Comportement de l’essaim',
       value: row?.essaim_en_vol ? 'En vol' : row?.essaim_pose ? 'Posé' : '—',
     },
-    { label: 'Densité diffuse', value: row?.densite_diffuse != null ? `${row.densite_diffuse} D/ha` : '—' },
-    { label: 'Densité groupée', value: row?.densite_groupee != null ? `${row.densite_groupee} D/m²` : '—' },
+    { label: 'Densité diffuse', value: row?.densite_diffuse != null ? `${row.densite_diffuse} ind./ha` : '—' },
+    { label: 'Densité groupée', value: row?.densite_groupee != null ? `${row.densite_groupee} ind./m²` : '—' },
   ];
 }
 
@@ -139,8 +139,8 @@ function buildLarveRows(row: PopulationRow | null): DetailRow[] {
     { label: 'Interdistance (m)', value: row?.interdistance != null ? String(row.interdistance) : '—' },
     { label: 'Surface contaminée (ha)', value: row?.surface_contaminee_ha != null ? String(row.surface_contaminee_ha) : '—' },
     // ✅ AJOUT : Densités pour les larves (maintenant sauvegardées en base)
-    { label: 'Densité diffuse', value: row?.densite_diffuse != null ? `${row.densite_diffuse} D/ha` : '—' },
-    { label: 'Densité groupée', value: row?.densite_groupee != null ? `${row.densite_groupee} D/m²` : '—' },
+    { label: 'Densité diffuse', value: row?.densite_diffuse != null ? `${row.densite_diffuse} ind./ha` : '—' },
+    { label: 'Densité groupée', value: row?.densite_groupee != null ? `${row.densite_groupee} ind./m²` : '—' },
     { label: 'Autres informations', value: autres.length > 0 ? autres.join(' · ') : '—' },
   ];
 }

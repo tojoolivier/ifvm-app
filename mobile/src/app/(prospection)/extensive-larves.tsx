@@ -143,7 +143,7 @@ export default function ExtensiveLarvesScreen() {
     if (!densiteDiffuseCheck.valid) {
       setSpecies(densiteDiffuseCheck.espece);
       setShowPopDiffError(true);
-      Alert.alert('Densité diffuse requise', 'La densité diffuse (D/ha) est obligatoire.');
+      Alert.alert('Densité diffuse requise', 'La densité diffuse (ind./ha) est obligatoire.');
       return;
     }
 
@@ -153,7 +153,7 @@ export default function ExtensiveLarvesScreen() {
     if (!densiteGroupeeCheck.valid) {
       setSpecies(densiteGroupeeCheck.espece);
       setShowPopGroupError(true);
-      Alert.alert('Densité groupée requise', 'La densité groupée (/m²) est obligatoire.');
+      Alert.alert('Densité groupée requise', 'La densité groupée (ind./m²) est obligatoire.');
       return;
     }
 
@@ -339,7 +339,7 @@ export default function ExtensiveLarvesScreen() {
               <Text style={styles.sectionLabel}>📊 Densités</Text>
               <View style={styles.row}>
                 <View style={[styles.card, styles.flex1, showPopDiffError && data.popDiff.trim() === '' && styles.cardError]}>
-                  <Text style={[styles.label, styles.requiredLabel]}>Population diffuse D/ha *</Text>
+                  <Text style={[styles.label, styles.requiredLabel]}>Population diffuse ind./ha *</Text>
                   <TextInput
                     value={data.popDiff}
                     onChangeText={(text) => {
@@ -353,7 +353,7 @@ export default function ExtensiveLarvesScreen() {
                   />
                 </View>
                 <View style={[styles.card, styles.flex1, showPopGroupError && data.popGroup.trim() === '' && styles.cardError]}>
-                  <Text style={[styles.label, styles.requiredLabel]}>Population groupée D/m² *</Text>
+                  <Text style={[styles.label, styles.requiredLabel]}>Population groupée ind./m² *</Text>
                   <TextInput
                     value={data.popGroup}
                     onChangeText={(text) => {
@@ -368,10 +368,10 @@ export default function ExtensiveLarvesScreen() {
                 </View>
               </View>
               {showPopDiffError && data.popDiff.trim() === '' && (
-                <Text style={styles.errorText}>La densité diffuse (D/ha) est obligatoire.</Text>
+                <Text style={styles.errorText}>La densité diffuse (ind./ha) est obligatoire.</Text>
               )}
               {showPopGroupError && data.popGroup.trim() === '' && (
-                <Text style={styles.errorText}>La densité groupée (/m²) est obligatoire.</Text>
+                <Text style={styles.errorText}>La densité groupée (ind./m²) est obligatoire.</Text>
               )}
               <Text style={styles.speciesHint}>Données spécifiques à {species}</Text>
             </View>
@@ -469,11 +469,11 @@ export default function ExtensiveLarvesScreen() {
               {/* ✨ AJOUT : Densités dans le récapitulatif */}
               <View style={styles.summaryDivider} />
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Pop. diffuse D/ha :</Text>
+                <Text style={styles.summaryLabel}>Pop. diffuse ind./ha :</Text>
                 <Text style={styles.summaryValue}>{data.popDiff || '0'}</Text>
               </View>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Pop. groupée D/m² :</Text>
+                <Text style={styles.summaryLabel}>Pop. groupée ind./m² :</Text>
                 <Text style={styles.summaryValue}>{data.popGroup || '0'}</Text>
               </View>
               <View style={styles.ruleBox}>

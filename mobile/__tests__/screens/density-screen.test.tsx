@@ -1,7 +1,7 @@
 /**
  * Règle métier : 4 blocs de densité indépendants — Locusta migratoria × Imagos/Larves et
- * Nomadacris × Imagos/Larves — chacun avec sa propre Densité diffuse (D/ha) ET Densité
- * groupée (/m², #densite-groupee-obligatoire), toutes deux obligatoires, jamais
+ * Nomadacris × Imagos/Larves — chacun avec sa propre Densité diffuse (ind./ha) ET Densité
+ * groupée (ind./m², #densite-groupee-obligatoire), toutes deux obligatoires, jamais
  * partagées entre espèce/stade.
  */
 import { Alert } from 'react-native';
@@ -86,9 +86,9 @@ describe('DensityScreen — 4 blocs de densité indépendants (LMC/NSE × imago/
 
     fireEvent.press(screen.getByText('Accouplement  ›'));
 
-    expect(alertSpy).toHaveBeenCalledWith('Densité diffuse requise', expect.stringContaining('D/ha'));
+    expect(alertSpy).toHaveBeenCalledWith('Densité diffuse requise', expect.stringContaining('ind./ha'));
     expect(prospectionRepository.saveProspectionPopulation).not.toHaveBeenCalled();
-    expect(await screen.findByText('Veuillez renseigner la densité diffuse (D/ha).')).toBeVisible();
+    expect(await screen.findByText('Veuillez renseigner la densité diffuse (ind./ha).')).toBeVisible();
   });
 
   it('enregistre la densité diffuse renseignée sous la bonne espèce/stade, sans écraser les autres blocs', async () => {
@@ -125,8 +125,8 @@ describe('DensityScreen — 4 blocs de densité indépendants (LMC/NSE × imago/
     await screen.findByDisplayValue('15');
     fireEvent.press(screen.getByText('Accouplement  ›'));
 
-    expect(alertSpy).toHaveBeenCalledWith('Densité groupée requise', 'La densité groupée (/m²) est obligatoire.');
+    expect(alertSpy).toHaveBeenCalledWith('Densité groupée requise', 'La densité groupée (ind./m²) est obligatoire.');
     expect(prospectionRepository.saveProspectionPopulation).not.toHaveBeenCalled();
-    expect(await screen.findByText('La densité groupée (/m²) est obligatoire.')).toBeVisible();
+    expect(await screen.findByText('La densité groupée (ind./m²) est obligatoire.')).toBeVisible();
   });
 });

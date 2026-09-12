@@ -280,7 +280,7 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
    * « Suivant » tant qu'une espèce avec des captures n'a pas renseigné sa densité
    * diffuse. Phases déjà cohérentes dans la fixture (captures_sol = captures_nombre)
    * pour isoler cette règle de « Captures = Phases », vérifiée par ailleurs. */
-  it('Densité diffuse (D/ha) obligatoire dès qu’il y a des captures — bloque puis débloque « Suivant »', async () => {
+  it('Densité diffuse (ind./ha) obligatoire dès qu’il y a des captures — bloque puis débloque « Suivant »', async () => {
     jest.mocked(prospectionRepository.getProspectionPopulation).mockImplementation(async (_id, espece) =>
       espece === 'LMC'
         ? ({
@@ -300,7 +300,7 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
     await settle();
 
     fireEvent.press(screen.getByText('Suivant : Larves ›'));
-    await waitFor(() => expect(screen.getByText('La densité diffuse (D/ha) est obligatoire.')).toBeVisible());
+    await waitFor(() => expect(screen.getByText('La densité diffuse (ind./ha) est obligatoire.')).toBeVisible());
     expect(prospectionRepository.saveProspectionPopulation).not.toHaveBeenCalled();
 
     // popDiff est le premier champ vide (popGroup est déjà rempli par la fixture).
