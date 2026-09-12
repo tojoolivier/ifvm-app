@@ -110,9 +110,7 @@ export default function SpeciesScreen() {
             <Text style={styles.hint}>Touchez les stades présents. Seules les grilles cochées apparaîtront.</Text>
 
             <View style={[styles.card, styles.cardActive]}>
-              <Text style={styles.cardTitle}>
-                Locusta migratoria <Text style={styles.italic}>capito</Text>
-              </Text>
+              <Text style={styles.cardTitle}>Locusta migratoria capito</Text>
               <View style={styles.toggleRow}>
                 <TouchableOpacity
                   style={[styles.toggle, selection.lmcImago && styles.toggleActive]}
@@ -132,9 +130,7 @@ export default function SpeciesScreen() {
             </View>
 
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>
-                Nomadacris <Text style={styles.italic}>septemfasciata</Text>
-              </Text>
+              <Text style={styles.cardTitle}>Nomadacris septemfasciata</Text>
               <View style={styles.toggleRow}>
                 <TouchableOpacity
                   style={[styles.toggle, selection.nseImago && styles.toggleActive]}
@@ -191,8 +187,11 @@ const styles = StyleSheet.create({
   hint: { fontSize: 12, lineHeight: 17, color: TEXT_SECONDARY, marginBottom: 14 },
   card: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 13, padding: 14, marginBottom: 12 },
   cardActive: { borderWidth: 2, borderColor: GREEN },
-  cardTitle: { fontSize: 14, fontWeight: '700', color: TEXT },
-  italic: { fontStyle: 'italic', fontWeight: '500', color: TEXT_SECONDARY },
+  // Nom scientifique en italique réel (fontStyle, pas des caractères Unicode) —
+  // convention de nomenclature (Locusta migratoria capito / Nomadacris
+  // septemfasciata), uniquement décoratif : n'affecte ni la valeur enregistrée
+  // (`prospection.especes`, cf. prospection-especes.ts) ni aucune autre règle.
+  cardTitle: { fontSize: 14, fontWeight: '700', fontStyle: 'italic', color: TEXT },
   toggleRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
   toggle: { flex: 1, borderRadius: 9, padding: 11, alignItems: 'center', backgroundColor: INACTIVE_BG },
   toggleActive: { backgroundColor: GREEN },

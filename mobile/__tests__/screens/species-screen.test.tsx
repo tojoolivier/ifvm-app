@@ -73,6 +73,29 @@ describe('SpeciesScreen', () => {
     );
   });
 
+  /**
+   * #especes-nom-scientifique-italique : convention de nomenclature — le nom
+   * scientifique complet (genre + espèce + sous-espèce) doit être rendu en
+   * italique réel (`fontStyle: 'italic'`, mécanisme du framework), pas
+   * seulement l'épithète comme avant ce correctif, et jamais via des
+   * caractères Unicode simulant l'italique.
+   */
+  it('affiche les deux noms scientifiques complets, en italique réelle (fontStyle)', async () => {
+    useProspectionWizardStore.setState({
+      draft: { id: 'draft-123', type_prospection: 'intensive', especes: null } as any,
+      captures: [],
+    });
+
+    await render(<SpeciesScreen />);
+
+    const locusta = await screen.findByText('Locusta migratoria capito');
+    const nomadacris = await screen.findByText('Nomadacris septemfasciata');
+
+    for (const noeud of [locusta, nomadacris]) {
+      expect(noeud.props.style).toEqual(expect.objectContaining({ fontStyle: 'italic' }));
+    }
+  });
+
   it("part toujours vers density.tsx, même quand la première grille sélectionnée est une larve", async () => {
     // Régression : `firstScreen` ne testait que `grilles[0]?.categorie === 'imago'` —
     // sélectionner uniquement une larve envoyait directement vers `captures`, sautant
