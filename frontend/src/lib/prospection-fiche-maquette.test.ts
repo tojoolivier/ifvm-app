@@ -20,7 +20,6 @@ import {
 
 const PROSPECTION: ProspectionFiche = {
   n_fiche: 'PR-2026-0148-INT',
-  n_releve: null,
   type_prospection: 'intensive',
   date_prospection: '2026-08-14',
   created_at: '2026-08-14T07:42:00',

@@ -89,7 +89,7 @@ export default function TraitementProspectionPickerScreen() {
               disabled={isSelectionEnCours}
             >
               <Text style={styles.rowTitle}>
-                {LIBELLE_TYPE[item.type_prospection] ?? item.type_prospection} · {item.n_fiche ?? item.n_releve ?? item.n_message ?? 'sans référence'}
+                {LIBELLE_TYPE[item.type_prospection] ?? item.type_prospection} · {item.n_fiche ?? item.n_message ?? 'sans référence'}
               </Text>
               <Text style={styles.rowSubtitle}>
                 {item.date_prospection?.slice(0, 10) ?? 'date inconnue'} ·{' '}
