@@ -410,11 +410,16 @@ function extractErrorMessage(
       )
       .map((item) => {
         const field =
-          Array.isArray(item.loc)
+          Array.isArray(item.loc) && item.loc.length > 0
             ? item.loc[item.loc.length - 1]
             : null;
 
-        return field
+        // `field` peut légitimement valoir 0 (index du premier élément d'une
+        // liste, ex. `populations.0`) — un test de vérité (`field ? … : …`)
+        // le traiterait comme absent et avalerait le préfixe, rendant ce
+        // message indiscernable de ceux sans `loc` du tout. D'où le test
+        // explicite null/undefined plutôt qu'un simple booléen.
+        return field !== null && field !== undefined
           ? `${field}: ${item.msg}`
           : item.msg;
       });
