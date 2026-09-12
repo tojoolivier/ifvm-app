@@ -147,15 +147,21 @@ export default function ReferencesScreen() {
         // reprendre, entrée directe par prospectionId).
         if (!routeTraitementId) {
           setDateValidation(prospection.date_prospection.slice(0, 10));
-          // Localité pré-remplie depuis la fiche de prospection extensive liée
-          // (`station_libre`, « nom du lieu-dit / repère local ») — modifiable
-          // ensuite (filet de sécurité, notamment sur une prospection intensive
-          // qui n'a pas ce champ). N'écrase jamais une saisie déjà présente : lu
-          // via getState() (pas la variable `store` de ce render, obsolète —
-          // cet effet ne dépend pas de `store` et ne se rejoue pas si l'agent a
-          // déjà tapé quelque chose pendant que cette requête était en vol).
-          if (prospection.station_libre && !useTraitementCaptureStore.getState().ref.localite) {
-            store.updateRef({ localite: prospection.station_libre });
+          // Localité pré-remplie depuis la fiche de prospection liée, déjà
+          // validée — jamais ressaisie pour créer la fiche de traitement
+          // (#localite-traitement-conservee-prospection). `station_nom`
+          // (intensif, référentiel) ou `station_libre` (extensif, saisie
+          // libre) : même ordre de priorité, et même exclusivité mutuelle
+          // selon le type de prospection, que `stationLabel()`
+          // ((app)/prospection.tsx et fiches.tsx). Modifiable ensuite (filet
+          // de sécurité, ex. fiche sans aucun des deux champs renseigné).
+          // N'écrase jamais une saisie déjà présente : lu via getState() (pas
+          // la variable `store` de ce render, obsolète — cet effet ne dépend
+          // pas de `store` et ne se rejoue pas si l'agent a déjà tapé quelque
+          // chose pendant que cette requête était en vol).
+          const localitePreremplie = prospection.station_nom || prospection.station_libre;
+          if (localitePreremplie && !useTraitementCaptureStore.getState().ref.localite) {
+            store.updateRef({ localite: localitePreremplie });
           }
         }
       })
