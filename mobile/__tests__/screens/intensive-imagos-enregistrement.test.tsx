@@ -76,7 +76,7 @@ describe('IntensiveImagosScreen — enregistrement complet', () => {
     fireEvent.press(screen.getByText('Dense'));
     await settle();
 
-    fireEvent.press(screen.getByText('Infestation  ›'));
+    fireEvent.press(screen.getByText('Végétation & Sol  ›'));
 
     await waitFor(() => expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalledTimes(1));
     const [, row] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
@@ -84,7 +84,7 @@ describe('IntensiveImagosScreen — enregistrement complet', () => {
     expect(JSON.parse(row.type_cible as string).sort()).toEqual(['dense', 'vol_clair']);
 
     await waitFor(() =>
-      expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ pathname: '/(prospection)/infestation' }))
+      expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ pathname: '/(prospection)/veg' }))
     );
   });
 });

@@ -77,7 +77,7 @@ describe('IntensiveLarvesScreen — enregistrement complet', () => {
     // Aucune "Surface contaminée" sur cet écran (exclue explicitement).
     expect(screen.queryByText('Surface contaminée (ha)')).toBeNull();
 
-    fireEvent.press(screen.getByText('Infestation  ›'));
+    fireEvent.press(screen.getByText('Végétation & Sol  ›'));
 
     await waitFor(() => expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalledTimes(1));
     const [, row] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
@@ -92,7 +92,7 @@ describe('IntensiveLarvesScreen — enregistrement complet', () => {
     });
 
     await waitFor(() =>
-      expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ pathname: '/(prospection)/infestation' }))
+      expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ pathname: '/(prospection)/veg' }))
     );
   });
 });

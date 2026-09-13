@@ -377,7 +377,7 @@ export default function IntensiveImagosScreen() {
       async () => {
         const ok = await commitCurrentGrille();
         if (!ok) return;
-        const next = hasLarveGrilles ? '/(prospection)/intensive-larves' : '/(prospection)/infestation';
+        const next = hasLarveGrilles ? '/(prospection)/intensive-larves' : '/(prospection)/veg';
         router.push({ pathname: next as any, params: { draftId } });
       },
       {
@@ -753,7 +753,7 @@ export default function IntensiveImagosScreen() {
               activeOpacity={0.85}
             >
               <Text style={styles.continueButtonText}>
-                {isLastImagoTab ? (hasLarveGrilles ? 'Larves  ›' : 'Infestation  ›') : 'Suivant  ›'}
+                {isLastImagoTab ? (hasLarveGrilles ? 'Larves  ›' : 'Végétation & Sol  ›') : 'Suivant  ›'}
               </Text>
             </TouchableOpacity>
           </View>
