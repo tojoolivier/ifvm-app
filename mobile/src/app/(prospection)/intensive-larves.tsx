@@ -332,7 +332,7 @@ export default function IntensiveLarvesScreen() {
       async () => {
         const ok = await commitCurrentGrille();
         if (!ok) return;
-        router.push({ pathname: '/(prospection)/infestation' as any, params: { draftId } });
+        router.push({ pathname: '/(prospection)/veg' as any, params: { draftId } });
       },
       {
         screen: 'intensive-larves',
@@ -661,7 +661,7 @@ export default function IntensiveLarvesScreen() {
               disabled={isSaving || !isConsistent}
               activeOpacity={0.85}
             >
-              <Text style={styles.continueButtonText}>{isLastLarveTab ? 'Infestation  ›' : 'Suivant  ›'}</Text>
+              <Text style={styles.continueButtonText}>{isLastLarveTab ? 'Végétation & Sol  ›' : 'Suivant  ›'}</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>

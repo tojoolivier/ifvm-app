@@ -70,10 +70,11 @@ export default function SpeciesScreen() {
         setDraft(await saveEspeceSelection(draftId, selection));
         const grilles = buildGrilles(selection);
         initGrilles(grilles, [], captures);
-        // density.tsx gère indifféremment imagos et larves (densité diffuse/groupée par
-        // espèce + stade) : toute grille — larve comprise — y transite d'abord, sans quoi
-        // ses densités n'étaient jamais saisies (cf. même correctif dans captures.tsx).
-        router.push({ pathname: '/(prospection)/density' as any, params: { draftId, grilleIndex: '0' } });
+        // B-Imagos si au moins un imago est coché, sinon directement C-Larves — les deux
+        // écrans fusionnés (cf. intensive-imagos.tsx/intensive-larves.tsx) rechargent
+        // eux-mêmes tout ce dont ils ont besoin depuis le brouillon et la base locale.
+        const next = selection.lmcImago || selection.nseImago ? '/(prospection)/intensive-imagos' : '/(prospection)/intensive-larves';
+        router.push({ pathname: next as any, params: { draftId } });
       },
       {
         screen: 'species',

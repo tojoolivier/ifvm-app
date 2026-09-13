@@ -109,6 +109,20 @@ export default function ReviewScreen() {
             </Text>
           </View>
 
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Référence</Text>
+            <Text style={styles.paragraph}>
+              PA <Text style={styles.paragraphStrong}>{recap.pa}</Text> · Station{' '}
+              <Text style={styles.paragraphStrong}>{recap.station}</Text>
+              {'\n'}
+              Surf. prospectée <Text style={styles.paragraphStrong}>{recap.surfaceProspectee ?? '—'} ha</Text> · station{' '}
+              <Text style={styles.paragraphStrong}>{recap.surfaceStation ?? '—'} ha</Text> · GPS{' '}
+              <Text style={styles.mono}>
+                {recap.latitude?.toFixed(4) ?? '—'}, {recap.longitude?.toFixed(4) ?? '—'}
+              </Text>
+            </Text>
+          </View>
+
           {recap.reviewGroups.map((group) => (
             <View key={group.label} style={styles.card}>
               <Text style={styles.cardTitle}>{group.label} — captures (calcul auto)</Text>
@@ -211,19 +225,6 @@ export default function ReviewScreen() {
             <Text style={styles.paragraph}>{recap.observationsText}</Text>
           </View>
 
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Référence</Text>
-            <Text style={styles.paragraph}>
-              PA <Text style={styles.paragraphStrong}>{recap.pa}</Text> · Station{' '}
-              <Text style={styles.paragraphStrong}>{recap.station}</Text>
-              {'\n'}
-              Surf. prospectée <Text style={styles.paragraphStrong}>{recap.surfaceProspectee ?? '—'} ha</Text> · station{' '}
-              <Text style={styles.paragraphStrong}>{recap.surfaceStation ?? '—'} ha</Text> · GPS{' '}
-              <Text style={styles.mono}>
-                {recap.latitude?.toFixed(4) ?? '—'}, {recap.longitude?.toFixed(4) ?? '—'}
-              </Text>
-            </Text>
-          </View>
         </ScrollView>
 
         <View style={styles.footer}>
