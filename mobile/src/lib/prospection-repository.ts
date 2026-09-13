@@ -1197,6 +1197,40 @@ export async function listUnsyncedProspections(): Promise<DraftProspection[]> {
 }
 
 /**
+ * Repli hors-ligne de « Fiches de traitement → Consulter une fiche validée »
+ * (prospection-picker.tsx) — normalement un appel serveur direct
+ * (`loadFichesDisponiblesPourTraitement`, prospection-accueil.ts), parce que
+ * la disponibilité globale (fiches des AUTRES agents comprises) est une
+ * opération serveur. Hors connexion, cette exhaustivité est impossible ; on
+ * propose donc une approximation plutôt qu'un écran bloqué :
+ *   - `statut_sync = 'synced'` fait office de proxy pour « validée » — l'app
+ *     locale ne connaît jamais le statut serveur final "Validée" (cf.
+ *     `loadValidatedProspections`, prospection-accueil.ts : "l'app locale ne
+ *     connaît que jusqu'à en_attente"), donc une fiche synchronisée mais pas
+ *     encore formellement validée par un administrateur peut apparaître ici ;
+ *   - aucune fiche d'un AUTRE agent, jamais synchronisée sur CET appareil,
+ *     n'est visible (même limite que `listReprenableTraitements`) ;
+ *   - `surface_infestee IS NOT NULL` : seules des candidates plausibles à un
+ *     traitement, demandé explicitement ;
+ *   - tous les types de prospection (pas seulement extensive/validation,
+ *     contrairement à `listValidatedProspections` ci-dessous, taillée pour un
+ *     autre écran) — le serveur ne restreint pas non plus par type.
+ * `prospection-picker.tsx` affiche un bandeau « hors ligne » quand ce repli
+ * est utilisé : imprécision assumée et signalée, jamais silencieuse (ADR-012
+ * décision 1).
+ */
+export async function listProspectionsDisponiblesPourTraitementLocal(): Promise<DraftProspection[]> {
+  const db = await getDb();
+  return db.getAllAsync<DraftProspection>(
+    `SELECT * FROM prospection p
+     WHERE p.statut_sync = 'synced'
+       AND p.surface_infestee IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM traitement t WHERE t.prospection_id = p.id)
+     ORDER BY p.updated_at DESC`
+  );
+}
+
+/**
  * Fiches de prospection éligibles au sélecteur de « Nouvelle fiche de traitement »
  * (traitement-picker.tsx) — exclut désormais celles dont la surface infestée est
  * déjà intégralement couverte par une fiche de traitement existante (Aérien ou

@@ -7,6 +7,7 @@ import {
   listRecentProspections,
   listUnsyncedProspections,
   listValidatedProspections,
+  listProspectionsDisponiblesPourTraitementLocal,
   countUnsyncedProspections,
   updateProspectionReference,
   updateProspectionEspeces,
@@ -253,6 +254,33 @@ describe('listValidatedProspections', () => {
     expect(query).toContain('tt.surface_restante_ha IS NOT NULL AND tt.surface_restante_ha <= 0');
     expect(query).toContain('JOIN traitement_aerien ta ON ta.traitement_id = t.id');
     expect(query).toContain('ta.surface_restante_ha IS NOT NULL AND ta.surface_restante_ha <= 0');
+  });
+});
+
+describe('listProspectionsDisponiblesPourTraitementLocal', () => {
+  it('renvoie les fiches synchronisées avec une surface infestée connue, tous types confondus', async () => {
+    const row = { ...STORED_ROW, type_prospection: 'intensive', statut_sync: 'synced', surface_infestee: 3.2 };
+    getAllAsync.mockResolvedValueOnce([row]);
+
+    const result = await listProspectionsDisponiblesPourTraitementLocal();
+
+    expect(result).toEqual([row]);
+    const [query] = getAllAsync.mock.calls[0];
+    // Contrairement à listValidatedProspections : pas de filtre par type — le
+    // serveur (disponible_pour_traitement) n'en applique pas non plus.
+    expect(query).not.toContain('type_prospection IN');
+    expect(query).toContain("p.statut_sync = 'synced'");
+    expect(query).toContain('p.surface_infestee IS NOT NULL');
+    expect(query).toContain('ORDER BY p.updated_at DESC');
+  });
+
+  it('exclut toute fiche déjà rattachée à un traitement (même règle que le serveur, disponible_pour_traitement)', async () => {
+    getAllAsync.mockResolvedValueOnce([]);
+
+    await listProspectionsDisponiblesPourTraitementLocal();
+
+    const [query] = getAllAsync.mock.calls[0];
+    expect(query).toContain('NOT EXISTS (SELECT 1 FROM traitement t WHERE t.prospection_id = p.id)');
   });
 });
 
