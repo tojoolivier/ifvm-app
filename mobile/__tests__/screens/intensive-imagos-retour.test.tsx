@@ -35,7 +35,20 @@ jest.mock('@/lib/prospection-repository', () => ({
 jest.mock('@/lib/referentiel-db', () => ({ listStadesGrille: jest.fn() }));
 
 describe('IntensiveImagosScreen — retour', () => {
-  afterEach(cleanup);
+  // Neutralise le chrono de l'écran (vrai `setInterval`, 1s) : laissé actif, il
+  // tourne au-delà de la fin du test si le processus met du temps à se
+  // terminer (CI partagée) et empêche Jest de sortir proprement. Un simple
+  // spy no-op suffit ici (pas de `settle()`/multi-étapes dans ce fichier —
+  // pas besoin de `jest.useFakeTimers()`, qui gênerait le polling réel de
+  // `findByText`).
+  let intervalSpy: jest.SpyInstance;
+  beforeEach(() => {
+    intervalSpy = jest.spyOn(global, 'setInterval').mockReturnValue(0 as unknown as NodeJS.Timeout);
+  });
+  afterEach(() => {
+    intervalSpy.mockRestore();
+    cleanup();
+  });
   beforeEach(() => {
     useProspectionCaptureStore.getState().reset();
     useProspectionCaptureStore.getState().setStadesParGrille({});
