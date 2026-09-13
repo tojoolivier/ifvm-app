@@ -11,10 +11,6 @@ import { ObservationsFormValues } from '@/lib/prospection-observations-schema';
 import { updateProspectionObservations } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { DateField } from '@/components/DateField';
-import { getCurrentPosition } from '@/lib/location';
-import { logger } from '@/lib/logger';
-
-const log = logger.child({ module: 'observations' });
 
 const ORANGE = '#e89b2b';
 const BG = '#faf7ef';
@@ -49,7 +45,6 @@ export default function ObservationsScreen() {
   // Horodatage technique (ISO, fuseau inclus) de l'heure d'observation — la valeur
   // affichée (HH:mm) en est dérivée à l'affichage, jamais stockée séparément.
   const [heureObservationAt, setHeureObservationAt] = useState<string | null>(null);
-  const [isHeureLoading, setIsHeureLoading] = useState(false);
 
   // Filet de sécurité si cet écran est atteint sans passer par reference.tsx (deep-link,
   // app relancée en plein milieu du parcours) : le store peut ne pas encore porter cette
@@ -122,26 +117,18 @@ export default function ObservationsScreen() {
       if (ennemis.autre) setShowAutre(true);
     });
 
-    // Heure d'observation automatique (GPS) : une heure déjà enregistrée pour cette
-    // fiche est restaurée telle quelle, sans jamais relancer d'acquisition GPS
-    // simplement parce que l'écran est remonté — seule l'absence de toute heure
-    // enregistrée déclenche un nouveau fix.
+    // Heure d'observation automatique : une heure déjà enregistrée pour cette fiche
+    // est restaurée telle quelle, sans jamais la recalculer simplement parce que
+    // l'écran est remonté — seule l'absence de toute heure enregistrée en capture
+    // une nouvelle. Horloge de l'appareil, pas un fix GPS (#heure-observation-fiable) :
+    // un fix GPS n'apportait rien pour une simple heure et pouvait échouer ou tarder
+    // (signal faible, permission refusée...), laissant le champ vide indéfiniment —
+    // l'heure système, elle, est toujours disponible immédiatement.
     if (draft.heure_observation_at) {
       void Promise.resolve().then(() => setHeureObservationAt(draft.heure_observation_at));
       return;
     }
-    void Promise.resolve().then(() => setIsHeureLoading(true));
-    getCurrentPosition()
-      .then((position) => {
-        setHeureObservationAt(new Date(position.timestamp).toISOString());
-      })
-      .catch((error) => {
-        // Silence délibéré : l'heure d'observation est un confort GPS, pas une donnée
-        // bloquante — son absence ne doit jamais empêcher de continuer la fiche
-        // (contrairement à la position GPS obligatoire de reference.tsx).
-        log.ignore(error, "Heure d'observation GPS indisponible — le champ reste vide.");
-      })
-      .finally(() => setIsHeureLoading(false));
+    void Promise.resolve().then(() => setHeureObservationAt(new Date().toISOString()));
   }, [draft, draftId, form]);
 
   return (
@@ -165,14 +152,10 @@ export default function ObservationsScreen() {
                 ========================================== */}
 
             <View style={styles.autoCard}>
-              <Text style={styles.autoLabel}>🕐 Heure d&apos;observation (GPS)</Text>
-              {isHeureLoading ? (
-                <Text style={styles.autoValueLoading}>Récupération GPS...</Text>
-              ) : (
-                <Text style={styles.autoValue}>
-                  {formatHeureLocale(heureObservationAt)}
-                </Text>
-              )}
+              <Text style={styles.autoLabel}>🕐 Heure d&apos;observation</Text>
+              <Text style={styles.autoValue}>
+                {formatHeureLocale(heureObservationAt)}
+              </Text>
             </View>
 
             {/* ==========================================
@@ -368,7 +351,6 @@ const styles = StyleSheet.create({
   autoCard: { backgroundColor: AUTO_BG, borderRadius: 12, padding: 14, marginBottom: 11 },
   autoLabel: { fontSize: 10, fontWeight: '600', color: GREEN, textTransform: 'uppercase', marginBottom: 4 },
   autoValue: { fontSize: 16, fontWeight: '700', color: TEXT, fontFamily: 'monospace' },
-  autoValueLoading: { fontSize: 13, fontWeight: '600', color: TEXT_SECONDARY, fontStyle: 'italic' },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },
   chip: { paddingHorizontal: 12, paddingVertical: 9, borderRadius: 8, backgroundColor: INACTIVE_BG },
   chipFlex: { flex: 1, alignItems: 'center' },
