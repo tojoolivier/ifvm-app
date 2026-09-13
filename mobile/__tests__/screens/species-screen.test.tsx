@@ -96,10 +96,10 @@ describe('SpeciesScreen', () => {
     }
   });
 
-  it("part toujours vers density.tsx, même quand la première grille sélectionnée est une larve", async () => {
+  it('part vers intensive-larves quand la seule grille sélectionnée est une larve', async () => {
     // Régression : `firstScreen` ne testait que `grilles[0]?.categorie === 'imago'` —
-    // sélectionner uniquement une larve envoyait directement vers `captures`, sautant
-    // la saisie de sa densité. density.tsx doit être le point de passage systématique.
+    // sélectionner uniquement une larve doit envoyer directement vers l'écran C-Larves
+    // (intensive-larves.tsx), pas vers B-Imagos qui n'aurait aucune grille à afficher.
     mockPush.mockClear();
     jest.mocked(prospectionRepository.updateProspectionEspeces).mockResolvedValue({
       id: 'draft-123',
@@ -118,7 +118,32 @@ describe('SpeciesScreen', () => {
 
     await waitFor(() =>
       expect(mockPush).toHaveBeenCalledWith(
-        expect.objectContaining({ pathname: '/(prospection)/density', params: { draftId: 'draft-123', grilleIndex: '0' } })
+        expect.objectContaining({ pathname: '/(prospection)/intensive-larves', params: { draftId: 'draft-123' } })
+      )
+    );
+  });
+
+  it('part vers intensive-imagos dès qu’un imago est sélectionné (même avec une larve aussi cochée)', async () => {
+    mockPush.mockClear();
+    jest.mocked(prospectionRepository.updateProspectionEspeces).mockResolvedValue({
+      id: 'draft-123',
+      especes: JSON.stringify({ lmcImago: true, lmcLarve: true, nseImago: false, nseLarve: false }),
+    } as any);
+
+    useProspectionWizardStore.setState({
+      draft: { id: 'draft-123', type_prospection: 'intensive', especes: null } as any,
+      captures: [],
+    });
+
+    await render(<SpeciesScreen />);
+    fireEvent.press((await screen.findAllByText('Imagos'))[0]);
+    fireEvent.press((await screen.findAllByText('Larves'))[0]);
+    expect(await screen.findByText('2 grille(s)')).toBeVisible();
+    fireEvent.press(screen.getByText('Captures  ›'));
+
+    await waitFor(() =>
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.objectContaining({ pathname: '/(prospection)/intensive-imagos', params: { draftId: 'draft-123' } })
       )
     );
   });
