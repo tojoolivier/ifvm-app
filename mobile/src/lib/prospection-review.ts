@@ -110,10 +110,12 @@ const CATEGORIE_LABEL = { imago: 'Imagos', larve: 'Larves' } as const;
  */
 function buildDensitesSummary(populations: PopulationRow[]): DensiteViewModel[] {
   const especes: ('LMC' | 'NSE')[] = ['LMC', 'NSE'];
+  // Imagos avant larves (et non espèce par espèce) : aligne le récapitulatif sur l'ordre
+  // A-Références/B-Imagos/C-Larves/D-Végétation & Sol/E-Observations du parcours de saisie.
   const categories: ('imago' | 'larve')[] = ['imago', 'larve'];
   const rows: DensiteViewModel[] = [];
-  for (const espece of especes) {
-    for (const categorie of categories) {
+  for (const categorie of categories) {
+    for (const espece of especes) {
       const row = populations.find((p) => p.espece === espece && p.categorie === categorie);
       rows.push({
         key: `${espece}-${categorie}`,
@@ -173,7 +175,12 @@ export function infestationDetailHasData(d: InfestationDetailViewModel): boolean
 }
 
 function buildReviewGroups(draft: DraftProspection, captures: CaptureRow[]): ReviewGroupViewModel[] {
-  const grilles = buildGrilles(parseEspeceSelection(draft.especes));
+  // Imagos avant larves (et non espèce par espèce, l'ordre naturel de `buildGrilles`) :
+  // aligne le récapitulatif sur l'ordre A-Références/B-Imagos/C-Larves/D-Végétation &
+  // Sol/E-Observations du parcours de saisie.
+  const grilles = [...buildGrilles(parseEspeceSelection(draft.especes))].sort((a, b) =>
+    a.categorie === b.categorie ? 0 : a.categorie === 'imago' ? -1 : 1
+  );
   return grilles.map((grille) => {
     const rows = captures.filter((c) => c.espece === grille.espece && c.categorie === grille.categorie);
     const counts = rowsToCounts(rows);
