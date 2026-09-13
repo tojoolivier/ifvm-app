@@ -64,7 +64,7 @@ describe('IntensiveImagosScreen — densités obligatoires', () => {
     await screen.findByText('Densité diffuse (ind./ha) *');
     await settle();
 
-    fireEvent.press(screen.getByText('Infestation  ›'));
+    fireEvent.press(screen.getByText('Végétation & Sol  ›'));
 
     expect(alertSpy).toHaveBeenCalledWith('Densité diffuse requise', expect.stringContaining('ind./ha'));
     expect(prospectionRepository.saveProspectionPopulation).not.toHaveBeenCalled();

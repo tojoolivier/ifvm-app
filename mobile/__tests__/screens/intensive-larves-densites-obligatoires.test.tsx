@@ -61,7 +61,7 @@ describe('IntensiveLarvesScreen — densités obligatoires', () => {
 
     fireEvent.changeText(screen.getByTestId('densite-diffuse-input'), '40');
     await settle();
-    fireEvent.press(screen.getByText('Infestation  ›'));
+    fireEvent.press(screen.getByText('Végétation & Sol  ›'));
 
     expect(alertSpy).toHaveBeenCalledWith('Densité groupée requise', 'La densité groupée (ind./m²) est obligatoire.');
     expect(prospectionRepository.saveProspectionPopulation).not.toHaveBeenCalled();
