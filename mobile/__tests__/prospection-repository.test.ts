@@ -8,6 +8,8 @@ import {
   listUnsyncedProspections,
   listValidatedProspections,
   listProspectionsDisponiblesPourTraitementLocal,
+  listProspectionsARevaliderLocal,
+  demarrerRevalidation,
   countUnsyncedProspections,
   updateProspectionReference,
   updateProspectionEspeces,
@@ -113,9 +115,75 @@ describe('createDraftProspection', () => {
   });
 });
 
-// #fiches-validees-multi-utilisateurs
+// #fiches-validees-multi-utilisateurs, étendu par #revalidation-prospection
+// (matérialisation complète : les champs restent à null ici pour ne pas
+// alourdir le test, seuls ceux exercés par les assertions sont renseignés).
+const CHAMPS_PROSPECTION_VALIDEE_PAR_DEFAUT = {
+  stationId: null,
+  latitude: null,
+  longitude: null,
+  altitude: null,
+  biotope: [],
+  surfaceStation: null,
+  surfaceProspectee: null,
+  degatsCultures: null,
+  dernierePluie: null,
+  intensitePluie: null,
+  vegetation: null,
+  sol: null,
+  verdissement: null,
+  hauteurStrate: null,
+  ennemisNaturels: null,
+  verifiedBy: null,
+  verifiedAt: null,
+  validatedBy: null,
+  validatedAt: null,
+  revalideDeId: null,
+  za: null,
+  paCode: null,
+  degatsCulturesPourcent: null,
+  verdissementPourcent: null,
+  hauteurHerbeCm: null,
+  heureObservationAt: null,
+  stationLibre: null,
+  typeStation: [],
+  verdureStrate: null,
+  signalementSource: null,
+  signalementDate: null,
+  signalementDescription: null,
+  conclusionValidation: null,
+  avertissements: [],
+  modeExtensif: null,
+  societe: null,
+  immatriculeAeronef: null,
+  pilote: null,
+  mecanicien: null,
+  chefDeBase: null,
+  lieuBaseId: null,
+  pesticidesEmbarques: null,
+  pesticideNomCommercial: null,
+  pesticideQuantiteDisponible: null,
+  pesticideQuantiteRecue: null,
+  futsDisponible: null,
+  futsPleins: null,
+  futsVides: null,
+  futsRecues: null,
+  signatureVisaNom: null,
+  signatureVisaHorodatage: null,
+  signatureConsultantFaoNom: null,
+  signatureConsultantFaoHorodatage: null,
+  signatureConsultantFaoImage: null,
+  signaturePiloteNom: null,
+  signaturePiloteHorodatage: null,
+  signaturePiloteImage: null,
+  signatureChefBaseNom: null,
+  signatureChefBaseHorodatage: null,
+  signatureChefBaseImage: null,
+};
+
 describe('materialiserProspectionValidee', () => {
   const FICHE_VALIDEE_AUTRE_AGENT = {
+    ...CHAMPS_PROSPECTION_VALIDEE_PAR_DEFAUT,
     id: 'presp-autre-agent',
     typeProspection: 'extensive',
     campagneId: 'camp-1',
@@ -139,6 +207,20 @@ describe('materialiserProspectionValidee', () => {
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringMatching(/INSERT OR REPLACE INTO prospection[\s\S]*'synced'/),
       expect.arrayContaining(['presp-autre-agent', 'extensive', 'validee'])
+    );
+  });
+
+  it('#revalidation-prospection : écrit validated_at et revalide_de_id quand fournis', async () => {
+    await materialiserProspectionValidee({
+      ...FICHE_VALIDEE_AUTRE_AGENT,
+      id: 'presp-revalidee',
+      validatedAt: '2026-08-01T00:00:00Z',
+      revalideDeId: 'presp-perimee',
+    });
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('revalide_de_id'),
+      expect.arrayContaining(['2026-08-01T00:00:00Z', 'presp-perimee'])
     );
   });
 });
@@ -266,9 +348,9 @@ describe('listProspectionsDisponiblesPourTraitementLocal', () => {
 
     expect(result).toEqual([row]);
     const [query] = getAllAsync.mock.calls[0];
-    // Contrairement à listValidatedProspections : pas de filtre par type — le
-    // serveur (disponible_pour_traitement) n'en applique pas non plus.
-    expect(query).not.toContain('type_prospection IN');
+    // La liste elle-même n'est pas restreinte par type (contrairement à
+    // listValidatedProspections) — seule l'exclusion des fiches périmées
+    // (#revalidation-prospection, ci-dessous) cible extensive/validation.
     expect(query).toContain("p.statut_sync = 'synced'");
     expect(query).toContain('p.surface_infestee IS NOT NULL');
     expect(query).toContain('ORDER BY p.updated_at DESC');
@@ -281,6 +363,122 @@ describe('listProspectionsDisponiblesPourTraitementLocal', () => {
 
     const [query] = getAllAsync.mock.calls[0];
     expect(query).toContain('NOT EXISTS (SELECT 1 FROM traitement t WHERE t.prospection_id = p.id)');
+  });
+
+  it('#revalidation-prospection : exclut aussi les fiches extensive/validation périmées et celles déjà revalidées', async () => {
+    getAllAsync.mockResolvedValueOnce([]);
+
+    await listProspectionsDisponiblesPourTraitementLocal();
+
+    const [query] = getAllAsync.mock.calls[0];
+    expect(query).toContain("type_prospection IN ('extensive', 'validation')");
+    expect(query).toContain('julianday');
+    expect(query).toContain('NOT EXISTS (SELECT 1 FROM prospection enfant WHERE enfant.revalide_de_id = p.id)');
+  });
+});
+
+describe('listProspectionsARevaliderLocal', () => {
+  it("renvoie les fiches extensive/validation périmées, ordonnées par ancienneté de validation", async () => {
+    const row = { ...STORED_ROW, type_prospection: 'extensive', validated_at: '2026-08-01T00:00:00Z' };
+    getAllAsync.mockResolvedValueOnce([row]);
+
+    const result = await listProspectionsARevaliderLocal();
+
+    expect(result).toEqual([row]);
+    const [query] = getAllAsync.mock.calls[0];
+    expect(query).toContain("type_prospection IN ('extensive', 'validation')");
+    expect(query).toContain('validated_at IS NOT NULL');
+    expect(query).toContain('julianday');
+    expect(query).toContain('ORDER BY p.validated_at ASC');
+  });
+
+  it('exclut les fiches déjà traitées et celles déjà revalidées', async () => {
+    getAllAsync.mockResolvedValueOnce([]);
+
+    await listProspectionsARevaliderLocal();
+
+    const [query] = getAllAsync.mock.calls[0];
+    expect(query).toContain('NOT EXISTS (SELECT 1 FROM traitement t WHERE t.prospection_id = p.id)');
+    expect(query).toContain('NOT EXISTS (SELECT 1 FROM prospection enfant WHERE enfant.revalide_de_id = p.id)');
+  });
+});
+
+describe('demarrerRevalidation', () => {
+  const FICHE_PERIMEE = {
+    ...STORED_ROW,
+    id: 'presp-perimee',
+    type_prospection: 'extensive',
+    region: 'Atsimo-Andrefana',
+    n_fiche: 'F-001',
+    validated_at: '2026-08-01T00:00:00.000Z',
+    revalide_de_id: null,
+  };
+
+  it('lève une erreur explicite si la fiche source n’est pas locale', async () => {
+    getFirstAsync.mockResolvedValueOnce(null);
+
+    await expect(demarrerRevalidation('inconnue')).rejects.toThrow(/introuvable localement/);
+  });
+
+  it('clone la fiche dans un nouveau brouillon chaîné via revalide_de_id, avec statut/dates réinitialisés', async () => {
+    getFirstAsync.mockResolvedValueOnce(FICHE_PERIMEE);
+    getAllAsync.mockResolvedValue([]);
+
+    const { draftId } = await demarrerRevalidation('presp-perimee');
+
+    expect(draftId).not.toBe('presp-perimee');
+    const insertCall = runAsync.mock.calls.find(([sql]) => sql.includes('INSERT INTO prospection'));
+    expect(insertCall).toBeDefined();
+    const [sql, params] = insertCall!;
+    // 'brouillon'/'local' sont des littéraux dans le SQL, pas des paramètres liés.
+    expect(sql).toContain("VALUES (?, 'brouillon', 'local'");
+    expect(sql).toContain('revalide_de_id');
+    expect(params).toEqual(
+      expect.arrayContaining([draftId, 'presp-perimee', 'Atsimo-Andrefana', 'F-001'])
+    );
+  });
+
+  it('ne clone jamais le revalide_de_id/statut/statut_sync de la source elle-même', async () => {
+    getFirstAsync.mockResolvedValueOnce({
+      ...FICHE_PERIMEE,
+      revalide_de_id: 'presp-grand-parent',
+      statut: 'validee',
+      statut_sync: 'synced',
+    });
+    getAllAsync.mockResolvedValue([]);
+
+    await demarrerRevalidation('presp-perimee');
+
+    const [, params] = runAsync.mock.calls.find(([sql]) => sql.includes('INSERT INTO prospection'))!;
+    // Le seul revalide_de_id transmis est la source elle-même — jamais le
+    // parent DE la source (pas de télescopage de la chaîne).
+    expect(params).not.toContain('presp-grand-parent');
+    expect(params).not.toContain('validee');
+    expect(params).not.toContain('synced');
+  });
+
+  it('clone populations, infestations, captures et opérations aériennes vers le nouveau brouillon', async () => {
+    getFirstAsync.mockResolvedValueOnce(FICHE_PERIMEE);
+    getAllAsync
+      .mockResolvedValueOnce([{ espece: 'LMC', categorie: 'imago' }]) // populations
+      .mockResolvedValueOnce([{ type_cible: 'dense' }]) // infestations
+      .mockResolvedValueOnce([
+        { espece: 'LMC', categorie: 'imago', sexe: null, phase: 'gregaire', stade: 'L1', effectif: 3 },
+      ]) // captures
+      .mockResolvedValueOnce([]); // opérations aériennes
+
+    const { draftId } = await demarrerRevalidation('presp-perimee');
+
+    const appelsAvecDraftId = runAsync.mock.calls.filter(
+      ([, params]) => Array.isArray(params) && params.includes(draftId)
+    );
+    // Au moins la ligne prospection elle-même + la capture clonée.
+    expect(appelsAvecDraftId.length).toBeGreaterThanOrEqual(2);
+    const requetesLecture = getAllAsync.mock.calls.map(([sql]) => sql);
+    expect(requetesLecture.some((sql) => sql.includes('prospection_population'))).toBe(true);
+    expect(requetesLecture.some((sql) => sql.includes('prospection_infestation'))).toBe(true);
+    expect(requetesLecture.some((sql) => sql.includes('prospection_capture'))).toBe(true);
+    expect(requetesLecture.some((sql) => sql.includes('prospection_operation_aerienne'))).toBe(true);
   });
 });
 

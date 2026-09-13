@@ -648,6 +648,17 @@ const COLONNES_PROSPECTION: readonly Colonne[] = [
   { name: 'signature_chef_base_nom', type: 'TEXT' },
   { name: 'signature_chef_base_horodatage', type: 'TEXT' },
   { name: 'signature_chef_base_image', type: 'TEXT' },
+  // #revalidation-prospection (migration backend 0062) — n'existaient pas du
+  // tout localement avant ce chantier :
+  //  - `validated_at` : l'app locale ne connaissait jusqu'ici que jusqu'à
+  //    'en_attente' (cf. commentaire de `loadValidatedProspections`,
+  //    prospection-accueil.ts) ; nécessaire ici pour calculer la péremption
+  //    (>5 jours) hors ligne, sans quoi le repli local de la liste « à
+  //    revalider » serait toujours vide.
+  //  - `revalide_de_id` : auto-référence vers la fiche périmée que CETTE
+  //    fiche revalide (mirroir de `traitement.traitement_origine_id`).
+  { name: 'validated_at', type: 'TEXT' },
+  { name: 'revalide_de_id', type: 'TEXT' },
 ];
 
 /** Colonnes ajoutées à `prospection_infestation` après sa création initiale. */

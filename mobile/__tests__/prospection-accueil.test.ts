@@ -9,6 +9,8 @@ import {
   materialiserProspectionValidee,
   saveProspectionPopulation,
   saveProspectionInfestation,
+  saveProspectionCaptures,
+  saveOperationsAeriennes,
   getProspection,
   DraftProspection,
 } from '../src/lib/prospection-repository';
@@ -24,6 +26,7 @@ import {
   loadValidatedProspections,
   loadMesProspectionsServeur,
   loadFichesDisponiblesPourTraitement,
+  loadFichesARevalider,
   assurerProspectionDisponibleLocalement,
   pickCurrentCampagneId,
   startNewProspection,
@@ -46,6 +49,8 @@ jest.mock('../src/lib/prospection-repository', () => ({
   materialiserProspectionValidee: jest.fn(),
   saveProspectionPopulation: jest.fn(),
   saveProspectionInfestation: jest.fn(),
+  saveProspectionCaptures: jest.fn(),
+  saveOperationsAeriennes: jest.fn(),
   getProspection: jest.fn(),
 }));
 
@@ -64,6 +69,8 @@ const mockListCampagnesLocal = jest.mocked(listCampagnesLocal);
 const mockMaterialiser = jest.mocked(materialiserProspectionValidee);
 const mockSavePopulation = jest.mocked(saveProspectionPopulation);
 const mockSaveInfestation = jest.mocked(saveProspectionInfestation);
+const mockSaveCaptures = jest.mocked(saveProspectionCaptures);
+const mockSaveOperations = jest.mocked(saveOperationsAeriennes);
 const mockGetProspection = jest.mocked(getProspection);
 
 const STORED_ROW: DraftProspection = {
@@ -338,6 +345,20 @@ describe('loadFichesDisponiblesPourTraitement', () => {
   });
 });
 
+// #revalidation-prospection
+describe('loadFichesARevalider', () => {
+  it('interroge le serveur avec statut=validee et a_revalider=true', async () => {
+    mockApiClient.listProspections.mockResolvedValueOnce([]);
+
+    await loadFichesARevalider('tok');
+
+    expect(mockApiClient.listProspections).toHaveBeenCalledWith('tok', {
+      statut: 'validee',
+      a_revalider: true,
+    });
+  });
+});
+
 describe('assurerProspectionDisponibleLocalement', () => {
   const FICHE_SERVEUR = {
     id: 'presp-autre-agent',
@@ -357,6 +378,8 @@ describe('assurerProspectionDisponibleLocalement', () => {
     updated_at: '2026-08-02T00:00:00Z',
     populations: [{ espece: 'LMC', categorie: 'imago' }],
     infestations: [{ type_cible: 'GENERALISEE', espece: 'LMC' }],
+    captures: [{ espece: 'LMC', categorie: 'imago', sexe: null, phase: 'gregaire', stade: 'L1', effectif: 4 }],
+    operations_aeriennes: [{ type_operation: 'traitement', numero: 1 }],
   } as any;
 
   it('ne fait rien si la fiche existe déjà en local (cas courant : propre fiche de l’agent)', async () => {
@@ -386,6 +409,31 @@ describe('assurerProspectionDisponibleLocalement', () => {
       'GENERALISEE',
       expect.objectContaining({ type_cible: 'GENERALISEE' })
     );
+  });
+
+  it("#revalidation-prospection : rapatrie aussi captures et opérations aériennes — jusqu'ici absentes de cette matérialisation", async () => {
+    mockGetProspection.mockResolvedValueOnce(null);
+
+    await assurerProspectionDisponibleLocalement(FICHE_SERVEUR);
+
+    expect(mockSaveCaptures).toHaveBeenCalledWith(
+      'presp-autre-agent',
+      'LMC',
+      'imago',
+      expect.arrayContaining([expect.objectContaining({ espece: 'LMC', categorie: 'imago', effectif: 4 })])
+    );
+    expect(mockSaveOperations).toHaveBeenCalledWith(
+      'presp-autre-agent',
+      expect.arrayContaining([expect.objectContaining({ type_operation: 'traitement' })])
+    );
+  });
+
+  it("#revalidation-prospection : n'appelle pas saveOperationsAeriennes quand la fiche n'en a aucune", async () => {
+    mockGetProspection.mockResolvedValueOnce(null);
+
+    await assurerProspectionDisponibleLocalement({ ...FICHE_SERVEUR, operations_aeriennes: [] });
+
+    expect(mockSaveOperations).not.toHaveBeenCalled();
   });
 });
 

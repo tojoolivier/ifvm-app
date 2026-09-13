@@ -317,6 +317,20 @@ export default function DashboardScreen() {
               <ThemedText style={styles.quickTileText}>Nouveau traitement</ThemedText>
             </TouchableOpacity>
 
+            {/* #revalidation-prospection : une fiche extensive/validation
+                validée depuis plus de 5 jours sans traitement n'est plus
+                proposée dans « Consulter une fiche validée » — c'est ici
+                qu'elle redevient accessible, pour être revalidée avant
+                traitement. */}
+            <TouchableOpacity
+              style={styles.quickTile}
+              onPress={() => navigateTo('/(prospection)/revalidation-liste')}
+              activeOpacity={0.85}
+            >
+              <ThemedText style={styles.quickTileIcon}>🔁</ThemedText>
+              <ThemedText style={styles.quickTileText}>Prospections à revalider</ThemedText>
+            </TouchableOpacity>
+
             <View style={[styles.quickTile, styles.quickTileDisabled]}>
               <ThemedText style={styles.quickTileIcon}>🔔</ThemedText>
               <ThemedText style={styles.quickTileText}>Alertes</ThemedText>

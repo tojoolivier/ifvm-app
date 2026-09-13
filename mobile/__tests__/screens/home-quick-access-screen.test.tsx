@@ -66,4 +66,16 @@ describe('DashboardScreen — Accès rapide', () => {
     expect(screen.getByText('Nouveau traitement')).toBeTruthy();
     expect(screen.getByText('Alertes')).toBeTruthy();
   });
+
+  // #revalidation-prospection
+  it('« Prospections à revalider » est accessible depuis le tableau de bord', async () => {
+    await render(
+      <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
+        <DashboardScreen />
+      </SafeAreaProvider>
+    );
+    await waitFor(() => expect(screen.getByText('ACCÈS RAPIDE')).toBeTruthy());
+
+    expect(screen.getByText('Prospections à revalider')).toBeTruthy();
+  });
 });
