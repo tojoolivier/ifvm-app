@@ -1777,6 +1777,8 @@ export interface components {
         ModeTraitement: "TOTAL" | "BARRIERE" | "IRREGULIER";
         /**
          * NiveauPopulation
+         * @description Accouplement/Ponte — réduit à 3 niveaux communs LMC/NSE (migration 0059,
+         *     remplace les 5/4 niveaux d'origine issus du PDF papier).
          * @enum {string}
          */
         NiveauPopulation: "neant" | "rare" | "beaucoup";
@@ -2373,6 +2375,8 @@ export interface components {
             operations_aeriennes: components["schemas"]["OperationAerienneCreate"][];
             /** Surface Infestee Pourcent */
             surface_infestee_pourcent?: number | null;
+            /** Revalide De Id */
+            revalide_de_id?: string | null;
         };
         /** ProspectionRead */
         ProspectionRead: {
@@ -2461,6 +2465,8 @@ export interface components {
             validated_by?: string | null;
             /** Validated At */
             validated_at?: string | null;
+            /** Revalide De Id */
+            revalide_de_id?: string | null;
             /** Prospecteur Nom */
             prospecteur_nom?: string | null;
             /** Verified By Nom */
@@ -5139,8 +5145,10 @@ export interface operations {
                 campagne_id?: string | null;
                 station_id?: string | null;
                 prospecteur_id?: string | null;
-                /** @description N'inclut que les fiches sans traitement associé — « Fiches de traitement → Consulter une fiche validée » (mobile), combiné à statut=validee. */
+                /** @description N'inclut que les fiches sans traitement associé, ni périmées (#revalidation-prospection : extensive/validation validées depuis plus de 5 jours sans traitement) — « Fiches de traitement → Consulter une fiche validée » (mobile), combiné à statut=validee. */
                 disponible_pour_traitement?: boolean;
+                /** @description N'inclut que les fiches périmées (#revalidation-prospection) — exactement celles qu'exclut disponible_pour_traitement pour cette raison, sans traitement associé et pas déjà revalidées. */
+                a_revalider?: boolean;
             };
             header?: never;
             path?: never;

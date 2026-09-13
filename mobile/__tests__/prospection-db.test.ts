@@ -59,6 +59,9 @@ const MIGRATED_COLUMNS = [
   { name: 'signature_chef_base_nom' },
   { name: 'signature_chef_base_horodatage' },
   { name: 'signature_chef_base_image' },
+  // #revalidation-prospection
+  { name: 'validated_at' },
+  { name: 'revalide_de_id' },
 
   // Colonnes de prospection_operation_aerienne
   { name: 'motif_divers' },
