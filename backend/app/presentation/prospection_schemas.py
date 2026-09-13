@@ -546,6 +546,10 @@ class ProspectionCreate(BaseModel):
     infestations: list[InfestationCreate] = []
     operations_aeriennes: list[OperationAerienneCreate] = []
     surface_infestee_pourcent: float | None = Field(None, ge=0, le=100)
+    # #revalidation-prospection : renseigné uniquement quand cette fiche
+    # revalide une fiche périmée (extensive/validation validée depuis plus de
+    # 5 jours sans traitement) — jamais décidé côté serveur.
+    revalide_de_id: uuid.UUID | None = None
 
     @model_validator(mode="after")
     def _biotope_obligatoire(self) -> "ProspectionCreate":
@@ -731,6 +735,9 @@ class ProspectionRead(BaseModel):
     verified_at: datetime | None = None
     validated_by: uuid.UUID | None = None
     validated_at: datetime | None = None
+    # #revalidation-prospection : auto-référence vers la fiche périmée que
+    # celle-ci revalide, `None` pour une fiche "normale" (cf. migration 0062).
+    revalide_de_id: uuid.UUID | None = None
     # Champs dérivés (jointure `utilisateur`, jamais stockés) — évite à chaque
     # client de résoudre lui-même id -> nom pour l'affichage.
     prospecteur_nom: str | None = None

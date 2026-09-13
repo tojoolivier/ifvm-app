@@ -76,6 +76,12 @@ class ProspectionModel(Base):
         UUID(as_uuid=True), ForeignKey("utilisateur.id"), nullable=True
     )
     validated_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    # Auto-référence vers la fiche périmée que cette fiche revalide (migration
+    # 0062, mirroir de TraitementModel.traitement_origine_id) — jamais une FK
+    # vers une autre table, toujours prospection.id.
+    revalide_de_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("prospection.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, server_default=sa.text("now()")
     )
@@ -253,6 +259,21 @@ class ProspectionModel(Base):
         CheckConstraint(
             "mode_extensif IN ('terrestre','aerien')",
             name="ck_prospection_mode_extensif",
+        ),
+        # #revalidation-prospection (migration 0062) — même paire d'index que
+        # TraitementAerienModel.traitement_origine_id : un plain index pour les
+        # jointures/recherches, et l'index unique partiel qui garantit la
+        # chaîne linéaire (une fiche d'origine ne peut être désignée que par
+        # UNE seule fiche de revalidation). Déclarés ici, pas seulement dans la
+        # migration : `Base.metadata.create_all()` (utilisé par les tests, cf.
+        # tests/conftest.py) ne rejoue jamais les migrations Alembic — sans ça,
+        # la contrainte n'existerait qu'en environnement migré à la main.
+        sa.Index("ix_prospection_revalide_de_id", "revalide_de_id"),
+        sa.Index(
+            "uq_prospection_revalide_de_id",
+            "revalide_de_id",
+            unique=True,
+            postgresql_where=sa.text("revalide_de_id IS NOT NULL"),
         ),
     )
 

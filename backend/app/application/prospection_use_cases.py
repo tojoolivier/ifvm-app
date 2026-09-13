@@ -138,23 +138,35 @@ class CreateProspection:
         signature_chef_base_nom: str | None = None,
         signature_chef_base_horodatage: datetime | None = None,
         signature_chef_base_image: str | None = None,
+        # #revalidation-prospection : renseigné uniquement quand cette fiche
+        # revalide une fiche périmée (extensive/validation, cf. domain/
+        # prospection.py) — jamais décidé côté serveur, toujours transmis
+        # explicitement par le client.
+        revalide_de_id: uuid.UUID | None = None,
     ) -> Prospection:
         if type_prospection == "intensive" and station_id is None:
             raise ValueError("station_id est obligatoire pour une prospection intensive")
 
-        # Une fiche de validation / signalisation est exploitable pour le
-        # traitement dès sa synchronisation : elle ne passe pas par la chaîne
-        # administrative en_attente -> verifiee -> validee réservée aux
-        # prospections intensive et extensive. Le client ne décide donc pas de
-        # ce statut métier. Son numéro visible est celui du message créé à la
-        # référence, jamais un second numéro généré au serveur.
-        if type_prospection == "validation":
-            statut = "validee"
-            n_fiche = n_message
-
         await _verifier_stades(self.repository, captures)
 
         now = datetime.utcnow()
+        # Une fiche de validation / signalisation est exploitable pour le
+        # traitement dès sa synchronisation : elle ne passe pas par la chaîne
+        # administrative en_attente -> verifiee -> validee réservée aux
+        # prospections intensive et extensive (`apply_transition`, jamais
+        # appelée ici). Le client ne décide donc pas de ce statut métier. Son
+        # numéro visible est celui du message créé à la référence, jamais un
+        # second numéro généré au serveur. `validated_at` est stampé ici pour
+        # la même raison qu'`apply_transition` le stampe pour les deux autres
+        # types : #revalidation-prospection en a besoin (délai de 5 jours
+        # depuis la validation) et ne doit pas dépendre du type pour trouver
+        # une valeur non-NULL.
+        validated_at = None
+        if type_prospection == "validation":
+            statut = "validee"
+            n_fiche = n_message
+            validated_at = now
+
         prospection = Prospection(
             type_prospection=type_prospection,
             campagne_id=campagne_id,
@@ -180,6 +192,8 @@ class CreateProspection:
             ennemis_naturels=ennemis_naturels,
             observations=observations,
             statut=statut,
+            validated_at=validated_at,
+            revalide_de_id=revalide_de_id,
             created_at=now,
             updated_at=now,
             populations=populations or [],
@@ -294,6 +308,7 @@ class ListProspections:
         station_id: uuid.UUID | None = None,
         prospecteur_id: uuid.UUID | None = None,
         disponible_pour_traitement: bool = False,
+        a_revalider: bool = False,
     ) -> list[Prospection]:
         return await self.repository.list_by_filters(
             type_prospection=type_prospection,
@@ -302,6 +317,7 @@ class ListProspections:
             station_id=station_id,
             prospecteur_id=prospecteur_id,
             disponible_pour_traitement=disponible_pour_traitement,
+            a_revalider=a_revalider,
         )
 
 
