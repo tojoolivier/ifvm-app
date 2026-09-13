@@ -11,7 +11,7 @@
  * origine exacte (React Test Renderer / Testing Library / timers réels).
  */
 import { Alert } from 'react-native';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react-native';
 import IntensiveImagosScreen from '@/app/(prospection)/intensive-imagos';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
@@ -37,10 +37,18 @@ jest.mock('@/lib/prospection-repository', () => ({
 
 jest.mock('@/lib/referentiel-db', () => ({ listStadesGrille: jest.fn() }));
 
-const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+/** `jest.useFakeTimers()` neutralise le chrono de l'écran (vrai `setInterval`,
+ * 1s) : laissé actif, il tourne au-delà de la fin du test si le processus met
+ * du temps à se terminer (CI partagée) et empêche Jest de sortir proprement —
+ * un des facteurs du job `lint-mobile` qui traînait en CI sur cette suite. */
+const settle = () => act(() => jest.advanceTimersByTimeAsync(20));
 
 describe('IntensiveImagosScreen — densités obligatoires', () => {
-  afterEach(cleanup);
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => {
+    cleanup();
+    jest.useRealTimers();
+  });
   beforeEach(() => {
     useProspectionCaptureStore.getState().reset();
     useProspectionCaptureStore.getState().setStadesParGrille({});
