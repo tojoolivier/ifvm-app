@@ -19,7 +19,6 @@ import { parseEspeceSelection, buildGrilles, parseGrillesCompletees } from '@/li
 import { parseDensite, parseSelectionMultiple, TYPE_CIBLE_IMAGO_OPTIONS, TypeCibleImago } from '@/lib/prospection-extensive';
 import { listStadesGrille } from '@/lib/referentiel-db';
 import { retourArriere } from '@/lib/fiche-routing';
-import { chronoSeconds, formatChrono } from '@/lib/prospection-review';
 import {
   PopulationRow,
   getProspectionPopulation,
@@ -85,7 +84,6 @@ export default function IntensiveImagosScreen() {
   const store = useProspectionCaptureStore();
   const { grilleOrder, currentGrilleIndex, currentSexe, phasesData, stadesDataF, stadesDataM } = store;
 
-  const [tick, setTick] = useState(0);
   const [chargementStades, setChargementStades] = useState(true);
   const [populations, setPopulations] = useState<Partial<Record<Espece, PopulationRow>>>({});
   const [populationsLoaded, setPopulationsLoaded] = useState(false);
@@ -184,12 +182,6 @@ export default function IntensiveImagosScreen() {
       .catch((error) => signalerChargement(error, { draftId }));
   }, [draftId, draft?.capture_started_at, setDraft, signalerChargement]);
 
-  // Effet 5 : tick du chronomètre affiché.
-  useEffect(() => {
-    const interval = setInterval(() => setTick((t) => t + 1), 1000);
-    return () => clearInterval(interval);
-  }, []);
-
   const grille = grilleOrder[currentGrilleIndex];
   const stadesGrille = grille ? (store.stadesParGrille[grilleKeyToString(grille)] ?? { F: [], M: [], larve: [] }) : { F: [], M: [], larve: [] };
   const stadesFList = stadesGrille.F;
@@ -247,8 +239,6 @@ export default function IntensiveImagosScreen() {
   const species = grille.espece;
   const population = populations[species] ?? emptyImagoPopulation(species);
   const typeCible = parseTypeCible(population.type_cible);
-  const seconds = chronoSeconds(draft?.capture_started_at ?? null);
-  void tick;
 
   const setPopulationField = <K extends keyof PopulationRow>(field: K, value: PopulationRow[K]) => {
     setPopulations((prev) => ({
@@ -506,13 +496,6 @@ export default function IntensiveImagosScreen() {
               <Text style={styles.statValuePrimary}>
                 {totalCaptures}
                 <Text style={styles.statValueMax}> / {max}</Text>
-              </Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Chrono</Text>
-              <Text style={styles.statValue}>
-                {formatChrono(seconds)}
-                <Text style={styles.statValueMaxDim}>/30</Text>
               </Text>
             </View>
           </View>
@@ -777,13 +760,9 @@ const styles = StyleSheet.create({
   speciesButtonTextActive: { color: '#fff' },
   statsRow: { marginHorizontal: 16, marginBottom: 10, flexDirection: 'row', gap: 9 },
   statCardPrimary: { flex: 1, backgroundColor: GREEN, borderRadius: 12, padding: 10 },
-  statCard: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 12, padding: 10 },
   statLabelPrimary: { color: '#ffffffcc', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 },
-  statLabel: { color: '#9a9484', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 },
   statValuePrimary: { color: '#fff', fontWeight: '700', fontSize: 19 },
-  statValue: { color: TEXT, fontWeight: '700', fontSize: 21 },
   statValueMax: { fontSize: 12, color: '#ffffffb3' },
-  statValueMaxDim: { fontSize: 11, color: '#bdb6a2' },
   scroll: { flex: 1 },
   chargementBloc: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
   chargementTexte: { fontSize: 12.5, color: TEXT_SECONDARY, fontWeight: '600' },
