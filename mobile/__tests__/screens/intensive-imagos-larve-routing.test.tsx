@@ -5,7 +5,7 @@
  * Fichier séparé des autres scénarios de cet écran — cf. le commentaire
  * d'intensive-imagos-densites-obligatoires.test.tsx pour le pourquoi.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import IntensiveImagosScreen from '@/app/(prospection)/intensive-imagos';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
@@ -32,10 +32,17 @@ jest.mock('@/lib/prospection-repository', () => ({
 
 jest.mock('@/lib/referentiel-db', () => ({ listStadesGrille: jest.fn() }));
 
-const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+/** `jest.useFakeTimers()` neutralise le chrono de l'écran (vrai `setInterval`,
+ * 1s) : laissé actif, il tourne au-delà de la fin du test si le processus met
+ * du temps à se terminer (CI partagée) et empêche Jest de sortir proprement. */
+const settle = () => act(() => jest.advanceTimersByTimeAsync(20));
 
 describe('IntensiveImagosScreen — routage vers C-Larves', () => {
-  afterEach(cleanup);
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => {
+    cleanup();
+    jest.useRealTimers();
+  });
   beforeEach(() => {
     useProspectionCaptureStore.getState().reset();
     useProspectionCaptureStore.getState().setStadesParGrille({});
