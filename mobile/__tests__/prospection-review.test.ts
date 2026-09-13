@@ -305,10 +305,12 @@ describe('buildRecapitulatif', () => {
     ];
     const recap = buildRecapitulatif(draft(), [], '', [], populations);
 
+    // Imagos avant larves (LMC puis NSE dans chaque groupe) : aligne le récapitulatif
+    // sur l'ordre A/B-Imagos/C-Larves/D/E du parcours de saisie (#recap-ordre-a-b-c-d-e).
     expect(recap.densites).toEqual([
       { key: 'LMC-imago', espece: 'LMC', categorie: 'imago', label: 'Locusta — Imagos', densiteDiffuse: 12, densiteGroupee: 3 },
-      { key: 'LMC-larve', espece: 'LMC', categorie: 'larve', label: 'Locusta — Larves', densiteDiffuse: 40, densiteGroupee: null },
       { key: 'NSE-imago', espece: 'NSE', categorie: 'imago', label: 'Nomadacris — Imagos', densiteDiffuse: 7, densiteGroupee: 1 },
+      { key: 'LMC-larve', espece: 'LMC', categorie: 'larve', label: 'Locusta — Larves', densiteDiffuse: 40, densiteGroupee: null },
       { key: 'NSE-larve', espece: 'NSE', categorie: 'larve', label: 'Nomadacris — Larves', densiteDiffuse: null, densiteGroupee: null },
     ]);
   });
