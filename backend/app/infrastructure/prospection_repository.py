@@ -1,11 +1,14 @@
 import uuid
+from datetime import datetime, timedelta
 
-from sqlalchemy import delete, select
+from sqlalchemy import and_, delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import aliased, selectinload
 
 from app.domain.prospection import (
+    DELAI_REVALIDATION_JOURS,
+    TYPES_PROSPECTION_SOUMIS_REVALIDATION,
     Prospection,
     ProspectionCapture,
     ProspectionInfestation,
@@ -93,6 +96,34 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         await self._resoudre_noms([prospection])
         return prospection
 
+    def _perimee_clause(self):
+        """Fiche extensive/validation validée depuis plus de
+        `DELAI_REVALIDATION_JOURS` jours (#revalidation-prospection) : la
+        surface infestée et la localisation des criquets ont pu changer,
+        elle n'est plus fiable pour déclencher un traitement sans être
+        revalidée d'abord. Jamais l'intensive — hors périmètre de la règle.
+        Une fiche jamais validée (`validated_at IS NULL`, ex. encore
+        `en_attente`) n'est de toute façon pas sélectionnable pour le
+        traitement (filtré par `statut=validee` en amont) : exclue ici aussi
+        pour ne pas dépendre de cet ordre.
+        """
+        seuil = datetime.utcnow() - timedelta(days=DELAI_REVALIDATION_JOURS)
+        return and_(
+            ProspectionModel.type_prospection.in_(TYPES_PROSPECTION_SOUMIS_REVALIDATION),
+            ProspectionModel.validated_at.is_not(None),
+            ProspectionModel.validated_at < seuil,
+        )
+
+    def _deja_revalidee_subquery(self):
+        """EXISTS corrélée : une autre fiche pointe déjà vers celle-ci via
+        `revalide_de_id` — elle a déjà été remplacée, ne doit plus apparaître
+        ni comme disponible pour traitement, ni comme à revalider (l'agent
+        doit utiliser la fiche qui l'a remplacée, pas revalider deux fois la
+        même origine — l'index unique partiel `uq_prospection_revalide_de_id`
+        garantit d'ailleurs qu'une seule fiche peut le faire)."""
+        enfant = aliased(ProspectionModel)
+        return select(enfant.id).where(enfant.revalide_de_id == ProspectionModel.id)
+
     async def list_by_filters(
         self,
         type_prospection: str | None = None,
@@ -101,6 +132,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         station_id: uuid.UUID | None = None,
         prospecteur_id: uuid.UUID | None = None,
         disponible_pour_traitement: bool = False,
+        a_revalider: bool = False,
     ) -> list[Prospection]:
         stmt = select(ProspectionModel).options(
             selectinload(ProspectionModel.populations),
@@ -135,7 +167,28 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             sous_requete = select(TraitementModel.id).where(
                 TraitementModel.prospection_id == ProspectionModel.id
             )
-            stmt = stmt.where(~sous_requete.exists())
+            # #revalidation-prospection : une fiche périmée (ou déjà
+            # revalidée par une fiche suivante) n'est plus « disponible » —
+            # elle doit passer par la revalidation d'abord (ou l'agent doit
+            # utiliser la fiche qui l'a déjà remplacée).
+            stmt = stmt.where(
+                ~sous_requete.exists(),
+                ~self._perimee_clause(),
+                ~self._deja_revalidee_subquery().exists(),
+            )
+        if a_revalider:
+            # Symétrique de `disponible_pour_traitement` ci-dessus : exactement
+            # les fiches qu'il exclut pour péremption, à condition qu'elles
+            # n'aient pas non plus déjà de traitement (inutile de revalider
+            # une fiche déjà traitée) ni déjà été revalidées par une autre.
+            sous_requete_traitee = select(TraitementModel.id).where(
+                TraitementModel.prospection_id == ProspectionModel.id
+            )
+            stmt = stmt.where(
+                self._perimee_clause(),
+                ~sous_requete_traitee.exists(),
+                ~self._deja_revalidee_subquery().exists(),
+            )
         stmt = stmt.order_by(ProspectionModel.date_prospection.desc())
         result = await self.session.execute(stmt)
         prospections = [self._to_domain(m) for m in result.scalars().all()]
@@ -211,6 +264,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             verified_at=prospection.verified_at,
             validated_by=prospection.validated_by,
             validated_at=prospection.validated_at,
+            revalide_de_id=prospection.revalide_de_id,
             created_at=prospection.created_at,
             updated_at=prospection.updated_at,
             # ==========================================
@@ -708,6 +762,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             verified_at=model.verified_at,
             validated_by=model.validated_by,
             validated_at=model.validated_at,
+            revalide_de_id=model.revalide_de_id,
             created_at=model.created_at,
             updated_at=model.updated_at,
             # ==========================================
