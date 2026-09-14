@@ -138,15 +138,17 @@ describe('ProspectionsPage — maquette §3 du handoff', () => {
 
   /** #revalidation-prospection : `validation` (« Vérifier un signalement ») est
    * un vrai `type_prospection` déjà accepté par le backend, mais absent de
-   * cette liste — et une fiche revalidée (`revalide_de_id` non nul) doit se
-   * distinguer d'une Extensive ordinaire, pas se fondre dedans. */
-  it('affiche « Signalement » et « Revalidation » dans la colonne Type, pas la valeur brute ni le type d’origine', async () => {
+   * cette liste — gardé sous son nom de type, « Validation » (demande
+   * explicite : pas de relibellé en « Signalement ») — et une fiche
+   * revalidée (`revalide_de_id` non nul) doit se distinguer d'une Extensive
+   * ordinaire, pas se fondre dedans. */
+  it('affiche « Validation » et « Revalidation » dans la colonne Type, pas la valeur brute ni le type d’origine', async () => {
     mockApi()
     renderPage()
 
     await waitFor(() => expect(rows()).toHaveLength(4))
-    const ligneSignalement = screen.getByText('MSG-2026-0042').closest('tr')!
-    expect(within(ligneSignalement).getByText('Signalement')).toBeInTheDocument()
+    const ligneValidation = screen.getByText('MSG-2026-0042').closest('tr')!
+    expect(within(ligneValidation).getByText('Validation')).toBeInTheDocument()
 
     const ligneRevalidation = screen.getByText('PR-2026-0150-EXT').closest('tr')!
     expect(within(ligneRevalidation).getByText('Revalidation')).toBeInTheDocument()
@@ -154,12 +156,12 @@ describe('ProspectionsPage — maquette §3 du handoff', () => {
     expect(within(ligneRevalidation).queryByText('Extensive')).not.toBeInTheDocument()
   })
 
-  it('filtre sur « Signalement » via les pastilles', async () => {
+  it('filtre sur « Validation » via les pastilles', async () => {
     mockApi()
     renderPage()
 
     await waitFor(() => expect(rows()).toHaveLength(4))
-    fireEvent.click(screen.getByRole('button', { name: 'Signalement' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Validation' }))
 
     await waitFor(() => expect(rows()).toHaveLength(1))
     expect(screen.getByText('MSG-2026-0042')).toBeInTheDocument()
