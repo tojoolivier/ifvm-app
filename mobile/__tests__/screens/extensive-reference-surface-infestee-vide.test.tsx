@@ -1,9 +1,8 @@
 /**
- * Surface infestée (ha) : une fiche doit toujours en avoir une, valeur unique
- * commune à LMC et NSE (une observation de terrain ne porte que sur une seule
- * espèce à la fois, cf. CONTEXT.md — aucune ventilation par espèce n'existe
- * pour ce champ). Obligatoire pour toute fiche non intensive (extensive comme
- * validation, seules à passer par extensive-reference.tsx).
+ * Surface infestée (ha) : facultative pour toute fiche non intensive
+ * (extensive comme validation, seules à passer par extensive-reference.tsx),
+ * #surface-infestee-facultative — n'était auparavant jamais transmise à
+ * l'intensive non plus, cette bascule aligne les deux écrans.
  *
  * Fichier séparé (un seul montage d'écran par fichier) — même mise en garde
  * que extensive-reference-screen-restore.test.tsx (fuite de la chaîne de
@@ -20,7 +19,15 @@ jest.mock('expo-router', () =>
 );
 
 jest.mock('@/lib/prospection-repository', () => ({
-  updateProspectionExtensiveReference: jest.fn().mockResolvedValue({ id: 'draft-123' }),
+  // `date_prospection` doit être présent dans la valeur résolue : `setDraft(updated)`
+  // republie le brouillon après l'enregistrement, et une valeur incomplète ici fait
+  // planter `generateNumeroMessage` sur un remontage ultérieur (cf.
+  // extensive-reference-surface-infestee-positive.test.tsx, même précaution).
+  updateProspectionExtensiveReference: jest.fn().mockResolvedValue({
+    id: 'draft-123',
+    type_prospection: 'extensive',
+    date_prospection: '2026-08-25',
+  }),
   listOperationsAeriennes: jest.fn().mockResolvedValue([]),
   saveOperationsAeriennes: jest.fn().mockResolvedValue(undefined),
 }));
@@ -29,7 +36,7 @@ jest.mock('@/lib/location', () => ({
   getCurrentPosition: jest.fn().mockResolvedValue({ latitude: -18.9, longitude: 47.5, altitude: null, accuracy: 5, timestamp: Date.now() }),
 }));
 
-describe('ExtensiveReferenceScreen — surface infestée obligatoire', () => {
+describe('ExtensiveReferenceScreen — surface infestée facultative', () => {
   beforeEach(() => {
     useProspectionWizardStore.setState({
       draft: { id: 'draft-123', type_prospection: 'extensive', date_prospection: '2026-08-25' } as any,
@@ -37,7 +44,7 @@ describe('ExtensiveReferenceScreen — surface infestée obligatoire', () => {
     });
   });
 
-  it('bloque « Suivant » avec un message si la surface infestée est vide', async () => {
+  it('laisse passer « Suivant » sans alerte quand la surface infestée est vide, et l’enregistre à null', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 
     await render(<ExtensiveReferenceScreen />);
@@ -45,7 +52,12 @@ describe('ExtensiveReferenceScreen — surface infestée obligatoire', () => {
 
     fireEvent.press(screen.getByText('Suivant : Imagos ›'));
 
-    expect(alertSpy).toHaveBeenCalledWith('Surface infestée requise', expect.any(String));
-    expect(prospectionRepository.updateProspectionExtensiveReference).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(prospectionRepository.updateProspectionExtensiveReference).toHaveBeenCalledWith(
+        'draft-123',
+        expect.objectContaining({ surfaceInfestee: null })
+      )
+    );
+    expect(alertSpy).not.toHaveBeenCalledWith('Surface infestée requise', expect.any(String));
   });
 });

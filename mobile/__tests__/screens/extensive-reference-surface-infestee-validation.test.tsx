@@ -1,10 +1,9 @@
 /**
- * Surface infestée (ha) obligatoire — s'applique aussi aux fiches de
+ * Surface infestée (ha) facultative — s'applique aussi aux fiches de
  * « prospection de validation » (vérification d'un signalement), qui passent
- * par le même écran extensive-reference.tsx que l'extensive (seule
- * l'intensive, sur reference.tsx, en est exemptée). Fichier séparé (un seul
- * montage d'écran par fichier), même mise en garde que
- * extensive-reference-screen-restore.test.tsx.
+ * par le même écran extensive-reference.tsx que l'extensive
+ * (#surface-infestee-facultative). Fichier séparé (un seul montage d'écran
+ * par fichier), même mise en garde que extensive-reference-screen-restore.test.tsx.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
@@ -17,7 +16,15 @@ jest.mock('expo-router', () =>
 );
 
 jest.mock('@/lib/prospection-repository', () => ({
-  updateProspectionExtensiveReference: jest.fn().mockResolvedValue({ id: 'draft-123' }),
+  // `date_prospection` doit être présent dans la valeur résolue : `setDraft(updated)`
+  // republie le brouillon après l'enregistrement, et une valeur incomplète ici fait
+  // planter `generateNumeroMessage` sur un remontage ultérieur (cf.
+  // extensive-reference-surface-infestee-positive.test.tsx, même précaution).
+  updateProspectionExtensiveReference: jest.fn().mockResolvedValue({
+    id: 'draft-123',
+    type_prospection: 'validation',
+    date_prospection: '2026-08-25',
+  }),
   listOperationsAeriennes: jest.fn().mockResolvedValue([]),
   saveOperationsAeriennes: jest.fn().mockResolvedValue(undefined),
 }));
@@ -26,7 +33,7 @@ jest.mock('@/lib/location', () => ({
   getCurrentPosition: jest.fn().mockResolvedValue({ latitude: -18.9, longitude: 47.5, altitude: null, accuracy: 5, timestamp: Date.now() }),
 }));
 
-describe('ExtensiveReferenceScreen — surface infestée obligatoire (prospection de validation)', () => {
+describe('ExtensiveReferenceScreen — surface infestée facultative (prospection de validation)', () => {
   beforeEach(() => {
     useProspectionWizardStore.setState({
       draft: { id: 'draft-123', type_prospection: 'validation', date_prospection: '2026-08-25' } as any,
@@ -34,7 +41,7 @@ describe('ExtensiveReferenceScreen — surface infestée obligatoire (prospectio
     });
   });
 
-  it('bloque « Suivant » avec un message si la surface infestée est vide', async () => {
+  it('laisse passer « Suivant » sans alerte quand la surface infestée est vide, et l’enregistre à null', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 
     await render(<ExtensiveReferenceScreen />);
@@ -42,7 +49,12 @@ describe('ExtensiveReferenceScreen — surface infestée obligatoire (prospectio
 
     fireEvent.press(screen.getByText('Suivant : Imagos ›'));
 
-    expect(alertSpy).toHaveBeenCalledWith('Surface infestée requise', expect.any(String));
-    expect(prospectionRepository.updateProspectionExtensiveReference).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(prospectionRepository.updateProspectionExtensiveReference).toHaveBeenCalledWith(
+        'draft-123',
+        expect.objectContaining({ surfaceInfestee: null })
+      )
+    );
+    expect(alertSpy).not.toHaveBeenCalledWith('Surface infestée requise', expect.any(String));
   });
 });

@@ -335,7 +335,7 @@ describe('listValidatedProspections', () => {
 });
 
 describe('listProspectionsDisponiblesPourTraitementLocal', () => {
-  it('renvoie les fiches synchronisées avec une surface infestée connue, tous types confondus', async () => {
+  it('renvoie les fiches synchronisées, tous types confondus, surface infestée connue ou non', async () => {
     const row = { ...STORED_ROW, type_prospection: 'intensive', statut_sync: 'synced', surface_infestee: 3.2 };
     getAllAsync.mockResolvedValueOnce([row]);
 
@@ -346,8 +346,11 @@ describe('listProspectionsDisponiblesPourTraitementLocal', () => {
     // La liste elle-même n'est pas restreinte par type (contrairement à
     // listValidatedProspections) — seule l'exclusion des fiches périmées
     // (#revalidation-prospection, ci-dessous) cible extensive/validation.
+    // #surface-infestee-facultative : plus de filtre sur `surface_infestee`
+    // (autrefois obligatoire pour extensive/validation, jamais renseigné pour
+    // certaines fiches légitimes depuis que le champ est facultatif partout).
     expect(query).toContain("p.statut_sync = 'synced'");
-    expect(query).toContain('p.surface_infestee IS NOT NULL');
+    expect(query).not.toContain('surface_infestee IS NOT NULL');
     expect(query).toContain('ORDER BY p.updated_at DESC');
   });
 

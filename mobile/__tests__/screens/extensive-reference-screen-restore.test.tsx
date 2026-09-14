@@ -118,7 +118,7 @@ describe('ExtensiveReferenceScreen — restauration après hydratation tardive d
     });
 
     await render(<ExtensiveReferenceScreen />);
-    await screen.findByText('Surface infestée (ha) *');
+    await screen.findByText('Surface infestée (ha)');
 
     // Station (saisie libre), Surface prospectée (ha) puis Surface infestée (ha) sont
     // les 3 champs vides, dans cet ordre.
@@ -206,7 +206,7 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
     });
 
     await render(<ExtensiveReferenceScreen />);
-    await screen.findByText('Surface infestée (ha) *');
+    await screen.findByText('Surface infestée (ha)');
 
     expect(screen.queryByText('INFORMATIONS AÉRONEF / ÉQUIPE')).toBeNull();
     expect(screen.queryByText('Informations sur les heures de vol')).toBeNull();
