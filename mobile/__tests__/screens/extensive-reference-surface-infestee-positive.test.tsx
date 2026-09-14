@@ -1,7 +1,9 @@
 /**
- * Surface infestée (ha) obligatoire — cf. extensive-reference-surface-infestee-vide.test.tsx
- * pour le contexte. Fichier séparé (un seul montage d'écran par fichier),
- * même mise en garde que extensive-reference-screen-restore.test.tsx.
+ * Surface infestée (ha) facultative — cf. extensive-reference-surface-infestee-vide.test.tsx
+ * pour le contexte (#surface-infestee-facultative). Une valeur positive
+ * saisie continue bien sûr d'être transmise normalement. Fichier séparé (un
+ * seul montage d'écran par fichier), même mise en garde que
+ * extensive-reference-screen-restore.test.tsx.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
@@ -27,7 +29,7 @@ jest.mock('@/lib/location', () => ({
   getCurrentPosition: jest.fn().mockResolvedValue({ latitude: -18.9, longitude: 47.5, altitude: null, accuracy: 5, timestamp: Date.now() }),
 }));
 
-describe('ExtensiveReferenceScreen — surface infestée obligatoire', () => {
+describe('ExtensiveReferenceScreen — surface infestée facultative', () => {
   beforeEach(() => {
     useProspectionWizardStore.setState({
       draft: { id: 'draft-123', type_prospection: 'extensive', date_prospection: '2026-08-25' } as any,

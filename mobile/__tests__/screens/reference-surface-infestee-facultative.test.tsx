@@ -1,7 +1,11 @@
 /**
- * Surface infestée (ha) reste facultative sur l'écran intensif (reference.tsx) —
- * seule exception à l'obligation posée sur extensive-reference.tsx (extensive
- * et validation), cf. extensive-reference-surface-infestee-vide.test.tsx.
+ * Surface infestée (ha) facultative sur l'écran intensif (reference.tsx) —
+ * comme sur extensive-reference.tsx (extensive et validation,
+ * #surface-infestee-facultative, cf. extensive-reference-surface-infestee-vide.test.tsx),
+ * mais avec une sérialisation différente en l'absence de saisie : `0` ici
+ * (transform yup de `prospection-reference-schema.ts`) contre `null` côté
+ * extensive/validation — différence préexistante entre les deux écrans, non
+ * unifiée par ce changement.
  * Fichier séparé de reference-distance-200m.test.tsx (même mise en garde :
  * fuite d'effets asynchrones du montage — capture GPS — entre tests d'un
  * même fichier).
