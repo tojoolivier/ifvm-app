@@ -43,13 +43,14 @@ def _vol(type_vol: str, debut: time, fin: time, **kwargs) -> Vol:
 def _fiche(**kwargs) -> FicheVol:
     defaults = dict(
         id=uuid.uuid4(),
-        numero_fiche="2026-08-24-IHO01-MDGA21",
+        numero_fiche="001-2026-08-24-IHO01-MDGA21",
         date_vol=date(2026, 8, 24),
         compagnie="Aviation Malgache",
         immatriculation="MDG-A21",
-        base_code="IHO01",
-        base_nom="Ihosy",
-        stand_nom="Stand Sud",
+        campagne_id=uuid.uuid4(),
+        base_id=uuid.uuid4(),
+        stand_id=uuid.uuid4(),
+        compteur=1,
         pilote="Rakoto A.",
         mecanicien="Randria B.",
         chef_de_base_id=uuid.uuid4(),
@@ -58,25 +59,32 @@ def _fiche(**kwargs) -> FicheVol:
     return FicheVol(**defaults)
 
 
-# --- Numéro de fiche : [Date]-[Base numérotée]-[Immatriculation] + compteur ---------
+# --- Numéro de fiche : [Compteur]-[Date]-[Équipe]-[Immatriculation] ----------------
 
 
 def test_numero_suit_le_format_du_cahier_des_charges():
-    assert composer_numero_fiche(date(2026, 8, 24), "IHO01", "MDG-A21") == "2026-08-24-IHO01-MDGA21"
-
-
-def test_numero_normalise_la_casse_et_les_separateurs_de_l_immatriculation():
-    assert composer_numero_fiche(date(2026, 8, 24), "iho01", "mdg a21") == (
-        "2026-08-24-IHO01-MDGA21"
+    assert (
+        composer_numero_fiche(1, date(2026, 8, 24), "IHO01", "MDG-A21")
+        == "001-2026-08-24-IHO01-MDGA21"
     )
 
 
-def test_une_seconde_fiche_du_meme_jour_recoit_un_compteur():
-    """« Une seule fiche par jour si possible » : convention, pas contrainte. Le terrain
-    ne doit jamais être bloqué — le numéro porte un suffixe incrémental."""
-    base = composer_numero_fiche(date(2026, 8, 24), "IHO01", "MDG-A21")
-    assert composer_numero_fiche(date(2026, 8, 24), "IHO01", "MDG-A21", suffixe=2) == f"{base}-02"
-    assert composer_numero_fiche(date(2026, 8, 24), "IHO01", "MDG-A21", suffixe=10) == f"{base}-10"
+def test_numero_normalise_la_casse_et_les_separateurs_de_l_immatriculation():
+    assert composer_numero_fiche(1, date(2026, 8, 24), "iho01", "mdg a21") == (
+        "001-2026-08-24-IHO01-MDGA21"
+    )
+
+
+def test_le_compteur_est_forme_sur_trois_chiffres():
+    assert composer_numero_fiche(12, date(2026, 8, 24), "IHO01", "MDG-A21").startswith("012-")
+
+
+def test_deux_compteurs_distincts_produisent_deux_numeros_distincts():
+    """Le compteur, pas un suffixe, porte désormais l'unicité — cf.
+    FicheVolRepositoryImpl.next_compteur, incrément atomique par campagne."""
+    premiere = composer_numero_fiche(1, date(2026, 8, 24), "IHO01", "MDG-A21")
+    seconde = composer_numero_fiche(2, date(2026, 8, 24), "IHO01", "MDG-A21")
+    assert premiere != seconde
 
 
 # --- Durées : dérivées, jamais stockées --------------------------------------------

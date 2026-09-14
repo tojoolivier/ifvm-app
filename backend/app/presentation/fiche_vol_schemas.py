@@ -54,19 +54,22 @@ class FicheVolCreate(BaseModel):
     date_vol: date
     compagnie: str = Field(min_length=1, max_length=255)
     immatriculation: str = Field(min_length=1, max_length=20)
-    base_code: str = Field(min_length=1, max_length=20)
-    base_nom: str = Field(min_length=1, max_length=255)
-    base_latitude: float | None = None
-    base_longitude: float | None = None
-    base_altitude: float | None = None
-    stand_nom: str = Field(min_length=1, max_length=255)
-    stand_latitude: float | None = None
-    stand_longitude: float | None = None
-    stand_altitude: float | None = None
+    campagne_id: uuid.UUID
+    base_id: uuid.UUID
+    stand_id: uuid.UUID
     pilote: str = Field(min_length=1, max_length=255)
     mecanicien: str = Field(min_length=1, max_length=255)
     chef_de_base_id: uuid.UUID
     consultant_international: str | None = None
+    # Un seul produit assumé par fiche et par jour (même forme que
+    # Prospection.pesticide_* en mode extensif aérien).
+    pesticide_nom_commercial: str | None = None
+    pesticide_quantite_disponible: float | None = None
+    pesticide_quantite_recue: float | None = None
+    futs_disponible: int | None = None
+    futs_recues: int | None = None
+    futs_pleins: int | None = None
+    futs_vides: int | None = None
     observations: str | None = None
     vols: list[VolCreate] = Field(default_factory=list)
 
@@ -75,17 +78,24 @@ class FicheVolRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    # [Date]-[Base numérotée]-[Immatriculation], suffixé à partir de la 2e fiche du jour.
+    # [Compteur 3 chiffres]-[Date]-[Équipe]-[Immatriculation], compteur continu par
+    # campagne (jamais réinitialisé, jamais suffixé).
     numero_fiche: str
     date_vol: date
     compagnie: str
     immatriculation: str
-    base_code: str
-    base_nom: str
+    campagne_id: uuid.UUID
+    compteur: int
+    base_id: uuid.UUID
+    stand_id: uuid.UUID
+    # Résolus par jointure (base_aerienne/stand_remplissage), jamais saisis.
+    base_numero: str | None = None
+    base_localite: str | None = None
     base_latitude: float | None = None
     base_longitude: float | None = None
     base_altitude: float | None = None
-    stand_nom: str
+    stand_numero: str | None = None
+    stand_localite: str | None = None
     stand_latitude: float | None = None
     stand_longitude: float | None = None
     stand_altitude: float | None = None
@@ -93,6 +103,16 @@ class FicheVolRead(BaseModel):
     mecanicien: str
     chef_de_base_id: uuid.UUID
     consultant_international: str | None = None
+    pesticide_nom_commercial: str | None = None
+    pesticide_quantite_disponible: float | None = None
+    pesticide_quantite_recue: float | None = None
+    # Dérivées (somme des rotations rattachées aux vols de la fiche), jamais stockées.
+    pesticide_quantite_utilisee: float | None = None
+    pesticide_quantite_restante: float | None = None
+    futs_disponible: int | None = None
+    futs_recues: int | None = None
+    futs_pleins: int | None = None
+    futs_vides: int | None = None
     observations: str | None = None
     statut: str
     statut_sync: str

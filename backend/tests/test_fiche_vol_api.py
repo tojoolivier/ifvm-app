@@ -15,20 +15,16 @@ from app.models.users import Utilisateur
 
 
 @pytest.fixture
-def payload_fiche(chef_de_base: Utilisateur) -> dict:
+def payload_fiche(
+    chef_de_base: Utilisateur, campagne_id: uuid.UUID, base_aerienne, stand_remplissage
+) -> dict:
     return {
         "date_vol": "2026-08-24",
         "compagnie": "Aviation Malgache",
         "immatriculation": "MDG-A21",
-        "base_code": "IHO01",
-        "base_nom": "Ihosy",
-        "base_latitude": -22.4021,
-        "base_longitude": 46.1250,
-        "base_altitude": 764.0,
-        "stand_nom": "Stand Sud",
-        "stand_latitude": -22.4100,
-        "stand_longitude": 46.1300,
-        "stand_altitude": 770.0,
+        "campagne_id": str(campagne_id),
+        "base_id": str(base_aerienne.id),
+        "stand_id": str(stand_remplissage.id),
         "pilote": "Rakoto A.",
         "mecanicien": "Randria B.",
         "chef_de_base_id": str(chef_de_base.id),
@@ -47,17 +43,20 @@ async def _creer(client, auth_headers, payload) -> dict:
 @pytest.mark.asyncio
 async def test_creation_derive_le_numero_de_fiche(client, auth_headers, payload_fiche):
     fiche = await _creer(client, auth_headers, payload_fiche)
-    assert fiche["numero_fiche"] == "2026-08-24-IHO01-MDGA21"
+    assert fiche["numero_fiche"] == "001-2026-08-24-IHO01-MDGA21"
     assert fiche["statut"] == "brouillon"
+    assert fiche["base_numero"] == "IHO01"
+    assert fiche["stand_numero"] == "STD01"
 
 
 @pytest.mark.asyncio
 async def test_seconde_fiche_du_jour_recoit_un_compteur(client, auth_headers, payload_fiche):
-    """Le terrain n'est jamais bloqué : la deuxième fiche est acceptée, numérotée."""
+    """Le terrain n'est jamais bloqué : la deuxième fiche est acceptée, numérotée. Le
+    compteur est continu par campagne (jamais un suffixe -02 : cf. next_compteur)."""
     premiere = await _creer(client, auth_headers, payload_fiche)
     seconde = await _creer(client, auth_headers, payload_fiche)
-    assert premiere["numero_fiche"] == "2026-08-24-IHO01-MDGA21"
-    assert seconde["numero_fiche"] == "2026-08-24-IHO01-MDGA21-02"
+    assert premiere["numero_fiche"] == "001-2026-08-24-IHO01-MDGA21"
+    assert seconde["numero_fiche"] == "002-2026-08-24-IHO01-MDGA21"
 
 
 @pytest.mark.asyncio

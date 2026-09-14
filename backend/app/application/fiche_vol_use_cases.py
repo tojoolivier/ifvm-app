@@ -13,7 +13,6 @@ from app.domain.fiche_vol import (
     FicheVol,
     FicheVolIntrouvableError,
     FicheVolVerrouilleeError,
-    NumeroFicheVolConflitError,
     SignatureVol,
     Vol,
     composer_numero_fiche,
@@ -21,10 +20,6 @@ from app.domain.fiche_vol import (
     valider_rotations_completes,
     valider_signatures,
 )
-
-# Garde-fou sur la boucle de numérotation : au-delà, c'est une anomalie de saisie, pas
-# une journée chargée.
-_SUFFIXE_MAX = 99
 
 
 async def _exiger_brouillon(repo, fiche_vol_id: uuid.UUID) -> FicheVol:
@@ -48,21 +43,17 @@ class CreateFicheVol:
         if chef is None or chef.role != "chef_de_base":
             raise ChefDeBaseVolInvalideError(str(fiche.chef_de_base_id))
 
-        # « Une seule fiche par jour si possible » : on tente le numéro nu, puis on
-        # incrémente. Le conflit est arbitré par la contrainte UNIQUE, pas par un SELECT
-        # préalable — deux tablettes qui synchronisent en même temps ne doivent pas
-        # pouvoir obtenir le même numéro.
-        for suffixe in [None, *range(2, _SUFFIXE_MAX + 1)]:
-            fiche.numero_fiche = composer_numero_fiche(
-                fiche.date_vol, fiche.base_code, fiche.immatriculation, suffixe
-            )
-            try:
-                return await self.repo.create(fiche)
-            except NumeroFicheVolConflitError:
-                continue
-        raise NumeroFicheVolConflitError(
-            f"plus de {_SUFFIXE_MAX} fiches le {fiche.date_vol} pour {fiche.immatriculation}"
+        # equipe = base_aerienne.numero, résolu avant l'écriture pour composer le
+        # numéro de fiche. next_compteur alloue atomiquement (verrou de ligne côté
+        # serveur) : contrairement à l'ancien mécanisme de suffixe, deux fiches créées
+        # en même temps n'obtiennent jamais le même compteur, donc jamais le même
+        # numéro — plus besoin de boucle de réessai sur conflit.
+        equipe = await self.repo.get_base_numero(fiche.base_id)
+        fiche.compteur = await self.repo.next_compteur(fiche.campagne_id)
+        fiche.numero_fiche = composer_numero_fiche(
+            fiche.compteur, fiche.date_vol, equipe, fiche.immatriculation
         )
+        return await self.repo.create(fiche)
 
 
 @dataclass
