@@ -26,9 +26,9 @@ jest.mock('@/lib/prospection-repository', () => ({
   },
 }));
 
-// Un des scénarios ci-dessous rend l'écran en mode aérien (Signatures Pilote/Chef
-// de Base) — non exercé par ces tests, mais listUtilisateursByRole est appelée au
-// montage : mocké pour ne pas dépendre d'expo-sqlite.
+// Un des scénarios ci-dessous rend l'écran en mode aérien (Signatures Consultant
+// FAO/Chef de Base) — non exercé par ces tests, mais listUtilisateursByRole est
+// appelée au montage : mocké pour ne pas dépendre d'expo-sqlite.
 jest.mock('@/lib/referentiel-db', () => ({
   listUtilisateursByRole: jest.fn().mockResolvedValue([]),
 }));

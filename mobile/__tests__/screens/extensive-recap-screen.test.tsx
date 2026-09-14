@@ -11,7 +11,6 @@ import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useAuthStore } from '@/lib/auth-store';
 import * as prospectionRepository from '@/lib/prospection-repository';
 import * as prospectionReview from '@/lib/prospection-review';
-import * as referentielDb from '@/lib/referentiel-db';
 import { formatHeureLocale } from '@/lib/prospection-fiche-lecture';
 
 jest.mock('expo-router', () =>
@@ -35,10 +34,6 @@ jest.mock('@/lib/prospection-repository', () => ({
 
 jest.mock('@/lib/prospection-review', () => ({
   enregistrerEtSynchroniser: jest.fn().mockResolvedValue({ envoyees: [], echouees: [], conflits: [] }),
-}));
-
-jest.mock('@/lib/referentiel-db', () => ({
-  listLieuxAeriens: jest.fn().mockResolvedValue([]),
 }));
 
 const DRAFT_BASE = {
@@ -324,13 +319,10 @@ describe('ExtensiveRecapScreen — mode aérien : pesticides embarqués + signat
     pilote: 'Jean Rakoto',
     mecanicien: 'Marc Andria',
     chef_de_base: 'Sarah Ravelo',
-    lieu_base_id: 'lieu-1',
+    base: 'Tuléar',
   };
 
   beforeEach(() => {
-    jest.mocked(referentielDb.listLieuxAeriens).mockResolvedValue([
-      { id: 'lieu-1', type_lieu: 'principale', nom: 'Tuléar' },
-    ]);
     jest.mocked(prospectionRepository.listAllProspectionPopulations).mockResolvedValue([]);
     jest.mocked(prospectionRepository.listOperationsAeriennes).mockResolvedValue([
       {
@@ -448,10 +440,13 @@ describe('ExtensiveRecapScreen — mode aérien : pesticides embarqués + signat
     expect(screen.getByText('5')).toBeVisible();
 
     // Signatures — VISA n'apparaît plus (donnée historique préservée en base,
-    // jamais réaffichée) ; Rakoto V. n'était que sa valeur, pas Pilote.
+    // jamais réaffichée) ; Rakoto V. n'était que sa valeur. Pilote n'est plus une
+    // ligne de Signatures non plus (« Pilote » reste affiché ailleurs, dans les
+    // Références aériennes — cf. `draft.pilote` ci-dessus) : seul le format
+    // combiné nom + horodatage propre à une ligne de signature est vérifié absent.
     expect(screen.queryByText('VISA')).toBeNull();
     expect(screen.queryByText(`Rakoto V. — ${formatHeureLocale('2026-09-01T09:00:00.000Z')}`)).toBeNull();
-    expect(screen.getByText(`Jean Rakoto — ${formatHeureLocale('2026-09-01T09:10:00.000Z')}`)).toBeVisible();
+    expect(screen.queryByText(`Jean Rakoto — ${formatHeureLocale('2026-09-01T09:10:00.000Z')}`)).toBeNull();
     // Consultant FAO et Chef de Base non signés : ligne présente avec « — », pas absente.
     expect(screen.getByText('Consultant FAO')).toBeVisible();
     expect(screen.getByText('Chef de Base')).toBeVisible();

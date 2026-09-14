@@ -302,7 +302,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             pilote=prospection.pilote,
             mecanicien=prospection.mecanicien,
             chef_de_base=prospection.chef_de_base,
-            lieu_base_id=prospection.lieu_base_id,
+            base=prospection.base,
             # ==========================================
             # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
             # ==========================================
@@ -497,7 +497,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         model.pilote = prospection.pilote
         model.mecanicien = prospection.mecanicien
         model.chef_de_base = prospection.chef_de_base
-        model.lieu_base_id = prospection.lieu_base_id
+        model.base = prospection.base
 
         # ==========================================
         # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
@@ -802,7 +802,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             pilote=model.pilote,
             mecanicien=model.mecanicien,
             chef_de_base=model.chef_de_base,
-            lieu_base_id=model.lieu_base_id,
+            base=model.base,
             # ==========================================
             # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
             # ==========================================

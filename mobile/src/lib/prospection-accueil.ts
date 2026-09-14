@@ -198,7 +198,7 @@ export async function assurerProspectionDisponibleLocalement(fiche: ProspectionR
     pilote: fiche.pilote ?? null,
     mecanicien: fiche.mecanicien ?? null,
     chefDeBase: fiche.chef_de_base ?? null,
-    lieuBaseId: fiche.lieu_base_id ?? null,
+    base: fiche.base ?? null,
     pesticidesEmbarques: fiche.pesticides_embarques ?? null,
     pesticideNomCommercial: fiche.pesticide_nom_commercial ?? null,
     pesticideQuantiteDisponible: fiche.pesticide_quantite_disponible ?? null,

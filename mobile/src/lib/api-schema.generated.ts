@@ -2313,8 +2313,8 @@ export interface components {
             mecanicien?: string | null;
             /** Chef De Base */
             chef_de_base?: string | null;
-            /** Lieu Base Id */
-            lieu_base_id?: string | null;
+            /** Base */
+            base?: string | null;
             /** Pesticides Embarques */
             pesticides_embarques?: boolean | null;
             /** Pesticide Nom Commercial */
@@ -2522,8 +2522,8 @@ export interface components {
             mecanicien?: string | null;
             /** Chef De Base */
             chef_de_base?: string | null;
-            /** Lieu Base Id */
-            lieu_base_id?: string | null;
+            /** Base */
+            base?: string | null;
             /** Pesticides Embarques */
             pesticides_embarques?: boolean | null;
             /** Pesticide Nom Commercial */
@@ -2672,8 +2672,8 @@ export interface components {
             mecanicien?: string | null;
             /** Chef De Base */
             chef_de_base?: string | null;
-            /** Lieu Base Id */
-            lieu_base_id?: string | null;
+            /** Base */
+            base?: string | null;
             /** Pesticides Embarques */
             pesticides_embarques?: boolean | null;
             /** Pesticide Nom Commercial */

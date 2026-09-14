@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     Numeric,
+    String,
     Text,
     UniqueConstraint,
 )
@@ -151,13 +152,14 @@ class ProspectionModel(Base):
     pilote: Mapped[str | None] = mapped_column(Text(), nullable=True)
     mecanicien: Mapped[str | None] = mapped_column(Text(), nullable=True)
     chef_de_base: Mapped[str | None] = mapped_column(Text(), nullable=True)
-    # Base principale du vol de prospection ; nullable — une prospection
-    # extensive aérienne « généralisée » (début/fin de campagne, relevé large
-    # non rattaché à une base) n'en a pas. Pas de base secondaire côté
-    # prospection : ce concept n'existe que pour le traitement.
-    lieu_base_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("lieu_aerien.id"), nullable=True
-    )
+    # Base principale du vol de prospection, texte libre (migration 0063,
+    # défait la FK vers le référentiel `lieu_aerien` posée en 0047 — même
+    # décision produit que `traitement_aerien.base_principale`, migration
+    # 0054). Nullable — une prospection extensive aérienne « généralisée »
+    # (début/fin de campagne, relevé large non rattaché à une base) n'en a
+    # pas. Pas de base secondaire côté prospection : ce concept n'existe que
+    # pour le traitement.
+    base: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # ==========================================
     # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures (migration 0036)

@@ -28,10 +28,6 @@ jest.mock('@/lib/prospection-repository', () => ({
   saveOperationsAeriennes: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('@/lib/referentiel-db', () => ({
-  listLieuxAeriens: jest.fn().mockResolvedValue([]),
-}));
-
 jest.mock('@/lib/location', () => ({
   getCurrentPosition: jest.fn().mockResolvedValue({
     latitude: -18.9,

@@ -162,7 +162,7 @@ async def create_prospection(
             pilote=body.pilote,
             mecanicien=body.mecanicien,
             chef_de_base=body.chef_de_base,
-            lieu_base_id=body.lieu_base_id,
+            base=body.base,
             # ==========================================
             # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
             # ==========================================
