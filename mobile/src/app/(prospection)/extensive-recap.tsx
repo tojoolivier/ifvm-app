@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
@@ -13,7 +13,7 @@ import {
   OperationAerienneRow,
   PopulationRow,
 } from '@/lib/prospection-repository';
-import { enregistrerEtSynchroniser } from '@/lib/prospection-review';
+import { enregistrerEtSynchroniser, trouverPopulationsIncompletes } from '@/lib/prospection-review';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import {
   BIOTOPE_EXTENSIVE_OPTIONS,
@@ -26,6 +26,8 @@ import { DEGATS_OPTIONS, formatHeureLocale } from '@/lib/prospection-fiche-lectu
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
+const ESPECE_LABEL = { LMC: 'Locusta', NSE: 'Nomadacris' } as const;
+const CATEGORIE_LABEL = { imago: 'Imagos', larve: 'Larves' } as const;
 const GREEN = '#235a36';
 const RED = '#c0412b';
 const BG = '#faf7ef';
@@ -324,8 +326,31 @@ export default function ExtensiveRecapScreen() {
 
   const isValidation = draft.type_prospection === 'validation';
 
-  const handleSave = () =>
-    run(
+  // #revalidation-prospection : une grille clonée depuis une fiche périmée
+  // (« Prospections à revalider ») peut porter des champs renseignés sans
+  // densité diffuse — l'agent n'a alors aucune raison de la rouvrir puisqu'elle
+  // paraît déjà remplie. Bloquer ici, avec le détail de la grille en cause,
+  // plutôt que laisser la fiche échouer plus tard — silencieusement — sur
+  // l'écran Synchronisation. Pas de table `prospection_capture` côté
+  // Extensif (captures_* scalaires directement sur la ligne population) :
+  // second argument toujours vide.
+  const populationsIncompletes = trouverPopulationsIncompletes(populations, []);
+
+  const bloquerSiDensiteDiffuseManquante = (): boolean => {
+    if (populationsIncompletes.length === 0) return false;
+    const grilles = populationsIncompletes
+      .map((p) => `${ESPECE_LABEL[p.espece]} · ${CATEGORIE_LABEL[p.categorie]}`)
+      .join('\n');
+    Alert.alert(
+      'Densité diffuse manquante',
+      `La densité diffuse (ind./ha) est obligatoire et n'est pas renseignée pour :\n\n${grilles}\n\nRetournez sur cette grille pour la compléter avant d'enregistrer.`
+    );
+    return true;
+  };
+
+  const handleSave = () => {
+    if (bloquerSiDensiteDiffuseManquante()) return;
+    void run(
       async () => {
         // #numero-fiche-extensive-egal-n-message : uniquement ici (Extensif,
         // pas la branche Signalisation/handleConclude ci-dessous) — le N° de
@@ -342,9 +367,11 @@ export default function ExtensiveRecapScreen() {
         context: { draftId: draft.id },
       }
     );
+  };
 
-  const handleConclude = (conclusion: 'confirmee' | 'infirmee') =>
-    run(
+  const handleConclude = (conclusion: 'confirmee' | 'infirmee') => {
+    if (bloquerSiDensiteDiffuseManquante()) return;
+    void run(
       async () => {
         const concluded = await concludeValidation(draft.id, conclusion);
         await enregistrerEtSynchroniser(concluded, [], token!);
@@ -358,6 +385,7 @@ export default function ExtensiveRecapScreen() {
         context: { draftId: draft.id, conclusion },
       }
     );
+  };
 
   if (isValidation) {
     return (
