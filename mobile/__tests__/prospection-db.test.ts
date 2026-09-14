@@ -250,6 +250,15 @@ describe('prospection-db', () => {
     expect(sql).toContain("REFERENCES prospection(id) ON DELETE CASCADE");
   });
 
+  it('creates the fiche_vol table (#fiche-vol)', async () => {
+    await getDb();
+
+    const sql = execAsync.mock.calls[0][0] as string;
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS fiche_vol ');
+    expect(sql).toContain('chef_de_base TEXT');
+    expect(sql).toContain('base_latitude REAL');
+  });
+
   it('memoizes the database across calls', async () => {
     const first = await getDb();
     const second = await getDb();

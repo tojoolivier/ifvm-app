@@ -1414,11 +1414,8 @@ export interface components {
             pilote: string;
             /** Mecanicien */
             mecanicien: string;
-            /**
-             * Chef De Base Id
-             * Format: uuid
-             */
-            chef_de_base_id: string;
+            /** Chef De Base */
+            chef_de_base: string;
             /** Consultant International */
             consultant_international?: string | null;
             /** Observations */
@@ -1466,11 +1463,8 @@ export interface components {
             pilote: string;
             /** Mecanicien */
             mecanicien: string;
-            /**
-             * Chef De Base Id
-             * Format: uuid
-             */
-            chef_de_base_id: string;
+            /** Chef De Base */
+            chef_de_base: string;
             /** Consultant International */
             consultant_international?: string | null;
             /** Observations */
@@ -5796,7 +5790,7 @@ export interface operations {
             query?: {
                 date_vol?: string | null;
                 immatriculation?: string | null;
-                chef_de_base_id?: string | null;
+                chef_de_base?: string | null;
             };
             header?: never;
             path?: never;
@@ -5863,7 +5857,7 @@ export interface operations {
                 /** @description Jour de référence des cumuls */
                 reference: string;
                 immatriculation?: string | null;
-                chef_de_base_id?: string | null;
+                chef_de_base?: string | null;
             };
             header?: never;
             path?: never;

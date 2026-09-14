@@ -18,7 +18,6 @@ from app.application.fiche_vol_use_cases import (
 from app.auth import get_current_user
 from app.database import get_db
 from app.domain.fiche_vol import (
-    ChefDeBaseVolInvalideError,
     FicheVol,
     FicheVolIntrouvableError,
     FicheVolVerrouilleeError,
@@ -34,7 +33,6 @@ from app.domain.fiche_vol import (
     VolRattachementInvalideError,
 )
 from app.infrastructure.fiche_vol_repository import FicheVolRepositoryImpl
-from app.infrastructure.utilisateur_repository import UtilisateurRepositoryImpl
 from app.models.users import Utilisateur
 from app.presentation.fiche_vol_schemas import (
     CumulsRead,
@@ -75,11 +73,7 @@ async def creer_fiche_vol(
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
 
     try:
-        creee = await CreateFicheVol(_repo(db), UtilisateurRepositoryImpl(db)).execute(fiche)
-    except ChefDeBaseVolInvalideError as exc:
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN, "chef_de_base_id n'a pas le rôle chef_de_base"
-        ) from exc
+        creee = await CreateFicheVol(_repo(db)).execute(fiche)
     except RotationDejaRapprocheeError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     except (RotationVolIntrouvableError, ProspectionVolIntrouvableError) as exc:
@@ -95,9 +89,9 @@ async def lister_fiches_vol(
     _: Annotated[Utilisateur, Depends(get_current_user)],
     date_vol: date | None = Query(default=None),
     immatriculation: str | None = Query(default=None),
-    chef_de_base_id: uuid.UUID | None = Query(default=None),
+    chef_de_base: str | None = Query(default=None),
 ):
-    fiches = await ListFichesVol(_repo(db)).execute(date_vol, immatriculation, chef_de_base_id)
+    fiches = await ListFichesVol(_repo(db)).execute(date_vol, immatriculation, chef_de_base)
     return [_presenter(f) for f in fiches]
 
 
@@ -107,9 +101,9 @@ async def cumuls_heures_vol(
     _: Annotated[Utilisateur, Depends(get_current_user)],
     reference: date = Query(description="Jour de référence des cumuls"),
     immatriculation: str | None = Query(default=None),
-    chef_de_base_id: uuid.UUID | None = Query(default=None),
+    chef_de_base: str | None = Query(default=None),
 ):
-    return await CumulsHeuresVol(_repo(db)).execute(reference, immatriculation, chef_de_base_id)
+    return await CumulsHeuresVol(_repo(db)).execute(reference, immatriculation, chef_de_base)
 
 
 @router.get("/{fiche_vol_id}", response_model=FicheVolRead)

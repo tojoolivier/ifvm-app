@@ -52,7 +52,7 @@ def _fiche(**kwargs) -> FicheVol:
         stand_nom="Stand Sud",
         pilote="Rakoto A.",
         mecanicien="Randria B.",
-        chef_de_base_id=uuid.uuid4(),
+        chef_de_base="Rabe C.",
     )
     defaults.update(kwargs)
     return FicheVol(**defaults)

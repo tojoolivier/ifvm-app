@@ -4,11 +4,12 @@
  * autres raccourcis (Nouvelle prospection, Mes fiches, Nouveau traitement,
  * Alertes) restent inchangés.
  */
-import { render, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import DashboardScreen from '@/app/(app)/index';
 import { useAuthStore } from '@/lib/auth-store';
 import * as prospectionRepository from '@/lib/prospection-repository';
+import * as ficheVolRepository from '@/lib/fiche-vol-repository';
 import * as Network from 'expo-network';
 
 const TEST_SAFE_AREA_METRICS = {
@@ -24,6 +25,10 @@ jest.mock('expo-router', () => ({
 jest.mock('@/lib/prospection-repository', () => ({
   listRecentProspections: jest.fn().mockResolvedValue([]),
   countUnsyncedProspections: jest.fn().mockResolvedValue(0),
+}));
+
+jest.mock('@/lib/fiche-vol-repository', () => ({
+  createDraftFicheVol: jest.fn().mockResolvedValue({ id: 'fiche-vol-1' }),
 }));
 
 jest.mock('expo-network', () => ({
@@ -46,6 +51,7 @@ describe('DashboardScreen — Accès rapide', () => {
     });
     jest.mocked(prospectionRepository.listRecentProspections).mockClear();
     jest.mocked(prospectionRepository.countUnsyncedProspections).mockClear();
+    jest.mocked(ficheVolRepository.createDraftFicheVol).mockClear().mockResolvedValue({ id: 'fiche-vol-1' } as any);
     jest.mocked(Network.getNetworkStateAsync).mockClear();
   });
 
@@ -77,5 +83,19 @@ describe('DashboardScreen — Accès rapide', () => {
     await waitFor(() => expect(screen.getByText('ACCÈS RAPIDE')).toBeTruthy());
 
     expect(screen.getByText('Prospections à revalider')).toBeTruthy();
+  });
+
+  // #fiche-vol
+  it('« Fiche de Vol » crée le brouillon local avant de naviguer vers A-Références', async () => {
+    await render(
+      <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
+        <DashboardScreen />
+      </SafeAreaProvider>
+    );
+    await waitFor(() => expect(screen.getByText('ACCÈS RAPIDE')).toBeTruthy());
+
+    fireEvent.press(screen.getByText('Fiche de Vol'));
+
+    await waitFor(() => expect(ficheVolRepository.createDraftFicheVol).toHaveBeenCalled());
   });
 });

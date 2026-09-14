@@ -65,7 +65,7 @@ class FicheVolCreate(BaseModel):
     stand_altitude: float | None = None
     pilote: str = Field(min_length=1, max_length=255)
     mecanicien: str = Field(min_length=1, max_length=255)
-    chef_de_base_id: uuid.UUID
+    chef_de_base: str = Field(min_length=1, max_length=255)
     consultant_international: str | None = None
     observations: str | None = None
     vols: list[VolCreate] = Field(default_factory=list)
@@ -91,7 +91,7 @@ class FicheVolRead(BaseModel):
     stand_altitude: float | None = None
     pilote: str
     mecanicien: str
-    chef_de_base_id: uuid.UUID
+    chef_de_base: str
     consultant_international: str | None = None
     observations: str | None = None
     statut: str

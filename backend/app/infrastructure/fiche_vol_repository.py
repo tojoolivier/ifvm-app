@@ -43,7 +43,7 @@ def _to_domain(model: FicheVolModel) -> FicheVol:
         stand_altitude=float(model.stand_altitude) if model.stand_altitude is not None else None,
         pilote=model.pilote,
         mecanicien=model.mecanicien,
-        chef_de_base_id=model.chef_de_base_id,
+        chef_de_base=model.chef_de_base,
         consultant_international=model.consultant_international,
         observations=model.observations,
         statut=model.statut,
@@ -112,15 +112,15 @@ class FicheVolRepositoryImpl:
         self,
         date_vol: date | None = None,
         immatriculation: str | None = None,
-        chef_de_base_id: uuid.UUID | None = None,
+        chef_de_base: str | None = None,
     ) -> list[FicheVol]:
         query = select(FicheVolModel).options(*self._CHARGEMENT)
         if date_vol is not None:
             query = query.where(FicheVolModel.date_vol == date_vol)
         if immatriculation is not None:
             query = query.where(FicheVolModel.immatriculation == immatriculation)
-        if chef_de_base_id is not None:
-            query = query.where(FicheVolModel.chef_de_base_id == chef_de_base_id)
+        if chef_de_base is not None:
+            query = query.where(FicheVolModel.chef_de_base == chef_de_base)
         result = await self.session.execute(query.order_by(FicheVolModel.date_vol.desc()))
         return [_to_domain(m) for m in result.scalars().unique().all()]
 
@@ -144,7 +144,7 @@ class FicheVolRepositoryImpl:
             stand_altitude=fiche.stand_altitude,
             pilote=fiche.pilote,
             mecanicien=fiche.mecanicien,
-            chef_de_base_id=fiche.chef_de_base_id,
+            chef_de_base=fiche.chef_de_base,
             consultant_international=fiche.consultant_international,
             observations=fiche.observations,
             statut=fiche.statut,

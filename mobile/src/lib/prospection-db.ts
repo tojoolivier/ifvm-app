@@ -460,6 +460,41 @@ async function creerTables(db: SQLite.SQLiteDatabase): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS ix_traitement_evaluation_risque_population_traitement_id
       ON traitement_evaluation_risque_population(traitement_id);
+
+    -- Fiche de Vol (#fiche-vol) : journal d'une journée pour un aéronef donné,
+    -- indépendant de prospection/traitement — cf. backend app/domain/fiche_vol.py
+    -- (ADR-011 §7). Bâtie petit à petit, slide par slide (A-Références, B-Équipe
+    -- pour l'instant) : toutes les colonnes du modèle cible sont déjà déclarées
+    -- ici pour éviter des migrations répétées, mais seules celles des slides déjà
+    -- construits sont lues/écrites. numero_fiche reste NULL en local (dérivé
+    -- côté serveur à la création réelle, jamais recalculé ici) ; vol et
+    -- fiche_vol_signature (entités faibles, slides D et F) seront ajoutées
+    -- quand ces écrans existeront.
+    CREATE TABLE IF NOT EXISTS fiche_vol (
+      id TEXT PRIMARY KEY NOT NULL,
+      numero_fiche TEXT,
+      date_vol TEXT NOT NULL,
+      compagnie TEXT,
+      immatriculation TEXT,
+      base_code TEXT,
+      base_nom TEXT,
+      base_latitude REAL,
+      base_longitude REAL,
+      base_altitude REAL,
+      stand_nom TEXT,
+      stand_latitude REAL,
+      stand_longitude REAL,
+      stand_altitude REAL,
+      pilote TEXT,
+      mecanicien TEXT,
+      chef_de_base TEXT,
+      consultant_international TEXT,
+      observations TEXT,
+      statut TEXT NOT NULL DEFAULT 'brouillon',
+      statut_sync TEXT NOT NULL DEFAULT 'local',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
     `);
   } catch (error) {
     throw new LocalWriteError(

@@ -38,7 +38,7 @@ ROLES_SIGNATURE: tuple[str, ...] = (
 _MATRICE_SIGNATURES: dict[str, str] = {
     "PILOTE": "pilote",
     "MECANICIEN": "mecanicien",
-    "CHEF_DE_BASE": "chef_de_base_id",
+    "CHEF_DE_BASE": "chef_de_base",
     "CONSULTANT_INTERNATIONAL": "consultant_international",
 }
 
@@ -73,10 +73,6 @@ class RotationsIncompletesError(ValueError):
 
 class SignaturesVolManquantesError(ValueError):
     """Un ou plusieurs rôles renseignés n'ont pas de signature correspondante."""
-
-
-class ChefDeBaseVolInvalideError(PermissionError):
-    """chef_de_base_id ne référence pas un utilisateur avec le rôle chef_de_base."""
 
 
 class RotationVolIntrouvableError(LookupError):
@@ -250,7 +246,7 @@ class FicheVol:
     stand_nom: str
     pilote: str
     mecanicien: str
-    chef_de_base_id: uuid.UUID
+    chef_de_base: str
     base_latitude: float | None = None
     base_longitude: float | None = None
     base_altitude: float | None = None

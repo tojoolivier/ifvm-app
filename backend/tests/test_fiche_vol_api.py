@@ -31,7 +31,7 @@ def payload_fiche(chef_de_base: Utilisateur) -> dict:
         "stand_altitude": 770.0,
         "pilote": "Rakoto A.",
         "mecanicien": "Randria B.",
-        "chef_de_base_id": str(chef_de_base.id),
+        "chef_de_base": f"{chef_de_base.prenom} {chef_de_base.nom}",
     }
 
 
@@ -58,15 +58,6 @@ async def test_seconde_fiche_du_jour_recoit_un_compteur(client, auth_headers, pa
     seconde = await _creer(client, auth_headers, payload_fiche)
     assert premiere["numero_fiche"] == "2026-08-24-IHO01-MDGA21"
     assert seconde["numero_fiche"] == "2026-08-24-IHO01-MDGA21-02"
-
-
-@pytest.mark.asyncio
-async def test_chef_de_base_doit_avoir_le_bon_role(
-    client, auth_headers, payload_fiche, utilisateur
-):
-    payload_fiche["chef_de_base_id"] = str(utilisateur.id)  # rôle prospecteur
-    reponse = await client.post("/fiches-vol", json=payload_fiche, headers=auth_headers)
-    assert reponse.status_code == 403
 
 
 # --- Vols et durées dérivées -------------------------------------------------------

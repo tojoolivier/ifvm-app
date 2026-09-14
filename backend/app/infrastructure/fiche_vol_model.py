@@ -41,13 +41,12 @@ class FicheVolModel(Base):
     stand_longitude: Mapped[float | None] = mapped_column(Numeric(11, 8), nullable=True)
     stand_altitude: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
 
-    # Pilote et mécanicien sont externes à l'IFVM (compagnie aérienne ou Armée malgache) :
-    # des noms, pas des comptes. Même choix que traitement_aerien.
+    # Pilote, mécanicien et chef de base sont externes à l'IFVM (compagnie aérienne ou
+    # Armée malgache) : des noms, pas des comptes — chef de base a rejoint cette
+    # convention en migration 0064, défaisant la FK posée en 0029 (ADR-011 §7.4).
     pilote: Mapped[str] = mapped_column(String(255), nullable=False)
     mecanicien: Mapped[str] = mapped_column(String(255), nullable=False)
-    chef_de_base_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("utilisateur.id"), nullable=False
-    )
+    chef_de_base: Mapped[str] = mapped_column(String(255), nullable=False)
     consultant_international: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     observations: Mapped[str | None] = mapped_column(Text(), nullable=True)
@@ -71,7 +70,6 @@ class FicheVolModel(Base):
         CheckConstraint("statut IN ('brouillon','validee')", name="ck_fiche_vol_statut"),
         Index("ix_fiche_vol_date_vol", "date_vol"),
         Index("ix_fiche_vol_immatriculation", "immatriculation"),
-        Index("ix_fiche_vol_chef_de_base_id", "chef_de_base_id"),
     )
 
 

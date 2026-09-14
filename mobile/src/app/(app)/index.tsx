@@ -15,9 +15,11 @@ import { useAuthStore } from '@/lib/auth-store';
 import { ThemedText } from '@/components/themed-text';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { listRecentProspections, countUnsyncedProspections, DraftProspection } from '@/lib/prospection-repository';
+import { createDraftFicheVol } from '@/lib/fiche-vol-repository';
 import { NewFicheFab } from '@/components/fiches/NewFicheFab';
 import * as Network from 'expo-network';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
+import { useAsyncAction } from '@/hooks/use-async-action';
 import { logger } from '@/lib/logger';
 
 // ============================================
@@ -143,6 +145,21 @@ export default function DashboardScreen() {
 
   const navigateTo = (path: string) => {
     router.push(path as any);
+  };
+
+  const { run: runStartFicheVol, isRunning: isStartingFicheVol } = useAsyncAction();
+
+  /** Tuile « Fiche de Vol » (#fiche-vol) : crée le brouillon local puis navigue
+   * vers A-Références — même geste que NewFicheFab pour une prospection
+   * (créer d'abord, naviguer ensuite avec le draftId). */
+  const startFicheVol = () => {
+    return runStartFicheVol(
+      async () => {
+        const draft = await createDraftFicheVol();
+        router.push({ pathname: '/(fiche-vol)/reference' as any, params: { draftId: draft.id } });
+      },
+      { screen: 'index.ficheVol' }
+    );
   };
 
   // Fiches par jour sur la semaine en cours (L -> D)
@@ -315,6 +332,16 @@ export default function DashboardScreen() {
             >
               <ThemedText style={styles.quickTileIcon}>🚁</ThemedText>
               <ThemedText style={styles.quickTileText}>Nouveau traitement</ThemedText>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickTile}
+              onPress={startFicheVol}
+              disabled={isStartingFicheVol}
+              activeOpacity={0.85}
+            >
+              <ThemedText style={styles.quickTileIcon}>✈️</ThemedText>
+              <ThemedText style={styles.quickTileText}>Fiche de Vol</ThemedText>
             </TouchableOpacity>
 
             {/* #revalidation-prospection : une fiche extensive/validation

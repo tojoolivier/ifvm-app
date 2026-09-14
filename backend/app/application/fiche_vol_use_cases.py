@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from datetime import date
 
 from app.domain.fiche_vol import (
-    ChefDeBaseVolInvalideError,
     FicheVol,
     FicheVolIntrouvableError,
     FicheVolVerrouilleeError,
@@ -41,13 +40,8 @@ async def _exiger_brouillon(repo, fiche_vol_id: uuid.UUID) -> FicheVol:
 @dataclass
 class CreateFicheVol:
     repo: object
-    utilisateur_repo: object
 
     async def execute(self, fiche: FicheVol) -> FicheVol:
-        chef = await self.utilisateur_repo.get_by_id(fiche.chef_de_base_id)
-        if chef is None or chef.role != "chef_de_base":
-            raise ChefDeBaseVolInvalideError(str(fiche.chef_de_base_id))
-
         # « Une seule fiche par jour si possible » : on tente le numéro nu, puis on
         # incrémente. Le conflit est arbitré par la contrainte UNIQUE, pas par un SELECT
         # préalable — deux tablettes qui synchronisent en même temps ne doivent pas
@@ -119,9 +113,9 @@ class ListFichesVol:
         self,
         date_vol: date | None = None,
         immatriculation: str | None = None,
-        chef_de_base_id: uuid.UUID | None = None,
+        chef_de_base: str | None = None,
     ) -> list[FicheVol]:
-        return await self.repo.list_by_filters(date_vol, immatriculation, chef_de_base_id)
+        return await self.repo.list_by_filters(date_vol, immatriculation, chef_de_base)
 
 
 @dataclass
@@ -138,7 +132,7 @@ class CumulsHeuresVol:
         self,
         reference: date,
         immatriculation: str | None = None,
-        chef_de_base_id: uuid.UUID | None = None,
+        chef_de_base: str | None = None,
     ) -> dict[str, int]:
-        fiches = await self.repo.list_by_filters(None, immatriculation, chef_de_base_id)
+        fiches = await self.repo.list_by_filters(None, immatriculation, chef_de_base)
         return cumuler_durees(fiches, reference)
