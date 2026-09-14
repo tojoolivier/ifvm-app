@@ -8,6 +8,7 @@ import {
   assurerProspectionDisponibleLocalement,
 } from '@/lib/prospection-accueil';
 import { listProspectionsARevaliderLocal, demarrerRevalidation } from '@/lib/prospection-repository';
+import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { NetworkError } from '@/lib/errors';
 import { useAuthStore } from '@/lib/auth-store';
 import { useAsyncAction } from '@/hooks/use-async-action';
@@ -104,6 +105,13 @@ export default function RevalidationListeScreen() {
           await assurerProspectionDisponibleLocalement(fiche as ProspectionRead);
         }
         const { draftId } = await demarrerRevalidation(fiche.id);
+        // Indispensable avant de naviguer : `extensive-reference.tsx` (et la
+        // suite du wizard) lisent `useProspectionWizardStore().draft`, jamais
+        // directement la base — sans cette hydratation, l'écran s'ouvrirait
+        // avec des champs vides malgré un brouillon déjà cloné en local.
+        // Même geste que `extensive-mode-chooser.tsx` avant son propre
+        // `router.replace` vers cet écran.
+        await useProspectionWizardStore.getState().hydrateFromDraft(draftId);
         router.push({
           pathname: '/(prospection)/extensive-reference' as any,
           params: { draftId },
