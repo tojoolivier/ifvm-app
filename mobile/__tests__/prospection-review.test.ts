@@ -404,6 +404,71 @@ describe('enregistrerEtSynchroniser', () => {
     expect(result.echouees).toEqual([]);
   });
 
+  /**
+   * #densite-zero-perdue : `valeur ? Number(valeur) : null` (JS) traite 0
+   * comme faux et le convertissait à tort en `null` à la synchronisation —
+   * perdant silencieusement une densité (ou un autre champ numérique)
+   * réellement saisie à zéro (aucune population diffuse constatée, par
+   * exemple) alors qu'elle était bien conservée en local. `!= null` seul
+   * distingue correctement « non renseigné » de « renseigné à zéro ».
+   */
+  it('conserve une densité (ou tout autre champ numérique) explicitement saisie à 0, ne la convertit pas en null', async () => {
+    mockCompleteProspection.mockResolvedValue(draft({ statut: 'en_attente' }));
+    mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
+    mockCreateProspection.mockResolvedValue({ id: 'remote-1' });
+    mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
+    mockListAllPopulations.mockResolvedValue([
+      {
+        espece: 'LMC', categorie: 'imago', densite_diffuse: 0, densite_groupee: 0, methode: null,
+        accouplement: null, ponte: null, captures_nombre: 0, captures_sol: 0, captures_trans: 0,
+        captures_greg: 0, interdistance: 0,
+      },
+    ] as any);
+    mockListAllInfestations.mockResolvedValue([
+      {
+        espece: 'LMC', type_cible: 'dense', taille_min: 0, taille_max: null, taille_moy: null,
+        surface_totale: null, densite_min: 0, densite_max: null, densite_moy: null, interdistance: null,
+        comportement: null, direction_de: null, direction_vers: null, vent_de: null, vent_vitesse: 0,
+        pullulation_nb: 0, taille_long: null, taille_large: null, taille_epaisseur: null,
+        essaim_en_vol: null, essaim_pose: null, type_essaim: null, nb_taches_bandes: null,
+        interdistance_m: null, interdistance_min: null, interdistance_max: null, interdistance_moy: null,
+        surface_contaminee_ha: 0, type_larve: null, surface_infestee_pourcent: 0, stade_dominant: null,
+        taille_groupe_m2: null, front_longueur_m: null, front_largeur_m: null, densite_max_front: null,
+        densite_moy_arriere_front: null, heure_observation: null, densite_en_vol: 0, dimension_ha: null,
+      },
+    ] as any);
+
+    await enregistrerEtSynchroniser(draft(), [], 'token-1');
+
+    expect(mockCreateProspection).toHaveBeenCalledWith(
+      'token-1',
+      expect.objectContaining({
+        populations: [
+          expect.objectContaining({
+            densite_diffuse: 0,
+            densite_groupee: 0,
+            captures_nombre: 0,
+            captures_sol: 0,
+            captures_trans: 0,
+            captures_greg: 0,
+            interdistance: 0,
+          }),
+        ],
+        infestations: [
+          expect.objectContaining({
+            taille_min: 0,
+            densite_min: 0,
+            vent_vitesse: 0,
+            pullulation_nb: 0,
+            surface_contaminee_ha: 0,
+            surface_infestee_pourcent: 0,
+            densite_en_vol: 0,
+          }),
+        ],
+      })
+    );
+  });
+
   it("transmet les champs extensif-imagos ajoutés (type de cible, direction, état/comportement, interdistance)", async () => {
     mockCompleteProspection.mockResolvedValue(draft({ statut: 'en_attente' }));
     mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);

@@ -678,15 +678,21 @@ function buildPopulationsPayload(rows: PopulationRow[]): ProspectionPopulationIn
     categorie: row.categorie,
     methode: (row.methode || null) as ProspectionPopulationInput['methode'],
     phase: row.phase || null,
-    captures_nombre: row.captures_nombre ? Number(row.captures_nombre) : null,
-    temps_capture: row.temps_capture ? Number(row.temps_capture) : null,
-    densite_diffuse: row.densite_diffuse ? Number(row.densite_diffuse) : null,
-    densite_groupee: row.densite_groupee ? Number(row.densite_groupee) : null,
+    // #densite-zero-perdue : `valeur ? Number(valeur) : null` traite 0 comme
+    // faux (JS) et le convertissait à tort en `null` — perdant silencieusement
+    // un « 0 » réellement saisi (densité nulle constatée, 0 capture d'une
+    // phase précise...) à la synchronisation, alors que la valeur était bien
+    // conservée en local (recap, SQLite). `!= null` seul distingue
+    // correctement « non renseigné » de « renseigné à zéro ».
+    captures_nombre: row.captures_nombre != null ? Number(row.captures_nombre) : null,
+    temps_capture: row.temps_capture != null ? Number(row.temps_capture) : null,
+    densite_diffuse: row.densite_diffuse != null ? Number(row.densite_diffuse) : null,
+    densite_groupee: row.densite_groupee != null ? Number(row.densite_groupee) : null,
     accouplement: normalizeIntensite(row.accouplement) as ProspectionPopulationInput['accouplement'],
     ponte: normalizeIntensite(row.ponte) as ProspectionPopulationInput['ponte'],
-    captures_sol: row.captures_sol ? Number(row.captures_sol) : null,
-    captures_trans: row.captures_trans ? Number(row.captures_trans) : null,
-    captures_greg: row.captures_greg ? Number(row.captures_greg) : null,
+    captures_sol: row.captures_sol != null ? Number(row.captures_sol) : null,
+    captures_trans: row.captures_trans != null ? Number(row.captures_trans) : null,
+    captures_greg: row.captures_greg != null ? Number(row.captures_greg) : null,
     stade_imago: (row.stade_imago || null) as ProspectionPopulationInput['stade_imago'],
     // #stades-imago-persistance : répartition par sexe/sous-stade — même traitement
     // que densites_larve juste en dessous (JSON encodé côté SQLite, objet côté API).
@@ -695,7 +701,7 @@ function buildPopulationsPayload(rows: PopulationRow[]): ProspectionPopulationIn
     densites_larve: row.densites_larve ? JSON.parse(row.densites_larve) : null,
     tache_larvaire: row.tache_larvaire != null ? Boolean(row.tache_larvaire) : null,
     bande_larvaire: row.bande_larvaire != null ? Boolean(row.bande_larvaire) : null,
-    interdistance: row.interdistance ? Number(row.interdistance) : null,
+    interdistance: row.interdistance != null ? Number(row.interdistance) : null,
     deplacement: (row.deplacement || null) as ProspectionPopulationInput['deplacement'],
     // Champs extensif-imagos par espèce (migration 0033) : bien présents sur PopulationRow
     // (cf. prospection-repository.ts) — indépendants de prospection_infestation/
@@ -703,7 +709,7 @@ function buildPopulationsPayload(rows: PopulationRow[]): ProspectionPopulationIn
     // fait silencieusement disparaître à la synchro serveur (régression déjà rencontrée à
     // deux reprises, cf. commits ca39761 et 55cdc59 qui les avaient retirés à tort — vérifié
     // sans ambiguïté par `npx tsc --noEmit`, aucune erreur sur ces champs).
-    surface_contaminee_ha: row.surface_contaminee_ha ? Number(row.surface_contaminee_ha) : null,
+    surface_contaminee_ha: row.surface_contaminee_ha != null ? Number(row.surface_contaminee_ha) : null,
     // #type-cible-multi-select : `row.type_cible` est un tableau JSON encodé (comme
     // biotope) — jamais la string brute, le backend attend désormais un vrai tableau.
     type_cible: parseSelectionMultiple(row.type_cible) as ProspectionPopulationInput['type_cible'],
@@ -750,46 +756,50 @@ function normalizeTypeCible(rawTypeCible: string, normalizedTypeEssaim: string |
 function buildInfestationsPayload(rows: InfestationRow[]): ProspectionInfestationInput[] {
   return rows.map((row) => {
     const typeEssaim = row.type_essaim ? (TYPE_ESSAIM_TO_BACKEND[row.type_essaim] ?? null) : null;
+    // #densite-zero-perdue : mêmes champs numériques que buildPopulationsPayload,
+    // `!= null` plutôt qu'un test de vérité JS — un 0 réellement saisi (densité
+    // nulle constatée, taille nulle...) ne doit pas se perdre en `null` à la
+    // synchronisation.
     return {
       type_cible: normalizeTypeCible(row.type_cible, typeEssaim) as ProspectionInfestationInput['type_cible'],
       espece: (row.espece || null) as ProspectionInfestationInput['espece'],
-      taille_min: row.taille_min ? Number(row.taille_min) : null,
-      taille_max: row.taille_max ? Number(row.taille_max) : null,
-      taille_moy: row.taille_moy ? Number(row.taille_moy) : null,
-      surface_totale: row.surface_totale ? Number(row.surface_totale) : null,
-      densite_min: row.densite_min ? Number(row.densite_min) : null,
-      densite_max: row.densite_max ? Number(row.densite_max) : null,
-      densite_moy: row.densite_moy ? Number(row.densite_moy) : null,
-      interdistance: row.interdistance ? Number(row.interdistance) : null,
+      taille_min: row.taille_min != null ? Number(row.taille_min) : null,
+      taille_max: row.taille_max != null ? Number(row.taille_max) : null,
+      taille_moy: row.taille_moy != null ? Number(row.taille_moy) : null,
+      surface_totale: row.surface_totale != null ? Number(row.surface_totale) : null,
+      densite_min: row.densite_min != null ? Number(row.densite_min) : null,
+      densite_max: row.densite_max != null ? Number(row.densite_max) : null,
+      densite_moy: row.densite_moy != null ? Number(row.densite_moy) : null,
+      interdistance: row.interdistance != null ? Number(row.interdistance) : null,
       comportement: (row.comportement || null) as ProspectionInfestationInput['comportement'],
       direction_de: row.direction_de || null,
       direction_vers: row.direction_vers || null,
       vent_de: row.vent_de || null,
-      vent_vitesse: row.vent_vitesse ? Number(row.vent_vitesse) : null,
-      pullulation_nb: row.pullulation_nb ? Number(row.pullulation_nb) : null,
-      taille_long: row.taille_long ? Number(row.taille_long) : null,
-      taille_large: row.taille_large ? Number(row.taille_large) : null,
-      taille_epaisseur: row.taille_epaisseur ? Number(row.taille_epaisseur) : null,
+      vent_vitesse: row.vent_vitesse != null ? Number(row.vent_vitesse) : null,
+      pullulation_nb: row.pullulation_nb != null ? Number(row.pullulation_nb) : null,
+      taille_long: row.taille_long != null ? Number(row.taille_long) : null,
+      taille_large: row.taille_large != null ? Number(row.taille_large) : null,
+      taille_epaisseur: row.taille_epaisseur != null ? Number(row.taille_epaisseur) : null,
       essaim_en_vol: row.essaim_en_vol != null ? Boolean(row.essaim_en_vol) : null,
       essaim_pose: row.essaim_pose != null ? Boolean(row.essaim_pose) : null,
       type_essaim: typeEssaim as ProspectionInfestationInput['type_essaim'],
       heure_observation: row.heure_observation || null,
-      densite_en_vol: row.densite_en_vol ? Number(row.densite_en_vol) : null,
-      dimension_ha: row.dimension_ha ? Number(row.dimension_ha) : null,
-      nb_taches_bandes: row.nb_taches_bandes ? Number(row.nb_taches_bandes) : null,
-      interdistance_m: row.interdistance_m ? Number(row.interdistance_m) : null,
-      interdistance_min: row.interdistance_min ? Number(row.interdistance_min) : null,
-      interdistance_max: row.interdistance_max ? Number(row.interdistance_max) : null,
-      interdistance_moy: row.interdistance_moy ? Number(row.interdistance_moy) : null,
-      surface_contaminee_ha: row.surface_contaminee_ha ? Number(row.surface_contaminee_ha) : null,
+      densite_en_vol: row.densite_en_vol != null ? Number(row.densite_en_vol) : null,
+      dimension_ha: row.dimension_ha != null ? Number(row.dimension_ha) : null,
+      nb_taches_bandes: row.nb_taches_bandes != null ? Number(row.nb_taches_bandes) : null,
+      interdistance_m: row.interdistance_m != null ? Number(row.interdistance_m) : null,
+      interdistance_min: row.interdistance_min != null ? Number(row.interdistance_min) : null,
+      interdistance_max: row.interdistance_max != null ? Number(row.interdistance_max) : null,
+      interdistance_moy: row.interdistance_moy != null ? Number(row.interdistance_moy) : null,
+      surface_contaminee_ha: row.surface_contaminee_ha != null ? Number(row.surface_contaminee_ha) : null,
       type_larve: (row.type_larve || null) as ProspectionInfestationInput['type_larve'],
-      surface_infestee_pourcent: row.surface_infestee_pourcent ? Number(row.surface_infestee_pourcent) : null,
+      surface_infestee_pourcent: row.surface_infestee_pourcent != null ? Number(row.surface_infestee_pourcent) : null,
       stade_dominant: (row.stade_dominant || null) as ProspectionInfestationInput['stade_dominant'],
-      taille_groupe_m2: row.taille_groupe_m2 ? Number(row.taille_groupe_m2) : null,
-      front_longueur_m: row.front_longueur_m ? Number(row.front_longueur_m) : null,
-      front_largeur_m: row.front_largeur_m ? Number(row.front_largeur_m) : null,
-      densite_max_front: row.densite_max_front ? Number(row.densite_max_front) : null,
-      densite_moy_arriere_front: row.densite_moy_arriere_front ? Number(row.densite_moy_arriere_front) : null,
+      taille_groupe_m2: row.taille_groupe_m2 != null ? Number(row.taille_groupe_m2) : null,
+      front_longueur_m: row.front_longueur_m != null ? Number(row.front_longueur_m) : null,
+      front_largeur_m: row.front_largeur_m != null ? Number(row.front_largeur_m) : null,
+      densite_max_front: row.densite_max_front != null ? Number(row.densite_max_front) : null,
+      densite_moy_arriere_front: row.densite_moy_arriere_front != null ? Number(row.densite_moy_arriere_front) : null,
     };
   });
 }
