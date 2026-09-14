@@ -59,9 +59,18 @@ async def list_prospections(
     disponible_pour_traitement: bool = Query(
         default=False,
         description=(
-            "N'inclut que les fiches sans traitement associé — "
-            "« Fiches de traitement → Consulter une fiche validée » (mobile), "
-            "combiné à statut=validee."
+            "N'inclut que les fiches sans traitement associé, ni périmées "
+            "(#revalidation-prospection : extensive/validation validées depuis "
+            "plus de 5 jours sans traitement) — « Fiches de traitement → "
+            "Consulter une fiche validée » (mobile), combiné à statut=validee."
+        ),
+    ),
+    a_revalider: bool = Query(
+        default=False,
+        description=(
+            "N'inclut que les fiches périmées (#revalidation-prospection) — "
+            "exactement celles qu'exclut disponible_pour_traitement pour cette "
+            "raison, sans traitement associé et pas déjà revalidées."
         ),
     ),
 ):
@@ -74,6 +83,7 @@ async def list_prospections(
         station_id=station_id,
         prospecteur_id=prospecteur_id,
         disponible_pour_traitement=disponible_pour_traitement,
+        a_revalider=a_revalider,
     )
 
 
@@ -175,6 +185,7 @@ async def create_prospection(
             signature_chef_base_nom=body.signature_chef_base_nom,
             signature_chef_base_horodatage=body.signature_chef_base_horodatage,
             signature_chef_base_image=body.signature_chef_base_image,
+            revalide_de_id=body.revalide_de_id,
         )
 
         # 👇 AJOUTE CETTE VÉRIFICATION POUR ÉVITER L'ERREUR 500

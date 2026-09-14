@@ -16,6 +16,15 @@ _TRANSITIONS: dict[str, dict[str, list[str]]] = {
     },
 }
 
+# Au-delà de ce délai depuis `validated_at` sans traitement associé, une fiche
+# extensive/validation n'est plus fiable pour déclencher un traitement (surface
+# infestée et localisation des criquets peuvent avoir changé) — elle doit être
+# revalidée (`ProspectionRepositoryImpl.list_by_filters`, filtres
+# `disponible_pour_traitement`/`a_revalider`). Jamais l'intensive : cette règle
+# est propre aux fiches qui alimentent directement une décision de traitement.
+DELAI_REVALIDATION_JOURS = 5
+TYPES_PROSPECTION_SOUMIS_REVALIDATION = ("extensive", "validation")
+
 
 class ProspectionIntegriteError(Exception):
     """La fiche viole une contrainte de la base autre que la référence à la station."""
@@ -199,6 +208,11 @@ class Prospection:
     verified_at: datetime | None = None
     validated_by: uuid.UUID | None = None
     validated_at: datetime | None = None
+    # Auto-référence vers la fiche périmée que CETTE fiche revalide (extensive/
+    # validation validées depuis plus de DELAI_REVALIDATION_JOURS sans
+    # traitement) — mirroir de Traitement.traitement_origine_id, cf. migration
+    # 0062. `None` : fiche "normale", jamais une revalidation.
+    revalide_de_id: uuid.UUID | None = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
 
