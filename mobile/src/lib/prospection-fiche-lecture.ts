@@ -6,12 +6,12 @@ export type Phenotype = 'solitaire' | 'solitaro_trans' | 'transiens' | 'gregaire
 
 export const PHENOTYPES: { value: Phenotype; label: string }[] = [
   { value: 'solitaire', label: 'Solitaires' },
-  { value: 'solitaro_trans', label: 'Solitaro-trans' },
+  { value: 'solitaro_trans', label: 'Solitaro-transiens' },
   { value: 'transiens', label: 'Transiens' },
   { value: 'gregaire', label: 'Grégaires' },
 ];
 
-/** NSE larve n'a pas de phénotype intermédiaire "Solitaro-trans" (PDF). */
+/** NSE larve n'a pas de phénotype intermédiaire "Solitaro-transiens" (PDF). */
 export const PHENOTYPES_3: { value: Phenotype; label: string }[] = PHENOTYPES.filter(
   (p) => p.value !== 'solitaro_trans'
 );
