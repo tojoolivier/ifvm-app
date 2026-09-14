@@ -26,13 +26,35 @@ interface Prospection {
   statut: string
   n_fiche: string | null
   surface_infestee: number | null
+  /** Fiche créée via « Prospections à revalider » (#revalidation-prospection) —
+   * pointe vers la fiche périmée dont elle reprend les données. N'existe pas
+   * sur les fiches plus anciennes (avant migration 0062) : optionnel. */
+  revalide_de_id?: string | null
 }
 
-/** Pastilles « Type » de la maquette (prototype, ligne 1337). */
-const TYPES = ['intensive', 'extensive'] as const
+/**
+ * Pastilles « Type » de la maquette (prototype, ligne 1337) — étendues à
+ * `validation` (« Vérifier un signalement », déjà un `type_prospection`
+ * réel côté backend — gardé sous son nom de type, « Validation », demande
+ * explicite : pas de relibellé en « Signalement ») et `revalidation`, qui
+ * n'en est PAS un : c'est une relation (`revalide_de_id` non nul, cf.
+ * #revalidation-prospection), pas une valeur de `type_prospection` — la
+ * fiche reste extensive/validation en base. Traitée ici comme un 5e type
+ * dérivé (cf. `ficheType` ci-dessous) car c'est l'information la plus utile
+ * à l'agent qui parcourt la liste : une fiche revalidée mérite d'être
+ * reconnue au premier coup d'œil, plus que son type d'origine.
+ */
+const TYPES = ['intensive', 'extensive', 'validation', 'revalidation'] as const
 const TYPE_LABELS: Record<string, string> = {
   intensive: 'Intensive',
   extensive: 'Extensive',
+  validation: 'Validation',
+  revalidation: 'Revalidation',
+}
+
+/** Type affiché/filtré dans cette page — cf. commentaire de `TYPES` ci-dessus. */
+function ficheType(p: Prospection): string {
+  return p.revalide_de_id ? 'revalidation' : p.type_prospection
 }
 
 const PAGE_SIZE = 20
@@ -106,7 +128,7 @@ export function ProspectionsPage() {
   const filtered = (() => {
     const q = recherche.trim().toLowerCase()
     return prospections.filter((p) => {
-      if (filtreType && p.type_prospection !== filtreType) return false
+      if (filtreType && ficheType(p) !== filtreType) return false
       if (filtreStatut && p.statut !== filtreStatut) return false
       if (!q) return true
       // La maquette n'expose qu'un champ « N° de fiche, agent… » : il couvre
@@ -139,7 +161,7 @@ export function ProspectionsPage() {
     {
       key: 'type',
       header: 'Type',
-      render: (p) => TYPE_LABELS[p.type_prospection] ?? p.type_prospection,
+      render: (p) => TYPE_LABELS[ficheType(p)] ?? ficheType(p),
     },
     { key: 'date', header: 'Date', mono: true, render: (p) => p.date_prospection },
     { key: 'prospecteur', header: 'Prospecteur', render: (p) => agentLabel(p) },

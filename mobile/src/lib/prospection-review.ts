@@ -622,6 +622,73 @@ function normalizeIntensite(value: string | null): string | null {
   return value.toLowerCase().normalize('NFD').replace(COMBINING_DIACRITICS_RE, '');
 }
 
+/**
+ * Une ligne population « ne porte aucune donnée » quand tous ses champs sont
+ * vides ET qu'aucune capture ne lui est associée (table `prospection_capture`,
+ * Intensif — `captures_*` scalaires, Extensif) : c'est un résidu sans intérêt,
+ * jamais une saisie de l'agent, qu'il faut simplement omettre du payload de
+ * synchro (cf. `syncOneProspection`) plutôt que le faire échouer sur
+ * `densite_diffuse` obligatoire pour une grille que l'agent n'a jamais ouverte.
+ *
+ * #revalidation-prospection : c'est le cas le plus fréquent pour ces lignes
+ * résiduelles — `demarrerRevalidation` clone TOUTES les lignes population de
+ * la fiche source, y compris une grille espèce/catégorie jamais renseignée
+ * sur l'ancienne fiche (tolérée en lecture par `PopulationRead`, jamais
+ * imposée), que l'agent n'a ensuite aucune raison de rouvrir s'il ne
+ * s'intéresse pas à cette espèce.
+ */
+function populationRowHasData(row: PopulationRow, captures: CaptureRow[]): boolean {
+  const hasCaptures = captures.some((c) => c.espece === row.espece && c.categorie === row.categorie);
+  return (
+    hasCaptures ||
+    row.densite_diffuse != null ||
+    row.densite_groupee != null ||
+    !!row.methode ||
+    !!row.accouplement ||
+    !!row.ponte ||
+    (row.captures_nombre ?? 0) > 0 ||
+    (row.captures_sol ?? 0) > 0 ||
+    (row.captures_trans ?? 0) > 0 ||
+    (row.captures_greg ?? 0) > 0 ||
+    (row.captures_solitaro_transiens ?? 0) > 0 ||
+    !!row.stades_imago ||
+    row.essaim_observe != null ||
+    !!row.densites_larve ||
+    !!row.tache_larvaire ||
+    !!row.bande_larvaire ||
+    row.interdistance != null ||
+    (!!row.deplacement && row.deplacement !== 'repos') ||
+    row.surface_contaminee_ha != null ||
+    parseSelectionMultiple(row.type_cible ?? null).length > 0 ||
+    !!row.direction_de ||
+    !!row.direction_vers ||
+    (!!row.etat && row.etat !== 'repos') ||
+    !!row.essaim_en_vol ||
+    !!row.essaim_pose
+  );
+}
+
+/**
+ * Lignes population qui portent une saisie réelle (cf. `populationRowHasData`
+ * ci-dessus) mais où `densite_diffuse` — seule densité restée obligatoire,
+ * cf. backend `prospection_schemas.py` #densite-diffuse-obligatoire — manque
+ * encore. Utilisé par les écrans de récapitulatif (review.tsx, extensive-
+ * recap.tsx) pour bloquer l'enregistrement avec un message ciblé plutôt que
+ * laisser la fiche échouer plus tard, silencieusement, sur l'écran
+ * Synchronisation (cf. #revalidation-prospection ci-dessus : une grille
+ * clonée depuis une fiche périmée peut porter des champs renseignés
+ * historiquement sans densité diffuse, l'agent n'a alors aucune raison de la
+ * rouvrir puisqu'elle paraît déjà remplie).
+ */
+export function trouverPopulationsIncompletes(
+  populations: PopulationRow[],
+  captures: CaptureRow[]
+): PopulationRow[] {
+  return populations.filter(
+    (row) => populationRowHasData(row, captures) && row.densite_diffuse == null
+  );
+}
+
 function buildPopulationsPayload(rows: PopulationRow[]): ProspectionPopulationInput[] {
   return rows.map((row) => ({
     espece: row.espece,
@@ -776,10 +843,17 @@ export async function syncOneProspection(
     listOperationsAeriennes(draft.id),
   ]);
 
+  // #revalidation-prospection : une ligne population sans aucune donnée (ni
+  // densité, ni capture associée) est un résidu — souvent une grille clonée
+  // depuis une fiche périmée que l'agent n'a jamais rouverte — jamais une
+  // saisie réelle. Omise du payload plutôt qu'envoyée pour échouer sur
+  // `densite_diffuse` obligatoire, cf. `populationRowHasData`.
+  const populationsAvecDonnees = populations.filter((row) => populationRowHasData(row, captures));
+
   const payload = {
     ...(await buildProspectionPayload(draft, token)),
     captures: buildCapturesPayload(captures),
-    populations: buildPopulationsPayload(populations),
+    populations: buildPopulationsPayload(populationsAvecDonnees),
     infestations: buildInfestationsPayload(infestations),
     operations_aeriennes: buildOperationsAeriennesPayload(operationsAeriennes),
   };

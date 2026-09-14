@@ -14,6 +14,10 @@ const mockedGet = api.get as unknown as ReturnType<typeof vi.fn>
 const STATIONS = [
   { id: 's-014', code: 'ST-014', nom: 'Ankazoabo', pa_code: 'PA-01' },
   { id: 's-021', code: 'ST-021', nom: 'Betioky', pa_code: 'PA-02' },
+  // Dédiée aux fixtures p-3/p-4 ci-dessous — s-014/s-021 restent réservées à
+  // p-1/p-2 pour ne pas casser les assertions d'unicité déjà existantes
+  // (« ST-014 Ankazoabo », recherche « betioky »).
+  { id: 's-030', code: 'ST-030', nom: 'Sakaraha', pa_code: 'PA-03' },
 ]
 
 const UTILISATEURS = [
@@ -41,6 +45,30 @@ const PROSPECTIONS = [
     station_id: 's-021',
     surface_infestee: null,
     statut: 'validee',
+  },
+  {
+    id: 'p-3',
+    n_fiche: 'MSG-2026-0042',
+    type_prospection: 'validation',
+    date_prospection: '2026-08-15',
+    prospecteur_id: 'u-2',
+    station_id: 's-030',
+    surface_infestee: null,
+    statut: 'validee',
+  },
+  // #revalidation-prospection : `revalide_de_id` non nul — reste `extensive`
+  // en base (`type_prospection`), affichée comme un type à part dans cette
+  // liste (cf. `ficheType`), pas comme une Extensive ordinaire.
+  {
+    id: 'p-4',
+    n_fiche: 'PR-2026-0150-EXT',
+    type_prospection: 'extensive',
+    date_prospection: '2026-08-16',
+    prospecteur_id: 'u-2',
+    station_id: 's-030',
+    surface_infestee: 3.5,
+    statut: 'validee',
+    revalide_de_id: 'p-2',
   },
 ]
 
@@ -97,12 +125,60 @@ describe('ProspectionsPage — maquette §3 du handoff', () => {
     ])
   })
 
-  it('liste les deux types de prospection, pas seulement les intensives', async () => {
+  it('liste tous les types de prospection, pas seulement les intensives', async () => {
     mockApi()
     renderPage()
 
-    await waitFor(() => expect(rows()).toHaveLength(2))
+    await waitFor(() => expect(rows()).toHaveLength(4))
     expect(screen.getByText('PR-2026-0148-INT')).toBeInTheDocument()
+    expect(screen.getByText('PR-2026-0146-EXT')).toBeInTheDocument()
+    expect(screen.getByText('MSG-2026-0042')).toBeInTheDocument()
+    expect(screen.getByText('PR-2026-0150-EXT')).toBeInTheDocument()
+  })
+
+  /** #revalidation-prospection : `validation` (« Vérifier un signalement ») est
+   * un vrai `type_prospection` déjà accepté par le backend, mais absent de
+   * cette liste — gardé sous son nom de type, « Validation » (demande
+   * explicite : pas de relibellé en « Signalement ») — et une fiche
+   * revalidée (`revalide_de_id` non nul) doit se distinguer d'une Extensive
+   * ordinaire, pas se fondre dedans. */
+  it('affiche « Validation » et « Revalidation » dans la colonne Type, pas la valeur brute ni le type d’origine', async () => {
+    mockApi()
+    renderPage()
+
+    await waitFor(() => expect(rows()).toHaveLength(4))
+    const ligneValidation = screen.getByText('MSG-2026-0042').closest('tr')!
+    expect(within(ligneValidation).getByText('Validation')).toBeInTheDocument()
+
+    const ligneRevalidation = screen.getByText('PR-2026-0150-EXT').closest('tr')!
+    expect(within(ligneRevalidation).getByText('Revalidation')).toBeInTheDocument()
+    // Pas « Extensive » alors que `type_prospection` vaut bien `extensive` en base.
+    expect(within(ligneRevalidation).queryByText('Extensive')).not.toBeInTheDocument()
+  })
+
+  it('filtre sur « Validation » via les pastilles', async () => {
+    mockApi()
+    renderPage()
+
+    await waitFor(() => expect(rows()).toHaveLength(4))
+    fireEvent.click(screen.getByRole('button', { name: 'Validation' }))
+
+    await waitFor(() => expect(rows()).toHaveLength(1))
+    expect(screen.getByText('MSG-2026-0042')).toBeInTheDocument()
+  })
+
+  it('filtre sur « Revalidation » via les pastilles — une fiche extensive revalidée n’apparaît plus sous « Extensive »', async () => {
+    mockApi()
+    renderPage()
+
+    await waitFor(() => expect(rows()).toHaveLength(4))
+    fireEvent.click(screen.getByRole('button', { name: 'Revalidation' }))
+
+    await waitFor(() => expect(rows()).toHaveLength(1))
+    expect(screen.getByText('PR-2026-0150-EXT')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Extensive' }))
+    await waitFor(() => expect(rows()).toHaveLength(1))
     expect(screen.getByText('PR-2026-0146-EXT')).toBeInTheDocument()
   })
 
@@ -118,7 +194,7 @@ describe('ProspectionsPage — maquette §3 du handoff', () => {
     mockApi({ usersFail: true })
     renderPage()
 
-    await waitFor(() => expect(rows()).toHaveLength(2))
+    await waitFor(() => expect(rows()).toHaveLength(4))
     expect(screen.getByText('PR-2026-0148-INT')).toBeInTheDocument()
   })
 
@@ -126,7 +202,7 @@ describe('ProspectionsPage — maquette §3 du handoff', () => {
     mockApi()
     renderPage()
 
-    await waitFor(() => expect(rows()).toHaveLength(2))
+    await waitFor(() => expect(rows()).toHaveLength(4))
     fireEvent.click(screen.getByRole('button', { name: 'Extensive' }))
 
     await waitFor(() => expect(rows()).toHaveLength(1))
@@ -137,7 +213,7 @@ describe('ProspectionsPage — maquette §3 du handoff', () => {
     mockApi()
     renderPage()
 
-    await waitFor(() => expect(rows()).toHaveLength(2))
+    await waitFor(() => expect(rows()).toHaveLength(4))
     fireEvent.click(screen.getByRole('button', { name: 'Vérifiée' }))
 
     await waitFor(() => expect(rows()).toHaveLength(1))
@@ -148,7 +224,7 @@ describe('ProspectionsPage — maquette §3 du handoff', () => {
     mockApi()
     renderPage()
 
-    await waitFor(() => expect(rows()).toHaveLength(2))
+    await waitFor(() => expect(rows()).toHaveLength(4))
     fireEvent.change(screen.getByLabelText('Recherche'), { target: { value: 'betioky' } })
 
     await waitFor(() => expect(rows()).toHaveLength(1))
@@ -159,7 +235,7 @@ describe('ProspectionsPage — maquette §3 du handoff', () => {
     mockApi()
     renderPage()
 
-    await waitFor(() => expect(screen.getByText('2 fiches')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('4 fiches')).toBeInTheDocument())
     expect(screen.getByText('Filtre : tous types · tous statuts')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Intensive' }))
@@ -180,14 +256,14 @@ describe('ProspectionsPage — maquette §3 du handoff', () => {
     mockApi()
     renderPage()
 
-    await waitFor(() => expect(screen.getAllByText('Ouvrir ›')).toHaveLength(2))
+    await waitFor(() => expect(screen.getAllByText('Ouvrir ›')).toHaveLength(4))
   })
 
   it('mémorise les filtres dans l’URL', async () => {
     mockApi()
     renderPage()
 
-    await waitFor(() => expect(rows()).toHaveLength(2))
+    await waitFor(() => expect(rows()).toHaveLength(4))
     fireEvent.click(screen.getByRole('button', { name: 'Rejetée' }))
 
     await waitFor(() => expect(screen.getByText('0 fiche')).toBeInTheDocument())
