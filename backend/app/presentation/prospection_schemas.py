@@ -323,17 +323,16 @@ class PopulationCreate(BaseModel):
     # de ce validateur. Laissée sans contrainte applicative, à l'image de
     # `PopulationRead` qui ne l'a jamais imposée non plus (tolérance aux
     # fiches historiques).
-
-    @model_validator(mode="after")
-    def _densite_diffuse_obligatoire(self) -> "PopulationCreate":
-        # #densite-diffuse-obligatoire : validation applicative, aucune
-        # contrainte DB (tolérance aux fiches historiques préservée via
-        # PopulationRead, non contraint). `densite_groupee`, elle, n'est plus
-        # obligatoire (cf. commentaire ci-dessus) — ne pas rétablir la même
-        # règle dessus sans nouvelle demande explicite.
-        if self.densite_diffuse is None:
-            raise ValueError("La densité diffuse (ind./ha) est obligatoire.")
-        return self
+    #
+    # #densite-diffuse-obligatoire : retiré à son tour (demande explicite du
+    # 2026-09-14) — ce validateur rejetait (422) toute synchronisation portant
+    # une grille non réellement prospectée (espèce cochée sur l'écran A mais
+    # jamais ouverte : `captures_nombre = 0`, `densite_diffuse = null`), que le
+    # mobile enregistre pourtant sans broncher (`validerDensiteDiffuseObligatoire`,
+    # prospection-extensive.ts, n'exige une densité que si `totalCaptures > 0`)
+    # — la fiche entière échouait à synchroniser pour une grille que l'agent
+    # n'avait jamais eu l'intention de remplir. `densite_diffuse` redevient
+    # donc facultative partout, comme `densite_groupee` ci-dessus.
 
 
 class CaptureCreate(BaseModel):

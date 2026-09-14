@@ -240,14 +240,16 @@ async def test_create_prospection_population_extensive_imagos_larves(
 
 
 @pytest.mark.asyncio
-async def test_create_prospection_population_densite_diffuse_obligatoire(
+async def test_create_prospection_population_densite_diffuse_facultative(
     client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
 ):
-    """#densite-diffuse-obligatoire : une population sans densité diffuse est
-    rejetée (422) avec le message FR dédié — validation applicative, aucune
-    contrainte DB, tolérance aux anciennes fiches préservée côté lecture
-    (PopulationRead). `densite_groupee`, elle, n'est plus obligatoire (retiré
-    sur demande explicite) — cf. test_create_prospection_population_densite_groupee_facultative."""
+    """#densite-diffuse-obligatoire retiré (demande explicite du 2026-09-14) :
+    une population sans densité diffuse ni groupée est acceptée — ce
+    validateur rejetait (422) la synchronisation d'une grille cochée sur
+    l'écran A mais jamais réellement prospectée (captures_nombre = 0), que le
+    mobile enregistre pourtant sans broncher côté local, faisant échouer la
+    synchronisation de la fiche entière pour une grille jamais destinée à être
+    remplie."""
     response = await client.post(
         "/prospections",
         json={
@@ -257,16 +259,17 @@ async def test_create_prospection_population_densite_diffuse_obligatoire(
             "date_prospection": "2026-08-26",
             "populations": [
                 {
-                    "espece": "LMC",
+                    "espece": "NSE",
                     "categorie": "imago",
-                    "densite_groupee": 4.0,
+                    "captures_nombre": 0,
                 }
             ],
         },
         headers=auth_headers,
     )
-    assert response.status_code == 422
-    assert "La densité diffuse (ind./ha) est obligatoire." in response.text
+    assert response.status_code == 201, response.text
+    assert response.json()["populations"][0]["densite_diffuse"] is None
+    assert response.json()["populations"][0]["densite_groupee"] is None
 
 
 @pytest.mark.asyncio
@@ -274,8 +277,7 @@ async def test_create_prospection_population_densite_groupee_facultative(
     client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
 ):
     """#densite-groupee-obligatoire retiré : une population sans densité
-    groupée (densite_diffuse seule renseignée) est acceptée — contrairement à
-    densite_diffuse, toujours obligatoire elle (test ci-dessus)."""
+    groupée (densite_diffuse seule renseignée) est acceptée."""
     response = await client.post(
         "/prospections",
         json={
