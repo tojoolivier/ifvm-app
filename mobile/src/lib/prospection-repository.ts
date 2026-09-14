@@ -1456,8 +1456,6 @@ export async function listUnsyncedProspections(): Promise<DraftProspection[]> {
  *     encore formellement validée par un administrateur peut apparaître ici ;
  *   - aucune fiche d'un AUTRE agent, jamais synchronisée sur CET appareil,
  *     n'est visible (même limite que `listReprenableTraitements`) ;
- *   - `surface_infestee IS NOT NULL` : seules des candidates plausibles à un
- *     traitement, demandé explicitement ;
  *   - tous les types de prospection (pas seulement extensive/validation,
  *     contrairement à `listValidatedProspections` ci-dessous, taillée pour un
  *     autre écran) — le serveur ne restreint pas non plus par type.
@@ -1470,7 +1468,6 @@ export async function listProspectionsDisponiblesPourTraitementLocal(): Promise<
   return db.getAllAsync<DraftProspection>(
     `SELECT * FROM prospection p
      WHERE p.statut_sync = 'synced'
-       AND p.surface_infestee IS NOT NULL
        AND NOT EXISTS (SELECT 1 FROM traitement t WHERE t.prospection_id = p.id)
        AND NOT (
          p.type_prospection IN ('extensive', 'validation')
