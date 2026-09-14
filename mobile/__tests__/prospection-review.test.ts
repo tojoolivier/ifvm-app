@@ -46,6 +46,7 @@ import {
   syncAllProspections,
   formatChrono,
   infestationDetailHasData,
+  trouverPopulationsIncompletes,
 } from '../src/lib/prospection-review';
 
 jest.mock('../src/lib/prospection-repository', () => ({
@@ -373,6 +374,39 @@ describe('infestationDetailHasData', () => {
   });
 });
 
+/** #revalidation-prospection : mêmes cas que `populationRowHasData` (privé,
+ * testé indirectement ici) — une grille clonée depuis une fiche périmée peut
+ * porter des champs renseignés sans densité diffuse ; les écrans de
+ * récapitulatif (review.tsx, extensive-recap.tsx) s'appuient sur cette
+ * fonction pour bloquer l'enregistrement avec un message ciblé. */
+describe('trouverPopulationsIncompletes', () => {
+  const vide = (espece: 'LMC' | 'NSE', categorie: 'imago' | 'larve'): PopulationRow => ({
+    espece, categorie, densite_diffuse: null, densite_groupee: null, methode: null, accouplement: null, ponte: null,
+  });
+
+  it('ignore une ligne totalement vide (résidu de clonage, pas une saisie)', () => {
+    expect(trouverPopulationsIncompletes([vide('NSE', 'imago')], [])).toEqual([]);
+  });
+
+  it('ignore une ligne complète (densité diffuse renseignée)', () => {
+    const row: PopulationRow = { ...vide('LMC', 'imago'), densite_diffuse: 5 };
+    expect(trouverPopulationsIncompletes([row], [])).toEqual([]);
+  });
+
+  it('signale une ligne avec des données mais sans densité diffuse', () => {
+    const row: PopulationRow = { ...vide('LMC', 'larve'), interdistance: 3, deplacement: 'perchee', tache_larvaire: true };
+    expect(trouverPopulationsIncompletes([row], [])).toEqual([row]);
+  });
+
+  it('signale une ligne intensive dont seules des captures existent (table séparée), sans densité diffuse', () => {
+    const row = vide('NSE', 'imago');
+    const captures: CaptureRow[] = [
+      { espece: 'NSE', categorie: 'imago', sexe: 'F', phase: 'gregaire', stade: 'A1', effectif: 3 } as CaptureRow,
+    ];
+    expect(trouverPopulationsIncompletes([row], captures)).toEqual([row]);
+  });
+});
+
 describe('enregistrerEtSynchroniser', () => {
   it('complète toujours la fiche locale puis synchronise si en ligne', async () => {
     mockCompleteProspection.mockResolvedValue(draft({ statut: 'en_attente' }));
@@ -434,6 +468,41 @@ describe('enregistrerEtSynchroniser', () => {
           }),
           expect.objectContaining({ espece: 'LMC', surface_contaminee_ha: 12.75 }),
         ],
+      })
+    );
+  });
+
+  /** #revalidation-prospection : `demarrerRevalidation` clone TOUTES les lignes
+   * population de la fiche source, y compris une grille espèce/catégorie jamais
+   * renseignée sur l'ancienne fiche (tolérée en lecture par `PopulationRead`) —
+   * sans filtrage, cette ligne totalement vide partirait en synchro et
+   * échouerait sur `densite_diffuse` obligatoire pour une grille que l'agent n'a
+   * jamais ouverte. Elle doit être omise du payload, silencieusement. */
+  it('omet du payload une ligne population sans aucune donnée (résidu de clonage), sans échouer', async () => {
+    mockCompleteProspection.mockResolvedValue(draft({ statut: 'en_attente' }));
+    mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
+    mockCreateProspection.mockResolvedValue({ id: 'remote-1' });
+    mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
+    mockListAllPopulations.mockResolvedValue([
+      {
+        espece: 'LMC', categorie: 'imago', densite_diffuse: 5, densite_groupee: null, methode: null,
+        accouplement: null, ponte: null,
+      },
+      // Ligne "NSE imago" jamais renseignée — clonée telle quelle depuis une
+      // fiche périmée (revalidation), aucun champ rempli.
+      {
+        espece: 'NSE', categorie: 'imago', densite_diffuse: null, densite_groupee: null, methode: null,
+        accouplement: null, ponte: null, type_cible: '[]',
+      },
+    ] as any);
+    mockListAllInfestations.mockResolvedValue([]);
+
+    await enregistrerEtSynchroniser(draft(), [], 'token-1');
+
+    expect(mockCreateProspection).toHaveBeenCalledWith(
+      'token-1',
+      expect.objectContaining({
+        populations: [expect.objectContaining({ espece: 'LMC', categorie: 'imago', densite_diffuse: 5 })],
       })
     );
   });
