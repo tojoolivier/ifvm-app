@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
@@ -15,6 +15,7 @@ import {
   DetailRowViewModel,
   enregistrerEtSynchroniser,
   infestationDetailHasData,
+  trouverPopulationsIncompletes,
 } from '@/lib/prospection-review';
 import { estToutParti, resumerEnPhrase } from '@/lib/sync-lot';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
@@ -22,6 +23,8 @@ import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
+const ESPECE_LABEL = { LMC: 'Locusta', NSE: 'Nomadacris' } as const;
+const CATEGORIE_LABEL = { imago: 'Imagos', larve: 'Larves' } as const;
 const GREEN = '#235a36';
 const BG = '#faf7ef';
 const TEXT = '#16201a';
@@ -83,8 +86,26 @@ export default function ReviewScreen() {
     );
   }
 
-  const handleSave = () =>
-    run(
+  // #revalidation-prospection : une grille clonée depuis une fiche périmée
+  // (« Prospections à revalider ») peut porter des champs renseignés sans
+  // densité diffuse — l'agent n'a alors aucune raison de rouvrir cette
+  // espèce/catégorie puisqu'elle paraît déjà remplie. Bloquer ici, avec le
+  // détail de la grille en cause, plutôt que laisser la fiche échouer plus
+  // tard — silencieusement — sur l'écran Synchronisation.
+  const populationsIncompletes = trouverPopulationsIncompletes(populations, captures);
+
+  const handleSave = () => {
+    if (populationsIncompletes.length > 0) {
+      const grilles = populationsIncompletes
+        .map((p) => `${ESPECE_LABEL[p.espece]} · ${CATEGORIE_LABEL[p.categorie]}`)
+        .join('\n');
+      Alert.alert(
+        'Densité diffuse manquante',
+        `La densité diffuse (ind./ha) est obligatoire et n'est pas renseignée pour :\n\n${grilles}\n\nRetournez sur cette grille pour la compléter avant d'enregistrer.`
+      );
+      return;
+    }
+    void run(
       async () => {
         const resume = await enregistrerEtSynchroniser(draft, captures, token!);
         resetWizard();
@@ -108,6 +129,7 @@ export default function ReviewScreen() {
         context: { draftId: draft.id },
       }
     );
+  };
 
   const infestationRowsByCategorie = (categorie: 'imago' | 'larve') =>
     recap.infestationDetail.filter((d) => d.categorie === categorie && infestationDetailHasData(d));

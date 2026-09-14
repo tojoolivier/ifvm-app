@@ -5,6 +5,7 @@
  * afficher une donnée inventée » et « ne jamais masquer silencieusement une donnée
  * renseignée ».
  */
+import { Alert } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import ExtensiveRecapScreen from '@/app/(prospection)/extensive-recap';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
@@ -32,9 +33,15 @@ jest.mock('@/lib/prospection-repository', () => ({
   },
 }));
 
-jest.mock('@/lib/prospection-review', () => ({
-  enregistrerEtSynchroniser: jest.fn().mockResolvedValue({ envoyees: [], echouees: [], conflits: [] }),
-}));
+jest.mock('@/lib/prospection-review', () => {
+  const actual = jest.requireActual('@/lib/prospection-review');
+  return {
+    enregistrerEtSynchroniser: jest.fn().mockResolvedValue({ envoyees: [], echouees: [], conflits: [] }),
+    // Vraie implémentation (pas de mock utile ici) : c'est justement elle
+    // qu'on veut exercer, cf. #revalidation-prospection ci-dessous.
+    trouverPopulationsIncompletes: actual.trouverPopulationsIncompletes,
+  };
+});
 
 const DRAFT_BASE = {
   id: 'draft-123',
@@ -300,6 +307,57 @@ describe('ExtensiveRecapScreen — N° de fiche = N° de message à l’enregist
 
     await waitFor(() => expect(prospectionRepository.concludeValidation).toHaveBeenCalled());
     expect(prospectionRepository.alignerNumeroFicheSurNumeroMessage).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * #revalidation-prospection : une grille clonée depuis une fiche périmée
+ * (« Prospections à revalider ») peut porter des champs renseignés sans
+ * densité diffuse — bloquer ici, avec un message ciblé, plutôt que laisser la
+ * fiche échouer plus tard — silencieusement — sur l'écran Synchronisation.
+ */
+describe('ExtensiveRecapScreen — densité diffuse manquante (#revalidation-prospection)', () => {
+  beforeEach(() => {
+    useAuthStore.setState({ token: 'tok-1' });
+    jest.mocked(prospectionReview.enregistrerEtSynchroniser).mockClear();
+    // `jest.spyOn` réutilise le même mock s'il est déjà en place (ex. posé par
+    // un test précédent sans `mockRestore`) — l'historique des appels doit
+    // être purgé explicitement, sinon `toHaveBeenCalled()` reflète des appels
+    // d'un test précédent plutôt que de celui-ci.
+    if (jest.isMockFunction(Alert.alert)) jest.mocked(Alert.alert).mockClear();
+  });
+
+  it("bloque l'enregistrement si une grille a des données mais pas de densité diffuse, avec le détail de la grille", async () => {
+    jest.mocked(prospectionRepository.listAllProspectionPopulations).mockResolvedValue([
+      {
+        espece: 'LMC', categorie: 'larve', captures_nombre: 6, densite_diffuse: null, densite_groupee: null,
+        methode: null, accouplement: null, ponte: null, tache_larvaire: true, interdistance: 3, deplacement: 'perchee',
+      },
+    ] as any);
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    useProspectionWizardStore.setState({ draft: { ...DRAFT_BASE, type_prospection: 'extensive' }, captures: [] });
+
+    await render(<ExtensiveRecapScreen />);
+    fireEvent.press(await screen.findByText('Enregistrer (hors-ligne) ✓'));
+
+    await waitFor(() => expect(alertSpy).toHaveBeenCalled());
+    expect(alertSpy.mock.calls[0][0]).toBe('Densité diffuse manquante');
+    expect(alertSpy.mock.calls[0][1]).toContain('Locusta · Larves');
+    expect(prospectionReview.enregistrerEtSynchroniser).not.toHaveBeenCalled();
+  });
+
+  it("n'affiche rien et n'enregistre pas non plus une grille clonée totalement vide (résidu de revalidation) — le blocage ne se déclenche pas dessus", async () => {
+    jest.mocked(prospectionRepository.listAllProspectionPopulations).mockResolvedValue([
+      { espece: 'NSE', categorie: 'imago', densite_diffuse: null, densite_groupee: null, methode: null, accouplement: null, ponte: null },
+    ] as any);
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    useProspectionWizardStore.setState({ draft: { ...DRAFT_BASE, type_prospection: 'extensive' }, captures: [] });
+
+    await render(<ExtensiveRecapScreen />);
+    fireEvent.press(await screen.findByText('Enregistrer (hors-ligne) ✓'));
+
+    await waitFor(() => expect(prospectionReview.enregistrerEtSynchroniser).toHaveBeenCalled());
+    expect(alertSpy).not.toHaveBeenCalled();
   });
 });
 
