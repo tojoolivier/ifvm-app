@@ -46,7 +46,6 @@ import {
   syncAllProspections,
   formatChrono,
   infestationDetailHasData,
-  trouverPopulationsIncompletes,
 } from '../src/lib/prospection-review';
 
 jest.mock('../src/lib/prospection-repository', () => ({
@@ -374,38 +373,6 @@ describe('infestationDetailHasData', () => {
   });
 });
 
-/** #revalidation-prospection : mêmes cas que `populationRowHasData` (privé,
- * testé indirectement ici) — une grille clonée depuis une fiche périmée peut
- * porter des champs renseignés sans densité diffuse ; les écrans de
- * récapitulatif (review.tsx, extensive-recap.tsx) s'appuient sur cette
- * fonction pour bloquer l'enregistrement avec un message ciblé. */
-describe('trouverPopulationsIncompletes', () => {
-  const vide = (espece: 'LMC' | 'NSE', categorie: 'imago' | 'larve'): PopulationRow => ({
-    espece, categorie, densite_diffuse: null, densite_groupee: null, methode: null, accouplement: null, ponte: null,
-  });
-
-  it('ignore une ligne totalement vide (résidu de clonage, pas une saisie)', () => {
-    expect(trouverPopulationsIncompletes([vide('NSE', 'imago')], [])).toEqual([]);
-  });
-
-  it('ignore une ligne complète (densité diffuse renseignée)', () => {
-    const row: PopulationRow = { ...vide('LMC', 'imago'), densite_diffuse: 5 };
-    expect(trouverPopulationsIncompletes([row], [])).toEqual([]);
-  });
-
-  it('signale une ligne avec des données mais sans densité diffuse', () => {
-    const row: PopulationRow = { ...vide('LMC', 'larve'), interdistance: 3, deplacement: 'perchee', tache_larvaire: true };
-    expect(trouverPopulationsIncompletes([row], [])).toEqual([row]);
-  });
-
-  it('signale une ligne intensive dont seules des captures existent (table séparée), sans densité diffuse', () => {
-    const row = vide('NSE', 'imago');
-    const captures: CaptureRow[] = [
-      { espece: 'NSE', categorie: 'imago', sexe: 'F', phase: 'gregaire', stade: 'A1', effectif: 3 } as CaptureRow,
-    ];
-    expect(trouverPopulationsIncompletes([row], captures)).toEqual([row]);
-  });
-});
 
 describe('enregistrerEtSynchroniser', () => {
   it('complète toujours la fiche locale puis synchronise si en ligne', async () => {

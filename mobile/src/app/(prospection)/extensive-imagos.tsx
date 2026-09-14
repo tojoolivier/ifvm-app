@@ -13,7 +13,6 @@ import {
   createEmptySpeciesData,
   speciesDataToPopulationRow,
   populationRowToSpeciesData,
-  validerDensiteDiffuseObligatoire,
 } from '@/lib/prospection-extensive';
 import { COMPASS_DIRECTIONS, oppositeDirection } from '@/lib/prospection-infestation-insights';
 import { useAsyncAction } from '@/hooks/use-async-action';
@@ -35,8 +34,6 @@ export default function ExtensiveImagosScreen() {
 
   const [species, setSpecies] = useState<Espece>('LMC');
   const [currentSexe, setCurrentSexe] = useState<Sexe>('F');
-  const [showPopDiffError, setShowPopDiffError] = useState(false);
-  
   const [speciesData, setSpeciesData] = useState<Record<Espece, ExtensiveImagoSpeciesData>>({
     LMC: createEmptySpeciesData(),
     NSE: createEmptySpeciesData(),
@@ -179,18 +176,12 @@ const handleContinue = () => {
     return;
   }
 
-  // #densite-diffuse-obligatoire : même garde, vérifiée avant la densité groupée
-  // (l'ordre d'affichage à l'écran, diffuse puis groupée).
-  const densiteDiffuseCheck = validerDensiteDiffuseObligatoire(speciesData);
-  if (!densiteDiffuseCheck.valid) {
-    setSpecies(densiteDiffuseCheck.espece);
-    setShowPopDiffError(true);
-    Alert.alert('Densité diffuse requise', 'La densité diffuse (ind./ha) est obligatoire.');
-    return;
-  }
-
-  // Densité groupée : redevenue facultative (demande explicite) — plus de
-  // blocage ici, cf. backend prospection_schemas.py (#densite-groupee-obligatoire).
+  // #densite-diffuse-obligatoire retiré (demande explicite du 2026-09-14) :
+  // la densité diffuse — comme la densité groupée ci-dessous — ne bloque plus
+  // "Suivant", y compris pour une espèce déjà pourvue de captures. Ce blocage
+  // faisait échouer la synchronisation de fiches de signalement (type
+  // `validation`, mêmes écrans que l'extensif) pour une grille jamais
+  // destinée à recevoir de densité.
 
   return run(
     async () => {
@@ -425,14 +416,11 @@ const handleContinue = () => {
             <View style={styles.densitySection}>
               <Text style={styles.sectionLabel}>📊 Densités</Text>
               <View style={styles.row}>
-                <View style={[styles.card, styles.flex1, showPopDiffError && data.popDiff.trim() === '' && styles.cardError]}>
-                  <Text style={[styles.label, styles.requiredLabel]}>Population diffuse ind./ha *</Text>
+                <View style={[styles.card, styles.flex1]}>
+                  <Text style={styles.label}>Population diffuse ind./ha</Text>
                   <TextInput
                     value={data.popDiff}
-                    onChangeText={(text) => {
-                      updateSpeciesData({ popDiff: text });
-                      if (text.trim() !== '') setShowPopDiffError(false);
-                    }}
+                    onChangeText={(text) => updateSpeciesData({ popDiff: text })}
                     keyboardType="decimal-pad"
                     style={styles.inputMono}
                     placeholder="0"
@@ -451,9 +439,6 @@ const handleContinue = () => {
                   />
                 </View>
               </View>
-              {showPopDiffError && data.popDiff.trim() === '' && (
-                <Text style={styles.errorText}>La densité diffuse (ind./ha) est obligatoire.</Text>
-              )}
               <Text style={styles.speciesHint}>Données spécifiques à {species}</Text>
             </View>
 
@@ -806,11 +791,9 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 8, marginBottom: 0 },
   flex1: { flex: 1 },
   card: { backgroundColor: '#f6f3e9', borderRadius: 9, padding: 8 },
-  cardError: { borderWidth: 1.5, borderColor: '#d32f2f' },
   // #lisibilite-terrain : libellé agrandi et assombri (au lieu de 9px gris clair,
   // difficile à lire en plein soleil) — même niveau de lisibilité que sectionLabel.
   label: { fontSize: 11, fontWeight: '700', color: TEXT_SECONDARY },
-  requiredLabel: { color: '#c0412b' },
   inputMono: { fontSize: 18, fontWeight: '700', color: TEXT, fontFamily: 'monospace', padding: 0 },
   speciesHint: { fontSize: 9, color: '#9a9484', marginTop: 4, textAlign: 'center', fontStyle: 'italic' },
   

@@ -276,11 +276,15 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
     expect(lmcRow).toMatchObject({ espece: 'LMC', type_cible: '["dense"]' });
   });
 
-  /** #densite-diffuse-obligatoire : même garde que la densité groupée, bloque
-   * « Suivant » tant qu'une espèce avec des captures n'a pas renseigné sa densité
-   * diffuse. Phases déjà cohérentes dans la fixture (captures_sol = captures_nombre)
-   * pour isoler cette règle de « Captures = Phases », vérifiée par ailleurs. */
-  it('Densité diffuse (ind./ha) obligatoire dès qu’il y a des captures — bloque puis débloque « Suivant »', async () => {
+  /** #densite-diffuse-obligatoire retiré (demande explicite du 2026-09-14) :
+   * « Suivant » n'est plus bloqué par l'absence de densité diffuse, même pour
+   * une espèce ayant des captures — ce blocage faisait échouer la
+   * synchronisation de fiches de signalement (type `validation`, mêmes
+   * écrans que l'extensif) pour une grille jamais destinée à recevoir de
+   * densité. Phases déjà cohérentes dans la fixture (captures_sol =
+   * captures_nombre) pour isoler cette règle de « Captures = Phases »,
+   * vérifiée par ailleurs. */
+  it('laisse passer « Suivant » sans densité diffuse même avec des captures', async () => {
     jest.mocked(prospectionRepository.getProspectionPopulation).mockImplementation(async (_id, espece) =>
       espece === 'LMC'
         ? ({
@@ -300,17 +304,10 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
     await settle();
 
     fireEvent.press(screen.getByText('Suivant : Larves ›'));
-    await waitFor(() => expect(screen.getByText('La densité diffuse (ind./ha) est obligatoire.')).toBeVisible());
-    expect(prospectionRepository.saveProspectionPopulation).not.toHaveBeenCalled();
-
-    // popDiff est le premier champ vide (popGroup est déjà rempli par la fixture).
-    fireEvent.changeText(screen.getAllByDisplayValue('')[0], '8');
-    await settle();
-
-    fireEvent.press(screen.getByText('Suivant : Larves ›'));
     await waitFor(() => expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText('La densité diffuse (ind./ha) est obligatoire.')).toBeNull();
     const [, lmcRow] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
-    expect(lmcRow).toMatchObject({ espece: 'LMC', densite_diffuse: 8, densite_groupee: 3 });
+    expect(lmcRow).toMatchObject({ espece: 'LMC', densite_diffuse: null, densite_groupee: 3 });
   });
 
   /**
@@ -380,8 +377,8 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
       await settle();
     }
 
-    // Densités obligatoires dès que les captures sont > 0 (#densite-diffuse-obligatoire) :
-    // les deux seuls champs encore vides à ce stade sont Population diffuse et groupée.
+    // Les deux seuls champs encore vides à ce stade sont Population diffuse et groupée
+    // (facultatifs désormais, mais renseignés ici pour couvrir le cas nominal).
     const densiteInputs = screen.getAllByDisplayValue('');
     fireEvent.changeText(densiteInputs[0], '4');
     fireEvent.changeText(densiteInputs[1], '2');

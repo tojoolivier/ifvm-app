@@ -122,9 +122,11 @@ describe('ExtensiveLarvesScreen', () => {
     expect(lmcRow).toMatchObject({ espece: 'LMC', captures_nombre: 25 });
   });
 
-  /** #densite-diffuse-obligatoire : même garde que sur extensive-imagos.tsx. Phases/
-   * stades déjà cohérents dans la fixture pour isoler cette seule règle. */
-  it('Densité diffuse (ind./ha) obligatoire dès qu’il y a des captures — bloque puis débloque « Suivant »', async () => {
+  /** #densite-diffuse-obligatoire retiré (demande explicite du 2026-09-14) :
+   * même garde que sur extensive-imagos.tsx — « Suivant » n'est plus bloqué
+   * par l'absence de densité diffuse. Phases/stades déjà cohérents dans la
+   * fixture pour isoler cette seule règle. */
+  it('laisse passer « Suivant » sans densité diffuse même avec des captures', async () => {
     jest.mocked(prospectionRepository.getProspectionPopulation).mockImplementation(async (_id, espece) =>
       espece === 'LMC'
         ? ({
@@ -145,16 +147,10 @@ describe('ExtensiveLarvesScreen', () => {
     await settle();
 
     fireEvent.press(screen.getByText('Suivant : Observations ›'));
-    await waitFor(() => expect(screen.getByText('La densité diffuse (ind./ha) est obligatoire.')).toBeVisible());
-    expect(prospectionRepository.saveProspectionPopulation).not.toHaveBeenCalled();
-
-    fireEvent.changeText(screen.getAllByDisplayValue('')[0], '6');
-    await settle();
-
-    fireEvent.press(screen.getByText('Suivant : Observations ›'));
     await waitFor(() => expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText('La densité diffuse (ind./ha) est obligatoire.')).toBeNull();
     const [, lmcRow] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
-    expect(lmcRow).toMatchObject({ espece: 'LMC', densite_diffuse: 6, densite_groupee: 2 });
+    expect(lmcRow).toMatchObject({ espece: 'LMC', densite_diffuse: null, densite_groupee: 2 });
   });
 
   /**
@@ -187,7 +183,7 @@ describe('ExtensiveLarvesScreen', () => {
     }
     expect(screen.getAllByText('5 ✅').length).toBeGreaterThan(0);
 
-    // Densités obligatoires dès que les captures sont > 0.
+    // Facultatives désormais, mais renseignées ici pour couvrir le cas nominal.
     const densiteInputs = screen.getAllByDisplayValue('');
     fireEvent.changeText(densiteInputs[0], '4');
     fireEvent.changeText(densiteInputs[1], '2');

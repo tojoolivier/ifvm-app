@@ -33,15 +33,9 @@ jest.mock('@/lib/prospection-repository', () => ({
   },
 }));
 
-jest.mock('@/lib/prospection-review', () => {
-  const actual = jest.requireActual('@/lib/prospection-review');
-  return {
-    enregistrerEtSynchroniser: jest.fn().mockResolvedValue({ envoyees: [], echouees: [], conflits: [] }),
-    // Vraie implémentation (pas de mock utile ici) : c'est justement elle
-    // qu'on veut exercer, cf. #revalidation-prospection ci-dessous.
-    trouverPopulationsIncompletes: actual.trouverPopulationsIncompletes,
-  };
-});
+jest.mock('@/lib/prospection-review', () => ({
+  enregistrerEtSynchroniser: jest.fn().mockResolvedValue({ envoyees: [], echouees: [], conflits: [] }),
+}));
 
 const DRAFT_BASE = {
   id: 'draft-123',
@@ -311,12 +305,15 @@ describe('ExtensiveRecapScreen — N° de fiche = N° de message à l’enregist
 });
 
 /**
- * #revalidation-prospection : une grille clonée depuis une fiche périmée
- * (« Prospections à revalider ») peut porter des champs renseignés sans
- * densité diffuse — bloquer ici, avec un message ciblé, plutôt que laisser la
- * fiche échouer plus tard — silencieusement — sur l'écran Synchronisation.
+ * #densite-diffuse-obligatoire retiré (demande explicite du 2026-09-14) :
+ * la densité diffuse ne bloque plus jamais l'enregistrement, même pour une
+ * grille qui porte des données réelles (captures, interdistance...) sans
+ * densité renseignée — un précédent blocage côté écran (#revalidation-
+ * prospection) faisait exactement ce que le backend faisait déjà côté
+ * synchronisation, et empêchait tout autant l'agent d'enregistrer une fiche
+ * de signalement légitimement incomplète sur ce champ.
  */
-describe('ExtensiveRecapScreen — densité diffuse manquante (#revalidation-prospection)', () => {
+describe('ExtensiveRecapScreen — densité diffuse facultative (#densite-diffuse-obligatoire retiré)', () => {
   beforeEach(() => {
     useAuthStore.setState({ token: 'tok-1' });
     jest.mocked(prospectionReview.enregistrerEtSynchroniser).mockClear();
@@ -327,7 +324,7 @@ describe('ExtensiveRecapScreen — densité diffuse manquante (#revalidation-pro
     if (jest.isMockFunction(Alert.alert)) jest.mocked(Alert.alert).mockClear();
   });
 
-  it("bloque l'enregistrement si une grille a des données mais pas de densité diffuse, avec le détail de la grille", async () => {
+  it("enregistre sans alerte une grille qui a des données mais pas de densité diffuse", async () => {
     jest.mocked(prospectionRepository.listAllProspectionPopulations).mockResolvedValue([
       {
         espece: 'LMC', categorie: 'larve', captures_nombre: 6, densite_diffuse: null, densite_groupee: null,
@@ -340,13 +337,11 @@ describe('ExtensiveRecapScreen — densité diffuse manquante (#revalidation-pro
     await render(<ExtensiveRecapScreen />);
     fireEvent.press(await screen.findByText('Enregistrer (hors-ligne) ✓'));
 
-    await waitFor(() => expect(alertSpy).toHaveBeenCalled());
-    expect(alertSpy.mock.calls[0][0]).toBe('Densité diffuse manquante');
-    expect(alertSpy.mock.calls[0][1]).toContain('Locusta · Larves');
-    expect(prospectionReview.enregistrerEtSynchroniser).not.toHaveBeenCalled();
+    await waitFor(() => expect(prospectionReview.enregistrerEtSynchroniser).toHaveBeenCalled());
+    expect(alertSpy).not.toHaveBeenCalled();
   });
 
-  it("n'affiche rien et n'enregistre pas non plus une grille clonée totalement vide (résidu de revalidation) — le blocage ne se déclenche pas dessus", async () => {
+  it("enregistre sans alerte une grille clonée totalement vide (résidu de revalidation)", async () => {
     jest.mocked(prospectionRepository.listAllProspectionPopulations).mockResolvedValue([
       { espece: 'NSE', categorie: 'imago', densite_diffuse: null, densite_groupee: null, methode: null, accouplement: null, ponte: null },
     ] as any);
