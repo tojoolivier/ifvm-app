@@ -479,16 +479,11 @@ export interface ProspectionValideeInput {
   intensitePluie: string | null;
   vegetation: Record<string, unknown> | null;
   sol: Record<string, unknown> | null;
-  verdissement: number | null;
-  hauteurStrate: number | null;
   ennemisNaturels: string | null;
   observations: string | null;
   nFiche: string | null;
   nMessage: string | null;
   statut: string;
-  verifiedBy: string | null;
-  verifiedAt: string | null;
-  validatedBy: string | null;
   // #revalidation-prospection : nécessaire ici pour que le repli hors ligne
   // (listProspectionsARevaliderLocal) sache calculer la péremption sur une
   // fiche matérialisée depuis un AUTRE agent — sans ça elle resterait
@@ -558,9 +553,9 @@ export async function materialiserProspectionValidee(input: ProspectionValideeIn
       date_prospection, latitude, longitude, altitude, biotope,
       surface_station, surface_prospectee, surface_infestee,
       degats_cultures, derniere_pluie, intensite_pluie, vegetation, sol,
-      verdissement, hauteur_strate, ennemis_naturels, observations,
+      ennemis_naturels, observations,
       n_fiche, n_message, statut, statut_sync,
-      verified_by, verified_at, validated_by, validated_at, revalide_de_id,
+      validated_at, revalide_de_id,
       region, district, commune, za, pa_code,
       degats_cultures_pourcent, verdissement_pourcent, hauteur_herbe_cm,
       heure_observation_at, station_libre, type_station, verdure_strate,
@@ -575,9 +570,9 @@ export async function materialiserProspectionValidee(input: ProspectionValideeIn
       signature_chef_base_nom, signature_chef_base_horodatage, signature_chef_base_image,
       created_at, updated_at
     ) VALUES (
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced',
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?,
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
     )`,
     [
       input.id,
@@ -598,16 +593,11 @@ export async function materialiserProspectionValidee(input: ProspectionValideeIn
       input.intensitePluie,
       input.vegetation != null ? JSON.stringify(input.vegetation) : null,
       input.sol != null ? JSON.stringify(input.sol) : null,
-      input.verdissement,
-      input.hauteurStrate,
       input.ennemisNaturels,
       input.observations,
       input.nFiche,
       input.nMessage,
       input.statut,
-      input.verifiedBy,
-      input.verifiedAt,
-      input.validatedBy,
       input.validatedAt,
       input.revalideDeId,
       input.region,
