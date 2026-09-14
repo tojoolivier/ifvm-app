@@ -255,11 +255,12 @@ export interface LieuAerien {
 }
 
 /**
- * Lieux aériens actifs du référentiel local, triés par nom. Alimente le champ « Base »
- * de la Prospection Extensive Aérienne (`lieu_base_id`, remplace les anciens champs
- * texte libre `base`/`base_secondaire` — migration backend 0047). Tous les types
- * (principale/secondaire/stand) sont renvoyés ; l'écran affiche le type dans chaque
- * option plutôt que de filtrer une catégorie hors du choix.
+ * Lieux aériens actifs du référentiel local, triés par nom. N'est plus consommé
+ * par la Prospection Extensive Aérienne (champ « Base » redevenu texte libre,
+ * migration backend 0063, défaisant la FK posée en 0047) ni par le Traitement
+ * Aérien (migration 0054, même bascule antérieure) — conservé tel quel, le
+ * référentiel `lieu_aerien` restant géré côté Web indépendamment de ces deux
+ * fiches.
  */
 export async function listLieuxAeriens(): Promise<LieuAerien[]> {
   const db = await getReferentielDb();

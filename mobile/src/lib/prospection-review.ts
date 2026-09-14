@@ -575,7 +575,7 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
     pilote: draft.pilote || null,
     mecanicien: draft.mecanicien || null,
     chef_de_base: draft.chef_de_base || null,
-    lieu_base_id: draft.lieu_base_id || null,
+    base: draft.base || null,
     pesticides_embarques: normalizeBoolean(draft.pesticides_embarques),
     pesticide_nom_commercial: draft.pesticide_nom_commercial || null,
     pesticide_quantite_disponible: draft.pesticide_quantite_disponible != null ? Number(draft.pesticide_quantite_disponible) : null,

@@ -159,7 +159,7 @@ const CHAMPS_PROSPECTION_VALIDEE_PAR_DEFAUT = {
   pilote: null,
   mecanicien: null,
   chefDeBase: null,
-  lieuBaseId: null,
+  base: null,
   pesticidesEmbarques: null,
   pesticideNomCommercial: null,
   pesticideQuantiteDisponible: null,

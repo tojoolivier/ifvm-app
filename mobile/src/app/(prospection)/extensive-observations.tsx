@@ -76,15 +76,21 @@ function validerPourcentage(raw: string, label: string): { value: number | null;
 // colonnes backend `signature_visa_nom`/`_horodatage` (migration 0036) restent en
 // base pour préserver l'historique déjà enregistré, mais plus aucune UI ne les lit
 // ni ne les écrit à partir d'ici.
-type SignatureRole = 'consultant_fao' | 'pilote' | 'chef_base';
+//
+// Pilote est retiré du slide Signatures — même traitement que VISA ci-dessus :
+// les colonnes backend `signature_pilote_nom`/`_horodatage`/`_image` restent en
+// base pour préserver l'historique déjà enregistré (cf. `buildPayload`, qui les
+// renvoie telles quelles), mais plus aucune UI ne propose de (re)signer pour ce
+// rôle. Son nom continue d'être saisi sur Référence (`draft.pilote`), sans lien
+// avec une signature.
+type SignatureRole = 'consultant_fao' | 'chef_base';
 
 const SIGNATURE_LABELS: Record<SignatureRole, string> = {
   consultant_fao: 'Consultant FAO',
-  pilote: 'Pilote',
   chef_base: 'Chef de Base',
 };
 
-const SIGNATURE_ROLES: SignatureRole[] = ['consultant_fao', 'pilote', 'chef_base'];
+const SIGNATURE_ROLES: SignatureRole[] = ['consultant_fao', 'chef_base'];
 
 /**
  * Chef de Base reste sur le mécanisme référentiel (ROLES dans
@@ -92,13 +98,9 @@ const SIGNATURE_ROLES: SignatureRole[] = ['consultant_fao', 'pilote', 'chef_base
  * Traitement (AerienForm.tsx) : on choisit la personne dans une liste d'agents
  * habilités (chips), on ne ressaisit jamais un nom à la main.
  *
- * Consultant FAO et Pilote n'y sont PLUS (#consultant-fao-pilote-auto) :
- * - Consultant FAO redevient une saisie libre (nom en texte + signature) — ce
- *   n'est pas un agent habilité de l'app, juste un visiteur externe dont on
- *   capture le nom au moment de la signature.
- * - Pilote n'est plus sélectionné ici du tout : son nom est celui déjà saisi
- *   sur Référence (`draft.pilote`, texte libre lui aussi), jamais ressaisi —
- *   cf. l'effet dédié plus bas qui garde `signatureNoms.pilote` synchronisé.
+ * Consultant FAO reste une saisie libre (nom en texte + signature) — ce n'est
+ * pas un agent habilité de l'app, juste un visiteur externe dont on capture le
+ * nom au moment de la signature (#consultant-fao-pilote-auto).
  */
 
 export default function ExtensiveObservationsScreen() {
@@ -156,26 +158,18 @@ export default function ExtensiveObservationsScreen() {
   // réelle — un rôle n'est considéré « signé » que lorsqu'elle est non nulle
   // (un nom seul, hérité d'une ancienne fiche pré-migration 0053, ne suffit
   // plus : l'écran repasse en édition tant qu'aucun tracé n'a été validé).
-  // Pilote (#consultant-fao-pilote-auto) : le nom vient toujours de Référence
-  // (`draft.pilote`), jamais de la signature persistée — évite un flash du nom
-  // associé à une ancienne signature avant que l'effet dédié plus bas ne
-  // corrige. L'horodatage/l'image ne sont repris que si la signature existante
-  // correspond bien au pilote actuel ; sinon ils restent à `null` (signature
-  // invalidée), l'effet dédié se chargeant de persister cette rupture.
-  const piloteSigneCoherent = (draft?.signature_pilote_nom ?? null) === (draft?.pilote ?? null);
+  // Pilote n'est plus un rôle géré ici (retiré du slide, cf. commentaire plus
+  // haut) : aucune entrée pour lui dans ces 4 states.
   const [signatureNoms, setSignatureNoms] = useState<Record<SignatureRole, string | null>>({
     consultant_fao: draft?.signature_consultant_fao_nom ?? null,
-    pilote: draft?.pilote ?? null,
     chef_base: draft?.signature_chef_base_nom ?? null,
   });
   const [signatureHorodatages, setSignatureHorodatages] = useState<Record<SignatureRole, string | null>>({
     consultant_fao: draft?.signature_consultant_fao_horodatage ?? null,
-    pilote: piloteSigneCoherent ? (draft?.signature_pilote_horodatage ?? null) : null,
     chef_base: draft?.signature_chef_base_horodatage ?? null,
   });
   const [signatureImages, setSignatureImages] = useState<Record<SignatureRole, string | null>>({
     consultant_fao: draft?.signature_consultant_fao_image ?? null,
-    pilote: piloteSigneCoherent ? (draft?.signature_pilote_image ?? null) : null,
     chef_base: draft?.signature_chef_base_image ?? null,
   });
   // Identifiant de l'agent associé à `signatureNoms[role]` — la relation
@@ -186,7 +180,6 @@ export default function ExtensiveObservationsScreen() {
   // faute d'une colonne d'id côté backend (même limite que traitement_signature).
   const [signatureAgentIds, setSignatureAgentIds] = useState<Record<SignatureRole, string | null>>({
     consultant_fao: null,
-    pilote: null,
     chef_base: null,
   });
   // Tracé en cours (avant VALIDER) — jamais persisté tant que VALIDER n'a pas
@@ -195,12 +188,10 @@ export default function ExtensiveObservationsScreen() {
   // changement de personne.
   const [pendingPaths, setPendingPaths] = useState<Record<SignatureRole, string>>({
     consultant_fao: '',
-    pilote: '',
     chef_base: '',
   });
   const [resetTicks, setResetTicks] = useState<Record<SignatureRole, number>>({
     consultant_fao: 0,
-    pilote: 0,
     chef_base: 0,
   });
   // Rôles actuellement en édition (chips + pavé affichés) — un rôle jamais
@@ -212,8 +203,8 @@ export default function ExtensiveObservationsScreen() {
   // Chef de Base : agents habilités proposés en chips (cf. commentaire plus
   // haut), sur le modèle de listUtilisateursByRole côté Traitement
   // (traitement.tsx, AerienForm.tsx). Chargé une seule fois, uniquement en
-  // mode aérien (seul mode où ce bloc Signatures s'affiche). Pilote/Consultant
-  // FAO n'ont plus besoin de cette liste (#consultant-fao-pilote-auto).
+  // mode aérien (seul mode où ce bloc Signatures s'affiche). Consultant FAO
+  // n'a plus besoin de cette liste (#consultant-fao-pilote-auto).
   const [chefsDeBase, setChefsDeBase] = useState<UtilisateurEquipe[]>([]);
 
   const { run, isRunning: isSaving } = useAsyncAction();
@@ -229,8 +220,8 @@ export default function ExtensiveObservationsScreen() {
   // Résolution best-effort de l'id du Chef de Base associé au nom déjà
   // enregistré (fiche relue) — ne touche jamais un id déjà connu (sélection
   // explicite ou match précédent), cf. commentaire sur `signatureAgentIds`
-  // plus haut. Pilote/Consultant FAO n'ont plus d'id à résoudre
-  // (#consultant-fao-pilote-auto : texte libre pour l'un, Référence pour l'autre).
+  // plus haut. Consultant FAO n'a pas d'id à résoudre (#consultant-fao-pilote-auto :
+  // texte libre, pas un agent habilité de l'app).
   useEffect(() => {
     if (signatureAgentIds.chef_base != null) return;
     const nom = signatureNoms.chef_base;
@@ -253,10 +244,9 @@ export default function ExtensiveObservationsScreen() {
    * fermetures `signatureNoms`/`signatureHorodatages`/`signatureImages` au
    * moment de l'appel).
    *
-   * Déclarée ici (avant `handleSelectSignataire`/l'effet de réconciliation du
-   * pilote, qui l'appellent tous deux) plutôt que plus bas avec VALIDER/
-   * MODIFIER/Suivant — un effet React doit fermer sur une référence déjà
-   * déclarée, pas sur une qui le sera plus loin dans le composant.
+   * Déclarée ici (avant `handleSelectSignataire`, qui l'appelle) plutôt que
+   * plus bas avec VALIDER/MODIFIER/Suivant — un effet React doit fermer sur une
+   * référence déjà déclarée, pas sur une qui le sera plus loin dans le composant.
    */
   const buildPayload = (
     overrides?: Partial<Record<SignatureRole, { nom: string | null; horodatage: string | null; image: string | null }>>
@@ -288,17 +278,17 @@ export default function ExtensiveObservationsScreen() {
       futsPleins: futsActifs ? validerEntierPositif(futsPleins, 'Fûts pleins').value : null,
       futsVides: futsActifs ? validerEntierPositif(futsVides, 'Fûts vides').value : null,
       futsRecues: futsActifs ? validerEntierPositif(futsRecues, 'Fûts reçues').value : null,
-      // VISA retiré de l'UI mais jamais réécrit à `null` : on renvoie tel quel
-      // ce que la fiche portait déjà (historique préservé, cf. commentaire sur
-      // SignatureRole plus haut).
+      // VISA et Pilote retirés de l'UI mais jamais réécrits : on renvoie tel
+      // quel ce que la fiche portait déjà (historique préservé, cf. commentaire
+      // sur SignatureRole plus haut).
       signatureVisaNom: draft?.signature_visa_nom ?? null,
       signatureVisaHorodatage: draft?.signature_visa_horodatage ?? null,
+      signaturePiloteNom: draft?.signature_pilote_nom ?? null,
+      signaturePiloteHorodatage: draft?.signature_pilote_horodatage ?? null,
+      signaturePiloteImage: draft?.signature_pilote_image ?? null,
       signatureConsultantFaoNom: isAerien ? noms.consultant_fao : null,
       signatureConsultantFaoHorodatage: isAerien ? horodatages.consultant_fao : null,
       signatureConsultantFaoImage: isAerien ? images.consultant_fao : null,
-      signaturePiloteNom: isAerien ? noms.pilote : null,
-      signaturePiloteHorodatage: isAerien ? horodatages.pilote : null,
-      signaturePiloteImage: isAerien ? images.pilote : null,
       signatureChefBaseNom: isAerien ? noms.chef_base : null,
       signatureChefBaseHorodatage: isAerien ? horodatages.chef_base : null,
       signatureChefBaseImage: isAerien ? images.chef_base : null,
@@ -386,9 +376,6 @@ export default function ExtensiveObservationsScreen() {
       setFutsPleins(draft.futs_pleins != null ? String(draft.futs_pleins) : '');
       setFutsVides(draft.futs_vides != null ? String(draft.futs_vides) : '');
       setFutsRecues(draft.futs_recues != null ? String(draft.futs_recues) : '');
-      // `pilote` n'est plus seed ici (#consultant-fao-pilote-auto) : source
-      // unique de vérité = l'effet dédié ci-dessous, qui couvre aussi bien ce
-      // premier chargement que le retour depuis Référence en cours de session.
       setSignatureNoms((current) => ({
         ...current,
         consultant_fao: draft.signature_consultant_fao_nom ?? null,
@@ -409,79 +396,6 @@ export default function ExtensiveObservationsScreen() {
       setEditingRoles(new Set());
     });
   }, [draft, draftId]);
-
-  /**
-   * Pilote (#consultant-fao-pilote-auto) : source unique de vérité pour
-   * `signatureNoms.pilote` — jamais une resaisie indépendante ici, toujours le
-   * nom actuellement saisi sur Référence (`draft.pilote`). Couvre à la fois :
-   * - le premier chargement d'une fiche (y compris une fiche rouverte après
-   *   un changement de pilote fait ailleurs SANS repasser par Signature —
-   *   `draft.signature_pilote_nom`, la valeur persistée pour la signature
-   *   elle-même, ne correspond alors plus à `draft.pilote`) ;
-   * - un changement fait dans la MÊME session (retour sur Référence, §4/Test 3)
-   *   — expo-router ne démonte pas cet écran en repassant par "précédent", donc
-   *   l'effet d'hydratation ci-dessus (guardé par `draft.id`, inchangé) ne se
-   *   redéclencherait pas tout seul.
-   *
-   * Toute incohérence (signature déjà validée pour un nom différent du pilote
-   * actuel) invalide immédiatement le tracé — jamais attribué au nouveau
-   * pilote (§4) — et persiste cette rupture tout de suite, même raison que
-   * `handleSelectSignataire` : une fermeture de l'app avant "Suivant" ne doit
-   * jamais laisser un tracé attribué à la mauvaise personne.
-   */
-  const piloteReconcilieRef = useRef<string>('');
-  useEffect(() => {
-    if (!isAerien || !draft || draft.id !== draftId) return;
-    const nomPilote = draft.pilote ?? null;
-    const nomDejaSigne = draft.signature_pilote_nom ?? null;
-    const imageDejaSignee = draft.signature_pilote_image ?? null;
-    const cle = `${nomPilote ?? ''}|${nomDejaSigne ?? ''}|${imageDejaSignee ? '1' : '0'}`;
-    if (piloteReconcilieRef.current === cle) return;
-    piloteReconcilieRef.current = cle;
-
-    const incoherent = !!imageDejaSignee && nomPilote !== nomDejaSigne;
-
-    // Différé au micro-tour suivant, comme les autres effets de cet écran —
-    // évite un setState synchrone dans le corps de l'effet (react-hooks/set-state-in-effect).
-    void Promise.resolve().then(() => {
-      setSignatureNoms((current) => (current.pilote === nomPilote ? current : { ...current, pilote: nomPilote }));
-
-      if (incoherent) {
-        setSignatureImages((current) => ({ ...current, pilote: null }));
-        setSignatureHorodatages((current) => ({ ...current, pilote: null }));
-        setPendingPaths((current) => ({ ...current, pilote: '' }));
-        setResetTicks((current) => ({ ...current, pilote: (current.pilote ?? 0) + 1 }));
-        setEditingRoles((current) => new Set(current).add('pilote'));
-        // Rupture persistée tout de suite — même raison que handleSelectSignataire :
-        // une fermeture de l'app avant "Suivant" ne doit jamais laisser le tracé
-        // attribué au nouveau pilote.
-        void run(
-          async () => {
-            const updated = await updateProspectionExtensiveObservations(
-              draftId,
-              buildPayload({ pilote: { nom: nomPilote, horodatage: null, image: null } })
-            );
-            setDraft(updated);
-          },
-          {
-            screen: 'extensive-observations',
-            precondition: !!draftId,
-            preconditionMessage: 'Session de saisie perdue — revenez à l’écran précédent et réessayez.',
-            context: { draftId, role: 'pilote', action: 'pilote-change-invalidation' },
-          }
-        );
-      } else if (imageDejaSignee) {
-        // Cohérent (déjà signé pour le bon pilote) : restaure aussi l'image et
-        // l'horodatage, que l'effet d'hydratation générique ne seed plus pour ce rôle.
-        setSignatureImages((current) => (current.pilote === imageDejaSignee ? current : { ...current, pilote: imageDejaSignee }));
-        setSignatureHorodatages((current) => {
-          const horodatage = draft.signature_pilote_horodatage ?? null;
-          return current.pilote === horodatage ? current : { ...current, pilote: horodatage };
-        });
-      }
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft, draftId, isAerien]);
 
   /**
    * VALIDER — capture définitivement le tracé en cours pour ce rôle. Persisté
@@ -769,14 +683,7 @@ export default function ExtensiveObservationsScreen() {
 
                       {enEdition ? (
                         <>
-                          {role === 'pilote' ? (
-                            // Auto-rempli depuis Référence (#consultant-fao-pilote-auto)
-                            // — jamais une resaisie manuelle ici, cf. l'effet dédié
-                            // plus haut qui garde signatureNoms.pilote synchronisé.
-                            <Text style={styles.signatureValue}>
-                              {draft?.pilote || 'Pilote non renseigné (voir Référence)'}
-                            </Text>
-                          ) : role === 'consultant_fao' ? (
+                          {role === 'consultant_fao' ? (
                             // Saisie libre (#consultant-fao-pilote-auto) — pas un
                             // agent habilité de l'app, pas de chip à choisir.
                             <TextInput
@@ -903,7 +810,7 @@ const styles = StyleSheet.create({
   futsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 9 },
   futsCell: { flexBasis: '47%', flexGrow: 1, marginBottom: 0 },
   signatureRow: { gap: 6 },
-  // Pilote/Chef de Base : nombre d'agents variable (contrairement aux chips à
+  // Chef de Base : nombre d'agents variable (contrairement aux chips à
   // effectif fixe du reste de l'écran, dimensionnées par `flex: 1`) — la rangée
   // doit donc pouvoir passer à la ligne, et chaque chip porte son propre padding
   // horizontal plutôt que de compter sur le flex pour se dimensionner.

@@ -115,7 +115,7 @@ function draft(overrides: Partial<DraftProspection> = {}): DraftProspection {
     pilote: null,
     mecanicien: null,
     chef_de_base: null,
-    lieu_base_id: null,
+    base: null,
     pesticides_embarques: null,
     pesticide_nom_commercial: null,
     pesticide_quantite_disponible: null,

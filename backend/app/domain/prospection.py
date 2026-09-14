@@ -258,7 +258,7 @@ class Prospection:
     pilote: str | None = None
     mecanicien: str | None = None
     chef_de_base: str | None = None
-    lieu_base_id: uuid.UUID | None = None
+    base: str | None = None
 
     # ==========================================
     # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures

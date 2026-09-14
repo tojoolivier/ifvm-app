@@ -617,11 +617,15 @@ const COLONNES_PROSPECTION: readonly Colonne[] = [
   { name: 'pilote', type: 'TEXT' },
   { name: 'mecanicien', type: 'TEXT' },
   { name: 'chef_de_base', type: 'TEXT' },
-  // `base`/`base_secondaire` (texte libre) remplacés par `lieu_base_id` (FK vers le
-  // référentiel lieu_aerien) — migration backend 0047. Les 2 colonnes ci-dessus
-  // restent déclarées pour les installations existantes (colonnes mortes, plus
-  // jamais lues/écrites par le code applicatif) — jamais supprimées côté SQLite
-  // mobile, cohérent avec le principe de préservation des données déjà en place.
+  // `base` (texte libre) avait été remplacée par `lieu_base_id` (FK vers le
+  // référentiel lieu_aerien) en migration backend 0047, puis la bascule est
+  // défaite en 0063 (saisie manuelle, sans dépendre du référentiel Web) — `base`
+  // redevient la colonne active, lue/écrite par le code applicatif.
+  // `lieu_base_id` reste déclarée pour les installations existantes (colonne
+  // morte, plus jamais lue/écrite) — jamais supprimée côté SQLite mobile,
+  // cohérent avec le principe de préservation des données déjà en place.
+  // `base_secondaire` n'a jamais existé côté prospection (seulement traitement) ;
+  // reste déclarée pour les installations où elle a pu être créée par erreur.
   { name: 'base', type: 'TEXT' },
   { name: 'base_secondaire', type: 'TEXT' },
   { name: 'lieu_base_id', type: 'TEXT' },
