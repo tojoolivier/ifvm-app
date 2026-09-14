@@ -627,8 +627,12 @@ function normalizeIntensite(value: string | null): string | null {
  * vides ET qu'aucune capture ne lui est associée (table `prospection_capture`,
  * Intensif — `captures_*` scalaires, Extensif) : c'est un résidu sans intérêt,
  * jamais une saisie de l'agent, qu'il faut simplement omettre du payload de
- * synchro (cf. `syncOneProspection`) plutôt que le faire échouer sur
- * `densite_diffuse` obligatoire pour une grille que l'agent n'a jamais ouverte.
+ * synchro (cf. `syncOneProspection`) plutôt que d'envoyer une ligne vide pour
+ * une grille que l'agent n'a jamais ouverte. `densite_diffuse` n'est plus
+ * obligatoire côté backend (#densite-diffuse-obligatoire retiré, demande
+ * explicite du 2026-09-14 — bloquait la synchronisation entière d'une fiche à
+ * cause d'une seule grille jamais destinée à être remplie), mais cette
+ * omission reste utile pour la propreté du payload.
  *
  * #revalidation-prospection : c'est le cas le plus fréquent pour ces lignes
  * résiduelles — `demarrerRevalidation` clone TOUTES les lignes population de
@@ -665,27 +669,6 @@ function populationRowHasData(row: PopulationRow, captures: CaptureRow[]): boole
     (!!row.etat && row.etat !== 'repos') ||
     !!row.essaim_en_vol ||
     !!row.essaim_pose
-  );
-}
-
-/**
- * Lignes population qui portent une saisie réelle (cf. `populationRowHasData`
- * ci-dessus) mais où `densite_diffuse` — seule densité restée obligatoire,
- * cf. backend `prospection_schemas.py` #densite-diffuse-obligatoire — manque
- * encore. Utilisé par les écrans de récapitulatif (review.tsx, extensive-
- * recap.tsx) pour bloquer l'enregistrement avec un message ciblé plutôt que
- * laisser la fiche échouer plus tard, silencieusement, sur l'écran
- * Synchronisation (cf. #revalidation-prospection ci-dessus : une grille
- * clonée depuis une fiche périmée peut porter des champs renseignés
- * historiquement sans densité diffuse, l'agent n'a alors aucune raison de la
- * rouvrir puisqu'elle paraît déjà remplie).
- */
-export function trouverPopulationsIncompletes(
-  populations: PopulationRow[],
-  captures: CaptureRow[]
-): PopulationRow[] {
-  return populations.filter(
-    (row) => populationRowHasData(row, captures) && row.densite_diffuse == null
   );
 }
 

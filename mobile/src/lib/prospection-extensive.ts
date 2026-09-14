@@ -292,30 +292,6 @@ export function parseDensite(value: string | null | undefined): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-/**
- * Densité diffuse obligatoire (#densite-diffuse-obligatoire) sur les écrans
- * Imagos/Larves extensif+validation, qui enregistrent toujours LMC et NSE
- * ensemble en un seul « Continuer » (contrairement à l'Intensif, où chaque
- * écran traite une grille espèce/catégorie à la fois). Ne réclame `popDiff`
- * que pour une espèce ayant des captures (`totalCaptures > 0`) — même garde
- * que la cohérence des phases déjà en place dans ces deux écrans : une
- * espèce non observée n'a pas à porter de densité.
- *
- * La densité groupée avait la même contrainte (#densite-groupee-obligatoire,
- * `validerDensiteGroupeeObligatoire`) — retirée sur demande explicite,
- * redevenue facultative comme avant l'introduction de cette règle.
- */
-export function validerDensiteDiffuseObligatoire(
-  speciesData: Record<'LMC' | 'NSE', { totalCaptures: number; popDiff: string }>
-): { valid: true } | { valid: false; espece: 'LMC' | 'NSE' } {
-  for (const espece of ['LMC', 'NSE'] as const) {
-    const data = speciesData[espece];
-    if (data.totalCaptures > 0 && data.popDiff.trim() === '') {
-      return { valid: false, espece };
-    }
-  }
-  return { valid: true };
-}
 
 export function speciesDataToPopulationRow(espece: Espece, data: ExtensiveImagoSpeciesData): PopulationRow {
   return {
