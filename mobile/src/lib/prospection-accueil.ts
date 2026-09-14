@@ -12,11 +12,15 @@ import {
   materialiserProspectionValidee,
   saveProspectionPopulation,
   saveProspectionInfestation,
+  saveProspectionCaptures,
+  saveOperationsAeriennes,
   getProspection,
   DraftProspection,
   TypeProspection,
   PopulationRow,
   InfestationRow,
+  CaptureRow,
+  OperationAerienneRow,
 } from './prospection-repository';
 import { validateProspectionDate } from './prospection-validation';
 import { PreconditionError, ReferentialError } from './errors';
@@ -110,6 +114,22 @@ export async function loadFichesDisponiblesPourTraitement(
 }
 
 /**
+ * « Prospections à revalider » (#revalidation-prospection) — les fiches
+ * validées depuis plus de 5 jours (extensive/validation uniquement) sans
+ * traitement associé : exactement celles qu'exclut
+ * `loadFichesDisponiblesPourTraitement` pour cette raison. Même
+ * raisonnement multi-utilisateurs que « Consulter une fiche validée » —
+ * toujours un appel serveur direct, jamais le cache local seul (repli hors
+ * ligne : `listProspectionsARevaliderLocal`, prospection-repository.ts).
+ */
+export async function loadFichesARevalider(token: string): Promise<ProspectionRead[]> {
+  return apiClient.listProspections(token, {
+    statut: STATUT_VALIDE,
+    a_revalider: true,
+  });
+}
+
+/**
  * Rapatrie en local une fiche choisie dans « Consulter une fiche validée »
  * (#fiches-validees-multi-utilisateurs) — sans quoi `references.tsx`
  * (`getTraitement`/`construireCible`, tous deux en lecture locale) ne
@@ -129,15 +149,75 @@ export async function assurerProspectionDisponibleLocalement(fiche: ProspectionR
     typeProspection: fiche.type_prospection,
     campagneId: fiche.campagne_id,
     prospecteurId: fiche.prospecteur_id,
+    stationId: fiche.station_id ?? null,
     dateProspection: fiche.date_prospection,
+    latitude: fiche.latitude ?? null,
+    longitude: fiche.longitude ?? null,
+    altitude: fiche.altitude ?? null,
+    biotope: fiche.biotope ?? [],
+    surfaceStation: fiche.surface_station ?? null,
+    surfaceProspectee: fiche.surface_prospectee ?? null,
     surfaceInfestee: fiche.surface_infestee ?? null,
+    degatsCultures: fiche.degats_cultures ?? null,
+    dernierePluie: fiche.derniere_pluie ?? null,
+    intensitePluie: fiche.intensite_pluie ?? null,
+    vegetation: fiche.vegetation ?? null,
+    sol: fiche.sol ?? null,
+    verdissement: fiche.verdissement ?? null,
+    hauteurStrate: fiche.hauteur_strate ?? null,
+    ennemisNaturels: fiche.ennemis_naturels ?? null,
+    observations: fiche.observations ?? null,
     nFiche: fiche.n_fiche ?? null,
     nMessage: fiche.n_message ?? null,
+    statut: fiche.statut,
+    verifiedBy: fiche.verified_by ?? null,
+    verifiedAt: fiche.verified_at ?? null,
+    validatedBy: fiche.validated_by ?? null,
+    validatedAt: fiche.validated_at ?? null,
+    revalideDeId: fiche.revalide_de_id ?? null,
     region: fiche.region ?? null,
     district: fiche.district ?? null,
     commune: fiche.commune ?? null,
-    observations: fiche.observations ?? null,
-    statut: fiche.statut,
+    za: fiche.za ?? null,
+    paCode: fiche.pa_code ?? null,
+    degatsCulturesPourcent: fiche.degats_cultures_pourcent ?? null,
+    verdissementPourcent: fiche.verdissement_pourcent ?? null,
+    hauteurHerbeCm: fiche.hauteur_herbe_cm ?? null,
+    heureObservationAt: fiche.heure_observation_at ?? null,
+    stationLibre: fiche.station_libre ?? null,
+    typeStation: fiche.type_station ?? [],
+    verdureStrate: fiche.verdure_strate ?? null,
+    signalementSource: fiche.signalement_source ?? null,
+    signalementDate: fiche.signalement_date ?? null,
+    signalementDescription: fiche.signalement_description ?? null,
+    conclusionValidation: fiche.conclusion_validation ?? null,
+    avertissements: fiche.avertissements ?? [],
+    modeExtensif: fiche.mode_extensif ?? null,
+    societe: fiche.societe ?? null,
+    immatriculeAeronef: fiche.immatricule_aeronef ?? null,
+    pilote: fiche.pilote ?? null,
+    mecanicien: fiche.mecanicien ?? null,
+    chefDeBase: fiche.chef_de_base ?? null,
+    lieuBaseId: fiche.lieu_base_id ?? null,
+    pesticidesEmbarques: fiche.pesticides_embarques ?? null,
+    pesticideNomCommercial: fiche.pesticide_nom_commercial ?? null,
+    pesticideQuantiteDisponible: fiche.pesticide_quantite_disponible ?? null,
+    pesticideQuantiteRecue: fiche.pesticide_quantite_recue ?? null,
+    futsDisponible: fiche.futs_disponible ?? null,
+    futsPleins: fiche.futs_pleins ?? null,
+    futsVides: fiche.futs_vides ?? null,
+    futsRecues: fiche.futs_recues ?? null,
+    signatureVisaNom: fiche.signature_visa_nom ?? null,
+    signatureVisaHorodatage: fiche.signature_visa_horodatage ?? null,
+    signatureConsultantFaoNom: fiche.signature_consultant_fao_nom ?? null,
+    signatureConsultantFaoHorodatage: fiche.signature_consultant_fao_horodatage ?? null,
+    signatureConsultantFaoImage: fiche.signature_consultant_fao_image ?? null,
+    signaturePiloteNom: fiche.signature_pilote_nom ?? null,
+    signaturePiloteHorodatage: fiche.signature_pilote_horodatage ?? null,
+    signaturePiloteImage: fiche.signature_pilote_image ?? null,
+    signatureChefBaseNom: fiche.signature_chef_base_nom ?? null,
+    signatureChefBaseHorodatage: fiche.signature_chef_base_horodatage ?? null,
+    signatureChefBaseImage: fiche.signature_chef_base_image ?? null,
     createdAt: fiche.created_at,
     updatedAt: fiche.updated_at,
   });
@@ -147,6 +227,23 @@ export async function assurerProspectionDisponibleLocalement(fiche: ProspectionR
   }
   for (const infestation of fiche.infestations ?? []) {
     await saveProspectionInfestation(fiche.id, infestation.type_cible, infestation as unknown as InfestationRow);
+  }
+  // Jusqu'ici absents de cette matérialisation (#revalidation-prospection) :
+  // sans eux, une fiche intensive/aérienne créée sur un AUTRE appareil se
+  // matérialiserait sans ses captures ni ses opérations aériennes.
+  const capturesParGroupe = new Map<string, CaptureRow[]>();
+  for (const capture of (fiche.captures ?? []) as unknown as CaptureRow[]) {
+    const cle = `${capture.espece}::${capture.categorie}`;
+    const groupe = capturesParGroupe.get(cle) ?? [];
+    groupe.push(capture);
+    capturesParGroupe.set(cle, groupe);
+  }
+  for (const [cle, rows] of capturesParGroupe) {
+    const [espece, categorie] = cle.split('::');
+    await saveProspectionCaptures(fiche.id, espece, categorie, rows);
+  }
+  if ((fiche.operations_aeriennes ?? []).length > 0) {
+    await saveOperationsAeriennes(fiche.id, fiche.operations_aeriennes as unknown as OperationAerienneRow[]);
   }
 }
 

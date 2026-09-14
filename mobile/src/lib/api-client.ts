@@ -259,6 +259,13 @@ export interface ListProspectionsParams {
    * le même workflow de statut, jamais restreint à un sous-ensemble.
    */
   disponible_pour_traitement?: boolean;
+  /**
+   * N'inclut que les fiches périmées (#revalidation-prospection : extensive/
+   * validation validées depuis plus de 5 jours sans traitement associé) —
+   * exactement celles qu'exclut `disponible_pour_traitement` pour cette
+   * raison. « Prospections à revalider » (revalidation-liste.tsx).
+   */
+  a_revalider?: boolean;
 }
 
 export interface EntityPull<T> {
@@ -1126,6 +1133,13 @@ export const apiClient = {
     if (params.disponible_pour_traitement) {
       query.set(
         'disponible_pour_traitement',
+        'true'
+      );
+    }
+
+    if (params.a_revalider) {
+      query.set(
+        'a_revalider',
         'true'
       );
     }

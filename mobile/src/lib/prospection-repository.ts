@@ -4,6 +4,15 @@ import { logger } from './logger';
 
 const log = logger.child({ module: 'prospection-repository' });
 
+/**
+ * #revalidation-prospection — DOIT rester synchronisé avec
+ * `DELAI_REVALIDATION_JOURS` (backend/app/domain/prospection.py) : c'est le
+ * serveur qui a le dernier mot (calculé côté serveur dans
+ * `disponible_pour_traitement`/`a_revalider`) ; cette copie ne sert qu'au
+ * repli hors ligne local, approximatif par nature.
+ */
+const DELAI_REVALIDATION_JOURS = 5;
+
 export type TypeProspection = 'intensive' | 'extensive' | 'validation';
 
 export interface DraftProspectionInput {
@@ -455,35 +464,281 @@ export interface ProspectionValideeInput {
   typeProspection: string;
   campagneId: string;
   prospecteurId: string;
+  stationId: string | null;
   dateProspection: string;
+  latitude: number | null;
+  longitude: number | null;
+  altitude: number | null;
+  biotope: string[];
+  surfaceStation: number | null;
+  surfaceProspectee: number | null;
   surfaceInfestee: number | null;
+  degatsCultures: string | null;
+  dernierePluie: string | null;
+  intensitePluie: string | null;
+  vegetation: Record<string, unknown> | null;
+  sol: Record<string, unknown> | null;
+  verdissement: number | null;
+  hauteurStrate: number | null;
+  ennemisNaturels: string | null;
+  observations: string | null;
   nFiche: string | null;
   nMessage: string | null;
+  statut: string;
+  verifiedBy: string | null;
+  verifiedAt: string | null;
+  validatedBy: string | null;
+  // #revalidation-prospection : nécessaire ici pour que le repli hors ligne
+  // (listProspectionsARevaliderLocal) sache calculer la péremption sur une
+  // fiche matérialisée depuis un AUTRE agent — sans ça elle resterait
+  // invisible de la liste « à revalider » locale indéfiniment.
+  validatedAt: string | null;
+  revalideDeId: string | null;
   region: string | null;
   district: string | null;
   commune: string | null;
-  observations: string | null;
-  statut: string;
+  za: string | null;
+  paCode: string | null;
+  degatsCulturesPourcent: number | null;
+  verdissementPourcent: number | null;
+  hauteurHerbeCm: number | null;
+  heureObservationAt: string | null;
+  stationLibre: string | null;
+  typeStation: string[];
+  verdureStrate: string | null;
+  signalementSource: string | null;
+  signalementDate: string | null;
+  signalementDescription: string | null;
+  conclusionValidation: string | null;
+  avertissements: string[];
+  modeExtensif: string | null;
+  societe: string | null;
+  immatriculeAeronef: string | null;
+  pilote: string | null;
+  mecanicien: string | null;
+  chefDeBase: string | null;
+  lieuBaseId: string | null;
+  pesticidesEmbarques: boolean | null;
+  pesticideNomCommercial: string | null;
+  pesticideQuantiteDisponible: number | null;
+  pesticideQuantiteRecue: number | null;
+  futsDisponible: number | null;
+  futsPleins: number | null;
+  futsVides: number | null;
+  futsRecues: number | null;
+  signatureVisaNom: string | null;
+  signatureVisaHorodatage: string | null;
+  signatureConsultantFaoNom: string | null;
+  signatureConsultantFaoHorodatage: string | null;
+  signatureConsultantFaoImage: string | null;
+  signaturePiloteNom: string | null;
+  signaturePiloteHorodatage: string | null;
+  signaturePiloteImage: string | null;
+  signatureChefBaseNom: string | null;
+  signatureChefBaseHorodatage: string | null;
+  signatureChefBaseImage: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
+/**
+ * Champs matérialisés : la totalité de ce qu'un écran du wizard extensif
+ * peut lire ou pré-remplir (#revalidation-prospection en a besoin pour
+ * cloner une fiche créée sur un AUTRE appareil, `demarrerRevalidation`
+ * ci-dessous) — pas seulement le sous-ensemble affiché par le picker
+ * `prospection-picker.tsx`, contrairement à l'implémentation d'origine
+ * (#fiches-validees-multi-utilisateurs) qui ne couvrait que celui-ci.
+ */
 export async function materialiserProspectionValidee(input: ProspectionValideeInput): Promise<void> {
   const db = await getDb();
   await db.runAsync(
     `INSERT OR REPLACE INTO prospection (
-      id, type_prospection, campagne_id, prospecteur_id,
-      date_prospection, surface_infestee, n_fiche, n_message,
-      region, district, commune, observations,
-      statut, statut_sync, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?)`,
+      id, type_prospection, campagne_id, prospecteur_id, station_id,
+      date_prospection, latitude, longitude, altitude, biotope,
+      surface_station, surface_prospectee, surface_infestee,
+      degats_cultures, derniere_pluie, intensite_pluie, vegetation, sol,
+      verdissement, hauteur_strate, ennemis_naturels, observations,
+      n_fiche, n_message, statut, statut_sync,
+      verified_by, verified_at, validated_by, validated_at, revalide_de_id,
+      region, district, commune, za, pa_code,
+      degats_cultures_pourcent, verdissement_pourcent, hauteur_herbe_cm,
+      heure_observation_at, station_libre, type_station, verdure_strate,
+      signalement_source, signalement_date, signalement_description,
+      conclusion_validation, avertissements, mode_extensif,
+      societe, immatricule_aeronef, pilote, mecanicien, chef_de_base, lieu_base_id,
+      pesticides_embarques, pesticide_nom_commercial, pesticide_quantite_disponible,
+      pesticide_quantite_recue, futs_disponible, futs_pleins, futs_vides, futs_recues,
+      signature_visa_nom, signature_visa_horodatage,
+      signature_consultant_fao_nom, signature_consultant_fao_horodatage, signature_consultant_fao_image,
+      signature_pilote_nom, signature_pilote_horodatage, signature_pilote_image,
+      signature_chef_base_nom, signature_chef_base_horodatage, signature_chef_base_image,
+      created_at, updated_at
+    ) VALUES (
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced',
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+    )`,
     [
-      input.id, input.typeProspection, input.campagneId, input.prospecteurId,
-      input.dateProspection, input.surfaceInfestee, input.nFiche, input.nMessage,
-      input.region, input.district, input.commune, input.observations,
-      input.statut, input.createdAt, input.updatedAt,
+      input.id,
+      input.typeProspection,
+      input.campagneId,
+      input.prospecteurId,
+      input.stationId,
+      input.dateProspection,
+      input.latitude,
+      input.longitude,
+      input.altitude,
+      JSON.stringify(input.biotope),
+      input.surfaceStation,
+      input.surfaceProspectee,
+      input.surfaceInfestee,
+      input.degatsCultures,
+      input.dernierePluie,
+      input.intensitePluie,
+      input.vegetation != null ? JSON.stringify(input.vegetation) : null,
+      input.sol != null ? JSON.stringify(input.sol) : null,
+      input.verdissement,
+      input.hauteurStrate,
+      input.ennemisNaturels,
+      input.observations,
+      input.nFiche,
+      input.nMessage,
+      input.statut,
+      input.verifiedBy,
+      input.verifiedAt,
+      input.validatedBy,
+      input.validatedAt,
+      input.revalideDeId,
+      input.region,
+      input.district,
+      input.commune,
+      input.za,
+      input.paCode,
+      input.degatsCulturesPourcent,
+      input.verdissementPourcent,
+      input.hauteurHerbeCm,
+      input.heureObservationAt,
+      input.stationLibre,
+      JSON.stringify(input.typeStation),
+      input.verdureStrate,
+      input.signalementSource,
+      input.signalementDate,
+      input.signalementDescription,
+      input.conclusionValidation,
+      JSON.stringify(input.avertissements),
+      input.modeExtensif,
+      input.societe,
+      input.immatriculeAeronef,
+      input.pilote,
+      input.mecanicien,
+      input.chefDeBase,
+      input.lieuBaseId,
+      input.pesticidesEmbarques == null ? null : input.pesticidesEmbarques ? 1 : 0,
+      input.pesticideNomCommercial,
+      input.pesticideQuantiteDisponible,
+      input.pesticideQuantiteRecue,
+      input.futsDisponible,
+      input.futsPleins,
+      input.futsVides,
+      input.futsRecues,
+      input.signatureVisaNom,
+      input.signatureVisaHorodatage,
+      input.signatureConsultantFaoNom,
+      input.signatureConsultantFaoHorodatage,
+      input.signatureConsultantFaoImage,
+      input.signaturePiloteNom,
+      input.signaturePiloteHorodatage,
+      input.signaturePiloteImage,
+      input.signatureChefBaseNom,
+      input.signatureChefBaseHorodatage,
+      input.signatureChefBaseImage,
+      input.createdAt,
+      input.updatedAt,
     ]
   );
+}
+
+/** Colonnes réinitialisées par `demarrerRevalidation` — jamais copiées depuis
+ * la source, toujours fixées à une valeur fraîche pour le nouveau brouillon. */
+const COLONNES_REVALIDATION_NON_CLONEES = new Set([
+  'id',
+  'statut',
+  'statut_sync',
+  'created_at',
+  'updated_at',
+  'revalide_de_id',
+]);
+
+/**
+ * « Prospections à revalider » (#revalidation-prospection) : amorce une
+ * NOUVELLE fiche (nouvel id, `statut='brouillon'`/`statut_sync='local'`,
+ * `revalide_de_id` pointant vers la source), pré-remplie avec TOUTES les
+ * données de la fiche périmée — y compris ses populations/infestations/
+ * captures/opérations aériennes. Contrairement à une mise à jour en place
+ * (que la prospection mobile ne sait pas faire, cf. plan
+ * robust-finding-hartmanis.md), le wizard extensif (`extensive-reference.tsx`
+ * et la suite) n'a besoin d'AUCUNE modification : il ne connaît que
+ * `draftId` et lit/écrit déjà directement en SQLite — un brouillon
+ * pré-rempli par clonage lui est indiscernable d'un brouillon neuf.
+ *
+ * La colonne source est lue générique­ment (`Object.keys`) plutôt
+ * qu'énumérée à la main : reste correct si `DraftProspection` gagne des
+ * champs plus tard, sans readapter cette fonction à chaque fois — au prix
+ * de devoir tenir `COLONNES_REVALIDATION_NON_CLONEES` à jour si une colonne
+ * doit un jour, elle aussi, repartir vierge.
+ *
+ * Précondition : la fiche source doit déjà être locale — appeler
+ * `assurerProspectionDisponibleLocalement` avant si elle vient d'un autre
+ * agent (ex. depuis l'écran « Prospections à revalider »).
+ */
+export async function demarrerRevalidation(sourceProspectionId: string): Promise<{ draftId: string }> {
+  const source = await getProspection(sourceProspectionId);
+  if (!source) {
+    throw new Error(
+      `#revalidation-prospection : fiche ${sourceProspectionId} introuvable localement — ` +
+        'assurerProspectionDisponibleLocalement() doit être appelée avant demarrerRevalidation()'
+    );
+  }
+
+  const db = await getDb();
+  const draftId = generateId();
+  const now = new Date().toISOString();
+
+  const colonnesClonees = Object.keys(source).filter(
+    (cle) => !COLONNES_REVALIDATION_NON_CLONEES.has(cle)
+  );
+  const valeursClonees = colonnesClonees.map(
+    (cle) => (source as unknown as Record<string, string | number | null>)[cle]
+  );
+
+  await db.runAsync(
+    `INSERT INTO prospection (
+      id, statut, statut_sync, created_at, updated_at, revalide_de_id, ${colonnesClonees.join(', ')}
+    ) VALUES (?, 'brouillon', 'local', ?, ?, ?, ${colonnesClonees.map(() => '?').join(', ')})`,
+    [draftId, now, now, sourceProspectionId, ...valeursClonees]
+  );
+
+  for (const population of await listAllProspectionPopulations(sourceProspectionId)) {
+    await saveProspectionPopulation(draftId, population);
+  }
+  for (const infestation of await listAllProspectionInfestations(sourceProspectionId)) {
+    await saveProspectionInfestation(draftId, infestation.type_cible, infestation);
+  }
+  const capturesParGroupe = new Map<string, CaptureRow[]>();
+  for (const capture of await listAllProspectionCaptures(sourceProspectionId)) {
+    const cle = `${capture.espece}::${capture.categorie}`;
+    capturesParGroupe.set(cle, [...(capturesParGroupe.get(cle) ?? []), capture]);
+  }
+  for (const [cle, rows] of capturesParGroupe) {
+    const [espece, categorie] = cle.split('::');
+    await saveProspectionCaptures(draftId, espece, categorie, rows);
+  }
+  const operations = await listOperationsAeriennes(sourceProspectionId);
+  if (operations.length > 0) {
+    await saveOperationsAeriennes(draftId, operations);
+  }
+
+  return { draftId };
 }
 
 export async function updateProspectionReference(id: string, input: ReferenceUpdateInput): Promise<DraftProspection> {
@@ -1226,7 +1481,36 @@ export async function listProspectionsDisponiblesPourTraitementLocal(): Promise<
      WHERE p.statut_sync = 'synced'
        AND p.surface_infestee IS NOT NULL
        AND NOT EXISTS (SELECT 1 FROM traitement t WHERE t.prospection_id = p.id)
+       AND NOT (
+         p.type_prospection IN ('extensive', 'validation')
+         AND p.validated_at IS NOT NULL
+         AND julianday('now') - julianday(p.validated_at) >= ${DELAI_REVALIDATION_JOURS}
+       )
+       AND NOT EXISTS (SELECT 1 FROM prospection enfant WHERE enfant.revalide_de_id = p.id)
      ORDER BY p.updated_at DESC`
+  );
+}
+
+/**
+ * Repli hors-ligne de « Prospections à revalider »
+ * (revalidation-liste.tsx) — même raisonnement que
+ * `listProspectionsDisponiblesPourTraitementLocal` ci-dessus, dont c'est
+ * exactement le complément : les fiches qu'il exclut pour péremption, à
+ * condition qu'elles n'aient ni traitement ni revalidation déjà faite.
+ * `validated_at` doit avoir été rapatrié localement (cf.
+ * `materialiserProspectionValidee`) pour qu'une fiche d'un AUTRE agent
+ * puisse jamais y apparaître.
+ */
+export async function listProspectionsARevaliderLocal(): Promise<DraftProspection[]> {
+  const db = await getDb();
+  return db.getAllAsync<DraftProspection>(
+    `SELECT * FROM prospection p
+     WHERE p.type_prospection IN ('extensive', 'validation')
+       AND p.validated_at IS NOT NULL
+       AND julianday('now') - julianday(p.validated_at) >= ${DELAI_REVALIDATION_JOURS}
+       AND NOT EXISTS (SELECT 1 FROM traitement t WHERE t.prospection_id = p.id)
+       AND NOT EXISTS (SELECT 1 FROM prospection enfant WHERE enfant.revalide_de_id = p.id)
+     ORDER BY p.validated_at ASC`
   );
 }
 
