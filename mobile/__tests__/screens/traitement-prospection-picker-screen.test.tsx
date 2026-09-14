@@ -5,7 +5,7 @@
  * agent (extensive/intensive/signalement), rapatrie en local celle
  * sélectionnée avant de démarrer le traitement.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor, act } from '@testing-library/react-native';
 import TraitementProspectionPickerScreen from '@/app/(traitement)/prospection-picker';
 import { useAuthStore } from '@/lib/auth-store';
 import * as prospectionAccueil from '@/lib/prospection-accueil';
@@ -17,6 +17,7 @@ const mockBack = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, back: mockBack, replace: jest.fn(), canGoBack: () => true }),
+  useFocusEffect: (effect: () => void) => effect(),
 }));
 
 jest.mock('@/lib/prospection-accueil', () => ({
@@ -40,6 +41,23 @@ const FICHE_PROPRE_AGENT = {
   prospecteur_nom: 'Jean Dupont',
   validated_by_nom: 'Marie Admin',
   validated_at: '2026-08-03T00:00:00Z',
+} as any;
+
+/** Fiche de « Vérifier un signalement » (#nouvelle-fiche-validation-immediate) —
+ * validée dès la création (jamais de brouillon/en attente), doit être pickable
+ * au même titre qu'extensive/intensive, sans traitement spécial. */
+const FICHE_VALIDATION_SIGNALEMENT = {
+  id: 'presp-signalement',
+  type_prospection: 'validation',
+  n_fiche: null,
+  n_message: 'MSG-2026-0042',
+  date_prospection: '2026-09-14',
+  region: 'Atsimo-Andrefana',
+  district: 'Toliara II',
+  commune: 'Betsinjaka',
+  prospecteur_nom: 'Jean Dupont',
+  validated_by_nom: 'Marie Admin',
+  validated_at: '2026-09-14T00:00:00Z',
 } as any;
 
 const FICHE_AUTRE_AGENT = {
@@ -87,6 +105,47 @@ describe('TraitementProspectionPickerScreen — visibilité multi-utilisateurs',
     await waitFor(() =>
       expect(prospectionAccueil.loadFichesDisponiblesPourTraitement).toHaveBeenCalledWith('token-1')
     );
+  });
+
+  /** #nouvelle-fiche-validation-immediate : une fiche de type `validation`
+   * (« Vérifier un signalement ») est pickable comme extensive/intensive,
+   * étiquetée « Signalement » — pas de filtrage ni de traitement spécial. */
+  it('affiche une fiche de signalement (type validation) au même titre que les autres', async () => {
+    jest.mocked(prospectionAccueil.loadFichesDisponiblesPourTraitement).mockResolvedValue([
+      FICHE_VALIDATION_SIGNALEMENT,
+    ]);
+
+    await render(<TraitementProspectionPickerScreen />);
+
+    expect(await screen.findByText(/Signalement · MSG-2026-0042/)).toBeVisible();
+  });
+});
+
+/**
+ * #nouvelle-fiche-validation-immediate : une fiche fraîchement créée et
+ * synchronisée (typiquement un signalement vérifié) doit apparaître sans
+ * attendre un redémarrage de l'app — l'écran doit redemander la liste à
+ * chaque prise de focus, pas seulement au montage initial (cf. useFocusEffect,
+ * même mécanisme que (app)/index.tsx, sync.tsx, prospection.tsx, fiches.tsx).
+ */
+describe('TraitementProspectionPickerScreen — rafraîchissement au focus', () => {
+  it('redemande la liste au serveur à chaque reprise de focus de l’écran', async () => {
+    jest.mocked(prospectionAccueil.loadFichesDisponiblesPourTraitement).mockResolvedValue([]);
+
+    const { rerender } = await render(<TraitementProspectionPickerScreen />);
+    expect(await screen.findByText(/Aucune fiche validée disponible/)).toBeVisible();
+
+    // La fiche de signalement vient d'être créée et synchronisée ailleurs dans
+    // l'app pendant que cet écran restait monté plus bas dans la pile — seule
+    // une reprise de focus (pas un remontage) doit suffire à la faire apparaître.
+    jest
+      .mocked(prospectionAccueil.loadFichesDisponiblesPourTraitement)
+      .mockResolvedValue([FICHE_VALIDATION_SIGNALEMENT]);
+    await act(async () => {
+      rerender(<TraitementProspectionPickerScreen />);
+    });
+
+    expect(await screen.findByText(/Signalement · MSG-2026-0042/)).toBeVisible();
   });
 });
 

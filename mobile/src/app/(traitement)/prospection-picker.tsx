@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { ProspectionRead } from '@/lib/api-client';
 import { loadFichesDisponiblesPourTraitement, assurerProspectionDisponibleLocalement } from '@/lib/prospection-accueil';
 import { listProspectionsDisponiblesPourTraitementLocal } from '@/lib/prospection-repository';
@@ -90,9 +90,13 @@ export default function TraitementProspectionPickerScreen() {
     });
   }, [token]);
 
-  useEffect(() => {
-    charger();
-  }, [charger]);
+  // Rafraîchi à chaque prise de focus (pas seulement au montage) : une fiche de
+  // signalement (#nouvelle-fiche-validation-immediate) créée et synchronisée
+  // pendant que cet écran restait monté plus bas dans la pile de navigation
+  // (retour arrière vers lui plutôt qu'un remontage complet) doit apparaître
+  // sans attendre un redémarrage de l'app — même mécanisme que (app)/index.tsx,
+  // sync.tsx, prospection.tsx et fiches.tsx.
+  useFocusEffect(charger);
 
   const choisir = (prospection: FichePickable) =>
     run(

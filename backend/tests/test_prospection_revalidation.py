@@ -119,6 +119,36 @@ async def test_validated_at_stampe_a_la_creation_pour_type_validation(
 
 
 @pytest.mark.asyncio
+async def test_disponible_pour_traitement_inclut_immediatement_une_fiche_validation_fraiche(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+):
+    """#nouvelle-fiche-validation-immediate : une fiche `validation` (« Vérifier
+    un signalement ») vient d'être créée (`validated_at` = maintenant, loin des
+    5 jours de la règle de péremption) — elle doit apparaître tout de suite
+    dans « disponible pour traitement », sans délai ni étape supplémentaire."""
+    resp = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "validation",
+            "campagne_id": str(campagne_id),
+            "date_prospection": "2026-08-01",
+            "n_message": "MSG-002",
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    pid = resp.json()["id"]
+
+    resp = await client.get(
+        "/prospections",
+        params={"statut": "validee", "disponible_pour_traitement": "true"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    assert pid in [p["id"] for p in resp.json()]
+
+
+@pytest.mark.asyncio
 async def test_disponible_pour_traitement_exclut_fiche_extensive_perimee(
     client: AsyncClient,
     db_session: AsyncSession,
