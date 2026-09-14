@@ -244,9 +244,10 @@ async def test_create_prospection_population_densite_diffuse_obligatoire(
     client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
 ):
     """#densite-diffuse-obligatoire : une population sans densité diffuse est
-    rejetée (422) avec le message FR dédié — même mécanisme que
-    _densite_groupee_obligatoire, aucune contrainte DB, tolérance aux anciennes
-    fiches préservée côté lecture (PopulationRead)."""
+    rejetée (422) avec le message FR dédié — validation applicative, aucune
+    contrainte DB, tolérance aux anciennes fiches préservée côté lecture
+    (PopulationRead). `densite_groupee`, elle, n'est plus obligatoire (retiré
+    sur demande explicite) — cf. test_create_prospection_population_densite_groupee_facultative."""
     response = await client.post(
         "/prospections",
         json={
@@ -266,6 +267,34 @@ async def test_create_prospection_population_densite_diffuse_obligatoire(
     )
     assert response.status_code == 422
     assert "La densité diffuse (ind./ha) est obligatoire." in response.text
+
+
+@pytest.mark.asyncio
+async def test_create_prospection_population_densite_groupee_facultative(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+):
+    """#densite-groupee-obligatoire retiré : une population sans densité
+    groupée (densite_diffuse seule renseignée) est acceptée — contrairement à
+    densite_diffuse, toujours obligatoire elle (test ci-dessus)."""
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "extensive",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-08-26",
+            "populations": [
+                {
+                    "espece": "LMC",
+                    "categorie": "imago",
+                    "densite_diffuse": 4.0,
+                }
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["populations"][0]["densite_groupee"] is None
 
 
 @pytest.mark.asyncio

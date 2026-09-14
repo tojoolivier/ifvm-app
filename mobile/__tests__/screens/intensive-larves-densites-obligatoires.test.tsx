@@ -1,6 +1,8 @@
 /**
- * intensive-larves.tsx (C-Larves) : la densité groupée reste obligatoire (héritée
- * de density.tsx) même une fois fusionnée dans le nouvel écran.
+ * intensive-larves.tsx (C-Larves) : la densité diffuse reste obligatoire
+ * (héritée de density.tsx), mais la densité groupée est redevenue
+ * facultative (#densite-groupee-obligatoire retiré, demande explicite) —
+ * elle ne bloque plus la progression, contrairement à avant.
  *
  * Fichier séparé des autres scénarios de cet écran — même précaution que côté
  * intensive-imagos (cf. intensive-imagos-densites-obligatoires.test.tsx) : un
@@ -38,7 +40,7 @@ jest.mock('@/lib/referentiel-db', () => ({ listStadesGrille: jest.fn() }));
  * du temps à se terminer (CI partagée) et empêche Jest de sortir proprement. */
 const settle = () => act(() => jest.advanceTimersByTimeAsync(20));
 
-describe('IntensiveLarvesScreen — densités obligatoires', () => {
+describe('IntensiveLarvesScreen — densités', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => {
     cleanup();
@@ -51,7 +53,21 @@ describe('IntensiveLarvesScreen — densités obligatoires', () => {
     jest.mocked(referentielDb.listStadesGrille).mockImplementation(STADES_PAR_DEFAUT as any);
   });
 
-  it('bloque « Infestation » tant que la densité groupée (obligatoire) manque', async () => {
+  it('bloque « Infestation » tant que la densité diffuse (toujours obligatoire) manque', async () => {
+    useProspectionWizardStore.setState({ draft: draftLmcLarveOnly(), captures: [] });
+    const alertSpy = jest.spyOn(Alert, 'alert');
+
+    await render(<IntensiveLarvesScreen />);
+    await screen.findByText('Densité diffuse (ind./ha) *');
+    await settle();
+
+    fireEvent.press(screen.getByText('Végétation & Sol  ›'));
+
+    expect(alertSpy).toHaveBeenCalledWith('Densité diffuse requise', expect.stringContaining('ind./ha'));
+    expect(prospectionRepository.saveProspectionPopulation).not.toHaveBeenCalled();
+  });
+
+  it("#densite-groupee-obligatoire retiré : n'exige plus la densité groupée pour continuer", async () => {
     useProspectionWizardStore.setState({ draft: draftLmcLarveOnly(), captures: [] });
     const alertSpy = jest.spyOn(Alert, 'alert');
 
@@ -62,8 +78,9 @@ describe('IntensiveLarvesScreen — densités obligatoires', () => {
     fireEvent.changeText(screen.getByTestId('densite-diffuse-input'), '40');
     await settle();
     fireEvent.press(screen.getByText('Végétation & Sol  ›'));
+    await settle();
 
-    expect(alertSpy).toHaveBeenCalledWith('Densité groupée requise', 'La densité groupée (ind./m²) est obligatoire.');
-    expect(prospectionRepository.saveProspectionPopulation).not.toHaveBeenCalled();
+    expect(alertSpy).not.toHaveBeenCalledWith('Densité groupée requise', expect.anything());
+    expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalled();
   });
 });
