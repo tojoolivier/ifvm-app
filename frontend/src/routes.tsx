@@ -7,6 +7,8 @@ import { CampagnesPage } from './pages/CampagnesPage'
 import { ProspectionsPage } from './pages/ProspectionsPage'
 import { TraitementsPage } from './pages/TraitementsPage'
 import { TraitementDetailPage } from './pages/TraitementDetailPage'
+import { FichesVolPage } from './pages/FichesVolPage'
+import { FicheVolDetailPage } from './pages/FicheVolDetailPage'
 import { NouvelleProspectionPage } from './pages/NouvelleProspectionPage'
 import { ProspectionDetailPage } from './pages/ProspectionDetailPage'
 import { SynthesesPage } from './pages/SynthesesPage'
@@ -61,6 +63,19 @@ export const routes: RouteObject[] = [
             path: '/traitements/:id',
             element: <TraitementDetailPage />,
             handle: { crumb: 'Lutte', title: 'Fiche de traitement' },
+          },
+
+          // Suivi des heures de vol (#suivi-heures-de-vol) — cahier des charges
+          // « Formulaire de gestion des heures de vol », ADR-011 §7.
+          {
+            path: '/fiches-vol',
+            element: <FichesVolPage />,
+            handle: { crumb: 'Lutte', title: 'Heures de vol' },
+          },
+          {
+            path: '/fiches-vol/:id',
+            element: <FicheVolDetailPage />,
+            handle: { crumb: 'Lutte', title: 'Fiche de vol' },
           },
 
           // Administration (utilisateurs + stations, écran à onglets)
