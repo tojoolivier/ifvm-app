@@ -101,4 +101,13 @@ describe('Layout (#121)', () => {
     })
     expect(screen.queryByText('Administration')).not.toBeInTheDocument()
   })
+
+  /** #suivi-heures-de-vol : même lectorat que Traitements (aérien). */
+  it('affiche l’entrée de nav "Heures de vol", à côté de Traitements', async () => {
+    renderLayout()
+    await waitFor(() => {
+      const item = screen.getByText('Heures de vol').closest('a')
+      expect(item).toHaveAttribute('href', '/fiches-vol')
+    })
+  })
 })

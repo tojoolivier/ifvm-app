@@ -107,7 +107,13 @@ export function Layout() {
         ]
       : []),
     ...(canTraitements
-      ? [{ to: '/traitements', label: 'Traitements', count: nbTraitements }]
+      ? [
+          { to: '/traitements', label: 'Traitements', count: nbTraitements },
+          // #suivi-heures-de-vol : même lectorat que Traitements (aérien) —
+          // pas de compteur, l'API `/fiches-vol/cumuls` répond en minutes
+          // (dérivées), pas en nombre de fiches à afficher tel quel.
+          { to: '/fiches-vol', label: 'Heures de vol' },
+        ]
       : []),
   ]
 
