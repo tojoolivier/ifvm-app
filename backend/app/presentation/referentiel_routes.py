@@ -6,41 +6,52 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.referentiel_use_cases import (
+    CreateBaseAerienne,
     CreateCodeStade,
     CreateCulture,
     CreateLieuAerien,
     CreatePesticide,
     CreatePosteAcridien,
+    CreateStandRemplissage,
     CreateStation,
+    GetBaseAerienne,
     GetCodeStade,
     GetCulture,
     GetLieuAerien,
     GetPesticide,
     GetPosteAcridien,
+    GetStandRemplissage,
     GetStation,
+    ListBasesAeriennes,
     ListCodesStades,
     ListCommunes,
     ListCultures,
     ListLieuxAeriens,
     ListPesticides,
     ListPostesAcridiens,
+    ListStandsRemplissage,
     ListStations,
     ListZonesAntiAcridiennes,
     PullReferentiel,
     ReferentielSinceCursors,
+    UpdateBaseAerienne,
     UpdateCodeStade,
     UpdateCulture,
     UpdateLieuAerien,
     UpdatePesticide,
     UpdatePosteAcridien,
+    UpdateStandRemplissage,
     UpdateStation,
 )
 from app.auth import get_current_user
 from app.database import get_db
 from app.domain.referentiel import (
+    BaseAerienneParentInvalideError,
     CodeReferentielDejaPrisError,
     CommuneInconnueError,
     GrilleDejaOccupeeError,
+    NumeroBaseAerienneDejaPrisError,
+    NumeroStandRemplissageDejaPrisError,
     PosteAcridienAvecStationsActivesError,
     PosteAcridienInactifError,
     PosteAcridienIntrouvableError,
@@ -56,14 +67,19 @@ from app.infrastructure.referentiel_repository import (
     ZoneAntiAcridienRepositoryImpl,
 )
 from app.infrastructure.referentiel_sync_repository import (
+    BaseAerienneRepositoryImpl,
     CodeStadeRepositoryImpl,
     CultureRepositoryImpl,
     LieuAerienRepositoryImpl,
     PesticideRepositoryImpl,
+    StandRemplissageRepositoryImpl,
     UtilisateurEquipeRepositoryImpl,
 )
 from app.models.users import Utilisateur
 from app.presentation.referentiel_schemas import (
+    BaseAerienneCreate,
+    BaseAerienneRead,
+    BaseAerienneUpdate,
     CodeStadeCreate,
     CodeStadeRead,
     CodeStadeUpdate,
@@ -82,6 +98,9 @@ from app.presentation.referentiel_schemas import (
     PosteAcridienRead,
     PosteAcridienUpdate,
     ReferentielPullResponse,
+    StandRemplissageCreate,
+    StandRemplissageRead,
+    StandRemplissageUpdate,
     StationFixeCreate,
     StationFixeRead,
     StationFixeUpdate,
@@ -580,6 +599,185 @@ async def update_lieu_aerien(
     if lieu is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lieu aérien non trouvé")
     return lieu
+
+
+# --- base_aerienne / stand_remplissage (fiche de vol) -------------------------------
+#
+# Référentiel dédié à la fiche de vol (migration 0064), distinct de lieu_aerien malgré
+# le chevauchement conceptuel — cf. docstring de BaseAerienneModel. Aucune route
+# DELETE, volontairement : la sortie de service passe par `actif=false`.
+
+
+@router.get("/bases-aeriennes", response_model=list[BaseAerienneRead])
+async def list_bases_aeriennes(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+    inclure_inactifs: bool = Query(
+        default=False,
+        description="Renvoie les bases des deux états — écran d'administration.",
+    ),
+):
+    use_case = ListBasesAeriennes(BaseAerienneRepositoryImpl(db))
+    return await use_case.execute(actif=None if inclure_inactifs else True)
+
+
+@router.post("/bases-aeriennes", response_model=BaseAerienneRead, status_code=201)
+async def create_base_aerienne(
+    body: BaseAerienneCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = CreateBaseAerienne(BaseAerienneRepositoryImpl(db))
+    try:
+        return await use_case.execute(
+            numero=body.numero,
+            localite=body.localite,
+            parent_base_id=body.parent_base_id,
+            longitude=body.longitude,
+            latitude=body.latitude,
+            altitude=body.altitude,
+        )
+    except BaseAerienneParentInvalideError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"parent_base_id invalide : {exc.args[0]}",
+        ) from exc
+    except NumeroBaseAerienneDejaPrisError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"numero déjà pris : {exc.args[0]}",
+        ) from exc
+
+
+@router.get("/bases-aeriennes/{base_id}", response_model=BaseAerienneRead)
+async def get_base_aerienne(
+    base_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = GetBaseAerienne(BaseAerienneRepositoryImpl(db))
+    base = await use_case.execute(base_id)
+    if base is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Base aérienne non trouvée"
+        )
+    return base
+
+
+@router.put("/bases-aeriennes/{base_id}", response_model=BaseAerienneRead)
+async def update_base_aerienne(
+    base_id: uuid.UUID,
+    body: BaseAerienneUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = UpdateBaseAerienne(BaseAerienneRepositoryImpl(db))
+    try:
+        base = await use_case.execute(
+            base_id=base_id,
+            numero=body.numero,
+            localite=body.localite,
+            parent_base_id=body.parent_base_id,
+            longitude=body.longitude,
+            latitude=body.latitude,
+            altitude=body.altitude,
+            actif=body.actif,
+            # Coordonnées et parent_base_id nullables : seul le corps reçu distingue
+            # « absent » de « mis à NULL ».
+            champs_fournis=body.model_fields_set,
+        )
+    except BaseAerienneParentInvalideError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"parent_base_id invalide : {exc.args[0]}",
+        ) from exc
+    except NumeroBaseAerienneDejaPrisError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"numero déjà pris : {exc.args[0]}",
+        ) from exc
+    if base is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Base aérienne non trouvée"
+        )
+    return base
+
+
+@router.get("/stands-remplissage", response_model=list[StandRemplissageRead])
+async def list_stands_remplissage(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+    inclure_inactifs: bool = Query(
+        default=False,
+        description="Renvoie les stands des deux états — écran d'administration.",
+    ),
+):
+    use_case = ListStandsRemplissage(StandRemplissageRepositoryImpl(db))
+    return await use_case.execute(actif=None if inclure_inactifs else True)
+
+
+@router.post("/stands-remplissage", response_model=StandRemplissageRead, status_code=201)
+async def create_stand_remplissage(
+    body: StandRemplissageCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = CreateStandRemplissage(StandRemplissageRepositoryImpl(db))
+    try:
+        return await use_case.execute(
+            numero=body.numero,
+            localite=body.localite,
+            longitude=body.longitude,
+            latitude=body.latitude,
+            altitude=body.altitude,
+        )
+    except NumeroStandRemplissageDejaPrisError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"numero déjà pris : {exc.args[0]}",
+        ) from exc
+
+
+@router.get("/stands-remplissage/{stand_id}", response_model=StandRemplissageRead)
+async def get_stand_remplissage(
+    stand_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = GetStandRemplissage(StandRemplissageRepositoryImpl(db))
+    stand = await use_case.execute(stand_id)
+    if stand is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stand non trouvé")
+    return stand
+
+
+@router.put("/stands-remplissage/{stand_id}", response_model=StandRemplissageRead)
+async def update_stand_remplissage(
+    stand_id: uuid.UUID,
+    body: StandRemplissageUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = UpdateStandRemplissage(StandRemplissageRepositoryImpl(db))
+    try:
+        stand = await use_case.execute(
+            stand_id=stand_id,
+            numero=body.numero,
+            localite=body.localite,
+            longitude=body.longitude,
+            latitude=body.latitude,
+            altitude=body.altitude,
+            actif=body.actif,
+            champs_fournis=body.model_fields_set,
+        )
+    except NumeroStandRemplissageDejaPrisError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"numero déjà pris : {exc.args[0]}",
+        ) from exc
+    if stand is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stand non trouvé")
+    return stand
 
 
 # --- pesticide -------------------------------------------------------------------

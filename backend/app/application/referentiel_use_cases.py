@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from app.domain.campagne import Campagne
 from app.domain.referentiel import (
     TYPES_LIEU_AERIEN,
+    BaseAerienne,
+    BaseAerienneParentInvalideError,
     CodeReferentielDejaPrisError,
     CodeStade,
     Commune,
@@ -18,6 +20,7 @@ from app.domain.referentiel import (
     PosteAcridienInactifError,
     PosteAcridienIntrouvableError,
     StadeInconnuError,
+    StandRemplissage,
     StationFixe,
     TypeLieuAerienInvalideError,
     UtilisateurEquipe,
@@ -25,6 +28,7 @@ from app.domain.referentiel import (
     ZoneAntiAcridienIntrouvableError,
 )
 from app.domain.repositories import (
+    BaseAerienneRepository,
     CampagneRepository,
     CodeStadeRepository,
     CommuneRepository,
@@ -32,6 +36,7 @@ from app.domain.repositories import (
     LieuAerienRepository,
     PesticideRepository,
     PosteAcridienRepository,
+    StandRemplissageRepository,
     StationFixeRepository,
     UtilisateurEquipeRepository,
     ZoneAntiAcridienRepository,
@@ -574,6 +579,194 @@ class UpdateLieuAerien:
         # Sans `updated_at` rehaussé, un futur pull incrémental sauterait la modification.
         lieu.updated_at = datetime.now(timezone.utc)
         return await self.repository.update(lieu)
+
+
+class ListBasesAeriennes:
+    def __init__(self, repository: BaseAerienneRepository):
+        self.repository = repository
+
+    async def execute(self, actif: bool | None = True) -> list[BaseAerienne]:
+        return await self.repository.list_all(actif=actif)
+
+
+class GetBaseAerienne:
+    def __init__(self, repository: BaseAerienneRepository):
+        self.repository = repository
+
+    async def execute(self, base_id: uuid.UUID) -> BaseAerienne | None:
+        return await self.repository.get_by_id(base_id)
+
+
+async def _valider_parent_base(
+    repository: BaseAerienneRepository, parent_base_id: uuid.UUID | None
+) -> None:
+    """La hiérarchie s'arrête à 2 niveaux : le parent référencé doit exister et être
+    lui-même une principale (pas de secondaire d'une secondaire)."""
+    if parent_base_id is None:
+        return
+    parent = await repository.get_by_id(parent_base_id)
+    if parent is None or parent.parent_base_id is not None:
+        raise BaseAerienneParentInvalideError(str(parent_base_id))
+
+
+class CreateBaseAerienne:
+    def __init__(self, repository: BaseAerienneRepository):
+        self.repository = repository
+
+    async def execute(
+        self,
+        numero: str,
+        localite: str,
+        parent_base_id: uuid.UUID | None = None,
+        longitude: float | None = None,
+        latitude: float | None = None,
+        altitude: float | None = None,
+    ) -> BaseAerienne:
+        await _valider_parent_base(self.repository, parent_base_id)
+
+        maintenant = datetime.now(timezone.utc)
+        return await self.repository.create(
+            BaseAerienne(
+                parent_base_id=parent_base_id,
+                numero=numero,
+                localite=localite,
+                longitude=longitude,
+                latitude=latitude,
+                altitude=altitude,
+                actif=True,
+                created_at=maintenant,
+                updated_at=maintenant,
+            )
+        )
+
+
+class UpdateBaseAerienne:
+    """Mise à jour partielle, `actif` compris. Pas de suppression : `actif=False` est
+    la seule sortie."""
+
+    def __init__(self, repository: BaseAerienneRepository):
+        self.repository = repository
+
+    async def execute(
+        self,
+        base_id: uuid.UUID,
+        numero: str | None = None,
+        localite: str | None = None,
+        parent_base_id: uuid.UUID | None = None,
+        longitude: float | None = None,
+        latitude: float | None = None,
+        altitude: float | None = None,
+        actif: bool | None = None,
+        champs_fournis: set[str] = frozenset(),
+    ) -> BaseAerienne | None:
+        base = await self.repository.get_by_id(base_id)
+        if base is None:
+            return None
+
+        if "parent_base_id" in champs_fournis:
+            if parent_base_id == base_id:
+                raise BaseAerienneParentInvalideError("une base ne peut pas être son propre parent")
+            await _valider_parent_base(self.repository, parent_base_id)
+            base.parent_base_id = parent_base_id
+        if numero is not None:
+            base.numero = numero
+        if localite is not None:
+            base.localite = localite
+        # Coordonnées nullables : seul le corps reçu distingue « absent » de « mis à
+        # NULL » — `champs_fournis` vient de `model_fields_set` côté schéma Pydantic.
+        if "longitude" in champs_fournis:
+            base.longitude = longitude
+        if "latitude" in champs_fournis:
+            base.latitude = latitude
+        if "altitude" in champs_fournis:
+            base.altitude = altitude
+        if actif is not None:
+            base.actif = actif
+
+        base.updated_at = datetime.now(timezone.utc)
+        return await self.repository.update(base)
+
+
+class ListStandsRemplissage:
+    def __init__(self, repository: StandRemplissageRepository):
+        self.repository = repository
+
+    async def execute(self, actif: bool | None = True) -> list[StandRemplissage]:
+        return await self.repository.list_all(actif=actif)
+
+
+class GetStandRemplissage:
+    def __init__(self, repository: StandRemplissageRepository):
+        self.repository = repository
+
+    async def execute(self, stand_id: uuid.UUID) -> StandRemplissage | None:
+        return await self.repository.get_by_id(stand_id)
+
+
+class CreateStandRemplissage:
+    def __init__(self, repository: StandRemplissageRepository):
+        self.repository = repository
+
+    async def execute(
+        self,
+        numero: str,
+        localite: str,
+        longitude: float | None = None,
+        latitude: float | None = None,
+        altitude: float | None = None,
+    ) -> StandRemplissage:
+        maintenant = datetime.now(timezone.utc)
+        return await self.repository.create(
+            StandRemplissage(
+                numero=numero,
+                localite=localite,
+                longitude=longitude,
+                latitude=latitude,
+                altitude=altitude,
+                actif=True,
+                created_at=maintenant,
+                updated_at=maintenant,
+            )
+        )
+
+
+class UpdateStandRemplissage:
+    """Mise à jour partielle, `actif` compris. Pas de suppression : `actif=False` est
+    la seule sortie."""
+
+    def __init__(self, repository: StandRemplissageRepository):
+        self.repository = repository
+
+    async def execute(
+        self,
+        stand_id: uuid.UUID,
+        numero: str | None = None,
+        localite: str | None = None,
+        longitude: float | None = None,
+        latitude: float | None = None,
+        altitude: float | None = None,
+        actif: bool | None = None,
+        champs_fournis: set[str] = frozenset(),
+    ) -> StandRemplissage | None:
+        stand = await self.repository.get_by_id(stand_id)
+        if stand is None:
+            return None
+
+        if numero is not None:
+            stand.numero = numero
+        if localite is not None:
+            stand.localite = localite
+        if "longitude" in champs_fournis:
+            stand.longitude = longitude
+        if "latitude" in champs_fournis:
+            stand.latitude = latitude
+        if "altitude" in champs_fournis:
+            stand.altitude = altitude
+        if actif is not None:
+            stand.actif = actif
+
+        stand.updated_at = datetime.now(timezone.utc)
+        return await self.repository.update(stand)
 
 
 class ListPesticides:

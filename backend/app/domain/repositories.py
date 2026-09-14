@@ -6,12 +6,14 @@ from typing import Any
 from app.domain.campagne import Campagne
 from app.domain.prospection import AuditLog, Prospection
 from app.domain.referentiel import (
+    BaseAerienne,
     CodeStade,
     Commune,
     Culture,
     LieuAerien,
     Pesticide,
     PosteAcridien,
+    StandRemplissage,
     StationFixe,
     UtilisateurEquipe,
     ZoneAntiAcridien,
@@ -404,6 +406,54 @@ class LieuAerienRepository(ABC):
 
     @abstractmethod
     async def update(self, lieu: LieuAerien) -> LieuAerien:
+        pass
+
+
+class BaseAerienneRepository(ABC):
+    """Aucune méthode de suppression : la sortie du référentiel est `actif=false`."""
+
+    @abstractmethod
+    async def list_since(self, since: datetime | None) -> list[BaseAerienne]:
+        pass
+
+    @abstractmethod
+    async def list_all(self, actif: bool | None = True) -> list[BaseAerienne]:
+        pass
+
+    @abstractmethod
+    async def get_by_id(self, base_id: uuid.UUID) -> BaseAerienne | None:
+        pass
+
+    @abstractmethod
+    async def create(self, base: BaseAerienne) -> BaseAerienne:
+        pass
+
+    @abstractmethod
+    async def update(self, base: BaseAerienne) -> BaseAerienne:
+        pass
+
+
+class StandRemplissageRepository(ABC):
+    """Aucune méthode de suppression : la sortie du référentiel est `actif=false`."""
+
+    @abstractmethod
+    async def list_since(self, since: datetime | None) -> list[StandRemplissage]:
+        pass
+
+    @abstractmethod
+    async def list_all(self, actif: bool | None = True) -> list[StandRemplissage]:
+        pass
+
+    @abstractmethod
+    async def get_by_id(self, stand_id: uuid.UUID) -> StandRemplissage | None:
+        pass
+
+    @abstractmethod
+    async def create(self, stand: StandRemplissage) -> StandRemplissage:
+        pass
+
+    @abstractmethod
+    async def update(self, stand: StandRemplissage) -> StandRemplissage:
         pass
 
 
