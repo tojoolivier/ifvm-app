@@ -18,6 +18,8 @@ from app.application.fiche_vol_use_cases import (
 from app.auth import get_current_user
 from app.database import get_db
 from app.domain.fiche_vol import (
+    BaseVolIntrouvableError,
+    CampagneVolIntrouvableError,
     ChefDeBaseVolInvalideError,
     FicheVol,
     FicheVolIntrouvableError,
@@ -30,6 +32,7 @@ from app.domain.fiche_vol import (
     RotationVolIntrouvableError,
     SignaturesVolManquantesError,
     SignatureVol,
+    StandVolIntrouvableError,
     Vol,
     VolRattachementInvalideError,
 )
@@ -82,7 +85,13 @@ async def creer_fiche_vol(
         ) from exc
     except RotationDejaRapprocheeError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
-    except (RotationVolIntrouvableError, ProspectionVolIntrouvableError) as exc:
+    except (
+        RotationVolIntrouvableError,
+        ProspectionVolIntrouvableError,
+        BaseVolIntrouvableError,
+        StandVolIntrouvableError,
+        CampagneVolIntrouvableError,
+    ) as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
     except NumeroFicheVolConflitError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
