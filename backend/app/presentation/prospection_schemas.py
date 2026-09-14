@@ -318,21 +318,19 @@ class PopulationCreate(BaseModel):
     essaim_en_vol: bool | None = None
     essaim_pose: bool | None = None
 
-    @model_validator(mode="after")
-    def _densite_groupee_obligatoire(self) -> "PopulationCreate":
-        # #densite-groupee-obligatoire : sur les 4 types de fiche. `densite_diffuse`
-        # reste typé Optional (comme avant) pour laisser passer la validation Pydantic
-        # de champ puis produire ici le message FR dédié, plutôt que le "Field
-        # required" générique qu'un `Field(...)` obligatoire aurait renvoyé.
-        if self.densite_groupee is None:
-            raise ValueError("La densité groupée (ind./m²) est obligatoire.")
-        return self
+    # #densite-groupee-obligatoire : retiré — `densite_groupee` redevient
+    # facultative (demande explicite), comme elle l'était avant l'introduction
+    # de ce validateur. Laissée sans contrainte applicative, à l'image de
+    # `PopulationRead` qui ne l'a jamais imposée non plus (tolérance aux
+    # fiches historiques).
 
     @model_validator(mode="after")
     def _densite_diffuse_obligatoire(self) -> "PopulationCreate":
-        # #densite-diffuse-obligatoire : même mécanisme que _densite_groupee_obligatoire
-        # ci-dessus (validation applicative, aucune contrainte DB — tolérance aux
-        # fiches historiques préservée via PopulationRead, non contraint).
+        # #densite-diffuse-obligatoire : validation applicative, aucune
+        # contrainte DB (tolérance aux fiches historiques préservée via
+        # PopulationRead, non contraint). `densite_groupee`, elle, n'est plus
+        # obligatoire (cf. commentaire ci-dessus) — ne pas rétablir la même
+        # règle dessus sans nouvelle demande explicite.
         if self.densite_diffuse is None:
             raise ValueError("La densité diffuse (ind./ha) est obligatoire.")
         return self

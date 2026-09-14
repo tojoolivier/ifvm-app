@@ -89,7 +89,6 @@ export default function IntensiveImagosScreen() {
   const [populationsLoaded, setPopulationsLoaded] = useState(false);
   const [totalCapturesInput, setTotalCapturesInput] = useState('');
   const [showDensiteDiffuseError, setShowDensiteDiffuseError] = useState(false);
-  const [showDensiteGroupeeError, setShowDensiteGroupeeError] = useState(false);
 
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('intensive-imagos');
@@ -211,7 +210,6 @@ export default function IntensiveImagosScreen() {
     const existingTotal = totalStadesF + totalStadesM;
     setTotalCapturesInput(existingTotal > 0 ? String(existingTotal) : '');
     setShowDensiteDiffuseError(false);
-    setShowDensiteGroupeeError(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentGrilleIndex, vocabulairePret]);
 
@@ -268,11 +266,8 @@ export default function IntensiveImagosScreen() {
       Alert.alert('Densité diffuse requise', 'Veuillez renseigner la densité diffuse (ind./ha).');
       return false;
     }
-    if (population.densite_groupee == null) {
-      setShowDensiteGroupeeError(true);
-      Alert.alert('Densité groupée requise', 'La densité groupée (ind./m²) est obligatoire.');
-      return false;
-    }
+    // Densité groupée : redevenue facultative (demande explicite) — plus de
+    // blocage ici, cf. backend prospection_schemas.py (#densite-groupee-obligatoire).
 
     if (totalCaptures > 0) {
       if (!isPhasesConsistent) {
@@ -606,8 +601,8 @@ export default function IntensiveImagosScreen() {
                   style={styles.fieldInput}
                 />
               </View>
-              <View style={[styles.field, showDensiteGroupeeError && population.densite_groupee == null && styles.fieldError]}>
-                <Text style={[styles.fieldLabel, styles.requiredLabel]}>Densité groupée (ind./m²) *</Text>
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Densité groupée (ind./m²)</Text>
                 <TextInput
                   testID="densite-groupee-input"
                   value={population.densite_groupee != null ? String(population.densite_groupee) : ''}
@@ -619,9 +614,6 @@ export default function IntensiveImagosScreen() {
             </View>
             {showDensiteDiffuseError && population.densite_diffuse == null && (
               <Text style={styles.errorText}>Veuillez renseigner la densité diffuse (ind./ha).</Text>
-            )}
-            {showDensiteGroupeeError && population.densite_groupee == null && (
-              <Text style={styles.errorText}>La densité groupée (ind./m²) est obligatoire.</Text>
             )}
 
             <Text style={styles.sectionLabel}>Méthode</Text>

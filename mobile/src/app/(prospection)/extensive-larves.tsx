@@ -11,7 +11,6 @@ import {
   createEmptyLarveSpeciesData,
   larveSpeciesDataToPopulationRow,
   populationRowToLarveSpeciesData,
-  validerDensiteGroupeeObligatoire,
   validerDensiteDiffuseObligatoire,
 } from '@/lib/prospection-extensive';
 import { useAsyncAction } from '@/hooks/use-async-action';
@@ -30,7 +29,6 @@ export default function ExtensiveLarvesScreen() {
   const { draftId } = useLocalSearchParams<{ draftId: string }>();
 
   const [species, setSpecies] = useState<Espece>('LMC');
-  const [showPopGroupError, setShowPopGroupError] = useState(false);
   const [showPopDiffError, setShowPopDiffError] = useState(false);
 
   const [speciesData, setSpeciesData] = useState<Record<Espece, ExtensiveLarveSpeciesData>>({
@@ -147,15 +145,8 @@ export default function ExtensiveLarvesScreen() {
       return;
     }
 
-    // #densite-groupee-obligatoire : vérifie LMC ET NSE, pas seulement l'onglet
-    // actuellement affiché — « Continuer » enregistre toujours les deux espèces.
-    const densiteGroupeeCheck = validerDensiteGroupeeObligatoire(speciesData);
-    if (!densiteGroupeeCheck.valid) {
-      setSpecies(densiteGroupeeCheck.espece);
-      setShowPopGroupError(true);
-      Alert.alert('Densité groupée requise', 'La densité groupée (ind./m²) est obligatoire.');
-      return;
-    }
+    // Densité groupée : redevenue facultative (demande explicite) — plus de
+    // blocage ici, cf. backend prospection_schemas.py (#densite-groupee-obligatoire).
 
     return run(
       async () => {
@@ -352,14 +343,11 @@ export default function ExtensiveLarvesScreen() {
                     placeholderTextColor={TEXT_SECONDARY}
                   />
                 </View>
-                <View style={[styles.card, styles.flex1, showPopGroupError && data.popGroup.trim() === '' && styles.cardError]}>
-                  <Text style={[styles.label, styles.requiredLabel]}>Population groupée ind./m² *</Text>
+                <View style={[styles.card, styles.flex1]}>
+                  <Text style={styles.label}>Population groupée ind./m²</Text>
                   <TextInput
                     value={data.popGroup}
-                    onChangeText={(text) => {
-                      updateSpeciesData({ popGroup: text });
-                      if (text.trim() !== '') setShowPopGroupError(false);
-                    }}
+                    onChangeText={(text) => updateSpeciesData({ popGroup: text })}
                     keyboardType="decimal-pad"
                     style={styles.inputMono}
                     placeholder="0"
@@ -369,9 +357,6 @@ export default function ExtensiveLarvesScreen() {
               </View>
               {showPopDiffError && data.popDiff.trim() === '' && (
                 <Text style={styles.errorText}>La densité diffuse (ind./ha) est obligatoire.</Text>
-              )}
-              {showPopGroupError && data.popGroup.trim() === '' && (
-                <Text style={styles.errorText}>La densité groupée (ind./m²) est obligatoire.</Text>
               )}
               <Text style={styles.speciesHint}>Données spécifiques à {species}</Text>
             </View>
