@@ -119,7 +119,7 @@ describe('TraitementsPage — colonnes maquette (README §7)', () => {
     expect(screen.getByText('3/5').className).toMatch(/ifvm-amber-text/)
   })
 
-  it('affiche les neuf colonnes de la maquette, sans colonne Statut', async () => {
+  it('affiche les dix colonnes de la maquette + Localité, sans colonne Statut', async () => {
     mockedGet.mockResolvedValue({ data: [traitementAerien()] })
     renderPage()
 
@@ -127,6 +127,7 @@ describe('TraitementsPage — colonnes maquette (README §7)', () => {
     const entetes = screen.getAllByRole('columnheader').map((th) => th.textContent)
     expect(entetes).toEqual([
       'N° de fiche',
+      'Localité',
       'Type',
       'Mode',
       'Date',
@@ -136,6 +137,20 @@ describe('TraitementsPage — colonnes maquette (README §7)', () => {
       'Signatures',
       '',
     ])
+  })
+
+  /**
+   * La localité vient de la fiche de prospection liée (station_nom/station_libre,
+   * pré-remplie à la création du traitement) : elle doit apparaître juste à côté
+   * du N° de fiche dans la liste, comme déjà fait sur « Mes fiches » côté mobile.
+   */
+  it('affiche la localité de la fiche de prospection liée, à côté du N° de fiche', async () => {
+    mockedGet.mockResolvedValue({ data: [traitementAerien(), traitementTerrestreAvecRestante()] })
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    expect(screen.getByText('Beroroha')).toBeInTheDocument()
+    expect(screen.getByText('Ihosy')).toBeInTheDocument()
   })
 
   it("n'affiche pas la surface restante en ambre quand elle est nulle", async () => {

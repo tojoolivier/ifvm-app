@@ -162,9 +162,12 @@ Existant : `ValidationFinalePage.tsx` — **non routée**, voir anomalie 1.
 Deux onglets (`padding 9px 16px`, rayon `9px`, `700 12px`) : liste / détail. Mention à droite :
 « Chaque fiche est rattachée à une prospection validée ».
 
-**Liste** — tableau : n° de fiche (mono `#235a36`), type (badge Aérien / Terrestre), mode, date
-(mono), responsable, traitée (ha), restante (mono, ambre `#8a6d2f` si > 0), signatures (`3/4`),
-« Ouvrir › ». Ligne cliquable, `border-top: 1px solid #f4efe2`.
+**Liste** — tableau : n° de fiche (mono `#235a36`), **localité** (texte gris, juste après le n° de
+fiche — vient de la fiche de prospection liée, `Traitement.localite`, pré-remplie depuis
+`station_nom`/`station_libre` à la création côté mobile ; ajoutée après la maquette initiale, à la
+demande explicite du produit), type (badge Aérien / Terrestre), mode, date (mono), responsable,
+traitée (ha), restante (mono, ambre `#8a6d2f` si > 0), signatures (`3/4`), « Ouvrir › ». Ligne
+cliquable, `border-top: 1px solid #f4efe2`.
 
 **Détail (lecture seule après validation)** — grille `1fr 320px` :
 - En-tête vert : `Jean-AERIEN-2026-08-12`, sous-titre « Aérien · mode Barrière · Beroroha ·

@@ -94,6 +94,14 @@ export function TraitementsPage() {
         </span>
       ),
     },
+    {
+      // La localité vient de la fiche de prospection liée (station_nom/station_libre,
+      // pré-remplie à la création du traitement, cf. references.tsx côté mobile) —
+      // affichée ici juste à côté du N° de fiche, comme déjà fait sur "Mes fiches" côté mobile.
+      key: 'localite',
+      header: 'Localité',
+      render: (t) => <span className="text-ifvm-text-tertiary">{t.localite || '—'}</span>,
+    },
     { key: 'type', header: 'Type', render: (t) => <TypeBadge type={t.type_traitement} /> },
     {
       key: 'mode',
