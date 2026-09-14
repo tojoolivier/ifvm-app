@@ -35,19 +35,20 @@ interface Prospection {
 /**
  * Pastilles « Type » de la maquette (prototype, ligne 1337) — étendues à
  * `validation` (« Vérifier un signalement », déjà un `type_prospection`
- * réel côté backend) et `revalidation`, qui n'en est PAS un : c'est une
- * relation (`revalide_de_id` non nul, cf. #revalidation-prospection), pas
- * une valeur de `type_prospection` — la fiche reste extensive/validation en
- * base. Traitée ici comme un 5e type dérivé (cf. `ficheType` ci-dessous)
- * car c'est l'information la plus utile à l'agent qui parcourt la liste :
- * une fiche revalidée mérite d'être reconnue au premier coup d'œil, plus
- * que son type d'origine.
+ * réel côté backend — gardé sous son nom de type, « Validation », demande
+ * explicite : pas de relibellé en « Signalement ») et `revalidation`, qui
+ * n'en est PAS un : c'est une relation (`revalide_de_id` non nul, cf.
+ * #revalidation-prospection), pas une valeur de `type_prospection` — la
+ * fiche reste extensive/validation en base. Traitée ici comme un 5e type
+ * dérivé (cf. `ficheType` ci-dessous) car c'est l'information la plus utile
+ * à l'agent qui parcourt la liste : une fiche revalidée mérite d'être
+ * reconnue au premier coup d'œil, plus que son type d'origine.
  */
 const TYPES = ['intensive', 'extensive', 'validation', 'revalidation'] as const
 const TYPE_LABELS: Record<string, string> = {
   intensive: 'Intensive',
   extensive: 'Extensive',
-  validation: 'Signalement',
+  validation: 'Validation',
   revalidation: 'Revalidation',
 }
 
