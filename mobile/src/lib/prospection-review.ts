@@ -23,9 +23,9 @@ import {
   normalizeBoolean,
 } from './prospection-repository';
 import { PHENOTYPES, TYPE_CIBLE_OPTIONS, formatHeureLocale } from './prospection-fiche-lecture';
-import { parseSelectionMultiple } from './prospection-extensive';
+import { parseSelectionMultiple, typeCibleImagoLabel } from './prospection-extensive';
 import { CaptureCounts, dominantPhenotype, rowsToCounts, totalBySexe, totalCaptures } from './prospection-capture-store';
-import { CHRONO_MAX_SECONDS, capturesMaxFor, phenotypesFor } from './prospection-especes-stades';
+import { CHRONO_MAX_SECONDS, capturesMaxFor, phasesFor, phenotypesFor } from './prospection-especes-stades';
 import { buildGrilles, parseEspeceSelection } from './prospection-especes';
 import { getDb } from './prospection-db';
 import { pullReferentiel } from './referentiel-sync';
@@ -74,6 +74,141 @@ export interface InfestationDetailViewModel {
   densiteGroupee: number | null;
 }
 
+export interface DetailRowViewModel {
+  label: string;
+  value: string;
+}
+
+/** Une espèce (LMC/NSE) avec au moins une donnée renseignée pour B-Imagos/C-Larves —
+ * même principe de masquage que `imagoRowHasData`/`larveRowHasData` côté Extensif
+ * (extensive-recap.tsx) : une combinaison jamais ouverte n'affiche aucun bloc. */
+export interface SpeciesDetailGroupViewModel {
+  espece: 'LMC' | 'NSE';
+  label: string;
+  rows: DetailRowViewModel[];
+}
+
+const PHASE_LABEL: Record<string, string> = {
+  solitaire: 'Solitaire',
+  solitaro_trans: 'Solitaro-Transiens',
+  transiens: 'Transiens',
+  gregaire: 'Grégaire',
+};
+
+function phasesBreakdownLabel(rows: CaptureRow[], phasesList: string[]): string {
+  const totals: Record<string, number> = {};
+  for (const phase of phasesList) totals[phase] = 0;
+  for (const row of rows) {
+    if (row.phase && Object.prototype.hasOwnProperty.call(totals, row.phase)) {
+      totals[row.phase] += row.effectif;
+    }
+  }
+  return phasesList.map((p) => `${PHASE_LABEL[p] ?? p} ${totals[p]}`).join(' · ');
+}
+
+function stadesBreakdownLabel(rows: CaptureRow[]): string {
+  const totals: Record<string, number> = {};
+  for (const row of rows) totals[row.stade] = (totals[row.stade] ?? 0) + row.effectif;
+  const nonZero = Object.entries(totals).filter(([, v]) => v > 0);
+  return nonZero.length > 0 ? nonZero.map(([stade, v]) => `${stade} ${v}`).join(' · ') : '—';
+}
+
+/**
+ * Détail complet B-Imagos, une espèce à la fois — même esprit que
+ * `buildImagoRows` côté Extensif (extensive-recap.tsx) : chaque champ saisi est
+ * affiché explicitement, jamais masqué silencieusement (« — » si absent). Le
+ * nombre de captures et la répartition Phases/Stades viennent de la table
+ * `prospection_capture` (comme `buildReviewGroups`/`buildInfestationDetail`),
+ * jamais de `PopulationRow.captures_*` (colonnes scalaires propres à l'Extensif,
+ * jamais renseignées côté Intensif — cf. #stades-imago-persistance).
+ */
+function buildImagoDetailRows(espece: 'LMC' | 'NSE', captures: CaptureRow[], population: PopulationRow | null): DetailRowViewModel[] {
+  const captureRows = captures.filter((c) => c.espece === espece && c.categorie === 'imago');
+  const counts = rowsToCounts(captureRows);
+  const phasesList = phasesFor(espece, 'imago');
+  const typeCible = parseSelectionMultiple(population?.type_cible ?? null);
+  return [
+    { label: 'Nombre de captures', value: String(totalCaptures(counts)) },
+    { label: 'Phases', value: phasesBreakdownLabel(captureRows, phasesList) },
+    { label: 'Stades', value: stadesBreakdownLabel(captureRows) },
+    { label: 'Densité diffuse', value: population?.densite_diffuse != null ? `${population.densite_diffuse} ind./ha` : '—' },
+    { label: 'Densité groupée', value: population?.densite_groupee != null ? `${population.densite_groupee} ind./m²` : '—' },
+    { label: 'Accouplement', value: population?.accouplement ?? '—' },
+    { label: 'Ponte', value: population?.ponte ?? '—' },
+    { label: 'Interdistance (m)', value: population?.interdistance != null ? String(population.interdistance) : '—' },
+    { label: 'Type de cible', value: typeCible.map((v) => typeCibleImagoLabel(v)).join(', ') || '—' },
+  ];
+}
+
+function imagoDetailHasData(captures: CaptureRow[], espece: 'LMC' | 'NSE', population: PopulationRow | null): boolean {
+  const hasCaptures = captures.some((c) => c.espece === espece && c.categorie === 'imago');
+  return (
+    hasCaptures ||
+    population?.densite_diffuse != null ||
+    population?.densite_groupee != null ||
+    !!population?.accouplement ||
+    !!population?.ponte ||
+    population?.interdistance != null ||
+    parseSelectionMultiple(population?.type_cible ?? null).length > 0
+  );
+}
+
+/** Détail complet C-Larves, une espèce à la fois — même esprit que
+ * `buildLarveRows` côté Extensif, adapté à l'Intensif (surface contaminée
+ * délibérément exclue, cf. #prospection-intensive-fusion-abcd). */
+function buildLarveDetailRows(espece: 'LMC' | 'NSE', captures: CaptureRow[], population: PopulationRow | null): DetailRowViewModel[] {
+  const captureRows = captures.filter((c) => c.espece === espece && c.categorie === 'larve');
+  const counts = rowsToCounts(captureRows);
+  const phasesList = phasesFor(espece, 'larve');
+  return [
+    { label: 'Nombre de captures', value: String(totalCaptures(counts)) },
+    { label: 'Phases', value: phasesBreakdownLabel(captureRows, phasesList) },
+    { label: 'Stades larvaires', value: stadesBreakdownLabel(captureRows) },
+    { label: 'Densité diffuse', value: population?.densite_diffuse != null ? `${population.densite_diffuse} ind./ha` : '—' },
+    { label: 'Densité groupée', value: population?.densite_groupee != null ? `${population.densite_groupee} ind./m²` : '—' },
+    { label: 'Interdistance (m)', value: population?.interdistance != null ? String(population.interdistance) : '—' },
+    { label: 'Tache larvaire', value: population?.tache_larvaire ? 'Oui' : 'Non' },
+    { label: 'Bande larvaire', value: population?.bande_larvaire ? 'Oui' : 'Non' },
+    {
+      label: 'Déplacement',
+      value: population?.deplacement === 'perchee' ? 'Perchée' : population?.deplacement === 'repos' ? 'Repos' : '—',
+    },
+  ];
+}
+
+function larveDetailHasData(captures: CaptureRow[], espece: 'LMC' | 'NSE', population: PopulationRow | null): boolean {
+  const hasCaptures = captures.some((c) => c.espece === espece && c.categorie === 'larve');
+  return (
+    hasCaptures ||
+    population?.densite_diffuse != null ||
+    population?.densite_groupee != null ||
+    population?.interdistance != null ||
+    !!population?.tache_larvaire ||
+    !!population?.bande_larvaire ||
+    (!!population?.deplacement && population.deplacement !== 'repos')
+  );
+}
+
+function buildSpeciesDetailGroups(
+  captures: CaptureRow[],
+  populations: PopulationRow[],
+  categorie: 'imago' | 'larve'
+): SpeciesDetailGroupViewModel[] {
+  const especes: ('LMC' | 'NSE')[] = ['LMC', 'NSE'];
+  const groups: SpeciesDetailGroupViewModel[] = [];
+  for (const espece of especes) {
+    const population = populations.find((p) => p.espece === espece && p.categorie === categorie) ?? null;
+    const hasData = categorie === 'imago' ? imagoDetailHasData(captures, espece, population) : larveDetailHasData(captures, espece, population);
+    if (!hasData) continue;
+    groups.push({
+      espece,
+      label: ESPECE_LABEL[espece],
+      rows: categorie === 'imago' ? buildImagoDetailRows(espece, captures, population) : buildLarveDetailRows(espece, captures, population),
+    });
+  }
+  return groups;
+}
+
 export interface RecapitulatifViewModel {
   nFiche: string;
   dateProspection: string;
@@ -97,6 +232,10 @@ export interface RecapitulatifViewModel {
   densites: DensiteViewModel[];
   infestationDetail: InfestationDetailViewModel[];
   heureObservationLabel: string;
+  /** Détail complet B-Imagos/C-Larves, style Extensif (#recap-style-extensif-vers-intensif) —
+   * un groupe par espèce ayant au moins une donnée, masqué sinon. */
+  imagoDetailGroups: SpeciesDetailGroupViewModel[];
+  larveDetailGroups: SpeciesDetailGroupViewModel[];
 }
 
 const ESPECE_LABEL = { LMC: 'Locusta', NSE: 'Nomadacris' } as const;
@@ -299,6 +438,8 @@ export function buildRecapitulatif(
     densites: buildDensitesSummary(populations),
     infestationDetail: buildInfestationDetail(captures, populations),
     heureObservationLabel: formatHeureLocale(draft.heure_observation_at),
+    imagoDetailGroups: buildSpeciesDetailGroups(captures, populations, 'imago'),
+    larveDetailGroups: buildSpeciesDetailGroups(captures, populations, 'larve'),
   };
 }
 

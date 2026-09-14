@@ -615,25 +615,81 @@ export default function IntensiveLarvesScreen() {
               })}
             </View>
 
-            {totalCaptures > 0 && (
-              <View style={styles.summaryContainer}>
-                <Text style={styles.summaryTitle}>📋 Récapitulatif — {ESPECE_LABEL[species]}</Text>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Captures :</Text>
-                  <Text style={styles.summaryValue}>{totalCaptures}</Text>
-                </View>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Phases :</Text>
-                  <Text style={[styles.summaryValue, isPhasesConsistent ? styles.summaryValueValid : styles.summaryValueInvalid]}>
-                    {totalPhases}{isPhasesConsistent ? ' ✅' : ' ❌'}
-                  </Text>
-                </View>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Stades larvaires :</Text>
-                  <Text style={[styles.summaryValue, isStadesConsistent ? styles.summaryValueValid : styles.summaryValueInvalid]}>
-                    {totalStadesLarve}{isStadesConsistent ? ' ✅' : ' ❌'}
-                  </Text>
-                </View>
+            <View style={styles.summaryContainer}>
+              <Text style={styles.summaryTitle}>📋 Récapitulatif — {ESPECE_LABEL[species]}</Text>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>1. Nombre de captures :</Text>
+                <Text style={[styles.summaryValue, styles.summaryValueValid]}>{totalCaptures}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>2. Phases :</Text>
+                <Text style={[styles.summaryValue, isPhasesConsistent ? styles.summaryValueValid : styles.summaryValueInvalid]}>
+                  {totalPhases}{isPhasesConsistent ? ' ✅' : ' ❌'}
+                </Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>3. Stades larvaires :</Text>
+                <Text style={[styles.summaryValue, isStadesConsistent ? styles.summaryValueValid : styles.summaryValueInvalid]}>
+                  {totalStadesLarve}{isStadesConsistent ? ' ✅' : ' ❌'}
+                </Text>
+              </View>
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Densité diffuse :</Text>
+                <Text style={styles.summaryValue}>
+                  {population.densite_diffuse != null ? population.densite_diffuse : '—'} ind./ha
+                </Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Densité groupée :</Text>
+                <Text style={styles.summaryValue}>
+                  {population.densite_groupee != null ? population.densite_groupee : '—'} ind./m²
+                </Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Interdistance :</Text>
+                <Text style={styles.summaryValue}>{population.interdistance != null ? population.interdistance : '—'} m</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Tache larvaire :</Text>
+                <Text style={styles.summaryValue}>{population.tache_larvaire ? 'Oui' : 'Non'}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Bande larvaire :</Text>
+                <Text style={styles.summaryValue}>{population.bande_larvaire ? 'Oui' : 'Non'}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Déplacement :</Text>
+                <Text style={styles.summaryValue}>
+                  {population.deplacement === 'perchee' ? 'Perchée' : population.deplacement === 'repos' ? 'Repos' : '—'}
+                </Text>
+              </View>
+              <View style={styles.ruleBox}>
+                <Text style={styles.ruleText}>Règle : Captures = Phases = Stades larvaires</Text>
+                <Text style={[styles.ruleText, { marginTop: 4, color: TEXT_SECONDARY, fontSize: 10 }]}>
+                  {totalCaptures === 0 ? '✅ 0 capture : cohérent par défaut' : ''}
+                </Text>
+              </View>
+            </View>
+
+            {isConsistent ? (
+              <View style={styles.successContainer}>
+                <Text style={styles.successText}>✅ COHÉRENT</Text>
+                <Text style={styles.successDetail}>
+                  {totalCaptures === 0
+                    ? 'Aucune capture enregistrée'
+                    : `${totalCaptures} captures = ${totalPhases} phases = ${totalStadesLarve} stades`}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.warningContainer}>
+                <Text style={styles.warningText}>⚠️ INCOHÉRENCE</Text>
+                <Text style={styles.warningDetail}>
+                  Captures : {totalCaptures}
+                  {'\n'}Phases : {totalPhases}
+                  {'\n'}Stades larvaires : {totalStadesLarve}
+                </Text>
+                <Text style={styles.warningHint}>La règle est : Captures = Phases = Stades larvaires</Text>
               </View>
             )}
           </ScrollView>
@@ -726,6 +782,16 @@ const styles = StyleSheet.create({
   summaryValue: { fontSize: 13, fontWeight: '700', color: TEXT },
   summaryValueValid: { color: GREEN },
   summaryValueInvalid: { color: '#dc2626' },
+  summaryDivider: { height: 1, backgroundColor: '#f0eee8', marginVertical: 4 },
+  ruleBox: { marginTop: 10, backgroundColor: '#f8f6f0', borderRadius: 7, padding: 8 },
+  ruleText: { fontSize: 11, color: TEXT_SECONDARY, textAlign: 'center', fontWeight: '600' },
+  successContainer: { backgroundColor: '#dcfce7', borderRadius: 8, padding: 10, marginTop: 8, borderWidth: 1, borderColor: '#86efac' },
+  successText: { color: '#15803d', fontWeight: '700', fontSize: 13, textAlign: 'center' },
+  successDetail: { color: '#15803d', fontSize: 12, textAlign: 'center', marginTop: 3, lineHeight: 18 },
+  warningContainer: { backgroundColor: '#fef2f2', borderRadius: 8, padding: 10, marginTop: 8, borderWidth: 1, borderColor: '#fca5a5' },
+  warningText: { color: '#dc2626', fontWeight: '700', fontSize: 13, textAlign: 'center' },
+  warningDetail: { color: '#dc2626', fontSize: 12, textAlign: 'center', marginTop: 5, lineHeight: 18 },
+  warningHint: { color: '#dc2626', fontSize: 11, textAlign: 'center', marginTop: 5, fontStyle: 'italic' },
   footer: { padding: 16 },
   continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
   continueButtonDisabled: { opacity: 0.5 },
