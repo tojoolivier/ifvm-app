@@ -582,9 +582,11 @@ const styles = StyleSheet.create({
   flex1: { flex: 1 },
   card: { backgroundColor: '#f6f3e9', borderRadius: 9, padding: 8 },
   cardError: { borderWidth: 1.5, borderColor: '#d32f2f' },
-  label: { fontSize: 9, fontWeight: '600', color: '#9a9484' },
+  // #lisibilite-terrain : libellé agrandi et assombri (au lieu de 9px gris clair,
+  // difficile à lire en plein soleil) — même niveau de lisibilité que sectionLabel.
+  label: { fontSize: 11, fontWeight: '700', color: TEXT_SECONDARY },
   requiredLabel: { color: '#c0412b' },
-  inputMono: { fontSize: 15, fontWeight: '700', color: TEXT, fontFamily: 'monospace', padding: 0 },
+  inputMono: { fontSize: 18, fontWeight: '700', color: TEXT, fontFamily: 'monospace', padding: 0 },
   speciesHint: { fontSize: 9, color: '#9a9484', marginBottom: 6, textAlign: 'center', fontStyle: 'italic' },
   
   observationsSection: { marginTop: 4, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },

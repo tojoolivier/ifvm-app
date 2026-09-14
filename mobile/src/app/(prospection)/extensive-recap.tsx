@@ -726,8 +726,10 @@ const styles = StyleSheet.create({
   detailSubtitle: { fontSize: 10, fontWeight: '700', color: GREEN, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
   detailLine: { fontSize: 12, color: '#5c5848', lineHeight: 17 },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: '#f0eee8' },
-  detailRowLabel: { fontSize: 11.5, color: TEXT_SECONDARY, flexShrink: 1 },
-  detailRowValue: { fontSize: 11.5, color: TEXT, fontWeight: '600', textAlign: 'right', flexShrink: 1 },
+  // #lisibilite-terrain : libellés/valeurs agrandis (au lieu de 11.5px) pour rester
+  // lisibles sur le terrain, y compris pour la densité.
+  detailRowLabel: { fontSize: 13, fontWeight: '600', color: TEXT_SECONDARY, flexShrink: 1 },
+  detailRowValue: { fontSize: 13.5, color: TEXT, fontWeight: '700', textAlign: 'right', flexShrink: 1 },
   offlineBanner: { marginTop: 6, backgroundColor: '#fdf6e7', borderWidth: 1, borderColor: '#f0e2bf', borderRadius: 11, padding: 12 },
   offlineText: { fontSize: 11, lineHeight: 16, color: '#8a6d2f', fontWeight: '500' },
   footer: { padding: 16 },

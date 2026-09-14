@@ -167,8 +167,10 @@ const styles = StyleSheet.create({
   especeBlock: { marginBottom: 10 },
   especeTitle: { fontSize: 13, fontWeight: '700', color: '#111827', marginBottom: 4 },
   row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
-  rowLabel: { color: '#6B7280', fontSize: 13 },
-  rowValue: { color: '#111827', fontSize: 13, fontWeight: '600' },
+  // #lisibilite-terrain : libellés/valeurs agrandis (densité incluse) pour rester
+  // lisibles sur le terrain par tous les prospecteurs.
+  rowLabel: { color: '#4B5563', fontSize: 14, fontWeight: '600' },
+  rowValue: { color: '#111827', fontSize: 15, fontWeight: '700' },
   summaryText: { color: '#111827', fontSize: 13, lineHeight: 19 },
   errorText: { color: '#dc2626', fontSize: 13, marginBottom: 8, textAlign: 'center' },
   btnExport: { backgroundColor: IFVM_GREEN, borderRadius: 10, paddingVertical: 16, alignItems: 'center', marginTop: 4 },

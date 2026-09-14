@@ -760,9 +760,11 @@ const styles = StyleSheet.create({
   fieldsRow: { flexDirection: 'row', gap: 9, marginBottom: 4 },
   field: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 10, marginBottom: 8 },
   fieldError: { borderColor: '#c0412b', borderWidth: 1.5 },
-  fieldLabel: { fontSize: 9.5, color: '#9a9484', marginBottom: 2 },
+  // #lisibilite-terrain : libellé agrandi et assombri (au lieu de 9.5px gris clair,
+  // difficile à lire en plein soleil) — même niveau de lisibilité que sectionLabel.
+  fieldLabel: { fontSize: 11, fontWeight: '700', color: TEXT_SECONDARY, marginBottom: 3 },
   requiredLabel: { color: '#c0412b' },
-  fieldInput: { fontSize: 16, fontWeight: '700', color: TEXT, padding: 0 },
+  fieldInput: { fontSize: 18, fontWeight: '700', color: TEXT, padding: 0 },
   errorText: { color: '#c0412b', fontSize: 11, marginTop: -2, marginBottom: 10 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 4 },
   chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: INACTIVE_BG },
