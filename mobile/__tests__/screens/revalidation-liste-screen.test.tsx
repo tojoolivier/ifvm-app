@@ -26,6 +26,11 @@ jest.mock('@/lib/prospection-accueil', () => ({
 jest.mock('@/lib/prospection-repository', () => ({
   listProspectionsARevaliderLocal: jest.fn(),
   demarrerRevalidation: jest.fn(),
+  // Consommées par le vrai `prospection-wizard-store.ts` (non mocké) via
+  // `hydrateFromDraft` — indispensable pour que l'écran suivant
+  // (extensive-reference.tsx) trouve le brouillon cloné pré-rempli.
+  getProspection: jest.fn(),
+  listAllProspectionCaptures: jest.fn(),
 }));
 
 const FICHE_PERIMEE = {
@@ -46,6 +51,11 @@ beforeEach(() => {
   jest.mocked(prospectionAccueil.assurerProspectionDisponibleLocalement).mockClear().mockResolvedValue(undefined);
   jest.mocked(prospectionRepository.listProspectionsARevaliderLocal).mockReset();
   jest.mocked(prospectionRepository.demarrerRevalidation).mockReset().mockResolvedValue({ draftId: 'draft-1' });
+  jest
+    .mocked(prospectionRepository.getProspection)
+    .mockReset()
+    .mockResolvedValue({ id: 'draft-1', n_fiche: 'F-100-CLONE' } as any);
+  jest.mocked(prospectionRepository.listAllProspectionCaptures).mockReset().mockResolvedValue([]);
   useAuthStore.setState({ user: { id: 'moi' } as any, token: 'token-1' } as any);
 });
 
@@ -79,6 +89,12 @@ describe('RevalidationListeScreen — sélection (démarre la revalidation)', ()
       expect(prospectionAccueil.assurerProspectionDisponibleLocalement).toHaveBeenCalledWith(FICHE_PERIMEE)
     );
     await waitFor(() => expect(prospectionRepository.demarrerRevalidation).toHaveBeenCalledWith('presp-perimee'));
+    // Indispensable : extensive-reference.tsx (écran suivant) lit
+    // useProspectionWizardStore().draft, jamais directement la base — sans
+    // cette hydratation avant la navigation, l'écran s'ouvrirait vide malgré
+    // le brouillon déjà cloné en local (bug corrigé ici).
+    await waitFor(() => expect(prospectionRepository.getProspection).toHaveBeenCalledWith('draft-1'));
+    await waitFor(() => expect(prospectionRepository.listAllProspectionCaptures).toHaveBeenCalledWith('draft-1'));
     await waitFor(() =>
       expect(mockPush).toHaveBeenCalledWith(
         expect.objectContaining({
