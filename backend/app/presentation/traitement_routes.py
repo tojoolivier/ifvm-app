@@ -7,28 +7,33 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.traitement_use_cases import (
+    AddBloc,
     AddProduitUtilise,
     AddRotation,
     CreateTraitementAerien,
     CreateTraitementTerrestre,
     GetTraitement,
     ListTraitements,
+    RemoveBloc,
     RemoveProduitUtilise,
     RemoveRotation,
     SyncPushTraitementAerien,
     SyncPushTraitementTerrestre,
+    UpdateBloc,
     UpdateRotation,
     ValiderTraitement,
 )
 from app.auth import get_current_user
 from app.database import get_db
 from app.domain.traitement import (
+    BlocIntrouvableError,
     ChefDeBaseInvalideError,
     ChefEquipeInvalideError,
     EvaluationRisquePopulation,
     NumeroFicheConflitError,
     ProduitUtiliseIntrouvableError,
     ProspectionIntrouvableError,
+    RotationBlocInvalideError,
     RotationIntrouvableError,
     TraitementIntrouvableError,
     TraitementOrigineDejaUtiliseeError,
@@ -42,6 +47,7 @@ from app.infrastructure.traitement_repository import TraitementRepositoryImpl
 from app.infrastructure.utilisateur_repository import UtilisateurRepositoryImpl
 from app.models.users import Utilisateur
 from app.presentation.traitement_schemas import (
+    BlocCreate,
     ProduitUtiliseCreate,
     RotationCreate,
     TraitementCreate,
@@ -328,12 +334,13 @@ async def add_rotation(
             heure_fermeture_vanne=body.heure_fermeture_vanne,
             heure_fin=body.heure_fin,
             nom_commercial=body.nom_commercial,
+            bloc_id=body.bloc_id,
         )
     except TraitementIntrouvableError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except TraitementVerrouilleError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
-    except ValueError as e:
+    except (ValueError, RotationBlocInvalideError) as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
 
@@ -363,12 +370,13 @@ async def update_rotation(
             heure_fermeture_vanne=body.heure_fermeture_vanne,
             heure_fin=body.heure_fin,
             nom_commercial=body.nom_commercial,
+            bloc_id=body.bloc_id,
         )
     except (TraitementIntrouvableError, RotationIntrouvableError) as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except TraitementVerrouilleError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
-    except ValueError as e:
+    except (ValueError, RotationBlocInvalideError) as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
 
@@ -383,6 +391,82 @@ async def remove_rotation(
     try:
         return await use_case.execute(traitement_id=traitement_id, rotation_id=rotation_id)
     except (TraitementIntrouvableError, RotationIntrouvableError) as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TraitementVerrouilleError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
+@router.post("/{traitement_id}/blocs", response_model=TraitementRead, status_code=201)
+async def add_bloc(
+    traitement_id: uuid.UUID,
+    body: BlocCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = AddBloc(get_repository(db))
+    try:
+        return await use_case.execute(
+            traitement_id=traitement_id,
+            nom=body.nom,
+            localite=body.localite,
+            surface_theorique_ha=body.surface_theorique_ha,
+            surface_reelle_ha=body.surface_reelle_ha,
+            surface_protegee_ha=body.surface_protegee_ha,
+            surface_traitee_ha=body.surface_traitee_ha,
+            largeur_andain_m=body.largeur_andain_m,
+            interpasse_m=body.interpasse_m,
+            hauteur_vol_min_m=body.hauteur_vol_min_m,
+            hauteur_vol_max_m=body.hauteur_vol_max_m,
+            observation=body.observation,
+        )
+    except TraitementIntrouvableError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TraitementVerrouilleError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
+@router.put("/{traitement_id}/blocs/{bloc_id}", response_model=TraitementRead)
+async def update_bloc(
+    traitement_id: uuid.UUID,
+    bloc_id: uuid.UUID,
+    body: BlocCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = UpdateBloc(get_repository(db))
+    try:
+        return await use_case.execute(
+            traitement_id=traitement_id,
+            bloc_id=bloc_id,
+            nom=body.nom,
+            localite=body.localite,
+            surface_theorique_ha=body.surface_theorique_ha,
+            surface_reelle_ha=body.surface_reelle_ha,
+            surface_protegee_ha=body.surface_protegee_ha,
+            surface_traitee_ha=body.surface_traitee_ha,
+            largeur_andain_m=body.largeur_andain_m,
+            interpasse_m=body.interpasse_m,
+            hauteur_vol_min_m=body.hauteur_vol_min_m,
+            hauteur_vol_max_m=body.hauteur_vol_max_m,
+            observation=body.observation,
+        )
+    except (TraitementIntrouvableError, BlocIntrouvableError) as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TraitementVerrouilleError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
+@router.delete("/{traitement_id}/blocs/{bloc_id}", response_model=TraitementRead)
+async def remove_bloc(
+    traitement_id: uuid.UUID,
+    bloc_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = RemoveBloc(get_repository(db))
+    try:
+        return await use_case.execute(traitement_id=traitement_id, bloc_id=bloc_id)
+    except (TraitementIntrouvableError, BlocIntrouvableError) as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except TraitementVerrouilleError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))

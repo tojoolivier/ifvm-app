@@ -53,6 +53,14 @@ class RotationIntrouvableError(LookupError):
     """La rotation référencée n'existe pas pour ce traitement aérien."""
 
 
+class BlocIntrouvableError(LookupError):
+    """Le bloc référencé n'existe pas pour ce traitement aérien."""
+
+
+class RotationBlocInvalideError(ValueError):
+    """`bloc_id` d'une rotation ne référence pas un bloc du même traitement aérien."""
+
+
 class ProduitUtiliseIntrouvableError(LookupError):
     """Le produit utilisé référencé n'existe pas pour ce traitement terrestre."""
 
@@ -119,9 +127,37 @@ class Cible:
 
 
 @dataclass
+class Bloc:
+    """Subdivision de la surface infestée d'un traitement aérien (migration 0064).
+    « Une surface prospectée peut se répartir en un ou plusieurs blocs » (cahier des
+    charges). Espèce (LMC/NSE/MELANGE) non dupliquée ici : lue par jointure sur
+    `Cible.espece` du même traitement."""
+
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    traitement_aerien_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    numero: int = 0
+    nom: str = ""
+    localite: str | None = None
+    surface_theorique_ha: float | None = None
+    surface_reelle_ha: float | None = None
+    # Renseignée si produit de choc.
+    surface_protegee_ha: float | None = None
+    # Renseignée si produit de barrière.
+    surface_traitee_ha: float | None = None
+    largeur_andain_m: float | None = None
+    interpasse_m: float | None = None
+    hauteur_vol_min_m: float | None = None
+    hauteur_vol_max_m: float | None = None
+    observation: str | None = None
+
+
+@dataclass
 class Rotation:
     id: uuid.UUID = field(default_factory=uuid.uuid4)
     traitement_aerien_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    # Bloc traité par cette rotation — nullable, un bloc peut être traité par
+    # plusieurs rotations (1 bloc -> N cuves, confirmé avec l'utilisateur).
+    bloc_id: uuid.UUID | None = None
     numero: int = 0
     # Dérivé de `numero` (str(numero)) côté application — plus de saisie libre
     # (migration 0047) : le numéro de cuve s'incrémente automatiquement par
@@ -216,6 +252,7 @@ class TraitementAerien:
     evaluation_efficacite_heures_apres: float | None = None
     methode_evaluation_efficacite: str | None = None
     rotations: list[Rotation] = field(default_factory=list)
+    blocs: list[Bloc] = field(default_factory=list)
 
     def recalculer_totaux(self) -> None:
         """Seul chemin d'écriture pour nb_rotations/total_pesticide_l/
