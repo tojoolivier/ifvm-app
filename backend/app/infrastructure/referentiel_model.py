@@ -135,6 +135,57 @@ class LieuAerienModel(Base):
     )
 
 
+class BaseAerienneModel(Base):
+    """Base principale ou base secondaire de la fiche de vol.
+
+    Table unique auto-référencée (`parent_base_id NULL` = principale, sinon
+    secondaire) plutôt que deux tables — même raisonnement que
+    `LieuAerienModel.type_lieu` : les deux niveaux partagent exactement les
+    mêmes attributs, seule la hiérarchie diffère. Introduite en migration
+    0064, délibérément distincte de `lieu_aerien` malgré le chevauchement
+    conceptuel : `lieu_aerien` a été débranché deux fois des fiches qui le
+    référençaient (`traitement_aerien` en 0054, `prospection` en 0063) parce
+    que choisir la base dans un référentiel synchronisé s'est révélé être une
+    contrainte terrain non voulue. La fiche de vol reprend malgré tout un
+    référentiel dédié — décision produit explicite, maintenue en connaissance
+    de ce précédent (cf. docstring de la migration 0064).
+    """
+
+    __tablename__ = "base_aerienne"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    parent_base_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("base_aerienne.id", ondelete="RESTRICT"), nullable=True
+    )
+    numero: Mapped[str] = mapped_column(Text(), nullable=False, unique=True)
+    localite: Mapped[str] = mapped_column(Text(), nullable=False)
+    longitude: Mapped[float | None] = mapped_column(Numeric(11, 8), nullable=True)
+    latitude: Mapped[float | None] = mapped_column(Numeric(10, 8), nullable=True)
+    altitude: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
+    actif: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+
+    parent: Mapped["BaseAerienneModel"] = relationship(remote_side=[id])
+
+
+class StandRemplissageModel(Base):
+    """Stand de remplissage de la fiche de vol — même forme que `BaseAerienneModel`,
+    sans hiérarchie."""
+
+    __tablename__ = "stand_remplissage"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    numero: Mapped[str] = mapped_column(Text(), nullable=False, unique=True)
+    localite: Mapped[str] = mapped_column(Text(), nullable=False)
+    longitude: Mapped[float | None] = mapped_column(Numeric(11, 8), nullable=True)
+    latitude: Mapped[float | None] = mapped_column(Numeric(10, 8), nullable=True)
+    altitude: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
+    actif: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+
+
 class PesticideModel(Base):
     __tablename__ = "pesticide"
 

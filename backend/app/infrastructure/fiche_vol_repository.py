@@ -1,12 +1,14 @@
 import uuid
 from datetime import UTC, date, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.domain.fiche_vol import (
+    BaseVolIntrouvableError,
+    CampagneVolIntrouvableError,
     FicheVol,
     FicheVolIntrouvableError,
     NumeroFicheVolConflitError,
@@ -14,6 +16,7 @@ from app.domain.fiche_vol import (
     RotationDejaRapprocheeError,
     RotationVolIntrouvableError,
     SignatureVol,
+    StandVolIntrouvableError,
     Vol,
 )
 from app.infrastructure.fiche_vol_model import (
@@ -21,30 +24,64 @@ from app.infrastructure.fiche_vol_model import (
     FicheVolSignatureModel,
     VolModel,
 )
+from app.infrastructure.referentiel_model import BaseAerienneModel
+from app.infrastructure.traitement_model import RotationModel
 
 
-def _to_domain(model: FicheVolModel) -> FicheVol:
+def _borner_a_zero(valeur: float) -> float:
+    return valeur if valeur > 0 else 0.0
+
+
+def _to_domain(model: FicheVolModel, pesticide_quantite_utilisee: float | None = None) -> FicheVol:
+    disponible = (
+        float(model.pesticide_quantite_disponible)
+        if model.pesticide_quantite_disponible is not None
+        else None
+    )
+    restante = (
+        _borner_a_zero(disponible - pesticide_quantite_utilisee)
+        if disponible is not None and pesticide_quantite_utilisee is not None
+        else None
+    )
     return FicheVol(
         id=model.id,
         numero_fiche=model.numero_fiche,
         date_vol=model.date_vol,
         compagnie=model.compagnie,
         immatriculation=model.immatriculation,
-        base_code=model.base_code,
-        base_nom=model.base_nom,
-        base_latitude=float(model.base_latitude) if model.base_latitude is not None else None,
-        base_longitude=float(model.base_longitude) if model.base_longitude is not None else None,
-        base_altitude=float(model.base_altitude) if model.base_altitude is not None else None,
-        stand_nom=model.stand_nom,
-        stand_latitude=float(model.stand_latitude) if model.stand_latitude is not None else None,
+        campagne_id=model.campagne_id,
+        compteur=model.compteur,
+        base_id=model.base_id,
+        stand_id=model.stand_id,
+        base_numero=model.base.numero,
+        base_localite=model.base.localite,
+        base_latitude=float(model.base.latitude) if model.base.latitude is not None else None,
+        base_longitude=float(model.base.longitude) if model.base.longitude is not None else None,
+        base_altitude=float(model.base.altitude) if model.base.altitude is not None else None,
+        stand_numero=model.stand.numero,
+        stand_localite=model.stand.localite,
+        stand_latitude=float(model.stand.latitude) if model.stand.latitude is not None else None,
         stand_longitude=(
-            float(model.stand_longitude) if model.stand_longitude is not None else None
+            float(model.stand.longitude) if model.stand.longitude is not None else None
         ),
-        stand_altitude=float(model.stand_altitude) if model.stand_altitude is not None else None,
+        stand_altitude=float(model.stand.altitude) if model.stand.altitude is not None else None,
         pilote=model.pilote,
         mecanicien=model.mecanicien,
         chef_de_base_id=model.chef_de_base_id,
         consultant_international=model.consultant_international,
+        pesticide_nom_commercial=model.pesticide_nom_commercial,
+        pesticide_quantite_disponible=disponible,
+        pesticide_quantite_recue=(
+            float(model.pesticide_quantite_recue)
+            if model.pesticide_quantite_recue is not None
+            else None
+        ),
+        pesticide_quantite_utilisee=pesticide_quantite_utilisee,
+        pesticide_quantite_restante=restante,
+        futs_disponible=model.futs_disponible,
+        futs_recues=model.futs_recues,
+        futs_pleins=model.futs_pleins,
+        futs_vides=model.futs_vides,
         observations=model.observations,
         statut=model.statut,
         statut_sync=model.statut_sync,
@@ -90,6 +127,8 @@ class FicheVolRepositoryImpl:
     _CHARGEMENT = (
         selectinload(FicheVolModel.vols),
         selectinload(FicheVolModel.signatures),
+        selectinload(FicheVolModel.base),
+        selectinload(FicheVolModel.stand),
     )
 
     async def _charger(self, fiche_vol_id: uuid.UUID) -> FicheVolModel | None:
@@ -104,9 +143,32 @@ class FicheVolRepositoryImpl:
             raise FicheVolIntrouvableError(str(fiche_vol_id))
         return model
 
+    async def _domaine(self, fiche_vol_id: uuid.UUID) -> FicheVol:
+        model = await self._exiger(fiche_vol_id)
+        return _to_domain(model, await self._pesticide_utilisee(model))
+
+    async def _pesticide_utilisee(self, model: FicheVolModel) -> float | None:
+        """Somme des rotations couvertes par les vols de la fiche (déduplique les
+        rotations : un MEP et une APPLICATION du même vol.rotation_id ne comptent
+        qu'une fois). None si aucun vol n'est rattaché à une rotation.
+
+        Mélange d'unités (L/kg) non arbitré ici — même simplification que
+        `Prospection.pesticide_*`, qui n'a pas non plus de colonne d'unité.
+        """
+        rotation_ids = {v.rotation_id for v in model.vols if v.rotation_id is not None}
+        if not rotation_ids:
+            return None
+        result = await self.session.execute(
+            select(func.sum(RotationModel.quantite)).where(RotationModel.id.in_(rotation_ids))
+        )
+        total = result.scalar_one_or_none()
+        return float(total) if total is not None else None
+
     async def get_by_id(self, fiche_vol_id: uuid.UUID) -> FicheVol | None:
         model = await self._charger(fiche_vol_id)
-        return _to_domain(model) if model else None
+        if model is None:
+            return None
+        return _to_domain(model, await self._pesticide_utilisee(model))
 
     async def list_by_filters(
         self,
@@ -122,30 +184,66 @@ class FicheVolRepositoryImpl:
         if chef_de_base_id is not None:
             query = query.where(FicheVolModel.chef_de_base_id == chef_de_base_id)
         result = await self.session.execute(query.order_by(FicheVolModel.date_vol.desc()))
-        return [_to_domain(m) for m in result.scalars().unique().all()]
+        modeles = result.scalars().unique().all()
+        return [_to_domain(m, await self._pesticide_utilisee(m)) for m in modeles]
+
+    async def get_base_numero(self, base_id: uuid.UUID) -> str:
+        """Résout `base_aerienne.numero` — c'est le fragment "équipe" du numéro de
+        fiche (composer_numero_fiche), avant même que la fiche existe en base."""
+        result = await self.session.execute(
+            select(BaseAerienneModel.numero).where(BaseAerienneModel.id == base_id)
+        )
+        numero = result.scalar_one_or_none()
+        if numero is None:
+            raise BaseVolIntrouvableError(str(base_id))
+        return numero
+
+    async def next_compteur(self, campagne_id: uuid.UUID) -> int:
+        """Incrément atomique de `campagne_fiche_vol_compteur` (upsert en une requête) :
+        deux fiches créées en même temps, y compris depuis deux sessions différentes,
+        n'obtiennent jamais le même compteur — c'est Postgres qui arbitre, pas une
+        lecture puis une écriture séparées. N'effectue pas de COMMIT : fait partie de
+        la même transaction que l'insertion de la fiche (cf. create), pour qu'un échec
+        de l'insertion annule aussi l'incrément et ne laisse pas de trou évitable dans
+        la numérotation.
+        """
+        result = await self.session.execute(
+            text(
+                "INSERT INTO campagne_fiche_vol_compteur (campagne_id, dernier_compteur) "
+                "VALUES (:campagne_id, 1) "
+                "ON CONFLICT (campagne_id) DO UPDATE "
+                "SET dernier_compteur = campagne_fiche_vol_compteur.dernier_compteur + 1 "
+                "RETURNING dernier_compteur"
+            ),
+            {"campagne_id": campagne_id},
+        )
+        return result.scalar_one()
 
     async def create(self, fiche: FicheVol) -> FicheVol:
-        """Raises NumeroFicheVolConflitError si `numero` existe déjà — l'appelant réessaie
-        avec un suffixe (cf. CreateFicheVol)."""
+        """`fiche.compteur`/`fiche.numero_fiche` doivent déjà être posés par l'appelant
+        (cf. CreateFicheVol.execute, qui enchaîne next_compteur puis
+        composer_numero_fiche dans la même transaction)."""
         model = FicheVolModel(
             id=fiche.id,
             numero_fiche=fiche.numero_fiche,
             date_vol=fiche.date_vol,
             compagnie=fiche.compagnie,
             immatriculation=fiche.immatriculation,
-            base_code=fiche.base_code,
-            base_nom=fiche.base_nom,
-            base_latitude=fiche.base_latitude,
-            base_longitude=fiche.base_longitude,
-            base_altitude=fiche.base_altitude,
-            stand_nom=fiche.stand_nom,
-            stand_latitude=fiche.stand_latitude,
-            stand_longitude=fiche.stand_longitude,
-            stand_altitude=fiche.stand_altitude,
+            campagne_id=fiche.campagne_id,
+            compteur=fiche.compteur,
+            base_id=fiche.base_id,
+            stand_id=fiche.stand_id,
             pilote=fiche.pilote,
             mecanicien=fiche.mecanicien,
             chef_de_base_id=fiche.chef_de_base_id,
             consultant_international=fiche.consultant_international,
+            pesticide_nom_commercial=fiche.pesticide_nom_commercial,
+            pesticide_quantite_disponible=fiche.pesticide_quantite_disponible,
+            pesticide_quantite_recue=fiche.pesticide_quantite_recue,
+            futs_disponible=fiche.futs_disponible,
+            futs_recues=fiche.futs_recues,
+            futs_pleins=fiche.futs_pleins,
+            futs_vides=fiche.futs_vides,
             observations=fiche.observations,
             statut=fiche.statut,
             statut_sync=fiche.statut_sync,
@@ -169,7 +267,7 @@ class FicheVolRepositoryImpl:
         except IntegrityError as exc:
             await self.session.rollback()
             raise _traduire_integrite(exc) from exc
-        return _to_domain(await self._exiger(model.id))
+        return await self._domaine(model.id)
 
     async def add_vol(self, fiche_vol_id: uuid.UUID, vol: Vol) -> FicheVol:
         model = await self._exiger(fiche_vol_id)
@@ -190,13 +288,13 @@ class FicheVolRepositoryImpl:
         except IntegrityError as exc:
             await self.session.rollback()
             raise _traduire_integrite(exc) from exc
-        return _to_domain(await self._exiger(fiche_vol_id))
+        return await self._domaine(fiche_vol_id)
 
     async def remove_vol(self, fiche_vol_id: uuid.UUID, vol_id: uuid.UUID) -> FicheVol:
         model = await self._exiger(fiche_vol_id)
         model.vols = [v for v in model.vols if v.id != vol_id]
         await self.session.commit()
-        return _to_domain(await self._exiger(fiche_vol_id))
+        return await self._domaine(fiche_vol_id)
 
     async def upsert_signature(self, fiche_vol_id: uuid.UUID, signature: SignatureVol) -> FicheVol:
         """Une signature est remplaçable tant que la fiche est brouillon : le verrouillage
@@ -219,13 +317,13 @@ class FicheVolRepositoryImpl:
                 )
             )
         await self.session.commit()
-        return _to_domain(await self._exiger(fiche_vol_id))
+        return await self._domaine(fiche_vol_id)
 
     async def valider(self, fiche_vol_id: uuid.UUID) -> FicheVol:
         model = await self._exiger(fiche_vol_id)
         model.statut = "validee"
         await self.session.commit()
-        return _to_domain(await self._exiger(fiche_vol_id))
+        return await self._domaine(fiche_vol_id)
 
 
 def _traduire_integrite(exc: IntegrityError) -> Exception:
@@ -245,6 +343,16 @@ def _traduire_integrite(exc: IntegrityError) -> Exception:
         return RotationVolIntrouvableError("la rotation référencée n'existe pas")
     if "vol_prospection_id_fkey" in message:
         return ProspectionVolIntrouvableError("la prospection référencée n'existe pas")
+    if "fk_fiche_vol_base_id" in message:
+        return BaseVolIntrouvableError("la base référencée n'existe pas")
+    if "fk_fiche_vol_stand_id" in message:
+        return StandVolIntrouvableError("le stand référencé n'existe pas")
+    if "fk_fiche_vol_campagne_id" in message:
+        return CampagneVolIntrouvableError("la campagne référencée n'existe pas")
+    if "uq_fiche_vol_campagne_compteur" in message:
+        # Ne devrait jamais se produire : next_compteur alloue de façon atomique. Un
+        # conflit ici signalerait un bug (compteur réutilisé), pas une course normale.
+        return NumeroFicheVolConflitError(message)
     if "fiche_vol" in message and "numero_fiche" in message:
         return NumeroFicheVolConflitError(message)
     return exc

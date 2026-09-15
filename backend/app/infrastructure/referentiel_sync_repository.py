@@ -2,28 +2,37 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.referentiel import (
+    BaseAerienne,
     CodeStade,
     Culture,
     LieuAerien,
+    NumeroBaseAerienneDejaPrisError,
+    NumeroStandRemplissageDejaPrisError,
     Pesticide,
+    StandRemplissage,
     UtilisateurEquipe,
 )
 from app.domain.repositories import (
+    BaseAerienneRepository,
     CodeStadeRepository,
     CultureRepository,
     LieuAerienRepository,
     PesticideRepository,
+    StandRemplissageRepository,
     UtilisateurEquipeRepository,
 )
 from app.infrastructure.referentiel_model import (
+    BaseAerienneModel,
     CodeStadeModel,
     CultureModel,
     LieuAerienModel,
     PesticideModel,
     StadeModel,
+    StandRemplissageModel,
 )
 from app.models.users import Utilisateur
 
@@ -274,6 +283,170 @@ class LieuAerienRepositoryImpl(LieuAerienRepository):
         model.actif = lieu.actif
         model.updated_at = lieu.updated_at
         await self.session.commit()
+        await self.session.refresh(model)
+        return self._to_domain(model)
+
+
+class BaseAerienneRepositoryImpl(BaseAerienneRepository):
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    def _to_domain(self, model: BaseAerienneModel) -> BaseAerienne:
+        return BaseAerienne(
+            id=model.id,
+            parent_base_id=model.parent_base_id,
+            numero=model.numero,
+            localite=model.localite,
+            longitude=float(model.longitude) if model.longitude is not None else None,
+            latitude=float(model.latitude) if model.latitude is not None else None,
+            altitude=float(model.altitude) if model.altitude is not None else None,
+            actif=model.actif,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+        )
+
+    async def list_since(self, since: datetime | None) -> list[BaseAerienne]:
+        stmt = select(BaseAerienneModel).order_by(BaseAerienneModel.numero)
+        if since is not None:
+            stmt = stmt.where(BaseAerienneModel.updated_at > since)
+        result = await self.session.execute(stmt)
+        return [self._to_domain(m) for m in result.scalars().all()]
+
+    async def list_all(self, actif: bool | None = True) -> list[BaseAerienne]:
+        stmt = select(BaseAerienneModel).order_by(BaseAerienneModel.numero)
+        # `actif=None` = pas de filtre : l'administration a besoin des deux états.
+        if actif is not None:
+            stmt = stmt.where(BaseAerienneModel.actif == actif)
+        result = await self.session.execute(stmt)
+        return [self._to_domain(m) for m in result.scalars().all()]
+
+    async def get_by_id(self, base_id: uuid.UUID) -> BaseAerienne | None:
+        result = await self.session.execute(
+            select(BaseAerienneModel).where(BaseAerienneModel.id == base_id)
+        )
+        model = result.scalar_one_or_none()
+        return None if model is None else self._to_domain(model)
+
+    async def create(self, base: BaseAerienne) -> BaseAerienne:
+        model = BaseAerienneModel(
+            id=base.id,
+            parent_base_id=base.parent_base_id,
+            numero=base.numero,
+            localite=base.localite,
+            longitude=base.longitude,
+            latitude=base.latitude,
+            altitude=base.altitude,
+            actif=base.actif,
+            created_at=base.created_at,
+            updated_at=base.updated_at,
+        )
+        self.session.add(model)
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise NumeroBaseAerienneDejaPrisError(base.numero) from exc
+        await self.session.refresh(model)
+        return self._to_domain(model)
+
+    async def update(self, base: BaseAerienne) -> BaseAerienne:
+        result = await self.session.execute(
+            select(BaseAerienneModel).where(BaseAerienneModel.id == base.id)
+        )
+        model = result.scalar_one()
+        model.parent_base_id = base.parent_base_id
+        model.numero = base.numero
+        model.localite = base.localite
+        model.longitude = base.longitude
+        model.latitude = base.latitude
+        model.altitude = base.altitude
+        model.actif = base.actif
+        model.updated_at = base.updated_at
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise NumeroBaseAerienneDejaPrisError(base.numero) from exc
+        await self.session.refresh(model)
+        return self._to_domain(model)
+
+
+class StandRemplissageRepositoryImpl(StandRemplissageRepository):
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    def _to_domain(self, model: StandRemplissageModel) -> StandRemplissage:
+        return StandRemplissage(
+            id=model.id,
+            numero=model.numero,
+            localite=model.localite,
+            longitude=float(model.longitude) if model.longitude is not None else None,
+            latitude=float(model.latitude) if model.latitude is not None else None,
+            altitude=float(model.altitude) if model.altitude is not None else None,
+            actif=model.actif,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+        )
+
+    async def list_since(self, since: datetime | None) -> list[StandRemplissage]:
+        stmt = select(StandRemplissageModel).order_by(StandRemplissageModel.numero)
+        if since is not None:
+            stmt = stmt.where(StandRemplissageModel.updated_at > since)
+        result = await self.session.execute(stmt)
+        return [self._to_domain(m) for m in result.scalars().all()]
+
+    async def list_all(self, actif: bool | None = True) -> list[StandRemplissage]:
+        stmt = select(StandRemplissageModel).order_by(StandRemplissageModel.numero)
+        if actif is not None:
+            stmt = stmt.where(StandRemplissageModel.actif == actif)
+        result = await self.session.execute(stmt)
+        return [self._to_domain(m) for m in result.scalars().all()]
+
+    async def get_by_id(self, stand_id: uuid.UUID) -> StandRemplissage | None:
+        result = await self.session.execute(
+            select(StandRemplissageModel).where(StandRemplissageModel.id == stand_id)
+        )
+        model = result.scalar_one_or_none()
+        return None if model is None else self._to_domain(model)
+
+    async def create(self, stand: StandRemplissage) -> StandRemplissage:
+        model = StandRemplissageModel(
+            id=stand.id,
+            numero=stand.numero,
+            localite=stand.localite,
+            longitude=stand.longitude,
+            latitude=stand.latitude,
+            altitude=stand.altitude,
+            actif=stand.actif,
+            created_at=stand.created_at,
+            updated_at=stand.updated_at,
+        )
+        self.session.add(model)
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise NumeroStandRemplissageDejaPrisError(stand.numero) from exc
+        await self.session.refresh(model)
+        return self._to_domain(model)
+
+    async def update(self, stand: StandRemplissage) -> StandRemplissage:
+        result = await self.session.execute(
+            select(StandRemplissageModel).where(StandRemplissageModel.id == stand.id)
+        )
+        model = result.scalar_one()
+        model.numero = stand.numero
+        model.localite = stand.localite
+        model.longitude = stand.longitude
+        model.latitude = stand.latitude
+        model.altitude = stand.altitude
+        model.actif = stand.actif
+        model.updated_at = stand.updated_at
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise NumeroStandRemplissageDejaPrisError(stand.numero) from exc
         await self.session.refresh(model)
         return self._to_domain(model)
 

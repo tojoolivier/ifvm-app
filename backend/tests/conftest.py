@@ -249,6 +249,44 @@ async def lieu_aerien(db_session: AsyncSession):
 
 
 @pytest_asyncio.fixture
+async def base_aerienne(db_session: AsyncSession):
+    from app.infrastructure.referentiel_model import BaseAerienneModel
+
+    base = BaseAerienneModel(
+        id=uuid.uuid4(),
+        numero="IHO01",
+        localite="Ihosy",
+        latitude=-22.4021,
+        longitude=46.1250,
+        altitude=764.0,
+        actif=True,
+    )
+    db_session.add(base)
+    await db_session.commit()
+    await db_session.refresh(base)
+    return base
+
+
+@pytest_asyncio.fixture
+async def stand_remplissage(db_session: AsyncSession):
+    from app.infrastructure.referentiel_model import StandRemplissageModel
+
+    stand = StandRemplissageModel(
+        id=uuid.uuid4(),
+        numero="STD01",
+        localite="Stand Sud",
+        latitude=-22.4100,
+        longitude=46.1300,
+        altitude=770.0,
+        actif=True,
+    )
+    db_session.add(stand)
+    await db_session.commit()
+    await db_session.refresh(stand)
+    return stand
+
+
+@pytest_asyncio.fixture
 async def chef_equipe(db_session: AsyncSession) -> Utilisateur:
     user = Utilisateur(
         id=uuid.uuid4(),

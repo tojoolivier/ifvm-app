@@ -255,6 +255,77 @@ class LieuAerienUpdate(BaseModel):
     actif: bool | None = None
 
 
+class BaseAerienneRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    parent_base_id: uuid.UUID | None
+    numero: str
+    localite: str
+    longitude: float | None
+    latitude: float | None
+    altitude: float | None
+    actif: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class BaseAerienneCreate(BaseModel):
+    numero: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)]
+    localite: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    parent_base_id: uuid.UUID | None = None
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    altitude: float | None = None
+
+
+class BaseAerienneUpdate(BaseModel):
+    """Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie."""
+
+    numero: (
+        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)] | None
+    ) = None
+    localite: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
+    parent_base_id: uuid.UUID | None = None
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    altitude: float | None = None
+    actif: bool | None = None
+
+
+class StandRemplissageRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    numero: str
+    localite: str
+    longitude: float | None
+    latitude: float | None
+    altitude: float | None
+    actif: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class StandRemplissageCreate(BaseModel):
+    numero: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)]
+    localite: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    altitude: float | None = None
+
+
+class StandRemplissageUpdate(BaseModel):
+    """Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie."""
+
+    numero: (
+        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)] | None
+    ) = None
+    localite: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    altitude: float | None = None
+    actif: bool | None = None
+
+
 class CultureSyncRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID

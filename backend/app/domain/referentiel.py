@@ -210,3 +210,61 @@ class LieuAerien:
     actif: bool = True
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
+
+
+class NumeroBaseAerienneDejaPrisError(Exception):
+    """`numero` d'une base_aerienne est déjà pris (contrainte UNIQUE)."""
+
+    pass
+
+
+class NumeroStandRemplissageDejaPrisError(Exception):
+    """`numero` d'un stand_remplissage est déjà pris (contrainte UNIQUE)."""
+
+    pass
+
+
+class BaseAerienneParentInvalideError(Exception):
+    """`parent_base_id` ne référence pas une base principale existante.
+
+    Couvre deux cas : l'id ne référence aucune base_aerienne, ou il en référence une
+    qui est elle-même une secondaire (`parent_base_id` non nul) — la hiérarchie
+    s'arrête à 2 niveaux, pas de secondaire d'une secondaire.
+    """
+
+    pass
+
+
+@dataclass
+class BaseAerienne:
+    """Base aérienne principale (`parent_base_id is None`) ou secondaire (référence sa
+    principale). Référentiel dédié à la fiche de vol, distinct de `LieuAerien` —
+    décision produit du 2026-09-15 maintenue malgré le précédent `lieu_aerien` (cf.
+    migration `0064`)."""
+
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    parent_base_id: uuid.UUID | None = None
+    numero: str = ""
+    localite: str = ""
+    longitude: float | None = None
+    latitude: float | None = None
+    altitude: float | None = None
+    actif: bool = True
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class StandRemplissage:
+    """Stand de remplissage de la fiche de vol — même forme que `BaseAerienne`, sans
+    hiérarchie."""
+
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    numero: str = ""
+    localite: str = ""
+    longitude: float | None = None
+    latitude: float | None = None
+    altitude: float | None = None
+    actif: bool = True
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)

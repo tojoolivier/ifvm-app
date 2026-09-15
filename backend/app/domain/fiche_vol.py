@@ -87,24 +87,37 @@ class ProspectionVolIntrouvableError(LookupError):
     """prospection_id ne référence aucune prospection."""
 
 
+class BaseVolIntrouvableError(LookupError):
+    """base_id ne référence aucune base_aerienne."""
+
+
+class StandVolIntrouvableError(LookupError):
+    """stand_id ne référence aucun stand_remplissage."""
+
+
+class CampagneVolIntrouvableError(LookupError):
+    """campagne_id ne référence aucune campagne."""
+
+
 class RotationDejaRapprocheeError(Exception):
     """Cette rotation a déjà un vol de ce type — une rotation vaut une MEP et une
     application, pas deux."""
 
 
-def composer_numero_fiche(
-    date_vol: date, base_code: str, immatriculation: str, suffixe: int | None = None
-) -> str:
-    """`[Date]-[Base numérotée]-[Immatriculation]` (cahier des charges §5).
+def composer_numero_fiche(compteur: int, date_vol: date, equipe: str, immatriculation: str) -> str:
+    """`[Compteur 3 chiffres]-[Date]-[Équipe]-[Immatriculation]` — arbitrage du 2026-09-15,
+    remplace le format `[Date]-[Base]-[Immatriculation]` d'ADR-011 §7.2/§5.
 
-    Le suffixe matérialise le « une seule fiche par jour **si possible** » : la convention
-    reste une fiche par jour et par appareil, mais une seconde fiche n'est jamais refusée —
-    bloquer un pilote hors-ligne coûterait plus cher que numéroter.
+    `compteur` est **continu sur toute la campagne**, jamais réinitialisé : il vient de
+    `campagne_fiche_vol_compteur`, incrémenté atomiquement côté serveur (jamais côté
+    client) — voir `FicheVolRepositoryImpl.next_compteur`. C'est lui, pas ce fragment de
+    texte, qui porte l'unicité (`UNIQUE(campagne_id, compteur)`) ; l'ancien mécanisme de
+    suffixe en cas de collision n'est donc plus nécessaire. `equipe` est le `numero` de la
+    base référencée par `fiche_vol.base_id`.
     """
-    base = _normaliser_fragment(base_code)
+    equipe_normalisee = _normaliser_fragment(equipe)
     immat = _normaliser_fragment(immatriculation)
-    numero = f"{date_vol.isoformat()}-{base}-{immat}"
-    return numero if suffixe is None else f"{numero}-{suffixe:02d}"
+    return f"{compteur:03d}-{date_vol.isoformat()}-{equipe_normalisee}-{immat}"
 
 
 def _normaliser_fragment(valeur: str) -> str:
@@ -245,19 +258,24 @@ class FicheVol:
     date_vol: date
     compagnie: str
     immatriculation: str
-    base_code: str
-    base_nom: str
-    stand_nom: str
+    campagne_id: uuid.UUID
+    base_id: uuid.UUID
+    stand_id: uuid.UUID
     pilote: str
     mecanicien: str
     chef_de_base_id: uuid.UUID
-    base_latitude: float | None = None
-    base_longitude: float | None = None
-    base_altitude: float | None = None
-    stand_latitude: float | None = None
-    stand_longitude: float | None = None
-    stand_altitude: float | None = None
+    # Attribué par FicheVolRepositoryImpl.next_compteur avant la première écriture ;
+    # 0 est une valeur transitoire côté domaine (jamais persistée telle quelle, cf.
+    # ck_fiche_vol_compteur_positif), pas une saisie possible.
+    compteur: int = 0
     consultant_international: str | None = None
+    pesticide_nom_commercial: str | None = None
+    pesticide_quantite_disponible: float | None = None
+    pesticide_quantite_recue: float | None = None
+    futs_disponible: int | None = None
+    futs_recues: int | None = None
+    futs_pleins: int | None = None
+    futs_vides: int | None = None
     observations: str | None = None
     statut: str = "brouillon"
     statut_sync: str = "local"
@@ -266,6 +284,26 @@ class FicheVol:
     created_at: datetime | None = None
     updated_at: datetime | None = None
     id: uuid.UUID = field(default_factory=uuid.uuid4)
+
+    # ==========================================
+    # Champs dérivés, non stockés — résolus par le repository (jointure sur
+    # base_aerienne/stand_remplissage), même patron que Prospection.prospecteur_nom.
+    # ==========================================
+    base_numero: str | None = None
+    base_localite: str | None = None
+    base_latitude: float | None = None
+    base_longitude: float | None = None
+    base_altitude: float | None = None
+    stand_numero: str | None = None
+    stand_localite: str | None = None
+    stand_latitude: float | None = None
+    stand_longitude: float | None = None
+    stand_altitude: float | None = None
+    # Somme de traitement_rotation.quantite pour les rotations couvertes par les vols de
+    # la fiche (jointure vol.rotation_id -> traitement_rotation) — jamais stockée.
+    pesticide_quantite_utilisee: float | None = None
+    # disponible - utilisee, plancher 0 — jamais stockée.
+    pesticide_quantite_restante: float | None = None
 
     @property
     def duree_totale_minutes(self) -> int:
