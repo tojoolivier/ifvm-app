@@ -1091,6 +1091,63 @@ export const apiClient = {
     );
   },
 
+  /**
+   * Référentiels de la fiche de vol (#fiche-vol-referentiel-creation-mobile) —
+   * `numero`/`localite` saisis à la main (pas d'auto-génération côté backend,
+   * cf. CreateBaseAerienne/CreateStandRemplissage), en ligne uniquement : ni
+   * `id` client, ni sync hors-ligne pour ces deux référentiels — même contrat
+   * que le web (ReferentielsPage.tsx), qui les crée de la même façon.
+   */
+  listBasesAeriennes: async (
+    token: string,
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['BaseAerienneRead'][]> => {
+    return makeRequest<components['schemas']['BaseAerienneRead'][]>(
+      '/bases-aeriennes',
+      { method: 'GET' },
+      token,
+      onUnauthorized
+    );
+  },
+
+  createBaseAerienne: async (
+    token: string,
+    body: components['schemas']['BaseAerienneCreate'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['BaseAerienneRead']> => {
+    return makeRequest<components['schemas']['BaseAerienneRead']>(
+      '/bases-aeriennes',
+      { method: 'POST', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
+  listStandsRemplissage: async (
+    token: string,
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['StandRemplissageRead'][]> => {
+    return makeRequest<components['schemas']['StandRemplissageRead'][]>(
+      '/stands-remplissage',
+      { method: 'GET' },
+      token,
+      onUnauthorized
+    );
+  },
+
+  createStandRemplissage: async (
+    token: string,
+    body: components['schemas']['StandRemplissageCreate'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['StandRemplissageRead']> => {
+    return makeRequest<components['schemas']['StandRemplissageRead']>(
+      '/stands-remplissage',
+      { method: 'POST', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
   /*
    * -------------------------------------------------------
    * PROSPECTIONS
