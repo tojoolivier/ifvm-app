@@ -15,6 +15,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getCurrentPosition, reverseGeocode } from '@/lib/location';
+import { validateGpsPosition } from '@/lib/prospection-validation';
 import { useAuthStore } from '@/lib/auth-store';
 import {
   OperationAerienneRow,
@@ -380,6 +381,19 @@ export default function ExtensiveReferenceScreen() {
   const operationsRenseignees = operations.filter((op) => !operationEstVide(op));
 
   const handleContinue = () => {
+    // #position-hors-madagascar : même garde-fou que reference.tsx (Intensif),
+    // absente jusqu'ici sur l'Extensif/la Validation — une position hors de
+    // Madagascar (y compris en pleine mer) n'est jamais acceptée.
+    const latNum = latitude ? parseFloat(latitude) : null;
+    const lonNum = longitude ? parseFloat(longitude) : null;
+    if (latNum != null && lonNum != null) {
+      const { blocages: gpsBlocages } = validateGpsPosition({ latitude: latNum, longitude: lonNum, accuracy: null });
+      if (gpsBlocages.length > 0) {
+        Alert.alert('⚠️ Position GPS invalide', gpsBlocages.join('\n'));
+        return;
+      }
+    }
+
     if (isAerien) {
       for (let i = 0; i < operationsRenseignees.length; i++) {
         const op = operationsRenseignees[i];

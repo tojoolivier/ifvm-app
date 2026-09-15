@@ -220,6 +220,22 @@ describe('validateReferences', () => {
     const errors = validateReferences({ ...valid, localite: '' });
     expect(errors.some((e) => e.field === 'localite')).toBe(true);
   });
+
+  // #position-hors-madagascar
+  it('accepts a position inside Madagascar', () => {
+    const errors = validateReferences({ ...valid, latitude: -18.9, longitude: 47.5 });
+    expect(errors).toEqual([]);
+  });
+
+  it('rejects a position at sea, even within the old bounding box', () => {
+    const errors = validateReferences({ ...valid, latitude: -18, longitude: 50.2 });
+    expect(errors.some((e) => e.field === 'latitude' && /hors de Madagascar/.test(e.message))).toBe(true);
+  });
+
+  it('does not require a position (GPS not yet captured)', () => {
+    const errors = validateReferences({ ...valid, latitude: null, longitude: null });
+    expect(errors.some((e) => e.field === 'latitude')).toBe(false);
+  });
 });
 
 describe('validateTerrestreConditions', () => {
