@@ -110,7 +110,10 @@ async def test_admin_peut_attribuer_un_sigle(
 
 @pytest.mark.asyncio
 async def test_sigle_vide_efface_le_sigle_existant(
-    client: AsyncClient, admin_headers: dict, utilisateur_rattache: Utilisateur, db_session: AsyncSession
+    client: AsyncClient,
+    admin_headers: dict,
+    utilisateur_rattache: Utilisateur,
+    db_session: AsyncSession,
 ):
     """Chaîne vide = effacement explicite — distinct de l'absence du champ dans
     le corps de la requête (`test_admin_peut_modifier_un_autre_compte` ci-dessus),
