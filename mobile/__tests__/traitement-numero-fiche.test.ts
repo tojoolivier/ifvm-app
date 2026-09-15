@@ -21,4 +21,16 @@ describe('composerNumeroFiche', () => {
     expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11', null)).toBe('Hery-Aerien-2026-08-11');
     expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11', undefined)).toBe('Hery-Aerien-2026-08-11');
   });
+
+  // #sigle-utilisateur-numero-fiche
+  it('insère le sigle de l’utilisateur connecté juste avant le suffixe de collision', () => {
+    expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11', null, 'ADM')).toBe('Hery-Aerien-2026-08-11-ADM');
+    expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11', 2, 'ADM')).toBe('Hery-Aerien-2026-08-11-ADM-2');
+  });
+
+  it('n’insère aucun tiret orphelin quand le sigle est absent, null ou vide', () => {
+    expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11', null, undefined)).toBe('Hery-Aerien-2026-08-11');
+    expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11', null, null)).toBe('Hery-Aerien-2026-08-11');
+    expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11', null, '')).toBe('Hery-Aerien-2026-08-11');
+  });
 });

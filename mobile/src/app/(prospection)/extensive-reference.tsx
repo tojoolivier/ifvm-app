@@ -51,11 +51,17 @@ const INACTIVE_BG = '#efeada';
 // pas utiliser des couleurs trop fortes »).
 const FILL_BG = '#fdf6e3';
 
-/** Auto-généré côté client comme n_fiche (cf. reference.tsx), faute de numérotation serveur pour l'extensif. */
-function generateNumeroMessage(draftId: string, dateProspection: string): string {
+/**
+ * Auto-généré côté client comme n_fiche (cf. reference.tsx), faute de
+ * numérotation serveur pour l'extensif. #sigle-utilisateur-numero-fiche : le
+ * sigle de l'utilisateur connecté s'insère entre la date et le suffixe final
+ * quand il est renseigné — jamais une chaîne vide (pas de tiret orphelin).
+ */
+function generateNumeroMessage(draftId: string, dateProspection: string, sigle?: string | null): string {
   const datePart = dateProspection.replace(/-/g, '');
   const idPart = draftId.replace(/-/g, '').slice(0, 4).toUpperCase();
-  return `${datePart}-${idPart}`;
+  const sigleParts = sigle ? `${sigle}-` : '';
+  return `${datePart}-${sigleParts}${idPart}`;
 }
 
 // ==========================================
@@ -199,7 +205,7 @@ export default function ExtensiveReferenceScreen() {
   const [surfaceStation, setSurfaceStation] = useState(draft?.surface_station != null ? String(draft.surface_station) : '');
   const [surfaceInfestee, setSurfaceInfestee] = useState(draft?.surface_infestee != null ? String(draft.surface_infestee) : '');
   const [nMessage, setNMessage] = useState(
-    draft?.n_message ?? (draftId && draft ? generateNumeroMessage(draftId, draft.date_prospection) : '')
+    draft?.n_message ?? (draftId && draft ? generateNumeroMessage(draftId, draft.date_prospection, user?.sigle) : '')
   );
   // Horodatage technique (ISO) de l'heure d'observation — même mécanisme que
   // observations.tsx côté Intensif (`getCurrentPosition().timestamp`, colonne
@@ -316,7 +322,7 @@ export default function ExtensiveReferenceScreen() {
       setSelectedTypeStation(parseSelectionMultiple(draft.type_station));
       setSurfaceStation(draft.surface_station != null ? String(draft.surface_station) : '');
       setSurfaceInfestee(draft.surface_infestee != null ? String(draft.surface_infestee) : '');
-      setNMessage(draft.n_message ?? generateNumeroMessage(draft.id, draft.date_prospection));
+      setNMessage(draft.n_message ?? generateNumeroMessage(draft.id, draft.date_prospection, user?.sigle));
       if (draft.heure_observation_at) setHeureObservationAt(draft.heure_observation_at);
       // Mode aérien uniquement — sans effet sur une fiche terrestre (colonnes NULL).
       setSociete(draft.societe ?? '');
@@ -326,7 +332,7 @@ export default function ExtensiveReferenceScreen() {
       setChefDeBase(draft.chef_de_base ?? '');
       setBase(draft.base ?? '');
     });
-  }, [draft, draftId]);
+  }, [draft, draftId, user?.sigle]);
 
   // Opérations aériennes déjà enregistrées (fiche reprise) — lues une seule fois par
   // fiche chargée, même garde que l'effet ci-dessus. Sans opération sauvegardée, on
