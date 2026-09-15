@@ -303,8 +303,19 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
+export interface StationLaPlusProche {
+  station: StationFixe;
+  /** Distance haversine (km) entre la position donnée et cette station —
+   * #station-intensive-hors-perimetre (reference.tsx) : sert à détecter qu'aucune
+   * station connue n'est réellement à proximité. */
+  distanceKm: number;
+}
+
 /** Station active la plus proche d'une position GPS — résout le mode "Auto" du PA/station. */
-export async function findNearestStation(latitude: number, longitude: number): Promise<StationFixe | null> {
+export async function findNearestStation(
+  latitude: number,
+  longitude: number
+): Promise<StationLaPlusProche | null> {
   const db = await getReferentielDb();
   const stations = await db.getAllAsync<StationFixe>(
     'SELECT id, code, nom, pa_id as paId, latitude, longitude, altitude, commune, district, region FROM station_fixe WHERE actif = 1'
@@ -320,7 +331,7 @@ export async function findNearestStation(latitude: number, longitude: number): P
       nearest = station;
     }
   }
-  return nearest;
+  return { station: nearest, distanceKm: bestDistance };
 }
 
 async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void> {
