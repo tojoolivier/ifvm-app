@@ -9,6 +9,8 @@ from app.domain.repositories import (
     UtilisateurRepository,
 )
 from app.domain.traitement import (
+    Bloc,
+    BlocIntrouvableError,
     ChefDeBaseInvalideError,
     ChefEquipeInvalideError,
     EvaluationRisquePopulation,
@@ -17,6 +19,7 @@ from app.domain.traitement import (
     ProduitUtiliseIntrouvableError,
     ProspectionIntrouvableError,
     Rotation,
+    RotationBlocInvalideError,
     RotationIntrouvableError,
     Traitement,
     TraitementAerien,
@@ -587,6 +590,24 @@ def _trouver_rotation(aerien: TraitementAerien, rotation_id: uuid.UUID) -> Rotat
     return rotation
 
 
+def _trouver_bloc(aerien: TraitementAerien, bloc_id: uuid.UUID) -> Bloc:
+    bloc = next((b for b in aerien.blocs if b.id == bloc_id), None)
+    if bloc is None:
+        raise BlocIntrouvableError(
+            f"Bloc {bloc_id} introuvable pour le traitement {aerien.traitement_id}"
+        )
+    return bloc
+
+
+def _valider_bloc_id(aerien: TraitementAerien, bloc_id: uuid.UUID | None) -> None:
+    """Une rotation ne peut pointer qu'un bloc du même traitement aérien — sinon la
+    subdivision par bloc perdrait tout son sens (un bloc d'un autre traitement)."""
+    if bloc_id is not None and not any(b.id == bloc_id for b in aerien.blocs):
+        raise RotationBlocInvalideError(
+            f"bloc_id {bloc_id} ne référence pas un bloc du traitement {aerien.traitement_id}"
+        )
+
+
 def _surface_infestee_ha(traitement: Traitement) -> float | None:
     """`traitement.cible` est toujours renseigné pour une fiche réellement persistée
     (construite via `construire_cible`) — `None` seulement pour un `Traitement`
@@ -627,6 +648,7 @@ class AddRotation:
         heure_fermeture_vanne: time,
         heure_fin: time,
         nom_commercial: str | None = None,
+        bloc_id: uuid.UUID | None = None,
     ) -> Traitement:
         traitement = await _get_traitement_aerien(self.repository, traitement_id)
         traitement.verifier_modifiable()
@@ -635,10 +657,12 @@ class AddRotation:
         if heure_fin <= heure_debut:
             raise ValueError("heure_fin doit être postérieure à heure_debut")
         _valider_heures_vanne(heure_debut, heure_ouverture_vanne, heure_fermeture_vanne, heure_fin)
+        _valider_bloc_id(aerien, bloc_id)
 
         prochain_numero = max((r.numero for r in aerien.rotations), default=0) + 1
         rotation = Rotation(
             traitement_aerien_id=aerien.traitement_id,
+            bloc_id=bloc_id,
             numero=prochain_numero,
             # Dérivé de numero, jamais saisi par le client (migration 0047).
             numero_cuve=str(prochain_numero),
@@ -699,6 +723,7 @@ class UpdateRotation:
         heure_fermeture_vanne: time,
         heure_fin: time,
         nom_commercial: str | None = None,
+        bloc_id: uuid.UUID | None = None,
     ) -> Traitement:
         traitement = await _get_traitement_aerien(self.repository, traitement_id)
         traitement.verifier_modifiable()
@@ -708,9 +733,11 @@ class UpdateRotation:
         if heure_fin <= heure_debut:
             raise ValueError("heure_fin doit être postérieure à heure_debut")
         _valider_heures_vanne(heure_debut, heure_ouverture_vanne, heure_fermeture_vanne, heure_fin)
+        _valider_bloc_id(aerien, bloc_id)
 
         # numero_cuve redérivé de numero (inchangé par une mise à jour) — jamais saisi.
         rotation.numero_cuve = str(rotation.numero)
+        rotation.bloc_id = bloc_id
         rotation.produit_id = produit_id
         rotation.quantite = quantite
         rotation.unite = unite
@@ -767,6 +794,107 @@ class RemoveRotation:
             aerien.surface_restante_ha,
             aerien.pesticide_stock_restant_l,
         )
+
+
+class AddBloc:
+    """Aucun recalcul de total : un bloc ne nourrit aucun champ dérivé de
+    `traitement_aerien` (contrairement à une rotation) — c'est une subdivision
+    informative de la surface infestée, pas un consommable."""
+
+    def __init__(self, repository: TraitementRepository):
+        self.repository = repository
+
+    async def execute(
+        self,
+        traitement_id: uuid.UUID,
+        nom: str,
+        localite: str | None = None,
+        surface_theorique_ha: float | None = None,
+        surface_reelle_ha: float | None = None,
+        surface_protegee_ha: float | None = None,
+        surface_traitee_ha: float | None = None,
+        largeur_andain_m: float | None = None,
+        interpasse_m: float | None = None,
+        hauteur_vol_min_m: float | None = None,
+        hauteur_vol_max_m: float | None = None,
+        observation: str | None = None,
+    ) -> Traitement:
+        traitement = await _get_traitement_aerien(self.repository, traitement_id)
+        traitement.verifier_modifiable()
+        aerien = traitement.aerien
+
+        prochain_numero = max((b.numero for b in aerien.blocs), default=0) + 1
+        bloc = Bloc(
+            traitement_aerien_id=aerien.traitement_id,
+            numero=prochain_numero,
+            nom=nom,
+            localite=localite,
+            surface_theorique_ha=surface_theorique_ha,
+            surface_reelle_ha=surface_reelle_ha,
+            surface_protegee_ha=surface_protegee_ha,
+            surface_traitee_ha=surface_traitee_ha,
+            largeur_andain_m=largeur_andain_m,
+            interpasse_m=interpasse_m,
+            hauteur_vol_min_m=hauteur_vol_min_m,
+            hauteur_vol_max_m=hauteur_vol_max_m,
+            observation=observation,
+        )
+        return await self.repository.add_bloc(traitement_id, bloc)
+
+
+class UpdateBloc:
+    def __init__(self, repository: TraitementRepository):
+        self.repository = repository
+
+    async def execute(
+        self,
+        traitement_id: uuid.UUID,
+        bloc_id: uuid.UUID,
+        nom: str,
+        localite: str | None = None,
+        surface_theorique_ha: float | None = None,
+        surface_reelle_ha: float | None = None,
+        surface_protegee_ha: float | None = None,
+        surface_traitee_ha: float | None = None,
+        largeur_andain_m: float | None = None,
+        interpasse_m: float | None = None,
+        hauteur_vol_min_m: float | None = None,
+        hauteur_vol_max_m: float | None = None,
+        observation: str | None = None,
+    ) -> Traitement:
+        traitement = await _get_traitement_aerien(self.repository, traitement_id)
+        traitement.verifier_modifiable()
+        aerien = traitement.aerien
+        bloc = _trouver_bloc(aerien, bloc_id)
+
+        bloc.nom = nom
+        bloc.localite = localite
+        bloc.surface_theorique_ha = surface_theorique_ha
+        bloc.surface_reelle_ha = surface_reelle_ha
+        bloc.surface_protegee_ha = surface_protegee_ha
+        bloc.surface_traitee_ha = surface_traitee_ha
+        bloc.largeur_andain_m = largeur_andain_m
+        bloc.interpasse_m = interpasse_m
+        bloc.hauteur_vol_min_m = hauteur_vol_min_m
+        bloc.hauteur_vol_max_m = hauteur_vol_max_m
+        bloc.observation = observation
+
+        return await self.repository.update_bloc(traitement_id, bloc)
+
+
+class RemoveBloc:
+    """Retirer un bloc met `bloc_id` à NULL sur ses rotations éventuelles
+    (ON DELETE SET NULL, migration 0064) — elles ne sont pas supprimées."""
+
+    def __init__(self, repository: TraitementRepository):
+        self.repository = repository
+
+    async def execute(self, traitement_id: uuid.UUID, bloc_id: uuid.UUID) -> Traitement:
+        traitement = await _get_traitement_aerien(self.repository, traitement_id)
+        traitement.verifier_modifiable()
+        _trouver_bloc(traitement.aerien, bloc_id)
+
+        return await self.repository.remove_bloc(traitement_id, bloc_id)
 
 
 async def _get_traitement_terrestre(

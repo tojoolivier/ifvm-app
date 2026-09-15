@@ -208,6 +208,9 @@ class TraitementAerienModel(Base):
     rotations: Mapped[list["RotationModel"]] = relationship(
         back_populates="aerien", cascade="all, delete-orphan", order_by="RotationModel.numero"
     )
+    blocs: Mapped[list["TraitementBlocModel"]] = relationship(
+        back_populates="aerien", cascade="all, delete-orphan", order_by="TraitementBlocModel.numero"
+    )
 
     __table_args__ = (
         # ck_traitement_aerien_roles_distincts supprimée (migration 0048_..._texte_libre) :
@@ -226,6 +229,44 @@ class TraitementAerienModel(Base):
     )
 
 
+class TraitementBlocModel(Base):
+    """Subdivision de la surface infestée d'un traitement aérien (migration 0064).
+
+    Espèce (LMC/NSE/MELANGE) non dupliquée ici : lue par jointure sur `cible.espece`
+    (même traitement), pour éviter une même information réécrite sur chaque bloc.
+    """
+
+    __tablename__ = "traitement_bloc"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    traitement_aerien_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("traitement_aerien.traitement_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    numero: Mapped[int] = mapped_column(Integer(), nullable=False)
+    nom: Mapped[str] = mapped_column(String(60), nullable=False)
+    localite: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    surface_theorique_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    surface_reelle_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    # Renseignée si produit de choc.
+    surface_protegee_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    # Renseignée si produit de barrière.
+    surface_traitee_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    largeur_andain_m: Mapped[float | None] = mapped_column(Numeric(6, 2), nullable=True)
+    interpasse_m: Mapped[float | None] = mapped_column(Numeric(6, 2), nullable=True)
+    hauteur_vol_min_m: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    hauteur_vol_max_m: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    observation: Mapped[str | None] = mapped_column(Text(), nullable=True)
+
+    aerien: Mapped[TraitementAerienModel] = relationship(back_populates="blocs")
+    rotations: Mapped[list["RotationModel"]] = relationship(back_populates="bloc")
+
+    __table_args__ = (
+        UniqueConstraint("traitement_aerien_id", "numero", name="uq_traitement_bloc_numero"),
+    )
+
+
 class RotationModel(Base):
     __tablename__ = "traitement_rotation"
 
@@ -234,6 +275,12 @@ class RotationModel(Base):
         UUID(as_uuid=True),
         ForeignKey("traitement_aerien.traitement_id", ondelete="CASCADE"),
         nullable=False,
+    )
+    # Bloc traité par cette rotation — nullable : une rotation peut ne pas encore
+    # être rattachée à un bloc (ou le traitement n'utilise pas la subdivision par
+    # bloc). Un bloc peut être traité par plusieurs rotations (1 bloc -> N cuves).
+    bloc_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("traitement_bloc.id", ondelete="SET NULL"), nullable=True
     )
     numero: Mapped[int] = mapped_column(Integer(), nullable=False)
     # Dérivé de `numero` (str(numero)) côté application — plus de saisie libre
@@ -268,6 +315,7 @@ class RotationModel(Base):
     nom_commercial: Mapped[str | None] = mapped_column(Text(), nullable=True)
 
     aerien: Mapped[TraitementAerienModel] = relationship(back_populates="rotations")
+    bloc: Mapped["TraitementBlocModel | None"] = relationship(back_populates="rotations")
 
     __table_args__ = (
         UniqueConstraint("traitement_aerien_id", "numero", name="uq_traitement_rotation_numero"),

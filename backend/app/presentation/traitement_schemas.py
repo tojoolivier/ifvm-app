@@ -258,9 +258,46 @@ class CibleRead(BaseModel):
         return valeur if valeur is not None else NON_RENSEIGNE
 
 
+class BlocCreate(BaseModel):
+    nom: str = Field(..., min_length=1, max_length=60)
+    localite: str | None = Field(None, max_length=255)
+    surface_theorique_ha: float | None = Field(None, ge=0)
+    surface_reelle_ha: float | None = Field(None, ge=0)
+    # Renseignée si produit de choc.
+    surface_protegee_ha: float | None = Field(None, ge=0)
+    # Renseignée si produit de barrière.
+    surface_traitee_ha: float | None = Field(None, ge=0)
+    largeur_andain_m: float | None = Field(None, ge=0)
+    interpasse_m: float | None = Field(None, ge=0)
+    hauteur_vol_min_m: float | None = Field(None, ge=0)
+    hauteur_vol_max_m: float | None = Field(None, ge=0)
+    observation: str | None = None
+
+
+class BlocRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    numero: int
+    nom: str
+    localite: str | None = None
+    surface_theorique_ha: float | None = None
+    surface_reelle_ha: float | None = None
+    surface_protegee_ha: float | None = None
+    surface_traitee_ha: float | None = None
+    largeur_andain_m: float | None = None
+    interpasse_m: float | None = None
+    hauteur_vol_min_m: float | None = None
+    hauteur_vol_max_m: float | None = None
+    observation: str | None = None
+
+
 class RotationCreate(BaseModel):
     # numero_cuve n'y figure pas : dérivé côté serveur de `numero` (migration
     # 0047), jamais saisi.
+    # bloc_id facultatif : une rotation peut ne pas encore être rattachée à un
+    # bloc, ou le traitement n'utilise pas la subdivision par bloc.
+    bloc_id: uuid.UUID | None = None
     produit_id: uuid.UUID
     quantite: float = Field(..., gt=0)
     unite: UniteQuantite
@@ -282,6 +319,7 @@ class RotationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    bloc_id: uuid.UUID | None = None
     numero: int
     numero_cuve: str
     produit_id: uuid.UUID
@@ -379,6 +417,7 @@ class TraitementAerienRead(BaseModel):
     evaluation_efficacite_heures_apres: float | None
     methode_evaluation_efficacite: MethodeEvaluationEfficacite | None
     rotations: list[RotationRead] = []
+    blocs: list[BlocRead] = []
 
 
 class TraitementTerrestreRead(BaseModel):
