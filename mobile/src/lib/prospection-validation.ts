@@ -11,6 +11,7 @@
  */
 
 import { PRECISION_GPS_CIBLE_M, PRECISION_GPS_SEUIL_ALERTE_M } from './gps-precision';
+import { estDansMadagascar } from './madagascar-boundary';
 
 export interface ValidationResult {
   blocages: string[];
@@ -28,17 +29,6 @@ export interface GpsPositionValidationInput {
   longitude: number;
   accuracy: number | null;
 }
-
-/**
- * Emprise géographique de Madagascar (bounding box large, §2.1 point du manuel).
- * Volontairement généreuse pour ne pas rejeter une position valide proche des côtes.
- */
-const MADAGASCAR_BBOX = {
-  latMin: -25.7,
-  latMax: -11.8,
-  lonMin: 43.1,
-  lonMax: 50.5,
-};
 
 export interface ProspectionDateValidationInput {
   dateProspection: string;
@@ -63,15 +53,12 @@ export function validateGpsPosition(input: GpsPositionValidationInput): Validati
   const blocages: string[] = [];
   const avertissements: string[] = [];
 
-  const horsMadagascar =
-    input.latitude < MADAGASCAR_BBOX.latMin ||
-    input.latitude > MADAGASCAR_BBOX.latMax ||
-    input.longitude < MADAGASCAR_BBOX.lonMin ||
-    input.longitude > MADAGASCAR_BBOX.lonMax;
-
-  if (horsMadagascar) {
+  // #position-hors-madagascar : contour réel de l'île (madagascar-boundary.ts),
+  // pas un simple rectangle englobant — un point en pleine mer, à l'est de l'île
+  // mais dans les mêmes bornes lat/lon, passait à tort l'ancien test.
+  if (!estDansMadagascar(input.latitude, input.longitude)) {
     blocages.push(
-      'Position GPS hors de Madagascar. Veuillez recapturer la position.'
+      'Vous semblez être hors de la zone de prospection (hors de Madagascar). Vérifiez votre position GPS et réessayez.'
     );
   }
 
