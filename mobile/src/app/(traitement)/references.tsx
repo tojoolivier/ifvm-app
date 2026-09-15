@@ -219,6 +219,8 @@ export default function ReferencesScreen() {
           dateValidation,
           localite: store.ref.localite ?? null,
           prospectionId,
+          latitude: store.ref.latitude ?? null,
+          longitude: store.ref.longitude ?? null,
         });
 
         const byField: Record<string, string> = {};
@@ -429,6 +431,7 @@ export default function ReferencesScreen() {
                   : 'Position non capturée'}
               </Text>
             </Card>
+            {errors.latitude && <Text style={styles.error}>{errors.latitude}</Text>}
 
             <Card variant="default" style={styles.regionCard}>
               <Text style={styles.label}>Région · district · commune (auto, hors-ligne)</Text>

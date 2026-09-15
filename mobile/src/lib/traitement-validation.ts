@@ -5,6 +5,8 @@
  * que les deux ne puissent jamais diverger.
  */
 
+import { estDansMadagascar } from './madagascar-boundary';
+
 export interface ValidationError {
   field: string;
   message: string;
@@ -200,6 +202,8 @@ export interface ReferencesValidationInput {
   dateValidation: string | null;
   localite: string | null;
   prospectionId: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export function validateReferences(input: ReferencesValidationInput): ValidationError[] {
@@ -224,6 +228,16 @@ export function validateReferences(input: ReferencesValidationInput): Validation
   }
   if (!input.localite || input.localite.trim() === '') {
     errors.push({ field: 'localite', message: 'La localité est obligatoire' });
+  }
+  // #position-hors-madagascar : même garde-fou que la Prospection (Intensif/
+  // Extensif/Validation) — une position hors de Madagascar, y compris en
+  // pleine mer, n'est jamais acceptée. Ne s'applique que si un point a déjà
+  // été capturé (facultatif tant que le GPS n'a pas encore renvoyé de fix).
+  if (input.latitude != null && input.longitude != null && !estDansMadagascar(input.latitude, input.longitude)) {
+    errors.push({
+      field: 'latitude',
+      message: 'Vous semblez être hors de la zone de prospection (hors de Madagascar). Vérifiez votre position GPS et réessayez.',
+    });
   }
 
   return errors;

@@ -110,9 +110,23 @@ describe('validateGpsPosition — emprise Madagascar', () => {
     expect(blocages).toEqual([expect.stringContaining('hors de Madagascar')]);
   });
 
-  it('bloque une position juste hors des bornes de la bounding box', () => {
+  it('bloque une position juste au nord de la pointe nord de l’île', () => {
     const { blocages } = validateGpsPosition({ latitude: -11.7, longitude: 47.5, accuracy: 10 });
     expect(blocages).toEqual([expect.stringContaining('hors de Madagascar')]);
+  });
+
+  // #position-hors-madagascar : l'ancien test (simple rectangle englobant lat
+  // [-25.7, -11.8] / lon [43.1, 50.5]) acceptait à tort ce point, en pleine mer
+  // à ~90 km au large de la côte est — remplacé par le contour réel de l'île
+  // (madagascar-boundary.ts).
+  it('bloque une position en pleine mer, à l’est de l’île, même dans l’ancien rectangle englobant', () => {
+    const { blocages } = validateGpsPosition({ latitude: -18, longitude: 50.2, accuracy: 10 });
+    expect(blocages).toEqual([expect.stringContaining('hors de Madagascar')]);
+  });
+
+  it('ne bloque pas une position réellement côtière, dans la marge de tolérance du contour simplifié', () => {
+    const { blocages } = validateGpsPosition({ latitude: -18.15, longitude: 49.48, accuracy: 10 });
+    expect(blocages).toEqual([]);
   });
 });
 
