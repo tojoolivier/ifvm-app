@@ -369,6 +369,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/bases-aeriennes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Bases Aeriennes */
+        get: operations["list_bases_aeriennes_bases_aeriennes_get"];
+        put?: never;
+        /** Create Base Aerienne */
+        post: operations["create_base_aerienne_bases_aeriennes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/bases-aeriennes/{base_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Base Aerienne */
+        get: operations["get_base_aerienne_bases_aeriennes__base_id__get"];
+        /** Update Base Aerienne */
+        put: operations["update_base_aerienne_bases_aeriennes__base_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stands-remplissage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Stands Remplissage */
+        get: operations["list_stands_remplissage_stands_remplissage_get"];
+        put?: never;
+        /** Create Stand Remplissage */
+        post: operations["create_stand_remplissage_stands_remplissage_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stands-remplissage/{stand_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Stand Remplissage */
+        get: operations["get_stand_remplissage_stands_remplissage__stand_id__get"];
+        /** Update Stand Remplissage */
+        put: operations["update_stand_remplissage_stands_remplissage__stand_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pesticides": {
         parameters: {
             query?: never;
@@ -886,6 +958,73 @@ export interface components {
              */
             created_at: string;
         };
+        /** BaseAerienneCreate */
+        BaseAerienneCreate: {
+            /** Numero */
+            numero: string;
+            /** Localite */
+            localite: string;
+            /** Parent Base Id */
+            parent_base_id?: string | null;
+            /** Longitude */
+            longitude?: number | null;
+            /** Latitude */
+            latitude?: number | null;
+            /** Altitude */
+            altitude?: number | null;
+        };
+        /** BaseAerienneRead */
+        BaseAerienneRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Parent Base Id */
+            parent_base_id: string | null;
+            /** Numero */
+            numero: string;
+            /** Localite */
+            localite: string;
+            /** Longitude */
+            longitude: number | null;
+            /** Latitude */
+            latitude: number | null;
+            /** Altitude */
+            altitude: number | null;
+            /** Actif */
+            actif: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * BaseAerienneUpdate
+         * @description Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie.
+         */
+        BaseAerienneUpdate: {
+            /** Numero */
+            numero?: string | null;
+            /** Localite */
+            localite?: string | null;
+            /** Parent Base Id */
+            parent_base_id?: string | null;
+            /** Longitude */
+            longitude?: number | null;
+            /** Latitude */
+            latitude?: number | null;
+            /** Altitude */
+            altitude?: number | null;
+            /** Actif */
+            actif?: boolean | null;
+        };
         /**
          * Biotope
          * @enum {string}
@@ -1392,24 +1531,21 @@ export interface components {
             compagnie: string;
             /** Immatriculation */
             immatriculation: string;
-            /** Base Code */
-            base_code: string;
-            /** Base Nom */
-            base_nom: string;
-            /** Base Latitude */
-            base_latitude?: number | null;
-            /** Base Longitude */
-            base_longitude?: number | null;
-            /** Base Altitude */
-            base_altitude?: number | null;
-            /** Stand Nom */
-            stand_nom: string;
-            /** Stand Latitude */
-            stand_latitude?: number | null;
-            /** Stand Longitude */
-            stand_longitude?: number | null;
-            /** Stand Altitude */
-            stand_altitude?: number | null;
+            /**
+             * Campagne Id
+             * Format: uuid
+             */
+            campagne_id: string;
+            /**
+             * Base Id
+             * Format: uuid
+             */
+            base_id: string;
+            /**
+             * Stand Id
+             * Format: uuid
+             */
+            stand_id: string;
             /** Pilote */
             pilote: string;
             /** Mecanicien */
@@ -1421,6 +1557,20 @@ export interface components {
             chef_de_base_id: string;
             /** Consultant International */
             consultant_international?: string | null;
+            /** Pesticide Nom Commercial */
+            pesticide_nom_commercial?: string | null;
+            /** Pesticide Quantite Disponible */
+            pesticide_quantite_disponible?: number | null;
+            /** Pesticide Quantite Recue */
+            pesticide_quantite_recue?: number | null;
+            /** Futs Disponible */
+            futs_disponible?: number | null;
+            /** Futs Recues */
+            futs_recues?: number | null;
+            /** Futs Pleins */
+            futs_pleins?: number | null;
+            /** Futs Vides */
+            futs_vides?: number | null;
             /** Observations */
             observations?: string | null;
             /** Vols */
@@ -1444,18 +1594,37 @@ export interface components {
             compagnie: string;
             /** Immatriculation */
             immatriculation: string;
-            /** Base Code */
-            base_code: string;
-            /** Base Nom */
-            base_nom: string;
+            /**
+             * Campagne Id
+             * Format: uuid
+             */
+            campagne_id: string;
+            /** Compteur */
+            compteur: number;
+            /**
+             * Base Id
+             * Format: uuid
+             */
+            base_id: string;
+            /**
+             * Stand Id
+             * Format: uuid
+             */
+            stand_id: string;
+            /** Base Numero */
+            base_numero?: string | null;
+            /** Base Localite */
+            base_localite?: string | null;
             /** Base Latitude */
             base_latitude?: number | null;
             /** Base Longitude */
             base_longitude?: number | null;
             /** Base Altitude */
             base_altitude?: number | null;
-            /** Stand Nom */
-            stand_nom: string;
+            /** Stand Numero */
+            stand_numero?: string | null;
+            /** Stand Localite */
+            stand_localite?: string | null;
             /** Stand Latitude */
             stand_latitude?: number | null;
             /** Stand Longitude */
@@ -1473,6 +1642,24 @@ export interface components {
             chef_de_base_id: string;
             /** Consultant International */
             consultant_international?: string | null;
+            /** Pesticide Nom Commercial */
+            pesticide_nom_commercial?: string | null;
+            /** Pesticide Quantite Disponible */
+            pesticide_quantite_disponible?: number | null;
+            /** Pesticide Quantite Recue */
+            pesticide_quantite_recue?: number | null;
+            /** Pesticide Quantite Utilisee */
+            pesticide_quantite_utilisee?: number | null;
+            /** Pesticide Quantite Restante */
+            pesticide_quantite_restante?: number | null;
+            /** Futs Disponible */
+            futs_disponible?: number | null;
+            /** Futs Recues */
+            futs_recues?: number | null;
+            /** Futs Pleins */
+            futs_pleins?: number | null;
+            /** Futs Vides */
+            futs_vides?: number | null;
             /** Observations */
             observations?: string | null;
             /** Statut */
@@ -2904,6 +3091,67 @@ export interface components {
          * @enum {string}
          */
         StadeImago: "A1" | "A2" | "A3" | "A4" | "A5";
+        /** StandRemplissageCreate */
+        StandRemplissageCreate: {
+            /** Numero */
+            numero: string;
+            /** Localite */
+            localite: string;
+            /** Longitude */
+            longitude?: number | null;
+            /** Latitude */
+            latitude?: number | null;
+            /** Altitude */
+            altitude?: number | null;
+        };
+        /** StandRemplissageRead */
+        StandRemplissageRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Numero */
+            numero: string;
+            /** Localite */
+            localite: string;
+            /** Longitude */
+            longitude: number | null;
+            /** Latitude */
+            latitude: number | null;
+            /** Altitude */
+            altitude: number | null;
+            /** Actif */
+            actif: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * StandRemplissageUpdate
+         * @description Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie.
+         */
+        StandRemplissageUpdate: {
+            /** Numero */
+            numero?: string | null;
+            /** Localite */
+            localite?: string | null;
+            /** Longitude */
+            longitude?: number | null;
+            /** Latitude */
+            latitude?: number | null;
+            /** Altitude */
+            altitude?: number | null;
+            /** Actif */
+            actif?: boolean | null;
+        };
         /**
          * StationFixeCreate
          * @description Bornes reprises du domaine géographique : un 422 lisible plutôt qu'une station
@@ -4953,6 +5201,268 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LieuAerienRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_bases_aeriennes_bases_aeriennes_get: {
+        parameters: {
+            query?: {
+                /** @description Renvoie les bases des deux états — écran d'administration. */
+                inclure_inactifs?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseAerienneRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_base_aerienne_bases_aeriennes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BaseAerienneCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseAerienneRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_base_aerienne_bases_aeriennes__base_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                base_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseAerienneRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_base_aerienne_bases_aeriennes__base_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                base_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BaseAerienneUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseAerienneRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_stands_remplissage_stands_remplissage_get: {
+        parameters: {
+            query?: {
+                /** @description Renvoie les stands des deux états — écran d'administration. */
+                inclure_inactifs?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StandRemplissageRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_stand_remplissage_stands_remplissage_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StandRemplissageCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StandRemplissageRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_stand_remplissage_stands_remplissage__stand_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                stand_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StandRemplissageRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_stand_remplissage_stands_remplissage__stand_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                stand_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StandRemplissageUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StandRemplissageRead"];
                 };
             };
             /** @description Validation Error */
