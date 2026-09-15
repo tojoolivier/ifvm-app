@@ -44,6 +44,16 @@ const BIOTOPE_OPTIONS = [
 ];
 
 /**
+ * #station-intensive-hors-perimetre : au-delà de cette distance à la station
+ * intensive la plus proche, le référentiel n'a plus de sens (aucune station
+ * connue n'est réellement « à côté ») — l'agent saisit sa propre localité
+ * plutôt que de se voir imposer une station lointaine et trompeuse. Peu
+ * importe que le nom saisi pour le Poste Acridien et celui de la Station
+ * soient identiques (demande explicite du 2026-09-15).
+ */
+const PERIMETRE_STATION_INTENSIVE_KM = 30;
+
+/**
  * #sigle-utilisateur-numero-fiche : le sigle de l'utilisateur connecté (ex.
  * "ADM", attribué par un admin depuis la page Utilisateurs du web) s'insère
  * entre la date et le suffixe final quand il est renseigné — jamais une
@@ -167,8 +177,14 @@ export default function ReferenceScreen() {
   const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
   const setDraft = useProspectionWizardStore((s) => s.setDraft);
   const sigle = useAuthStore((s) => s.user?.sigle);
+  const isIntensive = draft?.type_prospection === 'intensive';
 
   const [position, setPosition] = useState<GpsPosition | null>(null);
+  // #station-intensive-hors-perimetre : distance (km) à la station intensive
+  // la plus proche connue du référentiel — `null` tant qu'elle n'a pas encore
+  // été calculée (position pas encore capturée, ou fiche restaurée depuis un
+  // brouillon sans nouveau calcul GPS).
+  const [distanceStationKm, setDistanceStationKm] = useState<number | null>(null);
   const [adminArea, setAdminArea] = useState<{ region: string | null; district: string | null; commune: string | null }>({
     region: null,
     district: null,
@@ -357,19 +373,34 @@ export default function ReferenceScreen() {
         if (!isActive) return;
         setAdminArea(area);
 
-        const [nearestStation, postesList] = await Promise.all([
+        const [nearest, postesList] = await Promise.all([
           findNearestStation(pos.latitude, pos.longitude),
           listPostesAcridiens(),
         ]);
 
         if (!isActive) return;
 
-        if (nearestStation) {
+        setDistanceStationKm(nearest?.distanceKm ?? null);
+
+        if (nearest) {
+          const { station: nearestStation, distanceKm } = nearest;
           const nearestPa = postesList.find((p) => p.id === nearestStation.paId) ?? null;
           setAutoStation(nearestStation);
           setAutoPa(nearestPa);
 
-          if (nearestPa && paModeRef.current === 'auto') {
+          // #station-intensive-hors-perimetre : au-delà du périmètre, la station la
+          // plus proche connue reste trop lointaine pour être pertinente — bascule sur
+          // la saisie libre plutôt que d'imposer silencieusement cette station distante
+          // en mode Auto, préremplie avec la localité géocodée (modifiable).
+          if (draft?.type_prospection === 'intensive' && distanceKm > PERIMETRE_STATION_INTENSIVE_KM) {
+            setPaMode('manuel');
+            setStationMode('manuel');
+            paModeRef.current = 'manuel';
+            stationModeRef.current = 'manuel';
+            const localite = area.commune || area.district || '';
+            setPaManualNom((current) => current || localite);
+            setStationManualNom((current) => current || localite);
+          } else if (nearestPa && paModeRef.current === 'auto') {
             applyPa(nearestPa);
             if (stationModeRef.current === 'auto') {
               setStation(nearestStation);
@@ -439,15 +470,22 @@ export default function ReferenceScreen() {
     setStationMode('manuel');
   }
 
-  // Détection du type intensif
-  const isIntensive = draft?.type_prospection === 'intensive';
+  // #station-intensive-hors-perimetre : au-delà de PERIMETRE_STATION_INTENSIVE_KM,
+  // aucune station du référentiel n'est réellement pertinente — traité comme
+  // l'extensif (saisie libre). `distanceStationKm == null` (pas encore calculée)
+  // laisse le comportement historique inchangé.
+  const horsPerimetreStation =
+    isIntensive && distanceStationKm != null && distanceStationKm > PERIMETRE_STATION_INTENSIVE_KM;
 
-  // #manuel-referentiel-pa-station : en intensif, le mode Manuel choisit un
-  // PA/une Station du référentiel (comme l'auto) — `pa`/`station` restent de
-  // vrais objets référentiel dans les deux modes. Seul l'extensif garde la
-  // saisie libre historique (`paManualNom`/`stationManualNom`).
-  const paEstSaisieLibre = paMode === 'manuel' && !isIntensive;
-  const stationEstSaisieLibre = stationMode === 'manuel' && !isIntensive;
+  // #manuel-referentiel-pa-station : en intensif ET dans le périmètre, le mode
+  // Manuel choisit un PA/une Station du référentiel (comme l'auto) — `pa`/
+  // `station` restent de vrais objets référentiel. Hors périmètre (ou en
+  // extensif, historique), saisie libre (`paManualNom`/`stationManualNom`) —
+  // `paManualNom !== ''`/`stationManualNom !== ''` couvre la réouverture d'un
+  // brouillon déjà enregistré en saisie libre, sans recalcul de distance.
+  const paEstSaisieLibre = paMode === 'manuel' && (!isIntensive || horsPerimetreStation || paManualNom !== '');
+  const stationEstSaisieLibre =
+    stationMode === 'manuel' && (!isIntensive || horsPerimetreStation || stationManualNom !== '');
 
   // Biotopes (#biotope-multi) : sélection multiple — hors du form tanstack, comme
   // `selectedTextures` dans veg.tsx (state à part, la validation « au moins un »
@@ -628,6 +666,14 @@ export default function ReferenceScreen() {
                 <Text style={styles.gpsPrecisionAvertissement}>⚠️ {avertissementPrecision}</Text>
               ) : null}
 
+              {horsPerimetreStation ? (
+                <Text style={styles.gpsPrecisionAvertissement}>
+                  ⚠️ Aucune station intensive à moins de {PERIMETRE_STATION_INTENSIVE_KM} km (la plus proche est à{' '}
+                  {Math.round(distanceStationKm!)} km) — renseignez votre propre localité pour le Poste Acridien et
+                  la Station (le même nom pour les deux convient).
+                </Text>
+              ) : null}
+
               {isGpsLoading ? (
                 <View style={styles.gpsLoadingContainer}>
                   <Text style={styles.gpsLoadingText}>⏳ Récupération de la position GPS...</Text>
@@ -687,20 +733,20 @@ export default function ReferenceScreen() {
                     <Text style={styles.gpsBadgeText}>📡 via GPS</Text>
                   </View>
                 </View>
-              ) : isIntensive ? (
-                <SelecteurReferentiel
-                  valeur={pa}
-                  options={postesReferentiel}
-                  onSelect={applyPa}
-                  placeholder="Sélectionner un poste acridien"
-                />
-              ) : (
+              ) : paEstSaisieLibre ? (
                 <TextInput
                   value={paManualNom}
                   onChangeText={setPaManualNom}
                   placeholder="Saisir le nom du poste acridien"
                   placeholderTextColor={INACTIVE_TEXT}
                   style={styles.manualInput}
+                />
+              ) : (
+                <SelecteurReferentiel
+                  valeur={pa}
+                  options={postesReferentiel}
+                  onSelect={applyPa}
+                  placeholder="Sélectionner un poste acridien"
                 />
               )}
             </View>
@@ -729,7 +775,15 @@ export default function ReferenceScreen() {
                     <Text style={styles.gpsBadgeText}>📡 via GPS</Text>
                   </View>
                 </View>
-              ) : isIntensive ? (
+              ) : stationEstSaisieLibre ? (
+                <TextInput
+                  value={stationManualNom}
+                  onChangeText={setStationManualNom}
+                  placeholder="Saisir le nom de la station"
+                  placeholderTextColor={INACTIVE_TEXT}
+                  style={styles.manualInput}
+                />
+              ) : (
                 <SelecteurReferentiel
                   valeur={station}
                   options={stationsDisponibles}
@@ -737,14 +791,6 @@ export default function ReferenceScreen() {
                   placeholder="Sélectionner une station"
                   desactive={!pa}
                   messageDesactive="Choisissez d'abord un poste acridien"
-                />
-              ) : (
-                <TextInput
-                  value={stationManualNom}
-                  onChangeText={setStationManualNom}
-                  placeholder="Saisir le nom de la station"
-                  placeholderTextColor={INACTIVE_TEXT}
-                  style={styles.manualInput}
                 />
               )}
             </View>
