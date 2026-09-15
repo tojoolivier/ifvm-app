@@ -41,6 +41,18 @@ const isTablet = width >= 768;
 
 const WEEK_LABELS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
+/**
+ * `station_nom` (intensif, référentiel) ou `station_libre` (extensif, saisie
+ * libre) sont les deux vrais noms lisibles — même règle que `stationLabel`
+ * dans fiches.tsx/prospection.tsx, dupliquée ici plutôt que mutualisée (même
+ * choix que ces deux fichiers). « Activité récente » affichait « Station non
+ * spécifiée » pour toute fiche extensive/validation alors que la localité
+ * saisie (station_libre) existait bel et bien.
+ */
+function stationLabel(item: { station_nom?: string | null; station_libre?: string | null }): string {
+  return item.station_nom || item.station_libre || 'Station non spécifiée';
+}
+
 // ============================================
 // COMPOSANT PRINCIPAL
 // ============================================
@@ -263,7 +275,7 @@ export default function DashboardScreen() {
                   activeOpacity={0.7}
                 >
                   <View>
-                    <ThemedText style={styles.ficheTitle}>{fiche.station_nom || 'Station non spécifiée'}</ThemedText>
+                    <ThemedText style={styles.ficheTitle}>{stationLabel(fiche)}</ThemedText>
                     <ThemedText style={styles.ficheSub}>
                       N°{fiche.n_fiche ?? '—'} · {fiche.date_prospection}
                     </ThemedText>
