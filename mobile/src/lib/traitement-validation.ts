@@ -301,6 +301,63 @@ export function validateAerienEquipe(input: AerienEquipeValidationInput): Valida
   return errors;
 }
 
+/**
+ * #traitement-aerien-brouillon-incomplet-bloque-synchro : une fiche Aérien est
+ * créée en base (`statut_sync = 'local'`) dès l'écran de sélection, bien avant
+ * que l'écran Équipe & Références (ci-dessus) n'ait renseigné quoi que ce
+ * soit — pilote/mécanicien/chef de base/immatriculation/base principale valent
+ * alors tous `null`. Si une synchronisation (automatique ou manuelle) se
+ * déclenche avant que l'agent n'ait complété cet écran (brouillon abandonné en
+ * cours de route, appel entrant, etc.), le serveur renvoie ses messages Pydantic
+ * bruts et par défaut, en anglais ("String should have at least 1 character"...)
+ * — la fiche reste ensuite marquée en échec indéfiniment. Sert de garde-fou
+ * avant tout envoi (file d'attente ET bouton « Réessayer » ciblé) : une fiche
+ * qui ne satisfait pas encore ces champs, tous obligatoires côté backend
+ * (`TraitementAerienCreate`), n'est simplement jamais transmise.
+ */
+export interface AerienSyncPreconditionInput {
+  pilote: string | null | undefined;
+  mecanicien: string | null | undefined;
+  chefDeBaseId: string | null | undefined;
+  immatriculeAeronef: string | null | undefined;
+  basePrincipale: string | null | undefined;
+}
+
+export function estAerienPretPourSynchro(input: AerienSyncPreconditionInput): boolean {
+  return Boolean(
+    input.pilote?.trim() &&
+      input.mecanicien?.trim() &&
+      input.chefDeBaseId &&
+      input.immatriculeAeronef?.trim() &&
+      input.basePrincipale?.trim()
+  );
+}
+
+/**
+ * Miroir de `estAerienPretPourSynchro` pour la branche Terrestre — mêmes champs
+ * obligatoires sans valeur par défaut côté backend (`TraitementTerrestreCreate`) :
+ * chef d'équipe, heures de début/fin, vitesse du vent, température. Une fiche
+ * Terrestre est créée en base dès l'écran de sélection, avant l'écran
+ * Conditions qui les renseigne (traitement.tsx).
+ */
+export interface TerrestreSyncPreconditionInput {
+  chefEquipeId: string | null | undefined;
+  heureDebut: string | null | undefined;
+  heureFin: string | null | undefined;
+  vitesseVentMs: number | null | undefined;
+  temperatureC: number | null | undefined;
+}
+
+export function estTerrestrePretPourSynchro(input: TerrestreSyncPreconditionInput): boolean {
+  return Boolean(
+    input.chefEquipeId &&
+      input.heureDebut &&
+      input.heureFin &&
+      input.vitesseVentMs != null &&
+      input.temperatureC != null
+  );
+}
+
 // ==========================================
 // ROTATIONS (écran C, branche aérienne)
 // ==========================================

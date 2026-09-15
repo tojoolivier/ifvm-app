@@ -500,8 +500,8 @@ describe('ExtensiveRecapScreen — mode aérien : pesticides embarqués + signat
     expect(screen.queryByText('VISA')).toBeNull();
     expect(screen.queryByText(`Rakoto V. — ${formatHeureLocale('2026-09-01T09:00:00.000Z')}`)).toBeNull();
     expect(screen.queryByText(`Jean Rakoto — ${formatHeureLocale('2026-09-01T09:10:00.000Z')}`)).toBeNull();
-    // Consultant FAO et Chef de Base non signés : ligne présente avec « — », pas absente.
-    expect(screen.getByText('Consultant FAO')).toBeVisible();
+    // Consultant International et Chef de Base non signés : ligne présente avec « — », pas absente.
+    expect(screen.getByText('Consultant International')).toBeVisible();
     expect(screen.getByText('Chef de Base')).toBeVisible();
   });
 

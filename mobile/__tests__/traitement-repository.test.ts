@@ -835,8 +835,18 @@ describe('listUnsyncedTraitements (#synchronisation-automatique)', () => {
     getFirstAsync
       .mockResolvedValueOnce(STORED_TRAITEMENT_ROW) // ligne traitement (getTraitement)
       .mockResolvedValueOnce(null) // cible
-      .mockResolvedValueOnce(null); // traitement_aerien (pas de rotations à charger ensuite)
+      // Équipe & Références déjà complètes (#traitement-aerien-brouillon-incomplet-bloque-synchro) —
+      // ce scénario porte sur le filtre SQL par statut, pas sur la complétude.
+      .mockResolvedValueOnce({
+        traitement_id: STORED_TRAITEMENT_ROW.id,
+        pilote: 'Jean Dupont',
+        mecanicien: 'Marc Rabe',
+        chef_de_base_id: 'chef-1',
+        immatricule_aeronef: '5R-ABC',
+        base_principale: 'Base Betioky',
+      });
     getAllAsync
+      .mockResolvedValueOnce([]) // rotations
       .mockResolvedValueOnce([]) // signatures
       .mockResolvedValueOnce([]); // evaluations_risque_population
 
