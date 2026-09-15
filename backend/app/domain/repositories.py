@@ -18,7 +18,7 @@ from app.domain.referentiel import (
     UtilisateurEquipe,
     ZoneAntiAcridien,
 )
-from app.domain.traitement import ProduitUtilise, Rotation, Traitement, TraitementSignature
+from app.domain.traitement import Bloc, ProduitUtilise, Rotation, Traitement, TraitementSignature
 from app.domain.utilisateur import UtilisateurRef
 
 
@@ -153,6 +153,20 @@ class TraitementRepository(ABC):
         total_pesticide_l: float | None,
         pesticide_stock_restant_l: float | None,
     ) -> Traitement:
+        pass
+
+    @abstractmethod
+    async def add_bloc(self, traitement_id: uuid.UUID, bloc: Bloc) -> Traitement:
+        """Aucun total à recalculer : un bloc ne nourrit aucun champ dérivé de
+        `traitement_aerien` (contrairement à une rotation)."""
+        pass
+
+    @abstractmethod
+    async def update_bloc(self, traitement_id: uuid.UUID, bloc: Bloc) -> Traitement:
+        pass
+
+    @abstractmethod
+    async def remove_bloc(self, traitement_id: uuid.UUID, bloc_id: uuid.UUID) -> Traitement:
         pass
 
     @abstractmethod
