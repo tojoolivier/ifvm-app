@@ -787,9 +787,7 @@ async def test_delete_bloc_dun_autre_traitement_404(
     )
     bloc_id = bloc.json()["aerien"]["blocs"][0]["id"]
 
-    resp = await client.delete(
-        f"/traitements/{traitement_2}/blocs/{bloc_id}", headers=auth_headers
-    )
+    resp = await client.delete(f"/traitements/{traitement_2}/blocs/{bloc_id}", headers=auth_headers)
     assert resp.status_code == 404
 
 
