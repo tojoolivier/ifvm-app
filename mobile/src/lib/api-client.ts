@@ -212,6 +212,11 @@ export interface User {
   prenom: string;
   email: string;
   role: UserRole;
+  /** Identifiant court (ex. "ADM") inséré dans le numéro de fiche généré pour
+   * toute fiche créée par cet utilisateur — facultatif (migration backend 0065).
+   * Optionnel (et non `| null`) pour ne pas casser les nombreuses fixtures de
+   * test existantes qui construisent un `User` sans ce champ. */
+  sigle?: string | null;
   actif: boolean;
   created_at: string;
 }

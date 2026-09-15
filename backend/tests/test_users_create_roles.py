@@ -37,6 +37,26 @@ async def test_creation_reussie(client: AsyncClient, admin_headers: dict):
     )
     assert resp.status_code == 201
     assert resp.json()["role"] == "chef_equipe"
+    assert resp.json()["sigle"] is None
+
+
+async def test_creation_avec_sigle(client: AsyncClient, admin_headers: dict):
+    """Le sigle (migration 0065) s'insère dans le numéro de fiche généré côté
+    mobile — facultatif à la création."""
+    resp = await client.post(
+        "/users/",
+        json={
+            "nom": "Rabe",
+            "prenom": "Ando",
+            "email": "ando.rabe@test.mg",
+            "password": "secret123",
+            "role": "admin",
+            "sigle": "ADM",
+        },
+        headers=admin_headers,
+    )
+    assert resp.status_code == 201
+    assert resp.json()["sigle"] == "ADM"
 
 
 async def test_creation_email_duplique_renvoie_un_detail_exploitable(

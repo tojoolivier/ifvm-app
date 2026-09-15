@@ -67,6 +67,7 @@ export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState(ROLES[0])
+  const [sigle, setSigle] = useState('')
   const [createError, setCreateError] = useState('')
 
   const { data: usersData = [], isLoading, isError, error } = useQuery<Utilisateur[]>({
@@ -97,7 +98,7 @@ export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
   }
 
   const createMutation = useMutation({
-    mutationFn: (data: { nom: string; prenom: string; email: string; password: string; role: string }) =>
+    mutationFn: (data: { nom: string; prenom: string; email: string; password: string; role: string; sigle: string }) =>
       api.post('/users/', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
@@ -110,7 +111,7 @@ export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, ...data }: { id: string; role?: string; actif?: boolean }) =>
+    mutationFn: ({ id, ...data }: { id: string; role?: string; actif?: boolean; sigle?: string }) =>
       api.patch(`/users/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
@@ -126,13 +127,14 @@ export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
     setEmail('')
     setPassword('')
     setRole(ROLES[0])
+    setSigle('')
     setCreateError('')
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setCreateError('')
-    createMutation.mutate({ nom, prenom, email, password, role })
+    createMutation.mutate({ nom, prenom, email, password, role, sigle: sigle.trim() })
   }
 
   const columns: DataTableColumn<Utilisateur>[] = [
@@ -151,6 +153,35 @@ export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
         <span className="font-mono text-[11.5px] font-medium text-ifvm-text-tertiary">
           {u.email}
         </span>
+      ),
+    },
+    {
+      key: 'sigle',
+      header: 'Sigle',
+      render: (u) => (
+        // Chaîne vide envoyée au blur = effacement explicite côté backend
+        // (distinct de l'absence du champ, qui laisse le sigle inchangé) —
+        // cf. `update_user` (routers/users.py). `key` force le remontage si la
+        // valeur change ailleurs (refetch après succès), pour ne jamais
+        // afficher une saisie non commise à côté d'une valeur serveur stale.
+        <input
+          key={u.sigle ?? ''}
+          type="text"
+          maxLength={10}
+          defaultValue={u.sigle ?? ''}
+          aria-label={`Sigle de ${u.prenom} ${u.nom}`}
+          placeholder="—"
+          disabled={updateMutation.isPending}
+          onBlur={(e) => {
+            const value = e.target.value.trim()
+            if (value === (u.sigle ?? '')) return
+            updateMutation.mutate({ id: u.id, sigle: value })
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur()
+          }}
+          className="w-20 rounded border border-[#e7e0cd] bg-white px-2 py-1 font-mono text-[11.5px] font-medium uppercase text-ifvm-text-tertiary focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+        />
       ),
     },
     {
@@ -303,6 +334,17 @@ export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
                     </option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Sigle</label>
+                <input
+                  type="text"
+                  value={sigle}
+                  onChange={(e) => setSigle(e.target.value)}
+                  maxLength={10}
+                  placeholder="Ex. ADM"
+                  className="w-full border border-gray-300 rounded px-3 py-2 uppercase focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
               </div>
               <div className="flex gap-3 pt-2">
                 <button
