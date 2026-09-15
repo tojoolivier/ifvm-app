@@ -2,6 +2,7 @@ import * as Network from 'expo-network';
 import { apiClient } from '../src/lib/api-client';
 import {
   DraftTraitement,
+  estTraitementPretPourSynchro,
   markTraitementSynced,
   markTraitementConflict,
   markTraitementEchec,
@@ -11,9 +12,15 @@ import {
   syncOneTraitement,
   syncAllTraitements,
 } from '../src/lib/traitement-sync';
-import { NetworkError } from '../src/lib/errors';
+import { NetworkError, PreconditionError } from '../src/lib/errors';
 
 jest.mock('../src/lib/traitement-repository', () => ({
+  // Par défaut toujours prête : les fixtures de ce fichier ne visent pas cette
+  // règle (cf. #traitement-aerien-brouillon-incomplet-bloque-synchro, testée à
+  // part ci-dessous) — un `immatricule_aeronef: null` dans `draft()` de base ne
+  // doit pas faire échouer les scénarios de conflit/rotations qui n'en parlent
+  // pas.
+  estTraitementPretPourSynchro: jest.fn(() => true),
   markTraitementSynced: jest.fn(),
   markTraitementConflict: jest.fn(),
   markTraitementEchec: jest.fn(),
@@ -49,6 +56,7 @@ jest.mock('expo-network', () => ({ getNetworkStateAsync: jest.fn() }));
 const mockMarkSynced = jest.mocked(markTraitementSynced);
 const mockMarkConflict = jest.mocked(markTraitementConflict);
 const mockMarkEchec = jest.mocked(markTraitementEchec);
+const mockEstPret = jest.mocked(estTraitementPretPourSynchro);
 const mockSyncTraitement = jest.mocked(apiClient.syncTraitement);
 const mockGetNetworkState = jest.mocked(Network.getNetworkStateAsync);
 
@@ -132,6 +140,7 @@ beforeEach(() => {
   mockSyncTraitement.mockReset();
   mockGetNetworkState.mockReset();
   mockMarkEchec.mockReset();
+  mockEstPret.mockReset().mockReturnValue(true);
   jest.mocked(apiClient.addRotation).mockClear();
   jest.mocked(apiClient.removeRotation).mockClear();
   jest.mocked(apiClient.addProduitUtilise).mockClear();
@@ -509,6 +518,16 @@ describe('syncOneTraitement — l’unitaire lève', () => {
 
     await expect(syncOneTraitement(draft(), 'token-1')).rejects.toThrow('network error');
     expect(mockMarkSynced).not.toHaveBeenCalled();
+  });
+
+  // #traitement-aerien-brouillon-incomplet-bloque-synchro
+  it('refuse d’envoyer une fiche pas encore prête, sans jamais appeler le réseau', async () => {
+    mockEstPret.mockReturnValue(false);
+
+    await expect(syncOneTraitement(draft(), 'token-1')).rejects.toThrow(PreconditionError);
+    expect(mockSyncTraitement).not.toHaveBeenCalled();
+    expect(mockMarkSynced).not.toHaveBeenCalled();
+    expect(mockMarkEchec).not.toHaveBeenCalled();
   });
 });
 
