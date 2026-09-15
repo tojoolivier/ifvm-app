@@ -650,6 +650,224 @@ async def test_delete_rotation_dun_autre_traitement_404(
     assert verif.json()["aerien"]["nb_rotations"] == 1
 
 
+@pytest.fixture
+def payload_bloc():
+    def _build(**overrides):
+        payload = {
+            "nom": "bloc_1",
+            "localite": "Antragofano",
+            "surface_theorique_ha": 2000.0,
+            "surface_reelle_ha": 2000.0,
+            "surface_protegee_ha": 2000.0,
+            "largeur_andain_m": 500.0,
+            "interpasse_m": 500.0,
+            "hauteur_vol_min_m": 5.0,
+            "hauteur_vol_max_m": 10.0,
+        }
+        payload.update(overrides)
+        return payload
+
+    return _build
+
+
+@pytest.mark.asyncio
+async def test_add_bloc_numero_auto_incremente(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_bloc
+):
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    r1 = await client.post(
+        f"/traitements/{traitement_id}/blocs", json=payload_bloc(nom="bloc_1"), headers=auth_headers
+    )
+    r2 = await client.post(
+        f"/traitements/{traitement_id}/blocs", json=payload_bloc(nom="bloc_2"), headers=auth_headers
+    )
+    assert r1.status_code == 201, r1.text
+    assert r2.status_code == 201, r2.text
+    blocs = r2.json()["aerien"]["blocs"]
+    assert [b["numero"] for b in blocs] == [1, 2]
+    assert [b["nom"] for b in blocs] == ["bloc_1", "bloc_2"]
+
+
+@pytest.mark.asyncio
+async def test_add_bloc_traitement_inexistant_404(client, auth_headers, payload_bloc, db_engine):
+    resp = await client.post(
+        f"/traitements/{uuid.uuid4()}/blocs", json=payload_bloc(), headers=auth_headers
+    )
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_update_bloc(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_bloc
+):
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    created = await client.post(
+        f"/traitements/{traitement_id}/blocs", json=payload_bloc(), headers=auth_headers
+    )
+    bloc_id = created.json()["aerien"]["blocs"][0]["id"]
+
+    resp = await client.put(
+        f"/traitements/{traitement_id}/blocs/{bloc_id}",
+        json=payload_bloc(nom="bloc_1_renomme", surface_traitee_ha=1500.0),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    bloc = resp.json()["aerien"]["blocs"][0]
+    assert bloc["nom"] == "bloc_1_renomme"
+    assert bloc["surface_traitee_ha"] == 1500.0
+    assert bloc["numero"] == 1  # inchangé par la mise à jour
+
+
+@pytest.mark.asyncio
+async def test_update_bloc_inexistant_404(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_bloc
+):
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    resp = await client.put(
+        f"/traitements/{traitement_id}/blocs/{uuid.uuid4()}",
+        json=payload_bloc(),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_bloc_detache_ses_rotations(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement,
+    payload_bloc,
+    payload_rotation,
+):
+    """ON DELETE SET NULL (migration 0064) : supprimer un bloc ne supprime pas les
+    rotations qui le référençaient, ça les détache."""
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    bloc = await client.post(
+        f"/traitements/{traitement_id}/blocs", json=payload_bloc(), headers=auth_headers
+    )
+    bloc_id = bloc.json()["aerien"]["blocs"][0]["id"]
+    rotation = await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(bloc_id=bloc_id),
+        headers=auth_headers,
+    )
+    assert rotation.json()["aerien"]["rotations"][0]["bloc_id"] == bloc_id
+
+    resp = await client.delete(
+        f"/traitements/{traitement_id}/blocs/{bloc_id}", headers=auth_headers
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["aerien"]["blocs"] == []
+    assert resp.json()["aerien"]["rotations"][0]["bloc_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_delete_bloc_dun_autre_traitement_404(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_bloc
+):
+    traitement_1 = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    traitement_2 = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    bloc = await client.post(
+        f"/traitements/{traitement_1}/blocs", json=payload_bloc(), headers=auth_headers
+    )
+    bloc_id = bloc.json()["aerien"]["blocs"][0]["id"]
+
+    resp = await client.delete(
+        f"/traitements/{traitement_2}/blocs/{bloc_id}", headers=auth_headers
+    )
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_add_rotation_avec_bloc_id(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement,
+    payload_bloc,
+    payload_rotation,
+):
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    bloc = await client.post(
+        f"/traitements/{traitement_id}/blocs", json=payload_bloc(), headers=auth_headers
+    )
+    bloc_id = bloc.json()["aerien"]["blocs"][0]["id"]
+
+    resp = await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(bloc_id=bloc_id),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["aerien"]["rotations"][0]["bloc_id"] == bloc_id
+
+
+@pytest.mark.asyncio
+async def test_add_rotation_bloc_id_dun_autre_traitement_422(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement,
+    payload_bloc,
+    payload_rotation,
+):
+    """Un bloc n'est réutilisable que dans son propre traitement — pas de subdivision
+    partagée entre deux fiches."""
+    traitement_1 = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    traitement_2 = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    bloc = await client.post(
+        f"/traitements/{traitement_1}/blocs", json=payload_bloc(), headers=auth_headers
+    )
+    bloc_id = bloc.json()["aerien"]["blocs"][0]["id"]
+
+    resp = await client.post(
+        f"/traitements/{traitement_2}/rotations",
+        json=payload_rotation(bloc_id=bloc_id),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 422, resp.text
+
+
+@pytest.mark.asyncio
+async def test_add_rotation_bloc_id_inexistant_422(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_rotation
+):
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    resp = await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(bloc_id=str(uuid.uuid4())),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 422, resp.text
+
+
 @pytest.mark.asyncio
 async def test_list_traitements_filtres(
     client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement

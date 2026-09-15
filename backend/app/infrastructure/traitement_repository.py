@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.domain.repositories import TraitementRepository
 from app.domain.traitement import (
+    Bloc,
     Cible,
     EvaluationRisquePopulation,
     NumeroFicheConflitError,
@@ -26,6 +27,7 @@ from app.infrastructure.traitement_model import (
     ProduitUtiliseModel,
     RotationModel,
     TraitementAerienModel,
+    TraitementBlocModel,
     TraitementModel,
     TraitementSignatureModel,
     TraitementTerrestreModel,
@@ -43,6 +45,7 @@ class TraitementRepositoryImpl(TraitementRepository):
             .options(
                 selectinload(TraitementModel.cible),
                 selectinload(TraitementModel.aerien).selectinload(TraitementAerienModel.rotations),
+                selectinload(TraitementModel.aerien).selectinload(TraitementAerienModel.blocs),
                 selectinload(TraitementModel.terrestre).selectinload(
                     TraitementTerrestreModel.produits
                 ),
@@ -68,6 +71,7 @@ class TraitementRepositoryImpl(TraitementRepository):
         stmt = select(TraitementModel).options(
             selectinload(TraitementModel.cible),
             selectinload(TraitementModel.aerien).selectinload(TraitementAerienModel.rotations),
+            selectinload(TraitementModel.aerien).selectinload(TraitementAerienModel.blocs),
             selectinload(TraitementModel.terrestre).selectinload(TraitementTerrestreModel.produits),
             selectinload(TraitementModel.signatures),
             selectinload(TraitementModel.evaluations_risque_population),
@@ -346,6 +350,7 @@ class TraitementRepositoryImpl(TraitementRepository):
             RotationModel(
                 id=rotation.id,
                 traitement_aerien_id=traitement_id,
+                bloc_id=rotation.bloc_id,
                 numero=rotation.numero,
                 numero_cuve=rotation.numero_cuve,
                 produit_id=rotation.produit_id,
@@ -388,6 +393,7 @@ class TraitementRepositoryImpl(TraitementRepository):
         pesticide_stock_restant_l: float | None,
     ) -> Traitement:
         rotation_model = await self.session.get(RotationModel, rotation.id)
+        rotation_model.bloc_id = rotation.bloc_id
         rotation_model.numero_cuve = rotation.numero_cuve
         rotation_model.produit_id = rotation.produit_id
         rotation_model.quantite = rotation.quantite
@@ -440,6 +446,66 @@ class TraitementRepositoryImpl(TraitementRepository):
             surface_restante_ha,
             pesticide_stock_restant_l,
         )
+        return await self.get_by_id(traitement_id)
+
+    async def _expirer_blocs(self, traitement_id: uuid.UUID) -> None:
+        """Sans cet expire explicite, un `aerien` déjà chargé dans l'identity map de
+        la session (`expire_on_commit=False`, cf. conftest.py) garderait sa
+        collection `blocs` telle qu'au premier chargement — même patron que
+        `_persister_totaux` pour `rotations`."""
+        aerien_model = await self.session.get(TraitementAerienModel, traitement_id)
+        if aerien_model is not None:
+            self.session.expire(aerien_model, ["blocs"])
+
+    async def add_bloc(self, traitement_id: uuid.UUID, bloc: Bloc) -> Traitement:
+        self.session.add(
+            TraitementBlocModel(
+                id=bloc.id,
+                traitement_aerien_id=bloc.traitement_aerien_id,
+                numero=bloc.numero,
+                nom=bloc.nom,
+                localite=bloc.localite,
+                surface_theorique_ha=bloc.surface_theorique_ha,
+                surface_reelle_ha=bloc.surface_reelle_ha,
+                surface_protegee_ha=bloc.surface_protegee_ha,
+                surface_traitee_ha=bloc.surface_traitee_ha,
+                largeur_andain_m=bloc.largeur_andain_m,
+                interpasse_m=bloc.interpasse_m,
+                hauteur_vol_min_m=bloc.hauteur_vol_min_m,
+                hauteur_vol_max_m=bloc.hauteur_vol_max_m,
+                observation=bloc.observation,
+            )
+        )
+        await self.session.commit()
+        await self._expirer_blocs(traitement_id)
+        return await self.get_by_id(traitement_id)
+
+    async def update_bloc(self, traitement_id: uuid.UUID, bloc: Bloc) -> Traitement:
+        bloc_model = await self.session.get(TraitementBlocModel, bloc.id)
+        bloc_model.nom = bloc.nom
+        bloc_model.localite = bloc.localite
+        bloc_model.surface_theorique_ha = bloc.surface_theorique_ha
+        bloc_model.surface_reelle_ha = bloc.surface_reelle_ha
+        bloc_model.surface_protegee_ha = bloc.surface_protegee_ha
+        bloc_model.surface_traitee_ha = bloc.surface_traitee_ha
+        bloc_model.largeur_andain_m = bloc.largeur_andain_m
+        bloc_model.interpasse_m = bloc.interpasse_m
+        bloc_model.hauteur_vol_min_m = bloc.hauteur_vol_min_m
+        bloc_model.hauteur_vol_max_m = bloc.hauteur_vol_max_m
+        bloc_model.observation = bloc.observation
+        await self.session.commit()
+        await self._expirer_blocs(traitement_id)
+        return await self.get_by_id(traitement_id)
+
+    async def remove_bloc(self, traitement_id: uuid.UUID, bloc_id: uuid.UUID) -> Traitement:
+        bloc_model = await self.session.get(TraitementBlocModel, bloc_id)
+        await self.session.delete(bloc_model)
+        await self.session.commit()
+        # expire_all() plutôt qu'un expire ciblé : ON DELETE SET NULL (migration 0064)
+        # met aussi à jour traitement_rotation.bloc_id en base, hors de portée de
+        # l'ORM — une rotation déjà chargée dans l'identity map garderait sinon
+        # l'ancien bloc_id.
+        self.session.expire_all()
         return await self.get_by_id(traitement_id)
 
     async def add_produit(
@@ -818,6 +884,7 @@ class TraitementRepositoryImpl(TraitementRepository):
                     Rotation(
                         id=r.id,
                         traitement_aerien_id=r.traitement_aerien_id,
+                        bloc_id=r.bloc_id,
                         numero=r.numero,
                         numero_cuve=r.numero_cuve,
                         produit_id=r.produit_id,
@@ -835,6 +902,39 @@ class TraitementRepositoryImpl(TraitementRepository):
                         nom_commercial=r.nom_commercial,
                     )
                     for r in model.aerien.rotations
+                ],
+                blocs=[
+                    Bloc(
+                        id=b.id,
+                        traitement_aerien_id=b.traitement_aerien_id,
+                        numero=b.numero,
+                        nom=b.nom,
+                        localite=b.localite,
+                        surface_theorique_ha=float(b.surface_theorique_ha)
+                        if b.surface_theorique_ha is not None
+                        else None,
+                        surface_reelle_ha=float(b.surface_reelle_ha)
+                        if b.surface_reelle_ha is not None
+                        else None,
+                        surface_protegee_ha=float(b.surface_protegee_ha)
+                        if b.surface_protegee_ha is not None
+                        else None,
+                        surface_traitee_ha=float(b.surface_traitee_ha)
+                        if b.surface_traitee_ha is not None
+                        else None,
+                        largeur_andain_m=float(b.largeur_andain_m)
+                        if b.largeur_andain_m is not None
+                        else None,
+                        interpasse_m=float(b.interpasse_m) if b.interpasse_m is not None else None,
+                        hauteur_vol_min_m=float(b.hauteur_vol_min_m)
+                        if b.hauteur_vol_min_m is not None
+                        else None,
+                        hauteur_vol_max_m=float(b.hauteur_vol_max_m)
+                        if b.hauteur_vol_max_m is not None
+                        else None,
+                        observation=b.observation,
+                    )
+                    for b in model.aerien.blocs
                 ],
             )
             if model.aerien is not None
