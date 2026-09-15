@@ -722,6 +722,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/traitements/{traitement_id}/blocs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Bloc */
+        post: operations["add_bloc_traitements__traitement_id__blocs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/traitements/{traitement_id}/blocs/{bloc_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Bloc */
+        put: operations["update_bloc_traitements__traitement_id__blocs__bloc_id__put"];
+        post?: never;
+        /** Remove Bloc */
+        delete: operations["remove_bloc_traitements__traitement_id__blocs__bloc_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/traitements/{traitement_id}/produits": {
         parameters: {
             query?: never;
@@ -1030,6 +1065,63 @@ export interface components {
          * @enum {string}
          */
         Biotope: "xerophyle" | "mesophyle" | "hydrophyle";
+        /** BlocCreate */
+        BlocCreate: {
+            /** Nom */
+            nom: string;
+            /** Localite */
+            localite?: string | null;
+            /** Surface Theorique Ha */
+            surface_theorique_ha?: number | null;
+            /** Surface Reelle Ha */
+            surface_reelle_ha?: number | null;
+            /** Surface Protegee Ha */
+            surface_protegee_ha?: number | null;
+            /** Surface Traitee Ha */
+            surface_traitee_ha?: number | null;
+            /** Largeur Andain M */
+            largeur_andain_m?: number | null;
+            /** Interpasse M */
+            interpasse_m?: number | null;
+            /** Hauteur Vol Min M */
+            hauteur_vol_min_m?: number | null;
+            /** Hauteur Vol Max M */
+            hauteur_vol_max_m?: number | null;
+            /** Observation */
+            observation?: string | null;
+        };
+        /** BlocRead */
+        BlocRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Numero */
+            numero: number;
+            /** Nom */
+            nom: string;
+            /** Localite */
+            localite?: string | null;
+            /** Surface Theorique Ha */
+            surface_theorique_ha?: number | null;
+            /** Surface Reelle Ha */
+            surface_reelle_ha?: number | null;
+            /** Surface Protegee Ha */
+            surface_protegee_ha?: number | null;
+            /** Surface Traitee Ha */
+            surface_traitee_ha?: number | null;
+            /** Largeur Andain M */
+            largeur_andain_m?: number | null;
+            /** Interpasse M */
+            interpasse_m?: number | null;
+            /** Hauteur Vol Min M */
+            hauteur_vol_min_m?: number | null;
+            /** Hauteur Vol Max M */
+            hauteur_vol_max_m?: number | null;
+            /** Observation */
+            observation?: string | null;
+        };
         /** CampagneCreate */
         CampagneCreate: {
             /** Name */
@@ -2929,6 +3021,8 @@ export interface components {
         RoleSignature: "PILOTE" | "MECANICIEN" | "CHEF_DE_BASE" | "CHEF_EQUIPE" | "CONSULTANT_INTERNATIONAL";
         /** RotationCreate */
         RotationCreate: {
+            /** Bloc Id */
+            bloc_id?: string | null;
             /**
              * Produit Id
              * Format: uuid
@@ -2977,6 +3071,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Bloc Id */
+            bloc_id?: string | null;
             /** Numero */
             numero: number;
             /** Numero Cuve */
@@ -3415,6 +3511,11 @@ export interface components {
              * @default []
              */
             rotations: components["schemas"]["RotationRead"][];
+            /**
+             * Blocs
+             * @default []
+             */
+            blocs: components["schemas"]["BlocRead"][];
         };
         /** TraitementCreate */
         TraitementCreate: {
@@ -6174,6 +6275,109 @@ export interface operations {
             path: {
                 traitement_id: string;
                 rotation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TraitementRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_bloc_traitements__traitement_id__blocs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                traitement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BlocCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TraitementRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_bloc_traitements__traitement_id__blocs__bloc_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                traitement_id: string;
+                bloc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BlocCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TraitementRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_bloc_traitements__traitement_id__blocs__bloc_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                traitement_id: string;
+                bloc_id: string;
             };
             cookie?: never;
         };
