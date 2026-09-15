@@ -25,6 +25,20 @@ from app.domain.fiche_vol import (
 )
 
 
+def _sans_fuseau(valeur: datetime) -> datetime:
+    """Neutralise la présence ou l'absence de fuseau avant comparaison
+    (#erreur-sync-fiche-vol-datetime-naive-aware). `existante.updated_at` (colonne
+    TIMESTAMPTZ, cf. fiche_vol_model.py) revient parfois "aware" (lecture fraîche
+    depuis Postgres, asyncpg attache `tzinfo=UTC`) et parfois "naive" (objet encore en
+    cache dans l'identity map de la session depuis sa création — `datetime.utcnow()`,
+    naive, appliqué par la colonne `default=`, jamais réexpiré si `expire_on_commit`
+    est faux) — comparer les deux bruts lève `TypeError: can't compare offset-naive
+    and offset-aware datetimes`. `base_updated_at` (venu du client, une chaîne ISO
+    sans décalage) est toujours naive. Les deux désignent le même instant UTC : sûr de
+    retirer le fuseau plutôt que d'en forcer un côté client."""
+    return valeur.replace(tzinfo=None) if valeur.tzinfo is not None else valeur
+
+
 async def _exiger_brouillon(repo, fiche_vol_id: uuid.UUID) -> FicheVol:
     fiche = await repo.get_by_id(fiche_vol_id)
     if fiche is None:
@@ -128,7 +142,9 @@ class SyncPushFicheVol:
         if existante.statut != "brouillon":
             raise FicheVolValideeSyncRejeteError(existante)
 
-        if existante.updated_at > base_updated_at and contenu_diverge(existante, fiche):
+        if _sans_fuseau(existante.updated_at) > _sans_fuseau(base_updated_at) and contenu_diverge(
+            existante, fiche
+        ):
             marquee = await self.repo.marquer_conflict(existante.id)
             raise FicheVolSyncConflitError(marquee)
 
