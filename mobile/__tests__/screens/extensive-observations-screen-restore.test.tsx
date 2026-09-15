@@ -104,6 +104,31 @@ describe('ExtensiveObservationsScreen — restauration après hydratation tardiv
   });
 
   /**
+   * #saisie-decimale-virgule : une saisie avec la virgule (clavier "decimal-pad" en
+   * locale FR) ne doit plus se perdre à l'enregistrement. `parseFloat("0,80")` vaut 0
+   * telle quelle (s'arrête à la virgule) — le champ s'enregistrait donc toujours à
+   * 0 cm quelle que soit la valeur réellement saisie sous la barre.
+   */
+  it("H STR HERB : une saisie à la virgule (0,80 m) est convertie et enregistrée en centimètres (80 cm), jamais 0", async () => {
+    useProspectionWizardStore.setState({ draft: { id: 'draft-123', type_prospection: 'extensive' } as any, captures: [] });
+
+    await render(<ExtensiveObservationsScreen />);
+    await screen.findByText('H Str Herb (m)');
+
+    fireEvent.changeText(screen.getByTestId('hauteur-herbe-input'), '0,80');
+    expect(await screen.findByDisplayValue('0,80')).toBeVisible();
+
+    fireEvent.press(screen.getByText('Suivant : Récapitulatif ›'));
+
+    await waitFor(() =>
+      expect(prospectionRepository.updateProspectionExtensiveObservations).toHaveBeenCalledWith(
+        'draft-123',
+        expect.objectContaining({ hauteurHerbeCm: 80 })
+      )
+    );
+  });
+
+  /**
    * Non-régression explicite (#228) : « H STR HERB (m) » doit rester préaffiché et
    * modifiable sans effacer le reste de la fiche — reproduit exactement le scénario
    * donné par l'utilisateur (1.25 m → 1.50 m après modification, ni arrondi ni entier).
