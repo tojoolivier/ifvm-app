@@ -32,9 +32,7 @@ def _borner_a_zero(valeur: float) -> float:
     return valeur if valeur > 0 else 0.0
 
 
-def _to_domain(
-    model: FicheVolModel, pesticide_quantite_utilisee: float | None = None
-) -> FicheVol:
+def _to_domain(model: FicheVolModel, pesticide_quantite_utilisee: float | None = None) -> FicheVol:
     disponible = (
         float(model.pesticide_quantite_disponible)
         if model.pesticide_quantite_disponible is not None
