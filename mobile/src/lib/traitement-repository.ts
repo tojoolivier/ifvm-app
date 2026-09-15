@@ -2,6 +2,7 @@ import { getDb } from './prospection-db';
 import { generateId } from './id';
 import { composerNumeroFiche } from './traitement-numero-fiche';
 import { PreconditionError } from './errors';
+import { estAerienPretPourSynchro, estTerrestrePretPourSynchro } from './traitement-validation';
 
 export type TypeTraitement = 'AERIEN' | 'TERRESTRE';
 
@@ -1447,6 +1448,17 @@ export async function listRecentTraitements(limit = 20): Promise<DraftTraitement
  * `getTraitement` reconstruit la fiche complète (aerien/terrestre/rotations/
  * produits/signatures) — nécessaire pour repousser autre chose qu'une ligne
  * partielle.
+ *
+ * #traitement-aerien-brouillon-incomplet-bloque-synchro : `statut_sync =
+ * 'local'` est posé dès la création de la fiche (createDraftTraitementAerien/
+ * Terrestre), bien avant que l'écran Équipe & Références n'ait renseigné les
+ * champs obligatoires côté backend. Une fiche fraîchement créée (ou abandonnée
+ * en cours de route) était donc déjà éligible à l'envoi, et échouait à coup
+ * sûr avec les messages Pydantic par défaut (anglais, illisibles). On
+ * n'inclut plus dans la file qu'une fiche déjà prête pour son type
+ * (`estAerienPretPourSynchro`/`estTerrestrePretPourSynchro`) — elle y entrera
+ * dès que l'agent aura complété cet écran, sans qu'aucune action de sa part
+ * ne soit nécessaire ici.
  */
 export async function listUnsyncedTraitements(): Promise<DraftTraitement[]> {
   const db = await getDb();
@@ -1459,9 +1471,41 @@ export async function listUnsyncedTraitements(): Promise<DraftTraitement[]> {
   const drafts: DraftTraitement[] = [];
   for (const row of rows) {
     const draft = await getTraitement(row.id);
-    if (draft) drafts.push(draft);
+    if (draft && estTraitementPretPourSynchro(draft)) drafts.push(draft);
   }
   return drafts;
+}
+
+/** Vrai si la fiche a déjà tous les champs obligatoires (côté backend) de son
+ * type — cf. le commentaire de `listUnsyncedTraitements` ci-dessus. Partagée
+ * avec `syncOneTraitement` (traitement-sync.ts) pour que le bouton « Réessayer »
+ * ciblé, qui contourne cette liste, applique la même règle. */
+export function estTraitementPretPourSynchro(draft: DraftTraitement): boolean {
+  if (draft.type_traitement === 'AERIEN') {
+    return (
+      !!draft.aerien &&
+      estAerienPretPourSynchro({
+        pilote: draft.aerien.pilote,
+        mecanicien: draft.aerien.mecanicien,
+        chefDeBaseId: draft.aerien.chef_de_base_id,
+        immatriculeAeronef: draft.aerien.immatricule_aeronef,
+        basePrincipale: draft.aerien.base_principale,
+      })
+    );
+  }
+  if (draft.type_traitement === 'TERRESTRE') {
+    return (
+      !!draft.terrestre &&
+      estTerrestrePretPourSynchro({
+        chefEquipeId: draft.terrestre.chef_equipe_id,
+        heureDebut: draft.terrestre.heure_debut,
+        heureFin: draft.terrestre.heure_fin,
+        vitesseVentMs: draft.terrestre.vitesse_vent_ms,
+        temperatureC: draft.terrestre.temperature_c,
+      })
+    );
+  }
+  return false;
 }
 
 // ==========================================

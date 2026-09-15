@@ -834,7 +834,7 @@ export function ProspectionDetailPage() {
           </Carte>
         )}
 
-        {/* Extensif — signatures (visa, consultant FAO, pilote, chef de base) */}
+        {/* Extensif — signatures (visa, consultant international, pilote, chef de base) */}
         {(prospection.signature_visa_nom ||
           prospection.signature_consultant_fao_nom ||
           prospection.signature_pilote_nom ||
@@ -848,7 +848,7 @@ export function ProspectionDetailPage() {
                 [
                   ['Visa', prospection.signature_visa_nom, prospection.signature_visa_horodatage],
                   [
-                    'Consultant FAO',
+                    'Consultant International',
                     prospection.signature_consultant_fao_nom,
                     prospection.signature_consultant_fao_horodatage,
                   ],

@@ -3,11 +3,13 @@ import type { components } from './api-schema.generated';
 import { apiClient, conflitSync } from './api-client';
 import {
   DraftTraitement,
+  estTraitementPretPourSynchro,
   markTraitementConflict,
   markTraitementEchec,
   markTraitementSynced,
   ServerTraitement,
 } from './traitement-repository';
+import { PreconditionError } from './errors';
 import { logger } from './logger';
 import { avecConnexion, syncAll, type LotSync, type ResumeSync } from './sync-lot';
 
@@ -247,6 +249,21 @@ async function pushRotationsEtProduits(
  * connaît pas le sort réservé à la fiche.
  */
 export async function syncOneTraitement(draft: DraftTraitement, token: string): Promise<void> {
+  // #traitement-aerien-brouillon-incomplet-bloque-synchro : `listUnsyncedTraitements`
+  // exclut déjà une fiche incomplète de la file automatique, mais le bouton
+  // « Réessayer » ciblé (sync.tsx) relit `getTraitement` directement et
+  // contourne cette liste — sans ce garde-fou ici aussi, il repartirait vers le
+  // serveur pour échouer à l'identique, avec les mêmes messages Pydantic bruts.
+  if (!estTraitementPretPourSynchro(draft)) {
+    const champs =
+      draft.type_traitement === 'AERIEN'
+        ? 'pilote, mécanicien, chef de base, immatriculation, base'
+        : "chef d'équipe, heures de début/fin, vitesse du vent, température";
+    throw new PreconditionError(
+      `Fiche incomplète : renseignez d'abord Équipe & Conditions (${champs}) avant de synchroniser.`
+    );
+  }
+
   const payload = buildTraitementSyncPayload(draft);
   const { status, body } = await apiClient.syncTraitement(token, payload);
 
