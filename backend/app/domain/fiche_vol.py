@@ -104,6 +104,26 @@ class RotationDejaRapprocheeError(Exception):
     application, pas deux."""
 
 
+class FicheVolValideeSyncRejeteError(Exception):
+    """Fiche serveur déjà `validee` : rejet systématique de toute synchronisation
+    entrante, avant même toute comparaison de contenu — même patron que
+    `TraitementValideeSyncRejeteError` (app/domain/traitement.py). `statut_sync` reste
+    `synced`, jamais `conflict`, sur une fiche verrouillée."""
+
+    def __init__(self, fiche_vol_serveur: "FicheVol"):
+        self.fiche_vol_serveur = fiche_vol_serveur
+
+
+class FicheVolSyncConflitError(Exception):
+    """Conflit de synchronisation : `updated_at` serveur postérieur au
+    `base_updated_at` connu du client, et contenu divergent. La fiche entrante est
+    rejetée, `statut_sync` passe à `conflict` côté serveur, jamais de résolution
+    automatique — même patron que `TraitementSyncConflitError`."""
+
+    def __init__(self, fiche_vol_serveur: "FicheVol"):
+        self.fiche_vol_serveur = fiche_vol_serveur
+
+
 def composer_numero_fiche(compteur: int, date_vol: date, equipe: str, immatriculation: str) -> str:
     """`[Compteur 3 chiffres]-[Date]-[Équipe]-[Immatriculation]` — arbitrage du 2026-09-15,
     remplace le format `[Date]-[Base]-[Immatriculation]` d'ADR-011 §7.2/§5.
@@ -181,6 +201,73 @@ def valider_signatures(fiche: "FicheVol") -> None:
         raise SignaturesVolManquantesError(
             f"signatures manquantes : {', '.join(sorted(manquants))}"
         )
+
+
+# Champs de contenu métier comparés pour détecter un conflit de synchronisation — hors
+# champs techniques (statut, statut_sync, created_at, updated_at, compteur, numero_fiche,
+# attribués une fois à la création, jamais renvoyés par le client) et hors champs dérivés
+# en lecture seule (base_numero/..., pesticide_quantite_utilisee/restante, signatures —
+# gérées par leur propre endpoint). Même patron que _CHAMPS_CONTENU_COMMUNS côté
+# traitement (app/domain/traitement.py).
+_CHAMPS_CONTENU_FICHE: tuple[str, ...] = (
+    "date_vol",
+    "compagnie",
+    "immatriculation",
+    "campagne_id",
+    "base_id",
+    "stand_id",
+    "pilote",
+    "mecanicien",
+    "chef_de_base_id",
+    "consultant_international",
+    "pesticide_nom_commercial",
+    "pesticide_quantite_disponible",
+    "pesticide_quantite_recue",
+    "futs_disponible",
+    "futs_recues",
+    "futs_pleins",
+    "futs_vides",
+    "observations",
+)
+
+_CHAMPS_CONTENU_VOL: tuple[str, ...] = (
+    "numero",
+    "type_vol",
+    "heure_debut",
+    "heure_fin",
+    "rotation_id",
+    "prospection_id",
+    "observations",
+)
+
+
+def _vol_diverge(existant: "Vol", entrant: "Vol") -> bool:
+    return any(getattr(existant, champ) != getattr(entrant, champ) for champ in _CHAMPS_CONTENU_VOL)
+
+
+def contenu_diverge(existante: "FicheVol", entrante: "FicheVol") -> bool:
+    """Compare le contenu métier de deux fiches. Un renvoi réseau (même contenu) doit
+    être traité `synced` sans jamais être vu comme un conflit (même décision que côté
+    traitement) — cette fonction est le point de vérité unique pour "diverge".
+
+    Contrairement à `traitement.contenu_diverge`, les `vols` font partie du contenu
+    comparé : ce ne sont pas des sous-ressources à endpoints séparés comme
+    rotations/produits, mais remplacées en bloc à chaque synchronisation (cf.
+    `FicheVolRepositoryImpl.update_sync`) — comparés ici par `id` (attribué côté
+    client, stable d'une synchronisation à l'autre).
+    """
+    if any(
+        getattr(existante, champ) != getattr(entrante, champ) for champ in _CHAMPS_CONTENU_FICHE
+    ):
+        return True
+    if len(existante.vols) != len(entrante.vols):
+        return True
+    vols_existants = {v.id: v for v in existante.vols}
+    for vol in entrante.vols:
+        pair = vols_existants.get(vol.id)
+        if pair is None or _vol_diverge(pair, vol):
+            return True
+    return False
 
 
 def cumuler_durees(fiches: "list[FicheVol]", reference: date) -> dict[str, int]:
