@@ -15,6 +15,7 @@ import {
 } from '@/lib/referentiel-db';
 import { updateProspectionReference, DraftProspection } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
+import { useAuthStore } from '@/lib/auth-store';
 import { parseSelectionMultiple } from '@/lib/prospection-extensive';
 import { ReferenceFormValues } from '@/lib/prospection-reference-schema';
 import { validateGpsPosition } from '@/lib/prospection-validation';
@@ -42,10 +43,18 @@ const BIOTOPE_OPTIONS = [
   { label: 'Hygrophyle', value: 'hydrophyle' },
 ];
 
-function generateNumeroFiche(draftId: string, dateProspection: string): string {
+/**
+ * #sigle-utilisateur-numero-fiche : le sigle de l'utilisateur connecté (ex.
+ * "ADM", attribué par un admin depuis la page Utilisateurs du web) s'insère
+ * entre la date et le suffixe final quand il est renseigné — jamais une
+ * chaîne vide, pour ne pas laisser un tiret orphelin ("FI-20260915--A8DF4")
+ * quand l'utilisateur n'en a pas encore.
+ */
+function generateNumeroFiche(draftId: string, dateProspection: string, sigle?: string | null): string {
   const datePart = dateProspection.replace(/-/g, '');
   const idPart = draftId.replace(/-/g, '').slice(0, 6).toUpperCase();
-  return `FI-${datePart}-${idPart}`;
+  const sigleParts = sigle ? `${sigle}-` : '';
+  return `FI-${datePart}-${sigleParts}${idPart}`;
 }
 
 function formatDateHeure(date: Date): string {
@@ -157,6 +166,7 @@ export default function ReferenceScreen() {
   const draft = useProspectionWizardStore((s) => s.draft);
   const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
   const setDraft = useProspectionWizardStore((s) => s.setDraft);
+  const sigle = useAuthStore((s) => s.user?.sigle);
 
   const [position, setPosition] = useState<GpsPosition | null>(null);
   const [adminArea, setAdminArea] = useState<{ region: string | null; district: string | null; commune: string | null }>({
@@ -533,7 +543,7 @@ export default function ReferenceScreen() {
           setFormErrors({});
 
           const dateProspection = draft?.date_prospection ?? new Date().toISOString().slice(0, 10);
-          const nFiche = generateNumeroFiche(draftId, dateProspection);
+          const nFiche = generateNumeroFiche(draftId, dateProspection, sigle);
 
           // Préparer les données avec des valeurs par défaut (0 pour intensif)
           const surfaceProspecteeValue = value.surfaceProspectee ? Number(value.surfaceProspectee) : 0;
@@ -569,7 +579,7 @@ export default function ReferenceScreen() {
       ),
   });
 
-  const nFichePreview = draftId ? generateNumeroFiche(draftId, draft?.date_prospection ?? '') : '—';
+  const nFichePreview = draftId ? generateNumeroFiche(draftId, draft?.date_prospection ?? '', sigle) : '—';
 
   return (
     <View style={styles.root}>

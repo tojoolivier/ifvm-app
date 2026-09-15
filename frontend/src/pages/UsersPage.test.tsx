@@ -84,15 +84,18 @@ describe('UsersPage — colonnes maquette (README §10, onglet Utilisateurs)', (
     expect(toggle).toHaveAttribute('data-checked')
   })
 
-  it('affiche les 6 colonnes de la maquette, dont Station et Fiches', async () => {
+  it('affiche les 7 colonnes de la maquette, dont Sigle entre Email et Rôle', async () => {
     mockApi()
     renderPage()
 
     await waitFor(() => expect(screen.getByText('Jean Rakoto')).toBeInTheDocument())
 
-    for (const entete of ['Nom', 'Email', 'Rôle', 'Station', 'Fiches', 'Actif']) {
+    for (const entete of ['Nom', 'Email', 'Sigle', 'Rôle', 'Station', 'Fiches', 'Actif']) {
       expect(screen.getByRole('columnheader', { name: entete })).toBeInTheDocument()
     }
+    const headers = screen.getAllByRole('columnheader').map((h) => h.textContent)
+    expect(headers.indexOf('Sigle')).toBeGreaterThan(headers.indexOf('Email'))
+    expect(headers.indexOf('Sigle')).toBeLessThan(headers.indexOf('Rôle'))
     // Plus d'encart d'excuse : la donnée existe désormais côté API.
     expect(screen.queryByText(/ne sont pas exposés par l'API/i)).not.toBeInTheDocument()
   })
@@ -185,5 +188,33 @@ describe('UsersPage — colonnes maquette (README §10, onglet Utilisateurs)', (
     fireEvent.click(container.querySelector('input[type="checkbox"]')!)
 
     await waitFor(() => expect(mockedPatch).toHaveBeenCalledWith('/users/u1', { actif: false }))
+  })
+
+  it('le sigle éditable au blur appelle PATCH /users/{id} avec le nouveau sigle', async () => {
+    mockApi({ users: [utilisateur({ sigle: null })] })
+    mockedPatch.mockResolvedValue({ data: {} })
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Jean Rakoto')).toBeInTheDocument())
+
+    const champSigle = screen.getByLabelText('Sigle de Jean Rakoto')
+    expect(champSigle).toHaveValue('')
+    fireEvent.change(champSigle, { target: { value: 'ADM' } })
+    fireEvent.blur(champSigle)
+
+    await waitFor(() => expect(mockedPatch).toHaveBeenCalledWith('/users/u1', { sigle: 'ADM' }))
+  })
+
+  it("un blur sans changement de valeur n'appelle pas PATCH (pas de round-trip inutile)", async () => {
+    mockApi({ users: [utilisateur({ sigle: 'ADM' })] })
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Jean Rakoto')).toBeInTheDocument())
+
+    const champSigle = screen.getByLabelText('Sigle de Jean Rakoto')
+    expect(champSigle).toHaveValue('ADM')
+    fireEvent.blur(champSigle)
+
+    expect(mockedPatch).not.toHaveBeenCalled()
   })
 })

@@ -91,6 +91,7 @@ async def create_user(
 ):
     data = body.model_dump()
     data["password_hash"] = hash_password(data.pop("password"))
+    data["sigle"] = (data["sigle"] or "").strip() or None
     user = Utilisateur(**data)
     db.add(user)
     try:
@@ -165,6 +166,11 @@ async def update_user(
         user.role = body.role
     if body.actif is not None:
         user.actif = body.actif
+    # Chaîne vide = effacement explicite (distinct de l'absence du champ dans
+    # le corps de la requête, qui laisse le sigle inchangé) — un sigle vide
+    # n'a pas de sens dans un numéro de fiche.
+    if body.sigle is not None:
+        user.sigle = body.sigle.strip() or None
     await db.commit()
     await db.refresh(user)
     return user

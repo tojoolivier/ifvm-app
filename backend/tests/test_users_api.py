@@ -95,6 +95,40 @@ async def test_admin_peut_modifier_un_autre_compte(
 
 
 @pytest.mark.asyncio
+async def test_admin_peut_attribuer_un_sigle(
+    client: AsyncClient, admin_headers: dict, utilisateur_rattache: Utilisateur
+):
+    response = await client.patch(
+        f"/users/{utilisateur_rattache.id}",
+        json={"sigle": "ADM"},
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["sigle"] == "ADM"
+
+
+@pytest.mark.asyncio
+async def test_sigle_vide_efface_le_sigle_existant(
+    client: AsyncClient, admin_headers: dict, utilisateur_rattache: Utilisateur, db_session: AsyncSession
+):
+    """Chaîne vide = effacement explicite — distinct de l'absence du champ dans
+    le corps de la requête (`test_admin_peut_modifier_un_autre_compte` ci-dessus),
+    qui laisse le sigle inchangé."""
+    utilisateur_rattache.sigle = "ADM"
+    await db_session.commit()
+
+    response = await client.patch(
+        f"/users/{utilisateur_rattache.id}",
+        json={"sigle": "  "},
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["sigle"] is None
+
+
+@pytest.mark.asyncio
 async def test_me_reste_lisible_sans_rattachement(
     client: AsyncClient, auth_headers: dict, utilisateur
 ):
