@@ -35,6 +35,10 @@ class Utilisateur(Base):
     email: Mapped[str] = mapped_column(String(200), nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(String(200), nullable=False, server_default="")
     role: Mapped[str] = mapped_column(String(30), nullable=False)
+    # Identifiant court (ex. "ADM") inséré dans le numéro de fiche généré côté
+    # mobile pour toute fiche créée par cet utilisateur — facultatif, non
+    # unique (migration 0065).
+    sigle: Mapped[str | None] = mapped_column(String(10), nullable=True)
     pa_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("poste_acridien.id"), nullable=True
     )

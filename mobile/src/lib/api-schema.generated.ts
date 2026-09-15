@@ -4047,6 +4047,8 @@ export interface components {
             password: string;
             /** Role */
             role: string;
+            /** Sigle */
+            sigle?: string | null;
         };
         /**
          * UtilisateurCreateALaVolee
@@ -4104,6 +4106,8 @@ export interface components {
             email: string;
             /** Role */
             role: string;
+            /** Sigle */
+            sigle?: string | null;
             /** Actif */
             actif: boolean;
             /** Peut Se Connecter */
@@ -4126,6 +4130,8 @@ export interface components {
             role?: string | null;
             /** Actif */
             actif?: boolean | null;
+            /** Sigle */
+            sigle?: string | null;
         };
         /** ValidationError */
         ValidationError: {

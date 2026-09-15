@@ -10,6 +10,7 @@ class UtilisateurCreate(BaseModel):
     email: str
     password: str
     role: str
+    sigle: str | None = None
 
 
 class UtilisateurCreateALaVolee(BaseModel):
@@ -24,6 +25,7 @@ class UtilisateurCreateALaVolee(BaseModel):
 class UtilisateurUpdate(BaseModel):
     role: str | None = None
     actif: bool | None = None
+    sigle: str | None = None
 
 
 class UtilisateurRead(BaseModel):
@@ -33,6 +35,7 @@ class UtilisateurRead(BaseModel):
     prenom: str
     email: str
     role: str
+    sigle: str | None = None
     actif: bool
     peut_se_connecter: bool
     created_at: datetime

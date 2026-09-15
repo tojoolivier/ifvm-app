@@ -398,13 +398,14 @@ export async function genererNumeroFicheDisponible(
   prenomChef: string,
   typeTraitement: TypeTraitement,
   dateTraitementIso: string,
-  excludeId?: string | null
+  excludeId?: string | null,
+  sigle?: string | null
 ): Promise<string> {
   const db = await getDb();
   let suffixe: number | null = null;
 
   for (let tentative = 0; tentative < MAX_TENTATIVES_NUMERO_FICHE; tentative++) {
-    const candidat = composerNumeroFiche(prenomChef, typeTraitement, dateTraitementIso, suffixe);
+    const candidat = composerNumeroFiche(prenomChef, typeTraitement, dateTraitementIso, suffixe, sigle);
     const existant = await db.getFirstAsync<{ id: string }>(
       'SELECT id FROM traitement WHERE numero_fiche = ? AND (? IS NULL OR id != ?)',
       [candidat, excludeId ?? null, excludeId ?? null]

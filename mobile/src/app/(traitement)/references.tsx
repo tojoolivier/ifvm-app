@@ -183,7 +183,8 @@ export default function ReferencesScreen() {
       utilisateurConnecte.prenom,
       typeTraitement,
       store.ref.dateTraitement,
-      traitementId
+      traitementId,
+      utilisateurConnecte.sigle
     )
       .then((numero) => {
         if (!cancelled) store.updateRef({ numeroFiche: numero });
@@ -271,7 +272,8 @@ export default function ReferencesScreen() {
             utilisateurConnecte.prenom,
             typeTraitement,
             store.ref.dateTraitement,
-            id
+            id,
+            utilisateurConnecte.sigle
           );
           store.updateRef({ numeroFiche });
         }
