@@ -29,6 +29,14 @@ const INACTIVE_BG = '#efeada';
 // principe que ventVitesseKmhToMsInput dans infestation.tsx.
 const CM_PAR_M = 100;
 
+// #saisie-decimale-virgule : même bascule (côté parsing) que parseDecimalInput
+// dans veg.tsx/moyens.tsx/synthese.tsx — la virgule est le séparateur décimal
+// attendu par l'agent (clavier "decimal-pad" en locale FR), mais `parseFloat`
+// s'arrête au premier caractère non numérique : "0,80" valait donc 0 tel quel,
+// perdu silencieusement à l'enregistrement (jamais d'erreur, jamais de blocage —
+// juste une valeur fausse, 0,00 m quelle que soit la saisie sous la barre).
+// L'affichage (hauteurCmToMInput) reste en point : une fiche déjà enregistrée
+// s'y attend (#228, préaffiché à "1.25", jamais "1,25").
 function hauteurCmToMInput(cm: number | null): string {
   if (cm == null) return '';
   return String(Math.round((cm / CM_PAR_M) * 100) / 100);
@@ -36,7 +44,7 @@ function hauteurCmToMInput(cm: number | null): string {
 
 function hauteurMInputToCm(m: string): number | null {
   if (m === '') return null;
-  const parsed = parseFloat(m);
+  const parsed = parseFloat(m.replace(',', '.'));
   return Number.isFinite(parsed) ? Math.round(parsed * CM_PAR_M * 100) / 100 : null;
 }
 
@@ -272,8 +280,10 @@ export default function ExtensiveObservationsScreen() {
       intensitePluie: intensite || null,
       pesticidesEmbarques: isAerien ? pesticidesEmbarques : null,
       pesticideNomCommercial: futsActifs ? pesticideNomCommercial || null : null,
-      pesticideQuantiteDisponible: futsActifs && pesticideQuantiteDisponible ? parseFloat(pesticideQuantiteDisponible) : null,
-      pesticideQuantiteRecue: futsActifs && pesticideQuantiteRecue ? parseFloat(pesticideQuantiteRecue) : null,
+      // #saisie-decimale-virgule (cf. hauteurMInputToCm ci-dessus) — mêmes champs
+      // "decimal-pad" francophones, même perte silencieuse sans cette conversion.
+      pesticideQuantiteDisponible: futsActifs && pesticideQuantiteDisponible ? parseFloat(pesticideQuantiteDisponible.replace(',', '.')) : null,
+      pesticideQuantiteRecue: futsActifs && pesticideQuantiteRecue ? parseFloat(pesticideQuantiteRecue.replace(',', '.')) : null,
       futsDisponible: futsActifs ? validerEntierPositif(futsDisponible, 'Fûts disponibles').value : null,
       futsPleins: futsActifs ? validerEntierPositif(futsPleins, 'Fûts pleins').value : null,
       futsVides: futsActifs ? validerEntierPositif(futsVides, 'Fûts vides').value : null,
