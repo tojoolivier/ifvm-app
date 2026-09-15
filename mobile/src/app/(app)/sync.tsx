@@ -541,16 +541,20 @@ const styles = StyleSheet.create({
     borderColor: '#FDE68A',
   },
   statusBannerText: {
-    fontSize: 14,
+    fontSize: isSmallScreen ? 14 : 15,
     fontWeight: '600',
     textAlign: 'center',
     color: '#111827',
   },
+  // #lisibilite-terrain-sync : le motif exact du serveur (souvent une longue
+  // phrase technique, cf. resumeLigne) doit rester lisible en plein soleil —
+  // même bascule que fieldLabel dans intensive-imagos.tsx (9.5→11), ici sur un
+  // texte encore plus consulté (l'écran de synchronisation).
   resumeLigne: {
-    fontSize: 12,
+    fontSize: isSmallScreen ? 13 : 14,
     color: '#374151',
     marginTop: 6,
-    lineHeight: 17,
+    lineHeight: isSmallScreen ? 19 : 20,
   },
   retryCible: {
     marginBottom: 16,
@@ -575,17 +579,26 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e7e0cd',
   },
-  referentielEtatTitre: { fontSize: 12, fontWeight: '800', color: IFVM_GREEN, marginBottom: 6 },
-  referentielEtatLigne: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 },
-  referentielEtatTable: { fontSize: 11.5, color: '#6f6a59' },
-  referentielEtatNombre: { fontSize: 11.5, fontWeight: '700', color: '#16201a' },
+  // #lisibilite-terrain-sync : même bascule que resumeLigne ci-dessus — ce
+  // bloc (compteurs par table de référentiel) était le plus petit texte de
+  // l'écran (11.5px, gris) alors qu'il sert justement à diagnostiquer un
+  // référentiel manquant sur le terrain.
+  referentielEtatTitre: {
+    fontSize: isSmallScreen ? 13 : 14,
+    fontWeight: '800',
+    color: IFVM_GREEN,
+    marginBottom: 6,
+  },
+  referentielEtatLigne: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
+  referentielEtatTable: { fontSize: isSmallScreen ? 13 : 14, color: '#6f6a59' },
+  referentielEtatNombre: { fontSize: isSmallScreen ? 13 : 14, fontWeight: '700', color: '#16201a' },
   referentielEtatVide: { color: '#c0412b' },
   lastSyncContainer: {
     marginBottom: 16,
     alignItems: 'center',
   },
   lastSyncText: {
-    fontSize: 12,
+    fontSize: isSmallScreen ? 12 : 13,
     color: '#9CA3AF',
   },
   syncListContainer: {
@@ -639,20 +652,23 @@ const styles = StyleSheet.create({
     minWidth: 40,
     alignItems: 'center',
   },
+  // #lisibilite-terrain-sync : « Fiches en attente » — badge/date/statut
+  // tombaient jusqu'à 9px, illisibles en plein soleil (même raison que
+  // resumeLigne/referentielEtat* ci-dessus).
   typeBadgeText: {
-    fontSize: isSmallScreen ? 9 : 10,
+    fontSize: isSmallScreen ? 10 : 11,
     fontWeight: '700',
   },
   syncItemInfo: {
     flex: 1,
   },
   syncItemCode: {
-    fontSize: isSmallScreen ? 12 : 13,
+    fontSize: isSmallScreen ? 13 : 14,
     fontWeight: '600',
     color: '#111827',
   },
   syncItemDate: {
-    fontSize: isSmallScreen ? 10 : 11,
+    fontSize: isSmallScreen ? 11 : 12,
     color: '#9CA3AF',
     marginTop: 1,
   },
@@ -663,7 +679,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   syncItemStatusLabel: {
-    fontSize: isSmallScreen ? 9 : 10,
+    fontSize: isSmallScreen ? 10 : 11,
     fontWeight: '600',
     marginTop: 2,
   },

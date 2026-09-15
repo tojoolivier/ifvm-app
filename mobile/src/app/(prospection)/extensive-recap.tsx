@@ -239,7 +239,7 @@ function buildPesticidesRows(draft: DraftProspection): DetailRow[] {
 // part, y compris ici.
 function buildSignaturesRows(draft: DraftProspection): DetailRow[] {
   const roles: [string, string | null, string | null][] = [
-    ['Consultant FAO', draft.signature_consultant_fao_nom, draft.signature_consultant_fao_horodatage],
+    ['Consultant International', draft.signature_consultant_fao_nom, draft.signature_consultant_fao_horodatage],
     ['Chef de Base', draft.signature_chef_base_nom, draft.signature_chef_base_horodatage],
   ];
   return roles.map(([label, nom, horodatage]) => ({

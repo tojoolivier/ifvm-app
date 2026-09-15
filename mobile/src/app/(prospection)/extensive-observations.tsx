@@ -86,7 +86,7 @@ function validerPourcentage(raw: string, label: string): { value: number | null;
 type SignatureRole = 'consultant_fao' | 'chef_base';
 
 const SIGNATURE_LABELS: Record<SignatureRole, string> = {
-  consultant_fao: 'Consultant FAO',
+  consultant_fao: 'Consultant International',
   chef_base: 'Chef de Base',
 };
 
@@ -690,7 +690,7 @@ export default function ExtensiveObservationsScreen() {
                               testID="signature-consultant-fao-nom-input"
                               value={signatureNoms.consultant_fao ?? ''}
                               onChangeText={handleConsultantFaoNomChange}
-                              placeholder="Nom du Consultant FAO"
+                              placeholder="Nom du Consultant International"
                               placeholderTextColor={TEXT_SECONDARY}
                               style={styles.input}
                             />
