@@ -6,20 +6,37 @@ autour du dépôt et traduisent les conflits de persistance.
 
 import uuid
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 
 from app.domain.fiche_vol import (
     ChefDeBaseVolInvalideError,
     FicheVol,
     FicheVolIntrouvableError,
+    FicheVolSyncConflitError,
+    FicheVolValideeSyncRejeteError,
     FicheVolVerrouilleeError,
     SignatureVol,
     Vol,
     composer_numero_fiche,
+    contenu_diverge,
     cumuler_durees,
     valider_rotations_completes,
     valider_signatures,
 )
+
+
+def _sans_fuseau(valeur: datetime) -> datetime:
+    """Neutralise la présence ou l'absence de fuseau avant comparaison
+    (#erreur-sync-fiche-vol-datetime-naive-aware). `existante.updated_at` (colonne
+    TIMESTAMPTZ, cf. fiche_vol_model.py) revient parfois "aware" (lecture fraîche
+    depuis Postgres, asyncpg attache `tzinfo=UTC`) et parfois "naive" (objet encore en
+    cache dans l'identity map de la session depuis sa création — `datetime.utcnow()`,
+    naive, appliqué par la colonne `default=`, jamais réexpiré si `expire_on_commit`
+    est faux) — comparer les deux bruts lève `TypeError: can't compare offset-naive
+    and offset-aware datetimes`. `base_updated_at` (venu du client, une chaîne ISO
+    sans décalage) est toujours naive. Les deux désignent le même instant UTC : sûr de
+    retirer le fuseau plutôt que d'en forcer un côté client."""
+    return valeur.replace(tzinfo=None) if valeur.tzinfo is not None else valeur
 
 
 async def _exiger_brouillon(repo, fiche_vol_id: uuid.UUID) -> FicheVol:
@@ -92,6 +109,52 @@ class ValiderFicheVol:
         valider_signatures(fiche)
         valider_rotations_completes(fiche.vols)
         return await self.repo.valider(fiche_vol_id)
+
+
+@dataclass
+class SyncPushFicheVol:
+    """Point d'entrée hors-ligne (#fiche-vol-sync-hors-ligne, même patron que
+    `SyncPushTraitementTerrestre`/`Aerien`) : `fiche.id` fourni par le client, upsert
+    idempotent — un renvoi réseau (même contenu) est traité `synced` sans jamais être
+    vu comme un conflit."""
+
+    repo: object
+    utilisateur_repo: object
+
+    async def execute(self, fiche: FicheVol, base_updated_at: datetime) -> tuple[FicheVol, bool]:
+        chef = await self.utilisateur_repo.get_by_id(fiche.chef_de_base_id)
+        if chef is None or chef.role != "chef_de_base":
+            raise ChefDeBaseVolInvalideError(str(fiche.chef_de_base_id))
+
+        existante = await self.repo.get_by_id(fiche.id)
+
+        if existante is None:
+            # equipe = base_aerienne.numero, résolu avant l'écriture pour composer le
+            # numéro de fiche — même séquence que CreateFicheVol.execute.
+            equipe = await self.repo.get_base_numero(fiche.base_id)
+            fiche.compteur = await self.repo.next_compteur(fiche.campagne_id)
+            fiche.numero_fiche = composer_numero_fiche(
+                fiche.compteur, fiche.date_vol, equipe, fiche.immatriculation
+            )
+            fiche.statut_sync = "synced"
+            return await self.repo.create(fiche), True
+
+        if existante.statut != "brouillon":
+            raise FicheVolValideeSyncRejeteError(existante)
+
+        if _sans_fuseau(existante.updated_at) > _sans_fuseau(base_updated_at) and contenu_diverge(
+            existante, fiche
+        ):
+            marquee = await self.repo.marquer_conflict(existante.id)
+            raise FicheVolSyncConflitError(marquee)
+
+        # numero_fiche/compteur/created_at : attribués une fois à la création, jamais
+        # renvoyés par le client — repris tels quels de l'existant.
+        fiche.numero_fiche = existante.numero_fiche
+        fiche.compteur = existante.compteur
+        fiche.created_at = existante.created_at
+        fiche.updated_at = datetime.utcnow()
+        return await self.repo.update_sync(fiche), False
 
 
 @dataclass

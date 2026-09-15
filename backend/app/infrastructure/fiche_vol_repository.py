@@ -325,6 +325,78 @@ class FicheVolRepositoryImpl:
         await self.session.commit()
         return await self._domaine(fiche_vol_id)
 
+    async def update_sync(self, fiche: FicheVol) -> FicheVol:
+        """Point d'entrée hors-ligne (#fiche-vol-sync-hors-ligne) — suppose que la
+        fiche existe déjà (branche création : cf. `create`, appelé directement par
+        `SyncPushFicheVol.execute`). `fiche.numero_fiche`/`compteur`/`created_at`
+        doivent déjà être repris de l'existant par l'appelant : cette méthode ne les
+        touche jamais.
+
+        `model` provient de `self._exiger` (via `_charger`, qui précharge vols/
+        signatures/base/stand) : contrairement à `session.get()` nu, aucun risque de
+        `MissingGreenlet` sur un accès synchrone à une relation non chargée (cf.
+        historique de ce bug sur `TraitementRepositoryImpl.update_sync`).
+        """
+        model = await self._exiger(fiche.id)
+        model.date_vol = fiche.date_vol
+        model.compagnie = fiche.compagnie
+        model.immatriculation = fiche.immatriculation
+        model.campagne_id = fiche.campagne_id
+        model.base_id = fiche.base_id
+        model.stand_id = fiche.stand_id
+        model.pilote = fiche.pilote
+        model.mecanicien = fiche.mecanicien
+        model.chef_de_base_id = fiche.chef_de_base_id
+        model.consultant_international = fiche.consultant_international
+        model.pesticide_nom_commercial = fiche.pesticide_nom_commercial
+        model.pesticide_quantite_disponible = fiche.pesticide_quantite_disponible
+        model.pesticide_quantite_recue = fiche.pesticide_quantite_recue
+        model.futs_disponible = fiche.futs_disponible
+        model.futs_recues = fiche.futs_recues
+        model.futs_pleins = fiche.futs_pleins
+        model.futs_vides = fiche.futs_vides
+        model.observations = fiche.observations
+        model.statut_sync = "synced"
+        # Pas d'`onupdate` côté mapping (fiche_vol_model.py) : sans cette écriture
+        # explicite, `updated_at` resterait figé à sa valeur de création et la
+        # détection de conflit (`existant.updated_at > base_updated_at`) ne pourrait
+        # plus jamais se déclencher après le premier renvoi.
+        model.updated_at = fiche.updated_at
+
+        # vols : remplacés en bloc plutôt que diffés (même patron que
+        # evaluations_risque_population côté traitement) — un flush intermédiaire est
+        # nécessaire : sans lui, SQLAlchemy peut émettre les INSERT de la nouvelle
+        # liste avant les DELETE de l'ancienne dans le même flush, violant
+        # `uq_vol_numero`/`uq_vol_rotation_type` dès qu'un même numero/rotation
+        # réapparaît (cas courant : la fiche du jour se resynchronise à l'identique).
+        model.vols = []
+        await self.session.flush()
+        model.vols = [
+            VolModel(
+                id=v.id,
+                numero=v.numero,
+                type_vol=v.type_vol,
+                heure_debut=v.heure_debut,
+                heure_fin=v.heure_fin,
+                rotation_id=v.rotation_id,
+                prospection_id=v.prospection_id,
+                observations=v.observations,
+            )
+            for v in fiche.vols
+        ]
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise _traduire_integrite(exc) from exc
+        return await self._domaine(fiche.id)
+
+    async def marquer_conflict(self, fiche_vol_id: uuid.UUID) -> FicheVol:
+        model = await self._exiger(fiche_vol_id)
+        model.statut_sync = "conflict"
+        await self.session.commit()
+        return await self._domaine(fiche_vol_id)
+
 
 def _traduire_integrite(exc: IntegrityError) -> Exception:
     """Traduit une violation de contrainte en erreur de domaine.

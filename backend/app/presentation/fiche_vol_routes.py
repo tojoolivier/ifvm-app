@@ -3,6 +3,8 @@ from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.fiche_vol_use_cases import (
@@ -12,6 +14,7 @@ from app.application.fiche_vol_use_cases import (
     GetFicheVol,
     ListFichesVol,
     RemoveVol,
+    SyncPushFicheVol,
     UpsertSignatureVol,
     ValiderFicheVol,
 )
@@ -23,6 +26,8 @@ from app.domain.fiche_vol import (
     ChefDeBaseVolInvalideError,
     FicheVol,
     FicheVolIntrouvableError,
+    FicheVolSyncConflitError,
+    FicheVolValideeSyncRejeteError,
     FicheVolVerrouilleeError,
     HeuresVolIncoherentesError,
     NumeroFicheVolConflitError,
@@ -43,6 +48,7 @@ from app.presentation.fiche_vol_schemas import (
     CumulsRead,
     FicheVolCreate,
     FicheVolRead,
+    FicheVolSyncPush,
     SignatureVolUpsert,
     VolCreate,
 )
@@ -96,6 +102,61 @@ async def creer_fiche_vol(
     except NumeroFicheVolConflitError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     return _presenter(creee)
+
+
+@router.post("/sync", response_model=FicheVolRead)
+async def sync_fiche_vol(
+    payload: FicheVolSyncPush,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    """Push de synchronisation offline (#fiche-vol-sync-hors-ligne, même patron que
+    POST /traitements/sync) : 201 si la fiche n'existait pas encore côté serveur, 200
+    si mise à jour synchronisée sans conflit, 409 (avec la version serveur complète)
+    si la fiche est verrouillée (`validee`) ou en conflit."""
+    donnees = payload.model_dump()
+    fiche_id = donnees.pop("id")
+    base_updated_at = donnees.pop("base_updated_at")
+    vols_payload = donnees.pop("vols", [])
+    try:
+        fiche = FicheVol(id=fiche_id, numero_fiche="", **donnees)
+        fiche.vols = [Vol(fiche_vol_id=fiche_id, **v) for v in vols_payload]
+    except (VolRattachementInvalideError, HeuresVolIncoherentesError) as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+
+    try:
+        fiche_resultante, creee = await SyncPushFicheVol(
+            _repo(db), UtilisateurRepositoryImpl(db)
+        ).execute(fiche, base_updated_at)
+    except ChefDeBaseVolInvalideError as exc:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "chef_de_base_id n'a pas le rôle chef_de_base"
+        ) from exc
+    except (FicheVolValideeSyncRejeteError, FicheVolSyncConflitError) as exc:
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content=jsonable_encoder(
+                FicheVolRead.model_validate(_presenter(exc.fiche_vol_serveur))
+            ),
+        )
+    except RotationDejaRapprocheeError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    except (
+        RotationVolIntrouvableError,
+        ProspectionVolIntrouvableError,
+        BaseVolIntrouvableError,
+        StandVolIntrouvableError,
+        CampagneVolIntrouvableError,
+    ) as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except NumeroFicheVolConflitError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+
+    status_code = status.HTTP_201_CREATED if creee else status.HTTP_200_OK
+    return JSONResponse(
+        status_code=status_code,
+        content=jsonable_encoder(FicheVolRead.model_validate(_presenter(fiche_resultante))),
+    )
 
 
 @router.get("", response_model=list[FicheVolRead])

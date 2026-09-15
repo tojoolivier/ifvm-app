@@ -33,6 +33,23 @@ class VolRead(BaseModel):
     duree_minutes: int
 
 
+class VolSyncPush(BaseModel):
+    """Pendant de `VolCreate` pour la synchronisation hors-ligne (#fiche-vol-sync-hors-
+    ligne) : `id` fourni par le client (généré à la capture, hors-ligne), stable d'une
+    synchronisation à l'autre — c'est lui qui permet un remplacement en bloc idempotent
+    de la liste `vols` de la fiche plutôt qu'un ajout un par un (cf. VolCreate, réservé
+    à POST /{id}/vols, en ligne uniquement)."""
+
+    id: uuid.UUID
+    numero: int = Field(ge=1)
+    type_vol: TypeVol
+    heure_debut: time
+    heure_fin: time
+    rotation_id: uuid.UUID | None = None
+    prospection_id: uuid.UUID | None = None
+    observations: str | None = None
+
+
 class SignatureVolUpsert(BaseModel):
     role: RoleSignatureVol
     signataire_nom: str = Field(min_length=1, max_length=255)
@@ -72,6 +89,38 @@ class FicheVolCreate(BaseModel):
     futs_vides: int | None = None
     observations: str | None = None
     vols: list[VolCreate] = Field(default_factory=list)
+
+
+class FicheVolSyncPush(BaseModel):
+    """Push de synchronisation offline (#fiche-vol-sync-hors-ligne, même patron que
+    `TraitementSyncPush`) : `id` généré côté client à la capture — hors-ligne, une
+    fiche de vol se remplit vol après vol tout au long de la journée avant toute
+    connexion — et `base_updated_at`, dernier `updated_at` serveur connu du client,
+    pour la détection de conflit (première synchronisation : la date de création
+    locale, plus ancienne que tout `updated_at` serveur réel, ne peut donc que
+    déclencher un conflit détecté trop tôt — jamais un écrasement silencieux)."""
+
+    id: uuid.UUID
+    base_updated_at: datetime
+    date_vol: date
+    compagnie: str = Field(min_length=1, max_length=255)
+    immatriculation: str = Field(min_length=1, max_length=20)
+    campagne_id: uuid.UUID
+    base_id: uuid.UUID
+    stand_id: uuid.UUID
+    pilote: str = Field(min_length=1, max_length=255)
+    mecanicien: str = Field(min_length=1, max_length=255)
+    chef_de_base_id: uuid.UUID
+    consultant_international: str | None = None
+    pesticide_nom_commercial: str | None = None
+    pesticide_quantite_disponible: float | None = None
+    pesticide_quantite_recue: float | None = None
+    futs_disponible: int | None = None
+    futs_recues: int | None = None
+    futs_pleins: int | None = None
+    futs_vides: int | None = None
+    observations: str | None = None
+    vols: list[VolSyncPush] = Field(default_factory=list)
 
 
 class FicheVolRead(BaseModel):

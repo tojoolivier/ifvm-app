@@ -6,7 +6,7 @@ post-validation.
 """
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 
 import pytest
 
@@ -376,6 +376,117 @@ async def test_lecture_et_liste(client, auth_headers, payload_fiche):
 async def test_fiche_inconnue_renvoie_404(client, auth_headers):
     reponse = await client.get(f"/fiches-vol/{uuid.uuid4()}", headers=auth_headers)
     assert reponse.status_code == 404
+
+
+# --- Synchronisation hors-ligne (#fiche-vol-sync-hors-ligne) -----------------------
+
+
+def _payload_sync(fiche_id, payload_fiche, base_updated_at, vols=None):
+    return {
+        **payload_fiche,
+        "id": str(fiche_id),
+        "base_updated_at": base_updated_at.isoformat(),
+        "vols": vols or [],
+    }
+
+
+@pytest.mark.asyncio
+async def test_sync_cree_la_fiche_avec_id_fourni_par_le_client(client, auth_headers, payload_fiche):
+    fiche_id = uuid.uuid4()
+    vol_id = uuid.uuid4()
+    payload = _payload_sync(
+        fiche_id,
+        payload_fiche,
+        datetime.utcnow(),
+        vols=[
+            {
+                "id": str(vol_id),
+                "numero": 1,
+                "type_vol": "CONVOYAGE",
+                "heure_debut": "05:30:00",
+                "heure_fin": "06:45:00",
+            }
+        ],
+    )
+    reponse = await client.post("/fiches-vol/sync", json=payload, headers=auth_headers)
+    assert reponse.status_code == 201, reponse.text
+    corps = reponse.json()
+    assert corps["id"] == str(fiche_id)
+    assert corps["statut_sync"] == "synced"
+    assert corps["numero_fiche"] == "001-2026-08-24-IHO01-MDGA21"
+    assert [v["id"] for v in corps["vols"]] == [str(vol_id)]
+
+
+@pytest.mark.asyncio
+async def test_sync_renvoi_reseau_contenu_identique_traite_synced_sans_conflit(
+    client, auth_headers, payload_fiche
+):
+    """Critère d'acceptation : un renvoi réseau (même id, contenu identique) est traité
+    `synced` sans conflit."""
+    fiche_id = uuid.uuid4()
+    t0 = datetime.utcnow()
+    payload = _payload_sync(fiche_id, payload_fiche, t0)
+
+    premier = await client.post("/fiches-vol/sync", json=payload, headers=auth_headers)
+    assert premier.status_code == 201, premier.text
+    updated_at_serveur = premier.json()["updated_at"]
+
+    renvoi = {**payload, "base_updated_at": updated_at_serveur}
+    reponse = await client.post("/fiches-vol/sync", json=renvoi, headers=auth_headers)
+
+    assert reponse.status_code == 200, reponse.text
+    assert reponse.json()["statut_sync"] == "synced"
+
+
+@pytest.mark.asyncio
+async def test_sync_deux_appareils_meme_id_contenu_divergent_rejette_409_conflict(
+    client, auth_headers, payload_fiche
+):
+    fiche_id = uuid.uuid4()
+    t0 = datetime.utcnow()
+    payload = _payload_sync(fiche_id, payload_fiche, t0)
+    premier = await client.post("/fiches-vol/sync", json=payload, headers=auth_headers)
+    assert premier.status_code == 201, premier.text
+
+    # `base_updated_at` de ce second appareil est resté à t0 (avant la première
+    # synchronisation) : le serveur a déjà avancé, et le contenu diverge (observations).
+    divergent = {**payload, "observations": "Vu depuis un autre appareil"}
+    reponse = await client.post("/fiches-vol/sync", json=divergent, headers=auth_headers)
+
+    assert reponse.status_code == 409, reponse.text
+    assert reponse.json()["statut_sync"] == "conflict"
+
+
+@pytest.mark.asyncio
+async def test_sync_fiche_validee_rejette_systematiquement_sans_jamais_passer_par_conflict(
+    client, auth_headers, payload_fiche, chef_de_base
+):
+    fiche_id = uuid.uuid4()
+    payload = _payload_sync(fiche_id, payload_fiche, datetime.utcnow())
+    creation = await client.post("/fiches-vol/sync", json=payload, headers=auth_headers)
+    assert creation.status_code == 201, creation.text
+
+    signatures = {
+        "PILOTE": "Rakoto A.",
+        "MECANICIEN": "Randria B.",
+        "CHEF_DE_BASE": chef_de_base.nom,
+    }
+    for role, nom in signatures.items():
+        reponse_signature = await client.put(
+            f"/fiches-vol/{fiche_id}/signatures",
+            json={"role": role, "signataire_nom": nom},
+            headers=auth_headers,
+        )
+        assert reponse_signature.status_code == 200, reponse_signature.text
+
+    validation = await client.put(f"/fiches-vol/{fiche_id}/valider", headers=auth_headers)
+    assert validation.status_code == 200, validation.text
+
+    resync = await client.post("/fiches-vol/sync", json=payload, headers=auth_headers)
+    assert resync.status_code == 409, resync.text
+    assert resync.json()["statut"] == "validee"
+    # Verrouillage, pas un conflit de contenu : `statut_sync` reste `synced`.
+    assert resync.json()["statut_sync"] == "synced"
 
 
 async def _rotation_reelle(
