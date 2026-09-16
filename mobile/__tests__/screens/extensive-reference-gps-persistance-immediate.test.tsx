@@ -31,7 +31,7 @@ jest.mock('@/lib/prospection-repository', () => ({
 
 jest.mock('@/lib/location', () => ({
   getCurrentPosition: jest.fn().mockResolvedValue({ latitude: -18.9, longitude: 47.5, altitude: null, accuracy: 5, timestamp: Date.now() }),
-  reverseGeocode: jest.fn().mockResolvedValue({ region: null, district: null, commune: null }),
+  reverseGeocode: jest.fn().mockResolvedValue({ region: 'Analamanga', district: 'Antananarivo', commune: 'Andasibe' }),
 }));
 
 describe('ExtensiveReferenceScreen — persistance immédiate de la position GPS', () => {
@@ -44,7 +44,7 @@ describe('ExtensiveReferenceScreen — persistance immédiate de la position GPS
     });
   });
 
-  it('persiste latitude/longitude dès la capture, sans attendre « Suivant »', async () => {
+  it('persiste latitude/longitude/région/district/commune dès la capture, sans attendre « Suivant »', async () => {
     await render(<ExtensiveReferenceScreen />);
 
     await waitFor(() => expect(getCurrentPosition).toHaveBeenCalled());
@@ -53,6 +53,9 @@ describe('ExtensiveReferenceScreen — persistance immédiate de la position GPS
         latitude: -18.9,
         longitude: 47.5,
         altitude: null,
+        region: 'Analamanga',
+        district: 'Antananarivo',
+        commune: 'Andasibe',
       })
     );
 
