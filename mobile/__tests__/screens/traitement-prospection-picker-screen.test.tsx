@@ -242,6 +242,41 @@ describe('TraitementProspectionPickerScreen — hors ligne', () => {
   });
 });
 
+/**
+ * Régression : une fiche Extensive validée dont region/district/commune sont
+ * vides (ces champs n'étaient jamais persistés côté Extensif avant le
+ * correctif #brouillon-gps-persistance-immediate) affichait « localisation
+ * non renseignée » alors que la localité était bien connue via
+ * `station_libre` (texte libre saisi/auto-détecté à la création de la
+ * fiche). L'écran doit s'y replier plutôt que de prétendre l'information
+ * absente.
+ */
+describe('TraitementProspectionPickerScreen — repli sur station_libre', () => {
+  it("affiche station_libre quand region/district/commune sont vides", async () => {
+    jest.mocked(prospectionAccueil.loadFichesDisponiblesPourTraitement).mockResolvedValue([
+      {
+        id: 'presp-sans-region',
+        type_prospection: 'extensive',
+        n_fiche: 'F-300',
+        n_message: null,
+        date_prospection: '2026-09-10',
+        region: null,
+        district: null,
+        commune: null,
+        station_libre: 'Andasibe (bord de route)',
+        prospecteur_nom: 'Jean Dupont',
+        validated_by_nom: 'Marie Admin',
+        validated_at: '2026-09-11T00:00:00Z',
+      } as any,
+    ]);
+
+    await render(<TraitementProspectionPickerScreen />);
+
+    expect(await screen.findByText(/Andasibe \(bord de route\)/)).toBeVisible();
+    expect(screen.queryByText(/localisation non renseignée/)).toBeNull();
+  });
+});
+
 describe('TraitementProspectionPickerScreen — aucune fiche disponible', () => {
   it('affiche un état vide explicite sans planter', async () => {
     jest.mocked(prospectionAccueil.loadFichesDisponiblesPourTraitement).mockResolvedValue([]);

@@ -295,9 +295,14 @@ export default function ExtensiveReferenceScreen() {
         // encore renseigné à ce stade sur une fiche neuve. Sans ça, la position
         // ne survivait qu'en état React local : quitter la fiche avant
         // « Suivant » la perdait, et une réouverture relançait une nouvelle
-        // capture GPS au lieu de restaurer celle déjà obtenue. Pas de
-        // région/district/commune/altitude ici : cet écran ne les a jamais
-        // suivis (contrairement à l'Intensif), comportement inchangé.
+        // capture GPS au lieu de restaurer celle déjà obtenue.
+        //
+        // region/district/commune (issus de `zone` ci-dessus) sont désormais
+        // persistés ici aussi, comme pour l'Intensif : sans ça, la liste
+        // « Nouvelle fiche de traitement » (prospection-picker.tsx) affichait
+        // « localisation non renseignée » pour toute fiche Extensive validée,
+        // alors que la localité était bien connue (juste jamais écrite dans
+        // ces colonnes, seulement dans `station_libre`).
         if (draftId) {
           try {
             // Ne met pas à jour le store (`setDraft`) : `draft.latitude`/
@@ -311,6 +316,9 @@ export default function ExtensiveReferenceScreen() {
               latitude: position.latitude,
               longitude: position.longitude,
               altitude: null,
+              region: zone.region,
+              district: zone.district,
+              commune: zone.commune,
             });
           } catch (error) {
             logger.ignore(error, 'Persistance immédiate de la position GPS impossible, position conservée en mémoire');
