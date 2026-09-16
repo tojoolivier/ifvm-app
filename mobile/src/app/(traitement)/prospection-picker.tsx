@@ -33,6 +33,7 @@ interface FichePickable {
   region?: string | null;
   district?: string | null;
   commune?: string | null;
+  station_libre?: string | null;
   prospecteur_nom?: string | null;
   validated_by_nom?: string | null;
   validated_at?: string | null;
@@ -153,7 +154,9 @@ export default function TraitementProspectionPickerScreen() {
               </Text>
               <Text style={styles.rowSubtitle}>
                 {item.date_prospection?.slice(0, 10) ?? 'date inconnue'} ·{' '}
-                {[item.region, item.district, item.commune].filter(Boolean).join(' · ') || 'localisation non renseignée'}
+                {[item.region, item.district, item.commune].filter(Boolean).join(' · ') ||
+                  item.station_libre ||
+                  'localisation non renseignée'}
               </Text>
               <Text style={styles.rowDetail}>
                 Créée par {item.prospecteur_nom ?? '—'}
