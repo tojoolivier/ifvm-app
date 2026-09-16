@@ -13,7 +13,7 @@ import {
   PosteAcridien,
   StationFixe,
 } from '@/lib/referentiel-db';
-import { updateProspectionReference, DraftProspection } from '@/lib/prospection-repository';
+import { updateProspectionReference, updateProspectionGpsPosition, DraftProspection } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useAuthStore } from '@/lib/auth-store';
 import { parseSelectionMultiple } from '@/lib/prospection-extensive';
@@ -373,6 +373,36 @@ export default function ReferenceScreen() {
         if (!isActive) return;
         setAdminArea(area);
 
+        // #brouillon-gps-persistance-immediate : persiste la position dès sa
+        // capture, indépendamment du reste du formulaire (biotope, surfaces,
+        // PA/station… pas encore renseignés sur une fiche neuve) — sans ça, la
+        // position ne survivait qu'en état React local, perdue si l'agent
+        // quitte la fiche avant « Continuer », et une réouverture relançait
+        // une nouvelle capture GPS au lieu de restaurer celle déjà obtenue.
+        if (draftId) {
+          try {
+            // Ne met pas à jour le store (`setDraft`) : `draft` est une
+            // dépendance de cet effet, et le mettre à jour ici le referait
+            // tourner aussitôt avec `draft.latitude` désormais non nul,
+            // basculant à tort sur `restoreFromDraft` juste après la capture.
+            // La persistance SQLite suffit — une réouverture ultérieure la lit
+            // via `hydrateFromDraft`, sans dépendre de l'état mémoire courant.
+            await updateProspectionGpsPosition(draftId, {
+              latitude: pos.latitude,
+              longitude: pos.longitude,
+              altitude: pos.altitude ?? null,
+              region: area.region,
+              district: area.district,
+              commune: area.commune,
+            });
+          } catch (error) {
+            // Best effort : une position non persistée immédiatement sera de
+            // toute façon réenvoyée lors du prochain enregistrement complet
+            // (« Continuer ») — ne bloque jamais la saisie en cours.
+            logger.ignore(error, 'Persistance immédiate de la position GPS impossible, position conservée en mémoire');
+          }
+        }
+
         const [nearest, postesList] = await Promise.all([
           findNearestStation(pos.latitude, pos.longitude),
           listPostesAcridiens(),
@@ -437,7 +467,7 @@ export default function ReferenceScreen() {
     return () => {
       isActive = false;
     };
-  }, [draft]);
+  }, [draft, draftId, logError]);
 
   // #manuel-referentiel-pa-station (§8) : un changement de PA invalide toute
   // station déjà choisie qui ne lui est plus rattachée — qu'il s'agisse d'un

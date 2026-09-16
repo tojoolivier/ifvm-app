@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
 import { startNewProspection } from '@/lib/prospection-accueil';
+import { updateProspectionSignalement } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { DateField } from '@/components/DateField';
 import { useAsyncAction } from '@/hooks/use-async-action';
+import { logger } from '@/lib/logger';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -26,30 +28,69 @@ export default function ExtensiveSignalementScreen() {
   const [source, setSource] = useState('');
   const [date, setDate] = useState('');
   const [description, setDescription] = useState('');
-  const { run, isRunning: isCreating } = useAsyncAction();
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const { run, isRunning: isSaving } = useAsyncAction();
 
   const canContinue = source.trim().length > 0 && description.trim().length > 0;
+
+  // #brouillon-des-le-debut : le brouillon existe dès l'arrivée sur cet écran,
+  // avant même que l'agent ait tapé quoi que ce soit — pour ne jamais perdre
+  // une saisie commencée s'il quitte l'écran ou ferme l'application avant
+  // « Continuer » (même garde-fou que `chooseIntensive` sur type-chooser.tsx,
+  // qui crée déjà son brouillon immédiatement).
+  const creationLanceeRef = useRef(false);
+  useEffect(() => {
+    if (creationLanceeRef.current || !user || !token) return;
+    creationLanceeRef.current = true;
+    let cancelled = false;
+    void startNewProspection({ token, prospecteurId: user.id, typeProspection: 'validation' })
+      .then(async (draft) => {
+        if (cancelled) return;
+        setDraftId(draft.id);
+        await hydrateFromDraft(draft.id);
+      })
+      .catch((error) => {
+        // Réessayable : un prochain rendu (ex. reconnexion) relance la création.
+        creationLanceeRef.current = false;
+        logger.failure('extensive-signalement.creationBrouillon.failed', error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, token, hydrateFromDraft]);
+
+  // #brouillon-progressif : sauvegarde des trois champs à chaque modification,
+  // une fois le brouillon créé — léger débounce pour ne pas écrire à chaque
+  // frappe sur la Description (multiligne).
+  useEffect(() => {
+    if (!draftId) return;
+    const timer = setTimeout(() => {
+      void updateProspectionSignalement(draftId, {
+        signalementSource: source.trim() || null,
+        signalementDate: date.trim() || null,
+        signalementDescription: description.trim() || null,
+      }).catch((error) => logger.ignore(error, 'Sauvegarde progressive du signalement impossible'));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [draftId, source, date, description]);
 
   const startValidation = () =>
     run(
       async () => {
-        const draft = await startNewProspection({
-          token: token!,
-          prospecteurId: user!.id,
-          typeProspection: 'validation',
+        await updateProspectionSignalement(draftId!, {
           signalementSource: source.trim(),
           signalementDate: date.trim() || null,
           signalementDescription: description.trim(),
         });
-        await hydrateFromDraft(draft.id);
-        router.replace({ pathname: '/(prospection)/extensive-mode-chooser' as any, params: { draftId: draft.id } });
+        router.replace({ pathname: '/(prospection)/extensive-mode-chooser' as any, params: { draftId: draftId! } });
       },
       {
         screen: 'extensive-signalement',
-        precondition: !!user && !!token && canContinue,
-        preconditionMessage: !user || !token
-          ? 'Session expirée — reconnectez-vous pour créer une fiche.'
+        precondition: !!draftId && canContinue,
+        preconditionMessage: !draftId
+          ? 'Brouillon en cours de création — patientez un instant.'
           : 'Renseignez la source et la description avant de continuer.',
+        context: { draftId },
       }
     );
 
@@ -113,10 +154,12 @@ export default function ExtensiveSignalementScreen() {
             <TouchableOpacity
               style={[styles.continueButton, !canContinue && styles.continueButtonDisabled]}
               onPress={startValidation}
-              disabled={!canContinue || isCreating}
+              disabled={!canContinue || !draftId || isSaving}
               activeOpacity={0.85}
             >
-              <Text style={styles.continueButtonText}>{isCreating ? 'Création…' : 'Continuer : Type de prospection ›'}</Text>
+              <Text style={styles.continueButtonText}>
+                {!draftId ? 'Initialisation…' : isSaving ? 'Enregistrement…' : 'Continuer : Type de prospection ›'}
+              </Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>

@@ -1,12 +1,9 @@
 /**
- * « Vérifier un signalement » — #brouillon-des-le-debut (2026-09-16) : le
- * brouillon (type_prospection = 'validation') est désormais créé dès le
- * montage de l'écran, avant même que Source/Description ne soient saisis —
- * pour ne jamais perdre une saisie commencée si l'agent quitte l'écran ou
- * ferme l'application avant « Continuer ». Les trois champs sont ensuite
- * sauvegardés progressivement (`updateProspectionSignalement`, débounce),
- * puis « Continuer » enchaîne sur le choix Terrestre/Aérien
- * (`extensive-mode-chooser.tsx`).
+ * « Vérifier un signalement » — pendant de extensive-signalement-screen.test.tsx
+ * pour le scénario « Continuer » complet (isolé dans son propre fichier — cf. le
+ * commentaire d'extensive-observations-pesticides-signatures-screen.test.tsx pour
+ * le pourquoi : contention observée sur plusieurs montages de cet écran dans un
+ * même fichier).
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import ExtensiveSignalementScreen from '@/app/(prospection)/extensive-signalement';
@@ -15,6 +12,8 @@ import { startNewProspection } from '@/lib/prospection-accueil';
 import * as prospectionRepository from '@/lib/prospection-repository';
 
 const mockReplace = jest.fn();
+
+const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: mockReplace, canGoBack: () => true }),
@@ -31,7 +30,7 @@ jest.mock('@/lib/prospection-repository', () => ({
   updateProspectionSignalement: jest.fn().mockResolvedValue({ id: 'draft-signalement-1' }),
 }));
 
-describe('ExtensiveSignalementScreen', () => {
+describe('ExtensiveSignalementScreen — Continuer', () => {
   beforeEach(() => {
     mockReplace.mockClear();
     jest.mocked(startNewProspection).mockClear().mockResolvedValue({ id: 'draft-signalement-1' } as any);
@@ -39,25 +38,15 @@ describe('ExtensiveSignalementScreen', () => {
     useAuthStore.setState({ token: 'tok-1', user: { id: 'u1' } as any, isAuthenticated: true });
   });
 
-  it('crée le brouillon dès le montage, avant toute saisie', async () => {
-    await render(<ExtensiveSignalementScreen />);
-
-    await waitFor(() =>
-      expect(startNewProspection).toHaveBeenCalledWith(
-        expect.objectContaining({ typeProspection: 'validation' })
-      )
-    );
-    // Aucune saisie n'a encore eu lieu : les champs de signalement ne sont pas
-    // encore connus au moment de la création.
-    expect(jest.mocked(startNewProspection).mock.calls[0][0]).not.toHaveProperty('signalementSource');
-  });
-
-  it('sauvegarde progressivement Source/Description sur le brouillon déjà créé', async () => {
+  it('enregistre les valeurs finales puis route vers le choix du type de prospection, avec le draftId', async () => {
     await render(<ExtensiveSignalementScreen />);
     await waitFor(() => expect(startNewProspection).toHaveBeenCalled());
 
     fireEvent.changeText(screen.getByPlaceholderText('Ex. Rasoanaivo (habitant)'), 'Rasoanaivo');
+    await settle();
     fireEvent.changeText(screen.getByPlaceholderText('Ce qui a été signalé'), 'Essaim visible près du village');
+    await settle();
+    fireEvent.press(screen.getByText('Continuer : Type de prospection ›'));
 
     await waitFor(() =>
       expect(prospectionRepository.updateProspectionSignalement).toHaveBeenCalledWith(
@@ -68,6 +57,12 @@ describe('ExtensiveSignalementScreen', () => {
         })
       )
     );
-  });
 
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(prospection)/extensive-mode-chooser',
+        params: { draftId: 'draft-signalement-1' },
+      })
+    );
+  });
 });

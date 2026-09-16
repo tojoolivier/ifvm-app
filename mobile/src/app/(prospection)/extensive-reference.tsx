@@ -22,6 +22,7 @@ import {
   listOperationsAeriennes,
   saveOperationsAeriennes,
   updateProspectionExtensiveReference,
+  updateProspectionGpsPosition,
 } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import {
@@ -240,7 +241,7 @@ export default function ExtensiveReferenceScreen() {
       // (une heure d'observation déjà enregistrée est restaurée telle quelle,
       // sans jamais relancer d'acquisition GPS simplement parce que l'écran
       // est remonté — même règle que observations.tsx).
-      if (draft?.latitude && draft?.longitude) {
+      if (draft?.latitude != null && draft?.longitude != null) {
         if (isMounted) {
           setLatitude(String(draft.latitude));
           setLongitude(String(draft.longitude));
@@ -287,6 +288,34 @@ export default function ExtensiveReferenceScreen() {
           if (localite) setStationLibre((current) => current || localite);
           setIsDetectingStation(false);
         }
+
+        // #brouillon-gps-persistance-immediate : même garde-fou que
+        // reference.tsx (Intensif) — persiste la position dès sa capture,
+        // indépendamment du reste du formulaire (station, surfaces…), jamais
+        // encore renseigné à ce stade sur une fiche neuve. Sans ça, la position
+        // ne survivait qu'en état React local : quitter la fiche avant
+        // « Suivant » la perdait, et une réouverture relançait une nouvelle
+        // capture GPS au lieu de restaurer celle déjà obtenue. Pas de
+        // région/district/commune/altitude ici : cet écran ne les a jamais
+        // suivis (contrairement à l'Intensif), comportement inchangé.
+        if (draftId) {
+          try {
+            // Ne met pas à jour le store (`setDraft`) : `draft.latitude`/
+            // `draft.longitude` sont des dépendances de cet effet, et les
+            // mettre à jour ici le referait tourner aussitôt avec des
+            // coordonnées désormais non nulles, basculant à tort sur la
+            // branche « déjà restauré » juste après la capture. La
+            // persistance SQLite suffit — une réouverture ultérieure la lit
+            // via `hydrateFromDraft`, sans dépendre de l'état mémoire courant.
+            await updateProspectionGpsPosition(draftId, {
+              latitude: position.latitude,
+              longitude: position.longitude,
+              altitude: null,
+            });
+          } catch (error) {
+            logger.ignore(error, 'Persistance immédiate de la position GPS impossible, position conservée en mémoire');
+          }
+        }
       } catch (error) {
         // Best-effort délibéré : déjà visible via `gpsError`, l'agent peut
         // saisir les coordonnées — et la station — à la main.
@@ -306,7 +335,7 @@ export default function ExtensiveReferenceScreen() {
     return () => {
       isMounted = false;
     };
-  }, [draft?.latitude, draft?.longitude, draft?.heure_observation_at]);
+  }, [draft?.latitude, draft?.longitude, draft?.heure_observation_at, draftId]);
 
   // Station saisie librement, type de station, surface et n° message : de simples
   // `useState(draft?.x)` d'initialisation ne se remettent jamais à jour si `draft`
