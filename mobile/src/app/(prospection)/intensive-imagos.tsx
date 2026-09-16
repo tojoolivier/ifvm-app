@@ -16,7 +16,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Espece, accouplementOptionsFor, capturesMaxFor, grilleKeyToString, phasesFor } from '@/lib/prospection-especes-stades';
 import { parseEspeceSelection, buildGrilles, parseGrillesCompletees } from '@/lib/prospection-especes';
-import { parseDensite, parseSelectionMultiple, TYPE_CIBLE_IMAGO_OPTIONS, TypeCibleImago } from '@/lib/prospection-extensive';
+import { parseDensite, parseSelectionMultiple, TYPE_CIBLE_IMAGO_OPTIONS, TypeCibleImago, EtatImago } from '@/lib/prospection-extensive';
+import { COMPASS_DIRECTIONS, oppositeDirection } from '@/lib/prospection-infestation-insights';
 import { listStadesGrille } from '@/lib/referentiel-db';
 import { retourArriere } from '@/lib/fiche-routing';
 import {
@@ -54,6 +55,11 @@ function emptyImagoPopulation(espece: Espece): PopulationRow {
     ponte: null,
     interdistance: null,
     type_cible: null,
+    direction_de: null,
+    direction_vers: null,
+    etat: null,
+    essaim_en_vol: null,
+    essaim_pose: null,
   };
 }
 
@@ -247,6 +253,29 @@ export default function IntensiveImagosScreen() {
 
   const setTypeCibleValue = (values: TypeCibleImago[]) => {
     setPopulationField('type_cible', JSON.stringify(values));
+  };
+
+  const patchPopulation = (patch: Partial<PopulationRow>) => {
+    setPopulations((prev) => ({
+      ...prev,
+      [species]: { ...(prev[species] ?? emptyImagoPopulation(species)), ...patch },
+    }));
+  };
+
+  /** Même logique que handleEtatChange dans extensive-imagos.tsx (et
+   * infestation.tsx, règle #4) : le Comportement de l'essaim est entièrement
+   * dérivé de l'État, jamais choisi indépendamment — appuyer à nouveau sur
+   * l'État actif le désélectionne (et efface la direction, qui n'a de sens
+   * qu'en Déplacement). */
+  const handleEtatChange = (value: EtatImago) => {
+    const nextEtat = population.etat === value ? null : value;
+    patchPopulation(
+      nextEtat === 'repos'
+        ? { etat: 'repos', essaim_en_vol: false, essaim_pose: true, direction_de: null, direction_vers: null }
+        : nextEtat === 'deplacement'
+          ? { etat: 'deplacement', essaim_en_vol: true, essaim_pose: false }
+          : { etat: null, essaim_en_vol: null, essaim_pose: null, direction_de: null, direction_vers: null }
+    );
   };
 
   const imagoIndices = grilleOrder
@@ -697,6 +726,67 @@ export default function IntensiveImagosScreen() {
               })}
             </View>
 
+            {/* Direction du déplacement : n'a de sens qu'en État = Déplacement, comme
+                côté Extensif (extensive-imagos.tsx) et Infestation intensive — masquée
+                (et effacée par handleEtatChange) tant que l'État n'est pas "Déplacement". */}
+            {population.etat === 'deplacement' && (
+              <>
+                <Text style={styles.sectionLabel}>Direction du déplacement</Text>
+                <View style={styles.chipsRow}>
+                  {COMPASS_DIRECTIONS.map((dir) => {
+                    const active = dir.label === population.direction_de;
+                    return (
+                      <TouchableOpacity
+                        key={dir.label}
+                        onPress={() =>
+                          active
+                            ? patchPopulation({ direction_de: null, direction_vers: null })
+                            : patchPopulation({ direction_de: dir.label, direction_vers: oppositeDirection(dir.label) })
+                        }
+                        style={[styles.chip, active && styles.chipActive]}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[styles.chipText, active && styles.chipTextActive]}>{dir.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
+            )}
+
+            <Text style={styles.sectionLabel}>État</Text>
+            <View style={styles.chipsRow}>
+              {(['repos', 'deplacement'] as EtatImago[]).map((value) => {
+                const active = population.etat === value;
+                return (
+                  <TouchableOpacity
+                    key={value}
+                    onPress={() => handleEtatChange(value)}
+                    style={[styles.chip, active && styles.chipActive]}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                      {value === 'repos' ? 'Repos' : 'Déplacement'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={styles.sectionLabel}>Comportement de l&apos;essaim</Text>
+            <View style={styles.chipsRow}>
+              {(['vol', 'pose'] as const).map((value) => {
+                const active = value === 'vol' ? !!population.essaim_en_vol : !!population.essaim_pose;
+                return (
+                  <View key={value} style={[styles.chip, active && styles.chipActive]}>
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                      {value === 'vol' ? 'En vol' : 'Posé'}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+
             <View style={styles.summaryContainer}>
               <Text style={styles.summaryTitle}>📋 Récapitulatif — {ESPECE_LABEL[species]}</Text>
               <View style={styles.summaryRow}>
@@ -757,6 +847,26 @@ export default function IntensiveImagosScreen() {
                     : '—'}
                 </Text>
               </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>État :</Text>
+                <Text style={styles.summaryValue}>
+                  {population.etat === 'repos' ? 'Repos' : population.etat === 'deplacement' ? 'Déplacement' : '—'}
+                </Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Comportement de l&apos;essaim :</Text>
+                <Text style={styles.summaryValue}>
+                  {population.essaim_en_vol ? 'En vol' : population.essaim_pose ? 'Posé' : '—'}
+                </Text>
+              </View>
+              {population.etat === 'deplacement' && (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Direction :</Text>
+                  <Text style={styles.summaryValue}>
+                    {population.direction_de ? `${population.direction_de} → ${population.direction_vers}` : '—'}
+                  </Text>
+                </View>
+              )}
               <View style={styles.ruleBox}>
                 <Text style={styles.ruleText}>Règle bloquante : Captures = Phases</Text>
                 <Text style={[styles.ruleText, { marginTop: 4, color: TEXT_SECONDARY, fontSize: 10 }]}>
