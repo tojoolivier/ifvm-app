@@ -274,6 +274,7 @@ describe('parseVegetationSol / buildVegetationSummary (multi-strate)', () => {
 
     expect(state.strates.herbeuse).toEqual({
       surfRel: 40, hMoy: 0.3, recouvrement: 70, verdissement: 20, repousse: 10, orpad: ['Rare'],
+      feuille: [], fleur: [], fruit: [], sec: [],
     });
     expect(state.strates.buissonneuse.recouvrement).toBe(0);
     expect(state.solNu).toBe(5);

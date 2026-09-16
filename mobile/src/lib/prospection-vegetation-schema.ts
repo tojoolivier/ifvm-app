@@ -8,6 +8,10 @@ export interface StrateFormValues {
   verdissement: number | null;
   repousse: number | null;
   orpad: string[];
+  feuille: string[];
+  fleur: string[];
+  fruit: string[];
+  sec: string[];
 }
 
 export interface VegetationFormValues {
