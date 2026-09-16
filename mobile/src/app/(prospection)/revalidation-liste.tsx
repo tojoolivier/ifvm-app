@@ -32,6 +32,7 @@ interface FicheARevalider {
   region?: string | null;
   district?: string | null;
   commune?: string | null;
+  station_libre?: string | null;
   validated_at?: string | null;
 }
 
@@ -163,6 +164,7 @@ export default function RevalidationListeScreen() {
                 </Text>
                 <Text style={styles.rowSubtitle}>
                   {[item.region, item.district, item.commune].filter(Boolean).join(' · ') ||
+                    item.station_libre ||
                     'localisation non renseignée'}
                 </Text>
                 {retard != null && (

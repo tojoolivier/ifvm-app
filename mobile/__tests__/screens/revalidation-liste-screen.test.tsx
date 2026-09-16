@@ -76,6 +76,31 @@ describe('RevalidationListeScreen — affichage', () => {
 
     expect(await screen.findByText(/Aucune prospection à revalider/)).toBeVisible();
   });
+
+  /** Régression, même cause que prospection-picker.tsx : une fiche
+   * (extensive ou validation/signalement) dont region/district/commune sont
+   * vides affichait « localisation non renseignée » alors que la localité
+   * était bien connue via `station_libre`. */
+  it("affiche station_libre quand region/district/commune sont vides (fiche de signalement)", async () => {
+    jest.mocked(prospectionAccueil.loadFichesARevalider).mockResolvedValue([
+      {
+        id: 'presp-signalement-perime',
+        type_prospection: 'validation',
+        n_fiche: null,
+        n_message: 'MSG-2026-0099',
+        region: null,
+        district: null,
+        commune: null,
+        station_libre: 'Andasibe (bord de route)',
+        validated_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      } as any,
+    ]);
+
+    await render(<RevalidationListeScreen />);
+
+    expect(await screen.findByText(/Andasibe \(bord de route\)/)).toBeVisible();
+    expect(screen.queryByText(/localisation non renseignée/)).toBeNull();
+  });
 });
 
 describe('RevalidationListeScreen — sélection (démarre la revalidation)', () => {
