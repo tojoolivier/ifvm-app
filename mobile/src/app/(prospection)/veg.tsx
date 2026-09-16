@@ -7,7 +7,7 @@ import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import {
   HUMIDITE_OPTIONS,
-  ORPAD_STAGES,
+  PHENOLOGIE_STAGES,
   parseVegetationSol,
   STRATE_KEYS,
   STRATE_LABELS,
@@ -63,6 +63,19 @@ function formatDecimalDisplay(value: number | null): string {
 
 /** Les quatre champs décimaux libres d'une strate — tous `number | null` dans StrateFormValues. */
 type DecimalFieldKey = 'surfRel' | 'hMoy' | 'verdissement' | 'repousse';
+
+/** Les 5 champs phénologiques d'une strate (Néant/Rare/Beaucoup, multi-select) —
+ * "orpad" est le nom historique conservé côté données pour Germination (fiches déjà
+ * synchronisées avant le renommage d'affichage) ; seul le libellé UI a changé. */
+type PhenologieFieldKey = 'orpad' | 'feuille' | 'fleur' | 'fruit' | 'sec';
+
+const PHENOLOGIE_FIELDS: { key: PhenologieFieldKey; label: string }[] = [
+  { key: 'orpad', label: 'Germination' },
+  { key: 'feuille', label: 'Feuille' },
+  { key: 'fleur', label: 'Fleur' },
+  { key: 'fruit', label: 'Fruit' },
+  { key: 'sec', label: 'Sec' },
+];
 
 function emptyStrateForm(): StrateFormValues {
   return defaultStrateDetail();
@@ -217,10 +230,10 @@ export default function VegetationScreen() {
     setStrates((current) => ({ ...current, [key]: { ...current[key], [field]: processedValue } }));
   };
 
-  const toggleOrpad = (key: StrateKey, stage: string) => {
-    const current = strates[key].orpad;
+  const togglePhenologie = (key: StrateKey, field: PhenologieFieldKey, stage: string) => {
+    const current = strates[key][field];
     const next = current.includes(stage) ? current.filter((s) => s !== stage) : [...current, stage];
-    setStrateField(key, 'orpad', next);
+    setStrateField(key, field, next);
   };
 
   // ==========================================
@@ -447,22 +460,26 @@ export default function VegetationScreen() {
                         </View>
                       </View>
 
-                      <Text style={styles.smallLabel}>ORPAD</Text>
-                      <View style={styles.chipsRow}>
-                        {ORPAD_STAGES.map((stage) => {
-                          const active = strate.orpad.includes(stage);
-                          return (
-                            <TouchableOpacity
-                              key={stage}
-                              onPress={() => toggleOrpad(key, stage)}
-                              style={[styles.smallChip, active && styles.smallChipActive]}
-                              activeOpacity={0.8}
-                            >
-                              <Text style={[styles.smallChipText, active && styles.smallChipTextActive]}>{stage}</Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
+                      {PHENOLOGIE_FIELDS.map(({ key: fieldKey, label }) => (
+                        <View key={fieldKey}>
+                          <Text style={styles.smallLabel}>{label}</Text>
+                          <View style={styles.chipsRow}>
+                            {PHENOLOGIE_STAGES.map((stage) => {
+                              const active = strate[fieldKey].includes(stage);
+                              return (
+                                <TouchableOpacity
+                                  key={stage}
+                                  onPress={() => togglePhenologie(key, fieldKey, stage)}
+                                  style={[styles.smallChip, active && styles.smallChipActive]}
+                                  activeOpacity={0.8}
+                                >
+                                  <Text style={[styles.smallChipText, active && styles.smallChipTextActive]}>{stage}</Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+                        </View>
+                      ))}
                     </View>
                   )}
                 </View>
