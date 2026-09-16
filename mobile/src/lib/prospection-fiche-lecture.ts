@@ -31,11 +31,13 @@ export const TYPE_CIBLE_OPTIONS: { value: TypeCible; label: string }[] = [
 export type Humidite = 'surface' | '0_5cm' | '5_12cm' | '12_30cm' | 'gt_30cm';
 export type Texture = 'limoneuse' | 'argileuse' | 'sable_fin' | 'sable_grossier' | 'gravier' | 'cailloux' | 'bloc';
 export type DegatsCultures = 'nuls' | 'faibles' | 'moyens' | 'forts';
-/** Niveaux ORPAD (PDF cols f-j) : multi-select par strate, pas exclusif. */
-export type OrpadStage = 'Néant' | 'Rare' | 'Beaucoup';
+/** Niveaux phénologiques (Germination — ex-ORPAD, PDF cols f-j — Feuille, Fleur,
+ * Fruit, Sec) : multi-select par strate, pas exclusif, mêmes 3 valeurs pour les 5
+ * champs. */
+export type PhenologieStage = 'Néant' | 'Rare' | 'Beaucoup';
 export type StrateKey = 'arboree' | 'arbustive' | 'buissonneuse' | 'herbeuse' | 'cultures_seches' | 'cultures_hygro';
 
-export const ORPAD_STAGES: OrpadStage[] = ['Néant', 'Rare', 'Beaucoup'];
+export const PHENOLOGIE_STAGES: PhenologieStage[] = ['Néant', 'Rare', 'Beaucoup'];
 
 /** Les 6 strates du PDF (rows 37-42). "Sol nu" n'est pas une strate : c'est un champ (`solNu`) à l'intérieur de chaque strate (col k). */
 export const STRATE_KEYS: StrateKey[] = ['arboree', 'arbustive', 'buissonneuse', 'herbeuse', 'cultures_seches', 'cultures_hygro'];
@@ -80,7 +82,13 @@ export interface StrateDetail {
   recouvrement: number;
   verdissement: number | null;
   repousse: number | null;
+  /** Germination — nom historique "orpad" conservé côté données (fiches déjà
+   * synchronisées avant le renommage d'affichage), seul le libellé UI a changé. */
   orpad: string[];
+  feuille: string[];
+  fleur: string[];
+  fruit: string[];
+  sec: string[];
 }
 
 export type StratesState = Record<StrateKey, StrateDetail>;
@@ -119,7 +127,18 @@ function normalizeTextureSelection(raw: unknown): Texture[] {
 }
 
 export function defaultStrateDetail(): StrateDetail {
-  return { surfRel: null, hMoy: null, recouvrement: 0, verdissement: null, repousse: null, orpad: [] };
+  return {
+    surfRel: null,
+    hMoy: null,
+    recouvrement: 0,
+    verdissement: null,
+    repousse: null,
+    orpad: [],
+    feuille: [],
+    fleur: [],
+    fruit: [],
+    sec: [],
+  };
 }
 
 function defaultStrates(): StratesState {
@@ -153,6 +172,10 @@ export function parseVegetationSol(
           verdissement: typeof detail.verdissement === 'number' ? detail.verdissement : null,
           repousse: typeof detail.repousse === 'number' ? detail.repousse : null,
           orpad: Array.isArray(detail.orpad) ? detail.orpad : [],
+          feuille: Array.isArray(detail.feuille) ? detail.feuille : [],
+          fleur: Array.isArray(detail.fleur) ? detail.fleur : [],
+          fruit: Array.isArray(detail.fruit) ? detail.fruit : [],
+          sec: Array.isArray(detail.sec) ? detail.sec : [],
         };
       }
     }
