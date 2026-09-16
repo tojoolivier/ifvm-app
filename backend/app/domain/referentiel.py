@@ -235,15 +235,72 @@ class BaseAerienneParentInvalideError(Exception):
     pass
 
 
+class BaseAerienneEquipeInvalideError(Exception):
+    """`equipe_id` incohérent avec la hiérarchie (#equipe-aerienne, migration 0066).
+
+    Deux cas : une base principale (`parent_base_id is None`) sans `equipe_id`, ou une
+    base secondaire (`parent_base_id` non nul) à laquelle on tente d'assigner sa propre
+    `equipe_id` — elle hérite de celle de sa principale, elle n'en porte pas une à elle.
+    """
+
+    pass
+
+
+class EquipeAerienneIntrouvableError(Exception):
+    """`equipe_id` ne référence aucune `equipe_aerienne` existante."""
+
+    pass
+
+
+class EquipeAerienneDejaAssigneeError(Exception):
+    """L'équipe référencée possède déjà une base aérienne principale (UNIQUE
+    `base_aerienne.equipe_id`, une équipe = une base principale)."""
+
+    pass
+
+
+class ChefDeBaseEquipeInvalideError(Exception):
+    """`chef_de_base_id` ne référence pas un utilisateur avec le rôle `chef_de_base`."""
+
+    pass
+
+
+class ChefDeBaseDejaEquipeError(Exception):
+    """L'utilisateur référencé dirige déjà une autre équipe aérienne (UNIQUE
+    `equipe_aerienne.chef_de_base_id`, un chef de base = une équipe)."""
+
+    pass
+
+
+@dataclass
+class EquipeAerienne:
+    """Équipe aérienne (#equipe-aerienne, migration 0066) : une équipe = un chef de
+    base (`chef_de_base_id` UNIQUE) = une base aérienne principale (`base_aerienne.
+    equipe_id` UNIQUE, cf. `BaseAerienne`). Demande utilisateur du 2026-09-16, en
+    continuité de la fiche de vol (migration 0064)."""
+
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    nom: str = ""
+    chef_de_base_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    actif: bool = True
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
+
+
 @dataclass
 class BaseAerienne:
     """Base aérienne principale (`parent_base_id is None`) ou secondaire (référence sa
     principale). Référentiel dédié à la fiche de vol, distinct de `LieuAerien` —
     décision produit du 2026-09-15 maintenue malgré le précédent `lieu_aerien` (cf.
-    migration `0064`)."""
+    migration `0064`).
+
+    `equipe_id` (migration 0066) n'est renseigné que sur une base principale — une
+    base secondaire hérite de l'équipe de sa principale via `parent_base_id`, elle ne
+    porte pas sa propre `equipe_id` (cf. `BaseAerienneEquipeInvalideError`)."""
 
     id: uuid.UUID = field(default_factory=uuid.uuid4)
     parent_base_id: uuid.UUID | None = None
+    equipe_id: uuid.UUID | None = None
     numero: str = ""
     localite: str = ""
     longitude: float | None = None

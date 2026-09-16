@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
@@ -11,7 +11,6 @@ import { ReferentialError } from '@/lib/errors';
 import { DateField } from '@/components/DateField';
 import { BaseAerienneField, type BaseAerienneOption } from '@/components/referentiel/BaseAerienneField';
 import { StandRemplissageField, type StandRemplissageOption } from '@/components/referentiel/StandRemplissageField';
-import { ChefDeBaseField, type ChefDeBaseOption } from '@/components/referentiel/ChefDeBaseField';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -50,13 +49,41 @@ export default function FicheVolCreationScreen() {
 
   const [baseId, setBaseId] = useState<string | null>(null);
   const [standId, setStandId] = useState<string | null>(null);
+  // #equipe-aerienne : le chef de base n'est plus choisi séparément — il est
+  // dérivé de la base choisie (base -> équipe -> chef de base), puisqu'une
+  // équipe aérienne = un chef de base = une base principale (migration 0066).
   const [chefDeBaseId, setChefDeBaseId] = useState<string | null>(null);
+  const [chefDeBaseNom, setChefDeBaseNom] = useState<string | null>(null);
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const { run: runChef, isRunning: isChefLoading } = useAsyncAction();
 
-  const onChangeBase = (id: string, _option: BaseAerienneOption) => setBaseId(id);
+  const onChangeBase = (id: string, option: BaseAerienneOption) => {
+    setBaseId(id);
+    setChefDeBaseId(null);
+    setChefDeBaseNom(null);
+    void runChef(
+      async () => {
+        const equipeId =
+          option.parent_base_id === null
+            ? option.equipe_id
+            : (await apiClient.listBasesAeriennes(token!)).find((b) => b.id === option.parent_base_id)
+                ?.equipe_id ?? null;
+        if (!equipeId) {
+          throw new ReferentialError("Cette base n'a pas d'équipe aérienne rattachée.");
+        }
+        const equipe = (await apiClient.listEquipesAeriennes(token!)).find((e) => e.id === equipeId);
+        if (!equipe) {
+          throw new ReferentialError('Équipe aérienne introuvable pour cette base.');
+        }
+        const chef = (await apiClient.listChefsDeBase(token!)).find((c) => c.id === equipe.chef_de_base_id);
+        setChefDeBaseId(equipe.chef_de_base_id);
+        setChefDeBaseNom(chef ? `${chef.prenom} ${chef.nom}` : equipe.chef_de_base_id);
+      },
+      { screen: 'fiche-vol-creation', precondition: !!token }
+    );
+  };
   const onChangeStand = (id: string, _option: StandRemplissageOption) => setStandId(id);
-  const onChangeChef = (id: string, _option: ChefDeBaseOption) => setChefDeBaseId(id);
 
   const submit = () => {
     const errors: Record<string, string> = {};
@@ -67,7 +94,9 @@ export default function FicheVolCreationScreen() {
     if (!mecanicien.trim()) errors.mecanicien = 'Renseignez le mécanicien.';
     if (!baseId) errors.baseId = 'Choisissez une base aérienne.';
     if (!standId) errors.standId = 'Choisissez un stand de remplissage.';
-    if (!chefDeBaseId) errors.chefDeBaseId = 'Choisissez un chef de base.';
+    if (baseId && !chefDeBaseId) {
+      errors.chefDeBaseId = 'Le chef de base de cette base est introuvable — vérifiez son équipe aérienne.';
+    }
     setFormErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
@@ -123,6 +152,13 @@ export default function FicheVolCreationScreen() {
               <Text style={styles.back}>‹</Text>
             </TouchableOpacity>
             <Text style={styles.title}>Nouvelle fiche de vol</Text>
+            <View style={styles.headerSpacer} />
+            <TouchableOpacity
+              onPress={() => router.push('/(fiche-vol)/referentiels' as any)}
+              accessibilityRole="button"
+            >
+              <Text style={styles.referentielsLink}>Référentiels ›</Text>
+            </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -156,7 +192,17 @@ export default function FicheVolCreationScreen() {
 
             <BaseAerienneField value={baseId} onChange={onChangeBase} />
             <StandRemplissageField value={standId} onChange={onChangeStand} />
-            <ChefDeBaseField value={chefDeBaseId} onChange={onChangeChef} />
+
+            <View style={styles.card}>
+              <Text style={styles.label}>Chef de base</Text>
+              {isChefLoading ? (
+                <ActivityIndicator color={GREEN} />
+              ) : (
+                <Text style={styles.chefDeBaseValue}>
+                  {chefDeBaseNom ?? 'Choisissez une base pour déterminer le chef de base'}
+                </Text>
+              )}
+            </View>
 
             <View style={styles.card}>
               <Text style={styles.label}>Pilote</Text>
@@ -231,6 +277,8 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerSpacer: { flex: 1 },
+  referentielsLink: { fontSize: 12.5, fontWeight: '700', color: GREEN },
   back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
   title: { fontSize: 15, fontWeight: '700', color: TEXT },
   scroll: { flex: 1 },
@@ -239,6 +287,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 9, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase' },
   input: { fontSize: 13, fontWeight: '600', color: TEXT, borderWidth: 1, borderColor: BORDER, borderRadius: 8, padding: 8 },
   inputMultiline: { minHeight: 64, textAlignVertical: 'top' },
+  chefDeBaseValue: { fontSize: 13, fontWeight: '600', color: TEXT },
   errorText: { color: '#c0412b', fontSize: 11, marginBottom: 4 },
   footer: { paddingHorizontal: 16, paddingTop: 12, backgroundColor: BG },
   continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },

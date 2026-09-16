@@ -249,11 +249,61 @@ async def lieu_aerien(db_session: AsyncSession):
 
 
 @pytest_asyncio.fixture
-async def base_aerienne(db_session: AsyncSession):
+async def equipe_aerienne(db_session: AsyncSession, chef_de_base: Utilisateur):
+    from app.infrastructure.referentiel_model import EquipeAerienneModel
+
+    equipe = EquipeAerienneModel(
+        id=uuid.uuid4(),
+        nom="Équipe Ihosy",
+        chef_de_base_id=chef_de_base.id,
+        actif=True,
+    )
+    db_session.add(equipe)
+    await db_session.commit()
+    await db_session.refresh(equipe)
+    return equipe
+
+
+@pytest_asyncio.fixture
+async def equipe_aerienne_bis(db_session: AsyncSession):
+    """Deuxième équipe, chef distinct — pour les tests qui ont besoin d'une équipe
+    encore libre (`base_aerienne.equipe_id` UNIQUE) sans réutiliser celle de la
+    fixture `base_aerienne`."""
+    from app.infrastructure.referentiel_model import EquipeAerienneModel
+
+    chef = Utilisateur(
+        id=uuid.uuid4(),
+        nom="Rasolo",
+        prenom="Voahangy",
+        email=f"voahangy.rasolo+{uuid.uuid4().hex[:6]}@test.mg",
+        password_hash=hash_password("secret"),
+        role="chef_de_base",
+        actif=True,
+    )
+    db_session.add(chef)
+    await db_session.commit()
+
+    equipe = EquipeAerienneModel(
+        id=uuid.uuid4(),
+        nom="Équipe Betroka",
+        chef_de_base_id=chef.id,
+        actif=True,
+    )
+    db_session.add(equipe)
+    await db_session.commit()
+    await db_session.refresh(equipe)
+    return equipe
+
+
+@pytest_asyncio.fixture
+async def base_aerienne(db_session: AsyncSession, equipe_aerienne):
     from app.infrastructure.referentiel_model import BaseAerienneModel
 
+    # #equipe-aerienne (migration 0066) : une base principale doit avoir une
+    # équipe (`ck_base_aerienne_equipe_coherente`).
     base = BaseAerienneModel(
         id=uuid.uuid4(),
+        equipe_id=equipe_aerienne.id,
         numero="IHO01",
         localite="Ihosy",
         latitude=-22.4021,

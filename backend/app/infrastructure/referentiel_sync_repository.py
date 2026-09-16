@@ -7,8 +7,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.referentiel import (
     BaseAerienne,
+    BaseAerienneEquipeInvalideError,
+    ChefDeBaseDejaEquipeError,
     CodeStade,
     Culture,
+    EquipeAerienne,
+    EquipeAerienneDejaAssigneeError,
+    EquipeAerienneIntrouvableError,
     LieuAerien,
     NumeroBaseAerienneDejaPrisError,
     NumeroStandRemplissageDejaPrisError,
@@ -20,6 +25,7 @@ from app.domain.repositories import (
     BaseAerienneRepository,
     CodeStadeRepository,
     CultureRepository,
+    EquipeAerienneRepository,
     LieuAerienRepository,
     PesticideRepository,
     StandRemplissageRepository,
@@ -29,12 +35,26 @@ from app.infrastructure.referentiel_model import (
     BaseAerienneModel,
     CodeStadeModel,
     CultureModel,
+    EquipeAerienneModel,
     LieuAerienModel,
     PesticideModel,
     StadeModel,
     StandRemplissageModel,
 )
 from app.models.users import Utilisateur
+
+
+def _contrainte_violee(exc: IntegrityError) -> str | None:
+    """Nom de la contrainte violée — même mécanique que
+    `prospection_repository._contrainte_violee`/`routers.users._contrainte_violee` :
+    `exc.orig` est l'erreur asyncpg, qui porte `constraint_name` un cran plus bas."""
+    erreur: BaseException | None = getattr(exc, "orig", None)
+    while erreur is not None:
+        nom = getattr(erreur, "constraint_name", None)
+        if nom:
+            return str(nom)
+        erreur = erreur.__cause__
+    return None
 
 
 class UtilisateurEquipeRepositoryImpl(UtilisateurEquipeRepository):
@@ -295,6 +315,7 @@ class BaseAerienneRepositoryImpl(BaseAerienneRepository):
         return BaseAerienne(
             id=model.id,
             parent_base_id=model.parent_base_id,
+            equipe_id=model.equipe_id,
             numero=model.numero,
             localite=model.localite,
             longitude=float(model.longitude) if model.longitude is not None else None,
@@ -331,6 +352,7 @@ class BaseAerienneRepositoryImpl(BaseAerienneRepository):
         model = BaseAerienneModel(
             id=base.id,
             parent_base_id=base.parent_base_id,
+            equipe_id=base.equipe_id,
             numero=base.numero,
             localite=base.localite,
             longitude=base.longitude,
@@ -345,9 +367,22 @@ class BaseAerienneRepositoryImpl(BaseAerienneRepository):
             await self.session.commit()
         except IntegrityError as exc:
             await self.session.rollback()
-            raise NumeroBaseAerienneDejaPrisError(base.numero) from exc
+            raise self._traduire_integrite(exc, base) from exc
         await self.session.refresh(model)
         return self._to_domain(model)
+
+    def _traduire_integrite(self, exc: IntegrityError, base: BaseAerienne) -> Exception:
+        """Traduit l'IntegrityError en erreur domaine actionnable — sans ça, une
+        équipe déjà assignée ou inexistante remontait comme un doublon de `numero`
+        (message trompeur pour l'agent qui remplit le formulaire)."""
+        contrainte = _contrainte_violee(exc)
+        if contrainte == "ck_base_aerienne_equipe_coherente":
+            return BaseAerienneEquipeInvalideError(str(base.equipe_id))
+        if contrainte == "uq_base_aerienne_equipe_id":
+            return EquipeAerienneDejaAssigneeError(str(base.equipe_id))
+        if contrainte == "fk_base_aerienne_equipe_id":
+            return EquipeAerienneIntrouvableError(str(base.equipe_id))
+        return NumeroBaseAerienneDejaPrisError(base.numero)
 
     async def update(self, base: BaseAerienne) -> BaseAerienne:
         result = await self.session.execute(
@@ -355,6 +390,7 @@ class BaseAerienneRepositoryImpl(BaseAerienneRepository):
         )
         model = result.scalar_one()
         model.parent_base_id = base.parent_base_id
+        model.equipe_id = base.equipe_id
         model.numero = base.numero
         model.localite = base.localite
         model.longitude = base.longitude
@@ -366,7 +402,54 @@ class BaseAerienneRepositoryImpl(BaseAerienneRepository):
             await self.session.commit()
         except IntegrityError as exc:
             await self.session.rollback()
-            raise NumeroBaseAerienneDejaPrisError(base.numero) from exc
+            raise self._traduire_integrite(exc, base) from exc
+        await self.session.refresh(model)
+        return self._to_domain(model)
+
+
+class EquipeAerienneRepositoryImpl(EquipeAerienneRepository):
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    def _to_domain(self, model: EquipeAerienneModel) -> EquipeAerienne:
+        return EquipeAerienne(
+            id=model.id,
+            nom=model.nom,
+            chef_de_base_id=model.chef_de_base_id,
+            actif=model.actif,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+        )
+
+    async def list_all(self, actif: bool | None = True) -> list[EquipeAerienne]:
+        stmt = select(EquipeAerienneModel).order_by(EquipeAerienneModel.nom)
+        if actif is not None:
+            stmt = stmt.where(EquipeAerienneModel.actif == actif)
+        result = await self.session.execute(stmt)
+        return [self._to_domain(m) for m in result.scalars().all()]
+
+    async def get_by_id(self, equipe_id: uuid.UUID) -> EquipeAerienne | None:
+        result = await self.session.execute(
+            select(EquipeAerienneModel).where(EquipeAerienneModel.id == equipe_id)
+        )
+        model = result.scalar_one_or_none()
+        return None if model is None else self._to_domain(model)
+
+    async def create(self, equipe: EquipeAerienne) -> EquipeAerienne:
+        model = EquipeAerienneModel(
+            id=equipe.id,
+            nom=equipe.nom,
+            chef_de_base_id=equipe.chef_de_base_id,
+            actif=equipe.actif,
+            created_at=equipe.created_at,
+            updated_at=equipe.updated_at,
+        )
+        self.session.add(model)
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise ChefDeBaseDejaEquipeError(str(equipe.chef_de_base_id)) from exc
         await self.session.refresh(model)
         return self._to_domain(model)
 
