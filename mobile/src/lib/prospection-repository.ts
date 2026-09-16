@@ -446,6 +446,40 @@ export async function createDraftProspection(input: DraftProspectionInput): Prom
   return created;
 }
 
+export interface SignalementUpdateInput {
+  signalementSource: string | null;
+  signalementDate: string | null;
+  signalementDescription: string | null;
+}
+
+/**
+ * #brouillon-des-le-debut : sauvegarde progressive des trois champs de
+ * `extensive-signalement.tsx` (« Vérifier un signalement ») sur un brouillon
+ * déjà créé (dès le montage de l'écran, avant même que l'agent ait tapé quoi
+ * que ce soit) — jusqu'ici, ces champs ne survivaient qu'en état React local
+ * de l'écran, écrits une seule fois via `createDraftProspection` au moment de
+ * « Continuer », et perdus si l'agent quittait l'écran avant.
+ */
+export async function updateProspectionSignalement(
+  id: string,
+  input: SignalementUpdateInput
+): Promise<DraftProspection> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    `UPDATE prospection SET
+      signalement_source = ?, signalement_date = ?, signalement_description = ?,
+      updated_at = ?
+     WHERE id = ?`,
+    [input.signalementSource, input.signalementDate, input.signalementDescription, now, id]
+  );
+
+  const updated = await getProspection(id);
+  if (!updated) throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  return updated;
+}
+
 /**
  * Matérialise en local une fiche déjà VALIDÉE côté serveur, créée par
  * n'importe quel utilisateur — pas seulement celui de cet appareil
@@ -752,6 +786,54 @@ export async function updateProspectionReference(id: string, input: ReferenceUpd
       input.za ?? null, input.pa_code ?? null, input.pa_nom ?? null,
       input.stationId ?? null, input.station_nom ?? null,
       now, id
+    ]
+  );
+
+  const updated = await getProspection(id);
+  if (!updated) throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  return updated;
+}
+
+export interface GpsPositionUpdateInput {
+  latitude: number;
+  longitude: number;
+  altitude: number | null;
+  region?: string | null;
+  district?: string | null;
+  commune?: string | null;
+}
+
+/**
+ * #brouillon-gps-persistance-immediate : persiste la position GPS dès sa
+ * capture — appelée par reference.tsx (Intensif) et extensive-reference.tsx
+ * (Extensif/Validation) juste après `getCurrentPosition()`/`reverseGeocode()`,
+ * indépendamment du reste du formulaire de références (biotope, surfaces,
+ * PA/station…), jamais encore renseigné à ce stade sur une fiche neuve.
+ *
+ * Avant cette fonction, la position ne survivait qu'en état React local de
+ * l'écran : quitter la fiche avant d'atteindre « Continuer » la perdait, et
+ * une réouverture ultérieure relançait une nouvelle capture GPS au lieu de
+ * restaurer celle déjà obtenue — brouillon incomplet, mais bien réel dans
+ * les deux cas (une fiche existe dès `startNewProspection`), donc la
+ * position aurait dû, elle aussi, être conservée dès sa capture.
+ */
+export async function updateProspectionGpsPosition(
+  id: string,
+  input: GpsPositionUpdateInput
+): Promise<DraftProspection> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    `UPDATE prospection SET
+      latitude = ?, longitude = ?, altitude = ?,
+      region = ?, district = ?, commune = ?,
+      updated_at = ?
+     WHERE id = ?`,
+    [
+      input.latitude, input.longitude, input.altitude,
+      input.region ?? null, input.district ?? null, input.commune ?? null,
+      now, id,
     ]
   );
 
