@@ -1149,6 +1149,36 @@ export const apiClient = {
   },
 
   /**
+   * Équipe aérienne (#equipe-aerienne) — une équipe = un chef de base = une
+   * base aérienne principale (migration 0066). En ligne uniquement, même
+   * contrat que les autres référentiels de la fiche de vol.
+   */
+  listEquipesAeriennes: async (
+    token: string,
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['EquipeAerienneRead'][]> => {
+    return makeRequest<components['schemas']['EquipeAerienneRead'][]>(
+      '/equipes-aeriennes',
+      { method: 'GET' },
+      token,
+      onUnauthorized
+    );
+  },
+
+  createEquipeAerienne: async (
+    token: string,
+    body: components['schemas']['EquipeAerienneCreate'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['EquipeAerienneRead']> => {
+    return makeRequest<components['schemas']['EquipeAerienneRead']>(
+      '/equipes-aeriennes',
+      { method: 'POST', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
+  /**
    * Création d'un lieu aérien (#prospection-extensive-aerienne-lieu-aerien) —
    * référentiel `lieu_aerien` (migration 0047), historiquement débranché en
    * FK de la Prospection Extensive Aérienne (migration 0063) et du Traitement
