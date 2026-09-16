@@ -60,6 +60,66 @@ async def test_list_users_laisse_le_rattachement_vide_sans_poste(
     assert ligne["pa_nom"] is None
 
 
+@pytest_asyncio.fixture
+async def chef_de_base(db_session: AsyncSession) -> Utilisateur:
+    user = Utilisateur(
+        id=uuid.uuid4(),
+        nom="Rabe",
+        prenom="Toky",
+        email=f"toky.rabe+{uuid.uuid4().hex[:6]}@test.mg",
+        password_hash=hash_password("secret"),
+        role="chef_de_base",
+        sigle="TR",
+        actif=True,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest.mark.asyncio
+async def test_list_chefs_de_base_accessible_a_tout_utilisateur_authentifie(
+    client: AsyncClient, auth_headers: dict, chef_de_base
+):
+    """`auth_headers` est un simple prospecteur, pas un admin — l'annuaire des
+    chefs de base doit rester accessible pour remplir une fiche de vol."""
+    response = await client.get("/users/chefs-de-base", headers=auth_headers)
+
+    assert response.status_code == 200
+    ligne = next(u for u in response.json() if u["id"] == str(chef_de_base.id))
+    assert ligne["nom"] == "Rabe"
+    assert ligne["prenom"] == "Toky"
+    assert ligne["sigle"] == "TR"
+    assert "email" not in ligne
+
+
+@pytest.mark.asyncio
+async def test_list_chefs_de_base_exclut_les_autres_roles(
+    client: AsyncClient, auth_headers: dict, chef_de_base, utilisateur
+):
+    """`utilisateur` (fixture conftest) a le rôle `prospecteur` — il ne doit
+    pas apparaître dans l'annuaire des chefs de base."""
+    response = await client.get("/users/chefs-de-base", headers=auth_headers)
+    identifiants = {u["id"] for u in response.json()}
+
+    assert str(chef_de_base.id) in identifiants
+    assert str(utilisateur.id) not in identifiants
+
+
+@pytest.mark.asyncio
+async def test_list_chefs_de_base_exclut_les_inactifs(
+    client: AsyncClient, db_session: AsyncSession, auth_headers: dict, chef_de_base
+):
+    chef_de_base.actif = False
+    await db_session.commit()
+
+    response = await client.get("/users/chefs-de-base", headers=auth_headers)
+    identifiants = {u["id"] for u in response.json()}
+
+    assert str(chef_de_base.id) not in identifiants
+
+
 @pytest.mark.asyncio
 async def test_list_users_reste_reserve_aux_admins(client: AsyncClient, auth_headers: dict):
     """L'annuaire complet ne doit pas s'ouvrir en élargissant le schéma de lecture."""

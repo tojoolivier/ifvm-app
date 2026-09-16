@@ -55,6 +55,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/users/chefs-de-base": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Chefs De Base
+         * @description Annuaire des chefs de base actifs, pour le sélecteur `chef_de_base_id`
+         *     du formulaire de création de fiche de vol (#fiche-vol-creation-mobile) —
+         *     ce champ FK doit préexister (comme pour `create_user_a_la_volee`, issue
+         *     #319), donc pas de création à la volée ici. Ouvert à tout utilisateur
+         *     authentifié comme `POST /users/a-la-volee` : l'appelant est un agent de
+         *     terrain, pas un admin.
+         */
+        get: operations["list_chefs_de_base_users_chefs_de_base_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users/": {
         parameters: {
             query?: never;
@@ -820,6 +845,29 @@ export interface paths {
         put?: never;
         /** Creer Fiche Vol */
         post: operations["creer_fiche_vol_fiches_vol_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/fiches-vol/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sync Fiche Vol
+         * @description Push de synchronisation offline (#fiche-vol-sync-hors-ligne, même patron que
+         *     POST /traitements/sync) : 201 si la fiche n'existait pas encore côté serveur, 200
+         *     si mise à jour synchronisée sans conflit, 409 (avec la version serveur complète)
+         *     si la fiche est verrouillée (`validee`) ou en conflit.
+         */
+        post: operations["sync_fiche_vol_fiches_vol_sync_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1768,6 +1816,81 @@ export interface components {
             created_at?: string | null;
             /** Updated At */
             updated_at?: string | null;
+        };
+        /**
+         * FicheVolSyncPush
+         * @description Push de synchronisation offline (#fiche-vol-sync-hors-ligne, même patron que
+         *     `TraitementSyncPush`) : `id` généré côté client à la capture — hors-ligne, une
+         *     fiche de vol se remplit vol après vol tout au long de la journée avant toute
+         *     connexion — et `base_updated_at`, dernier `updated_at` serveur connu du client,
+         *     pour la détection de conflit (première synchronisation : la date de création
+         *     locale, plus ancienne que tout `updated_at` serveur réel, ne peut donc que
+         *     déclencher un conflit détecté trop tôt — jamais un écrasement silencieux).
+         */
+        FicheVolSyncPush: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Base Updated At
+             * Format: date-time
+             */
+            base_updated_at: string;
+            /**
+             * Date Vol
+             * Format: date
+             */
+            date_vol: string;
+            /** Compagnie */
+            compagnie: string;
+            /** Immatriculation */
+            immatriculation: string;
+            /**
+             * Campagne Id
+             * Format: uuid
+             */
+            campagne_id: string;
+            /**
+             * Base Id
+             * Format: uuid
+             */
+            base_id: string;
+            /**
+             * Stand Id
+             * Format: uuid
+             */
+            stand_id: string;
+            /** Pilote */
+            pilote: string;
+            /** Mecanicien */
+            mecanicien: string;
+            /**
+             * Chef De Base Id
+             * Format: uuid
+             */
+            chef_de_base_id: string;
+            /** Consultant International */
+            consultant_international?: string | null;
+            /** Pesticide Nom Commercial */
+            pesticide_nom_commercial?: string | null;
+            /** Pesticide Quantite Disponible */
+            pesticide_quantite_disponible?: number | null;
+            /** Pesticide Quantite Recue */
+            pesticide_quantite_recue?: number | null;
+            /** Futs Disponible */
+            futs_disponible?: number | null;
+            /** Futs Recues */
+            futs_recues?: number | null;
+            /** Futs Pleins */
+            futs_pleins?: number | null;
+            /** Futs Vides */
+            futs_vides?: number | null;
+            /** Observations */
+            observations?: string | null;
+            /** Vols */
+            vols?: components["schemas"]["VolSyncPush"][];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -4035,6 +4158,26 @@ export interface components {
          * @enum {string}
          */
         UniteQuantite: "L" | "kg";
+        /**
+         * UtilisateurAnnuaireRead
+         * @description Identité minimale exposée à tout utilisateur authentifié (pas de rôle
+         *     admin requis) — pour les sélecteurs de type « chef de base » dans les
+         *     formulaires de saisie (fiche de vol), sans exposer l'email des tiers
+         *     comme le fait `UtilisateurRead` (réservé à `/users/` admin-only).
+         */
+        UtilisateurAnnuaireRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Nom */
+            nom: string;
+            /** Prenom */
+            prenom: string;
+            /** Sigle */
+            sigle?: string | null;
+        };
         /** UtilisateurCreate */
         UtilisateurCreate: {
             /** Nom */
@@ -4220,6 +4363,44 @@ export interface components {
             /** Duree Minutes */
             duree_minutes: number;
         };
+        /**
+         * VolSyncPush
+         * @description Pendant de `VolCreate` pour la synchronisation hors-ligne (#fiche-vol-sync-hors-
+         *     ligne) : `id` fourni par le client (généré à la capture, hors-ligne), stable d'une
+         *     synchronisation à l'autre — c'est lui qui permet un remplacement en bloc idempotent
+         *     de la liste `vols` de la fiche plutôt qu'un ajout un par un (cf. VolCreate, réservé
+         *     à POST /{id}/vols, en ligne uniquement).
+         */
+        VolSyncPush: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Numero */
+            numero: number;
+            /**
+             * Type Vol
+             * @enum {string}
+             */
+            type_vol: "PROSPECTION" | "MEP" | "APPLICATION" | "CONVOYAGE" | "DIVERS";
+            /**
+             * Heure Debut
+             * Format: time
+             */
+            heure_debut: string;
+            /**
+             * Heure Fin
+             * Format: time
+             */
+            heure_fin: string;
+            /** Rotation Id */
+            rotation_id?: string | null;
+            /** Prospection Id */
+            prospection_id?: string | null;
+            /** Observations */
+            observations?: string | null;
+        };
         /** ZoneAntiAcridienRead */
         ZoneAntiAcridienRead: {
             /**
@@ -4347,6 +4528,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UtilisateurRead"];
+                };
+            };
+        };
+    };
+    list_chefs_de_base_users_chefs_de_base_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UtilisateurAnnuaireRead"][];
                 };
             };
         };
@@ -6559,6 +6760,39 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FicheVolRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sync_fiche_vol_fiches_vol_sync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FicheVolSyncPush"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
