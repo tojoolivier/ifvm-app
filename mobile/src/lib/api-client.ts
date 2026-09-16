@@ -1148,6 +1148,28 @@ export const apiClient = {
     );
   },
 
+  /**
+   * Création d'un lieu aérien (#prospection-extensive-aerienne-lieu-aerien) —
+   * référentiel `lieu_aerien` (migration 0047), historiquement débranché en
+   * FK de la Prospection Extensive Aérienne (migration 0063) et du Traitement
+   * Aérien (migration 0054) : le champ « Base » y reste du texte libre, mais
+   * peut désormais suggérer/créer une entrée partagée ici plutôt que de
+   * réintroduire une FK bloquante — même contrat que le Web
+   * (ReferentielsPage.tsx : POST /lieux-aeriens, en ligne, pas d'id client).
+   */
+  createLieuAerien: async (
+    token: string,
+    body: components['schemas']['LieuAerienCreate'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['LieuAerienRead']> => {
+    return makeRequest<components['schemas']['LieuAerienRead']>(
+      '/lieux-aeriens',
+      { method: 'POST', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
   /*
    * -------------------------------------------------------
    * FICHE DE VOL
