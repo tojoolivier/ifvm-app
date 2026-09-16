@@ -329,18 +329,16 @@ export default function DashboardScreen() {
               <ThemedText style={styles.quickTileText}>Nouveau traitement</ThemedText>
             </TouchableOpacity>
 
-            {/* #revalidation-prospection : une fiche extensive/validation
-                validée depuis plus de 5 jours sans traitement n'est plus
-                proposée dans « Consulter une fiche validée » — c'est ici
-                qu'elle redevient accessible, pour être revalidée avant
-                traitement. */}
+            {/* #fiche-vol-creation-mobile : une fiche de vol regroupe tous les
+                vols d'un hélicoptère pour une date (ADR-011) — l'en-tête se
+                crée ici, la saisie des vols suit dans un chantier à venir. */}
             <TouchableOpacity
               style={styles.quickTile}
-              onPress={() => navigateTo('/(prospection)/revalidation-liste')}
+              onPress={() => navigateTo('/(fiche-vol)/creation')}
               activeOpacity={0.85}
             >
-              <ThemedText style={styles.quickTileIcon}>🔁</ThemedText>
-              <ThemedText style={styles.quickTileText}>Prospections à revalider</ThemedText>
+              <ThemedText style={styles.quickTileIcon}>🛫</ThemedText>
+              <ThemedText style={styles.quickTileText}>Nouvelle fiche de vol</ThemedText>
             </TouchableOpacity>
 
             <View style={[styles.quickTile, styles.quickTileDisabled]}>

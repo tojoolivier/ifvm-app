@@ -46,6 +46,16 @@ export default function TypeChooserScreen() {
     router.push('/(prospection)/extensive-signalement' as any);
   };
 
+  // #revalidation-prospection : une fiche extensive/validation validée
+  // depuis plus de 5 jours sans traitement n'est plus proposée dans
+  // « Consulter une fiche validée » — c'est ici qu'elle redevient accessible,
+  // pour être revalidée avant traitement (déplacé depuis l'accès rapide du
+  // tableau de bord, qui n'accueille plus que les points d'entrée de premier
+  // niveau).
+  const chooseRevalidation = () => {
+    router.push('/(prospection)/revalidation-liste' as any);
+  };
+
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
@@ -80,6 +90,13 @@ export default function TypeChooserScreen() {
             <Text style={styles.cardTitle}>☑ Vérifier un signalement</Text>
             <Text style={styles.cardSubtitle}>
               Même fiche A→D, conclue par Confirmée / Infirmée sur place.
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.card, styles.cardDashed]} onPress={chooseRevalidation} activeOpacity={0.85}>
+            <Text style={styles.cardTitle}>🔁 Prospections à revalider</Text>
+            <Text style={styles.cardSubtitle}>
+              Fiches validées depuis plus de 5 jours sans traitement, à revalider avant traitement.
             </Text>
           </TouchableOpacity>
         </View>

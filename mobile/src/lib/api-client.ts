@@ -1150,6 +1150,50 @@ export const apiClient = {
 
   /*
    * -------------------------------------------------------
+   * FICHE DE VOL
+   * -------------------------------------------------------
+   */
+
+  /**
+   * Annuaire des chefs de base actifs (#fiche-vol-creation-mobile) —
+   * `chef_de_base_id` est une FK qui doit préexister (issue #319, pas de
+   * création à la volée comme pour pilote/mécanicien) : ouvert à tout
+   * utilisateur authentifié, pas réservé aux admins comme `GET /users/`.
+   */
+  listChefsDeBase: async (
+    token: string,
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['UtilisateurAnnuaireRead'][]> => {
+    return makeRequest<components['schemas']['UtilisateurAnnuaireRead'][]>(
+      '/users/chefs-de-base',
+      { method: 'GET' },
+      token,
+      onUnauthorized
+    );
+  },
+
+  /**
+   * Création en ligne de l'en-tête d'une fiche de vol (#fiche-vol-creation-
+   * mobile) — pas de `syncPush` ici : contrairement à la capture des vols
+   * eux-mêmes (hors-ligne, vol après vol), l'en-tête se crée en une fois, en
+   * ligne, exactement comme `createBaseAerienne`/`createStandRemplissage` ;
+   * `numero_fiche` est généré côté serveur (compteur atomique, cf. ADR-011).
+   */
+  createFicheVol: async (
+    token: string,
+    body: components['schemas']['FicheVolCreate'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['FicheVolRead']> => {
+    return makeRequest<components['schemas']['FicheVolRead']>(
+      '/fiches-vol',
+      { method: 'POST', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
+  /*
+   * -------------------------------------------------------
    * PROSPECTIONS
    * -------------------------------------------------------
    */

@@ -67,8 +67,10 @@ describe('DashboardScreen — Accès rapide', () => {
     expect(screen.getByText('Alertes')).toBeTruthy();
   });
 
-  // #revalidation-prospection
-  it('« Prospections à revalider » est accessible depuis le tableau de bord', async () => {
+  // #fiche-vol-creation-mobile : « Prospections à revalider » a été déplacé
+  // vers le choix du type de prospection (à côté de « Vérifier un
+  // signalement ») pour laisser la place au nouveau raccourci fiche de vol.
+  it('« Nouvelle fiche de vol » est accessible depuis le tableau de bord', async () => {
     await render(
       <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
         <DashboardScreen />
@@ -76,6 +78,7 @@ describe('DashboardScreen — Accès rapide', () => {
     );
     await waitFor(() => expect(screen.getByText('ACCÈS RAPIDE')).toBeTruthy());
 
-    expect(screen.getByText('Prospections à revalider')).toBeTruthy();
+    expect(screen.getByText('Nouvelle fiche de vol')).toBeTruthy();
+    expect(screen.queryByText('Prospections à revalider')).toBeNull();
   });
 });

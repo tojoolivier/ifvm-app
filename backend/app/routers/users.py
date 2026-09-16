@@ -11,6 +11,7 @@ from app.database import get_db
 from app.infrastructure.referentiel_model import PosteAcridienModel
 from app.models.users import ROLES_A_LA_VOLEE, Utilisateur
 from app.schemas.users import (
+    UtilisateurAnnuaireRead,
     UtilisateurCreate,
     UtilisateurCreateALaVolee,
     UtilisateurRead,
@@ -53,6 +54,26 @@ def _detail_creation_utilisateur(exc: IntegrityError) -> str:
 @router.get("/me", response_model=UtilisateurRead)
 async def me(current_user: Annotated[Utilisateur, Depends(get_current_user)]):
     return current_user
+
+
+@router.get("/chefs-de-base", response_model=list[UtilisateurAnnuaireRead])
+async def list_chefs_de_base(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    """Annuaire des chefs de base actifs, pour le sélecteur `chef_de_base_id`
+    du formulaire de création de fiche de vol (#fiche-vol-creation-mobile) —
+    ce champ FK doit préexister (comme pour `create_user_a_la_volee`, issue
+    #319), donc pas de création à la volée ici. Ouvert à tout utilisateur
+    authentifié comme `POST /users/a-la-volee` : l'appelant est un agent de
+    terrain, pas un admin."""
+    stmt = (
+        select(Utilisateur)
+        .where(Utilisateur.role == "chef_de_base", Utilisateur.actif.is_(True))
+        .order_by(Utilisateur.nom)
+    )
+    result = await db.execute(stmt)
+    return result.scalars().all()
 
 
 def require_admin(current_user: Annotated[Utilisateur, Depends(get_current_user)]) -> Utilisateur:
