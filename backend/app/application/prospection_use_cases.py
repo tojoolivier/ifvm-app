@@ -174,6 +174,19 @@ class CreateProspection:
             statut = "validee"
             n_fiche = n_message
             validated_at = now
+        elif revalide_de_id is not None:
+            # #revalidation-prospection : une fiche qui revalide une prospection
+            # périmée documente une situation terrain qui vient d'être
+            # revérifiée sur le moment — la refaire passer par la chaîne
+            # administrative en_attente -> verifiee -> validee de sa fiche
+            # d'origine la laisserait invisible du sélecteur de traitement
+            # pendant potentiellement plusieurs jours de plus, ce qui
+            # réintroduirait exactement le problème que la revalidation sert à
+            # résoudre. `validated_at` reçoit une date fraîche (maintenant),
+            # jamais celle de la fiche source : c'est elle qui fait courir à
+            # nouveau le délai de péremption de 5 jours.
+            statut = "validee"
+            validated_at = now
 
         prospection = Prospection(
             type_prospection=type_prospection,

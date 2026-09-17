@@ -26,6 +26,10 @@ jest.mock('@/lib/prospection-repository', () => ({
   countUnsyncedProspections: jest.fn().mockResolvedValue(0),
 }));
 
+jest.mock('@/lib/traitement-repository', () => ({
+  listRecentTraitements: jest.fn().mockResolvedValue([]),
+}));
+
 jest.mock('expo-network', () => ({
   getNetworkStateAsync: jest.fn().mockResolvedValue({ isConnected: true, isInternetReachable: true }),
 }));
