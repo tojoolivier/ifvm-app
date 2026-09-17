@@ -9,6 +9,7 @@ class Campagne:
     name: str = ""
     start_date: date = field(default_factory=date.today)
     end_date: date | None = None
+    actif: bool = True
     created_by: uuid.UUID = field(default_factory=uuid.uuid4)
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)

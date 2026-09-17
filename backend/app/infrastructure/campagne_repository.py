@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.campagne import Campagne
@@ -35,6 +35,7 @@ class CampagneRepositoryImpl(CampagneRepository):
             name=campagne.name,
             start_date=campagne.start_date,
             end_date=campagne.end_date,
+            actif=campagne.actif,
             created_by=campagne.created_by,
             created_at=campagne.created_at,
             updated_at=campagne.updated_at,
@@ -52,17 +53,11 @@ class CampagneRepositoryImpl(CampagneRepository):
         model.name = campagne.name
         model.start_date = campagne.start_date
         model.end_date = campagne.end_date
+        model.actif = campagne.actif
         model.updated_at = campagne.updated_at
         await self.session.commit()
         await self.session.refresh(model)
         return self._to_domain(model)
-
-    async def delete(self, campagne_id: uuid.UUID) -> bool:
-        result = await self.session.execute(
-            delete(CampagneModel).where(CampagneModel.id == campagne_id)
-        )
-        await self.session.commit()
-        return result.rowcount > 0
 
     async def list_since(self, since: datetime | None) -> list[Campagne]:
         stmt = select(CampagneModel).order_by(CampagneModel.start_date.desc())
@@ -77,6 +72,7 @@ class CampagneRepositoryImpl(CampagneRepository):
             name=model.name,
             start_date=model.start_date,
             end_date=model.end_date,
+            actif=model.actif,
             created_by=model.created_by,
             created_at=model.created_at,
             updated_at=model.updated_at,
