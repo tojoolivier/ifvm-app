@@ -1679,6 +1679,14 @@ export interface components {
              * Format: uuid
              */
             chef_de_base_id: string;
+            /** Pilote */
+            pilote: string;
+            /** Mecanicien */
+            mecanicien: string;
+            /** Consultant International */
+            consultant_international?: string | null;
+            /** Membres */
+            membres?: components["schemas"]["MembreEquipeAerienneCreate"][];
         };
         /** EquipeAerienneRead */
         EquipeAerienneRead: {
@@ -1694,6 +1702,14 @@ export interface components {
              * Format: uuid
              */
             chef_de_base_id: string;
+            /** Pilote */
+            pilote?: string | null;
+            /** Mecanicien */
+            mecanicien?: string | null;
+            /** Consultant International */
+            consultant_international?: string | null;
+            /** Membres */
+            membres?: components["schemas"]["MembreEquipeAerienneRead"][];
             /** Actif */
             actif: boolean;
             /**
@@ -2257,6 +2273,21 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+        };
+        /** MembreEquipeAerienneCreate */
+        MembreEquipeAerienneCreate: {
+            /** Nom */
+            nom: string;
+        };
+        /** MembreEquipeAerienneRead */
+        MembreEquipeAerienneRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Nom */
+            nom: string;
         };
         /**
          * MethodeEvaluationEfficacite
