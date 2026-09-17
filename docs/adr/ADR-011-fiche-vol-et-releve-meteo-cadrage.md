@@ -339,7 +339,7 @@ colonne « type de vol » ne peut pas représenter une journée réelle.
 
 | Question | Décision | Conséquence |
 |---|---|---|
-| Base aérienne / stand de remplissage | **Relevés ponctuels** portés par la fiche (nom saisi, position captée hors ligne) | Aucune nouvelle table de référentiel, aucun élargissement du périmètre ADR-007. Le « numéro de base » du format devient `fiche_vol.base_code`, saisi. |
+| Base aérienne / stand de remplissage | **Relevés ponctuels** portés par la fiche (nom saisi, position captée hors ligne) | Aucune nouvelle table de référentiel, aucun élargissement du périmètre ADR-007. Le « numéro de base » du format devient `fiche_vol.base_code`, saisi. **⚠️ Renversé par la migration 0064 (§8) : redevenu un vrai référentiel.** |
 | Unicité de la fiche | **Compteur dans le numéro** — seul `numero` est `UNIQUE` | « Une seule fiche par jour si possible » reste une convention. Le terrain n'est jamais bloqué : la 2ᵉ fiche du jour prend le suffixe `-02`. |
 | Nature de la signature | **Nom horodaté + tracé manuscrit** (`signature_image`, data URI, nullable) | Diverge de `traitement_signature`, qui n'a pas de tracé. Coût de sync assumé (~20-50 Ko par signature) ; nullable pour que la fiche reste enregistrable avant le passage de signature. |
 
@@ -370,3 +370,219 @@ exprimable en contrainte de ligne ; elle est vérifiée à la validation de la f
 
 Migration `0029`, appliquée et annulée avec succès sur base vierge. Aucune colonne dérivée :
 ni durée, ni cumul, ni décompte de rotations rapprochées.
+
+---
+
+## 8. Révision du 2026-09-17 — règles de gestion consolidées, vérifiées ligne à ligne
+
+Le lot a beaucoup évolué depuis le §7 (migrations 0029 → 0070). Cette section consolide
+l'ensemble des règles de gestion **telles qu'effectivement implémentées** aujourd'hui, et
+corrige les points du §7 devenus faux. Chaque règle est citée à son fichier:ligne ; les
+règles garanties en base citent le nom exact de la contrainte, les règles qui ne sont
+vérifiées que côté application citent la fonction responsable — aucune des deux catégories
+ne remplace l'autre : quand les deux existent, elles sont doublées délibérément (défense en
+profondeur), pas redondantes par oubli.
+
+### 8.1 Identité et unicité
+
+- Numéro de fiche = `[compteur 3 chiffres]-[date]-[équipe]-[immatriculation]`, ex.
+  `012-2026-09-17-BASE1-5YLUZ` — `composer_numero_fiche`
+  (`app/domain/fiche_vol.py:127-140`), arbitrage du 2026-09-15, **remplace** le format
+  `[Date]-[Base]-[Immatriculation]` du §7.2.
+- **Côté application** : le `compteur` n'est jamais saisi côté client. Il est incrémenté
+  atomiquement en base par un upsert `INSERT ... ON CONFLICT DO UPDATE ... RETURNING`
+  (`FicheVolRepositoryImpl.next_compteur`, `app/infrastructure/fiche_vol_repository.py:201-220`),
+  continu sur toute la campagne, jamais réinitialisé.
+- **En base** : c'est le compteur, pas le texte du numéro, qui porte l'unicité —
+  `UNIQUE(campagne_id, compteur)` (contrainte `uq_fiche_vol_campagne_compteur`,
+  `app/infrastructure/fiche_vol_model.py:125`) ; `compteur > 0` est également gardé en base
+  (`ck_fiche_vol_compteur_positif`, ligne 124). `numero_fiche` porte en plus sa propre
+  contrainte `UNIQUE` de colonne (ligne 49), doublon défensif du compteur, jamais celui qui
+  fait foi.
+- Une fiche = un jour + un aéronef ; elle peut couvrir plusieurs traitements, plusieurs
+  prospections, ou des vols non rattachés à rien (lecture confirmée en §7.1, inchangée — le
+  schéma ne porte aucune contrainte d'unicité sur `(date_vol, immatriculation)` qui
+  l'empêcherait).
+- **En base** : `statut IN ('brouillon','validee')` (`ck_fiche_vol_statut`, ligne 123).
+  **Côté application** : une fois `validee`, toute écriture (ajout/retrait de vol, upsert de
+  signature) est refusée par `_exiger_brouillon`
+  (`app/application/fiche_vol_use_cases.py:42-50`), qui lève `FicheVolVerrouilleeError`
+  (`app/domain/fiche_vol.py:58-60`) — non exprimable en `CHECK` puisque la règle porte sur
+  une transition dans le temps, pas sur l'état d'une seule ligne.
+
+### 8.2 Rattachement des vols — cardinalités
+
+- `MEP`/`APPLICATION` → doit pointer une rotation ; `PROSPECTION` → doit pointer une
+  prospection ; `CONVOYAGE`/`DIVERS` → ne pointe rien. **Doublé** : côté application par
+  `valider_rattachement` (`app/domain/fiche_vol.py:148-163`, appelée par `Vol.__post_init__`
+  ligne 323) ; en base par `ck_vol_rotation_type_compatible` et
+  `ck_vol_prospection_type_compatible` (`app/infrastructure/fiche_vol_model.py:170-177`).
+- Une rotation (une cuve) = au minimum 1 `MEP` + 1 `APPLICATION`. **En base**, garanti qu'il
+  n'y en a **jamais plus de deux** : `UNIQUE(rotation_id, type_vol)` (`uq_vol_rotation_type`,
+  ligne 165 — deux `NULL` n'étant jamais égaux en SQL, les vols sans rotation n'entrent pas
+  en collision entre eux). La **complétude** (les deux effectivement présents) n'est pas
+  exprimable en contrainte de ligne (elle porte sur un ensemble de lignes, pas sur une
+  seule) ; elle n'est vérifiée **côté application** qu'à la validation de la fiche, par
+  `valider_rotations_completes` (`app/domain/fiche_vol.py:174-191`), appelée depuis
+  `ValiderFicheVol.execute` (`app/application/fiche_vol_use_cases.py:107-111`).
+- **En base** : `heure_fin > heure_debut` (`ck_vol_heures`, ligne 178) — un vol ne franchit
+  pas minuit. Doublé côté application par `valider_heures`
+  (`app/domain/fiche_vol.py:166-172`).
+- **Côté application uniquement** (non exprimable en `CHECK`, la règle référence une autre
+  table) : `chef_de_base_id` doit référencer un `utilisateur` de rôle `chef_de_base` —
+  vérifié dans `CreateFicheVol.execute` (`app/application/fiche_vol_use_cases.py:60-61`) et
+  `SyncPushFicheVol.execute` (lignes 125-127), qui lèvent `ChefDeBaseVolInvalideError`
+  si absent. La colonne elle-même n'est qu'une `FOREIGN KEY(chef_de_base_id) REFERENCES
+  utilisateur(id)` (`fiche_vol_model.py:76-77`), sans contrainte de rôle.
+- **Le n° de cuve n'est plus la clé de rapprochement** (renversement du §3.4/§7.3, inchangé
+  depuis) : c'est la FK `vol.rotation_id`, posée par le chef de base, qui fait foi.
+  `Rotation.numero_cuve` (`app/domain/traitement.py:234`, commentaire ligne 231-234) reste
+  une aide à la saisie, dérivée de `numero`, jamais rattachée par elle-même.
+- **Point ouvert non couvert par le brouillon d'origine** : le §3.2 de cette même ADR
+  posait « participation totale côté `vol` (un vol n'existe pas sans fiche), et **au moins
+  un vol par fiche** ». Ce n'est **plus implémenté** : `FicheVolCreate.vols`
+  (`app/presentation/fiche_vol_schemas.py:94`) a pour défaut une liste vide, et
+  `ValiderFicheVol.execute` (`app/application/fiche_vol_use_cases.py:107-111`) ne vérifie
+  que les signatures et la complétude
+  des rotations — jamais le nombre de vols. Une fiche à zéro vol peut donc aujourd'hui être
+  créée **et validée**. À confirmer si c'est un oubli ou une décision assumée (une fiche
+  « journée sans vol » pour un aéronef immobilisé, par exemple) avant de la corriger.
+
+### 8.3 Valeurs dérivées — jamais stockées
+
+| Valeur | Calcul | Fonction / méthode |
+|---|---|---|
+| Durée d'un vol | `heure_fin − heure_debut` | `Vol.duree_minutes` (`fiche_vol.py:326-330`) |
+| Cumuls jour / semaine ISO / mois / total | agrégés à la volée sur plusieurs fiches | `cumuler_durees` (`fiche_vol.py:273-290`) |
+| Pesticide utilisé | Σ `traitement_rotation.quantite` des rotations couvertes par les vols de la fiche (dédupliquée : un `MEP` et une `APPLICATION` sur la même rotation ne comptent qu'une fois) | `FicheVolRepositoryImpl._pesticide_utilisee` (`fiche_vol_repository.py:150-165`) |
+| Pesticide restant | disponible − utilisé, plancher 0 | `_borner_a_zero` (`fiche_vol_repository.py:31-32`), appliqué dans `_to_domain` (ligne 41-44) |
+| N° fiche de prospection **et** N° fiche de validation en en-tête | jointure sur `prospection_id` (migration `0070`) → `prospection.n_fiche` | `_to_domain` (`fiche_vol_repository.py:71-72`) |
+| Date de validation en en-tête | jointure sur `prospection_id` → `prospection.validated_at` | `_to_domain` (`fiche_vol_repository.py:73`) |
+
+Même raisonnement qu'au §6 pour chacune : les stocker créerait une dépendance
+fonctionnelle dont le déterminant n'est pas superclé, avec l'anomalie classique qu'une
+correction d'horaire ou de rotation laisserait une valeur figée mentir.
+
+**Précision sur la ligne « N° fiche de prospection / N° fiche de validation »** : ce sont
+**la même valeur** (`prospection_numero_fiche`, un seul champ dérivé —
+`app/domain/fiche_vol.py:399`, `app/presentation/fiche_vol_schemas.py:161`), exposée deux
+fois en en-tête parce que le cahier des charges papier porte deux cases distinctes. Il
+n'existe **aucune entité « fiche de validation »** séparée dans le modèle : valider une
+prospection est une transition de statut sur la prospection elle-même
+(`Prospection.apply_transition`, `app/domain/prospection.py:309-338`), pas la création d'un
+second document numéroté. Si le métier attend un jour un numéro distinct pour l'acte de
+validation, c'est une extension du modèle à faire, pas une lecture différente d'un champ
+déjà là.
+
+**Espèce d'un bloc (LMC/NSE/MELANGE)** suit la même logique de non-stockage, à un niveau
+différent : non dupliquée sur `Bloc` (`app/domain/traitement.py:156-160`, docstring), lue
+par jointure sur `Cible.espece`, elle-même calculée **une fois**, à la création du
+traitement, par `construire_cible` (`app/domain/traitement.py:759-772`) : aucune espèce
+renseignée en prospection → `None` (ligne 767-768) ; une seule espèce présente (LMC seule ou
+NSE seule) → cette espèce (ligne 769-770) ; les deux présentes → `"MELANGE"` (ligne
+771-772).
+
+### 8.4 Dénormalisations assumées
+
+- `compagnie` + `immatriculation` cohabitent sur `fiche_vol` alors que
+  `immatriculation → compagnie` est une dépendance fonctionnelle dont le déterminant n'est
+  pas superclé de `fiche_vol`. **Dénormalisation temporelle assumée**, documentée sur le
+  dataclass `FicheVol` (`app/domain/fiche_vol.py:336-342`) : l'exploitant d'un appareil peut
+  changer, une fiche ancienne doit conserver celui du jour — même patron que `Cible`
+  (« snapshot à la création »).
+- `pilote` / `mecanicien` en texte libre (`String(255)`, `fiche_vol_model.py:74-75`),
+  documenté « externes à l'IFVM (compagnie aérienne ou Armée malgache) : des noms, pas des
+  comptes » (commentaire ligne 72-73). Seul `chef_de_base_id` est une FK vers
+  `utilisateur`.
+- Ce sont les **deux seules** dénormalisations délibérées de `fiche_vol` — inchangé depuis
+  le §7.6.
+
+### 8.5 Référentiels associés — renversement du §7.6
+
+Le §7.6 tranchait « aucune nouvelle table de référentiel » pour base/stand. **Ce n'est plus
+le cas**, et le tableau du §7.6 est corrigé en conséquence (⚠️ ci-dessus). La migration
+`0064_fiche_vol_bloc_base_stand_pesticide` crée `base_aerienne` et `stand_remplissage`,
+deux vraies tables référentiel avec FK depuis `fiche_vol`
+(`fiche_vol_model.py:65-69`) :
+
+- **En base** : `base_aerienne` est auto-référencée — `parent_base_id IS NULL` = principale,
+  sinon secondaire (`app/infrastructure/referentiel_model.py:170-224`). La migration
+  `0066_equipe_aerienne` ajoute `equipe_aerienne` par-dessus, avec trois contraintes
+  nommées explicitement (le commentaire ligne 155-158/206-207 précise qu'elles doivent
+  matcher la migration à l'identique, dont dépend la traduction des violations d'intégrité) :
+  - `UNIQUE(chef_de_base_id)` sur `equipe_aerienne` — `uq_equipe_aerienne_chef_de_base_id`
+    (ligne 166) : un chef de base dirige au plus une équipe.
+  - `UNIQUE(equipe_id)` sur `base_aerienne` — `uq_base_aerienne_equipe_id` (ligne 215) : une
+    équipe a au plus une base principale.
+  - `CHECK ((parent_base_id IS NULL AND equipe_id IS NOT NULL) OR (parent_base_id IS NOT
+    NULL AND equipe_id IS NULL))` — `ck_base_aerienne_equipe_coherente` (lignes 216-220) :
+    une base secondaire ne porte jamais sa propre `equipe_id` (elle hérite de celle de sa
+    principale via `parent_base_id`).
+- `stand_remplissage` : référentiel indépendant, sans hiérarchie ni `equipe_id`.
+- Décision produit explicite du 2026-09-16, assumée en connaissance du précédent
+  `lieu_aerien` — débranché deux fois des fiches qui le référençaient (`traitement_aerien`
+  en migration 0054, `prospection` en migration 0063) parce que choisir la base dans un
+  référentiel synchronisé s'était révélé être une contrainte terrain non voulue
+  (`referentiel_model.py:176-183`, docstring de `BaseAerienneModel`) : cette fois le
+  référentiel reste.
+
+### 8.6 Signatures
+
+- 4 rôles : `PILOTE`, `MECANICIEN`, `CHEF_DE_BASE`, `CONSULTANT_INTERNATIONAL` — **en base**,
+  `ck_fiche_vol_signature_role` (`fiche_vol_model.py:205-208`).
+- **En base** : au plus une signature par rôle et par fiche —
+  `UNIQUE(fiche_vol_id, role)` (`uq_fiche_vol_signature`, ligne 209).
+- **Côté application** : un rôle n'est obligatoire à la signature que si le champ
+  correspondant est renseigné sur la fiche — `roles_signature_requis`
+  (`app/domain/fiche_vol.py:194-195`), qui s'appuie sur `_MATRICE_SIGNATURES` (lignes
+  38-43) : `PILOTE` ← `pilote`, `MECANICIEN` ← `mecanicien`, `CHEF_DE_BASE` ←
+  `chef_de_base_id`, `CONSULTANT_INTERNATIONAL` ← `consultant_international`. En pratique,
+  seul le rôle `CONSULTANT_INTERNATIONAL` est réellement conditionnel : `pilote`,
+  `mecanicien` et `chef_de_base_id` sont `NOT NULL` sur `FicheVolCreate`
+  (`fiche_vol_schemas.py:77-79`), donc ces trois signatures sont de fait **toujours**
+  requises à la validation (`valider_signatures`, `fiche_vol.py:198-203`, appelée par
+  `ValiderFicheVol.execute`).
+
+### 8.7 Synchronisation offline
+
+- `statut_sync ∈ local | synced | conflict` (pas de `CHECK` en base sur cette colonne,
+  contrairement à `statut` — à vérifier si c'est un oubli).
+- **Côté application**, dans `SyncPushFicheVol.execute`
+  (`app/application/fiche_vol_use_cases.py:115-157`) : une fiche `validee` côté serveur
+  rejette toute synchronisation entrante **sans comparer le contenu** — le test `statut !=
+  "brouillon"` (ligne 142) précède et court-circuite la comparaison de contenu (ligne 145),
+  et lève `FicheVolValideeSyncRejeteError` (`fiche_vol.py:107-115`).
+- Sinon, conflit détecté par comparaison de contenu — `contenu_diverge`
+  (`fiche_vol.py:249-270`) : un renvoi réseau identique n'est jamais vu comme un conflit. Les
+  `vols` sont comparés par `id` (pas par position ni par `numero`) via `_vol_diverge`
+  (lignes 245-246), puis, en cas de synchronisation acceptée, **remplacés en bloc** —
+  `FicheVolRepositoryImpl.update_sync` vide `model.vols` puis réinsère la liste entrante
+  après un `flush()` intermédiaire (`fiche_vol_repository.py:378-391`), jamais fusionnés
+  champ par champ.
+
+### 8.8 Ce qui reste ouvert
+
+1. Le relevé météo (§5.1, §5.2, §5.4, §5.7) est toujours entièrement en suspens —
+   recommandation inchangée de le traiter comme un lot séparé de l'issue #125.
+2. **Cardinalité minimale des vols non appliquée** (§8.2) : le §3.2 exigeait « au moins un
+   vol par fiche », rien ne le vérifie aujourd'hui. À trancher : bug à corriger, ou
+   assouplissement volontaire jamais documenté comme tel ?
+3. `statut_sync` n'a pas de `CHECK` en base contrairement à `statut` (§8.7) — asymétrie à
+   confirmer.
+4. « Numéro fiche de validation » n'est pas un document distinct de « numéro fiche de
+   prospection » (§8.3) — à confirmer que c'est bien l'intention du cahier des charges et
+   pas une simplification à corriger plus tard par une vraie entité « fiche de validation ».
+
+### 8.9 Incohérence relevée — non résolue
+
+`TraitementAerienModel` (fiche de traitement / CRT) modélise `base_principale`, `stand` et
+`base_secondaire` en **texte libre** (`String(255)`, migration 0054 —
+`app/infrastructure/traitement_model.py:163-176`), alors que `FicheVolModel` (fiche de vol)
+modélise les mêmes lieux physiques en **FK vers un référentiel** (`base_aerienne`,
+`stand_remplissage`, migration 0064, postérieure — §8.5 ci-dessus). Un même lieu a donc deux
+représentations différentes selon la fiche qui le porte, sans passerelle entre les deux : la
+migration 0064 a délibérément gardé `lieu_aerien`/le texte libre du traitement inchangés
+(`referentiel_model.py:176-183` le documente comme un choix assumé, pas un oubli). À
+arbitrer si le besoin de rapprocher automatiquement CRT et fiche de vol pour une même base
+se confirme — aujourd'hui, la seule passerelle entre les deux fiches passe par
+`prospection_id` (§8.3), pas par le lieu.

@@ -1789,6 +1789,8 @@ export interface components {
              * Format: uuid
              */
             chef_de_base_id: string;
+            /** Prospection Id */
+            prospection_id?: string | null;
             /** Consultant International */
             consultant_international?: string | null;
             /** Pesticide Nom Commercial */
@@ -1874,6 +1876,12 @@ export interface components {
              * Format: uuid
              */
             chef_de_base_id: string;
+            /** Prospection Id */
+            prospection_id?: string | null;
+            /** Prospection Numero Fiche */
+            prospection_numero_fiche?: string | null;
+            /** Prospection Date Validation */
+            prospection_date_validation?: string | null;
             /** Consultant International */
             consultant_international?: string | null;
             /** Pesticide Nom Commercial */
@@ -1965,6 +1973,8 @@ export interface components {
              * Format: uuid
              */
             chef_de_base_id: string;
+            /** Prospection Id */
+            prospection_id?: string | null;
             /** Consultant International */
             consultant_international?: string | null;
             /** Pesticide Nom Commercial */

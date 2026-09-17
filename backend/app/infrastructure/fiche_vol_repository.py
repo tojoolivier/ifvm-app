@@ -68,6 +68,9 @@ def _to_domain(model: FicheVolModel, pesticide_quantite_utilisee: float | None =
         pilote=model.pilote,
         mecanicien=model.mecanicien,
         chef_de_base_id=model.chef_de_base_id,
+        prospection_id=model.prospection_id,
+        prospection_numero_fiche=model.prospection.n_fiche if model.prospection else None,
+        prospection_date_validation=(model.prospection.validated_at if model.prospection else None),
         consultant_international=model.consultant_international,
         pesticide_nom_commercial=model.pesticide_nom_commercial,
         pesticide_quantite_disponible=disponible,
@@ -129,6 +132,7 @@ class FicheVolRepositoryImpl:
         selectinload(FicheVolModel.signatures),
         selectinload(FicheVolModel.base),
         selectinload(FicheVolModel.stand),
+        selectinload(FicheVolModel.prospection),
     )
 
     async def _charger(self, fiche_vol_id: uuid.UUID) -> FicheVolModel | None:
@@ -236,6 +240,7 @@ class FicheVolRepositoryImpl:
             pilote=fiche.pilote,
             mecanicien=fiche.mecanicien,
             chef_de_base_id=fiche.chef_de_base_id,
+            prospection_id=fiche.prospection_id,
             consultant_international=fiche.consultant_international,
             pesticide_nom_commercial=fiche.pesticide_nom_commercial,
             pesticide_quantite_disponible=fiche.pesticide_quantite_disponible,
@@ -347,6 +352,7 @@ class FicheVolRepositoryImpl:
         model.pilote = fiche.pilote
         model.mecanicien = fiche.mecanicien
         model.chef_de_base_id = fiche.chef_de_base_id
+        model.prospection_id = fiche.prospection_id
         model.consultant_international = fiche.consultant_international
         model.pesticide_nom_commercial = fiche.pesticide_nom_commercial
         model.pesticide_quantite_disponible = fiche.pesticide_quantite_disponible
@@ -413,7 +419,7 @@ def _traduire_integrite(exc: IntegrityError) -> Exception:
         )
     if "vol_rotation_id_fkey" in message:
         return RotationVolIntrouvableError("la rotation référencée n'existe pas")
-    if "vol_prospection_id_fkey" in message:
+    if "vol_prospection_id_fkey" in message or "fk_fiche_vol_prospection_id" in message:
         return ProspectionVolIntrouvableError("la prospection référencée n'existe pas")
     if "fk_fiche_vol_base_id" in message:
         return BaseVolIntrouvableError("la base référencée n'existe pas")

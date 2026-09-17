@@ -1263,6 +1263,103 @@ export const apiClient = {
     );
   },
 
+  getFicheVol: async (
+    token: string,
+    ficheVolId: string,
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['FicheVolRead']> => {
+    return makeRequest<components['schemas']['FicheVolRead']>(
+      `/fiches-vol/${ficheVolId}`,
+      { method: 'GET' },
+      token,
+      onUnauthorized
+    );
+  },
+
+  /**
+   * Ajoute un vol à une fiche brouillon (#fiche-vol-saisie-vols) — en ligne
+   * uniquement, comme la création de la fiche elle-même (POST /fiches-vol) ;
+   * `numero` est fourni par l'appelant (prochain numéro libre côté client).
+   */
+  addVolFicheVol: async (
+    token: string,
+    ficheVolId: string,
+    body: components['schemas']['VolCreate'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['FicheVolRead']> => {
+    return makeRequest<components['schemas']['FicheVolRead']>(
+      `/fiches-vol/${ficheVolId}/vols`,
+      { method: 'POST', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
+  removeVolFicheVol: async (
+    token: string,
+    ficheVolId: string,
+    volId: string,
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['FicheVolRead']> => {
+    return makeRequest<components['schemas']['FicheVolRead']>(
+      `/fiches-vol/${ficheVolId}/vols/${volId}`,
+      { method: 'DELETE' },
+      token,
+      onUnauthorized
+    );
+  },
+
+  upsertSignatureFicheVol: async (
+    token: string,
+    ficheVolId: string,
+    body: components['schemas']['SignatureVolUpsert'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['FicheVolRead']> => {
+    return makeRequest<components['schemas']['FicheVolRead']>(
+      `/fiches-vol/${ficheVolId}/signatures`,
+      { method: 'PUT', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
+  validerFicheVol: async (
+    token: string,
+    ficheVolId: string,
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['FicheVolRead']> => {
+    return makeRequest<components['schemas']['FicheVolRead']>(
+      `/fiches-vol/${ficheVolId}/valider`,
+      { method: 'PUT' },
+      token,
+      onUnauthorized
+    );
+  },
+
+  /**
+   * Traitement(s) (CRT) rattaché(s) à une prospection — utilisé par la fiche
+   * de vol (#fiche-vol-saisie-vols) pour proposer les rotations/blocs déjà
+   * saisis côté CRT aérien comme rattachement d'un vol MEP/APPLICATION,
+   * sans les ressaisir (lecture seule ici, aucune écriture).
+   */
+  listTraitements: async (
+    token: string,
+    params: { prospection_id?: string } = {},
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['TraitementRead'][]> => {
+    const query = new URLSearchParams();
+    if (params.prospection_id) {
+      query.set('prospection_id', params.prospection_id);
+    }
+    const qs = query.toString();
+    return makeRequest<components['schemas']['TraitementRead'][]>(
+      `/traitements${qs ? `?${qs}` : ''}`,
+      { method: 'GET' },
+      token,
+      onUnauthorized
+    );
+  },
+
   /*
    * -------------------------------------------------------
    * PROSPECTIONS
