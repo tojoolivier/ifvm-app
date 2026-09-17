@@ -19,6 +19,7 @@ import { NewFicheFab } from '@/components/fiches/NewFicheFab';
 import * as Network from 'expo-network';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { logger } from '@/lib/logger';
+import { peutSaisirFicheVol } from '@/lib/fiche-vol-access';
 
 // ============================================
 // CONSTANTES - PALETTE CLAIRE
@@ -331,15 +332,20 @@ export default function DashboardScreen() {
 
             {/* #fiche-vol-menu-entree : point d'entrée unique du parcours fiche
                 de vol — ouvre un menu (créer un lieu aérien, nouvelle fiche,
-                mes fiches) plutôt que d'aller droit à la création. */}
-            <TouchableOpacity
-              style={styles.quickTile}
-              onPress={() => navigateTo('/(fiche-vol)/menu')}
-              activeOpacity={0.85}
-            >
-              <ThemedText style={styles.quickTileIcon}>🛫</ThemedText>
-              <ThemedText style={styles.quickTileText}>Fiche de vol</ThemedText>
-            </TouchableOpacity>
+                mes fiches) plutôt que d'aller droit à la création.
+                #fiche-vol-acces-roles : réservé au chef de base et à l'équipe
+                aérienne (pilote/mécanicien) — masqué pour les autres rôles
+                plutôt qu'un raccourci qui mène à un écran d'accès refusé. */}
+            {peutSaisirFicheVol(user?.role) && (
+              <TouchableOpacity
+                style={styles.quickTile}
+                onPress={() => navigateTo('/(fiche-vol)/menu')}
+                activeOpacity={0.85}
+              >
+                <ThemedText style={styles.quickTileIcon}>🛫</ThemedText>
+                <ThemedText style={styles.quickTileText}>Fiche de vol</ThemedText>
+              </TouchableOpacity>
+            )}
 
             <View style={[styles.quickTile, styles.quickTileDisabled]}>
               <ThemedText style={styles.quickTileIcon}>🔔</ThemedText>

@@ -1,6 +1,9 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useAuthStore } from '@/lib/auth-store';
+import { peutSaisirFicheVol } from '@/lib/fiche-vol-access';
+import { AccesRestreint } from '@/components/fiche-vol/AccesRestreint';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -14,9 +17,18 @@ const BORDER = '#e7e0cd';
  * d'aller droit à la création, pour donner accès aux trois actions du
  * parcours : gérer les référentiels aériens, créer une fiche, consulter les
  * fiches existantes.
+ *
+ * Réservé au chef de base et à l'équipe aérienne (#fiche-vol-acces-roles) —
+ * garde-fou au cas où cet écran serait atteint par lien direct plutôt que
+ * depuis le raccourci du tableau de bord (déjà masqué pour les autres rôles).
  */
 export default function FicheVolMenuScreen() {
   const router = useRouter();
+  const role = useAuthStore((s) => s.user?.role);
+
+  if (!peutSaisirFicheVol(role)) {
+    return <AccesRestreint />;
+  }
 
   return (
     <View style={styles.root}>
