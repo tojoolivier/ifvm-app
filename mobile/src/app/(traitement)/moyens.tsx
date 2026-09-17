@@ -250,7 +250,7 @@ export default function MoyensScreen() {
             inchangé : la section reste visible telle quelle. */}
         {typeTraitement !== 'AERIEN' && (
           <>
-            <Text style={styles.label}>Végétation</Text>
+            <Text style={styles.vegetationLabel}>Végétation</Text>
 
             <Text style={styles.fieldLabel}>Strate herbeuse (m) — pré-remplie, modifiable</Text>
             <TextInput
@@ -327,6 +327,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   label: { fontFamily: traitementFonts.uiMedium, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
+  // Titre de section Végétation : centré, agrandi et en gras — même hiérarchie
+  // visuelle que les valeurs de l'écran Cibles (cibles.tsx), sur demande
+  // explicite, sans toucher au `label` partagé (utilisé aussi par « Zones
+  // exposées » juste au-dessus, qui reste inchangé).
+  vegetationLabel: {
+    fontFamily: traitementFonts.uiBold,
+    fontSize: traitementTypeSizes.corps + 3,
+    color: traitementColors.texteTitre,
+    textAlign: 'center',
+  },
   fieldLabel: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   input: {
