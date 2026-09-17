@@ -105,10 +105,40 @@ describe('RotationsScreen — efficacité (taux de mortalité)', () => {
 
     await render(<RotationsScreen />);
 
-    expect(await screen.findByDisplayValue('87.5')).toBeVisible();
+    expect(await screen.findByDisplayValue('87,5')).toBeVisible();
     expect(screen.getByDisplayValue('6')).toBeVisible();
     expect(screen.getByText('Comptages pré/post-traitement').props.style).toEqual(
       expect.arrayContaining([expect.objectContaining({ color: '#fff' })])
     );
+  });
+});
+
+describe('RotationsScreen — saisie décimale francophone (virgule)', () => {
+  it("conserve la valeur saisie avec une virgule sur Approvisionnement, sans jamais afficher NaN", async () => {
+    await render(<RotationsScreen />);
+    await screen.findByTestId('rotation-numero-cuve-0');
+
+    fireEvent.changeText(screen.getByTestId('pesticide-recu-input'), '12,5');
+    await settle();
+
+    expect(screen.getByDisplayValue('12,5')).toBeVisible();
+    expect(screen.queryByDisplayValue('NaN')).toBeNull();
+
+    fireEvent.press(screen.getByText('Continuer  ›'));
+
+    await waitFor(() =>
+      expect(traitementRepository.updateTraitementAerienPesticideRecu).toHaveBeenCalledWith('trait-1', 12.5)
+    );
+  });
+
+  it("permet de renseigner la Vitesse du vent fin (m/s) avec une virgule, sans rester bloqué à NaN", async () => {
+    await render(<RotationsScreen />);
+    await screen.findByTestId('rotation-numero-cuve-0');
+
+    fireEvent.changeText(screen.getByTestId('rotation-vent-fin-input-0'), '3,2');
+    await settle();
+
+    expect(screen.getByTestId('rotation-vent-fin-input-0').props.value).toBe('3,2');
+    expect(screen.queryByDisplayValue('NaN')).toBeNull();
   });
 });

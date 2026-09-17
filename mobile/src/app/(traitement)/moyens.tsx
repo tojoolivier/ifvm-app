@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getTraitement, updateTraitementMoyens } from '@/lib/traitement-repository';
@@ -191,7 +191,8 @@ export default function MoyensScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <KeyboardAvoidingView style={styles.keyboardAvoidingView} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView contentContainerStyle={styles.content}>
         <ProgressBar
           currentIndex={typeTraitement === 'TERRESTRE' ? 3 : 4}
           segments={typeTraitement === 'TERRESTRE' ? PROGRESS_SEGMENTS_TERRESTRE : PROGRESS_SEGMENTS_AERIEN}
@@ -293,13 +294,15 @@ export default function MoyensScreen() {
             <Text style={styles.continueButtonText}>{isSaving ? 'Enregistrement…' : 'Continuer  ›'}</Text>
           </TouchableOpacity>
         )}
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: traitementColors.fondApp },
+  keyboardAvoidingView: { flex: 1 },
   content: { padding: 16, gap: 10 },
   title: { fontFamily: traitementFonts.uiExtraBold, fontSize: traitementTypeSizes.titreEcran, color: traitementColors.texteTitre },
   bannerTextOk: { fontFamily: traitementFonts.uiSemiBold, color: traitementColors.vertPrincipal },
@@ -326,7 +329,9 @@ const styles = StyleSheet.create({
     minWidth: 20,
     textAlign: 'center',
   },
-  label: { fontFamily: traitementFonts.uiMedium, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
+  // Semi-gras (au lieu de uiMedium) : demande explicite, titres de champ plus
+  // visibles sur les fiches de traitement.
+  label: { fontFamily: traitementFonts.uiSemiBold, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
   // Titre de section Végétation : centré, agrandi et en gras — même hiérarchie
   // visuelle que les valeurs de l'écran Cibles (cibles.tsx), sur demande
   // explicite, sans toucher au `label` partagé (utilisé aussi par « Zones
@@ -337,7 +342,7 @@ const styles = StyleSheet.create({
     color: traitementColors.texteTitre,
     textAlign: 'center',
   },
-  fieldLabel: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
+  fieldLabel: { fontFamily: traitementFonts.uiSemiBold, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   input: {
     minHeight: 44,
