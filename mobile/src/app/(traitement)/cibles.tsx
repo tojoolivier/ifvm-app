@@ -20,6 +20,38 @@ function displayVolsClairsEssaims(value: number | null | undefined): string {
   return value ? 'oui' : 'non';
 }
 
+/** Une espèce est « présente » sur la cible dès que l'un de ses champs détaillés
+ * (petites/grandes larves ou densités) est renseigné — `null` sur les 4 signifie
+ * que cette espèce n'a aucune ligne population sur la prospection liée. Même
+ * logique que synthese.tsx (écran Aérien). */
+function especePresente(cible: Cible | null, espece: 'lmc' | 'nse'): boolean {
+  if (!cible) return false;
+  return (
+    cible[`petites_larves_${espece}`] != null ||
+    cible[`grandes_larves_${espece}`] != null ||
+    cible[`densite_diffuse_${espece}`] != null ||
+    cible[`densite_groupee_${espece}`] != null
+  );
+}
+
+/** « LMC », « NSE » ou « LMC / NSE » selon les espèces détaillées présentes ;
+ * repli sur `cible.espece` (agrégé, peut valoir "MELANGE") pour une fiche créée
+ * avant l'ajout du détail par espèce. */
+function displayEspeces(cible: Cible | null): string {
+  const especes = (['lmc', 'nse'] as const).filter((e) => especePresente(cible, e));
+  if (especes.length > 0) return especes.map((e) => e.toUpperCase()).join(' / ');
+  return display(cible?.espece);
+}
+
+/** « LMC : 4 / NSE : 2 » — n'affiche que les espèces dont cette valeur est
+ * renseignée (`null` = espèce absente de la prospection liée). */
+function displayParEspece(lmc: number | null | undefined, nse: number | null | undefined): string {
+  const parts: string[] = [];
+  if (lmc != null) parts.push(`LMC : ${lmc}`);
+  if (nse != null) parts.push(`NSE : ${nse}`);
+  return parts.length > 0 ? parts.join(' / ') : 'non renseigné';
+}
+
 /**
  * Écran B — Cibles (snapshot figé à la création).
  *
@@ -71,15 +103,15 @@ export default function CiblesScreen() {
 
         <View style={styles.field}>
           <Text style={styles.label}>Espèce</Text>
-          <Text style={styles.value}>{display(cible?.espece)}</Text>
+          <Text style={styles.value}>{displayEspeces(cible)}</Text>
         </View>
         <View style={styles.field}>
-          <Text style={styles.label}>Petites larves</Text>
-          <Text style={styles.value}>{display(cible?.petites_larves)}</Text>
+          <Text style={styles.label}>Petites larves (stades L1 à L3)</Text>
+          <Text style={styles.value}>{displayParEspece(cible?.petites_larves_lmc, cible?.petites_larves_nse)}</Text>
         </View>
         <View style={styles.field}>
-          <Text style={styles.label}>Grandes larves</Text>
-          <Text style={styles.value}>{display(cible?.grandes_larves)}</Text>
+          <Text style={styles.label}>Grandes larves (LMC : L4-L5 · NSE : L4-L7)</Text>
+          <Text style={styles.value}>{displayParEspece(cible?.grandes_larves_lmc, cible?.grandes_larves_nse)}</Text>
         </View>
         <View style={styles.field}>
           <Text style={styles.label}>Vols/essaims</Text>
@@ -87,7 +119,22 @@ export default function CiblesScreen() {
         </View>
         <View style={styles.field}>
           <Text style={styles.label}>Répartition de la population</Text>
-          <Text style={styles.value}>{display(cible?.repartition_population)}</Text>
+          {especePresente(cible, 'lmc') || especePresente(cible, 'nse') ? (
+            <>
+              {especePresente(cible, 'lmc') && (
+                <Text style={styles.value}>
+                  LMC — diffuse : {display(cible?.densite_diffuse_lmc)} ind./ha · groupée : {display(cible?.densite_groupee_lmc)} ind./m²
+                </Text>
+              )}
+              {especePresente(cible, 'nse') && (
+                <Text style={styles.value}>
+                  NSE — diffuse : {display(cible?.densite_diffuse_nse)} ind./ha · groupée : {display(cible?.densite_groupee_nse)} ind./m²
+                </Text>
+              )}
+            </>
+          ) : (
+            <Text style={styles.value}>{display(cible?.repartition_population)}</Text>
+          )}
         </View>
 
         <Card variant="derivee" style={styles.deriveeCentree}>

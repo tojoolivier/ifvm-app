@@ -10,6 +10,7 @@ import { render, screen, waitFor } from '@testing-library/react-native';
 import MoyensScreen from '@/app/(traitement)/moyens';
 import * as traitementRepository from '@/lib/traitement-repository';
 import * as prospectionRepository from '@/lib/prospection-repository';
+import { traitementFonts } from '@/components/traitement/tokens';
 
 let mockRouteParams: Record<string, string> = { traitementId: 'trait-1' };
 
@@ -100,5 +101,29 @@ describe('MoyensScreen — végétation pré-remplie depuis la prospection liée
     await waitFor(() => expect(prospectionRepository.getProspection).toHaveBeenCalledWith('prosp-1'));
     expect(screen.getByPlaceholderText('Ex. 1,5')).toHaveProp('value', '');
     expect(screen.getByPlaceholderText('Ex. 80')).toHaveProp('value', '');
+  });
+
+  /** Demande explicite : le titre de section « Végétation » doit être centré,
+   * agrandi et en gras (même famille de police que les valeurs « vedette » de
+   * l'écran Cibles, traitementFonts.uiBold) — sans affecter « Zones exposées »,
+   * qui garde sa police/taille d'origine (traitementFonts.uiMedium). */
+  it('affiche le titre « Végétation » centré, agrandi et en gras, contrairement à « Zones exposées »', async () => {
+    jest.mocked(prospectionRepository.getProspection).mockResolvedValue({
+      id: 'prosp-1',
+      hauteur_herbe_cm: null,
+      verdissement_pourcent: null,
+    } as any);
+
+    await render(<MoyensScreen />);
+
+    const titre = await screen.findByText('Végétation');
+    expect(titre.props.style).toEqual(
+      expect.objectContaining({ textAlign: 'center', fontFamily: traitementFonts.uiBold })
+    );
+    const zonesExposees = screen.getByText('Zones exposées');
+    expect(zonesExposees.props.style).toEqual(
+      expect.objectContaining({ fontFamily: traitementFonts.uiMedium })
+    );
+    expect(titre.props.style.fontSize).toBeGreaterThan(zonesExposees.props.style.fontSize);
   });
 });
