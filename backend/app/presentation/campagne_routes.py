@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.campagne_use_cases import (
     CreateCampagne,
-    DeleteCampagne,
     GetCampagne,
     ListCampagnes,
     UpdateCampagne,
@@ -64,6 +63,10 @@ async def get_campagne(
     return campagne
 
 
+# Aucune route DELETE, volontairement (ADR-010, #137) : `GET /referentiel/pull` ne
+# transporte que des upserts, une suppression physique resterait indéfiniment dans le
+# SQLite des téléphones déjà synchronisés. La désactivation logique passe par `PUT`
+# avec `actif: false`, comme les 6 autres référentiels.
 @router.put("/{campagne_id}", response_model=CampagneRead)
 async def update_campagne(
     campagne_id: uuid.UUID,
@@ -78,20 +81,8 @@ async def update_campagne(
         name=body.name,
         start_date=body.start_date,
         end_date=body.end_date,
+        actif=body.actif,
     )
     if campagne is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campagne non trouvée")
     return campagne
-
-
-@router.delete("/{campagne_id}", status_code=204)
-async def delete_campagne(
-    campagne_id: uuid.UUID,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[Utilisateur, Depends(get_current_user)],
-):
-    repository = get_repository(db)
-    use_case = DeleteCampagne(repository)
-    deleted = await use_case.execute(campagne_id)
-    if not deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campagne non trouvée")

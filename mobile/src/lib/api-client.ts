@@ -340,6 +340,7 @@ export interface CampagneSync {
   name: string;
   start_date: string;
   end_date: string | null;
+  actif: boolean;
   updated_at: string;
 }
 

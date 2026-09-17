@@ -699,10 +699,10 @@ const ENTITES: EntitySpec[] = [
     table: 'campagne',
     addLabel: '+ Nouvelle campagne',
     apiOk: true,
-    apiLabel: 'GET · POST · PUT · DELETE /campagnes',
-    desc: 'Seul référentiel administrable de bout en bout. Cadre les prospections et les traitements sur une période.',
+    apiLabel: 'GET · POST · PUT /campagnes',
+    desc: 'Seul référentiel administrable de bout en bout. Cadre les prospections et les traitements sur une période. Pas de DELETE : désactivation logique (`actif`), comme les autres référentiels (#137).',
     addRoute: '/campagnes',
-    hasActif: false,
+    hasActif: true,
     rowLabel: (row) => text(row, 'name'),
     columns: [
       { key: 'name', header: 'Nom', render: (row) => text(row, 'name'), sortValue: (row) => text(row, 'name') },
