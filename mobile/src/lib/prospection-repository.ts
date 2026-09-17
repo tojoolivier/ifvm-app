@@ -730,6 +730,16 @@ const COLONNES_REVALIDATION_NON_CLONEES = new Set([
   'created_at',
   'updated_at',
   'revalide_de_id',
+  // `validated_at` ne doit JAMAIS venir de la source : c'est justement parce
+  // que cette date est trop ancienne (délai de péremption, #revalidation-
+  // prospection) qu'une revalidation a été démarrée. La copier ferait
+  // apparaître le nouveau brouillon — pas encore synchronisé, donc pas encore
+  // revalidé — dans « Prospections à revalider » avant même d'être terminé
+  // (`listProspectionsARevaliderLocal` ne filtre que sur `validated_at`, le
+  // statut du traitement associé et l'existence d'un enfant qui la revalide —
+  // pas sur `statut`). Le serveur la reposera à une date fraîche à la
+  // synchronisation (`CreateProspection.execute`, backend).
+  'validated_at',
 ]);
 
 /**
