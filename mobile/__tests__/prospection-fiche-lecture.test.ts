@@ -264,8 +264,8 @@ describe('parseVegetationSol / buildVegetationSummary (multi-strate)', () => {
   it('parse une strate complète et calcule le résumé sur le recouvrement de chaque strate renseignée', () => {
     const vegetation = JSON.stringify({
       strates: {
-        herbeuse: { surfRel: 40, hMoy: 0.3, recouvrement: 70, verdissement: 20, repousse: 10, orpad: ['Rare'] },
-        arboree: { surfRel: 10, hMoy: 4, recouvrement: 15, verdissement: 0, repousse: 0, orpad: [] },
+        herbeuse: { surfRel: 40, hMoy: 0.3, recouvrement: 70, verdissement: 20, repousse: true, orpad: ['Rare'] },
+        arboree: { surfRel: 10, hMoy: 4, recouvrement: 15, verdissement: 0, repousse: false, orpad: [] },
       },
     });
     const sol = JSON.stringify({ humidite: '5_12cm', texture: 'sable_grossier', solNu: 5 });
@@ -273,7 +273,7 @@ describe('parseVegetationSol / buildVegetationSummary (multi-strate)', () => {
     const state = parseVegetationSol(vegetation, sol, 'moyens');
 
     expect(state.strates.herbeuse).toEqual({
-      surfRel: 40, hMoy: 0.3, recouvrement: 70, verdissement: 20, repousse: 10, orpad: ['Rare'],
+      surfRel: 40, hMoy: 0.3, recouvrement: 70, verdissement: 20, repousse: true, orpad: ['Rare'],
       feuille: [], fleur: [], fruit: [], sec: [],
     });
     expect(state.strates.buissonneuse.recouvrement).toBe(0);
@@ -285,6 +285,18 @@ describe('parseVegetationSol / buildVegetationSummary (multi-strate)', () => {
     expect(summary).toContain('Sol nu 5%');
     expect(summary).toContain('Texture Sable grossier');
     expect(summary).toContain('Dégâts culture Moyens');
+  });
+
+  it('repousse : un ancien brouillon avec un pourcentage numérique (avant #repousse-presence-absence) retombe à null plutôt que de garder une valeur incohérente', () => {
+    const vegetation = JSON.stringify({
+      strates: {
+        herbeuse: { surfRel: 40, hMoy: 0.3, recouvrement: 70, verdissement: 20, repousse: 10, orpad: [] },
+      },
+    });
+
+    const state = parseVegetationSol(vegetation, null, null);
+
+    expect(state.strates.herbeuse.repousse).toBeNull();
   });
 
   it('ne casse pas sur un JSON vide', () => {

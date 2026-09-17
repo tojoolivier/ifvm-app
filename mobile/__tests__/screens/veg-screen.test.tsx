@@ -28,7 +28,7 @@ jest.mock('@/lib/prospection-repository', () => ({
 // "Continuer" serait bloqué dans les tests de réenregistrement ci-dessous.
 const EXISTING_VEGETATION = JSON.stringify({
   strates: {
-    herbeuse: { surfRel: 94.5, hMoy: 2.75, recouvrement: 70, verdissement: 33.5, repousse: 12.25, orpad: ['Rare'] },
+    herbeuse: { surfRel: 94.5, hMoy: 2.75, recouvrement: 70, verdissement: 33.5, repousse: true, orpad: ['Rare'] },
   },
 });
 // Sol nu (%) est un champ station, pas par strate (#278) : il vit dans `sol`, pas
@@ -92,7 +92,7 @@ describe('VegetationScreen — restauration des données déjà enregistrées', 
     const [, payload] = jest.mocked(prospectionRepository.updateProspectionVegetation).mock.calls[0];
 
     const vegetation = JSON.parse(payload.vegetation);
-    expect(vegetation.strates.herbeuse).toMatchObject({ recouvrement: 70, verdissement: 33.5, hMoy: 2.75 });
+    expect(vegetation.strates.herbeuse).toMatchObject({ recouvrement: 70, verdissement: 33.5, hMoy: 2.75, repousse: true });
 
     const sol = JSON.parse(payload.sol);
     expect(sol.humidite).toEqual(expect.arrayContaining(['0_5cm', 'gt_30cm']));
@@ -138,9 +138,11 @@ describe('VegetationScreen — restauration des données déjà enregistrées', 
     );
   });
 
-  it('accepte une saisie décimale libre (virgule) pour Surf. rel./H. moy/Verdissement/Repousse, sans arrondi au pas de 5', async () => {
-    // Régression : ces 4 champs étaient arrondis au multiple de 5 le plus proche
+  it('accepte une saisie décimale libre (virgule) pour Surf. rel./H. moy/Verdissement, sans arrondi au pas de 5', async () => {
+    // Régression : ces 3 champs étaient arrondis au multiple de 5 le plus proche
     // (clampTo5), comme le stepper Recouvrement — qui, lui, garde ce comportement.
+    // Repousse n'en fait plus partie (#repousse-presence-absence) : Présence/Absence,
+    // testé séparément ci-dessous.
     useProspectionWizardStore.setState({
       draft: { id: 'draft-123', type_prospection: 'intensive', vegetation: null, sol: null } as any,
       captures: [],
@@ -150,30 +152,25 @@ describe('VegetationScreen — restauration des données déjà enregistrées', 
     fireEvent.press(await screen.findByText('Strate arborée'));
     await waitFor(() => expect(screen.getByText('Recouvrement')).toBeVisible());
 
-    // Une seule strate dépliée : 4 champs décimaux vides à l'écran (Surf. rel. %,
-    // H. moy, % Verdissement, % Repousse). Sol nu, en haut, est indépendant des
-    // strates et se saisit comme Recouvrement (stepper par pas de 5%), pas un champ
-    // texte — il n'apparaît donc pas ici. Peu importe lequel des 4 champs reçoit
-    // quelle valeur ci-dessous : seule compte la non-régression testée (aucun n'est
-    // arrondi à un multiple de 5, contrairement au stepper Recouvrement) — on retape
-    // après chaque frappe, l'index des champs encore vides se décalant à mesure
-    // qu'ils se remplissent.
+    // Une seule strate dépliée : 3 champs décimaux vides à l'écran (Surf. rel. %,
+    // H. moy, % Verdissement). Sol nu, en haut, est indépendant des strates et se
+    // saisit comme Recouvrement (stepper par pas de 5%), pas un champ texte — il
+    // n'apparaît donc pas ici. Peu importe lequel des 3 champs reçoit quelle valeur
+    // ci-dessous : seule compte la non-régression testée (aucun n'est arrondi à un
+    // multiple de 5, contrairement au stepper Recouvrement) — on retape après chaque
+    // frappe, l'index des champs encore vides se décalant à mesure qu'ils se remplissent.
     fireEvent.changeText(screen.getAllByDisplayValue('')[0], '2,75');
     expect(await screen.findByDisplayValue('2,75')).toBeVisible();
 
     fireEvent.changeText(screen.getAllByDisplayValue('')[0], '33,5');
     expect(await screen.findByDisplayValue('33,5')).toBeVisible();
 
-    fireEvent.changeText(screen.getAllByDisplayValue('')[0], '12,25');
-    expect(await screen.findByDisplayValue('12,25')).toBeVisible();
-
     fireEvent.changeText(screen.getAllByDisplayValue('')[0], '5,5');
-    // Aucun de ces 4 champs n'est arrondi à un multiple de 5 (contrairement à
-    // Recouvrement) : les quatre valeurs décimales saisies restent visibles telles quelles.
+    // Aucun de ces 3 champs n'est arrondi à un multiple de 5 (contrairement à
+    // Recouvrement) : les valeurs décimales saisies restent visibles telles quelles.
     expect(await screen.findByDisplayValue('5,5')).toBeVisible();
     expect(screen.getByDisplayValue('2,75')).toBeVisible();
     expect(screen.getByDisplayValue('33,5')).toBeVisible();
-    expect(screen.getByDisplayValue('12,25')).toBeVisible();
   });
 });
 

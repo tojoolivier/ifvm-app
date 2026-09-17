@@ -6,7 +6,10 @@ export interface StrateFormValues {
   hMoy: number | null;
   recouvrement: number;
   verdissement: number | null;
-  repousse: number | null;
+  // Présence/Absence (pas un pourcentage saisi) : renommé de "% Repousse" à
+  // "Repousse" (#repousse-presence-absence) — la fiche papier n'attend qu'une
+  // constatation binaire à cet endroit, pas une valeur mesurée.
+  repousse: boolean | null;
   orpad: string[];
   feuille: string[];
   fleur: string[];
