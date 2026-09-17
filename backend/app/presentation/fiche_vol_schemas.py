@@ -77,6 +77,9 @@ class FicheVolCreate(BaseModel):
     pilote: str = Field(min_length=1, max_length=255)
     mecanicien: str = Field(min_length=1, max_length=255)
     chef_de_base_id: uuid.UUID
+    # Prospection "principale" affichée en en-tête (Référence, migration 0070) —
+    # facultative, distincte du rattachement par vol (VolCreate.prospection_id).
+    prospection_id: uuid.UUID | None = None
     consultant_international: str | None = None
     # Un seul produit assumé par fiche et par jour (même forme que
     # Prospection.pesticide_* en mode extensif aérien).
@@ -111,6 +114,7 @@ class FicheVolSyncPush(BaseModel):
     pilote: str = Field(min_length=1, max_length=255)
     mecanicien: str = Field(min_length=1, max_length=255)
     chef_de_base_id: uuid.UUID
+    prospection_id: uuid.UUID | None = None
     consultant_international: str | None = None
     pesticide_nom_commercial: str | None = None
     pesticide_quantite_disponible: float | None = None
@@ -151,6 +155,11 @@ class FicheVolRead(BaseModel):
     pilote: str
     mecanicien: str
     chef_de_base_id: uuid.UUID
+    prospection_id: uuid.UUID | None = None
+    # Dérivés par jointure sur prospection_id, jamais saisis (cf. domaine :
+    # numero_fiche_validation = même document que numero_fiche_prospection).
+    prospection_numero_fiche: str | None = None
+    prospection_date_validation: datetime | None = None
     consultant_international: str | None = None
     pesticide_nom_commercial: str | None = None
     pesticide_quantite_disponible: float | None = None
