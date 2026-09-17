@@ -11,6 +11,7 @@ import { ReferentialError } from '@/lib/errors';
 import { DateField } from '@/components/DateField';
 import { BaseAerienneField, type BaseAerienneOption } from '@/components/referentiel/BaseAerienneField';
 import { StandRemplissageField, type StandRemplissageOption } from '@/components/referentiel/StandRemplissageField';
+import { ProspectionValideeField, type ProspectionValideeOption } from '@/components/referentiel/ProspectionValideeField';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -46,6 +47,16 @@ export default function FicheVolCreationScreen() {
   const [mecanicien, setMecanicien] = useState('');
   const [consultantInternational, setConsultantInternational] = useState('');
   const [observations, setObservations] = useState('');
+
+  const [prospectionId, setProspectionId] = useState<string | null>(null);
+
+  const [pesticideNomCommercial, setPesticideNomCommercial] = useState('');
+  const [pesticideQuantiteDisponible, setPesticideQuantiteDisponible] = useState('');
+  const [pesticideQuantiteRecue, setPesticideQuantiteRecue] = useState('');
+  const [futsDisponible, setFutsDisponible] = useState('');
+  const [futsRecues, setFutsRecues] = useState('');
+  const [futsPleins, setFutsPleins] = useState('');
+  const [futsVides, setFutsVides] = useState('');
 
   const [baseId, setBaseId] = useState<string | null>(null);
   const [standId, setStandId] = useState<string | null>(null);
@@ -84,6 +95,7 @@ export default function FicheVolCreationScreen() {
     );
   };
   const onChangeStand = (id: string, _option: StandRemplissageOption) => setStandId(id);
+  const onChangeProspection = (id: string | null, _option: ProspectionValideeOption | null) => setProspectionId(id);
 
   const submit = () => {
     const errors: Record<string, string> = {};
@@ -117,17 +129,24 @@ export default function FicheVolCreationScreen() {
           pilote: pilote.trim(),
           mecanicien: mecanicien.trim(),
           chef_de_base_id: chefDeBaseId!,
+          prospection_id: prospectionId,
           consultant_international: consultantInternational.trim() || null,
+          pesticide_nom_commercial: pesticideNomCommercial.trim() || null,
+          pesticide_quantite_disponible:
+            pesticideQuantiteDisponible.trim() !== '' ? parseFloat(pesticideQuantiteDisponible) : null,
+          pesticide_quantite_recue:
+            pesticideQuantiteRecue.trim() !== '' ? parseFloat(pesticideQuantiteRecue) : null,
+          futs_disponible: futsDisponible.trim() !== '' ? parseInt(futsDisponible, 10) : null,
+          futs_recues: futsRecues.trim() !== '' ? parseInt(futsRecues, 10) : null,
+          futs_pleins: futsPleins.trim() !== '' ? parseInt(futsPleins, 10) : null,
+          futs_vides: futsVides.trim() !== '' ? parseInt(futsVides, 10) : null,
           observations: observations.trim() || null,
         });
         router.replace({
           pathname: '/(fiche-vol)/recap' as any,
           params: {
             id: fiche.id,
-            numeroFiche: fiche.numero_fiche,
-            dateVol: fiche.date_vol,
-            immatriculation: fiche.immatriculation,
-            compagnie: fiche.compagnie,
+            chefDeBaseNom: chefDeBaseNom ?? '',
           },
         });
       },
@@ -192,6 +211,7 @@ export default function FicheVolCreationScreen() {
 
             <BaseAerienneField value={baseId} onChange={onChangeBase} />
             <StandRemplissageField value={standId} onChange={onChangeStand} />
+            <ProspectionValideeField value={prospectionId} onChange={onChangeProspection} />
 
             <View style={styles.card}>
               <Text style={styles.label}>Chef de base</Text>
@@ -235,6 +255,97 @@ export default function FicheVolCreationScreen() {
                 placeholderTextColor={TEXT_SECONDARY}
                 style={styles.input}
               />
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.label}>Pesticide — nom commercial (facultatif)</Text>
+              <TextInput
+                value={pesticideNomCommercial}
+                onChangeText={setPesticideNomCommercial}
+                placeholder="Ex. Fenitrothion 96 UL"
+                placeholderTextColor={TEXT_SECONDARY}
+                style={styles.input}
+              />
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.label}>Pesticide — quantité (L)</Text>
+              <View style={styles.rowInputs}>
+                <View style={styles.rowInputItem}>
+                  <Text style={styles.sousLabel}>Disponible</Text>
+                  <TextInput
+                    value={pesticideQuantiteDisponible}
+                    onChangeText={setPesticideQuantiteDisponible}
+                    placeholder="0"
+                    placeholderTextColor={TEXT_SECONDARY}
+                    keyboardType="decimal-pad"
+                    style={styles.input}
+                  />
+                </View>
+                <View style={styles.rowInputItem}>
+                  <Text style={styles.sousLabel}>Reçue</Text>
+                  <TextInput
+                    value={pesticideQuantiteRecue}
+                    onChangeText={setPesticideQuantiteRecue}
+                    placeholder="0"
+                    placeholderTextColor={TEXT_SECONDARY}
+                    keyboardType="decimal-pad"
+                    style={styles.input}
+                  />
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.label}>Nombre de fûts</Text>
+              <View style={styles.rowInputs}>
+                <View style={styles.rowInputItem}>
+                  <Text style={styles.sousLabel}>Disponibles</Text>
+                  <TextInput
+                    value={futsDisponible}
+                    onChangeText={setFutsDisponible}
+                    placeholder="0"
+                    placeholderTextColor={TEXT_SECONDARY}
+                    keyboardType="number-pad"
+                    style={styles.input}
+                  />
+                </View>
+                <View style={styles.rowInputItem}>
+                  <Text style={styles.sousLabel}>Reçues</Text>
+                  <TextInput
+                    value={futsRecues}
+                    onChangeText={setFutsRecues}
+                    placeholder="0"
+                    placeholderTextColor={TEXT_SECONDARY}
+                    keyboardType="number-pad"
+                    style={styles.input}
+                  />
+                </View>
+              </View>
+              <View style={styles.rowInputs}>
+                <View style={styles.rowInputItem}>
+                  <Text style={styles.sousLabel}>Pleins</Text>
+                  <TextInput
+                    value={futsPleins}
+                    onChangeText={setFutsPleins}
+                    placeholder="0"
+                    placeholderTextColor={TEXT_SECONDARY}
+                    keyboardType="number-pad"
+                    style={styles.input}
+                  />
+                </View>
+                <View style={styles.rowInputItem}>
+                  <Text style={styles.sousLabel}>Vides</Text>
+                  <TextInput
+                    value={futsVides}
+                    onChangeText={setFutsVides}
+                    placeholder="0"
+                    placeholderTextColor={TEXT_SECONDARY}
+                    keyboardType="number-pad"
+                    style={styles.input}
+                  />
+                </View>
+              </View>
             </View>
 
             <View style={styles.card}>
@@ -287,6 +398,9 @@ const styles = StyleSheet.create({
   label: { fontSize: 9, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase' },
   input: { fontSize: 13, fontWeight: '600', color: TEXT, borderWidth: 1, borderColor: BORDER, borderRadius: 8, padding: 8 },
   inputMultiline: { minHeight: 64, textAlignVertical: 'top' },
+  rowInputs: { flexDirection: 'row', gap: 8 },
+  rowInputItem: { flex: 1, gap: 4 },
+  sousLabel: { fontSize: 9, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase' },
   chefDeBaseValue: { fontSize: 13, fontWeight: '600', color: TEXT },
   errorText: { color: '#c0412b', fontSize: 11, marginBottom: 4 },
   footer: { paddingHorizontal: 16, paddingTop: 12, backgroundColor: BG },

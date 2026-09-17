@@ -216,6 +216,7 @@ _CHAMPS_CONTENU_FICHE: tuple[str, ...] = (
     "campagne_id",
     "base_id",
     "stand_id",
+    "prospection_id",
     "pilote",
     "mecanicien",
     "chef_de_base_id",
@@ -351,6 +352,11 @@ class FicheVol:
     pilote: str
     mecanicien: str
     chef_de_base_id: uuid.UUID
+    # Prospection "principale" affichée en en-tête (Référence, migration 0070) —
+    # facultative, distincte du rattachement réel des vols individuels
+    # (Vol.prospection_id/rotation_id). numero_fiche_prospection/date_validation
+    # ci-dessous en sont dérivés par jointure, jamais stockés.
+    prospection_id: uuid.UUID | None = None
     # Attribué par FicheVolRepositoryImpl.next_compteur avant la première écriture ;
     # 0 est une valeur transitoire côté domaine (jamais persistée telle quelle, cf.
     # ck_fiche_vol_compteur_positif), pas une saisie possible.
@@ -386,6 +392,12 @@ class FicheVol:
     stand_latitude: float | None = None
     stand_longitude: float | None = None
     stand_altitude: float | None = None
+    # Dérivés de prospection_id (jointure) — pas de "fiche de validation" distincte
+    # dans le modèle : numero_fiche_validation est le même document que
+    # numero_fiche_prospection, exposé une deuxième fois (cahier des charges),
+    # daté par prospection.validated_at (None tant que non validée).
+    prospection_numero_fiche: str | None = None
+    prospection_date_validation: datetime | None = None
     # Somme de traitement_rotation.quantite pour les rotations couvertes par les vols de
     # la fiche (jointure vol.rotation_id -> traitement_rotation) — jamais stockée.
     pesticide_quantite_utilisee: float | None = None

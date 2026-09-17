@@ -378,6 +378,49 @@ async def test_fiche_inconnue_renvoie_404(client, auth_headers):
     assert reponse.status_code == 404
 
 
+# --- Référence à une prospection (migration 0070) ----------------------------------
+
+
+@pytest.mark.asyncio
+async def test_prospection_id_derive_les_references_en_tete(
+    client, auth_headers, payload_fiche, db_session, campagne_id, utilisateur
+):
+    """numero_fiche_prospection/numero_fiche_validation/date_validation sont dérivés
+    par jointure sur prospection_id, jamais saisis (#fiche-vol-prospection-id)."""
+    validated_at = datetime(2026, 8, 20, 9, 30)
+    prospection = ProspectionModel(
+        id=uuid.uuid4(),
+        type_prospection="extensive",
+        campagne_id=campagne_id,
+        prospecteur_id=utilisateur.id,
+        n_fiche="EXT-2026-08-0042",
+        date_prospection=date(2026, 8, 18),
+        statut="validee",
+        statut_sync="local",
+        validated_at=validated_at,
+    )
+    db_session.add(prospection)
+    await db_session.commit()
+
+    fiche = await _creer(
+        client, auth_headers, {**payload_fiche, "prospection_id": str(prospection.id)}
+    )
+
+    assert fiche["prospection_id"] == str(prospection.id)
+    assert fiche["prospection_numero_fiche"] == "EXT-2026-08-0042"
+    assert fiche["prospection_date_validation"].startswith("2026-08-20T09:30:00")
+
+
+@pytest.mark.asyncio
+async def test_prospection_id_inexistant_renvoie_404(client, auth_headers, payload_fiche):
+    reponse = await client.post(
+        "/fiches-vol",
+        json={**payload_fiche, "prospection_id": str(uuid.uuid4())},
+        headers=auth_headers,
+    )
+    assert reponse.status_code == 404, reponse.text
+
+
 # --- Synchronisation hors-ligne (#fiche-vol-sync-hors-ligne) -----------------------
 
 

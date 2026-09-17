@@ -39,8 +39,8 @@ function StatutBadge({ statut }: { statut: string }) {
  * Liste des fiches de vol (#fiche-vol-menu-entree) — pas de filtre « créées
  * par moi » : une fiche de vol couvre tout un hélicoptère pour une journée,
  * partagée par l'équipe (pas de champ créateur en base, contrairement à la
- * prospection). Lecture seule pour l'instant : la consultation détaillée
- * (vols, signatures) est un chantier à venir, avec la saisie des vols.
+ * prospection). Chaque ligne ouvre `recap.tsx` (vols, traitement/opération,
+ * pesticide, signatures, validation).
  */
 export default function MesFichesVolScreen() {
   const router = useRouter();
@@ -97,7 +97,12 @@ export default function MesFichesVolScreen() {
           <ScrollView contentContainerStyle={styles.content}>
             {fiches.length === 0 && <Text style={styles.vide}>Aucune fiche de vol.</Text>}
             {fiches.map((fiche) => (
-              <View key={fiche.id} style={styles.card}>
+              <TouchableOpacity
+                key={fiche.id}
+                style={styles.card}
+                onPress={() => router.push({ pathname: '/(fiche-vol)/recap' as any, params: { id: fiche.id } })}
+                accessibilityRole="button"
+              >
                 <View style={styles.cardHeaderRow}>
                   <Text style={styles.numero}>{fiche.numero_fiche}</Text>
                   <StatutBadge statut={fiche.statut} />
@@ -105,7 +110,7 @@ export default function MesFichesVolScreen() {
                 <Text style={styles.sousTexte}>
                   {fiche.date_vol} · {fiche.immatriculation} · {fiche.compagnie}
                 </Text>
-              </View>
+              </TouchableOpacity>
             ))}
           </ScrollView>
         )}

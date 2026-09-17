@@ -17,6 +17,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.infrastructure.prospection_model import ProspectionModel
 from app.infrastructure.referentiel_model import BaseAerienneModel, StandRemplissageModel
 from app.models.base import Base
 
@@ -77,6 +78,14 @@ class FicheVolModel(Base):
     )
     consultant_international: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
+    # Prospection "principale" affichée en en-tête (Référence) — migration 0070.
+    # N'est pas le rattachement réel des vols (vol.prospection_id/rotation_id,
+    # inchangés) : seulement la fiche dont numero_fiche_prospection/date_validation
+    # sont dérivés par jointure, jamais stockés.
+    prospection_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("prospection.id", ondelete="SET NULL"), nullable=True
+    )
+
     # Un seul produit assumé par fiche et par jour — même forme que
     # Prospection.pesticide_* (mode extensif aérien), pas de table 1-N. Quantité
     # utilisée/restante : dérivées (somme des rotations rattachées), jamais stockées.
@@ -102,6 +111,7 @@ class FicheVolModel(Base):
 
     base: Mapped[BaseAerienneModel] = relationship()
     stand: Mapped[StandRemplissageModel] = relationship()
+    prospection: Mapped[ProspectionModel | None] = relationship()
     vols: Mapped[list["VolModel"]] = relationship(
         back_populates="fiche_vol", cascade="all, delete-orphan", order_by="VolModel.numero"
     )
@@ -119,6 +129,7 @@ class FicheVolModel(Base):
         Index("ix_fiche_vol_campagne_id", "campagne_id"),
         Index("ix_fiche_vol_base_id", "base_id"),
         Index("ix_fiche_vol_stand_id", "stand_id"),
+        Index("ix_fiche_vol_prospection_id", "prospection_id"),
     )
 
 

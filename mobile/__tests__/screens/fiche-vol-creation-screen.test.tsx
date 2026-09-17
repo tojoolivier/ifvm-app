@@ -146,7 +146,15 @@ describe('FicheVolCreationScreen', () => {
         pilote: 'Jean Rakoto',
         mecanicien: 'Paul Rabe',
         chef_de_base_id: 'chef-1',
+        prospection_id: null,
         consultant_international: null,
+        pesticide_nom_commercial: null,
+        pesticide_quantite_disponible: null,
+        pesticide_quantite_recue: null,
+        futs_disponible: null,
+        futs_recues: null,
+        futs_pleins: null,
+        futs_vides: null,
         observations: null,
       })
     );
@@ -156,10 +164,7 @@ describe('FicheVolCreationScreen', () => {
         pathname: '/(fiche-vol)/recap',
         params: {
           id: 'fiche-1',
-          numeroFiche: '001-2026-09-16-EQ-5R-MXY',
-          dateVol: '2026-09-16',
-          immatriculation: '5R-MXY',
-          compagnie: 'Air Test',
+          chefDeBaseNom: 'Toky Rabe',
         },
       })
     );
