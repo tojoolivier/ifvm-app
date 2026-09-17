@@ -7,7 +7,9 @@ import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes
  * réutilisaient déjà exactement les mêmes tokens avant la scission.
  */
 export const formStyles = StyleSheet.create({
-  label: { fontFamily: traitementFonts.uiMedium, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
+  // Semi-gras (au lieu de uiMedium) : demande explicite, titres de champ plus
+  // visibles sur les fiches de traitement (Équipe, Pesticides & rotations).
+  label: { fontFamily: traitementFonts.uiSemiBold, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
   row: { flexDirection: 'row', gap: 8 },
   flex1: { flex: 1 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
