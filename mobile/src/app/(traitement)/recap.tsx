@@ -7,6 +7,7 @@ import {
   countUnsyncedTraitements,
   markTraitementValidee,
   DraftTraitement,
+  Cible,
 } from '@/lib/traitement-repository';
 import { enregistrerEtSynchroniserTraitement } from '@/lib/traitement-sync';
 import { apiClient } from '@/lib/api-client';
@@ -28,6 +29,7 @@ import { useAsyncAction } from '@/hooks/use-async-action';
 import { useErrorStore } from '@/lib/error-store';
 import { useErrorLogStore } from '@/lib/error-log-store';
 import { toFriendlyError } from '@/lib/friendly-error';
+import { logger } from '@/lib/logger';
 import { EtatVide } from '@/components/erreurs/etat-vide';
 
 // Aérien : 8 étapes (Équipe/Pesticides & rotations scindés, #equipe-slide-aerien ;
@@ -79,6 +81,141 @@ async function validerEtVerrouillerSurServeur(draft: DraftTraitement, token: str
       horodatage: s.horodatage,
     }))
   );
+}
+
+/**
+ * #recap-fiche-traitement-incomplet : le récapitulatif n'affichait que
+ * l'Équipe et Pesticides & rotations (Aérien) — Moyens & protection, Impacts &
+ * risque, Cibles, et la totalité du Terrestre (Équipe & Conditions, Moyens,
+ * Produits utilisés) n'y apparaissaient jamais, alors que ces données sont
+ * bien enregistrées. Sans écran de relecture complet, revenir « voir ce qui a
+ * été saisi » donnait l'impression que ces informations avaient disparu — les
+ * helpers et cartes ci-dessous couvrent chaque écran du parcours, dans son
+ * propre ordre de saisie.
+ */
+function display(value: string | number | null | undefined): string {
+  if (value === null || value === undefined || value === '') return 'non renseigné';
+  return String(value);
+}
+
+function displayBool(value: boolean | null | undefined): string {
+  if (value === null || value === undefined) return 'non renseigné';
+  return value ? 'Oui' : 'Non';
+}
+
+function displayListe(values: string[]): string {
+  return values.length > 0 ? values.join(', ') : 'aucun(e)';
+}
+
+/** Listes cochables (espèces non ciblées, familles de mortalité) : même repli
+ * que impacts.tsx sur une chaîne corrompue — un écran de relecture ne doit
+ * jamais planter pour ça, juste afficher « aucun(e) ». */
+function parseJsonArraySafe(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    logger.ignore(e, 'Liste corrompue au récapitulatif — affichée comme vide.');
+    return [];
+  }
+}
+
+function parseJsonDictSafe(raw: string | null | undefined): Record<string, boolean> {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return typeof parsed === 'object' && parsed !== null ? parsed : {};
+  } catch (e) {
+    logger.ignore(e, 'Dictionnaire corrompu au récapitulatif — affiché comme vide.');
+    return {};
+  }
+}
+
+/** `vols_clairs_essaims` stocké 1/0 (colonne REAL, cf. construireCible) — même
+ * repli que cibles.tsx/synthese.tsx. */
+function displayVolsClairsEssaims(value: number | null | undefined): string {
+  if (value === null || value === undefined) return 'non renseigné';
+  return value ? 'Oui' : 'Non';
+}
+
+/** Une espèce est « présente » sur la cible dès que l'un de ses champs
+ * détaillés est renseigné — même logique que cibles.tsx/synthese.tsx. */
+function especePresenteRecap(cible: Cible | null | undefined, espece: 'lmc' | 'nse'): boolean {
+  if (!cible) return false;
+  return (
+    cible[`petites_larves_${espece}`] != null ||
+    cible[`grandes_larves_${espece}`] != null ||
+    cible[`densite_diffuse_${espece}`] != null ||
+    cible[`densite_groupee_${espece}`] != null
+  );
+}
+
+function displayEspecesRecap(cible: Cible | null | undefined): string {
+  const especes = (['lmc', 'nse'] as const).filter((e) => especePresenteRecap(cible, e));
+  if (especes.length > 0) return especes.map((e) => e.toUpperCase()).join(' / ');
+  return display(cible?.espece);
+}
+
+function displayParEspeceRecap(lmc: number | null | undefined, nse: number | null | undefined): string {
+  const parts: string[] = [];
+  if (lmc != null) parts.push(`LMC : ${lmc}`);
+  if (nse != null) parts.push(`NSE : ${nse}`);
+  return parts.length > 0 ? parts.join(' / ') : 'non renseigné';
+}
+
+/** Méthode d'évaluation de l'efficacité — même libellés que rotations.tsx
+ * (Aérien) / TerrestreForm.tsx (Terrestre), les deux seuls écrans qui la saisissent. */
+function displayMethodeEvaluation(value: string | null | undefined): string {
+  if (value === 'ESTIMATION_VISUELLE') return 'Estimation visuelle';
+  if (value === 'COMPTAGES_PRE_POST') return 'Comptages pré/post-traitement';
+  return 'non renseigné';
+}
+
+/** Personne concernée/mode de contamination (empoisonnement) — mêmes libellés
+ * que impacts.tsx. */
+function displayPersonneConcernee(value: string | null | undefined): string {
+  if (value === 'AGENT') return 'Agent';
+  if (value === 'POPULATION') return 'Population';
+  return 'non renseigné';
+}
+
+const MODE_CONTAMINATION_LABELS: Record<string, string> = {
+  INGESTION: 'Ingestion',
+  INHALATION: 'Inhalation',
+  CONTACT: 'Contact',
+  AUTRE: 'Autre',
+};
+
+function displayModeContamination(value: string | null | undefined): string {
+  if (!value) return 'non renseigné';
+  return MODE_CONTAMINATION_LABELS[value] ?? value;
+}
+
+/** 4 axes de l'écran Impacts & risque (impacts.tsx, `AXES_RISQUE`) — dupliqué
+ * ici plutôt que mutualisé, même choix que le reste de ce module. */
+const AXES_RISQUE_LABELS: Record<string, string> = {
+  ressources_eau: 'Ressources en eau',
+  sol: 'Sol',
+  faune_non_cible: 'Faune non cible',
+  abeilles: 'Abeilles/pollinisateurs',
+};
+
+function displayEvaluationRisque(dict: Record<string, boolean>): string {
+  const entries = Object.entries(AXES_RISQUE_LABELS).filter(([key]) => dict[key] !== undefined);
+  if (entries.length === 0) return 'non renseigné';
+  return entries.map(([key, label]) => `${label} : ${dict[key] ? 'Oui' : 'Non'}`).join(' · ');
+}
+
+/** Zones exposées (moyens.tsx/synthese.tsx, `ZONES`) — dupliqué ici, même choix. */
+const ZONES_LABELS: Record<string, string> = { cultures: 'Cultures', paturages: 'Pâturages' };
+
+function displayZonesExposees(raw: string | null | undefined): string {
+  const dict = parseJsonDictSafe(raw);
+  const actives = Object.entries(dict)
+    .filter(([, actif]) => actif)
+    .map(([key]) => ZONES_LABELS[key] ?? key);
+  return actives.length > 0 ? actives.join(', ') : 'aucune';
 }
 
 /** Une ligne « libellé : valeur » des cartes Équipe/Traitement — « — » si absent,
@@ -340,6 +477,24 @@ export default function RecapScreen() {
           );
         })}
 
+        {draft.cible && (
+          <Card>
+            <Text style={styles.sectionTitle}>Cible</Text>
+            <RecapLigne label="Espèce" value={displayEspecesRecap(draft.cible)} />
+            <RecapLigne
+              label="Petites larves (L1-L3)"
+              value={displayParEspeceRecap(draft.cible.petites_larves_lmc, draft.cible.petites_larves_nse)}
+            />
+            <RecapLigne
+              label="Grandes larves"
+              value={displayParEspeceRecap(draft.cible.grandes_larves_lmc, draft.cible.grandes_larves_nse)}
+            />
+            <RecapLigne label="Vols/essaims" value={displayVolsClairsEssaims(draft.cible.vols_clairs_essaims)} />
+            <RecapLigne label="Répartition de la population" value={display(draft.cible.repartition_population)} />
+            <RecapLigne label="Surface infestée (ha)" value={display(draft.cible.surface_infestee_ha)} />
+          </Card>
+        )}
+
         {draft.type_traitement === 'AERIEN' && draft.aerien && (
           <>
             <Card>
@@ -352,6 +507,7 @@ export default function RecapScreen() {
               <RecapLigne label="Base principale" value={draft.aerien.base_principale} />
               <RecapLigne label="Stand" value={draft.aerien.stand} />
               <RecapLigne label="Base secondaire" value={draft.aerien.base_secondaire} />
+              <RecapLigne label="Reprise de traitement" value={displayBool(draft.aerien.reprise_traitement)} />
             </Card>
 
             <Card>
@@ -361,6 +517,10 @@ export default function RecapScreen() {
               <RecapLigne label="Total pesticide (kg)" value={draft.aerien.total_pesticide_kg != null ? String(draft.aerien.total_pesticide_kg) : null} />
               <RecapLigne label="Surface traitée (ha)" value={draft.aerien.surface_traitee_ha != null ? String(draft.aerien.surface_traitee_ha) : null} />
               <RecapLigne label="Approvisionnement (l)" value={draft.aerien.pesticide_recu_l != null ? String(draft.aerien.pesticide_recu_l) : null} />
+              <RecapLigne label="Reste en stock (l)" value={display(draft.aerien.pesticide_stock_restant_l)} />
+              <RecapLigne label="Taux de mortalité (%)" value={display(draft.aerien.taux_mortalite_pourcent)} />
+              <RecapLigne label="Évalué après (heures)" value={display(draft.aerien.evaluation_efficacite_heures_apres)} />
+              <RecapLigne label="Méthode d'évaluation" value={displayMethodeEvaluation(draft.aerien.methode_evaluation_efficacite)} />
             </Card>
 
             <Card variant="info">
@@ -370,6 +530,113 @@ export default function RecapScreen() {
               </Text>
             </Card>
           </>
+        )}
+
+        {draft.type_traitement === 'TERRESTRE' && draft.terrestre && (
+          <>
+            <Card>
+              <Text style={styles.sectionTitle}>Équipe & Conditions</Text>
+              <RecapLigne label="Chef d'équipe" value={nomPersonne(draft.terrestre.chef_equipe_id)} />
+              <RecapLigne label="Agent encadreur" value={draft.terrestre.agent_encadreur} />
+              <RecapLigne label="Consultant" value={draft.terrestre.consultant_international} />
+              <RecapLigne label="Heure début" value={draft.terrestre.heure_debut} />
+              <RecapLigne label="Heure fin" value={draft.terrestre.heure_fin} />
+              <RecapLigne label="Vitesse du vent (m/s)" value={display(draft.terrestre.vitesse_vent_ms)} />
+              <RecapLigne label="Direction du vent" value={draft.terrestre.direction_vent} />
+              <RecapLigne label="Température (°C)" value={display(draft.terrestre.temperature_c)} />
+              <RecapLigne label="Reprise de traitement" value={displayBool(draft.terrestre.reprise_traitement)} />
+              <RecapLigne label="Taux de mortalité (%)" value={display(draft.terrestre.taux_mortalite_pourcent)} />
+              <RecapLigne label="Évalué après (heures)" value={display(draft.terrestre.evaluation_efficacite_heures_apres)} />
+              <RecapLigne label="Méthode d'évaluation" value={displayMethodeEvaluation(draft.terrestre.methode_evaluation_efficacite)} />
+            </Card>
+
+            <Card>
+              <Text style={styles.sectionTitle}>Moyens & produits (Terrestre)</Text>
+              <RecapLigne label="Atomiseur à dos (ha)" value={display(draft.terrestre.surface_atomiseur_ha)} />
+              <RecapLigne label="Atomiseur autoporté (ha)" value={display(draft.terrestre.surface_atomiseur_autoporte_ha)} />
+              <RecapLigne label="Disque rotatif (ha)" value={display(draft.terrestre.surface_disque_rotatif_ha)} />
+              <RecapLigne label="Surface traitée (ha)" value={display(draft.terrestre.surface_traitee_ha)} />
+              <RecapLigne label="Surface cumulée (ha)" value={display(draft.terrestre.surface_cumulee_ha)} />
+              <RecapLigne label="Surface restante (ha)" value={display(draft.terrestre.surface_restante_ha)} />
+              {draft.terrestre.surface_restante_abandonnee && (
+                <RecapLigne label="Motif d'abandon" value={draft.terrestre.motif_surface_restante_abandonnee} />
+              )}
+              {draft.terrestre.produits.length === 0 ? (
+                <RecapLigne label="Produits utilisés" value={null} />
+              ) : (
+                draft.terrestre.produits.map((p, index) => (
+                  <RecapLigne
+                    key={p.id}
+                    label={p.nom_commercial ?? `Produit ${index + 1}`}
+                    value={p.quantite_l != null ? `${p.quantite_l} l` : null}
+                  />
+                ))
+              )}
+              <RecapLigne label="Total pesticide (l)" value={display(draft.terrestre.total_pesticide_l)} />
+              <RecapLigne label="Approvisionnement (l)" value={display(draft.terrestre.pesticide_recu_l)} />
+              <RecapLigne label="Reste en stock (l)" value={display(draft.terrestre.pesticide_stock_restant_l)} />
+              <RecapLigne label="Essence (l)" value={display(draft.terrestre.essence_litres)} />
+              <RecapLigne label="Nombre de piles" value={display(draft.terrestre.nb_piles)} />
+            </Card>
+          </>
+        )}
+
+        <Card>
+          <Text style={styles.sectionTitle}>Moyens & protection</Text>
+          <RecapLigne label="Combinaisons" value={display(draft.kit_combinaison)} />
+          <RecapLigne label="Gants" value={display(draft.kit_gants)} />
+          <RecapLigne label="Lunettes" value={display(draft.kit_lunettes)} />
+          <RecapLigne label="Masques" value={display(draft.kit_masques)} />
+          <RecapLigne label="Bottes" value={display(draft.kit_botte)} />
+          <RecapLigne label="Zones exposées" value={displayZonesExposees(draft.zones_exposees)} />
+          <RecapLigne label="Strate herbeuse (m)" value={display(draft.hauteur_strate_herbeuse_m)} />
+          <RecapLigne label="Strate arborée (m)" value={display(draft.hauteur_strate_arboree_m)} />
+          <RecapLigne label="Recouvrement (%)" value={display(draft.recouvrement_percent)} />
+        </Card>
+
+        <Card>
+          <Text style={styles.sectionTitle}>Impacts & risque</Text>
+          <RecapLigne label="Empoisonnement" value={displayBool(draft.empoisonnement)} />
+          {draft.empoisonnement && (
+            <>
+              <RecapLigne label="Personne concernée" value={displayPersonneConcernee(draft.empoisonnement_type)} />
+              <RecapLigne label="Mode de contamination" value={displayModeContamination(draft.empoisonnement_mode)} />
+              {draft.empoisonnement_mode === 'AUTRE' && (
+                <RecapLigne label="Préciser" value={draft.empoisonnement_autre} />
+              )}
+            </>
+          )}
+          <RecapLigne label="Évaluation du risque" value={displayEvaluationRisque(parseJsonDictSafe(draft.evaluation_risque))} />
+          <RecapLigne label="Comportement anormal" value={displayBool(draft.comportement_anormal)} />
+          {draft.comportement_anormal && (
+            <RecapLigne label="Espèces concernées" value={displayListe(parseJsonArraySafe(draft.comportement_non_cibles))} />
+          )}
+          <RecapLigne label="Mortalité" value={displayBool(draft.mortalite)} />
+          {draft.mortalite && (
+            <RecapLigne label="Familles concernées" value={displayListe(parseJsonArraySafe(draft.mortalite_familles))} />
+          )}
+          <RecapLigne label="Observations" value={draft.observations} />
+        </Card>
+
+        {(draft.evaluations_risque_population ?? []).length > 0 && (
+          <Card>
+            <Text style={styles.sectionTitle}>Évaluation du risque pour la population</Text>
+            {(draft.evaluations_risque_population ?? []).map((evaluation, index) => (
+              <RecapLigne
+                key={evaluation.id}
+                label={`Évaluation ${index + 1}`}
+                value={`${display(evaluation.habitat_proche)} · ${
+                  evaluation.distance_km != null ? `${evaluation.distance_km} km` : 'non renseigné'
+                } · ${
+                  evaluation.sensibilisation == null
+                    ? 'non renseigné'
+                    : evaluation.sensibilisation
+                      ? 'sensibilisée'
+                      : 'non sensibilisée'
+                }`}
+              />
+            ))}
+          </Card>
         )}
 
         {signatureMatrix.length > 0 && (
