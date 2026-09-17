@@ -17,8 +17,11 @@ from app.application.traitement_use_cases import (
 )
 from app.domain.prospection import Prospection, ProspectionPopulation
 from app.domain.traitement import (
+    BlocModeIncoherentError,
+    BlocSurfaceDepasseInfesteeError,
     ChefDeBaseInvalideError,
     ChefEquipeInvalideError,
+    Cible,
     MotifAbandonManquantError,
     NumeroFicheConflitError,
     ProduitUtilise,
@@ -40,6 +43,7 @@ from app.domain.traitement import (
     construire_cible,
     contenu_diverge,
     generer_numero_fiche,
+    valider_surfaces_bloc,
 )
 from app.domain.utilisateur import UtilisateurRef
 
@@ -1655,6 +1659,48 @@ def test_contenu_diverge_identique_renvoi_reseau():
     existant = _traitement_terrestre_sync()
     entrant = copy.deepcopy(existant)
     assert contenu_diverge(existant, entrant) is False
+
+
+def test_valider_surfaces_bloc_total_avec_surface_protegee_refuse():
+    """#surface-bloc-mode-infestee : TOTAL (choc) n'attend que surface_traitee_ha."""
+    with pytest.raises(BlocModeIncoherentError):
+        valider_surfaces_bloc("TOTAL", None, surface_protegee_ha=10.0, surface_traitee_ha=None)
+
+
+def test_valider_surfaces_bloc_barriere_avec_surface_traitee_refuse():
+    """BARRIERE (barrière) n'attend que surface_protegee_ha."""
+    with pytest.raises(BlocModeIncoherentError):
+        valider_surfaces_bloc("BARRIERE", None, surface_protegee_ha=None, surface_traitee_ha=10.0)
+
+
+def test_valider_surfaces_bloc_total_avec_surface_traitee_seule_accepte():
+    valider_surfaces_bloc("TOTAL", None, surface_protegee_ha=None, surface_traitee_ha=10.0)
+    valider_surfaces_bloc("TOTAL", None, surface_protegee_ha=0, surface_traitee_ha=10.0)
+
+
+def test_valider_surfaces_bloc_barriere_avec_surface_protegee_seule_accepte():
+    valider_surfaces_bloc("BARRIERE", None, surface_protegee_ha=10.0, surface_traitee_ha=None)
+
+
+def test_valider_surfaces_bloc_irregulier_sans_contrainte_de_mode():
+    """IRREGULIER n'impose rien — même tolérance que `typeProduitAttendu` mobile."""
+    valider_surfaces_bloc("IRREGULIER", None, surface_protegee_ha=5.0, surface_traitee_ha=5.0)
+
+
+def test_valider_surfaces_bloc_depasse_surface_infestee_refuse():
+    cible = Cible(surface_infestee_ha=8.0)
+    with pytest.raises(BlocSurfaceDepasseInfesteeError):
+        valider_surfaces_bloc("TOTAL", cible, surface_protegee_ha=None, surface_traitee_ha=10.0)
+
+
+def test_valider_surfaces_bloc_egale_surface_infestee_accepte():
+    cible = Cible(surface_infestee_ha=10.0)
+    valider_surfaces_bloc("TOTAL", cible, surface_protegee_ha=None, surface_traitee_ha=10.0)
+
+
+def test_valider_surfaces_bloc_sans_surface_infestee_connue_aucun_controle():
+    cible = Cible(surface_infestee_ha=None)
+    valider_surfaces_bloc("TOTAL", cible, surface_protegee_ha=None, surface_traitee_ha=1000.0)
 
 
 def test_contenu_diverge_champ_commun_different():

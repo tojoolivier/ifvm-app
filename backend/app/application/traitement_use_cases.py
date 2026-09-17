@@ -33,6 +33,7 @@ from app.domain.traitement import (
     contenu_diverge,
     generer_numero_fiche,
     valider_roles_aerien_distincts,
+    valider_surfaces_bloc,
 )
 
 _MAX_TENTATIVES_NUMERO_FICHE = 50
@@ -823,6 +824,10 @@ class AddBloc:
         traitement.verifier_modifiable()
         aerien = traitement.aerien
 
+        valider_surfaces_bloc(
+            traitement.mode_traitement, traitement.cible, surface_protegee_ha, surface_traitee_ha
+        )
+
         prochain_numero = max((b.numero for b in aerien.blocs), default=0) + 1
         bloc = Bloc(
             traitement_aerien_id=aerien.traitement_id,
@@ -866,6 +871,10 @@ class UpdateBloc:
         traitement.verifier_modifiable()
         aerien = traitement.aerien
         bloc = _trouver_bloc(aerien, bloc_id)
+
+        valider_surfaces_bloc(
+            traitement.mode_traitement, traitement.cible, surface_protegee_ha, surface_traitee_ha
+        )
 
         bloc.nom = nom
         bloc.localite = localite
