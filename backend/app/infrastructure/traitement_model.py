@@ -261,9 +261,11 @@ class TraitementBlocModel(Base):
     localite: Mapped[str | None] = mapped_column(String(255), nullable=True)
     surface_theorique_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     surface_reelle_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
-    # Renseignée si produit de choc.
+    # Renseignée si produit de barrière (mode_traitement BARRIERE) — corrigé le
+    # 2026-09-17, inversé avec surface_traitee_ha depuis la migration 0064
+    # (#surface-bloc-mode-infestee).
     surface_protegee_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
-    # Renseignée si produit de barrière.
+    # Renseignée si produit de choc (mode_traitement TOTAL).
     surface_traitee_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     largeur_andain_m: Mapped[float | None] = mapped_column(Numeric(6, 2), nullable=True)
     interpasse_m: Mapped[float | None] = mapped_column(Numeric(6, 2), nullable=True)

@@ -281,9 +281,11 @@ class BlocCreate(BaseModel):
     localite: str | None = Field(None, max_length=255)
     surface_theorique_ha: float | None = Field(None, ge=0)
     surface_reelle_ha: float | None = Field(None, ge=0)
-    # Renseignée si produit de choc.
+    # Renseignée si produit de barrière (mode_traitement BARRIERE) ; validée
+    # contre mode_traitement et la surface infestée par `valider_surfaces_bloc`
+    # (#surface-bloc-mode-infestee).
     surface_protegee_ha: float | None = Field(None, ge=0)
-    # Renseignée si produit de barrière.
+    # Renseignée si produit de choc (mode_traitement TOTAL).
     surface_traitee_ha: float | None = Field(None, ge=0)
     largeur_andain_m: float | None = Field(None, ge=0)
     interpasse_m: float | None = Field(None, ge=0)
