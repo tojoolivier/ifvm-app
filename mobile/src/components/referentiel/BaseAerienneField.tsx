@@ -10,6 +10,7 @@ export interface BaseAerienneOption {
   numero: string;
   localite: string;
   parent_base_id: string | null;
+  equipe_id: string | null;
 }
 
 interface BaseAerienneFieldProps {
@@ -33,10 +34,13 @@ const BORDER = '#e7e0cd';
  * contrairement aux fiches : la création exige donc une connexion.
  *
  * `parent_base_id` (NULL = principale, sinon secondaire d'une base
- * principale existante, cf. migration backend 0064) : le formulaire de
- * création propose donc, en plus de numero/localite, un choix « Principale /
- * Secondaire de… » — jamais plus d'un niveau, même limite documentée côté
- * backend (pas de secondaire d'une secondaire).
+ * principale existante, cf. migration backend 0064). La création rapide
+ * intégrée ici ne crée que des bases **secondaires** (#equipe-aerienne,
+ * migration 0066) : une principale doit désormais appartenir à une équipe
+ * aérienne, un rattachement hors sujet pour ce champ embarqué — elle se crée
+ * depuis l'écran « Référentiels aériens », qui gère ce contexte. Si aucune
+ * principale n'existe encore, la création reste désactivée avec un renvoi
+ * vers cet écran plutôt que de proposer un formulaire cassé.
  *
  * Coordonnées capturées automatiquement par le GPS de l'appareil et
  * verrouillées (non modifiables) une fois acquises.
@@ -66,6 +70,7 @@ export function BaseAerienneField({ value, onChange, label = 'Base aérienne' }:
               numero: b.numero,
               localite: b.localite,
               parent_base_id: b.parent_base_id,
+              equipe_id: b.equipe_id,
             }))
           );
           setLoaded(true);
@@ -84,8 +89,14 @@ export function BaseAerienneField({ value, onChange, label = 'Base aérienne' }:
       { screen: 'base-aerienne-field' }
     );
 
+  // Seules les bases principales (sans parent) peuvent recevoir une secondaire —
+  // pas de secondaire d'une secondaire, même limite que côté backend.
+  const basesPrincipales = bases.filter((b) => b.parent_base_id === null);
+
   const ouvrirCreation = () => {
+    if (basesPrincipales.length === 0) return;
     setCreation(true);
+    setParentBaseId(basesPrincipales[0].id);
     if (!position) void capturerPosition();
   };
 
@@ -105,6 +116,7 @@ export function BaseAerienneField({ value, onChange, label = 'Base aérienne' }:
           numero: cree.numero,
           localite: cree.localite,
           parent_base_id: cree.parent_base_id,
+          equipe_id: cree.equipe_id,
         };
         setBases((precedentes) => [...precedentes, option]);
         onChange(cree.id, option);
@@ -116,14 +128,10 @@ export function BaseAerienneField({ value, onChange, label = 'Base aérienne' }:
       },
       {
         screen: 'base-aerienne-field',
-        precondition: !!token && numero.trim().length > 0 && localite.trim().length > 0,
-        preconditionMessage: 'Renseignez le numéro et la localité avant de créer la base.',
+        precondition: !!token && numero.trim().length > 0 && localite.trim().length > 0 && !!parentBaseId,
+        preconditionMessage: 'Renseignez le numéro, la localité et la base principale avant de créer la base.',
       }
     );
-
-  // Seules les bases principales (sans parent) peuvent recevoir une secondaire —
-  // pas de secondaire d'une secondaire, même limite que côté backend.
-  const basesPrincipales = bases.filter((b) => b.parent_base_id === null);
 
   return (
     <View style={styles.card}>
@@ -151,9 +159,15 @@ export function BaseAerienneField({ value, onChange, label = 'Base aérienne' }:
               </Text>
             </TouchableOpacity>
           ))}
-          <TouchableOpacity style={styles.nouveauLink} onPress={ouvrirCreation} accessibilityRole="button">
-            <Text style={styles.nouveauLinkText}>+ Nouvelle base aérienne</Text>
-          </TouchableOpacity>
+          {basesPrincipales.length > 0 ? (
+            <TouchableOpacity style={styles.nouveauLink} onPress={ouvrirCreation} accessibilityRole="button">
+              <Text style={styles.nouveauLinkText}>+ Nouvelle base secondaire</Text>
+            </TouchableOpacity>
+          ) : (
+            <Text style={styles.hint}>
+              Créez d&apos;abord une base principale (avec son équipe) depuis Référentiels aériens.
+            </Text>
+          )}
         </View>
       )}
 
@@ -174,42 +188,26 @@ export function BaseAerienneField({ value, onChange, label = 'Base aérienne' }:
             style={styles.input}
           />
 
-          <Text style={styles.sousLabel}>Type</Text>
+          <Text style={styles.sousLabel}>Secondaire de…</Text>
           <View style={styles.typeRow}>
-            <TouchableOpacity
-              style={[styles.typeChip, parentBaseId === null && styles.typeChipSelectionne]}
-              onPress={() => setParentBaseId(null)}
-              accessibilityRole="button"
-            >
-              <Text style={[styles.typeChipText, parentBaseId === null && styles.typeChipTextSelectionne]}>
-                Principale
-              </Text>
-            </TouchableOpacity>
+            {basesPrincipales.map((principale) => (
+              <TouchableOpacity
+                key={principale.id}
+                style={[styles.typeChip, parentBaseId === principale.id && styles.typeChipSelectionne]}
+                onPress={() => setParentBaseId(principale.id)}
+                accessibilityRole="button"
+              >
+                <Text
+                  style={[
+                    styles.typeChipText,
+                    parentBaseId === principale.id && styles.typeChipTextSelectionne,
+                  ]}
+                >
+                  {principale.numero}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
-          {basesPrincipales.length > 0 && (
-            <>
-              <Text style={styles.sousLabel}>Secondaire de…</Text>
-              <View style={styles.typeRow}>
-                {basesPrincipales.map((principale) => (
-                  <TouchableOpacity
-                    key={principale.id}
-                    style={[styles.typeChip, parentBaseId === principale.id && styles.typeChipSelectionne]}
-                    onPress={() => setParentBaseId(principale.id)}
-                    accessibilityRole="button"
-                  >
-                    <Text
-                      style={[
-                        styles.typeChipText,
-                        parentBaseId === principale.id && styles.typeChipTextSelectionne,
-                      ]}
-                    >
-                      {principale.numero}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </>
-          )}
 
           <View style={styles.gpsRow}>
             <Text style={styles.gpsRowText}>Coordonnées (auto, verrouillées)</Text>
@@ -256,6 +254,7 @@ const styles = StyleSheet.create({
   optionTextSelectionnee: { color: GREEN },
   nouveauLink: { paddingVertical: 8, alignItems: 'center' },
   nouveauLinkText: { fontSize: 13, fontWeight: '700', color: GREEN },
+  hint: { fontSize: 11.5, color: TEXT_SECONDARY, fontStyle: 'italic', paddingVertical: 6 },
   formulaire: { gap: 8 },
   input: { fontSize: 13, fontWeight: '600', color: TEXT, borderWidth: 1, borderColor: BORDER, borderRadius: 8, padding: 8 },
   sousLabel: { fontSize: 9, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase' },

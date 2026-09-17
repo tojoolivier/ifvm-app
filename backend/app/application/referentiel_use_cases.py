@@ -6,12 +6,15 @@ from app.domain.campagne import Campagne
 from app.domain.referentiel import (
     TYPES_LIEU_AERIEN,
     BaseAerienne,
+    BaseAerienneEquipeInvalideError,
     BaseAerienneParentInvalideError,
+    ChefDeBaseEquipeInvalideError,
     CodeReferentielDejaPrisError,
     CodeStade,
     Commune,
     CommuneInconnueError,
     Culture,
+    EquipeAerienne,
     GrilleDejaOccupeeError,
     LieuAerien,
     Pesticide,
@@ -33,6 +36,7 @@ from app.domain.repositories import (
     CodeStadeRepository,
     CommuneRepository,
     CultureRepository,
+    EquipeAerienneRepository,
     LieuAerienRepository,
     PesticideRepository,
     PosteAcridienRepository,
@@ -609,6 +613,26 @@ async def _valider_parent_base(
         raise BaseAerienneParentInvalideError(str(parent_base_id))
 
 
+def _valider_equipe_coherente(
+    parent_base_id: uuid.UUID | None, equipe_id: uuid.UUID | None
+) -> None:
+    """#equipe-aerienne (migration 0066) : une base principale (`parent_base_id`
+    NULL) doit avoir une équipe ; une base secondaire hérite de celle de sa
+    principale et n'en porte pas une à elle — même règle que le CHECK
+    `ck_base_aerienne_equipe_coherente`, vérifiée ici en amont pour un message
+    d'erreur explicite plutôt qu'une violation de contrainte brute."""
+    est_principale = parent_base_id is None
+    if est_principale and equipe_id is None:
+        raise BaseAerienneEquipeInvalideError(
+            "une base aérienne principale doit appartenir à une équipe aérienne"
+        )
+    if not est_principale and equipe_id is not None:
+        raise BaseAerienneEquipeInvalideError(
+            "une base aérienne secondaire hérite de l'équipe de sa base principale, "
+            "elle ne peut pas avoir sa propre équipe"
+        )
+
+
 class CreateBaseAerienne:
     def __init__(self, repository: BaseAerienneRepository):
         self.repository = repository
@@ -618,16 +642,19 @@ class CreateBaseAerienne:
         numero: str,
         localite: str,
         parent_base_id: uuid.UUID | None = None,
+        equipe_id: uuid.UUID | None = None,
         longitude: float | None = None,
         latitude: float | None = None,
         altitude: float | None = None,
     ) -> BaseAerienne:
         await _valider_parent_base(self.repository, parent_base_id)
+        _valider_equipe_coherente(parent_base_id, equipe_id)
 
         maintenant = datetime.now(timezone.utc)
         return await self.repository.create(
             BaseAerienne(
                 parent_base_id=parent_base_id,
+                equipe_id=equipe_id,
                 numero=numero,
                 localite=localite,
                 longitude=longitude,
@@ -653,6 +680,7 @@ class UpdateBaseAerienne:
         numero: str | None = None,
         localite: str | None = None,
         parent_base_id: uuid.UUID | None = None,
+        equipe_id: uuid.UUID | None = None,
         longitude: float | None = None,
         latitude: float | None = None,
         altitude: float | None = None,
@@ -668,6 +696,10 @@ class UpdateBaseAerienne:
                 raise BaseAerienneParentInvalideError("une base ne peut pas être son propre parent")
             await _valider_parent_base(self.repository, parent_base_id)
             base.parent_base_id = parent_base_id
+        if "equipe_id" in champs_fournis:
+            base.equipe_id = equipe_id
+        if "parent_base_id" in champs_fournis or "equipe_id" in champs_fournis:
+            _valider_equipe_coherente(base.parent_base_id, base.equipe_id)
         if numero is not None:
             base.numero = numero
         if localite is not None:
@@ -685,6 +717,49 @@ class UpdateBaseAerienne:
 
         base.updated_at = datetime.now(timezone.utc)
         return await self.repository.update(base)
+
+
+class ListEquipesAeriennes:
+    def __init__(self, repository: EquipeAerienneRepository):
+        self.repository = repository
+
+    async def execute(self, actif: bool | None = True) -> list[EquipeAerienne]:
+        return await self.repository.list_all(actif=actif)
+
+
+class GetEquipeAerienne:
+    def __init__(self, repository: EquipeAerienneRepository):
+        self.repository = repository
+
+    async def execute(self, equipe_id: uuid.UUID) -> EquipeAerienne | None:
+        return await self.repository.get_by_id(equipe_id)
+
+
+class CreateEquipeAerienne:
+    """`utilisateur_repo` (duck-typé, même contrat que `SyncPushFicheVol` —
+    #fiche-vol-creation-mobile) : valide que `chef_de_base_id` référence un
+    utilisateur actif du rôle `chef_de_base`, comme la fiche de vol le fait déjà
+    pour son propre `chef_de_base_id`."""
+
+    def __init__(self, repository: EquipeAerienneRepository, utilisateur_repo: object):
+        self.repository = repository
+        self.utilisateur_repo = utilisateur_repo
+
+    async def execute(self, nom: str, chef_de_base_id: uuid.UUID) -> EquipeAerienne:
+        chef = await self.utilisateur_repo.get_by_id(chef_de_base_id)
+        if chef is None or chef.role != "chef_de_base":
+            raise ChefDeBaseEquipeInvalideError(str(chef_de_base_id))
+
+        maintenant = datetime.now(timezone.utc)
+        return await self.repository.create(
+            EquipeAerienne(
+                nom=nom,
+                chef_de_base_id=chef_de_base_id,
+                actif=True,
+                created_at=maintenant,
+                updated_at=maintenant,
+            )
+        )
 
 
 class ListStandsRemplissage:

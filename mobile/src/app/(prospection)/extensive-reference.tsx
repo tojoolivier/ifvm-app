@@ -35,6 +35,7 @@ import {
   parseSelectionMultiple,
 } from '@/lib/prospection-extensive';
 import { TimeField } from '@/components/TimeField';
+import { LieuAerienField } from '@/components/referentiel/LieuAerienField';
 import { formatHeureLocale } from '@/lib/prospection-fiche-lecture';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
@@ -649,13 +650,16 @@ export default function ExtensiveReferenceScreen() {
                     setFocusedField={setFocusedAerienField}
                   />
 
-                  {/* Saisie manuelle (migration backend 0063, défait la FK vers le
-                   * référentiel lieu_aerien posée en 0047, même décision produit que
-                   * le Traitement Aérien en 0054) — l'agent renseigne directement le
-                   * nom de la base, sans dépendre du référentiel Web ni d'une
-                   * synchronisation préalable. Facultatif : une opération aérienne
-                   * « généralisée » n'est rattachée à aucune base. */}
-                  <AerienField
+                  {/* Le champ reste du texte libre (migration backend 0063, défait
+                   * la FK vers le référentiel lieu_aerien posée en 0047, même
+                   * décision produit que le Traitement Aérien en 0054) — jamais
+                   * bloquant si le référentiel est vide ou hors-ligne. Mais
+                   * `LieuAerienField` (#prospection-extensive-aerienne-lieu-
+                   * aerien) suggère désormais les lieux déjà enregistrés et
+                   * permet d'en créer un nouveau, sans réintroduire la FK.
+                   * Facultatif : une opération aérienne « généralisée » n'est
+                   * rattachée à aucune base. */}
+                  <LieuAerienField
                     label="Base"
                     value={base}
                     onChangeText={setBase}
