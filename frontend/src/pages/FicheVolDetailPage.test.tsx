@@ -17,13 +17,26 @@ const FICHE_VOL = {
   date_vol: '2026-08-14',
   compagnie: 'Aero Services',
   immatriculation: '5R-MDG',
-  base_code: 'MDGA21',
-  base_nom: 'Ambovombe',
-  stand_nom: 'Stand Nord',
+  base_numero: 'MDGA21',
+  base_localite: 'Ambovombe',
+  stand_numero: 'ST-1',
+  stand_localite: 'Stand Nord',
   pilote: 'Jean Rakoto',
   mecanicien: 'Paul Andria',
   chef_de_base_id: 'u-chef',
   consultant_international: null,
+  prospection_id: null,
+  prospection_numero_fiche: null,
+  prospection_date_validation: null,
+  pesticide_nom_commercial: 'Fenitrothion 96 UL',
+  pesticide_quantite_disponible: 200,
+  pesticide_quantite_recue: 50,
+  pesticide_quantite_utilisee: 80,
+  pesticide_quantite_restante: 120,
+  futs_disponible: 4,
+  futs_recues: 1,
+  futs_pleins: 3,
+  futs_vides: 2,
   observations: 'RAS',
   statut: 'brouillon',
   vols: [
@@ -60,11 +73,17 @@ const FICHE_VOL = {
 // sinon leurs libellés « HH:MM » se confondent dans le rendu (deux « 01:35 »).
 const CUMULS = { jour: 50, semaine: 245, mois: 610, total: 4820 }
 
-function mockApi({ ficheVol = FICHE_VOL, cumuls = CUMULS, users = [{ id: 'u-chef', nom: 'Rasoa Chef', role: 'chef_de_base' }] } = {}) {
+function mockApi({
+  ficheVol = FICHE_VOL,
+  cumuls = CUMULS,
+  users = [{ id: 'u-chef', nom: 'Rasoa Chef', role: 'chef_de_base' }],
+  traitements = [] as unknown[],
+} = {}) {
   mockedGet.mockImplementation((url: string) => {
     if (url === '/fiches-vol/fv-1') return Promise.resolve({ data: ficheVol })
     if (url === '/fiches-vol/cumuls') return Promise.resolve({ data: cumuls })
     if (url === '/users/') return Promise.resolve({ data: users })
+    if (url === '/traitements') return Promise.resolve({ data: traitements })
     return Promise.resolve({ data: [] })
   })
 }
@@ -187,5 +206,94 @@ describe('FicheVolDetailPage', () => {
 
     await screen.findByTestId('fiche-vol-header')
     expect(screen.queryByText('🔒 Lecture seule')).not.toBeInTheDocument()
+  })
+
+  it('affiche le pesticide et les fûts', async () => {
+    mockApi()
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Fenitrothion 96 UL')).toBeInTheDocument())
+    expect(screen.getByText('120')).toBeInTheDocument() // restante
+  })
+
+  it('n’affiche pas la carte Référence prospection quand la fiche n’en porte aucune', async () => {
+    mockApi()
+    renderPage()
+
+    await screen.findByTestId('fiche-vol-header')
+    expect(screen.queryByText('Référence prospection')).not.toBeInTheDocument()
+  })
+
+  it('affiche la référence prospection (n° fiche, n° validation, date) quand la fiche en porte une', async () => {
+    mockApi({
+      ficheVol: {
+        ...FICHE_VOL,
+        prospection_id: 'p-1',
+        prospection_numero_fiche: 'EXT-2026-08-0042',
+        prospection_date_validation: '2026-08-20T09:30:00',
+      },
+    })
+    renderPage()
+
+    const carte = (await screen.findByText('Référence prospection')).closest('section')!
+    expect(within(carte).getAllByText('EXT-2026-08-0042')).toHaveLength(2) // n° prospection + n° validation
+    expect(within(carte).getByText('2026-08-20')).toBeInTheDocument()
+  })
+
+  it('affiche les tableaux Traitement (blocs) et Opération (rotations) depuis le CRT rattaché à la prospection', async () => {
+    mockApi({
+      ficheVol: { ...FICHE_VOL, prospection_id: 'p-1' },
+      traitements: [
+        {
+          id: 't-1',
+          cible: { espece: 'LMC' },
+          aerien: {
+            blocs: [
+              {
+                id: 'b-1',
+                nom: 'Bloc 1',
+                localite: 'Betioky',
+                surface_protegee_ha: null,
+                surface_traitee_ha: 12.5,
+                interpasse_m: 50,
+                hauteur_vol_min_m: 5,
+                hauteur_vol_max_m: 6,
+                observation: null,
+              },
+            ],
+            rotations: [
+              {
+                id: 'r-1',
+                numero_cuve: 'C-1',
+                nom_commercial: 'Fenitrothion 96 UL',
+                quantite: 10,
+                unite: 'L',
+                temperature_debut_c: 25,
+                temperature_fin_c: 27,
+                vent_debut_ms: 2,
+                vent_fin_ms: 3,
+                heure_debut: '06:00:00',
+                heure_fin: '06:30:00',
+              },
+            ],
+          },
+        },
+      ],
+    })
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Bloc 1')).toBeInTheDocument())
+    expect(screen.getByText('Betioky')).toBeInTheDocument()
+    expect(screen.getByText('traitée 12.5')).toBeInTheDocument()
+    expect(screen.getByText('C-1')).toBeInTheDocument()
+    expect(screen.getAllByText('Fenitrothion 96 UL').length).toBeGreaterThan(0)
+  })
+
+  it('ne montre pas Traitement/Opération quand la fiche n’a pas de prospection de référence', async () => {
+    mockApi()
+    renderPage()
+
+    await screen.findByTestId('fiche-vol-header')
+    expect(screen.queryByText('Opération')).not.toBeInTheDocument()
   })
 })

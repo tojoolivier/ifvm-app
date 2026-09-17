@@ -15,8 +15,8 @@ interface FicheVol {
   date_vol: string
   compagnie: string
   immatriculation: string
-  base_code: string
-  base_nom: string
+  base_numero: string | null
+  base_localite: string | null
   pilote: string
   mecanicien: string
   statut: string
@@ -74,7 +74,7 @@ export function FichesVolPage() {
     return fichesVol.filter((f) => {
       if (filtreStatut && f.statut !== filtreStatut) return false
       if (!q) return true
-      return [f.numero_fiche, f.immatriculation, f.compagnie, f.pilote, f.base_nom]
+      return [f.numero_fiche, f.immatriculation, f.compagnie, f.pilote, f.base_localite]
         .join(' ')
         .toLowerCase()
         .includes(q)
@@ -109,7 +109,7 @@ export function FichesVolPage() {
       {
         key: 'base',
         header: 'Base',
-        render: (f) => <span className="text-ifvm-text-tertiary">{f.base_nom}</span>,
+        render: (f) => <span className="text-ifvm-text-tertiary">{f.base_localite ?? '—'}</span>,
       },
       {
         key: 'duree',
