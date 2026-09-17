@@ -11,6 +11,12 @@ import { getCurrentPosition } from '@/lib/location';
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: jest.fn() }),
+  // Chargé automatiquement au montage (#referentiel-creation-sans-recharger) —
+  // au montage seulement (deps []), jamais à chaque rendu : `charger()` pose
+  // de nouveaux tableaux (`setChefs`/`setEquipes`/...) à chaque appel, un mock
+  // qui rappellerait `effect()` sans tenir compte des dépendances boucle
+  // indéfiniment.
+  useFocusEffect: (effect: () => void) => require('react').useEffect(effect, []),
 }));
 
 jest.mock('@/lib/api-client', () => ({
@@ -78,7 +84,6 @@ describe('ReferentielsAeriensScreen', () => {
     } as any);
 
     await render(<ReferentielsAeriensScreen />);
-    await fireEvent.press(screen.getByText('Charger les référentiels ›'));
     await screen.findByText('ÉQUIPES AÉRIENNES');
 
     // --- Équipe aérienne ---
@@ -152,7 +157,6 @@ describe('ReferentielsAeriensScreen', () => {
 
   it("n'affiche pas de bouton de création de base principale sans équipe disponible", async () => {
     await render(<ReferentielsAeriensScreen />);
-    await fireEvent.press(screen.getByText('Charger les référentiels ›'));
 
     await screen.findByText('BASES PRINCIPALES');
     expect(screen.getByText('Créez d’abord une équipe aérienne.')).toBeTruthy();

@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
 import { apiClient } from '@/lib/api-client';
 import { getCurrentPosition } from '@/lib/location';
@@ -59,23 +59,33 @@ export default function ReferentielsAeriensScreen() {
 
   const { run: runChargement, isRunning: isChargement } = useAsyncAction();
 
-  const charger = () =>
-    runChargement(
-      async () => {
-        const [chefsRes, equipesRes, basesRes, standsRes] = await Promise.all([
-          apiClient.listChefsDeBase(token!),
-          apiClient.listEquipesAeriennes(token!),
-          apiClient.listBasesAeriennes(token!),
-          apiClient.listStandsRemplissage(token!),
-        ]);
-        setChefs(chefsRes);
-        setEquipes(equipesRes);
-        setBases(basesRes);
-        setStands(standsRes);
-        setLoaded(true);
-      },
-      { screen: 'referentiels-aeriens', precondition: !!token }
-    );
+  const charger = useCallback(
+    () =>
+      runChargement(
+        async () => {
+          const [chefsRes, equipesRes, basesRes, standsRes] = await Promise.all([
+            apiClient.listChefsDeBase(token!),
+            apiClient.listEquipesAeriennes(token!),
+            apiClient.listBasesAeriennes(token!),
+            apiClient.listStandsRemplissage(token!),
+          ]);
+          setChefs(chefsRes);
+          setEquipes(equipesRes);
+          setBases(basesRes);
+          setStands(standsRes);
+          setLoaded(true);
+        },
+        { screen: 'referentiels-aeriens', precondition: !!token }
+      ),
+    [runChargement, token]
+  );
+
+  // Chargé automatiquement à l'ouverture (#referentiel-creation-sans-recharger)
+  // — plus de bouton « Charger les référentiels » à taper avant d'atteindre les
+  // formulaires de création (équipe, base principale/secondaire, stand).
+  useFocusEffect(useCallback(() => {
+    void charger();
+  }, [charger]));
 
   if (!loaded) {
     return (
