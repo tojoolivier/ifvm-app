@@ -138,6 +138,18 @@ class Cible:
     vols_clairs_essaims: str | None = None
     repartition_population: str | None = None
     surface_infestee_ha: float | None = None
+    # Detail par espece (migration 0066) : petites_larves/grandes_larves
+    # ci-dessus restent les totaux toutes especes confondues (ecran Cibles,
+    # Terrestre) ; ces 8 champs portent le detail LMC/NSE (ecran Synthese,
+    # Aerien) — `None` pour une espece absente de la prospection liee.
+    petites_larves_lmc: float | None = None
+    petites_larves_nse: float | None = None
+    grandes_larves_lmc: float | None = None
+    grandes_larves_nse: float | None = None
+    densite_diffuse_lmc: float | None = None
+    densite_groupee_lmc: float | None = None
+    densite_diffuse_nse: float | None = None
+    densite_groupee_nse: float | None = None
 
 
 @dataclass
@@ -759,18 +771,51 @@ def construire_cible(prospection: Prospection) -> Cible:
     else:
         espece = "MELANGE"
 
+    # Petites larves = stades L1 a L3 cumules ; grandes larves = le reste des
+    # stades larvaires cumules (L4-L5 pour LMC qui n'en compte que 5, L4-L7
+    # pour NSE qui en compte 7 — la regle "L1/L2/L3 vs le reste" les couvre
+    # les deux sans distinction explicite du plafond, chaque espece n'ayant
+    # de toute facon pas de stade au-dela du sien).
     petites_total = 0
     grandes_total = 0
     larves_renseignees = False
+    petites_par_espece: dict[str, float] = {"LMC": 0, "NSE": 0}
+    grandes_par_espece: dict[str, float] = {"LMC": 0, "NSE": 0}
+    larves_renseignees_par_espece: dict[str, bool] = {"LMC": False, "NSE": False}
     for p in prospection.populations:
         if p.categorie != "larve" or not p.densites_larve:
             continue
         for stade, densite in p.densites_larve.items():
             larves_renseignees = True
-            if stade.upper() in ("L1", "L2"):
+            petite = stade.upper() in ("L1", "L2", "L3")
+            if petite:
                 petites_total += densite
             else:
                 grandes_total += densite
+            if p.espece in petites_par_espece:
+                larves_renseignees_par_espece[p.espece] = True
+                if petite:
+                    petites_par_espece[p.espece] += densite
+                else:
+                    grandes_par_espece[p.espece] += densite
+
+    # Repartition (diffuse/groupee) par espece : somme des densites de toutes
+    # les lignes de cette espece (imago + larve), meme logique additive que
+    # les larves ci-dessus — une espece peut avoir une densite saisie sur sa
+    # ligne imago ET sa ligne larve.
+    densite_diffuse_par_espece: dict[str, float | None] = {"LMC": None, "NSE": None}
+    densite_groupee_par_espece: dict[str, float | None] = {"LMC": None, "NSE": None}
+    for p in prospection.populations:
+        if p.espece not in densite_diffuse_par_espece:
+            continue
+        if p.densite_diffuse is not None:
+            densite_diffuse_par_espece[p.espece] = (
+                densite_diffuse_par_espece[p.espece] or 0
+            ) + p.densite_diffuse
+        if p.densite_groupee is not None:
+            densite_groupee_par_espece[p.espece] = (
+                densite_groupee_par_espece[p.espece] or 0
+            ) + p.densite_groupee
 
     # `essaim_observe` (booléen à 2 états) reste lu pour les prospections
     # antérieures à la migration 0033 ; pour l'Extensif Imagos (0033+), il a été
@@ -808,4 +853,20 @@ def construire_cible(prospection: Prospection) -> Cible:
         vols_clairs_essaims=vols_clairs_essaims,
         repartition_population=repartition,
         surface_infestee_ha=prospection.surface_infestee,
+        petites_larves_lmc=(
+            petites_par_espece["LMC"] if larves_renseignees_par_espece["LMC"] else None
+        ),
+        petites_larves_nse=(
+            petites_par_espece["NSE"] if larves_renseignees_par_espece["NSE"] else None
+        ),
+        grandes_larves_lmc=(
+            grandes_par_espece["LMC"] if larves_renseignees_par_espece["LMC"] else None
+        ),
+        grandes_larves_nse=(
+            grandes_par_espece["NSE"] if larves_renseignees_par_espece["NSE"] else None
+        ),
+        densite_diffuse_lmc=densite_diffuse_par_espece["LMC"],
+        densite_groupee_lmc=densite_groupee_par_espece["LMC"],
+        densite_diffuse_nse=densite_diffuse_par_espece["NSE"],
+        densite_groupee_nse=densite_groupee_par_espece["NSE"],
     )

@@ -67,6 +67,14 @@ describe('construireCible', () => {
       vols_clairs_essaims: null,
       repartition_population: null,
       surface_infestee_ha: null,
+      petites_larves_lmc: null,
+      petites_larves_nse: null,
+      grandes_larves_lmc: null,
+      grandes_larves_nse: null,
+      densite_diffuse_lmc: null,
+      densite_groupee_lmc: null,
+      densite_diffuse_nse: null,
+      densite_groupee_nse: null,
     });
   });
 
@@ -89,7 +97,7 @@ describe('construireCible', () => {
     expect(cible.espece).toBe('LMC');
   });
 
-  it('cumule les densités L1/L2 en petites larves et le reste en grandes larves', () => {
+  it('cumule les densités L1 à L3 en petites larves et le reste en grandes larves', () => {
     const cible = construireCible(
       { surface_infestee: null },
       [
@@ -101,8 +109,61 @@ describe('construireCible', () => {
       ],
       []
     );
-    expect(cible.petites_larves).toBe(15);
-    expect(cible.grandes_larves).toBe(10);
+    expect(cible.petites_larves).toBe(22);
+    expect(cible.grandes_larves).toBe(3);
+  });
+
+  it('détaille les petites/grandes larves par espèce (LMC et NSE séparément)', () => {
+    const cible = construireCible(
+      { surface_infestee: null },
+      [
+        population({
+          espece: 'LMC',
+          categorie: 'larve',
+          densites_larve: JSON.stringify({ L1: 10, L2: 5, L3: 7, L5: 3 }),
+        }),
+        population({
+          espece: 'NSE',
+          categorie: 'larve',
+          densites_larve: JSON.stringify({ L1: 2, L4: 1, L7: 4 }),
+        }),
+      ],
+      []
+    );
+    expect(cible.petites_larves_lmc).toBe(22);
+    expect(cible.grandes_larves_lmc).toBe(3);
+    expect(cible.petites_larves_nse).toBe(2);
+    expect(cible.grandes_larves_nse).toBe(5);
+    // Totaux agrégés (écran Cibles, Terrestre) inchangés : somme des 2 espèces.
+    expect(cible.petites_larves).toBe(24);
+    expect(cible.grandes_larves).toBe(8);
+  });
+
+  it('laisse à null le détail larvaire d’une espèce absente de la prospection', () => {
+    const cible = construireCible(
+      { surface_infestee: null },
+      [population({ espece: 'LMC', categorie: 'larve', densites_larve: JSON.stringify({ L1: 10 }) })],
+      []
+    );
+    expect(cible.petites_larves_lmc).toBe(10);
+    expect(cible.petites_larves_nse).toBeNull();
+    expect(cible.grandes_larves_nse).toBeNull();
+  });
+
+  it('détaille les densités diffuse/groupée par espèce, cumulées sur les lignes imago + larve', () => {
+    const cible = construireCible(
+      { surface_infestee: null },
+      [
+        population({ espece: 'LMC', categorie: 'imago', densite_diffuse: 12, densite_groupee: 3 }),
+        population({ espece: 'LMC', categorie: 'larve', densite_diffuse: 8 }),
+        population({ espece: 'NSE', categorie: 'imago', densite_diffuse: 5 }),
+      ],
+      []
+    );
+    expect(cible.densite_diffuse_lmc).toBe(20);
+    expect(cible.densite_groupee_lmc).toBe(3);
+    expect(cible.densite_diffuse_nse).toBe(5);
+    expect(cible.densite_groupee_nse).toBeNull();
   });
 
   it('ne renseigne ni petites ni grandes larves si aucune densité larvaire', () => {

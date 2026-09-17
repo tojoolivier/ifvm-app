@@ -229,6 +229,14 @@ class TraitementRepositoryImpl(TraitementRepository):
                 vols_clairs_essaims=traitement.cible.vols_clairs_essaims,
                 repartition_population=traitement.cible.repartition_population,
                 surface_infestee_ha=traitement.cible.surface_infestee_ha,
+                petites_larves_lmc=traitement.cible.petites_larves_lmc,
+                petites_larves_nse=traitement.cible.petites_larves_nse,
+                grandes_larves_lmc=traitement.cible.grandes_larves_lmc,
+                grandes_larves_nse=traitement.cible.grandes_larves_nse,
+                densite_diffuse_lmc=traitement.cible.densite_diffuse_lmc,
+                densite_groupee_lmc=traitement.cible.densite_groupee_lmc,
+                densite_diffuse_nse=traitement.cible.densite_diffuse_nse,
+                densite_groupee_nse=traitement.cible.densite_groupee_nse,
             )
 
         if traitement.aerien is not None:
@@ -839,6 +847,30 @@ class TraitementRepositoryImpl(TraitementRepository):
                 repartition_population=model.cible.repartition_population,
                 surface_infestee_ha=float(model.cible.surface_infestee_ha)
                 if model.cible.surface_infestee_ha is not None
+                else None,
+                petites_larves_lmc=float(model.cible.petites_larves_lmc)
+                if model.cible.petites_larves_lmc is not None
+                else None,
+                petites_larves_nse=float(model.cible.petites_larves_nse)
+                if model.cible.petites_larves_nse is not None
+                else None,
+                grandes_larves_lmc=float(model.cible.grandes_larves_lmc)
+                if model.cible.grandes_larves_lmc is not None
+                else None,
+                grandes_larves_nse=float(model.cible.grandes_larves_nse)
+                if model.cible.grandes_larves_nse is not None
+                else None,
+                densite_diffuse_lmc=float(model.cible.densite_diffuse_lmc)
+                if model.cible.densite_diffuse_lmc is not None
+                else None,
+                densite_groupee_lmc=float(model.cible.densite_groupee_lmc)
+                if model.cible.densite_groupee_lmc is not None
+                else None,
+                densite_diffuse_nse=float(model.cible.densite_diffuse_nse)
+                if model.cible.densite_diffuse_nse is not None
+                else None,
+                densite_groupee_nse=float(model.cible.densite_groupee_nse)
+                if model.cible.densite_groupee_nse is not None
                 else None,
             )
             if model.cible is not None

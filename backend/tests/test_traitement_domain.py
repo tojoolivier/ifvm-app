@@ -102,6 +102,8 @@ def test_cible_deux_especes_donne_melange():
 
 
 def test_cible_larves_petites_et_grandes():
+    # Petites larves = L1 a L3 cumules (pas seulement L1/L2) ; grandes larves
+    # = le reste (L4 et au-dela).
     p = _prospection(
         populations=[
             ProspectionPopulation(
@@ -112,8 +114,63 @@ def test_cible_larves_petites_et_grandes():
         ]
     )
     cible = construire_cible(p)
-    assert cible.petites_larves == "15"
-    assert cible.grandes_larves == "10"
+    assert cible.petites_larves == "22"
+    assert cible.grandes_larves == "3"
+
+
+def test_cible_detail_par_espece_petites_grandes_larves():
+    p = _prospection(
+        populations=[
+            ProspectionPopulation(
+                espece="LMC",
+                categorie="larve",
+                densites_larve={"L1": 10, "L2": 5, "L3": 7, "L5": 3},
+            ),
+            ProspectionPopulation(
+                espece="NSE",
+                categorie="larve",
+                densites_larve={"L1": 2, "L4": 1, "L7": 4},
+            ),
+        ]
+    )
+    cible = construire_cible(p)
+    assert cible.petites_larves_lmc == 22
+    assert cible.grandes_larves_lmc == 3
+    assert cible.petites_larves_nse == 2
+    assert cible.grandes_larves_nse == 5
+    # Totaux agreges (ecran Cibles, Terrestre) inchanges : somme des 2 especes.
+    assert cible.petites_larves == "24"
+    assert cible.grandes_larves == "8"
+
+
+def test_cible_detail_par_espece_absente_reste_non_renseigne():
+    p = _prospection(
+        populations=[
+            ProspectionPopulation(espece="LMC", categorie="larve", densites_larve={"L1": 10})
+        ]
+    )
+    cible = construire_cible(p)
+    assert cible.petites_larves_lmc == 10
+    assert cible.petites_larves_nse is None
+    assert cible.grandes_larves_nse is None
+
+
+def test_cible_detail_par_espece_densites_diffuse_groupee():
+    p = _prospection(
+        populations=[
+            ProspectionPopulation(
+                espece="LMC", categorie="imago", densite_diffuse=12.0, densite_groupee=3.0
+            ),
+            ProspectionPopulation(espece="LMC", categorie="larve", densite_diffuse=8.0),
+            ProspectionPopulation(espece="NSE", categorie="imago", densite_diffuse=5.0),
+        ]
+    )
+    cible = construire_cible(p)
+    # LMC : cumul des lignes imago + larve de cette espece (20 = 12 + 8).
+    assert cible.densite_diffuse_lmc == 20.0
+    assert cible.densite_groupee_lmc == 3.0
+    assert cible.densite_diffuse_nse == 5.0
+    assert cible.densite_groupee_nse is None
 
 
 def test_cible_repartition_groupee_prioritaire():

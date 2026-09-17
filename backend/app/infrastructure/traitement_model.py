@@ -119,6 +119,18 @@ class CibleModel(Base):
     vols_clairs_essaims: Mapped[str | None] = mapped_column(String(50), nullable=True)
     repartition_population: Mapped[str | None] = mapped_column(String(30), nullable=True)
     surface_infestee_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    # Detail par espece (migration 0066) : les colonnes ci-dessus restent des
+    # totaux agreges toutes especes confondues (consommes tels quels par
+    # l'ecran Cibles cote Terrestre) ; ces 8 colonnes portent le detail
+    # LMC/NSE affiche a l'ecran Synthese cote Aerien.
+    petites_larves_lmc: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    petites_larves_nse: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    grandes_larves_lmc: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    grandes_larves_nse: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    densite_diffuse_lmc: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    densite_groupee_lmc: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    densite_diffuse_nse: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    densite_groupee_nse: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
 
     traitement: Mapped[TraitementModel] = relationship(back_populates="cible")
 
