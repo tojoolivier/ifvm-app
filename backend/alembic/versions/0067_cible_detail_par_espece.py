@@ -20,9 +20,9 @@ suit le meme parti pris que le reste du code (colonnes paralleles par
 espece, cf. PopulationRow/intensive-imagos.tsx), pas une table enfant pour
 une cardinalite bornee et connue.
 
-Revision ID: 0066
-Revises: 0065
-Create Date: 2026-09-16
+Revision ID: 0067
+Revises: 0066
+Create Date: 2026-09-17
 
 """
 
@@ -30,8 +30,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0066"
-down_revision = "0065"
+revision = "0067"
+down_revision = "0066"
 branch_labels = None
 depends_on = None
 
