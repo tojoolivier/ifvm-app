@@ -6,7 +6,7 @@ import { useAuthStore } from '@/lib/auth-store';
 import { loadAccueilData, loadMesProspectionsServeur } from '@/lib/prospection-accueil';
 import { DraftProspection } from '@/lib/prospection-repository';
 import { ProspectionRead } from '@/lib/api-client';
-import { listMesTraitements, DraftTraitementRow } from '@/lib/traitement-repository';
+import { listRecentTraitements, DraftTraitementRow } from '@/lib/traitement-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { navigateToProspectionConsult, navigateToProspectionDraft, navigateToTraitement } from '@/lib/fiche-routing';
 import { FicheCard } from '@/components/fiches/FicheCard';
@@ -92,12 +92,18 @@ export default function FichesScreen() {
               criticality: 'essential',
             })
           : null,
-        user
-          ? runTask(() => listMesTraitements(user.id), {
-              name: 'fiches.traitements',
-              criticality: 'essential',
-            })
-          : null,
+        // Toute fiche de traitement créée sur cet appareil doit apparaître ici, pas
+        // seulement celles où l'utilisateur connecté est déjà chef d'équipe/chef de
+        // base (#crt-fiches-creees-absentes-de-mes-fiches) : `listMesTraitements`
+        // filtrait par ce rôle, donc une fiche encore en cours de saisie (écran
+        // Équipe pas encore atteint) ou créée par un agent qui n'est pas lui-même le
+        // chef assigné n'apparaissait jamais, malgré la fiche déjà présente
+        // localement — contrairement aux prospections (`loadAccueilData`, aucun
+        // filtre par rôle).
+        runTask(() => listRecentTraitements(), {
+          name: 'fiches.traitements',
+          criticality: 'essential',
+        }),
       ]);
 
       const [brouillons, validees, traitementsLus] = lectures;

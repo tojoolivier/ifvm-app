@@ -1225,34 +1225,6 @@ export async function listDraftTraitements(): Promise<DraftTraitementRow[]> {
 }
 
 /**
- * Fiches de traitement dont l'utilisateur connecté est responsable — chef
- * d'équipe (Terrestre) OU chef de base (Aérien).
- *
- * Bug #264 : la requête d'origine ne joignait que `traitement_terrestre`, donc
- * une fiche AÉRIEN (chef_de_base_id, pas de ligne dans `traitement_terrestre`)
- * n'apparaissait jamais dans "Mes fiches" après enregistrement, quel que soit
- * le chef de base connecté. Les deux `LEFT JOIN` couvrent les deux
- * spécialisations ; une fiche donnée n'a jamais de ligne que dans l'une des
- * deux tables (disjointes par `type_traitement`), donc chaque `traitement` ne
- * peut correspondre qu'à une seule branche du `OR` — pas de doublon possible.
- */
-export async function listMesTraitements(
-  utilisateurId: string
-): Promise<DraftTraitementRow[]> {
-  const db = await getDb();
-
-  return db.getAllAsync<DraftTraitementRow>(
-    `SELECT traitement.*
-     FROM traitement
-     LEFT JOIN traitement_terrestre ON traitement_terrestre.traitement_id = traitement.id
-     LEFT JOIN traitement_aerien ON traitement_aerien.traitement_id = traitement.id
-     WHERE traitement_terrestre.chef_equipe_id = ? OR traitement_aerien.chef_de_base_id = ?
-     ORDER BY traitement.updated_at DESC`,
-    [utilisateurId, utilisateurId]
-  );
-}
-
-/**
  * Ligne `listReprenableTraitements` : la fiche d'origine (validée, surface
  * restante nulle ou positive), avec `surface_restante_ha` — surface encore
  * infestée non traitée par cette fiche, donc surface disponible à traiter
