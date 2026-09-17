@@ -157,9 +157,22 @@ class ProspectionModel(Base):
     # décision produit que `traitement_aerien.base_principale`, migration
     # 0054). Nullable — une prospection extensive aérienne « généralisée »
     # (début/fin de campagne, relevé large non rattaché à une base) n'en a
-    # pas. Pas de base secondaire côté prospection : ce concept n'existe que
-    # pour le traitement.
+    # pas. Libellé « Base principale » côté affichage (migration 0068,
+    # colonne inchangée pour ne pas invalider les fiches déjà synchronisées).
     base: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Numéro, date d'installation et coordonnées GPS de la base principale
+    # (migration 0068) — capturées sur place, jamais recalculées.
+    base_numero: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    base_date_installation: Mapped[date | None] = mapped_column(Date(), nullable=True)
+    base_latitude: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
+    base_longitude: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
+    # Base secondaire (migration 0068, revient sur la décision documentée en
+    # 0063 : "pas de base secondaire côté prospection") — texte libre, même
+    # date d'installation + coordonnées GPS que la base principale.
+    base_secondaire: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    base_secondaire_date_installation: Mapped[date | None] = mapped_column(Date(), nullable=True)
+    base_secondaire_latitude: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
+    base_secondaire_longitude: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
 
     # ==========================================
     # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures (migration 0036)

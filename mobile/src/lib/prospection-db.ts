@@ -629,14 +629,26 @@ const COLONNES_PROSPECTION: readonly Colonne[] = [
   // `base` (texte libre) avait été remplacée par `lieu_base_id` (FK vers le
   // référentiel lieu_aerien) en migration backend 0047, puis la bascule est
   // défaite en 0063 (saisie manuelle, sans dépendre du référentiel Web) — `base`
-  // redevient la colonne active, lue/écrite par le code applicatif.
+  // redevient la colonne active, lue/écrite par le code applicatif. Libellé
+  // « Base principale » côté affichage (migration backend 0068).
   // `lieu_base_id` reste déclarée pour les installations existantes (colonne
   // morte, plus jamais lue/écrite) — jamais supprimée côté SQLite mobile,
   // cohérent avec le principe de préservation des données déjà en place.
-  // `base_secondaire` n'a jamais existé côté prospection (seulement traitement) ;
-  // reste déclarée pour les installations où elle a pu être créée par erreur.
   { name: 'base', type: 'TEXT' },
+  // Numéro, date d'installation et coordonnées GPS de la base principale
+  // (migration backend 0068) — capturées sur place, jamais recalculées.
+  { name: 'base_numero', type: 'INTEGER' },
+  { name: 'base_date_installation', type: 'TEXT' },
+  { name: 'base_latitude', type: 'REAL' },
+  { name: 'base_longitude', type: 'REAL' },
+  // `base_secondaire` était déclarée mais jamais lue/écrite côté prospection
+  // (seulement côté traitement) ; migration backend 0068 lui donne enfin un
+  // usage — texte libre, même schéma que la base principale (date
+  // d'installation + coordonnées GPS propres, ci-dessous).
   { name: 'base_secondaire', type: 'TEXT' },
+  { name: 'base_secondaire_date_installation', type: 'TEXT' },
+  { name: 'base_secondaire_latitude', type: 'REAL' },
+  { name: 'base_secondaire_longitude', type: 'REAL' },
   { name: 'lieu_base_id', type: 'TEXT' },
   // Pesticides embarqués + signatures (mode aérien uniquement) — NULL sur toute
   // fiche terrestre, comme le mode aérien lui-même. Cf. migration backend 0036.

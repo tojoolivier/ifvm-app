@@ -115,6 +115,14 @@ class CreateProspection:
         mecanicien: str | None = None,
         chef_de_base: str | None = None,
         base: str | None = None,
+        base_numero: int | None = None,
+        base_date_installation: date | None = None,
+        base_latitude: float | None = None,
+        base_longitude: float | None = None,
+        base_secondaire: str | None = None,
+        base_secondaire_date_installation: date | None = None,
+        base_secondaire_latitude: float | None = None,
+        base_secondaire_longitude: float | None = None,
         operations_aeriennes: list[ProspectionOperationAerienne] | None = None,
         # ==========================================
         # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
@@ -235,6 +243,14 @@ class CreateProspection:
             mecanicien=mecanicien,
             chef_de_base=chef_de_base,
             base=base,
+            base_numero=base_numero,
+            base_date_installation=base_date_installation,
+            base_latitude=base_latitude,
+            base_longitude=base_longitude,
+            base_secondaire=base_secondaire,
+            base_secondaire_date_installation=base_secondaire_date_installation,
+            base_secondaire_latitude=base_secondaire_latitude,
+            base_secondaire_longitude=base_secondaire_longitude,
             operations_aeriennes=operations_aeriennes or [],
             # ==========================================
             # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
@@ -393,6 +409,14 @@ class UpdateProspection:
         mecanicien: str | None = None,
         chef_de_base: str | None = None,
         base: str | None = None,
+        base_numero: int | None = None,
+        base_date_installation: date | None = None,
+        base_latitude: float | None = None,
+        base_longitude: float | None = None,
+        base_secondaire: str | None = None,
+        base_secondaire_date_installation: date | None = None,
+        base_secondaire_latitude: float | None = None,
+        base_secondaire_longitude: float | None = None,
         # ==========================================
         # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
         # ==========================================
@@ -529,6 +553,22 @@ class UpdateProspection:
             prospection.chef_de_base = chef_de_base
         if base is not None:
             prospection.base = base
+        if base_numero is not None:
+            prospection.base_numero = base_numero
+        if base_date_installation is not None:
+            prospection.base_date_installation = base_date_installation
+        if base_latitude is not None:
+            prospection.base_latitude = base_latitude
+        if base_longitude is not None:
+            prospection.base_longitude = base_longitude
+        if base_secondaire is not None:
+            prospection.base_secondaire = base_secondaire
+        if base_secondaire_date_installation is not None:
+            prospection.base_secondaire_date_installation = base_secondaire_date_installation
+        if base_secondaire_latitude is not None:
+            prospection.base_secondaire_latitude = base_secondaire_latitude
+        if base_secondaire_longitude is not None:
+            prospection.base_secondaire_longitude = base_secondaire_longitude
 
         # ==========================================
         # Mise à jour des nouveaux champs - Extensif : pesticides embarqués + signatures

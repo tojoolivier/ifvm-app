@@ -514,6 +514,14 @@ class ProspectionCreate(BaseModel):
     mecanicien: str | None = None
     chef_de_base: str | None = None
     base: str | None = None
+    base_numero: int | None = None
+    base_date_installation: date | None = None
+    base_latitude: float | None = None
+    base_longitude: float | None = None
+    base_secondaire: str | None = None
+    base_secondaire_date_installation: date | None = None
+    base_secondaire_latitude: float | None = None
+    base_secondaire_longitude: float | None = None
 
     # ==========================================
     # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
@@ -625,6 +633,14 @@ class ProspectionUpdate(BaseModel):
     mecanicien: str | None = None
     chef_de_base: str | None = None
     base: str | None = None
+    base_numero: int | None = None
+    base_date_installation: date | None = None
+    base_latitude: float | None = None
+    base_longitude: float | None = None
+    base_secondaire: str | None = None
+    base_secondaire_date_installation: date | None = None
+    base_secondaire_latitude: float | None = None
+    base_secondaire_longitude: float | None = None
 
     # ==========================================
     # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
@@ -780,6 +796,14 @@ class ProspectionRead(BaseModel):
     mecanicien: str | None = None
     chef_de_base: str | None = None
     base: str | None = None
+    base_numero: int | None = None
+    base_date_installation: date | None = None
+    base_latitude: float | None = None
+    base_longitude: float | None = None
+    base_secondaire: str | None = None
+    base_secondaire_date_installation: date | None = None
+    base_secondaire_latitude: float | None = None
+    base_secondaire_longitude: float | None = None
 
     # ==========================================
     # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures

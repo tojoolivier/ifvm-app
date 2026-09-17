@@ -166,13 +166,27 @@ function larveRowHasData(row: PopulationRow | null): boolean {
  * sont alors omis plutôt qu'affichés à `null`, cf. `buildPesticidesRows`.
  */
 function buildReferencesAeriennesRows(draft: DraftProspection): DetailRow[] {
+  const coordonneesBase =
+    draft.base_latitude != null && draft.base_longitude != null
+      ? `${draft.base_latitude.toFixed(4)}, ${draft.base_longitude.toFixed(4)}`
+      : '—';
+  const coordonneesBaseSecondaire =
+    draft.base_secondaire_latitude != null && draft.base_secondaire_longitude != null
+      ? `${draft.base_secondaire_latitude.toFixed(4)}, ${draft.base_secondaire_longitude.toFixed(4)}`
+      : '—';
   return [
     { label: 'Société', value: draft.societe ?? '—' },
     { label: 'Immatricule Aéronef', value: draft.immatricule_aeronef ?? '—' },
     { label: 'Pilote', value: draft.pilote ?? '—' },
     { label: 'Mécanicien', value: draft.mecanicien ?? '—' },
     { label: 'Chef de base', value: draft.chef_de_base ?? '—' },
-    { label: 'Base', value: draft.base ?? '—' },
+    { label: 'Base principale', value: draft.base ?? '—' },
+    { label: 'Numéro de base', value: draft.base_numero != null ? String(draft.base_numero) : '—' },
+    { label: 'Date d’installation (Base principale)', value: draft.base_date_installation ?? '—' },
+    { label: 'Coordonnées GPS (Base principale)', value: coordonneesBase },
+    { label: 'Base secondaire', value: draft.base_secondaire ?? '—' },
+    { label: 'Date d’installation (Base secondaire)', value: draft.base_secondaire_date_installation ?? '—' },
+    { label: 'Coordonnées GPS (Base secondaire)', value: coordonneesBaseSecondaire },
   ];
 }
 

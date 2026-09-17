@@ -155,6 +155,14 @@ const CHAMPS_PROSPECTION_VALIDEE_PAR_DEFAUT = {
   mecanicien: null,
   chefDeBase: null,
   base: null,
+  baseNumero: null,
+  baseDateInstallation: null,
+  baseLatitude: null,
+  baseLongitude: null,
+  baseSecondaire: null,
+  baseSecondaireDateInstallation: null,
+  baseSecondaireLatitude: null,
+  baseSecondaireLongitude: null,
   pesticidesEmbarques: null,
   pesticideNomCommercial: null,
   pesticideQuantiteDisponible: null,
@@ -701,9 +709,11 @@ describe('updateProspectionExtensiveReference', () => {
         REF_INPUT.nMessage,
         REF_INPUT.heureObservationAt,
         // Mode aérien uniquement — non fournis par REF_INPUT (mode terrestre implicite
-        // dans ce test), donc null : cf. les 6 champs équipe/aéronef/base ajoutés à
-        // ExtensiveReferenceUpdateInput.
+        // dans ce test), donc null : cf. les champs équipe/aéronef/base (+ numéro,
+        // date d'installation, GPS de la base principale et de la base secondaire)
+        // ajoutés à ExtensiveReferenceUpdateInput.
         null, null, null, null, null, null,
+        null, null, null, null, null, null, null, null,
         expect.any(String),
         BASE_INPUT.id,
       ]
