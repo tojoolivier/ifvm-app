@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import TIMESTAMP, Date, ForeignKey, String
+from sqlalchemy import TIMESTAMP, Boolean, Date, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -15,6 +15,7 @@ class CampagneModel(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    actif: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
     created_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("utilisateur.id"), nullable=False
     )

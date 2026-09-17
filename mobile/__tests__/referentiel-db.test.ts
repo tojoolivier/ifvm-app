@@ -164,7 +164,7 @@ describe('listCampagnesLocal', () => {
     const result = await listCampagnesLocal();
 
     expect(getAllAsync).toHaveBeenCalledWith(
-      'SELECT id, name, start_date, end_date FROM campagne ORDER BY start_date DESC'
+      'SELECT id, name, start_date, end_date FROM campagne WHERE actif = 1 ORDER BY start_date DESC'
     );
     expect(result).toEqual([
       { id: 'camp-1', name: 'Campagne 2026', start_date: '2026-01-01', end_date: null },

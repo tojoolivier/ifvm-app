@@ -221,11 +221,15 @@ export interface CampagneLocal {
   end_date: string | null;
 }
 
-/** Campagnes connues du référentiel local — alimente `pickCurrentCampagneId` hors-ligne (ADR-007). */
+/**
+ * Campagnes actives du référentiel local — alimente `pickCurrentCampagneId` hors-ligne
+ * (ADR-007). Une campagne désactivée (`actif = 0`) reste dans le cache pour l'historique
+ * mais ne doit plus être proposée à la saisie (#137).
+ */
 export async function listCampagnesLocal(): Promise<CampagneLocal[]> {
   const db = await getReferentielDb();
   return db.getAllAsync<CampagneLocal>(
-    'SELECT id, name, start_date, end_date FROM campagne ORDER BY start_date DESC'
+    'SELECT id, name, start_date, end_date FROM campagne WHERE actif = 1 ORDER BY start_date DESC'
   );
 }
 
@@ -411,6 +415,7 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
       name TEXT NOT NULL,
       start_date TEXT NOT NULL,
       end_date TEXT,
+      actif INTEGER NOT NULL DEFAULT 1,
       updated_at TEXT NOT NULL
     );
 
@@ -439,6 +444,9 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
     { name: 'commune', type: 'TEXT' },
     { name: 'district', type: 'TEXT' },
     { name: 'region', type: 'TEXT' },
+  ]);
+  await addColumnsIfMissing(db, 'campagne', [
+    { name: 'actif', type: 'INTEGER NOT NULL DEFAULT 1' },
   ]);
   await addColumnsIfMissing(db, 'pesticide', [
     { name: 'matiere_active', type: 'TEXT' },
