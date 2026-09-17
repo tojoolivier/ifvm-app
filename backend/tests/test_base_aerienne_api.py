@@ -5,17 +5,54 @@ from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
-async def test_create_base_principale(client: AsyncClient, auth_headers: dict):
+async def test_create_base_principale(client: AsyncClient, auth_headers: dict, equipe_aerienne):
     response = await client.post(
         "/bases-aeriennes",
-        json={"numero": "IHO01", "localite": "Ihosy", "latitude": -22.4021, "longitude": 46.1250},
+        json={
+            "numero": "IHO01",
+            "localite": "Ihosy",
+            "latitude": -22.4021,
+            "longitude": 46.1250,
+            "equipe_id": str(equipe_aerienne.id),
+        },
         headers=auth_headers,
     )
     assert response.status_code == 201
     data = response.json()
     assert data["numero"] == "IHO01"
     assert data["parent_base_id"] is None
+    assert data["equipe_id"] == str(equipe_aerienne.id)
     assert data["actif"] is True
+
+
+@pytest.mark.asyncio
+async def test_create_base_principale_sans_equipe_422(client: AsyncClient, auth_headers: dict):
+    """#equipe-aerienne : une base principale doit appartenir à une équipe aérienne."""
+    response = await client.post(
+        "/bases-aeriennes",
+        json={"numero": "IHO01", "localite": "Ihosy", "latitude": -22.4021, "longitude": 46.1250},
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_base_secondaire_avec_sa_propre_equipe_422(
+    client: AsyncClient, auth_headers: dict, base_aerienne, equipe_aerienne_bis
+):
+    """Une base secondaire hérite de l'équipe de sa principale, elle ne peut pas
+    en avoir une à elle."""
+    response = await client.post(
+        "/bases-aeriennes",
+        json={
+            "numero": "IHO02",
+            "localite": "Ihosy Sud",
+            "parent_base_id": str(base_aerienne.id),
+            "equipe_id": str(equipe_aerienne_bis.id),
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
 
 
 @pytest.mark.asyncio
@@ -69,11 +106,15 @@ async def test_create_base_parent_inexistant_422(client: AsyncClient, auth_heade
 
 @pytest.mark.asyncio
 async def test_create_base_numero_deja_pris_409(
-    client: AsyncClient, auth_headers: dict, base_aerienne
+    client: AsyncClient, auth_headers: dict, base_aerienne, equipe_aerienne_bis
 ):
     response = await client.post(
         "/bases-aeriennes",
-        json={"numero": base_aerienne.numero, "localite": "Ailleurs"},
+        json={
+            "numero": base_aerienne.numero,
+            "localite": "Ailleurs",
+            "equipe_id": str(equipe_aerienne_bis.id),
+        },
         headers=auth_headers,
     )
     assert response.status_code == 409

@@ -6,10 +6,12 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     Numeric,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -135,6 +137,36 @@ class LieuAerienModel(Base):
     )
 
 
+class EquipeAerienneModel(Base):
+    """Équipe aérienne (#equipe-aerienne, migration 0066) : une équipe = un chef de
+    base (`chef_de_base_id` UNIQUE) = une base aérienne principale
+    (`BaseAerienneModel.equipe_id` UNIQUE). Demande utilisateur du 2026-09-16, en
+    continuité de la fiche de vol (migration 0064)."""
+
+    __tablename__ = "equipe_aerienne"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    nom: Mapped[str] = mapped_column(Text(), nullable=False)
+    chef_de_base_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    actif: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+
+    # Noms de contraintes explicites — doivent matcher la migration 0066 à
+    # l'identique : `_traduire_integrite` (referentiel_sync_repository.py) et
+    # `EquipeAerienneRepositoryImpl.create` en dépendent pour distinguer les
+    # violations (chef déjà assigné) d'une erreur générique.
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["chef_de_base_id"],
+            ["utilisateur.id"],
+            name="fk_equipe_aerienne_chef_de_base_id",
+            ondelete="RESTRICT",
+        ),
+        UniqueConstraint("chef_de_base_id", name="uq_equipe_aerienne_chef_de_base_id"),
+    )
+
+
 class BaseAerienneModel(Base):
     """Base principale ou base secondaire de la fiche de vol.
 
@@ -149,6 +181,10 @@ class BaseAerienneModel(Base):
     contrainte terrain non voulue. La fiche de vol reprend malgré tout un
     référentiel dédié — décision produit explicite, maintenue en connaissance
     de ce précédent (cf. docstring de la migration 0064).
+
+    `equipe_id` (migration 0066) : NOT NULL uniquement sur une base principale
+    (`ck_base_aerienne_equipe_coherente`) — une base secondaire hérite de l'équipe
+    de sa principale via `parent_base_id`, elle ne porte pas sa propre `equipe_id`.
     """
 
     __tablename__ = "base_aerienne"
@@ -157,6 +193,7 @@ class BaseAerienneModel(Base):
     parent_base_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("base_aerienne.id", ondelete="RESTRICT"), nullable=True
     )
+    equipe_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     numero: Mapped[str] = mapped_column(Text(), nullable=False, unique=True)
     localite: Mapped[str] = mapped_column(Text(), nullable=False)
     longitude: Mapped[float | None] = mapped_column(Numeric(11, 8), nullable=True)
@@ -165,6 +202,23 @@ class BaseAerienneModel(Base):
     actif: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+
+    # Noms de contraintes explicites — doivent matcher la migration 0066 à
+    # l'identique (cf. commentaire équivalent sur `EquipeAerienneModel`).
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["equipe_id"],
+            ["equipe_aerienne.id"],
+            name="fk_base_aerienne_equipe_id",
+            ondelete="RESTRICT",
+        ),
+        UniqueConstraint("equipe_id", name="uq_base_aerienne_equipe_id"),
+        CheckConstraint(
+            "(parent_base_id IS NULL AND equipe_id IS NOT NULL) OR "
+            "(parent_base_id IS NOT NULL AND equipe_id IS NULL)",
+            name="ck_base_aerienne_equipe_coherente",
+        ),
+    )
 
     parent: Mapped["BaseAerienneModel"] = relationship(remote_side=[id])
 

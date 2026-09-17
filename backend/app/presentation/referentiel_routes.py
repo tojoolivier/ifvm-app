@@ -9,6 +9,7 @@ from app.application.referentiel_use_cases import (
     CreateBaseAerienne,
     CreateCodeStade,
     CreateCulture,
+    CreateEquipeAerienne,
     CreateLieuAerien,
     CreatePesticide,
     CreatePosteAcridien,
@@ -17,6 +18,7 @@ from app.application.referentiel_use_cases import (
     GetBaseAerienne,
     GetCodeStade,
     GetCulture,
+    GetEquipeAerienne,
     GetLieuAerien,
     GetPesticide,
     GetPosteAcridien,
@@ -26,6 +28,7 @@ from app.application.referentiel_use_cases import (
     ListCodesStades,
     ListCommunes,
     ListCultures,
+    ListEquipesAeriennes,
     ListLieuxAeriens,
     ListPesticides,
     ListPostesAcridiens,
@@ -46,9 +49,14 @@ from app.application.referentiel_use_cases import (
 from app.auth import get_current_user
 from app.database import get_db
 from app.domain.referentiel import (
+    BaseAerienneEquipeInvalideError,
     BaseAerienneParentInvalideError,
+    ChefDeBaseDejaEquipeError,
+    ChefDeBaseEquipeInvalideError,
     CodeReferentielDejaPrisError,
     CommuneInconnueError,
+    EquipeAerienneDejaAssigneeError,
+    EquipeAerienneIntrouvableError,
     GrilleDejaOccupeeError,
     NumeroBaseAerienneDejaPrisError,
     NumeroStandRemplissageDejaPrisError,
@@ -70,11 +78,13 @@ from app.infrastructure.referentiel_sync_repository import (
     BaseAerienneRepositoryImpl,
     CodeStadeRepositoryImpl,
     CultureRepositoryImpl,
+    EquipeAerienneRepositoryImpl,
     LieuAerienRepositoryImpl,
     PesticideRepositoryImpl,
     StandRemplissageRepositoryImpl,
     UtilisateurEquipeRepositoryImpl,
 )
+from app.infrastructure.utilisateur_repository import UtilisateurRepositoryImpl
 from app.models.users import Utilisateur
 from app.presentation.referentiel_schemas import (
     BaseAerienneCreate,
@@ -88,6 +98,8 @@ from app.presentation.referentiel_schemas import (
     CultureRead,
     CultureUpdate,
     EntityPull,
+    EquipeAerienneCreate,
+    EquipeAerienneRead,
     LieuAerienCreate,
     LieuAerienRead,
     LieuAerienUpdate,
@@ -601,11 +613,61 @@ async def update_lieu_aerien(
     return lieu
 
 
-# --- base_aerienne / stand_remplissage (fiche de vol) -------------------------------
+# --- equipe_aerienne / base_aerienne / stand_remplissage (fiche de vol) -------------
 #
 # Référentiel dédié à la fiche de vol (migration 0064), distinct de lieu_aerien malgré
-# le chevauchement conceptuel — cf. docstring de BaseAerienneModel. Aucune route
-# DELETE, volontairement : la sortie de service passe par `actif=false`.
+# le chevauchement conceptuel — cf. docstring de BaseAerienneModel. `equipe_aerienne`
+# (migration 0066, #equipe-aerienne) s'ajoute au-dessus de la base principale. Aucune
+# route DELETE, volontairement : la sortie de service passe par `actif=false`.
+
+
+@router.get("/equipes-aeriennes", response_model=list[EquipeAerienneRead])
+async def list_equipes_aeriennes(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+    inclure_inactifs: bool = Query(
+        default=False,
+        description="Renvoie les équipes des deux états — écran d'administration.",
+    ),
+):
+    use_case = ListEquipesAeriennes(EquipeAerienneRepositoryImpl(db))
+    return await use_case.execute(actif=None if inclure_inactifs else True)
+
+
+@router.post("/equipes-aeriennes", response_model=EquipeAerienneRead, status_code=201)
+async def create_equipe_aerienne(
+    body: EquipeAerienneCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = CreateEquipeAerienne(EquipeAerienneRepositoryImpl(db), UtilisateurRepositoryImpl(db))
+    try:
+        return await use_case.execute(nom=body.nom, chef_de_base_id=body.chef_de_base_id)
+    except ChefDeBaseEquipeInvalideError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"chef_de_base_id n'a pas le rôle chef_de_base : {exc.args[0]}",
+        ) from exc
+    except ChefDeBaseDejaEquipeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"chef_de_base_id dirige déjà une autre équipe : {exc.args[0]}",
+        ) from exc
+
+
+@router.get("/equipes-aeriennes/{equipe_id}", response_model=EquipeAerienneRead)
+async def get_equipe_aerienne(
+    equipe_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = GetEquipeAerienne(EquipeAerienneRepositoryImpl(db))
+    equipe = await use_case.execute(equipe_id)
+    if equipe is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Équipe aérienne non trouvée"
+        )
+    return equipe
 
 
 @router.get("/bases-aeriennes", response_model=list[BaseAerienneRead])
@@ -633,6 +695,7 @@ async def create_base_aerienne(
             numero=body.numero,
             localite=body.localite,
             parent_base_id=body.parent_base_id,
+            equipe_id=body.equipe_id,
             longitude=body.longitude,
             latitude=body.latitude,
             altitude=body.altitude,
@@ -641,6 +704,19 @@ async def create_base_aerienne(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"parent_base_id invalide : {exc.args[0]}",
+        ) from exc
+    except BaseAerienneEquipeInvalideError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    except EquipeAerienneIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"equipe_id introuvable : {exc.args[0]}"
+        ) from exc
+    except EquipeAerienneDejaAssigneeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"equipe_id possède déjà une base principale : {exc.args[0]}",
         ) from exc
     except NumeroBaseAerienneDejaPrisError as exc:
         raise HTTPException(
@@ -678,18 +754,32 @@ async def update_base_aerienne(
             numero=body.numero,
             localite=body.localite,
             parent_base_id=body.parent_base_id,
+            equipe_id=body.equipe_id,
             longitude=body.longitude,
             latitude=body.latitude,
             altitude=body.altitude,
             actif=body.actif,
-            # Coordonnées et parent_base_id nullables : seul le corps reçu distingue
-            # « absent » de « mis à NULL ».
+            # Coordonnées, parent_base_id et equipe_id nullables : seul le corps reçu
+            # distingue « absent » de « mis à NULL ».
             champs_fournis=body.model_fields_set,
         )
     except BaseAerienneParentInvalideError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"parent_base_id invalide : {exc.args[0]}",
+        ) from exc
+    except BaseAerienneEquipeInvalideError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    except EquipeAerienneIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"equipe_id introuvable : {exc.args[0]}"
+        ) from exc
+    except EquipeAerienneDejaAssigneeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"equipe_id possède déjà une base principale : {exc.args[0]}",
         ) from exc
     except NumeroBaseAerienneDejaPrisError as exc:
         raise HTTPException(

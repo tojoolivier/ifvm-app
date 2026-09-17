@@ -394,6 +394,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/equipes-aeriennes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Equipes Aeriennes */
+        get: operations["list_equipes_aeriennes_equipes_aeriennes_get"];
+        put?: never;
+        /** Create Equipe Aerienne */
+        post: operations["create_equipe_aerienne_equipes_aeriennes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/equipes-aeriennes/{equipe_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Equipe Aerienne */
+        get: operations["get_equipe_aerienne_equipes_aeriennes__equipe_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/bases-aeriennes": {
         parameters: {
             query?: never;
@@ -1049,6 +1084,8 @@ export interface components {
             localite: string;
             /** Parent Base Id */
             parent_base_id?: string | null;
+            /** Equipe Id */
+            equipe_id?: string | null;
             /** Longitude */
             longitude?: number | null;
             /** Latitude */
@@ -1065,6 +1102,8 @@ export interface components {
             id: string;
             /** Parent Base Id */
             parent_base_id: string | null;
+            /** Equipe Id */
+            equipe_id: string | null;
             /** Numero */
             numero: string;
             /** Localite */
@@ -1099,6 +1138,8 @@ export interface components {
             localite?: string | null;
             /** Parent Base Id */
             parent_base_id?: string | null;
+            /** Equipe Id */
+            equipe_id?: string | null;
             /** Longitude */
             longitude?: number | null;
             /** Latitude */
@@ -1612,6 +1653,43 @@ export interface components {
              * Format: date-time
              */
             server_time: string;
+        };
+        /** EquipeAerienneCreate */
+        EquipeAerienneCreate: {
+            /** Nom */
+            nom: string;
+            /**
+             * Chef De Base Id
+             * Format: uuid
+             */
+            chef_de_base_id: string;
+        };
+        /** EquipeAerienneRead */
+        EquipeAerienneRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Nom */
+            nom: string;
+            /**
+             * Chef De Base Id
+             * Format: uuid
+             */
+            chef_de_base_id: string;
+            /** Actif */
+            actif: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /**
          * EspeceAcridienne
@@ -5509,6 +5587,102 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LieuAerienRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_equipes_aeriennes_equipes_aeriennes_get: {
+        parameters: {
+            query?: {
+                /** @description Renvoie les équipes des deux états — écran d'administration. */
+                inclure_inactifs?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EquipeAerienneRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_equipe_aerienne_equipes_aeriennes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EquipeAerienneCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EquipeAerienneRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_equipe_aerienne_equipes_aeriennes__equipe_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                equipe_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EquipeAerienneRead"];
                 };
             };
             /** @description Validation Error */

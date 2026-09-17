@@ -25,6 +25,7 @@ const BASE_PRINCIPALE = {
   numero: 'IHO01',
   localite: 'Ihosy',
   parent_base_id: null,
+  equipe_id: 'equipe-1',
   longitude: 0,
   latitude: 0,
   altitude: 0,
@@ -47,7 +48,7 @@ describe('BaseAerienneField', () => {
 
     fireEvent.press(screen.getByText('Charger la liste ›'));
     await screen.findByText('IHO01 — Ihosy');
-    fireEvent.press(screen.getByText('+ Nouvelle base aérienne'));
+    fireEvent.press(screen.getByText('+ Nouvelle base secondaire'));
 
     await screen.findByText('Secondaire de…');
     expect(screen.getByText('IHO01')).toBeVisible();
@@ -59,6 +60,7 @@ describe('BaseAerienneField', () => {
       numero: 'IHO02',
       localite: 'Zazafotsy',
       parent_base_id: 'base-1',
+      equipe_id: null,
       longitude: 46.1,
       latitude: -22.4,
       altitude: 700,
@@ -68,8 +70,8 @@ describe('BaseAerienneField', () => {
     await render(<BaseAerienneField value={null} onChange={onChange} />);
 
     fireEvent.press(screen.getByText('Charger la liste ›'));
-    await screen.findByText('+ Nouvelle base aérienne');
-    fireEvent.press(screen.getByText('+ Nouvelle base aérienne'));
+    await screen.findByText('+ Nouvelle base secondaire');
+    fireEvent.press(screen.getByText('+ Nouvelle base secondaire'));
 
     await screen.findByText('IHO01');
     fireEvent.press(screen.getByText('IHO01'));
@@ -94,6 +96,7 @@ describe('BaseAerienneField', () => {
       numero: 'IHO02',
       localite: 'Zazafotsy',
       parent_base_id: 'base-1',
+      equipe_id: null,
     });
   });
 });

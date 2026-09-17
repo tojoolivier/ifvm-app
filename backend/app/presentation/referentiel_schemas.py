@@ -255,10 +255,29 @@ class LieuAerienUpdate(BaseModel):
     actif: bool | None = None
 
 
+class EquipeAerienneRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    nom: str
+    chef_de_base_id: uuid.UUID
+    actif: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class EquipeAerienneCreate(BaseModel):
+    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
+    chef_de_base_id: uuid.UUID
+
+
 class BaseAerienneRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     parent_base_id: uuid.UUID | None
+    # NOT NULL uniquement sur une base principale (#equipe-aerienne, migration
+    # 0066) — une secondaire hérite de l'équipe de sa principale via
+    # `parent_base_id`, elle n'a pas sa propre `equipe_id`.
+    equipe_id: uuid.UUID | None
     numero: str
     localite: str
     longitude: float | None
@@ -273,6 +292,10 @@ class BaseAerienneCreate(BaseModel):
     numero: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)]
     localite: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     parent_base_id: uuid.UUID | None = None
+    # Requis si `parent_base_id` est absent (base principale), doit être absent
+    # sinon (base secondaire) — validé par `CreateBaseAerienne` (message clair)
+    # et par `ck_base_aerienne_equipe_coherente` (garde-fou base de données).
+    equipe_id: uuid.UUID | None = None
     longitude: float | None = Field(default=None, ge=-180, le=180)
     latitude: float | None = Field(default=None, ge=-90, le=90)
     altitude: float | None = None
@@ -286,6 +309,7 @@ class BaseAerienneUpdate(BaseModel):
     ) = None
     localite: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
     parent_base_id: uuid.UUID | None = None
+    equipe_id: uuid.UUID | None = None
     longitude: float | None = Field(default=None, ge=-180, le=180)
     latitude: float | None = Field(default=None, ge=-90, le=90)
     altitude: float | None = None

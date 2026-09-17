@@ -10,6 +10,7 @@ from app.domain.referentiel import (
     CodeStade,
     Commune,
     Culture,
+    EquipeAerienne,
     LieuAerien,
     Pesticide,
     PosteAcridien,
@@ -444,6 +445,22 @@ class BaseAerienneRepository(ABC):
 
     @abstractmethod
     async def update(self, base: BaseAerienne) -> BaseAerienne:
+        pass
+
+
+class EquipeAerienneRepository(ABC):
+    """Aucune méthode de suppression : la sortie du référentiel est `actif=false`."""
+
+    @abstractmethod
+    async def list_all(self, actif: bool | None = True) -> list[EquipeAerienne]:
+        pass
+
+    @abstractmethod
+    async def get_by_id(self, equipe_id: uuid.UUID) -> EquipeAerienne | None:
+        pass
+
+    @abstractmethod
+    async def create(self, equipe: EquipeAerienne) -> EquipeAerienne:
         pass
 
 
