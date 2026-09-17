@@ -329,12 +329,37 @@ export function validateAerienEquipe(input: AerienEquipeValidationInput): Valida
  * qui ne satisfait pas encore ces champs, tous obligatoires côté backend
  * (`TraitementAerienCreate`), n'est simplement jamais transmise.
  */
+export interface RotationSyncPreconditionInput {
+  produitId: string | null | undefined;
+  quantite: number | null | undefined;
+}
+
 export interface AerienSyncPreconditionInput {
   pilote: string | null | undefined;
   mecanicien: string | null | undefined;
   chefDeBaseId: string | null | undefined;
   immatriculeAeronef: string | null | undefined;
   basePrincipale: string | null | undefined;
+  rotations: RotationSyncPreconditionInput[];
+}
+
+/**
+ * `RotationCreate` côté backend exige `produit_id` (UUID) et `quantite` (> 0)
+ * sans défaut possible — contrairement à `estAerienPretPourSynchro`, une
+ * rotation ajoutée (bouton « + ») mais jamais remplie (produit non choisi,
+ * quantité vide) n'était pas couverte par ce garde-fou : `pushRotationsEtProduits`
+ * (traitement-sync.ts) coalesce alors `produit_id` en `''` et `quantite` en `0`
+ * pour ne pas planter l'appel, et c'est le serveur qui renvoie ses messages
+ * Pydantic bruts ("produit_id: Input should be a valid UUID... found 0";
+ * "quantite: Input should be greater than 0"), fiche bloquée en échec
+ * indéfiniment (#traitement-aerien-rotation-incomplete-bloque-synchro).
+ *
+ * Une fiche sans aucune rotation n'est PAS bloquée ici : `pushRotationsEtProduits`
+ * ne boucle sur rien dans ce cas, donc rien n'est envoyé au serveur — seule une
+ * rotation existante mais incomplète pose problème.
+ */
+function rotationsAerienPretesPourSynchro(rotations: RotationSyncPreconditionInput[]): boolean {
+  return rotations.every((r) => !!r.produitId && r.quantite != null && r.quantite > 0);
 }
 
 export function estAerienPretPourSynchro(input: AerienSyncPreconditionInput): boolean {
@@ -343,7 +368,8 @@ export function estAerienPretPourSynchro(input: AerienSyncPreconditionInput): bo
       input.mecanicien?.trim() &&
       input.chefDeBaseId &&
       input.immatriculeAeronef?.trim() &&
-      input.basePrincipale?.trim()
+      input.basePrincipale?.trim() &&
+      rotationsAerienPretesPourSynchro(input.rotations)
   );
 }
 
@@ -354,12 +380,25 @@ export function estAerienPretPourSynchro(input: AerienSyncPreconditionInput): bo
  * Terrestre est créée en base dès l'écran de sélection, avant l'écran
  * Conditions qui les renseigne (traitement.tsx).
  */
+export interface ProduitUtiliseSyncPreconditionInput {
+  produitId: string | null | undefined;
+  quantiteL: number | null | undefined;
+}
+
 export interface TerrestreSyncPreconditionInput {
   chefEquipeId: string | null | undefined;
   heureDebut: string | null | undefined;
   heureFin: string | null | undefined;
   vitesseVentMs: number | null | undefined;
   temperatureC: number | null | undefined;
+  produits: ProduitUtiliseSyncPreconditionInput[];
+}
+
+/** Même raison que `rotationsAerienPretesPourSynchro` : `ProduitUtiliseCreate`
+ * exige aussi `produit_id` (UUID) et `quantite_l` (> 0) sans défaut côté
+ * backend. Une fiche sans aucun produit n'est pas bloquée, même règle. */
+function produitsTerrestrePretsPourSynchro(produits: ProduitUtiliseSyncPreconditionInput[]): boolean {
+  return produits.every((p) => !!p.produitId && p.quantiteL != null && p.quantiteL > 0);
 }
 
 export function estTerrestrePretPourSynchro(input: TerrestreSyncPreconditionInput): boolean {
@@ -368,7 +407,8 @@ export function estTerrestrePretPourSynchro(input: TerrestreSyncPreconditionInpu
       input.heureDebut &&
       input.heureFin &&
       input.vitesseVentMs != null &&
-      input.temperatureC != null
+      input.temperatureC != null &&
+      produitsTerrestrePretsPourSynchro(input.produits)
   );
 }
 

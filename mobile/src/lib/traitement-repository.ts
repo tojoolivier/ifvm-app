@@ -1520,6 +1520,7 @@ export function estTraitementPretPourSynchro(draft: DraftTraitement): boolean {
         chefDeBaseId: draft.aerien.chef_de_base_id,
         immatriculeAeronef: draft.aerien.immatricule_aeronef,
         basePrincipale: draft.aerien.base_principale,
+        rotations: draft.aerien.rotations.map((r) => ({ produitId: r.produit_id, quantite: r.quantite })),
       })
     );
   }
@@ -1532,6 +1533,7 @@ export function estTraitementPretPourSynchro(draft: DraftTraitement): boolean {
         heureFin: draft.terrestre.heure_fin,
         vitesseVentMs: draft.terrestre.vitesse_vent_ms,
         temperatureC: draft.terrestre.temperature_c,
+        produits: draft.terrestre.produits.map((p) => ({ produitId: p.produit_id, quantiteL: p.quantite_l })),
       })
     );
   }
