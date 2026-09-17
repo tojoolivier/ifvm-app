@@ -9,6 +9,19 @@ import { ErrorBanner } from '@/components/ui/error-banner'
 import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { EquipesAeriennesSection } from './EquipesAeriennesSection'
+
+/**
+ * Clé de nav spéciale : équipes/bases/stands aériens n'entrent pas dans le
+ * système générique `ENTITES` (formulaire à plat `EditableField`) — une
+ * équipe porte une liste de membres de taille variable, et les 4 sections
+ * (équipes, bases principales, bases secondaires, stands) se filtrent les
+ * unes les autres (chefsLibres/equipesLibres). `EquipesAeriennesSection` les
+ * gère avec son propre état, hors du pull générique (ces référentiels sont
+ * « en ligne uniquement », comme côté mobile — jamais dans
+ * `GET /referentiel/pull`, donc pas de `pullKey` possible ici).
+ */
+const CLE_EQUIPES_AERIENNES = 'equipes-aeriennes' as const
 
 /**
  * Écran Référentiels — docs/design_handoff_web/README.md §11.
@@ -876,10 +889,15 @@ export function ReferentielsPage() {
   // Une entité peut lire sa liste depuis sa propre route plutôt que le pull :
   // celui-ci ne transporte que le contrat hors-ligne du mobile (clés étrangères
   // brutes), sans les jointures ni les champs dérivés dont l'administration a besoin.
+  const surEquipesAeriennes = selectedKey === CLE_EQUIPES_AERIENNES
   const { data: writeListData, isLoading: writeListLoading } = useQuery<Row[]>({
     queryKey: ['referentiel-write-list', entity.write?.listPath ?? 'none'],
     queryFn: () => api.get(entity.write!.listPath!).then((r) => r.data),
-    enabled: Boolean(entity.write?.listPath),
+    // `entity` retombe sur `ENTITES[0]` quand l'onglet spécial Équipes
+    // aériennes est actif (cf. définition de `entity` ci-dessus) — sans ce
+    // garde-fou, cet onglet déclencherait quand même l'appel réseau de
+    // l'entité générique du dessous.
+    enabled: Boolean(entity.write?.listPath) && !surEquipesAeriennes,
   })
 
   const rows = useMemo(() => {
@@ -1123,11 +1141,11 @@ export function ReferentielsPage() {
     // les 28px latéraux alignent la colonne de gauche sur le fil d'Ariane du header,
     // lui aussi à px-[28px] dans Layout.
     <div className="grid grid-cols-[216px_1fr] items-start gap-5 px-7 pb-10 pt-[26px]">
-      {/* Colonne gauche — 7 cartes de navigation */}
+      {/* Colonne gauche — 7 cartes de navigation + Équipes aériennes */}
       <nav aria-label="Référentiels" className="flex flex-col gap-[7px]">
-        <SectionLabel>{`${ENTITES.length} référentiels`}</SectionLabel>
+        <SectionLabel>{`${ENTITES.length + 1} référentiels`}</SectionLabel>
         {ENTITES.map((e) => {
-          const active = e.key === entity.key
+          const active = !surEquipesAeriennes && e.key === selectedKey
           const count = data?.[e.pullKey]?.upserts.length ?? 0
           return (
             <button
@@ -1169,10 +1187,44 @@ export function ReferentielsPage() {
             </button>
           )
         })}
+        {/* Équipes/bases/stands aériens : « en ligne uniquement », comme côté
+            mobile — jamais dans le pull hors-ligne, donc pas de compteur ici. */}
+        <button
+          type="button"
+          aria-current={surEquipesAeriennes ? 'true' : undefined}
+          onClick={() => selectEntity(CLE_EQUIPES_AERIENNES)}
+          className={cn(
+            'flex items-center gap-[9px] rounded-[10px] border-[1.5px] px-[13px] py-[11px] text-left transition-colors duration-[120ms]',
+            surEquipesAeriennes
+              ? 'border-[#235a36] bg-ifvm-green-bg'
+              : 'border-[#e7e0cd] bg-white hover:bg-[#faf7ef]',
+          )}
+        >
+          <span className="min-w-0 flex-1">
+            <span
+              className={cn(
+                'block text-[12.5px]',
+                surEquipesAeriennes ? 'font-bold text-[#235a36]' : 'font-semibold text-[#3a3a30]',
+              )}
+            >
+              Équipes aériennes
+            </span>
+            <span className="block font-mono text-[10px] font-medium text-ifvm-text-weak">
+              equipe_aerienne
+            </span>
+          </span>
+          <span className="rounded-full bg-ifvm-green-bg px-[7px] py-0.5 font-sans text-[9px] font-bold text-ifvm-green-text">
+            API
+          </span>
+        </button>
       </nav>
 
       {/* Colonne droite */}
       <div className="flex flex-col gap-[14px]">
+        {surEquipesAeriennes ? (
+          <EquipesAeriennesSection />
+        ) : (
+          <>
         {/* Carte d'en-tête */}
         <div className="flex flex-col gap-[9px] rounded-[11px] border border-[#e7e0cd] bg-white px-5 py-4">
           <div className="flex items-center gap-[10px]">
@@ -1389,9 +1441,11 @@ export function ReferentielsPage() {
             {fraicheurTerrain}
           </div>
         )}
+          </>
+        )}
       </div>
 
-      {editingRow && entity.write && (
+      {!surEquipesAeriennes && editingRow && entity.write && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div
             role="dialog"
@@ -1467,7 +1521,7 @@ export function ReferentielsPage() {
         </div>
       )}
 
-      {creating && entity.write && (
+      {!surEquipesAeriennes && creating && entity.write && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div
             role="dialog"

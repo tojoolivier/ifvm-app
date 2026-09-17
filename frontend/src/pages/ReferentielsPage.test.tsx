@@ -52,11 +52,11 @@ describe('ReferentielsPage — maquette §11 du handoff', () => {
     vi.restoreAllMocks()
   })
 
-  it('liste les 8 référentiels de la colonne de navigation', async () => {
+  it('liste les 9 référentiels de la colonne de navigation', async () => {
     mockedGet.mockResolvedValue(pull())
     renderPage()
 
-    await waitFor(() => expect(nav().getByText('8 référentiels')).toBeInTheDocument())
+    await waitFor(() => expect(nav().getByText('9 référentiels')).toBeInTheDocument())
 
     for (const table of [
       'pesticide',
@@ -67,6 +67,7 @@ describe('ReferentielsPage — maquette §11 du handoff', () => {
       'lieu_aerien',
       'utilisateur',
       'campagne',
+      'equipe_aerienne',
     ]) {
       expect(nav().getByText(table)).toBeInTheDocument()
     }
@@ -76,13 +77,14 @@ describe('ReferentielsPage — maquette §11 du handoff', () => {
     mockedGet.mockResolvedValue(pull())
     renderPage()
 
-    await waitFor(() => expect(nav().getByText('8 référentiels')).toBeInTheDocument())
+    await waitFor(() => expect(nav().getByText('9 référentiels')).toBeInTheDocument())
 
-    // Les 8 référentiels exposent désormais au moins une lecture/écriture :
+    // Les 9 référentiels exposent désormais au moins une lecture/écriture :
     // culture (#130), code_stade, poste_acridien, station_fixe (#133),
-    // utilisateur, campagne, pesticide (#129, #134), lieu_aerien (#prospection-lieu-base).
+    // utilisateur, campagne, pesticide (#129, #134), lieu_aerien
+    // (#prospection-lieu-base), equipe_aerienne (assignation chef de base).
     expect(nav().queryAllByText('à créer')).toHaveLength(0)
-    expect(nav().getAllByText('API')).toHaveLength(8)
+    expect(nav().getAllByText('API')).toHaveLength(9)
   })
 
   it('affiche la matière active et la dose de référence sur les pesticides', async () => {
