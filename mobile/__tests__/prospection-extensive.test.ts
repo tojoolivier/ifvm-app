@@ -198,6 +198,16 @@ describe('speciesDataToPopulationRow / populationRowToSpeciesData — round-trip
   it('populationRowToSpeciesData renvoie des données vides si row est null', () => {
     expect(populationRowToSpeciesData(null)).toEqual(createEmptySpeciesData());
   });
+
+  it('populationRowToSpeciesData ne plante pas sur un stades_imago pré-JSON (ancien brouillon) — rapport ifvm-debug-1789630807888', () => {
+    const data = { ...createEmptySpeciesData(), totalCaptures: 7 };
+    const row = speciesDataToPopulationRow('LMC', data);
+    row.stades_imago = 'moyenne'; // valeur scalaire d'avant #stades-imago-persistance, pas du JSON
+
+    const restored = populationRowToSpeciesData(row);
+    expect(restored.stades).toEqual(createEmptySpeciesData().stades);
+    expect(restored.totalCaptures).toBe(7);
+  });
 });
 
 describe('larveSpeciesDataToPopulationRow / populationRowToLarveSpeciesData — round-trip larve', () => {
@@ -253,6 +263,16 @@ describe('larveSpeciesDataToPopulationRow / populationRowToLarveSpeciesData — 
 
   it('populationRowToLarveSpeciesData renvoie des données vides (par espèce) si row est null', () => {
     expect(populationRowToLarveSpeciesData('LMC', null)).toEqual(createEmptyLarveSpeciesData('LMC'));
+  });
+
+  it('populationRowToLarveSpeciesData ne plante pas sur un densites_larve pré-JSON (ancien brouillon) — rapport ifvm-debug-1789630807888', () => {
+    const data = { ...createEmptyLarveSpeciesData('NSE'), totalCaptures: 12 };
+    const row = larveSpeciesDataToPopulationRow('NSE', data);
+    row.densites_larve = 'Larve'; // valeur scalaire d'avant le passage en JSON, pas du JSON valide
+
+    const restored = populationRowToLarveSpeciesData('NSE', row);
+    expect(restored.stades).toEqual(createEmptyLarveSpeciesData('NSE').stades);
+    expect(restored.totalCaptures).toBe(12);
   });
 });
 

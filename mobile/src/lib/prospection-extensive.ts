@@ -339,7 +339,16 @@ export function populationRowToSpeciesData(row: PopulationRow | null): Extensive
   // que populationRowToLarveSpeciesData/densites_larve — le merge avec `empty.stades`
   // couvre les fiches enregistrées avant ce correctif (colonne encore `null`, retombe
   // proprement sur des 0 partout) et une éventuelle clé manquante dans un JSON ancien.
-  const parsedStadesImago = row.stades_imago ? (JSON.parse(row.stades_imago) as Partial<ExtensiveImagoSpeciesData['stades']>) : {};
+  let parsedStadesImago: Partial<ExtensiveImagoSpeciesData['stades']> = {};
+  if (row.stades_imago) {
+    try {
+      parsedStadesImago = JSON.parse(row.stades_imago) as Partial<ExtensiveImagoSpeciesData['stades']>;
+    } catch (error) {
+      // Silence délibéré : brouillon antérieur au correctif #stades-imago-persistance,
+      // stades_imago n'était pas encore du JSON — on retombe sur {} (⇒ empty.stades).
+      log.ignore(error, 'stades_imago au format pré-JSON (ancien brouillon) — repris à vide.');
+    }
+  }
   return {
     totalCaptures: row.captures_nombre ?? 0,
     activePhase: 'solitaire',
@@ -397,7 +406,16 @@ export function populationRowToLarveSpeciesData(
   const empty = createEmptyLarveSpeciesData(espece);
   if (!row) return empty;
 
-  const parsedStades = row.densites_larve ? JSON.parse(row.densites_larve) : {};
+  let parsedStades: Record<string, number> = {};
+  if (row.densites_larve) {
+    try {
+      parsedStades = JSON.parse(row.densites_larve);
+    } catch (error) {
+      // Silence délibéré : brouillon antérieur au passage de densites_larve en JSON —
+      // ancienne valeur scalaire, pas du JSON valide — on retombe sur {} (⇒ empty.stades).
+      log.ignore(error, 'densites_larve au format pré-JSON (ancien brouillon) — repris à vide.');
+    }
+  }
 
   return {
     totalCaptures: row.captures_nombre ?? 0,
