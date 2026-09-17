@@ -141,16 +141,36 @@ class EquipeAerienneModel(Base):
     """Équipe aérienne (#equipe-aerienne, migration 0066) : une équipe = un chef de
     base (`chef_de_base_id` UNIQUE) = une base aérienne principale
     (`BaseAerienneModel.equipe_id` UNIQUE). Demande utilisateur du 2026-09-16, en
-    continuité de la fiche de vol (migration 0064)."""
+    continuité de la fiche de vol (migration 0064).
+
+    `pilote`/`mecanicien`/`consultant_international` (migration 0071) : texte libre,
+    même choix que partout ailleurs dans le domaine aérien
+    (`fiche_vol.pilote`/`.mecanicien`, `traitement_aerien.pilote`/`.mecanicien`) —
+    externes à l'IFVM, pas des comptes `utilisateur`. Nullable en base pour ne pas
+    invalider les équipes créées avant cette migration ; `EquipeAerienneCreate`
+    (schéma API) exige `pilote`/`mecanicien` pour toute nouvelle équipe,
+    `consultant_international` reste facultatif des deux côtés.
+    `membres` (`equipe_aerienne_membre`, table fille) : les autres membres de
+    l'équipe au-delà de ces rôles nommés, en nombre variable — une liste, pas une
+    chaîne concaténée, pour rester en 1FN (chaque membre reste individuellement
+    identifiable/supprimable).
+    """
 
     __tablename__ = "equipe_aerienne"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     nom: Mapped[str] = mapped_column(Text(), nullable=False)
     chef_de_base_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    pilote: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    mecanicien: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    consultant_international: Mapped[str | None] = mapped_column(Text(), nullable=True)
     actif: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+
+    membres: Mapped[list["EquipeAerienneMembreModel"]] = relationship(
+        back_populates="equipe", cascade="all, delete-orphan", order_by="EquipeAerienneMembreModel.created_at"
+    )
 
     # Noms de contraintes explicites — doivent matcher la migration 0066 à
     # l'identique : `_traduire_integrite` (referentiel_sync_repository.py) et
@@ -164,6 +184,29 @@ class EquipeAerienneModel(Base):
             ondelete="RESTRICT",
         ),
         UniqueConstraint("chef_de_base_id", name="uq_equipe_aerienne_chef_de_base_id"),
+    )
+
+
+class EquipeAerienneMembreModel(Base):
+    """Membre supplémentaire d'une équipe aérienne (migration 0071), au-delà du chef
+    de base/pilote/mécanicien/consultant déjà nommés sur `EquipeAerienneModel` — un
+    nom, en nombre variable. Table fille plutôt qu'une chaîne concaténée sur
+    `equipe_aerienne` (1FN) : chaque membre reste identifiable et supprimable
+    individuellement, même patron que `fiche_vol_signature`/`traitement_rotation`."""
+
+    __tablename__ = "equipe_aerienne_membre"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    equipe_aerienne_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("equipe_aerienne.id", ondelete="CASCADE"), nullable=False
+    )
+    nom: Mapped[str] = mapped_column(Text(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+
+    equipe: Mapped[EquipeAerienneModel] = relationship(back_populates="membres")
+
+    __table_args__ = (
+        Index("ix_equipe_aerienne_membre_equipe_aerienne_id", "equipe_aerienne_id"),
     )
 
 

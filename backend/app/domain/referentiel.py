@@ -273,18 +273,40 @@ class ChefDeBaseDejaEquipeError(Exception):
 
 
 @dataclass
+class MembreEquipeAerienne:
+    """Membre d'une équipe aérienne au-delà des rôles nommés (chef de base, pilote,
+    mécanicien, consultant international) — migration 0071. Entité faible de
+    `EquipeAerienne`, un nom en nombre variable."""
+
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    equipe_aerienne_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    nom: str = ""
+
+
+@dataclass
 class EquipeAerienne:
     """Équipe aérienne (#equipe-aerienne, migration 0066) : une équipe = un chef de
     base (`chef_de_base_id` UNIQUE) = une base aérienne principale (`base_aerienne.
     equipe_id` UNIQUE, cf. `BaseAerienne`). Demande utilisateur du 2026-09-16, en
-    continuité de la fiche de vol (migration 0064)."""
+    continuité de la fiche de vol (migration 0064).
+
+    `pilote`/`mecanicien`/`consultant_international` (migration 0071) : texte libre,
+    externes à l'IFVM — même patron que `FicheVol`/`TraitementAerien`. Nullable
+    pour les équipes créées avant cette migration ; `pilote`/`mecanicien` sont
+    exigés par `EquipeAerienneCreate` pour toute nouvelle équipe,
+    `consultant_international` reste facultatif. `membres` couvre les autres
+    membres de l'équipe, en nombre variable."""
 
     id: uuid.UUID = field(default_factory=uuid.uuid4)
     nom: str = ""
     chef_de_base_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    pilote: str | None = None
+    mecanicien: str | None = None
+    consultant_international: str | None = None
     actif: bool = True
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
+    membres: list[MembreEquipeAerienne] = field(default_factory=list)
 
 
 @dataclass

@@ -642,7 +642,14 @@ async def create_equipe_aerienne(
 ):
     use_case = CreateEquipeAerienne(EquipeAerienneRepositoryImpl(db), UtilisateurRepositoryImpl(db))
     try:
-        return await use_case.execute(nom=body.nom, chef_de_base_id=body.chef_de_base_id)
+        return await use_case.execute(
+            nom=body.nom,
+            chef_de_base_id=body.chef_de_base_id,
+            pilote=body.pilote,
+            mecanicien=body.mecanicien,
+            consultant_international=body.consultant_international,
+            membres=[m.nom for m in body.membres],
+        )
     except ChefDeBaseEquipeInvalideError as exc:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
