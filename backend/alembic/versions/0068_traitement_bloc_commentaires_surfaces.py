@@ -15,15 +15,19 @@ valider_surfaces_bloc`, qui applique la règle correcte ci-dessus) — cette
 migration ne fait que corriger le texte pour qu'il cesse de contredire le
 comportement réel.
 
-Revision ID: 0067
-Revises: 0066
+Revision ID: 0068
+Revises: 0067
 Create Date: 2026-09-17
+
+Renumérotée 0067 -> 0068 (2026-09-17) : collision avec
+`0067_cible_detail_par_espece.py`, fusionnée entre-temps depuis `main` — deux
+migrations avaient indépendamment pris le numéro 0067 après 0066_equipe_aerienne.
 """
 
 from alembic import op
 
-revision = "0067"
-down_revision = "0066"
+revision = "0068"
+down_revision = "0067"
 branch_labels = None
 depends_on = None
 
