@@ -73,7 +73,11 @@ describe('DashboardScreen — Accès rapide', () => {
   // #fiche-vol-menu-entree : ce raccourci ouvre désormais un menu (créer un
   // lieu aérien, nouvelle fiche, mes fiches) plutôt que d'aller droit à la
   // création — d'où le libellé « Fiche de vol » plutôt que « Nouvelle ... ».
-  it('« Fiche de vol » est accessible depuis le tableau de bord', async () => {
+  // #fiche-vol-acces-roles : réservé au chef de base et à l'équipe aérienne —
+  // un chef de base ici, un prospecteur dans le test suivant.
+  it('« Fiche de vol » est accessible depuis le tableau de bord pour un chef de base', async () => {
+    useAuthStore.setState((state) => ({ user: { ...state.user, role: 'chef_de_base' } as any }));
+
     await render(
       <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
         <DashboardScreen />
@@ -84,4 +88,32 @@ describe('DashboardScreen — Accès rapide', () => {
     expect(screen.getByText('Fiche de vol')).toBeTruthy();
     expect(screen.queryByText('Prospections à revalider')).toBeNull();
   });
+
+  it('« Fiche de vol » n\'apparaît pas pour un rôle hors chef de base / équipe aérienne', async () => {
+    // role: 'prospecteur' posé par le beforeEach.
+    await render(
+      <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
+        <DashboardScreen />
+      </SafeAreaProvider>
+    );
+    await waitFor(() => expect(screen.getByText('ACCÈS RAPIDE')).toBeTruthy());
+
+    expect(screen.queryByText('Fiche de vol')).toBeNull();
+  });
+
+  it.each(['pilote', 'mecanicien'] as const)(
+    '« Fiche de vol » est accessible pour le rôle %s',
+    async (role) => {
+      useAuthStore.setState((state) => ({ user: { ...state.user, role } as any }));
+
+      await render(
+        <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
+          <DashboardScreen />
+        </SafeAreaProvider>
+      );
+      await waitFor(() => expect(screen.getByText('ACCÈS RAPIDE')).toBeTruthy());
+
+      expect(screen.getByText('Fiche de vol')).toBeTruthy();
+    }
+  );
 });

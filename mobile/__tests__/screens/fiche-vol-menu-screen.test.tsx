@@ -5,6 +5,7 @@
  */
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import FicheVolMenuScreen from '@/app/(fiche-vol)/menu';
+import { useAuthStore } from '@/lib/auth-store';
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
@@ -17,6 +18,8 @@ describe('FicheVolMenuScreen', () => {
   beforeEach(() => {
     mockPush.mockClear();
     mockBack.mockClear();
+    // #fiche-vol-acces-roles : réservé au chef de base et à l'équipe aérienne.
+    useAuthStore.setState({ user: { role: 'chef_de_base' } as any });
   });
 
   it('navigue vers les référentiels aériens', async () => {
@@ -35,5 +38,14 @@ describe('FicheVolMenuScreen', () => {
     await render(<FicheVolMenuScreen />);
     await fireEvent.press(screen.getByText('Mes fiches de vol'));
     expect(mockPush).toHaveBeenCalledWith('/(fiche-vol)/mes-fiches');
+  });
+
+  it('affiche un accès refusé pour un rôle hors chef de base / équipe aérienne', async () => {
+    useAuthStore.setState({ user: { role: 'prospecteur' } as any });
+
+    await render(<FicheVolMenuScreen />);
+
+    await screen.findByText('Accès réservé');
+    expect(screen.queryByText('Nouvelle fiche de vol')).toBeNull();
   });
 });
