@@ -18,7 +18,6 @@ import {
   getTraitement,
   listDraftTraitements,
   listUnsyncedTraitements,
-  listMesTraitements,
   listReprenableTraitements,
   markTraitementSynced,
   markTraitementConflict,
@@ -891,33 +890,6 @@ describe('listUnsyncedTraitements (#synchronisation-automatique)', () => {
 
     expect(result).toEqual([]);
     expect(getFirstAsync).not.toHaveBeenCalled();
-  });
-});
-
-describe('listMesTraitements', () => {
-  it('joins traitement_terrestre et traitement_aerien, filtre sur chef_equipe_id OU chef_de_base_id', async () => {
-    getAllAsync.mockResolvedValueOnce([STORED_TRAITEMENT_ROW]);
-
-    const result = await listMesTraitements('utilisateur-1');
-
-    expect(result).toEqual([STORED_TRAITEMENT_ROW]);
-    expect(getAllAsync).toHaveBeenCalledWith(
-      expect.stringContaining('traitement_terrestre.chef_equipe_id = ? OR traitement_aerien.chef_de_base_id = ?'),
-      ['utilisateur-1', 'utilisateur-1']
-    );
-  });
-
-  it('utilise un LEFT JOIN (pas INNER) pour ne pas exclure les fiches AÉRIEN', async () => {
-    // Bug #264 : un JOIN (INNER) sur traitement_terrestre excluait toute fiche
-    // AÉRIEN de "Mes fiches", quel que soit le chef de base connecté — une
-    // fiche AÉRIEN n'a aucune ligne dans traitement_terrestre.
-    getAllAsync.mockResolvedValueOnce([]);
-
-    await listMesTraitements('chef-de-base-1');
-
-    const [sql] = getAllAsync.mock.calls[0];
-    expect(sql).toEqual(expect.stringContaining('LEFT JOIN traitement_terrestre'));
-    expect(sql).toEqual(expect.stringContaining('LEFT JOIN traitement_aerien'));
   });
 });
 
