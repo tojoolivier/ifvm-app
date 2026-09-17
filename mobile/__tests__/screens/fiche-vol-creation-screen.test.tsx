@@ -78,7 +78,7 @@ describe('FicheVolCreationScreen', () => {
     mockReplace.mockClear();
     mockPush.mockClear();
     mockBaseOption = { id: 'base-1', parent_base_id: null, equipe_id: 'equipe-1' };
-    useAuthStore.setState({ token: 'token-test' } as any);
+    useAuthStore.setState({ token: 'token-test', user: { role: 'chef_de_base' } as any });
     jest.mocked(apiClient.createFicheVol).mockReset();
     jest.mocked(apiClient.listBasesAeriennes).mockReset().mockResolvedValue([] as any);
     jest.mocked(apiClient.listEquipesAeriennes).mockReset().mockResolvedValue([EQUIPE] as any);
@@ -181,5 +181,16 @@ describe('FicheVolCreationScreen', () => {
 
     await waitFor(() => expect(listCampagnesLocal).toHaveBeenCalled());
     expect(apiClient.createFicheVol).not.toHaveBeenCalled();
+  });
+
+  // #fiche-vol-acces-roles : garde-fou si cet écran est atteint par lien
+  // direct plutôt que depuis le menu (déjà filtré pour les autres rôles).
+  it('affiche un accès refusé pour un rôle hors chef de base / équipe aérienne', async () => {
+    useAuthStore.setState({ token: 'token-test', user: { role: 'prospecteur' } as any });
+
+    await render(<FicheVolCreationScreen />);
+
+    await screen.findByText('Accès réservé');
+    expect(screen.queryByPlaceholderText('Ex. Madagascar Hélicoptères')).toBeNull();
   });
 });
