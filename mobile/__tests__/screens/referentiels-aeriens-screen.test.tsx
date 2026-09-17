@@ -162,4 +162,32 @@ describe('ReferentielsAeriensScreen', () => {
     expect(screen.getByText('Créez d’abord une équipe aérienne.')).toBeTruthy();
     expect(screen.queryByText('+ Nouvelle base principale')).toBeNull();
   });
+
+  // #referentiel-echec-partiel : /equipes-aeriennes non déployé sur un
+  // environnement (404) ne doit pas retomber sur le bouton « Charger les
+  // référentiels » indéfiniment alors que les 3 autres référentiels ont bien
+  // été chargés — chacun d'eux est indépendant, l'écran doit rester utilisable.
+  it('reste utilisable (bases/stands) même si /equipes-aeriennes échoue', async () => {
+    jest.mocked(apiClient.listEquipesAeriennes).mockRejectedValue(new Error('Not Found'));
+    jest.mocked(apiClient.listBasesAeriennes).mockResolvedValue([
+      {
+        id: 'base-1',
+        numero: 'IHO01',
+        localite: 'Ihosy',
+        parent_base_id: null,
+        equipe_id: 'equipe-1',
+        actif: true,
+      },
+    ] as any);
+    jest.mocked(apiClient.listStandsRemplissage).mockResolvedValue([
+      { id: 'stand-1', numero: 'STD01', localite: 'Ihosy', actif: true },
+    ] as any);
+
+    await render(<ReferentielsAeriensScreen />);
+
+    await screen.findByText('IHO01 — Ihosy');
+    expect(screen.getByText('STD01 — Ihosy')).toBeTruthy();
+    expect(screen.getByText(/équipes aériennes/)).toBeTruthy();
+    expect(screen.queryByText('Charger les référentiels ›')).toBeNull();
+  });
 });

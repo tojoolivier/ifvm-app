@@ -6,6 +6,9 @@ import { useAuthStore } from '@/lib/auth-store';
 import { apiClient } from '@/lib/api-client';
 import { getCurrentPosition } from '@/lib/location';
 import { useAsyncAction } from '@/hooks/use-async-action';
+import { logger } from '@/lib/logger';
+
+const log = logger.child({ module: 'referentiels-aeriens' });
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -56,23 +59,49 @@ export default function ReferentielsAeriensScreen() {
   const [bases, setBases] = useState<Base[]>([]);
   const [stands, setStands] = useState<Stand[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [echecsPartiels, setEchecsPartiels] = useState<string[]>([]);
 
   const { run: runChargement, isRunning: isChargement } = useAsyncAction();
 
+  // `Promise.allSettled`, pas `Promise.all` : les quatre référentiels sont
+  // indépendants (bases secondaires et stands ne dépendent d'aucun des deux
+  // autres) — un seul en panne (ex. /equipes-aeriennes non déployé sur cet
+  // environnement) ne doit pas empêcher `loaded` de passer à `true` et
+  // renvoyer tout l'écran sur le lien de repli « Charger les référentiels »,
+  // alors que 3 référentiels sur 4 étaient en réalité disponibles.
   const charger = useCallback(
     () =>
       runChargement(
         async () => {
-          const [chefsRes, equipesRes, basesRes, standsRes] = await Promise.all([
+          const [chefsRes, equipesRes, basesRes, standsRes] = await Promise.allSettled([
             apiClient.listChefsDeBase(token!),
             apiClient.listEquipesAeriennes(token!),
             apiClient.listBasesAeriennes(token!),
             apiClient.listStandsRemplissage(token!),
           ]);
-          setChefs(chefsRes);
-          setEquipes(equipesRes);
-          setBases(basesRes);
-          setStands(standsRes);
+
+          const echecs: string[] = [];
+          if (chefsRes.status === 'fulfilled') setChefs(chefsRes.value);
+          else {
+            echecs.push('chefs de base');
+            log.ignore(chefsRes.reason, 'Chefs de base indisponibles — écran affiché en dégradé.');
+          }
+          if (equipesRes.status === 'fulfilled') setEquipes(equipesRes.value);
+          else {
+            echecs.push('équipes aériennes');
+            log.ignore(equipesRes.reason, 'Équipes aériennes indisponibles — écran affiché en dégradé.');
+          }
+          if (basesRes.status === 'fulfilled') setBases(basesRes.value);
+          else {
+            echecs.push('bases aériennes');
+            log.ignore(basesRes.reason, 'Bases aériennes indisponibles — écran affiché en dégradé.');
+          }
+          if (standsRes.status === 'fulfilled') setStands(standsRes.value);
+          else {
+            echecs.push('stands de remplissage');
+            log.ignore(standsRes.reason, 'Stands de remplissage indisponibles — écran affiché en dégradé.');
+          }
+          setEchecsPartiels(echecs);
           setLoaded(true);
         },
         { screen: 'referentiels-aeriens', precondition: !!token }
@@ -135,6 +164,18 @@ export default function ReferentielsAeriensScreen() {
         </View>
 
         <ScrollView contentContainerStyle={styles.content}>
+          {echecsPartiels.length > 0 && (
+            <View style={styles.avertissement}>
+              <Text style={styles.avertissementTexte}>
+                Indisponible pour le moment : {echecsPartiels.join(', ')}. Les autres référentiels
+                restent utilisables.
+              </Text>
+              <TouchableOpacity onPress={charger} accessibilityRole="button">
+                <Text style={styles.avertissementLien}>Réessayer ›</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           <SectionEquipes
             equipes={equipes}
             chefsLibres={chefsLibres}
@@ -685,6 +726,16 @@ const styles = StyleSheet.create({
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   chargerLinkText: { fontSize: 14, fontWeight: '700', color: GREEN },
   content: { paddingHorizontal: 16, paddingBottom: 24, gap: 14 },
+  avertissement: {
+    backgroundColor: '#fdf1e3',
+    borderWidth: 1,
+    borderColor: '#e8c99a',
+    borderRadius: 10,
+    padding: 11,
+    gap: 6,
+  },
+  avertissementTexte: { fontSize: 12, color: '#7a5a26', lineHeight: 16 },
+  avertissementLien: { fontSize: 12.5, fontWeight: '700', color: GREEN },
   section: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 12, padding: 13, gap: 8 },
   sectionTitle: { fontSize: 11, fontWeight: '700', color: TEXT_SECONDARY, letterSpacing: 0.5 },
   vide: { fontSize: 12.5, color: TEXT_SECONDARY, fontStyle: 'italic' },
