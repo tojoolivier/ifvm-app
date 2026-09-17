@@ -329,16 +329,16 @@ export default function DashboardScreen() {
               <ThemedText style={styles.quickTileText}>Nouveau traitement</ThemedText>
             </TouchableOpacity>
 
-            {/* #fiche-vol-creation-mobile : une fiche de vol regroupe tous les
-                vols d'un hélicoptère pour une date (ADR-011) — l'en-tête se
-                crée ici, la saisie des vols suit dans un chantier à venir. */}
+            {/* #fiche-vol-menu-entree : point d'entrée unique du parcours fiche
+                de vol — ouvre un menu (créer un lieu aérien, nouvelle fiche,
+                mes fiches) plutôt que d'aller droit à la création. */}
             <TouchableOpacity
               style={styles.quickTile}
-              onPress={() => navigateTo('/(fiche-vol)/creation')}
+              onPress={() => navigateTo('/(fiche-vol)/menu')}
               activeOpacity={0.85}
             >
               <ThemedText style={styles.quickTileIcon}>🛫</ThemedText>
-              <ThemedText style={styles.quickTileText}>Nouvelle fiche de vol</ThemedText>
+              <ThemedText style={styles.quickTileText}>Fiche de vol</ThemedText>
             </TouchableOpacity>
 
             <View style={[styles.quickTile, styles.quickTileDisabled]}>
