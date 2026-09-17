@@ -40,10 +40,11 @@ function clampTo5(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, roundTo5(value)));
 }
 
-// Champs de saisie décimale libre de la strate (Surf. rel. %, H. moy, % Verdissement,
-// % Repousse) : contrairement au Recouvrement (stepper dédié par pas de 5), on
-// conserve la valeur réellement saisie — seule la borne [min, max] est appliquée
-// pour les champs qui sont des pourcentages (H. moy n'en a aucune).
+// Champs de saisie décimale libre de la strate (Surf. rel. %, H. moy, % Verdissement) :
+// contrairement au Recouvrement (stepper dédié par pas de 5), on conserve la valeur
+// réellement saisie — seule la borne [min, max] est appliquée pour les champs qui sont
+// des pourcentages (H. moy n'en a aucune). Repousse (Présence/Absence) n'en fait pas
+// partie : ce n'est pas une saisie décimale (#repousse-presence-absence).
 function clampPercent(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -61,8 +62,10 @@ function formatDecimalDisplay(value: number | null): string {
   return value != null ? String(value).replace('.', ',') : '';
 }
 
-/** Les quatre champs décimaux libres d'une strate — tous `number | null` dans StrateFormValues. */
-type DecimalFieldKey = 'surfRel' | 'hMoy' | 'verdissement' | 'repousse';
+/** Les trois champs décimaux libres d'une strate — tous `number | null` dans
+ * StrateFormValues. Repousse n'en fait plus partie (#repousse-presence-absence) :
+ * Présence/Absence, pas une saisie décimale. */
+type DecimalFieldKey = 'surfRel' | 'hMoy' | 'verdissement';
 
 /** Les 5 champs phénologiques d'une strate (Néant/Rare/Beaucoup, multi-select) —
  * "orpad" est le nom historique conservé côté données pour Germination (fiches déjà
@@ -99,10 +102,10 @@ export default function VegetationScreen() {
     }
   }, [draftId, draft?.id, hydrateFromDraft, signalerChargement]);
   const [expandedStrate, setExpandedStrate] = useState<StrateKey | null>(null);
-  // Texte brut en cours de saisie pour les 4 champs décimaux libres de chaque strate
-  // (Surf. rel. %, H. moy, % Verdissement, % Repousse) — permet de taper un séparateur
-  // décimal ou un zéro de fin ("25,", "25,10") sans que le champ ne se reformate à
-  // chaque frappe (cf. `strate.xxx != null ? String(strate.xxx) : ''` sinon).
+  // Texte brut en cours de saisie pour les 3 champs décimaux libres de chaque strate
+  // (Surf. rel. %, H. moy, % Verdissement) — permet de taper un séparateur décimal ou
+  // un zéro de fin ("25,", "25,10") sans que le champ ne se reformate à chaque frappe
+  // (cf. `strate.xxx != null ? String(strate.xxx) : ''` sinon).
   const [decimalDrafts, setDecimalDrafts] = useState<
     Partial<Record<StrateKey, Partial<Record<DecimalFieldKey, string>>>>
   >({});
@@ -219,12 +222,13 @@ export default function VegetationScreen() {
 
   const setStrateField = <K extends keyof StrateFormValues>(key: StrateKey, field: K, value: StrateFormValues[K]) => {
     // Recouvrement reste par pas de 5 (stepper dédié, cf. handleRecouvrementChange). Les
-    // trois autres pourcentages (surfRel, verdissement, repousse) sont des saisies libres
-    // décimales, seulement bornées à [0, 100] — H. moy n'a aucune contrainte connue.
+    // deux autres pourcentages (surfRel, verdissement) sont des saisies libres décimales,
+    // seulement bornées à [0, 100] — H. moy n'a aucune contrainte connue. Repousse est un
+    // booléen Présence/Absence (#repousse-presence-absence), jamais borné ici.
     let processedValue = value;
     if (typeof value === 'number' && field === 'recouvrement') {
       processedValue = clampTo5(value, 0, 100) as StrateFormValues[K];
-    } else if (typeof value === 'number' && ['surfRel', 'verdissement', 'repousse'].includes(field as string)) {
+    } else if (typeof value === 'number' && ['surfRel', 'verdissement'].includes(field as string)) {
       processedValue = clampPercent(value, 0, 100) as StrateFormValues[K];
     }
     setStrates((current) => ({ ...current, [key]: { ...current[key], [field]: processedValue } }));
@@ -449,14 +453,27 @@ export default function VegetationScreen() {
                           />
                         </View>
                         <View style={styles.field}>
-                          <Text style={styles.fieldLabel}>% Repousse</Text>
-                          <TextInput
-                            value={getDecimalDraft(key, 'repousse') ?? formatDecimalDisplay(strate.repousse)}
-                            onChangeText={(v) => handleDecimalChange(key, 'repousse', v, { min: 0, max: 100 })}
-                            onBlur={() => handleDecimalBlur(key, 'repousse')}
-                            keyboardType="decimal-pad"
-                            style={styles.fieldInput}
-                          />
+                          <Text style={styles.fieldLabel}>Repousse</Text>
+                          <View style={styles.chipsRow}>
+                            {([
+                              { value: true, label: 'Présence' },
+                              { value: false, label: 'Absence' },
+                            ] as const).map((option) => {
+                              const active = strate.repousse === option.value;
+                              return (
+                                <TouchableOpacity
+                                  key={String(option.value)}
+                                  onPress={() => setStrateField(key, 'repousse', option.value)}
+                                  style={[styles.smallChip, active && styles.smallChipActive]}
+                                  activeOpacity={0.8}
+                                >
+                                  <Text style={[styles.smallChipText, active && styles.smallChipTextActive]}>
+                                    {option.label}
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
                         </View>
                       </View>
 

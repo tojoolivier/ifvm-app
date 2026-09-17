@@ -81,7 +81,9 @@ export interface StrateDetail {
   hMoy: number | null;
   recouvrement: number;
   verdissement: number | null;
-  repousse: number | null;
+  // Présence/Absence (#repousse-presence-absence) — jamais un pourcentage saisi,
+  // contrairement à verdissement.
+  repousse: boolean | null;
   /** Germination — nom historique "orpad" conservé côté données (fiches déjà
    * synchronisées avant le renommage d'affichage), seul le libellé UI a changé. */
   orpad: string[];
@@ -170,7 +172,7 @@ export function parseVegetationSol(
           hMoy: typeof detail.hMoy === 'number' ? detail.hMoy : null,
           recouvrement: clampRecouvrement(detail.recouvrement ?? 0),
           verdissement: typeof detail.verdissement === 'number' ? detail.verdissement : null,
-          repousse: typeof detail.repousse === 'number' ? detail.repousse : null,
+          repousse: typeof detail.repousse === 'boolean' ? detail.repousse : null,
           orpad: Array.isArray(detail.orpad) ? detail.orpad : [],
           feuille: Array.isArray(detail.feuille) ? detail.feuille : [],
           fleur: Array.isArray(detail.fleur) ? detail.fleur : [],
