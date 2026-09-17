@@ -737,6 +737,103 @@ async def test_update_bloc_inexistant_404(
     assert resp.status_code == 404
 
 
+# #surface-bloc-mode-infestee : TOTAL (produit de choc) n'attend que
+# surface_traitee_ha, BARRIERE (produit de barrière) n'attend que
+# surface_protegee_ha, et la valeur renseignée ne doit pas dépasser la
+# surface infestée de la prospection liée.
+
+
+@pytest.mark.asyncio
+async def test_add_bloc_mode_total_avec_surface_protegee_422(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_bloc
+):
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surface_infestee=5000.0
+    )
+    created = await client.post(
+        "/traitements",
+        json=payload_traitement(prospection_id, mode_traitement="TOTAL"),
+        headers=auth_headers,
+    )
+    traitement_id = created.json()["id"]
+
+    resp = await client.post(
+        f"/traitements/{traitement_id}/blocs",
+        json=payload_bloc(surface_protegee_ha=2000.0, surface_traitee_ha=None),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_add_bloc_mode_barriere_avec_surface_traitee_422(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_bloc
+):
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surface_infestee=5000.0
+    )
+    created = await client.post(
+        "/traitements",
+        json=payload_traitement(prospection_id, mode_traitement="BARRIERE"),
+        headers=auth_headers,
+    )
+    traitement_id = created.json()["id"]
+
+    resp = await client.post(
+        f"/traitements/{traitement_id}/blocs",
+        json=payload_bloc(surface_protegee_ha=None, surface_traitee_ha=2000.0),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_add_bloc_mode_total_avec_surface_traitee_seule_201(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_bloc
+):
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surface_infestee=5000.0
+    )
+    created = await client.post(
+        "/traitements",
+        json=payload_traitement(prospection_id, mode_traitement="TOTAL"),
+        headers=auth_headers,
+    )
+    traitement_id = created.json()["id"]
+
+    resp = await client.post(
+        f"/traitements/{traitement_id}/blocs",
+        json=payload_bloc(surface_protegee_ha=None, surface_traitee_ha=2000.0),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    bloc = resp.json()["aerien"]["blocs"][0]
+    assert bloc["surface_traitee_ha"] == 2000.0
+    assert bloc["surface_protegee_ha"] is None
+
+
+@pytest.mark.asyncio
+async def test_add_bloc_surface_depasse_surface_infestee_422(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_bloc
+):
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surface_infestee=1000.0
+    )
+    created = await client.post(
+        "/traitements",
+        json=payload_traitement(prospection_id, mode_traitement="TOTAL"),
+        headers=auth_headers,
+    )
+    traitement_id = created.json()["id"]
+
+    resp = await client.post(
+        f"/traitements/{traitement_id}/blocs",
+        json=payload_bloc(surface_protegee_ha=None, surface_traitee_ha=2000.0),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 422
+
+
 @pytest.mark.asyncio
 async def test_delete_bloc_detache_ses_rotations(
     client,

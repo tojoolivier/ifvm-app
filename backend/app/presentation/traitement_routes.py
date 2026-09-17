@@ -27,6 +27,8 @@ from app.auth import get_current_user
 from app.database import get_db
 from app.domain.traitement import (
     BlocIntrouvableError,
+    BlocModeIncoherentError,
+    BlocSurfaceDepasseInfesteeError,
     ChefDeBaseInvalideError,
     ChefEquipeInvalideError,
     EvaluationRisquePopulation,
@@ -423,6 +425,8 @@ async def add_bloc(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except TraitementVerrouilleError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except (BlocModeIncoherentError, BlocSurfaceDepasseInfesteeError) as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
 
 @router.put("/{traitement_id}/blocs/{bloc_id}", response_model=TraitementRead)
@@ -454,6 +458,8 @@ async def update_bloc(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except TraitementVerrouilleError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except (BlocModeIncoherentError, BlocSurfaceDepasseInfesteeError) as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
 
 @router.delete("/{traitement_id}/blocs/{bloc_id}", response_model=TraitementRead)

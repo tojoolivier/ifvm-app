@@ -61,6 +61,20 @@ class RotationBlocInvalideError(ValueError):
     """`bloc_id` d'une rotation ne référence pas un bloc du même traitement aérien."""
 
 
+class BlocModeIncoherentError(ValueError):
+    """`surface_traitee_ha`/`surface_protegee_ha` d'un bloc ne correspond pas au
+    `mode_traitement` du traitement (#surface-bloc-mode-infestee) : TOTAL (produit
+    de choc) renseigne `surface_traitee_ha` (et laisse `surface_protegee_ha` à
+    zéro/vide) ; BARRIERE (produit de barrière) renseigne `surface_protegee_ha`
+    (et laisse `surface_traitee_ha` à zéro/vide) — jamais les deux à la fois."""
+
+
+class BlocSurfaceDepasseInfesteeError(ValueError):
+    """La surface traitée/protégée d'un bloc dépasse la surface infestée de la
+    prospection liée (`Traitement.cible.surface_infestee_ha`,
+    #surface-bloc-mode-infestee)."""
+
+
 class ProduitUtiliseIntrouvableError(LookupError):
     """Le produit utilisé référencé n'existe pas pour ce traitement terrestre."""
 
@@ -152,15 +166,58 @@ class Bloc:
     localite: str | None = None
     surface_theorique_ha: float | None = None
     surface_reelle_ha: float | None = None
-    # Renseignée si produit de choc.
+    # Renseignée si produit de barrière (mode_traitement BARRIERE) — corrigé le
+    # 2026-09-17, ce commentaire (et celui de surface_traitee_ha ci-dessous)
+    # étaient inversés depuis la migration 0064 (#surface-bloc-mode-infestee).
     surface_protegee_ha: float | None = None
-    # Renseignée si produit de barrière.
+    # Renseignée si produit de choc (mode_traitement TOTAL).
     surface_traitee_ha: float | None = None
     largeur_andain_m: float | None = None
     interpasse_m: float | None = None
     hauteur_vol_min_m: float | None = None
     hauteur_vol_max_m: float | None = None
     observation: str | None = None
+
+
+def valider_surfaces_bloc(
+    mode_traitement: str | None,
+    cible: "Cible | None",
+    surface_protegee_ha: float | None,
+    surface_traitee_ha: float | None,
+) -> None:
+    """#surface-bloc-mode-infestee : TOTAL (produit de choc) attend
+    `surface_traitee_ha`, avec `surface_protegee_ha` à zéro/vide ; BARRIERE
+    (produit de barrière) attend l'inverse. IRREGULIER (ou mode absent)
+    n'impose rien — même tolérance que `typeProduitAttendu` côté mobile
+    (referentiel-db.ts), qui ne restreint le produit que pour TOTAL/BARRIERE.
+
+    La valeur renseignée (quel que soit le champ) ne doit pas dépasser la
+    surface infestée de la prospection liée (`cible.surface_infestee_ha`) —
+    aucun contrôle si `cible`/`surface_infestee_ha` est inconnu (rien à
+    borner)."""
+    protegee = surface_protegee_ha or 0
+    traitee = surface_traitee_ha or 0
+
+    if mode_traitement == "TOTAL" and protegee > 0:
+        raise BlocModeIncoherentError(
+            "mode_traitement TOTAL (produit de choc) : surface_protegee_ha doit "
+            "rester à zéro, seule surface_traitee_ha est attendue."
+        )
+    if mode_traitement == "BARRIERE" and traitee > 0:
+        raise BlocModeIncoherentError(
+            "mode_traitement BARRIERE (produit de barrière) : surface_traitee_ha "
+            "doit rester à zéro, seule surface_protegee_ha est attendue."
+        )
+
+    surface_infestee = cible.surface_infestee_ha if cible is not None else None
+    if surface_infestee is None:
+        return
+    for valeur in (protegee, traitee):
+        if valeur > surface_infestee:
+            raise BlocSurfaceDepasseInfesteeError(
+                f"{valeur} ha dépasse la surface infestée de la prospection "
+                f"({surface_infestee} ha)."
+            )
 
 
 @dataclass
