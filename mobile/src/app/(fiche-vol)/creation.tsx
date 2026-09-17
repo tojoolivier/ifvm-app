@@ -12,6 +12,8 @@ import { DateField } from '@/components/DateField';
 import { BaseAerienneField, type BaseAerienneOption } from '@/components/referentiel/BaseAerienneField';
 import { StandRemplissageField, type StandRemplissageOption } from '@/components/referentiel/StandRemplissageField';
 import { ProspectionValideeField, type ProspectionValideeOption } from '@/components/referentiel/ProspectionValideeField';
+import { peutSaisirFicheVol } from '@/lib/fiche-vol-access';
+import { AccesRestreint } from '@/components/fiche-vol/AccesRestreint';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -29,15 +31,21 @@ function todayIso(): string {
  * regroupe tous les vols d'un hélicoptère pour une date donnée (ADR-011) ;
  * cet écran ne crée que l'en-tête (équipage, base de rattachement,
  * hélicoptère) : la saisie des vols eux-mêmes (chrono, MEP/Application/
- * Prospection, Convoyage/Divers) sera son propre chantier, à la suite.
+ * Prospection, Convoyage/Divers) continue ensuite sur l'écran de
+ * récapitulatif (`(fiche-vol)/recap.tsx`).
  *
  * Création en ligne uniquement, comme `BaseAerienneField`/`StandRemplissageField`
  * — pas de `syncPush` ici : `numero_fiche` est généré côté serveur.
+ *
+ * Réservé au chef de base et à l'équipe aérienne (#fiche-vol-acces-roles) —
+ * garde-fou au cas où cet écran serait atteint par lien direct plutôt que
+ * depuis `(fiche-vol)/menu.tsx`, déjà filtré pour les autres rôles.
  */
 export default function FicheVolCreationScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const token = useAuthStore((s) => s.token);
+  const role = useAuthStore((s) => s.user?.role);
   const { run, isRunning: isSaving } = useAsyncAction();
 
   const [dateVol, setDateVol] = useState<string | null>(todayIso());
@@ -158,6 +166,10 @@ export default function FicheVolCreationScreen() {
       }
     );
   };
+
+  if (!peutSaisirFicheVol(role)) {
+    return <AccesRestreint />;
+  }
 
   return (
     <View style={styles.root}>
