@@ -1,75 +1,120 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
+import { Text, TouchableOpacity, FlatList, StyleSheet, Alert } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { listMesTraitements, DraftTraitementRow } from '@/lib/traitement-repository';
-import { useAuthStore } from '@/lib/auth-store';
+import { listDraftTraitements, deleteDraftTraitement, DraftTraitementRow } from '@/lib/traitement-repository';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
 import { runTask } from '@/lib/run-task';
+import { useAsyncAction } from '@/hooks/use-async-action';
 import { EtatVide } from '@/components/erreurs/etat-vide';
 
 /**
- * Écran "Mes fiches" (Lot 3) — fiches de traitement dont l'utilisateur
- * connecté est responsable (chef d'équipe Terrestre ou chef de base Aérien),
- * à partir de la copie locale déjà synchronisée.
+ * Écran "Mes fiches" (traitement) — brouillons locaux (`listDraftTraitements`),
+ * sur son propre écran plutôt qu'en liste dépliée sur `select.tsx` (#liste-
+ * mes-fiches-melangee-boutons) : la liste apparaissait auparavant mélangée
+ * aux boutons Nouveau traitement / Mes fiches / Zones à reprendre sur le
+ * même écran, au lieu de vivre dans "Mes fiches" comme les deux autres
+ * boutons vivent déjà chacun dans leur propre écran.
  */
 export default function TraitementMesFichesScreen() {
   const router = useRouter();
-  const user = useAuthStore((s) => s.user);
-  const [fiches, setFiches] = useState<DraftTraitementRow[]>([]);
-  const [loading, setLoading] = useState(() => !!user?.id);
+  const [drafts, setDrafts] = useState<DraftTraitementRow[]>([]);
   const [erreurDeLecture, setErreurDeLecture] = useState<unknown>(null);
+  const { run: runDelete } = useAsyncAction();
 
   const charger = useCallback(() => {
-    const utilisateurId = user?.id;
-    if (!utilisateurId) {
-      return;
-    }
-    void runTask(() => listMesTraitements(utilisateurId), {
+    void runTask(() => listDraftTraitements(), {
       name: 'traitement.mesFiches',
       criticality: 'essential',
     }).then((outcome) => {
       setErreurDeLecture(outcome.ok ? null : outcome.error);
-      if (outcome.ok) setFiches(outcome.value);
-      setLoading(false);
+      if (outcome.ok) setDrafts(outcome.value);
     });
-  }, [user?.id]);
+  }, []);
 
   useEffect(() => {
     charger();
   }, [charger]);
 
-  const openFiche = (fiche: DraftTraitementRow) => {
+  const openFiche = (draft: DraftTraitementRow) => {
     router.push({
       pathname: '/(traitement)/references' as any,
-      params: { traitementId: fiche.id, isValidationView: '1' },
+      params: { traitementId: draft.id, isValidationView: '1' },
     });
+  };
+
+  /**
+   * Fiches restées bloquées « ÉCHEC ENVOI » sans espoir d'aboutir (brouillon
+   * abandonné avec des champs obligatoires jamais remplis) : `deleteDraftTraitement`
+   * refuse toute fiche déjà `'validee'` (même garde que `deleteDraftProspection`,
+   * prospection.tsx), donc rien de connu du serveur ne peut être perdu par ce geste.
+   */
+  const handleDelete = (draft: DraftTraitementRow) => {
+    Alert.alert(
+      'Supprimer la fiche ?',
+      'Cette fiche brouillon sera définitivement supprimée.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: () =>
+            runDelete(
+              async () => {
+                await deleteDraftTraitement(draft);
+                charger();
+              },
+              { screen: 'traitement.mesFiches', context: { draftId: draft.id } }
+            ),
+        },
+      ]
+    );
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>Mes fiches</Text>
 
-      {loading ? (
-        <Text style={styles.emptyText}>Chargement…</Text>
-      ) : (
-        <FlatList
-          style={styles.list}
-          data={fiches}
-          keyExtractor={(item) => item.id}
-          ListEmptyComponent={
-            <EtatVide erreur={erreurDeLecture} titreVide="Aucune fiche pour le moment." onReessayer={charger} />
-          }
-          renderItem={({ item }) => (
+      <FlatList
+        style={styles.list}
+        data={drafts}
+        keyExtractor={(item) => item.id}
+        ListEmptyComponent={
+          <EtatVide erreur={erreurDeLecture} titreVide="Aucune fiche pour le moment." onReessayer={charger} />
+        }
+        renderItem={({ item }) => {
+          const row = (
             <TouchableOpacity style={styles.row} onPress={() => openFiche(item)}>
               <Text style={styles.rowTitle}>{item.numero_fiche ?? 'généré à l’enregistrement'}</Text>
               <Text style={styles.rowSubtitle}>
                 {item.type_traitement} · {item.localite ?? 'localité non renseignée'}
               </Text>
             </TouchableOpacity>
-          )}
-        />
-      )}
+          );
+
+          // Swipe-to-delete réservé aux brouillons : une fiche déjà validée
+          // n'est de toute façon pas supprimable (garde dans
+          // `deleteDraftTraitement`) — autant ne pas proposer le geste.
+          if (item.statut !== 'brouillon') return row;
+
+          return (
+            <Swipeable
+              renderRightActions={() => (
+                <TouchableOpacity
+                  style={styles.deleteAction}
+                  onPress={() => handleDelete(item)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.deleteActionText}>Supprimer</Text>
+                </TouchableOpacity>
+              )}
+            >
+              {row}
+            </Swipeable>
+          );
+        }}
+      />
 
       <TouchableOpacity style={styles.backLink} onPress={() => router.back()}>
         <Text style={styles.backLinkText}>‹ Retour</Text>
@@ -86,7 +131,6 @@ const styles = StyleSheet.create({
     color: traitementColors.texteTitre,
   },
   list: { flex: 1 },
-  emptyText: { fontFamily: traitementFonts.ui, color: traitementColors.texteLabel, textAlign: 'center', marginTop: 20 },
   row: {
     backgroundColor: '#fff',
     borderWidth: 1,
@@ -98,6 +142,15 @@ const styles = StyleSheet.create({
   },
   rowTitle: { fontFamily: traitementFonts.mono, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre },
   rowSubtitle: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.label, color: traitementColors.texteSecondaire },
+  deleteAction: {
+    backgroundColor: '#DC2626',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    borderRadius: traitementRadii.carte,
+    marginBottom: 8,
+  },
+  deleteActionText: { fontFamily: traitementFonts.uiBold, color: '#FFFFFF', fontSize: traitementTypeSizes.label },
   backLink: {
     borderWidth: 1,
     borderStyle: 'dashed',

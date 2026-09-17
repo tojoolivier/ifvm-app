@@ -1,20 +1,16 @@
 /**
  * Écran « Fiches de traitement » (select.tsx) — #boutons-fiches-de-traitement.
  *
- * L'ancien bouton « Consulter une fiche validée » de CET écran (qui bascule la
- * liste locale des brouillons via `listDraftTraitements` — à ne pas confondre
- * avec le slide `prospection-picker.tsx`, qui porte le même titre mais est un
- * écran totalement différent, atteint depuis « Nouvelle fiche de traitement »,
- * et reste inchangé) est renommé « Mes fiches », avec exactement le même
- * comportement fonctionnel. L'ancien bouton « Mes fiches » (qui pointait vers
- * l'écran séparé /(traitement)/mes-fiches) est supprimé : il ne doit plus en
- * rester qu'un seul sur cette page.
+ * "Mes fiches" ouvrait auparavant sa liste directement sur cet écran, mêlée
+ * aux boutons (#liste-mes-fiches-melangee-boutons). Chacun des trois boutons
+ * ouvre désormais son propre écran dédié : "Mes fiches" sur
+ * /(traitement)/mes-fiches, comme "Zones à reprendre" le fait déjà sur
+ * /(traitement)/zones-a-reprendre — ce fichier ne teste donc plus que la
+ * navigation, le contenu de la liste étant couvert par
+ * traitement-mes-fiches-screen.test.tsx.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-
-const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import TraitementSelectScreen from '@/app/(traitement)/select';
-import * as traitementRepository from '@/lib/traitement-repository';
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
@@ -25,15 +21,10 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockRouteParams,
 }));
 
-jest.mock('@/lib/traitement-repository', () => ({
-  listDraftTraitements: jest.fn().mockResolvedValue([]),
-}));
-
 beforeEach(() => {
   mockPush.mockClear();
   mockReplace.mockClear();
   mockRouteParams = {};
-  jest.mocked(traitementRepository.listDraftTraitements).mockReset().mockResolvedValue([]);
 });
 
 describe('TraitementSelectScreen — boutons de la page « Fiches de traitement »', () => {
@@ -41,11 +32,8 @@ describe('TraitementSelectScreen — boutons de la page « Fiches de traitement 
     await render(<TraitementSelectScreen />);
 
     expect(screen.getByText('Nouvelle fiche de traitement')).toBeVisible();
-    expect(screen.getByText('Zones à reprendre')).toBeVisible();
-    // Un seul « Mes fiches » : ni doublon, ni ancien libellé « Consulter une
-    // fiche validée » (qui reste réservé au slide prospection-picker.tsx).
     expect(screen.getAllByText('Mes fiches')).toHaveLength(1);
-    expect(screen.queryByText('Consulter une fiche validée')).toBeNull();
+    expect(screen.getByText('Zones à reprendre')).toBeVisible();
   });
 
   it('« Nouvelle fiche de traitement » fonctionne toujours (sans prospectionId, ouvre le sélecteur de prospection)', async () => {
@@ -56,48 +44,19 @@ describe('TraitementSelectScreen — boutons de la page « Fiches de traitement 
     expect(mockPush).toHaveBeenCalledWith('/(traitement)/prospection-picker');
   });
 
+  it('« Mes fiches » ouvre désormais son propre écran, sans afficher de liste ici', async () => {
+    await render(<TraitementSelectScreen />);
+
+    fireEvent.press(screen.getByText('Mes fiches'));
+
+    expect(mockPush).toHaveBeenCalledWith('/(traitement)/mes-fiches');
+  });
+
   it('« Zones à reprendre » fonctionne toujours', async () => {
     await render(<TraitementSelectScreen />);
 
     fireEvent.press(screen.getByText('Zones à reprendre'));
 
     expect(mockPush).toHaveBeenCalledWith('/(traitement)/zones-a-reprendre');
-  });
-
-  it('« Mes fiches » (ex-« Consulter une fiche validée ») conserve le même comportement : bascule la liste locale des brouillons', async () => {
-    jest.mocked(traitementRepository.listDraftTraitements).mockResolvedValue([
-      { id: 'trait-1', numero_fiche: 'F-1', type_traitement: 'AERIEN', localite: 'Betioky' } as any,
-    ]);
-
-    await render(<TraitementSelectScreen />);
-    expect(traitementRepository.listDraftTraitements).not.toHaveBeenCalled();
-
-    fireEvent.press(screen.getByText('Mes fiches'));
-
-    await waitFor(() => expect(traitementRepository.listDraftTraitements).toHaveBeenCalled());
-    expect(await screen.findByText('F-1')).toBeVisible();
-    await settle();
-
-    // Re-presser referme la liste (bascule), sans nouvel appel réseau/local.
-    jest.mocked(traitementRepository.listDraftTraitements).mockClear();
-    fireEvent.press(screen.getByText('Mes fiches'));
-    await settle();
-    expect(screen.queryByText('F-1')).toBeNull();
-    expect(traitementRepository.listDraftTraitements).not.toHaveBeenCalled();
-  });
-
-  it('sélectionner une fiche dans la liste ouvre Références en lecture seule (comportement inchangé)', async () => {
-    jest.mocked(traitementRepository.listDraftTraitements).mockResolvedValue([
-      { id: 'trait-1', numero_fiche: 'F-1', type_traitement: 'AERIEN', localite: 'Betioky' } as any,
-    ]);
-
-    await render(<TraitementSelectScreen />);
-    fireEvent.press(screen.getByText('Mes fiches'));
-    fireEvent.press(await screen.findByText('F-1'));
-
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(traitement)/references',
-      params: { traitementId: 'trait-1', isValidationView: '1' },
-    });
   });
 });
