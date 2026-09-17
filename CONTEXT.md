@@ -315,6 +315,20 @@ mobile/src/app/
 | Build | EAS Build (APK sideload) | `mobile/eas.json` |
 | Variables d'env | `EXPO_PUBLIC_API_URL` | `mobile/.env` |
 
+> **Contrat `EXPO_PUBLIC_API_URL` / `ROOT_PATH`.** En local, `EXPO_PUBLIC_API_URL=http://localhost:8000`
+> (ou `http://10.0.2.2:8000` sur émulateur Android, cf. `mobile/.env`) pointe directement sur le
+> backend FastAPI, qui expose ses routes **sans préfixe** (`app.include_router(..., prefix="")`
+> dans `backend/app/main.py`, ex. `GET /equipes-aeriennes`, pas `/api/equipes-aeriennes`).
+> En preview/production (`mobile/eas.json`), `EXPO_PUBLIC_API_URL=https://ifvm.orakotondravao.com/api`
+> suppose qu'un reverse proxy placé devant le backend **retire le préfixe `/api`** avant de
+> transmettre la requête à uvicorn — c'est ce même préfixe que `ROOT_PATH` (variable backend,
+> cf. `.env.example`) sert uniquement à réintégrer dans les URLs générées par FastAPI (docs
+> OpenAPI, redirections), pas à faire le routing lui-même (`ProxyHeadersMiddleware` d'uvicorn ne
+> gère que `X-Forwarded-For`/`-Proto`, pas le strip de préfixe). **Si le reverse proxy en
+> production ne retire pas `/api`, toutes les routes referentiels/fiches-vol renvoient 404**
+> côté mobile (symptôme observé : `equipes-aeriennes`, `referentiels-aeriens`) — c'est une
+> config d'infra externe au repo, à vérifier sur le serveur, pas un bug applicatif.
+
 ### Commandes essentielles
 
 ```bash
