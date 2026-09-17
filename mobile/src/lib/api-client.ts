@@ -3,7 +3,7 @@ import {
   RequestLogEntry,
 } from './request-log-store';
 import type { components } from './api-schema.generated';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from './storage';
 import { AuthError, NetworkError, isTypedError } from './errors';
 import { logger } from './logger';
 
@@ -490,8 +490,14 @@ export function isTokenExpired(
  * Utiliser refreshAccessTokenSingleFlight().
  */
 async function refreshAccessToken(): Promise<string | null> {
+  // `storage` (expo-secure-store, cf. lib/storage.ts) — pas AsyncStorage : le
+  // jeton de rafraîchissement est écrit là par auth-store.ts au login
+  // (storage.setItem(refreshTokenKey, ...)). Lire depuis un autre magasin le
+  // rendait invisible ici, donc ce rafraîchissement échouait systématiquement
+  // (#refresh-token-mauvais-magasin) — l'app affichait « Session expirée »
+  // dès le premier jeton d'accès expiré, jamais un vrai rafraîchissement.
   const refreshToken =
-    await AsyncStorage.getItem(
+    await storage.getItem(
       REFRESH_TOKEN_KEY
     );
 
@@ -552,10 +558,18 @@ async function refreshAccessToken(): Promise<string | null> {
     return null;
   }
 
-  await AsyncStorage.setItem(
+  await storage.setItem(
     TOKEN_KEY,
     data.access_token
   );
+
+  // Propage le nouveau jeton au store d'auth (Zustand) — sans ça, `token` en
+  // mémoire (lu par tous les écrans via `useAuthStore((s) => s.token)`) reste
+  // l'ancien jeton expiré : chaque appel suivant re-déclencherait ce même
+  // rafraîchissement au lieu de réutiliser celui-ci. Import dynamique pour
+  // éviter le cycle statique (`auth-store.ts` importe déjà `apiClient` d'ici).
+  const { useAuthStore } = await import('./auth-store');
+  useAuthStore.setState({ token: data.access_token });
 
   return data.access_token;
 }

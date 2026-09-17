@@ -10,6 +10,13 @@ import {
   type LotSync,
 } from '../src/lib/sync-lot';
 
+// `api-client.ts` importe `storage` (expo-secure-store) — sans mock, le
+// projet Jest "logic" (environnement node, sans jest.setup.js) tente de
+// charger `react-native` réellement et échoue sur sa syntaxe Flow.
+jest.mock('../src/lib/storage', () => ({
+  storage: { getItem: jest.fn(), setItem: jest.fn(), deleteItem: jest.fn() },
+}));
+
 jest.mock('../src/lib/logger', () => {
   const child = { failure: jest.fn(), event: jest.fn(), ignore: jest.fn() };
   return {
