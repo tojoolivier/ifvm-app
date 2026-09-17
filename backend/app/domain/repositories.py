@@ -41,10 +41,6 @@ class CampagneRepository(ABC):
         pass
 
     @abstractmethod
-    async def delete(self, campagne_id: uuid.UUID) -> bool:
-        pass
-
-    @abstractmethod
     async def list_since(self, since: datetime | None) -> list[Campagne]:
         pass
 
