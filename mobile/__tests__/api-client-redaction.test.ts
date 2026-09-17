@@ -6,12 +6,23 @@
  * `refresh_token` — était journalisé en clair.
  */
 
+// `storage` (expo-secure-store, lib/storage.ts) — pas AsyncStorage, cf.
+// api-client.test.ts (#refresh-token-mauvais-magasin).
 jest.mock(
-  '@react-native-async-storage/async-storage',
+  '../src/lib/storage',
   () => ({
-    getItem: jest.fn(),
-    setItem: jest.fn(),
-    removeItem: jest.fn(),
+    storage: {
+      getItem: jest.fn(),
+      setItem: jest.fn(),
+      deleteItem: jest.fn(),
+    },
+  })
+);
+
+jest.mock(
+  '../src/lib/auth-store',
+  () => ({
+    useAuthStore: { setState: jest.fn() },
   })
 );
 

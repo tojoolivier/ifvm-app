@@ -1,9 +1,24 @@
+// `storage` (expo-secure-store, lib/storage.ts) — pas AsyncStorage : c'est ce
+// magasin qu'auth-store.ts utilise réellement pour poser le jeton de
+// rafraîchissement au login (#refresh-token-mauvais-magasin). Un mock
+// AsyncStorage ici masquait le fait que api-client.ts lisait le mauvais
+// magasin en production — toujours vide, donc le rafraîchissement échouait
+// systématiquement malgré ces tests au vert.
 jest.mock(
-  '@react-native-async-storage/async-storage',
+  '../src/lib/storage',
   () => ({
-    getItem: jest.fn(),
-    setItem: jest.fn(),
-    removeItem: jest.fn(),
+    storage: {
+      getItem: jest.fn(),
+      setItem: jest.fn(),
+      deleteItem: jest.fn(),
+    },
+  })
+);
+
+jest.mock(
+  '../src/lib/auth-store',
+  () => ({
+    useAuthStore: { setState: jest.fn() },
   })
 );
 
@@ -18,7 +33,7 @@ jest.mock(
   })
 );
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from '../src/lib/storage';
 
 import {
   apiClient,
@@ -110,13 +125,13 @@ beforeEach(() => {
   };
 
   (
-    AsyncStorage.getItem as jest.Mock
+    storage.getItem as jest.Mock
   ).mockResolvedValue(
     'refresh-token-test'
   );
 
   (
-    AsyncStorage.setItem as jest.Mock
+    storage.setItem as jest.Mock
   ).mockResolvedValue(
     undefined
   );
@@ -861,6 +876,77 @@ describe('API Client', () => {
       expect(
         refreshCalls
       ).toHaveLength(1);
+    });
+  });
+
+  // #refresh-token-mauvais-magasin : le rafraîchissement lisait/écrivait via
+  // AsyncStorage, un magasin jamais utilisé par auth-store.ts (qui pose les
+  // jetons via `storage`, expo-secure-store) — le jeton de rafraîchissement
+  // y était donc introuvable, et l'app affichait « Session expirée » dès le
+  // premier jeton d'accès expiré, sans jamais réellement tenter le
+  // rafraîchissement pour de bon.
+  describe('Refresh storage backend (#refresh-token-mauvais-magasin)', () => {
+    it('lit le jeton de rafraîchissement depuis `storage` (expo-secure-store), pas AsyncStorage', async () => {
+      const refreshedToken =
+        createJwt(Math.floor(Date.now() / 1000) + 3600);
+
+      mockFetch.mockResolvedValueOnce(
+        mockJsonResponse({
+          ok: true,
+          status: 200,
+          json: async () => ({ access_token: refreshedToken }),
+        })
+      );
+
+      await refreshAccessTokenSingleFlight();
+
+      expect(storage.getItem).toHaveBeenCalledWith('refresh_token');
+    });
+
+    it('persiste le nouveau jeton d’accès via `storage`, pas AsyncStorage', async () => {
+      const refreshedToken =
+        createJwt(Math.floor(Date.now() / 1000) + 3600);
+
+      mockFetch.mockResolvedValueOnce(
+        mockJsonResponse({
+          ok: true,
+          status: 200,
+          json: async () => ({ access_token: refreshedToken }),
+        })
+      );
+
+      await refreshAccessTokenSingleFlight();
+
+      expect(storage.setItem).toHaveBeenCalledWith('auth_token', refreshedToken);
+    });
+
+    it('propage le nouveau jeton au store d’auth (Zustand), pour que les appels suivants ne le rejouent pas', async () => {
+      const { useAuthStore } = jest.requireMock('../src/lib/auth-store') as {
+        useAuthStore: { setState: jest.Mock };
+      };
+      const refreshedToken =
+        createJwt(Math.floor(Date.now() / 1000) + 3600);
+
+      mockFetch.mockResolvedValueOnce(
+        mockJsonResponse({
+          ok: true,
+          status: 200,
+          json: async () => ({ access_token: refreshedToken }),
+        })
+      );
+
+      await refreshAccessTokenSingleFlight();
+
+      expect(useAuthStore.setState).toHaveBeenCalledWith({ token: refreshedToken });
+    });
+
+    it('renvoie null sans jamais appeler le serveur si aucun jeton de rafraîchissement n’est stocké', async () => {
+      (storage.getItem as jest.Mock).mockResolvedValueOnce(null);
+
+      const result = await refreshAccessTokenSingleFlight();
+
+      expect(result).toBeNull();
+      expect(mockFetch).not.toHaveBeenCalled();
     });
   });
 
