@@ -1333,6 +1333,22 @@ export interface components {
             repartition_population: string | number;
             /** Surface Infestee Ha */
             surface_infestee_ha: string | number;
+            /** Petites Larves Lmc */
+            petites_larves_lmc: string | number;
+            /** Petites Larves Nse */
+            petites_larves_nse: string | number;
+            /** Grandes Larves Lmc */
+            grandes_larves_lmc: string | number;
+            /** Grandes Larves Nse */
+            grandes_larves_nse: string | number;
+            /** Densite Diffuse Lmc */
+            densite_diffuse_lmc: string | number;
+            /** Densite Groupee Lmc */
+            densite_groupee_lmc: string | number;
+            /** Densite Diffuse Nse */
+            densite_diffuse_nse: string | number;
+            /** Densite Groupee Nse */
+            densite_groupee_nse: string | number;
         };
         /**
          * CodeStadeCreate
@@ -2795,6 +2811,22 @@ export interface components {
             chef_de_base?: string | null;
             /** Base */
             base?: string | null;
+            /** Base Numero */
+            base_numero?: number | null;
+            /** Base Date Installation */
+            base_date_installation?: string | null;
+            /** Base Latitude */
+            base_latitude?: number | null;
+            /** Base Longitude */
+            base_longitude?: number | null;
+            /** Base Secondaire */
+            base_secondaire?: string | null;
+            /** Base Secondaire Date Installation */
+            base_secondaire_date_installation?: string | null;
+            /** Base Secondaire Latitude */
+            base_secondaire_latitude?: number | null;
+            /** Base Secondaire Longitude */
+            base_secondaire_longitude?: number | null;
             /** Pesticides Embarques */
             pesticides_embarques?: boolean | null;
             /** Pesticide Nom Commercial */
@@ -3004,6 +3036,22 @@ export interface components {
             chef_de_base?: string | null;
             /** Base */
             base?: string | null;
+            /** Base Numero */
+            base_numero?: number | null;
+            /** Base Date Installation */
+            base_date_installation?: string | null;
+            /** Base Latitude */
+            base_latitude?: number | null;
+            /** Base Longitude */
+            base_longitude?: number | null;
+            /** Base Secondaire */
+            base_secondaire?: string | null;
+            /** Base Secondaire Date Installation */
+            base_secondaire_date_installation?: string | null;
+            /** Base Secondaire Latitude */
+            base_secondaire_latitude?: number | null;
+            /** Base Secondaire Longitude */
+            base_secondaire_longitude?: number | null;
             /** Pesticides Embarques */
             pesticides_embarques?: boolean | null;
             /** Pesticide Nom Commercial */
@@ -3154,6 +3202,22 @@ export interface components {
             chef_de_base?: string | null;
             /** Base */
             base?: string | null;
+            /** Base Numero */
+            base_numero?: number | null;
+            /** Base Date Installation */
+            base_date_installation?: string | null;
+            /** Base Latitude */
+            base_latitude?: number | null;
+            /** Base Longitude */
+            base_longitude?: number | null;
+            /** Base Secondaire */
+            base_secondaire?: string | null;
+            /** Base Secondaire Date Installation */
+            base_secondaire_date_installation?: string | null;
+            /** Base Secondaire Latitude */
+            base_secondaire_latitude?: number | null;
+            /** Base Secondaire Longitude */
+            base_secondaire_longitude?: number | null;
             /** Pesticides Embarques */
             pesticides_embarques?: boolean | null;
             /** Pesticide Nom Commercial */

@@ -78,8 +78,20 @@ export interface DraftProspection {
    * 0063, défait la FK vers le référentiel `lieu_aerien` posée en 0047 —
    * l'agent la saisit directement, sans dépendre du référentiel Web) :
    * une prospection extensive aérienne « généralisée » n'est rattachée à aucune
-   * base. Pas de base secondaire côté prospection. */
+   * base. */
   base: string | null;
+  /** Numéro, date d'installation et coordonnées GPS de la base principale
+   * (migration backend 0068) — capturées sur place, jamais recalculées. */
+  base_numero: number | null;
+  base_date_installation: string | null;
+  base_latitude: number | null;
+  base_longitude: number | null;
+  /** Base secondaire (migration backend 0068) — texte libre, même schéma que
+   * la base principale (date d'installation + coordonnées GPS propres). */
+  base_secondaire: string | null;
+  base_secondaire_date_installation: string | null;
+  base_secondaire_latitude: number | null;
+  base_secondaire_longitude: number | null;
   /** Pesticides embarqués + signatures (mode aérien uniquement) — NULL en mode
    * terrestre. `pesticides_embarques` reste la valeur SQLite brute (0/1/NULL,
    * pas de type booléen natif) : normaliser avec `normalizeBoolean` à la lecture. */
@@ -172,6 +184,14 @@ export interface ExtensiveReferenceUpdateInput {
   mecanicien?: string | null;
   chefDeBase?: string | null;
   base?: string | null;
+  baseNumero?: number | null;
+  baseDateInstallation?: string | null;
+  baseLatitude?: number | null;
+  baseLongitude?: number | null;
+  baseSecondaire?: string | null;
+  baseSecondaireDateInstallation?: string | null;
+  baseSecondaireLatitude?: number | null;
+  baseSecondaireLongitude?: number | null;
 }
 
 export interface ExtensiveObservationsUpdateInput {
@@ -548,6 +568,14 @@ export interface ProspectionValideeInput {
   mecanicien: string | null;
   chefDeBase: string | null;
   base: string | null;
+  baseNumero: number | null;
+  baseDateInstallation: string | null;
+  baseLatitude: number | null;
+  baseLongitude: number | null;
+  baseSecondaire: string | null;
+  baseSecondaireDateInstallation: string | null;
+  baseSecondaireLatitude: number | null;
+  baseSecondaireLongitude: number | null;
   pesticidesEmbarques: boolean | null;
   pesticideNomCommercial: string | null;
   pesticideQuantiteDisponible: number | null;
@@ -596,6 +624,8 @@ export async function materialiserProspectionValidee(input: ProspectionValideeIn
       signalement_source, signalement_date, signalement_description,
       conclusion_validation, avertissements, mode_extensif,
       societe, immatricule_aeronef, pilote, mecanicien, chef_de_base, base,
+      base_numero, base_date_installation, base_latitude, base_longitude,
+      base_secondaire, base_secondaire_date_installation, base_secondaire_latitude, base_secondaire_longitude,
       pesticides_embarques, pesticide_nom_commercial, pesticide_quantite_disponible,
       pesticide_quantite_recue, futs_disponible, futs_pleins, futs_vides, futs_recues,
       signature_visa_nom, signature_visa_horodatage,
@@ -606,7 +636,7 @@ export async function materialiserProspectionValidee(input: ProspectionValideeIn
     ) VALUES (
       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?,
       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
     )`,
     [
       input.id,
@@ -658,6 +688,14 @@ export async function materialiserProspectionValidee(input: ProspectionValideeIn
       input.mecanicien,
       input.chefDeBase,
       input.base,
+      input.baseNumero,
+      input.baseDateInstallation,
+      input.baseLatitude,
+      input.baseLongitude,
+      input.baseSecondaire,
+      input.baseSecondaireDateInstallation,
+      input.baseSecondaireLatitude,
+      input.baseSecondaireLongitude,
       input.pesticidesEmbarques == null ? null : input.pesticidesEmbarques ? 1 : 0,
       input.pesticideNomCommercial,
       input.pesticideQuantiteDisponible,
@@ -882,6 +920,9 @@ export async function updateProspectionExtensiveReference(id: string, input: Ext
       surface_station = ?, surface_infestee = ?, n_message = ?, heure_observation_at = ?,
       societe = ?, immatricule_aeronef = ?, pilote = ?, mecanicien = ?,
       chef_de_base = ?, base = ?,
+      base_numero = ?, base_date_installation = ?, base_latitude = ?, base_longitude = ?,
+      base_secondaire = ?, base_secondaire_date_installation = ?,
+      base_secondaire_latitude = ?, base_secondaire_longitude = ?,
       updated_at = ?
      WHERE id = ?`,
     [
@@ -889,6 +930,9 @@ export async function updateProspectionExtensiveReference(id: string, input: Ext
       input.surfaceStation, input.surfaceInfestee, input.nMessage, input.heureObservationAt,
       input.societe ?? null, input.immatriculeAeronef ?? null, input.pilote ?? null, input.mecanicien ?? null,
       input.chefDeBase ?? null, input.base ?? null,
+      input.baseNumero ?? null, input.baseDateInstallation ?? null, input.baseLatitude ?? null, input.baseLongitude ?? null,
+      input.baseSecondaire ?? null, input.baseSecondaireDateInstallation ?? null,
+      input.baseSecondaireLatitude ?? null, input.baseSecondaireLongitude ?? null,
       now, id,
     ]
   );

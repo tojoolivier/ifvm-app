@@ -456,7 +456,9 @@ describe('ExtensiveRecapScreen — mode aérien : pesticides embarqués + signat
     expect(screen.getByText('Air Acridien')).toBeVisible();
     expect(screen.getByText('5R-ABC')).toBeVisible();
     expect(screen.getByText('Tuléar')).toBeVisible();
-    expect(screen.queryByText('Base secondaire')).toBeNull();
+    // Base secondaire (migration backend 0068) : ligne toujours présente, « — »
+    // quand non renseignée — même principe que Chef de Base non signé plus bas.
+    expect(screen.getByText('Base secondaire')).toBeVisible();
 
     // Opérations + Total heure de vol par opération (150 min = 02:30, 135 min = 02:15,
     // franchissement de minuit 23:00 → 01:15 inclus) + Total jour = 285 min = 04:45.

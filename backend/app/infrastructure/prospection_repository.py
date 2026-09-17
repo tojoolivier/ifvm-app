@@ -303,6 +303,14 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             mecanicien=prospection.mecanicien,
             chef_de_base=prospection.chef_de_base,
             base=prospection.base,
+            base_numero=prospection.base_numero,
+            base_date_installation=prospection.base_date_installation,
+            base_latitude=prospection.base_latitude,
+            base_longitude=prospection.base_longitude,
+            base_secondaire=prospection.base_secondaire,
+            base_secondaire_date_installation=prospection.base_secondaire_date_installation,
+            base_secondaire_latitude=prospection.base_secondaire_latitude,
+            base_secondaire_longitude=prospection.base_secondaire_longitude,
             # ==========================================
             # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
             # ==========================================
@@ -803,6 +811,20 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             mecanicien=model.mecanicien,
             chef_de_base=model.chef_de_base,
             base=model.base,
+            base_numero=model.base_numero,
+            base_date_installation=model.base_date_installation,
+            base_latitude=float(model.base_latitude) if model.base_latitude is not None else None,
+            base_longitude=float(model.base_longitude)
+            if model.base_longitude is not None
+            else None,
+            base_secondaire=model.base_secondaire,
+            base_secondaire_date_installation=model.base_secondaire_date_installation,
+            base_secondaire_latitude=float(model.base_secondaire_latitude)
+            if model.base_secondaire_latitude is not None
+            else None,
+            base_secondaire_longitude=float(model.base_secondaire_longitude)
+            if model.base_secondaire_longitude is not None
+            else None,
             # ==========================================
             # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
             # ==========================================

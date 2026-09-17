@@ -35,6 +35,7 @@ import {
   parseSelectionMultiple,
 } from '@/lib/prospection-extensive';
 import { TimeField } from '@/components/TimeField';
+import { DateField } from '@/components/DateField';
 import { LieuAerienField } from '@/components/referentiel/LieuAerienField';
 import { formatHeureLocale } from '@/lib/prospection-fiche-lecture';
 import { useAsyncAction } from '@/hooks/use-async-action';
@@ -145,6 +146,7 @@ function AerienField({
   focusedField,
   setFocusedField,
   style,
+  keyboardType,
 }: {
   label: string;
   value: string;
@@ -152,6 +154,7 @@ function AerienField({
   focusedField: string | null;
   setFocusedField: Dispatch<SetStateAction<string | null>>;
   style?: StyleProp<ViewStyle>;
+  keyboardType?: 'default' | 'number-pad';
 }) {
   const isFocused = focusedField === label;
   return (
@@ -166,8 +169,39 @@ function AerienField({
           onBlur={() => setFocusedField((current) => (current === label ? null : current))}
           placeholderTextColor={TEXT_SECONDARY}
           style={styles.aerienFieldInput}
+          keyboardType={keyboardType}
         />
       </View>
+    </View>
+  );
+}
+
+/** Bouton de localisation manuelle + affichage des coordonnées déjà captées
+ * (Base principale/secondaire, #base-principale-secondaire-numero-date-gps) —
+ * jamais de capture automatique, contrairement à la position GPS de la fiche
+ * elle-même. */
+function LocalisationBaseField({
+  position,
+  onLocaliser,
+  isLoading,
+}: {
+  position: { latitude: number; longitude: number } | null;
+  onLocaliser: () => void;
+  isLoading: boolean;
+}) {
+  return (
+    <View style={styles.gpsBaseRow}>
+      <TouchableOpacity
+        onPress={onLocaliser}
+        style={styles.gpsBaseButton}
+        disabled={isLoading}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.gpsBaseButtonText}>📍 {isLoading ? 'Localisation…' : 'Localiser'}</Text>
+      </TouchableOpacity>
+      <Text style={styles.gpsBaseValue}>
+        {position ? `${position.latitude.toFixed(5)}, ${position.longitude.toFixed(5)}` : 'Coordonnées non renseignées'}
+      </Text>
     </View>
   );
 }
@@ -225,13 +259,34 @@ export default function ExtensiveReferenceScreen() {
   const [chefDeBase, setChefDeBase] = useState(draft?.chef_de_base ?? '');
   // Saisie manuelle (migration backend 0063, défait la FK vers le référentiel
   // lieu_aerien posée en 0047) ; une opération aérienne « généralisée » n'en a
-  // aucune (champ facultatif).
+  // aucune (champ facultatif). Libellé « Base principale » côté affichage
+  // (migration backend 0068).
   const [base, setBase] = useState(draft?.base ?? '');
+  const [baseNumero, setBaseNumero] = useState(draft?.base_numero != null ? String(draft.base_numero) : '');
+  const [baseDateInstallation, setBaseDateInstallation] = useState<string | null>(draft?.base_date_installation ?? null);
+  const [basePosition, setBasePosition] = useState<{ latitude: number; longitude: number } | null>(
+    draft?.base_latitude != null && draft?.base_longitude != null
+      ? { latitude: draft.base_latitude, longitude: draft.base_longitude }
+      : null
+  );
+  // Base secondaire (migration backend 0068) — texte libre, même schéma que la
+  // base principale (date d'installation + coordonnées GPS propres).
+  const [baseSecondaire, setBaseSecondaire] = useState(draft?.base_secondaire ?? '');
+  const [baseSecondaireDateInstallation, setBaseSecondaireDateInstallation] = useState<string | null>(
+    draft?.base_secondaire_date_installation ?? null
+  );
+  const [baseSecondairePosition, setBaseSecondairePosition] = useState<{ latitude: number; longitude: number } | null>(
+    draft?.base_secondaire_latitude != null && draft?.base_secondaire_longitude != null
+      ? { latitude: draft.base_secondaire_latitude, longitude: draft.base_secondaire_longitude }
+      : null
+  );
   // Label du champ actuellement focus dans le bloc aéronef/équipe (un seul à la
   // fois) — pilote uniquement l'état visuel (bordure) de `AerienField`.
   const [focusedAerienField, setFocusedAerienField] = useState<string | null>(null);
   const [operations, setOperations] = useState<OperationDraft[]>([emptyOperation()]);
   const { run, isRunning: isSaving } = useAsyncAction();
+  const { run: runCapturerPositionBase, isRunning: isRunningCapturerPositionBase } = useAsyncAction();
+  const { run: runCapturerPositionBaseSecondaire, isRunning: isRunningCapturerPositionBaseSecondaire } = useAsyncAction();
 
   // Récupération automatique des coordonnées GPS
   useEffect(() => {
@@ -370,6 +425,20 @@ export default function ExtensiveReferenceScreen() {
       setMecanicien(draft.mecanicien ?? '');
       setChefDeBase(draft.chef_de_base ?? '');
       setBase(draft.base ?? '');
+      setBaseNumero(draft.base_numero != null ? String(draft.base_numero) : '');
+      setBaseDateInstallation(draft.base_date_installation ?? null);
+      setBasePosition(
+        draft.base_latitude != null && draft.base_longitude != null
+          ? { latitude: draft.base_latitude, longitude: draft.base_longitude }
+          : null
+      );
+      setBaseSecondaire(draft.base_secondaire ?? '');
+      setBaseSecondaireDateInstallation(draft.base_secondaire_date_installation ?? null);
+      setBaseSecondairePosition(
+        draft.base_secondaire_latitude != null && draft.base_secondaire_longitude != null
+          ? { latitude: draft.base_secondaire_latitude, longitude: draft.base_secondaire_longitude }
+          : null
+      );
     });
   }, [draft, draftId, user?.sigle]);
 
@@ -417,6 +486,31 @@ export default function ExtensiveReferenceScreen() {
   // de `emptyOperation` dans l'effet de chargement) — celles-là seules sont validées
   // et enregistrées ; en laisser une intégralement vide ne bloque jamais Continuer.
   const operationsRenseignees = operations.filter((op) => !operationEstVide(op));
+
+  // Localisation manuelle de la Base principale/secondaire (#base-principale-
+  // secondaire-numero-date-gps) — sur demande explicite (bouton), jamais
+  // automatique : contrairement à la position GPS de la fiche elle-même
+  // (capturée à l'ouverture de l'écran), une base n'est pas forcément là où
+  // l'agent se trouve au moment de remplir la fiche. `getCurrentPosition`
+  // (lib/location.ts) fonctionne hors ligne (GPS de l'appareil, pas un
+  // service réseau) — cohérent avec « généré par le gps hors ligne ».
+  const capturerPositionBase = () =>
+    runCapturerPositionBase(
+      async () => {
+        const pos = await getCurrentPosition();
+        setBasePosition({ latitude: pos.latitude, longitude: pos.longitude });
+      },
+      { screen: 'extensive-reference', context: { champ: 'base_principale' } }
+    );
+
+  const capturerPositionBaseSecondaire = () =>
+    runCapturerPositionBaseSecondaire(
+      async () => {
+        const pos = await getCurrentPosition();
+        setBaseSecondairePosition({ latitude: pos.latitude, longitude: pos.longitude });
+      },
+      { screen: 'extensive-reference', context: { champ: 'base_secondaire' } }
+    );
 
   const handleContinue = () => {
     // #position-hors-madagascar : même garde-fou que reference.tsx (Intensif),
@@ -468,6 +562,14 @@ export default function ExtensiveReferenceScreen() {
           mecanicien: isAerien ? mecanicien || null : null,
           chefDeBase: isAerien ? chefDeBase || null : null,
           base: isAerien ? base || null : null,
+          baseNumero: isAerien && baseNumero ? parseInt(baseNumero, 10) : null,
+          baseDateInstallation: isAerien ? baseDateInstallation : null,
+          baseLatitude: isAerien ? basePosition?.latitude ?? null : null,
+          baseLongitude: isAerien ? basePosition?.longitude ?? null : null,
+          baseSecondaire: isAerien ? baseSecondaire || null : null,
+          baseSecondaireDateInstallation: isAerien ? baseSecondaireDateInstallation : null,
+          baseSecondaireLatitude: isAerien ? baseSecondairePosition?.latitude ?? null : null,
+          baseSecondaireLongitude: isAerien ? baseSecondairePosition?.longitude ?? null : null,
         });
 
         if (isAerien) {
@@ -660,11 +762,49 @@ export default function ExtensiveReferenceScreen() {
                    * Facultatif : une opération aérienne « généralisée » n'est
                    * rattachée à aucune base. */}
                   <LieuAerienField
-                    label="Base"
+                    label="Base principale"
                     value={base}
                     onChangeText={setBase}
                     focusedField={focusedAerienField}
                     setFocusedField={setFocusedAerienField}
+                  />
+                  <View style={styles.aerienFieldRowSplit}>
+                    <AerienField
+                      label="Numéro de base"
+                      value={baseNumero}
+                      onChangeText={(v) => setBaseNumero(v.replace(/[^0-9]/g, ''))}
+                      focusedField={focusedAerienField}
+                      setFocusedField={setFocusedAerienField}
+                      style={[styles.flex1, styles.aerienFieldNoMargin]}
+                      keyboardType="number-pad"
+                    />
+                    <View style={[styles.aerienFieldGroup, styles.flex1, styles.aerienFieldNoMargin]}>
+                      <Text style={styles.aerienFieldLabel}>Date d&apos;installation</Text>
+                      <DateField value={baseDateInstallation} onChange={setBaseDateInstallation} />
+                    </View>
+                  </View>
+                  <LocalisationBaseField
+                    position={basePosition}
+                    onLocaliser={capturerPositionBase}
+                    isLoading={isRunningCapturerPositionBase}
+                  />
+
+                  <Text style={styles.aerienSubgroupLabel}>Base secondaire</Text>
+                  <AerienField
+                    label="Base secondaire"
+                    value={baseSecondaire}
+                    onChangeText={setBaseSecondaire}
+                    focusedField={focusedAerienField}
+                    setFocusedField={setFocusedAerienField}
+                  />
+                  <View style={styles.aerienFieldGroup}>
+                    <Text style={styles.aerienFieldLabel}>Date d&apos;installation</Text>
+                    <DateField value={baseSecondaireDateInstallation} onChange={setBaseSecondaireDateInstallation} />
+                  </View>
+                  <LocalisationBaseField
+                    position={baseSecondairePosition}
+                    onLocaliser={capturerPositionBaseSecondaire}
+                    isLoading={isRunningCapturerPositionBaseSecondaire}
                   />
                 </View>
 
@@ -888,6 +1028,10 @@ const styles = StyleSheet.create({
   aerienFieldBoxFocused: { borderColor: GREEN, borderWidth: 1.5 },
   aerienFieldInput: { fontSize: 13, fontWeight: '600', color: TEXT, padding: 0 },
   aerienFieldRowSplit: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  gpsBaseRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  gpsBaseButton: { backgroundColor: GREEN, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12 },
+  gpsBaseButtonText: { fontSize: 12, fontWeight: '700', color: '#fff' },
+  gpsBaseValue: { fontSize: 11.5, fontWeight: '600', color: TEXT_SECONDARY, flexShrink: 1 },
   // « Motif du divers » (#ux-aerien) : même style de zone à remplir que le bloc
   // aéronef/équipe, réutilisé ici pour rester cohérent visuellement.
   operationMotifDivers: { marginTop: 4 },

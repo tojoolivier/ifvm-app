@@ -235,9 +235,9 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
     });
 
     await render(<ExtensiveReferenceScreen />);
-    await screen.findByText('Base');
+    await screen.findByText('Base principale');
 
-    fireEvent.changeText(screen.getByTestId('aerien-field-Base'), 'Tuléar');
+    fireEvent.changeText(screen.getByTestId('aerien-field-Base principale'), 'Tuléar');
     expect(await screen.findByDisplayValue('Tuléar')).toBeVisible();
 
     fireEvent.press(screen.getByText('Suivant : Imagos ›'));

@@ -363,6 +363,78 @@ async def test_create_prospection_extensive_mode_aerien(
 
 
 @pytest.mark.asyncio
+async def test_create_prospection_extensive_aerienne_base_principale_et_secondaire(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+):
+    """Base principale : numéro, date d'installation et coordonnées GPS ;
+    Base secondaire (texte libre) : sa propre date d'installation et ses
+    propres coordonnées GPS — les deux indépendantes l'une de l'autre."""
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "extensive",
+            "campagne_id": str(campagne_id),
+            "date_prospection": "2026-08-26",
+            "mode_extensif": "aerien",
+            "base": "Base Antsirabe",
+            "base_numero": 12,
+            "base_date_installation": "2026-08-20",
+            "base_latitude": -19.8667,
+            "base_longitude": 47.0333,
+            "base_secondaire": "Base secondaire Ambositra",
+            "base_secondaire_date_installation": "2026-08-22",
+            "base_secondaire_latitude": -20.5333,
+            "base_secondaire_longitude": 47.25,
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 201, response.text
+    data = response.json()
+
+    assert data["base"] == "Base Antsirabe"
+    assert data["base_numero"] == 12
+    assert data["base_date_installation"] == "2026-08-20"
+    assert data["base_latitude"] == -19.8667
+    assert data["base_longitude"] == 47.0333
+    assert data["base_secondaire"] == "Base secondaire Ambositra"
+    assert data["base_secondaire_date_installation"] == "2026-08-22"
+    assert data["base_secondaire_latitude"] == -20.5333
+    assert data["base_secondaire_longitude"] == 47.25
+
+
+@pytest.mark.asyncio
+async def test_create_prospection_extensive_aerienne_sans_base_secondaire_reste_non_renseignee(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+):
+    """Base secondaire facultative : une prospection aérienne sans base
+    secondaire n'a rien à renseigner ici, sans effet sur la base principale."""
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "extensive",
+            "campagne_id": str(campagne_id),
+            "date_prospection": "2026-08-26",
+            "mode_extensif": "aerien",
+            "base": "Base Antsirabe",
+            "base_numero": 12,
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 201, response.text
+    data = response.json()
+
+    assert data["base"] == "Base Antsirabe"
+    assert data["base_numero"] == 12
+    assert data["base_date_installation"] is None
+    assert data["base_latitude"] is None
+    assert data["base_longitude"] is None
+    assert data["base_secondaire"] is None
+    assert data["base_secondaire_date_installation"] is None
+    assert data["base_secondaire_latitude"] is None
+    assert data["base_secondaire_longitude"] is None
+
+
+@pytest.mark.asyncio
 async def test_create_prospection_operation_motif_divers(
     client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
 ):
