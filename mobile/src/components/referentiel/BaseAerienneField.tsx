@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
 import { apiClient } from '@/lib/api-client';
 import { getCurrentPosition } from '@/lib/location';
@@ -79,6 +80,13 @@ export function BaseAerienneField({ value, onChange, label = 'Base aérienne' }:
       ),
     [runChargement, token]
   );
+
+  // Chargée automatiquement à l'ouverture (#referentiel-creation-sans-recharger)
+  // — plus de bouton « Charger la liste » à taper avant d'atteindre le
+  // formulaire de création d'une base secondaire.
+  useFocusEffect(useCallback(() => {
+    void charger();
+  }, [charger]));
 
   const capturerPosition = () =>
     runGps(
