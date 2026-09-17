@@ -249,18 +249,24 @@ async function pushRotationsEtProduits(
  * connaît pas le sort réservé à la fiche.
  */
 export async function syncOneTraitement(draft: DraftTraitement, token: string): Promise<void> {
-  // #traitement-aerien-brouillon-incomplet-bloque-synchro : `listUnsyncedTraitements`
+  // #traitement-aerien-brouillon-incomplet-bloque-synchro et
+  // #traitement-aerien-rotation-incomplete-bloque-synchro : `listUnsyncedTraitements`
   // exclut déjà une fiche incomplète de la file automatique, mais le bouton
   // « Réessayer » ciblé (sync.tsx) relit `getTraitement` directement et
   // contourne cette liste — sans ce garde-fou ici aussi, il repartirait vers le
   // serveur pour échouer à l'identique, avec les mêmes messages Pydantic bruts.
   if (!estTraitementPretPourSynchro(draft)) {
-    const champs =
-      draft.type_traitement === 'AERIEN'
-        ? 'pilote, mécanicien, chef de base, immatriculation, base'
-        : "chef d'équipe, heures de début/fin, vitesse du vent, température";
+    if (draft.type_traitement === 'AERIEN') {
+      throw new PreconditionError(
+        "Fiche incomplète : renseignez d'abord Équipe & Conditions (pilote, mécanicien, chef de base, " +
+          'immatriculation, base) et Pesticides & rotations (au moins une rotation avec produit et quantité) ' +
+          'avant de synchroniser.'
+      );
+    }
     throw new PreconditionError(
-      `Fiche incomplète : renseignez d'abord Équipe & Conditions (${champs}) avant de synchroniser.`
+      "Fiche incomplète : renseignez d'abord Équipe & Conditions (chef d'équipe, heures de début/fin, " +
+        'vitesse du vent, température) et Produits utilisés (au moins un produit avec quantité) ' +
+        'avant de synchroniser.'
     );
   }
 
