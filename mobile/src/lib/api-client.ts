@@ -1244,6 +1244,25 @@ export const apiClient = {
     );
   },
 
+  /**
+   * Liste des fiches de vol (#fiche-vol-menu-entree) — pas de champ « créée
+   * par », contrairement à la prospection (`prospecteur_id`) : une fiche de
+   * vol couvre tout un hélicoptère pour une journée, partagée par l'équipe,
+   * pas rattachée à un seul agent. « Mes fiches de vol » liste donc toutes
+   * les fiches, pas seulement celles de l'utilisateur courant.
+   */
+  listFichesVol: async (
+    token: string,
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['FicheVolRead'][]> => {
+    return makeRequest<components['schemas']['FicheVolRead'][]>(
+      '/fiches-vol',
+      { method: 'GET' },
+      token,
+      onUnauthorized
+    );
+  },
+
   /*
    * -------------------------------------------------------
    * PROSPECTIONS
