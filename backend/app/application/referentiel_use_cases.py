@@ -17,6 +17,7 @@ from app.domain.referentiel import (
     EquipeAerienne,
     GrilleDejaOccupeeError,
     LieuAerien,
+    MembreEquipeAerienne,
     Pesticide,
     PosteAcridien,
     PosteAcridienAvecStationsActivesError,
@@ -745,19 +746,36 @@ class CreateEquipeAerienne:
         self.repository = repository
         self.utilisateur_repo = utilisateur_repo
 
-    async def execute(self, nom: str, chef_de_base_id: uuid.UUID) -> EquipeAerienne:
+    async def execute(
+        self,
+        nom: str,
+        chef_de_base_id: uuid.UUID,
+        pilote: str,
+        mecanicien: str,
+        consultant_international: str | None = None,
+        membres: list[str] | None = None,
+    ) -> EquipeAerienne:
         chef = await self.utilisateur_repo.get_by_id(chef_de_base_id)
         if chef is None or chef.role != "chef_de_base":
             raise ChefDeBaseEquipeInvalideError(str(chef_de_base_id))
 
         maintenant = datetime.now(timezone.utc)
+        equipe_id = uuid.uuid4()
         return await self.repository.create(
             EquipeAerienne(
+                id=equipe_id,
                 nom=nom,
                 chef_de_base_id=chef_de_base_id,
+                pilote=pilote,
+                mecanicien=mecanicien,
+                consultant_international=consultant_international,
                 actif=True,
                 created_at=maintenant,
                 updated_at=maintenant,
+                membres=[
+                    MembreEquipeAerienne(equipe_aerienne_id=equipe_id, nom=nom_membre)
+                    for nom_membre in (membres or [])
+                ],
             )
         )
 
