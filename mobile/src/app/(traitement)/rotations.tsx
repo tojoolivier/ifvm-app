@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Text, TextInput, TouchableOpacity, ScrollView, View, StyleSheet } from 'react-native';
+import { Text, TextInput, TouchableOpacity, ScrollView, View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -215,7 +215,8 @@ export default function RotationsScreen() {
 
   return (
     <SafeAreaView style={chrome.container}>
-      <ScrollView contentContainerStyle={chrome.content}>
+      <KeyboardAvoidingView style={chrome.keyboardAvoidingView} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView contentContainerStyle={chrome.content}>
         <ProgressBar currentIndex={3} segments={PROGRESS_SEGMENTS_AERIEN} />
         <Text style={chrome.title}>Pesticides & rotations</Text>
 
@@ -515,13 +516,15 @@ export default function RotationsScreen() {
             <Text style={chrome.continueButtonText}>{isSaving ? 'Enregistrement…' : 'Continuer  ›'}</Text>
           </TouchableOpacity>
         )}
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const chrome = StyleSheet.create({
   container: { flex: 1, backgroundColor: traitementColors.fondApp },
+  keyboardAvoidingView: { flex: 1 },
   content: { padding: 16, gap: 10 },
   title: { fontFamily: traitementFonts.uiExtraBold, fontSize: traitementTypeSizes.titreEcran, color: traitementColors.texteTitre },
   dureeCard: { flex: 1 },

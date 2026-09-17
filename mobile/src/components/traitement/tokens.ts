@@ -60,7 +60,13 @@ export const traitementSpacing = {
 } as const;
 
 export const traitementTypeSizes = {
-  label: 9,
+  // Agrandi de 9 à 12 (demande explicite : les titres de champ des fiches de
+  // traitement étaient trop petits/peu visibles, l'écran devait se sentir
+  // « bien occupé » plutôt que clairsemé). Ce token est partagé par les
+  // libellés de champ ET par du texte accessoire (indices, erreurs, sous-
+  // titres de listes) — l'agrandissement profite à l'ensemble, cohérent avec
+  // la demande d'une meilleure lisibilité générale sur ce module.
+  label: 12,
   corps: 11.5,
   titreEcran: 15,
   valeurDerivee: 17.5,

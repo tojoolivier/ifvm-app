@@ -105,9 +105,11 @@ describe('MoyensScreen — végétation pré-remplie depuis la prospection liée
 
   /** Demande explicite : le titre de section « Végétation » doit être centré,
    * agrandi et en gras (même famille de police que les valeurs « vedette » de
-   * l'écran Cibles, traitementFonts.uiBold) — sans affecter « Zones exposées »,
-   * qui garde sa police/taille d'origine (traitementFonts.uiMedium). */
-  it('affiche le titre « Végétation » centré, agrandi et en gras, contrairement à « Zones exposées »', async () => {
+   * l'écran Cibles, traitementFonts.uiBold) — plus visible que « Zones
+   * exposées », qui a reçu le même semi-gras que tous les titres de champ de
+   * ce module (demande générale de lisibilité), mais pas l'agrandissement
+   * supplémentaire propre à Végétation. */
+  it('affiche le titre « Végétation » centré, agrandi et en gras, davantage que « Zones exposées »', async () => {
     jest.mocked(prospectionRepository.getProspection).mockResolvedValue({
       id: 'prosp-1',
       hauteur_herbe_cm: null,
@@ -122,7 +124,7 @@ describe('MoyensScreen — végétation pré-remplie depuis la prospection liée
     );
     const zonesExposees = screen.getByText('Zones exposées');
     expect(zonesExposees.props.style).toEqual(
-      expect.objectContaining({ fontFamily: traitementFonts.uiMedium })
+      expect.objectContaining({ fontFamily: traitementFonts.uiSemiBold })
     );
     expect(titre.props.style.fontSize).toBeGreaterThan(zonesExposees.props.style.fontSize);
   });
