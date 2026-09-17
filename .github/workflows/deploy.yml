@@ -3,6 +3,7 @@ name: Build and deploy
 on:
   push:
     branches: [main]
+    tags: ["v*"]
 
 permissions:
   contents: read
@@ -79,9 +80,9 @@ jobs:
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
 
-  update-manifests:
+  update-manifests-dev:
     needs: [changes, build-and-push]
-    if: needs.build-and-push.result == 'success'
+    if: needs.build-and-push.result == 'success' && github.ref == 'refs/heads/main'
     runs-on: self-hosted-linux
     steps:
       - name: Checkout infra-k8s
@@ -95,11 +96,11 @@ jobs:
           TAG="${{ needs.build-and-push.outputs.tag }}"
           if [[ "${{ needs.changes.outputs.backend }}" == "true" ]]; then
             sed -i "s|image: ghcr.io/tojoolivier/ifvm-app-backend:.*|image: ghcr.io/tojoolivier/ifvm-app-backend:${TAG}|" \
-              clusters/production/apps/ifvm-app/manifests/backend.yaml
+              clusters/production/apps/ifvm-app-dev/manifests/backend.yaml
           fi
           if [[ "${{ needs.changes.outputs.frontend }}" == "true" ]]; then
             sed -i "s|image: ghcr.io/tojoolivier/ifvm-app-frontend:.*|image: ghcr.io/tojoolivier/ifvm-app-frontend:${TAG}|" \
-              clusters/production/apps/ifvm-app/manifests/frontend.yaml
+              clusters/production/apps/ifvm-app-dev/manifests/frontend.yaml
           fi
 
       - name: Commit and push
@@ -110,5 +111,39 @@ jobs:
             echo "No manifest changes to deploy"
             exit 0
           fi
-          git commit -am "Deploy ifvm-app ${{ needs.build-and-push.outputs.tag }}"
+          git commit -am "Deploy ifvm-app-dev ${{ needs.build-and-push.outputs.tag }}"
+          git push
+
+  update-manifests-prod:
+    needs: [changes, build-and-push]
+    if: needs.build-and-push.result == 'success' && startsWith(github.ref, 'refs/tags/')
+    runs-on: self-hosted-linux
+    steps:
+      - name: Checkout infra-k8s
+        uses: actions/checkout@v4
+        with:
+          repository: tojoolivier/infra-k8s
+          ssh-key: ${{ secrets.INFRA_REPO_DEPLOY_KEY }}
+
+      - name: Bump image tags
+        run: |
+          TAG="${{ needs.build-and-push.outputs.tag }}"
+          if [[ "${{ needs.changes.outputs.backend }}" == "true" ]]; then
+            sed -i "s|image: ghcr.io/tojoolivier/ifvm-app-backend:.*|image: ghcr.io/tojoolivier/ifvm-app-backend:${TAG}|" \
+              clusters/production/apps/ifvm-app-prod/manifests/backend.yaml
+          fi
+          if [[ "${{ needs.changes.outputs.frontend }}" == "true" ]]; then
+            sed -i "s|image: ghcr.io/tojoolivier/ifvm-app-frontend:.*|image: ghcr.io/tojoolivier/ifvm-app-frontend:${TAG}|" \
+              clusters/production/apps/ifvm-app-prod/manifests/frontend.yaml
+          fi
+
+      - name: Commit and push
+        run: |
+          git config user.name "ifvm-app-ci"
+          git config user.email "ci@ifvm-app"
+          if git diff --quiet; then
+            echo "No manifest changes to deploy"
+            exit 0
+          fi
+          git commit -am "Deploy ifvm-app-prod ${{ github.ref_name }} (${{ needs.build-and-push.outputs.tag }})"
           git push
