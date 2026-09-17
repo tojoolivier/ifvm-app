@@ -243,6 +243,16 @@ class CibleRead(BaseModel):
     vols_clairs_essaims: str | None
     repartition_population: RepartitionPopulation | None
     surface_infestee_ha: float | None
+    # Detail par espece (migration 0066) : `None` quand cette espece n'est pas
+    # presente dans la prospection liee — cf. construire_cible().
+    petites_larves_lmc: float | None
+    petites_larves_nse: float | None
+    grandes_larves_lmc: float | None
+    grandes_larves_nse: float | None
+    densite_diffuse_lmc: float | None
+    densite_groupee_lmc: float | None
+    densite_diffuse_nse: float | None
+    densite_groupee_nse: float | None
 
     @field_serializer(
         "espece",
@@ -251,6 +261,14 @@ class CibleRead(BaseModel):
         "vols_clairs_essaims",
         "repartition_population",
         "surface_infestee_ha",
+        "petites_larves_lmc",
+        "petites_larves_nse",
+        "grandes_larves_lmc",
+        "grandes_larves_nse",
+        "densite_diffuse_lmc",
+        "densite_groupee_lmc",
+        "densite_diffuse_nse",
+        "densite_groupee_nse",
     )
     def _remplacer_absent(
         self, valeur: EspeceCible | RepartitionPopulation | str | float | None

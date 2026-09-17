@@ -29,6 +29,8 @@ export function construireCible(
     vols_clairs_essaims: deriveVolsClairsEssaims(populations),
     repartition_population: deriveRepartition(populations),
     surface_infestee_ha: prospection.surface_infestee ?? null,
+    ...deriveLarvesParEspece(populations),
+    ...deriveDensitesParEspece(populations),
   };
 }
 
@@ -41,9 +43,11 @@ function deriveEspece(populations: PopulationRow[], infestations: InfestationRow
   return 'MELANGE';
 }
 
-/** Petites larves = densités L1/L2 cumulées ; grandes larves = le reste des stades
- * larvaires cumulés — même seuil que le backend (`stade.upper() in ("L1", "L2")`),
- * indépendamment de l'espèce (LMC va jusqu'à L5, NSE jusqu'à L7). */
+/** Petites larves = densités L1 à L3 cumulées ; grandes larves = le reste des
+ * stades larvaires cumulés (L4-L5 pour LMC qui n'en compte que 5, L4-L7 pour
+ * NSE qui en compte 7 — la règle « L1/L2/L3 vs le reste » couvre les deux
+ * sans distinction explicite du plafond, chaque espèce n'ayant de toute
+ * façon pas de stade au-delà du sien), même seuil que le backend. */
 function deriveLarves(populations: PopulationRow[]): { petites_larves: number | null; grandes_larves: number | null } {
   let petites = 0;
   let grandes = 0;
@@ -64,7 +68,7 @@ function deriveLarves(populations: PopulationRow[]): { petites_larves: number | 
     for (const [stade, densite] of Object.entries(densites)) {
       renseignees = true;
       const valeur = Number(densite) || 0;
-      if (stade.toUpperCase() === 'L1' || stade.toUpperCase() === 'L2') {
+      if (['L1', 'L2', 'L3'].includes(stade.toUpperCase())) {
         petites += valeur;
       } else {
         grandes += valeur;
@@ -73,6 +77,85 @@ function deriveLarves(populations: PopulationRow[]): { petites_larves: number | 
   }
 
   return { petites_larves: renseignees ? petites : null, grandes_larves: renseignees ? grandes : null };
+}
+
+type EspeceCible = 'LMC' | 'NSE';
+
+interface LarvesParEspece {
+  petites_larves_lmc: number | null;
+  petites_larves_nse: number | null;
+  grandes_larves_lmc: number | null;
+  grandes_larves_nse: number | null;
+}
+
+/** Même règle que `deriveLarves` (L1-L3 = petites, le reste = grandes), mais
+ * détaillée par espèce plutôt qu'agrégée — écran Synthèse (Aérien). `null`
+ * pour une espèce jamais rencontrée avec une densité larvaire renseignée. */
+function deriveLarvesParEspece(populations: PopulationRow[]): LarvesParEspece {
+  const petites: Record<EspeceCible, number> = { LMC: 0, NSE: 0 };
+  const grandes: Record<EspeceCible, number> = { LMC: 0, NSE: 0 };
+  const renseignees: Record<EspeceCible, boolean> = { LMC: false, NSE: false };
+
+  for (const p of populations) {
+    if (p.categorie !== 'larve' || !p.densites_larve) continue;
+    if (p.espece !== 'LMC' && p.espece !== 'NSE') continue;
+    let densites: Record<string, number>;
+    try {
+      densites = JSON.parse(p.densites_larve);
+    } catch (error) {
+      logger.ignore(error, 'densites_larve illisible pour la cible par espèce — ligne ignorée');
+      continue;
+    }
+    for (const [stade, densite] of Object.entries(densites)) {
+      renseignees[p.espece] = true;
+      const valeur = Number(densite) || 0;
+      if (['L1', 'L2', 'L3'].includes(stade.toUpperCase())) {
+        petites[p.espece] += valeur;
+      } else {
+        grandes[p.espece] += valeur;
+      }
+    }
+  }
+
+  return {
+    petites_larves_lmc: renseignees.LMC ? petites.LMC : null,
+    petites_larves_nse: renseignees.NSE ? petites.NSE : null,
+    grandes_larves_lmc: renseignees.LMC ? grandes.LMC : null,
+    grandes_larves_nse: renseignees.NSE ? grandes.NSE : null,
+  };
+}
+
+interface DensitesParEspece {
+  densite_diffuse_lmc: number | null;
+  densite_groupee_lmc: number | null;
+  densite_diffuse_nse: number | null;
+  densite_groupee_nse: number | null;
+}
+
+/** Cumule densite_diffuse/densite_groupee sur toutes les lignes (imago +
+ * larve) d'une même espèce — une espèce peut avoir une densité saisie sur sa
+ * ligne imago ET sa ligne larve, même logique additive que les larves
+ * ci-dessus. `null` si aucune ligne de cette espèce ne porte cette densité. */
+function deriveDensitesParEspece(populations: PopulationRow[]): DensitesParEspece {
+  const diffuse: Record<EspeceCible, number | null> = { LMC: null, NSE: null };
+  const groupee: Record<EspeceCible, number | null> = { LMC: null, NSE: null };
+
+  for (const p of populations) {
+    if (p.espece !== 'LMC' && p.espece !== 'NSE') continue;
+    if (p.densite_diffuse != null) {
+      diffuse[p.espece] = (diffuse[p.espece] ?? 0) + p.densite_diffuse;
+    }
+    if (p.densite_groupee != null) {
+      groupee[p.espece] = (groupee[p.espece] ?? 0) + p.densite_groupee;
+    }
+  }
+
+  return {
+    densite_diffuse_lmc: diffuse.LMC,
+    densite_groupee_lmc: groupee.LMC,
+    densite_diffuse_nse: diffuse.NSE,
+    densite_groupee_nse: groupee.NSE,
+  };
 }
 
 /**

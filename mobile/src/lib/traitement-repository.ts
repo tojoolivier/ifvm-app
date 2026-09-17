@@ -79,6 +79,17 @@ export interface Cible {
   vols_clairs_essaims: number | null;
   repartition_population: string | null;
   surface_infestee_ha: number | null;
+  // Détail par espèce (LMC/NSE), écran Synthèse (Aérien) — `null` pour une
+  // espèce absente de la prospection liée. Les champs ci-dessus restent des
+  // totaux agrégés, inchangés (écran Cibles, Terrestre).
+  petites_larves_lmc: number | null;
+  petites_larves_nse: number | null;
+  grandes_larves_lmc: number | null;
+  grandes_larves_nse: number | null;
+  densite_diffuse_lmc: number | null;
+  densite_groupee_lmc: number | null;
+  densite_diffuse_nse: number | null;
+  densite_groupee_nse: number | null;
 }
 
 export interface TraitementAerien {
@@ -285,6 +296,14 @@ export interface CibleInput {
   vols_clairs_essaims?: number | null;
   repartition_population?: string | null;
   surface_infestee_ha?: number | null;
+  petites_larves_lmc?: number | null;
+  petites_larves_nse?: number | null;
+  grandes_larves_lmc?: number | null;
+  grandes_larves_nse?: number | null;
+  densite_diffuse_lmc?: number | null;
+  densite_groupee_lmc?: number | null;
+  densite_diffuse_nse?: number | null;
+  densite_groupee_nse?: number | null;
 }
 
 export interface DraftTraitement extends DraftTraitementRow {
@@ -934,8 +953,10 @@ export async function saveCible(traitementId: string, input: CibleInput): Promis
   await db.runAsync(
     `INSERT OR REPLACE INTO cible (
       traitement_id, espece, petites_larves, grandes_larves,
-      vols_clairs_essaims, repartition_population, surface_infestee_ha
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      vols_clairs_essaims, repartition_population, surface_infestee_ha,
+      petites_larves_lmc, petites_larves_nse, grandes_larves_lmc, grandes_larves_nse,
+      densite_diffuse_lmc, densite_groupee_lmc, densite_diffuse_nse, densite_groupee_nse
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       traitementId,
       input.espece ?? null,
@@ -944,6 +965,14 @@ export async function saveCible(traitementId: string, input: CibleInput): Promis
       input.vols_clairs_essaims ?? null,
       input.repartition_population ?? null,
       input.surface_infestee_ha ?? null,
+      input.petites_larves_lmc ?? null,
+      input.petites_larves_nse ?? null,
+      input.grandes_larves_lmc ?? null,
+      input.grandes_larves_nse ?? null,
+      input.densite_diffuse_lmc ?? null,
+      input.densite_groupee_lmc ?? null,
+      input.densite_diffuse_nse ?? null,
+      input.densite_groupee_nse ?? null,
     ]
   );
 }
