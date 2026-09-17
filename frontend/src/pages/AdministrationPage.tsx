@@ -5,6 +5,7 @@ import { useLocation } from 'react-router-dom'
 import { api } from '../api/client'
 import { UsersPage } from './UsersPage'
 import { StationPage } from './StationPage'
+import { EquipesAeriennesPage } from './EquipesAeriennesPage'
 
 /**
  * Onglets de la maquette §10 (prototype ligne 891) : `padding 9px 16px`,
@@ -20,13 +21,13 @@ const chipClass =
 const addButtonClass =
   'rounded-[9px] bg-ifvm-green-text px-4 py-[10px] font-sans text-[12px] font-bold text-white'
 
-type Tab = 'utilisateurs' | 'stations'
+type Tab = 'utilisateurs' | 'stations' | 'equipes-aeriennes'
 
 export function AdministrationPage() {
   const location = useLocation()
-  const initialTab: Tab = (location.state as { tab?: string } | null)?.tab === 'stations'
-    ? 'stations'
-    : 'utilisateurs'
+  const tabDemande = (location.state as { tab?: string } | null)?.tab
+  const initialTab: Tab =
+    tabDemande === 'stations' || tabDemande === 'equipes-aeriennes' ? tabDemande : 'utilisateurs'
   const [tab, setTab] = useState<Tab>(initialTab)
   const [showCreateUser, setShowCreateUser] = useState(false)
 
@@ -53,16 +54,20 @@ export function AdministrationPage() {
             <TabsPrimitive.Tab value="stations" className={chipClass}>
               Stations · {stations.length}
             </TabsPrimitive.Tab>
+            <TabsPrimitive.Tab value="equipes-aeriennes" className={chipClass}>
+              Équipes aériennes
+            </TabsPrimitive.Tab>
           </TabsPrimitive.List>
 
-          {tab === 'utilisateurs' ? (
+          {tab === 'utilisateurs' && (
             <button
               onClick={() => setShowCreateUser(true)}
               className={`${addButtonClass} transition hover:bg-[#1a4429]`}
             >
               + Nouvel utilisateur
             </button>
-          ) : (
+          )}
+          {tab === 'stations' && (
             <button
               disabled
               title="Indisponible : l'API n'expose aucune écriture sur station_fixe (lecture seule)."
@@ -71,6 +76,9 @@ export function AdministrationPage() {
               + Nouvelle station
             </button>
           )}
+          {/* Équipes aériennes / bases : deux actions distinctes (équipe, base),
+              portées par leurs propres boutons dans EquipesAeriennesPage plutôt
+              que par ce bouton unique d'en-tête. */}
         </div>
 
         <TabsPrimitive.Panel value="utilisateurs">
@@ -78,6 +86,9 @@ export function AdministrationPage() {
         </TabsPrimitive.Panel>
         <TabsPrimitive.Panel value="stations">
           <StationPage />
+        </TabsPrimitive.Panel>
+        <TabsPrimitive.Panel value="equipes-aeriennes">
+          <EquipesAeriennesPage />
         </TabsPrimitive.Panel>
       </TabsPrimitive.Root>
     </div>
