@@ -463,6 +463,17 @@ describe('demarrerRevalidation', () => {
     expect(params).not.toContain('synced');
   });
 
+  it('ne clone jamais validated_at de la source — sinon le brouillon en cours reparaîtrait dans « à revalider » avant même d’être terminé', async () => {
+    getFirstAsync.mockResolvedValueOnce(FICHE_PERIMEE);
+    getAllAsync.mockResolvedValue([]);
+
+    await demarrerRevalidation('presp-perimee');
+
+    const [sql, params] = runAsync.mock.calls.find(([s]) => s.includes('INSERT INTO prospection'))!;
+    expect(sql).not.toContain('validated_at');
+    expect(params).not.toContain(FICHE_PERIMEE.validated_at);
+  });
+
   it('clone populations, infestations, captures et opérations aériennes vers le nouveau brouillon', async () => {
     getFirstAsync.mockResolvedValueOnce(FICHE_PERIMEE);
     getAllAsync

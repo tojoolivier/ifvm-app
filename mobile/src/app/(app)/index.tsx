@@ -15,6 +15,7 @@ import { useAuthStore } from '@/lib/auth-store';
 import { ThemedText } from '@/components/themed-text';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { listRecentProspections, countUnsyncedProspections, DraftProspection } from '@/lib/prospection-repository';
+import { listRecentTraitements, DraftTraitementRow } from '@/lib/traitement-repository';
 import { NewFicheFab } from '@/components/fiches/NewFicheFab';
 import * as Network from 'expo-network';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
@@ -54,6 +55,37 @@ function stationLabel(item: { station_nom?: string | null; station_libre?: strin
   return item.station_nom || item.station_libre || 'Station non spécifiée';
 }
 
+/** Une ligne de la carte « Activité récente » — prospection ou traitement,
+ * réduits à ce que la carte affiche, pour ne pas faire dépendre le rendu de
+ * deux formes de données différentes (#activite-recente-traitements). */
+interface ActiviteItem {
+  id: string;
+  titre: string;
+  sousTitre: string;
+  synced: boolean;
+  updatedAt: string;
+}
+
+function prospectionVersActivite(fiche: DraftProspection): ActiviteItem {
+  return {
+    id: fiche.id,
+    titre: stationLabel(fiche),
+    sousTitre: `N°${fiche.n_fiche ?? '—'} · ${fiche.date_prospection}`,
+    synced: fiche.statut_sync === 'synced',
+    updatedAt: fiche.updated_at,
+  };
+}
+
+function traitementVersActivite(fiche: DraftTraitementRow): ActiviteItem {
+  return {
+    id: fiche.id,
+    titre: fiche.localite || 'Localité non spécifiée',
+    sousTitre: `N°${fiche.numero_fiche ?? '—'} · ${fiche.date_traitement ?? '—'}`,
+    synced: fiche.statut_sync === 'synced',
+    updatedAt: fiche.updated_at,
+  };
+}
+
 // ============================================
 // COMPOSANT PRINCIPAL
 // ============================================
@@ -63,6 +95,7 @@ export default function DashboardScreen() {
   const router = useRouter();
 
   const [prospections, setProspections] = useState<DraftProspection[]>([]);
+  const [traitements, setTraitements] = useState<DraftTraitementRow[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [showSyncBanner, setShowSyncBanner] = useState(false);
@@ -128,12 +161,14 @@ export default function DashboardScreen() {
     if (!user?.id) return;
 
     try {
-      const [fiches, pendingCount] = await Promise.all([
+      const [fiches, ficheTraitements, pendingCount] = await Promise.all([
         listRecentProspections(),
+        listRecentTraitements(),
         countUnsyncedProspections(),
       ]);
 
       setProspections(fiches);
+      setTraitements(ficheTraitements);
       setPendingSyncCount(pendingCount);
       setShowSyncBanner(pendingCount > 0);
     } catch (error) {
@@ -157,6 +192,16 @@ export default function DashboardScreen() {
   const navigateTo = (path: string) => {
     router.push(path as any);
   };
+
+  // Activité récente — prospections ET traitements confondus, triés par
+  // dernière modification (#activite-recente-traitements : les fiches de
+  // traitement n'y apparaissaient pas du tout, alors que « Mes fiches »
+  // (fiches.tsx) les affiche déjà toutes les deux).
+  const activiteRecente = useMemo(() => {
+    return [...prospections.map(prospectionVersActivite), ...traitements.map(traitementVersActivite)]
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .slice(0, 5);
+  }, [prospections, traitements]);
 
   // Fiches par jour sur la semaine en cours (L -> D)
   const weekCounts = useMemo(() => {
@@ -258,7 +303,7 @@ export default function DashboardScreen() {
         )}
 
         {/* Activité récente */}
-        {prospections.length > 0 && (
+        {activiteRecente.length > 0 && (
           <Animated.View style={[styles.recentSection, { opacity: fadeAnim, transform: [{ translateY: Animated.multiply(slideAnim, new Animated.Value(0.1)) }] }]}>
             <View style={styles.sectionHeader}>
               <ThemedText style={styles.sectionTitle}>ACTIVITÉ RÉCENTE</ThemedText>
@@ -266,36 +311,31 @@ export default function DashboardScreen() {
                 <ThemedText style={styles.viewAll}>Tout voir ›</ThemedText>
               </TouchableOpacity>
             </View>
-            {prospections.slice(0, 5).map((fiche, index) => {
-              const synced = fiche.statut_sync === 'synced';
-              return (
-                <TouchableOpacity
-                  key={fiche.id}
-                  style={[styles.ficheCard, index === Math.min(4, prospections.length - 1) && styles.ficheCardLast]}
-                  onPress={() => navigateTo('/(app)/fiches')}
-                  activeOpacity={0.7}
+            {activiteRecente.map((item, index) => (
+              <TouchableOpacity
+                key={item.id}
+                style={[styles.ficheCard, index === activiteRecente.length - 1 && styles.ficheCardLast]}
+                onPress={() => navigateTo('/(app)/fiches')}
+                activeOpacity={0.7}
+              >
+                <View>
+                  <ThemedText style={styles.ficheTitle}>{item.titre}</ThemedText>
+                  <ThemedText style={styles.ficheSub}>{item.sousTitre}</ThemedText>
+                </View>
+                <View
+                  style={[
+                    styles.statusBadge,
+                    { backgroundColor: item.synced ? IFVM_GREEN_BG : IFVM_ORANGE_BG },
+                  ]}
                 >
-                  <View>
-                    <ThemedText style={styles.ficheTitle}>{stationLabel(fiche)}</ThemedText>
-                    <ThemedText style={styles.ficheSub}>
-                      N°{fiche.n_fiche ?? '—'} · {fiche.date_prospection}
-                    </ThemedText>
-                  </View>
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      { backgroundColor: synced ? IFVM_GREEN_BG : IFVM_ORANGE_BG },
-                    ]}
+                  <ThemedText
+                    style={[styles.statusBadgeText, { color: item.synced ? IFVM_GREEN_LIGHT : IFVM_ORANGE }]}
                   >
-                    <ThemedText
-                      style={[styles.statusBadgeText, { color: synced ? IFVM_GREEN_LIGHT : IFVM_ORANGE }]}
-                    >
-                      {synced ? 'SYNCHRO ✓' : 'À SYNCHRO'}
-                    </ThemedText>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+                    {item.synced ? 'SYNCHRO ✓' : 'À SYNCHRO'}
+                  </ThemedText>
+                </View>
+              </TouchableOpacity>
+            ))}
           </Animated.View>
         )}
 

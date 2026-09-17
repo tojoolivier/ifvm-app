@@ -119,6 +119,104 @@ async def test_validated_at_stampe_a_la_creation_pour_type_validation(
 
 
 @pytest.mark.asyncio
+async def test_revalidation_est_validee_immediatement_a_la_creation(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    verificateur: Utilisateur,
+    validateur: Utilisateur,
+):
+    """#revalidation-immediate : une fiche qui revalide une prospection
+    extensive périmée ne doit pas repasser par la chaîne administrative
+    en_attente -> verifiee -> validee de sa fiche d'origine — elle doit être
+    exploitable pour le traitement dès sa synchronisation, comme une fiche
+    `validation` (Signalement)."""
+    pid_origine = await _valider_extensive(
+        client, auth_headers, campagne_id, verificateur, validateur
+    )
+    await _reculer_validated_at(db_session, pid_origine, DELAI_REVALIDATION_JOURS + 1)
+
+    resp = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "extensive",
+            "campagne_id": str(campagne_id),
+            "date_prospection": "2026-08-01",
+            "revalide_de_id": pid_origine,
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    data = resp.json()
+    assert data["statut"] == "validee"
+    assert data["validated_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_revalidation_recoit_une_date_de_validation_fraiche_pas_celle_de_la_source(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    verificateur: Utilisateur,
+    validateur: Utilisateur,
+):
+    """La fiche d'origine est périmée (`validated_at` reculé de plus de 5
+    jours) précisément parce que sa date de validation est trop ancienne —
+    la copier sur l'enfant ferait repartir celui-ci déjà périmé. `validated_at`
+    doit être une date fraîche (maintenant), jamais celle de la source."""
+    pid_origine = await _valider_extensive(
+        client, auth_headers, campagne_id, verificateur, validateur
+    )
+    await _reculer_validated_at(db_session, pid_origine, DELAI_REVALIDATION_JOURS + 1)
+
+    resp = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "extensive",
+            "campagne_id": str(campagne_id),
+            "date_prospection": "2026-08-01",
+            "revalide_de_id": pid_origine,
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    validated_at = datetime.fromisoformat(resp.json()["validated_at"])
+    assert datetime.utcnow() - validated_at < timedelta(minutes=1)
+
+
+@pytest.mark.asyncio
+async def test_disponible_pour_traitement_inclut_immediatement_une_fiche_revalidee(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    verificateur: Utilisateur,
+    validateur: Utilisateur,
+):
+    """Conséquence directe de la validation immédiate : la fiche de
+    revalidation doit pouvoir servir de base à un nouveau traitement dès sa
+    synchronisation, sans étape de validation manuelle supplémentaire."""
+    pid_origine = await _valider_extensive(
+        client, auth_headers, campagne_id, verificateur, validateur
+    )
+    await _reculer_validated_at(db_session, pid_origine, DELAI_REVALIDATION_JOURS + 1)
+
+    pid_enfant = await _creer_prospection(
+        client, auth_headers, campagne_id, "extensive", revalide_de_id=pid_origine
+    )
+
+    resp = await client.get(
+        "/prospections",
+        params={"statut": "validee", "disponible_pour_traitement": "true"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    assert pid_enfant in [p["id"] for p in resp.json()]
+
+
+@pytest.mark.asyncio
 async def test_disponible_pour_traitement_inclut_immediatement_une_fiche_validation_fraiche(
     client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
 ):
