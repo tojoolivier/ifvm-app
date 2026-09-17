@@ -90,11 +90,19 @@ describe('ReferentielsAeriensScreen', () => {
     await fireEvent.press(screen.getByText('+ Nouvelle équipe aérienne'));
     await fireEvent.changeText(screen.getByPlaceholderText("Nom de l'équipe"), 'Équipe Ihosy');
     await fireEvent.press(screen.getByText('Toky Rabe'));
+    await fireEvent.changeText(screen.getByPlaceholderText('Pilote'), 'Jean Rakoto');
+    await fireEvent.changeText(screen.getByPlaceholderText('Mécanicien'), 'Paul Rasoa');
+    await fireEvent.changeText(screen.getByPlaceholderText('Nom du membre'), 'Marie Rafara');
+    await fireEvent.press(screen.getByText('Ajouter'));
     await fireEvent.press(screen.getByText('Créer'));
     await waitFor(() =>
       expect(apiClient.createEquipeAerienne).toHaveBeenCalledWith('token-test', {
         nom: 'Équipe Ihosy',
         chef_de_base_id: 'chef-1',
+        pilote: 'Jean Rakoto',
+        mecanicien: 'Paul Rasoa',
+        consultant_international: null,
+        membres: [{ nom: 'Marie Rafara' }],
       })
     );
     await screen.findByText('Équipe Ihosy');
@@ -153,6 +161,42 @@ describe('ReferentielsAeriensScreen', () => {
       })
     );
     await screen.findByText('STD01 — Ihosy');
+  });
+
+  it('ajoute et retire un membre avant de créer une équipe', async () => {
+    jest.mocked(apiClient.createEquipeAerienne).mockResolvedValue({
+      id: 'equipe-1',
+      nom: 'Équipe Ihosy',
+      chef_de_base_id: 'chef-1',
+      actif: true,
+    } as any);
+
+    await render(<ReferentielsAeriensScreen />);
+    await screen.findByText('ÉQUIPES AÉRIENNES');
+
+    await fireEvent.press(screen.getByText('+ Nouvelle équipe aérienne'));
+    await fireEvent.changeText(screen.getByPlaceholderText("Nom de l'équipe"), 'Équipe Ihosy');
+    await fireEvent.press(screen.getByText('Toky Rabe'));
+    await fireEvent.changeText(screen.getByPlaceholderText('Pilote'), 'Jean Rakoto');
+    await fireEvent.changeText(screen.getByPlaceholderText('Mécanicien'), 'Paul Rasoa');
+
+    await fireEvent.changeText(screen.getByPlaceholderText('Nom du membre'), 'Membre à retirer');
+    await fireEvent.press(screen.getByText('Ajouter'));
+    await screen.findByText('Membre à retirer');
+    await fireEvent.press(screen.getByText('Retirer'));
+    expect(screen.queryByText('Membre à retirer')).toBeNull();
+
+    await fireEvent.press(screen.getByText('Créer'));
+    await waitFor(() =>
+      expect(apiClient.createEquipeAerienne).toHaveBeenCalledWith('token-test', {
+        nom: 'Équipe Ihosy',
+        chef_de_base_id: 'chef-1',
+        pilote: 'Jean Rakoto',
+        mecanicien: 'Paul Rasoa',
+        consultant_international: null,
+        membres: [],
+      })
+    );
   });
 
   it("n'affiche pas de bouton de création de base principale sans équipe disponible", async () => {

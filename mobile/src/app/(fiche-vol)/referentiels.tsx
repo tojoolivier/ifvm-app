@@ -228,7 +228,22 @@ function SectionEquipes({
   const [creation, setCreation] = useState(false);
   const [nom, setNom] = useState('');
   const [chefDeBaseId, setChefDeBaseId] = useState<string | null>(null);
+  const [pilote, setPilote] = useState('');
+  const [mecanicien, setMecanicien] = useState('');
+  const [consultantInternational, setConsultantInternational] = useState('');
+  const [membres, setMembres] = useState<string[]>([]);
+  const [nouveauMembre, setNouveauMembre] = useState('');
   const { run, isRunning } = useAsyncAction();
+
+  const ajouterMembre = () => {
+    if (nouveauMembre.trim().length === 0) return;
+    setMembres((prev) => [...prev, nouveauMembre.trim()]);
+    setNouveauMembre('');
+  };
+
+  const retirerMembre = (index: number) => {
+    setMembres((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const creer = () =>
     run(
@@ -236,16 +251,31 @@ function SectionEquipes({
         const cree = await apiClient.createEquipeAerienne(token, {
           nom: nom.trim(),
           chef_de_base_id: chefDeBaseId!,
+          pilote: pilote.trim(),
+          mecanicien: mecanicien.trim(),
+          consultant_international: consultantInternational.trim() || null,
+          membres: membres.map((nomMembre) => ({ nom: nomMembre })),
         });
         onCreated({ id: cree.id, nom: cree.nom, chef_de_base_id: cree.chef_de_base_id });
         setCreation(false);
         setNom('');
         setChefDeBaseId(null);
+        setPilote('');
+        setMecanicien('');
+        setConsultantInternational('');
+        setMembres([]);
+        setNouveauMembre('');
       },
       {
         screen: 'referentiels-aeriens',
-        precondition: !!token && nom.trim().length > 0 && !!chefDeBaseId,
-        preconditionMessage: 'Renseignez le nom et choisissez un chef de base avant de créer l’équipe.',
+        precondition:
+          !!token &&
+          nom.trim().length > 0 &&
+          !!chefDeBaseId &&
+          pilote.trim().length > 0 &&
+          mecanicien.trim().length > 0,
+        preconditionMessage:
+          'Renseignez le nom, le chef de base, le pilote et le mécanicien avant de créer l’équipe.',
       }
     );
 
@@ -292,6 +322,48 @@ function SectionEquipes({
                 </Text>
               </TouchableOpacity>
             ))}
+          </View>
+          <TextInput
+            value={pilote}
+            onChangeText={setPilote}
+            placeholder="Pilote"
+            placeholderTextColor={TEXT_SECONDARY}
+            style={styles.input}
+          />
+          <TextInput
+            value={mecanicien}
+            onChangeText={setMecanicien}
+            placeholder="Mécanicien"
+            placeholderTextColor={TEXT_SECONDARY}
+            style={styles.input}
+          />
+          <TextInput
+            value={consultantInternational}
+            onChangeText={setConsultantInternational}
+            placeholder="Consultant international (facultatif)"
+            placeholderTextColor={TEXT_SECONDARY}
+            style={styles.input}
+          />
+          <Text style={styles.sousLabel}>Autres membres</Text>
+          {membres.map((membre, index) => (
+            <View key={`${membre}-${index}`} style={styles.membreRow}>
+              <Text style={styles.itemText}>{membre}</Text>
+              <TouchableOpacity onPress={() => retirerMembre(index)} accessibilityRole="button">
+                <Text style={styles.annulerText}>Retirer</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+          <View style={styles.membreRow}>
+            <TextInput
+              value={nouveauMembre}
+              onChangeText={setNouveauMembre}
+              placeholder="Nom du membre"
+              placeholderTextColor={TEXT_SECONDARY}
+              style={[styles.input, styles.membreInput]}
+            />
+            <TouchableOpacity onPress={ajouterMembre} accessibilityRole="button">
+              <Text style={styles.nouveauLinkText}>Ajouter</Text>
+            </TouchableOpacity>
           </View>
           <View style={styles.actionsRow}>
             <TouchableOpacity onPress={() => setCreation(false)} accessibilityRole="button">
@@ -748,6 +820,8 @@ const styles = StyleSheet.create({
   input: { fontSize: 13, fontWeight: '600', color: TEXT, borderWidth: 1, borderColor: BORDER, borderRadius: 8, padding: 8 },
   sousLabel: { fontSize: 9, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase' },
   chipsRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  membreRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  membreInput: { flex: 1 },
   chip: { borderWidth: 1, borderColor: BORDER, borderRadius: 14, paddingVertical: 5, paddingHorizontal: 10 },
   chipSelectionne: { borderColor: GREEN, backgroundColor: '#eaf3ec' },
   chipText: { fontSize: 12, fontWeight: '600', color: TEXT_SECONDARY },
