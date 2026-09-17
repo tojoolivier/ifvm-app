@@ -17,6 +17,8 @@ import {
   computeSignatureMatrix,
   aggregateRecapErrors,
   deriveNomCommercial,
+  estAerienPretPourSynchro,
+  estTerrestrePretPourSynchro,
 } from '../src/lib/traitement-validation';
 
 /**
@@ -452,6 +454,84 @@ describe('validateAerienEquipe', () => {
 
   it('le consultant peut être la même personne qu’un rôle obligatoire (exempté de la règle de distinction)', () => {
     expect(validateAerienEquipe({ ...equipeValide, consultantInternational: equipeValide.pilote })).toEqual([]);
+  });
+});
+
+/**
+ * #traitement-aerien-rotation-incomplete-bloque-synchro : `RotationCreate`
+ * (backend) exige `produit_id` (UUID) et `quantite` (> 0) sans défaut — une
+ * rotation ajoutée mais jamais remplie ne doit pas passer ce garde-fou, sous
+ * peine que `pushRotationsEtProduits` (traitement-sync.ts) l'envoie avec
+ * `produit_id: ''` / `quantite: 0`, rejetée par le serveur avec ses messages
+ * Pydantic bruts.
+ */
+describe('estAerienPretPourSynchro', () => {
+  const base = {
+    pilote: 'Jean Dupont',
+    mecanicien: 'Paul Martin',
+    chefDeBaseId: 'user-1',
+    immatriculeAeronef: '5R-ABC',
+    basePrincipale: 'Betioky',
+    rotations: [{ produitId: 'prod-1', quantite: 10 }],
+  };
+
+  it('accepte une fiche équipe complète avec au moins une rotation renseignée', () => {
+    expect(estAerienPretPourSynchro(base)).toBe(true);
+  });
+
+  it('accepte une fiche équipe complète sans aucune rotation (rien à pousser, pas d’appel en échec)', () => {
+    expect(estAerienPretPourSynchro({ ...base, rotations: [] })).toBe(true);
+  });
+
+  it('refuse une rotation sans produit sélectionné', () => {
+    expect(estAerienPretPourSynchro({ ...base, rotations: [{ produitId: null, quantite: 10 }] })).toBe(false);
+  });
+
+  it('refuse une rotation avec une quantité nulle ou à zéro', () => {
+    expect(estAerienPretPourSynchro({ ...base, rotations: [{ produitId: 'prod-1', quantite: null }] })).toBe(false);
+    expect(estAerienPretPourSynchro({ ...base, rotations: [{ produitId: 'prod-1', quantite: 0 }] })).toBe(false);
+  });
+
+  it('refuse dès qu’une seule rotation parmi plusieurs est incomplète', () => {
+    expect(
+      estAerienPretPourSynchro({
+        ...base,
+        rotations: [
+          { produitId: 'prod-1', quantite: 10 },
+          { produitId: null, quantite: null },
+        ],
+      })
+    ).toBe(false);
+  });
+
+  it('refuse toujours quand les champs équipe manquent, même avec des rotations valides', () => {
+    expect(estAerienPretPourSynchro({ ...base, pilote: null })).toBe(false);
+  });
+});
+
+/** Miroir de la suite ci-dessus pour la branche Terrestre — `ProduitUtiliseCreate`
+ * porte exactement la même contrainte (`produit_id` UUID, `quantite_l` > 0). */
+describe('estTerrestrePretPourSynchro', () => {
+  const base = {
+    chefEquipeId: 'user-1',
+    heureDebut: '08:00',
+    heureFin: '10:00',
+    vitesseVentMs: 2,
+    temperatureC: 25,
+    produits: [{ produitId: 'prod-1', quantiteL: 5 }],
+  };
+
+  it('accepte une fiche complète avec au moins un produit renseigné', () => {
+    expect(estTerrestrePretPourSynchro(base)).toBe(true);
+  });
+
+  it('accepte une fiche complète sans aucun produit (rien à pousser, pas d’appel en échec)', () => {
+    expect(estTerrestrePretPourSynchro({ ...base, produits: [] })).toBe(true);
+  });
+
+  it('refuse un produit sans sélection ou sans quantité', () => {
+    expect(estTerrestrePretPourSynchro({ ...base, produits: [{ produitId: null, quantiteL: 5 }] })).toBe(false);
+    expect(estTerrestrePretPourSynchro({ ...base, produits: [{ produitId: 'prod-1', quantiteL: 0 }] })).toBe(false);
   });
 });
 
