@@ -45,6 +45,31 @@ import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
  * y a été déplacé depuis Équipe : c'est une
  * information propre au traitement (stock de pesticide), pas à l'équipe.
  */
+// Saisie francophone : la virgule est le séparateur décimal attendu par l'utilisateur,
+// mais JS/JSON n'utilisent que le point en interne — même paire de fonctions que
+// moyens.tsx/synthese.tsx (#326), pas mutualisée pour l'instant (cf. commentaire
+// équivalent là-bas). Sans conversion, taper "3,2" produisait `Number("3,2")` =
+// `NaN`, aussitôt réaffiché tel quel par `String(NaN)` — la valeur saisie semblait
+// « disparaître », remplacée par "NaN" (#pesticides-rotations-decimales).
+function parseDecimalInput(raw: string): number | null {
+  if (raw === '') return null;
+  const val = Number(raw.replace(',', '.'));
+  return isNaN(val) ? null : val;
+}
+
+function formatDecimalDisplay(value: number | null | undefined): string {
+  return value != null ? String(value).replace('.', ',') : '';
+}
+
+type AerienDecimalField = 'pesticideRecuL' | 'tauxMortalitePourcent' | 'evaluationEfficaciteHeuresApres';
+type RotationDecimalField =
+  | 'quantite'
+  | 'surface_ha'
+  | 'temperature_debut_c'
+  | 'temperature_fin_c'
+  | 'vent_debut_ms'
+  | 'vent_fin_ms';
+
 export default function RotationsScreen() {
   const router = useRouter();
   const { traitementId, isValidationView } = useLocalSearchParams<{ traitementId: string; isValidationView?: string }>();
@@ -55,6 +80,62 @@ export default function RotationsScreen() {
   const [surfaceInfesteeHa, setSurfaceInfesteeHa] = useState<number | null>(null);
   const [origineCumuleeHa, setOrigineCumuleeHa] = useState<number | null>(null);
   const [error, setError] = useState<string | undefined>();
+  // Texte brut en cours de saisie pour les champs décimaux — permet de taper un
+  // séparateur décimal ou un zéro de fin ("3," / "3,2") sans que le champ ne se
+  // reformate à chaque frappe (cf. `store.aerien.xxx != null ? String(...) : ''`
+  // sinon). Un objet pour les champs "aérien" (niveau fiche), un autre indexé par
+  // rotation (`localId`) pour les champs propres à chaque rotation.
+  const [aerienDrafts, setAerienDrafts] = useState<Partial<Record<AerienDecimalField, string>>>({});
+  const [rotationDrafts, setRotationDrafts] = useState<Record<string, Partial<Record<RotationDecimalField, string>>>>({});
+
+  const getAerienDraft = (field: AerienDecimalField): string | undefined => aerienDrafts[field];
+
+  const handleAerienDecimalChange = (field: AerienDecimalField, raw: string) => {
+    if (raw !== '' && !/^\d*[.,]?\d*$/.test(raw)) return;
+    setAerienDrafts((current) => ({ ...current, [field]: raw }));
+    if (raw === '') {
+      store.updateAerien({ [field]: null });
+      return;
+    }
+    if (raw.endsWith('.') || raw.endsWith(',')) return;
+    const val = parseDecimalInput(raw);
+    if (val === null) return;
+    store.updateAerien({ [field]: val });
+  };
+
+  const clearAerienDraft = (field: AerienDecimalField) => {
+    setAerienDrafts((current) => {
+      if (current[field] === undefined) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const getRotationDraft = (localId: string, field: RotationDecimalField): string | undefined =>
+    rotationDrafts[localId]?.[field];
+
+  const handleRotationDecimalChange = (localId: string, field: RotationDecimalField, raw: string) => {
+    if (raw !== '' && !/^\d*[.,]?\d*$/.test(raw)) return;
+    setRotationDrafts((current) => ({ ...current, [localId]: { ...current[localId], [field]: raw } }));
+    if (raw === '') {
+      store.updateRotation(localId, { [field]: null });
+      return;
+    }
+    if (raw.endsWith('.') || raw.endsWith(',')) return;
+    const val = parseDecimalInput(raw);
+    if (val === null) return;
+    store.updateRotation(localId, { [field]: val });
+  };
+
+  const clearRotationDraft = (localId: string, field: RotationDecimalField) => {
+    setRotationDrafts((current) => {
+      if (current[localId]?.[field] === undefined) return current;
+      const nextForId = { ...current[localId] };
+      delete nextForId[field];
+      return { ...current, [localId]: nextForId };
+    });
+  };
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargementBase = useSignalerChargement('rotations');
   const signalerChargement = (error: unknown, source: string) =>
@@ -226,9 +307,10 @@ export default function RotationsScreen() {
           editable={!readOnly}
           style={styles.input}
           placeholder="0"
-          keyboardType="numeric"
-          value={store.aerien.pesticideRecuL != null ? String(store.aerien.pesticideRecuL) : ''}
-          onChangeText={(v) => store.updateAerien({ pesticideRecuL: v ? Number(v) : null })}
+          keyboardType="decimal-pad"
+          value={getAerienDraft('pesticideRecuL') ?? formatDecimalDisplay(store.aerien.pesticideRecuL)}
+          onChangeText={(v) => handleAerienDecimalChange('pesticideRecuL', v)}
+          onBlur={() => clearAerienDraft('pesticideRecuL')}
         />
 
         {store.aerien.rotations.map((rotation, index) => {
@@ -275,9 +357,10 @@ export default function RotationsScreen() {
                 editable={!readOnly}
                 style={styles.input}
                 placeholder="0"
-                keyboardType="numeric"
-                value={rotation.quantite != null ? String(rotation.quantite) : ''}
-                onChangeText={(v) => store.updateRotation(rotation.localId, { quantite: v ? Number(v) : null })}
+                keyboardType="decimal-pad"
+                value={getRotationDraft(rotation.localId, 'quantite') ?? formatDecimalDisplay(rotation.quantite)}
+                onChangeText={(v) => handleRotationDecimalChange(rotation.localId, 'quantite', v)}
+                onBlur={() => clearRotationDraft(rotation.localId, 'quantite')}
               />
 
               <Text style={styles.label}>Surface traitée (ha) *</Text>
@@ -286,9 +369,10 @@ export default function RotationsScreen() {
                 editable={!readOnly}
                 style={styles.input}
                 placeholder="0"
-                keyboardType="numeric"
-                value={rotation.surface_ha != null ? String(rotation.surface_ha) : ''}
-                onChangeText={(v) => store.updateRotation(rotation.localId, { surface_ha: v ? Number(v) : null })}
+                keyboardType="decimal-pad"
+                value={getRotationDraft(rotation.localId, 'surface_ha') ?? formatDecimalDisplay(rotation.surface_ha)}
+                onChangeText={(v) => handleRotationDecimalChange(rotation.localId, 'surface_ha', v)}
+                onBlur={() => clearRotationDraft(rotation.localId, 'surface_ha')}
               />
 
               <Text style={styles.label}>Produit / matières actives *</Text>
@@ -353,9 +437,10 @@ export default function RotationsScreen() {
                     editable={!readOnly}
                     style={styles.input}
                     placeholder="0"
-                    keyboardType="numeric"
-                    value={rotation.temperature_debut_c != null ? String(rotation.temperature_debut_c) : ''}
-                    onChangeText={(v) => store.updateRotation(rotation.localId, { temperature_debut_c: v ? Number(v) : null })}
+                    keyboardType="decimal-pad"
+                    value={getRotationDraft(rotation.localId, 'temperature_debut_c') ?? formatDecimalDisplay(rotation.temperature_debut_c)}
+                    onChangeText={(v) => handleRotationDecimalChange(rotation.localId, 'temperature_debut_c', v)}
+                    onBlur={() => clearRotationDraft(rotation.localId, 'temperature_debut_c')}
                   />
                 </View>
                 <View style={styles.flex1}>
@@ -364,9 +449,10 @@ export default function RotationsScreen() {
                     editable={!readOnly}
                     style={styles.input}
                     placeholder="0"
-                    keyboardType="numeric"
-                    value={rotation.temperature_fin_c != null ? String(rotation.temperature_fin_c) : ''}
-                    onChangeText={(v) => store.updateRotation(rotation.localId, { temperature_fin_c: v ? Number(v) : null })}
+                    keyboardType="decimal-pad"
+                    value={getRotationDraft(rotation.localId, 'temperature_fin_c') ?? formatDecimalDisplay(rotation.temperature_fin_c)}
+                    onChangeText={(v) => handleRotationDecimalChange(rotation.localId, 'temperature_fin_c', v)}
+                    onBlur={() => clearRotationDraft(rotation.localId, 'temperature_fin_c')}
                   />
                 </View>
               </View>
@@ -375,23 +461,27 @@ export default function RotationsScreen() {
                 <View style={styles.flex1}>
                   <Text style={styles.label}>Vitesse du vent début (m/s) *</Text>
                   <TextInput
+                    testID={`rotation-vent-debut-input-${index}`}
                     editable={!readOnly}
                     style={styles.input}
                     placeholder="0"
-                    keyboardType="numeric"
-                    value={rotation.vent_debut_ms != null ? String(rotation.vent_debut_ms) : ''}
-                    onChangeText={(v) => store.updateRotation(rotation.localId, { vent_debut_ms: v ? Number(v) : null })}
+                    keyboardType="decimal-pad"
+                    value={getRotationDraft(rotation.localId, 'vent_debut_ms') ?? formatDecimalDisplay(rotation.vent_debut_ms)}
+                    onChangeText={(v) => handleRotationDecimalChange(rotation.localId, 'vent_debut_ms', v)}
+                    onBlur={() => clearRotationDraft(rotation.localId, 'vent_debut_ms')}
                   />
                 </View>
                 <View style={styles.flex1}>
                   <Text style={styles.label}>Vitesse du vent fin (m/s) *</Text>
                   <TextInput
+                    testID={`rotation-vent-fin-input-${index}`}
                     editable={!readOnly}
                     style={styles.input}
                     placeholder="0"
-                    keyboardType="numeric"
-                    value={rotation.vent_fin_ms != null ? String(rotation.vent_fin_ms) : ''}
-                    onChangeText={(v) => store.updateRotation(rotation.localId, { vent_fin_ms: v ? Number(v) : null })}
+                    keyboardType="decimal-pad"
+                    value={getRotationDraft(rotation.localId, 'vent_fin_ms') ?? formatDecimalDisplay(rotation.vent_fin_ms)}
+                    onChangeText={(v) => handleRotationDecimalChange(rotation.localId, 'vent_fin_ms', v)}
+                    onBlur={() => clearRotationDraft(rotation.localId, 'vent_fin_ms')}
                   />
                 </View>
               </View>
@@ -467,13 +557,10 @@ export default function RotationsScreen() {
           editable={!readOnly}
           style={styles.input}
           placeholder="0"
-          keyboardType="numeric"
-          value={
-            store.aerien.tauxMortalitePourcent != null
-              ? String(store.aerien.tauxMortalitePourcent)
-              : ''
-          }
-          onChangeText={(v) => store.updateAerien({ tauxMortalitePourcent: v ? Number(v) : null })}
+          keyboardType="decimal-pad"
+          value={getAerienDraft('tauxMortalitePourcent') ?? formatDecimalDisplay(store.aerien.tauxMortalitePourcent)}
+          onChangeText={(v) => handleAerienDecimalChange('tauxMortalitePourcent', v)}
+          onBlur={() => clearAerienDraft('tauxMortalitePourcent')}
         />
         <Text style={styles.label}>Évalué après traitement (heures)</Text>
         <TextInput
@@ -481,15 +568,13 @@ export default function RotationsScreen() {
           editable={!readOnly}
           style={styles.input}
           placeholder="0"
-          keyboardType="numeric"
+          keyboardType="decimal-pad"
           value={
-            store.aerien.evaluationEfficaciteHeuresApres != null
-              ? String(store.aerien.evaluationEfficaciteHeuresApres)
-              : ''
+            getAerienDraft('evaluationEfficaciteHeuresApres') ??
+            formatDecimalDisplay(store.aerien.evaluationEfficaciteHeuresApres)
           }
-          onChangeText={(v) =>
-            store.updateAerien({ evaluationEfficaciteHeuresApres: v ? Number(v) : null })
-          }
+          onChangeText={(v) => handleAerienDecimalChange('evaluationEfficaciteHeuresApres', v)}
+          onBlur={() => clearAerienDraft('evaluationEfficaciteHeuresApres')}
         />
         <Text style={styles.label}>Méthode d&apos;évaluation</Text>
         <View style={styles.chipRow}>
