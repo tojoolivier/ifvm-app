@@ -193,6 +193,16 @@ const MIGRATED_COLUMNS = [
   // Colonne de traitement_signature — signature numérique (#signatures-auto-equipe,
   // migration backend 0049).
   { name: 'signature_image' },
+
+  // Colonnes de cible — détail par espèce (migration backend 0066).
+  { name: 'petites_larves_lmc' },
+  { name: 'petites_larves_nse' },
+  { name: 'grandes_larves_lmc' },
+  { name: 'grandes_larves_nse' },
+  { name: 'densite_diffuse_lmc' },
+  { name: 'densite_groupee_lmc' },
+  { name: 'densite_diffuse_nse' },
+  { name: 'densite_groupee_nse' },
 ];
 
 const execAsync = jest.fn().mockResolvedValue(undefined);

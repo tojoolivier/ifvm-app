@@ -646,7 +646,31 @@ describe('saveCible', () => {
 
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT OR REPLACE INTO cible'),
-      [AERIEN_INPUT.id, 'LMC', 1, 2, 0, 'diffuse', 3.5]
+      [AERIEN_INPUT.id, 'LMC', 1, 2, 0, 'diffuse', 3.5, null, null, null, null, null, null, null, null]
+    );
+  });
+
+  it('upserts the per-species detail alongside the aggregate totals', async () => {
+    await saveCible(AERIEN_INPUT.id, {
+      espece: 'MELANGE',
+      petites_larves: 24,
+      grandes_larves: 8,
+      vols_clairs_essaims: null,
+      repartition_population: 'DIFFUSE',
+      surface_infestee_ha: 10,
+      petites_larves_lmc: 22,
+      petites_larves_nse: 2,
+      grandes_larves_lmc: 3,
+      grandes_larves_nse: 5,
+      densite_diffuse_lmc: 20,
+      densite_groupee_lmc: 3,
+      densite_diffuse_nse: 5,
+      densite_groupee_nse: null,
+    });
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT OR REPLACE INTO cible'),
+      [AERIEN_INPUT.id, 'MELANGE', 24, 8, null, 'DIFFUSE', 10, 22, 2, 3, 5, 20, 3, 5, null]
     );
   });
 });

@@ -73,6 +73,7 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
   await ajouterColonnesManquantes(db, 'traitement_terrestre', COLONNES_TRAITEMENT_TERRESTRE);
   await ajouterColonnesManquantes(db, 'produit_utilise', COLONNES_PRODUIT_UTILISE);
   await ajouterColonnesManquantes(db, 'traitement_signature', COLONNES_TRAITEMENT_SIGNATURE);
+  await ajouterColonnesManquantes(db, 'cible', COLONNES_CIBLE);
 
   log.event('db.ouverte', { base: DB_NAME });
 
@@ -355,7 +356,15 @@ async function creerTables(db: SQLite.SQLiteDatabase): Promise<void> {
       grandes_larves REAL,
       vols_clairs_essaims REAL,
       repartition_population TEXT,
-      surface_infestee_ha REAL
+      surface_infestee_ha REAL,
+      petites_larves_lmc REAL,
+      petites_larves_nse REAL,
+      grandes_larves_lmc REAL,
+      grandes_larves_nse REAL,
+      densite_diffuse_lmc REAL,
+      densite_groupee_lmc REAL,
+      densite_diffuse_nse REAL,
+      densite_groupee_nse REAL
     );
 
     CREATE TABLE IF NOT EXISTS traitement_aerien (
@@ -855,4 +864,22 @@ const COLONNES_TRAITEMENT_TERRESTRE: readonly Colonne[] = [
  */
 const COLONNES_TRAITEMENT_SIGNATURE: readonly Colonne[] = [
   { name: 'signature_image', type: 'TEXT' },
+];
+
+/**
+ * Colonnes ajoutées à `cible` après sa création initiale (backend migration
+ * 0066) : détail par espèce (LMC/NSE) des petites/grandes larves et de la
+ * répartition diffuse/groupée, affiché à l'écran Synthèse (Aérien) — les
+ * colonnes existantes restent des totaux agrégés, inchangés (écran Cibles,
+ * Terrestre).
+ */
+const COLONNES_CIBLE: readonly Colonne[] = [
+  { name: 'petites_larves_lmc', type: 'REAL' },
+  { name: 'petites_larves_nse', type: 'REAL' },
+  { name: 'grandes_larves_lmc', type: 'REAL' },
+  { name: 'grandes_larves_nse', type: 'REAL' },
+  { name: 'densite_diffuse_lmc', type: 'REAL' },
+  { name: 'densite_groupee_lmc', type: 'REAL' },
+  { name: 'densite_diffuse_nse', type: 'REAL' },
+  { name: 'densite_groupee_nse', type: 'REAL' },
 ];
