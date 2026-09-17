@@ -9,6 +9,16 @@ import { useAuthStore } from '@/lib/auth-store';
 import { apiClient } from '@/lib/api-client';
 import { getCurrentPosition } from '@/lib/location';
 
+// Charge automatiquement au montage (#referentiel-creation-sans-recharger) —
+// `useFocusEffect` exige un vrai `NavigationContainer`, absent ici puisque le
+// composant est rendu isolément. `useEffect(effect, [])` en tient lieu : au
+// montage seulement, jamais à chaque rendu — `charger()` recrée un nouveau
+// tableau (`.map()`) à chaque appel, un mock qui rappellerait `effect()` sans
+// tenir compte des dépendances boucle indéfiniment.
+jest.mock('expo-router', () => ({
+  useFocusEffect: (effect: () => void) => require('react').useEffect(effect, []),
+}));
+
 jest.mock('@/lib/api-client', () => ({
   apiClient: {
     listBasesAeriennes: jest.fn(),
@@ -46,7 +56,6 @@ describe('BaseAerienneField', () => {
     const onChange = jest.fn();
     await render(<BaseAerienneField value={null} onChange={onChange} />);
 
-    fireEvent.press(screen.getByText('Charger la liste ›'));
     await screen.findByText('IHO01 — Ihosy');
     fireEvent.press(screen.getByText('+ Nouvelle base secondaire'));
 
@@ -69,7 +78,6 @@ describe('BaseAerienneField', () => {
     const onChange = jest.fn();
     await render(<BaseAerienneField value={null} onChange={onChange} />);
 
-    fireEvent.press(screen.getByText('Charger la liste ›'));
     await screen.findByText('+ Nouvelle base secondaire');
     fireEvent.press(screen.getByText('+ Nouvelle base secondaire'));
 
