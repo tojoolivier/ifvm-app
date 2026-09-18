@@ -11,6 +11,8 @@ import {
 } from '@/lib/traitement-repository';
 import { enregistrerEtSynchroniserTraitement } from '@/lib/traitement-sync';
 import { apiClient } from '@/lib/api-client';
+import { telechargerEtPartagerPdf } from '@/lib/pdf-partage';
+import { depsPdfPartage } from '@/lib/pdf-partage-natif';
 import { estToutParti, resumerEnPhrase } from '@/lib/sync-lot';
 import { useAuthStore } from '@/lib/auth-store';
 import { SignatureRole } from '@/lib/traitement-capture-store';
@@ -331,6 +333,23 @@ export default function RecapScreen() {
       </SafeAreaView>
     );
   }
+
+  const traitementIdCourant = draft.id;
+  const numeroFicheCourant = draft.numero_fiche ?? draft.id;
+
+  // Le PDF n'existe côté backend que pour une fiche validée (#495, même règle
+  // que #494) — le bouton ne peut apparaître que dans le bloc `readOnly`
+  // ci-dessous, jamais pendant la saisie.
+  const telechargerPdf = () =>
+    run(
+      () =>
+        telechargerEtPartagerPdf(
+          depsPdfPartage(),
+          `/traitements/${traitementIdCourant}/pdf`,
+          `fiche-crt-${numeroFicheCourant}.pdf`
+        ),
+      { screen: 'recap', context: { traitementId: traitementIdCourant, action: 'telecharger-pdf' } }
+    );
 
   // « Signé » se lit désormais dans la fiche persistée localement (SQLite,
   // `traitement_signature`), pas dans un state éphémère (#signatures-auto-equipe
@@ -655,9 +674,22 @@ export default function RecapScreen() {
         </Card>
 
         {readOnly ? (
-          <Card variant="info">
-            <Text style={styles.note}>🔒 Fiche verrouillée (lecture seule)</Text>
-          </Card>
+          <>
+            <Card variant="info">
+              <Text style={styles.note}>🔒 Fiche verrouillée (lecture seule)</Text>
+            </Card>
+            {draft.statut === 'validee' && (
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={telechargerPdf}
+                disabled={isSaving}
+              >
+                <Text style={styles.saveButtonText}>
+                  {isSaving ? 'Génération…' : 'Télécharger le PDF'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </>
         ) : (
           <TouchableOpacity
             style={[styles.saveButton, errors.length > 0 && styles.saveButtonWarn]}

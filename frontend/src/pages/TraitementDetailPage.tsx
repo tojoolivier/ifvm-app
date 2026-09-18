@@ -305,6 +305,8 @@ export function TraitementDetailPage() {
     enabled: !!traitement,
   })
   const [reprisePromptOuvert, setReprisePromptOuvert] = useState(false)
+  const [telechargementPdfEnCours, setTelechargementPdfEnCours] = useState(false)
+  const [erreurPdf, setErreurPdf] = useState<string | null>(null)
 
   const { nomAgent } = useAnnuaire()
 
@@ -467,6 +469,27 @@ export function TraitementDetailPage() {
         .join(' · ')
     : null
 
+  const traitementId = traitement.id
+  const numeroFiche = traitement.numero_fiche
+
+  async function telechargerPdf() {
+    setErreurPdf(null)
+    setTelechargementPdfEnCours(true)
+    try {
+      const response = await api.get(`/traitements/${traitementId}/pdf`, { responseType: 'blob' })
+      const url = URL.createObjectURL(response.data as Blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `fiche-crt-${numeroFiche}.pdf`
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setErreurPdf('Impossible de télécharger le PDF.')
+    } finally {
+      setTelechargementPdfEnCours(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4 px-7 pb-10 pt-[26px]">
       <NavTabs
@@ -491,11 +514,23 @@ export function TraitementDetailPage() {
           <p className="mt-1 font-sans text-[12px] font-medium text-white/75">{sousTitre}</p>
         </div>
         {lectureSeule && (
-          <span className="shrink-0 rounded-full bg-white/[.16] px-3 py-[6px] font-sans text-[11px] font-bold">
-            🔒 Lecture seule
-          </span>
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white"
+              onClick={telechargerPdf}
+              disabled={telechargementPdfEnCours}
+            >
+              {telechargementPdfEnCours ? 'Génération…' : 'Télécharger le PDF'}
+            </Button>
+            <span className="shrink-0 rounded-full bg-white/[.16] px-3 py-[6px] font-sans text-[11px] font-bold">
+              🔒 Lecture seule
+            </span>
+          </>
         )}
       </header>
+      {erreurPdf && <ErrorBanner label="PDF" message={erreurPdf} />}
 
       {/* N° fiche prospection liée (#numero-fiche-prospection-liee) — dérivé de
           prospection_id côté backend, jamais saisi ici, toujours visible (pas

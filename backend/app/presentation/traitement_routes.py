@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,14 +44,17 @@ from app.domain.traitement import (
     TraitementValideeSyncRejeteError,
     TraitementVerrouilleError,
 )
+from app.infrastructure.pdf_renderer import render_html_to_pdf
 from app.infrastructure.prospection_repository import ProspectionRepositoryImpl
 from app.infrastructure.traitement_repository import TraitementRepositoryImpl
 from app.infrastructure.utilisateur_repository import UtilisateurRepositoryImpl
 from app.models.users import Utilisateur
+from app.presentation.traitement_pdf import build_crt_html
 from app.presentation.traitement_schemas import (
     BlocCreate,
     ProduitUtiliseCreate,
     RotationCreate,
+    StatutTraitement,
     TraitementCreate,
     TraitementRead,
     TraitementSyncPush,
@@ -310,6 +313,33 @@ async def get_traitement(
     if traitement is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Traitement non trouvé")
     return traitement
+
+
+@router.get("/{traitement_id}/pdf")
+async def get_traitement_pdf(
+    traitement_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    repository = get_repository(db)
+    use_case = GetTraitement(repository)
+    traitement = await use_case.execute(traitement_id)
+    if traitement is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Traitement non trouvé")
+    traitement_read = TraitementRead.model_validate(traitement)
+    if traitement_read.statut == StatutTraitement.BROUILLON:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Le PDF n'est disponible que pour un CRT validé",
+        )
+    html = build_crt_html(traitement_read)
+    pdf = render_html_to_pdf(html)
+    nom_fichier = f"fiche-crt-{traitement_read.numero_fiche}.pdf"
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{nom_fichier}"'},
+    )
 
 
 @router.post("/{traitement_id}/rotations", response_model=TraitementRead, status_code=201)
