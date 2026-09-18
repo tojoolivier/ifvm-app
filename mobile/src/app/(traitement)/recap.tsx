@@ -30,6 +30,7 @@ import { useErrorStore } from '@/lib/error-store';
 import { useErrorLogStore } from '@/lib/error-log-store';
 import { toFriendlyError } from '@/lib/friendly-error';
 import { logger } from '@/lib/logger';
+import { formatDirectionDeplacement } from '@/lib/prospection-infestation-insights';
 import { EtatVide } from '@/components/erreurs/etat-vide';
 
 // Aérien : 8 étapes (Équipe/Pesticides & rotations scindés, #equipe-slide-aerien ;
@@ -540,7 +541,7 @@ export default function RecapScreen() {
               <RecapLigne label="Heure début" value={draft.terrestre.heure_debut} />
               <RecapLigne label="Heure fin" value={draft.terrestre.heure_fin} />
               <RecapLigne label="Vitesse du vent (m/s)" value={display(draft.terrestre.vitesse_vent_ms)} />
-              <RecapLigne label="Direction du vent" value={draft.terrestre.direction_vent} />
+              <RecapLigne label="Direction du vent" value={formatDirectionDeplacement(draft.terrestre.direction_vent)} />
               <RecapLigne label="Température (°C)" value={display(draft.terrestre.temperature_c)} />
               <RecapLigne label="Reprise de traitement" value={displayBool(draft.terrestre.reprise_traitement)} />
               <RecapLigne label="Taux de mortalité (%)" value={display(draft.terrestre.taux_mortalite_pourcent)} />
