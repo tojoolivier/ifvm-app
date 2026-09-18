@@ -137,12 +137,15 @@ jobs:
       - run: ruff format --check .
       - run: pytest
 
-  # Gatekeeper : "lint-backend" est un required status check nomme sur main
-  # (branch protection). Un skip via `if:` sur ce nom ferait rester le check
+  # Gatekeeper : "backend" est le required status check nomme sur main
+  # (branch protection) — pas "lint-backend" (cf. #ci-check-requis-desaligne :
+  # un renommage anterieur des jobs, jamais reporte sur la protection de
+  # branche, laissait ce check bloque indefiniment sur "waiting for status to
+  # be reported"). Un skip via `if:` sur ce nom ferait rester le check
   # "expected" indefiniment et bloquerait le merge. Ce job tourne donc
   # toujours, sur self-hosted-linux (pas de cout dind), et se contente de
   # relayer le resultat de lint-backend-impl quand backend/ a change.
-  lint-backend:
+  backend:
     needs: [changes, lint-backend-impl]
     if: always()
     runs-on: self-hosted-linux
@@ -175,8 +178,8 @@ jobs:
       - run: npm run lint
       - run: npm test
 
-  # Gatekeeper, meme raison que lint-backend ci-dessus.
-  lint-frontend:
+  # Gatekeeper, meme raison que "backend" ci-dessus.
+  frontend:
     needs: [changes, lint-frontend-impl]
     if: always()
     runs-on: self-hosted-linux
@@ -214,8 +217,8 @@ jobs:
       - run: npm run check:schema-drift
       - run: npm test
 
-  # Gatekeeper, meme raison que lint-backend ci-dessus.
-  lint-mobile:
+  # Gatekeeper, meme raison que "backend" ci-dessus.
+  mobile:
     needs: [changes, lint-mobile-impl]
     if: always()
     runs-on: self-hosted-linux
