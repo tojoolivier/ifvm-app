@@ -23,7 +23,6 @@ jest.mock('@/lib/traitement-repository', () => ({
   updateTraitementTerrestre: jest.fn().mockResolvedValue({}),
   addProduitUtilise: jest.fn().mockResolvedValue({}),
   deleteAllProduitsForTraitementTerrestre: jest.fn().mockResolvedValue(undefined),
-  listReprenableTraitements: jest.fn().mockResolvedValue([]),
 }));
 
 jest.mock('@/lib/referentiel-db', () => ({
