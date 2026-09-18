@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -20,10 +20,23 @@ const FICHE_VOL = {
   base_code: 'MDGA21',
   base_nom: 'Ambovombe',
   stand_nom: 'Stand Nord',
+  base_numero: 'MDGA21',
+  base_localite: 'Ambovombe',
+  stand_numero: 'S1',
+  stand_localite: 'Stand Nord',
   pilote: 'Jean Rakoto',
   mecanicien: 'Paul Andria',
   chef_de_base_id: 'u-chef',
   consultant_international: null,
+  pesticide_nom_commercial: 'Icon 10 CS',
+  pesticide_quantite_disponible: 200,
+  pesticide_quantite_recue: 50,
+  pesticide_quantite_utilisee: 10,
+  pesticide_quantite_restante: 190,
+  futs_disponible: 4,
+  futs_recues: 1,
+  futs_pleins: 3,
+  futs_vides: 1,
   observations: 'RAS',
   statut: 'brouillon',
   vols: [
@@ -37,6 +50,23 @@ const FICHE_VOL = {
       prospection_id: null,
       observations: null,
       duree_minutes: 35,
+      numero_cuve: '1',
+      produit_nom: 'Icon 10 CS',
+      bloc: {
+        numero: 1,
+        nom: 'Bloc 1',
+        localite: 'Betioky-Sud',
+        surface_theorique_ha: 12.5,
+        surface_protegee_ha: null,
+        surface_traitee_ha: 10,
+        largeur_andain_m: 18,
+        interpasse_m: 45,
+        hauteur_vol_min_m: 8,
+        hauteur_vol_max_m: 12,
+        observation: 'RAS',
+        espece: 'LMC',
+        vols_clairs_essaims: 'Quelques vols clairs observés',
+      },
     },
     {
       id: 'v-2',
@@ -48,6 +78,9 @@ const FICHE_VOL = {
       prospection_id: 'p-1',
       observations: 'Survol de contrôle',
       duree_minutes: 60,
+      numero_cuve: null,
+      produit_nom: null,
+      bloc: null,
     },
   ],
   signatures: [
@@ -187,5 +220,48 @@ describe('FicheVolDetailPage', () => {
 
     await screen.findByTestId('fiche-vol-header')
     expect(screen.queryByText('🔒 Lecture seule')).not.toBeInTheDocument()
+  })
+})
+
+describe('FicheVolDetailPage — impression A4 (#fiche-vol-impression)', () => {
+  beforeEach(() => {
+    window.print = vi.fn()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("n'affiche pas le bouton d'export pour une fiche brouillon", async () => {
+    mockApi()
+    renderPage()
+
+    await screen.findByTestId('fiche-vol-header')
+    expect(screen.queryByRole('button', { name: /Imprimer A4/i })).not.toBeInTheDocument()
+  })
+
+  it('affiche le bouton d’export pour une fiche validée et déclenche window.print au clic', async () => {
+    mockApi({ ficheVol: { ...FICHE_VOL, statut: 'validee' } })
+    renderPage()
+
+    await screen.findByTestId('fiche-vol-header')
+    const button = screen.getByRole('button', { name: /Imprimer A4/i })
+    expect(screen.queryByTestId('fiche-imprimable')).not.toBeInTheDocument()
+
+    button.click()
+
+    await waitFor(() => expect(screen.getByTestId('fiche-imprimable')).toBeInTheDocument())
+    expect(window.print).toHaveBeenCalledTimes(1)
+
+    const fiche = screen.getByTestId('fiche-imprimable')
+    expect(within(fiche).getByText('Fiche n° 2026-08-14-MDGA21-A21')).toBeInTheDocument()
+    // Ligne du tableau blocs, résolue par jointure Rotation -> Bloc -> Cible.
+    expect(within(fiche).getByText(/Bloc 1/)).toBeInTheDocument()
+    expect(within(fiche).getByText('Betioky-Sud')).toBeInTheDocument()
+    expect(within(fiche).getByText('12.5 ha')).toBeInTheDocument()
+    // Le vol de prospection (sans bloc rattaché) n'a pas de ligne dans ce tableau.
+    expect(within(fiche).queryByText('Survol de contrôle')).not.toBeInTheDocument()
+    // Indicateur essaims global, pas une colonne par bloc.
+    expect(within(fiche).getByText(/Quelques vols clairs observés/)).toBeInTheDocument()
   })
 })

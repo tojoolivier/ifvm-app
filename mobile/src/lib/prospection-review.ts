@@ -27,6 +27,7 @@ import { parseSelectionMultiple, typeCibleImagoLabel } from './prospection-exten
 import { CaptureCounts, dominantPhenotype, rowsToCounts, totalBySexe, totalCaptures } from './prospection-capture-store';
 import { CHRONO_MAX_SECONDS, capturesMaxFor, phasesFor, phenotypesFor } from './prospection-especes-stades';
 import { buildGrilles, parseEspeceSelection } from './prospection-especes';
+import { formatDirectionDeplacement } from './prospection-infestation-insights';
 import { getDb } from './prospection-db';
 import { pullReferentiel } from './referentiel-sync';
 import { assertPresent, ReferentialError } from './errors';
@@ -383,8 +384,8 @@ function buildComportementSummary(infestations: InfestationRow[]): string {
   if (row.comportement) {
     parts.push(`État ${row.comportement === 'deplacement' ? 'Déplacement' : 'Repos'}`);
   }
-  if (row.direction_de || row.direction_vers) {
-    parts.push(`Direction ${row.direction_de ?? '—'} → ${row.direction_vers ?? '—'}`);
+  if (row.direction_de) {
+    parts.push(`Direction ${formatDirectionDeplacement(row.direction_de)}`);
   }
   if (row.essaim_en_vol || row.essaim_pose) {
     const etats = [row.essaim_en_vol ? 'en vol' : null, row.essaim_pose ? 'posé' : null].filter(Boolean);

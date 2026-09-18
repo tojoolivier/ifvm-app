@@ -19,6 +19,32 @@ export function oppositeDirection(label: string): string {
   return COMPASS_DIRECTIONS[(index + 4) % COMPASS_DIRECTIONS.length].label;
 }
 
+const COMPASS_DIRECTION_LABELS: Record<string, string> = {
+  N: 'Nord',
+  NE: 'Nord-Est',
+  E: 'Est',
+  SE: 'Sud-Est',
+  S: 'Sud',
+  SO: 'Sud-Ouest',
+  O: 'Ouest',
+  NO: 'Nord-Ouest',
+};
+
+/**
+ * Formate un point cardinal choisi sur un chip (ex. "NE") pour un
+ * récapitulatif — utilisé pour « Direction du déplacement » sur toutes les
+ * fiches de prospection (Intensive, Extensive, Validation/Revalidation, qui
+ * réutilisent les écrans de l'Intensif) et pour « Direction du vent » sur la
+ * fiche de traitement Terrestre (recap.tsx) : même règle partout, n'affiche
+ * que l'élément réellement choisi ("vers Nord-Est"), jamais un sens opposé
+ * dérivé automatiquement (direction_vers/directionVers, propre au
+ * déplacement) qui n'a jamais été une saisie.
+ */
+export function formatDirectionDeplacement(code: string | null | undefined): string {
+  if (!code) return '—';
+  return `vers ${COMPASS_DIRECTION_LABELS[code] ?? code}`;
+}
+
 /** Seuil placeholder — à remplacer par le seuil critique agronomique réel une fois confirmé. */
 const DENSITE_SEUIL_CRITIQUE = 300;
 

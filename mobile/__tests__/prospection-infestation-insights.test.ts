@@ -3,6 +3,7 @@ import {
   oppositeDirection,
   densityInsight,
   comportementInsight,
+  formatDirectionDeplacement,
 } from '../src/lib/prospection-infestation-insights';
 
 describe('COMPASS_DIRECTIONS', () => {
@@ -43,6 +44,28 @@ describe('densityInsight', () => {
   it('flags moderate densité below the threshold', () => {
     expect(densityInsight(120)).toBe('Densité modérée, à surveiller.');
     expect(densityInsight(0)).toBe('Densité modérée, à surveiller.');
+  });
+});
+
+describe('formatDirectionDeplacement', () => {
+  it('formate chaque point cardinal en toutes lettres, préfixé de "vers"', () => {
+    expect(formatDirectionDeplacement('N')).toBe('vers Nord');
+    expect(formatDirectionDeplacement('NE')).toBe('vers Nord-Est');
+    expect(formatDirectionDeplacement('E')).toBe('vers Est');
+    expect(formatDirectionDeplacement('SE')).toBe('vers Sud-Est');
+    expect(formatDirectionDeplacement('S')).toBe('vers Sud');
+    expect(formatDirectionDeplacement('SO')).toBe('vers Sud-Ouest');
+    expect(formatDirectionDeplacement('O')).toBe('vers Ouest');
+    expect(formatDirectionDeplacement('NO')).toBe('vers Nord-Ouest');
+  });
+
+  it('affiche "—" quand aucune direction n’est renseignée', () => {
+    expect(formatDirectionDeplacement(null)).toBe('—');
+    expect(formatDirectionDeplacement(undefined)).toBe('—');
+  });
+
+  it('retombe sur la valeur brute pour un code inconnu, sans planter', () => {
+    expect(formatDirectionDeplacement('Nord')).toBe('vers Nord');
   });
 });
 
