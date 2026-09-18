@@ -36,7 +36,7 @@ class PosteAcridienRead(BaseModel):
     za_id: uuid.UUID
     za_code: str
     za_nom: str
-    # Rattachement à une équipe terrestre (migration 0072) : nullable, plusieurs
+    # Rattachement à une équipe terrestre (migration 0073) : nullable, plusieurs
     # postes peuvent partager la même équipe.
     equipe_terrestre_id: uuid.UUID | None = None
     equipe_terrestre_nom: str | None = None
@@ -293,7 +293,7 @@ class EquipeAerienneRead(BaseModel):
     id: uuid.UUID
     nom: str
     chef_de_base_id: uuid.UUID
-    # Nullable : équipes créées avant la migration 0071. Toujours renseignés pour
+    # Nullable : équipes créées avant la migration 0072. Toujours renseignés pour
     # une équipe créée depuis (EquipeAerienneCreate les exige).
     pilote: str | None = None
     mecanicien: str | None = None

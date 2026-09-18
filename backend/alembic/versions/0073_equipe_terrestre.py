@@ -2,7 +2,7 @@
 
 Demande utilisateur (2026-09-18) : pouvoir regrouper/filtrer le personnel et les
 postes/stations acridiens par équipe, sur le même principe que l'équipe aérienne
-(migrations 0066/0071) mais côté terrestre.
+(migrations 0066/0072) mais côté terrestre.
 
 ## Cardinalités (confirmées avec l'utilisateur)
 
@@ -11,7 +11,7 @@ postes/stations acridiens par équipe, sur le même principe que l'équipe aéri
   équipe, même règle que `equipe_aerienne.chef_de_base_id`.
 - Une équipe terrestre porte un nombre variable d'« autres membres » — table fille
   `equipe_terrestre_membre` (`ON DELETE CASCADE`), même patron que
-  `equipe_aerienne_membre` (migration 0071) : un texte concaténé violerait la 1FN
+  `equipe_aerienne_membre` (migration 0072) : un texte concaténé violerait la 1FN
   (repeating group), une table fille permet d'identifier/supprimer chaque membre
   individuellement.
 - `poste_acridien.equipe_terrestre_id` (nullable, FK simple) : **pas d'UNIQUE**,
@@ -20,8 +20,8 @@ postes/stations acridiens par équipe, sur le même principe que l'équipe aéri
   relation est plusieurs postes : une équipe, pas 1:1 comme côté aérien (où une
   équipe correspond à une base physique unique).
 
-Revision ID: 0072
-Revises: 0071
+Revision ID: 0073
+Revises: 0072
 Create Date: 2026-09-18
 
 """
@@ -31,8 +31,8 @@ from sqlalchemy.dialects.postgresql import UUID
 
 from alembic import op
 
-revision = "0072"
-down_revision = "0071"
+revision = "0073"
+down_revision = "0072"
 branch_labels = None
 depends_on = None
 

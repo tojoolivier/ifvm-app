@@ -368,7 +368,7 @@ async def test_desactivation_repercutee_dans_le_pull(
     assert poste["actif"] is False
 
 
-# --- Rattachement equipe_terrestre (migration 0072) -----------------------------
+# --- Rattachement equipe_terrestre (migration 0073) -----------------------------
 
 
 @pytest.mark.asyncio
