@@ -40,7 +40,10 @@ describe('TraitementMesFichesScreen', () => {
     expect(await screen.findByText('F-1')).toBeVisible();
   });
 
-  it('sélectionner une fiche ouvre Références en lecture seule', async () => {
+  it('sélectionner un brouillon (pas encore synchronisé) ouvre Références en édition, pas en lecture seule (#traitement-brouillon-editable-avant-sync)', async () => {
+    // Cet écran ne liste que des fiches `statut = 'brouillon'` (listDraftTraitements) :
+    // aucune d'elles n'est encore verrouillée côté serveur, donc toutes doivent rester
+    // vérifiables ET modifiables slide par slide tant qu'elles ne sont pas synchronisées.
     jest.mocked(traitementRepository.listDraftTraitements).mockResolvedValue([
       { id: 'trait-1', numero_fiche: 'F-1', type_traitement: 'AERIEN', localite: 'Betioky', statut: 'brouillon' } as any,
     ]);
@@ -50,7 +53,25 @@ describe('TraitementMesFichesScreen', () => {
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(traitement)/references',
-      params: { traitementId: 'trait-1', isValidationView: '1' },
+      params: { traitementId: 'trait-1' },
+    });
+  });
+
+  it('sélectionner une fiche déjà validée (verrouillée côté serveur) ouvre Références en lecture seule', async () => {
+    // Cas limite : la synchronisation a réussi mais la fiche n'a pas encore quitté
+    // cette liste (`listDraftTraitements` ne filtre que sur `statut`, pas `statut_sync`).
+    // Une fois `statut = 'validee'`, elle doit rester en lecture seule comme partout
+    // ailleurs dans l'app (cf. navigateToTraitement, fiches.tsx).
+    jest.mocked(traitementRepository.listDraftTraitements).mockResolvedValue([
+      { id: 'trait-2', numero_fiche: 'F-2', type_traitement: 'AERIEN', localite: 'Betioky', statut: 'validee' } as any,
+    ]);
+
+    await render(<TraitementMesFichesScreen />);
+    fireEvent.press(await screen.findByText('F-2'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(traitement)/references',
+      params: { traitementId: 'trait-2', isValidationView: '1' },
     });
   });
 

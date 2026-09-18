@@ -1,7 +1,6 @@
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity } from 'react-native';
 import { UtilisateurEquipe, Pesticide } from '@/lib/referentiel-db';
-import { DraftTraitementRow } from '@/lib/traitement-repository';
 import { ProduitDraft, useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import { deriveNomCommercial } from '@/lib/traitement-validation';
 import { generateId } from '@/lib/id';
@@ -13,10 +12,37 @@ import { formStyles as styles } from '@/components/traitement/TraitementFormStyl
 
 const DIRECTIONS_VENT = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
 
+// Saisie francophone : la virgule est le séparateur décimal attendu par l'utilisateur,
+// mais JS/JSON n'utilisent que le point en interne — même paire de fonctions que
+// rotations.tsx/veg.tsx/synthese.tsx/moyens.tsx (#326), pas mutualisée pour l'instant
+// (cf. commentaire équivalent là-bas). Sans conversion, taper "3,2" produisait
+// `Number("3,2")` = `NaN`, aussitôt réaffiché tel quel par `String(NaN)` — la valeur
+// saisie semblait « disparaître », remplacée par "NaN" (#terrestre-decimales-virgule).
+function parseDecimalInput(raw: string): number | null {
+  if (raw === '') return null;
+  const val = Number(raw.replace(',', '.'));
+  return isNaN(val) ? null : val;
+}
+
+function formatDecimalDisplay(value: number | null | undefined): string {
+  return value != null ? String(value).replace('.', ',') : '';
+}
+
+type TerrestreDecimalField =
+  | 'vitesse_vent_ms'
+  | 'temperature_c'
+  | 'taux_mortalite_pourcent'
+  | 'evaluation_efficacite_heures_apres'
+  | 'surface_atomiseur_ha'
+  | 'surface_atomiseur_autoporte_ha'
+  | 'surface_disque_rotatif_ha'
+  | 'pesticideRecuL'
+  | 'essence_litres'
+  | 'nb_piles';
+
 export interface TerrestreFormProps {
   readOnly: boolean;
   chefsEquipe: UtilisateurEquipe[];
-  reprenables: DraftTraitementRow[];
   pesticides: Pesticide[];
   produits: ProduitDraft[];
   setProduits: (updater: (prev: ProduitDraft[]) => ProduitDraft[]) => void;
@@ -32,7 +58,6 @@ export interface TerrestreFormProps {
 export function TerrestreForm({
   readOnly,
   chefsEquipe,
-  reprenables,
   pesticides,
   produits,
   setProduits,
@@ -44,6 +69,61 @@ export function TerrestreForm({
   errors,
 }: TerrestreFormProps) {
   const store = useTraitementCaptureStore();
+  // Texte brut en cours de saisie pour les champs décimaux libres de cet écran —
+  // permet de taper un séparateur décimal ou un zéro de fin ("3," / "3,2") sans que
+  // le champ ne se reformate à chaque frappe (cf. `formatDecimalDisplay` sinon
+  // appelé sur une valeur encore inexploitable). Un objet pour les champs
+  // `store.terrestre`, un autre indexé par produit (`localId`) pour la quantité.
+  const [decimalDrafts, setDecimalDrafts] = useState<Partial<Record<TerrestreDecimalField, string>>>({});
+  const [produitDrafts, setProduitDrafts] = useState<Record<string, string>>({});
+
+  const getDecimalDraft = (field: TerrestreDecimalField): string | undefined => decimalDrafts[field];
+
+  const handleDecimalChange = (field: TerrestreDecimalField, raw: string) => {
+    if (raw !== '' && !/^\d*[.,]?\d*$/.test(raw)) return;
+    setDecimalDrafts((current) => ({ ...current, [field]: raw }));
+    if (raw === '') {
+      store.updateTerrestre({ [field]: null });
+      return;
+    }
+    if (raw.endsWith('.') || raw.endsWith(',')) return;
+    const val = parseDecimalInput(raw);
+    if (val === null) return;
+    store.updateTerrestre({ [field]: val });
+  };
+
+  const clearDecimalDraft = (field: TerrestreDecimalField) => {
+    setDecimalDrafts((current) => {
+      if (current[field] === undefined) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const getProduitDraft = (localId: string): string | undefined => produitDrafts[localId];
+
+  const handleProduitQuantiteChange = (localId: string, raw: string) => {
+    if (raw !== '' && !/^\d*[.,]?\d*$/.test(raw)) return;
+    setProduitDrafts((current) => ({ ...current, [localId]: raw }));
+    if (raw === '') {
+      setProduits((prev) => prev.map((x) => (x.localId === localId ? { ...x, quantite_l: null } : x)));
+      return;
+    }
+    if (raw.endsWith('.') || raw.endsWith(',')) return;
+    const val = parseDecimalInput(raw);
+    if (val === null) return;
+    setProduits((prev) => prev.map((x) => (x.localId === localId ? { ...x, quantite_l: val } : x)));
+  };
+
+  const clearProduitDraft = (localId: string) => {
+    setProduitDrafts((current) => {
+      if (current[localId] === undefined) return current;
+      const next = { ...current };
+      delete next[localId];
+      return next;
+    });
+  };
 
   return (
     <Fragment>
@@ -106,18 +186,20 @@ export function TerrestreForm({
         editable={!readOnly}
         style={styles.input}
         placeholder="0"
-        keyboardType="numeric"
-        value={store.terrestre.vitesse_vent_ms != null ? String(store.terrestre.vitesse_vent_ms) : ''}
-        onChangeText={(v) => store.updateTerrestre({ vitesse_vent_ms: v ? Number(v) : null })}
+        keyboardType="decimal-pad"
+        value={getDecimalDraft('vitesse_vent_ms') ?? formatDecimalDisplay(store.terrestre.vitesse_vent_ms)}
+        onChangeText={(v) => handleDecimalChange('vitesse_vent_ms', v)}
+        onBlur={() => clearDecimalDraft('vitesse_vent_ms')}
       />
       <Text style={styles.label}>Température (°C) *</Text>
       <TextInput
         editable={!readOnly}
         style={styles.input}
         placeholder="0"
-        keyboardType="numeric"
-        value={store.terrestre.temperature_c != null ? String(store.terrestre.temperature_c) : ''}
-        onChangeText={(v) => store.updateTerrestre({ temperature_c: v ? Number(v) : null })}
+        keyboardType="decimal-pad"
+        value={getDecimalDraft('temperature_c') ?? formatDecimalDisplay(store.terrestre.temperature_c)}
+        onChangeText={(v) => handleDecimalChange('temperature_c', v)}
+        onBlur={() => clearDecimalDraft('temperature_c')}
       />
       <Text style={styles.label}>Direction du vent</Text>
       <View style={styles.chipRow}>
@@ -137,28 +219,23 @@ export function TerrestreForm({
         editable={!readOnly}
         style={styles.input}
         placeholder="0"
-        keyboardType="numeric"
-        value={
-          store.terrestre.taux_mortalite_pourcent != null
-            ? String(store.terrestre.taux_mortalite_pourcent)
-            : ''
-        }
-        onChangeText={(v) => store.updateTerrestre({ taux_mortalite_pourcent: v ? Number(v) : null })}
+        keyboardType="decimal-pad"
+        value={getDecimalDraft('taux_mortalite_pourcent') ?? formatDecimalDisplay(store.terrestre.taux_mortalite_pourcent)}
+        onChangeText={(v) => handleDecimalChange('taux_mortalite_pourcent', v)}
+        onBlur={() => clearDecimalDraft('taux_mortalite_pourcent')}
       />
       <Text style={styles.label}>Évalué après traitement (heures)</Text>
       <TextInput
         editable={!readOnly}
         style={styles.input}
         placeholder="0"
-        keyboardType="numeric"
+        keyboardType="decimal-pad"
         value={
-          store.terrestre.evaluation_efficacite_heures_apres != null
-            ? String(store.terrestre.evaluation_efficacite_heures_apres)
-            : ''
+          getDecimalDraft('evaluation_efficacite_heures_apres') ??
+          formatDecimalDisplay(store.terrestre.evaluation_efficacite_heures_apres)
         }
-        onChangeText={(v) =>
-          store.updateTerrestre({ evaluation_efficacite_heures_apres: v ? Number(v) : null })
-        }
+        onChangeText={(v) => handleDecimalChange('evaluation_efficacite_heures_apres', v)}
+        onBlur={() => clearDecimalDraft('evaluation_efficacite_heures_apres')}
       />
       <Text style={styles.label}>Méthode d&apos;évaluation</Text>
       <View style={styles.chipRow}>
@@ -178,62 +255,39 @@ export function TerrestreForm({
         />
       </View>
 
-      <Text style={styles.label}>Reprise de traitement</Text>
-      <View style={styles.chipRow}>
-        <Chip
-          label="Non"
-          selected={!store.terrestre.repriseTraitement}
-          onPress={() => !readOnly && store.updateTerrestre({ repriseTraitement: false, traitementOrigineId: null })}
-        />
-        <Chip label="Oui" selected={!!store.terrestre.repriseTraitement} onPress={() => !readOnly && store.updateTerrestre({ repriseTraitement: true })} />
-      </View>
-      {store.terrestre.repriseTraitement && (
-        <View style={styles.chipRow}>
-          {reprenables.map((r) => (
-            <Chip
-              key={r.id}
-              label={r.numero_fiche ?? r.id.slice(0, 8)}
-              selected={store.terrestre.traitementOrigineId === r.id}
-              onPress={() => !readOnly && store.updateTerrestre({ traitementOrigineId: r.id })}
-            />
-          ))}
-        </View>
-      )}
-      {errors.traitementOrigineId && <Text style={styles.error}>{errors.traitementOrigineId}</Text>}
-
       <Text style={styles.label}>Moyens &amp; surfaces (ha)</Text>
       <Text style={styles.label}>Atomiseur à dos</Text>
       <TextInput
         editable={!readOnly}
         style={styles.input}
         placeholder="0"
-        keyboardType="numeric"
-        value={store.terrestre.surface_atomiseur_ha != null ? String(store.terrestre.surface_atomiseur_ha) : ''}
-        onChangeText={(v) => store.updateTerrestre({ surface_atomiseur_ha: v ? Number(v) : null })}
+        keyboardType="decimal-pad"
+        value={getDecimalDraft('surface_atomiseur_ha') ?? formatDecimalDisplay(store.terrestre.surface_atomiseur_ha)}
+        onChangeText={(v) => handleDecimalChange('surface_atomiseur_ha', v)}
+        onBlur={() => clearDecimalDraft('surface_atomiseur_ha')}
       />
       <Text style={styles.label}>Atomiseur autoporté</Text>
       <TextInput
         editable={!readOnly}
         style={styles.input}
         placeholder="0"
-        keyboardType="numeric"
+        keyboardType="decimal-pad"
         value={
-          store.terrestre.surface_atomiseur_autoporte_ha != null
-            ? String(store.terrestre.surface_atomiseur_autoporte_ha)
-            : ''
+          getDecimalDraft('surface_atomiseur_autoporte_ha') ??
+          formatDecimalDisplay(store.terrestre.surface_atomiseur_autoporte_ha)
         }
-        onChangeText={(v) =>
-          store.updateTerrestre({ surface_atomiseur_autoporte_ha: v ? Number(v) : null })
-        }
+        onChangeText={(v) => handleDecimalChange('surface_atomiseur_autoporte_ha', v)}
+        onBlur={() => clearDecimalDraft('surface_atomiseur_autoporte_ha')}
       />
       <Text style={styles.label}>Disque rotatif</Text>
       <TextInput
         editable={!readOnly}
         style={styles.input}
         placeholder="0"
-        keyboardType="numeric"
-        value={store.terrestre.surface_disque_rotatif_ha != null ? String(store.terrestre.surface_disque_rotatif_ha) : ''}
-        onChangeText={(v) => store.updateTerrestre({ surface_disque_rotatif_ha: v ? Number(v) : null })}
+        keyboardType="decimal-pad"
+        value={getDecimalDraft('surface_disque_rotatif_ha') ?? formatDecimalDisplay(store.terrestre.surface_disque_rotatif_ha)}
+        onChangeText={(v) => handleDecimalChange('surface_disque_rotatif_ha', v)}
+        onBlur={() => clearDecimalDraft('surface_disque_rotatif_ha')}
       />
 
       <Card variant="derivee">
@@ -320,13 +374,10 @@ export function TerrestreForm({
             editable={!readOnly}
             style={styles.input}
             placeholder="0"
-            keyboardType="numeric"
-            value={produit.quantite_l != null ? String(produit.quantite_l) : ''}
-            onChangeText={(v) =>
-              setProduits((prev) =>
-                prev.map((x) => (x.localId === produit.localId ? { ...x, quantite_l: v ? Number(v) : null } : x))
-              )
-            }
+            keyboardType="decimal-pad"
+            value={getProduitDraft(produit.localId) ?? formatDecimalDisplay(produit.quantite_l)}
+            onChangeText={(v) => handleProduitQuantiteChange(produit.localId, v)}
+            onBlur={() => clearProduitDraft(produit.localId)}
           />
         </Card>
       ))}
@@ -345,9 +396,10 @@ export function TerrestreForm({
         editable={!readOnly}
         style={styles.input}
         placeholder="0"
-        keyboardType="numeric"
-        value={store.terrestre.pesticideRecuL != null ? String(store.terrestre.pesticideRecuL) : ''}
-        onChangeText={(v) => store.updateTerrestre({ pesticideRecuL: v ? Number(v) : null })}
+        keyboardType="decimal-pad"
+        value={getDecimalDraft('pesticideRecuL') ?? formatDecimalDisplay(store.terrestre.pesticideRecuL)}
+        onChangeText={(v) => handleDecimalChange('pesticideRecuL', v)}
+        onBlur={() => clearDecimalDraft('pesticideRecuL')}
       />
       {pesticideStockRestant != null && (
         <Card variant="derivee">
@@ -361,18 +413,20 @@ export function TerrestreForm({
         editable={!readOnly}
         style={styles.input}
         placeholder="0"
-        keyboardType="numeric"
-        value={store.terrestre.essence_litres != null ? String(store.terrestre.essence_litres) : ''}
-        onChangeText={(v) => store.updateTerrestre({ essence_litres: v ? Number(v) : null })}
+        keyboardType="decimal-pad"
+        value={getDecimalDraft('essence_litres') ?? formatDecimalDisplay(store.terrestre.essence_litres)}
+        onChangeText={(v) => handleDecimalChange('essence_litres', v)}
+        onBlur={() => clearDecimalDraft('essence_litres')}
       />
       <Text style={styles.label}>Nombre de piles</Text>
       <TextInput
         editable={!readOnly}
         style={styles.input}
         placeholder="0"
-        keyboardType="numeric"
-        value={store.terrestre.nb_piles != null ? String(store.terrestre.nb_piles) : ''}
-        onChangeText={(v) => store.updateTerrestre({ nb_piles: v ? Number(v) : null })}
+        keyboardType="decimal-pad"
+        value={getDecimalDraft('nb_piles') ?? formatDecimalDisplay(store.terrestre.nb_piles)}
+        onChangeText={(v) => handleDecimalChange('nb_piles', v)}
+        onBlur={() => clearDecimalDraft('nb_piles')}
       />
     </Fragment>
   );
