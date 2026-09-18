@@ -36,7 +36,7 @@ jobs:
 
   # Pas de job de test ici : main est protegee (squash-merge apres checks
   # verts, cf. branch protection), donc le code qui arrive sur main a deja
-  # ete valide par le check "mobile" (npm test inclus) dans lint.yml en PR.
+  # ete valide par mobile (checks-mobile + tests-mobile) dans lint.yml en PR.
   # Relancer npm test ici serait redondant sur un contenu deja teste.
 
   # Publication OTA (expo-updates) pour les changements JS/TS purs : les apps installees

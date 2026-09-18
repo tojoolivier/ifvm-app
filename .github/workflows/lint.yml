@@ -41,8 +41,12 @@ jobs:
               - "mobile/**"
               - "backend/**"
 
-  check-migrations:
-    # Parse statique des fichiers de migration : ni Postgres ni env applicatif.
+  # Checks rapides (pas de DB, pas de dind) : lint, format, coherence
+  # statique des migrations. Tourne en parallele de tests-backend au lieu de
+  # le precede : sur le cas nominal (tout passe), attendre le lint avant de
+  # lancer pytest n'ajoute que de la latence. Sur une PR qui echoue au lint,
+  # ruff est <1s donc le gaspillage de tests-backend est marginal.
+  checks-backend:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: self-hosted-linux
@@ -59,11 +63,14 @@ jobs:
       - name: Historique Alembic lineaire (head unique)
         run: python scripts/check_migration_linearity.py
 
-  lint-backend-impl:
-    # Porte aussi le rejeu des migrations : le pool dind est plafonne a
-    # maxRunners=1 (runner-scale-set-dind.yaml), donc deux jobs dind dans ce
-    # workflow se serialisent au lieu de tourner en parallele.
-    # "services: postgres" impose un daemon Docker dans le pod -> pool dind.
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check .
+      - run: ruff format --check .
+
+  # Rejeu des migrations + pytest : seule la partie qui a reellement besoin
+  # de Postgres/Docker occupe le pool dind (maxRunners=1, partage avec
+  # deploy.yml) desormais - ruff/format en ont ete sortis (cf. checks-backend).
+  tests-backend:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: self-hosted-dind
@@ -104,7 +111,7 @@ jobs:
       - run: pip install -r requirements-dev.txt
 
       # Rejeu de la chaine 0001..head sur une base vierge : attrape ce que le
-      # parse statique de check-migrations ne peut pas voir (colonne ajoutee
+      # parse statique de checks-backend ne peut pas voir (colonne ajoutee
       # deux fois, contrainte deja posee, migration autogeneree contre une base
       # en derive). Base dediee : pytest a la sienne (ifvm_test, cf.
       # tests/conftest.py) et la creerait via ses propres fixtures.
@@ -133,32 +140,34 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://ifvm:ifvm_secret@localhost:5432/ifvm_migrations
         run: alembic upgrade head
 
-      - run: ruff check .
-      - run: ruff format --check .
-      - run: pytest
+      # -n 2 volontairement prudent (pas -n auto) : le pod dind est partage/
+      # etroit en ressources, cf. l'incident memoire de la suite Jest mobile
+      # (jest.config.js) qui a fait perdre la connexion a un runner sous
+      # charge. A ajuster seulement avec des metriques de charge du pod.
+      - run: pytest -n 2
 
   # Gatekeeper : "backend" est le required status check nomme sur main
   # (branch protection) — pas "lint-backend" (cf. #ci-check-requis-desaligne :
   # un renommage anterieur des jobs, jamais reporte sur la protection de
   # branche, laissait ce check bloque indefiniment sur "waiting for status to
-  # be reported"). Un skip via `if:` sur ce nom ferait rester le check
-  # "expected" indefiniment et bloquerait le merge. Ce job tourne donc
-  # toujours, sur self-hosted-linux (pas de cout dind), et se contente de
-  # relayer le resultat de lint-backend-impl quand backend/ a change.
+  # be reported"). Tourne toujours, sur self-hosted-linux (pas de cout dind),
+  # et relaie le resultat des deux jobs ci-dessus quand backend/ a change.
   backend:
-    needs: [changes, lint-backend-impl]
+    needs: [changes, checks-backend, tests-backend]
     if: always()
     runs-on: self-hosted-linux
     steps:
-      - name: Verifie le resultat de lint-backend-impl
+      - name: Verifie le resultat de checks-backend et tests-backend
         run: |
-          if [[ "${{ needs.changes.outputs.backend }}" == "true" && "${{ needs.lint-backend-impl.result }}" != "success" ]]; then
-            echo "lint-backend-impl a echoue ou ne s'est pas termine (result=${{ needs.lint-backend-impl.result }})"
-            exit 1
+          if [[ "${{ needs.changes.outputs.backend }}" == "true" ]]; then
+            if [[ "${{ needs.checks-backend.result }}" != "success" || "${{ needs.tests-backend.result }}" != "success" ]]; then
+              echo "checks-backend=${{ needs.checks-backend.result }} tests-backend=${{ needs.tests-backend.result }}"
+              exit 1
+            fi
           fi
-          echo "OK (backend modifie: ${{ needs.changes.outputs.backend }}, resultat impl: ${{ needs.lint-backend-impl.result }})"
+          echo "OK (backend modifie: ${{ needs.changes.outputs.backend }}, checks: ${{ needs.checks-backend.result }}, tests: ${{ needs.tests-backend.result }})"
 
-  lint-frontend-impl:
+  checks-frontend:
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
     runs-on: self-hosted-linux
@@ -176,23 +185,43 @@ jobs:
 
       - run: npm ci
       - run: npm run lint
+
+  tests-frontend:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: self-hosted-linux
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
       - run: npm test
 
   # Gatekeeper, meme raison que "backend" ci-dessus.
   frontend:
-    needs: [changes, lint-frontend-impl]
+    needs: [changes, checks-frontend, tests-frontend]
     if: always()
     runs-on: self-hosted-linux
     steps:
-      - name: Verifie le resultat de lint-frontend-impl
+      - name: Verifie le resultat de checks-frontend et tests-frontend
         run: |
-          if [[ "${{ needs.changes.outputs.frontend }}" == "true" && "${{ needs.lint-frontend-impl.result }}" != "success" ]]; then
-            echo "lint-frontend-impl a echoue ou ne s'est pas termine (result=${{ needs.lint-frontend-impl.result }})"
-            exit 1
+          if [[ "${{ needs.changes.outputs.frontend }}" == "true" ]]; then
+            if [[ "${{ needs.checks-frontend.result }}" != "success" || "${{ needs.tests-frontend.result }}" != "success" ]]; then
+              echo "checks-frontend=${{ needs.checks-frontend.result }} tests-frontend=${{ needs.tests-frontend.result }}"
+              exit 1
+            fi
           fi
-          echo "OK (frontend modifie: ${{ needs.changes.outputs.frontend }}, resultat impl: ${{ needs.lint-frontend-impl.result }})"
+          echo "OK (frontend modifie: ${{ needs.changes.outputs.frontend }}, checks: ${{ needs.checks-frontend.result }}, tests: ${{ needs.tests-frontend.result }})"
 
-  lint-mobile-impl:
+  checks-mobile:
     # Se declenche aussi sur backend/** (pas seulement mobile/**) : c'est ce
     # job qui porte check:schema-drift, le garde-fou contre une derive entre
     # le schema backend et le cache SQLite mobile (cf. CLAUDE.md).
@@ -215,18 +244,54 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run check:schema-drift
-      - run: npm test
+
+  # 3 legs au lieu d'un seul "npm test" : la suite jest-expo ("screens", 114
+  # fichiers vs 55 pour "logic") est le facteur limitant et le projet identifie
+  # comme gourmand en memoire (cf. jest.config.js, maxWorkers:2 volontairement
+  # bas suite a un OOM-kill de runner). On parallelise par JOB (plus de
+  # runners), pas par worker (plus de memoire par runner) - meme profil
+  # memoire par job qu'avant, juste plus de jobs en vol.
+  tests-mobile:
+    needs: changes
+    if: needs.changes.outputs.mobile == 'true'
+    runs-on: self-hosted-linux
+    defaults:
+      run:
+        working-directory: mobile
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: logic
+            jest_args: --selectProjects logic
+          - shard: screens-1
+            jest_args: --selectProjects screens --shard=1/2
+          - shard: screens-2
+            jest_args: --selectProjects screens --shard=2/2
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - run: npm ci
+      - run: npm test -- ${{ matrix.jest_args }}
 
   # Gatekeeper, meme raison que "backend" ci-dessus.
   mobile:
-    needs: [changes, lint-mobile-impl]
+    needs: [changes, checks-mobile, tests-mobile]
     if: always()
     runs-on: self-hosted-linux
     steps:
-      - name: Verifie le resultat de lint-mobile-impl
+      - name: Verifie le resultat de checks-mobile et tests-mobile
         run: |
-          if [[ "${{ needs.changes.outputs.mobile }}" == "true" && "${{ needs.lint-mobile-impl.result }}" != "success" ]]; then
-            echo "lint-mobile-impl a echoue ou ne s'est pas termine (result=${{ needs.lint-mobile-impl.result }})"
-            exit 1
+          if [[ "${{ needs.changes.outputs.mobile }}" == "true" ]]; then
+            if [[ "${{ needs.checks-mobile.result }}" != "success" || "${{ needs.tests-mobile.result }}" != "success" ]]; then
+              echo "checks-mobile=${{ needs.checks-mobile.result }} tests-mobile=${{ needs.tests-mobile.result }}"
+              exit 1
+            fi
           fi
-          echo "OK (mobile/backend modifie: ${{ needs.changes.outputs.mobile }}, resultat impl: ${{ needs.lint-mobile-impl.result }})"
+          echo "OK (mobile/backend modifie: ${{ needs.changes.outputs.mobile }}, checks: ${{ needs.checks-mobile.result }}, tests: ${{ needs.tests-mobile.result }})"
