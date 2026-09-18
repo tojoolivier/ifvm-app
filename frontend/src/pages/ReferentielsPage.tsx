@@ -4,6 +4,7 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import { AxiosError } from 'axios'
 import { api } from '../api/client'
 import { cn } from '@/lib/utils'
+import { PAGE_SIZE, compareSortValues, nextSort, normalize } from '@/lib/table-search-sort'
 import { DataTable, type DataTableColumn, type DataTableSort } from '@/components/ui/data-table'
 import { ErrorBanner } from '@/components/ui/error-banner'
 import { Switch } from '@/components/ui/switch'
@@ -254,8 +255,6 @@ function codeColumn(header = 'Code'): DataTableColumn<Row> {
   }
 }
 
-const PAGE_SIZE = 15
-
 /**
  * Entités administrables où le filtre « par équipe terrestre » a du sens —
  * limité au périmètre terrestre (poste_acridien, station_fixe, utilisateur) :
@@ -265,35 +264,6 @@ const PAGE_SIZE = 15
  * Au module plutôt qu'en render : référence stable pour les dépendances de hooks.
  */
 const ENTITES_FILTRABLES_PAR_EQUIPE = ['poste_acridien', 'station_fixe', 'utilisateur']
-
-/** Recherche insensible aux accents et à la casse ("Réunion" trouvé par "reunion"). */
-function normalize(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-}
-
-/**
- * Compare deux `sortValue` de colonne. `null` (valeur absente, « — » à
- * l'affichage) est toujours relégué en fin de liste, quel que soit le sens du
- * tri — sinon un tri descendant ferait remonter les lignes incomplètes en
- * premier, ce qui n'aide personne.
- */
-function compareSortValues(a: string | number | boolean | null, b: string | number | boolean | null): number {
-  if (a === b) return 0
-  if (a === null) return 1
-  if (b === null) return -1
-  if (typeof a === 'boolean' || typeof b === 'boolean') return Number(a) - Number(b)
-  if (typeof a === 'number' && typeof b === 'number') return a - b
-  return String(a).localeCompare(String(b), 'fr', { sensitivity: 'base', numeric: true })
-}
-
-function nextSort(current: DataTableSort | null, key: string): DataTableSort | null {
-  if (!current || current.key !== key) return { key, direction: 'asc' }
-  if (current.direction === 'asc') return { key, direction: 'desc' }
-  return null
-}
 
 /**
  * Ordre et contenu repris de la maquette (`REF_ORDER`). Les colonnes et champs

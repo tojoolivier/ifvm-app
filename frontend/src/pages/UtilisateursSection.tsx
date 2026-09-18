@@ -4,10 +4,13 @@ import { AxiosError } from 'axios'
 import { api } from '../api/client'
 import { Utilisateur } from '../types'
 import { useCurrentUser } from '../hooks/useCurrentUser'
-import { DataTable, DataTableColumn } from '../components/ui/data-table'
+import { DataTable, type DataTableColumn, type DataTableSort } from '../components/ui/data-table'
 import { Switch } from '../components/ui/switch'
 import { ErrorBanner } from '@/components/ui/error-banner'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
+import { PAGE_SIZE, compareSortValues, nextSort, normalize } from '@/lib/table-search-sort'
 
 const ROLES = [
   'prospecteur',
@@ -54,12 +57,25 @@ const ROLE_LABELS: Record<string, string> = {
   admin: 'Administrateur',
 }
 
-interface UsersPageProps {
+const fieldLabelClass =
+  'font-sans text-[9.5px] font-semibold uppercase tracking-[.8px] text-ifvm-text-weak'
+const inputClass =
+  'min-h-9 w-full rounded-lg border border-[#e0d9c4] bg-white px-[11px] text-[12.5px] font-semibold text-[#16201a] focus:outline-none focus:ring-2 focus:ring-[#235a36]'
+
+interface UtilisateursSectionProps {
   showCreate: boolean
   onShowCreateChange: (showCreate: boolean) => void
 }
 
-export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
+/**
+ * Section « Utilisateurs » de l'écran Administration — même présentation que
+ * ReferentielsPage.tsx (carte d'en-tête, carte « Enregistrements » avec
+ * recherche/tri/pagination, modale de création), portée ici avec la logique
+ * métier propre à cet écran : rôle et interrupteur actif verrouillés sur son
+ * propre compte (issue #250), sigle éditable en ligne, compteur de fiches
+ * dérivé de `GET /prospections`.
+ */
+export function UtilisateursSection({ showCreate, onShowCreateChange }: UtilisateursSectionProps) {
   const queryClient = useQueryClient()
   const { data: currentUser } = useCurrentUser()
   const [nom, setNom] = useState('')
@@ -69,6 +85,10 @@ export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
   const [role, setRole] = useState(ROLES[0])
   const [sigle, setSigle] = useState('')
   const [createError, setCreateError] = useState('')
+
+  const [search, setSearch] = useState('')
+  const [sort, setSort] = useState<DataTableSort | null>(null)
+  const [page, setPage] = useState(1)
 
   const { data: usersData = [], isLoading, isError, error } = useQuery<Utilisateur[]>({
     queryKey: ['users'],
@@ -81,7 +101,7 @@ export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
 
   // Colonne « Fiches » de la maquette : `GET /prospections` n'expose pas de
   // compteur agrégé par prospecteur — on compte côté client, comme le fait déjà
-  // StationPage pour ses prospections par station. Provisoire : la liste
+  // StationsSection pour ses prospections par station. Provisoire : la liste
   // complète transite à chaque affichage, ce qui ne tiendra pas à l'échelle
   // d'une base de plusieurs milliers de fiches. Un agrégat côté API
   // (`GET /prospections?group_by=prospecteur_id`) est la vraie réponse.
@@ -141,19 +161,17 @@ export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
     {
       key: 'nom',
       header: 'Nom',
-      render: (u) => (
-        <span className="text-[12.5px] font-semibold">{`${u.prenom} ${u.nom}`}</span>
-      ),
+      render: (u) => <span className="text-[12.5px] font-semibold">{`${u.prenom} ${u.nom}`}</span>,
+      sortValue: (u) => `${u.nom} ${u.prenom}`,
     },
     {
       key: 'email',
       header: 'Email',
       mono: true,
       render: (u) => (
-        <span className="font-mono text-[11.5px] font-medium text-ifvm-text-tertiary">
-          {u.email}
-        </span>
+        <span className="font-mono text-[11.5px] font-medium text-ifvm-text-tertiary">{u.email}</span>
       ),
+      sortValue: (u) => u.email,
     },
     {
       key: 'sigle',
@@ -183,6 +201,7 @@ export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
           className="w-20 rounded border border-[#e7e0cd] bg-white px-2 py-1 font-mono text-[11.5px] font-medium uppercase text-ifvm-text-tertiary focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
         />
       ),
+      sortValue: (u) => u.sigle ?? null,
     },
     {
       key: 'role',
@@ -199,8 +218,7 @@ export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
           onChange={(e) => updateMutation.mutate({ id: u.id, role: e.target.value })}
           className={cn(
             'inline-flex items-center rounded-full border px-[9px] py-[3px] font-sans text-[10px] font-bold disabled:opacity-50',
-            ROLE_TONES[u.role] ??
-              'bg-ifvm-brouillon-bg text-ifvm-brouillon-text border-ifvm-brouillon-border',
+            ROLE_TONES[u.role] ?? 'bg-ifvm-brouillon-bg text-ifvm-brouillon-text border-ifvm-brouillon-border',
           )}
         >
           {ROLES.map((r) => (
@@ -210,18 +228,18 @@ export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
           ))}
         </select>
       ),
+      sortValue: (u) => ROLE_LABELS[u.role] ?? u.role,
     },
     {
       key: 'station',
       header: 'Station',
       render: (u) =>
         u.pa_nom ? (
-          <span className="text-[#3a3a30]">
-            {u.pa_code ? `${u.pa_code} ${u.pa_nom}` : u.pa_nom}
-          </span>
+          <span className="text-[#3a3a30]">{u.pa_code ? `${u.pa_code} ${u.pa_nom}` : u.pa_nom}</span>
         ) : (
           <span className="text-ifvm-text-weak">—</span>
         ),
+      sortValue: (u) => u.pa_nom ?? null,
     },
     {
       key: 'fiches',
@@ -229,12 +247,8 @@ export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
       align: 'right',
       mono: true,
       // Un « ? » plutôt qu'un 0 trompeur si le comptage n'a pas pu être chargé.
-      render: (u) =>
-        fichesIndisponibles ? (
-          <span className="text-ifvm-text-weak">?</span>
-        ) : (
-          (fichesParProspecteur.get(u.id) ?? 0)
-        ),
+      render: (u) => (fichesIndisponibles ? <span className="text-ifvm-text-weak">?</span> : (fichesParProspecteur.get(u.id) ?? 0)),
+      sortValue: (u) => (fichesIndisponibles ? null : (fichesParProspecteur.get(u.id) ?? 0)),
     },
     {
       key: 'actif',
@@ -244,89 +258,219 @@ export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
           checked={u.actif}
           disabled={updateMutation.isPending || u.id === currentUser?.id}
           onCheckedChange={(checked) => updateMutation.mutate({ id: u.id, actif: checked })}
+          aria-label={`${u.prenom} ${u.nom} — ${u.actif ? 'actif' : 'inactif'}`}
         />
       ),
+      sortValue: (u) => u.actif,
     },
   ]
 
+  const searchQuery = normalize(search.trim())
+  const searchedRows = searchQuery
+    ? users.filter((u) =>
+        columns.some((column) => {
+          const value = column.sortValue?.(u)
+          return value !== null && value !== undefined && normalize(String(value)).includes(searchQuery)
+        }),
+      )
+    : users
+
+  const sortColumn = sort ? columns.find((c) => c.key === sort.key) : undefined
+  const sortedRows =
+    sort && sortColumn?.sortValue
+      ? [...searchedRows].sort((a, b) => {
+          const cmp = compareSortValues(sortColumn.sortValue!(a), sortColumn.sortValue!(b))
+          return sort.direction === 'asc' ? cmp : -cmp
+        })
+      : searchedRows
+
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const paginatedRows = sortedRows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  function updateSearch(value: string) {
+    setSearch(value)
+    setPage(1)
+  }
+
+  function toggleSort(key: string) {
+    setSort((current) => nextSort(current, key))
+    setPage(1)
+  }
+
   return (
-    <div>
-      {isError ? (
-        <ErrorBanner
-          label={errorStatus ? `Erreur ${errorStatus}` : 'Erreur'}
-          message={errorDetail ?? 'Impossible de charger les utilisateurs.'}
-        />
-      ) : (
-        <div className="overflow-hidden rounded-[11px] border border-[#e7e0cd] bg-card">
+    <div className="flex flex-col gap-[14px]">
+      {/* Carte d'en-tête */}
+      <div className="flex flex-col gap-[9px] rounded-[11px] border border-[#e7e0cd] bg-white px-5 py-4">
+        <div className="flex items-center gap-[10px]">
+          <h2 className="flex-1 font-sans text-[17px] font-extrabold">Utilisateurs</h2>
+          <span className="font-mono text-[11px] font-medium text-ifvm-text-weak">utilisateur</span>
+          <span className="rounded-full border border-ifvm-green-border bg-ifvm-green-bg px-[10px] py-1 font-sans text-[10px] font-bold text-ifvm-green-text">
+            GET /users/ · POST /users/ · PATCH /users/{'{id}'}
+          </span>
+        </div>
+        <p className="font-sans text-[12.5px] font-medium leading-[1.55] text-[#3a3a30]">
+          Agents et encadrants. Le rôle conditionne la navigation web et les rôles signataires des
+          fiches de traitement.
+        </p>
+      </div>
+
+      {/* Carte Enregistrements */}
+      <div className="overflow-hidden rounded-[11px] border border-[#e7e0cd] bg-white">
+        <div className="flex items-center gap-[10px] border-b border-[#f1ecdd] px-5 py-[13px]">
+          <h3 className="flex-1 font-sans text-[13px] font-bold">Enregistrements</h3>
+          <Label htmlFor="utilisateurs-recherche" className="sr-only">
+            Rechercher parmi les utilisateurs
+          </Label>
+          <Input
+            id="utilisateurs-recherche"
+            type="search"
+            value={search}
+            onChange={(event) => updateSearch(event.target.value)}
+            placeholder="Rechercher…"
+            className="h-9 w-48 rounded-[8px] border-[#e0d9c4] bg-[#fffdf8] text-[12px]"
+          />
+          <button
+            type="button"
+            onClick={() => onShowCreateChange(true)}
+            className="rounded-lg bg-[#235a36] px-[14px] py-2 font-sans text-[11.5px] font-bold text-white transition-colors duration-[120ms] hover:bg-[#1a4429]"
+          >
+            + Nouvel utilisateur
+          </button>
+        </div>
+
+        {isError ? (
+          <div className="p-5">
+            <ErrorBanner
+              label={errorStatus ? `Erreur ${errorStatus}` : 'Erreur'}
+              message={errorDetail ?? 'Impossible de charger les utilisateurs.'}
+            />
+          </div>
+        ) : isLoading ? (
+          <div className="divide-y divide-[#f4efe2]">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-[43px] animate-pulse bg-[#faf7ef]" />
+            ))}
+          </div>
+        ) : (
           <DataTable
             columns={columns}
-            rows={users}
+            rows={paginatedRows}
             getRowKey={(u) => u.id}
-            emptyMessage={isLoading ? 'Chargement…' : 'Aucun utilisateur enregistré.'}
+            rowClassName={(_, index) => (index % 2 ? 'bg-[#fffdf8]' : 'bg-white')}
+            emptyMessage={searchQuery ? `Aucun résultat pour « ${search.trim()} ».` : 'Aucun utilisateur enregistré.'}
+            sort={sort ?? undefined}
+            onSortChange={toggleSort}
           />
-        </div>
-      )}
+        )}
 
-      {showCreate && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div className="px-6 py-4 border-b">
-              <h2 className="text-lg font-semibold">Nouvel utilisateur</h2>
+        {!isError && !isLoading && totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-[#f1ecdd] px-5 py-3">
+            <span className="font-sans text-[11.5px] font-medium text-ifvm-text-weak">
+              Page {currentPage} / {totalPages} · {sortedRows.length} enregistrement
+              {sortedRows.length > 1 ? 's' : ''}
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPage(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="rounded-[8px] border border-[#e0d9c4] bg-white px-3 py-2 font-sans text-[11.5px] font-semibold text-ifvm-text-tertiary disabled:opacity-50"
+              >
+                ← Précédent
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="rounded-[8px] border border-[#e0d9c4] bg-white px-3 py-2 font-sans text-[11.5px] font-semibold text-ifvm-text-tertiary disabled:opacity-50"
+              >
+                Suivant →
+              </button>
             </div>
-            <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4">
-              {createError && (
-                <div className="bg-red-50 text-red-700 p-3 rounded text-sm">{createError}</div>
-              )}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Prénom *</label>
+          </div>
+        )}
+      </div>
+
+      {/* Modale : nouvel utilisateur */}
+      {showCreate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Nouvel utilisateur"
+            className="mx-4 w-full max-w-md rounded-[11px] border border-[#e7e0cd] bg-white shadow-xl"
+          >
+            <div className="border-b border-[#f4efe2] px-6 py-4">
+              <h2 className="font-sans text-[15px] font-extrabold">Nouvel utilisateur</h2>
+            </div>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-6 py-4">
+              {createError && <ErrorBanner label="Création impossible" message={createError} />}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="nu-prenom" className={fieldLabelClass}>
+                    Prénom *
+                  </label>
                   <input
+                    id="nu-prenom"
                     type="text"
                     value={prenom}
                     onChange={(e) => setPrenom(e.target.value)}
                     required
-                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className={inputClass}
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nom *</label>
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="nu-nom" className={fieldLabelClass}>
+                    Nom *
+                  </label>
                   <input
+                    id="nu-nom"
                     type="text"
                     value={nom}
                     onChange={(e) => setNom(e.target.value)}
                     required
-                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className={inputClass}
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="nu-email" className={fieldLabelClass}>
+                  Email *
+                </label>
                 <input
+                  id="nu-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className={inputClass}
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Mot de passe *</label>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="nu-password" className={fieldLabelClass}>
+                  Mot de passe *
+                </label>
                 <input
+                  id="nu-password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={8}
-                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className={inputClass}
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Rôle *</label>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="nu-role" className={fieldLabelClass}>
+                  Rôle *
+                </label>
                 <select
+                  id="nu-role"
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
                   required
-                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className={cn(inputClass, 'font-sans')}
                 >
                   {ROLES.map((r) => (
                     <option key={r} value={r}>
@@ -335,22 +479,25 @@ export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Sigle</label>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="nu-sigle" className={fieldLabelClass}>
+                  Sigle
+                </label>
                 <input
+                  id="nu-sigle"
                   type="text"
                   value={sigle}
                   onChange={(e) => setSigle(e.target.value)}
                   maxLength={10}
                   placeholder="Ex. ADM"
-                  className="w-full border border-gray-300 rounded px-3 py-2 uppercase focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className={cn(inputClass, 'uppercase')}
                 />
               </div>
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-3 pt-1">
                 <button
                   type="submit"
                   disabled={createMutation.isPending}
-                  className="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800 disabled:opacity-50 transition"
+                  className="rounded-[9px] bg-[#235a36] px-4 py-[10px] font-sans text-[12px] font-bold text-white transition-colors duration-[120ms] hover:bg-[#1a4429] disabled:opacity-50"
                 >
                   {createMutation.isPending ? 'Création…' : 'Créer'}
                 </button>
@@ -360,7 +507,7 @@ export function UsersPage({ showCreate, onShowCreateChange }: UsersPageProps) {
                     onShowCreateChange(false)
                     resetForm()
                   }}
-                  className="border border-gray-300 px-4 py-2 rounded hover:bg-gray-50 transition"
+                  className="rounded-[9px] border border-[#e7e0cd] px-4 py-[10px] font-sans text-[12px] font-bold text-ifvm-text-tertiary transition-colors duration-[120ms] hover:bg-[#faf7ef]"
                 >
                   Annuler
                 </button>
