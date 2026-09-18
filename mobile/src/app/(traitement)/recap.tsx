@@ -380,8 +380,6 @@ export default function RecapScreen() {
         ? {
             heureDebut: draft.terrestre.heure_debut,
             heureFin: draft.terrestre.heure_fin,
-            repriseTraitement: draft.terrestre.reprise_traitement,
-            traitementOrigineId: draft.terrestre.traitement_origine_id,
             surfaceRestanteHa: surfaceRestante,
             surfaceRestanteAbandonnee: draft.terrestre.surface_restante_abandonnee,
             motifSurfaceRestanteAbandonnee: draft.terrestre.motif_surface_restante_abandonnee,

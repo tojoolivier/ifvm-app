@@ -24,7 +24,6 @@ jest.mock('@/lib/traitement-repository', () => ({
   updateTraitementTerrestre: jest.fn().mockResolvedValue({}),
   addProduitUtilise: jest.fn().mockResolvedValue({}),
   deleteAllProduitsForTraitementTerrestre: jest.fn().mockResolvedValue(undefined),
-  listReprenableTraitements: jest.fn().mockResolvedValue([]),
   addRotation: jest.fn().mockResolvedValue({}),
   deleteAllRotationsForTraitementAerien: jest.fn().mockResolvedValue(undefined),
   updateTraitementAerienPesticideRecu: jest.fn().mockResolvedValue({}),

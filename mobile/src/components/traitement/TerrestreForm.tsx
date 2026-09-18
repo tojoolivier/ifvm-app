@@ -1,7 +1,6 @@
 import { Fragment } from 'react';
 import { View, Text, TextInput, TouchableOpacity } from 'react-native';
 import { UtilisateurEquipe, Pesticide } from '@/lib/referentiel-db';
-import { DraftTraitementRow } from '@/lib/traitement-repository';
 import { ProduitDraft, useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import { deriveNomCommercial } from '@/lib/traitement-validation';
 import { generateId } from '@/lib/id';
@@ -16,7 +15,6 @@ const DIRECTIONS_VENT = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
 export interface TerrestreFormProps {
   readOnly: boolean;
   chefsEquipe: UtilisateurEquipe[];
-  reprenables: DraftTraitementRow[];
   pesticides: Pesticide[];
   produits: ProduitDraft[];
   setProduits: (updater: (prev: ProduitDraft[]) => ProduitDraft[]) => void;
@@ -32,7 +30,6 @@ export interface TerrestreFormProps {
 export function TerrestreForm({
   readOnly,
   chefsEquipe,
-  reprenables,
   pesticides,
   produits,
   setProduits,
@@ -177,29 +174,6 @@ export function TerrestreForm({
           }
         />
       </View>
-
-      <Text style={styles.label}>Reprise de traitement</Text>
-      <View style={styles.chipRow}>
-        <Chip
-          label="Non"
-          selected={!store.terrestre.repriseTraitement}
-          onPress={() => !readOnly && store.updateTerrestre({ repriseTraitement: false, traitementOrigineId: null })}
-        />
-        <Chip label="Oui" selected={!!store.terrestre.repriseTraitement} onPress={() => !readOnly && store.updateTerrestre({ repriseTraitement: true })} />
-      </View>
-      {store.terrestre.repriseTraitement && (
-        <View style={styles.chipRow}>
-          {reprenables.map((r) => (
-            <Chip
-              key={r.id}
-              label={r.numero_fiche ?? r.id.slice(0, 8)}
-              selected={store.terrestre.traitementOrigineId === r.id}
-              onPress={() => !readOnly && store.updateTerrestre({ traitementOrigineId: r.id })}
-            />
-          ))}
-        </View>
-      )}
-      {errors.traitementOrigineId && <Text style={styles.error}>{errors.traitementOrigineId}</Text>}
 
       <Text style={styles.label}>Moyens &amp; surfaces (ha)</Text>
       <Text style={styles.label}>Atomiseur à dos</Text>
