@@ -9,6 +9,7 @@ from app.application.traitement_use_cases import (
     AddRotation,
     CreateTraitementAerien,
     CreateTraitementTerrestre,
+    GenererTraitementPdf,
     RemoveProduitUtilise,
     RemoveRotation,
     SyncPushTraitementTerrestre,
@@ -34,6 +35,7 @@ from app.domain.traitement import (
     Traitement,
     TraitementAerien,
     TraitementIntrouvableError,
+    TraitementNonValideeError,
     TraitementOrigineDejaUtiliseeError,
     TraitementOrigineIntrouvableError,
     TraitementSyncConflitError,
@@ -1453,6 +1455,45 @@ async def test_add_produit_sur_traitement_verrouille_leve_verrouille():
     use_case = AddProduitUtilise(repo)
     with pytest.raises(TraitementVerrouilleError):
         await use_case.execute(traitement_id=traitement.id, **_produit_args())
+
+
+# ==========================================
+# Traitement.verifier_disponible_pour_pdf / GenererTraitementPdf (#495)
+# ==========================================
+
+
+def test_verifier_disponible_pour_pdf_brouillon_leve_non_validee():
+    with pytest.raises(TraitementNonValideeError):
+        Traitement(statut="brouillon").verifier_disponible_pour_pdf()
+
+
+def test_verifier_disponible_pour_pdf_validee_ne_leve_pas():
+    Traitement(statut="validee").verifier_disponible_pour_pdf()
+
+
+@pytest.mark.asyncio
+async def test_generer_traitement_pdf_inexistant_leve_introuvable():
+    repo = FakeTraitementRepo(traitements_par_id={})
+    use_case = GenererTraitementPdf(repo)
+    with pytest.raises(TraitementIntrouvableError):
+        await use_case.execute(uuid.uuid4())
+
+
+@pytest.mark.asyncio
+async def test_generer_traitement_pdf_brouillon_leve_non_validee():
+    traitement = Traitement(statut="brouillon")
+    repo = FakeTraitementRepo(traitements_par_id={traitement.id: traitement})
+    use_case = GenererTraitementPdf(repo)
+    with pytest.raises(TraitementNonValideeError):
+        await use_case.execute(traitement.id)
+
+
+@pytest.mark.asyncio
+async def test_generer_traitement_pdf_validee_retourne_le_traitement():
+    traitement = Traitement(statut="validee")
+    repo = FakeTraitementRepo(traitements_par_id={traitement.id: traitement})
+    use_case = GenererTraitementPdf(repo)
+    assert await use_case.execute(traitement.id) is traitement
 
 
 # ==========================================
