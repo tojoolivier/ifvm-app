@@ -91,6 +91,16 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Libs natives requises par WeasyPrint (rendu PDF, #533) — cf. commentaire du Dockerfile.
+      - name: Installe les libs natives de WeasyPrint
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            libpango-1.0-0 \
+            libpangoft2-1.0-0 \
+            libgdk-pixbuf-2.0-0 \
+            libcairo2
+
       - run: pip install -r requirements-dev.txt
 
       # Rejeu de la chaine 0001..head sur une base vierge : attrape ce que le

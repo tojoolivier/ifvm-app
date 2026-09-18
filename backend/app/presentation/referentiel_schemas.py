@@ -500,6 +500,7 @@ class CampagneSyncRead(BaseModel):
     name: str
     start_date: date
     end_date: date | None
+    actif: bool
     updated_at: datetime
 
 

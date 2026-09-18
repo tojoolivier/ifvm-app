@@ -194,6 +194,22 @@ async def test_pull_since_null_returns_campagnes(client: AsyncClient, auth_heade
     body = response.json()
     campagne_ids = {c["id"] for c in body["campagnes"]["upserts"]}
     assert campagne_ids == {str(campagne_id)}
+    assert all(c["actif"] is True for c in body["campagnes"]["upserts"])
+
+
+@pytest.mark.asyncio
+async def test_pull_inclut_une_campagne_desactivee_comme_upsert(
+    client: AsyncClient, auth_headers, campagne_id
+):
+    """La désactivation logique reste un upsert (#137) : un pull incrémental doit
+    faire redescendre `actif: false`, jamais faire disparaître la campagne."""
+    await client.put(f"/campagnes/{campagne_id}", json={"actif": False}, headers=auth_headers)
+
+    response = await client.get("/referentiel/pull", headers=auth_headers)
+
+    body = response.json()
+    upserts = {c["id"]: c["actif"] for c in body["campagnes"]["upserts"]}
+    assert upserts[str(campagne_id)] is False
 
 
 @pytest.mark.asyncio

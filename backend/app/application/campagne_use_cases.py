@@ -53,6 +53,7 @@ class UpdateCampagne:
         name: str | None = None,
         start_date: date | None = None,
         end_date: date | None = None,
+        actif: bool | None = None,
     ) -> Campagne | None:
         campagne = await self.repository.get_by_id(campagne_id)
         if campagne is None:
@@ -64,14 +65,8 @@ class UpdateCampagne:
             campagne.start_date = start_date
         if end_date is not None:
             campagne.end_date = end_date
+        if actif is not None:
+            campagne.actif = actif
         campagne.updated_at = datetime.utcnow()
 
         return await self.repository.update(campagne)
-
-
-class DeleteCampagne:
-    def __init__(self, repository: CampagneRepository):
-        self.repository = repository
-
-    async def execute(self, campagne_id: uuid.UUID) -> bool:
-        return await self.repository.delete(campagne_id)

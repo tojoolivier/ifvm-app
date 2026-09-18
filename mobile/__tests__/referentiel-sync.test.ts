@@ -241,6 +241,7 @@ describe('pullReferentiel', () => {
             name: 'Campagne 2026',
             start_date: '2026-01-01',
             end_date: null,
+            actif: true,
             updated_at: '2026-08-01T00:00:00Z',
           },
         ],
@@ -252,7 +253,33 @@ describe('pullReferentiel', () => {
 
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO campagne'),
-      ['camp-1', 'Campagne 2026', '2026-01-01', null, '2026-08-01T00:00:00Z']
+      ['camp-1', 'Campagne 2026', '2026-01-01', null, 1, '2026-08-01T00:00:00Z']
+    );
+  });
+
+  it('propage la désactivation logique d\'une campagne (actif: false) au cache local', async () => {
+    mockPullReferentiel.mockResolvedValue({
+      ...emptyResponse('2026-08-02T00:00:00Z'),
+      campagnes: {
+        upserts: [
+          {
+            id: 'camp-1',
+            name: 'Campagne 2026',
+            start_date: '2026-01-01',
+            end_date: null,
+            actif: false,
+            updated_at: '2026-08-01T00:00:00Z',
+          },
+        ],
+        server_time: '2026-08-02T00:00:00Z',
+      },
+    });
+
+    await pullReferentiel('token-1');
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO campagne'),
+      ['camp-1', 'Campagne 2026', '2026-01-01', null, 0, '2026-08-01T00:00:00Z']
     );
   });
 

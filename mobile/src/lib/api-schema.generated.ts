@@ -173,8 +173,7 @@ export interface paths {
         /** Update Campagne */
         put: operations["update_campagne_campagnes__campagne_id__put"];
         post?: never;
-        /** Delete Campagne */
-        delete: operations["delete_campagne_campagnes__campagne_id__delete"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1239,6 +1238,8 @@ export interface components {
             start_date: string;
             /** End Date */
             end_date: string | null;
+            /** Actif */
+            actif: boolean;
             /**
              * Created By
              * Format: uuid
@@ -1271,6 +1272,8 @@ export interface components {
             start_date: string;
             /** End Date */
             end_date: string | null;
+            /** Actif */
+            actif: boolean;
             /**
              * Updated At
              * Format: date-time
@@ -1285,6 +1288,8 @@ export interface components {
             start_date?: string | null;
             /** End Date */
             end_date?: string | null;
+            /** Actif */
+            actif?: boolean | null;
         };
         /** CaptureCreate */
         CaptureCreate: {
@@ -4963,35 +4968,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CampagneRead"];
                 };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_campagne_campagnes__campagne_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                campagne_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description Validation Error */
             422: {

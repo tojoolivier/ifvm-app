@@ -241,12 +241,19 @@ async function upsertCampagnes(
 ): Promise<void> {
   for (const campagne of upserts) {
     await db.runAsync(
-      `INSERT INTO campagne (id, name, start_date, end_date, updated_at)
-       VALUES (?, ?, ?, ?, ?)
+      `INSERT INTO campagne (id, name, start_date, end_date, actif, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          name = excluded.name, start_date = excluded.start_date, end_date = excluded.end_date,
-         updated_at = excluded.updated_at`,
-      [campagne.id, campagne.name, campagne.start_date, campagne.end_date, campagne.updated_at]
+         actif = excluded.actif, updated_at = excluded.updated_at`,
+      [
+        campagne.id,
+        campagne.name,
+        campagne.start_date,
+        campagne.end_date,
+        campagne.actif ? 1 : 0,
+        campagne.updated_at,
+      ]
     );
   }
 }
