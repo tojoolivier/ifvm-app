@@ -366,3 +366,140 @@ async def test_desactivation_repercutee_dans_le_pull(
     postes = pull.json()["postes_acridiens"]["upserts"]
     poste = next(p for p in postes if p["id"] == str(poste_acridien.id))
     assert poste["actif"] is False
+
+
+# --- Rattachement equipe_terrestre (migration 0073) -----------------------------
+
+
+@pytest.mark.asyncio
+async def test_create_avec_equipe_terrestre(
+    client: AsyncClient, auth_headers: dict, zone_anti_acridien, equipe_terrestre
+):
+    response = await client.post(
+        "/postes-acridiens",
+        json={
+            "code": "PA-NEW-05",
+            "nom": "Poste Neuf",
+            "za_id": str(zone_anti_acridien.id),
+            "equipe_terrestre_id": str(equipe_terrestre.id),
+        },
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 201, response.text
+    data = response.json()
+    assert data["equipe_terrestre_id"] == str(equipe_terrestre.id)
+    assert data["equipe_terrestre_nom"] == equipe_terrestre.nom
+
+
+@pytest.mark.asyncio
+async def test_create_plusieurs_postes_partagent_la_meme_equipe_terrestre(
+    client: AsyncClient, auth_headers: dict, zone_anti_acridien, equipe_terrestre, poste_acridien
+):
+    """Décision produit : pas de UNIQUE sur poste_acridien.equipe_terrestre_id —
+    une équipe terrestre est mobile, plusieurs postes peuvent la partager."""
+    await client.put(
+        f"/postes-acridiens/{poste_acridien.id}",
+        json={"equipe_terrestre_id": str(equipe_terrestre.id)},
+        headers=auth_headers,
+    )
+    response = await client.post(
+        "/postes-acridiens",
+        json={
+            "code": "PA-NEW-06",
+            "nom": "Poste Voisin",
+            "za_id": str(zone_anti_acridien.id),
+            "equipe_terrestre_id": str(equipe_terrestre.id),
+        },
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["equipe_terrestre_id"] == str(equipe_terrestre.id)
+
+
+@pytest.mark.asyncio
+async def test_create_equipe_terrestre_inexistante_retourne_409(
+    client: AsyncClient, auth_headers: dict, zone_anti_acridien
+):
+    response = await client.post(
+        "/postes-acridiens",
+        json={
+            "code": "PA-NEW-07",
+            "nom": "Poste Orphelin",
+            "za_id": str(zone_anti_acridien.id),
+            "equipe_terrestre_id": str(uuid.uuid4()),
+        },
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_update_assigne_une_equipe_terrestre(
+    client: AsyncClient, auth_headers: dict, poste_acridien, equipe_terrestre
+):
+    response = await client.put(
+        f"/postes-acridiens/{poste_acridien.id}",
+        json={"equipe_terrestre_id": str(equipe_terrestre.id)},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["equipe_terrestre_id"] == str(equipe_terrestre.id)
+
+
+@pytest.mark.asyncio
+async def test_update_detache_le_poste_de_son_equipe_terrestre(
+    client: AsyncClient, auth_headers: dict, poste_acridien, equipe_terrestre
+):
+    """`equipe_terrestre_id: null` explicite doit détacher le poste — distinct d'un
+    corps qui omet le champ (`champs_fournis`, cf. UpdateBaseAerienne.equipe_id)."""
+    await client.put(
+        f"/postes-acridiens/{poste_acridien.id}",
+        json={"equipe_terrestre_id": str(equipe_terrestre.id)},
+        headers=auth_headers,
+    )
+
+    response = await client.put(
+        f"/postes-acridiens/{poste_acridien.id}",
+        json={"equipe_terrestre_id": None},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["equipe_terrestre_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_update_omettre_equipe_terrestre_id_la_laisse_inchangee(
+    client: AsyncClient, auth_headers: dict, poste_acridien, equipe_terrestre
+):
+    await client.put(
+        f"/postes-acridiens/{poste_acridien.id}",
+        json={"equipe_terrestre_id": str(equipe_terrestre.id)},
+        headers=auth_headers,
+    )
+
+    response = await client.put(
+        f"/postes-acridiens/{poste_acridien.id}",
+        json={"nom": "Poste Renommé"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["equipe_terrestre_id"] == str(equipe_terrestre.id)
+
+
+@pytest.mark.asyncio
+async def test_update_equipe_terrestre_inexistante_retourne_409(
+    client: AsyncClient, auth_headers: dict, poste_acridien
+):
+    response = await client.put(
+        f"/postes-acridiens/{poste_acridien.id}",
+        json={"equipe_terrestre_id": str(uuid.uuid4())},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 409

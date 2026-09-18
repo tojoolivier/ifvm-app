@@ -76,6 +76,23 @@ async def list_chefs_de_base(
     return result.scalars().all()
 
 
+@router.get("/chefs-equipe", response_model=list[UtilisateurAnnuaireRead])
+async def list_chefs_equipe(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    """Annuaire des chefs d'équipe actifs, pour le sélecteur `chef_equipe_id` du
+    formulaire de création d'équipe terrestre (portail web, #equipe-terrestre) —
+    même patron que `list_chefs_de_base`."""
+    stmt = (
+        select(Utilisateur)
+        .where(Utilisateur.role == "chef_equipe", Utilisateur.actif.is_(True))
+        .order_by(Utilisateur.nom)
+    )
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+
 def require_admin(current_user: Annotated[Utilisateur, Depends(get_current_user)]) -> Utilisateur:
     if current_user.role != "admin":
         raise HTTPException(

@@ -11,6 +11,7 @@ from app.domain.referentiel import (
     Commune,
     Culture,
     EquipeAerienne,
+    EquipeTerrestre,
     LieuAerien,
     Pesticide,
     PosteAcridien,
@@ -236,7 +237,8 @@ class AuditLogRepository(ABC):
 
 class ZoneAntiAcridienRepository(ABC):
     @abstractmethod
-    async def list_all(self) -> list[ZoneAntiAcridien]:
+    async def list_all(self, actif: bool | None = True) -> list[ZoneAntiAcridien]:
+        """`actif=None` : les deux états (écran d'administration)."""
         pass
 
     @abstractmethod
@@ -244,7 +246,29 @@ class ZoneAntiAcridienRepository(ABC):
         pass
 
     @abstractmethod
+    async def get_by_id(self, za_id: uuid.UUID) -> ZoneAntiAcridien | None:
+        pass
+
+    @abstractmethod
     async def list_since(self, since: datetime | None) -> list[ZoneAntiAcridien]:
+        pass
+
+    @abstractmethod
+    async def code_pris_par_un_autre(self, code: str, exclude_id: uuid.UUID | None = None) -> bool:
+        """`exclude_id` permet de réenregistrer une zone sans buter sur son propre code."""
+        pass
+
+    @abstractmethod
+    async def a_des_postes_actifs(self, za_id: uuid.UUID) -> bool:
+        """Garde-fou de désactivation (`ZoneAntiAcridienAvecPostesActifsError`)."""
+        pass
+
+    @abstractmethod
+    async def create(self, zone: ZoneAntiAcridien) -> ZoneAntiAcridien:
+        pass
+
+    @abstractmethod
+    async def update(self, zone: ZoneAntiAcridien) -> ZoneAntiAcridien:
         pass
 
 
@@ -457,6 +481,25 @@ class EquipeAerienneRepository(ABC):
 
     @abstractmethod
     async def create(self, equipe: EquipeAerienne) -> EquipeAerienne:
+        pass
+
+
+class EquipeTerrestreRepository(ABC):
+    """Aucune méthode de suppression : la sortie du référentiel est `actif=false`.
+    Pas de `PUT` pour ce lot (mirroring `EquipeAerienneRepository`) : ni le
+    renommage, ni le changement de chef, ni l'édition des membres après création
+    ne sont exposés."""
+
+    @abstractmethod
+    async def list_all(self, actif: bool | None = True) -> list[EquipeTerrestre]:
+        pass
+
+    @abstractmethod
+    async def get_by_id(self, equipe_id: uuid.UUID) -> EquipeTerrestre | None:
+        pass
+
+    @abstractmethod
+    async def create(self, equipe: EquipeTerrestre) -> EquipeTerrestre:
         pass
 
 

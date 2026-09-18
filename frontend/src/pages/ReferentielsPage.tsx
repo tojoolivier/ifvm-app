@@ -9,6 +9,29 @@ import { ErrorBanner } from '@/components/ui/error-banner'
 import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { EquipesAeriennesSection } from './EquipesAeriennesSection'
+import { EquipesTerrestresSection } from './EquipesTerrestresSection'
+
+/**
+ * Clé de nav spéciale : équipes/bases/stands aériens n'entrent pas dans le
+ * système générique `ENTITES` (formulaire à plat `EditableField`) — une
+ * équipe porte une liste de membres de taille variable, et les 4 sections
+ * (équipes, bases principales, bases secondaires, stands) se filtrent les
+ * unes les autres (chefsLibres/equipesLibres). `EquipesAeriennesSection` les
+ * gère avec son propre état, hors du pull générique (ces référentiels sont
+ * « en ligne uniquement », comme côté mobile — jamais dans
+ * `GET /referentiel/pull`, donc pas de `pullKey` possible ici).
+ */
+const CLE_EQUIPES_AERIENNES = 'equipes-aeriennes' as const
+
+/**
+ * Même principe que `CLE_EQUIPES_AERIENNES`, côté terrestre (migration 0072) :
+ * une équipe terrestre porte elle aussi une liste de membres à taille
+ * variable. Contrairement à l'aérien, pas de base physique à gérer ici — le
+ * rattachement d'un poste acridien à une équipe se fait dans le formulaire
+ * générique `poste_acridien` (champ `equipe_terrestre_id`).
+ */
+const CLE_EQUIPES_TERRESTRES = 'equipes-terrestres' as const
 
 /**
  * Écran Référentiels — docs/design_handoff_web/README.md §11.
@@ -102,8 +125,13 @@ interface WriteSpec {
 
 interface EntitySpec {
   key: string
-  /** Clé correspondante dans le payload `GET /referentiel/pull`. */
-  pullKey: PullKey
+  /**
+   * Clé correspondante dans le payload `GET /referentiel/pull`. Absente pour
+   * une entité « en ligne uniquement » qui lit sa liste via `write.listPath`
+   * plutôt que le pull (ex. `zone_acridien`) — dans ce cas, ni le compteur de
+   * nav ni « Fraîcheur terrain » n'ont de valeur pull à afficher.
+   */
+  pullKey?: PullKey
   label: string
   /** Nom de table affiché en mono sous le libellé. */
   table: string
@@ -227,6 +255,16 @@ function codeColumn(header = 'Code'): DataTableColumn<Row> {
 }
 
 const PAGE_SIZE = 15
+
+/**
+ * Entités administrables où le filtre « par équipe terrestre » a du sens —
+ * limité au périmètre terrestre (poste_acridien, station_fixe, utilisateur) :
+ * l'aérien n'a structurellement aucun lien avec poste_acridien/station_fixe
+ * (référentiel dédié base_aerienne/lieu_aerien) et son rattachement équipe ->
+ * base est déjà visible dans EquipesAeriennesSection sans filtre supplémentaire.
+ * Au module plutôt qu'en render : référence stable pour les dépendances de hooks.
+ */
+const ENTITES_FILTRABLES_PAR_EQUIPE = ['poste_acridien', 'station_fixe', 'utilisateur']
 
 /** Recherche insensible aux accents et à la casse ("Réunion" trouvé par "reunion"). */
 function normalize(value: string): string {
@@ -454,6 +492,33 @@ const ENTITES: EntitySpec[] = [
     },
   },
   {
+    key: 'zone_acridien',
+    label: 'Zones anti-acridiennes',
+    table: 'zone_anti_acridien',
+    addLabel: '+ Nouvelle zone anti-acridienne',
+    apiOk: true,
+    apiLabel: 'GET · POST · PUT /zones-anti-acridiennes',
+    desc: 'Niveau le plus haut de la hiérarchie géographique : chaque poste acridien y est rattaché (za_id).',
+    hasActif: true,
+    rowLabel: (row) => text(row, 'code'),
+    columns: [
+      codeColumn(),
+      { key: 'nom', header: 'Nom', render: (row) => text(row, 'nom'), sortValue: (row) => text(row, 'nom') },
+    ],
+    // Panneau en lecture seule inutilisé : `write` prend le relais.
+    fields: [],
+    write: {
+      path: '/zones-anti-acridiennes',
+      // `inclure_inactifs` : l'écran d'administration a besoin des deux états.
+      listPath: '/zones-anti-acridiennes?inclure_inactifs=true',
+      createTitle: 'Nouvelle zone anti-acridienne',
+      fields: [
+        { name: 'code', label: 'Code', kind: 'text', mono: true, required: true },
+        { name: 'nom', label: 'Nom', kind: 'text', required: true },
+      ],
+    },
+  },
+  {
     key: 'poste_acridien',
     pullKey: 'postes_acridiens',
     label: 'Postes acridiens',
@@ -473,6 +538,12 @@ const ENTITES: EntitySpec[] = [
         header: 'Zone anti-acridienne',
         render: (row) => <span className="text-ifvm-text-tertiary">{text(row, 'za_nom')}</span>,
         sortValue: (row) => text(row, 'za_nom'),
+      },
+      {
+        key: 'equipe_terrestre_nom',
+        header: 'Équipe terrestre',
+        render: (row) => text(row, 'equipe_terrestre_nom'),
+        sortValue: (row) => text(row, 'equipe_terrestre_nom'),
       },
       {
         key: 'nb_stations',
@@ -502,6 +573,19 @@ const ENTITES: EntitySpec[] = [
           optionsFrom: {
             path: '/zones-anti-acridiennes',
             queryKey: 'zones-anti-acridiennes',
+            valueKey: 'id',
+            labelKey: 'nom',
+          },
+        },
+        {
+          name: 'equipe_terrestre_id',
+          label: 'Équipe terrestre',
+          kind: 'foreign-key',
+          nullable: true,
+          hint: 'Plusieurs postes peuvent partager la même équipe.',
+          optionsFrom: {
+            path: '/equipes-terrestres',
+            queryKey: 'equipes-terrestres',
             valueKey: 'id',
             labelKey: 'nom',
           },
@@ -876,19 +960,62 @@ export function ReferentielsPage() {
   // Une entité peut lire sa liste depuis sa propre route plutôt que le pull :
   // celui-ci ne transporte que le contrat hors-ligne du mobile (clés étrangères
   // brutes), sans les jointures ni les champs dérivés dont l'administration a besoin.
+  const surEquipesAeriennes = selectedKey === CLE_EQUIPES_AERIENNES
+  const surEquipesTerrestres = selectedKey === CLE_EQUIPES_TERRESTRES
+  const surSectionBespoke = surEquipesAeriennes || surEquipesTerrestres
   const { data: writeListData, isLoading: writeListLoading } = useQuery<Row[]>({
     queryKey: ['referentiel-write-list', entity.write?.listPath ?? 'none'],
     queryFn: () => api.get(entity.write!.listPath!).then((r) => r.data),
-    enabled: Boolean(entity.write?.listPath),
+    // `entity` retombe sur `ENTITES[0]` quand un onglet spécial (Équipes
+    // aériennes/terrestres) est actif (cf. définition de `entity` ci-dessus) —
+    // sans ce garde-fou, cet onglet déclencherait quand même l'appel réseau de
+    // l'entité générique du dessous.
+    enabled: Boolean(entity.write?.listPath) && !surSectionBespoke,
   })
 
   const rows = useMemo(() => {
     if (entity.write?.listPath) return Array.isArray(writeListData) ? writeListData : []
-    return data?.[entity.pullKey]?.upserts ?? []
+    return (entity.pullKey ? data?.[entity.pullKey]?.upserts : undefined) ?? []
   }, [data, entity, writeListData])
   const rowsLoading = entity.write?.listPath ? writeListLoading : isLoading
+
+  // --- Filtre transversal « par équipe terrestre » ----------------------------
+  //
+  // Limité au périmètre terrestre (poste_acridien, station_fixe, utilisateur) :
+  // l'aérien n'a structurellement aucun lien avec poste_acridien/station_fixe
+  // (référentiel dédié base_aerienne/lieu_aerien) et son rattachement équipe ->
+  // base est déjà visible dans EquipesAeriennesSection sans filtre supplémentaire.
+  const filtreEquipeVisible = !surSectionBespoke && ENTITES_FILTRABLES_PAR_EQUIPE.includes(entity.key)
+  const [equipeTerrestreFiltreId, setEquipeTerrestreFiltreId] = useState('')
+
+  const { data: equipesTerrestresFiltre = [] } = useQuery<Row[]>({
+    queryKey: ['equipes-terrestres'],
+    queryFn: () => api.get('/equipes-terrestres').then((r) => r.data),
+    enabled: filtreEquipeVisible,
+  })
+  // Transitif pour station_fixe/utilisateur : leur seul lien à une équipe
+  // terrestre passe par le poste acridien de rattachement (pa_id).
+  const { data: postesPourFiltre = [] } = useQuery<Row[]>({
+    queryKey: ['referentiel-postes-pour-filtre'],
+    queryFn: () => api.get('/postes-acridiens?inclure_inactifs=true').then((r) => r.data),
+    enabled: filtreEquipeVisible && entity.key !== 'poste_acridien',
+  })
+
+  const visibleRows = useMemo(() => {
+    if (!equipeTerrestreFiltreId || !ENTITES_FILTRABLES_PAR_EQUIPE.includes(entity.key)) return rows
+    if (entity.key === 'poste_acridien') {
+      return rows.filter((row) => row.equipe_terrestre_id === equipeTerrestreFiltreId)
+    }
+    // station_fixe / utilisateur : transitif via pa_id -> poste_acridien.equipe_terrestre_id.
+    const postesRattaches = new Set(
+      postesPourFiltre
+        .filter((p) => p.equipe_terrestre_id === equipeTerrestreFiltreId)
+        .map((p) => p.id),
+    )
+    return rows.filter((row) => row.pa_id && postesRattaches.has(row.pa_id))
+  }, [rows, entity.key, equipeTerrestreFiltreId, postesPourFiltre])
   const selectedRow = rows[selectedRowIndex] ?? rows[0]
-  const serverTime = data?.[entity.pullKey]?.server_time
+  const serverTime = entity.pullKey ? data?.[entity.pullKey]?.server_time : undefined
 
   // --- Écritures (entités portant un `write`) --------------------------------
   const writeFields = entity.write?.fields ?? []
@@ -1048,6 +1175,7 @@ export function ReferentielsPage() {
     setSearch('')
     setSort(null)
     setPage(1)
+    setEquipeTerrestreFiltreId('')
     closeEdit()
   }
 
@@ -1067,13 +1195,13 @@ export function ReferentielsPage() {
   // bien un utilisateur par son prénom grâce au `sortValue` combiné nom+prénom).
   const searchQuery = normalize(search.trim())
   const searchedRows = searchQuery
-    ? rows.filter((row) =>
+    ? visibleRows.filter((row) =>
         columns.some((column) => {
           const value = column.sortValue?.(row)
           return value !== null && value !== undefined && normalize(String(value)).includes(searchQuery)
         }),
       )
-    : rows
+    : visibleRows
 
   const sortColumn = sort ? columns.find((c) => c.key === sort.key) : undefined
   const sortedRows =
@@ -1123,12 +1251,12 @@ export function ReferentielsPage() {
     // les 28px latéraux alignent la colonne de gauche sur le fil d'Ariane du header,
     // lui aussi à px-[28px] dans Layout.
     <div className="grid grid-cols-[216px_1fr] items-start gap-5 px-7 pb-10 pt-[26px]">
-      {/* Colonne gauche — 7 cartes de navigation */}
+      {/* Colonne gauche — cartes de navigation génériques + Équipes aériennes/terrestres */}
       <nav aria-label="Référentiels" className="flex flex-col gap-[7px]">
-        <SectionLabel>{`${ENTITES.length} référentiels`}</SectionLabel>
+        <SectionLabel>{`${ENTITES.length + 2} référentiels`}</SectionLabel>
         {ENTITES.map((e) => {
-          const active = e.key === entity.key
-          const count = data?.[e.pullKey]?.upserts.length ?? 0
+          const active = !surSectionBespoke && e.key === selectedKey
+          const count = e.pullKey ? (data?.[e.pullKey]?.upserts.length ?? 0) : null
           return (
             <button
               key={e.key}
@@ -1165,14 +1293,85 @@ export function ReferentielsPage() {
               >
                 {e.apiOk ? 'API' : 'à créer'}
               </span>
-              <span className="font-mono text-[11px] font-semibold text-ifvm-text-weak">{count}</span>
+              {/* Pas de `pullKey` (zone_acridien) : ni le pull ni `write.listPath`
+                  n'ont de compteur pertinent à afficher ici, même traitement que
+                  les boutons dédiés équipes aériennes/terrestres ci-dessous. */}
+              {count !== null && (
+                <span className="font-mono text-[11px] font-semibold text-ifvm-text-weak">{count}</span>
+              )}
             </button>
           )
         })}
+        {/* Équipes/bases/stands aériens : « en ligne uniquement », comme côté
+            mobile — jamais dans le pull hors-ligne, donc pas de compteur ici. */}
+        <button
+          type="button"
+          aria-current={surEquipesAeriennes ? 'true' : undefined}
+          onClick={() => selectEntity(CLE_EQUIPES_AERIENNES)}
+          className={cn(
+            'flex items-center gap-[9px] rounded-[10px] border-[1.5px] px-[13px] py-[11px] text-left transition-colors duration-[120ms]',
+            surEquipesAeriennes
+              ? 'border-[#235a36] bg-ifvm-green-bg'
+              : 'border-[#e7e0cd] bg-white hover:bg-[#faf7ef]',
+          )}
+        >
+          <span className="min-w-0 flex-1">
+            <span
+              className={cn(
+                'block text-[12.5px]',
+                surEquipesAeriennes ? 'font-bold text-[#235a36]' : 'font-semibold text-[#3a3a30]',
+              )}
+            >
+              Équipes aériennes
+            </span>
+            <span className="block font-mono text-[10px] font-medium text-ifvm-text-weak">
+              equipe_aerienne
+            </span>
+          </span>
+          <span className="rounded-full bg-ifvm-green-bg px-[7px] py-0.5 font-sans text-[9px] font-bold text-ifvm-green-text">
+            API
+          </span>
+        </button>
+        {/* Équipes terrestres (migration 0072) : même traitement « en ligne
+            uniquement » que les équipes aériennes. */}
+        <button
+          type="button"
+          aria-current={surEquipesTerrestres ? 'true' : undefined}
+          onClick={() => selectEntity(CLE_EQUIPES_TERRESTRES)}
+          className={cn(
+            'flex items-center gap-[9px] rounded-[10px] border-[1.5px] px-[13px] py-[11px] text-left transition-colors duration-[120ms]',
+            surEquipesTerrestres
+              ? 'border-[#235a36] bg-ifvm-green-bg'
+              : 'border-[#e7e0cd] bg-white hover:bg-[#faf7ef]',
+          )}
+        >
+          <span className="min-w-0 flex-1">
+            <span
+              className={cn(
+                'block text-[12.5px]',
+                surEquipesTerrestres ? 'font-bold text-[#235a36]' : 'font-semibold text-[#3a3a30]',
+              )}
+            >
+              Équipes terrestres
+            </span>
+            <span className="block font-mono text-[10px] font-medium text-ifvm-text-weak">
+              equipe_terrestre
+            </span>
+          </span>
+          <span className="rounded-full bg-ifvm-green-bg px-[7px] py-0.5 font-sans text-[9px] font-bold text-ifvm-green-text">
+            API
+          </span>
+        </button>
       </nav>
 
       {/* Colonne droite */}
       <div className="flex flex-col gap-[14px]">
+        {surEquipesAeriennes ? (
+          <EquipesAeriennesSection />
+        ) : surEquipesTerrestres ? (
+          <EquipesTerrestresSection />
+        ) : (
+          <>
         {/* Carte d'en-tête */}
         <div className="flex flex-col gap-[9px] rounded-[11px] border border-[#e7e0cd] bg-white px-5 py-4">
           <div className="flex items-center gap-[10px]">
@@ -1194,6 +1393,36 @@ export function ReferentielsPage() {
             <p className="rounded-[9px] border border-ifvm-amber-border bg-ifvm-amber-bg px-[13px] py-[11px] font-sans text-[11.5px] font-medium leading-[1.55] text-ifvm-amber-text">
               {entity.note}
             </p>
+          )}
+          {filtreEquipeVisible && (
+            <div className="flex items-center gap-[10px]">
+              <Label htmlFor="filtre-equipe-terrestre" className="font-sans text-[11.5px] font-semibold text-[#3a3a30]">
+                Filtrer par équipe terrestre
+              </Label>
+              <select
+                id="filtre-equipe-terrestre"
+                value={equipeTerrestreFiltreId}
+                onChange={(event) => {
+                  setEquipeTerrestreFiltreId(event.target.value)
+                  setPage(1)
+                }}
+                className="h-9 rounded-[8px] border border-[#e0d9c4] bg-[#fffdf8] px-[10px] font-sans text-[12px]"
+              >
+                <option value="">— Toutes —</option>
+                {equipesTerrestresFiltre.map((e) => (
+                  <option key={String(e.id)} value={String(e.id)}>
+                    {String(e.nom)}
+                  </option>
+                ))}
+              </select>
+              {entity.key === 'utilisateur' && equipeTerrestreFiltreId && (
+                <span className="font-sans text-[11px] text-ifvm-text-weak">
+                  Agents affectés à un poste rattaché à cette équipe — le pilote, le mécanicien et les
+                  autres membres d'une équipe aérienne ne sont pas des comptes utilisateur, ils
+                  n'apparaîtront jamais ici.
+                </span>
+              )}
+            </div>
           )}
         </div>
 
@@ -1389,9 +1618,11 @@ export function ReferentielsPage() {
             {fraicheurTerrain}
           </div>
         )}
+          </>
+        )}
       </div>
 
-      {editingRow && entity.write && (
+      {!surSectionBespoke && editingRow && entity.write && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div
             role="dialog"
@@ -1467,7 +1698,7 @@ export function ReferentielsPage() {
         </div>
       )}
 
-      {creating && entity.write && (
+      {!surSectionBespoke && creating && entity.write && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div
             role="dialog"
