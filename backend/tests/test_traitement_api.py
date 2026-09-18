@@ -1353,6 +1353,7 @@ async def _creer_fiche_terrestre_chainee(
     *,
     surface_atomiseur_ha: float,
     traitement_origine_id=None,
+    surface_restante_abandonnee: bool = False,
 ):
     """Fixture-factory : crée un maillon de la chaîne de reprise (racine ou reprise).
 
@@ -1361,7 +1362,7 @@ async def _creer_fiche_terrestre_chainee(
     """
     payload = copy.deepcopy(base_payload)
     payload["terrestre"]["surface_atomiseur_ha"] = surface_atomiseur_ha
-    payload["terrestre"]["surface_restante_abandonnee"] = False
+    payload["terrestre"]["surface_restante_abandonnee"] = surface_restante_abandonnee
     if traitement_origine_id is not None:
         payload["terrestre"]["reprise_traitement"] = True
         payload["terrestre"]["traitement_origine_id"] = str(traitement_origine_id)
@@ -1514,6 +1515,46 @@ async def test_list_traitements_reprenable_exclut_origine_deja_utilisee_et_surfa
     assert resp.status_code == 200
     ids = {t["id"] for t in resp.json()}
     assert ids == {maillon_reprenable["id"], reprenable["id"]}
+
+
+@pytest.mark.asyncio
+async def test_list_traitements_reprenable_exclut_surface_restante_abandonnee(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+):
+    """#zone-a-reprendre-surface-abandonnee : une fiche dont la surface restante a
+    été explicitement déclarée abandonnée ("Surface restante abandonnée ?" = Oui)
+    ne doit plus jamais proposer de reprise, même si sa surface restante est
+    encore positive — l'agent a déjà décidé de ne pas y retourner."""
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surface_infestee=100.0
+    )
+    base_payload = payload_traitement_terrestre(prospection_id)
+
+    abandonnee = await _creer_fiche_terrestre_chainee(
+        client,
+        auth_headers,
+        base_payload,
+        surface_atomiseur_ha=60.0,
+        surface_restante_abandonnee=True,
+    )
+    assert abandonnee["terrestre"]["surface_restante_ha"] == 40.0
+    non_abandonnee = await _creer_fiche_terrestre_chainee(
+        client,
+        auth_headers,
+        base_payload,
+        surface_atomiseur_ha=30.0,
+        surface_restante_abandonnee=False,
+    )
+
+    resp = await client.get(
+        "/traitements",
+        params={"type_traitement": "TERRESTRE", "reprenable": "true"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    ids = {t["id"] for t in resp.json()}
+    assert non_abandonnee["id"] in ids
+    assert abandonnee["id"] not in ids
 
 
 async def _creer_fiche_aerien_chainee(

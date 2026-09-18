@@ -115,6 +115,13 @@ class TraitementRepositoryImpl(TraitementRepository):
                             TraitementTerrestreModel.surface_restante_ha.is_(None),
                             TraitementTerrestreModel.surface_restante_ha > 0,
                         ),
+                        # #zone-a-reprendre-surface-abandonnee : une surface restante
+                        # explicitement abandonnée (l'agent a répondu "Oui" sur
+                        # "Surface restante abandonnée ?") ne doit plus proposer cette
+                        # fiche pour une reprise — il a déjà décidé de ne pas y
+                        # retourner. `isnot(True)` inclut NULL (jamais tranché, cf.
+                        # fiches créées avant ce champ) et False, exclut seulement True.
+                        TraitementTerrestreModel.surface_restante_abandonnee.isnot(True),
                         TraitementModel.id.not_in(origines_utilisees_terrestre),
                     ),
                     and_(

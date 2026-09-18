@@ -1266,6 +1266,11 @@ export async function listReprenableTraitements(): Promise<ReprenableTraitementR
      JOIN traitement_terrestre ON traitement_terrestre.traitement_id = traitement.id
      WHERE traitement.statut = 'validee'
        AND (traitement_terrestre.surface_restante_ha IS NULL OR traitement_terrestre.surface_restante_ha > 0)
+       -- #zone-a-reprendre-surface-abandonnee : une surface restante explicitement
+       -- abandonnée (l'agent a répondu "Oui") ne doit plus proposer de reprise —
+       -- même règle que côté serveur (traitement_repository.py, list_by_filters).
+       -- IS NOT 1 inclut NULL (jamais tranché) et 0, exclut seulement 1 (true).
+       AND traitement_terrestre.surface_restante_abandonnee IS NOT 1
        AND traitement.id NOT IN (
          SELECT traitement_origine_id FROM traitement_terrestre WHERE traitement_origine_id IS NOT NULL
        )
