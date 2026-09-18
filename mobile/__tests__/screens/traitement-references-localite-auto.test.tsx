@@ -33,6 +33,7 @@ jest.mock('@/lib/prospection-repository', () => ({
   getProspection: jest.fn(),
   listAllProspectionPopulations: jest.fn().mockResolvedValue([]),
   listAllProspectionInfestations: jest.fn().mockResolvedValue([]),
+  listAllProspectionCaptures: jest.fn().mockResolvedValue([]),
 }));
 
 jest.mock('@/lib/location', () => ({

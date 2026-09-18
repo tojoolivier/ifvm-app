@@ -1,4 +1,4 @@
-import { DraftProspection, InfestationRow, PopulationRow } from './prospection-repository';
+import { CaptureRow, DraftProspection, InfestationRow, PopulationRow } from './prospection-repository';
 import { CibleInput } from './traitement-repository';
 import { logger } from './logger';
 
@@ -21,15 +21,16 @@ import { logger } from './logger';
 export function construireCible(
   prospection: Pick<DraftProspection, 'surface_infestee'>,
   populations: PopulationRow[],
-  infestations: InfestationRow[]
+  infestations: InfestationRow[],
+  captures: CaptureRow[] = []
 ): CibleInput {
   return {
     espece: deriveEspece(populations, infestations),
-    ...deriveLarves(populations),
+    ...deriveLarves(populations, captures),
     vols_clairs_essaims: deriveVolsClairsEssaims(populations),
     repartition_population: deriveRepartition(populations),
     surface_infestee_ha: prospection.surface_infestee ?? null,
-    ...deriveLarvesParEspece(populations),
+    ...deriveLarvesParEspece(populations, captures),
     ...deriveDensitesParEspece(populations),
   };
 }
@@ -48,7 +49,10 @@ function deriveEspece(populations: PopulationRow[], infestations: InfestationRow
  * NSE qui en compte 7 — la règle « L1/L2/L3 vs le reste » couvre les deux
  * sans distinction explicite du plafond, chaque espèce n'ayant de toute
  * façon pas de stade au-delà du sien), même seuil que le backend. */
-function deriveLarves(populations: PopulationRow[]): { petites_larves: number | null; grandes_larves: number | null } {
+function deriveLarves(
+  populations: PopulationRow[],
+  captures: CaptureRow[]
+): { petites_larves: number | null; grandes_larves: number | null } {
   let petites = 0;
   let grandes = 0;
   let renseignees = false;
@@ -76,6 +80,25 @@ function deriveLarves(populations: PopulationRow[]): { petites_larves: number | 
     }
   }
 
+  // Intensif (fusion des écrans B/C, cf. intensive-imagos.tsx/intensive-larves.tsx) :
+  // les effectifs larvaires par stade ne sont plus posés sur densites_larve
+  // (propre à l'Extensif) mais dans des lignes CaptureRow distinctes (categorie
+  // "larve", stade, effectif), jamais lues ici jusqu'à ce correctif, d'où
+  // "Cibles"/"Synthèse" affichant "non renseigné" pour toute fiche de
+  // traitement dérivée d'une prospection Intensive. Les deux sources ne se
+  // recouvrent jamais pour une même prospection (l'Extensif n'écrit jamais
+  // dans prospection_capture, l'Intensif jamais dans densites_larve) : les
+  // additionner est donc sans risque de doublon.
+  for (const c of captures) {
+    if (c.categorie !== 'larve' || !c.stade) continue;
+    renseignees = true;
+    if (['L1', 'L2', 'L3'].includes(c.stade.toUpperCase())) {
+      petites += c.effectif;
+    } else {
+      grandes += c.effectif;
+    }
+  }
+
   return { petites_larves: renseignees ? petites : null, grandes_larves: renseignees ? grandes : null };
 }
 
@@ -91,7 +114,7 @@ interface LarvesParEspece {
 /** Même règle que `deriveLarves` (L1-L3 = petites, le reste = grandes), mais
  * détaillée par espèce plutôt qu'agrégée — écran Synthèse (Aérien). `null`
  * pour une espèce jamais rencontrée avec une densité larvaire renseignée. */
-function deriveLarvesParEspece(populations: PopulationRow[]): LarvesParEspece {
+function deriveLarvesParEspece(populations: PopulationRow[], captures: CaptureRow[]): LarvesParEspece {
   const petites: Record<EspeceCible, number> = { LMC: 0, NSE: 0 };
   const grandes: Record<EspeceCible, number> = { LMC: 0, NSE: 0 };
   const renseignees: Record<EspeceCible, boolean> = { LMC: false, NSE: false };
@@ -114,6 +137,18 @@ function deriveLarvesParEspece(populations: PopulationRow[]): LarvesParEspece {
       } else {
         grandes[p.espece] += valeur;
       }
+    }
+  }
+
+  // Intensif : même bascule que `deriveLarves` ci-dessus, cf. son commentaire.
+  for (const c of captures) {
+    if (c.categorie !== 'larve' || !c.stade) continue;
+    if (c.espece !== 'LMC' && c.espece !== 'NSE') continue;
+    renseignees[c.espece] = true;
+    if (['L1', 'L2', 'L3'].includes(c.stade.toUpperCase())) {
+      petites[c.espece] += c.effectif;
+    } else {
+      grandes[c.espece] += c.effectif;
     }
   }
 
