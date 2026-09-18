@@ -591,8 +591,9 @@ export async function updateTraitementAerienPesticideRecu(
 
 /**
  * Efficacité (migration backend 0058, fiche CRT papier section "Traitement") —
- * même écran que pesticide reçu ci-dessus (rotations.tsx), même raison :
- * information propre au traitement (résultat, pas équipe), fonction dédiée
+ * saisie sur l'écran « Moyens & protection » (moyens.tsx, #efficacite-moyens-
+ * protection — déplacée depuis rotations.tsx), même raison : information
+ * propre au traitement (résultat, pas équipe/rotations), fonction dédiée
  * plutôt qu'un champ de plus sur `AerienUpdateInput`.
  */
 export interface AerienEfficaciteInput {
@@ -721,11 +722,6 @@ export interface TerrestreUpdateInput {
   vitesse_vent_ms?: number | null;
   direction_vent?: string | null;
   temperature_c?: number | null;
-  // Efficacité (migration backend 0058, fiche CRT papier section "Traitement",
-  // juste après Condition de traitement).
-  taux_mortalite_pourcent?: number | null;
-  evaluation_efficacite_heures_apres?: number | null;
-  methode_evaluation_efficacite?: string | null;
   repriseTraitement?: boolean | null;
   traitementOrigineId?: string | null;
   surface_atomiseur_ha?: number | null;
@@ -754,9 +750,6 @@ export async function updateTraitementTerrestre(
       vitesse_vent_ms = ?,
       direction_vent = ?,
       temperature_c = ?,
-      taux_mortalite_pourcent = ?,
-      evaluation_efficacite_heures_apres = ?,
-      methode_evaluation_efficacite = ?,
       reprise_traitement = ?,
       traitement_origine_id = ?,
       surface_atomiseur_ha = ?,
@@ -777,9 +770,6 @@ export async function updateTraitementTerrestre(
       input.vitesse_vent_ms ?? null,
       input.direction_vent ?? null,
       input.temperature_c ?? null,
-      input.taux_mortalite_pourcent ?? null,
-      input.evaluation_efficacite_heures_apres ?? null,
-      input.methode_evaluation_efficacite ?? null,
       input.repriseTraitement ?? null,
       input.traitementOrigineId ?? null,
       input.surface_atomiseur_ha ?? null,
@@ -790,6 +780,46 @@ export async function updateTraitementTerrestre(
       input.essence_litres ?? null,
       input.nb_piles ?? null,
       input.pesticideRecuL ?? null,
+      traitementId,
+    ]
+  );
+
+  const updated = await getTraitement(traitementId);
+  if (!updated) {
+    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  }
+  return updated;
+}
+
+/**
+ * Efficacité (migration backend 0058, fiche CRT papier section "Traitement") —
+ * saisie sur l'écran « Moyens & protection » (moyens.tsx), même patron que
+ * `updateTraitementAerienEfficacite` : information propre au résultat du
+ * traitement, pas à l'équipe, fonction dédiée plutôt qu'un champ de plus sur
+ * `TerrestreUpdateInput` (#efficacite-moyens-protection).
+ */
+export interface TerrestreEfficaciteInput {
+  taux_mortalite_pourcent?: number | null;
+  evaluation_efficacite_heures_apres?: number | null;
+  methode_evaluation_efficacite?: string | null;
+}
+
+export async function updateTraitementTerrestreEfficacite(
+  traitementId: string,
+  input: TerrestreEfficaciteInput
+): Promise<DraftTraitement> {
+  const db = await getDb();
+
+  await db.runAsync(
+    `UPDATE traitement_terrestre SET
+      taux_mortalite_pourcent = ?,
+      evaluation_efficacite_heures_apres = ?,
+      methode_evaluation_efficacite = ?
+     WHERE traitement_id = ?`,
+    [
+      input.taux_mortalite_pourcent ?? null,
+      input.evaluation_efficacite_heures_apres ?? null,
+      input.methode_evaluation_efficacite ?? null,
       traitementId,
     ]
   );

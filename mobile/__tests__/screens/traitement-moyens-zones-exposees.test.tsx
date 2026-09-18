@@ -19,6 +19,8 @@ jest.mock('expo-router', () => ({
 jest.mock('@/lib/traitement-repository', () => ({
   getTraitement: jest.fn(),
   updateTraitementMoyens: jest.fn().mockResolvedValue({}),
+  updateTraitementAerienEfficacite: jest.fn().mockResolvedValue({}),
+  updateTraitementTerrestreEfficacite: jest.fn().mockResolvedValue({}),
 }));
 
 jest.mock('@/lib/prospection-repository', () => ({
