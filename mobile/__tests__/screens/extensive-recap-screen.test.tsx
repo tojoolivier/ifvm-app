@@ -119,7 +119,7 @@ describe('ExtensiveRecapScreen — récapitulatif complet (#227)', () => {
     expect(screen.getByText('Type de cible')).toBeVisible();
     expect(screen.getByText('Très dense')).toBeVisible();
     expect(screen.getByText('Direction du déplacement')).toBeVisible();
-    expect(screen.getByText('Nord → Sud')).toBeVisible();
+    expect(screen.getByText('vers Nord')).toBeVisible();
     expect(screen.getByText('État')).toBeVisible();
     expect(screen.getByText('Déplacement')).toBeVisible();
     expect(screen.getByText('Comportement de l’essaim')).toBeVisible();

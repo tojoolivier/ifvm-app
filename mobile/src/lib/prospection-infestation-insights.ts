@@ -19,6 +19,30 @@ export function oppositeDirection(label: string): string {
   return COMPASS_DIRECTIONS[(index + 4) % COMPASS_DIRECTIONS.length].label;
 }
 
+const COMPASS_DIRECTION_LABELS: Record<string, string> = {
+  N: 'Nord',
+  NE: 'Nord-Est',
+  E: 'Est',
+  SE: 'Sud-Est',
+  S: 'Sud',
+  SO: 'Sud-Ouest',
+  O: 'Ouest',
+  NO: 'Nord-Ouest',
+};
+
+/**
+ * Formate la « Direction du déplacement » choisie (ex. "NE") pour le
+ * récapitulatif — toutes fiches de prospection confondues (Intensive,
+ * Extensive, Validation/Revalidation, qui réutilisent les écrans de
+ * l'Intensif) : n'affiche que l'élément réellement choisi par l'agent
+ * ("vers Nord-Est"), sans le sens opposé dérivé automatiquement
+ * (direction_vers/directionVers) qui n'a jamais été une saisie.
+ */
+export function formatDirectionDeplacement(code: string | null | undefined): string {
+  if (!code) return '—';
+  return `vers ${COMPASS_DIRECTION_LABELS[code] ?? code}`;
+}
+
 /** Seuil placeholder — à remplacer par le seuil critique agronomique réel une fois confirmé. */
 const DENSITE_SEUIL_CRITIQUE = 300;
 
