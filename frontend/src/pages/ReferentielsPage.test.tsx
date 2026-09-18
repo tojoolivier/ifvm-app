@@ -52,22 +52,24 @@ describe('ReferentielsPage — maquette §11 du handoff', () => {
     vi.restoreAllMocks()
   })
 
-  it('liste les 9 référentiels de la colonne de navigation', async () => {
+  it('liste les 11 référentiels de la colonne de navigation', async () => {
     mockedGet.mockResolvedValue(pull())
     renderPage()
 
-    await waitFor(() => expect(nav().getByText('9 référentiels')).toBeInTheDocument())
+    await waitFor(() => expect(nav().getByText('11 référentiels')).toBeInTheDocument())
 
     for (const table of [
       'pesticide',
       'culture',
       'code_stade',
+      'zone_anti_acridien',
       'poste_acridien',
       'station_fixe',
       'lieu_aerien',
       'utilisateur',
       'campagne',
       'equipe_aerienne',
+      'equipe_terrestre',
     ]) {
       expect(nav().getByText(table)).toBeInTheDocument()
     }
@@ -77,14 +79,15 @@ describe('ReferentielsPage — maquette §11 du handoff', () => {
     mockedGet.mockResolvedValue(pull())
     renderPage()
 
-    await waitFor(() => expect(nav().getByText('9 référentiels')).toBeInTheDocument())
+    await waitFor(() => expect(nav().getByText('11 référentiels')).toBeInTheDocument())
 
-    // Les 9 référentiels exposent désormais au moins une lecture/écriture :
-    // culture (#130), code_stade, poste_acridien, station_fixe (#133),
-    // utilisateur, campagne, pesticide (#129, #134), lieu_aerien
-    // (#prospection-lieu-base), equipe_aerienne (assignation chef de base).
+    // Les 11 référentiels exposent désormais au moins une lecture/écriture :
+    // culture (#130), code_stade, zone_acridien, poste_acridien, station_fixe
+    // (#133), utilisateur, campagne, pesticide (#129, #134), lieu_aerien
+    // (#prospection-lieu-base), equipe_aerienne/equipe_terrestre (assignation
+    // chef de base/d'équipe).
     expect(nav().queryAllByText('à créer')).toHaveLength(0)
-    expect(nav().getAllByText('API')).toHaveLength(9)
+    expect(nav().getAllByText('API')).toHaveLength(11)
   })
 
   it('affiche la matière active et la dose de référence sur les pesticides', async () => {
@@ -330,6 +333,9 @@ describe('ReferentielsPage — écritures poste_acridien (#132)', () => {
     mockedGet.mockImplementation((url: string) => {
       if (url.startsWith('/postes-acridiens')) return Promise.resolve({ data: postes })
       if (url.startsWith('/zones-anti-acridiennes')) return Promise.resolve({ data: [ZONE] })
+      // Sélecteur « Filtrer par équipe terrestre » (poste_acridien fait partie
+      // du périmètre filtrable) : liste vide suffit, non testée ici.
+      if (url.startsWith('/equipes-terrestres')) return Promise.resolve({ data: [] })
       return Promise.resolve(pull())
     })
   }
@@ -379,6 +385,7 @@ describe('ReferentielsPage — écritures poste_acridien (#132)', () => {
         code: 'PA-ZOM',
         nom: 'Zombitse renommé',
         za_id: 'za1',
+        equipe_terrestre_id: null,
         actif: true,
       }),
     )
@@ -401,6 +408,7 @@ describe('ReferentielsPage — écritures poste_acridien (#132)', () => {
       code: 'PA-ISA',
       nom: 'Isalo',
       za_id: 'za1',
+      equipe_terrestre_id: null,
     })
   })
 
@@ -443,6 +451,94 @@ describe('ReferentielsPage — écritures poste_acridien (#132)', () => {
     await ouvrirPostesAcridiens()
 
     expect(screen.queryByRole('button', { name: /supprimer/i })).not.toBeInTheDocument()
+  })
+})
+
+describe('ReferentielsPage — filtre par équipe terrestre (#equipe-terrestre)', () => {
+  const ZONE = { id: 'za1', code: 'ZA-ZOM', nom: 'Zombitse', created_at: SERVER_TIME }
+  const EQUIPE_IHOSY = { id: 'et1', nom: 'Équipe Terrestre Ihosy', chef_equipe_id: 'u1', actif: true }
+  const POSTE_RATTACHE = {
+    id: 'pa1',
+    code: 'PA-ZOM',
+    nom: 'Zombitse-Vohibasia',
+    za_id: 'za1',
+    za_code: 'ZA-ZOM',
+    za_nom: 'Zombitse',
+    equipe_terrestre_id: 'et1',
+    equipe_terrestre_nom: 'Équipe Terrestre Ihosy',
+    actif: true,
+    nb_stations: 0,
+    created_at: SERVER_TIME,
+    updated_at: SERVER_TIME,
+  }
+  const POSTE_LIBRE = {
+    id: 'pa2',
+    code: 'PA-ISA',
+    nom: 'Isalo',
+    za_id: 'za1',
+    za_code: 'ZA-ZOM',
+    za_nom: 'Zombitse',
+    equipe_terrestre_id: null,
+    equipe_terrestre_nom: null,
+    actif: true,
+    nb_stations: 0,
+    created_at: SERVER_TIME,
+    updated_at: SERVER_TIME,
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  function mockGetParUrl() {
+    mockedGet.mockImplementation((url: string) => {
+      if (url.startsWith('/postes-acridiens')) return Promise.resolve({ data: [POSTE_RATTACHE, POSTE_LIBRE] })
+      if (url.startsWith('/zones-anti-acridiennes')) return Promise.resolve({ data: [ZONE] })
+      if (url.startsWith('/equipes-terrestres')) return Promise.resolve({ data: [EQUIPE_IHOSY] })
+      return Promise.resolve(pull())
+    })
+  }
+
+  it('réduit la liste des postes acridiens à ceux rattachés à l’équipe choisie', async () => {
+    mockGetParUrl()
+    renderPage()
+
+    await waitFor(() => expect(nav().getByText('poste_acridien')).toBeInTheDocument())
+    fireEvent.click(nav().getByText('poste_acridien'))
+
+    await screen.findByText('PA-ZOM')
+    expect(screen.getByText('PA-ISA')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Filtrer par équipe terrestre'), {
+      target: { value: 'et1' },
+    })
+
+    expect(screen.getByText('PA-ZOM')).toBeInTheDocument()
+    expect(screen.queryByText('PA-ISA')).not.toBeInTheDocument()
+  })
+
+  it('revient à la liste complète sur « — Toutes — »', async () => {
+    mockGetParUrl()
+    renderPage()
+
+    await waitFor(() => expect(nav().getByText('poste_acridien')).toBeInTheDocument())
+    fireEvent.click(nav().getByText('poste_acridien'))
+    await screen.findByText('PA-ZOM')
+
+    const select = screen.getByLabelText('Filtrer par équipe terrestre')
+    fireEvent.change(select, { target: { value: 'et1' } })
+    expect(screen.queryByText('PA-ISA')).not.toBeInTheDocument()
+
+    fireEvent.change(select, { target: { value: '' } })
+    expect(screen.getByText('PA-ISA')).toBeInTheDocument()
+  })
+
+  it('ne propose pas le filtre sur un référentiel hors périmètre terrestre (pesticide)', async () => {
+    mockGetParUrl()
+    renderPage()
+
+    await waitFor(() => expect(nav().getByText('pesticide')).toBeInTheDocument())
+    expect(screen.queryByLabelText('Filtrer par équipe terrestre')).not.toBeInTheDocument()
   })
 })
 
@@ -1027,6 +1123,9 @@ describe('ReferentielsPage — écritures station_fixe (#133)', () => {
       if (url.startsWith('/stations')) return Promise.resolve({ data: stations })
       if (url.startsWith('/postes-acridiens')) return Promise.resolve({ data: [POSTE] })
       if (url.startsWith('/communes')) return Promise.resolve({ data: [COMMUNE] })
+      // Sélecteur « Filtrer par équipe terrestre » (station_fixe fait partie du
+      // périmètre filtrable) : liste vide suffit, non testée ici.
+      if (url.startsWith('/equipes-terrestres')) return Promise.resolve({ data: [] })
       return Promise.resolve(pull())
     })
   }
