@@ -31,12 +31,14 @@ const COMPASS_DIRECTION_LABELS: Record<string, string> = {
 };
 
 /**
- * Formate la « Direction du déplacement » choisie (ex. "NE") pour le
- * récapitulatif — toutes fiches de prospection confondues (Intensive,
- * Extensive, Validation/Revalidation, qui réutilisent les écrans de
- * l'Intensif) : n'affiche que l'élément réellement choisi par l'agent
- * ("vers Nord-Est"), sans le sens opposé dérivé automatiquement
- * (direction_vers/directionVers) qui n'a jamais été une saisie.
+ * Formate un point cardinal choisi sur un chip (ex. "NE") pour un
+ * récapitulatif — utilisé pour « Direction du déplacement » sur toutes les
+ * fiches de prospection (Intensive, Extensive, Validation/Revalidation, qui
+ * réutilisent les écrans de l'Intensif) et pour « Direction du vent » sur la
+ * fiche de traitement Terrestre (recap.tsx) : même règle partout, n'affiche
+ * que l'élément réellement choisi ("vers Nord-Est"), jamais un sens opposé
+ * dérivé automatiquement (direction_vers/directionVers, propre au
+ * déplacement) qui n'a jamais été une saisie.
  */
 export function formatDirectionDeplacement(code: string | null | undefined): string {
   if (!code) return '—';

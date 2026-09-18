@@ -133,7 +133,7 @@ describe('RecapScreen — Terrestre : rien de saisi ne manque à la relecture', 
     expect(await screen.findByText('Marie Rasoa')).toBeVisible();
     expect(screen.getByText('06:00')).toBeVisible();
     expect(screen.getByText('09:00')).toBeVisible();
-    expect(screen.getByText('Nord')).toBeVisible();
+    expect(screen.getByText('vers Nord')).toBeVisible();
     expect(screen.getByText('88')).toBeVisible();
     expect(screen.getByText('Comptages pré/post-traitement')).toBeVisible();
   });
