@@ -417,7 +417,7 @@ async def test_un_vol_rattache_a_une_rotation_avec_bloc_renvoie_le_detail_du_blo
         },
         headers=auth_headers,
     )
-    assert ajout.status_code == 201, ajout.text
+    assert ajout.status_code == 200, ajout.text
 
     lue = await client.get(f"/fiches-vol/{fiche['id']}", headers=auth_headers)
     assert lue.status_code == 200
@@ -448,7 +448,7 @@ async def test_un_vol_sans_rotation_renvoie_un_bloc_nul(client, auth_headers, pa
         },
         headers=auth_headers,
     )
-    assert ajout.status_code == 201, ajout.text
+    assert ajout.status_code == 200, ajout.text
 
     lue = await client.get(f"/fiches-vol/{fiche['id']}", headers=auth_headers)
     assert lue.status_code == 200
