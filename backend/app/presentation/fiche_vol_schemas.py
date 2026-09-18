@@ -18,6 +18,29 @@ class VolCreate(BaseModel):
     observations: str | None = None
 
 
+class BlocDetailRead(BaseModel):
+    """Projection en lecture seule de traitement_bloc + cible, résolue par jointure sur
+    Vol.rotation_id (cf. FicheVolRepositoryImpl._rotations_detail) — pour la vue
+    imprimable A4 de la fiche de vol (#fiche-vol-impression). vols_clairs_essaims reste
+    un indicateur global au traitement (porté par cible, pas par bloc individuel)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    numero: int
+    nom: str
+    localite: str | None = None
+    surface_theorique_ha: float | None = None
+    surface_protegee_ha: float | None = None
+    surface_traitee_ha: float | None = None
+    largeur_andain_m: float | None = None
+    interpasse_m: float | None = None
+    hauteur_vol_min_m: float | None = None
+    hauteur_vol_max_m: float | None = None
+    observation: str | None = None
+    espece: str | None = None
+    vols_clairs_essaims: str | None = None
+
+
 class VolRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -31,6 +54,11 @@ class VolRead(BaseModel):
     observations: str | None = None
     # Dérivée de heure_fin - heure_debut, jamais stockée.
     duree_minutes: int
+    # Résolus par jointure sur rotation_id (jamais saisis) — None pour un vol sans
+    # rotation (convoyage) ou dont la rotation n'a pas encore de bloc rattaché.
+    numero_cuve: str | None = None
+    produit_nom: str | None = None
+    bloc: BlocDetailRead | None = None
 
 
 class VolSyncPush(BaseModel):

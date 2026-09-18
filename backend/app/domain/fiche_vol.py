@@ -303,6 +303,31 @@ class SignatureVol:
 
 
 @dataclass
+class VolBlocDetail:
+    """Projection en lecture seule de `traitement_bloc` + `cible` pour la vue imprimable
+    A4 de la fiche de vol (#fiche-vol-impression) — jamais persistée côté fiche_vol,
+    résolue par jointure sur `Vol.rotation_id` à chaque lecture (cf.
+    FicheVolRepositoryImpl._detail_rotations). `vols_clairs_essaims` reste un indicateur
+    global au traitement (porté par `cible`, pas par bloc) : aucune donnée par bloc
+    n'existe en base, ne pas laisser croire le contraire en l'affichant ailleurs que
+    dans une note explicite (cf. ADR fiche de vol)."""
+
+    numero: int
+    nom: str
+    localite: str | None
+    surface_theorique_ha: float | None
+    surface_protegee_ha: float | None
+    surface_traitee_ha: float | None
+    largeur_andain_m: float | None
+    interpasse_m: float | None
+    hauteur_vol_min_m: float | None
+    hauteur_vol_max_m: float | None
+    observation: str | None
+    espece: str | None
+    vols_clairs_essaims: str | None
+
+
+@dataclass
 class Vol:
     """Entité faible de `fiche_vol` : « V1 » n'a de sens que dans sa fiche.
 
@@ -319,6 +344,12 @@ class Vol:
     prospection_id: uuid.UUID | None = None
     observations: str | None = None
     id: uuid.UUID = field(default_factory=uuid.uuid4)
+    # Résolus par jointure sur rotation_id (jamais saisis, jamais stockés côté
+    # fiche_vol) — cf. VolBlocDetail. None pour un vol sans rotation (convoyage,
+    # mise en place non rattachée) ou dont la rotation n'a pas encore de bloc.
+    numero_cuve: str | None = None
+    produit_nom: str | None = None
+    bloc: VolBlocDetail | None = None
 
     def __post_init__(self) -> None:
         valider_rattachement(self.type_vol, self.rotation_id, self.prospection_id)
