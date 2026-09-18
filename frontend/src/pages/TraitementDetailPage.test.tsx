@@ -130,8 +130,10 @@ function renderPage(
   traitement: ReturnType<typeof traitementAerien>,
   reprenables: { id: string }[] = [],
   referentiel: { utilisateurs?: { id: string; nom: string; role: string }[] } = {},
+  extra: Record<string, () => Promise<unknown>> = {},
 ) {
   mockedGet.mockImplementation((url: string) => {
+    if (url in extra) return extra[url]()
     if (url === '/traitements/t1') return Promise.resolve({ data: traitement })
     if (url === '/referentiel/pull') return Promise.resolve(pesticidePull)
     if (url === '/traitements') return Promise.resolve({ data: reprenables })
@@ -169,6 +171,50 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
     renderPage(traitementAerien({ statut: 'brouillon' }))
     await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
     expect(screen.queryByText('🔒 Lecture seule')).not.toBeInTheDocument()
+  })
+
+  it("n'affiche pas le bouton de téléchargement du PDF pour une fiche en brouillon (#495)", async () => {
+    renderPage(traitementAerien({ statut: 'brouillon' }))
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: 'Télécharger le PDF' })).not.toBeInTheDocument()
+  })
+
+  it('affiche le bouton de téléchargement du PDF pour une fiche validée (#495)', async () => {
+    renderPage(traitementAerien())
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Télécharger le PDF' })).toBeInTheDocument()
+  })
+
+  it('télécharge le PDF en appelant /traitements/{id}/pdf en blob authentifié (#495)', async () => {
+    const createObjectURL = vi.fn().mockReturnValue('blob:mock-url')
+    const revokeObjectURL = vi.fn()
+    vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL })
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const pdfBlob = new Blob(['%PDF-1.4'], { type: 'application/pdf' })
+
+    renderPage(traitementAerien(), [], {}, { '/traitements/t1/pdf': () => Promise.resolve({ data: pdfBlob }) })
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Télécharger le PDF' }))
+
+    await waitFor(() =>
+      expect(mockedGet).toHaveBeenCalledWith('/traitements/t1/pdf', { responseType: 'blob' }),
+    )
+    await waitFor(() => expect(clickSpy).toHaveBeenCalled())
+    expect(createObjectURL).toHaveBeenCalledWith(pdfBlob)
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock-url')
+
+    clickSpy.mockRestore()
+    vi.unstubAllGlobals()
+  })
+
+  it('affiche une erreur si le téléchargement du PDF échoue (#495)', async () => {
+    renderPage(traitementAerien(), [], {}, { '/traitements/t1/pdf': () => Promise.reject(new Error('boom')) })
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Télécharger le PDF' }))
+
+    await waitFor(() => expect(screen.getByText('Impossible de télécharger le PDF.')).toBeInTheDocument())
   })
 
   it('affiche le bandeau cible (snapshot figé) avec le lien vers la prospection', async () => {
