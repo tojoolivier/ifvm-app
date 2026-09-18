@@ -552,6 +552,22 @@ class GetTraitement:
         return await self.repository.get_by_id(traitement_id)
 
 
+class GenererTraitementPdf:
+    """PDF de la fiche CRT (#495) — délègue la garde « validé uniquement » à
+    `Traitement.verifier_disponible_pour_pdf`, symétrique de la garde
+    `verifier_modifiable` des use cases d'écriture."""
+
+    def __init__(self, repository: TraitementRepository):
+        self.repository = repository
+
+    async def execute(self, traitement_id: uuid.UUID) -> Traitement:
+        traitement = await self.repository.get_by_id(traitement_id)
+        if traitement is None:
+            raise TraitementIntrouvableError(str(traitement_id))
+        traitement.verifier_disponible_pour_pdf()
+        return traitement
+
+
 class ListTraitements:
     def __init__(self, repository: TraitementRepository):
         self.repository = repository

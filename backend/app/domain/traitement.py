@@ -91,6 +91,11 @@ class TraitementVerrouilleError(PermissionError):
     """La fiche n'est plus `brouillon` — verrouillage post-validation."""
 
 
+class TraitementNonValideeError(PermissionError):
+    """Le PDF (#495) n'est disponible que pour un CRT validé — symétrique de
+    `TraitementVerrouilleError`, côté lecture plutôt qu'écriture."""
+
+
 class SignaturesManquantesError(ValueError):
     """Un ou plusieurs rôles renseignés n'ont pas de signature correspondante (CDG §9)."""
 
@@ -552,6 +557,12 @@ class Traitement:
         """
         if self.statut != "brouillon":
             raise TraitementVerrouilleError("Seules les fiches en brouillon peuvent être modifiées")
+
+    def verifier_disponible_pour_pdf(self) -> None:
+        """Garde pour la génération du PDF (#495) : uniquement pour un CRT
+        validé, symétrique de `verifier_modifiable` (verrouillage brouillon)."""
+        if self.statut == "brouillon":
+            raise TraitementNonValideeError("Le PDF n'est disponible que pour un CRT validé")
 
     def valider(
         self, date_validation: date, signatures: list[dict[str, str | None]]

@@ -12,6 +12,7 @@ from app.application.traitement_use_cases import (
     AddRotation,
     CreateTraitementAerien,
     CreateTraitementTerrestre,
+    GenererTraitementPdf,
     GetTraitement,
     ListTraitements,
     RemoveBloc,
@@ -38,6 +39,7 @@ from app.domain.traitement import (
     RotationBlocInvalideError,
     RotationIntrouvableError,
     TraitementIntrouvableError,
+    TraitementNonValideeError,
     TraitementOrigineDejaUtiliseeError,
     TraitementOrigineIntrouvableError,
     TraitementSyncConflitError,
@@ -54,7 +56,6 @@ from app.presentation.traitement_schemas import (
     BlocCreate,
     ProduitUtiliseCreate,
     RotationCreate,
-    StatutTraitement,
     TraitementCreate,
     TraitementRead,
     TraitementSyncPush,
@@ -322,16 +323,15 @@ async def get_traitement_pdf(
     _: Annotated[Utilisateur, Depends(get_current_user)],
 ):
     repository = get_repository(db)
-    use_case = GetTraitement(repository)
-    traitement = await use_case.execute(traitement_id)
-    if traitement is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Traitement non trouvé")
+    use_case = GenererTraitementPdf(repository)
+    try:
+        traitement = await use_case.execute(traitement_id)
+    except TraitementIntrouvableError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TraitementNonValideeError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
     traitement_read = TraitementRead.model_validate(traitement)
-    if traitement_read.statut == StatutTraitement.BROUILLON:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Le PDF n'est disponible que pour un CRT validé",
-        )
     html = build_crt_html(traitement_read)
     pdf = render_html_to_pdf(html)
     nom_fichier = f"fiche-crt-{traitement_read.numero_fiche}.pdf"
