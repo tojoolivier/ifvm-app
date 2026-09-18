@@ -290,7 +290,7 @@ describe('buildRecapitulatif', () => {
       densite_moy_arriere_front: null, heure_observation: null, densite_en_vol: null, dimension_ha: null,
     } as const;
     const recap = buildRecapitulatif(draft(), [], '', [row]);
-    expect(recap.comportementSummary).toBe('État Déplacement · Direction N → S');
+    expect(recap.comportementSummary).toBe('État Déplacement · Direction vers Nord');
 
     const empty = buildRecapitulatif(draft(), [], '', []);
     expect(empty.comportementSummary).toBe('Aucun comportement renseigné.');

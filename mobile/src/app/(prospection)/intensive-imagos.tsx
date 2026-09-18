@@ -17,7 +17,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Espece, accouplementOptionsFor, capturesMaxFor, grilleKeyToString, phasesFor } from '@/lib/prospection-especes-stades';
 import { parseEspeceSelection, buildGrilles, parseGrillesCompletees } from '@/lib/prospection-especes';
 import { parseDensite, parseSelectionMultiple, TYPE_CIBLE_IMAGO_OPTIONS, TypeCibleImago, EtatImago } from '@/lib/prospection-extensive';
-import { COMPASS_DIRECTIONS, oppositeDirection } from '@/lib/prospection-infestation-insights';
+import { COMPASS_DIRECTIONS, oppositeDirection, formatDirectionDeplacement } from '@/lib/prospection-infestation-insights';
 import { listStadesGrille } from '@/lib/referentiel-db';
 import { retourArriere } from '@/lib/fiche-routing';
 import {
@@ -863,7 +863,7 @@ export default function IntensiveImagosScreen() {
                 <View style={styles.summaryRow}>
                   <Text style={styles.summaryLabel}>Direction :</Text>
                   <Text style={styles.summaryValue}>
-                    {population.direction_de ? `${population.direction_de} → ${population.direction_vers}` : '—'}
+                    {formatDirectionDeplacement(population.direction_de)}
                   </Text>
                 </View>
               )}

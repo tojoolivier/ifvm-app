@@ -23,6 +23,7 @@ import {
   typeCibleImagoLabel,
 } from '@/lib/prospection-extensive';
 import { DEGATS_OPTIONS, formatHeureLocale } from '@/lib/prospection-fiche-lecture';
+import { formatDirectionDeplacement } from '@/lib/prospection-infestation-insights';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
@@ -85,7 +86,7 @@ function buildImagoRows(row: PopulationRow | null): DetailRow[] {
     },
     {
       label: 'Direction du déplacement',
-      value: row?.direction_de ? `${row.direction_de} → ${row.direction_vers}` : '—',
+      value: formatDirectionDeplacement(row?.direction_de),
     },
     { label: 'État', value: row?.etat === 'repos' ? 'Repos' : row?.etat === 'deplacement' ? 'Déplacement' : '—' },
     {

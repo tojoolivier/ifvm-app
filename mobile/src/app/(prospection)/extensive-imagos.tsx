@@ -14,7 +14,7 @@ import {
   speciesDataToPopulationRow,
   populationRowToSpeciesData,
 } from '@/lib/prospection-extensive';
-import { COMPASS_DIRECTIONS, oppositeDirection } from '@/lib/prospection-infestation-insights';
+import { COMPASS_DIRECTIONS, oppositeDirection, formatDirectionDeplacement } from '@/lib/prospection-infestation-insights';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
@@ -667,7 +667,7 @@ const handleContinue = () => {
                 <View style={styles.summaryRow}>
                   <Text style={styles.summaryLabel}>Direction :</Text>
                   <Text style={styles.summaryValue}>
-                    {data.directionDe ? `${data.directionDe} → ${data.directionVers}` : '—'}
+                    {formatDirectionDeplacement(data.directionDe)}
                   </Text>
                 </View>
               )}
