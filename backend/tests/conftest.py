@@ -1,9 +1,11 @@
 import os
 import uuid
 
+import asyncpg
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 # Import all models so metadata knows about all tables
@@ -23,9 +25,58 @@ from app.models.users import Utilisateur
 # `db_engine` recrée le schéma à chaque test (DROP SCHEMA ... CASCADE). Deux suites
 # lancées en parallèle sur la même base se prennent donc des deadlocks de catalogue :
 # surchargez cette URL pour donner sa propre base à chaque worktree.
-TEST_DATABASE_URL = os.environ.get(
+_DATABASE_URL_PAR_DEFAUT = os.environ.get(
     "TEST_DATABASE_URL", "postgresql+asyncpg://ifvm:ifvm_secret@localhost:5432/ifvm_test"
 )
+
+
+def _url_par_worker_xdist(url: str) -> str:
+    """Une base dédiée par worker `pytest -n` — même raison que le commentaire
+    ci-dessus, mais pour le parallélisme *interne* à une seule invocation
+    pytest : deux workers xdist partageant `TEST_DATABASE_URL` déclenchent le
+    même DROP SCHEMA/TRUNCATE en course, avec des doublons de clé sur les
+    tables de référentiel réensemencées à chaque test (`stade`, `code_stade`).
+    `PYTEST_XDIST_WORKER` (ex. "gw0") n'existe que sous xdist ; en son absence
+    (pytest sans -n), l'URL n'est pas modifiée.
+    """
+    worker_id = os.environ.get("PYTEST_XDIST_WORKER")
+    if not worker_id:
+        return url
+    parsed = make_url(url)
+    # `str(url)` masque le mot de passe (`***`) par défaut — `render_as_string`
+    # explicite est requis pour obtenir une URL réellement utilisable.
+    return parsed.set(database=f"{parsed.database}_{worker_id}").render_as_string(
+        hide_password=False
+    )
+
+
+TEST_DATABASE_URL = _url_par_worker_xdist(_DATABASE_URL_PAR_DEFAUT)
+
+_bases_deja_assurees: set[str] = set()
+
+
+async def _assure_base_existe(url: str) -> None:
+    """Crée la base du worker si elle n'existe pas encore (idempotent, mise en
+    cache par process pour ne payer la connexion admin qu'une fois)."""
+    if url in _bases_deja_assurees:
+        return
+    parsed = make_url(url)
+    conn = await asyncpg.connect(
+        host=parsed.host,
+        port=parsed.port,
+        user=parsed.username,
+        password=parsed.password,
+        database="postgres",
+    )
+    try:
+        existe = await conn.fetchval(
+            "SELECT 1 FROM pg_database WHERE datname = $1", parsed.database
+        )
+        if not existe:
+            await conn.execute(f'CREATE DATABASE "{parsed.database}"')
+    finally:
+        await conn.close()
+    _bases_deja_assurees.add(url)
 
 
 @pytest_asyncio.fixture
@@ -39,6 +90,7 @@ async def db_engine():
     par cascade — d'où des `relation "utilisateur" does not exist` erratiques.
     Le DDL n'est donc joué que lorsque le schéma n'est pas déjà complet.
     """
+    await _assure_base_existe(TEST_DATABASE_URL)
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
     tables = ", ".join(f'public."{table.name}"' for table in Base.metadata.sorted_tables)
     # `try/finally` obligatoire : sans lui, une erreur pendant la préparation
