@@ -242,7 +242,7 @@ Les voies progressives classiques (`--max-warnings` dégressif, baseline de supp
 
 **Aucune dérogation locale.** Pas d'`eslint-disable` : un `eslint-disable` produit du silence, `ignore()` produit une ligne de journal. Un cas non couvert se corrige dans la configuration — une discussion versionnée — pas dans un commentaire enterré.
 
-**CI = autorité** (`lint-mobile`, déjà bloquant, aucun changement d'infrastructure), **pre-commit = retour rapide** (ne voit que l'index, contournable par `--no-verify`).
+**CI = autorité** (`mobile` — ex-`lint-mobile`, déjà bloquant, aucun changement d'infrastructure), **pre-commit = retour rapide** (ne voit que l'index, contournable par `--no-verify`).
 
 ---
 
