@@ -354,6 +354,22 @@ async def chef_equipe(db_session: AsyncSession) -> Utilisateur:
 
 
 @pytest_asyncio.fixture
+async def equipe_terrestre(db_session: AsyncSession, chef_equipe: Utilisateur):
+    from app.infrastructure.referentiel_model import EquipeTerrestreModel
+
+    equipe = EquipeTerrestreModel(
+        id=uuid.uuid4(),
+        nom="Équipe Terrestre Ihosy",
+        chef_equipe_id=chef_equipe.id,
+        actif=True,
+    )
+    db_session.add(equipe)
+    await db_session.commit()
+    await db_session.refresh(equipe)
+    return equipe
+
+
+@pytest_asyncio.fixture
 async def campagne_id(db_session: AsyncSession, utilisateur: Utilisateur) -> uuid.UUID:
     from datetime import date
 

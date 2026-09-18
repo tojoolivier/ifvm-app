@@ -10,15 +10,18 @@ from app.application.referentiel_use_cases import (
     CreateCodeStade,
     CreateCulture,
     CreateEquipeAerienne,
+    CreateEquipeTerrestre,
     CreateLieuAerien,
     CreatePesticide,
     CreatePosteAcridien,
     CreateStandRemplissage,
     CreateStation,
+    CreateZoneAntiAcridien,
     GetBaseAerienne,
     GetCodeStade,
     GetCulture,
     GetEquipeAerienne,
+    GetEquipeTerrestre,
     GetLieuAerien,
     GetPesticide,
     GetPosteAcridien,
@@ -29,6 +32,7 @@ from app.application.referentiel_use_cases import (
     ListCommunes,
     ListCultures,
     ListEquipesAeriennes,
+    ListEquipesTerrestres,
     ListLieuxAeriens,
     ListPesticides,
     ListPostesAcridiens,
@@ -45,6 +49,7 @@ from app.application.referentiel_use_cases import (
     UpdatePosteAcridien,
     UpdateStandRemplissage,
     UpdateStation,
+    UpdateZoneAntiAcridien,
 )
 from app.auth import get_current_user
 from app.database import get_db
@@ -53,10 +58,13 @@ from app.domain.referentiel import (
     BaseAerienneParentInvalideError,
     ChefDeBaseDejaEquipeError,
     ChefDeBaseEquipeInvalideError,
+    ChefEquipeDejaEquipeError,
+    ChefEquipeInvalideError,
     CodeReferentielDejaPrisError,
     CommuneInconnueError,
     EquipeAerienneDejaAssigneeError,
     EquipeAerienneIntrouvableError,
+    EquipeTerrestreIntrouvableError,
     GrilleDejaOccupeeError,
     NumeroBaseAerienneDejaPrisError,
     NumeroStandRemplissageDejaPrisError,
@@ -65,6 +73,7 @@ from app.domain.referentiel import (
     PosteAcridienIntrouvableError,
     StadeInconnuError,
     TypeLieuAerienInvalideError,
+    ZoneAntiAcridienAvecPostesActifsError,
     ZoneAntiAcridienIntrouvableError,
 )
 from app.infrastructure.campagne_repository import CampagneRepositoryImpl
@@ -79,6 +88,7 @@ from app.infrastructure.referentiel_sync_repository import (
     CodeStadeRepositoryImpl,
     CultureRepositoryImpl,
     EquipeAerienneRepositoryImpl,
+    EquipeTerrestreRepositoryImpl,
     LieuAerienRepositoryImpl,
     PesticideRepositoryImpl,
     StandRemplissageRepositoryImpl,
@@ -100,6 +110,8 @@ from app.presentation.referentiel_schemas import (
     EntityPull,
     EquipeAerienneCreate,
     EquipeAerienneRead,
+    EquipeTerrestreCreate,
+    EquipeTerrestreRead,
     LieuAerienCreate,
     LieuAerienRead,
     LieuAerienUpdate,
@@ -116,7 +128,9 @@ from app.presentation.referentiel_schemas import (
     StationFixeCreate,
     StationFixeRead,
     StationFixeUpdate,
+    ZoneAntiAcridienCreate,
     ZoneAntiAcridienRead,
+    ZoneAntiAcridienUpdate,
 )
 
 router = APIRouter()
@@ -126,10 +140,65 @@ router = APIRouter()
 async def list_zones_anti_acridiennes(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Utilisateur, Depends(get_current_user)],
+    inclure_inactifs: bool = Query(
+        default=False,
+        description="Renvoie les zones des deux états — écran d'administration.",
+    ),
 ):
     repository = ZoneAntiAcridienRepositoryImpl(db)
     use_case = ListZonesAntiAcridiennes(repository)
-    return await use_case.execute()
+    return await use_case.execute(actif=None if inclure_inactifs else True)
+
+
+@router.post("/zones-anti-acridiennes", response_model=ZoneAntiAcridienRead, status_code=201)
+async def create_zone_anti_acridienne(
+    body: ZoneAntiAcridienCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = CreateZoneAntiAcridien(ZoneAntiAcridienRepositoryImpl(db))
+    try:
+        return await use_case.execute(code=body.code, nom=body.nom)
+    except CodeReferentielDejaPrisError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Le code « {body.code} » est déjà utilisé par une autre zone anti-acridienne",
+        ) from exc
+
+
+@router.put("/zones-anti-acridiennes/{za_id}", response_model=ZoneAntiAcridienRead)
+async def update_zone_anti_acridienne(
+    za_id: uuid.UUID,
+    body: ZoneAntiAcridienUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = UpdateZoneAntiAcridien(ZoneAntiAcridienRepositoryImpl(db))
+    try:
+        zone = await use_case.execute(
+            za_id=za_id,
+            code=body.code,
+            nom=body.nom,
+            actif=body.actif,
+        )
+    except CodeReferentielDejaPrisError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Le code « {body.code} » est déjà utilisé par une autre zone anti-acridienne",
+        ) from exc
+    except ZoneAntiAcridienAvecPostesActifsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Des postes acridiens actifs sont rattachés à cette zone : "
+                "désactivez-les d'abord, la désactivation ne se propage pas."
+            ),
+        ) from exc
+    if zone is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Zone anti-acridienne non trouvée"
+        )
+    return zone
 
 
 @router.get("/postes-acridiens", response_model=list[PosteAcridienRead])
@@ -169,13 +238,24 @@ async def create_poste_acridien(
     use_case = CreatePosteAcridien(
         repository=PosteAcridienRepositoryImpl(db),
         zone_repository=ZoneAntiAcridienRepositoryImpl(db),
+        equipe_terrestre_repository=EquipeTerrestreRepositoryImpl(db),
     )
     try:
-        return await use_case.execute(code=body.code, nom=body.nom, za_id=body.za_id)
+        return await use_case.execute(
+            code=body.code,
+            nom=body.nom,
+            za_id=body.za_id,
+            equipe_terrestre_id=body.equipe_terrestre_id,
+        )
     except ZoneAntiAcridienIntrouvableError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Zone anti-acridienne inconnue",
+        ) from exc
+    except EquipeTerrestreIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Équipe terrestre inconnue",
         ) from exc
     except CodeReferentielDejaPrisError as exc:
         raise HTTPException(
@@ -197,6 +277,7 @@ async def update_poste_acridien(
     use_case = UpdatePosteAcridien(
         repository=PosteAcridienRepositoryImpl(db),
         zone_repository=ZoneAntiAcridienRepositoryImpl(db),
+        equipe_terrestre_repository=EquipeTerrestreRepositoryImpl(db),
     )
     try:
         poste = await use_case.execute(
@@ -204,12 +285,19 @@ async def update_poste_acridien(
             code=body.code,
             nom=body.nom,
             za_id=body.za_id,
+            equipe_terrestre_id=body.equipe_terrestre_id,
             actif=body.actif,
+            champs_fournis=body.model_fields_set,
         )
     except ZoneAntiAcridienIntrouvableError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Zone anti-acridienne inconnue",
+        ) from exc
+    except EquipeTerrestreIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Équipe terrestre inconnue",
         ) from exc
     except CodeReferentielDejaPrisError as exc:
         raise HTTPException(
@@ -673,6 +761,68 @@ async def get_equipe_aerienne(
     if equipe is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Équipe aérienne non trouvée"
+        )
+    return equipe
+
+
+# --- equipe_terrestre --------------------------------------------------------------
+#
+# Équipe terrestre (migration 0072) : même patron que equipe_aerienne, un chef
+# d'équipe (rôle chef_equipe) + des membres à nombre variable. Contrairement à
+# l'aérien, pas de base physique unique — plusieurs postes acridiens peuvent
+# partager la même équipe (poste_acridien.equipe_terrestre_id, sans UNIQUE).
+# Aucune route PUT dans ce lot, même périmètre réduit que equipe_aerienne.
+
+
+@router.get("/equipes-terrestres", response_model=list[EquipeTerrestreRead])
+async def list_equipes_terrestres(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+    inclure_inactifs: bool = Query(
+        default=False,
+        description="Renvoie les équipes des deux états — écran d'administration.",
+    ),
+):
+    use_case = ListEquipesTerrestres(EquipeTerrestreRepositoryImpl(db))
+    return await use_case.execute(actif=None if inclure_inactifs else True)
+
+
+@router.post("/equipes-terrestres", response_model=EquipeTerrestreRead, status_code=201)
+async def create_equipe_terrestre(
+    body: EquipeTerrestreCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = CreateEquipeTerrestre(EquipeTerrestreRepositoryImpl(db), UtilisateurRepositoryImpl(db))
+    try:
+        return await use_case.execute(
+            nom=body.nom,
+            chef_equipe_id=body.chef_equipe_id,
+            membres=[m.nom for m in body.membres],
+        )
+    except ChefEquipeInvalideError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"chef_equipe_id n'a pas le rôle chef_equipe : {exc.args[0]}",
+        ) from exc
+    except ChefEquipeDejaEquipeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"chef_equipe_id dirige déjà une autre équipe : {exc.args[0]}",
+        ) from exc
+
+
+@router.get("/equipes-terrestres/{equipe_id}", response_model=EquipeTerrestreRead)
+async def get_equipe_terrestre(
+    equipe_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = GetEquipeTerrestre(EquipeTerrestreRepositoryImpl(db))
+    equipe = await use_case.execute(equipe_id)
+    if equipe is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Équipe terrestre non trouvée"
         )
     return equipe
 

@@ -32,6 +32,16 @@ class PosteAcridienAvecStationsActivesError(Exception):
     pass
 
 
+class ZoneAntiAcridienAvecPostesActifsError(Exception):
+    """Désactiver une zone n'orpheline pas ses postes.
+
+    Réciproque de `PosteAcridienAvecStationsActivesError`, un niveau plus haut dans la
+    hiérarchie géographique : refuse tant que des postes actifs référencent la zone.
+    """
+
+    pass
+
+
 class PosteAcridienIntrouvableError(Exception):
     """pa_id ne référence pas un poste acridien existant."""
 
@@ -73,6 +83,10 @@ class PosteAcridien:
     za_id: uuid.UUID = field(default_factory=uuid.uuid4)
     za_code: str = ""
     za_nom: str = ""
+    # Rattachement à une équipe terrestre (migration 0072) : nullable, plusieurs
+    # postes peuvent partager la même équipe (équipe mobile, pas de UNIQUE).
+    equipe_terrestre_id: uuid.UUID | None = None
+    equipe_terrestre_nom: str | None = None
     actif: bool = True
     # Dérivé : nombre de stations fixes actives rattachées. Jamais saisissable — c'est
     # la colonne « Stations » de l'écran Référentiels, et le garde-fou de désactivation.
@@ -347,3 +361,51 @@ class StandRemplissage:
     actif: bool = True
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
+
+
+class EquipeTerrestreIntrouvableError(Exception):
+    """`equipe_terrestre_id` ne référence aucune `equipe_terrestre` existante."""
+
+    pass
+
+
+class ChefEquipeInvalideError(Exception):
+    """`chef_equipe_id` ne référence pas un utilisateur avec le rôle `chef_equipe`."""
+
+    pass
+
+
+class ChefEquipeDejaEquipeError(Exception):
+    """L'utilisateur référencé dirige déjà une autre équipe terrestre (UNIQUE
+    `equipe_terrestre.chef_equipe_id`, un chef d'équipe = une équipe)."""
+
+    pass
+
+
+@dataclass
+class MembreEquipeTerrestre:
+    """Membre d'une équipe terrestre au-delà du chef d'équipe (migration 0072) —
+    entité faible de `EquipeTerrestre`, un nom en nombre variable. Même patron que
+    `MembreEquipeAerienne`."""
+
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    equipe_terrestre_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    nom: str = ""
+
+
+@dataclass
+class EquipeTerrestre:
+    """Équipe terrestre (migration 0072) : une équipe = un chef d'équipe
+    (`chef_equipe_id` UNIQUE, rôle `chef_equipe`). Contrairement à l'équipe aérienne,
+    pas de base physique unique : plusieurs postes acridiens peuvent partager la même
+    équipe (`PosteAcridien.equipe_terrestre_id`, sans UNIQUE), une équipe terrestre
+    étant mobile. `membres` couvre les autres membres de l'équipe, en nombre
+    variable."""
+
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    nom: str = ""
+    chef_equipe_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    actif: bool = True
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
+    membres: list[MembreEquipeTerrestre] = field(default_factory=list)

@@ -41,12 +41,27 @@ class PosteAcridienModel(Base):
     za_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("zone_anti_acridien.id"), nullable=False
     )
+    # Rattachement à une équipe terrestre (migration 0072) : nullable, sans UNIQUE —
+    # plusieurs postes peuvent partager la même équipe (équipe mobile).
+    # `use_alter=True` : casse le cycle de FK utilisateur.pa_id -> poste_acridien
+    # -> equipe_terrestre -> utilisateur.chef_equipe_id, sinon `Base.metadata.
+    # create_all()` (tests) ne peut pas trier les tables topologiquement — même
+    # mécanique que la migration elle-même, qui ajoute cette FK par `ALTER TABLE`
+    # après coup plutôt qu'inline.
+    equipe_terrestre_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "equipe_terrestre.id", use_alter=True, name="fk_poste_acridien_equipe_terrestre_id"
+        ),
+        nullable=True,
+    )
     actif: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
 
     zone: Mapped["ZoneAntiAcridienModel"] = relationship(back_populates="postes")
     stations: Mapped[list["StationFixeModel"]] = relationship(back_populates="poste")
+    equipe_terrestre: Mapped["EquipeTerrestreModel | None"] = relationship()
 
 
 class RegionModel(Base):
@@ -207,6 +222,64 @@ class EquipeAerienneMembreModel(Base):
 
     __table_args__ = (
         Index("ix_equipe_aerienne_membre_equipe_aerienne_id", "equipe_aerienne_id"),
+    )
+
+
+class EquipeTerrestreModel(Base):
+    """Équipe terrestre (migration 0072) : une équipe = un chef d'équipe
+    (`chef_equipe_id` UNIQUE, rôle `chef_equipe`). Contrairement à l'équipe
+    aérienne, pas de UNIQUE côté `PosteAcridienModel.equipe_terrestre_id` :
+    plusieurs postes peuvent partager la même équipe terrestre (équipe mobile).
+    `membres` (`equipe_terrestre_membre`, table fille) : autres membres de
+    l'équipe en nombre variable, même patron que `EquipeAerienneMembreModel`.
+    """
+
+    __tablename__ = "equipe_terrestre"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    nom: Mapped[str] = mapped_column(Text(), nullable=False)
+    chef_equipe_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    actif: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+
+    membres: Mapped[list["EquipeTerrestreMembreModel"]] = relationship(
+        back_populates="equipe", cascade="all, delete-orphan", order_by="EquipeTerrestreMembreModel.created_at"
+    )
+
+    # Noms de contraintes explicites — doivent matcher la migration 0072 à
+    # l'identique : `EquipeTerrestreRepositoryImpl.create` en dépend pour
+    # distinguer la violation (chef déjà assigné) d'une erreur générique.
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["chef_equipe_id"],
+            ["utilisateur.id"],
+            name="fk_equipe_terrestre_chef_equipe_id",
+            ondelete="RESTRICT",
+        ),
+        UniqueConstraint("chef_equipe_id", name="uq_equipe_terrestre_chef_equipe_id"),
+    )
+
+
+class EquipeTerrestreMembreModel(Base):
+    """Membre supplémentaire d'une équipe terrestre (migration 0072), au-delà du chef
+    d'équipe déjà nommé sur `EquipeTerrestreModel` — un nom, en nombre variable.
+    Table fille plutôt qu'une chaîne concaténée (1FN), même patron que
+    `EquipeAerienneMembreModel`."""
+
+    __tablename__ = "equipe_terrestre_membre"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    equipe_terrestre_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("equipe_terrestre.id", ondelete="CASCADE"), nullable=False
+    )
+    nom: Mapped[str] = mapped_column(Text(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+
+    equipe: Mapped[EquipeTerrestreModel] = relationship(back_populates="membres")
+
+    __table_args__ = (
+        Index("ix_equipe_terrestre_membre_equipe_terrestre_id", "equipe_terrestre_id"),
     )
 
 
