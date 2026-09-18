@@ -8,14 +8,64 @@ from httpx import AsyncClient
 async def test_create_equipe_aerienne(client: AsyncClient, auth_headers: dict, chef_de_base):
     response = await client.post(
         "/equipes-aeriennes",
-        json={"nom": "Équipe Ihosy", "chef_de_base_id": str(chef_de_base.id)},
+        json={
+            "nom": "Équipe Ihosy",
+            "chef_de_base_id": str(chef_de_base.id),
+            "pilote": "Jean Rakoto",
+            "mecanicien": "Paul Andria",
+            "consultant_international": "John Smith",
+            "membres": [{"nom": "Rasoa Voahangy"}, {"nom": "Tovo Randria"}],
+        },
         headers=auth_headers,
     )
-    assert response.status_code == 201
+    assert response.status_code == 201, response.text
     data = response.json()
     assert data["nom"] == "Équipe Ihosy"
     assert data["chef_de_base_id"] == str(chef_de_base.id)
+    assert data["pilote"] == "Jean Rakoto"
+    assert data["mecanicien"] == "Paul Andria"
+    assert data["consultant_international"] == "John Smith"
+    assert [m["nom"] for m in data["membres"]] == ["Rasoa Voahangy", "Tovo Randria"]
     assert data["actif"] is True
+
+
+@pytest.mark.asyncio
+async def test_create_equipe_aerienne_sans_consultant_ni_membres(
+    client: AsyncClient, auth_headers: dict, chef_de_base
+):
+    """Consultant international et membres sont facultatifs, contrairement à
+    pilote/mécanicien."""
+    response = await client.post(
+        "/equipes-aeriennes",
+        json={
+            "nom": "Équipe Ihosy",
+            "chef_de_base_id": str(chef_de_base.id),
+            "pilote": "Jean Rakoto",
+            "mecanicien": "Paul Andria",
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 201, response.text
+    data = response.json()
+    assert data["consultant_international"] is None
+    assert data["membres"] == []
+
+
+@pytest.mark.asyncio
+async def test_create_equipe_aerienne_sans_pilote_422(
+    client: AsyncClient, auth_headers: dict, chef_de_base
+):
+    """pilote/mécanicien sont exigés pour toute nouvelle équipe."""
+    response = await client.post(
+        "/equipes-aeriennes",
+        json={
+            "nom": "Équipe Ihosy",
+            "chef_de_base_id": str(chef_de_base.id),
+            "mecanicien": "Paul Andria",
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
 
 
 @pytest.mark.asyncio
@@ -24,7 +74,12 @@ async def test_create_equipe_aerienne_chef_avec_mauvais_role_403(
 ):
     response = await client.post(
         "/equipes-aeriennes",
-        json={"nom": "Équipe Ihosy", "chef_de_base_id": str(pilote.id)},
+        json={
+            "nom": "Équipe Ihosy",
+            "chef_de_base_id": str(pilote.id),
+            "pilote": "Jean Rakoto",
+            "mecanicien": "Paul Andria",
+        },
         headers=auth_headers,
     )
     assert response.status_code == 403
@@ -34,7 +89,12 @@ async def test_create_equipe_aerienne_chef_avec_mauvais_role_403(
 async def test_create_equipe_aerienne_chef_inexistant_403(client: AsyncClient, auth_headers: dict):
     response = await client.post(
         "/equipes-aeriennes",
-        json={"nom": "Équipe Ihosy", "chef_de_base_id": str(uuid.uuid4())},
+        json={
+            "nom": "Équipe Ihosy",
+            "chef_de_base_id": str(uuid.uuid4()),
+            "pilote": "Jean Rakoto",
+            "mecanicien": "Paul Andria",
+        },
         headers=auth_headers,
     )
     assert response.status_code == 403
@@ -47,7 +107,12 @@ async def test_create_equipe_aerienne_chef_deja_assigne_409(
     """Un chef de base ne dirige qu'une équipe (UNIQUE chef_de_base_id)."""
     response = await client.post(
         "/equipes-aeriennes",
-        json={"nom": "Deuxième équipe", "chef_de_base_id": str(chef_de_base.id)},
+        json={
+            "nom": "Deuxième équipe",
+            "chef_de_base_id": str(chef_de_base.id),
+            "pilote": "Jean Rakoto",
+            "mecanicien": "Paul Andria",
+        },
         headers=auth_headers,
     )
     assert response.status_code == 409

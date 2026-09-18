@@ -9,14 +9,19 @@ from app.domain.referentiel import (
     BaseAerienneEquipeInvalideError,
     BaseAerienneParentInvalideError,
     ChefDeBaseEquipeInvalideError,
+    ChefEquipeInvalideError,
     CodeReferentielDejaPrisError,
     CodeStade,
     Commune,
     CommuneInconnueError,
     Culture,
     EquipeAerienne,
+    EquipeTerrestre,
+    EquipeTerrestreIntrouvableError,
     GrilleDejaOccupeeError,
     LieuAerien,
+    MembreEquipeAerienne,
+    MembreEquipeTerrestre,
     Pesticide,
     PosteAcridien,
     PosteAcridienAvecStationsActivesError,
@@ -28,6 +33,7 @@ from app.domain.referentiel import (
     TypeLieuAerienInvalideError,
     UtilisateurEquipe,
     ZoneAntiAcridien,
+    ZoneAntiAcridienAvecPostesActifsError,
     ZoneAntiAcridienIntrouvableError,
 )
 from app.domain.repositories import (
@@ -37,6 +43,7 @@ from app.domain.repositories import (
     CommuneRepository,
     CultureRepository,
     EquipeAerienneRepository,
+    EquipeTerrestreRepository,
     LieuAerienRepository,
     PesticideRepository,
     PosteAcridienRepository,
@@ -51,8 +58,61 @@ class ListZonesAntiAcridiennes:
     def __init__(self, repository: ZoneAntiAcridienRepository):
         self.repository = repository
 
-    async def execute(self) -> list[ZoneAntiAcridien]:
-        return await self.repository.list_all()
+    async def execute(self, actif: bool | None = True) -> list[ZoneAntiAcridien]:
+        return await self.repository.list_all(actif=actif)
+
+
+class CreateZoneAntiAcridien:
+    def __init__(self, repository: ZoneAntiAcridienRepository):
+        self.repository = repository
+
+    async def execute(self, code: str, nom: str) -> ZoneAntiAcridien:
+        if await self.repository.code_pris_par_un_autre(code):
+            raise CodeReferentielDejaPrisError(code)
+
+        maintenant = datetime.now(timezone.utc)
+        zone = ZoneAntiAcridien(
+            code=code, nom=nom, actif=True, created_at=maintenant, updated_at=maintenant
+        )
+        return await self.repository.create(zone)
+
+
+class UpdateZoneAntiAcridien:
+    """Mise à jour d'une zone, `actif` compris.
+
+    Aucune suppression physique n'est offerte, même raison que `UpdatePosteAcridien` :
+    le pull hors-ligne ne transporte que des upserts.
+    """
+
+    def __init__(self, repository: ZoneAntiAcridienRepository):
+        self.repository = repository
+
+    async def execute(
+        self,
+        za_id: uuid.UUID,
+        code: str | None = None,
+        nom: str | None = None,
+        actif: bool | None = None,
+    ) -> ZoneAntiAcridien | None:
+        zone = await self.repository.get_by_id(za_id)
+        if zone is None:
+            return None
+
+        if code is not None and code != zone.code:
+            if await self.repository.code_pris_par_un_autre(code, exclude_id=za_id):
+                raise CodeReferentielDejaPrisError(code)
+            zone.code = code
+
+        if nom is not None:
+            zone.nom = nom
+
+        if actif is False and zone.actif and await self.repository.a_des_postes_actifs(za_id):
+            raise ZoneAntiAcridienAvecPostesActifsError(za_id)
+        if actif is not None:
+            zone.actif = actif
+
+        zone.updated_at = datetime.now(timezone.utc)
+        return await self.repository.update(zone)
 
 
 class ListPostesAcridiens:
@@ -76,13 +136,26 @@ class CreatePosteAcridien:
         self,
         repository: PosteAcridienRepository,
         zone_repository: ZoneAntiAcridienRepository,
+        equipe_terrestre_repository: EquipeTerrestreRepository,
     ):
         self.repository = repository
         self.zone_repository = zone_repository
+        self.equipe_terrestre_repository = equipe_terrestre_repository
 
-    async def execute(self, code: str, nom: str, za_id: uuid.UUID) -> PosteAcridien:
+    async def execute(
+        self,
+        code: str,
+        nom: str,
+        za_id: uuid.UUID,
+        equipe_terrestre_id: uuid.UUID | None = None,
+    ) -> PosteAcridien:
         if not await self.zone_repository.exists(za_id):
             raise ZoneAntiAcridienIntrouvableError(str(za_id))
+        if (
+            equipe_terrestre_id is not None
+            and await self.equipe_terrestre_repository.get_by_id(equipe_terrestre_id) is None
+        ):
+            raise EquipeTerrestreIntrouvableError(str(equipe_terrestre_id))
         if await self.repository.code_pris_par_un_autre(code):
             raise CodeReferentielDejaPrisError(code)
 
@@ -91,6 +164,7 @@ class CreatePosteAcridien:
             code=code,
             nom=nom,
             za_id=za_id,
+            equipe_terrestre_id=equipe_terrestre_id,
             actif=True,
             created_at=maintenant,
             updated_at=maintenant,
@@ -109,9 +183,11 @@ class UpdatePosteAcridien:
         self,
         repository: PosteAcridienRepository,
         zone_repository: ZoneAntiAcridienRepository,
+        equipe_terrestre_repository: EquipeTerrestreRepository,
     ):
         self.repository = repository
         self.zone_repository = zone_repository
+        self.equipe_terrestre_repository = equipe_terrestre_repository
 
     async def execute(
         self,
@@ -119,7 +195,9 @@ class UpdatePosteAcridien:
         code: str | None = None,
         nom: str | None = None,
         za_id: uuid.UUID | None = None,
+        equipe_terrestre_id: uuid.UUID | None = None,
         actif: bool | None = None,
+        champs_fournis: set[str] = frozenset(),
     ) -> PosteAcridien | None:
         poste = await self.repository.get_by_id(pa_id)
         if poste is None:
@@ -129,6 +207,17 @@ class UpdatePosteAcridien:
             if not await self.zone_repository.exists(za_id):
                 raise ZoneAntiAcridienIntrouvableError(str(za_id))
             poste.za_id = za_id
+
+        # `equipe_terrestre_id` est nullable (un poste peut être détaché de son
+        # équipe) : seul `champs_fournis` (model_fields_set côté Pydantic) distingue
+        # « absent » de « mis à NULL », même patron que `UpdateBaseAerienne.equipe_id`.
+        if "equipe_terrestre_id" in champs_fournis:
+            if (
+                equipe_terrestre_id is not None
+                and await self.equipe_terrestre_repository.get_by_id(equipe_terrestre_id) is None
+            ):
+                raise EquipeTerrestreIntrouvableError(str(equipe_terrestre_id))
+            poste.equipe_terrestre_id = equipe_terrestre_id
 
         if code is not None and code != poste.code:
             if await self.repository.code_pris_par_un_autre(code, exclude_id=pa_id):
@@ -745,19 +834,88 @@ class CreateEquipeAerienne:
         self.repository = repository
         self.utilisateur_repo = utilisateur_repo
 
-    async def execute(self, nom: str, chef_de_base_id: uuid.UUID) -> EquipeAerienne:
+    async def execute(
+        self,
+        nom: str,
+        chef_de_base_id: uuid.UUID,
+        pilote: str,
+        mecanicien: str,
+        consultant_international: str | None = None,
+        membres: list[str] | None = None,
+    ) -> EquipeAerienne:
         chef = await self.utilisateur_repo.get_by_id(chef_de_base_id)
         if chef is None or chef.role != "chef_de_base":
             raise ChefDeBaseEquipeInvalideError(str(chef_de_base_id))
 
         maintenant = datetime.now(timezone.utc)
+        equipe_id = uuid.uuid4()
         return await self.repository.create(
             EquipeAerienne(
+                id=equipe_id,
                 nom=nom,
                 chef_de_base_id=chef_de_base_id,
+                pilote=pilote,
+                mecanicien=mecanicien,
+                consultant_international=consultant_international,
                 actif=True,
                 created_at=maintenant,
                 updated_at=maintenant,
+                membres=[
+                    MembreEquipeAerienne(equipe_aerienne_id=equipe_id, nom=nom_membre)
+                    for nom_membre in (membres or [])
+                ],
+            )
+        )
+
+
+class ListEquipesTerrestres:
+    def __init__(self, repository: EquipeTerrestreRepository):
+        self.repository = repository
+
+    async def execute(self, actif: bool | None = True) -> list[EquipeTerrestre]:
+        return await self.repository.list_all(actif=actif)
+
+
+class GetEquipeTerrestre:
+    def __init__(self, repository: EquipeTerrestreRepository):
+        self.repository = repository
+
+    async def execute(self, equipe_id: uuid.UUID) -> EquipeTerrestre | None:
+        return await self.repository.get_by_id(equipe_id)
+
+
+class CreateEquipeTerrestre:
+    """`utilisateur_repo` (duck-typé, même contrat que `CreateEquipeAerienne`) : valide
+    que `chef_equipe_id` référence un utilisateur actif du rôle `chef_equipe`."""
+
+    def __init__(self, repository: EquipeTerrestreRepository, utilisateur_repo: object):
+        self.repository = repository
+        self.utilisateur_repo = utilisateur_repo
+
+    async def execute(
+        self,
+        nom: str,
+        chef_equipe_id: uuid.UUID,
+        membres: list[str] | None = None,
+    ) -> EquipeTerrestre:
+        chef = await self.utilisateur_repo.get_by_id(chef_equipe_id)
+        if chef is None or chef.role != "chef_equipe":
+            raise ChefEquipeInvalideError(str(chef_equipe_id))
+
+        maintenant = datetime.now(timezone.utc)
+        equipe_id = uuid.uuid4()
+        return await self.repository.create(
+            EquipeTerrestre(
+                id=equipe_id,
+                nom=nom,
+                chef_equipe_id=chef_equipe_id,
+                actif=True,
+                created_at=maintenant,
+                updated_at=maintenant,
+                membres=[
+                    MembreEquipeTerrestre(equipe_terrestre_id=equipe_id, nom=nom_membre)
+                    for nom_membre in (membres or [])
+                ],
             )
         )
 

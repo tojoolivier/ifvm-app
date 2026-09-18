@@ -4,17 +4,22 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.domain.referentiel import (
     BaseAerienne,
     BaseAerienneEquipeInvalideError,
     ChefDeBaseDejaEquipeError,
+    ChefEquipeDejaEquipeError,
     CodeStade,
     Culture,
     EquipeAerienne,
     EquipeAerienneDejaAssigneeError,
     EquipeAerienneIntrouvableError,
+    EquipeTerrestre,
     LieuAerien,
+    MembreEquipeAerienne,
+    MembreEquipeTerrestre,
     NumeroBaseAerienneDejaPrisError,
     NumeroStandRemplissageDejaPrisError,
     Pesticide,
@@ -26,6 +31,7 @@ from app.domain.repositories import (
     CodeStadeRepository,
     CultureRepository,
     EquipeAerienneRepository,
+    EquipeTerrestreRepository,
     LieuAerienRepository,
     PesticideRepository,
     StandRemplissageRepository,
@@ -35,7 +41,10 @@ from app.infrastructure.referentiel_model import (
     BaseAerienneModel,
     CodeStadeModel,
     CultureModel,
+    EquipeAerienneMembreModel,
     EquipeAerienneModel,
+    EquipeTerrestreMembreModel,
+    EquipeTerrestreModel,
     LieuAerienModel,
     PesticideModel,
     StadeModel,
@@ -411,28 +420,41 @@ class EquipeAerienneRepositoryImpl(EquipeAerienneRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
 
+    _CHARGEMENT = (selectinload(EquipeAerienneModel.membres),)
+
     def _to_domain(self, model: EquipeAerienneModel) -> EquipeAerienne:
         return EquipeAerienne(
             id=model.id,
             nom=model.nom,
             chef_de_base_id=model.chef_de_base_id,
+            pilote=model.pilote,
+            mecanicien=model.mecanicien,
+            consultant_international=model.consultant_international,
             actif=model.actif,
             created_at=model.created_at,
             updated_at=model.updated_at,
+            membres=[
+                MembreEquipeAerienne(id=m.id, equipe_aerienne_id=m.equipe_aerienne_id, nom=m.nom)
+                for m in model.membres
+            ],
         )
 
     async def list_all(self, actif: bool | None = True) -> list[EquipeAerienne]:
-        stmt = select(EquipeAerienneModel).order_by(EquipeAerienneModel.nom)
+        stmt = (
+            select(EquipeAerienneModel).options(*self._CHARGEMENT).order_by(EquipeAerienneModel.nom)
+        )
         if actif is not None:
             stmt = stmt.where(EquipeAerienneModel.actif == actif)
         result = await self.session.execute(stmt)
-        return [self._to_domain(m) for m in result.scalars().all()]
+        return [self._to_domain(m) for m in result.scalars().unique().all()]
 
     async def get_by_id(self, equipe_id: uuid.UUID) -> EquipeAerienne | None:
         result = await self.session.execute(
-            select(EquipeAerienneModel).where(EquipeAerienneModel.id == equipe_id)
+            select(EquipeAerienneModel)
+            .options(*self._CHARGEMENT)
+            .where(EquipeAerienneModel.id == equipe_id)
         )
-        model = result.scalar_one_or_none()
+        model = result.unique().scalar_one_or_none()
         return None if model is None else self._to_domain(model)
 
     async def create(self, equipe: EquipeAerienne) -> EquipeAerienne:
@@ -440,9 +462,13 @@ class EquipeAerienneRepositoryImpl(EquipeAerienneRepository):
             id=equipe.id,
             nom=equipe.nom,
             chef_de_base_id=equipe.chef_de_base_id,
+            pilote=equipe.pilote,
+            mecanicien=equipe.mecanicien,
+            consultant_international=equipe.consultant_international,
             actif=equipe.actif,
             created_at=equipe.created_at,
             updated_at=equipe.updated_at,
+            membres=[EquipeAerienneMembreModel(id=m.id, nom=m.nom) for m in equipe.membres],
         )
         self.session.add(model)
         try:
@@ -450,7 +476,67 @@ class EquipeAerienneRepositoryImpl(EquipeAerienneRepository):
         except IntegrityError as exc:
             await self.session.rollback()
             raise ChefDeBaseDejaEquipeError(str(equipe.chef_de_base_id)) from exc
-        await self.session.refresh(model)
+        await self.session.refresh(model, attribute_names=["membres"])
+        return self._to_domain(model)
+
+
+class EquipeTerrestreRepositoryImpl(EquipeTerrestreRepository):
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    _CHARGEMENT = (selectinload(EquipeTerrestreModel.membres),)
+
+    def _to_domain(self, model: EquipeTerrestreModel) -> EquipeTerrestre:
+        return EquipeTerrestre(
+            id=model.id,
+            nom=model.nom,
+            chef_equipe_id=model.chef_equipe_id,
+            actif=model.actif,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+            membres=[
+                MembreEquipeTerrestre(id=m.id, equipe_terrestre_id=m.equipe_terrestre_id, nom=m.nom)
+                for m in model.membres
+            ],
+        )
+
+    async def list_all(self, actif: bool | None = True) -> list[EquipeTerrestre]:
+        stmt = (
+            select(EquipeTerrestreModel)
+            .options(*self._CHARGEMENT)
+            .order_by(EquipeTerrestreModel.nom)
+        )
+        if actif is not None:
+            stmt = stmt.where(EquipeTerrestreModel.actif == actif)
+        result = await self.session.execute(stmt)
+        return [self._to_domain(m) for m in result.scalars().unique().all()]
+
+    async def get_by_id(self, equipe_id: uuid.UUID) -> EquipeTerrestre | None:
+        result = await self.session.execute(
+            select(EquipeTerrestreModel)
+            .options(*self._CHARGEMENT)
+            .where(EquipeTerrestreModel.id == equipe_id)
+        )
+        model = result.unique().scalar_one_or_none()
+        return None if model is None else self._to_domain(model)
+
+    async def create(self, equipe: EquipeTerrestre) -> EquipeTerrestre:
+        model = EquipeTerrestreModel(
+            id=equipe.id,
+            nom=equipe.nom,
+            chef_equipe_id=equipe.chef_equipe_id,
+            actif=equipe.actif,
+            created_at=equipe.created_at,
+            updated_at=equipe.updated_at,
+            membres=[EquipeTerrestreMembreModel(id=m.id, nom=m.nom) for m in equipe.membres],
+        )
+        self.session.add(model)
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise ChefEquipeDejaEquipeError(str(equipe.chef_equipe_id)) from exc
+        await self.session.refresh(model, attribute_names=["membres"])
         return self._to_domain(model)
 
 

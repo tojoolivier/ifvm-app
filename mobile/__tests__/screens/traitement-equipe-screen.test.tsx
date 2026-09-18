@@ -26,7 +26,6 @@ jest.mock('@/lib/traitement-repository', () => ({
   updateTraitementTerrestre: jest.fn().mockResolvedValue({}),
   addProduitUtilise: jest.fn().mockResolvedValue({}),
   deleteAllProduitsForTraitementTerrestre: jest.fn().mockResolvedValue(undefined),
-  listReprenableTraitements: jest.fn().mockResolvedValue([]),
 }));
 
 jest.mock('@/lib/referentiel-db', () => ({
@@ -493,5 +492,87 @@ describe('TraitementScreen (Équipe) — date d\'installation du Stand/de la Bas
     expect(await screen.findByText('01/07/2026')).toBeVisible();
     expect(screen.getByText('15/07/2026')).toBeVisible();
     expect(screen.getAllByText(/date d.installation/i)).toHaveLength(2);
+  });
+});
+
+/**
+ * #retire-champ-reprise-traitement : le bouton Oui/Non "Reprise de traitement"
+ * (avec le choix d'une fiche d'origine) est retiré de cet écran pour l'Aérien
+ * et le Terrestre — plus aucun moyen de le déclencher manuellement ici. Le
+ * chaînage automatique déclenché depuis "Zones à reprendre" (origineId) doit
+ * continuer de fonctionner sans lui : c'est la seule façon désormais de lier
+ * une fiche à son origine.
+ */
+describe('TraitementScreen (Équipe) — champ "Reprise de traitement" retiré', () => {
+  it('n’affiche plus le choix "Reprise de traitement" côté Aérien', async () => {
+    await render(<TraitementScreen />);
+    await screen.findByText('Sarah Ravelo');
+
+    expect(screen.queryByText('Reprise de traitement')).toBeNull();
+  });
+
+  it('n’affiche plus le choix "Reprise de traitement" côté Terrestre', async () => {
+    useTraitementCaptureStore.setState({ ...RESET_STATE, typeTraitement: 'TERRESTRE' });
+    jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
+      id: 'trait-1',
+      type_traitement: 'TERRESTRE',
+      cible: { surface_infestee_ha: 100 },
+      terrestre: {
+        chef_equipe_id: null,
+        agent_encadreur: null,
+        consultant_international: null,
+        heure_debut: null,
+        heure_fin: null,
+        vitesse_vent_ms: null,
+        direction_vent: null,
+        temperature_c: null,
+        taux_mortalite_pourcent: null,
+        evaluation_efficacite_heures_apres: null,
+        methode_evaluation_efficacite: null,
+        reprise_traitement: false,
+        traitement_origine_id: null,
+        surface_atomiseur_ha: null,
+        surface_disque_rotatif_ha: null,
+        surface_atomiseur_autoporte_ha: null,
+        surface_restante_abandonnee: null,
+        motif_surface_restante_abandonnee: null,
+        essence_litres: null,
+        nb_piles: null,
+        pesticide_recu_l: null,
+        produits: [],
+      },
+    } as any);
+
+    await render(<TraitementScreen />);
+    await screen.findByText("Chef d'équipe / zone*");
+
+    expect(screen.queryByText('Reprise de traitement')).toBeNull();
+  });
+
+  it('lie quand même la fiche à son origine (venue de "Zones à reprendre"), sans champ visible pour le faire ici', async () => {
+    mockRouteParams = { traitementId: 'trait-1', origineId: 'trait-origine' };
+
+    await render(<TraitementScreen />);
+    await screen.findByText('Sarah Ravelo');
+
+    fireEvent.changeText(screen.getByPlaceholderText('Nom de la base principale'), 'Base Betioky');
+    await settle();
+    fireEvent.press(screen.getByText('Sarah Ravelo'));
+    await settle();
+    fireEvent.changeText(screen.getByPlaceholderText('Nom du pilote'), 'Jean Dupont');
+    await settle();
+    fireEvent.changeText(screen.getByPlaceholderText('Nom du mécanicien'), 'Marc Rabe');
+    await settle();
+    fireEvent.changeText(screen.getByPlaceholderText('Ex. 5R-ABC'), '5R-XYZ');
+    await settle();
+
+    fireEvent.press(screen.getByText('Continuer  ›'));
+
+    await waitFor(() =>
+      expect(traitementRepository.updateTraitementAerien).toHaveBeenCalledWith(
+        'trait-1',
+        expect.objectContaining({ repriseTraitement: true, traitementOrigineId: 'trait-origine' })
+      )
+    );
   });
 });

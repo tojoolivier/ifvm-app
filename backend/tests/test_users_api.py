@@ -121,6 +121,43 @@ async def test_list_chefs_de_base_exclut_les_inactifs(
 
 
 @pytest.mark.asyncio
+async def test_list_chefs_equipe_accessible_a_tout_utilisateur_authentifie(
+    client: AsyncClient, auth_headers: dict, chef_equipe
+):
+    """Annuaire du sélecteur `chef_equipe_id` (création d'équipe terrestre) — même
+    règle d'accès que `/users/chefs-de-base`."""
+    response = await client.get("/users/chefs-equipe", headers=auth_headers)
+
+    assert response.status_code == 200
+    identifiants = {u["id"] for u in response.json()}
+    assert str(chef_equipe.id) in identifiants
+
+
+@pytest.mark.asyncio
+async def test_list_chefs_equipe_exclut_les_autres_roles(
+    client: AsyncClient, auth_headers: dict, chef_equipe, utilisateur
+):
+    response = await client.get("/users/chefs-equipe", headers=auth_headers)
+    identifiants = {u["id"] for u in response.json()}
+
+    assert str(chef_equipe.id) in identifiants
+    assert str(utilisateur.id) not in identifiants
+
+
+@pytest.mark.asyncio
+async def test_list_chefs_equipe_exclut_les_inactifs(
+    client: AsyncClient, db_session: AsyncSession, auth_headers: dict, chef_equipe
+):
+    chef_equipe.actif = False
+    await db_session.commit()
+
+    response = await client.get("/users/chefs-equipe", headers=auth_headers)
+    identifiants = {u["id"] for u in response.json()}
+
+    assert str(chef_equipe.id) not in identifiants
+
+
+@pytest.mark.asyncio
 async def test_list_users_reste_reserve_aux_admins(client: AsyncClient, auth_headers: dict):
     """L'annuaire complet ne doit pas s'ouvrir en élargissant le schéma de lecture."""
     response = await client.get("/users/", headers=auth_headers)

@@ -147,8 +147,11 @@ jobs:
       - run: pytest -n 2
 
   # Gatekeeper : "backend" est le required status check nomme sur main
-  # (branch protection). Tourne toujours, sur self-hosted-linux (pas de cout
-  # dind), et relaie le resultat des deux jobs ci-dessus quand backend/ a change.
+  # (branch protection) — pas "lint-backend" (cf. #ci-check-requis-desaligne :
+  # un renommage anterieur des jobs, jamais reporte sur la protection de
+  # branche, laissait ce check bloque indefiniment sur "waiting for status to
+  # be reported"). Tourne toujours, sur self-hosted-linux (pas de cout dind),
+  # et relaie le resultat des deux jobs ci-dessus quand backend/ a change.
   backend:
     needs: [changes, checks-backend, tests-backend]
     if: always()

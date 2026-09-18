@@ -14,6 +14,7 @@ from app.domain.repositories import (
 from app.infrastructure.referentiel_model import (
     CommuneModel,
     DistrictModel,
+    EquipeTerrestreModel,
     PosteAcridienModel,
     RegionModel,
     StationFixeModel,
@@ -25,10 +26,11 @@ class ZoneAntiAcridienRepositoryImpl(ZoneAntiAcridienRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def list_all(self) -> list[ZoneAntiAcridien]:
-        result = await self.session.execute(
-            select(ZoneAntiAcridienModel).order_by(ZoneAntiAcridienModel.code)
-        )
+    async def list_all(self, actif: bool | None = True) -> list[ZoneAntiAcridien]:
+        stmt = select(ZoneAntiAcridienModel).order_by(ZoneAntiAcridienModel.code)
+        if actif is not None:
+            stmt = stmt.where(ZoneAntiAcridienModel.actif == actif)
+        result = await self.session.execute(stmt)
         return [self._to_domain(m) for m in result.scalars().all()]
 
     async def exists(self, za_id: uuid.UUID) -> bool:
@@ -37,12 +39,59 @@ class ZoneAntiAcridienRepositoryImpl(ZoneAntiAcridienRepository):
         )
         return result.first() is not None
 
+    async def get_by_id(self, za_id: uuid.UUID) -> ZoneAntiAcridien | None:
+        result = await self.session.execute(
+            select(ZoneAntiAcridienModel).where(ZoneAntiAcridienModel.id == za_id)
+        )
+        model = result.scalar_one_or_none()
+        return None if model is None else self._to_domain(model)
+
     async def list_since(self, since: datetime | None) -> list[ZoneAntiAcridien]:
         stmt = select(ZoneAntiAcridienModel).order_by(ZoneAntiAcridienModel.code)
         if since is not None:
             stmt = stmt.where(ZoneAntiAcridienModel.updated_at > since)
         result = await self.session.execute(stmt)
         return [self._to_domain(m) for m in result.scalars().all()]
+
+    async def code_pris_par_un_autre(self, code: str, exclude_id: uuid.UUID | None = None) -> bool:
+        stmt = select(ZoneAntiAcridienModel.id).where(ZoneAntiAcridienModel.code == code)
+        if exclude_id is not None:
+            stmt = stmt.where(ZoneAntiAcridienModel.id != exclude_id)
+        result = await self.session.execute(stmt)
+        return result.first() is not None
+
+    async def a_des_postes_actifs(self, za_id: uuid.UUID) -> bool:
+        result = await self.session.execute(
+            select(PosteAcridienModel.id)
+            .where(PosteAcridienModel.za_id == za_id)
+            .where(PosteAcridienModel.actif.is_(True))
+        )
+        return result.first() is not None
+
+    async def create(self, zone: ZoneAntiAcridien) -> ZoneAntiAcridien:
+        model = ZoneAntiAcridienModel(
+            id=zone.id,
+            code=zone.code,
+            nom=zone.nom,
+            actif=zone.actif,
+            created_at=zone.created_at,
+            updated_at=zone.updated_at,
+        )
+        self.session.add(model)
+        await self.session.commit()
+        return self._to_domain(model)
+
+    async def update(self, zone: ZoneAntiAcridien) -> ZoneAntiAcridien:
+        result = await self.session.execute(
+            select(ZoneAntiAcridienModel).where(ZoneAntiAcridienModel.id == zone.id)
+        )
+        model = result.scalar_one()
+        model.code = zone.code
+        model.nom = zone.nom
+        model.actif = zone.actif
+        model.updated_at = zone.updated_at
+        await self.session.commit()
+        return self._to_domain(model)
 
     def _to_domain(self, model: ZoneAntiAcridienModel) -> ZoneAntiAcridien:
         return ZoneAntiAcridien(
@@ -88,6 +137,7 @@ class PosteAcridienRepositoryImpl(PosteAcridienRepository):
             code=poste.code,
             nom=poste.nom,
             za_id=poste.za_id,
+            equipe_terrestre_id=poste.equipe_terrestre_id,
             actif=poste.actif,
             created_at=poste.created_at,
             updated_at=poste.updated_at,
@@ -104,6 +154,7 @@ class PosteAcridienRepositoryImpl(PosteAcridienRepository):
         model.code = poste.code
         model.nom = poste.nom
         model.za_id = poste.za_id
+        model.equipe_terrestre_id = poste.equipe_terrestre_id
         model.actif = poste.actif
         model.updated_at = poste.updated_at
         await self.session.commit()
@@ -134,12 +185,22 @@ class PosteAcridienRepositoryImpl(PosteAcridienRepository):
             .correlate(PosteAcridienModel)
             .scalar_subquery()
         )
-        return select(
-            PosteAcridienModel,
-            ZoneAntiAcridienModel.code.label("za_code"),
-            ZoneAntiAcridienModel.nom.label("za_nom"),
-            nb_stations.label("nb_stations"),
-        ).join(ZoneAntiAcridienModel, PosteAcridienModel.za_id == ZoneAntiAcridienModel.id)
+        return (
+            select(
+                PosteAcridienModel,
+                ZoneAntiAcridienModel.code.label("za_code"),
+                ZoneAntiAcridienModel.nom.label("za_nom"),
+                EquipeTerrestreModel.nom.label("equipe_terrestre_nom"),
+                nb_stations.label("nb_stations"),
+            )
+            .join(ZoneAntiAcridienModel, PosteAcridienModel.za_id == ZoneAntiAcridienModel.id)
+            # LEFT JOIN : equipe_terrestre_id est nullable, un poste sans équipe
+            # rattachée reste listable.
+            .outerjoin(
+                EquipeTerrestreModel,
+                PosteAcridienModel.equipe_terrestre_id == EquipeTerrestreModel.id,
+            )
+        )
 
     def _to_domain(self, row) -> PosteAcridien:
         model = row[0]
@@ -150,6 +211,8 @@ class PosteAcridienRepositoryImpl(PosteAcridienRepository):
             za_id=model.za_id,
             za_code=row.za_code,
             za_nom=row.za_nom,
+            equipe_terrestre_id=model.equipe_terrestre_id,
+            equipe_terrestre_nom=row.equipe_terrestre_nom,
             actif=model.actif,
             nb_stations=row.nb_stations,
             created_at=model.created_at,

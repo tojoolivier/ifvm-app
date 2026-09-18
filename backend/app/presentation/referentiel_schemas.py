@@ -10,7 +10,22 @@ class ZoneAntiAcridienRead(BaseModel):
     id: uuid.UUID
     code: str
     nom: str
+    actif: bool
     created_at: datetime
+    updated_at: datetime
+
+
+class ZoneAntiAcridienCreate(BaseModel):
+    code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+
+class ZoneAntiAcridienUpdate(BaseModel):
+    """Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie."""
+
+    code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
+    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
+    actif: bool | None = None
 
 
 class PosteAcridienRead(BaseModel):
@@ -21,6 +36,10 @@ class PosteAcridienRead(BaseModel):
     za_id: uuid.UUID
     za_code: str
     za_nom: str
+    # Rattachement à une équipe terrestre (migration 0073) : nullable, plusieurs
+    # postes peuvent partager la même équipe.
+    equipe_terrestre_id: uuid.UUID | None = None
+    equipe_terrestre_nom: str | None = None
     actif: bool
     # Dérivé (stations actives rattachées) : lecture seule, absent des schémas d'écriture.
     nb_stations: int
@@ -33,6 +52,7 @@ class PosteAcridienCreate(BaseModel):
     code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     za_id: uuid.UUID
+    equipe_terrestre_id: uuid.UUID | None = None
 
 
 class PosteAcridienUpdate(BaseModel):
@@ -41,6 +61,9 @@ class PosteAcridienUpdate(BaseModel):
     code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
     nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
     za_id: uuid.UUID | None = None
+    # Nullable : seul `model_fields_set` (transmis en `champs_fournis`) distingue
+    # « absent » de « détacher le poste de son équipe » (mis à NULL).
+    equipe_terrestre_id: uuid.UUID | None = None
     actif: bool | None = None
 
 
@@ -255,11 +278,27 @@ class LieuAerienUpdate(BaseModel):
     actif: bool | None = None
 
 
+class MembreEquipeAerienneRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    nom: str
+
+
+class MembreEquipeAerienneCreate(BaseModel):
+    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
+
+
 class EquipeAerienneRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     nom: str
     chef_de_base_id: uuid.UUID
+    # Nullable : équipes créées avant la migration 0072. Toujours renseignés pour
+    # une équipe créée depuis (EquipeAerienneCreate les exige).
+    pilote: str | None = None
+    mecanicien: str | None = None
+    consultant_international: str | None = None
+    membres: list[MembreEquipeAerienneRead] = Field(default_factory=list)
     actif: bool
     created_at: datetime
     updated_at: datetime
@@ -268,6 +307,42 @@ class EquipeAerienneRead(BaseModel):
 class EquipeAerienneCreate(BaseModel):
     nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
     chef_de_base_id: uuid.UUID
+    pilote: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
+    mecanicien: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)
+    ]
+    consultant_international: (
+        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
+        | None
+    ) = None
+    membres: list[MembreEquipeAerienneCreate] = Field(default_factory=list)
+
+
+class MembreEquipeTerrestreRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    nom: str
+
+
+class MembreEquipeTerrestreCreate(BaseModel):
+    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
+
+
+class EquipeTerrestreRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    nom: str
+    chef_equipe_id: uuid.UUID
+    membres: list[MembreEquipeTerrestreRead] = Field(default_factory=list)
+    actif: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class EquipeTerrestreCreate(BaseModel):
+    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
+    chef_equipe_id: uuid.UUID
+    membres: list[MembreEquipeTerrestreCreate] = Field(default_factory=list)
 
 
 class BaseAerienneRead(BaseModel):

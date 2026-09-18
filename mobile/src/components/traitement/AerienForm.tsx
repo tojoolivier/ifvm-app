@@ -1,7 +1,6 @@
 import { Fragment } from 'react';
 import { View, Text, TextInput } from 'react-native';
 import { UtilisateurEquipe } from '@/lib/referentiel-db';
-import { DraftTraitementRow } from '@/lib/traitement-repository';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import { Chip } from '@/components/traitement/Chip';
 import { DateField } from '@/components/traitement/DateField';
@@ -10,8 +9,6 @@ import { formStyles as styles } from '@/components/traitement/TraitementFormStyl
 export interface AerienFormProps {
   readOnly: boolean;
   chefsDeBase: UtilisateurEquipe[];
-  // Chaînage de reprise (migration backend 0050) — mirroir de TerrestreFormProps.
-  reprenables: DraftTraitementRow[];
   errors: Record<string, string>;
 }
 
@@ -40,7 +37,6 @@ export interface AerienFormProps {
 export function AerienForm({
   readOnly,
   chefsDeBase,
-  reprenables,
   errors,
 }: AerienFormProps) {
   const store = useTraitementCaptureStore();
@@ -149,30 +145,6 @@ export function AerienForm({
         </View>
       </View>
 
-      {/* Chaînage de reprise (migration backend 0050) — mirroir exact du bloc
-          équivalent dans TerrestreForm. */}
-      <Text style={styles.label}>Reprise de traitement</Text>
-      <View style={styles.chipRow}>
-        <Chip
-          label="Non"
-          selected={!store.aerien.repriseTraitement}
-          onPress={() => !readOnly && store.updateAerien({ repriseTraitement: false, traitementOrigineId: null })}
-        />
-        <Chip label="Oui" selected={!!store.aerien.repriseTraitement} onPress={() => !readOnly && store.updateAerien({ repriseTraitement: true })} />
-      </View>
-      {store.aerien.repriseTraitement && (
-        <View style={styles.chipRow}>
-          {reprenables.map((r) => (
-            <Chip
-              key={r.id}
-              label={r.numero_fiche ?? r.id.slice(0, 8)}
-              selected={store.aerien.traitementOrigineId === r.id}
-              onPress={() => !readOnly && store.updateAerien({ traitementOrigineId: r.id })}
-            />
-          ))}
-        </View>
-      )}
-      {errors.traitementOrigineId && <Text style={styles.error}>{errors.traitementOrigineId}</Text>}
     </Fragment>
   );
 }

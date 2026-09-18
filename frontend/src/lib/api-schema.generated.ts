@@ -80,6 +80,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/users/chefs-equipe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Chefs Equipe
+         * @description Annuaire des chefs d'équipe actifs, pour le sélecteur `chef_equipe_id` du
+         *     formulaire de création d'équipe terrestre (portail web, #equipe-terrestre) —
+         *     même patron que `list_chefs_de_base`.
+         */
+        get: operations["list_chefs_equipe_users_chefs_equipe_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users/": {
         parameters: {
             query?: never;
@@ -173,7 +195,8 @@ export interface paths {
         /** Update Campagne */
         put: operations["update_campagne_campagnes__campagne_id__put"];
         post?: never;
-        delete?: never;
+        /** Delete Campagne */
+        delete: operations["delete_campagne_campagnes__campagne_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -189,6 +212,24 @@ export interface paths {
         /** List Zones Anti Acridiennes */
         get: operations["list_zones_anti_acridiennes_zones_anti_acridiennes_get"];
         put?: never;
+        /** Create Zone Anti Acridienne */
+        post: operations["create_zone_anti_acridienne_zones_anti_acridiennes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/zones-anti-acridiennes/{za_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Zone Anti Acridienne */
+        put: operations["update_zone_anti_acridienne_zones_anti_acridiennes__za_id__put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -420,6 +461,41 @@ export interface paths {
         };
         /** Get Equipe Aerienne */
         get: operations["get_equipe_aerienne_equipes_aeriennes__equipe_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/equipes-terrestres": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Equipes Terrestres */
+        get: operations["list_equipes_terrestres_equipes_terrestres_get"];
+        put?: never;
+        /** Create Equipe Terrestre */
+        post: operations["create_equipe_terrestre_equipes_terrestres_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/equipes-terrestres/{equipe_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Equipe Terrestre */
+        get: operations["get_equipe_terrestre_equipes_terrestres__equipe_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1238,8 +1314,6 @@ export interface components {
             start_date: string;
             /** End Date */
             end_date: string | null;
-            /** Actif */
-            actif: boolean;
             /**
              * Created By
              * Format: uuid
@@ -1272,8 +1346,6 @@ export interface components {
             start_date: string;
             /** End Date */
             end_date: string | null;
-            /** Actif */
-            actif: boolean;
             /**
              * Updated At
              * Format: date-time
@@ -1288,8 +1360,6 @@ export interface components {
             start_date?: string | null;
             /** End Date */
             end_date?: string | null;
-            /** Actif */
-            actif?: boolean | null;
         };
         /** CaptureCreate */
         CaptureCreate: {
@@ -1715,6 +1785,47 @@ export interface components {
             consultant_international?: string | null;
             /** Membres */
             membres?: components["schemas"]["MembreEquipeAerienneRead"][];
+            /** Actif */
+            actif: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** EquipeTerrestreCreate */
+        EquipeTerrestreCreate: {
+            /** Nom */
+            nom: string;
+            /**
+             * Chef Equipe Id
+             * Format: uuid
+             */
+            chef_equipe_id: string;
+            /** Membres */
+            membres?: components["schemas"]["MembreEquipeTerrestreCreate"][];
+        };
+        /** EquipeTerrestreRead */
+        EquipeTerrestreRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Nom */
+            nom: string;
+            /**
+             * Chef Equipe Id
+             * Format: uuid
+             */
+            chef_equipe_id: string;
+            /** Membres */
+            membres?: components["schemas"]["MembreEquipeTerrestreRead"][];
             /** Actif */
             actif: boolean;
             /**
@@ -2294,6 +2405,21 @@ export interface components {
             /** Nom */
             nom: string;
         };
+        /** MembreEquipeTerrestreCreate */
+        MembreEquipeTerrestreCreate: {
+            /** Nom */
+            nom: string;
+        };
+        /** MembreEquipeTerrestreRead */
+        MembreEquipeTerrestreRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Nom */
+            nom: string;
+        };
         /**
          * MethodeEvaluationEfficacite
          * @enum {string}
@@ -2642,6 +2768,8 @@ export interface components {
              * Format: uuid
              */
             za_id: string;
+            /** Equipe Terrestre Id */
+            equipe_terrestre_id?: string | null;
         };
         /** PosteAcridienRead */
         PosteAcridienRead: {
@@ -2663,6 +2791,10 @@ export interface components {
             za_code: string;
             /** Za Nom */
             za_nom: string;
+            /** Equipe Terrestre Id */
+            equipe_terrestre_id?: string | null;
+            /** Equipe Terrestre Nom */
+            equipe_terrestre_nom?: string | null;
             /** Actif */
             actif: boolean;
             /** Nb Stations */
@@ -2713,6 +2845,8 @@ export interface components {
             nom?: string | null;
             /** Za Id */
             za_id?: string | null;
+            /** Equipe Terrestre Id */
+            equipe_terrestre_id?: string | null;
             /** Actif */
             actif?: boolean | null;
         };
@@ -4589,6 +4723,13 @@ export interface components {
             /** Observations */
             observations?: string | null;
         };
+        /** ZoneAntiAcridienCreate */
+        ZoneAntiAcridienCreate: {
+            /** Code */
+            code: string;
+            /** Nom */
+            nom: string;
+        };
         /** ZoneAntiAcridienRead */
         ZoneAntiAcridienRead: {
             /**
@@ -4600,11 +4741,18 @@ export interface components {
             code: string;
             /** Nom */
             nom: string;
+            /** Actif */
+            actif: boolean;
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** ZoneAntiAcridienSyncRead */
         ZoneAntiAcridienSyncRead: {
@@ -4624,6 +4772,18 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /**
+         * ZoneAntiAcridienUpdate
+         * @description Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie.
+         */
+        ZoneAntiAcridienUpdate: {
+            /** Code */
+            code?: string | null;
+            /** Nom */
+            nom?: string | null;
+            /** Actif */
+            actif?: boolean | null;
         };
     };
     responses: never;
@@ -4721,6 +4881,26 @@ export interface operations {
         };
     };
     list_chefs_de_base_users_chefs_de_base_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UtilisateurAnnuaireRead"][];
+                };
+            };
+        };
+    };
+    list_chefs_equipe_users_chefs_equipe_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -4980,9 +5160,41 @@ export interface operations {
             };
         };
     };
-    list_zones_anti_acridiennes_zones_anti_acridiennes_get: {
+    delete_campagne_campagnes__campagne_id__delete: {
         parameters: {
             query?: never;
+            header?: never;
+            path: {
+                campagne_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_zones_anti_acridiennes_zones_anti_acridiennes_get: {
+        parameters: {
+            query?: {
+                /** @description Renvoie les zones des deux états — écran d'administration. */
+                inclure_inactifs?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4996,6 +5208,83 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ZoneAntiAcridienRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_zone_anti_acridienne_zones_anti_acridiennes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ZoneAntiAcridienCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZoneAntiAcridienRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_zone_anti_acridienne_zones_anti_acridiennes__za_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                za_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ZoneAntiAcridienUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZoneAntiAcridienRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5764,6 +6053,102 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EquipeAerienneRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_equipes_terrestres_equipes_terrestres_get: {
+        parameters: {
+            query?: {
+                /** @description Renvoie les équipes des deux états — écran d'administration. */
+                inclure_inactifs?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EquipeTerrestreRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_equipe_terrestre_equipes_terrestres_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EquipeTerrestreCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EquipeTerrestreRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_equipe_terrestre_equipes_terrestres__equipe_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                equipe_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EquipeTerrestreRead"];
                 };
             };
             /** @description Validation Error */

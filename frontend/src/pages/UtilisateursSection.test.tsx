@@ -4,7 +4,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { api } from '../api/client'
-import { UsersPage } from './UsersPage'
+import { UtilisateursSection } from './UtilisateursSection'
 
 vi.mock('../api/client', () => ({
   api: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
@@ -48,7 +48,7 @@ function mockApi({
 
 function Wrapper() {
   const [showCreate, setShowCreate] = useState(false)
-  return <UsersPage showCreate={showCreate} onShowCreateChange={setShowCreate} />
+  return <UtilisateursSection showCreate={showCreate} onShowCreateChange={setShowCreate} />
 }
 
 function renderPage() {
@@ -63,9 +63,20 @@ function renderPage() {
   )
 }
 
-describe('UsersPage — colonnes maquette (README §10, onglet Utilisateurs)', () => {
+describe('UtilisateursSection — même présentation que ReferentielsPage', () => {
   afterEach(() => {
     vi.restoreAllMocks()
+  })
+
+  it('affiche la carte d’en-tête et la carte Enregistrements', async () => {
+    mockApi()
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Jean Rakoto')).toBeInTheDocument())
+
+    expect(screen.getByRole('heading', { name: 'Utilisateurs' })).toBeInTheDocument()
+    expect(screen.getByText('utilisateur')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Enregistrements' })).toBeInTheDocument()
   })
 
   it('affiche nom, email en mono, rôle en badge et un interrupteur actif', async () => {
@@ -93,11 +104,12 @@ describe('UsersPage — colonnes maquette (README §10, onglet Utilisateurs)', (
     for (const entete of ['Nom', 'Email', 'Sigle', 'Rôle', 'Station', 'Fiches', 'Actif']) {
       expect(screen.getByRole('columnheader', { name: entete })).toBeInTheDocument()
     }
-    const headers = screen.getAllByRole('columnheader').map((h) => h.textContent)
-    expect(headers.indexOf('Sigle')).toBeGreaterThan(headers.indexOf('Email'))
-    expect(headers.indexOf('Sigle')).toBeLessThan(headers.indexOf('Rôle'))
-    // Plus d'encart d'excuse : la donnée existe désormais côté API.
-    expect(screen.queryByText(/ne sont pas exposés par l'API/i)).not.toBeInTheDocument()
+    // Colonnes triables : l'en-tête porte aussi l'icône de tri (aria-hidden),
+    // d'où `includes` plutôt qu'une égalité stricte sur `textContent`.
+    const headers = screen.getAllByRole('columnheader').map((h) => h.textContent ?? '')
+    const indexOfHeader = (label: string) => headers.findIndex((h) => h.includes(label))
+    expect(indexOfHeader('Sigle')).toBeGreaterThan(indexOfHeader('Email'))
+    expect(indexOfHeader('Sigle')).toBeLessThan(indexOfHeader('Rôle'))
   })
 
   it('remplit Station avec le poste acridien de rattachement, et « — » sans rattachement', async () => {
@@ -216,5 +228,50 @@ describe('UsersPage — colonnes maquette (README §10, onglet Utilisateurs)', (
     fireEvent.blur(champSigle)
 
     expect(mockedPatch).not.toHaveBeenCalled()
+  })
+
+  it('recherche filtre les lignes (nom, email, rôle…)', async () => {
+    mockApi({
+      users: [
+        utilisateur(),
+        utilisateur({ id: 'u2', nom: 'Soa', prenom: 'Lalao', email: 'l.soa@ifvm.mg' }),
+      ],
+    })
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Lalao Soa')).toBeInTheDocument())
+
+    fireEvent.change(screen.getByPlaceholderText('Rechercher…'), { target: { value: 'lalao' } })
+
+    expect(screen.getByText('Lalao Soa')).toBeInTheDocument()
+    expect(screen.queryByText('Jean Rakoto')).not.toBeInTheDocument()
+  })
+
+  it('trie par nom au clic sur l’en-tête de colonne', async () => {
+    mockApi({
+      users: [
+        utilisateur({ id: 'u1', nom: 'Rakoto', prenom: 'Jean' }),
+        utilisateur({ id: 'u2', nom: 'Andria', prenom: 'Voahangy', email: 'v.andria@ifvm.mg' }),
+      ],
+    })
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Jean Rakoto')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('columnheader', { name: 'Nom' }).querySelector('button')!)
+
+    const rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('Voahangy Andria')
+  })
+
+  it('le bouton "+ Nouvel utilisateur" ouvre le formulaire', async () => {
+    mockApi()
+    renderPage()
+
+    await waitFor(() => expect(screen.getByRole('button', { name: '+ Nouvel utilisateur' })).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Nouvel utilisateur' }))
+
+    expect(screen.getByRole('heading', { name: 'Nouvel utilisateur' })).toBeInTheDocument()
   })
 })
