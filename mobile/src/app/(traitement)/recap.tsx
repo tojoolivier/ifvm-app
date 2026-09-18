@@ -613,29 +613,28 @@ export default function RecapScreen() {
           {draft.mortalite && (
             <RecapLigne label="Familles concernées" value={displayListe(parseJsonArraySafe(draft.mortalite_familles))} />
           )}
+          {(draft.evaluations_risque_population ?? []).length > 0 && (
+            <>
+              <Text style={styles.sousTitre}>Évaluation du risque pour la population</Text>
+              {(draft.evaluations_risque_population ?? []).map((evaluation, index) => (
+                <RecapLigne
+                  key={evaluation.id}
+                  label={`Évaluation ${index + 1}`}
+                  value={`${display(evaluation.habitat_proche)} · ${
+                    evaluation.distance_km != null ? `${evaluation.distance_km} km` : 'non renseigné'
+                  } · ${
+                    evaluation.sensibilisation == null
+                      ? 'non renseigné'
+                      : evaluation.sensibilisation
+                        ? 'sensibilisée'
+                        : 'non sensibilisée'
+                  }`}
+                />
+              ))}
+            </>
+          )}
           <RecapLigne label="Observations" value={draft.observations} />
         </Card>
-
-        {(draft.evaluations_risque_population ?? []).length > 0 && (
-          <Card>
-            <Text style={styles.sectionTitle}>Évaluation du risque pour la population</Text>
-            {(draft.evaluations_risque_population ?? []).map((evaluation, index) => (
-              <RecapLigne
-                key={evaluation.id}
-                label={`Évaluation ${index + 1}`}
-                value={`${display(evaluation.habitat_proche)} · ${
-                  evaluation.distance_km != null ? `${evaluation.distance_km} km` : 'non renseigné'
-                } · ${
-                  evaluation.sensibilisation == null
-                    ? 'non renseigné'
-                    : evaluation.sensibilisation
-                      ? 'sensibilisée'
-                      : 'non sensibilisée'
-                }`}
-              />
-            ))}
-          </Card>
-        )}
 
         {signatureMatrix.length > 0 && (
           <Card>
@@ -692,6 +691,13 @@ const styles = StyleSheet.create({
   recapLabel: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.corps, color: traitementColors.texteSecondaire, flex: 1 },
   recapValue: { fontFamily: traitementFonts.uiSemiBold, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre, textAlign: 'right' },
   label: { fontFamily: traitementFonts.uiMedium, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
+  sousTitre: {
+    fontFamily: traitementFonts.uiSemiBold,
+    fontSize: traitementTypeSizes.label,
+    color: traitementColors.texteTitre,
+    marginTop: 6,
+    marginBottom: 2,
+  },
   note: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.corps, color: traitementColors.texteNote },
   saveButton: {
     minHeight: 44,
