@@ -1,4 +1,4 @@
-"""Écritures du référentiel `zone_anti_acridien` (#equipe-terrestre, migration 0072).
+"""Écritures du référentiel `zone_anti_acridien` (#equipe-terrestre, migration 0073).
 
 Comme `poste_acridien` (#132) : le pull hors-ligne ne transporte que des upserts,
 aucune route DELETE, la sortie de service passe par `actif=false` — bloquée tant

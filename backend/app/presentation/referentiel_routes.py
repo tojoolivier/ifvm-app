@@ -767,7 +767,7 @@ async def get_equipe_aerienne(
 
 # --- equipe_terrestre --------------------------------------------------------------
 #
-# Équipe terrestre (migration 0072) : même patron que equipe_aerienne, un chef
+# Équipe terrestre (migration 0073) : même patron que equipe_aerienne, un chef
 # d'équipe (rôle chef_equipe) + des membres à nombre variable. Contrairement à
 # l'aérien, pas de base physique unique — plusieurs postes acridiens peuvent
 # partager la même équipe (poste_acridien.equipe_terrestre_id, sans UNIQUE).

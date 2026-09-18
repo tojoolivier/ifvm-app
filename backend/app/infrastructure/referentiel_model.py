@@ -41,7 +41,7 @@ class PosteAcridienModel(Base):
     za_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("zone_anti_acridien.id"), nullable=False
     )
-    # Rattachement à une équipe terrestre (migration 0072) : nullable, sans UNIQUE —
+    # Rattachement à une équipe terrestre (migration 0073) : nullable, sans UNIQUE —
     # plusieurs postes peuvent partager la même équipe (équipe mobile).
     # `use_alter=True` : casse le cycle de FK utilisateur.pa_id -> poste_acridien
     # -> equipe_terrestre -> utilisateur.chef_equipe_id, sinon `Base.metadata.
@@ -158,7 +158,7 @@ class EquipeAerienneModel(Base):
     (`BaseAerienneModel.equipe_id` UNIQUE). Demande utilisateur du 2026-09-16, en
     continuité de la fiche de vol (migration 0064).
 
-    `pilote`/`mecanicien`/`consultant_international` (migration 0071) : texte libre,
+    `pilote`/`mecanicien`/`consultant_international` (migration 0072) : texte libre,
     même choix que partout ailleurs dans le domaine aérien
     (`fiche_vol.pilote`/`.mecanicien`, `traitement_aerien.pilote`/`.mecanicien`) —
     externes à l'IFVM, pas des comptes `utilisateur`. Nullable en base pour ne pas
@@ -205,7 +205,7 @@ class EquipeAerienneModel(Base):
 
 
 class EquipeAerienneMembreModel(Base):
-    """Membre supplémentaire d'une équipe aérienne (migration 0071), au-delà du chef
+    """Membre supplémentaire d'une équipe aérienne (migration 0072), au-delà du chef
     de base/pilote/mécanicien/consultant déjà nommés sur `EquipeAerienneModel` — un
     nom, en nombre variable. Table fille plutôt qu'une chaîne concaténée sur
     `equipe_aerienne` (1FN) : chaque membre reste identifiable et supprimable
@@ -226,7 +226,7 @@ class EquipeAerienneMembreModel(Base):
 
 
 class EquipeTerrestreModel(Base):
-    """Équipe terrestre (migration 0072) : une équipe = un chef d'équipe
+    """Équipe terrestre (migration 0073) : une équipe = un chef d'équipe
     (`chef_equipe_id` UNIQUE, rôle `chef_equipe`). Contrairement à l'équipe
     aérienne, pas de UNIQUE côté `PosteAcridienModel.equipe_terrestre_id` :
     plusieurs postes peuvent partager la même équipe terrestre (équipe mobile).
@@ -249,7 +249,7 @@ class EquipeTerrestreModel(Base):
         order_by="EquipeTerrestreMembreModel.created_at",
     )
 
-    # Noms de contraintes explicites — doivent matcher la migration 0072 à
+    # Noms de contraintes explicites — doivent matcher la migration 0073 à
     # l'identique : `EquipeTerrestreRepositoryImpl.create` en dépend pour
     # distinguer la violation (chef déjà assigné) d'une erreur générique.
     __table_args__ = (
@@ -264,7 +264,7 @@ class EquipeTerrestreModel(Base):
 
 
 class EquipeTerrestreMembreModel(Base):
-    """Membre supplémentaire d'une équipe terrestre (migration 0072), au-delà du chef
+    """Membre supplémentaire d'une équipe terrestre (migration 0073), au-delà du chef
     d'équipe déjà nommé sur `EquipeTerrestreModel` — un nom, en nombre variable.
     Table fille plutôt qu'une chaîne concaténée (1FN), même patron que
     `EquipeAerienneMembreModel`."""

@@ -25,8 +25,8 @@ impossible à identifier/supprimer individuellement. Même patron que
 `fiche_vol_signature`/`traitement_rotation` : entité faible de son parent,
 `ON DELETE CASCADE`.
 
-Revision ID: 0071
-Revises: 0070
+Revision ID: 0072
+Revises: 0071
 Create Date: 2026-09-17
 
 """
@@ -36,8 +36,8 @@ from sqlalchemy.dialects import postgresql
 
 from alembic import op
 
-revision = "0071"
-down_revision = "0070"
+revision = "0072"
+down_revision = "0071"
 branch_labels = None
 depends_on = None
 

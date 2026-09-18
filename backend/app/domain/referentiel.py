@@ -83,7 +83,7 @@ class PosteAcridien:
     za_id: uuid.UUID = field(default_factory=uuid.uuid4)
     za_code: str = ""
     za_nom: str = ""
-    # Rattachement à une équipe terrestre (migration 0072) : nullable, plusieurs
+    # Rattachement à une équipe terrestre (migration 0073) : nullable, plusieurs
     # postes peuvent partager la même équipe (équipe mobile, pas de UNIQUE).
     equipe_terrestre_id: uuid.UUID | None = None
     equipe_terrestre_nom: str | None = None
@@ -289,7 +289,7 @@ class ChefDeBaseDejaEquipeError(Exception):
 @dataclass
 class MembreEquipeAerienne:
     """Membre d'une équipe aérienne au-delà des rôles nommés (chef de base, pilote,
-    mécanicien, consultant international) — migration 0071. Entité faible de
+    mécanicien, consultant international) — migration 0072. Entité faible de
     `EquipeAerienne`, un nom en nombre variable."""
 
     id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -304,7 +304,7 @@ class EquipeAerienne:
     equipe_id` UNIQUE, cf. `BaseAerienne`). Demande utilisateur du 2026-09-16, en
     continuité de la fiche de vol (migration 0064).
 
-    `pilote`/`mecanicien`/`consultant_international` (migration 0071) : texte libre,
+    `pilote`/`mecanicien`/`consultant_international` (migration 0072) : texte libre,
     externes à l'IFVM — même patron que `FicheVol`/`TraitementAerien`. Nullable
     pour les équipes créées avant cette migration ; `pilote`/`mecanicien` sont
     exigés par `EquipeAerienneCreate` pour toute nouvelle équipe,
@@ -384,7 +384,7 @@ class ChefEquipeDejaEquipeError(Exception):
 
 @dataclass
 class MembreEquipeTerrestre:
-    """Membre d'une équipe terrestre au-delà du chef d'équipe (migration 0072) —
+    """Membre d'une équipe terrestre au-delà du chef d'équipe (migration 0073) —
     entité faible de `EquipeTerrestre`, un nom en nombre variable. Même patron que
     `MembreEquipeAerienne`."""
 
@@ -395,7 +395,7 @@ class MembreEquipeTerrestre:
 
 @dataclass
 class EquipeTerrestre:
-    """Équipe terrestre (migration 0072) : une équipe = un chef d'équipe
+    """Équipe terrestre (migration 0073) : une équipe = un chef d'équipe
     (`chef_equipe_id` UNIQUE, rôle `chef_equipe`). Contrairement à l'équipe aérienne,
     pas de base physique unique : plusieurs postes acridiens peuvent partager la même
     équipe (`PosteAcridien.equipe_terrestre_id`, sans UNIQUE), une équipe terrestre
