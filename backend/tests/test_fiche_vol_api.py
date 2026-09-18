@@ -378,6 +378,86 @@ async def test_fiche_inconnue_renvoie_404(client, auth_headers):
     assert reponse.status_code == 404
 
 
+@pytest.mark.asyncio
+async def test_un_vol_rattache_a_une_rotation_avec_bloc_renvoie_le_detail_du_bloc(
+    client,
+    auth_headers,
+    payload_fiche,
+    db_session,
+    campagne_id,
+    utilisateur,
+    chef_de_base,
+    pesticide,
+    pilote,
+    mecanicien,
+):
+    """#fiche-vol-impression : la vue imprimable A4 a besoin du détail du bloc traité
+    par la rotation d'un vol (n° bloc, surfaces, andain, interpasse, hauteur de vol),
+    résolu par jointure et jamais saisi côté fiche_vol."""
+    fiche = await _creer(client, auth_headers, payload_fiche)
+    rotation_id = await _rotation_avec_bloc(
+        client,
+        auth_headers,
+        db_session,
+        campagne_id,
+        utilisateur,
+        chef_de_base,
+        pesticide,
+        pilote,
+        mecanicien,
+    )
+    ajout = await client.post(
+        f"/fiches-vol/{fiche['id']}/vols",
+        json={
+            "numero": 1,
+            "type_vol": "APPLICATION",
+            "heure_debut": "06:00:00",
+            "heure_fin": "06:30:00",
+            "rotation_id": rotation_id,
+        },
+        headers=auth_headers,
+    )
+    assert ajout.status_code == 201, ajout.text
+
+    lue = await client.get(f"/fiches-vol/{fiche['id']}", headers=auth_headers)
+    assert lue.status_code == 200
+    vol = lue.json()["vols"][0]
+    assert vol["produit_nom"] == "Icon 10 CS"
+    assert vol["bloc"]["nom"] == "Bloc 1"
+    assert vol["bloc"]["localite"] == "Betioky-Sud"
+    assert vol["bloc"]["surface_theorique_ha"] == 12.5
+    assert vol["bloc"]["largeur_andain_m"] == 18.0
+    assert vol["bloc"]["interpasse_m"] == 45.0
+    assert vol["bloc"]["hauteur_vol_min_m"] == 8.0
+    assert vol["bloc"]["hauteur_vol_max_m"] == 12.0
+    assert vol["bloc"]["observation"] == "RAS"
+
+
+@pytest.mark.asyncio
+async def test_un_vol_sans_rotation_renvoie_un_bloc_nul(client, auth_headers, payload_fiche):
+    """Un convoyage (pas de rotation_id) ne doit jamais faire planter la jointure —
+    juste renvoyer bloc: null."""
+    fiche = await _creer(client, auth_headers, payload_fiche)
+    ajout = await client.post(
+        f"/fiches-vol/{fiche['id']}/vols",
+        json={
+            "numero": 1,
+            "type_vol": "CONVOYAGE",
+            "heure_debut": "05:00:00",
+            "heure_fin": "05:20:00",
+        },
+        headers=auth_headers,
+    )
+    assert ajout.status_code == 201, ajout.text
+
+    lue = await client.get(f"/fiches-vol/{fiche['id']}", headers=auth_headers)
+    assert lue.status_code == 200
+    vol = lue.json()["vols"][0]
+    assert vol["bloc"] is None
+    assert vol["numero_cuve"] is None
+    assert vol["produit_nom"] is None
+
+
 # --- Référence à une prospection (migration 0070) ----------------------------------
 
 
@@ -590,6 +670,93 @@ async def _rotation_reelle(
             "heure_ouverture_vanne": "06:05:00",
             "heure_fermeture_vanne": "06:25:00",
             "heure_fin": "06:30:00",
+        },
+        headers=auth_headers,
+    )
+    assert rotation.status_code == 201, rotation.text
+    return rotation.json()["aerien"]["rotations"][0]["id"]
+
+
+async def _rotation_avec_bloc(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    chef_de_base,
+    pesticide,
+    pilote,
+    mecanicien,
+) -> str:
+    """Même patron que `_rotation_reelle`, mais la rotation est rattachée à un bloc
+    (#fiche-vol-impression) — pour vérifier la jointure Rotation -> Bloc -> Cible
+    exposée par `GET /fiches-vol/{id}`."""
+    prospection = ProspectionModel(
+        id=uuid.uuid4(),
+        type_prospection="extensive",
+        campagne_id=campagne_id,
+        prospecteur_id=utilisateur.id,
+        date_prospection=date(2026, 8, 1),
+        statut="brouillon",
+        statut_sync="local",
+    )
+    db_session.add(prospection)
+    await db_session.commit()
+
+    traitement = await client.post(
+        "/traitements",
+        json={
+            "prospection_id": str(prospection.id),
+            "date_traitement": "2026-08-11",
+            "date_validation": "2026-08-10",
+            "localite": "Betioky",
+            "aerien": {
+                "pilote": f"{pilote.prenom} {pilote.nom}",
+                "mecanicien": f"{mecanicien.prenom} {mecanicien.nom}",
+                "chef_de_base_id": str(chef_de_base.id),
+                "base_principale": "Base Betioky",
+                "immatricule_aeronef": "5R-ABC",
+            },
+        },
+        headers=auth_headers,
+    )
+    assert traitement.status_code == 201, traitement.text
+    traitement_id = traitement.json()["id"]
+
+    bloc = await client.post(
+        f"/traitements/{traitement_id}/blocs",
+        json={
+            "nom": "Bloc 1",
+            "localite": "Betioky-Sud",
+            "surface_theorique_ha": 12.5,
+            "largeur_andain_m": 18.0,
+            "interpasse_m": 45.0,
+            "hauteur_vol_min_m": 8.0,
+            "hauteur_vol_max_m": 12.0,
+            "observation": "RAS",
+        },
+        headers=auth_headers,
+    )
+    assert bloc.status_code == 201, bloc.text
+    bloc_id = bloc.json()["aerien"]["blocs"][0]["id"]
+
+    rotation = await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json={
+            "bloc_id": bloc_id,
+            "produit_id": str(pesticide.id),
+            "quantite": 10.0,
+            "unite": "L",
+            "surface_ha": 5.0,
+            "temperature_debut_c": 25.0,
+            "temperature_fin_c": 27.0,
+            "vent_debut_ms": 2.0,
+            "vent_fin_ms": 3.0,
+            "heure_debut": "06:00:00",
+            "heure_ouverture_vanne": "06:05:00",
+            "heure_fermeture_vanne": "06:25:00",
+            "heure_fin": "06:30:00",
+            "nom_commercial": "Icon 10 CS",
         },
         headers=auth_headers,
     )

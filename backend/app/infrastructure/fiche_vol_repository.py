@@ -18,6 +18,7 @@ from app.domain.fiche_vol import (
     SignatureVol,
     StandVolIntrouvableError,
     Vol,
+    VolBlocDetail,
 )
 from app.infrastructure.fiche_vol_model import (
     FicheVolModel,
@@ -25,14 +26,58 @@ from app.infrastructure.fiche_vol_model import (
     VolModel,
 )
 from app.infrastructure.referentiel_model import BaseAerienneModel
-from app.infrastructure.traitement_model import RotationModel
+from app.infrastructure.traitement_model import (
+    RotationModel,
+    TraitementAerienModel,
+    TraitementBlocModel,
+    TraitementModel,
+)
 
 
 def _borner_a_zero(valeur: float) -> float:
     return valeur if valeur > 0 else 0.0
 
 
-def _to_domain(model: FicheVolModel, pesticide_quantite_utilisee: float | None = None) -> FicheVol:
+def _bloc_detail(rotation: RotationModel) -> VolBlocDetail | None:
+    bloc = rotation.bloc
+    if bloc is None:
+        return None
+    cible = bloc.aerien.traitement.cible if bloc.aerien.traitement is not None else None
+    return VolBlocDetail(
+        numero=bloc.numero,
+        nom=bloc.nom,
+        localite=bloc.localite,
+        surface_theorique_ha=(
+            float(bloc.surface_theorique_ha) if bloc.surface_theorique_ha is not None else None
+        ),
+        surface_protegee_ha=(
+            float(bloc.surface_protegee_ha) if bloc.surface_protegee_ha is not None else None
+        ),
+        surface_traitee_ha=(
+            float(bloc.surface_traitee_ha) if bloc.surface_traitee_ha is not None else None
+        ),
+        largeur_andain_m=(
+            float(bloc.largeur_andain_m) if bloc.largeur_andain_m is not None else None
+        ),
+        interpasse_m=float(bloc.interpasse_m) if bloc.interpasse_m is not None else None,
+        hauteur_vol_min_m=(
+            float(bloc.hauteur_vol_min_m) if bloc.hauteur_vol_min_m is not None else None
+        ),
+        hauteur_vol_max_m=(
+            float(bloc.hauteur_vol_max_m) if bloc.hauteur_vol_max_m is not None else None
+        ),
+        observation=bloc.observation,
+        espece=cible.espece if cible is not None else None,
+        vols_clairs_essaims=cible.vols_clairs_essaims if cible is not None else None,
+    )
+
+
+def _to_domain(
+    model: FicheVolModel,
+    pesticide_quantite_utilisee: float | None = None,
+    rotations_detail: dict[uuid.UUID, RotationModel] | None = None,
+) -> FicheVol:
+    rotations_detail = rotations_detail or {}
     disponible = (
         float(model.pesticide_quantite_disponible)
         if model.pesticide_quantite_disponible is not None
@@ -101,6 +146,21 @@ def _to_domain(model: FicheVolModel, pesticide_quantite_utilisee: float | None =
                 rotation_id=v.rotation_id,
                 prospection_id=v.prospection_id,
                 observations=v.observations,
+                numero_cuve=(
+                    rotations_detail[v.rotation_id].numero_cuve
+                    if v.rotation_id in rotations_detail
+                    else None
+                ),
+                produit_nom=(
+                    rotations_detail[v.rotation_id].nom_commercial
+                    if v.rotation_id in rotations_detail
+                    else None
+                ),
+                bloc=(
+                    _bloc_detail(rotations_detail[v.rotation_id])
+                    if v.rotation_id in rotations_detail
+                    else None
+                ),
             )
             for v in sorted(model.vols, key=lambda v: v.numero)
         ],
@@ -149,7 +209,30 @@ class FicheVolRepositoryImpl:
 
     async def _domaine(self, fiche_vol_id: uuid.UUID) -> FicheVol:
         model = await self._exiger(fiche_vol_id)
-        return _to_domain(model, await self._pesticide_utilisee(model))
+        return _to_domain(
+            model, await self._pesticide_utilisee(model), await self._rotations_detail(model)
+        )
+
+    async def _rotations_detail(self, model: FicheVolModel) -> dict[uuid.UUID, RotationModel]:
+        """Rotation → Bloc → Cible pour chaque vol rattaché, pour la vue imprimable A4
+        (#fiche-vol-impression). Requête séparée plutôt qu'une relation ORM sur
+        `VolModel` : même patron que `_pesticide_utilisee` ci-dessus, un vol n'a besoin
+        de naviguer vers sa rotation qu'en lecture, jamais en écriture.
+        """
+        rotation_ids = {v.rotation_id for v in model.vols if v.rotation_id is not None}
+        if not rotation_ids:
+            return {}
+        result = await self.session.execute(
+            select(RotationModel)
+            .options(
+                selectinload(RotationModel.bloc)
+                .selectinload(TraitementBlocModel.aerien)
+                .selectinload(TraitementAerienModel.traitement)
+                .selectinload(TraitementModel.cible)
+            )
+            .where(RotationModel.id.in_(rotation_ids))
+        )
+        return {r.id: r for r in result.scalars().all()}
 
     async def _pesticide_utilisee(self, model: FicheVolModel) -> float | None:
         """Somme des rotations couvertes par les vols de la fiche (déduplique les
@@ -172,7 +255,9 @@ class FicheVolRepositoryImpl:
         model = await self._charger(fiche_vol_id)
         if model is None:
             return None
-        return _to_domain(model, await self._pesticide_utilisee(model))
+        return _to_domain(
+            model, await self._pesticide_utilisee(model), await self._rotations_detail(model)
+        )
 
     async def list_by_filters(
         self,
