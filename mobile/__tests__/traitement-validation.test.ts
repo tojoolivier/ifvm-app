@@ -244,8 +244,6 @@ describe('validateTerrestreConditions', () => {
   const base = {
     heureDebut: '08:00',
     heureFin: '10:00',
-    repriseTraitement: false,
-    traitementOrigineId: null,
     surfaceRestanteHa: 0,
     surfaceRestanteAbandonnee: null,
     motifSurfaceRestanteAbandonnee: null,
@@ -258,11 +256,6 @@ describe('validateTerrestreConditions', () => {
   it('rejects an end time not after the start time', () => {
     const errors = validateTerrestreConditions({ ...base, heureFin: '08:00' });
     expect(errors.some((e) => e.field === 'heureFin')).toBe(true);
-  });
-
-  it('requires an origin fiche when reprise is chosen', () => {
-    const errors = validateTerrestreConditions({ ...base, repriseTraitement: true, traitementOrigineId: null });
-    expect(errors.some((e) => e.field === 'traitementOrigineId')).toBe(true);
   });
 
   it('requires an abandon choice when restante surface is positive', () => {
@@ -583,8 +576,6 @@ describe('aggregateRecapErrors', () => {
       terrestreConditions: {
         heureDebut: '08:00',
         heureFin: '08:00',
-        repriseTraitement: false,
-        traitementOrigineId: null,
         surfaceRestanteHa: 0,
         surfaceRestanteAbandonnee: null,
         motifSurfaceRestanteAbandonnee: null,

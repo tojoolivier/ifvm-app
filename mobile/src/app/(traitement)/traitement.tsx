@@ -8,8 +8,6 @@ import {
   updateTraitementTerrestre,
   addProduitUtilise,
   deleteAllProduitsForTraitementTerrestre,
-  listReprenableTraitements,
-  DraftTraitementRow,
 } from '@/lib/traitement-repository';
 import { listUtilisateursByRole, listPesticides, Pesticide, UtilisateurEquipe } from '@/lib/referentiel-db';
 import { useTraitementCaptureStore, ProduitDraft } from '@/lib/traitement-capture-store';
@@ -23,7 +21,6 @@ import {
   computePesticideStockRestant,
   validateTerrestreConditions,
   validateAerienEquipe,
-  validateRepriseTraitement,
 } from '@/lib/traitement-validation';
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN, PROGRESS_SEGMENTS_TERRESTRE } from '@/components/traitement/ProgressBar';
 import { AerienForm } from '@/components/traitement/AerienForm';
@@ -44,7 +41,6 @@ export default function TraitementScreen() {
   const [chefsDeBase, setChefsDeBase] = useState<UtilisateurEquipe[]>([]);
   const [chefsEquipe, setChefsEquipe] = useState<UtilisateurEquipe[]>([]);
   const [pesticides, setPesticides] = useState<Pesticide[]>([]);
-  const [reprenables, setReprenables] = useState<DraftTraitementRow[]>([]);
   const [surfaceInfesteeHa, setSurfaceInfesteeHa] = useState<number | null>(null);
   const [origineCumuleeHa, setOrigineCumuleeHa] = useState<number | null>(null);
   // Le store (Lot 1, non modifiable) n'expose pas de updateProduit — seulement
@@ -136,7 +132,6 @@ export default function TraitementScreen() {
         }
       }
     }).catch((error) => signalerChargement(error, 'getTraitement'));
-    listReprenableTraitements().then(setReprenables).catch((error) => signalerChargement(error, 'listReprenableTraitements'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [traitementId]);
 
@@ -222,14 +217,6 @@ export default function TraitementScreen() {
             setErrors({ aerien: equipeErrors[0].message });
             return;
           }
-          const repriseErrors = validateRepriseTraitement(
-            store.aerien.repriseTraitement,
-            store.aerien.traitementOrigineId
-          );
-          if (repriseErrors.length > 0) {
-            setErrors({ traitementOrigineId: repriseErrors[0].message });
-            return;
-          }
           await updateTraitementAerien(traitementId, {
             pilote: store.aerien.pilote!,
             mecanicien: store.aerien.mecanicien!,
@@ -248,8 +235,6 @@ export default function TraitementScreen() {
           const conditionErrors = validateTerrestreConditions({
             heureDebut: store.terrestre.heureDebut ?? null,
             heureFin: store.terrestre.heureFin ?? null,
-            repriseTraitement: store.terrestre.repriseTraitement ?? false,
-            traitementOrigineId: store.terrestre.traitementOrigineId ?? null,
             surfaceRestanteHa: surfaceRestante,
             surfaceRestanteAbandonnee: store.terrestre.surfaceRestanteAbandonnee ?? null,
             motifSurfaceRestanteAbandonnee: store.terrestre.motifSurfaceRestanteAbandonnee ?? null,
@@ -316,12 +301,6 @@ export default function TraitementScreen() {
       }
     );
 
-  // Migration backend 0050 : listReprenableTraitements() couvre désormais les deux
-  // chaînes (Aérien et Terrestre) — chaque type ne doit reprendre que sa propre
-  // chaîne (la fiche d'origine doit être du même type, cf. validation backend).
-  const reprenablesAerien = reprenables.filter((r) => r.type_traitement === 'AERIEN');
-  const reprenablesTerrestre = reprenables.filter((r) => r.type_traitement === 'TERRESTRE');
-
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView style={styles.keyboardAvoidingView} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -336,7 +315,6 @@ export default function TraitementScreen() {
           <AerienForm
             readOnly={readOnly}
             chefsDeBase={chefsDeBase}
-            reprenables={reprenablesAerien}
             errors={errors}
           />
         )}
@@ -345,7 +323,6 @@ export default function TraitementScreen() {
           <TerrestreForm
             readOnly={readOnly}
             chefsEquipe={chefsEquipe}
-            reprenables={reprenablesTerrestre}
             pesticides={pesticides}
             produits={produits}
             setProduits={setProduits}
