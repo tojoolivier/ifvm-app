@@ -941,6 +941,15 @@ describe('listReprenableTraitements', () => {
     expect(fiches[0].surface_restante_ha).toBe(3.5);
     expect(fiches[1].surface_restante_ha).toBeNull();
   });
+
+  it('exclut la branche Terrestre dont la surface restante a été explicitement déclarée abandonnée (#zone-a-reprendre-surface-abandonnee)', async () => {
+    getAllAsync.mockResolvedValueOnce([]);
+
+    await listReprenableTraitements();
+
+    const [sql] = getAllAsync.mock.calls[0];
+    expect(sql).toEqual(expect.stringContaining('surface_restante_abandonnee IS NOT 1'));
+  });
 });
 
 describe('markTraitementSynced', () => {
