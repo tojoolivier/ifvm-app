@@ -7,6 +7,7 @@ import { listDraftTraitements, deleteDraftTraitement, DraftTraitementRow } from 
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
 import { runTask } from '@/lib/run-task';
 import { useAsyncAction } from '@/hooks/use-async-action';
+import { navigateToTraitement } from '@/lib/fiche-routing';
 import { EtatVide } from '@/components/erreurs/etat-vide';
 
 /**
@@ -37,11 +38,23 @@ export default function TraitementMesFichesScreen() {
     charger();
   }, [charger]);
 
+  /**
+   * Éditable slide par slide tant que la fiche n'est pas encore validée
+   * (#traitement-brouillon-editable-avant-sync) : cet écran ne liste que des
+   * fiches `statut = 'brouillon'` (`listDraftTraitements`), mais figer
+   * `isValidationView` à `'1'` sans condition rendait toute fiche rouverte
+   * ici en lecture seule dès le premier enregistrement local — impossible de
+   * vérifier ni corriger quoi que ce soit avant sa synchronisation, y
+   * compris une fiche jamais encore envoyée au serveur. Même politique que
+   * `navigateToTraitement` sur l'écran « Mes fiches » global (fiches.tsx) :
+   * lecture seule seulement une fois `statut === 'validee'` (verrouillée
+   * côté serveur), éditable tant que ce n'est pas le cas — y compris le cas
+   * limite où la synchronisation a réussi mais la validation serveur a
+   * échoué juste après (`recap.tsx`, `validerEtVerrouillerSurServeur`),
+   * laissant la fiche `statut_sync = 'synced'` mais encore `'brouillon'`.
+   */
   const openFiche = (draft: DraftTraitementRow) => {
-    router.push({
-      pathname: '/(traitement)/references' as any,
-      params: { traitementId: draft.id, isValidationView: '1' },
-    });
+    navigateToTraitement(router, draft, { validationView: draft.statut === 'validee' });
   };
 
   /**
