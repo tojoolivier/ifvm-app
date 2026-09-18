@@ -38,7 +38,7 @@ export const STATUT_BADGE_CONFIG: Record<string, BadgeStyle> = {
 /** Badges de type de fiche (catégorie de premier niveau). */
 export const TYPE_BADGE_CONFIG: Record<string, BadgeStyle> = {
   PROSPECTION: { label: 'PRO', icon: '🔍', color: '#2563EB', bg: '#DBEAFE' },
-  CRT: { label: 'CRT', icon: '💊', color: '#7C3AED', bg: '#EDE9FE' },
+  CRT: { label: 'CRT', color: '#7C3AED', bg: '#EDE9FE' },
   METEO: { label: 'MET', icon: '🌤️', color: '#F59E0B', bg: '#FEF3C7' },
 };
 
