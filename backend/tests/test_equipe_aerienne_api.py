@@ -52,11 +52,17 @@ async def test_create_equipe_aerienne_sans_consultant_ni_membres(
 
 
 @pytest.mark.asyncio
-async def test_create_equipe_aerienne_sans_pilote_422(client: AsyncClient, auth_headers: dict, chef_de_base):
+async def test_create_equipe_aerienne_sans_pilote_422(
+    client: AsyncClient, auth_headers: dict, chef_de_base
+):
     """pilote/mécanicien sont exigés pour toute nouvelle équipe."""
     response = await client.post(
         "/equipes-aeriennes",
-        json={"nom": "Équipe Ihosy", "chef_de_base_id": str(chef_de_base.id), "mecanicien": "Paul Andria"},
+        json={
+            "nom": "Équipe Ihosy",
+            "chef_de_base_id": str(chef_de_base.id),
+            "mecanicien": "Paul Andria",
+        },
         headers=auth_headers,
     )
     assert response.status_code == 422

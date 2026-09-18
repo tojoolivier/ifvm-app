@@ -308,9 +308,12 @@ class EquipeAerienneCreate(BaseModel):
     nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
     chef_de_base_id: uuid.UUID
     pilote: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
-    mecanicien: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
+    mecanicien: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)
+    ]
     consultant_international: (
-        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)] | None
+        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
+        | None
     ) = None
     membres: list[MembreEquipeAerienneCreate] = Field(default_factory=list)
 

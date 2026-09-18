@@ -17,7 +17,9 @@ from httpx import AsyncClient
 async def zone_inactive(db_session):
     from app.infrastructure.referentiel_model import ZoneAntiAcridienModel
 
-    zone = ZoneAntiAcridienModel(id=uuid.uuid4(), code="ZA-TEST-OFF", nom="Zone Fermée", actif=False)
+    zone = ZoneAntiAcridienModel(
+        id=uuid.uuid4(), code="ZA-TEST-OFF", nom="Zone Fermée", actif=False
+    )
     db_session.add(zone)
     await db_session.commit()
     await db_session.refresh(zone)
@@ -43,7 +45,9 @@ async def test_list_masque_les_inactives_par_defaut(
 async def test_list_inclure_inactives_retourne_les_deux_etats(
     client: AsyncClient, auth_headers: dict, zone_anti_acridien, zone_inactive
 ):
-    response = await client.get("/zones-anti-acridiennes?inclure_inactifs=true", headers=auth_headers)
+    response = await client.get(
+        "/zones-anti-acridiennes?inclure_inactifs=true", headers=auth_headers
+    )
 
     assert response.status_code == 200
     codes = [z["code"] for z in response.json()]
