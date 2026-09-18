@@ -142,6 +142,6 @@ describe('TraitementScreen (Équipe, Terrestre) — Atomiseur à dos / autoport�
     await waitFor(() =>
       expect(useTraitementCaptureStore.getState().terrestre.surface_atomiseur_autoporte_ha).toBe(7.5)
     );
-    expect(screen.getByDisplayValue('7.5')).toBeVisible();
+    expect(screen.getByDisplayValue('7,5')).toBeVisible();
   });
 });
