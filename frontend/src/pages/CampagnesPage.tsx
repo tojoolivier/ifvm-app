@@ -77,7 +77,7 @@ export function CampagnesPage({ today }: CampagnesPageProps = {}) {
 
   // Colonnes « Prospections » et « Traitements » de la maquette : l'API n'expose
   // aucun agrégat par campagne (`GET /campagnes` ne renvoie que les 4 champs de
-  // la table). On compte côté client, comme le fait déjà UsersPage pour ses
+  // la table). On compte côté client, comme le fait déjà UtilisateursSection pour ses
   // fiches par prospecteur. Provisoire : les deux listes complètes transitent à
   // chaque affichage. La vraie réponse est un compteur côté API
   // (`GET /campagnes` enrichi, ou `?group_by=campagne_id`).
