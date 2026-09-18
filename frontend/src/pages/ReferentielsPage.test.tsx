@@ -20,12 +20,9 @@ function pull(overrides: Record<string, unknown> = {}) {
   return {
     data: {
       postes_acridiens: empty,
-      stations_fixes: empty,
-      utilisateurs_equipe: empty,
       pesticides: empty,
       cultures: empty,
       codes_stades: empty,
-      campagnes: empty,
       lieux_aeriens: empty,
       ...overrides,
     },
@@ -52,11 +49,11 @@ describe('ReferentielsPage — maquette §11 du handoff', () => {
     vi.restoreAllMocks()
   })
 
-  it('liste les 11 référentiels de la colonne de navigation', async () => {
+  it('liste les 6 référentiels de la colonne de navigation', async () => {
     mockedGet.mockResolvedValue(pull())
     renderPage()
 
-    await waitFor(() => expect(nav().getByText('11 référentiels')).toBeInTheDocument())
+    await waitFor(() => expect(nav().getByText('6 référentiels')).toBeInTheDocument())
 
     for (const table of [
       'pesticide',
@@ -64,14 +61,14 @@ describe('ReferentielsPage — maquette §11 du handoff', () => {
       'code_stade',
       'zone_anti_acridien',
       'poste_acridien',
-      'station_fixe',
       'lieu_aerien',
-      'utilisateur',
-      'campagne',
-      'equipe_aerienne',
-      'equipe_terrestre',
     ]) {
       expect(nav().getByText(table)).toBeInTheDocument()
+    }
+    // Utilisateurs, stations et équipes (aériennes/terrestres) vivent désormais
+    // sur /administration, plus ici.
+    for (const table of ['utilisateur', 'station_fixe', 'campagne', 'equipe_aerienne', 'equipe_terrestre']) {
+      expect(nav().queryByText(table)).not.toBeInTheDocument()
     }
   })
 
@@ -79,15 +76,13 @@ describe('ReferentielsPage — maquette §11 du handoff', () => {
     mockedGet.mockResolvedValue(pull())
     renderPage()
 
-    await waitFor(() => expect(nav().getByText('11 référentiels')).toBeInTheDocument())
+    await waitFor(() => expect(nav().getByText('6 référentiels')).toBeInTheDocument())
 
-    // Les 11 référentiels exposent désormais au moins une lecture/écriture :
-    // culture (#130), code_stade, zone_acridien, poste_acridien, station_fixe
-    // (#133), utilisateur, campagne, pesticide (#129, #134), lieu_aerien
-    // (#prospection-lieu-base), equipe_aerienne/equipe_terrestre (assignation
-    // chef de base/d'équipe).
+    // Les 6 référentiels exposent désormais au moins une lecture/écriture :
+    // culture (#130), code_stade, zone_acridien, poste_acridien, pesticide
+    // (#129, #134), lieu_aerien (#prospection-lieu-base).
     expect(nav().queryAllByText('à créer')).toHaveLength(0)
-    expect(nav().getAllByText('API')).toHaveLength(11)
+    expect(nav().getAllByText('API')).toHaveLength(6)
   })
 
   it('affiche la matière active et la dose de référence sur les pesticides', async () => {
@@ -116,18 +111,6 @@ describe('ReferentielsPage — maquette §11 du handoff', () => {
     expect(screen.getAllByText('0.5 l/ha').length).toBeGreaterThan(0)
     expect(screen.getByRole('columnheader', { name: 'Dose de référence' })).toBeInTheDocument()
     expect(screen.queryByText('colonne absente en base')).not.toBeInTheDocument()
-  })
-
-  it('renvoie vers le CRUD existant pour les entités déjà administrables', async () => {
-    mockedGet.mockResolvedValue(pull())
-    renderPage()
-
-    await waitFor(() => expect(nav().getByText('campagne')).toBeInTheDocument())
-    fireEvent.click(nav().getByText('campagne'))
-
-    expect(screen.getByRole('button', { name: '+ Nouvelle campagne' })).not.toHaveAttribute(
-      'aria-disabled',
-    )
   })
 
   it('change de référentiel et affiche ses colonnes dédiées', async () => {
@@ -1084,173 +1067,5 @@ describe('ReferentielsPage — recherche, tri, pagination', () => {
 
     await waitFor(async () => expect((await table()).queryByText('PST-CHL')).not.toBeInTheDocument())
     expect((await table()).getByText('PST-DEL')).toBeInTheDocument()
-  })
-})
-
-describe('ReferentielsPage — écritures station_fixe (#133)', () => {
-  const POSTE = { id: 'pa1', code: 'PA-ZOM', nom: 'Zombitse', actif: true }
-  const COMMUNE = { id: 'cm1', nom: 'Ambovombe', district: 'Androy', region: 'Anosy' }
-
-  const STATION = {
-    id: 'st1',
-    code: 'ST-001',
-    nom: 'Ambovombe Nord',
-    pa_id: 'pa1',
-    pa_code: 'PA-ZOM',
-    pa_nom: 'Zombitse',
-    commune_id: 'cm1',
-    commune: 'Ambovombe',
-    district: 'Androy',
-    region: 'Anosy',
-    latitude: -25.17,
-    longitude: 46.08,
-    altitude: 120,
-    actif: true,
-    created_at: SERVER_TIME,
-    updated_at: SERVER_TIME,
-  }
-
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  /**
-   * L'écran lit `/stations` et non le pull : `StationFixeSyncRead` ne porte que les
-   * FK brutes, sans `commune_id` — impossible d'y présélectionner la commune.
-   */
-  function mockGetParUrl(stations: Record<string, unknown>[] = [STATION]) {
-    mockedGet.mockImplementation((url: string) => {
-      if (url.startsWith('/stations')) return Promise.resolve({ data: stations })
-      if (url.startsWith('/postes-acridiens')) return Promise.resolve({ data: [POSTE] })
-      if (url.startsWith('/communes')) return Promise.resolve({ data: [COMMUNE] })
-      // Sélecteur « Filtrer par équipe terrestre » (station_fixe fait partie du
-      // périmètre filtrable) : liste vide suffit, non testée ici.
-      if (url.startsWith('/equipes-terrestres')) return Promise.resolve({ data: [] })
-      return Promise.resolve(pull())
-    })
-  }
-
-  async function ouvrirStations(stations: Record<string, unknown>[] = [STATION]) {
-    mockGetParUrl(stations)
-    renderPage()
-    await waitFor(() => expect(nav().getByText('station_fixe')).toBeInTheDocument())
-    fireEvent.click(nav().getByText('station_fixe'))
-    fireEvent.click(await screen.findByRole('button', { name: `Modifier ${stations[0].code}` }))
-    await screen.findByDisplayValue('ST-001')
-  }
-
-  it('ouvre le panneau Modifier prérempli, rattachements compris', async () => {
-    await ouvrirStations()
-
-    expect(screen.getByDisplayValue('Ambovombe Nord')).toBeInTheDocument()
-    expect(screen.getByLabelText('Poste acridien *')).toHaveValue('pa1')
-    expect(screen.getByLabelText('Commune *')).toHaveValue('cm1')
-    expect(screen.getByLabelText('Latitude *')).toHaveValue(-25.17)
-    expect(screen.getByLabelText('Altitude (m)')).toHaveValue(120)
-    expect(screen.getByRole('button', { name: 'Enregistrer' })).not.toHaveAttribute('aria-disabled')
-    expect(screen.getByRole('button', { name: '+ Nouvelle station' })).not.toHaveAttribute(
-      'aria-disabled',
-    )
-  })
-
-  it('affiche district et région en champs dérivés, jamais saisissables', async () => {
-    await ouvrirStations()
-
-    expect(screen.getByText('District')).toBeInTheDocument()
-    expect(screen.getByText('Région')).toBeInTheDocument()
-    expect(screen.queryByDisplayValue('Androy')).not.toBeInTheDocument()
-  })
-
-  it('enregistre une modification en PUT', async () => {
-    mockedPut.mockResolvedValue({ data: STATION })
-    await ouvrirStations()
-
-    fireEvent.change(screen.getByDisplayValue('Ambovombe Nord'), {
-      target: { value: 'Ambovombe Sud' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
-
-    await waitFor(() =>
-      expect(mockedPut).toHaveBeenCalledWith(
-        '/stations/st1',
-        expect.objectContaining({ nom: 'Ambovombe Sud', pa_id: 'pa1', commune_id: 'cm1' }),
-      ),
-    )
-  })
-
-  it('crée une station via POST /stations', async () => {
-    mockedPost.mockResolvedValue({ data: { ...STATION, id: 'st2', code: 'ST-002' } })
-    await ouvrirStations()
-
-    fireEvent.click(screen.getByRole('button', { name: '+ Nouvelle station' }))
-
-    const modal = within(screen.getByRole('dialog', { name: 'Nouvelle station' }))
-    fireEvent.change(modal.getByLabelText('Code *'), { target: { value: 'ST-002' } })
-    fireEvent.change(modal.getByLabelText('Nom *'), { target: { value: 'Ambovombe Est' } })
-    fireEvent.change(modal.getByLabelText('Poste acridien *'), { target: { value: 'pa1' } })
-    fireEvent.change(modal.getByLabelText('Commune *'), { target: { value: 'cm1' } })
-    fireEvent.change(modal.getByLabelText('Latitude *'), { target: { value: '-25' } })
-    fireEvent.change(modal.getByLabelText('Longitude *'), { target: { value: '46' } })
-    fireEvent.click(modal.getByRole('button', { name: 'Créer' }))
-
-    await waitFor(() => expect(mockedPost).toHaveBeenCalledTimes(1))
-    const [url, payload] = mockedPost.mock.calls[0]
-    expect(url).toBe('/stations')
-    expect(payload).toMatchObject({
-      code: 'ST-002',
-      nom: 'Ambovombe Est',
-      pa_id: 'pa1',
-      commune_id: 'cm1',
-      latitude: -25,
-      longitude: 46,
-    })
-  })
-
-  it("désactive une station par l'interrupteur, seule sortie de service offerte", async () => {
-    mockedPut.mockResolvedValue({ data: { ...STATION, actif: false } })
-    await ouvrirStations()
-
-    fireEvent.click(screen.getByRole('switch', { name: 'Actif' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
-
-    await waitFor(() =>
-      expect(mockedPut).toHaveBeenCalledWith(
-        '/stations/st1',
-        expect.objectContaining({ actif: false }),
-      ),
-    )
-  })
-
-  it('affiche le refus du backend quand le poste visé est désactivé', async () => {
-    mockedPut.mockRejectedValue({
-      response: {
-        data: { detail: 'Le poste acridien « PA-OFF » est désactivé : aucun nouveau rattachement possible' },
-      },
-    })
-    await ouvrirStations()
-
-    fireEvent.change(screen.getByDisplayValue('Ambovombe Nord'), { target: { value: 'X' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('est désactivé')
-  })
-
-  it('« Annuler » ferme la modale sans enregistrer ; rouvrir repart de la valeur serveur', async () => {
-    await ouvrirStations()
-
-    fireEvent.change(screen.getByDisplayValue('Ambovombe Nord'), { target: { value: 'Brouillon' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Annuler' }))
-
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(mockedPut).not.toHaveBeenCalled()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Modifier ST-001' }))
-    expect(screen.getByDisplayValue('Ambovombe Nord')).toBeInTheDocument()
-  })
-
-  it('aucune affordance de suppression : le pull ne transporte que des upserts', async () => {
-    await ouvrirStations()
-
-    expect(screen.queryByRole('button', { name: /supprimer/i })).not.toBeInTheDocument()
   })
 })

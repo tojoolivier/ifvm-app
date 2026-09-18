@@ -7,7 +7,6 @@ import {
   addRotation,
   deleteAllRotationsForTraitementAerien,
   updateTraitementAerienPesticideRecu,
-  updateTraitementAerienEfficacite,
 } from '@/lib/traitement-repository';
 import { listPesticides, Pesticide } from '@/lib/referentiel-db';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
@@ -61,7 +60,7 @@ function formatDecimalDisplay(value: number | null | undefined): string {
   return value != null ? String(value).replace('.', ',') : '';
 }
 
-type AerienDecimalField = 'pesticideRecuL' | 'tauxMortalitePourcent' | 'evaluationEfficaciteHeuresApres';
+type AerienDecimalField = 'pesticideRecuL';
 type RotationDecimalField =
   | 'quantite'
   | 'surface_ha'
@@ -154,14 +153,6 @@ export default function RotationsScreen() {
         if (draft.type_traitement === 'AERIEN' && draft.aerien) {
           store.updateAerien({
             pesticideRecuL: draft.aerien.pesticide_recu_l,
-            // Efficacité (migration backend 0058) — même écran/même garde que
-            // pesticideRecuL ci-dessus.
-            tauxMortalitePourcent: draft.aerien.taux_mortalite_pourcent,
-            evaluationEfficaciteHeuresApres: draft.aerien.evaluation_efficacite_heures_apres,
-            methodeEvaluationEfficacite: draft.aerien.methode_evaluation_efficacite as
-              | 'ESTIMATION_VISUELLE'
-              | 'COMPTAGES_PRE_POST'
-              | null,
           });
         }
         // Rotations chargées ici seulement (sous-ressource propre à cet écran, pas à
@@ -256,11 +247,6 @@ export default function RotationsScreen() {
         }
         setError(undefined);
         await updateTraitementAerienPesticideRecu(traitementId, store.aerien.pesticideRecuL);
-        await updateTraitementAerienEfficacite(traitementId, {
-          tauxMortalitePourcent: store.aerien.tauxMortalitePourcent,
-          evaluationEfficaciteHeuresApres: store.aerien.evaluationEfficaciteHeuresApres,
-          methodeEvaluationEfficacite: store.aerien.methodeEvaluationEfficacite,
-        });
         // Purge avant re-création (#persistance-fiches-traitement) : le store
         // ne porte pas d'id stable côté DB pour distinguer une rotation déjà
         // enregistrée d'une nouvelle — sans cette purge, ré-enregistrer une
@@ -549,50 +535,6 @@ export default function RotationsScreen() {
             <Text style={styles.derivedValue}>{pesticideStockRestant}</Text>
           </Card>
         )}
-
-        <Text style={styles.label}>Efficacité</Text>
-        <Text style={styles.label}>Taux de mortalité (%)</Text>
-        <TextInput
-          testID="taux-mortalite-input"
-          editable={!readOnly}
-          style={styles.input}
-          placeholder="0"
-          keyboardType="decimal-pad"
-          value={getAerienDraft('tauxMortalitePourcent') ?? formatDecimalDisplay(store.aerien.tauxMortalitePourcent)}
-          onChangeText={(v) => handleAerienDecimalChange('tauxMortalitePourcent', v)}
-          onBlur={() => clearAerienDraft('tauxMortalitePourcent')}
-        />
-        <Text style={styles.label}>Évalué après traitement (heures)</Text>
-        <TextInput
-          testID="evaluation-efficacite-heures-input"
-          editable={!readOnly}
-          style={styles.input}
-          placeholder="0"
-          keyboardType="decimal-pad"
-          value={
-            getAerienDraft('evaluationEfficaciteHeuresApres') ??
-            formatDecimalDisplay(store.aerien.evaluationEfficaciteHeuresApres)
-          }
-          onChangeText={(v) => handleAerienDecimalChange('evaluationEfficaciteHeuresApres', v)}
-          onBlur={() => clearAerienDraft('evaluationEfficaciteHeuresApres')}
-        />
-        <Text style={styles.label}>Méthode d&apos;évaluation</Text>
-        <View style={styles.chipRow}>
-          <Chip
-            label="Estimation visuelle"
-            selected={store.aerien.methodeEvaluationEfficacite === 'ESTIMATION_VISUELLE'}
-            onPress={() =>
-              !readOnly && store.updateAerien({ methodeEvaluationEfficacite: 'ESTIMATION_VISUELLE' })
-            }
-          />
-          <Chip
-            label="Comptages pré/post-traitement"
-            selected={store.aerien.methodeEvaluationEfficacite === 'COMPTAGES_PRE_POST'}
-            onPress={() =>
-              !readOnly && store.updateAerien({ methodeEvaluationEfficacite: 'COMPTAGES_PRE_POST' })
-            }
-          />
-        </View>
 
         {error && <Text style={styles.error}>{error}</Text>}
 

@@ -112,9 +112,9 @@ describe('TraitementScreen (Équipe, Terrestre) — saisie décimale francophone
     await render(<TraitementScreen />);
     await waitFor(() => expect(useTraitementCaptureStore.getState().terrestre.chefEquipeId).toBe('chef-equipe-1'));
 
-    // vitesse_vent_ms (0), temperature_c (1), taux_mortalite_pourcent (2),
-    // evaluation_efficacite_heures_apres (3), surface_atomiseur_ha (4).
-    fireEvent.changeText(screen.getAllByPlaceholderText('0')[4], '1,5');
+    // vitesse_vent_ms (0), temperature_c (1), surface_atomiseur_ha (2)
+    // (efficacité déplacée sur Moyens & protection, #efficacite-moyens-protection).
+    fireEvent.changeText(screen.getAllByPlaceholderText('0')[2], '1,5');
 
     expect(await screen.findByDisplayValue('1,5')).toBeVisible();
     expect(screen.queryByDisplayValue('NaN')).toBeNull();
@@ -124,8 +124,8 @@ describe('TraitementScreen (Équipe, Terrestre) — saisie décimale francophone
     await render(<TraitementScreen />);
     await waitFor(() => expect(useTraitementCaptureStore.getState().terrestre.chefEquipeId).toBe('chef-equipe-1'));
 
-    // ... surface_disque_rotatif_ha (6), Pesticides consommés du 1er produit (7).
-    fireEvent.changeText(screen.getAllByPlaceholderText('0')[7], '4,25');
+    // ... surface_disque_rotatif_ha (4), Pesticides consommés du 1er produit (5).
+    fireEvent.changeText(screen.getAllByPlaceholderText('0')[5], '4,25');
 
     expect(await screen.findByDisplayValue('4,25')).toBeVisible();
     expect(screen.queryByDisplayValue('NaN')).toBeNull();
@@ -135,8 +135,8 @@ describe('TraitementScreen (Équipe, Terrestre) — saisie décimale francophone
     await render(<TraitementScreen />);
     await waitFor(() => expect(useTraitementCaptureStore.getState().terrestre.chefEquipeId).toBe('chef-equipe-1'));
 
-    // ... Pesticides consommés (7), Approvisionnement (8), Essence (9).
-    fireEvent.changeText(screen.getAllByPlaceholderText('0')[9], '10,75');
+    // ... Pesticides consommés (5), Approvisionnement (6), Essence (7).
+    fireEvent.changeText(screen.getAllByPlaceholderText('0')[7], '10,75');
 
     expect(await screen.findByDisplayValue('10,75')).toBeVisible();
     expect(screen.queryByDisplayValue('NaN')).toBeNull();

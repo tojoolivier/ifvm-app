@@ -5,19 +5,22 @@ import { api } from '../api/client'
 import { cn } from '@/lib/utils'
 import { UtilisateursSection } from './UtilisateursSection'
 import { StationsSection } from './StationsSection'
+import { EquipesAeriennesSection } from './EquipesAeriennesSection'
+import { EquipesTerrestresSection } from './EquipesTerrestresSection'
 
 /**
  * Écran Administration — même présentation que ReferentielsPage.tsx (§11 du
  * handoff) : nav de gauche (216px, une carte par section avec libellé, nom de
  * table, pastille API et compteur) + colonne de droite pleine largeur pour la
- * section active. Deux entrées seulement (Utilisateurs, Stations), chacune
- * dans sa propre section auto-portante — même patron que
+ * section active. Chaque section est auto-portante — même patron que
  * `EquipesAeriennesSection`/`EquipesTerrestresSection` côté Référentiels.
  *
- * Équipes/bases aériennes et terrestres (assignation d'un chef de base/d'une
- * équipe) vivent dans `ReferentielsPage.tsx`, pas ici.
+ * Regroupe ici tout ce qui concerne le personnel et les équipes : Utilisateurs,
+ * Stations, Équipes aériennes, Équipes terrestres — auparavant réparties entre
+ * cet écran et ReferentielsPage.tsx (qui garde les référentiels « purs » :
+ * pesticide, culture, code_stade, zone_acridien, poste_acridien, lieu_aerien).
  */
-type Section = 'utilisateurs' | 'stations'
+type Section = 'utilisateurs' | 'stations' | 'equipe_aerienne' | 'equipe_terrestre'
 
 export function AdministrationPage() {
   const location = useLocation()
@@ -36,6 +39,14 @@ export function AdministrationPage() {
     queryKey: ['stations', 'administration'],
     queryFn: () => api.get('/stations', { params: { inclure_inactifs: true } }).then((r) => r.data),
   })
+  const { data: equipesAeriennes = [] } = useQuery<unknown[]>({
+    queryKey: ['equipes-aeriennes'],
+    queryFn: () => api.get('/equipes-aeriennes').then((r) => r.data),
+  })
+  const { data: equipesTerrestres = [] } = useQuery<unknown[]>({
+    queryKey: ['equipes-terrestres'],
+    queryFn: () => api.get('/equipes-terrestres').then((r) => r.data),
+  })
 
   const navItems: {
     key: Section
@@ -45,6 +56,8 @@ export function AdministrationPage() {
   }[] = [
     { key: 'utilisateurs', label: 'Utilisateurs', table: 'utilisateur', count: users.length },
     { key: 'stations', label: 'Stations', table: 'station_fixe', count: stations.length },
+    { key: 'equipe_aerienne', label: 'Équipes aériennes', table: 'equipe_aerienne', count: equipesAeriennes.length },
+    { key: 'equipe_terrestre', label: 'Équipes terrestres', table: 'equipe_terrestre', count: equipesTerrestres.length },
   ]
 
   return (
@@ -93,8 +106,12 @@ export function AdministrationPage() {
       {/* Colonne droite */}
       {section === 'utilisateurs' ? (
         <UtilisateursSection showCreate={showCreateUser} onShowCreateChange={setShowCreateUser} />
-      ) : (
+      ) : section === 'stations' ? (
         <StationsSection />
+      ) : section === 'equipe_aerienne' ? (
+        <EquipesAeriennesSection />
+      ) : (
+        <EquipesTerrestresSection />
       )}
     </div>
   )

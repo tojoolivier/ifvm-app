@@ -78,11 +78,12 @@ export const routes: RouteObject[] = [
             handle: { crumb: 'Lutte', title: 'Fiche de vol' },
           },
 
-          // Administration (utilisateurs + stations, écran à onglets)
+          // Administration (personnel, stations, équipes aériennes/terrestres —
+          // même présentation que ReferentielsPage, nav de gauche par section)
           {
             path: '/administration',
             element: <AdministrationPage />,
-            handle: { crumb: 'Administration', title: 'Utilisateurs & stations' },
+            handle: { crumb: 'Administration', title: 'Utilisateurs, stations & équipes' },
           },
           // Anciennes routes, conservées en redirection — l'onglet ouvert doit
           // correspondre à l'ancienne route, pas retomber sur Utilisateurs par défaut.
