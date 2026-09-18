@@ -5,7 +5,7 @@
  * à la synchronisation.
  */
 import { construireCible } from '@/lib/traitement-cible';
-import { InfestationRow, PopulationRow } from '@/lib/prospection-repository';
+import { CaptureRow, InfestationRow, PopulationRow } from '@/lib/prospection-repository';
 
 function population(overrides: Partial<PopulationRow>): PopulationRow {
   return {
@@ -16,6 +16,18 @@ function population(overrides: Partial<PopulationRow>): PopulationRow {
     methode: null,
     accouplement: null,
     ponte: null,
+    ...overrides,
+  };
+}
+
+function capture(overrides: Partial<CaptureRow>): CaptureRow {
+  return {
+    espece: 'LMC',
+    categorie: 'larve',
+    sexe: null,
+    phase: 'gregaire',
+    stade: 'L1',
+    effectif: 0,
     ...overrides,
   };
 }
@@ -148,6 +160,42 @@ describe('construireCible', () => {
     expect(cible.petites_larves_lmc).toBe(10);
     expect(cible.petites_larves_nse).toBeNull();
     expect(cible.grandes_larves_nse).toBeNull();
+  });
+
+  it('dérive les petites/grandes larves depuis ProspectionCapture (Intensif, #cible-intensif-larves-non-renseigne)', () => {
+    // Intensif (fusion des écrans B/C, intensive-imagos.tsx/intensive-larves.tsx) :
+    // les effectifs larvaires par stade sont posés sur des lignes CaptureRow, pas
+    // sur densites_larve (propre à l'Extensif) — avant ce correctif, "Cibles"/
+    // "Synthèse" affichaient toujours "non renseigné" pour ces fiches.
+    const cible = construireCible(
+      { surface_infestee: null },
+      [],
+      [],
+      [
+        capture({ espece: 'LMC', stade: 'L1', effectif: 10 }),
+        capture({ espece: 'LMC', stade: 'L5', effectif: 3 }),
+        // Une capture imago ne doit jamais être comptée comme larve.
+        capture({ espece: 'LMC', categorie: 'imago', stade: 'F', effectif: 99 }),
+      ]
+    );
+    expect(cible.petites_larves).toBe(10);
+    expect(cible.grandes_larves).toBe(3);
+    expect(cible.petites_larves_lmc).toBe(10);
+    expect(cible.grandes_larves_lmc).toBe(3);
+    expect(cible.petites_larves_nse).toBeNull();
+  });
+
+  it('cumule densites_larve et ProspectionCapture sans les faire s’écraser l’un l’autre', () => {
+    // Les deux sources ne se recouvrent jamais pour une même prospection
+    // (l'Extensif n'écrit jamais dans prospection_capture, l'Intensif jamais
+    // dans densites_larve) : garde-fou défensif, pas un scénario réel.
+    const cible = construireCible(
+      { surface_infestee: null },
+      [population({ espece: 'NSE', categorie: 'larve', densites_larve: JSON.stringify({ L1: 2 }) })],
+      [],
+      [capture({ espece: 'NSE', stade: 'L1', effectif: 5 })]
+    );
+    expect(cible.petites_larves_nse).toBe(7);
   });
 
   it('détaille les densités diffuse/groupée par espèce, cumulées sur les lignes imago + larve', () => {

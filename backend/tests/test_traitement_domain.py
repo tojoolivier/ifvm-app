@@ -15,7 +15,7 @@ from app.application.traitement_use_cases import (
     UpdateRotation,
     ValiderTraitement,
 )
-from app.domain.prospection import Prospection, ProspectionPopulation
+from app.domain.prospection import Prospection, ProspectionCapture, ProspectionPopulation
 from app.domain.traitement import (
     BlocModeIncoherentError,
     BlocSurfaceDepasseInfesteeError,
@@ -153,6 +153,54 @@ def test_cible_detail_par_espece_absente_reste_non_renseigne():
     assert cible.petites_larves_lmc == 10
     assert cible.petites_larves_nse is None
     assert cible.grandes_larves_nse is None
+
+
+def test_cible_larves_via_prospection_capture_intensif():
+    """Intensif (fusion des écrans B/C, cf. intensive-imagos.tsx/intensive-
+    larves.tsx) : les effectifs larvaires par stade sont posés sur des lignes
+    ProspectionCapture (categorie="larve"), jamais sur densites_larve (propre
+    à l'Extensif) — avant ce correctif, "Cibles"/"Synthèse" affichaient
+    toujours "non renseigné" pour les larves d'une fiche de traitement issue
+    d'une prospection Intensive (#cible-intensif-larves-non-renseigne)."""
+    p = _prospection(
+        captures=[
+            ProspectionCapture(
+                espece="LMC", categorie="larve", phase="gregaire", stade="L1", effectif=10
+            ),
+            ProspectionCapture(
+                espece="LMC", categorie="larve", phase="gregaire", stade="L5", effectif=3
+            ),
+            # Une capture imago ne doit jamais être comptée comme larve.
+            ProspectionCapture(
+                espece="LMC", categorie="imago", phase="gregaire", stade="F", effectif=99
+            ),
+        ]
+    )
+    cible = construire_cible(p)
+    assert cible.petites_larves == "10"
+    assert cible.grandes_larves == "3"
+    assert cible.petites_larves_lmc == 10
+    assert cible.grandes_larves_lmc == 3
+    assert cible.petites_larves_nse is None
+
+
+def test_cible_larves_cumule_densites_larve_et_prospection_capture():
+    """Les deux sources ne se recouvrent jamais pour une même prospection
+    (l'Extensif n'écrit jamais dans ProspectionCapture, l'Intensif jamais dans
+    densites_larve) : vérifie qu'elles s'additionnent sans s'écraser si les
+    deux sont présentes (garde-fou défensif, pas un scénario réel)."""
+    p = _prospection(
+        populations=[
+            ProspectionPopulation(espece="NSE", categorie="larve", densites_larve={"L1": 2}),
+        ],
+        captures=[
+            ProspectionCapture(
+                espece="NSE", categorie="larve", phase="gregaire", stade="L1", effectif=5
+            ),
+        ],
+    )
+    cible = construire_cible(p)
+    assert cible.petites_larves_nse == 7
 
 
 def test_cible_detail_par_espece_densites_diffuse_groupee():
