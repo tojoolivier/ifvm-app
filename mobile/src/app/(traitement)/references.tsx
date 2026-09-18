@@ -12,7 +12,12 @@ import {
   saveCible,
 } from '@/lib/traitement-repository';
 import { construireCible } from '@/lib/traitement-cible';
-import { getProspection, listAllProspectionPopulations, listAllProspectionInfestations } from '@/lib/prospection-repository';
+import {
+  getProspection,
+  listAllProspectionPopulations,
+  listAllProspectionInfestations,
+  listAllProspectionCaptures,
+} from '@/lib/prospection-repository';
 import { STATUT_VALIDE } from '@/lib/prospection-fiche-lecture';
 import { generateId } from '@/lib/id';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
@@ -254,13 +259,14 @@ export default function ReferencesScreen() {
           // cf. l'avertissement affiché sur l'écran Cibles) — dérivé de la fiche
           // de prospection liée, même logique que construire_cible() côté backend.
           if (prospectionId) {
-            const [prospectionLiee, populations, infestations] = await Promise.all([
+            const [prospectionLiee, populations, infestations, captures] = await Promise.all([
               getProspection(prospectionId),
               listAllProspectionPopulations(prospectionId),
               listAllProspectionInfestations(prospectionId),
+              listAllProspectionCaptures(prospectionId),
             ]);
             if (prospectionLiee) {
-              await saveCible(id, construireCible(prospectionLiee, populations, infestations));
+              await saveCible(id, construireCible(prospectionLiee, populations, infestations, captures));
             }
           }
         }

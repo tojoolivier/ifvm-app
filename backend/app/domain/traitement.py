@@ -799,6 +799,31 @@ def construire_cible(prospection: Prospection) -> Cible:
                 else:
                     grandes_par_espece[p.espece] += densite
 
+    # Intensif (fusion des écrans B/C, cf. intensive-imagos.tsx/intensive-larves.tsx) :
+    # les effectifs larvaires par stade ne sont plus posés sur densites_larve
+    # (propre à l'Extensif) mais dans des lignes ProspectionCapture distinctes
+    # (categorie="larve", stade, effectif) — jamais lues ici jusqu'à ce
+    # correctif, d'où "Cibles"/"Synthèse" affichant "non renseigné" pour les
+    # larves sur toute fiche de traitement dérivée d'une prospection Intensive.
+    # Les deux sources ne se recouvrent jamais pour une même prospection
+    # (l'Extensif n'écrit jamais dans ProspectionCapture, l'Intensif jamais
+    # dans densites_larve) : les additionner est donc sans risque de doublon.
+    for c in prospection.captures:
+        if c.categorie != "larve" or not c.stade:
+            continue
+        larves_renseignees = True
+        petite = c.stade.upper() in ("L1", "L2", "L3")
+        if petite:
+            petites_total += c.effectif
+        else:
+            grandes_total += c.effectif
+        if c.espece in petites_par_espece:
+            larves_renseignees_par_espece[c.espece] = True
+            if petite:
+                petites_par_espece[c.espece] += c.effectif
+            else:
+                grandes_par_espece[c.espece] += c.effectif
+
     # Repartition (diffuse/groupee) par espece : somme des densites de toutes
     # les lignes de cette espece (imago + larve), meme logique additive que
     # les larves ci-dessus — une espece peut avoir une densite saisie sur sa
