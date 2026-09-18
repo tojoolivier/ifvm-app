@@ -104,14 +104,14 @@ describe('TraitementScreen (Équipe, Terrestre) — Atomiseur à dos / autoport�
     await render(<TraitementScreen />);
     await waitFor(() => expect(useTraitementCaptureStore.getState().terrestre.chefEquipeId).toBe('chef-equipe-1'));
 
-    // Ordre de rendu : vitesse du vent (0), température (1), taux de mortalité (2),
-    // délai d'évaluation (3), atomiseur à dos (4), atomiseur autoporté (5),
-    // disque rotatif (6).
-    fireEvent.changeText(screen.getAllByPlaceholderText('0')[4], '10');
+    // Ordre de rendu (efficacité déplacée sur Moyens & protection, #efficacite-moyens-
+    // protection) : vitesse du vent (0), température (1), atomiseur à dos (2),
+    // atomiseur autoporté (3), disque rotatif (4).
+    fireEvent.changeText(screen.getAllByPlaceholderText('0')[2], '10');
     expect(await screen.findByDisplayValue('10')).toBeVisible();
-    fireEvent.changeText(screen.getAllByPlaceholderText('0')[5], '3');
+    fireEvent.changeText(screen.getAllByPlaceholderText('0')[3], '3');
     expect(await screen.findByDisplayValue('3')).toBeVisible();
-    fireEvent.changeText(screen.getAllByPlaceholderText('0')[6], '5');
+    fireEvent.changeText(screen.getAllByPlaceholderText('0')[4], '5');
     expect(await screen.findByDisplayValue('5')).toBeVisible();
 
     fireEvent.press(screen.getByText('Continuer  ›'));

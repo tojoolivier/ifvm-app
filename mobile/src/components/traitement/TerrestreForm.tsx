@@ -31,8 +31,6 @@ function formatDecimalDisplay(value: number | null | undefined): string {
 type TerrestreDecimalField =
   | 'vitesse_vent_ms'
   | 'temperature_c'
-  | 'taux_mortalite_pourcent'
-  | 'evaluation_efficacite_heures_apres'
   | 'surface_atomiseur_ha'
   | 'surface_atomiseur_autoporte_ha'
   | 'surface_disque_rotatif_ha'
@@ -211,48 +209,6 @@ export function TerrestreForm({
             onPress={() => !readOnly && store.updateTerrestre({ direction_vent: d })}
           />
         ))}
-      </View>
-
-      <Text style={styles.label}>Efficacité</Text>
-      <Text style={styles.label}>Taux de mortalité (%)</Text>
-      <TextInput
-        editable={!readOnly}
-        style={styles.input}
-        placeholder="0"
-        keyboardType="decimal-pad"
-        value={getDecimalDraft('taux_mortalite_pourcent') ?? formatDecimalDisplay(store.terrestre.taux_mortalite_pourcent)}
-        onChangeText={(v) => handleDecimalChange('taux_mortalite_pourcent', v)}
-        onBlur={() => clearDecimalDraft('taux_mortalite_pourcent')}
-      />
-      <Text style={styles.label}>Évalué après traitement (heures)</Text>
-      <TextInput
-        editable={!readOnly}
-        style={styles.input}
-        placeholder="0"
-        keyboardType="decimal-pad"
-        value={
-          getDecimalDraft('evaluation_efficacite_heures_apres') ??
-          formatDecimalDisplay(store.terrestre.evaluation_efficacite_heures_apres)
-        }
-        onChangeText={(v) => handleDecimalChange('evaluation_efficacite_heures_apres', v)}
-        onBlur={() => clearDecimalDraft('evaluation_efficacite_heures_apres')}
-      />
-      <Text style={styles.label}>Méthode d&apos;évaluation</Text>
-      <View style={styles.chipRow}>
-        <Chip
-          label="Estimation visuelle"
-          selected={store.terrestre.methode_evaluation_efficacite === 'ESTIMATION_VISUELLE'}
-          onPress={() =>
-            !readOnly && store.updateTerrestre({ methode_evaluation_efficacite: 'ESTIMATION_VISUELLE' })
-          }
-        />
-        <Chip
-          label="Comptages pré/post-traitement"
-          selected={store.terrestre.methode_evaluation_efficacite === 'COMPTAGES_PRE_POST'}
-          onPress={() =>
-            !readOnly && store.updateTerrestre({ methode_evaluation_efficacite: 'COMPTAGES_PRE_POST' })
-          }
-        />
       </View>
 
       <Text style={styles.label}>Moyens &amp; surfaces (ha)</Text>

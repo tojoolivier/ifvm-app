@@ -1,8 +1,10 @@
 /**
- * Efficacité (migration backend 0058, fiche CRT papier section "Traitement") :
- * taux de mortalité, délai d'évaluation et méthode — côté Aérien, saisi sur le
- * même écran que « Pesticide reçu » (rotations.tsx), une seule évaluation par
- * fiche (après l'ensemble des rotations), pas par rotation individuelle.
+ * Saisie décimale francophone (virgule) sur l'écran « Pesticides & rotations »
+ * (rotations.tsx) — Approvisionnement et vent fin de rotation.
+ *
+ * L'efficacité (taux de mortalité, délai d'évaluation, méthode) vivait ici
+ * jusqu'à son déplacement sur « Moyens & protection » (moyens.tsx,
+ * #efficacite-moyens-protection) — cf. traitement-moyens-efficacite.test.tsx.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import RotationsScreen from '@/app/(traitement)/rotations';
@@ -21,7 +23,6 @@ jest.mock('@/lib/traitement-repository', () => ({
   addRotation: jest.fn().mockResolvedValue({}),
   deleteAllRotationsForTraitementAerien: jest.fn().mockResolvedValue(undefined),
   updateTraitementAerienPesticideRecu: jest.fn().mockResolvedValue({}),
-  updateTraitementAerienEfficacite: jest.fn().mockResolvedValue({}),
 }));
 
 jest.mock('@/lib/referentiel-db', () => ({
@@ -63,54 +64,7 @@ beforeEach(() => {
   jest.mocked(traitementRepository.addRotation).mockClear().mockResolvedValue({} as any);
   jest.mocked(traitementRepository.deleteAllRotationsForTraitementAerien).mockClear().mockResolvedValue(undefined);
   jest.mocked(traitementRepository.updateTraitementAerienPesticideRecu).mockClear().mockResolvedValue({} as any);
-  jest.mocked(traitementRepository.updateTraitementAerienEfficacite).mockClear().mockResolvedValue({} as any);
   useTraitementCaptureStore.setState(RESET_STATE);
-});
-
-describe('RotationsScreen — efficacité (taux de mortalité)', () => {
-  it('saisit et enregistre le taux de mortalité, le délai et la méthode', async () => {
-    await render(<RotationsScreen />);
-    await screen.findByTestId('rotation-numero-cuve-0');
-
-    fireEvent.changeText(screen.getByTestId('taux-mortalite-input'), '92');
-    await settle();
-    fireEvent.changeText(screen.getByTestId('evaluation-efficacite-heures-input'), '24');
-    await settle();
-    fireEvent.press(screen.getByText('Estimation visuelle'));
-    await settle();
-    fireEvent.press(screen.getByText('Continuer  ›'));
-
-    await waitFor(() =>
-      expect(traitementRepository.updateTraitementAerienEfficacite).toHaveBeenCalledWith('trait-1', {
-        tauxMortalitePourcent: 92,
-        evaluationEfficaciteHeuresApres: 24,
-        methodeEvaluationEfficacite: 'ESTIMATION_VISUELLE',
-      })
-    );
-  });
-
-  it('restaure une évaluation déjà enregistrée', async () => {
-    jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
-      id: 'trait-1',
-      type_traitement: 'AERIEN',
-      cible: { surface_infestee_ha: 100 },
-      aerien: {
-        pesticide_recu_l: null,
-        taux_mortalite_pourcent: 87.5,
-        evaluation_efficacite_heures_apres: 6,
-        methode_evaluation_efficacite: 'COMPTAGES_PRE_POST',
-        rotations: [],
-      },
-    } as any);
-
-    await render(<RotationsScreen />);
-
-    expect(await screen.findByDisplayValue('87,5')).toBeVisible();
-    expect(screen.getByDisplayValue('6')).toBeVisible();
-    expect(screen.getByText('Comptages pré/post-traitement').props.style).toEqual(
-      expect.arrayContaining([expect.objectContaining({ color: '#fff' })])
-    );
-  });
 });
 
 describe('RotationsScreen — saisie décimale francophone (virgule)', () => {

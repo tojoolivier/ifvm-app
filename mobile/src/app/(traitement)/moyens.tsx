@@ -2,7 +2,12 @@ import { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { getTraitement, updateTraitementMoyens } from '@/lib/traitement-repository';
+import {
+  getTraitement,
+  updateTraitementMoyens,
+  updateTraitementAerienEfficacite,
+  updateTraitementTerrestreEfficacite,
+} from '@/lib/traitement-repository';
 import { getProspection } from '@/lib/prospection-repository';
 import { validateRecouvrement } from '@/lib/traitement-validation';
 import { useAsyncAction } from '@/hooks/use-async-action';
@@ -36,7 +41,7 @@ function formatDecimalDisplay(value: number | null): string {
   return value != null ? String(value).replace('.', ',') : '';
 }
 
-type VegetationDecimalField = 'herbeuse' | 'arboree' | 'recouvrement';
+type MoyensDecimalField = 'herbeuse' | 'arboree' | 'recouvrement' | 'tauxMortalite' | 'evaluationEfficaciteHeures';
 
 // Réduit à Cultures/Pâturages — Habitations, Points d'eau, Aire protégée et
 // Ruchers retirés du choix (décision produit).
@@ -58,10 +63,16 @@ export default function MoyensScreen() {
   const [hauteurHerbeuse, setHauteurHerbeuse] = useState<number | null>(null);
   const [hauteurArboree, setHauteurArboree] = useState<number | null>(null);
   const [recouvrement, setRecouvrement] = useState<number | null>(null);
-  // Texte brut en cours de saisie pour les 3 champs décimaux de la végétation — permet de
+  // Efficacité (migration backend 0058, fiche CRT papier section "Traitement") —
+  // déplacée ici depuis Équipe/Pesticides & rotations (#efficacite-moyens-protection) :
+  // une seule évaluation par fiche, commune à l'Aérien et au Terrestre.
+  const [tauxMortalite, setTauxMortalite] = useState<number | null>(null);
+  const [evaluationEfficaciteHeures, setEvaluationEfficaciteHeures] = useState<number | null>(null);
+  const [methodeEvaluation, setMethodeEvaluation] = useState<'ESTIMATION_VISUELLE' | 'COMPTAGES_PRE_POST' | null>(null);
+  // Texte brut en cours de saisie pour les champs décimaux de cet écran — permet de
   // taper la virgule ou un zéro de fin ("1,", "1,50") sans que le champ ne se reformate à
   // chaque frappe (cf. `formatDecimalDisplay` sinon appelé sur une valeur encore inexploitable).
-  const [decimalDrafts, setDecimalDrafts] = useState<Partial<Record<VegetationDecimalField, string>>>({});
+  const [decimalDrafts, setDecimalDrafts] = useState<Partial<Record<MoyensDecimalField, string>>>({});
   // Décide du nombre d'étapes de ProgressBar (7 en aérien avec l'écran Rotations, 6 en
   // terrestre sans lui) — même garde défensive que cibles.tsx/signatures.tsx.
   const [typeTraitement, setTypeTraitement] = useState<'AERIEN' | 'TERRESTRE' | null>(null);
@@ -96,6 +107,14 @@ export default function MoyensScreen() {
         setHauteurHerbeuse(draft.hauteur_strate_herbeuse_m);
         setHauteurArboree(draft.hauteur_strate_arboree_m);
         setRecouvrement(draft.recouvrement_percent);
+        const efficacite = draft.type_traitement === 'AERIEN' ? draft.aerien : draft.terrestre;
+        if (efficacite) {
+          setTauxMortalite(efficacite.taux_mortalite_pourcent);
+          setEvaluationEfficaciteHeures(efficacite.evaluation_efficacite_heures_apres);
+          setMethodeEvaluation(
+            efficacite.methode_evaluation_efficacite as 'ESTIMATION_VISUELLE' | 'COMPTAGES_PRE_POST' | null
+          );
+        }
       })
       .catch((error) => signalerChargement(error, { traitementId }));
   }, [traitementId, signalerChargement]);
@@ -131,30 +150,32 @@ export default function MoyensScreen() {
   const nbKitFournis = KIT_ROWS.filter((row) => (kit[row.key] ?? 0) > 0).length;
   const recouvrementErrors = validateRecouvrement(recouvrement);
 
-  const vegetationFieldSetters: Record<VegetationDecimalField, (v: number | null) => void> = {
+  const decimalFieldSetters: Record<MoyensDecimalField, (v: number | null) => void> = {
     herbeuse: setHauteurHerbeuse,
     arboree: setHauteurArboree,
     recouvrement: setRecouvrement,
+    tauxMortalite: setTauxMortalite,
+    evaluationEfficaciteHeures: setEvaluationEfficaciteHeures,
   };
 
   // Accepte "," et "." et tolère la saisie intermédiaire ("1," / "1.") sans la figer tant
   // qu'elle n'est pas exploitable — même logique que `handleDecimalChange` de veg.tsx.
-  const handleVegetationChange = (field: VegetationDecimalField, raw: string) => {
+  const handleDecimalChange = (field: MoyensDecimalField, raw: string) => {
     if (raw !== '' && !/^\d*[.,]?\d*$/.test(raw)) return;
     setDecimalDrafts((current) => ({ ...current, [field]: raw }));
     if (raw === '') {
-      vegetationFieldSetters[field](null);
+      decimalFieldSetters[field](null);
       return;
     }
     if (raw.endsWith('.') || raw.endsWith(',')) return;
     const val = parseDecimalInput(raw);
     if (val === null) return;
-    vegetationFieldSetters[field](val);
+    decimalFieldSetters[field](val);
   };
 
   // Resynchronise l'affichage sur la valeur numérique canonique (virgule) une fois la
   // saisie terminée.
-  const handleVegetationBlur = (field: VegetationDecimalField) => {
+  const handleDecimalBlur = (field: MoyensDecimalField) => {
     setDecimalDrafts((current) => {
       if (current[field] === undefined) return current;
       const next = { ...current };
@@ -168,6 +189,19 @@ export default function MoyensScreen() {
       async () => {
         // Déjà visible à l'écran (message par champ) : pas de second signal.
         if (recouvrementErrors.length > 0) return;
+        if (typeTraitement === 'AERIEN') {
+          await updateTraitementAerienEfficacite(traitementId, {
+            tauxMortalitePourcent: tauxMortalite,
+            evaluationEfficaciteHeuresApres: evaluationEfficaciteHeures,
+            methodeEvaluationEfficacite: methodeEvaluation,
+          });
+        } else if (typeTraitement === 'TERRESTRE') {
+          await updateTraitementTerrestreEfficacite(traitementId, {
+            taux_mortalite_pourcent: tauxMortalite,
+            evaluation_efficacite_heures_apres: evaluationEfficaciteHeures,
+            methode_evaluation_efficacite: methodeEvaluation,
+          });
+        }
         await updateTraitementMoyens(traitementId, {
           kit_combinaison: kit.kit_combinaison ?? 0,
           kit_gants: kit.kit_gants ?? 0,
@@ -198,6 +232,43 @@ export default function MoyensScreen() {
           segments={typeTraitement === 'TERRESTRE' ? PROGRESS_SEGMENTS_TERRESTRE : PROGRESS_SEGMENTS_AERIEN}
         />
         <Text style={styles.title}>Moyens & protection</Text>
+
+        <Text style={styles.sectionLabel}>Efficacité</Text>
+        <Text style={styles.fieldLabel}>Taux de mortalité (%)</Text>
+        <TextInput
+          testID="taux-mortalite-input"
+          editable={!readOnly}
+          style={styles.input}
+          placeholder="0"
+          keyboardType="decimal-pad"
+          value={decimalDrafts.tauxMortalite ?? formatDecimalDisplay(tauxMortalite)}
+          onChangeText={(v) => handleDecimalChange('tauxMortalite', v)}
+          onBlur={() => handleDecimalBlur('tauxMortalite')}
+        />
+        <Text style={styles.fieldLabel}>Évalué après traitement (heures)</Text>
+        <TextInput
+          testID="evaluation-efficacite-heures-input"
+          editable={!readOnly}
+          style={styles.input}
+          placeholder="0"
+          keyboardType="decimal-pad"
+          value={decimalDrafts.evaluationEfficaciteHeures ?? formatDecimalDisplay(evaluationEfficaciteHeures)}
+          onChangeText={(v) => handleDecimalChange('evaluationEfficaciteHeures', v)}
+          onBlur={() => handleDecimalBlur('evaluationEfficaciteHeures')}
+        />
+        <Text style={styles.fieldLabel}>Méthode d&apos;évaluation</Text>
+        <View style={styles.chipRow}>
+          <Chip
+            label="Estimation visuelle"
+            selected={methodeEvaluation === 'ESTIMATION_VISUELLE'}
+            onPress={() => !readOnly && setMethodeEvaluation('ESTIMATION_VISUELLE')}
+          />
+          <Chip
+            label="Comptages pré/post-traitement"
+            selected={methodeEvaluation === 'COMPTAGES_PRE_POST'}
+            onPress={() => !readOnly && setMethodeEvaluation('COMPTAGES_PRE_POST')}
+          />
+        </View>
 
         <Card variant={nbKitFournis === 5 ? 'info' : 'avertissement'}>
           <Text style={nbKitFournis === 5 ? styles.bannerTextOk : styles.bannerTextWarn}>
@@ -251,7 +322,7 @@ export default function MoyensScreen() {
             inchangé : la section reste visible telle quelle. */}
         {typeTraitement !== 'AERIEN' && (
           <>
-            <Text style={styles.vegetationLabel}>Végétation</Text>
+            <Text style={styles.sectionLabel}>Végétation</Text>
 
             <Text style={styles.fieldLabel}>Strate herbeuse (m) — pré-remplie, modifiable</Text>
             <TextInput
@@ -260,8 +331,8 @@ export default function MoyensScreen() {
               placeholder="Ex. 1,5"
               keyboardType="decimal-pad"
               value={decimalDrafts.herbeuse ?? formatDecimalDisplay(hauteurHerbeuse)}
-              onChangeText={(v) => handleVegetationChange('herbeuse', v)}
-              onBlur={() => handleVegetationBlur('herbeuse')}
+              onChangeText={(v) => handleDecimalChange('herbeuse', v)}
+              onBlur={() => handleDecimalBlur('herbeuse')}
             />
             <Text style={styles.fieldLabel}>Strate arborée (m)</Text>
             <TextInput
@@ -270,8 +341,8 @@ export default function MoyensScreen() {
               placeholder="Ex. 2,5"
               keyboardType="decimal-pad"
               value={decimalDrafts.arboree ?? formatDecimalDisplay(hauteurArboree)}
-              onChangeText={(v) => handleVegetationChange('arboree', v)}
-              onBlur={() => handleVegetationBlur('arboree')}
+              onChangeText={(v) => handleDecimalChange('arboree', v)}
+              onBlur={() => handleDecimalBlur('arboree')}
             />
             <Text style={styles.fieldLabel}>Recouvrement (%) — pré-rempli, modifiable</Text>
             <TextInput
@@ -280,8 +351,8 @@ export default function MoyensScreen() {
               placeholder="Ex. 80"
               keyboardType="decimal-pad"
               value={decimalDrafts.recouvrement ?? formatDecimalDisplay(recouvrement)}
-              onChangeText={(v) => handleVegetationChange('recouvrement', v)}
-              onBlur={() => handleVegetationBlur('recouvrement')}
+              onChangeText={(v) => handleDecimalChange('recouvrement', v)}
+              onBlur={() => handleDecimalBlur('recouvrement')}
             />
             {recouvrementErrors.map((e) => (
               <Text key={e.field} style={styles.error}>{e.message}</Text>
@@ -332,11 +403,11 @@ const styles = StyleSheet.create({
   // Semi-gras (au lieu de uiMedium) : demande explicite, titres de champ plus
   // visibles sur les fiches de traitement.
   label: { fontFamily: traitementFonts.uiSemiBold, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
-  // Titre de section Végétation : centré, agrandi et en gras — même hiérarchie
-  // visuelle que les valeurs de l'écran Cibles (cibles.tsx), sur demande
-  // explicite, sans toucher au `label` partagé (utilisé aussi par « Zones
-  // exposées » juste au-dessus, qui reste inchangé).
-  vegetationLabel: {
+  // Titre de section (Efficacité, Végétation) : centré, agrandi et en gras —
+  // même hiérarchie visuelle que les valeurs de l'écran Cibles (cibles.tsx),
+  // sur demande explicite, sans toucher au `label` partagé (utilisé aussi par
+  // « Zones exposées », qui reste inchangé).
+  sectionLabel: {
     fontFamily: traitementFonts.uiBold,
     fontSize: traitementTypeSizes.corps + 3,
     color: traitementColors.texteTitre,
