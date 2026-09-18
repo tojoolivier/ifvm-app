@@ -793,7 +793,9 @@ async def create_equipe_terrestre(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Utilisateur, Depends(get_current_user)],
 ):
-    use_case = CreateEquipeTerrestre(EquipeTerrestreRepositoryImpl(db), UtilisateurRepositoryImpl(db))
+    use_case = CreateEquipeTerrestre(
+        EquipeTerrestreRepositoryImpl(db), UtilisateurRepositoryImpl(db)
+    )
     try:
         return await use_case.execute(
             nom=body.nom,

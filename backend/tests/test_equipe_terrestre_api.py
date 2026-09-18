@@ -24,7 +24,9 @@ async def test_create_equipe_terrestre(client: AsyncClient, auth_headers: dict, 
 
 
 @pytest.mark.asyncio
-async def test_create_equipe_terrestre_sans_membres(client: AsyncClient, auth_headers: dict, chef_equipe):
+async def test_create_equipe_terrestre_sans_membres(
+    client: AsyncClient, auth_headers: dict, chef_equipe
+):
     response = await client.post(
         "/equipes-terrestres",
         json={"nom": "Équipe Terrestre Ihosy", "chef_equipe_id": str(chef_equipe.id)},

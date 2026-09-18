@@ -184,7 +184,9 @@ class EquipeAerienneModel(Base):
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
 
     membres: Mapped[list["EquipeAerienneMembreModel"]] = relationship(
-        back_populates="equipe", cascade="all, delete-orphan", order_by="EquipeAerienneMembreModel.created_at"
+        back_populates="equipe",
+        cascade="all, delete-orphan",
+        order_by="EquipeAerienneMembreModel.created_at",
     )
 
     # Noms de contraintes explicites — doivent matcher la migration 0066 à
@@ -220,9 +222,7 @@ class EquipeAerienneMembreModel(Base):
 
     equipe: Mapped[EquipeAerienneModel] = relationship(back_populates="membres")
 
-    __table_args__ = (
-        Index("ix_equipe_aerienne_membre_equipe_aerienne_id", "equipe_aerienne_id"),
-    )
+    __table_args__ = (Index("ix_equipe_aerienne_membre_equipe_aerienne_id", "equipe_aerienne_id"),)
 
 
 class EquipeTerrestreModel(Base):
@@ -244,7 +244,9 @@ class EquipeTerrestreModel(Base):
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
 
     membres: Mapped[list["EquipeTerrestreMembreModel"]] = relationship(
-        back_populates="equipe", cascade="all, delete-orphan", order_by="EquipeTerrestreMembreModel.created_at"
+        back_populates="equipe",
+        cascade="all, delete-orphan",
+        order_by="EquipeTerrestreMembreModel.created_at",
     )
 
     # Noms de contraintes explicites — doivent matcher la migration 0072 à

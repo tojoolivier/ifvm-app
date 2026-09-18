@@ -440,7 +440,9 @@ class EquipeAerienneRepositoryImpl(EquipeAerienneRepository):
         )
 
     async def list_all(self, actif: bool | None = True) -> list[EquipeAerienne]:
-        stmt = select(EquipeAerienneModel).options(*self._CHARGEMENT).order_by(EquipeAerienneModel.nom)
+        stmt = (
+            select(EquipeAerienneModel).options(*self._CHARGEMENT).order_by(EquipeAerienneModel.nom)
+        )
         if actif is not None:
             stmt = stmt.where(EquipeAerienneModel.actif == actif)
         result = await self.session.execute(stmt)
@@ -466,9 +468,7 @@ class EquipeAerienneRepositoryImpl(EquipeAerienneRepository):
             actif=equipe.actif,
             created_at=equipe.created_at,
             updated_at=equipe.updated_at,
-            membres=[
-                EquipeAerienneMembreModel(id=m.id, nom=m.nom) for m in equipe.membres
-            ],
+            membres=[EquipeAerienneMembreModel(id=m.id, nom=m.nom) for m in equipe.membres],
         )
         self.session.add(model)
         try:
@@ -501,7 +501,11 @@ class EquipeTerrestreRepositoryImpl(EquipeTerrestreRepository):
         )
 
     async def list_all(self, actif: bool | None = True) -> list[EquipeTerrestre]:
-        stmt = select(EquipeTerrestreModel).options(*self._CHARGEMENT).order_by(EquipeTerrestreModel.nom)
+        stmt = (
+            select(EquipeTerrestreModel)
+            .options(*self._CHARGEMENT)
+            .order_by(EquipeTerrestreModel.nom)
+        )
         if actif is not None:
             stmt = stmt.where(EquipeTerrestreModel.actif == actif)
         result = await self.session.execute(stmt)
@@ -524,9 +528,7 @@ class EquipeTerrestreRepositoryImpl(EquipeTerrestreRepository):
             actif=equipe.actif,
             created_at=equipe.created_at,
             updated_at=equipe.updated_at,
-            membres=[
-                EquipeTerrestreMembreModel(id=m.id, nom=m.nom) for m in equipe.membres
-            ],
+            membres=[EquipeTerrestreMembreModel(id=m.id, nom=m.nom) for m in equipe.membres],
         )
         self.session.add(model)
         try:

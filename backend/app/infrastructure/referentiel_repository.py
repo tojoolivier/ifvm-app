@@ -197,7 +197,8 @@ class PosteAcridienRepositoryImpl(PosteAcridienRepository):
             # LEFT JOIN : equipe_terrestre_id est nullable, un poste sans équipe
             # rattachée reste listable.
             .outerjoin(
-                EquipeTerrestreModel, PosteAcridienModel.equipe_terrestre_id == EquipeTerrestreModel.id
+                EquipeTerrestreModel,
+                PosteAcridienModel.equipe_terrestre_id == EquipeTerrestreModel.id,
             )
         )
 

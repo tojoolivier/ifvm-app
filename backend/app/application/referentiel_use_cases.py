@@ -71,7 +71,9 @@ class CreateZoneAntiAcridien:
             raise CodeReferentielDejaPrisError(code)
 
         maintenant = datetime.now(timezone.utc)
-        zone = ZoneAntiAcridien(code=code, nom=nom, actif=True, created_at=maintenant, updated_at=maintenant)
+        zone = ZoneAntiAcridien(
+            code=code, nom=nom, actif=True, created_at=maintenant, updated_at=maintenant
+        )
         return await self.repository.create(zone)
 
 
@@ -149,9 +151,10 @@ class CreatePosteAcridien:
     ) -> PosteAcridien:
         if not await self.zone_repository.exists(za_id):
             raise ZoneAntiAcridienIntrouvableError(str(za_id))
-        if equipe_terrestre_id is not None and await self.equipe_terrestre_repository.get_by_id(
-            equipe_terrestre_id
-        ) is None:
+        if (
+            equipe_terrestre_id is not None
+            and await self.equipe_terrestre_repository.get_by_id(equipe_terrestre_id) is None
+        ):
             raise EquipeTerrestreIntrouvableError(str(equipe_terrestre_id))
         if await self.repository.code_pris_par_un_autre(code):
             raise CodeReferentielDejaPrisError(code)
@@ -209,9 +212,10 @@ class UpdatePosteAcridien:
         # équipe) : seul `champs_fournis` (model_fields_set côté Pydantic) distingue
         # « absent » de « mis à NULL », même patron que `UpdateBaseAerienne.equipe_id`.
         if "equipe_terrestre_id" in champs_fournis:
-            if equipe_terrestre_id is not None and await self.equipe_terrestre_repository.get_by_id(
-                equipe_terrestre_id
-            ) is None:
+            if (
+                equipe_terrestre_id is not None
+                and await self.equipe_terrestre_repository.get_by_id(equipe_terrestre_id) is None
+            ):
                 raise EquipeTerrestreIntrouvableError(str(equipe_terrestre_id))
             poste.equipe_terrestre_id = equipe_terrestre_id
 
