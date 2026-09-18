@@ -246,7 +246,7 @@ jobs:
           cache: npm
           cache-dependency-path: mobile/package-lock.json
 
-      # Meme garde-fou que lint-frontend-impl : echoue vite et clairement si le
+      # Meme garde-fou que checks-frontend : echoue vite et clairement si le
       # lockfile pointe vers un miroir npm non officiel.
       - name: Verifie que package-lock.json ne pointe que vers le registre npm officiel
         run: node ../scripts/check-lockfile-registry.js package-lock.json
