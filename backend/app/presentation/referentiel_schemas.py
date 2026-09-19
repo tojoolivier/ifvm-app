@@ -255,6 +255,10 @@ class LieuAerienRead(BaseModel):
     longitude: float
     altitude: float | None
     actif: bool
+    # Résolus par jointure (migration 0074), jamais saisis. `equipe_aerienne_id` est
+    # `None` pour un lieu créé avant cette évolution, non encore rattaché.
+    equipe_aerienne_id: uuid.UUID | None = None
+    equipe_aerienne_nom: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -265,6 +269,9 @@ class LieuAerienCreate(BaseModel):
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
     altitude: float | None = None
+    # Obligatoire pour toute nouvelle création (#lieu-aerien-equipe-aerienne) — les
+    # lieux créés avant cette évolution restent nullables en base (migration 0074).
+    equipe_aerienne_id: uuid.UUID
 
 
 class LieuAerienUpdate(BaseModel):
@@ -275,6 +282,7 @@ class LieuAerienUpdate(BaseModel):
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
     altitude: float | None = None
+    equipe_aerienne_id: uuid.UUID | None = None
     actif: bool | None = None
 
 
@@ -443,6 +451,7 @@ class LieuAerienSyncRead(BaseModel):
     longitude: float
     altitude: float | None
     actif: bool
+    equipe_aerienne_id: uuid.UUID | None = None
     updated_at: datetime
 
 

@@ -563,6 +563,13 @@ const ENTITES: EntitySpec[] = [
       },
       { key: 'nom', header: 'Nom', render: (row) => text(row, 'nom'), sortValue: (row) => text(row, 'nom') },
       {
+        // « — » pour un lieu créé avant la migration 0074, pas encore rattaché.
+        key: 'equipe_aerienne_nom',
+        header: 'Équipe aérienne',
+        render: (row) => text(row, 'equipe_aerienne_nom'),
+        sortValue: (row) => text(row, 'equipe_aerienne_nom'),
+      },
+      {
         key: 'coord',
         header: 'Coordonnées',
         mono: true,
@@ -598,6 +605,21 @@ const ENTITES: EntitySpec[] = [
           options: TYPE_LIEU_AERIEN_OPTIONS,
         },
         { name: 'nom', label: 'Nom', kind: 'text', required: true },
+        {
+          // Obligatoire : l'équipe doit exister avant ses lieux (#lieu-aerien-equipe-aerienne).
+          // Une équipe peut posséder plusieurs lieux (bases principales, secondaires, stands).
+          name: 'equipe_aerienne_id',
+          label: 'Équipe aérienne',
+          kind: 'foreign-key',
+          required: true,
+          hint: 'Une équipe peut posséder plusieurs lieux.',
+          optionsFrom: {
+            path: '/equipes-aeriennes',
+            queryKey: 'equipes-aeriennes',
+            valueKey: 'id',
+            labelKey: 'nom',
+          },
+        },
         { name: 'latitude', label: 'Latitude', kind: 'number', mono: true, required: true },
         { name: 'longitude', label: 'Longitude', kind: 'number', mono: true, required: true },
         { name: 'altitude', label: 'Altitude (m)', kind: 'number', mono: true, nullable: true },
@@ -631,11 +653,19 @@ function blankFormValues(fields: EditableField[]): FormValues {
  * Champs de formulaire → corps JSON. La chaîne vide vaut NULL sur un champ
  * nullable ; ailleurs elle part telle quelle, le backend restant l'autorité
  * (409 code hors vocabulaire, 409 grille déjà occupée, 422 valeur interdite).
+ *
+ * Exception : une clé étrangère non nullable laissée vide est omise plutôt
+ * qu'envoyée en `''` (qui n'est pas un UUID valide). À la création, le backend
+ * refuse alors proprement (champ requis) ; à la modification, la valeur reste
+ * inchangée — ce qui permet d'éditer ou de désactiver un lieu aérien créé avant
+ * la migration 0074 (pas encore rattaché à une équipe) sans devoir choisir une
+ * équipe d'abord.
  */
 function toPayload(fields: EditableField[], values: FormValues): Record<string, unknown> {
   const payload: Record<string, unknown> = {}
   for (const field of fields) {
     const raw = values[field.name] ?? ''
+    if (field.kind === 'foreign-key' && raw === '' && !field.nullable) continue
     if (field.kind === 'number') payload[field.name] = raw === '' ? 0 : Number(raw)
     else payload[field.name] = raw === '' && field.nullable ? null : raw
   }

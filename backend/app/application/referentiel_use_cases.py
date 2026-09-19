@@ -16,6 +16,7 @@ from app.domain.referentiel import (
     CommuneInconnueError,
     Culture,
     EquipeAerienne,
+    EquipeAerienneIntrouvableError,
     EquipeTerrestre,
     EquipeTerrestreIntrouvableError,
     GrilleDejaOccupeeError,
@@ -601,8 +602,13 @@ class GetLieuAerien:
 
 
 class CreateLieuAerien:
-    def __init__(self, repository: LieuAerienRepository):
+    def __init__(
+        self,
+        repository: LieuAerienRepository,
+        equipe_aerienne_repository: EquipeAerienneRepository,
+    ):
         self.repository = repository
+        self.equipe_aerienne_repository = equipe_aerienne_repository
 
     async def execute(
         self,
@@ -611,9 +617,12 @@ class CreateLieuAerien:
         latitude: float,
         longitude: float,
         altitude: float | None,
+        equipe_aerienne_id: uuid.UUID,
     ) -> LieuAerien:
         if type_lieu not in TYPES_LIEU_AERIEN:
             raise TypeLieuAerienInvalideError(type_lieu)
+        if await self.equipe_aerienne_repository.get_by_id(equipe_aerienne_id) is None:
+            raise EquipeAerienneIntrouvableError(str(equipe_aerienne_id))
 
         maintenant = datetime.now(timezone.utc)
         return await self.repository.create(
@@ -624,6 +633,7 @@ class CreateLieuAerien:
                 longitude=longitude,
                 altitude=altitude,
                 actif=True,
+                equipe_aerienne_id=equipe_aerienne_id,
                 created_at=maintenant,
                 updated_at=maintenant,
             )
@@ -634,8 +644,13 @@ class UpdateLieuAerien:
     """Mise à jour partielle, `actif` compris. Pas de suppression : `actif=False` est
     la seule sortie."""
 
-    def __init__(self, repository: LieuAerienRepository):
+    def __init__(
+        self,
+        repository: LieuAerienRepository,
+        equipe_aerienne_repository: EquipeAerienneRepository,
+    ):
         self.repository = repository
+        self.equipe_aerienne_repository = equipe_aerienne_repository
 
     async def execute(
         self,
@@ -645,6 +660,7 @@ class UpdateLieuAerien:
         latitude: float | None = None,
         longitude: float | None = None,
         altitude: float | None = None,
+        equipe_aerienne_id: uuid.UUID | None = None,
         actif: bool | None = None,
         champs_fournis: set[str] = frozenset(),
     ) -> LieuAerien | None:
@@ -666,6 +682,16 @@ class UpdateLieuAerien:
         # NULL » — `champs_fournis` vient de `model_fields_set` côté schéma Pydantic.
         if "altitude" in champs_fournis:
             lieu.altitude = altitude
+        # `equipe_aerienne_id` est nullable en base (un lieu peut être détaché de son
+        # équipe, même si le formulaire web n'expose pas cette option) — même patron
+        # que `UpdatePosteAcridien.equipe_terrestre_id`.
+        if "equipe_aerienne_id" in champs_fournis:
+            if (
+                equipe_aerienne_id is not None
+                and await self.equipe_aerienne_repository.get_by_id(equipe_aerienne_id) is None
+            ):
+                raise EquipeAerienneIntrouvableError(str(equipe_aerienne_id))
+            lieu.equipe_aerienne_id = equipe_aerienne_id
         if actif is not None:
             lieu.actif = actif
 

@@ -42,7 +42,7 @@ async def stand_inactif(db_session):
 
 
 @pytest.mark.asyncio
-async def test_create_lieu_aerien(client: AsyncClient, auth_headers: dict):
+async def test_create_lieu_aerien(client: AsyncClient, auth_headers: dict, equipe_aerienne):
     response = await client.post(
         "/lieux-aeriens",
         json={
@@ -51,6 +51,7 @@ async def test_create_lieu_aerien(client: AsyncClient, auth_headers: dict):
             "latitude": -20.53,
             "longitude": 47.24,
             "altitude": 1265.0,
+            "equipe_aerienne_id": str(equipe_aerienne.id),
         },
         headers=auth_headers,
     )
@@ -62,7 +63,9 @@ async def test_create_lieu_aerien(client: AsyncClient, auth_headers: dict):
 
 
 @pytest.mark.asyncio
-async def test_create_lieu_aerien_type_lieu_invalide_422(client: AsyncClient, auth_headers: dict):
+async def test_create_lieu_aerien_type_lieu_invalide_422(
+    client: AsyncClient, auth_headers: dict, equipe_aerienne
+):
     response = await client.post(
         "/lieux-aeriens",
         json={
@@ -70,6 +73,7 @@ async def test_create_lieu_aerien_type_lieu_invalide_422(client: AsyncClient, au
             "nom": "Quelque part",
             "latitude": -20.0,
             "longitude": 47.0,
+            "equipe_aerienne_id": str(equipe_aerienne.id),
         },
         headers=auth_headers,
     )
@@ -77,7 +81,9 @@ async def test_create_lieu_aerien_type_lieu_invalide_422(client: AsyncClient, au
 
 
 @pytest.mark.asyncio
-async def test_create_lieu_aerien_latitude_hors_bornes_422(client: AsyncClient, auth_headers: dict):
+async def test_create_lieu_aerien_latitude_hors_bornes_422(
+    client: AsyncClient, auth_headers: dict, equipe_aerienne
+):
     response = await client.post(
         "/lieux-aeriens",
         json={
@@ -85,6 +91,7 @@ async def test_create_lieu_aerien_latitude_hors_bornes_422(client: AsyncClient, 
             "nom": "Hors Madagascar",
             "latitude": 200.0,
             "longitude": 47.0,
+            "equipe_aerienne_id": str(equipe_aerienne.id),
         },
         headers=auth_headers,
     )
@@ -178,3 +185,196 @@ async def test_update_lieu_aerien_inexistant_404(client: AsyncClient, auth_heade
         headers=auth_headers,
     )
     assert response.status_code == 404
+
+
+# --- Rattachement à une équipe aérienne (migration 0074) --------------------------------
+
+
+@pytest.mark.asyncio
+async def test_create_lieu_aerien_avec_equipe_aerienne(
+    client: AsyncClient, auth_headers: dict, equipe_aerienne
+):
+    response = await client.post(
+        "/lieux-aeriens",
+        json={
+            "type_lieu": "principale",
+            "nom": "Base Ihosy",
+            "latitude": -22.4,
+            "longitude": 46.12,
+            "equipe_aerienne_id": str(equipe_aerienne.id),
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert data["equipe_aerienne_id"] == str(equipe_aerienne.id)
+    assert data["equipe_aerienne_nom"] == equipe_aerienne.nom
+
+
+@pytest.mark.asyncio
+async def test_create_lieu_aerien_sans_equipe_aerienne_422(client: AsyncClient, auth_headers: dict):
+    """Obligatoire pour toute nouvelle création — les lieux déjà en base restent
+    nullables, mais aucun nouveau lieu ne peut être créé sans équipe."""
+    response = await client.post(
+        "/lieux-aeriens",
+        json={
+            "type_lieu": "principale",
+            "nom": "Base Sans Equipe",
+            "latitude": -22.4,
+            "longitude": 46.12,
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_lieu_aerien_equipe_inexistante_409(client: AsyncClient, auth_headers: dict):
+    response = await client.post(
+        "/lieux-aeriens",
+        json={
+            "type_lieu": "principale",
+            "nom": "Base Equipe Fantome",
+            "latitude": -22.4,
+            "longitude": 46.12,
+            "equipe_aerienne_id": str(uuid.uuid4()),
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Équipe aérienne inconnue"
+
+
+@pytest.mark.asyncio
+async def test_plusieurs_lieux_aeriens_partagent_la_meme_equipe(
+    client: AsyncClient, auth_headers: dict, equipe_aerienne
+):
+    """Pas d'UNIQUE sur `equipe_aerienne_id` : une équipe peut posséder plusieurs
+    lieux (bases principales, secondaires, stands), contrairement à
+    `base_aerienne.equipe_id` (1:1)."""
+    lieux = [("Base A", "principale"), ("Base B", "principale"), ("Stand C", "stand")]
+    for nom, type_lieu in lieux:
+        response = await client.post(
+            "/lieux-aeriens",
+            json={
+                "type_lieu": type_lieu,
+                "nom": nom,
+                "latitude": -22.4,
+                "longitude": 46.12,
+                "equipe_aerienne_id": str(equipe_aerienne.id),
+            },
+            headers=auth_headers,
+        )
+        assert response.status_code == 201, response.text
+
+    liste = await client.get("/lieux-aeriens", headers=auth_headers)
+    rattaches = [
+        lieu for lieu in liste.json() if lieu["equipe_aerienne_id"] == str(equipe_aerienne.id)
+    ]
+    assert len(rattaches) == 3
+
+
+@pytest.mark.asyncio
+async def test_lieu_aerien_existant_sans_equipe_reste_lisible(
+    client: AsyncClient, auth_headers: dict, lieu_aerien
+):
+    """Un lieu créé avant la migration 0074 (fixture directe, sans équipe) reste
+    listable/consultable avec `equipe_aerienne_id`/`equipe_aerienne_nom` à null."""
+    response = await client.get(f"/lieux-aeriens/{lieu_aerien.id}", headers=auth_headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["equipe_aerienne_id"] is None
+    assert data["equipe_aerienne_nom"] is None
+
+
+@pytest.mark.asyncio
+async def test_update_lieu_aerien_rattache_un_lieu_existant_a_une_equipe(
+    client: AsyncClient, auth_headers: dict, lieu_aerien, equipe_aerienne
+):
+    response = await client.put(
+        f"/lieux-aeriens/{lieu_aerien.id}",
+        json={"equipe_aerienne_id": str(equipe_aerienne.id)},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["equipe_aerienne_id"] == str(equipe_aerienne.id)
+    assert data["equipe_aerienne_nom"] == equipe_aerienne.nom
+
+
+@pytest.mark.asyncio
+async def test_update_lieu_aerien_change_d_equipe(
+    client: AsyncClient, auth_headers: dict, lieu_aerien, equipe_aerienne, equipe_aerienne_bis
+):
+    await client.put(
+        f"/lieux-aeriens/{lieu_aerien.id}",
+        json={"equipe_aerienne_id": str(equipe_aerienne.id)},
+        headers=auth_headers,
+    )
+    response = await client.put(
+        f"/lieux-aeriens/{lieu_aerien.id}",
+        json={"equipe_aerienne_id": str(equipe_aerienne_bis.id)},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["equipe_aerienne_nom"] == equipe_aerienne_bis.nom
+
+
+@pytest.mark.asyncio
+async def test_update_lieu_aerien_equipe_inexistante_409(
+    client: AsyncClient, auth_headers: dict, lieu_aerien
+):
+    response = await client.put(
+        f"/lieux-aeriens/{lieu_aerien.id}",
+        json={"equipe_aerienne_id": str(uuid.uuid4())},
+        headers=auth_headers,
+    )
+    assert response.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_update_lieu_aerien_omettre_equipe_la_laisse_inchangee(
+    client: AsyncClient, auth_headers: dict, lieu_aerien, equipe_aerienne
+):
+    """`champs_fournis` (model_fields_set) distingue « absent » (inchangé) de
+    « mis à NULL » (détachement) — même patron que `poste_acridien.equipe_terrestre_id`."""
+    await client.put(
+        f"/lieux-aeriens/{lieu_aerien.id}",
+        json={"equipe_aerienne_id": str(equipe_aerienne.id)},
+        headers=auth_headers,
+    )
+    response = await client.put(
+        f"/lieux-aeriens/{lieu_aerien.id}",
+        json={"nom": "Nouveau Nom"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["nom"] == "Nouveau Nom"
+    assert data["equipe_aerienne_id"] == str(equipe_aerienne.id)
+
+
+@pytest.mark.asyncio
+async def test_referentiel_pull_transporte_equipe_aerienne_id(
+    client: AsyncClient, auth_headers: dict, equipe_aerienne
+):
+    """Le pull mobile (`GET /referentiel/pull`) expose `equipe_aerienne_id` sur
+    `lieux_aeriens`, pour que le cache SQLite local reste fidèle au contrat API."""
+    creation = await client.post(
+        "/lieux-aeriens",
+        json={
+            "type_lieu": "principale",
+            "nom": "Base Pull",
+            "latitude": -22.4,
+            "longitude": 46.12,
+            "equipe_aerienne_id": str(equipe_aerienne.id),
+        },
+        headers=auth_headers,
+    )
+    assert creation.status_code == 201
+    lieu_id = creation.json()["id"]
+
+    pull = await client.get("/referentiel/pull", headers=auth_headers)
+    assert pull.status_code == 200
+    lieu = next(u for u in pull.json()["lieux_aeriens"]["upserts"] if u["id"] == lieu_id)
+    assert lieu["equipe_aerienne_id"] == str(equipe_aerienne.id)

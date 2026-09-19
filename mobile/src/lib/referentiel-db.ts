@@ -443,6 +443,7 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
       latitude REAL NOT NULL,
       longitude REAL NOT NULL,
       altitude REAL,
+      equipe_aerienne_id TEXT,
       actif INTEGER NOT NULL DEFAULT 1,
       updated_at TEXT NOT NULL
     );
@@ -470,6 +471,9 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
     { name: 'dose_reference', type: 'TEXT' },
     { name: 'type_produit', type: 'TEXT' },
   ]);
+  // Rattachement d'un lieu aérien à son équipe (migration backend 0074) : nullable, les
+  // lieux déjà en cache restent NULL comme côté serveur tant qu'un admin ne les rattache pas.
+  await addColumnsIfMissing(db, 'lieu_aerien', [{ name: 'equipe_aerienne_id', type: 'TEXT' }]);
   await migrateCodeStade(db);
   await migrateUtilisateurEquipe(db);
 }

@@ -47,8 +47,13 @@ export function LieuAerienField({ label, value, onChangeText, focusedField, setF
   const [nom, setNom] = useState('');
   const [typeLieu, setTypeLieu] = useState<'principale' | 'secondaire' | 'stand'>('principale');
   const [position, setPosition] = useState<{ latitude: number; longitude: number; altitude: number | null } | null>(null);
+  // Équipes aériennes (en ligne uniquement, comme `BaseAerienneField`) : un lieu doit
+  // appartenir à une équipe — l'équipe existe donc avant ses lieux.
+  const [equipes, setEquipes] = useState<{ id: string; nom: string }[]>([]);
+  const [equipeId, setEquipeId] = useState<string | null>(null);
 
   const { run: runChargement, isRunning: isChargement } = useAsyncAction();
+  const { run: runEquipes, isRunning: isChargementEquipes } = useAsyncAction();
   const { run: runGps, isRunning: isGpsLoading } = useAsyncAction();
   const { run: runCreation, isRunning: isCreating } = useAsyncAction();
 
@@ -79,11 +84,25 @@ export function LieuAerienField({ label, value, onChangeText, focusedField, setF
       { screen: 'lieu-aerien-field' }
     );
 
+  const chargerEquipes = useCallback(
+    () =>
+      runEquipes(
+        async () => {
+          const liste = await apiClient.listEquipesAeriennes(token!);
+          setEquipes(liste.map((e) => ({ id: e.id, nom: e.nom })));
+        },
+        { screen: 'lieu-aerien-field', precondition: !!token }
+      ),
+    [runEquipes, token]
+  );
+
   const ouvrirCreation = () => {
     setCreation(true);
     setListe(false);
     setNom(value);
     if (!position) void capturerPosition();
+    // Retente tant que la liste est vide (échec réseau précédent, ou aucune équipe encore créée).
+    if (equipes.length === 0) void chargerEquipes();
   };
 
   const creer = () =>
@@ -95,6 +114,7 @@ export function LieuAerienField({ label, value, onChangeText, focusedField, setF
           latitude: position!.latitude,
           longitude: position!.longitude,
           altitude: position!.altitude,
+          equipe_aerienne_id: equipeId!,
         });
         setLieux((precedents) => [...precedents, { id: cree.id, type_lieu: cree.type_lieu, nom: cree.nom }]);
         onChangeText(cree.nom);
@@ -104,8 +124,9 @@ export function LieuAerienField({ label, value, onChangeText, focusedField, setF
       },
       {
         screen: 'lieu-aerien-field',
-        precondition: !!token && nom.trim().length > 0 && !!position,
-        preconditionMessage: 'Renseignez le nom et attendez la position GPS avant de créer le lieu.',
+        precondition: !!token && nom.trim().length > 0 && !!position && !!equipeId,
+        preconditionMessage:
+          "Renseignez le nom, choisissez l'équipe aérienne et attendez la position GPS avant de créer le lieu.",
       }
     );
 
@@ -179,6 +200,27 @@ export function LieuAerienField({ label, value, onChangeText, focusedField, setF
               </TouchableOpacity>
             ))}
           </View>
+          <Text style={styles.equipeLabel}>Équipe aérienne *</Text>
+          {isChargementEquipes && <ActivityIndicator color={GREEN} />}
+          {!isChargementEquipes && equipes.length === 0 && (
+            <Text style={styles.vide}>
+              Aucune équipe aérienne disponible : elle doit être créée avant ses lieux.
+            </Text>
+          )}
+          <View style={styles.equipeRow}>
+            {equipes.map((equipe) => (
+              <TouchableOpacity
+                key={equipe.id}
+                style={[styles.typeChip, equipeId === equipe.id && styles.typeChipSelectionne]}
+                onPress={() => setEquipeId(equipe.id)}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.typeChipText, equipeId === equipe.id && styles.typeChipTextSelectionne]}>
+                  {equipe.nom}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
           <View style={styles.gpsRow}>
             <Text style={styles.gpsRowText}>Coordonnées (auto)</Text>
             <Text style={styles.gpsValue}>
@@ -223,6 +265,8 @@ const styles = StyleSheet.create({
   optionType: { fontSize: 10.5, fontWeight: '500', color: TEXT_SECONDARY },
   creationInput: { fontSize: 13, fontWeight: '600', color: TEXT, borderWidth: 1, borderColor: BORDER, borderRadius: 8, padding: 8 },
   typeRow: { flexDirection: 'row', gap: 6 },
+  equipeLabel: { fontSize: 9, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase' },
+  equipeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   typeChip: { borderWidth: 1, borderColor: BORDER, borderRadius: 14, paddingVertical: 5, paddingHorizontal: 10 },
   typeChipSelectionne: { borderColor: GREEN, backgroundColor: '#eaf3ec' },
   typeChipText: { fontSize: 11.5, fontWeight: '600', color: TEXT_SECONDARY },

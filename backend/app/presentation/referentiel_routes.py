@@ -641,7 +641,7 @@ async def create_lieu_aerien(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Utilisateur, Depends(get_current_user)],
 ):
-    use_case = CreateLieuAerien(LieuAerienRepositoryImpl(db))
+    use_case = CreateLieuAerien(LieuAerienRepositoryImpl(db), EquipeAerienneRepositoryImpl(db))
     try:
         return await use_case.execute(
             type_lieu=body.type_lieu,
@@ -649,11 +649,17 @@ async def create_lieu_aerien(
             latitude=body.latitude,
             longitude=body.longitude,
             altitude=body.altitude,
+            equipe_aerienne_id=body.equipe_aerienne_id,
         )
     except TypeLieuAerienInvalideError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"type_lieu invalide : {exc.args[0]}",
+        ) from exc
+    except EquipeAerienneIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Équipe aérienne inconnue",
         ) from exc
 
 
@@ -677,7 +683,7 @@ async def update_lieu_aerien(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Utilisateur, Depends(get_current_user)],
 ):
-    use_case = UpdateLieuAerien(LieuAerienRepositoryImpl(db))
+    use_case = UpdateLieuAerien(LieuAerienRepositoryImpl(db), EquipeAerienneRepositoryImpl(db))
     try:
         lieu = await use_case.execute(
             lieu_id=lieu_id,
@@ -686,15 +692,21 @@ async def update_lieu_aerien(
             latitude=body.latitude,
             longitude=body.longitude,
             altitude=body.altitude,
+            equipe_aerienne_id=body.equipe_aerienne_id,
             actif=body.actif,
-            # `altitude` est nullable : seul le corps reçu distingue « absent » de
-            # « mis à NULL ».
+            # `altitude`/`equipe_aerienne_id` sont nullables : seul le corps reçu
+            # distingue « absent » de « mis à NULL ».
             champs_fournis=body.model_fields_set,
         )
     except TypeLieuAerienInvalideError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"type_lieu invalide : {exc.args[0]}",
+        ) from exc
+    except EquipeAerienneIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Équipe aérienne inconnue",
         ) from exc
     if lieu is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lieu aérien non trouvé")

@@ -655,9 +655,25 @@ describe('ReferentielsPage — écritures lieu_aerien (#prospection-lieu-base)',
     longitude: 43.68,
     altitude: null,
     actif: true,
+    equipe_aerienne_id: 'ea1',
+    equipe_aerienne_nom: 'Équipe Ihosy',
     created_at: SERVER_TIME,
     updated_at: SERVER_TIME,
   }
+
+  /** Lieu créé avant la migration 0074 : pas encore rattaché à une équipe. */
+  const LIEU_SANS_EQUIPE = {
+    ...LIEU,
+    id: 'la9',
+    nom: 'Ancien lieu',
+    equipe_aerienne_id: null,
+    equipe_aerienne_nom: null,
+  }
+
+  const EQUIPES = [
+    { id: 'ea1', nom: 'Équipe Ihosy' },
+    { id: 'ea2', nom: 'Équipe Betroka' },
+  ]
 
   afterEach(() => {
     vi.restoreAllMocks()
@@ -666,10 +682,12 @@ describe('ReferentielsPage — écritures lieu_aerien (#prospection-lieu-base)',
   /**
    * L'administration lit `/lieux-aeriens?inclure_inactifs=true` et non le pull :
    * elle affiche un badge « État », il lui faut donc aussi les lieux désactivés.
+   * `/equipes-aeriennes` alimente la liste déroulante « Équipe aérienne ».
    */
   function mockGetParUrl(lieux: Record<string, unknown>[] = [LIEU]) {
     mockedGet.mockImplementation((url: string) => {
       if (url.startsWith('/lieux-aeriens')) return Promise.resolve({ data: lieux })
+      if (url === '/equipes-aeriennes') return Promise.resolve({ data: EQUIPES })
       return Promise.resolve(pull())
     })
   }
@@ -680,7 +698,7 @@ describe('ReferentielsPage — écritures lieu_aerien (#prospection-lieu-base)',
     await waitFor(() => expect(nav().getByText('lieu_aerien')).toBeInTheDocument())
     fireEvent.click(nav().getByText('lieu_aerien'))
     fireEvent.click(await screen.findByRole('button', { name: `Modifier ${lieux[0].nom}` }))
-    await screen.findByDisplayValue('Tuléar')
+    await screen.findByDisplayValue(lieux[0].nom as string)
   }
 
   it("expose la pastille « API » et active les affordances d'écriture", async () => {
@@ -712,6 +730,7 @@ describe('ReferentielsPage — écritures lieu_aerien (#prospection-lieu-base)',
       expect(mockedPut).toHaveBeenCalledWith('/lieux-aeriens/la1', {
         type_lieu: 'principale',
         nom: 'Tuléar aéroport',
+        equipe_aerienne_id: 'ea1',
         latitude: -23.35,
         longitude: 43.68,
         // `altitude` nullable en base, mais `toPayload` ne traite le vide comme
@@ -733,6 +752,10 @@ describe('ReferentielsPage — écritures lieu_aerien (#prospection-lieu-base)',
 
     const modal = within(screen.getByRole('dialog', { name: 'Nouveau lieu aérien' }))
     fireEvent.change(modal.getByLabelText('Nom *'), { target: { value: 'Ihosy' } })
+    // Les options du select sont chargées par `/equipes-aeriennes` : attendre qu'elles
+    // existent, sinon jsdom ignore la valeur assignée.
+    await modal.findByRole('option', { name: 'Équipe Betroka' })
+    fireEvent.change(modal.getByLabelText('Équipe aérienne *'), { target: { value: 'ea2' } })
     fireEvent.change(modal.getByLabelText('Latitude *'), { target: { value: '-22.4' } })
     fireEvent.change(modal.getByLabelText('Longitude *'), { target: { value: '46.12' } })
     fireEvent.click(modal.getByRole('button', { name: 'Créer' }))
@@ -741,10 +764,63 @@ describe('ReferentielsPage — écritures lieu_aerien (#prospection-lieu-base)',
     expect(mockedPost).toHaveBeenCalledWith('/lieux-aeriens', {
       type_lieu: 'principale',
       nom: 'Ihosy',
+      equipe_aerienne_id: 'ea2',
       latitude: -22.4,
       longitude: 46.12,
       altitude: 0,
     })
+  })
+
+  it("affiche l'équipe aérienne de chaque lieu, « — » pour un lieu non rattaché", async () => {
+    await ouvrirLieuxAeriens([LIEU, LIEU_SANS_EQUIPE])
+
+    expect(screen.getByRole('columnheader', { name: 'Équipe aérienne' })).toBeInTheDocument()
+    const lignes = within(screen.getByRole('table')).getAllByRole('row')
+    const ligneTuléar = lignes.find((l) => within(l).queryByText('Tuléar'))!
+    const ligneAncien = lignes.find((l) => within(l).queryByText('Ancien lieu'))!
+    expect(within(ligneTuléar).getByText('Équipe Ihosy')).toBeInTheDocument()
+    expect(within(ligneAncien).queryByText('Équipe Ihosy')).not.toBeInTheDocument()
+    expect(within(ligneAncien).getAllByText('—').length).toBeGreaterThan(0)
+  })
+
+  it('alimente la liste « Équipe aérienne » depuis /equipes-aeriennes', async () => {
+    await ouvrirLieuxAeriens()
+
+    await waitFor(() =>
+      expect(mockedGet).toHaveBeenCalledWith('/equipes-aeriennes'),
+    )
+    const select = screen.getByLabelText('Équipe aérienne *')
+    expect(await within(select).findByRole('option', { name: 'Équipe Betroka' })).toBeInTheDocument()
+    expect(select).toHaveValue('ea1')
+  })
+
+  it("refuse côté serveur la création d'un lieu sans équipe : la clé est omise du corps", async () => {
+    mockedPost.mockRejectedValue(new Error('422'))
+    await ouvrirLieuxAeriens()
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Nouveau lieu aérien' }))
+    const modal = within(screen.getByRole('dialog', { name: 'Nouveau lieu aérien' }))
+    fireEvent.change(modal.getByLabelText('Nom *'), { target: { value: 'Sans équipe' } })
+    fireEvent.change(modal.getByLabelText('Latitude *'), { target: { value: '-22.4' } })
+    fireEvent.change(modal.getByLabelText('Longitude *'), { target: { value: '46.12' } })
+    fireEvent.click(modal.getByRole('button', { name: 'Créer' }))
+
+    await waitFor(() => expect(mockedPost).toHaveBeenCalledTimes(1))
+    // Une chaîne vide n'est pas un UUID : la clé est omise, le backend répond « champ requis ».
+    expect(mockedPost.mock.calls[0][1]).not.toHaveProperty('equipe_aerienne_id')
+  })
+
+  it('permet de désactiver un ancien lieu non rattaché sans choisir d’équipe', async () => {
+    mockedPut.mockResolvedValue({ data: { ...LIEU_SANS_EQUIPE, actif: false } })
+    await ouvrirLieuxAeriens([LIEU_SANS_EQUIPE])
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Actif' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    await waitFor(() => expect(mockedPut).toHaveBeenCalledTimes(1))
+    // Omise : le backend laisse `equipe_aerienne_id` inchangé (NULL) au lieu de rejeter `''`.
+    expect(mockedPut.mock.calls[0][1]).not.toHaveProperty('equipe_aerienne_id')
+    expect(mockedPut.mock.calls[0][1]).toMatchObject({ actif: false })
   })
 
   it('désactive logiquement plutôt que de supprimer', async () => {
