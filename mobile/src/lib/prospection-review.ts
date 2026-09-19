@@ -16,6 +16,7 @@ import {
   completeProspection,
   markProspectionEchec,
   markProspectionSynced,
+  synchroniserStatutServeur,
   listAllProspectionCaptures,
   listAllProspectionPopulations,
   listAllProspectionInfestations,
@@ -604,6 +605,14 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
     signature_chef_base_nom: draft.signature_chef_base_nom || null,
     signature_chef_base_horodatage: draft.signature_chef_base_horodatage || null,
     signature_chef_base_image: draft.signature_chef_base_image || null,
+    // #revalidation-sync-lien-perdu : jamais envoyé jusqu'ici — le serveur ne
+    // pouvait donc ni faire passer cette fiche directement à statut='validee'
+    // (CreateProspection.execute), ni marquer l'origine périmée comme
+    // remplacée (_deja_revalidee_subquery). Une revalidation synchronisée
+    // retombait alors dans la chaîne administrative normale en_attente ->
+    // verifiee -> validee — exactement ce que la revalidation doit éviter —
+    // et l'origine restait « à revalider » indéfiniment côté serveur.
+    revalide_de_id: draft.revalide_de_id || null,
   };
 }
 
@@ -863,8 +872,13 @@ export async function syncOneProspection(
   // Le `try/catch` qui entourait ce corps ne faisait que journaliser puis
   // relancer. L'erreur remonte désormais typée depuis `api-client`, et la
   // frontière de l'appelant la journalise une fois — pas deux.
-  await apiClient.createProspection(token, payload);
+  const cree = await apiClient.createProspection(token, payload);
   await markProspectionSynced(draft.id);
+  // #revalidation-sync-lien-perdu : évite d'attendre le prochain passage sur
+  // "Mes prospections"/"Mes fiches" (synchroniserStatutServeur, appelée
+  // là-bas) pour qu'une revalidation apparaisse enfin `validee` en local —
+  // le serveur le sait déjà dans sa réponse à cette création.
+  await synchroniserStatutServeur([{ id: draft.id, statut: cree.statut, validated_at: cree.validated_at }]);
 
   log.event('prospection.sync.ok', {
     prospectionId: draft.id,

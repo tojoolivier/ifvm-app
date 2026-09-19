@@ -30,6 +30,7 @@ import {
   completeProspection,
   markProspectionEchec,
   markProspectionSynced,
+  synchroniserStatutServeur,
   listAllProspectionCaptures,
   listAllProspectionPopulations,
   listAllProspectionInfestations,
@@ -52,6 +53,7 @@ jest.mock('../src/lib/prospection-repository', () => ({
   completeProspection: jest.fn(),
   markProspectionSynced: jest.fn(),
   markProspectionEchec: jest.fn(),
+  synchroniserStatutServeur: jest.fn(),
   listAllProspectionCaptures: jest.fn(),
   listAllProspectionPopulations: jest.fn(),
   listAllProspectionInfestations: jest.fn(),
@@ -81,6 +83,7 @@ jest.mock('expo-network', () => ({ getNetworkStateAsync: jest.fn() }));
 const mockCompleteProspection = jest.mocked(completeProspection);
 const mockMarkSynced = jest.mocked(markProspectionSynced);
 const mockMarkEchec = jest.mocked(markProspectionEchec);
+const mockSynchroniserStatutServeur = jest.mocked(synchroniserStatutServeur);
 const mockCreateProspection = jest.mocked(apiClient.createProspection);
 const mockGetNetworkState = jest.mocked(Network.getNetworkStateAsync);
 const mockListAllCaptures = jest.mocked(listAllProspectionCaptures);
@@ -95,6 +98,8 @@ function draft(overrides: Partial<DraftProspection> = {}): DraftProspection {
     campagne_id: 'camp-1',
     prospecteur_id: 'user-1',
     prospecteur_nom: null,
+    validated_at: null,
+    revalide_de_id: null,
     station_id: null,
     biotope: 'Mesophyle',
     region: null,
@@ -387,7 +392,7 @@ describe('enregistrerEtSynchroniser', () => {
   it('complète toujours la fiche locale puis synchronise si en ligne', async () => {
     mockCompleteProspection.mockResolvedValue(draft({ statut: 'en_attente' }));
     mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
-    mockCreateProspection.mockResolvedValue({ id: 'remote-1' });
+    mockCreateProspection.mockResolvedValue({ id: 'remote-1', statut: 'validee', validated_at: null });
     mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
     mockListAllPopulations.mockResolvedValue([
       { espece: 'LMC', categorie: 'imago', densite_diffuse: 5, densite_groupee: 1, methode: null, accouplement: 'rare', ponte: null },
@@ -424,7 +429,7 @@ describe('enregistrerEtSynchroniser', () => {
   it('conserve une densité (ou tout autre champ numérique) explicitement saisie à 0, ne la convertit pas en null', async () => {
     mockCompleteProspection.mockResolvedValue(draft({ statut: 'en_attente' }));
     mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
-    mockCreateProspection.mockResolvedValue({ id: 'remote-1' });
+    mockCreateProspection.mockResolvedValue({ id: 'remote-1', statut: 'validee', validated_at: null });
     mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
     mockListAllPopulations.mockResolvedValue([
       {
@@ -481,7 +486,7 @@ describe('enregistrerEtSynchroniser', () => {
   it("transmet les champs extensif-imagos ajoutés (type de cible, direction, état/comportement, interdistance)", async () => {
     mockCompleteProspection.mockResolvedValue(draft({ statut: 'en_attente' }));
     mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
-    mockCreateProspection.mockResolvedValue({ id: 'remote-1' });
+    mockCreateProspection.mockResolvedValue({ id: 'remote-1', statut: 'validee', validated_at: null });
     mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
     mockListAllPopulations.mockResolvedValue([
       {
@@ -522,7 +527,7 @@ describe('enregistrerEtSynchroniser', () => {
   it('omet du payload une ligne population sans aucune donnée (résidu de clonage), sans échouer', async () => {
     mockCompleteProspection.mockResolvedValue(draft({ statut: 'en_attente' }));
     mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
-    mockCreateProspection.mockResolvedValue({ id: 'remote-1' });
+    mockCreateProspection.mockResolvedValue({ id: 'remote-1', statut: 'validee', validated_at: null });
     mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
     mockListAllPopulations.mockResolvedValue([
       {
@@ -548,10 +553,46 @@ describe('enregistrerEtSynchroniser', () => {
     );
   });
 
+  /** #revalidation-sync-lien-perdu : `revalide_de_id` n'était jusqu'ici jamais
+   * transmis à la synchronisation — le serveur ne pouvait donc ni faire
+   * passer cette fiche directement à `validee` (CreateProspection.execute),
+   * ni marquer l'origine périmée comme remplacée. */
+  it('transmet revalide_de_id quand la fiche revalide une origine périmée', async () => {
+    mockCompleteProspection.mockResolvedValue(draft({ statut: 'en_attente', revalide_de_id: 'presp-perimee' }));
+    mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
+    mockCreateProspection.mockResolvedValue({ id: 'remote-1', statut: 'validee', validated_at: '2026-09-19T00:00:00Z' });
+    mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
+    mockListAllPopulations.mockResolvedValue([]);
+    mockListAllInfestations.mockResolvedValue([]);
+
+    await enregistrerEtSynchroniser(draft({ revalide_de_id: 'presp-perimee' }), [], 'token-1');
+
+    expect(mockCreateProspection).toHaveBeenCalledWith(
+      'token-1',
+      expect.objectContaining({ revalide_de_id: 'presp-perimee' })
+    );
+  });
+
+  it('transmet revalide_de_id=null pour une fiche qui ne revalide rien', async () => {
+    mockCompleteProspection.mockResolvedValue(draft({ statut: 'en_attente' }));
+    mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
+    mockCreateProspection.mockResolvedValue({ id: 'remote-1', statut: 'en_attente', validated_at: null });
+    mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
+    mockListAllPopulations.mockResolvedValue([]);
+    mockListAllInfestations.mockResolvedValue([]);
+
+    await enregistrerEtSynchroniser(draft(), [], 'token-1');
+
+    expect(mockCreateProspection).toHaveBeenCalledWith(
+      'token-1',
+      expect.objectContaining({ revalide_de_id: null })
+    );
+  });
+
   it('normalise type_cible et type_essaim pour la synchro (0031 : "essaim" a disparu du contrat TypeCible ; anciennes valeurs à 5 niveaux de type_essaim toujours reconnues)', async () => {
     mockCompleteProspection.mockResolvedValue(draft({ statut: 'en_attente' }));
     mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
-    mockCreateProspection.mockResolvedValue({ id: 'remote-1' });
+    mockCreateProspection.mockResolvedValue({ id: 'remote-1', statut: 'validee', validated_at: null });
     mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
     mockListAllPopulations.mockResolvedValue([]);
     mockListAllInfestations.mockResolvedValue([
@@ -624,7 +665,7 @@ describe('enregistrerEtSynchroniser', () => {
       if (i === 3) {
         mockCreateProspection.mockRejectedValueOnce(new NetworkError(`Erreur serveur sur la fiche ${i}`));
       } else {
-        mockCreateProspection.mockResolvedValueOnce({ id: `remote-${i}` });
+        mockCreateProspection.mockResolvedValueOnce({ id: `remote-${i}`, statut: 'validee', validated_at: null });
       }
 
       const result = await enregistrerEtSynchroniser(draft({ id: `draft-${i}` }), [], 'token-1');
@@ -643,7 +684,7 @@ describe('enregistrerEtSynchroniser', () => {
 describe('syncOneProspection — l’unitaire lève', () => {
   it('renvoie la fiche en_attente au serveur puis la marque synchronisée', async () => {
     mockListAllCaptures.mockResolvedValue([]);
-    mockCreateProspection.mockResolvedValue({ id: 'remote-1' });
+    mockCreateProspection.mockResolvedValue({ id: 'remote-1', statut: 'validee', validated_at: null });
     mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
 
     await syncOneProspection(draft({ statut: 'en_attente' }), 'token-1');
@@ -653,6 +694,25 @@ describe('syncOneProspection — l’unitaire lève', () => {
     expect(mockListAllInfestations).toHaveBeenCalledWith('draft-1');
     expect(mockCreateProspection).toHaveBeenCalled();
     expect(mockMarkSynced).toHaveBeenCalledWith('draft-1');
+  });
+
+  /** #revalidation-sync-lien-perdu : évite d'attendre le prochain passage sur
+   * "Mes prospections"/"Mes fiches" pour qu'une revalidation apparaisse enfin
+   * `validee` en local — le serveur le sait déjà dans sa réponse à la création. */
+  it('reporte immédiatement le statut/validated_at renvoyés par le serveur', async () => {
+    mockListAllCaptures.mockResolvedValue([]);
+    mockCreateProspection.mockResolvedValue({
+      id: 'remote-1',
+      statut: 'validee',
+      validated_at: '2026-09-19T00:00:00Z',
+    });
+    mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
+
+    await syncOneProspection(draft({ id: 'draft-1', statut: 'en_attente' }), 'token-1');
+
+    expect(mockSynchroniserStatutServeur).toHaveBeenCalledWith([
+      { id: 'draft-1', statut: 'validee', validated_at: '2026-09-19T00:00:00Z' },
+    ]);
   });
 
   it("laisse remonter l'erreur au lieu de l'avaler — c'est le lot qui la range", async () => {
@@ -671,9 +731,9 @@ describe('syncAllProspections — le lot résume', () => {
     mockListAllCaptures.mockResolvedValue([]);
     mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
     mockCreateProspection
-      .mockResolvedValueOnce({ id: 'remote-1' })
+      .mockResolvedValueOnce({ id: 'remote-1', statut: 'validee', validated_at: null })
       .mockRejectedValueOnce(new NetworkError('coupure'))
-      .mockResolvedValueOnce({ id: 'remote-3' });
+      .mockResolvedValueOnce({ id: 'remote-3', statut: 'validee', validated_at: null });
 
     const resume = await syncAllProspections(
       [draft({ id: 'a' }), draft({ id: 'b' }), draft({ id: 'c' })],

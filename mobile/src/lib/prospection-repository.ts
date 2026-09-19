@@ -148,6 +148,14 @@ export interface DraftProspection {
   avertissements: string | null;
   statut: string;
   statut_sync: string;
+  /** #revalidation-prospection : date de validation connue localement — jamais
+   * renseignée pour une fiche créée sur cet appareil avant sa toute première
+   * synchronisation (cf. `synchroniserStatutServeur`), déjà connue en revanche
+   * pour une fiche matérialisée depuis un autre agent (`materialiserProspectionValidee`). */
+  validated_at: string | null;
+  /** #revalidation-prospection : renseigné uniquement si cette fiche revalide
+   * une fiche périmée (extensive/validation) — pointe vers la fiche d'origine. */
+  revalide_de_id: string | null;
   created_at: string;
   updated_at: string;
 }
