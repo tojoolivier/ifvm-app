@@ -1528,6 +1528,41 @@ export async function markProspectionSynced(id: string): Promise<DraftProspectio
 }
 
 /**
+ * Reporte localement le statut serveur AUTHENTIQUE (#liste-traitement-apres-
+ * validation) d'une fiche déjà envoyée — jusqu'ici, `statut` restait figé à
+ * 'en_attente' pour une fiche créée sur CET appareil, l'app locale n'ayant
+ * aucun moyen d'apprendre qu'un administrateur l'avait depuis validée (ou
+ * rejetée). Résultat : le repli hors ligne de « disponible pour traitement »
+ * (listProspectionsDisponiblesPourTraitementLocal) se rabattait sur
+ * `statut_sync = 'synced'` comme approximation de « validée » — une fiche
+ * simplement envoyée, jamais encore revue par un administrateur, pouvait donc
+ * apparaître comme disponible pour un traitement, alors que le chemin en
+ * ligne l'aurait exclue (il filtre strictement sur statut=validee).
+ *
+ * `fiches` vient de `loadMesProspectionsServeur` (déjà appelée pour l'écran
+ * "Mes prospections") : ne contient QUE les fiches de l'agent connecté, donc
+ * déjà envoyées par construction — jamais un brouillon purement local.
+ * `WHERE id = ?` est sans effet si la fiche n'existe pas encore ici (aucun
+ * risque d'insérer une ligne partielle).
+ */
+export async function synchroniserStatutServeur(
+  fiches: { id: string; statut: string; validated_at?: string | null }[]
+): Promise<void> {
+  const db = await getDb();
+
+  // `updated_at` délibérément jamais touché ici : un simple recalage de
+  // statut ne doit pas faire remonter la fiche en tête de « Mes prospections »
+  // (listRecentProspections, triée sur updated_at), qui reflète une saisie,
+  // pas une consultation.
+  for (const fiche of fiches) {
+    await db.runAsync(
+      `UPDATE prospection SET statut = ?, validated_at = ? WHERE id = ?`,
+      [fiche.statut, fiche.validated_at ?? null, fiche.id]
+    );
+  }
+}
+
+/**
  * Sort la fiche de la file d'attente — ADR-012 décision 9, issue #177.
  *
  * Réservé aux refus du serveur (4xx) : réessayer à l'identique reproduirait le
@@ -1597,11 +1632,15 @@ export async function listUnsyncedProspections(): Promise<DraftProspection[]> {
  * la disponibilité globale (fiches des AUTRES agents comprises) est une
  * opération serveur. Hors connexion, cette exhaustivité est impossible ; on
  * propose donc une approximation plutôt qu'un écran bloqué :
- *   - `statut_sync = 'synced'` fait office de proxy pour « validée » — l'app
- *     locale ne connaît jamais le statut serveur final "Validée" (cf.
- *     `loadValidatedProspections`, prospection-accueil.ts : "l'app locale ne
- *     connaît que jusqu'à en_attente"), donc une fiche synchronisée mais pas
- *     encore formellement validée par un administrateur peut apparaître ici ;
+ *   - `statut = 'validee'`, exactement le même filtre que le chemin en ligne
+ *     (#liste-traitement-apres-validation) — pas `statut_sync = 'synced'`
+ *     comme auparavant, qui laissait passer une fiche simplement ENVOYÉE
+ *     mais pas encore VALIDÉE par un administrateur. Pour une fiche créée
+ *     sur CET appareil, `statut` n'apprend cette validation qu'après coup,
+ *     via `synchroniserStatutServeur` (rappelé par l'écran "Mes
+ *     prospections") — pour une fiche d'un AUTRE agent, `statut` est déjà
+ *     correct dès sa matérialisation (`materialiserProspectionValidee`,
+ *     jamais appelée que pour une fiche déjà `statut=validee` côté serveur) ;
  *   - aucune fiche d'un AUTRE agent, jamais synchronisée sur CET appareil,
  *     n'est visible (même limite que `listReprenableTraitements`) ;
  *   - tous les types de prospection (pas seulement extensive/validation,
@@ -1623,7 +1662,7 @@ export async function listProspectionsDisponiblesPourTraitementLocal(): Promise<
   const db = await getDb();
   return db.getAllAsync<DraftProspection>(
     `SELECT * FROM prospection p
-     WHERE p.statut_sync = 'synced'
+     WHERE p.statut = 'validee'
        AND NOT EXISTS (SELECT 1 FROM traitement t WHERE t.prospection_id = p.id)
        AND NOT (
          p.type_prospection IN ('extensive', 'validation')

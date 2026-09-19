@@ -9,6 +9,7 @@ import {
   listValidatedProspections,
   listProspectionsDisponiblesPourTraitementLocal,
   listProspectionsARevaliderLocal,
+  synchroniserStatutServeur,
   demarrerRevalidation,
   countUnsyncedProspections,
   updateProspectionReference,
@@ -344,8 +345,8 @@ describe('listValidatedProspections', () => {
 });
 
 describe('listProspectionsDisponiblesPourTraitementLocal', () => {
-  it('renvoie les fiches synchronisées, tous types confondus, surface infestée connue ou non', async () => {
-    const row = { ...STORED_ROW, type_prospection: 'intensive', statut_sync: 'synced', surface_infestee: 3.2 };
+  it('renvoie les fiches validées, tous types confondus, surface infestée connue ou non', async () => {
+    const row = { ...STORED_ROW, type_prospection: 'intensive', statut: 'validee', surface_infestee: 3.2 };
     getAllAsync.mockResolvedValueOnce([row]);
 
     const result = await listProspectionsDisponiblesPourTraitementLocal();
@@ -358,7 +359,9 @@ describe('listProspectionsDisponiblesPourTraitementLocal', () => {
     // #surface-infestee-facultative : plus de filtre sur `surface_infestee`
     // (autrefois obligatoire pour extensive/validation, jamais renseigné pour
     // certaines fiches légitimes depuis que le champ est facultatif partout).
-    expect(query).toContain("p.statut_sync = 'synced'");
+    // #liste-traitement-apres-validation : statut='validee', pas seulement
+    // synchronisée — même filtre que le chemin en ligne.
+    expect(query).toContain("p.statut = 'validee'");
     expect(query).not.toContain('surface_infestee IS NOT NULL');
     expect(query).toContain('ORDER BY p.updated_at DESC');
   });
@@ -370,6 +373,16 @@ describe('listProspectionsDisponiblesPourTraitementLocal', () => {
 
     const [query] = getAllAsync.mock.calls[0];
     expect(query).toContain('NOT EXISTS (SELECT 1 FROM traitement t WHERE t.prospection_id = p.id)');
+  });
+
+  it("#liste-traitement-apres-validation : n'inclut jamais une fiche seulement envoyée (en_attente), pas encore validée par un administrateur", async () => {
+    getAllAsync.mockResolvedValueOnce([]);
+
+    await listProspectionsDisponiblesPourTraitementLocal();
+
+    const [query] = getAllAsync.mock.calls[0];
+    expect(query).not.toContain('statut_sync');
+    expect(query).toContain("p.statut = 'validee'");
   });
 
   it('#revalidation-prospection : exclut aussi les fiches extensive/validation périmées et celles déjà revalidées', async () => {
@@ -414,6 +427,31 @@ describe('listProspectionsARevaliderLocal', () => {
     // #revalidation-cree-apres-confirmation : idem, cf. le test équivalent de
     // listProspectionsDisponiblesPourTraitementLocal ci-dessus.
     expect(query).toContain("enfant.statut != 'brouillon'");
+  });
+});
+
+describe('synchroniserStatutServeur', () => {
+  it('#liste-traitement-apres-validation : reporte le statut et validated_at authentiques du serveur', async () => {
+    await synchroniserStatutServeur([
+      { id: 'presp-1', statut: 'validee', validated_at: '2026-09-01T00:00:00Z' },
+      { id: 'presp-2', statut: 'rejetee', validated_at: null },
+    ]);
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE prospection SET statut = ?, validated_at = ?'),
+      ['validee', '2026-09-01T00:00:00Z', 'presp-1']
+    );
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE prospection SET statut = ?, validated_at = ?'),
+      ['rejetee', null, 'presp-2']
+    );
+  });
+
+  it("ne touche jamais updated_at (ne doit pas faire remonter la fiche dans les listes triées dessus)", async () => {
+    await synchroniserStatutServeur([{ id: 'presp-1', statut: 'validee', validated_at: null }]);
+
+    const [query] = runAsync.mock.calls[0];
+    expect(query).not.toContain('updated_at');
   });
 });
 

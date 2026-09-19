@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
 import { loadAccueilData, loadMesProspectionsServeur } from '@/lib/prospection-accueil';
-import { DraftProspection } from '@/lib/prospection-repository';
+import { DraftProspection, synchroniserStatutServeur } from '@/lib/prospection-repository';
 import { ProspectionRead } from '@/lib/api-client';
 import { listRecentTraitements, DraftTraitementRow } from '@/lib/traitement-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
@@ -108,7 +108,19 @@ export default function FichesScreen() {
 
       const [brouillons, validees, traitementsLus] = lectures;
       if (brouillons.ok) setDraftsRecent(brouillons.value.recent);
-      if (validees?.ok) setValidated(validees.value);
+      if (validees?.ok) {
+        setValidated(validees.value);
+        // #liste-traitement-apres-validation : reporte le statut serveur
+        // authentique en local — cf. commentaire équivalent dans
+        // (app)/prospection.tsx, même correctif, même raison.
+        await runTask(
+          () =>
+            synchroniserStatutServeur(
+              validees.value.map((f) => ({ id: f.id, statut: f.statut, validated_at: f.validated_at ?? null }))
+            ),
+          { name: 'fiches.statut-serveur.persistance', criticality: 'best-effort' }
+        );
+      }
       if (traitementsLus?.ok) setTraitements(traitementsLus.value);
 
       // Une lecture ratée sur trois suffit à rendre la liste incomplète : la
