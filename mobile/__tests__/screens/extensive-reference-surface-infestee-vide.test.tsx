@@ -1,8 +1,12 @@
 /**
  * Surface infestée (ha) : facultative pour toute fiche non intensive
  * (extensive comme validation, seules à passer par extensive-reference.tsx),
- * #surface-infestee-facultative — n'était auparavant jamais transmise à
- * l'intensive non plus, cette bascule aligne les deux écrans.
+ * #surface-infestee-facultative.
+ *
+ * #cible-terrestre-extensif-validation : enregistrée à 0 (pas `null`) quand
+ * laissée vide — même règle que reference.tsx (Intensif) — pour que la Cible
+ * de traitement dérivée (surface_infestee_ha) affiche 0 plutôt que "non
+ * renseigné" en l'absence d'infestation.
  *
  * Fichier séparé (un seul montage d'écran par fichier) — même mise en garde
  * que extensive-reference-screen-restore.test.tsx (fuite de la chaîne de
@@ -44,7 +48,7 @@ describe('ExtensiveReferenceScreen — surface infestée facultative', () => {
     });
   });
 
-  it('laisse passer « Suivant » sans alerte quand la surface infestée est vide, et l’enregistre à null', async () => {
+  it('laisse passer « Suivant » sans alerte quand la surface infestée est vide, et l’enregistre à 0', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 
     await render(<ExtensiveReferenceScreen />);
@@ -55,7 +59,7 @@ describe('ExtensiveReferenceScreen — surface infestée facultative', () => {
     await waitFor(() =>
       expect(prospectionRepository.updateProspectionExtensiveReference).toHaveBeenCalledWith(
         'draft-123',
-        expect.objectContaining({ surfaceInfestee: null })
+        expect.objectContaining({ surfaceInfestee: 0 })
       )
     );
     expect(alertSpy).not.toHaveBeenCalledWith('Surface infestée requise', expect.any(String));

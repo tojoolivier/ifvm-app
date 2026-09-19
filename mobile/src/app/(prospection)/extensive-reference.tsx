@@ -553,7 +553,11 @@ export default function ExtensiveReferenceScreen() {
           stationLibre: stationLibre || null,
           typeStation: normalizedTypeStation.length > 0 ? JSON.stringify(normalizedTypeStation) : null,
           surfaceStation: surfaceStation ? parseFloat(surfaceStation) : null,
-          surfaceInfestee: surfaceInfestee ? parseFloat(surfaceInfestee) : null,
+          // Facultative, 0 par défaut si non saisie (aucune infestation) — même
+          // règle que reference.tsx (Intensif) : sans ça, la Cible de traitement
+          // dérivée (surface_infestee_ha) affichait "non renseigné" au lieu de 0
+          // pour toute fiche Extensif/Validation où l'agent n'a rien à reporter ici.
+          surfaceInfestee: surfaceInfestee ? parseFloat(surfaceInfestee) : 0,
           nMessage: nMessage || null,
           heureObservationAt,
           societe: isAerien ? societe || null : null,
