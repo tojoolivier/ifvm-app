@@ -1610,6 +1610,14 @@ export async function listUnsyncedProspections(): Promise<DraftProspection[]> {
  * `prospection-picker.tsx` affiche un bandeau « hors ligne » quand ce repli
  * est utilisé : imprécision assumée et signalée, jamais silencieuse (ADR-012
  * décision 1).
+ *
+ * `enfant.statut != 'brouillon'` (#revalidation-cree-apres-confirmation) :
+ * une revalidation seulement AMORCÉE (`demarrerRevalidation`, brouillon
+ * jamais confirmé/enregistré) ne doit pas faire disparaître l'origine —
+ * seule une revalidation réellement enregistrée (statut `en_attente` ou
+ * au-delà) la remplace. Sans cette condition, ouvrir puis abandonner
+ * l'assistant de revalidation rendait la fiche d'origine introuvable ici,
+ * alors qu'aucune revalidation n'avait été réellement créée.
  */
 export async function listProspectionsDisponiblesPourTraitementLocal(): Promise<DraftProspection[]> {
   const db = await getDb();
@@ -1622,7 +1630,10 @@ export async function listProspectionsDisponiblesPourTraitementLocal(): Promise<
          AND p.validated_at IS NOT NULL
          AND julianday('now') - julianday(p.validated_at) >= ${DELAI_REVALIDATION_JOURS}
        )
-       AND NOT EXISTS (SELECT 1 FROM prospection enfant WHERE enfant.revalide_de_id = p.id)
+       AND NOT EXISTS (
+         SELECT 1 FROM prospection enfant
+         WHERE enfant.revalide_de_id = p.id AND enfant.statut != 'brouillon'
+       )
      ORDER BY p.updated_at DESC`
   );
 }
@@ -1636,6 +1647,12 @@ export async function listProspectionsDisponiblesPourTraitementLocal(): Promise<
  * `validated_at` doit avoir été rapatrié localement (cf.
  * `materialiserProspectionValidee`) pour qu'une fiche d'un AUTRE agent
  * puisse jamais y apparaître.
+ *
+ * `enfant.statut != 'brouillon'` (#revalidation-cree-apres-confirmation) :
+ * même condition que `listProspectionsDisponiblesPourTraitementLocal`
+ * ci-dessus — l'origine ne doit disparaître de cette liste qu'une fois la
+ * revalidation réellement CRÉÉE (confirmée/enregistrée), pas dès qu'un
+ * brouillon est amorcé.
  */
 export async function listProspectionsARevaliderLocal(): Promise<DraftProspection[]> {
   const db = await getDb();
@@ -1645,7 +1662,10 @@ export async function listProspectionsARevaliderLocal(): Promise<DraftProspectio
        AND p.validated_at IS NOT NULL
        AND julianday('now') - julianday(p.validated_at) >= ${DELAI_REVALIDATION_JOURS}
        AND NOT EXISTS (SELECT 1 FROM traitement t WHERE t.prospection_id = p.id)
-       AND NOT EXISTS (SELECT 1 FROM prospection enfant WHERE enfant.revalide_de_id = p.id)
+       AND NOT EXISTS (
+         SELECT 1 FROM prospection enfant
+         WHERE enfant.revalide_de_id = p.id AND enfant.statut != 'brouillon'
+       )
      ORDER BY p.validated_at ASC`
   );
 }

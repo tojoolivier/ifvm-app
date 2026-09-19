@@ -380,7 +380,11 @@ describe('listProspectionsDisponiblesPourTraitementLocal', () => {
     const [query] = getAllAsync.mock.calls[0];
     expect(query).toContain("type_prospection IN ('extensive', 'validation')");
     expect(query).toContain('julianday');
-    expect(query).toContain('NOT EXISTS (SELECT 1 FROM prospection enfant WHERE enfant.revalide_de_id = p.id)');
+    expect(query).toContain('enfant.revalide_de_id = p.id');
+    // #revalidation-cree-apres-confirmation : un brouillon de revalidation
+    // seulement amorcé (jamais confirmé/enregistré) ne doit pas exclure
+    // l'origine — seule une revalidation réellement créée (statut != brouillon).
+    expect(query).toContain("enfant.statut != 'brouillon'");
   });
 });
 
@@ -406,7 +410,10 @@ describe('listProspectionsARevaliderLocal', () => {
 
     const [query] = getAllAsync.mock.calls[0];
     expect(query).toContain('NOT EXISTS (SELECT 1 FROM traitement t WHERE t.prospection_id = p.id)');
-    expect(query).toContain('NOT EXISTS (SELECT 1 FROM prospection enfant WHERE enfant.revalide_de_id = p.id)');
+    expect(query).toContain('enfant.revalide_de_id = p.id');
+    // #revalidation-cree-apres-confirmation : idem, cf. le test équivalent de
+    // listProspectionsDisponiblesPourTraitementLocal ci-dessus.
+    expect(query).toContain("enfant.statut != 'brouillon'");
   });
 });
 
