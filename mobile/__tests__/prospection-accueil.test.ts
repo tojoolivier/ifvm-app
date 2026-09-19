@@ -28,6 +28,7 @@ import {
   loadFichesDisponiblesPourTraitement,
   loadFichesARevalider,
   assurerProspectionDisponibleLocalement,
+  materialiserFichesDisponibles,
   pickCurrentCampagneId,
   startNewProspection,
   deleteDraftProspection,
@@ -78,6 +79,7 @@ const STORED_ROW: DraftProspection = {
   type_prospection: 'intensive',
   campagne_id: '22222222-2222-2222-2222-222222222222',
   prospecteur_id: '33333333-3333-3333-3333-333333333333',
+  prospecteur_nom: null,
   station_id: null,
   biotope: 'Mesophyle',
   region: null,
@@ -373,6 +375,7 @@ describe('assurerProspectionDisponibleLocalement', () => {
     type_prospection: 'extensive',
     campagne_id: 'camp-1',
     prospecteur_id: 'autre-agent',
+    prospecteur_nom: 'Alice Autre',
     date_prospection: '2026-08-01',
     surface_infestee: 12.5,
     n_fiche: 'F-001',
@@ -406,7 +409,12 @@ describe('assurerProspectionDisponibleLocalement', () => {
     await assurerProspectionDisponibleLocalement(FICHE_SERVEUR);
 
     expect(mockMaterialiser).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'presp-autre-agent', statut: 'validee', surfaceInfestee: 12.5 })
+      expect.objectContaining({
+        id: 'presp-autre-agent',
+        statut: 'validee',
+        surfaceInfestee: 12.5,
+        prospecteurNom: 'Alice Autre',
+      })
     );
     expect(mockSavePopulation).toHaveBeenCalledWith(
       'presp-autre-agent',
@@ -442,6 +450,29 @@ describe('assurerProspectionDisponibleLocalement', () => {
     await assurerProspectionDisponibleLocalement({ ...FICHE_SERVEUR, operations_aeriennes: [] });
 
     expect(mockSaveOperations).not.toHaveBeenCalled();
+  });
+});
+
+describe('materialiserFichesDisponibles', () => {
+  const FICHE_A = { id: 'presp-a', statut: 'validee' } as any;
+  const FICHE_B = { id: 'presp-b', statut: 'validee' } as any;
+
+  it('matérialise chaque fiche de la liste (#fiches-disponibles-hors-ligne)', async () => {
+    mockGetProspection.mockResolvedValue(null);
+
+    await materialiserFichesDisponibles([FICHE_A, FICHE_B]);
+
+    expect(mockMaterialiser).toHaveBeenCalledWith(expect.objectContaining({ id: 'presp-a' }));
+    expect(mockMaterialiser).toHaveBeenCalledWith(expect.objectContaining({ id: 'presp-b' }));
+  });
+
+  it("continue sur les fiches suivantes si l'une d'elles échoue, sans jamais planter l'appelant", async () => {
+    mockGetProspection.mockResolvedValue(null);
+    mockMaterialiser.mockRejectedValueOnce(new Error('échec matérialisation'));
+
+    await expect(materialiserFichesDisponibles([FICHE_A, FICHE_B])).resolves.toBeUndefined();
+
+    expect(mockMaterialiser).toHaveBeenCalledWith(expect.objectContaining({ id: 'presp-b' }));
   });
 });
 

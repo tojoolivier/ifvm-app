@@ -149,6 +149,7 @@ export async function assurerProspectionDisponibleLocalement(fiche: ProspectionR
     typeProspection: fiche.type_prospection,
     campagneId: fiche.campagne_id,
     prospecteurId: fiche.prospecteur_id,
+    prospecteurNom: fiche.prospecteur_nom ?? null,
     stationId: fiche.station_id ?? null,
     dateProspection: fiche.date_prospection,
     latitude: fiche.latitude ?? null,
@@ -247,6 +248,32 @@ export async function assurerProspectionDisponibleLocalement(fiche: ProspectionR
   }
   if ((fiche.operations_aeriennes ?? []).length > 0) {
     await saveOperationsAeriennes(fiche.id, fiche.operations_aeriennes as unknown as OperationAerienneRow[]);
+  }
+}
+
+/**
+ * Matérialise en local TOUTES les fiches d'une liste « disponible pour
+ * traitement » (#fiches-disponibles-hors-ligne), pas seulement celle
+ * finalement choisie par l'agent : sans ça, une fiche validée par un AUTRE
+ * agent, seulement VUE en ligne dans « Consulter une fiche validée »
+ * (prospection-picker.tsx) sans être sélectionnée, redevenait invisible dès
+ * le passage hors ligne — `assurerProspectionDisponibleLocalement` n'étant
+ * jusque-là appelée qu'au moment du choix (`choisir()`).
+ *
+ * Best-effort, fiche par fiche : un échec isolé (ex. fiche corrompue côté
+ * serveur) ne doit jamais empêcher les autres d'être mises en cache, ni
+ * bloquer l'affichage de la liste elle-même.
+ */
+export async function materialiserFichesDisponibles(fiches: ProspectionRead[]): Promise<void> {
+  for (const fiche of fiches) {
+    try {
+      await assurerProspectionDisponibleLocalement(fiche);
+    } catch (error) {
+      log.ignore(
+        error,
+        `Mise en cache hors ligne de la fiche ${fiche.id} échouée — fiche ignorée, les autres continuent`
+      );
+    }
   }
 }
 

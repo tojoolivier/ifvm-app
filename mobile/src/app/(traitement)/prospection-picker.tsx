@@ -3,7 +3,11 @@ import { Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { ProspectionRead } from '@/lib/api-client';
-import { loadFichesDisponiblesPourTraitement, assurerProspectionDisponibleLocalement } from '@/lib/prospection-accueil';
+import {
+  loadFichesDisponiblesPourTraitement,
+  assurerProspectionDisponibleLocalement,
+  materialiserFichesDisponibles,
+} from '@/lib/prospection-accueil';
 import { listProspectionsDisponiblesPourTraitementLocal } from '@/lib/prospection-repository';
 import { NetworkError } from '@/lib/errors';
 import { useAuthStore } from '@/lib/auth-store';
@@ -70,6 +74,10 @@ export default function TraitementProspectionPickerScreen() {
       criticality: 'essential',
     }).then(async (outcome) => {
       if (outcome.ok) {
+        // #fiches-disponibles-hors-ligne : met en cache local TOUTE la liste
+        // dès qu'elle apparaît en ligne (pas seulement la fiche choisie), pour
+        // qu'elle reste consultable au prochain passage hors connexion.
+        await materialiserFichesDisponibles(outcome.value);
         setHorsLigne(false);
         setErreurDeLecture(null);
         setProspections(outcome.value);

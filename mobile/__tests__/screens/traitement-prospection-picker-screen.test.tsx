@@ -23,6 +23,7 @@ jest.mock('expo-router', () => ({
 jest.mock('@/lib/prospection-accueil', () => ({
   loadFichesDisponiblesPourTraitement: jest.fn(),
   assurerProspectionDisponibleLocalement: jest.fn().mockResolvedValue(undefined),
+  materialiserFichesDisponibles: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('@/lib/prospection-repository', () => ({
@@ -79,6 +80,7 @@ beforeEach(() => {
   mockBack.mockClear();
   jest.mocked(prospectionAccueil.loadFichesDisponiblesPourTraitement).mockReset();
   jest.mocked(prospectionAccueil.assurerProspectionDisponibleLocalement).mockClear().mockResolvedValue(undefined);
+  jest.mocked(prospectionAccueil.materialiserFichesDisponibles).mockClear().mockResolvedValue(undefined);
   jest.mocked(prospectionRepository.listProspectionsDisponiblesPourTraitementLocal).mockReset();
   useAuthStore.setState({ user: { id: 'moi' } as any, token: 'token-1' } as any);
 });
@@ -118,6 +120,43 @@ describe('TraitementProspectionPickerScreen — visibilité multi-utilisateurs',
     await render(<TraitementProspectionPickerScreen />);
 
     expect(await screen.findByText(/Signalement · MSG-2026-0042/)).toBeVisible();
+  });
+});
+
+/**
+ * #fiches-disponibles-hors-ligne : une fiche validée par un AUTRE agent, VUE
+ * en ligne dans cette liste mais jamais SÉLECTIONNÉE, devenait invisible dès
+ * le passage hors ligne — `assurerProspectionDisponibleLocalement` n'était
+ * appelée qu'au moment du choix (`choisir()`). Toute la liste doit désormais
+ * être mise en cache local dès qu'elle apparaît en ligne.
+ */
+describe('TraitementProspectionPickerScreen — mise en cache hors ligne de toute la liste', () => {
+  it('matérialise localement toutes les fiches reçues en ligne, pas seulement celle choisie', async () => {
+    jest.mocked(prospectionAccueil.loadFichesDisponiblesPourTraitement).mockResolvedValue([
+      FICHE_PROPRE_AGENT,
+      FICHE_AUTRE_AGENT,
+    ]);
+
+    await render(<TraitementProspectionPickerScreen />);
+
+    await waitFor(() =>
+      expect(prospectionAccueil.materialiserFichesDisponibles).toHaveBeenCalledWith([
+        FICHE_PROPRE_AGENT,
+        FICHE_AUTRE_AGENT,
+      ])
+    );
+  });
+
+  it('ne matérialise rien en repli hors ligne (liste déjà locale)', async () => {
+    jest.mocked(prospectionAccueil.loadFichesDisponiblesPourTraitement).mockRejectedValue(
+      new NetworkError('Connexion au serveur impossible pour le moment.')
+    );
+    jest.mocked(prospectionRepository.listProspectionsDisponiblesPourTraitementLocal).mockResolvedValue([]);
+
+    await render(<TraitementProspectionPickerScreen />);
+
+    await waitFor(() => expect(screen.getByText(/Hors ligne/)).toBeVisible());
+    expect(prospectionAccueil.materialiserFichesDisponibles).not.toHaveBeenCalled();
   });
 });
 

@@ -69,6 +69,8 @@ const MIGRATED_COLUMNS = [
   // #revalidation-prospection
   { name: 'validated_at' },
   { name: 'revalide_de_id' },
+  // #fiches-disponibles-hors-ligne
+  { name: 'prospecteur_nom' },
 
   // Colonnes de prospection_operation_aerienne
   { name: 'motif_divers' },
