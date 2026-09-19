@@ -539,6 +539,13 @@ export interface ProspectionValideeInput {
   prospecteurId: string;
   prospecteurNom: string | null;
   stationId: string | null;
+  /** #localite-traitement-poste-acridien-autre-agent : nom du poste acridien
+   * (référentiel station, Intensif) déjà résolu côté serveur — sans lui, une
+   * fiche de traitement créée depuis cette prospection par un AUTRE agent
+   * (donc jamais passée par `updateProspectionReference` sur CET appareil)
+   * ne pouvait pas pré-remplir « Localité » (references.tsx ne lit que
+   * `station_nom`/`station_libre`, jamais station_id directement). */
+  stationNom: string | null;
   dateProspection: string;
   latitude: number | null;
   longitude: number | null;
@@ -630,7 +637,7 @@ export async function materialiserProspectionValidee(input: ProspectionValideeIn
   const db = await getDb();
   await db.runAsync(
     `INSERT OR REPLACE INTO prospection (
-      id, type_prospection, campagne_id, prospecteur_id, prospecteur_nom, station_id,
+      id, type_prospection, campagne_id, prospecteur_id, prospecteur_nom, station_id, station_nom,
       date_prospection, latitude, longitude, altitude, biotope,
       surface_station, surface_prospectee, surface_infestee,
       degats_cultures, derniere_pluie, intensite_pluie, vegetation, sol,
@@ -653,7 +660,7 @@ export async function materialiserProspectionValidee(input: ProspectionValideeIn
       signature_chef_base_nom, signature_chef_base_horodatage, signature_chef_base_image,
       created_at, updated_at
     ) VALUES (
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?,
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?,
       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
     )`,
@@ -664,6 +671,7 @@ export async function materialiserProspectionValidee(input: ProspectionValideeIn
       input.prospecteurId,
       input.prospecteurNom,
       input.stationId,
+      input.stationNom,
       input.dateProspection,
       input.latitude,
       input.longitude,

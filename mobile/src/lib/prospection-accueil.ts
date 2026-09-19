@@ -1,7 +1,7 @@
 import { apiClient, Campagne, ProspectionRead } from './api-client';
 import { generateId } from './id';
 import { STATUT_VALIDE } from './prospection-fiche-lecture';
-import { listCampagnesLocal } from './referentiel-db';
+import { listCampagnesLocal, getStationById } from './referentiel-db';
 import {
   createDraftProspection,
   countUnsyncedProspections,
@@ -145,6 +145,17 @@ export async function assurerProspectionDisponibleLocalement(fiche: ProspectionR
   const dejaLocale = await getProspection(fiche.id);
   if (dejaLocale) return;
 
+  // #localite-traitement-poste-acridien-autre-agent : `ProspectionRead` (réponse
+  // serveur) n'expose pas le nom de la station (contrairement à `prospecteur_nom`,
+  // résolu côté backend) — sans lui, une fiche de traitement Terrestre créée
+  // depuis cette prospection Intensive par un AUTRE agent ne pouvait jamais
+  // pré-remplir « Localité » (references.tsx ne lit que `station_nom`/
+  // `station_libre`). Résolu ici depuis le référentiel local déjà synchronisé
+  // (`station_fixe`, partagé entre tous les agents) — `null` si absent
+  // (extensif, sans station) ou si le référentiel n'a encore jamais été
+  // synchronisé sur cet appareil, même repli que l'absence actuelle.
+  const stationNom = fiche.station_id ? ((await getStationById(fiche.station_id))?.nom ?? null) : null;
+
   await materialiserProspectionValidee({
     id: fiche.id,
     typeProspection: fiche.type_prospection,
@@ -152,6 +163,7 @@ export async function assurerProspectionDisponibleLocalement(fiche: ProspectionR
     prospecteurId: fiche.prospecteur_id,
     prospecteurNom: fiche.prospecteur_nom ?? null,
     stationId: fiche.station_id ?? null,
+    stationNom,
     dateProspection: fiche.date_prospection,
     latitude: fiche.latitude ?? null,
     longitude: fiche.longitude ?? null,

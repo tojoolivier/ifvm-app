@@ -14,7 +14,7 @@ import {
   getProspection,
   DraftProspection,
 } from '../src/lib/prospection-repository';
-import { listCampagnesLocal } from '../src/lib/referentiel-db';
+import { listCampagnesLocal, getStationById } from '../src/lib/referentiel-db';
 
 // `auth-store.ts` importe `storage.ts` -> `expo-secure-store`, qui tire
 // `react-native` (non transformé dans ce projet Jest "logic") — jamais un
@@ -67,6 +67,7 @@ jest.mock('../src/lib/prospection-repository', () => ({
 
 jest.mock('../src/lib/referentiel-db', () => ({
   listCampagnesLocal: jest.fn(),
+  getStationById: jest.fn(),
 }));
 
 const mockApiClient = jest.mocked(apiClient);
@@ -83,6 +84,7 @@ const mockSaveInfestation = jest.mocked(saveProspectionInfestation);
 const mockSaveCaptures = jest.mocked(saveProspectionCaptures);
 const mockSaveOperations = jest.mocked(saveOperationsAeriennes);
 const mockGetProspection = jest.mocked(getProspection);
+const mockGetStationById = jest.mocked(getStationById);
 
 const STORED_ROW: DraftProspection = {
   id: '11111111-1111-1111-1111-111111111111',
@@ -491,6 +493,60 @@ describe('assurerProspectionDisponibleLocalement', () => {
     await assurerProspectionDisponibleLocalement({ ...FICHE_SERVEUR, operations_aeriennes: [] });
 
     expect(mockSaveOperations).not.toHaveBeenCalled();
+  });
+
+  /** #localite-traitement-poste-acridien-autre-agent : `ProspectionRead` n'expose
+   * pas `station_nom` — sans ce report, "Localité" ne pouvait jamais se
+   * pré-remplir sur une fiche de traitement créée depuis une prospection
+   * Intensive d'un AUTRE agent (references.tsx ne lit que station_nom/
+   * station_libre). */
+  it('résout le nom de la station (Intensif) depuis le référentiel local et le reporte dans stationNom', async () => {
+    mockGetProspection.mockResolvedValueOnce(null);
+    mockGetStationById.mockResolvedValueOnce({
+      id: 'station-1',
+      code: 'ST01',
+      nom: 'Poste Ambovombe',
+      paId: 'pa-1',
+      latitude: -25.1,
+      longitude: 46.1,
+      altitude: null,
+      commune: 'Ambovombe',
+      district: 'Ambovombe',
+      region: 'Androy',
+    });
+
+    await assurerProspectionDisponibleLocalement({
+      ...FICHE_SERVEUR,
+      type_prospection: 'intensive',
+      station_id: 'station-1',
+    });
+
+    expect(mockGetStationById).toHaveBeenCalledWith('station-1');
+    expect(mockMaterialiser).toHaveBeenCalledWith(
+      expect.objectContaining({ stationId: 'station-1', stationNom: 'Poste Ambovombe' })
+    );
+  });
+
+  it("ne cherche jamais de station quand la fiche n'en a pas (Extensif)", async () => {
+    mockGetProspection.mockResolvedValueOnce(null);
+
+    await assurerProspectionDisponibleLocalement(FICHE_SERVEUR);
+
+    expect(mockGetStationById).not.toHaveBeenCalled();
+    expect(mockMaterialiser).toHaveBeenCalledWith(expect.objectContaining({ stationNom: null }));
+  });
+
+  it("reporte stationNom=null si la station n'est plus dans le référentiel local (jamais synchronisé, ou supprimée)", async () => {
+    mockGetProspection.mockResolvedValueOnce(null);
+    mockGetStationById.mockResolvedValueOnce(null);
+
+    await assurerProspectionDisponibleLocalement({
+      ...FICHE_SERVEUR,
+      type_prospection: 'intensive',
+      station_id: 'station-inconnue',
+    });
+
+    expect(mockMaterialiser).toHaveBeenCalledWith(expect.objectContaining({ stationNom: null }));
   });
 });
 

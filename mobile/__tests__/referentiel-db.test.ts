@@ -7,12 +7,14 @@ import {
   listCampagnesLocal,
   listCultures,
   listCodesStades,
+  getStationById,
 } from '../src/lib/referentiel-db';
 
 const execAsync = jest.fn().mockResolvedValue(undefined);
 const getAllAsync = jest.fn().mockResolvedValue([]);
+const getFirstAsync = jest.fn().mockResolvedValue(null);
 const runAsync = jest.fn().mockResolvedValue(undefined);
-const openDatabaseAsync = jest.fn().mockResolvedValue({ execAsync, getAllAsync, runAsync });
+const openDatabaseAsync = jest.fn().mockResolvedValue({ execAsync, getAllAsync, getFirstAsync, runAsync });
 
 jest.mock('expo-sqlite', () => ({
   openDatabaseAsync: (...args: unknown[]) => openDatabaseAsync(...args),
@@ -24,6 +26,7 @@ beforeEach(() => {
   openDatabaseAsync.mockClear();
   execAsync.mockClear();
   getAllAsync.mockClear();
+  getFirstAsync.mockClear().mockResolvedValue(null);
   runAsync.mockClear();
 });
 
@@ -241,5 +244,42 @@ describe('listUtilisateursByRole', () => {
       ['chef_de_base']
     );
     expect(result).toEqual([{ id: 'u-1', nom: 'Rakoto', prenom: 'Jean' }]);
+  });
+});
+
+/** #localite-traitement-poste-acridien-autre-agent : résout une station du
+ * référentiel local par id, sans filtre `actif` (une station désactivée
+ * depuis doit rester résolvable pour une prospection existante). */
+describe('getStationById', () => {
+  it('résout une station active ou non, sans filtrer sur actif', async () => {
+    getFirstAsync.mockResolvedValueOnce({
+      id: 'station-1',
+      code: 'ST01',
+      nom: 'Poste Ambovombe',
+      paId: 'pa-1',
+      latitude: -25.1,
+      longitude: 46.1,
+      altitude: null,
+      commune: 'Ambovombe',
+      district: 'Ambovombe',
+      region: 'Androy',
+    });
+
+    const result = await getStationById('station-1');
+
+    expect(getFirstAsync).toHaveBeenCalledWith(
+      expect.stringContaining('FROM station_fixe WHERE id = ?'),
+      ['station-1']
+    );
+    expect(getFirstAsync.mock.calls[0][0]).not.toContain('actif');
+    expect(result?.nom).toBe('Poste Ambovombe');
+  });
+
+  it('renvoie null si la station est introuvable', async () => {
+    getFirstAsync.mockResolvedValueOnce(null);
+
+    const result = await getStationById('station-inconnue');
+
+    expect(result).toBeNull();
   });
 });

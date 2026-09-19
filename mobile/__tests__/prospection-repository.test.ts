@@ -122,6 +122,7 @@ describe('createDraftProspection', () => {
 const CHAMPS_PROSPECTION_VALIDEE_PAR_DEFAUT = {
   prospecteurNom: null,
   stationId: null,
+  stationNom: null,
   latitude: null,
   longitude: null,
   altitude: null,
