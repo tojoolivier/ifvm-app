@@ -1,9 +1,13 @@
 /**
- * Écran « Cibles » (Terrestre) — détail par espèce (LMC/NSE) des petites/grandes
- * larves et de la répartition diffuse/groupée, même contenu que l'écran
- * « Synthèse » côté Aérien (traitement-synthese-detail-par-espece.test.tsx) :
- * une prospection mélangeant LMC et NSE ne doit plus perdre le détail par
- * espèce au moment du traitement, quel que soit le type de traitement.
+ * Écran « Cibles » (Terrestre) — détail par espèce (LMC/NSE) de la répartition
+ * diffuse/groupée, même contenu que l'écran « Synthèse » côté Aérien
+ * (traitement-synthese-detail-par-espece.test.tsx) : une prospection mélangeant
+ * LMC et NSE ne doit plus perdre le détail par espèce au moment du traitement,
+ * quel que soit le type de traitement.
+ *
+ * Petites/Grandes larves retirées de cet écran au profit des tableaux Phase/Stade
+ * en direct (#cibles-phase-stade-en-direct, cf. traitement-cibles-screen.test.tsx) —
+ * ce fichier ne couvre donc plus que la Répartition de la population par espèce.
  *
  * Fichier séparé de traitement-cibles-screen.test.tsx — cf. le commentaire
  * d'intensive-imagos-densites-obligatoires.test.tsx pour le pourquoi.
@@ -23,6 +27,15 @@ jest.mock('@/lib/traitement-repository', () => ({
   getTraitement: jest.fn(),
 }));
 
+// Les fiches de ces tests n'ont pas de `prospection_id` -> le fetch live
+// Phase/Stade est court-circuité, mais le module reste importé (import de
+// valeur, pas seulement de type, dans cibles.tsx) : mocké comme partout
+// ailleurs pour ne pas dépendre du vrai expo-sqlite en test.
+jest.mock('@/lib/prospection-repository', () => ({
+  listAllProspectionPopulations: jest.fn().mockResolvedValue([]),
+  listAllProspectionCaptures: jest.fn().mockResolvedValue([]),
+}));
+
 function draftAvecCible(cible: Record<string, unknown> | null) {
   return {
     id: 'trait-1',
@@ -36,7 +49,7 @@ beforeEach(() => {
 });
 
 describe('CiblesScreen (Terrestre) — détail par espèce', () => {
-  it('affiche LMC et NSE séparément (Espèce, Petites/Grandes larves, Répartition) sur une fiche mélangée', async () => {
+  it('affiche LMC et NSE séparément (Espèce, Répartition) sur une fiche mélangée', async () => {
     jest.mocked(traitementRepository.getTraitement).mockResolvedValue(
       draftAvecCible({
         espece: 'MELANGE',
@@ -59,8 +72,6 @@ describe('CiblesScreen (Terrestre) — détail par espèce', () => {
     await render(<CiblesScreen />);
 
     expect(await screen.findByText('LMC / NSE')).toBeVisible();
-    expect(screen.getByText('LMC : 22 / NSE : 2')).toBeVisible();
-    expect(screen.getByText('LMC : 3 / NSE : 5')).toBeVisible();
     expect(screen.getByText(/LMC — diffuse : 20 ind\.\/ha · groupée : 3 ind\.\/m²/)).toBeVisible();
     expect(screen.getByText(/NSE — diffuse : 5 ind\.\/ha · groupée : non renseigné ind\.\/m²/)).toBeVisible();
   });
@@ -81,8 +92,6 @@ describe('CiblesScreen (Terrestre) — détail par espèce', () => {
     await render(<CiblesScreen />);
 
     expect(await screen.findByText('LMC')).toBeVisible();
-    // Petites/Grandes larves : aucun detail par espece -> repli "non renseigné".
-    expect(screen.getAllByText('non renseigné')).toHaveLength(2);
     expect(screen.getByText('GROUPEE')).toBeVisible();
   });
 });

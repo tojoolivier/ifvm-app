@@ -3,6 +3,8 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getTraitement, Cible } from '@/lib/traitement-repository';
+import { listAllProspectionCaptures, listAllProspectionPopulations } from '@/lib/prospection-repository';
+import { construireDetailPhaseStade, PhaseStadeGroup } from '@/lib/traitement-cible';
 import { Card } from '@/components/traitement/Card';
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN, PROGRESS_SEGMENTS_TERRESTRE } from '@/components/traitement/ProgressBar';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
@@ -43,30 +45,40 @@ function displayEspeces(cible: Cible | null): string {
   return display(cible?.espece);
 }
 
-/** « LMC : 4 / NSE : 2 » — n'affiche que les espèces dont cette valeur est
- * renseignée (`null` = espèce absente de la prospection liée). */
-function displayParEspece(lmc: number | null | undefined, nse: number | null | undefined): string {
-  const parts: string[] = [];
-  if (lmc != null) parts.push(`LMC : ${lmc}`);
-  if (nse != null) parts.push(`NSE : ${nse}`);
-  return parts.length > 0 ? parts.join(' / ') : 'non renseigné';
+function PhaseStadeTable({ title, entries }: { title: string; entries: { label: string; value: number }[] }) {
+  return (
+    <View style={styles.phaseStadeTable}>
+      <Text style={styles.phaseStadeTitle}>{title}</Text>
+      {entries.length === 0 ? (
+        <Text style={styles.value}>non renseigné</Text>
+      ) : (
+        entries.map((entry) => (
+          <View key={entry.label} style={styles.detailRow}>
+            <Text style={styles.detailRowLabel}>{entry.label}</Text>
+            <Text style={styles.detailRowValue}>{entry.value}</Text>
+          </View>
+        ))
+      )}
+    </View>
+  );
 }
 
 /**
- * Écran B — Cibles (snapshot figé à la création).
+ * Écran B — Cibles.
  *
  * Terrestre uniquement depuis #326 : côté Aérien, cet écran est remplacé par
  * « Synthèse » (synthese.tsx), qui reprend le même contenu de cible en lecture
  * seule et y ajoute la végétation (déplacée depuis Moyens) — `references.tsx`
  * route vers l'un ou l'autre selon `type_traitement`.
  *
- * La cible est calculée une seule fois, à la création de la fiche de traitement
- * (references.tsx, via `construireCible` dans traitement-cible.ts — même logique que
- * `construire_cible()` côté backend), à partir des populations/infestations de la
- * fiche de prospection liée. Cet écran se contente de la relire telle quelle
- * (`getTraitement(id).cible`) : elle ne se recalcule jamais après coup, même si la
- * prospection est modifiée ensuite. Si vide (aucune capture amont), chaque champ
- * affiche "non renseigné" comme prévu par le brief.
+ * Écran à deux vitesses depuis #cibles-phase-stade-en-direct : Espèce, Vols/essaims
+ * et Répartition de la population restent un snapshot figé (`cible`, calculé une
+ * seule fois à la création de la fiche via `construireCible`/`construire_cible()` —
+ * jamais recalculé après coup). Les tableaux Phase/Stade par espèce/catégorie
+ * (LMC/NSE × Imagos/Larves), eux, sont recalculés EN DIRECT à chaque visite de cet
+ * écran depuis les populations/captures de la prospection liée
+ * (`construireDetailPhaseStade`) — voulu ainsi pour refléter la prospection telle
+ * qu'elle est aujourd'hui, pas telle qu'elle était à la création du traitement.
  */
 export default function CiblesScreen() {
   const router = useRouter();
@@ -76,14 +88,24 @@ export default function CiblesScreen() {
   // Type de traitement de la fiche — décide du nombre d'étapes de ProgressBar (7 en
   // aérien avec l'écran Rotations, 6 en terrestre sans lui).
   const [typeTraitement, setTypeTraitement] = useState<'AERIEN' | 'TERRESTRE' | null>(null);
+  const [phaseStadeGroups, setPhaseStadeGroups] = useState<PhaseStadeGroup[]>([]);
   const signalerChargement = useSignalerChargement('cibles');
 
   useEffect(() => {
     if (!traitementId) return;
     void getTraitement(traitementId)
-      .then((draft) => {
+      .then(async (draft) => {
         setCible(draft?.cible ?? null);
         setTypeTraitement(draft?.type_traitement ?? null);
+        if (!draft?.prospection_id) {
+          setPhaseStadeGroups([]);
+          return;
+        }
+        const [populations, captures] = await Promise.all([
+          listAllProspectionPopulations(draft.prospection_id),
+          listAllProspectionCaptures(draft.prospection_id),
+        ]);
+        setPhaseStadeGroups(construireDetailPhaseStade(populations, captures));
       })
       .catch((error) => signalerChargement(error, { traitementId }));
   }, [traitementId, signalerChargement]);
@@ -97,21 +119,9 @@ export default function CiblesScreen() {
         />
         <Text style={styles.title}>Cibles</Text>
 
-        <Card variant="avertissement">
-          <Text style={styles.warningText}>⚠ Snapshot figé à la création</Text>
-        </Card>
-
         <View style={styles.field}>
           <Text style={styles.label}>Espèce</Text>
           <Text style={styles.value}>{displayEspeces(cible)}</Text>
-        </View>
-        <View style={styles.field}>
-          <Text style={styles.label}>Petites larves (stades L1 à L3)</Text>
-          <Text style={styles.value}>{displayParEspece(cible?.petites_larves_lmc, cible?.petites_larves_nse)}</Text>
-        </View>
-        <View style={styles.field}>
-          <Text style={styles.label}>Grandes larves (LMC : L4-L5 · NSE : L4-L7)</Text>
-          <Text style={styles.value}>{displayParEspece(cible?.grandes_larves_lmc, cible?.grandes_larves_nse)}</Text>
         </View>
         <View style={styles.field}>
           <Text style={styles.label}>Vols/essaims</Text>
@@ -137,6 +147,14 @@ export default function CiblesScreen() {
           )}
         </View>
 
+        {phaseStadeGroups.map((group) => (
+          <Card key={`${group.espece}-${group.categorie}`}>
+            <Text style={styles.groupTitle}>{group.label}</Text>
+            <PhaseStadeTable title="Phase" entries={group.phases} />
+            <PhaseStadeTable title="Stade" entries={group.stades} />
+          </Card>
+        ))}
+
         <Card variant="derivee" style={styles.deriveeCentree}>
           <Text style={styles.label}>Surface infestée (ha)</Text>
           <Text style={styles.derivedValue}>{display(cible?.surface_infestee_ha)}</Text>
@@ -159,7 +177,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: traitementColors.fondApp },
   content: { padding: 16, gap: 12 },
   title: { fontFamily: traitementFonts.uiExtraBold, fontSize: traitementTypeSizes.titreEcran, color: traitementColors.texteTitre },
-  warningText: { fontFamily: traitementFonts.uiMedium, fontSize: traitementTypeSizes.corps, color: traitementColors.avertissementTexte },
   // `alignItems: 'center'` centre le bloc de chaque Text (titre puis valeur)
   // dans la largeur de l'écran, quelle que soit sa longueur ; combiné au
   // `textAlign: 'center'` ci-dessous, une valeur qui retourne à la ligne
@@ -189,6 +206,30 @@ const styles = StyleSheet.create({
     color: traitementColors.vertPrincipal,
     textAlign: 'center',
   },
+  groupTitle: {
+    fontFamily: traitementFonts.uiExtraBold,
+    fontSize: traitementTypeSizes.corps + 1,
+    color: traitementColors.texteTitre,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  phaseStadeTable: { marginBottom: 8 },
+  phaseStadeTitle: {
+    fontFamily: traitementFonts.uiSemiBold,
+    fontSize: traitementTypeSizes.corps,
+    color: traitementColors.texteLabel,
+    marginBottom: 4,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingVertical: 3,
+    borderBottomWidth: 1,
+    borderBottomColor: traitementColors.bordure,
+  },
+  detailRowLabel: { fontFamily: traitementFonts.uiSemiBold, fontSize: traitementTypeSizes.corps - 1, color: traitementColors.texteLabel },
+  detailRowValue: { fontFamily: traitementFonts.uiBold, fontSize: traitementTypeSizes.corps - 1, color: traitementColors.texteTitre },
   // Override local, propre à cet écran : centre le contenu de cette carte
   // "derivee" précise sans toucher au composant `Card` partagé (utilisé tel
   // quel, non centré, par d'autres écrans de la fiche de traitement).

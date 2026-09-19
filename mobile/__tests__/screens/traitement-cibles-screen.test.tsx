@@ -19,6 +19,15 @@ jest.mock('@/lib/traitement-repository', () => ({
   getTraitement: jest.fn(),
 }));
 
+// Les fiches de ces tests n'ont pas de `prospection_id` -> le fetch live
+// Phase/Stade est court-circuité, mais le module reste importé (import de
+// valeur, pas seulement de type, dans cibles.tsx) : mocké comme partout
+// ailleurs pour ne pas dépendre du vrai expo-sqlite en test.
+jest.mock('@/lib/prospection-repository', () => ({
+  listAllProspectionPopulations: jest.fn().mockResolvedValue([]),
+  listAllProspectionCaptures: jest.fn().mockResolvedValue([]),
+}));
+
 function draftAvecCible(cible: Record<string, unknown> | null) {
   return {
     id: 'trait-1',
