@@ -8,7 +8,7 @@ import { useAuthStore } from '@/lib/auth-store';
 import { loadAccueilData, loadMesProspectionsServeur, deleteDraftProspection, AccueilViewModel } from '@/lib/prospection-accueil';
 import { syncAllProspections } from '@/lib/prospection-review';
 import { estToutParti, resumerEnPhrase } from '@/lib/sync-lot';
-import { DraftProspection } from '@/lib/prospection-repository';
+import { DraftProspection, synchroniserStatutServeur } from '@/lib/prospection-repository';
 import { ProspectionRead } from '@/lib/api-client';
 import { navigateToProspectionConsult, navigateToProspectionDraft } from '@/lib/fiche-routing';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
@@ -104,6 +104,20 @@ export default function ProspectionScreen() {
           // serveur, tous statuts confondus. Cela évite un changement de
           // schéma local tout en faisant primer l'état de revue officiel.
           setData((current) => ({ ...current, validated: fichesServeur.value }));
+
+          // #liste-traitement-apres-validation : reporte aussi ce statut
+          // authentique dans la base locale — sans ça, une fiche créée sur CET
+          // appareil restait figée à 'en_attente' pour toujours localement,
+          // et le repli hors ligne de « disponible pour traitement » ne
+          // pouvait jamais savoir qu'elle avait depuis été réellement validée
+          // (ou rejetée) par un administrateur.
+          await runTask(
+            () =>
+              synchroniserStatutServeur(
+                fichesServeur.value.map((f) => ({ id: f.id, statut: f.statut, validated_at: f.validated_at ?? null }))
+              ),
+            { name: 'prospection.statut-serveur.persistance', criticality: 'best-effort' }
+          );
         }
       }
 
