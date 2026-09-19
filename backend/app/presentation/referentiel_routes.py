@@ -27,6 +27,7 @@ from app.application.referentiel_use_cases import (
     GetPosteAcridien,
     GetStandRemplissage,
     GetStation,
+    ListAeronefs,
     ListBasesAeriennes,
     ListCodesStades,
     ListCommunes,
@@ -41,6 +42,7 @@ from app.application.referentiel_use_cases import (
     ListZonesAntiAcridiennes,
     PullReferentiel,
     ReferentielSinceCursors,
+    UpdateAeronef,
     UpdateBaseAerienne,
     UpdateCodeStade,
     UpdateCulture,
@@ -54,6 +56,9 @@ from app.application.referentiel_use_cases import (
 from app.auth import get_current_user
 from app.database import get_db
 from app.domain.referentiel import (
+    Aeronef,
+    AeronefDejaAffecteError,
+    AeronefIntrouvableError,
     BaseAerienneEquipeInvalideError,
     BaseAerienneParentInvalideError,
     ChefDeBaseDejaEquipeError,
@@ -64,8 +69,11 @@ from app.domain.referentiel import (
     CommuneInconnueError,
     EquipeAerienneDejaAssigneeError,
     EquipeAerienneIntrouvableError,
+    EquipeNonAutoriseeError,
+    EquipeRequiseError,
     EquipeTerrestreIntrouvableError,
     GrilleDejaOccupeeError,
+    ImmatriculationAeronefDejaPriseError,
     NumeroBaseAerienneDejaPrisError,
     NumeroStandRemplissageDejaPrisError,
     PosteAcridienAvecStationsActivesError,
@@ -84,6 +92,7 @@ from app.infrastructure.referentiel_repository import (
     ZoneAntiAcridienRepositoryImpl,
 )
 from app.infrastructure.referentiel_sync_repository import (
+    AeronefRepositoryImpl,
     BaseAerienneRepositoryImpl,
     CodeStadeRepositoryImpl,
     CultureRepositoryImpl,
@@ -97,6 +106,8 @@ from app.infrastructure.referentiel_sync_repository import (
 from app.infrastructure.utilisateur_repository import UtilisateurRepositoryImpl
 from app.models.users import Utilisateur
 from app.presentation.referentiel_schemas import (
+    AeronefRead,
+    AeronefUpdate,
     BaseAerienneCreate,
     BaseAerienneRead,
     BaseAerienneUpdate,
@@ -749,6 +760,11 @@ async def create_equipe_aerienne(
             mecanicien=body.mecanicien,
             consultant_international=body.consultant_international,
             membres=[m.nom for m in body.membres],
+            aeronef=Aeronef(
+                immatriculation=body.aeronef.immatriculation,
+                societe=body.aeronef.societe,
+                volume_cuve_l=body.aeronef.volume_cuve_l,
+            ),
         )
     except ChefDeBaseEquipeInvalideError as exc:
         raise HTTPException(
@@ -759,6 +775,16 @@ async def create_equipe_aerienne(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"chef_de_base_id dirige déjà une autre équipe : {exc.args[0]}",
+        ) from exc
+    except ImmatriculationAeronefDejaPriseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"immatriculation déjà utilisée par un autre aéronef : {exc.args[0]}",
+        ) from exc
+    except AeronefDejaAffecteError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"aéronef déjà affecté à une autre équipe : {exc.args[0]}",
         ) from exc
 
 
@@ -775,6 +801,57 @@ async def get_equipe_aerienne(
             status_code=status.HTTP_404_NOT_FOUND, detail="Équipe aérienne non trouvée"
         )
     return equipe
+
+
+# --- aeronef (hélicoptère d'une équipe aérienne, migration 0075) -------------------
+#
+# Pas de POST : un aéronef naît avec son équipe (POST /equipes-aeriennes, champ
+# `aeronef`), jamais orphelin. Pas de DELETE : la sortie de service est `actif=false`.
+
+
+@router.get("/aeronefs", response_model=list[AeronefRead])
+async def list_aeronefs(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+    inclure_inactifs: bool = Query(
+        default=False,
+        description="Renvoie les aéronefs des deux états — écran d'administration.",
+    ),
+):
+    use_case = ListAeronefs(AeronefRepositoryImpl(db))
+    return await use_case.execute(actif=None if inclure_inactifs else True)
+
+
+@router.put("/aeronefs/{aeronef_id}", response_model=AeronefRead)
+async def update_aeronef(
+    aeronef_id: uuid.UUID,
+    body: AeronefUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    acteur: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    # Le parc d'hélicoptères est une donnée d'administration : réservé aux admins.
+    if acteur.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Réservé aux administrateurs"
+        )
+    use_case = UpdateAeronef(AeronefRepositoryImpl(db))
+    try:
+        return await use_case.execute(
+            aeronef_id=aeronef_id,
+            immatriculation=body.immatriculation,
+            societe=body.societe,
+            volume_cuve_l=body.volume_cuve_l,
+            actif=body.actif,
+        )
+    except AeronefIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Aéronef non trouvé"
+        ) from exc
+    except ImmatriculationAeronefDejaPriseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"immatriculation déjà utilisée par un autre aéronef : {exc.args[0]}",
+        ) from exc
 
 
 # --- equipe_terrestre --------------------------------------------------------------
@@ -858,11 +935,12 @@ async def list_bases_aeriennes(
 async def create_base_aerienne(
     body: BaseAerienneCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[Utilisateur, Depends(get_current_user)],
+    acteur: Annotated[Utilisateur, Depends(get_current_user)],
 ):
-    use_case = CreateBaseAerienne(BaseAerienneRepositoryImpl(db))
+    use_case = CreateBaseAerienne(BaseAerienneRepositoryImpl(db), EquipeAerienneRepositoryImpl(db))
     try:
         return await use_case.execute(
+            acteur=acteur,
             numero=body.numero,
             localite=body.localite,
             parent_base_id=body.parent_base_id,
@@ -871,6 +949,8 @@ async def create_base_aerienne(
             latitude=body.latitude,
             altitude=body.altitude,
         )
+    except EquipeNonAutoriseeError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     except BaseAerienneParentInvalideError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -916,11 +996,12 @@ async def update_base_aerienne(
     base_id: uuid.UUID,
     body: BaseAerienneUpdate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[Utilisateur, Depends(get_current_user)],
+    acteur: Annotated[Utilisateur, Depends(get_current_user)],
 ):
-    use_case = UpdateBaseAerienne(BaseAerienneRepositoryImpl(db))
+    use_case = UpdateBaseAerienne(BaseAerienneRepositoryImpl(db), EquipeAerienneRepositoryImpl(db))
     try:
         base = await use_case.execute(
+            acteur=acteur,
             base_id=base_id,
             numero=body.numero,
             localite=body.localite,
@@ -934,6 +1015,8 @@ async def update_base_aerienne(
             # distingue « absent » de « mis à NULL ».
             champs_fournis=body.model_fields_set,
         )
+    except EquipeNonAutoriseeError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     except BaseAerienneParentInvalideError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -981,17 +1064,32 @@ async def list_stands_remplissage(
 async def create_stand_remplissage(
     body: StandRemplissageCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[Utilisateur, Depends(get_current_user)],
+    acteur: Annotated[Utilisateur, Depends(get_current_user)],
 ):
-    use_case = CreateStandRemplissage(StandRemplissageRepositoryImpl(db))
+    use_case = CreateStandRemplissage(
+        StandRemplissageRepositoryImpl(db), EquipeAerienneRepositoryImpl(db)
+    )
     try:
         return await use_case.execute(
+            acteur=acteur,
             numero=body.numero,
             localite=body.localite,
+            equipe_aerienne_id=body.equipe_aerienne_id,
             longitude=body.longitude,
             latitude=body.latitude,
             altitude=body.altitude,
         )
+    except EquipeNonAutoriseeError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except EquipeRequiseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    except EquipeAerienneIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"equipe_aerienne_id introuvable : {exc.args[0]}",
+        ) from exc
     except NumeroStandRemplissageDejaPrisError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -1017,20 +1115,31 @@ async def update_stand_remplissage(
     stand_id: uuid.UUID,
     body: StandRemplissageUpdate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[Utilisateur, Depends(get_current_user)],
+    acteur: Annotated[Utilisateur, Depends(get_current_user)],
 ):
-    use_case = UpdateStandRemplissage(StandRemplissageRepositoryImpl(db))
+    use_case = UpdateStandRemplissage(
+        StandRemplissageRepositoryImpl(db), EquipeAerienneRepositoryImpl(db)
+    )
     try:
         stand = await use_case.execute(
+            acteur=acteur,
             stand_id=stand_id,
             numero=body.numero,
             localite=body.localite,
             longitude=body.longitude,
             latitude=body.latitude,
             altitude=body.altitude,
+            equipe_aerienne_id=body.equipe_aerienne_id,
             actif=body.actif,
             champs_fournis=body.model_fields_set,
         )
+    except EquipeNonAutoriseeError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except EquipeAerienneIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"equipe_aerienne_id introuvable : {exc.args[0]}",
+        ) from exc
     except NumeroStandRemplissageDejaPrisError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

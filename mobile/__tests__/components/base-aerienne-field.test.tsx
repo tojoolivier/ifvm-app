@@ -44,7 +44,7 @@ const BASE_PRINCIPALE = {
 
 describe('BaseAerienneField', () => {
   beforeEach(() => {
-    useAuthStore.setState({ token: 'token-test' } as any);
+    useAuthStore.setState({ token: 'token-test', user: { id: 'chef-1', role: 'chef_de_base' } } as any);
     jest.mocked(apiClient.listBasesAeriennes).mockReset().mockResolvedValue([BASE_PRINCIPALE] as any);
     jest.mocked(apiClient.createBaseAerienne).mockReset();
     jest.mocked(getCurrentPosition)
@@ -61,6 +61,38 @@ describe('BaseAerienneField', () => {
 
     await screen.findByText('Secondaire de…');
     expect(screen.getByText('IHO01')).toBeVisible();
+  });
+
+  it("ne propose que les bases de l'équipe choisie (sa principale et ses secondaires)", async () => {
+    const secondaire = { ...BASE_PRINCIPALE, id: 'base-2', numero: 'IHO02', localite: 'Zazafotsy', parent_base_id: 'base-1', equipe_id: null };
+    const autrePrincipale = { ...BASE_PRINCIPALE, id: 'base-9', numero: 'BET01', localite: 'Betroka', equipe_id: 'equipe-2' };
+    const autreSecondaire = { ...BASE_PRINCIPALE, id: 'base-10', numero: 'BET02', localite: 'Betroka nord', parent_base_id: 'base-9', equipe_id: null };
+    jest
+      .mocked(apiClient.listBasesAeriennes)
+      .mockResolvedValue([BASE_PRINCIPALE, secondaire, autrePrincipale, autreSecondaire] as any);
+    await render(<BaseAerienneField value={null} onChange={jest.fn()} equipeId="equipe-1" />);
+
+    await screen.findByText('IHO01 — Ihosy');
+    expect(screen.getByText('IHO02 — Zazafotsy (secondaire)')).toBeVisible();
+    expect(screen.queryByText('BET01 — Betroka')).toBeNull();
+    expect(screen.queryByText('BET02 — Betroka nord (secondaire)')).toBeNull();
+  });
+
+  it('sans équipe choisie, toutes les bases restent listées (autres écrans)', async () => {
+    const autrePrincipale = { ...BASE_PRINCIPALE, id: 'base-9', numero: 'BET01', localite: 'Betroka', equipe_id: 'equipe-2' };
+    jest.mocked(apiClient.listBasesAeriennes).mockResolvedValue([BASE_PRINCIPALE, autrePrincipale] as any);
+    await render(<BaseAerienneField value={null} onChange={jest.fn()} />);
+
+    await screen.findByText('BET01 — Betroka');
+    expect(screen.getByText('IHO01 — Ihosy')).toBeVisible();
+  });
+
+  it('masque la création de base secondaire à un rôle autre que chef de base', async () => {
+    useAuthStore.setState({ token: 'token-test', user: { id: 'mecano-1', role: 'mecanicien' } } as any);
+    await render(<BaseAerienneField value={null} onChange={jest.fn()} />);
+
+    await screen.findByText('IHO01 — Ihosy');
+    expect(screen.queryByText('+ Nouvelle base secondaire')).toBeNull();
   });
 
   it('crée une base secondaire rattachée au parent choisi', async () => {

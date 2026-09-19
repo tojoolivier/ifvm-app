@@ -7,6 +7,7 @@ import { apiClient } from '@/lib/api-client';
 import { getCurrentPosition } from '@/lib/location';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { logger } from '@/lib/logger';
+import { peutCreerLieuAerien } from '@/lib/fiche-vol-access';
 
 const log = logger.child({ module: 'referentiels-aeriens' });
 
@@ -26,6 +27,7 @@ interface Equipe {
   id: string;
   nom: string;
   chef_de_base_id: string;
+  aeronef?: { immatriculation: string; societe: string; volume_cuve_l: number } | null;
 }
 
 interface Base {
@@ -53,6 +55,7 @@ interface Stand {
 export default function ReferentielsAeriensScreen() {
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
+  const peutCreer = peutCreerLieuAerien(useAuthStore((s) => s.user?.role));
 
   const [chefs, setChefs] = useState<Chef[]>([]);
   const [equipes, setEquipes] = useState<Equipe[]>([]);
@@ -190,6 +193,7 @@ export default function ReferentielsAeriensScreen() {
             equipesLibres={equipesLibres}
             equipesById={equipesById}
             token={token!}
+            peutCreer={peutCreer}
             onCreated={(b) => setBases((prev) => [...prev, b])}
           />
 
@@ -198,12 +202,14 @@ export default function ReferentielsAeriensScreen() {
             basesPrincipales={basesPrincipales}
             basesById={basesById}
             token={token!}
+            peutCreer={peutCreer}
             onCreated={(b) => setBases((prev) => [...prev, b])}
           />
 
           <SectionStand
             stands={stands}
             token={token!}
+            peutCreer={peutCreer}
             onCreated={(s) => setStands((prev) => [...prev, s])}
           />
         </ScrollView>
@@ -231,6 +237,9 @@ function SectionEquipes({
   const [pilote, setPilote] = useState('');
   const [mecanicien, setMecanicien] = useState('');
   const [consultantInternational, setConsultantInternational] = useState('');
+  const [immatriculation, setImmatriculation] = useState('');
+  const [societe, setSociete] = useState('');
+  const [volumeCuve, setVolumeCuve] = useState('');
   const [membres, setMembres] = useState<string[]>([]);
   const [nouveauMembre, setNouveauMembre] = useState('');
   const { run, isRunning } = useAsyncAction();
@@ -254,15 +263,28 @@ function SectionEquipes({
           pilote: pilote.trim(),
           mecanicien: mecanicien.trim(),
           consultant_international: consultantInternational.trim() || null,
+          aeronef: {
+            immatriculation: immatriculation.trim(),
+            societe: societe.trim(),
+            volume_cuve_l: parseFloat(volumeCuve.replace(',', '.')),
+          },
           membres: membres.map((nomMembre) => ({ nom: nomMembre })),
         });
-        onCreated({ id: cree.id, nom: cree.nom, chef_de_base_id: cree.chef_de_base_id });
+        onCreated({
+          id: cree.id,
+          nom: cree.nom,
+          chef_de_base_id: cree.chef_de_base_id,
+          aeronef: cree.aeronef ?? null,
+        });
         setCreation(false);
         setNom('');
         setChefDeBaseId(null);
         setPilote('');
         setMecanicien('');
         setConsultantInternational('');
+        setImmatriculation('');
+        setSociete('');
+        setVolumeCuve('');
         setMembres([]);
         setNouveauMembre('');
       },
@@ -273,9 +295,12 @@ function SectionEquipes({
           nom.trim().length > 0 &&
           !!chefDeBaseId &&
           pilote.trim().length > 0 &&
-          mecanicien.trim().length > 0,
+          mecanicien.trim().length > 0 &&
+          immatriculation.trim().length > 0 &&
+          societe.trim().length > 0 &&
+          parseFloat(volumeCuve.replace(',', '.')) > 0,
         preconditionMessage:
-          'Renseignez le nom, le chef de base, le pilote et le mécanicien avant de créer l’équipe.',
+          'Renseignez le nom, le chef de base, le pilote, le mécanicien et l’hélicoptère (immatriculation, société, volume de cuve) avant de créer l’équipe.',
       }
     );
 
@@ -287,6 +312,12 @@ function SectionEquipes({
         <View key={equipe.id} style={styles.item}>
           <Text style={styles.itemText}>{equipe.nom}</Text>
           <Text style={styles.itemSubtext}>Chef de base : {nomChef(equipe.chef_de_base_id)}</Text>
+          {equipe.aeronef && (
+            <Text style={styles.itemSubtext}>
+              Hélicoptère : {equipe.aeronef.immatriculation} — {equipe.aeronef.societe} (cuve{' '}
+              {equipe.aeronef.volume_cuve_l} L)
+            </Text>
+          )}
         </View>
       ))}
 
@@ -342,6 +373,30 @@ function SectionEquipes({
             onChangeText={setConsultantInternational}
             placeholder="Consultant international (facultatif)"
             placeholderTextColor={TEXT_SECONDARY}
+            style={styles.input}
+          />
+          <Text style={styles.sousLabel}>Hélicoptère de l&apos;équipe</Text>
+          <TextInput
+            value={immatriculation}
+            onChangeText={setImmatriculation}
+            placeholder="Immatriculation (ex. 5R-MXY)"
+            placeholderTextColor={TEXT_SECONDARY}
+            autoCapitalize="characters"
+            style={styles.input}
+          />
+          <TextInput
+            value={societe}
+            onChangeText={setSociete}
+            placeholder="Société"
+            placeholderTextColor={TEXT_SECONDARY}
+            style={styles.input}
+          />
+          <TextInput
+            value={volumeCuve}
+            onChangeText={setVolumeCuve}
+            placeholder="Volume de cuve (L)"
+            placeholderTextColor={TEXT_SECONDARY}
+            keyboardType="decimal-pad"
             style={styles.input}
           />
           <Text style={styles.sousLabel}>Autres membres</Text>
@@ -406,8 +461,10 @@ function SectionBasePrincipale({
   equipesLibres,
   equipesById,
   token,
+  peutCreer,
   onCreated,
 }: {
+  peutCreer: boolean;
   basesPrincipales: Base[];
   equipes: Equipe[];
   equipesLibres: Equipe[];
@@ -475,7 +532,7 @@ function SectionBasePrincipale({
 
       {equipes.length === 0 ? (
         <Text style={styles.vide}>Créez d’abord une équipe aérienne.</Text>
-      ) : !creation ? (
+      ) : !creation && peutCreer ? (
         <TouchableOpacity style={styles.nouveauLink} onPress={ouvrir} accessibilityRole="button">
           <Text style={styles.nouveauLinkText}>+ Nouvelle base principale</Text>
         </TouchableOpacity>
@@ -549,8 +606,10 @@ function SectionBaseSecondaire({
   basesPrincipales,
   basesById,
   token,
+  peutCreer,
   onCreated,
 }: {
+  peutCreer: boolean;
   basesSecondaires: Base[];
   basesPrincipales: Base[];
   basesById: Map<string, Base>;
@@ -617,7 +676,7 @@ function SectionBaseSecondaire({
 
       {basesPrincipales.length === 0 ? (
         <Text style={styles.vide}>Créez d’abord une base principale.</Text>
-      ) : !creation ? (
+      ) : !creation && peutCreer ? (
         <TouchableOpacity style={styles.nouveauLink} onPress={ouvrir} accessibilityRole="button">
           <Text style={styles.nouveauLinkText}>+ Nouvelle base secondaire</Text>
         </TouchableOpacity>
@@ -686,8 +745,10 @@ function SectionBaseSecondaire({
 function SectionStand({
   stands,
   token,
+  peutCreer,
   onCreated,
 }: {
+  peutCreer: boolean;
   stands: Stand[];
   token: string;
   onCreated: (stand: Stand) => void;
@@ -738,7 +799,7 @@ function SectionStand({
         </View>
       ))}
 
-      {!creation && (
+      {!creation && peutCreer && (
         <TouchableOpacity style={styles.nouveauLink} onPress={ouvrir} accessibilityRole="button">
           <Text style={styles.nouveauLinkText}>+ Nouveau stand de remplissage</Text>
         </TouchableOpacity>

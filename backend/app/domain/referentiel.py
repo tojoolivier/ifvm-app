@@ -293,6 +293,54 @@ class ChefDeBaseDejaEquipeError(Exception):
     pass
 
 
+class ImmatriculationAeronefDejaPriseError(Exception):
+    """`immatriculation` d'un aéronef est déjà prise (UNIQUE `aeronef.immatriculation`)."""
+
+    pass
+
+
+class AeronefIntrouvableError(Exception):
+    """`aeronef_id` ne référence aucun `aeronef` existant."""
+
+    pass
+
+
+class AeronefDejaAffecteError(Exception):
+    """L'aéronef référencé est déjà affecté à une autre équipe aérienne (UNIQUE
+    `equipe_aerienne.aeronef_id`, un aéronef = une équipe)."""
+
+    pass
+
+
+class EquipeNonAutoriseeError(PermissionError):
+    """L'utilisateur n'a pas le droit d'agir pour cette équipe aérienne : seul le chef de
+    base de l'équipe (ou un admin) crée les lieux aériens de SON équipe."""
+
+    pass
+
+
+class EquipeRequiseError(ValueError):
+    """Un admin agit pour le compte d'une équipe sans la désigner : contrairement au chef
+    de base (qui n'en a qu'une, la sienne), rien ne permet de la déduire."""
+
+    pass
+
+
+@dataclass
+class Aeronef:
+    """Hélicoptère d'une équipe aérienne (migration 0075). `immatriculation` est sa clé
+    candidate : `societe` (exploitant) et `volume_cuve_l` en dépendent, d'où une entité à
+    part plutôt que des colonnes de `EquipeAerienne`. Jamais supprimé : `actif=false`."""
+
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    immatriculation: str = ""
+    societe: str = ""
+    volume_cuve_l: float = 0.0
+    actif: bool = True
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
+
+
 @dataclass
 class MembreEquipeAerienne:
     """Membre d'une équipe aérienne au-delà des rôles nommés (chef de base, pilote,
@@ -324,6 +372,10 @@ class EquipeAerienne:
     pilote: str | None = None
     mecanicien: str | None = None
     consultant_international: str | None = None
+    # Hélicoptère de l'équipe (migration 0075) : 1:1, `None` pour les équipes créées
+    # avant cette migration. `aeronef` est résolu par jointure à la lecture.
+    aeronef_id: uuid.UUID | None = None
+    aeronef: Aeronef | None = None
     actif: bool = True
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
@@ -357,7 +409,8 @@ class BaseAerienne:
 @dataclass
 class StandRemplissage:
     """Stand de remplissage de la fiche de vol — même forme que `BaseAerienne`, sans
-    hiérarchie."""
+    hiérarchie. `equipe_aerienne_id` (migration 0075) : équipe propriétaire, plusieurs
+    stands par équipe ; `None` pour les stands antérieurs, exigé à la création."""
 
     id: uuid.UUID = field(default_factory=uuid.uuid4)
     numero: str = ""
@@ -365,6 +418,7 @@ class StandRemplissage:
     longitude: float | None = None
     latitude: float | None = None
     altitude: float | None = None
+    equipe_aerienne_id: uuid.UUID | None = None
     actif: bool = True
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)

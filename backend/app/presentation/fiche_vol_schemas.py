@@ -105,6 +105,12 @@ class FicheVolCreate(BaseModel):
     pilote: str = Field(min_length=1, max_length=255)
     mecanicien: str = Field(min_length=1, max_length=255)
     chef_de_base_id: uuid.UUID
+    # Équipe aérienne choisie (migration 0075). Quand elle est fournie, le serveur fait
+    # autorité : chef de base, pilote, mécanicien, consultant, immatriculation et
+    # compagnie sont repris de l'équipe (les valeurs ci-dessus, pré-remplies par le
+    # mobile, sont alors écrasées), et base_id/stand_id doivent lui appartenir. Omise :
+    # comportement antérieur (clients mobiles pas encore mis à jour).
+    equipe_aerienne_id: uuid.UUID | None = None
     # Prospection "principale" affichée en en-tête (Référence, migration 0070) —
     # facultative, distincte du rattachement par vol (VolCreate.prospection_id).
     prospection_id: uuid.UUID | None = None
@@ -142,6 +148,7 @@ class FicheVolSyncPush(BaseModel):
     pilote: str = Field(min_length=1, max_length=255)
     mecanicien: str = Field(min_length=1, max_length=255)
     chef_de_base_id: uuid.UUID
+    equipe_aerienne_id: uuid.UUID | None = None
     prospection_id: uuid.UUID | None = None
     consultant_international: str | None = None
     pesticide_nom_commercial: str | None = None
@@ -183,6 +190,9 @@ class FicheVolRead(BaseModel):
     pilote: str
     mecanicien: str
     chef_de_base_id: uuid.UUID
+    equipe_aerienne_id: uuid.UUID | None = None
+    # Dérivé par jointure (equipe_aerienne), jamais saisi.
+    equipe_aerienne_nom: str | None = None
     prospection_id: uuid.UUID | None = None
     # Dérivés par jointure sur prospection_id, jamais saisis (cf. domaine :
     # numero_fiche_validation = même document que numero_fiche_prospection).

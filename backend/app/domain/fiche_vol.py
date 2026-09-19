@@ -95,6 +95,15 @@ class StandVolIntrouvableError(LookupError):
     """stand_id ne référence aucun stand_remplissage."""
 
 
+class EquipeVolIntrouvableError(LookupError):
+    """equipe_aerienne_id ne référence aucune équipe aérienne active."""
+
+
+class LieuVolHorsEquipeError(ValueError):
+    """La base ou le stand choisi n'appartient pas à l'équipe aérienne de la fiche : une
+    équipe ne vole que depuis ses propres lieux (migration 0075)."""
+
+
 class CampagneVolIntrouvableError(LookupError):
     """campagne_id ne référence aucune campagne."""
 
@@ -220,6 +229,7 @@ _CHAMPS_CONTENU_FICHE: tuple[str, ...] = (
     "pilote",
     "mecanicien",
     "chef_de_base_id",
+    "equipe_aerienne_id",
     "consultant_international",
     "pesticide_nom_commercial",
     "pesticide_quantite_disponible",
@@ -388,6 +398,12 @@ class FicheVol:
     # (Vol.prospection_id/rotation_id). numero_fiche_prospection/date_validation
     # ci-dessous en sont dérivés par jointure, jamais stockés.
     prospection_id: uuid.UUID | None = None
+    # Équipe aérienne choisie à la création (migration 0075). Quand elle est renseignée,
+    # le serveur écrase chef_de_base_id/pilote/mecanicien/consultant/immatriculation/
+    # compagnie par ceux de l'équipe (snapshot du jour, cf. la docstring de classe) et
+    # exige que base_id/stand_id lui appartiennent. `None` : fiches antérieures et clients
+    # mobiles qui ne l'envoient pas encore — les valeurs saisies sont alors conservées.
+    equipe_aerienne_id: uuid.UUID | None = None
     # Attribué par FicheVolRepositoryImpl.next_compteur avant la première écriture ;
     # 0 est une valeur transitoire côté domaine (jamais persistée telle quelle, cf.
     # ck_fiche_vol_compteur_positif), pas une saisie possible.
@@ -423,6 +439,8 @@ class FicheVol:
     stand_latitude: float | None = None
     stand_longitude: float | None = None
     stand_altitude: float | None = None
+    # Dérivé de equipe_aerienne_id (jointure), jamais stocké.
+    equipe_aerienne_nom: str | None = None
     # Dérivés de prospection_id (jointure) — pas de "fiche de validation" distincte
     # dans le modèle : numero_fiche_validation est le même document que
     # numero_fiche_prospection, exposé une deuxième fois (cahier des charges),
@@ -442,3 +460,37 @@ class FicheVol:
     @property
     def rotations_rapprochees(self) -> set[uuid.UUID]:
         return {vol.rotation_id for vol in self.vols if vol.rotation_id is not None}
+
+
+@dataclass(frozen=True)
+class EquipeVolContexte:
+    """Ce que l'équipe aérienne fournit à une fiche de vol (migration 0075). Les champs
+    `None` viennent d'une équipe créée avant les migrations 0072/0075 : sans pilote,
+    mécanicien ou aéronef renseigné, on garde ce que le client a saisi."""
+
+    chef_de_base_id: uuid.UUID
+    pilote: str | None = None
+    mecanicien: str | None = None
+    consultant_international: str | None = None
+    immatriculation: str | None = None
+    societe: str | None = None
+
+
+def appliquer_equipe(fiche: FicheVol, contexte: EquipeVolContexte) -> None:
+    """Renseigne l'en-tête de la fiche depuis l'équipe : le serveur fait autorité, une
+    valeur saisie par le client est écrasée (le mobile les pré-remplit à titre informatif).
+    C'est un snapshot du jour — jamais rappelé ensuite si l'équipe change de pilote ou
+    d'hélicoptère (cf. la docstring de `FicheVol`)."""
+    fiche.chef_de_base_id = contexte.chef_de_base_id
+    if contexte.pilote:
+        fiche.pilote = contexte.pilote
+    if contexte.mecanicien:
+        fiche.mecanicien = contexte.mecanicien
+    # Le consultant international « signe lorsqu'il intervient » : facultatif par équipe,
+    # et une fiche peut en mentionner un de passage même si l'équipe n'en a pas.
+    if contexte.consultant_international:
+        fiche.consultant_international = contexte.consultant_international
+    if contexte.immatriculation:
+        fiche.immatriculation = contexte.immatriculation
+    if contexte.societe:
+        fiche.compagnie = contexte.societe

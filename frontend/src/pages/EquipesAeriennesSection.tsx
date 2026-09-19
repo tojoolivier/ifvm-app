@@ -47,6 +47,9 @@ export function EquipesAeriennesSection() {
   const [piloteEquipe, setPiloteEquipe] = useState('')
   const [mecanicienEquipe, setMecanicienEquipe] = useState('')
   const [consultantEquipe, setConsultantEquipe] = useState('')
+  const [immatriculationEquipe, setImmatriculationEquipe] = useState('')
+  const [societeEquipe, setSocieteEquipe] = useState('')
+  const [volumeCuveEquipe, setVolumeCuveEquipe] = useState('')
   const [membres, setMembres] = useState<string[]>([])
   const [nouveauMembre, setNouveauMembre] = useState('')
   const [createEquipeError, setCreateEquipeError] = useState('')
@@ -69,6 +72,7 @@ export function EquipesAeriennesSection() {
   const [showCreateStand, setShowCreateStand] = useState(false)
   const [numeroStand, setNumeroStand] = useState('')
   const [localiteStand, setLocaliteStand] = useState('')
+  const [equipeIdStand, setEquipeIdStand] = useState('')
   const [createStandError, setCreateStandError] = useState('')
 
   const {
@@ -147,6 +151,9 @@ export function EquipesAeriennesSection() {
       setPiloteEquipe('')
       setMecanicienEquipe('')
       setConsultantEquipe('')
+      setImmatriculationEquipe('')
+      setSocieteEquipe('')
+      setVolumeCuveEquipe('')
       setMembres([])
       setNouveauMembre('')
       setCreateEquipeError('')
@@ -194,6 +201,7 @@ export function EquipesAeriennesSection() {
       setShowCreateStand(false)
       setNumeroStand('')
       setLocaliteStand('')
+      setEquipeIdStand('')
       setCreateStandError('')
     },
     onError: (err: AxiosError<{ detail?: string }>) => {
@@ -209,6 +217,19 @@ export function EquipesAeriennesSection() {
     },
     onError: (err: AxiosError<{ detail?: string }>) => {
       alert(err.response?.data?.detail || 'Erreur lors de la réaffectation')
+    },
+  })
+
+  // Rattache un stand antérieur à la migration 0075 (« sans équipe ») à son équipe :
+  // réservé aux admins côté serveur, un stand sans équipe n'étant proposé à personne.
+  const rattacherStandMutation = useMutation({
+    mutationFn: ({ id, equipe_aerienne_id }: { id: string; equipe_aerienne_id: string }) =>
+      api.put(`/stands-remplissage/${id}`, { equipe_aerienne_id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['stands-remplissage'] })
+    },
+    onError: (err: AxiosError<{ detail?: string }>) => {
+      alert(err.response?.data?.detail || 'Erreur lors du rattachement')
     },
   })
 
@@ -232,6 +253,19 @@ export function EquipesAeriennesSection() {
       key: 'consultant',
       header: 'Consultant international',
       render: (e) => e.consultant_international ?? '—',
+    },
+    {
+      key: 'aeronef',
+      header: 'Hélicoptère',
+      render: (e) =>
+        e.aeronef ? (
+          <span>
+            <span className="font-mono text-[11.5px]">{e.aeronef.immatriculation}</span> —{' '}
+            {e.aeronef.societe} (cuve {e.aeronef.volume_cuve_l} L)
+          </span>
+        ) : (
+          <span className="text-ifvm-text-weak">—</span>
+        ),
     },
     {
       key: 'membres',
@@ -303,9 +337,37 @@ export function EquipesAeriennesSection() {
     },
   ]
 
+  const equipesActives = equipes.filter((e) => e.actif)
+
   const standColumns: DataTableColumn<StandRemplissage>[] = [
     { key: 'numero', header: 'N°', mono: true, render: (s) => s.numero },
     { key: 'localite', header: 'Localité', render: (s) => s.localite },
+    {
+      key: 'equipe',
+      header: 'Équipe',
+      render: (s) =>
+        s.equipe_aerienne_id ? (
+          (equipes.find((e) => e.id === s.equipe_aerienne_id)?.nom ?? '—')
+        ) : (
+          <select
+            value=""
+            disabled={rattacherStandMutation.isPending}
+            aria-label={`Rattacher le stand ${s.numero} à une équipe`}
+            onChange={(e) => {
+              if (!e.target.value) return
+              rattacherStandMutation.mutate({ id: s.id, equipe_aerienne_id: e.target.value })
+            }}
+            className="w-full rounded border border-[#e0d9c4] bg-white px-2 py-1 font-sans text-[12px] disabled:opacity-50"
+          >
+            <option value="">— sans équipe : rattacher —</option>
+            {equipesActives.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.nom}
+              </option>
+            ))}
+          </select>
+        ),
+    },
   ]
 
   return (
@@ -468,6 +530,11 @@ export function EquipesAeriennesSection() {
                   pilote: piloteEquipe.trim(),
                   mecanicien: mecanicienEquipe.trim(),
                   consultant_international: consultantEquipe.trim() || null,
+                  aeronef: {
+                    immatriculation: immatriculationEquipe.trim(),
+                    societe: societeEquipe.trim(),
+                    volume_cuve_l: Number(volumeCuveEquipe.replace(',', '.')),
+                  },
                   membres: membres.map((nom) => ({ nom })),
                 })
               }}
@@ -551,6 +618,52 @@ export function EquipesAeriennesSection() {
                   className={inputClass}
                 />
               </div>
+              <fieldset className="space-y-3 rounded border border-gray-200 p-3">
+                <legend className="px-1 text-sm font-medium text-gray-700">Hélicoptère de l'équipe</legend>
+                <div>
+                  <label htmlFor="equipe-immatriculation" className={labelClass}>
+                    Immatriculation *
+                  </label>
+                  <input
+                    id="equipe-immatriculation"
+                    type="text"
+                    value={immatriculationEquipe}
+                    onChange={(e) => setImmatriculationEquipe(e.target.value)}
+                    placeholder="Ex. 5R-MXY"
+                    maxLength={20}
+                    required
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="equipe-societe" className={labelClass}>
+                    Société *
+                  </label>
+                  <input
+                    id="equipe-societe"
+                    type="text"
+                    value={societeEquipe}
+                    onChange={(e) => setSocieteEquipe(e.target.value)}
+                    required
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="equipe-volume-cuve" className={labelClass}>
+                    Volume de cuve (L) *
+                  </label>
+                  <input
+                    id="equipe-volume-cuve"
+                    type="number"
+                    min="1"
+                    step="any"
+                    value={volumeCuveEquipe}
+                    onChange={(e) => setVolumeCuveEquipe(e.target.value)}
+                    required
+                    className={inputClass}
+                  />
+                </div>
+              </fieldset>
               <div>
                 <label htmlFor="equipe-nouveau-membre" className={labelClass}>
                   Autres membres (facultatif)
@@ -616,6 +729,9 @@ export function EquipesAeriennesSection() {
                     setPiloteEquipe('')
                     setMecanicienEquipe('')
                     setConsultantEquipe('')
+                    setImmatriculationEquipe('')
+                    setSocieteEquipe('')
+                    setVolumeCuveEquipe('')
                     setMembres([])
                     setNouveauMembre('')
                     setCreateEquipeError('')
@@ -840,6 +956,7 @@ export function EquipesAeriennesSection() {
                 createStandMutation.mutate({
                   numero: numeroStand.trim(),
                   localite: localiteStand.trim(),
+                  equipe_aerienne_id: equipeIdStand,
                 })
               }}
               className="space-y-4 px-6 py-4"
@@ -874,6 +991,27 @@ export function EquipesAeriennesSection() {
                   className={inputClass}
                 />
               </div>
+              <div>
+                <label htmlFor="stand-equipe" className={labelClass}>
+                  Équipe *
+                </label>
+                <select
+                  id="stand-equipe"
+                  value={equipeIdStand}
+                  onChange={(e) => setEquipeIdStand(e.target.value)}
+                  required
+                  className={inputClass}
+                >
+                  <option value="" disabled>
+                    — choisir —
+                  </option>
+                  {equipesActives.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.nom}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="flex gap-3 pt-2">
                 <button
                   type="submit"
@@ -888,6 +1026,7 @@ export function EquipesAeriennesSection() {
                     setShowCreateStand(false)
                     setNumeroStand('')
                     setLocaliteStand('')
+                    setEquipeIdStand('')
                     setCreateStandError('')
                   }}
                   className="rounded border border-gray-300 px-4 py-2 transition hover:bg-gray-50"

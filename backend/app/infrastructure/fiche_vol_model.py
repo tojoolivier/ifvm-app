@@ -18,7 +18,11 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.infrastructure.prospection_model import ProspectionModel
-from app.infrastructure.referentiel_model import BaseAerienneModel, StandRemplissageModel
+from app.infrastructure.referentiel_model import (
+    BaseAerienneModel,
+    EquipeAerienneModel,
+    StandRemplissageModel,
+)
 from app.models.base import Base
 
 
@@ -49,8 +53,15 @@ class FicheVolModel(Base):
     # 2026-09-15, remplace le format [Date]-[Base]-[Immatriculation] d'ADR-011 §7.2.
     numero_fiche: Mapped[str] = mapped_column(String(60), nullable=False, unique=True)
     date_vol: Mapped[date] = mapped_column(Date(), nullable=False)
+    # Snapshot du jour (migration 0075) : renseignés depuis l'équipe aérienne à la
+    # création (aéronef → immatriculation/société, cf. `FicheVol`), jamais recalculés.
     compagnie: Mapped[str] = mapped_column(String(255), nullable=False)
     immatriculation: Mapped[str] = mapped_column(String(20), nullable=False)
+    # Équipe aérienne choisie à la création (migration 0075) — nullable : fiches
+    # antérieures et clients mobiles qui ne l'envoient pas encore.
+    equipe_aerienne_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("equipe_aerienne.id", ondelete="RESTRICT"), nullable=True
+    )
 
     # Fragment du compteur continu par campagne (jamais réinitialisé) — cf.
     # campagne_fiche_vol_compteur, alimenté par FicheVolRepositoryImpl.next_compteur.
@@ -111,6 +122,7 @@ class FicheVolModel(Base):
 
     base: Mapped[BaseAerienneModel] = relationship()
     stand: Mapped[StandRemplissageModel] = relationship()
+    equipe: Mapped[EquipeAerienneModel | None] = relationship()
     prospection: Mapped[ProspectionModel | None] = relationship()
     vols: Mapped[list["VolModel"]] = relationship(
         back_populates="fiche_vol", cascade="all, delete-orphan", order_by="VolModel.numero"
@@ -129,6 +141,7 @@ class FicheVolModel(Base):
         Index("ix_fiche_vol_campagne_id", "campagne_id"),
         Index("ix_fiche_vol_base_id", "base_id"),
         Index("ix_fiche_vol_stand_id", "stand_id"),
+        Index("ix_fiche_vol_equipe_aerienne_id", "equipe_aerienne_id"),
         Index("ix_fiche_vol_prospection_id", "prospection_id"),
     )
 

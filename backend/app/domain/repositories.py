@@ -6,6 +6,7 @@ from typing import Any
 from app.domain.campagne import Campagne
 from app.domain.prospection import AuditLog, Prospection
 from app.domain.referentiel import (
+    Aeronef,
     BaseAerienne,
     CodeStade,
     Commune,
@@ -468,6 +469,24 @@ class BaseAerienneRepository(ABC):
         pass
 
 
+class AeronefRepository(ABC):
+    """Aucune méthode de suppression : la sortie du référentiel est `actif=false`."""
+
+    @abstractmethod
+    async def list_all(self, actif: bool | None = True) -> list[Aeronef]:
+        pass
+
+    @abstractmethod
+    async def get_by_id(self, aeronef_id: uuid.UUID) -> Aeronef | None:
+        pass
+
+    @abstractmethod
+    async def update(self, aeronef: Aeronef) -> Aeronef:
+        """Pas de `create` : un aéronef naît avec son équipe (cf.
+        `EquipeAerienneRepository.create`), jamais orphelin."""
+        pass
+
+
 class EquipeAerienneRepository(ABC):
     """Aucune méthode de suppression : la sortie du référentiel est `actif=false`."""
 
@@ -480,7 +499,15 @@ class EquipeAerienneRepository(ABC):
         pass
 
     @abstractmethod
+    async def get_by_chef_de_base_id(self, chef_de_base_id: uuid.UUID) -> EquipeAerienne | None:
+        """L'équipe dirigée par cet utilisateur (UNIQUE `chef_de_base_id`), `None` s'il
+        n'en dirige aucune — c'est ainsi qu'on déduit « son » équipe."""
+        pass
+
+    @abstractmethod
     async def create(self, equipe: EquipeAerienne) -> EquipeAerienne:
+        """Crée l'équipe et, si `equipe.aeronef` est fourni, son aéronef dans la même
+        transaction."""
         pass
 
 
