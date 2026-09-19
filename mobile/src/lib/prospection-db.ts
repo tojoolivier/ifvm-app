@@ -684,6 +684,12 @@ const COLONNES_PROSPECTION: readonly Colonne[] = [
   //    fiche revalide (mirroir de `traitement.traitement_origine_id`).
   { name: 'validated_at', type: 'TEXT' },
   { name: 'revalide_de_id', type: 'TEXT' },
+  // #fiches-disponibles-hors-ligne : nom résolu du prospecteur (colonne calculée
+  // côté serveur, cf. `_resoudre_noms`) — sans ce cache, « Créé par … » ne
+  // pouvait jamais s'afficher pour une fiche d'un AUTRE agent une fois hors
+  // ligne (seul `prospecteur_id`, un UUID non résolvable localement, était
+  // stocké jusqu'ici).
+  { name: 'prospecteur_nom', type: 'TEXT' },
 ];
 
 /** Colonnes ajoutées à `prospection_infestation` après sa création initiale. */

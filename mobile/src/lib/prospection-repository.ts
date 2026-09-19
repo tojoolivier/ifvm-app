@@ -47,6 +47,10 @@ export interface DraftProspection {
   type_prospection: string;
   campagne_id: string;
   prospecteur_id: string;
+  /** Nom résolu du prospecteur (#fiches-disponibles-hors-ligne) — cache local
+   * du champ calculé côté serveur, pour afficher « Créé par … » même hors
+   * ligne sur une fiche matérialisée depuis un autre agent. */
+  prospecteur_nom: string | null;
   station_id: string | null;
   biotope: string | null;
   region: string | null;
@@ -519,6 +523,7 @@ export interface ProspectionValideeInput {
   typeProspection: string;
   campagneId: string;
   prospecteurId: string;
+  prospecteurNom: string | null;
   stationId: string | null;
   dateProspection: string;
   latitude: number | null;
@@ -611,7 +616,7 @@ export async function materialiserProspectionValidee(input: ProspectionValideeIn
   const db = await getDb();
   await db.runAsync(
     `INSERT OR REPLACE INTO prospection (
-      id, type_prospection, campagne_id, prospecteur_id, station_id,
+      id, type_prospection, campagne_id, prospecteur_id, prospecteur_nom, station_id,
       date_prospection, latitude, longitude, altitude, biotope,
       surface_station, surface_prospectee, surface_infestee,
       degats_cultures, derniere_pluie, intensite_pluie, vegetation, sol,
@@ -634,7 +639,7 @@ export async function materialiserProspectionValidee(input: ProspectionValideeIn
       signature_chef_base_nom, signature_chef_base_horodatage, signature_chef_base_image,
       created_at, updated_at
     ) VALUES (
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?,
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?,
       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
     )`,
@@ -643,6 +648,7 @@ export async function materialiserProspectionValidee(input: ProspectionValideeIn
       input.typeProspection,
       input.campagneId,
       input.prospecteurId,
+      input.prospecteurNom,
       input.stationId,
       input.dateProspection,
       input.latitude,

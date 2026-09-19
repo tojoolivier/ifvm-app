@@ -94,6 +94,7 @@ function draft(overrides: Partial<DraftProspection> = {}): DraftProspection {
     type_prospection: 'intensive',
     campagne_id: 'camp-1',
     prospecteur_id: 'user-1',
+    prospecteur_nom: null,
     station_id: null,
     biotope: 'Mesophyle',
     region: null,

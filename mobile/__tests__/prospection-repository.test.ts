@@ -119,6 +119,7 @@ describe('createDraftProspection', () => {
 // (matérialisation complète : les champs restent à null ici pour ne pas
 // alourdir le test, seuls ceux exercés par les assertions sont renseignés).
 const CHAMPS_PROSPECTION_VALIDEE_PAR_DEFAUT = {
+  prospecteurNom: null,
   stationId: null,
   latitude: null,
   longitude: null,
