@@ -158,6 +158,7 @@ export function TerrestreForm({
         onChangeText={(v) => store.updateTerrestre({ consultantInternational: v })}
       />
 
+      <Text style={styles.sectionTitle}>Condition de traitement</Text>
       <View style={styles.row}>
         <View style={styles.flex1}>
           <Text style={styles.label}>Heure début*</Text>

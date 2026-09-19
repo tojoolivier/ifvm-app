@@ -10,6 +10,10 @@ export const formStyles = StyleSheet.create({
   // Semi-gras (au lieu de uiMedium) : demande explicite, titres de champ plus
   // visibles sur les fiches de traitement (Équipe, Pesticides & rotations).
   label: { fontFamily: traitementFonts.uiSemiBold, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
+  // Titre de sous-section, même style que le titre d'écran "Équipe"
+  // (traitement.tsx) — plus visible qu'un simple `label`, pour distinguer un
+  // regroupement de champs (ex. "Condition de traitement") du reste du formulaire.
+  sectionTitle: { fontFamily: traitementFonts.uiExtraBold, fontSize: traitementTypeSizes.titreEcran, color: traitementColors.texteTitre },
   row: { flexDirection: 'row', gap: 8 },
   flex1: { flex: 1 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
