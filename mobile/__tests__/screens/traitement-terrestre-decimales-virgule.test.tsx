@@ -124,8 +124,9 @@ describe('TraitementScreen (Équipe, Terrestre) — saisie décimale francophone
     await render(<TraitementScreen />);
     await waitFor(() => expect(useTraitementCaptureStore.getState().terrestre.chefEquipeId).toBe('chef-equipe-1'));
 
-    // ... surface_disque_rotatif_ha (4), Pesticides consommés du 1er produit (5).
-    fireEvent.changeText(screen.getAllByPlaceholderText('0')[5], '4,25');
+    // ... surface_disque_rotatif_ha (3), Pesticides consommés du 1er produit (4)
+    // (Atomiseur autoporté retiré de l'écran).
+    fireEvent.changeText(screen.getAllByPlaceholderText('0')[4], '4,25');
 
     expect(await screen.findByDisplayValue('4,25')).toBeVisible();
     expect(screen.queryByDisplayValue('NaN')).toBeNull();
@@ -135,8 +136,8 @@ describe('TraitementScreen (Équipe, Terrestre) — saisie décimale francophone
     await render(<TraitementScreen />);
     await waitFor(() => expect(useTraitementCaptureStore.getState().terrestre.chefEquipeId).toBe('chef-equipe-1'));
 
-    // ... Pesticides consommés (5), Approvisionnement (6), Essence (7).
-    fireEvent.changeText(screen.getAllByPlaceholderText('0')[7], '10,75');
+    // ... Pesticides consommés (4), Approvisionnement (5), Essence (6).
+    fireEvent.changeText(screen.getAllByPlaceholderText('0')[6], '10,75');
 
     expect(await screen.findByDisplayValue('10,75')).toBeVisible();
     expect(screen.queryByDisplayValue('NaN')).toBeNull();
