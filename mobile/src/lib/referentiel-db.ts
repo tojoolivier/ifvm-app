@@ -78,6 +78,23 @@ export async function listStationsByPoste(paId: string): Promise<StationFixe[]> 
   );
 }
 
+/**
+ * Résout le nom d'une station par son id, active ou non — #localite-traitement-
+ * poste-acridien-autre-agent : `ProspectionRead` (réponse serveur) n'expose pas
+ * `station_nom` (contrairement à `prospecteur_nom`, résolu côté backend), donc
+ * une fiche intensive matérialisée depuis un AUTRE agent ne peut le connaître
+ * qu'en le retrouvant ici, dans le référentiel local déjà synchronisé — jamais
+ * filtré sur `actif` : une station depuis désactivée doit rester résolvable
+ * pour l'historique d'une prospection existante, ce n'est pas une sélection.
+ */
+export async function getStationById(id: string): Promise<StationFixe | null> {
+  const db = await getReferentielDb();
+  return db.getFirstAsync<StationFixe>(
+    'SELECT id, code, nom, pa_id as paId, latitude, longitude, altitude, commune, district, region FROM station_fixe WHERE id = ?',
+    [id]
+  );
+}
+
 export interface StadeGrille {
   code: string;
   libelle: string;
