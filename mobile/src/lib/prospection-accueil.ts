@@ -25,6 +25,7 @@ import {
 import { validateProspectionDate } from './prospection-validation';
 import { PreconditionError, ReferentialError } from './errors';
 import { logger } from './logger';
+import { useAuthStore } from './auth-store';
 
 const log = logger.child({ module: 'prospection-accueil' });
 
@@ -352,11 +353,20 @@ export async function startNewProspection(params: {
     }
   }
 
+  // #fiches-disponibles-hors-ligne : le nom de l'agent connecté (déjà en
+  // mémoire, jamais un appel réseau) est figé ici pour que « Créé par … »
+  // s'affiche aussi hors ligne pour SA PROPRE fiche, une fois celle-ci
+  // apparue dans « Consulter une fiche validée » sur un AUTRE appareil —
+  // même convention "Prénom Nom" que `_resoudre_noms` côté serveur.
+  const agentConnecte = useAuthStore.getState().user;
+  const prospecteurNom = agentConnecte ? `${agentConnecte.prenom} ${agentConnecte.nom}` : null;
+
   const draft = await createDraftProspection({
     id: generateId(),
     typeProspection: params.typeProspection ?? 'intensive',
     campagneId: selectedCampagneId,
     prospecteurId: params.prospecteurId,
+    prospecteurNom,
     dateProspection,
     region: null,
     district: null,
