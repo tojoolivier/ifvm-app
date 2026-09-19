@@ -4,7 +4,7 @@
  * snapshot affiché hors-ligne (cibles.tsx) coïncide avec ce que le backend recalculera
  * à la synchronisation.
  */
-import { construireCible } from '@/lib/traitement-cible';
+import { construireCible, construireDetailPhaseStade } from '@/lib/traitement-cible';
 import { CaptureRow, InfestationRow, PopulationRow } from '@/lib/prospection-repository';
 
 function population(overrides: Partial<PopulationRow>): PopulationRow {
@@ -283,5 +283,93 @@ describe('construireCible', () => {
   it('reprend la surface infestée telle quelle', () => {
     const cible = construireCible({ surface_infestee: 42.5 }, [], []);
     expect(cible.surface_infestee_ha).toBe(42.5);
+  });
+});
+
+/**
+ * construireDetailPhaseStade() — écran Cibles (Terrestre), lu EN DIRECT à chaque
+ * visite (#cibles-phase-stade-en-direct), contrairement à construireCible()
+ * ci-dessus (snapshot figé). Toujours 4 groupes (LMC/NSE × Imagos/Larves), même
+ * quand aucune donnée n'est disponible pour un groupe.
+ */
+describe('construireDetailPhaseStade', () => {
+  it('renvoie les 4 groupes vides quand la prospection est vide', () => {
+    const groupes = construireDetailPhaseStade([], []);
+    expect(groupes.map((g) => g.label)).toEqual(['LMC Imagos', 'LMC Larves', 'NSE Imagos', 'NSE Larves']);
+    for (const g of groupes) {
+      expect(g.phases).toEqual([]);
+      expect(g.stades).toEqual([]);
+    }
+  });
+
+  it('dérive Phase et Stade imago Extensif depuis les colonnes scalaires et stades_imago (JSON)', () => {
+    const groupes = construireDetailPhaseStade(
+      [
+        population({
+          espece: 'LMC',
+          categorie: 'imago',
+          captures_sol: 5,
+          captures_trans: 0,
+          captures_greg: 2,
+          captures_solitaro_transiens: 0,
+          stades_imago: JSON.stringify({ femelleA1: 3, maleA1: 4, femelleA2: 0 }),
+        }),
+      ],
+      []
+    );
+    const lmcImagos = groupes.find((g) => g.label === 'LMC Imagos')!;
+    expect(lmcImagos.phases).toEqual([
+      { label: 'Solitaire', value: 5 },
+      { label: 'Grégaire', value: 2 },
+    ]);
+    // femelleA2 à 0 est exclu, comme extensive-recap.tsx (nonZero).
+    expect(lmcImagos.stades).toEqual([
+      { label: 'femelleA1', value: 3 },
+      { label: 'maleA1', value: 4 },
+    ]);
+  });
+
+  it("n'a pas de notion de phase pour les larves Extensif (jamais saisie) — seul le Stade est renseigné", () => {
+    const groupes = construireDetailPhaseStade(
+      [
+        population({
+          espece: 'NSE',
+          categorie: 'larve',
+          densites_larve: JSON.stringify({ L1: 10, L4: 3 }),
+        }),
+      ],
+      []
+    );
+    const nseLarves = groupes.find((g) => g.label === 'NSE Larves')!;
+    expect(nseLarves.phases).toEqual([]);
+    expect(nseLarves.stades).toEqual([
+      { label: 'L1', value: 10 },
+      { label: 'L4', value: 3 },
+    ]);
+  });
+
+  it('dérive Phase ET Stade Intensif depuis des lignes CaptureRow, cumulées par code', () => {
+    const groupes = construireDetailPhaseStade(
+      [],
+      [
+        capture({ espece: 'NSE', categorie: 'larve', phase: 'gregaire', stade: 'L2', effectif: 6 }),
+        capture({ espece: 'NSE', categorie: 'larve', phase: 'gregaire', stade: 'L3', effectif: 4 }),
+      ]
+    );
+    const nseLarves = groupes.find((g) => g.label === 'NSE Larves')!;
+    expect(nseLarves.phases).toEqual([{ label: 'Grégaire', value: 10 }]);
+    expect(nseLarves.stades).toEqual([
+      { label: 'L2', value: 6 },
+      { label: 'L3', value: 4 },
+    ]);
+  });
+
+  it('additionne une population Extensif et des captures Intensif sans les faire s’écraser (garde-fou défensif)', () => {
+    const groupes = construireDetailPhaseStade(
+      [population({ espece: 'LMC', categorie: 'imago', captures_sol: 5 })],
+      [capture({ espece: 'LMC', categorie: 'imago', phase: 'solitaire', stade: 'A1', effectif: 3 })]
+    );
+    const lmcImagos = groupes.find((g) => g.label === 'LMC Imagos')!;
+    expect(lmcImagos.phases).toEqual([{ label: 'Solitaire', value: 8 }]);
   });
 });

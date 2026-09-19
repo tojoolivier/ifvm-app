@@ -227,3 +227,95 @@ function deriveRepartition(populations: PopulationRow[]): 'GROUPEE' | 'DIFFUSE' 
   if (populations.some((p) => p.densite_diffuse != null)) return 'DIFFUSE';
   return null;
 }
+
+export interface PhaseStadeEntry {
+  label: string;
+  value: number;
+}
+
+export interface PhaseStadeGroup {
+  espece: 'LMC' | 'NSE';
+  categorie: 'imago' | 'larve';
+  label: string;
+  phases: PhaseStadeEntry[];
+  stades: PhaseStadeEntry[];
+}
+
+const PHASE_LABELS: Record<string, string> = {
+  solitaire: 'Solitaire',
+  solitaro_trans: 'Solitaro-transiens',
+  transiens: 'Transiens',
+  gregaire: 'Grégaire',
+};
+
+const GROUPES_PHASE_STADE: { espece: 'LMC' | 'NSE'; categorie: 'imago' | 'larve'; label: string }[] = [
+  { espece: 'LMC', categorie: 'imago', label: 'LMC Imagos' },
+  { espece: 'LMC', categorie: 'larve', label: 'LMC Larves' },
+  { espece: 'NSE', categorie: 'imago', label: 'NSE Imagos' },
+  { espece: 'NSE', categorie: 'larve', label: 'NSE Larves' },
+];
+
+/**
+ * Détail Phase/Stade par espèce/catégorie pour l'écran Cibles (Terrestre) —
+ * lu EN DIRECT depuis la prospection liée à chaque visite de l'écran (contrairement
+ * au reste de la cible, qui reste un snapshot figé, cf. construireCible ci-dessus) :
+ * l'utilisateur a explicitement demandé cette section à jour plutôt que figée.
+ *
+ * Unifie les deux formats de stockage existants (confirmés lors de l'implémentation,
+ * mêmes unités — effectifs bruts — dans les deux cas, donc additionnables sans
+ * distinction visuelle) :
+ * - Extensif : phase imago en colonnes scalaires (captures_sol/trans/greg/
+ *   solitaro_transiens), stade (imago ou larve) en JSON (stades_imago/densites_larve).
+ *   Pas de notion de phase pour les larves côté Extensif (jamais saisie).
+ * - Intensif (fusion B/C) : phase ET stade en lignes CaptureRow individuelles
+ *   (categorie/phase/stade/effectif), pour imago et larve.
+ * Les deux sources ne se recouvrent jamais pour une même prospection (cf.
+ * deriveLarves ci-dessus, même garantie) : les additionner est sans risque de doublon.
+ */
+export function construireDetailPhaseStade(
+  populations: PopulationRow[],
+  captures: CaptureRow[]
+): PhaseStadeGroup[] {
+  return GROUPES_PHASE_STADE.map(({ espece, categorie, label }) => {
+    const population = populations.find((p) => p.espece === espece && p.categorie === categorie) ?? null;
+    const capturesGroupe = captures.filter((c) => c.espece === espece && c.categorie === categorie);
+
+    const phaseCounts: Record<string, number> = {};
+    if (categorie === 'imago' && population) {
+      if (population.captures_sol) phaseCounts.solitaire = (phaseCounts.solitaire ?? 0) + population.captures_sol;
+      if (population.captures_trans) phaseCounts.transiens = (phaseCounts.transiens ?? 0) + population.captures_trans;
+      if (population.captures_solitaro_transiens) {
+        phaseCounts.solitaro_trans = (phaseCounts.solitaro_trans ?? 0) + population.captures_solitaro_transiens;
+      }
+      if (population.captures_greg) phaseCounts.gregaire = (phaseCounts.gregaire ?? 0) + population.captures_greg;
+    }
+    for (const c of capturesGroupe) {
+      if (!c.phase) continue;
+      phaseCounts[c.phase] = (phaseCounts[c.phase] ?? 0) + c.effectif;
+    }
+    const phases = Object.entries(phaseCounts)
+      .filter(([, v]) => v > 0)
+      .map(([code, v]) => ({ label: PHASE_LABELS[code] ?? code, value: v }));
+
+    const stadeCounts: Record<string, number> = {};
+    const jsonStades = categorie === 'imago' ? population?.stades_imago : population?.densites_larve;
+    if (jsonStades) {
+      try {
+        const parsed = JSON.parse(jsonStades) as Record<string, number>;
+        for (const [stade, v] of Object.entries(parsed)) {
+          const valeur = Number(v) || 0;
+          if (valeur > 0) stadeCounts[stade] = (stadeCounts[stade] ?? 0) + valeur;
+        }
+      } catch (error) {
+        logger.ignore(error, 'stades JSON illisible pour le détail Phase/Stade — ligne ignorée');
+      }
+    }
+    for (const c of capturesGroupe) {
+      if (!c.stade) continue;
+      stadeCounts[c.stade] = (stadeCounts[c.stade] ?? 0) + c.effectif;
+    }
+    const stades = Object.entries(stadeCounts).map(([code, v]) => ({ label: code, value: v }));
+
+    return { espece, categorie, label, phases, stades };
+  });
+}
