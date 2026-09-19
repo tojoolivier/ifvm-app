@@ -142,6 +142,7 @@ describe('pullReferentiel', () => {
             latitude: -23.35,
             longitude: 43.67,
             altitude: 8,
+            equipe_aerienne_id: 'equipe-1',
             actif: true,
             updated_at: '2026-08-01T00:00:00Z',
           },
@@ -154,7 +155,36 @@ describe('pullReferentiel', () => {
 
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO lieu_aerien'),
-      ['lieu-1', 'principale', 'Tuléar', -23.35, 43.67, 8, 1, '2026-08-01T00:00:00Z']
+      ['lieu-1', 'principale', 'Tuléar', -23.35, 43.67, 8, 'equipe-1', 1, '2026-08-01T00:00:00Z']
+    );
+  });
+
+  it("stocke NULL pour un lieu aérien pas encore rattaché à une équipe (migration 0074)", async () => {
+    mockPullReferentiel.mockResolvedValue({
+      ...emptyResponse('2026-08-02T00:00:00Z'),
+      lieux_aeriens: {
+        upserts: [
+          {
+            id: 'lieu-2',
+            type_lieu: 'stand',
+            nom: 'Ancien stand',
+            latitude: -22.4,
+            longitude: 46.12,
+            altitude: null,
+            equipe_aerienne_id: null,
+            actif: true,
+            updated_at: '2026-08-01T00:00:00Z',
+          },
+        ],
+        server_time: '2026-08-02T00:00:00Z',
+      },
+    });
+
+    await pullReferentiel('token-1');
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO lieu_aerien'),
+      ['lieu-2', 'stand', 'Ancien stand', -22.4, 46.12, null, null, 1, '2026-08-01T00:00:00Z']
     );
   });
 

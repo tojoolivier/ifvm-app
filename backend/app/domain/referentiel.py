@@ -224,6 +224,13 @@ class LieuAerien:
     actif: bool = True
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
+    # Rattachement à l'équipe aérienne propriétaire du lieu (migration 0074) —
+    # nullable (lieux existants "sans équipe"), obligatoire côté application pour
+    # toute nouvelle création (cf. CreateLieuAerien).
+    equipe_aerienne_id: uuid.UUID | None = None
+    # Dérivé par jointure à la lecture, jamais stocké (même statut que
+    # `equipe_terrestre_nom` sur `PosteAcridien`).
+    equipe_aerienne_nom: str | None = None
 
 
 class NumeroBaseAerienneDejaPrisError(Exception):

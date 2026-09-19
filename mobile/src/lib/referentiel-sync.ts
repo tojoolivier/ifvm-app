@@ -188,11 +188,12 @@ async function upsertLieuxAeriens(
 ): Promise<void> {
   for (const lieu of upserts) {
     await db.runAsync(
-      `INSERT INTO lieu_aerien (id, type_lieu, nom, latitude, longitude, altitude, actif, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO lieu_aerien (id, type_lieu, nom, latitude, longitude, altitude, equipe_aerienne_id, actif, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          type_lieu = excluded.type_lieu, nom = excluded.nom, latitude = excluded.latitude,
-         longitude = excluded.longitude, altitude = excluded.altitude, actif = excluded.actif,
+         longitude = excluded.longitude, altitude = excluded.altitude,
+         equipe_aerienne_id = excluded.equipe_aerienne_id, actif = excluded.actif,
          updated_at = excluded.updated_at`,
       [
         lieu.id,
@@ -201,6 +202,7 @@ async function upsertLieuxAeriens(
         lieu.latitude,
         lieu.longitude,
         lieu.altitude,
+        lieu.equipe_aerienne_id ?? null,
         lieu.actif ? 1 : 0,
         lieu.updated_at,
       ]

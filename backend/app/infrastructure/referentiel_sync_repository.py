@@ -243,7 +243,19 @@ class LieuAerienRepositoryImpl(LieuAerienRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    def _to_domain(self, model: LieuAerienModel) -> LieuAerien:
+    def _select_with_equipe(self):
+        return select(
+            LieuAerienModel,
+            EquipeAerienneModel.nom.label("equipe_aerienne_nom"),
+        ).outerjoin(
+            # LEFT JOIN : equipe_aerienne_id est nullable, un lieu sans équipe
+            # rattachée reste listable (cf. migration 0074).
+            EquipeAerienneModel,
+            LieuAerienModel.equipe_aerienne_id == EquipeAerienneModel.id,
+        )
+
+    def _to_domain(self, row) -> LieuAerien:
+        model = row[0]
         return LieuAerien(
             id=model.id,
             type_lieu=model.type_lieu,
@@ -252,35 +264,37 @@ class LieuAerienRepositoryImpl(LieuAerienRepository):
             longitude=float(model.longitude),
             altitude=float(model.altitude) if model.altitude is not None else None,
             actif=model.actif,
+            equipe_aerienne_id=model.equipe_aerienne_id,
+            equipe_aerienne_nom=row.equipe_aerienne_nom,
             created_at=model.created_at,
             updated_at=model.updated_at,
         )
 
     async def list_since(self, since: datetime | None) -> list[LieuAerien]:
-        stmt = select(LieuAerienModel).order_by(LieuAerienModel.nom)
+        stmt = self._select_with_equipe().order_by(LieuAerienModel.nom)
         if since is not None:
             stmt = stmt.where(LieuAerienModel.updated_at > since)
         result = await self.session.execute(stmt)
-        return [self._to_domain(m) for m in result.scalars().all()]
+        return [self._to_domain(row) for row in result.all()]
 
     async def list_all(
         self, type_lieu: str | None = None, actif: bool | None = True
     ) -> list[LieuAerien]:
-        stmt = select(LieuAerienModel).order_by(LieuAerienModel.nom)
+        stmt = self._select_with_equipe().order_by(LieuAerienModel.nom)
         # `actif=None` = pas de filtre : l'administration a besoin des deux états.
         if actif is not None:
             stmt = stmt.where(LieuAerienModel.actif == actif)
         if type_lieu is not None:
             stmt = stmt.where(LieuAerienModel.type_lieu == type_lieu)
         result = await self.session.execute(stmt)
-        return [self._to_domain(m) for m in result.scalars().all()]
+        return [self._to_domain(row) for row in result.all()]
 
     async def get_by_id(self, lieu_id: uuid.UUID) -> LieuAerien | None:
         result = await self.session.execute(
-            select(LieuAerienModel).where(LieuAerienModel.id == lieu_id)
+            self._select_with_equipe().where(LieuAerienModel.id == lieu_id)
         )
-        model = result.scalar_one_or_none()
-        return None if model is None else self._to_domain(model)
+        row = result.first()
+        return None if row is None else self._to_domain(row)
 
     async def create(self, lieu: LieuAerien) -> LieuAerien:
         model = LieuAerienModel(
@@ -291,13 +305,13 @@ class LieuAerienRepositoryImpl(LieuAerienRepository):
             longitude=lieu.longitude,
             altitude=lieu.altitude,
             actif=lieu.actif,
+            equipe_aerienne_id=lieu.equipe_aerienne_id,
             created_at=lieu.created_at,
             updated_at=lieu.updated_at,
         )
         self.session.add(model)
         await self.session.commit()
-        await self.session.refresh(model)
-        return self._to_domain(model)
+        return await self._relire(model.id)
 
     async def update(self, lieu: LieuAerien) -> LieuAerien:
         result = await self.session.execute(
@@ -310,10 +324,18 @@ class LieuAerienRepositoryImpl(LieuAerienRepository):
         model.longitude = lieu.longitude
         model.altitude = lieu.altitude
         model.actif = lieu.actif
+        model.equipe_aerienne_id = lieu.equipe_aerienne_id
         model.updated_at = lieu.updated_at
         await self.session.commit()
-        await self.session.refresh(model)
-        return self._to_domain(model)
+        return await self._relire(model.id)
+
+    async def _relire(self, lieu_id: uuid.UUID) -> LieuAerien:
+        """Une écriture ne renvoie jamais l'entité écrite telle quelle :
+        `equipe_aerienne_nom` est une jointure, absente du modèle ORM."""
+        lieu = await self.get_by_id(lieu_id)
+        if lieu is None:  # pragma: no cover — on vient de l'écrire dans cette session
+            raise RuntimeError(f"Lieu aérien {lieu_id} introuvable juste après écriture")
+        return lieu
 
 
 class BaseAerienneRepositoryImpl(BaseAerienneRepository):

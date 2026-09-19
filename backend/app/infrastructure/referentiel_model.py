@@ -141,6 +141,17 @@ class LieuAerienModel(Base):
     latitude: Mapped[float] = mapped_column(Numeric(10, 8), nullable=False)
     longitude: Mapped[float] = mapped_column(Numeric(11, 8), nullable=False)
     altitude: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
+    # Rattachement à une équipe aérienne (migration 0074) : nullable — les lieux déjà
+    # en base restent "sans équipe" jusqu'à rattachement manuel ; obligatoire côté
+    # application pour toute nouvelle création (LieuAerienCreate). Pas d'UNIQUE :
+    # une équipe peut posséder plusieurs lieux (bases principales/secondaires/stands),
+    # contrairement à `BaseAerienneModel.equipe_id` (1:1, référentiel distinct dédié à
+    # la fiche de vol).
+    equipe_aerienne_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("equipe_aerienne.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
     actif: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
