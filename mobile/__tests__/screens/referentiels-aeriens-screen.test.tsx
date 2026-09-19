@@ -39,7 +39,7 @@ const CHEF = { id: 'chef-1', nom: 'Rabe', prenom: 'Toky', sigle: null };
 
 describe('ReferentielsAeriensScreen', () => {
   beforeEach(() => {
-    useAuthStore.setState({ token: 'token-test' } as any);
+    useAuthStore.setState({ token: 'token-test', user: { id: 'chef-1', role: 'chef_de_base' } } as any);
     jest.mocked(apiClient.listChefsDeBase).mockReset().mockResolvedValue([CHEF] as any);
     jest.mocked(apiClient.listEquipesAeriennes).mockReset().mockResolvedValue([]);
     jest.mocked(apiClient.listBasesAeriennes).mockReset().mockResolvedValue([]);
@@ -92,6 +92,9 @@ describe('ReferentielsAeriensScreen', () => {
     await fireEvent.press(screen.getByText('Toky Rabe'));
     await fireEvent.changeText(screen.getByPlaceholderText('Pilote'), 'Jean Rakoto');
     await fireEvent.changeText(screen.getByPlaceholderText('Mécanicien'), 'Paul Rasoa');
+    await fireEvent.changeText(screen.getByPlaceholderText('Immatriculation (ex. 5R-MXY)'), '5R-MJA');
+    await fireEvent.changeText(screen.getByPlaceholderText('Société'), 'Heli Madagascar');
+    await fireEvent.changeText(screen.getByPlaceholderText('Volume de cuve (L)'), '800');
     await fireEvent.changeText(screen.getByPlaceholderText('Nom du membre'), 'Marie Rafara');
     await fireEvent.press(screen.getByText('Ajouter'));
     await fireEvent.press(screen.getByText('Créer'));
@@ -102,6 +105,7 @@ describe('ReferentielsAeriensScreen', () => {
         pilote: 'Jean Rakoto',
         mecanicien: 'Paul Rasoa',
         consultant_international: null,
+        aeronef: { immatriculation: '5R-MJA', societe: 'Heli Madagascar', volume_cuve_l: 800 },
         membres: [{ nom: 'Marie Rafara' }],
       })
     );
@@ -179,6 +183,9 @@ describe('ReferentielsAeriensScreen', () => {
     await fireEvent.press(screen.getByText('Toky Rabe'));
     await fireEvent.changeText(screen.getByPlaceholderText('Pilote'), 'Jean Rakoto');
     await fireEvent.changeText(screen.getByPlaceholderText('Mécanicien'), 'Paul Rasoa');
+    await fireEvent.changeText(screen.getByPlaceholderText('Immatriculation (ex. 5R-MXY)'), '5R-MJA');
+    await fireEvent.changeText(screen.getByPlaceholderText('Société'), 'Heli Madagascar');
+    await fireEvent.changeText(screen.getByPlaceholderText('Volume de cuve (L)'), '800');
 
     await fireEvent.changeText(screen.getByPlaceholderText('Nom du membre'), 'Membre à retirer');
     await fireEvent.press(screen.getByText('Ajouter'));
@@ -194,6 +201,7 @@ describe('ReferentielsAeriensScreen', () => {
         pilote: 'Jean Rakoto',
         mecanicien: 'Paul Rasoa',
         consultant_international: null,
+        aeronef: { immatriculation: '5R-MJA', societe: 'Heli Madagascar', volume_cuve_l: 800 },
         membres: [],
       })
     );
@@ -233,5 +241,40 @@ describe('ReferentielsAeriensScreen', () => {
     expect(screen.getByText('STD01 — Ihosy')).toBeTruthy();
     expect(screen.getByText(/équipes aériennes/)).toBeTruthy();
     expect(screen.queryByText('Charger les référentiels ›')).toBeNull();
+  });
+
+  // Seul le chef de base crée les lieux de SON équipe (le serveur répond 403 sinon) :
+  // inutile de proposer des formulaires voués à l'échec aux autres rôles.
+  it("masque la création de bases et de stands à un rôle autre que chef de base", async () => {
+    useAuthStore.setState({ token: 'token-test', user: { id: 'pilote-1', role: 'pilote' } } as any);
+    jest.mocked(apiClient.listEquipesAeriennes).mockResolvedValue([
+      { id: 'equipe-1', nom: 'Équipe Ihosy', chef_de_base_id: 'chef-1', actif: true },
+    ] as any);
+    jest.mocked(apiClient.listBasesAeriennes).mockResolvedValue([
+      { id: 'base-1', numero: 'IHO01', localite: 'Ihosy', parent_base_id: null, equipe_id: 'equipe-1', actif: true },
+    ] as any);
+
+    await render(<ReferentielsAeriensScreen />);
+
+    await screen.findByText('IHO01 — Ihosy');
+    expect(screen.queryByText('+ Nouvelle base principale')).toBeNull();
+    expect(screen.queryByText('+ Nouvelle base secondaire')).toBeNull();
+    expect(screen.queryByText('+ Nouveau stand de remplissage')).toBeNull();
+  });
+
+  it("affiche l'hélicoptère de chaque équipe", async () => {
+    jest.mocked(apiClient.listEquipesAeriennes).mockResolvedValue([
+      {
+        id: 'equipe-1',
+        nom: 'Équipe Ihosy',
+        chef_de_base_id: 'chef-1',
+        aeronef: { immatriculation: '5R-MJA', societe: 'Heli Madagascar', volume_cuve_l: 800 },
+        actif: true,
+      },
+    ] as any);
+
+    await render(<ReferentielsAeriensScreen />);
+
+    await screen.findByText('Hélicoptère : 5R-MJA — Heli Madagascar (cuve 800 L)');
   });
 });

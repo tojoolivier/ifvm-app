@@ -60,6 +60,8 @@ interface FicheVolDetail {
   pilote: string
   mecanicien: string
   chef_de_base_id: string
+  // Équipe aérienne choisie à la création (migration 0075) — null pour une fiche antérieure.
+  equipe_aerienne_nom?: string | null
   consultant_international: string | null
   pesticide_nom_commercial: string | null
   pesticide_quantite_disponible: number | null
@@ -302,6 +304,7 @@ export function FicheVolDetailPage() {
         <div className="flex flex-col gap-4">
           <Carte className="flex flex-col gap-2 p-5">
             <h2 className="mb-1 font-sans text-[13px] font-bold">Appareil &amp; équipage</h2>
+            <Champ label="Équipe" value={fiche.equipe_aerienne_nom ?? null} />
             <Champ label="Base" value={`${fiche.base_code} · ${fiche.base_nom}`} />
             <Champ label="Stand" value={fiche.stand_nom} />
             <Champ label="Pilote" value={fiche.pilote} />
@@ -378,6 +381,7 @@ function FicheImprimable({
       </header>
 
       <dl className="mb-4 grid grid-cols-2 gap-4 text-sm">
+        <ChampImprimable label="Équipe" value={fiche.equipe_aerienne_nom ?? null} />
         <ChampImprimable
           label="Base"
           value={[fiche.base_numero, fiche.base_localite].filter(Boolean).join(' · ') || null}

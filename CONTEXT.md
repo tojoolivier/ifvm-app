@@ -68,6 +68,21 @@ Agriculteur → Signalement → Prospection de Validation
   chacun relevé en position (lat/lon/alt captées automatiquement, hors ligne) et nommé à la main.
   Ni l'un ni l'autre n'est un **poste acridien** ou une **station fixe**.
 
+- **Équipe aérienne** et **aéronef** (migrations 0066, 0072, 0075). Une équipe aérienne = un
+  chef de base (seul compte utilisateur de l'équipe) + un pilote, un mécanicien (noms libres),
+  un consultant international facultatif, des autres membres en nombre variable, et **un
+  aéronef** (hélicoptère : immatriculation, société, volume de cuve — table `aeronef`,
+  relation 1:1, `immatriculation` en est la clé candidate). Une équipe possède sa base
+  principale (`base_aerienne.equipe_id`), ses bases secondaires (héritées de la principale) et
+  ses stands (`stand_remplissage.equipe_aerienne_id`). **Seul le chef de base de l'équipe (ou
+  un admin) crée ses lieux**, rattachés d'office à SON équipe (contrôle serveur, 403 sinon).
+  Créer une fiche de vol commence par choisir l'équipe : chef de base, pilote, mécanicien,
+  consultant, immatriculation et société de l'hélicoptère s'en déduisent (le serveur fait
+  autorité et les **copie** sur la fiche — snapshot du jour, jamais recalculé), et seuls les
+  lieux de cette équipe sont proposés (`LieuVolHorsEquipeError`, 422 sinon). Le référentiel de
+  lieux de la fiche de vol reste `base_aerienne`/`stand_remplissage` (décision 0064), distinct
+  de `lieu_aerien` (prospection/traitement).
+
 - **Pilote** et **mécanicien** sont **externes à l'IFVM** (compagnie aérienne ou Armée malgache) :
   ce sont des noms, pas des comptes `utilisateur`. Seul le **chef de base** est un agent IFVM. Le
   **consultant international** signe lorsqu'il intervient.

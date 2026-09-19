@@ -17,3 +17,13 @@ export const ROLES_FICHE_VOL: readonly UserRole[] = ['chef_de_base', 'pilote', '
 export function peutSaisirFicheVol(role: UserRole | null | undefined): boolean {
   return !!role && ROLES_FICHE_VOL.includes(role);
 }
+
+/**
+ * Seul le chef de base crée les lieux aériens (bases, stands) de SON équipe — seul
+ * compte utilisateur de l'équipe (pilote/mécanicien sont des noms libres, sans accès à
+ * l'API). Le serveur applique la même règle (403) ; ce contrôle évite seulement de
+ * proposer un formulaire voué à l'échec.
+ */
+export function peutCreerLieuAerien(role: UserRole | null | undefined): boolean {
+  return role === 'chef_de_base';
+}

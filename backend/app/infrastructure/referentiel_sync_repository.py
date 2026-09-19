@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.domain.referentiel import (
+    Aeronef,
+    AeronefDejaAffecteError,
     BaseAerienne,
     BaseAerienneEquipeInvalideError,
     ChefDeBaseDejaEquipeError,
@@ -17,6 +19,7 @@ from app.domain.referentiel import (
     EquipeAerienneDejaAssigneeError,
     EquipeAerienneIntrouvableError,
     EquipeTerrestre,
+    ImmatriculationAeronefDejaPriseError,
     LieuAerien,
     MembreEquipeAerienne,
     MembreEquipeTerrestre,
@@ -27,6 +30,7 @@ from app.domain.referentiel import (
     UtilisateurEquipe,
 )
 from app.domain.repositories import (
+    AeronefRepository,
     BaseAerienneRepository,
     CodeStadeRepository,
     CultureRepository,
@@ -38,6 +42,7 @@ from app.domain.repositories import (
     UtilisateurEquipeRepository,
 )
 from app.infrastructure.referentiel_model import (
+    AeronefModel,
     BaseAerienneModel,
     CodeStadeModel,
     CultureModel,
@@ -442,7 +447,10 @@ class EquipeAerienneRepositoryImpl(EquipeAerienneRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    _CHARGEMENT = (selectinload(EquipeAerienneModel.membres),)
+    _CHARGEMENT = (
+        selectinload(EquipeAerienneModel.membres),
+        selectinload(EquipeAerienneModel.aeronef),
+    )
 
     def _to_domain(self, model: EquipeAerienneModel) -> EquipeAerienne:
         return EquipeAerienne(
@@ -452,6 +460,8 @@ class EquipeAerienneRepositoryImpl(EquipeAerienneRepository):
             pilote=model.pilote,
             mecanicien=model.mecanicien,
             consultant_international=model.consultant_international,
+            aeronef_id=model.aeronef_id,
+            aeronef=_aeronef_to_domain(model.aeronef) if model.aeronef is not None else None,
             actif=model.actif,
             created_at=model.created_at,
             updated_at=model.updated_at,
@@ -479,7 +489,17 @@ class EquipeAerienneRepositoryImpl(EquipeAerienneRepository):
         model = result.unique().scalar_one_or_none()
         return None if model is None else self._to_domain(model)
 
+    async def get_by_chef_de_base_id(self, chef_de_base_id: uuid.UUID) -> EquipeAerienne | None:
+        result = await self.session.execute(
+            select(EquipeAerienneModel)
+            .options(*self._CHARGEMENT)
+            .where(EquipeAerienneModel.chef_de_base_id == chef_de_base_id)
+        )
+        model = result.unique().scalar_one_or_none()
+        return None if model is None else self._to_domain(model)
+
     async def create(self, equipe: EquipeAerienne) -> EquipeAerienne:
+        aeronef = equipe.aeronef
         model = EquipeAerienneModel(
             id=equipe.id,
             nom=equipe.nom,
@@ -487,19 +507,88 @@ class EquipeAerienneRepositoryImpl(EquipeAerienneRepository):
             pilote=equipe.pilote,
             mecanicien=equipe.mecanicien,
             consultant_international=equipe.consultant_international,
+            aeronef_id=aeronef.id if aeronef is not None else equipe.aeronef_id,
             actif=equipe.actif,
             created_at=equipe.created_at,
             updated_at=equipe.updated_at,
             membres=[EquipeAerienneMembreModel(id=m.id, nom=m.nom) for m in equipe.membres],
         )
+        if aeronef is not None:
+            # Même transaction que l'équipe : un échec (immatriculation déjà prise,
+            # chef déjà affecté) n'écrit ni l'un ni l'autre — jamais d'aéronef orphelin.
+            model.aeronef = AeronefModel(
+                id=aeronef.id,
+                immatriculation=aeronef.immatriculation,
+                societe=aeronef.societe,
+                volume_cuve_l=aeronef.volume_cuve_l,
+                actif=aeronef.actif,
+                created_at=aeronef.created_at,
+                updated_at=aeronef.updated_at,
+            )
         self.session.add(model)
         try:
             await self.session.commit()
         except IntegrityError as exc:
             await self.session.rollback()
+            contrainte = _contrainte_violee(exc)
+            if contrainte == "uq_aeronef_immatriculation":
+                raise ImmatriculationAeronefDejaPriseError(
+                    aeronef.immatriculation if aeronef is not None else ""
+                ) from exc
+            if contrainte == "uq_equipe_aerienne_aeronef_id":
+                raise AeronefDejaAffecteError(str(equipe.aeronef_id)) from exc
             raise ChefDeBaseDejaEquipeError(str(equipe.chef_de_base_id)) from exc
-        await self.session.refresh(model, attribute_names=["membres"])
+        await self.session.refresh(model, attribute_names=["membres", "aeronef"])
         return self._to_domain(model)
+
+
+def _aeronef_to_domain(model: AeronefModel) -> Aeronef:
+    return Aeronef(
+        id=model.id,
+        immatriculation=model.immatriculation,
+        societe=model.societe,
+        volume_cuve_l=float(model.volume_cuve_l),
+        actif=model.actif,
+        created_at=model.created_at,
+        updated_at=model.updated_at,
+    )
+
+
+class AeronefRepositoryImpl(AeronefRepository):
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def list_all(self, actif: bool | None = True) -> list[Aeronef]:
+        stmt = select(AeronefModel).order_by(AeronefModel.immatriculation)
+        if actif is not None:
+            stmt = stmt.where(AeronefModel.actif == actif)
+        result = await self.session.execute(stmt)
+        return [_aeronef_to_domain(m) for m in result.scalars().all()]
+
+    async def get_by_id(self, aeronef_id: uuid.UUID) -> Aeronef | None:
+        result = await self.session.execute(
+            select(AeronefModel).where(AeronefModel.id == aeronef_id)
+        )
+        model = result.scalar_one_or_none()
+        return None if model is None else _aeronef_to_domain(model)
+
+    async def update(self, aeronef: Aeronef) -> Aeronef:
+        result = await self.session.execute(
+            select(AeronefModel).where(AeronefModel.id == aeronef.id)
+        )
+        model = result.scalar_one()
+        model.immatriculation = aeronef.immatriculation
+        model.societe = aeronef.societe
+        model.volume_cuve_l = aeronef.volume_cuve_l
+        model.actif = aeronef.actif
+        model.updated_at = aeronef.updated_at
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise ImmatriculationAeronefDejaPriseError(aeronef.immatriculation) from exc
+        await self.session.refresh(model)
+        return _aeronef_to_domain(model)
 
 
 class EquipeTerrestreRepositoryImpl(EquipeTerrestreRepository):
@@ -574,6 +663,7 @@ class StandRemplissageRepositoryImpl(StandRemplissageRepository):
             longitude=float(model.longitude) if model.longitude is not None else None,
             latitude=float(model.latitude) if model.latitude is not None else None,
             altitude=float(model.altitude) if model.altitude is not None else None,
+            equipe_aerienne_id=model.equipe_aerienne_id,
             actif=model.actif,
             created_at=model.created_at,
             updated_at=model.updated_at,
@@ -608,6 +698,7 @@ class StandRemplissageRepositoryImpl(StandRemplissageRepository):
             longitude=stand.longitude,
             latitude=stand.latitude,
             altitude=stand.altitude,
+            equipe_aerienne_id=stand.equipe_aerienne_id,
             actif=stand.actif,
             created_at=stand.created_at,
             updated_at=stand.updated_at,
@@ -617,9 +708,16 @@ class StandRemplissageRepositoryImpl(StandRemplissageRepository):
             await self.session.commit()
         except IntegrityError as exc:
             await self.session.rollback()
-            raise NumeroStandRemplissageDejaPrisError(stand.numero) from exc
+            raise self._traduire_integrite(exc, stand) from exc
         await self.session.refresh(model)
         return self._to_domain(model)
+
+    @staticmethod
+    def _traduire_integrite(exc: IntegrityError, stand: StandRemplissage) -> Exception:
+        """Une équipe inexistante ne doit pas remonter comme un doublon de `numero`."""
+        if _contrainte_violee(exc) == "fk_stand_remplissage_equipe_aerienne_id":
+            return EquipeAerienneIntrouvableError(str(stand.equipe_aerienne_id))
+        return NumeroStandRemplissageDejaPrisError(stand.numero)
 
     async def update(self, stand: StandRemplissage) -> StandRemplissage:
         result = await self.session.execute(
@@ -631,13 +729,14 @@ class StandRemplissageRepositoryImpl(StandRemplissageRepository):
         model.longitude = stand.longitude
         model.latitude = stand.latitude
         model.altitude = stand.altitude
+        model.equipe_aerienne_id = stand.equipe_aerienne_id
         model.actif = stand.actif
         model.updated_at = stand.updated_at
         try:
             await self.session.commit()
         except IntegrityError as exc:
             await self.session.rollback()
-            raise NumeroStandRemplissageDejaPrisError(stand.numero) from exc
+            raise self._traduire_integrite(exc, stand) from exc
         await self.session.refresh(model)
         return self._to_domain(model)
 

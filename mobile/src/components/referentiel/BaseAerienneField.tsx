@@ -5,6 +5,7 @@ import { useAuthStore } from '@/lib/auth-store';
 import { apiClient } from '@/lib/api-client';
 import { getCurrentPosition } from '@/lib/location';
 import { useAsyncAction } from '@/hooks/use-async-action';
+import { peutCreerLieuAerien } from '@/lib/fiche-vol-access';
 
 export interface BaseAerienneOption {
   id: string;
@@ -18,6 +19,11 @@ interface BaseAerienneFieldProps {
   value: string | null;
   onChange: (id: string, option: BaseAerienneOption) => void;
   label?: string;
+  /**
+   * Équipe aérienne choisie sur la fiche : seules les bases de cette équipe sont
+   * proposées (sa principale, et les secondaires qui en héritent). Absente : toutes.
+   */
+  equipeId?: string | null;
 }
 
 const GREEN = '#235a36';
@@ -46,8 +52,9 @@ const BORDER = '#e7e0cd';
  * Coordonnées capturées automatiquement par le GPS de l'appareil et
  * verrouillées (non modifiables) une fois acquises.
  */
-export function BaseAerienneField({ value, onChange, label = 'Base aérienne' }: BaseAerienneFieldProps) {
+export function BaseAerienneField({ value, onChange, label = 'Base aérienne', equipeId }: BaseAerienneFieldProps) {
   const token = useAuthStore((s) => s.token);
+  const peutCreer = peutCreerLieuAerien(useAuthStore((s) => s.user?.role));
   const [bases, setBases] = useState<BaseAerienneOption[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [creation, setCreation] = useState(false);
@@ -97,9 +104,17 @@ export function BaseAerienneField({ value, onChange, label = 'Base aérienne' }:
       { screen: 'base-aerienne-field' }
     );
 
+  // Une base principale porte son équipe ; une secondaire l'hérite de sa principale
+  // (`parent_base_id`), jamais d'`equipe_id` propre (migration 0066).
+  const equipeDeLaBase = (base: BaseAerienneOption): string | null =>
+    base.parent_base_id === null
+      ? base.equipe_id
+      : (bases.find((b) => b.id === base.parent_base_id)?.equipe_id ?? null);
+  const basesVisibles = equipeId ? bases.filter((b) => equipeDeLaBase(b) === equipeId) : bases;
+
   // Seules les bases principales (sans parent) peuvent recevoir une secondaire —
   // pas de secondaire d'une secondaire, même limite que côté backend.
-  const basesPrincipales = bases.filter((b) => b.parent_base_id === null);
+  const basesPrincipales = basesVisibles.filter((b) => b.parent_base_id === null);
 
   const ouvrirCreation = () => {
     if (basesPrincipales.length === 0) return;
@@ -154,7 +169,7 @@ export function BaseAerienneField({ value, onChange, label = 'Base aérienne' }:
 
       {loaded && !creation && (
         <View style={styles.liste}>
-          {bases.map((base) => (
+          {basesVisibles.map((base) => (
             <TouchableOpacity
               key={base.id}
               style={[styles.option, value === base.id && styles.optionSelectionnee]}
@@ -168,9 +183,11 @@ export function BaseAerienneField({ value, onChange, label = 'Base aérienne' }:
             </TouchableOpacity>
           ))}
           {basesPrincipales.length > 0 ? (
-            <TouchableOpacity style={styles.nouveauLink} onPress={ouvrirCreation} accessibilityRole="button">
-              <Text style={styles.nouveauLinkText}>+ Nouvelle base secondaire</Text>
-            </TouchableOpacity>
+            peutCreer && (
+              <TouchableOpacity style={styles.nouveauLink} onPress={ouvrirCreation} accessibilityRole="button">
+                <Text style={styles.nouveauLinkText}>+ Nouvelle base secondaire</Text>
+              </TouchableOpacity>
+            )
           ) : (
             <Text style={styles.hint}>
               Créez d&apos;abord une base principale (avec son équipe) depuis Référentiels aériens.

@@ -3,6 +3,8 @@ import uuid
 import pytest
 from httpx import AsyncClient
 
+AERONEF = {"immatriculation": "5R-MJA", "societe": "Madagascar Helicopter", "volume_cuve_l": 800}
+
 
 @pytest.mark.asyncio
 async def test_create_equipe_aerienne(client: AsyncClient, auth_headers: dict, chef_de_base):
@@ -13,6 +15,7 @@ async def test_create_equipe_aerienne(client: AsyncClient, auth_headers: dict, c
             "chef_de_base_id": str(chef_de_base.id),
             "pilote": "Jean Rakoto",
             "mecanicien": "Paul Andria",
+            "aeronef": AERONEF,
             "consultant_international": "John Smith",
             "membres": [{"nom": "Rasoa Voahangy"}, {"nom": "Tovo Randria"}],
         },
@@ -27,6 +30,10 @@ async def test_create_equipe_aerienne(client: AsyncClient, auth_headers: dict, c
     assert data["consultant_international"] == "John Smith"
     assert [m["nom"] for m in data["membres"]] == ["Rasoa Voahangy", "Tovo Randria"]
     assert data["actif"] is True
+    assert data["aeronef"]["immatriculation"] == "5R-MJA"
+    assert data["aeronef"]["societe"] == "Madagascar Helicopter"
+    assert data["aeronef"]["volume_cuve_l"] == 800
+    assert data["aeronef_id"] == data["aeronef"]["id"]
 
 
 @pytest.mark.asyncio
@@ -42,6 +49,7 @@ async def test_create_equipe_aerienne_sans_consultant_ni_membres(
             "chef_de_base_id": str(chef_de_base.id),
             "pilote": "Jean Rakoto",
             "mecanicien": "Paul Andria",
+            "aeronef": AERONEF,
         },
         headers=auth_headers,
     )
@@ -62,6 +70,7 @@ async def test_create_equipe_aerienne_sans_pilote_422(
             "nom": "Équipe Ihosy",
             "chef_de_base_id": str(chef_de_base.id),
             "mecanicien": "Paul Andria",
+            "aeronef": AERONEF,
         },
         headers=auth_headers,
     )
@@ -79,6 +88,7 @@ async def test_create_equipe_aerienne_chef_avec_mauvais_role_403(
             "chef_de_base_id": str(pilote.id),
             "pilote": "Jean Rakoto",
             "mecanicien": "Paul Andria",
+            "aeronef": AERONEF,
         },
         headers=auth_headers,
     )
@@ -94,6 +104,7 @@ async def test_create_equipe_aerienne_chef_inexistant_403(client: AsyncClient, a
             "chef_de_base_id": str(uuid.uuid4()),
             "pilote": "Jean Rakoto",
             "mecanicien": "Paul Andria",
+            "aeronef": AERONEF,
         },
         headers=auth_headers,
     )
@@ -112,6 +123,7 @@ async def test_create_equipe_aerienne_chef_deja_assigne_409(
             "chef_de_base_id": str(chef_de_base.id),
             "pilote": "Jean Rakoto",
             "mecanicien": "Paul Andria",
+            "aeronef": AERONEF,
         },
         headers=auth_headers,
     )
@@ -147,7 +159,7 @@ async def test_get_equipe_aerienne_inexistante_404(client: AsyncClient, auth_hea
 
 @pytest.mark.asyncio
 async def test_base_principale_avec_equipe_deja_assignee_409(
-    client: AsyncClient, auth_headers: dict, base_aerienne, equipe_aerienne
+    client: AsyncClient, admin_headers: dict, base_aerienne, equipe_aerienne
 ):
     """Une équipe ne possède qu'une base principale (UNIQUE base_aerienne.equipe_id) —
     `base_aerienne` (fixture) possède déjà `equipe_aerienne`."""
@@ -158,16 +170,18 @@ async def test_base_principale_avec_equipe_deja_assignee_409(
             "localite": "Ailleurs",
             "equipe_id": str(equipe_aerienne.id),
         },
-        headers=auth_headers,
+        headers=admin_headers,
     )
     assert response.status_code == 409
 
 
 @pytest.mark.asyncio
-async def test_base_principale_avec_equipe_inexistante_404(client: AsyncClient, auth_headers: dict):
+async def test_base_principale_avec_equipe_inexistante_404(
+    client: AsyncClient, admin_headers: dict
+):
     response = await client.post(
         "/bases-aeriennes",
         json={"numero": "IHO09", "localite": "Ailleurs", "equipe_id": str(uuid.uuid4())},
-        headers=auth_headers,
+        headers=admin_headers,
     )
     assert response.status_code == 404

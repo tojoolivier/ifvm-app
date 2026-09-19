@@ -9,6 +9,8 @@ from sqlalchemy.orm import selectinload
 from app.domain.fiche_vol import (
     BaseVolIntrouvableError,
     CampagneVolIntrouvableError,
+    EquipeVolContexte,
+    EquipeVolIntrouvableError,
     FicheVol,
     FicheVolIntrouvableError,
     NumeroFicheVolConflitError,
@@ -25,7 +27,11 @@ from app.infrastructure.fiche_vol_model import (
     FicheVolSignatureModel,
     VolModel,
 )
-from app.infrastructure.referentiel_model import BaseAerienneModel
+from app.infrastructure.referentiel_model import (
+    BaseAerienneModel,
+    EquipeAerienneModel,
+    StandRemplissageModel,
+)
 from app.infrastructure.traitement_model import (
     RotationModel,
     TraitementAerienModel,
@@ -110,6 +116,8 @@ def _to_domain(
             float(model.stand.longitude) if model.stand.longitude is not None else None
         ),
         stand_altitude=float(model.stand.altitude) if model.stand.altitude is not None else None,
+        equipe_aerienne_id=model.equipe_aerienne_id,
+        equipe_aerienne_nom=model.equipe.nom if model.equipe is not None else None,
         pilote=model.pilote,
         mecanicien=model.mecanicien,
         chef_de_base_id=model.chef_de_base_id,
@@ -192,6 +200,7 @@ class FicheVolRepositoryImpl:
         selectinload(FicheVolModel.signatures),
         selectinload(FicheVolModel.base),
         selectinload(FicheVolModel.stand),
+        selectinload(FicheVolModel.equipe),
         selectinload(FicheVolModel.prospection),
     )
 
@@ -287,6 +296,65 @@ class FicheVolRepositoryImpl:
             raise BaseVolIntrouvableError(str(base_id))
         return numero
 
+    async def resoudre_equipe(self, equipe_id: uuid.UUID) -> EquipeVolContexte | None:
+        """L'équipe active et ce qu'elle fournit à l'en-tête d'une fiche (chef, pilote,
+        mécanicien, consultant, immatriculation/société de son aéronef). `None` si
+        l'équipe n'existe pas ou n'est plus active : une équipe sortie de service ne
+        démarre plus de fiche."""
+        result = await self.session.execute(
+            select(EquipeAerienneModel)
+            .options(selectinload(EquipeAerienneModel.aeronef))
+            .where(EquipeAerienneModel.id == equipe_id, EquipeAerienneModel.actif.is_(True))
+        )
+        equipe = result.scalar_one_or_none()
+        if equipe is None:
+            return None
+        aeronef = equipe.aeronef
+        return EquipeVolContexte(
+            chef_de_base_id=equipe.chef_de_base_id,
+            pilote=equipe.pilote,
+            mecanicien=equipe.mecanicien,
+            consultant_international=equipe.consultant_international,
+            immatriculation=aeronef.immatriculation if aeronef is not None else None,
+            societe=aeronef.societe if aeronef is not None else None,
+        )
+
+    async def base_appartient_a_equipe(self, base_id: uuid.UUID, equipe_id: uuid.UUID) -> bool:
+        """Une base principale porte son équipe ; une secondaire l'hérite de sa principale
+        (`parent_base_id`) — jamais de `equipe_id` propre (CHECK 0066)."""
+        base = (
+            await self.session.execute(
+                select(BaseAerienneModel).where(BaseAerienneModel.id == base_id)
+            )
+        ).scalar_one_or_none()
+        if base is None:
+            raise BaseVolIntrouvableError(str(base_id))
+        if base.parent_base_id is None:
+            return base.equipe_id == equipe_id
+        parent_equipe = (
+            await self.session.execute(
+                select(BaseAerienneModel.equipe_id).where(
+                    BaseAerienneModel.id == base.parent_base_id
+                )
+            )
+        ).scalar_one_or_none()
+        return parent_equipe == equipe_id
+
+    async def stand_appartient_a_equipe(self, stand_id: uuid.UUID, equipe_id: uuid.UUID) -> bool:
+        """Un stand « sans équipe » (antérieur à la migration 0075) n'appartient à
+        personne : il n'est proposable à aucune équipe tant qu'un admin ne l'a pas
+        rattaché."""
+        row = (
+            await self.session.execute(
+                select(StandRemplissageModel.equipe_aerienne_id).where(
+                    StandRemplissageModel.id == stand_id
+                )
+            )
+        ).first()
+        if row is None:
+            raise StandVolIntrouvableError(str(stand_id))
+        return row[0] == equipe_id
+
     async def next_compteur(self, campagne_id: uuid.UUID) -> int:
         """Incrément atomique de `campagne_fiche_vol_compteur` (upsert en une requête) :
         deux fiches créées en même temps, y compris depuis deux sessions différentes,
@@ -322,6 +390,7 @@ class FicheVolRepositoryImpl:
             compteur=fiche.compteur,
             base_id=fiche.base_id,
             stand_id=fiche.stand_id,
+            equipe_aerienne_id=fiche.equipe_aerienne_id,
             pilote=fiche.pilote,
             mecanicien=fiche.mecanicien,
             chef_de_base_id=fiche.chef_de_base_id,
@@ -434,6 +503,7 @@ class FicheVolRepositoryImpl:
         model.campagne_id = fiche.campagne_id
         model.base_id = fiche.base_id
         model.stand_id = fiche.stand_id
+        model.equipe_aerienne_id = fiche.equipe_aerienne_id
         model.pilote = fiche.pilote
         model.mecanicien = fiche.mecanicien
         model.chef_de_base_id = fiche.chef_de_base_id
@@ -510,6 +580,8 @@ def _traduire_integrite(exc: IntegrityError) -> Exception:
         return BaseVolIntrouvableError("la base référencée n'existe pas")
     if "fk_fiche_vol_stand_id" in message:
         return StandVolIntrouvableError("le stand référencé n'existe pas")
+    if "fk_fiche_vol_equipe_aerienne_id" in message:
+        return EquipeVolIntrouvableError("l'équipe aérienne référencée n'existe pas")
     if "fk_fiche_vol_campagne_id" in message:
         return CampagneVolIntrouvableError("la campagne référencée n'existe pas")
     if "uq_fiche_vol_campagne_compteur" in message:

@@ -5,17 +5,21 @@ import { useAuthStore } from '@/lib/auth-store';
 import { apiClient } from '@/lib/api-client';
 import { getCurrentPosition } from '@/lib/location';
 import { useAsyncAction } from '@/hooks/use-async-action';
+import { peutCreerLieuAerien } from '@/lib/fiche-vol-access';
 
 export interface StandRemplissageOption {
   id: string;
   numero: string;
   localite: string;
+  equipe_aerienne_id: string | null;
 }
 
 interface StandRemplissageFieldProps {
   value: string | null;
   onChange: (id: string, option: StandRemplissageOption) => void;
   label?: string;
+  /** Équipe aérienne choisie sur la fiche : seuls ses stands sont proposés. Absente : tous. */
+  equipeId?: string | null;
 }
 
 const GREEN = '#235a36';
@@ -38,8 +42,9 @@ const BORDER = '#e7e0cd';
  * texte libre, même principe que la capture GPS des écrans de référence
  * existants (extensive-reference.tsx, traitement/references.tsx).
  */
-export function StandRemplissageField({ value, onChange, label = 'Stand de remplissage' }: StandRemplissageFieldProps) {
+export function StandRemplissageField({ value, onChange, label = 'Stand de remplissage', equipeId }: StandRemplissageFieldProps) {
   const token = useAuthStore((s) => s.token);
+  const peutCreer = peutCreerLieuAerien(useAuthStore((s) => s.user?.role));
   const [stands, setStands] = useState<StandRemplissageOption[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [creation, setCreation] = useState(false);
@@ -56,7 +61,14 @@ export function StandRemplissageField({ value, onChange, label = 'Stand de rempl
       runChargement(
         async () => {
           const resultat = await apiClient.listStandsRemplissage(token!);
-          setStands(resultat.map((s) => ({ id: s.id, numero: s.numero, localite: s.localite })));
+          setStands(
+            resultat.map((s) => ({
+              id: s.id,
+              numero: s.numero,
+              localite: s.localite,
+              equipe_aerienne_id: s.equipe_aerienne_id ?? null,
+            }))
+          );
           setLoaded(true);
         },
         { screen: 'stand-remplissage-field', precondition: !!token }
@@ -80,6 +92,10 @@ export function StandRemplissageField({ value, onChange, label = 'Stand de rempl
       { screen: 'stand-remplissage-field' }
     );
 
+  // Un stand « sans équipe » (antérieur à la migration 0075) n'appartient à personne :
+  // il n'est proposé à aucune équipe tant qu'un admin ne l'a pas rattaché.
+  const standsVisibles = equipeId ? stands.filter((s) => s.equipe_aerienne_id === equipeId) : stands;
+
   const ouvrirCreation = () => {
     setCreation(true);
     if (!position) void capturerPosition();
@@ -95,7 +111,12 @@ export function StandRemplissageField({ value, onChange, label = 'Stand de rempl
           longitude: position?.longitude ?? null,
           altitude: position?.altitude ?? null,
         });
-        const option = { id: cree.id, numero: cree.numero, localite: cree.localite };
+        const option = {
+          id: cree.id,
+          numero: cree.numero,
+          localite: cree.localite,
+          equipe_aerienne_id: cree.equipe_aerienne_id ?? null,
+        };
         setStands((precedents) => [...precedents, option]);
         onChange(cree.id, option);
         setCreation(false);
@@ -123,7 +144,7 @@ export function StandRemplissageField({ value, onChange, label = 'Stand de rempl
 
       {loaded && !creation && (
         <View style={styles.liste}>
-          {stands.map((stand) => (
+          {standsVisibles.map((stand) => (
             <TouchableOpacity
               key={stand.id}
               style={[styles.option, value === stand.id && styles.optionSelectionnee]}
@@ -135,9 +156,11 @@ export function StandRemplissageField({ value, onChange, label = 'Stand de rempl
               </Text>
             </TouchableOpacity>
           ))}
-          <TouchableOpacity style={styles.nouveauLink} onPress={ouvrirCreation} accessibilityRole="button">
-            <Text style={styles.nouveauLinkText}>+ Nouveau stand de remplissage</Text>
-          </TouchableOpacity>
+          {peutCreer && (
+            <TouchableOpacity style={styles.nouveauLink} onPress={ouvrirCreation} accessibilityRole="button">
+              <Text style={styles.nouveauLinkText}>+ Nouveau stand de remplissage</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 

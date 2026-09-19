@@ -24,12 +24,14 @@ from app.domain.fiche_vol import (
     BaseVolIntrouvableError,
     CampagneVolIntrouvableError,
     ChefDeBaseVolInvalideError,
+    EquipeVolIntrouvableError,
     FicheVol,
     FicheVolIntrouvableError,
     FicheVolSyncConflitError,
     FicheVolValideeSyncRejeteError,
     FicheVolVerrouilleeError,
     HeuresVolIncoherentesError,
+    LieuVolHorsEquipeError,
     NumeroFicheVolConflitError,
     ProspectionVolIntrouvableError,
     RotationDejaRapprocheeError,
@@ -97,8 +99,11 @@ async def creer_fiche_vol(
         BaseVolIntrouvableError,
         StandVolIntrouvableError,
         CampagneVolIntrouvableError,
+        EquipeVolIntrouvableError,
     ) as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except LieuVolHorsEquipeError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
     except NumeroFicheVolConflitError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     return _presenter(creee)
@@ -147,8 +152,11 @@ async def sync_fiche_vol(
         BaseVolIntrouvableError,
         StandVolIntrouvableError,
         CampagneVolIntrouvableError,
+        EquipeVolIntrouvableError,
     ) as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except LieuVolHorsEquipeError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
     except NumeroFicheVolConflitError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 

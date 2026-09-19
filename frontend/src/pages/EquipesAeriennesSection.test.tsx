@@ -22,6 +22,12 @@ const EQUIPE_IHOSY = {
   pilote: 'Jean Rakoto',
   mecanicien: 'Paul Andria',
   consultant_international: null as string | null,
+  aeronef: {
+    id: 'aeronef-1',
+    immatriculation: '5R-MJA',
+    societe: 'Heli Madagascar',
+    volume_cuve_l: 800,
+  } as { id: string; immatriculation: string; societe: string; volume_cuve_l: number } | null,
   membres: [] as { id: string; nom: string }[],
   actif: true,
 }
@@ -32,6 +38,7 @@ const EQUIPE_LIBRE = {
   pilote: 'Marc Randria',
   mecanicien: 'Ali Hasan',
   consultant_international: 'John Smith',
+  aeronef: null,
   membres: [{ id: 'm-1', nom: 'Voahangy' }],
   actif: true,
 }
@@ -49,12 +56,12 @@ function mockApi({
   chefs = [CHEF_TOKY, CHEF_LALA],
   equipes = [EQUIPE_IHOSY, EQUIPE_LIBRE],
   bases = [BASE_IHOSY],
-  stands = [] as { id: string; numero: string; localite: string }[],
+  stands = [] as { id: string; numero: string; localite: string; equipe_aerienne_id?: string | null }[],
 }: {
   chefs?: typeof CHEF_TOKY[]
   equipes?: typeof EQUIPE_IHOSY[]
   bases?: typeof BASE_IHOSY[]
-  stands?: { id: string; numero: string; localite: string }[]
+  stands?: { id: string; numero: string; localite: string; equipe_aerienne_id?: string | null }[]
 } = {}) {
   mockedGet.mockImplementation((url: string) => {
     if (url === '/users/chefs-de-base') return Promise.resolve({ data: chefs })
@@ -63,6 +70,12 @@ function mockApi({
     if (url === '/stands-remplissage') return Promise.resolve({ data: stands })
     return Promise.resolve({ data: [] })
   })
+}
+
+function saisirHelicoptere() {
+  fireEvent.change(screen.getByLabelText('Immatriculation *'), { target: { value: '5R-MJA' } })
+  fireEvent.change(screen.getByLabelText('Société *'), { target: { value: 'Heli Madagascar' } })
+  fireEvent.change(screen.getByLabelText('Volume de cuve (L) *'), { target: { value: '800' } })
 }
 
 function renderSection() {
@@ -89,6 +102,9 @@ describe('EquipesAeriennesSection — assigner un chef de base à une base aéri
     expect(screen.getByText('Paul Andria')).toBeInTheDocument()
     expect(screen.getByText('John Smith')).toBeInTheDocument()
     expect(screen.getByText('Voahangy')).toBeInTheDocument()
+    // Hélicoptère de l'équipe : immatriculation, société et volume de cuve.
+    expect(screen.getByText('5R-MJA')).toBeInTheDocument()
+    expect(screen.getByText(/Heli Madagascar \(cuve 800 L\)/)).toBeInTheDocument()
     // Équipe Ihosy ne porte pas de consultant : affiché en repli, pas vide.
     expect(screen.getAllByText('—').length).toBeGreaterThan(0)
   })
@@ -108,6 +124,7 @@ describe('EquipesAeriennesSection — assigner un chef de base à une base aéri
     fireEvent.change(screen.getByLabelText('Chef de base *'), { target: { value: 'chef-2' } })
     fireEvent.change(screen.getByLabelText('Pilote *'), { target: { value: 'Jean Rakoto' } })
     fireEvent.change(screen.getByLabelText('Mécanicien *'), { target: { value: 'Paul Andria' } })
+    saisirHelicoptere()
     fireEvent.click(screen.getByRole('button', { name: 'Créer' }))
 
     await waitFor(() =>
@@ -117,6 +134,7 @@ describe('EquipesAeriennesSection — assigner un chef de base à une base aéri
         pilote: 'Jean Rakoto',
         mecanicien: 'Paul Andria',
         consultant_international: null,
+        aeronef: { immatriculation: '5R-MJA', societe: 'Heli Madagascar', volume_cuve_l: 800 },
         membres: [],
       }),
     )
@@ -161,6 +179,7 @@ describe('EquipesAeriennesSection — assigner un chef de base à une base aéri
     fireEvent.change(screen.getByLabelText('Chef de base *'), { target: { value: 'chef-2' } })
     fireEvent.change(screen.getByLabelText('Pilote *'), { target: { value: 'X' } })
     fireEvent.change(screen.getByLabelText('Mécanicien *'), { target: { value: 'Y' } })
+    saisirHelicoptere()
     fireEvent.click(screen.getByRole('button', { name: 'Créer' }))
 
     await waitFor(() =>
@@ -254,12 +273,44 @@ describe('EquipesAeriennesSection — assigner un chef de base à une base aéri
 
     fireEvent.change(screen.getByLabelText('Numéro *'), { target: { value: 'STD01' } })
     fireEvent.change(screen.getByLabelText('Localité *'), { target: { value: 'Ihosy' } })
+    fireEvent.change(screen.getByLabelText('Équipe *'), { target: { value: 'equipe-1' } })
     fireEvent.click(screen.getByRole('button', { name: 'Créer' }))
 
     await waitFor(() =>
       expect(mockedPost).toHaveBeenCalledWith('/stands-remplissage', {
         numero: 'STD01',
         localite: 'Ihosy',
+        equipe_aerienne_id: 'equipe-1',
+      }),
+    )
+  })
+
+  it("affiche l'équipe propriétaire de chaque stand", async () => {
+    mockApi({
+      stands: [{ id: 'stand-1', numero: 'STD01', localite: 'Ihosy', equipe_aerienne_id: 'equipe-1' }],
+    })
+    renderSection()
+
+    await screen.findByText('STD01')
+    const ligne = screen.getByText('STD01').closest('tr') as HTMLElement
+    expect(within(ligne).getByText('Équipe Ihosy')).toBeInTheDocument()
+  })
+
+  it('rattache à une équipe un stand antérieur à la migration, sans équipe', async () => {
+    mockApi({
+      stands: [{ id: 'stand-0', numero: 'STD00', localite: 'Ancien', equipe_aerienne_id: null }],
+    })
+    mockedPut.mockResolvedValue({ data: {} })
+    renderSection()
+
+    await screen.findByText('STD00')
+    fireEvent.change(screen.getByLabelText('Rattacher le stand STD00 à une équipe'), {
+      target: { value: 'equipe-1' },
+    })
+
+    await waitFor(() =>
+      expect(mockedPut).toHaveBeenCalledWith('/stands-remplissage/stand-0', {
+        equipe_aerienne_id: 'equipe-1',
       }),
     )
   })

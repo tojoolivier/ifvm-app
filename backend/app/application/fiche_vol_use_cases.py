@@ -10,13 +10,16 @@ from datetime import date, datetime
 
 from app.domain.fiche_vol import (
     ChefDeBaseVolInvalideError,
+    EquipeVolIntrouvableError,
     FicheVol,
     FicheVolIntrouvableError,
     FicheVolSyncConflitError,
     FicheVolValideeSyncRejeteError,
     FicheVolVerrouilleeError,
+    LieuVolHorsEquipeError,
     SignatureVol,
     Vol,
+    appliquer_equipe,
     composer_numero_fiche,
     contenu_diverge,
     cumuler_durees,
@@ -39,6 +42,32 @@ def _sans_fuseau(valeur: datetime) -> datetime:
     return valeur.replace(tzinfo=None) if valeur.tzinfo is not None else valeur
 
 
+async def _appliquer_equipe_aerienne(repo, fiche: FicheVol, ecraser_en_tete: bool = True) -> None:
+    """Migration 0075 : quand la fiche désigne une équipe, l'en-tête (chef de base, pilote,
+    mécanicien, consultant, immatriculation, société) vient de l'équipe et le serveur en
+    fait autorité — ce que le client a saisi est écrasé. La base et le stand doivent être
+    ceux de cette équipe. Sans équipe (fiches antérieures, clients mobiles pas encore
+    mis à jour), rien ne change : les valeurs saisies sont conservées.
+
+    `ecraser_en_tete=False` : la fiche existe déjà avec cette même équipe (renvoi de
+    synchro). L'en-tête est un snapshot du jour, jamais recalculé — on ne le réécrit pas
+    si l'équipe a changé de pilote entre-temps ; seuls les lieux restent contrôlés.
+
+    À exécuter AVANT la validation du chef de base : c'est le chef de l'équipe, pas celui
+    que le client aurait envoyé, qui doit avoir le rôle `chef_de_base`."""
+    if fiche.equipe_aerienne_id is None:
+        return
+    if ecraser_en_tete:
+        contexte = await repo.resoudre_equipe(fiche.equipe_aerienne_id)
+        if contexte is None:
+            raise EquipeVolIntrouvableError(str(fiche.equipe_aerienne_id))
+        appliquer_equipe(fiche, contexte)
+    if not await repo.base_appartient_a_equipe(fiche.base_id, fiche.equipe_aerienne_id):
+        raise LieuVolHorsEquipeError("la base choisie n'appartient pas à l'équipe aérienne")
+    if not await repo.stand_appartient_a_equipe(fiche.stand_id, fiche.equipe_aerienne_id):
+        raise LieuVolHorsEquipeError("le stand choisi n'appartient pas à l'équipe aérienne")
+
+
 async def _exiger_brouillon(repo, fiche_vol_id: uuid.UUID) -> FicheVol:
     fiche = await repo.get_by_id(fiche_vol_id)
     if fiche is None:
@@ -56,6 +85,7 @@ class CreateFicheVol:
     utilisateur_repo: object
 
     async def execute(self, fiche: FicheVol) -> FicheVol:
+        await _appliquer_equipe_aerienne(self.repo, fiche)
         chef = await self.utilisateur_repo.get_by_id(fiche.chef_de_base_id)
         if chef is None or chef.role != "chef_de_base":
             raise ChefDeBaseVolInvalideError(str(fiche.chef_de_base_id))
@@ -122,11 +152,20 @@ class SyncPushFicheVol:
     utilisateur_repo: object
 
     async def execute(self, fiche: FicheVol, base_updated_at: datetime) -> tuple[FicheVol, bool]:
+        existante = await self.repo.get_by_id(fiche.id)
+        # Fiche verrouillée : rejet systématique AVANT tout contrôle de contenu (dont
+        # celui de l'équipe, qui pourrait sinon masquer ce 409 par un 422).
+        if existante is not None and existante.statut != "brouillon":
+            raise FicheVolValideeSyncRejeteError(existante)
+        await _appliquer_equipe_aerienne(
+            self.repo,
+            fiche,
+            ecraser_en_tete=existante is None
+            or existante.equipe_aerienne_id != fiche.equipe_aerienne_id,
+        )
         chef = await self.utilisateur_repo.get_by_id(fiche.chef_de_base_id)
         if chef is None or chef.role != "chef_de_base":
             raise ChefDeBaseVolInvalideError(str(fiche.chef_de_base_id))
-
-        existante = await self.repo.get_by_id(fiche.id)
 
         if existante is None:
             # equipe = base_aerienne.numero, résolu avant l'écriture pour composer le
@@ -138,9 +177,6 @@ class SyncPushFicheVol:
             )
             fiche.statut_sync = "synced"
             return await self.repo.create(fiche), True
-
-        if existante.statut != "brouillon":
-            raise FicheVolValideeSyncRejeteError(existante)
 
         if _sans_fuseau(existante.updated_at) > _sans_fuseau(base_updated_at) and contenu_diverge(
             existante, fiche

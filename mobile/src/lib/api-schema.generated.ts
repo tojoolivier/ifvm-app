@@ -468,6 +468,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/aeronefs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Aeronefs */
+        get: operations["list_aeronefs_aeronefs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/aeronefs/{aeronef_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Aeronef */
+        put: operations["update_aeronef_aeronefs__aeronef_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/equipes-terrestres": {
         parameters: {
             query?: never;
@@ -1138,6 +1172,59 @@ export interface components {
          * @enum {string}
          */
         ActionAudit: "creation" | "modification" | "soumission" | "verification" | "validation" | "rejet" | "commentaire";
+        /**
+         * AeronefCreate
+         * @description Aéronef créé avec son équipe (`EquipeAerienneCreate.aeronef`) — pas d'endpoint de
+         *     création isolé : un aéronef n'existe pas sans équipe.
+         */
+        AeronefCreate: {
+            /** Immatriculation */
+            immatriculation: string;
+            /** Societe */
+            societe: string;
+            /** Volume Cuve L */
+            volume_cuve_l: number;
+        };
+        /** AeronefRead */
+        AeronefRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Immatriculation */
+            immatriculation: string;
+            /** Societe */
+            societe: string;
+            /** Volume Cuve L */
+            volume_cuve_l: number;
+            /** Actif */
+            actif: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * AeronefUpdate
+         * @description Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie.
+         */
+        AeronefUpdate: {
+            /** Immatriculation */
+            immatriculation?: string | null;
+            /** Societe */
+            societe?: string | null;
+            /** Volume Cuve L */
+            volume_cuve_l?: number | null;
+            /** Actif */
+            actif?: boolean | null;
+        };
         /** AuditLogRead */
         AuditLogRead: {
             /**
@@ -1821,6 +1908,7 @@ export interface components {
             mecanicien: string;
             /** Consultant International */
             consultant_international?: string | null;
+            aeronef: components["schemas"]["AeronefCreate"];
             /** Membres */
             membres?: components["schemas"]["MembreEquipeAerienneCreate"][];
         };
@@ -1844,6 +1932,9 @@ export interface components {
             mecanicien?: string | null;
             /** Consultant International */
             consultant_international?: string | null;
+            /** Aeronef Id */
+            aeronef_id?: string | null;
+            aeronef?: components["schemas"]["AeronefRead"] | null;
             /** Membres */
             membres?: components["schemas"]["MembreEquipeAerienneRead"][];
             /** Actif */
@@ -1982,6 +2073,8 @@ export interface components {
              * Format: uuid
              */
             chef_de_base_id: string;
+            /** Equipe Aerienne Id */
+            equipe_aerienne_id?: string | null;
             /** Prospection Id */
             prospection_id?: string | null;
             /** Consultant International */
@@ -2069,6 +2162,10 @@ export interface components {
              * Format: uuid
              */
             chef_de_base_id: string;
+            /** Equipe Aerienne Id */
+            equipe_aerienne_id?: string | null;
+            /** Equipe Aerienne Nom */
+            equipe_aerienne_nom?: string | null;
             /** Prospection Id */
             prospection_id?: string | null;
             /** Prospection Numero Fiche */
@@ -2166,6 +2263,8 @@ export interface components {
              * Format: uuid
              */
             chef_de_base_id: string;
+            /** Equipe Aerienne Id */
+            equipe_aerienne_id?: string | null;
             /** Prospection Id */
             prospection_id?: string | null;
             /** Consultant International */
@@ -3718,6 +3817,8 @@ export interface components {
             latitude?: number | null;
             /** Altitude */
             altitude?: number | null;
+            /** Equipe Aerienne Id */
+            equipe_aerienne_id?: string | null;
         };
         /** StandRemplissageRead */
         StandRemplissageRead: {
@@ -3736,6 +3837,8 @@ export interface components {
             latitude: number | null;
             /** Altitude */
             altitude: number | null;
+            /** Equipe Aerienne Id */
+            equipe_aerienne_id?: string | null;
             /** Actif */
             actif: boolean;
             /**
@@ -3764,6 +3867,8 @@ export interface components {
             latitude?: number | null;
             /** Altitude */
             altitude?: number | null;
+            /** Equipe Aerienne Id */
+            equipe_aerienne_id?: string | null;
             /** Actif */
             actif?: boolean | null;
         };
@@ -6103,6 +6208,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EquipeAerienneRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_aeronefs_aeronefs_get: {
+        parameters: {
+            query?: {
+                /** @description Renvoie les aéronefs des deux états — écran d'administration. */
+                inclure_inactifs?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AeronefRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_aeronef_aeronefs__aeronef_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                aeronef_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AeronefUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AeronefRead"];
                 };
             };
             /** @description Validation Error */

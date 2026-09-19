@@ -1,12 +1,14 @@
 /**
- * Écran de création de l'en-tête d'une fiche de vol (#fiche-vol-creation-mobile)
- * — regroupe tous les vols d'un hélicoptère pour une date (ADR-011). Le chef de
- * base n'est plus choisi séparément (#equipe-aerienne) : il est dérivé de la
- * base choisie (base -> équipe -> chef de base).
+ * Écran de création de l'en-tête d'une fiche de vol (#fiche-vol-creation-mobile) —
+ * regroupe tous les vols d'un hélicoptère pour une date (ADR-011).
  *
- * `BaseAerienneField`/`StandRemplissageField` sont mockés : leur propre
- * comportement est déjà couvert par leurs tests dédiés — ce test se concentre
- * sur la logique propre à cet écran (dérivation du chef de base, validation,
+ * L'équipe aérienne se choisit en premier (migration backend 0075) : le chef de base, le
+ * pilote, le mécanicien, le consultant, l'immatriculation et la société de son hélicoptère
+ * s'en déduisent (lecture seule), et seuls ses lieux (base, stand) sont proposés.
+ *
+ * `EquipeAerienneField`/`BaseAerienneField`/`StandRemplissageField` sont mockés : leur
+ * propre comportement est couvert par leurs tests dédiés — ce test se concentre sur la
+ * logique propre à cet écran (déduction de l'en-tête, filtrage des lieux, validation,
  * assemblage du payload, navigation post-création).
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
@@ -26,8 +28,6 @@ jest.mock('expo-router', () => ({
 jest.mock('@/lib/api-client', () => ({
   apiClient: {
     createFicheVol: jest.fn(),
-    listBasesAeriennes: jest.fn(),
-    listEquipesAeriennes: jest.fn(),
     listChefsDeBase: jest.fn(),
   },
 }));
@@ -36,118 +36,180 @@ jest.mock('@/lib/referentiel-db', () => ({
   listCampagnesLocal: jest.fn(),
 }));
 
-let mockBaseOption: Record<string, unknown> = { id: 'base-1', parent_base_id: null, equipe_id: 'equipe-1' };
+const EQUIPE_COMPLETE = {
+  id: 'equipe-1',
+  nom: 'Équipe Ihosy',
+  chef_de_base_id: 'chef-1',
+  pilote: 'Jean Rakoto',
+  mecanicien: 'Paul Andria',
+  consultant_international: 'John Smith',
+  aeronef: { immatriculation: '5R-MJA', societe: 'Heli Madagascar', volume_cuve_l: 800 },
+};
 
-jest.mock('@/components/referentiel/BaseAerienneField', () => {
+// Équipe créée avant les migrations 0072/0075 : ni pilote, ni mécanicien, ni hélicoptère.
+const EQUIPE_ANCIENNE = {
+  id: 'equipe-2',
+  nom: 'Équipe Betroka',
+  chef_de_base_id: 'chef-1',
+  pilote: null,
+  mecanicien: null,
+  consultant_international: null,
+  aeronef: null,
+};
+
+let mockEquipe: Record<string, unknown> = EQUIPE_COMPLETE;
+
+jest.mock('@/components/referentiel/EquipeAerienneField', () => {
   const { TouchableOpacity, Text } = require('react-native');
   return {
-    BaseAerienneField: ({ onChange }: { onChange: (id: string, option: unknown) => void }) => (
-      <TouchableOpacity onPress={() => onChange(mockBaseOption.id as string, mockBaseOption)}>
-        <Text>[mock] choisir base</Text>
+    EquipeAerienneField: ({ onChange }: { onChange: (id: string, option: unknown) => void }) => (
+      <TouchableOpacity onPress={() => onChange(mockEquipe.id as string, mockEquipe)}>
+        <Text>[mock] choisir équipe</Text>
       </TouchableOpacity>
+    ),
+  };
+});
+
+jest.mock('@/components/referentiel/BaseAerienneField', () => {
+  const { TouchableOpacity, Text, View } = require('react-native');
+  return {
+    BaseAerienneField: ({ onChange, equipeId }: { onChange: (id: string) => void; equipeId?: string | null }) => (
+      <View>
+        <Text>{`[mock] bases de ${equipeId}`}</Text>
+        <TouchableOpacity onPress={() => onChange('base-1')}>
+          <Text>[mock] choisir base</Text>
+        </TouchableOpacity>
+      </View>
     ),
   };
 });
 
 jest.mock('@/components/referentiel/StandRemplissageField', () => {
-  const { TouchableOpacity, Text } = require('react-native');
+  const { TouchableOpacity, Text, View } = require('react-native');
   return {
-    StandRemplissageField: ({ onChange }: { onChange: (id: string, option: unknown) => void }) => (
-      <TouchableOpacity onPress={() => onChange('stand-1', { id: 'stand-1' })}>
-        <Text>[mock] choisir stand-1</Text>
-      </TouchableOpacity>
+    StandRemplissageField: ({ onChange, equipeId }: { onChange: (id: string) => void; equipeId?: string | null }) => (
+      <View>
+        <Text>{`[mock] stands de ${equipeId}`}</Text>
+        <TouchableOpacity onPress={() => onChange('stand-1')}>
+          <Text>[mock] choisir stand-1</Text>
+        </TouchableOpacity>
+      </View>
     ),
   };
 });
 
 const CAMPAGNE = { id: 'campagne-1', name: '2026', start_date: '2026-01-01', end_date: null };
-const EQUIPE = { id: 'equipe-1', nom: 'Équipe Ihosy', chef_de_base_id: 'chef-1', actif: true };
 const CHEF = { id: 'chef-1', nom: 'Rabe', prenom: 'Toky', sigle: null };
 
-async function remplirEtSelectionner() {
-  await fireEvent.changeText(screen.getByPlaceholderText('Ex. Madagascar Hélicoptères'), 'Air Test');
-  await fireEvent.changeText(screen.getByPlaceholderText('Ex. 5R-MXY'), '5R-MXY');
-  await fireEvent.changeText(screen.getByPlaceholderText('Nom du pilote'), 'Jean Rakoto');
-  await fireEvent.changeText(screen.getByPlaceholderText('Nom du mécanicien'), 'Paul Rabe');
-  await fireEvent.press(screen.getByText('[mock] choisir base'));
+async function choisirEquipeBaseEtStand() {
+  await fireEvent.press(screen.getByText('[mock] choisir équipe'));
+  await fireEvent.press(await screen.findByText('[mock] choisir base'));
   await fireEvent.press(screen.getByText('[mock] choisir stand-1'));
+  await screen.findByText('Toky Rabe');
 }
 
 describe('FicheVolCreationScreen', () => {
   beforeEach(() => {
     mockReplace.mockClear();
     mockPush.mockClear();
-    mockBaseOption = { id: 'base-1', parent_base_id: null, equipe_id: 'equipe-1' };
+    mockEquipe = EQUIPE_COMPLETE;
     useAuthStore.setState({ token: 'token-test', user: { role: 'chef_de_base' } as any });
     jest.mocked(apiClient.createFicheVol).mockReset();
-    jest.mocked(apiClient.listBasesAeriennes).mockReset().mockResolvedValue([] as any);
-    jest.mocked(apiClient.listEquipesAeriennes).mockReset().mockResolvedValue([EQUIPE] as any);
     jest.mocked(apiClient.listChefsDeBase).mockReset().mockResolvedValue([CHEF] as any);
     jest.mocked(listCampagnesLocal).mockReset().mockResolvedValue([CAMPAGNE] as any);
   });
 
-  it('affiche des erreurs de validation quand les champs requis sont vides', async () => {
+  it("exige l'équipe, la base et le stand avant de créer", async () => {
     await render(<FicheVolCreationScreen />);
 
     await fireEvent.press(screen.getByText('Créer la fiche  ›'));
 
-    await screen.findByText('Renseignez la compagnie.');
-    expect(screen.getByText("Renseignez l'immatriculation.")).toBeVisible();
+    await screen.findByText('Choisissez l’équipe aérienne.');
     expect(screen.getByText('Choisissez une base aérienne.')).toBeVisible();
     expect(screen.getByText('Choisissez un stand de remplissage.')).toBeVisible();
     expect(apiClient.createFicheVol).not.toHaveBeenCalled();
   });
 
-  it('dérive le chef de base depuis la base principale choisie', async () => {
+  it("ne propose ni base ni stand tant qu'aucune équipe n'est choisie", async () => {
     await render(<FicheVolCreationScreen />);
 
-    await fireEvent.press(screen.getByText('[mock] choisir base'));
-
-    await screen.findByText('Toky Rabe');
-    expect(apiClient.listBasesAeriennes).not.toHaveBeenCalled();
+    expect(screen.getByText("Choisissez l'équipe aérienne pour voir ses bases et ses stands.")).toBeVisible();
+    expect(screen.queryByText('[mock] choisir base')).toBeNull();
+    expect(screen.queryByText('[mock] choisir stand-1')).toBeNull();
   });
 
-  it('dérive le chef de base depuis la base principale de la base secondaire choisie', async () => {
-    mockBaseOption = { id: 'base-2', parent_base_id: 'base-1', equipe_id: null };
-    jest.mocked(apiClient.listBasesAeriennes).mockResolvedValue([
-      { id: 'base-1', numero: 'IHO01', localite: 'Ihosy', parent_base_id: null, equipe_id: 'equipe-1' },
-    ] as any);
-
+  it("déduit l'en-tête de l'équipe choisie, en lecture seule", async () => {
     await render(<FicheVolCreationScreen />);
-    await fireEvent.press(screen.getByText('[mock] choisir base'));
 
-    await waitFor(() => expect(apiClient.listBasesAeriennes).toHaveBeenCalled());
-    await screen.findByText('Toky Rabe');
+    await fireEvent.press(screen.getByText('[mock] choisir équipe'));
+
+    await screen.findByText('Toky Rabe'); // chef de base, résolu depuis l'équipe
+    expect(screen.getByText('Jean Rakoto')).toBeVisible();
+    expect(screen.getByText('Paul Andria')).toBeVisible();
+    expect(screen.getByText('John Smith')).toBeVisible();
+    expect(screen.getByText('5R-MJA')).toBeVisible();
+    expect(screen.getByText('Heli Madagascar')).toBeVisible();
+    expect(screen.getByText('800 L')).toBeVisible();
+    // Rien à saisir : le serveur fait autorité, le mobile n'affiche que le résultat.
+    expect(screen.queryByPlaceholderText(/Pilote/)).toBeNull();
+    expect(screen.queryByPlaceholderText(/Immatriculation/)).toBeNull();
   });
 
-  it('crée la fiche de vol avec la campagne en cours et navigue vers le récapitulatif', async () => {
+  it("ne propose que les lieux de l'équipe choisie", async () => {
+    await render(<FicheVolCreationScreen />);
+
+    await fireEvent.press(screen.getByText('[mock] choisir équipe'));
+
+    await screen.findByText('[mock] bases de equipe-1');
+    expect(screen.getByText('[mock] stands de equipe-1')).toBeVisible();
+  });
+
+  it("efface la base et le stand choisis quand l'équipe change", async () => {
+    await render(<FicheVolCreationScreen />);
+    await choisirEquipeBaseEtStand();
+
+    // Autre équipe : ses lieux diffèrent, les choix précédents ne valent plus.
+    mockEquipe = EQUIPE_ANCIENNE;
+    await fireEvent.press(screen.getByText('[mock] choisir équipe'));
+    await fireEvent.changeText(screen.getByPlaceholderText(/Pilote/), 'P');
+    await fireEvent.changeText(screen.getByPlaceholderText(/Mécanicien/), 'M');
+    await fireEvent.changeText(screen.getByPlaceholderText(/Immatriculation/), '5R-X');
+    await fireEvent.changeText(screen.getByPlaceholderText('Compagnie'), 'Air Test');
+    await fireEvent.press(screen.getByText('Créer la fiche  ›'));
+
+    await screen.findByText('Choisissez une base aérienne.');
+    expect(screen.getByText('Choisissez un stand de remplissage.')).toBeVisible();
+    expect(apiClient.createFicheVol).not.toHaveBeenCalled();
+  });
+
+  it("crée la fiche avec l'en-tête de l'équipe et navigue vers le récapitulatif", async () => {
     jest.mocked(apiClient.createFicheVol).mockResolvedValue({
       id: 'fiche-1',
-      numero_fiche: '001-2026-09-16-EQ-5R-MXY',
+      numero_fiche: '001-2026-09-16-EQ-5RMJA',
       date_vol: '2026-09-16',
-      immatriculation: '5R-MXY',
-      compagnie: 'Air Test',
+      immatriculation: '5R-MJA',
+      compagnie: 'Heli Madagascar',
     } as any);
 
     await render(<FicheVolCreationScreen />);
-    await remplirEtSelectionner();
-    await screen.findByText('Toky Rabe');
+    await choisirEquipeBaseEtStand();
 
     await fireEvent.press(screen.getByText('Créer la fiche  ›'));
 
     await waitFor(() =>
       expect(apiClient.createFicheVol).toHaveBeenCalledWith('token-test', {
         date_vol: expect.any(String),
-        compagnie: 'Air Test',
-        immatriculation: '5R-MXY',
+        compagnie: 'Heli Madagascar',
+        immatriculation: '5R-MJA',
         campagne_id: 'campagne-1',
         base_id: 'base-1',
         stand_id: 'stand-1',
         pilote: 'Jean Rakoto',
-        mecanicien: 'Paul Rabe',
+        mecanicien: 'Paul Andria',
         chef_de_base_id: 'chef-1',
+        equipe_aerienne_id: 'equipe-1',
         prospection_id: null,
-        consultant_international: null,
+        consultant_international: 'John Smith',
         pesticide_nom_commercial: null,
         pesticide_quantite_disponible: null,
         pesticide_quantite_recue: null,
@@ -170,12 +232,42 @@ describe('FicheVolCreationScreen', () => {
     );
   });
 
+  it("garde les champs saisissables quand l'équipe n'a ni pilote, ni mécanicien, ni hélicoptère", async () => {
+    mockEquipe = EQUIPE_ANCIENNE;
+    jest.mocked(apiClient.createFicheVol).mockResolvedValue({ id: 'fiche-2' } as any);
+
+    await render(<FicheVolCreationScreen />);
+    await fireEvent.press(screen.getByText('[mock] choisir équipe'));
+    await fireEvent.press(await screen.findByText('[mock] choisir base'));
+    await fireEvent.press(screen.getByText('[mock] choisir stand-1'));
+    await fireEvent.changeText(screen.getByPlaceholderText(/Pilote/), 'Jean Rakoto');
+    await fireEvent.changeText(screen.getByPlaceholderText(/Mécanicien/), 'Paul Rabe');
+    await fireEvent.changeText(screen.getByPlaceholderText(/Immatriculation/), '5R-MXY');
+    await fireEvent.changeText(screen.getByPlaceholderText('Compagnie'), 'Air Test');
+
+    await fireEvent.press(screen.getByText('Créer la fiche  ›'));
+
+    await waitFor(() =>
+      expect(apiClient.createFicheVol).toHaveBeenCalledWith(
+        'token-test',
+        expect.objectContaining({
+          compagnie: 'Air Test',
+          immatriculation: '5R-MXY',
+          pilote: 'Jean Rakoto',
+          mecanicien: 'Paul Rabe',
+          chef_de_base_id: 'chef-1',
+          equipe_aerienne_id: 'equipe-2',
+          consultant_international: null,
+        })
+      )
+    );
+  });
+
   it("bloque la création quand aucune campagne n'est disponible hors-ligne", async () => {
     jest.mocked(listCampagnesLocal).mockResolvedValue([]);
 
     await render(<FicheVolCreationScreen />);
-    await remplirEtSelectionner();
-    await screen.findByText('Toky Rabe');
+    await choisirEquipeBaseEtStand();
 
     await fireEvent.press(screen.getByText('Créer la fiche  ›'));
 
@@ -191,6 +283,6 @@ describe('FicheVolCreationScreen', () => {
     await render(<FicheVolCreationScreen />);
 
     await screen.findByText('Accès réservé');
-    expect(screen.queryByPlaceholderText('Ex. Madagascar Hélicoptères')).toBeNull();
+    expect(screen.queryByText('[mock] choisir équipe')).toBeNull();
   });
 });

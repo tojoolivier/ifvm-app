@@ -9,8 +9,9 @@ import { pickCurrentCampagneId } from '@/lib/prospection-accueil';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { ReferentialError } from '@/lib/errors';
 import { DateField } from '@/components/DateField';
-import { BaseAerienneField, type BaseAerienneOption } from '@/components/referentiel/BaseAerienneField';
-import { StandRemplissageField, type StandRemplissageOption } from '@/components/referentiel/StandRemplissageField';
+import { BaseAerienneField } from '@/components/referentiel/BaseAerienneField';
+import { StandRemplissageField } from '@/components/referentiel/StandRemplissageField';
+import { EquipeAerienneField, type EquipeAerienneOption } from '@/components/referentiel/EquipeAerienneField';
 import { ProspectionValideeField, type ProspectionValideeOption } from '@/components/referentiel/ProspectionValideeField';
 import { peutSaisirFicheVol } from '@/lib/fiche-vol-access';
 import { AccesRestreint } from '@/components/fiche-vol/AccesRestreint';
@@ -29,10 +30,16 @@ function todayIso(): string {
 /**
  * En-tête d'une fiche de vol (#fiche-vol-creation-mobile) — une fiche de vol
  * regroupe tous les vols d'un hélicoptère pour une date donnée (ADR-011) ;
- * cet écran ne crée que l'en-tête (équipage, base de rattachement,
- * hélicoptère) : la saisie des vols eux-mêmes (chrono, MEP/Application/
- * Prospection, Convoyage/Divers) continue ensuite sur l'écran de
+ * cet écran ne crée que l'en-tête : la saisie des vols eux-mêmes (chrono,
+ * MEP/Application/Prospection, Convoyage/Divers) continue ensuite sur l'écran de
  * récapitulatif (`(fiche-vol)/recap.tsx`).
+ *
+ * L'équipe aérienne se choisit en premier (migration backend 0075) : le chef de base,
+ * le pilote, le mécanicien, le consultant, l'immatriculation et la société de son
+ * hélicoptère s'en déduisent — affichés en lecture seule, le serveur en fait autorité —
+ * et seuls les lieux (base, stand) de cette équipe sont proposés. Une équipe créée avant
+ * cette évolution peut manquer de pilote/mécanicien/hélicoptère : ces seuls champs
+ * restent alors saisissables.
  *
  * Création en ligne uniquement, comme `BaseAerienneField`/`StandRemplissageField`
  * — pas de `syncPush` ici : `numero_fiche` est généré côté serveur.
@@ -49,6 +56,7 @@ export default function FicheVolCreationScreen() {
   const { run, isRunning: isSaving } = useAsyncAction();
 
   const [dateVol, setDateVol] = useState<string | null>(todayIso());
+  // Saisies de repli, utilisées seulement si l'équipe ne fournit pas la valeur.
   const [compagnie, setCompagnie] = useState('');
   const [immatriculation, setImmatriculation] = useState('');
   const [pilote, setPilote] = useState('');
@@ -66,57 +74,52 @@ export default function FicheVolCreationScreen() {
   const [futsPleins, setFutsPleins] = useState('');
   const [futsVides, setFutsVides] = useState('');
 
+  const [equipe, setEquipe] = useState<EquipeAerienneOption | null>(null);
   const [baseId, setBaseId] = useState<string | null>(null);
   const [standId, setStandId] = useState<string | null>(null);
-  // #equipe-aerienne : le chef de base n'est plus choisi séparément — il est
-  // dérivé de la base choisie (base -> équipe -> chef de base), puisqu'une
-  // équipe aérienne = un chef de base = une base principale (migration 0066).
-  const [chefDeBaseId, setChefDeBaseId] = useState<string | null>(null);
   const [chefDeBaseNom, setChefDeBaseNom] = useState<string | null>(null);
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const { run: runChef, isRunning: isChefLoading } = useAsyncAction();
 
-  const onChangeBase = (id: string, option: BaseAerienneOption) => {
-    setBaseId(id);
-    setChefDeBaseId(null);
+  // Une nouvelle équipe change les lieux proposés : la base et le stand déjà choisis
+  // appartenaient à l'ancienne, on les efface plutôt que de les laisser incohérents.
+  const onChangeEquipe = (id: string, option: EquipeAerienneOption) => {
+    if (equipe?.id !== id) {
+      setBaseId(null);
+      setStandId(null);
+    }
+    setEquipe(option);
     setChefDeBaseNom(null);
     void runChef(
       async () => {
-        const equipeId =
-          option.parent_base_id === null
-            ? option.equipe_id
-            : (await apiClient.listBasesAeriennes(token!)).find((b) => b.id === option.parent_base_id)
-                ?.equipe_id ?? null;
-        if (!equipeId) {
-          throw new ReferentialError("Cette base n'a pas d'équipe aérienne rattachée.");
-        }
-        const equipe = (await apiClient.listEquipesAeriennes(token!)).find((e) => e.id === equipeId);
-        if (!equipe) {
-          throw new ReferentialError('Équipe aérienne introuvable pour cette base.');
-        }
-        const chef = (await apiClient.listChefsDeBase(token!)).find((c) => c.id === equipe.chef_de_base_id);
-        setChefDeBaseId(equipe.chef_de_base_id);
-        setChefDeBaseNom(chef ? `${chef.prenom} ${chef.nom}` : equipe.chef_de_base_id);
+        const chef = (await apiClient.listChefsDeBase(token!)).find((c) => c.id === option.chef_de_base_id);
+        setChefDeBaseNom(chef ? `${chef.prenom} ${chef.nom}` : option.chef_de_base_id);
       },
       { screen: 'fiche-vol-creation', precondition: !!token }
     );
   };
-  const onChangeStand = (id: string, _option: StandRemplissageOption) => setStandId(id);
+  const onChangeBase = (id: string) => setBaseId(id);
+  const onChangeStand = (id: string) => setStandId(id);
   const onChangeProspection = (id: string | null, _option: ProspectionValideeOption | null) => setProspectionId(id);
+
+  // Valeur de l'équipe quand elle en fournit une, saisie de repli sinon.
+  const piloteEffectif = equipe?.pilote || pilote.trim();
+  const mecanicienEffectif = equipe?.mecanicien || mecanicien.trim();
+  const immatriculationEffective = equipe?.aeronef?.immatriculation || immatriculation.trim();
+  const compagnieEffective = equipe?.aeronef?.societe || compagnie.trim();
+  const consultantEffectif = equipe?.consultant_international || consultantInternational.trim() || null;
 
   const submit = () => {
     const errors: Record<string, string> = {};
     if (!dateVol) errors.dateVol = 'Renseignez la date du vol.';
-    if (!compagnie.trim()) errors.compagnie = 'Renseignez la compagnie.';
-    if (!immatriculation.trim()) errors.immatriculation = "Renseignez l'immatriculation.";
-    if (!pilote.trim()) errors.pilote = 'Renseignez le pilote.';
-    if (!mecanicien.trim()) errors.mecanicien = 'Renseignez le mécanicien.';
+    if (!equipe) errors.equipe = 'Choisissez l’équipe aérienne.';
+    if (equipe && !compagnieEffective) errors.compagnie = 'Renseignez la compagnie.';
+    if (equipe && !immatriculationEffective) errors.immatriculation = "Renseignez l'immatriculation.";
+    if (equipe && !piloteEffectif) errors.pilote = 'Renseignez le pilote.';
+    if (equipe && !mecanicienEffectif) errors.mecanicien = 'Renseignez le mécanicien.';
     if (!baseId) errors.baseId = 'Choisissez une base aérienne.';
     if (!standId) errors.standId = 'Choisissez un stand de remplissage.';
-    if (baseId && !chefDeBaseId) {
-      errors.chefDeBaseId = 'Le chef de base de cette base est introuvable — vérifiez son équipe aérienne.';
-    }
     setFormErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
@@ -129,16 +132,17 @@ export default function FicheVolCreationScreen() {
         }
         const fiche = await apiClient.createFicheVol(token!, {
           date_vol: dateVol!,
-          compagnie: compagnie.trim(),
-          immatriculation: immatriculation.trim(),
+          compagnie: compagnieEffective,
+          immatriculation: immatriculationEffective,
           campagne_id: campagneId,
           base_id: baseId!,
           stand_id: standId!,
-          pilote: pilote.trim(),
-          mecanicien: mecanicien.trim(),
-          chef_de_base_id: chefDeBaseId!,
+          pilote: piloteEffectif,
+          mecanicien: mecanicienEffectif,
+          chef_de_base_id: equipe!.chef_de_base_id,
+          equipe_aerienne_id: equipe!.id,
           prospection_id: prospectionId,
-          consultant_international: consultantInternational.trim() || null,
+          consultant_international: consultantEffectif,
           pesticide_nom_commercial: pesticideNomCommercial.trim() || null,
           pesticide_quantite_disponible:
             pesticideQuantiteDisponible.trim() !== '' ? parseFloat(pesticideQuantiteDisponible) : null,
@@ -162,7 +166,7 @@ export default function FicheVolCreationScreen() {
         screen: 'fiche-vol-creation',
         precondition: !!token,
         preconditionMessage: 'Session expirée — reconnectez-vous pour créer une fiche.',
-        context: { baseId, standId, chefDeBaseId },
+        context: { equipeId: equipe?.id, baseId, standId },
       }
     );
   };
@@ -198,76 +202,117 @@ export default function FicheVolCreationScreen() {
               <DateField value={dateVol} onChange={setDateVol} />
             </View>
 
-            <View style={styles.card}>
-              <Text style={styles.label}>Compagnie</Text>
-              <TextInput
-                value={compagnie}
-                onChangeText={setCompagnie}
-                placeholder="Ex. Madagascar Hélicoptères"
-                placeholderTextColor={TEXT_SECONDARY}
-                style={styles.input}
-              />
-            </View>
+            <EquipeAerienneField value={equipe?.id ?? null} onChange={onChangeEquipe} />
 
-            <View style={styles.card}>
-              <Text style={styles.label}>Immatriculation</Text>
-              <TextInput
-                value={immatriculation}
-                onChangeText={setImmatriculation}
-                placeholder="Ex. 5R-MXY"
-                placeholderTextColor={TEXT_SECONDARY}
-                autoCapitalize="characters"
-                style={styles.input}
-              />
-            </View>
+            {equipe && (
+              <View style={styles.card}>
+                <Text style={styles.label}>Équipage et hélicoptère (repris de l&apos;équipe)</Text>
 
-            <BaseAerienneField value={baseId} onChange={onChangeBase} />
-            <StandRemplissageField value={standId} onChange={onChangeStand} />
-            <ProspectionValideeField value={prospectionId} onChange={onChangeProspection} />
+                <View style={styles.ligneInfo}>
+                  <Text style={styles.sousLabel}>Chef de base</Text>
+                  {isChefLoading ? (
+                    <ActivityIndicator color={GREEN} />
+                  ) : (
+                    <Text style={styles.chefDeBaseValue}>{chefDeBaseNom ?? '—'}</Text>
+                  )}
+                </View>
 
-            <View style={styles.card}>
-              <Text style={styles.label}>Chef de base</Text>
-              {isChefLoading ? (
-                <ActivityIndicator color={GREEN} />
-              ) : (
+                {equipe.pilote ? (
+                  <View style={styles.ligneInfo}>
+                    <Text style={styles.sousLabel}>Pilote</Text>
+                    <Text style={styles.chefDeBaseValue}>{equipe.pilote}</Text>
+                  </View>
+                ) : (
+                  <TextInput
+                    value={pilote}
+                    onChangeText={setPilote}
+                    placeholder="Pilote (non renseigné sur l'équipe)"
+                    placeholderTextColor={TEXT_SECONDARY}
+                    style={styles.input}
+                  />
+                )}
+
+                {equipe.mecanicien ? (
+                  <View style={styles.ligneInfo}>
+                    <Text style={styles.sousLabel}>Mécanicien</Text>
+                    <Text style={styles.chefDeBaseValue}>{equipe.mecanicien}</Text>
+                  </View>
+                ) : (
+                  <TextInput
+                    value={mecanicien}
+                    onChangeText={setMecanicien}
+                    placeholder="Mécanicien (non renseigné sur l'équipe)"
+                    placeholderTextColor={TEXT_SECONDARY}
+                    style={styles.input}
+                  />
+                )}
+
+                {equipe.consultant_international ? (
+                  <View style={styles.ligneInfo}>
+                    <Text style={styles.sousLabel}>Consultant international</Text>
+                    <Text style={styles.chefDeBaseValue}>{equipe.consultant_international}</Text>
+                  </View>
+                ) : (
+                  <TextInput
+                    value={consultantInternational}
+                    onChangeText={setConsultantInternational}
+                    placeholder="Consultant international, si présent (facultatif)"
+                    placeholderTextColor={TEXT_SECONDARY}
+                    style={styles.input}
+                  />
+                )}
+
+                {equipe.aeronef ? (
+                  <>
+                    <View style={styles.ligneInfo}>
+                      <Text style={styles.sousLabel}>Immatriculation</Text>
+                      <Text style={styles.chefDeBaseValue}>{equipe.aeronef.immatriculation}</Text>
+                    </View>
+                    <View style={styles.ligneInfo}>
+                      <Text style={styles.sousLabel}>Société</Text>
+                      <Text style={styles.chefDeBaseValue}>{equipe.aeronef.societe}</Text>
+                    </View>
+                    <View style={styles.ligneInfo}>
+                      <Text style={styles.sousLabel}>Volume de cuve</Text>
+                      <Text style={styles.chefDeBaseValue}>{equipe.aeronef.volume_cuve_l} L</Text>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <TextInput
+                      value={immatriculation}
+                      onChangeText={setImmatriculation}
+                      placeholder="Immatriculation (aucun hélicoptère sur l'équipe)"
+                      placeholderTextColor={TEXT_SECONDARY}
+                      autoCapitalize="characters"
+                      style={styles.input}
+                    />
+                    <TextInput
+                      value={compagnie}
+                      onChangeText={setCompagnie}
+                      placeholder="Compagnie"
+                      placeholderTextColor={TEXT_SECONDARY}
+                      style={styles.input}
+                    />
+                  </>
+                )}
+              </View>
+            )}
+
+            {equipe ? (
+              <>
+                <BaseAerienneField value={baseId} onChange={onChangeBase} equipeId={equipe.id} />
+                <StandRemplissageField value={standId} onChange={onChangeStand} equipeId={equipe.id} />
+              </>
+            ) : (
+              <View style={styles.card}>
+                <Text style={styles.label}>Base et stand</Text>
                 <Text style={styles.chefDeBaseValue}>
-                  {chefDeBaseNom ?? 'Choisissez une base pour déterminer le chef de base'}
+                  Choisissez l&apos;équipe aérienne pour voir ses bases et ses stands.
                 </Text>
-              )}
-            </View>
-
-            <View style={styles.card}>
-              <Text style={styles.label}>Pilote</Text>
-              <TextInput
-                value={pilote}
-                onChangeText={setPilote}
-                placeholder="Nom du pilote"
-                placeholderTextColor={TEXT_SECONDARY}
-                style={styles.input}
-              />
-            </View>
-
-            <View style={styles.card}>
-              <Text style={styles.label}>Mécanicien</Text>
-              <TextInput
-                value={mecanicien}
-                onChangeText={setMecanicien}
-                placeholder="Nom du mécanicien"
-                placeholderTextColor={TEXT_SECONDARY}
-                style={styles.input}
-              />
-            </View>
-
-            <View style={styles.card}>
-              <Text style={styles.label}>Consultant international (facultatif)</Text>
-              <TextInput
-                value={consultantInternational}
-                onChangeText={setConsultantInternational}
-                placeholder="Nom, si présent"
-                placeholderTextColor={TEXT_SECONDARY}
-                style={styles.input}
-              />
-            </View>
+              </View>
+            )}
+            <ProspectionValideeField value={prospectionId} onChange={onChangeProspection} />
 
             <View style={styles.card}>
               <Text style={styles.label}>Pesticide — nom commercial (facultatif)</Text>
@@ -414,6 +459,7 @@ const styles = StyleSheet.create({
   rowInputItem: { flex: 1, gap: 4 },
   sousLabel: { fontSize: 9, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase' },
   chefDeBaseValue: { fontSize: 13, fontWeight: '600', color: TEXT },
+  ligneInfo: { gap: 2 },
   errorText: { color: '#c0412b', fontSize: 11, marginBottom: 4 },
   footer: { paddingHorizontal: 16, paddingTop: 12, backgroundColor: BG },
   continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },

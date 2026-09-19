@@ -10,6 +10,7 @@ from sqlalchemy import (
     Index,
     Integer,
     Numeric,
+    String,
     Text,
     UniqueConstraint,
 )
@@ -163,6 +164,29 @@ class LieuAerienModel(Base):
     )
 
 
+class AeronefModel(Base):
+    """Hélicoptère d'une équipe aérienne (migration 0075) : `immatriculation` en est la
+    clé candidate, `societe` (exploitant) et `volume_cuve_l` en dépendent — d'où une
+    table à part plutôt que trois colonnes sur `equipe_aerienne` (dépendance transitive
+    équipe → immatriculation → société). Affecté à au plus une équipe
+    (`EquipeAerienneModel.aeronef_id` UNIQUE)."""
+
+    __tablename__ = "aeronef"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    immatriculation: Mapped[str] = mapped_column(String(20), nullable=False)
+    societe: Mapped[str] = mapped_column(Text(), nullable=False)
+    volume_cuve_l: Mapped[float] = mapped_column(Numeric(8, 2), nullable=False)
+    actif: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("immatriculation", name="uq_aeronef_immatriculation"),
+        CheckConstraint("volume_cuve_l > 0", name="ck_aeronef_volume_cuve_positif"),
+    )
+
+
 class EquipeAerienneModel(Base):
     """Équipe aérienne (#equipe-aerienne, migration 0066) : une équipe = un chef de
     base (`chef_de_base_id` UNIQUE) = une base aérienne principale
@@ -190,6 +214,9 @@ class EquipeAerienneModel(Base):
     pilote: Mapped[str | None] = mapped_column(Text(), nullable=True)
     mecanicien: Mapped[str | None] = mapped_column(Text(), nullable=True)
     consultant_international: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    # Hélicoptère de l'équipe (migration 0075) : 1:1 (UNIQUE), nullable pour les
+    # équipes créées avant cette migration ; exigé par `EquipeAerienneCreate`.
+    aeronef_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     actif: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
@@ -199,6 +226,7 @@ class EquipeAerienneModel(Base):
         cascade="all, delete-orphan",
         order_by="EquipeAerienneMembreModel.created_at",
     )
+    aeronef: Mapped["AeronefModel | None"] = relationship()
 
     # Noms de contraintes explicites — doivent matcher la migration 0066 à
     # l'identique : `_traduire_integrite` (referentiel_sync_repository.py) et
@@ -212,6 +240,13 @@ class EquipeAerienneModel(Base):
             ondelete="RESTRICT",
         ),
         UniqueConstraint("chef_de_base_id", name="uq_equipe_aerienne_chef_de_base_id"),
+        ForeignKeyConstraint(
+            ["aeronef_id"],
+            ["aeronef.id"],
+            name="fk_equipe_aerienne_aeronef_id",
+            ondelete="RESTRICT",
+        ),
+        UniqueConstraint("aeronef_id", name="uq_equipe_aerienne_aeronef_id"),
     )
 
 
@@ -354,7 +389,12 @@ class BaseAerienneModel(Base):
 
 class StandRemplissageModel(Base):
     """Stand de remplissage de la fiche de vol — même forme que `BaseAerienneModel`,
-    sans hiérarchie."""
+    sans hiérarchie.
+
+    `equipe_aerienne_id` (migration 0075) : équipe propriétaire du stand. Sans UNIQUE —
+    une équipe possède plusieurs stands, contrairement à sa base principale. Nullable :
+    les stands antérieurs restent « sans équipe » jusqu'à rattachement manuel ; exigé à
+    la création côté application."""
 
     __tablename__ = "stand_remplissage"
 
@@ -364,9 +404,21 @@ class StandRemplissageModel(Base):
     longitude: Mapped[float | None] = mapped_column(Numeric(11, 8), nullable=True)
     latitude: Mapped[float | None] = mapped_column(Numeric(10, 8), nullable=True)
     altitude: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
+    equipe_aerienne_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     actif: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+
+    # Nom explicite, identique à la migration 0075 : le dépôt s'en sert pour distinguer
+    # une équipe inexistante d'un doublon de `numero`.
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["equipe_aerienne_id"],
+            ["equipe_aerienne.id"],
+            name="fk_stand_remplissage_equipe_aerienne_id",
+            ondelete="RESTRICT",
+        ),
+    )
 
 
 class PesticideModel(Base):
