@@ -2298,3 +2298,80 @@ async def test_sync_renvoi_remplace_les_evaluations_risque_population(
     # Relecture indépendante : la liste remplacée est bien celle persistée.
     relu = await client.get(f"/traitements/{fiche_id}", headers=auth_headers)
     assert len(relu.json()["evaluations_risque_population"]) == 2
+
+
+# ==========================================
+# GET /traitements/{id}/pdf — génération CRT (#495)
+# ==========================================
+
+
+@pytest.mark.asyncio
+async def test_get_traitement_pdf_inexistant_404(client, auth_headers, db_engine):
+    resp = await client.get(f"/traitements/{uuid.uuid4()}/pdf", headers=auth_headers)
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_get_traitement_pdf_brouillon_403(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+):
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    resp = await client.get(f"/traitements/{traitement_id}/pdf", headers=auth_headers)
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_get_traitement_pdf_aerien_valide_200(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_rotation
+):
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    await client.post(
+        f"/traitements/{traitement_id}/rotations", json=payload_rotation(), headers=auth_headers
+    )
+    valider = await client.post(
+        f"/traitements/{traitement_id}/valider",
+        json={
+            "date_validation": "2026-08-11",
+            "signatures": [
+                {"role": "PILOTE", "signataire_nom": "J. Dupont"},
+                {"role": "MECANICIEN", "signataire_nom": "M. Rabe"},
+                {"role": "CHEF_DE_BASE", "signataire_nom": "Hery Andria"},
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert valider.status_code == 200, valider.text
+    numero_fiche = valider.json()["numero_fiche"]
+
+    resp = await client.get(f"/traitements/{traitement_id}/pdf", headers=auth_headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["content-type"] == "application/pdf"
+    assert f"fiche-crt-{numero_fiche}.pdf" in resp.headers["content-disposition"]
+    assert resp.content.startswith(b"%PDF-")
+
+
+@pytest.mark.asyncio
+async def test_get_traitement_pdf_terrestre_valide_200(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+):
+    traitement_id = await _creer_traitement_terrestre(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
+    )
+    valider = await client.post(
+        f"/traitements/{traitement_id}/valider",
+        json={
+            "date_validation": "2026-08-11",
+            "signatures": [{"role": "CHEF_EQUIPE", "signataire_nom": "Hery"}],
+        },
+        headers=auth_headers,
+    )
+    assert valider.status_code == 200, valider.text
+
+    resp = await client.get(f"/traitements/{traitement_id}/pdf", headers=auth_headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["content-type"] == "application/pdf"
+    assert resp.content.startswith(b"%PDF-")
