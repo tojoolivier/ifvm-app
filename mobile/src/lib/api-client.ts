@@ -239,6 +239,12 @@ export type ProspectionCreateInput =
 
 export interface ProspectionCreateResponse {
   id: string;
+  // #revalidation-sync-lien-perdu : le serveur peut renvoyer statut='validee'
+  // dès la création (revalide_de_id fourni, cf. CreateProspection.execute) —
+  // sans ces deux champs, le client n'aurait aucun moyen de le savoir avant
+  // sa prochaine lecture de "Mes prospections"/"Mes fiches".
+  statut: string;
+  validated_at: string | null;
 }
 
 export type PopulationRead =
