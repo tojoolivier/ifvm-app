@@ -20,6 +20,11 @@ export interface DraftProspectionInput {
   typeProspection: TypeProspection;
   campagneId: string;
   prospecteurId: string;
+  /** Nom résolu de l'agent connecté (#fiches-disponibles-hors-ligne), fourni par
+   * l'appelant (auth-store) — même convention "Prénom Nom" que le serveur
+   * (`_resoudre_noms`). Facultatif : une fiche créée avant ce champ, ou sans
+   * profil chargé, reste à `null` — `createDraftProspection` ne l'exige pas. */
+  prospecteurNom?: string | null;
   dateProspection: string;
   stationId?: string | null;
   latitude?: number | null;
@@ -445,16 +450,17 @@ export async function createDraftProspection(input: DraftProspectionInput): Prom
 
   await db.runAsync(
     `INSERT INTO prospection (
-      id, type_prospection, campagne_id, prospecteur_id, station_id,
+      id, type_prospection, campagne_id, prospecteur_id, prospecteur_nom, station_id,
       biotope, region, district, commune, za, pa_code,
       date_prospection, latitude, longitude, altitude,
       surface_station, surface_prospectee, surface_infestee,
       signalement_source, signalement_date, signalement_description,
       mode_extensif,
       statut, statut_sync, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'brouillon', 'local', ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'brouillon', 'local', ?, ?)`,
     [
-      input.id, input.typeProspection, input.campagneId, input.prospecteurId, input.stationId ?? null,
+      input.id, input.typeProspection, input.campagneId, input.prospecteurId, input.prospecteurNom ?? null,
+      input.stationId ?? null,
       input.biotope ?? null, input.region ?? null, input.district ?? null, input.commune ?? null,
       input.za ?? null, input.pa_code ?? null, input.dateProspection,
       input.latitude ?? null, input.longitude ?? null, input.altitude ?? null,

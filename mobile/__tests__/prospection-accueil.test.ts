@@ -15,6 +15,16 @@ import {
   DraftProspection,
 } from '../src/lib/prospection-repository';
 import { listCampagnesLocal } from '../src/lib/referentiel-db';
+
+// `auth-store.ts` importe `storage.ts` -> `expo-secure-store`, qui tire
+// `react-native` (non transformé dans ce projet Jest "logic") — jamais un
+// souci tant que rien ne l'importait ; `startNewProspection` en a désormais
+// besoin (#fiches-disponibles-hors-ligne), d'où ce mock minimal plutôt que le
+// vrai module.
+const mockAuthState: { user: { nom: string; prenom: string } | null } = { user: null };
+jest.mock('../src/lib/auth-store', () => ({
+  useAuthStore: { getState: () => mockAuthState },
+}));
 import {
   NetworkError,
   PreconditionError,
@@ -162,6 +172,7 @@ const STORED_ROW: DraftProspection = {
 
 beforeEach(() => {
   jest.resetAllMocks();
+  mockAuthState.user = null;
 });
 
 describe('loadAccueilData', () => {
@@ -251,6 +262,34 @@ describe('startNewProspection', () => {
         typeProspection: 'intensive',
       })
     );
+  });
+
+  it('#fiches-disponibles-hors-ligne : fige le nom de l’agent connecté ("Prénom Nom")', async () => {
+    mockListCampagnesLocal.mockResolvedValueOnce([
+      { id: 'current', name: 'En cours', start_date: '2020-01-01', end_date: null },
+    ]);
+    mockCreateDraft.mockResolvedValueOnce(STORED_ROW);
+    mockAuthState.user = { nom: 'Rasoa', prenom: 'Marie' };
+
+    await startNewProspection({
+      token: 'tok',
+      prospecteurId: '33333333-3333-3333-3333-333333333333',
+    });
+
+    expect(mockCreateDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ prospecteurNom: 'Marie Rasoa' })
+    );
+  });
+
+  it('#fiches-disponibles-hors-ligne : laisse prospecteurNom à null si aucun profil n’est encore chargé', async () => {
+    mockListCampagnesLocal.mockResolvedValueOnce([
+      { id: 'current', name: 'En cours', start_date: '2020-01-01', end_date: null },
+    ]);
+    mockCreateDraft.mockResolvedValueOnce(STORED_ROW);
+
+    await startNewProspection({ token: 'tok', prospecteurId: 'p1' });
+
+    expect(mockCreateDraft).toHaveBeenCalledWith(expect.objectContaining({ prospecteurNom: null }));
   });
 
   it('does not call the network — reads only from the local référentiel cache', async () => {
