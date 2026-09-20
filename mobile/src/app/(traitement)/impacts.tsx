@@ -10,6 +10,7 @@ import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { logger } from '@/lib/logger';
 import { generateId } from '@/lib/id';
 import { Chip } from '@/components/traitement/Chip';
+import { OuiNonToggle } from '@/components/traitement/OuiNonToggle';
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN, PROGRESS_SEGMENTS_TERRESTRE } from '@/components/traitement/ProgressBar';
 import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
 
@@ -139,10 +140,12 @@ export default function ImpactsScreen() {
         <Text style={styles.title}>Impacts & risque</Text>
 
         <Text style={styles.label}>Empoisonnement</Text>
-        <View style={styles.chipRow}>
-          <Chip label="Non" selected={!store.imp.empoisonnement} onPress={() => !readOnly && store.updateImp({ empoisonnement: false })} />
-          <Chip label="Oui" selected={!!store.imp.empoisonnement} onPress={() => !readOnly && store.updateImp({ empoisonnement: true })} />
-        </View>
+        <OuiNonToggle
+          options={[
+            { label: 'Non', selected: !store.imp.empoisonnement, onPress: () => !readOnly && store.updateImp({ empoisonnement: false }) },
+            { label: 'Oui', selected: !!store.imp.empoisonnement, onPress: () => !readOnly && store.updateImp({ empoisonnement: true }) },
+          ]}
+        />
         {store.imp.empoisonnement && (
           <>
             <Text style={styles.label}>Personne concernée*</Text>
@@ -179,33 +182,35 @@ export default function ImpactsScreen() {
           return (
             <View key={axe.key} style={styles.axeRow}>
               <Text style={styles.axeLabel}>{axe.label}</Text>
-              <View style={styles.chipRow}>
-                <Chip
-                  label="Non"
-                  selected={valeur === false}
-                  onPress={() =>
-                    !readOnly &&
-                    store.updateImp({ evaluationRisque: { ...store.imp.evaluationRisque, [axe.key]: false } })
-                  }
-                />
-                <Chip
-                  label="Oui"
-                  selected={valeur === true}
-                  onPress={() =>
-                    !readOnly &&
-                    store.updateImp({ evaluationRisque: { ...store.imp.evaluationRisque, [axe.key]: true } })
-                  }
-                />
-              </View>
+              <OuiNonToggle
+                options={[
+                  {
+                    label: 'Non',
+                    selected: valeur === false,
+                    onPress: () =>
+                      !readOnly &&
+                      store.updateImp({ evaluationRisque: { ...store.imp.evaluationRisque, [axe.key]: false } }),
+                  },
+                  {
+                    label: 'Oui',
+                    selected: valeur === true,
+                    onPress: () =>
+                      !readOnly &&
+                      store.updateImp({ evaluationRisque: { ...store.imp.evaluationRisque, [axe.key]: true } }),
+                  },
+                ]}
+              />
             </View>
           );
         })}
 
         <Text style={styles.label}>Comportement anormal</Text>
-        <View style={styles.chipRow}>
-          <Chip label="Non" selected={!store.imp.comportementAnormal} onPress={() => !readOnly && store.updateImp({ comportementAnormal: false })} />
-          <Chip label="Oui" selected={!!store.imp.comportementAnormal} onPress={() => !readOnly && store.updateImp({ comportementAnormal: true })} />
-        </View>
+        <OuiNonToggle
+          options={[
+            { label: 'Non', selected: !store.imp.comportementAnormal, onPress: () => !readOnly && store.updateImp({ comportementAnormal: false }) },
+            { label: 'Oui', selected: !!store.imp.comportementAnormal, onPress: () => !readOnly && store.updateImp({ comportementAnormal: true }) },
+          ]}
+        />
         {store.imp.comportementAnormal && (
           <View style={styles.chipRow}>
             {ESPECES_NON_CIBLES.map((esp) => {
@@ -227,10 +232,12 @@ export default function ImpactsScreen() {
         )}
 
         <Text style={styles.label}>Mortalité</Text>
-        <View style={styles.chipRow}>
-          <Chip label="Non" selected={!store.imp.mortalite} onPress={() => !readOnly && store.updateImp({ mortalite: false })} />
-          <Chip label="Oui" selected={!!store.imp.mortalite} onPress={() => !readOnly && store.updateImp({ mortalite: true })} />
-        </View>
+        <OuiNonToggle
+          options={[
+            { label: 'Non', selected: !store.imp.mortalite, onPress: () => !readOnly && store.updateImp({ mortalite: false }) },
+            { label: 'Oui', selected: !!store.imp.mortalite, onPress: () => !readOnly && store.updateImp({ mortalite: true }) },
+          ]}
+        />
         {store.imp.mortalite && (
           <View style={styles.chipRow}>
             {FAMILLES_MORTALITE.map((f) => {
@@ -291,23 +298,32 @@ export default function ImpactsScreen() {
               }}
             />
             <Text style={styles.label}>Sensibilisation</Text>
-            <View style={styles.chipRow}>
-              {([true, false] as const).map((v) => (
-                <Chip
-                  key={String(v)}
-                  label={v ? 'Oui' : 'Non'}
-                  selected={evaluation.sensibilisation === v}
-                  onPress={() =>
+            <OuiNonToggle
+              options={[
+                {
+                  label: 'Non',
+                  selected: evaluation.sensibilisation === false,
+                  onPress: () =>
                     !readOnly &&
                     store.updateImp({
                       evaluationsRisquePopulation: (store.imp.evaluationsRisquePopulation ?? []).map((e) =>
-                        e.id === evaluation.id ? { ...e, sensibilisation: v } : e
+                        e.id === evaluation.id ? { ...e, sensibilisation: false } : e
                       ),
-                    })
-                  }
-                />
-              ))}
-            </View>
+                    }),
+                },
+                {
+                  label: 'Oui',
+                  selected: evaluation.sensibilisation === true,
+                  onPress: () =>
+                    !readOnly &&
+                    store.updateImp({
+                      evaluationsRisquePopulation: (store.imp.evaluationsRisquePopulation ?? []).map((e) =>
+                        e.id === evaluation.id ? { ...e, sensibilisation: true } : e
+                      ),
+                    }),
+                },
+              ]}
+            />
           </View>
         ))}
         {!readOnly && (
