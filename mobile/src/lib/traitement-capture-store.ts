@@ -145,6 +145,9 @@ export interface TerrestreDraft {
   essence_litres?: number | null;
   nb_piles?: number | null;
   pesticideRecuL?: number | null;
+  // Stock avant approvisionnement (migration backend 0075, fiche CRT papier
+  // section 5) — Terrestre uniquement, pas d'équivalent AerienDraft.
+  stockInitialL?: number | null;
   produits: ProduitDraft[];
 }
 

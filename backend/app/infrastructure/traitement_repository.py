@@ -308,6 +308,7 @@ class TraitementRepositoryImpl(TraitementRepository):
                 nb_piles=traitement.terrestre.nb_piles,
                 total_pesticide_l=traitement.terrestre.total_pesticide_l,
                 pesticide_recu_l=traitement.terrestre.pesticide_recu_l,
+                stock_initial_l=traitement.terrestre.stock_initial_l,
                 pesticide_stock_restant_l=traitement.terrestre.pesticide_stock_restant_l,
             )
 
@@ -711,6 +712,7 @@ class TraitementRepositoryImpl(TraitementRepository):
             t.essence_litres = src.essence_litres
             t.nb_piles = src.nb_piles
             t.pesticide_recu_l = src.pesticide_recu_l
+            t.stock_initial_l = src.stock_initial_l
             t.pesticide_stock_restant_l = src.pesticide_stock_restant_l
 
         # Liste dynamique remplacée en bloc à chaque enregistrement (ajout/
@@ -1021,6 +1023,9 @@ class TraitementRepositoryImpl(TraitementRepository):
                 else None,
                 pesticide_recu_l=float(model.terrestre.pesticide_recu_l)
                 if model.terrestre.pesticide_recu_l is not None
+                else None,
+                stock_initial_l=float(model.terrestre.stock_initial_l)
+                if model.terrestre.stock_initial_l is not None
                 else None,
                 pesticide_stock_restant_l=float(model.terrestre.pesticide_stock_restant_l)
                 if model.terrestre.pesticide_stock_restant_l is not None

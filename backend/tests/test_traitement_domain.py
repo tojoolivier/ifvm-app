@@ -1064,6 +1064,22 @@ async def test_creation_terrestre_transmet_stock_pesticide():
 
 
 @pytest.mark.asyncio
+async def test_creation_terrestre_transmet_stock_initial():
+    """`stock_initial_l` (#stock-initial-terrestre) entre dans le calcul du
+    stock final au même titre que `pesticide_recu_l`."""
+    prospection = _prospection(surface_infestee=100.0)
+    use_case, _ = _use_case_terrestre(prospection=prospection, chef=_CHEF_EQUIPE)
+    traitement = await use_case.execute(
+        **_args_terrestre(
+            surface_restante_abandonnee=False, stock_initial_l=40.0, pesticide_recu_l=150.0
+        )
+    )
+
+    assert traitement.terrestre.stock_initial_l == 40.0
+    assert traitement.terrestre.pesticide_stock_restant_l == 190.0
+
+
+@pytest.mark.asyncio
 async def test_creation_terrestre_transmet_efficacite():
     prospection = _prospection(surface_infestee=100.0)
     use_case, _ = _use_case_terrestre(prospection=prospection, chef=_CHEF_EQUIPE)
@@ -1313,6 +1329,48 @@ def test_recalculer_stock_pesticide_terrestre_plancher_zero_surconsommation():
     terrestre.produits = [_produit(numero=1, quantite_l=40.0)]
     terrestre.recalculer_total_pesticide()
     assert terrestre.pesticide_stock_restant_l == 0.0
+
+
+def test_recalculer_stock_pesticide_terrestre_integre_le_stock_initial():
+    """`pesticide_stock_restant_l` (« Stock final ») = stock initial + reçu −
+    consommé — pas seulement reçu − consommé (#stock-initial-terrestre)."""
+    terrestre = TraitementTerrestre(stock_initial_l=30.0, pesticide_recu_l=100.0)
+    terrestre.produits = [_produit(numero=1, quantite_l=40.0)]
+    terrestre.recalculer_total_pesticide()
+    assert terrestre.pesticide_stock_restant_l == 90.0
+
+
+def test_recalculer_stock_pesticide_terrestre_stock_initial_seul_sans_approvisionnement():
+    """Stock initial seul (sans réception) suffit à déduire un stock final —
+    contrairement à `pesticide_recu_l` seul, "reçu" n'est plus la seule source
+    possible depuis l'ajout du stock initial."""
+    terrestre = TraitementTerrestre(stock_initial_l=50.0)
+    terrestre.produits = [_produit(numero=1, quantite_l=20.0)]
+    terrestre.recalculer_total_pesticide()
+    assert terrestre.pesticide_stock_restant_l == 30.0
+
+
+def test_recalculer_stock_pesticide_terrestre_ni_initial_ni_recu_reste_none():
+    terrestre = TraitementTerrestre()
+    terrestre.produits = [_produit(numero=1, quantite_l=40.0)]
+    terrestre.recalculer_total_pesticide()
+    assert terrestre.pesticide_stock_restant_l is None
+
+
+def test_recalculer_stock_pesticide_terrestre_stock_initial_plancher_zero_surconsommation():
+    terrestre = TraitementTerrestre(stock_initial_l=10.0, pesticide_recu_l=10.0)
+    terrestre.produits = [_produit(numero=1, quantite_l=40.0)]
+    terrestre.recalculer_total_pesticide()
+    assert terrestre.pesticide_stock_restant_l == 0.0
+
+
+def test_recalculer_stock_pesticide_aerien_sans_stock_initial_inchange():
+    """Aérien n'a pas de `stock_initial_l` : `_stock_pesticide_restant` doit se
+    comporter exactement comme avant l'ajout du stock initial (Terrestre)."""
+    aerien = TraitementAerien(pesticide_recu_l=200.0)
+    aerien.rotations = [_rotation(numero=1, quantite=60.0)]
+    aerien.recalculer_totaux()
+    assert aerien.pesticide_stock_restant_l == 140.0
 
 
 # ==========================================
@@ -1790,6 +1848,7 @@ def _traitement_terrestre_sync(**overrides) -> Traitement:
         essence_litres=None,
         nb_piles=None,
         pesticide_recu_l=None,
+        stock_initial_l=None,
     )
     for cle, valeur in overrides.items():
         if cle in terrestre_args:
@@ -1858,6 +1917,15 @@ def test_contenu_diverge_champ_commun_different():
 def test_contenu_diverge_champ_terrestre_different():
     existant = _traitement_terrestre_sync()
     entrant = _traitement_terrestre_sync(surface_atomiseur_ha=99.0)
+    assert contenu_diverge(existant, entrant) is True
+
+
+def test_contenu_diverge_stock_initial_terrestre_different():
+    """#stock-initial-terrestre : une modification isolée de `stock_initial_l`
+    doit être détectée comme un contenu divergent, comme tout autre champ de
+    `_CHAMPS_CONTENU_TERRESTRE`."""
+    existant = _traitement_terrestre_sync(stock_initial_l=30.0)
+    entrant = _traitement_terrestre_sync(stock_initial_l=45.0)
     assert contenu_diverge(existant, entrant) is True
 
 
@@ -2057,6 +2125,23 @@ async def test_sync_push_terrestre_conserve_stock_pesticide_existant_sans_ecrase
     assert cree is False
     assert traitement.terrestre.total_pesticide_l == 40.0
     assert traitement.terrestre.pesticide_stock_restant_l == 110.0
+
+
+@pytest.mark.asyncio
+async def test_sync_push_terrestre_transmet_stock_initial():
+    """#stock-initial-terrestre côté synchronisation (create-branch, id inconnu) :
+    même comportement que la création directe (`CreateTraitementTerrestre`)."""
+    fiche_id = uuid.uuid4()
+    use_case, _ = _sync_use_case(existant=None)
+
+    args = _sync_terrestre_args(
+        fiche_id, base_updated_at=datetime.utcnow(), stock_initial_l=40.0, pesticide_recu_l=150.0
+    )
+    traitement, cree = await use_case.execute(**args)
+
+    assert cree is True
+    assert traitement.terrestre.stock_initial_l == 40.0
+    assert traitement.terrestre.pesticide_stock_restant_l == 190.0
 
 
 @pytest.mark.asyncio

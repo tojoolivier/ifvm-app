@@ -193,6 +193,9 @@ export interface TraitementTerrestre {
   surface_restante_ha: number | null;
   total_pesticide_l: number | null;
   pesticide_recu_l: number | null;
+  // Stock avant approvisionnement (migration backend 0075, fiche CRT papier
+  // section 5) — entre dans le calcul de pesticide_stock_restant_l (« Stock final »).
+  stock_initial_l: number | null;
   pesticide_stock_restant_l: number | null;
 }
 
@@ -732,6 +735,7 @@ export interface TerrestreUpdateInput {
   essence_litres?: number | null;
   nb_piles?: number | null;
   pesticideRecuL?: number | null;
+  stockInitialL?: number | null;
 }
 
 export async function updateTraitementTerrestre(
@@ -759,7 +763,8 @@ export async function updateTraitementTerrestre(
       motif_surface_restante_abandonnee = ?,
       essence_litres = ?,
       nb_piles = ?,
-      pesticide_recu_l = ?
+      pesticide_recu_l = ?,
+      stock_initial_l = ?
      WHERE traitement_id = ?`,
     [
       input.chefEquipeId,
@@ -780,6 +785,7 @@ export async function updateTraitementTerrestre(
       input.essence_litres ?? null,
       input.nb_piles ?? null,
       input.pesticideRecuL ?? null,
+      input.stockInitialL ?? null,
       traitementId,
     ]
   );

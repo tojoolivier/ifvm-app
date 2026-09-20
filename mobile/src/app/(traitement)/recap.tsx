@@ -590,8 +590,9 @@ export default function RecapScreen() {
                 ))
               )}
               <RecapLigne label="Total pesticide (l)" value={display(draft.terrestre.total_pesticide_l)} />
+              <RecapLigne label="Stock initial (l)" value={display(draft.terrestre.stock_initial_l)} />
               <RecapLigne label="Approvisionnement (l)" value={display(draft.terrestre.pesticide_recu_l)} />
-              <RecapLigne label="Reste en stock (l)" value={display(draft.terrestre.pesticide_stock_restant_l)} />
+              <RecapLigne label="Stock Final (l)" value={display(draft.terrestre.pesticide_stock_restant_l)} />
               <RecapLigne label="Essence (l)" value={display(draft.terrestre.essence_litres)} />
               <RecapLigne label="Nombre de piles" value={display(draft.terrestre.nb_piles)} />
             </Card>

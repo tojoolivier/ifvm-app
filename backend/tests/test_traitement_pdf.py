@@ -115,6 +115,7 @@ def _traitement_terrestre(**overrides) -> TraitementRead:
         nb_piles=None,
         total_pesticide_l=None,
         pesticide_recu_l=None,
+        stock_initial_l=None,
         pesticide_stock_restant_l=None,
         produits=[],
     )
@@ -163,10 +164,27 @@ def test_build_crt_html_affiche_les_signatures():
 
 
 def test_build_crt_html_champs_manquants_au_modele_affiches_vides():
-    """§4.1/4.2 (moyens humains/materiels) et §5.3 (stock initial pesticide) ne
-    sont pas modelises (cf. issue #495) : la case doit rester vide, pas
-    disparaitre ni planter."""
+    """§4.1/4.2 (moyens humains/materiels) ne sont pas modelises (cf. issue #495) :
+    la case doit rester vide, pas disparaitre ni planter. §5.3 (stock initial
+    pesticide) l'est désormais côté Terrestre (#stock-initial-terrestre) mais
+    reste non modélisé côté Aérien — ce test utilise volontairement une fiche
+    Aérien pour vérifier que la case "Stock initial" reste vide sans planter
+    dans ce cas-là (cf. test_build_crt_html_terrestre_affiche_stock_initial
+    pour le cas Terrestre, renseigné)."""
     html = build_crt_html(_traitement_aerien())
 
     assert "Nb agents permanents" in html
     assert "Stock initial" in html
+
+
+def test_build_crt_html_terrestre_affiche_stock_initial():
+    """#stock-initial-terrestre : contrairement à l'Aérien (ci-dessus), la case
+    "Stock initial" du Terrestre est désormais alimentée par une vraie valeur,
+    pas seulement affichée vide."""
+    traitement = _traitement_terrestre()
+    traitement.terrestre.stock_initial_l = 40.0
+
+    html = build_crt_html(traitement)
+
+    assert "Stock initial" in html
+    assert "40.0" in html

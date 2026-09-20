@@ -393,6 +393,7 @@ class TraitementTerrestreModel(Base):
     nb_piles: Mapped[int | None] = mapped_column(Integer(), nullable=True)
     total_pesticide_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     pesticide_recu_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    stock_initial_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     pesticide_stock_restant_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
 
     traitement: Mapped[TraitementModel] = relationship(

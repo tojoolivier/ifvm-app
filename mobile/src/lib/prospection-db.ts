@@ -425,6 +425,7 @@ async function creerTables(db: SQLite.SQLiteDatabase): Promise<void> {
       surface_restante_ha REAL,
       total_pesticide_l REAL,
       pesticide_recu_l REAL,
+      stock_initial_l REAL,
       pesticide_stock_restant_l REAL
     );
 
@@ -853,6 +854,11 @@ const COLONNES_TRAITEMENT_AERIEN: readonly Colonne[] = [
 const COLONNES_TRAITEMENT_TERRESTRE: readonly Colonne[] = [
   { name: 'pesticide_recu_l', type: 'REAL' },
   { name: 'pesticide_stock_restant_l', type: 'REAL' },
+  // Stock avant approvisionnement (migration backend 0075, fiche CRT papier
+  // section 5 — Terrestre uniquement) : entre dans le calcul de
+  // pesticide_stock_restant_l ci-dessus (« Stock final »), cf. construireCible-
+  // équivalent côté backend `_stock_pesticide_restant`.
+  { name: 'stock_initial_l', type: 'REAL' },
   // agent_encadreur_id (FK utilisateur) -> texte libre (migration backend 0057,
   // même retour en arrière que pilote/mécanicien/consultant_international côté
   // Aérien, migration 0048). agent_encadreur_id ci-dessus (dans le CREATE TABLE)

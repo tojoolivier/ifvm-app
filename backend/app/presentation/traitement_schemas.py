@@ -148,6 +148,9 @@ class TraitementTerrestreCreate(BaseModel):
     essence_litres: float | None = Field(None, ge=0)
     nb_piles: int | None = Field(None, ge=0)
     pesticide_recu_l: float | None = Field(None, ge=0)
+    # Stock avant approvisionnement (fiche CRT papier, section 5) — Terrestre
+    # uniquement, pas d'équivalent côté TraitementAerienCreate.
+    stock_initial_l: float | None = Field(None, ge=0)
     reprise_traitement: bool = False
     traitement_origine_id: uuid.UUID | None = None
 
@@ -468,6 +471,7 @@ class TraitementTerrestreRead(BaseModel):
     nb_piles: int | None
     total_pesticide_l: float | None
     pesticide_recu_l: float | None
+    stock_initial_l: float | None
     pesticide_stock_restant_l: float | None
     produits: list[ProduitUtiliseRead] = []
 

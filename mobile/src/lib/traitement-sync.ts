@@ -168,6 +168,7 @@ function buildTraitementSyncPayload(draft: DraftTraitement): components['schemas
         essence_litres: draft.terrestre.essence_litres,
         nb_piles: draft.terrestre.nb_piles,
         pesticide_recu_l: draft.terrestre.pesticide_recu_l,
+        stock_initial_l: draft.terrestre.stock_initial_l,
         reprise_traitement: draft.terrestre.reprise_traitement,
         traitement_origine_id: draft.terrestre.traitement_origine_id,
       } as components['schemas']['TraitementTerrestreCreate'],

@@ -4431,6 +4431,8 @@ export interface components {
             nb_piles?: number | null;
             /** Pesticide Recu L */
             pesticide_recu_l?: number | null;
+            /** Stock Initial L */
+            stock_initial_l?: number | null;
             /**
              * Reprise Traitement
              * @default false
@@ -4498,6 +4500,8 @@ export interface components {
             total_pesticide_l: number | null;
             /** Pesticide Recu L */
             pesticide_recu_l: number | null;
+            /** Stock Initial L */
+            stock_initial_l: number | null;
             /** Pesticide Stock Restant L */
             pesticide_stock_restant_l: number | null;
             /**
