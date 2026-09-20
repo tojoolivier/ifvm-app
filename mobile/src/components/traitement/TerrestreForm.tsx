@@ -286,7 +286,7 @@ export function TerrestreForm({
         </Fragment>
       )}
 
-      <Text style={styles.label}>Produits utilisés</Text>
+      <Text style={styles.sectionTitle}>Produits utilisés</Text>
       {produits.map((produit, index) => (
         <Card key={produit.localId} style={styles.rotationCard}>
           <View style={styles.rotationHeader}>
