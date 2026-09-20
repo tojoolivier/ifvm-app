@@ -1,4 +1,4 @@
-"""Aéronef d'une équipe aérienne + « seule l'équipe crée ses lieux » (migration 0075).
+"""Aéronef d'une équipe aérienne + « seule l'équipe crée ses lieux » (migration 0077).
 
 Règle produit (2026-09-19) : une équipe aérienne a un aéronef (immatriculation, société,
 volume de cuve) ; seul le chef de base de l'équipe — le seul compte utilisateur de
@@ -450,3 +450,27 @@ async def test_chef_ne_change_pas_l_equipe_de_son_stand_403(
         headers=chef_headers,
     )
     assert reponse.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_chef_reenvoie_le_meme_stand_sans_403(
+    client: AsyncClient, chef_headers: dict, equipe_aerienne
+):
+    """Un PUT qui échoue simplement l'équipe déjà en place (lecture-modification-
+    écriture typique d'un client) ne doit pas 403 le propriétaire légitime — seul un
+    changement réel d'équipe est réservé à l'admin."""
+    stand = (
+        await client.post(
+            "/stands-remplissage",
+            json={"numero": "STD17", "localite": "Le mien"},
+            headers=chef_headers,
+        )
+    ).json()
+    reponse = await client.put(
+        f"/stands-remplissage/{stand['id']}",
+        json={"localite": "Le mien (renommé)", "equipe_aerienne_id": stand["equipe_aerienne_id"]},
+        headers=chef_headers,
+    )
+    assert reponse.status_code == 200, reponse.text
+    assert reponse.json()["localite"] == "Le mien (renommé)"
+    assert reponse.json()["equipe_aerienne_id"] == str(equipe_aerienne.id)

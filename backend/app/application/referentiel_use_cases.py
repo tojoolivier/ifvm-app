@@ -607,6 +607,9 @@ class GetLieuAerien:
 
 
 class CreateLieuAerien:
+    """Seul le chef de base de l'équipe (ou un admin) crée ses lieux — même règle que
+    `CreateBaseAerienne`/`CreateStandRemplissage`."""
+
     def __init__(
         self,
         repository: LieuAerienRepository,
@@ -617,6 +620,7 @@ class CreateLieuAerien:
 
     async def execute(
         self,
+        acteur: object,
         type_lieu: str,
         nom: str,
         latitude: float,
@@ -626,6 +630,9 @@ class CreateLieuAerien:
     ) -> LieuAerien:
         if type_lieu not in TYPES_LIEU_AERIEN:
             raise TypeLieuAerienInvalideError(type_lieu)
+        equipe_aerienne_id = await _resoudre_equipe_creation(
+            acteur, self.equipe_aerienne_repository, equipe_aerienne_id
+        )
         if await self.equipe_aerienne_repository.get_by_id(equipe_aerienne_id) is None:
             raise EquipeAerienneIntrouvableError(str(equipe_aerienne_id))
 
@@ -659,6 +666,7 @@ class UpdateLieuAerien:
 
     async def execute(
         self,
+        acteur: object,
         lieu_id: uuid.UUID,
         type_lieu: str | None = None,
         nom: str | None = None,
@@ -672,6 +680,10 @@ class UpdateLieuAerien:
         lieu = await self.repository.get_by_id(lieu_id)
         if lieu is None:
             return None
+
+        await _exiger_droit_sur_equipe(
+            acteur, self.equipe_aerienne_repository, lieu.equipe_aerienne_id
+        )
 
         if type_lieu is not None:
             if type_lieu not in TYPES_LIEU_AERIEN:
@@ -756,7 +768,7 @@ async def _exiger_droit_sur_equipe(
     equipe_id: uuid.UUID | None,
 ) -> None:
     """Modifier un lieu existant : admin, ou chef de base de l'équipe qui le possède.
-    Un lieu « sans équipe » (antérieur à la migration 0075/0074) n'est modifiable que
+    Un lieu « sans équipe » (antérieur à la migration 0077/0074) n'est modifiable que
     par un admin — personne ne peut prétendre en être le propriétaire."""
     if _est_admin(acteur):
         return
@@ -1177,12 +1189,22 @@ class UpdateStandRemplissage:
             acteur, self.equipe_aerienne_repository, stand.equipe_aerienne_id
         )
 
-        # Rattacher/changer l'équipe d'un stand : admin seulement — c'est ainsi qu'on
-        # rattache les stands antérieurs à la migration 0075 (« sans équipe »).
-        if equipe_aerienne_id is not None:
+        # Rattacher/changer/détacher l'équipe d'un stand : admin seulement — c'est ainsi
+        # qu'on rattache les stands antérieurs à la migration 0077 (« sans équipe »).
+        # Gardé sur `champs_fournis` + comparaison à la valeur actuelle (pas seulement
+        # `is not None`) : un PUT qui échoue simplement l'équipe déjà en place (lecture-
+        # modification-écriture d'un client) ne doit pas 403 son propriétaire légitime,
+        # et un admin doit pouvoir explicitement détacher (`equipe_aerienne_id: null`).
+        if (
+            "equipe_aerienne_id" in champs_fournis
+            and equipe_aerienne_id != stand.equipe_aerienne_id
+        ):
             if not _est_admin(acteur):
                 raise EquipeNonAutoriseeError("seul un admin change l'équipe d'un stand")
-            if await self.equipe_aerienne_repository.get_by_id(equipe_aerienne_id) is None:
+            if (
+                equipe_aerienne_id is not None
+                and await self.equipe_aerienne_repository.get_by_id(equipe_aerienne_id) is None
+            ):
                 raise EquipeAerienneIntrouvableError(str(equipe_aerienne_id))
             stand.equipe_aerienne_id = equipe_aerienne_id
 

@@ -60,7 +60,7 @@ interface FicheVolDetail {
   pilote: string
   mecanicien: string
   chef_de_base_id: string
-  // Équipe aérienne choisie à la création (migration 0075) — null pour une fiche antérieure.
+  // Équipe aérienne choisie à la création (migration 0077) — null pour une fiche antérieure.
   equipe_aerienne_nom?: string | null
   consultant_international: string | null
   pesticide_nom_commercial: string | null

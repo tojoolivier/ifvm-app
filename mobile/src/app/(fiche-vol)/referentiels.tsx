@@ -55,7 +55,9 @@ interface Stand {
 export default function ReferentielsAeriensScreen() {
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
-  const peutCreer = peutCreerLieuAerien(useAuthStore((s) => s.user?.role));
+  const role = useAuthStore((s) => s.user?.role);
+  const utilisateurId = useAuthStore((s) => s.user?.id);
+  const peutCreer = peutCreerLieuAerien(role);
 
   const [chefs, setChefs] = useState<Chef[]>([]);
   const [equipes, setEquipes] = useState<Equipe[]>([]);
@@ -149,7 +151,15 @@ export default function ReferentielsAeriensScreen() {
   const basesPrincipales = bases.filter((b) => b.parent_base_id === null);
   const basesSecondaires = bases.filter((b) => b.parent_base_id !== null);
   const chefsLibres = chefs.filter((c) => !equipes.some((e) => e.chef_de_base_id === c.id));
-  const equipesLibres = equipes.filter((e) => !bases.some((b) => b.equipe_id === e.id));
+  const equipesSansBasePrincipale = equipes.filter((e) => !bases.some((b) => b.equipe_id === e.id));
+  // Un chef de base ne peut créer une base principale que pour SA propre équipe — le
+  // serveur (_resoudre_equipe_creation) refuse toute autre équipe désignée. Sans ce
+  // filtre, la liste proposait aussi les équipes des autres chefs, qui échouaient
+  // systématiquement en 403 à la création. Un admin agit pour n'importe quelle équipe.
+  const equipesLibres =
+    role === 'admin'
+      ? equipesSansBasePrincipale
+      : equipesSansBasePrincipale.filter((e) => e.chef_de_base_id === utilisateurId);
 
   const nomChef = (chefId: string) => {
     const chef = chefsById.get(chefId);

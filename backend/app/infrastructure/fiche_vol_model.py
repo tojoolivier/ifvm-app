@@ -53,11 +53,11 @@ class FicheVolModel(Base):
     # 2026-09-15, remplace le format [Date]-[Base]-[Immatriculation] d'ADR-011 §7.2.
     numero_fiche: Mapped[str] = mapped_column(String(60), nullable=False, unique=True)
     date_vol: Mapped[date] = mapped_column(Date(), nullable=False)
-    # Snapshot du jour (migration 0075) : renseignés depuis l'équipe aérienne à la
+    # Snapshot du jour (migration 0077) : renseignés depuis l'équipe aérienne à la
     # création (aéronef → immatriculation/société, cf. `FicheVol`), jamais recalculés.
     compagnie: Mapped[str] = mapped_column(String(255), nullable=False)
     immatriculation: Mapped[str] = mapped_column(String(20), nullable=False)
-    # Équipe aérienne choisie à la création (migration 0075) — nullable : fiches
+    # Équipe aérienne choisie à la création (migration 0077) — nullable : fiches
     # antérieures et clients mobiles qui ne l'envoient pas encore.
     equipe_aerienne_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("equipe_aerienne.id", ondelete="RESTRICT"), nullable=True

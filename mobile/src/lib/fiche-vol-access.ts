@@ -19,11 +19,13 @@ export function peutSaisirFicheVol(role: UserRole | null | undefined): boolean {
 }
 
 /**
- * Seul le chef de base crée les lieux aériens (bases, stands) de SON équipe — seul
- * compte utilisateur de l'équipe (pilote/mécanicien sont des noms libres, sans accès à
- * l'API). Le serveur applique la même règle (403) ; ce contrôle évite seulement de
- * proposer un formulaire voué à l'échec.
+ * Le chef de base crée les lieux aériens (bases, stands) de SON équipe — seul compte
+ * utilisateur de l'équipe (pilote/mécanicien sont des noms libres, sans accès à
+ * l'API) — et un admin peut le faire pour n'importe quelle équipe (ex. avant même
+ * qu'un compte chef de base n'existe pour elle). `_resoudre_equipe_creation`
+ * (backend/app/application/referentiel_use_cases.py) autorise explicitement les deux ;
+ * ce contrôle mobile évite seulement de proposer un formulaire voué à l'échec.
  */
 export function peutCreerLieuAerien(role: UserRole | null | undefined): boolean {
-  return role === 'chef_de_base';
+  return role === 'chef_de_base' || role === 'admin';
 }

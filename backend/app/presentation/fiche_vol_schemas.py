@@ -105,7 +105,7 @@ class FicheVolCreate(BaseModel):
     pilote: str = Field(min_length=1, max_length=255)
     mecanicien: str = Field(min_length=1, max_length=255)
     chef_de_base_id: uuid.UUID
-    # Équipe aérienne choisie (migration 0075). Quand elle est fournie, le serveur fait
+    # Équipe aérienne choisie (migration 0077). Quand elle est fournie, le serveur fait
     # autorité : chef de base, pilote, mécanicien, consultant, immatriculation et
     # compagnie sont repris de l'équipe (les valeurs ci-dessus, pré-remplies par le
     # mobile, sont alors écrasées), et base_id/stand_id doivent lui appartenir. Omise :
