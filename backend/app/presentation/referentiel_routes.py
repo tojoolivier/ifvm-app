@@ -650,11 +650,12 @@ async def list_lieux_aeriens(
 async def create_lieu_aerien(
     body: LieuAerienCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[Utilisateur, Depends(get_current_user)],
+    acteur: Annotated[Utilisateur, Depends(get_current_user)],
 ):
     use_case = CreateLieuAerien(LieuAerienRepositoryImpl(db), EquipeAerienneRepositoryImpl(db))
     try:
         return await use_case.execute(
+            acteur=acteur,
             type_lieu=body.type_lieu,
             nom=body.nom,
             latitude=body.latitude,
@@ -667,6 +668,8 @@ async def create_lieu_aerien(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"type_lieu invalide : {exc.args[0]}",
         ) from exc
+    except EquipeNonAutoriseeError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     except EquipeAerienneIntrouvableError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -692,11 +695,12 @@ async def update_lieu_aerien(
     lieu_id: uuid.UUID,
     body: LieuAerienUpdate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[Utilisateur, Depends(get_current_user)],
+    acteur: Annotated[Utilisateur, Depends(get_current_user)],
 ):
     use_case = UpdateLieuAerien(LieuAerienRepositoryImpl(db), EquipeAerienneRepositoryImpl(db))
     try:
         lieu = await use_case.execute(
+            acteur=acteur,
             lieu_id=lieu_id,
             type_lieu=body.type_lieu,
             nom=body.nom,
@@ -714,6 +718,8 @@ async def update_lieu_aerien(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"type_lieu invalide : {exc.args[0]}",
         ) from exc
+    except EquipeNonAutoriseeError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     except EquipeAerienneIntrouvableError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -803,7 +809,7 @@ async def get_equipe_aerienne(
     return equipe
 
 
-# --- aeronef (hélicoptère d'une équipe aérienne, migration 0075) -------------------
+# --- aeronef (hélicoptère d'une équipe aérienne, migration 0077) -------------------
 #
 # Pas de POST : un aéronef naît avec son équipe (POST /equipes-aeriennes, champ
 # `aeronef`), jamais orphelin. Pas de DELETE : la sortie de service est `actif=false`.

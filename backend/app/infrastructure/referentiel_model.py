@@ -165,7 +165,7 @@ class LieuAerienModel(Base):
 
 
 class AeronefModel(Base):
-    """Hélicoptère d'une équipe aérienne (migration 0075) : `immatriculation` en est la
+    """Hélicoptère d'une équipe aérienne (migration 0077) : `immatriculation` en est la
     clé candidate, `societe` (exploitant) et `volume_cuve_l` en dépendent — d'où une
     table à part plutôt que trois colonnes sur `equipe_aerienne` (dépendance transitive
     équipe → immatriculation → société). Affecté à au plus une équipe
@@ -214,7 +214,7 @@ class EquipeAerienneModel(Base):
     pilote: Mapped[str | None] = mapped_column(Text(), nullable=True)
     mecanicien: Mapped[str | None] = mapped_column(Text(), nullable=True)
     consultant_international: Mapped[str | None] = mapped_column(Text(), nullable=True)
-    # Hélicoptère de l'équipe (migration 0075) : 1:1 (UNIQUE), nullable pour les
+    # Hélicoptère de l'équipe (migration 0077) : 1:1 (UNIQUE), nullable pour les
     # équipes créées avant cette migration ; exigé par `EquipeAerienneCreate`.
     aeronef_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     actif: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
@@ -391,7 +391,7 @@ class StandRemplissageModel(Base):
     """Stand de remplissage de la fiche de vol — même forme que `BaseAerienneModel`,
     sans hiérarchie.
 
-    `equipe_aerienne_id` (migration 0075) : équipe propriétaire du stand. Sans UNIQUE —
+    `equipe_aerienne_id` (migration 0077) : équipe propriétaire du stand. Sans UNIQUE —
     une équipe possède plusieurs stands, contrairement à sa base principale. Nullable :
     les stands antérieurs restent « sans équipe » jusqu'à rattachement manuel ; exigé à
     la création côté application."""
@@ -409,7 +409,7 @@ class StandRemplissageModel(Base):
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
 
-    # Nom explicite, identique à la migration 0075 : le dépôt s'en sert pour distinguer
+    # Nom explicite, identique à la migration 0077 : le dépôt s'en sert pour distinguer
     # une équipe inexistante d'un doublon de `numero`.
     __table_args__ = (
         ForeignKeyConstraint(

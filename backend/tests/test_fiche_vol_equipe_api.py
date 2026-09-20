@@ -1,4 +1,4 @@
-"""Fiche de vol et équipe aérienne (migration 0075).
+"""Fiche de vol et équipe aérienne (migration 0077).
 
 Choisir une équipe à la création renseigne l'en-tête (chef de base, pilote, mécanicien,
 immatriculation, société de l'hélicoptère) depuis l'équipe — le serveur fait autorité — et
@@ -244,3 +244,48 @@ async def test_le_renvoi_de_synchro_ne_reecrit_pas_le_snapshot_du_jour(
     reponse = await client.post("/fiches-vol/sync", json=renvoi, headers=auth_headers)
     assert reponse.status_code == 200, reponse.text
     assert reponse.json()["pilote"] == "Jean Rakoto"
+
+
+@pytest.mark.asyncio
+async def test_sync_omettant_equipe_ne_detache_pas_une_fiche_deja_rattachee(
+    client, auth_headers, payload, equipe_equipee
+):
+    """Un client qui n'envoie pas encore ce champ (mobile pas à jour) ne doit jamais
+    pouvoir détacher silencieusement une fiche déjà rattachée à une équipe."""
+    fiche_id = uuid.uuid4()
+    creation = await client.post(
+        "/fiches-vol/sync", json=_push(fiche_id, payload, datetime.utcnow()), headers=auth_headers
+    )
+    assert creation.status_code == 201, creation.text
+
+    renvoi = _push(fiche_id, payload, datetime.utcnow())
+    renvoi.pop("equipe_aerienne_id")
+    reponse = await client.post("/fiches-vol/sync", json=renvoi, headers=auth_headers)
+    assert reponse.status_code == 200, reponse.text
+    assert reponse.json()["equipe_aerienne_id"] == str(equipe_equipee.id)
+    assert reponse.json()["pilote"] == "Jean Rakoto"
+
+
+@pytest.mark.asyncio
+async def test_sync_meme_equipe_ignore_un_en_tete_falsifie(
+    client, auth_headers, payload, equipe_aerienne_bis
+):
+    """Un renvoi de synchro sur la même équipe ne doit pas pouvoir substituer le chef
+    de base, le pilote ou l'appareil par ceux d'une autre équipe : l'en-tête reste le
+    snapshot du jour, jamais celui que le client soumet."""
+    fiche_id = uuid.uuid4()
+    creation = await client.post(
+        "/fiches-vol/sync", json=_push(fiche_id, payload, datetime.utcnow()), headers=auth_headers
+    )
+    assert creation.status_code == 201, creation.text
+    snapshot = creation.json()
+
+    renvoi = _push(fiche_id, payload, datetime.utcnow())
+    renvoi["chef_de_base_id"] = str(equipe_aerienne_bis.chef_de_base_id)
+    renvoi["pilote"] = "Pilote Usurpateur"
+    renvoi["immatriculation"] = "USURPE-1"
+    reponse = await client.post("/fiches-vol/sync", json=renvoi, headers=auth_headers)
+    assert reponse.status_code == 200, reponse.text
+    assert reponse.json()["chef_de_base_id"] == snapshot["chef_de_base_id"]
+    assert reponse.json()["pilote"] == "Jean Rakoto"
+    assert reponse.json()["immatriculation"] == snapshot["immatriculation"]

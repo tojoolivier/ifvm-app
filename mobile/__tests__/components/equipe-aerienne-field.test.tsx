@@ -53,28 +53,19 @@ describe('EquipeAerienneField', () => {
     await screen.findByText('Équipe Ihosy');
     fireEvent.press(screen.getByText('Équipe Ihosy'));
 
-    expect(onChange).toHaveBeenCalledWith('equipe-1', {
-      id: 'equipe-1',
-      nom: 'Équipe Ihosy',
-      chef_de_base_id: 'chef-1',
-      pilote: 'Jean Rakoto',
-      mecanicien: 'Paul Andria',
-      consultant_international: null,
-      aeronef: { id: 'a-1', immatriculation: '5R-MJA', societe: 'Heli Madagascar', volume_cuve_l: 800 },
-    });
+    // Objet du contrat OpenAPI transmis tel quel (CLAUDE.md « Contrat API mobile ↔
+    // backend ») — aucune reconstruction manuelle qui pourrait diverger du schéma.
+    expect(onChange).toHaveBeenCalledWith('equipe-1', EQUIPE_IHOSY);
   });
 
-  it('normalise une équipe ancienne, sans pilote ni hélicoptère', async () => {
+  it('remonte une équipe ancienne, sans pilote ni hélicoptère, telle que renvoyée par l’API', async () => {
     const onChange = jest.fn();
     await render(<EquipeAerienneField value={null} onChange={onChange} />);
 
     await screen.findByText('Équipe Betroka');
     fireEvent.press(screen.getByText('Équipe Betroka'));
 
-    expect(onChange).toHaveBeenCalledWith(
-      'equipe-2',
-      expect.objectContaining({ pilote: null, mecanicien: null, consultant_international: null, aeronef: null })
-    );
+    expect(onChange).toHaveBeenCalledWith('equipe-2', EQUIPE_BETROKA);
   });
 
   it("présélectionne l'équipe du chef de base connecté", async () => {

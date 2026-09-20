@@ -157,6 +157,27 @@ class SyncPushFicheVol:
         # celui de l'équipe, qui pourrait sinon masquer ce 409 par un 422).
         if existante is not None and existante.statut != "brouillon":
             raise FicheVolValideeSyncRejeteError(existante)
+
+        if existante is not None and existante.equipe_aerienne_id is not None:
+            # Un client qui n'envoie pas encore ce champ (ancien mobile, ou tout appelant
+            # qui l'omet) ne doit jamais pouvoir détacher silencieusement une fiche déjà
+            # rattachée à une équipe : sans ce garde, `_appliquer_equipe_aerienne` sort
+            # immédiatement (equipe_aerienne_id is None) sans revérifier base/stand, et
+            # `update_sync` écrase l'équipe existante par NULL.
+            if fiche.equipe_aerienne_id is None:
+                fiche.equipe_aerienne_id = existante.equipe_aerienne_id
+            if fiche.equipe_aerienne_id == existante.equipe_aerienne_id:
+                # Même équipe : l'en-tête est un snapshot du jour, jamais recalculé — mais
+                # jamais laissé au client sur un renvoi de synchro non plus, même patron
+                # que numero_fiche/compteur/created_at plus bas : le serveur reste seul
+                # maître de ce qu'il a déjà attesté pour cette équipe.
+                fiche.chef_de_base_id = existante.chef_de_base_id
+                fiche.pilote = existante.pilote
+                fiche.mecanicien = existante.mecanicien
+                fiche.consultant_international = existante.consultant_international
+                fiche.immatriculation = existante.immatriculation
+                fiche.compagnie = existante.compagnie
+
         await _appliquer_equipe_aerienne(
             self.repo,
             fiche,

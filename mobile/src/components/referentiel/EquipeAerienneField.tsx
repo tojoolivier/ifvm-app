@@ -1,19 +1,15 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
 import { apiClient } from '@/lib/api-client';
+import type { components } from '@/lib/api-schema.generated';
 import { useAsyncAction } from '@/hooks/use-async-action';
 
-export interface EquipeAerienneOption {
-  id: string;
-  nom: string;
-  chef_de_base_id: string;
-  pilote: string | null;
-  mecanicien: string | null;
-  consultant_international: string | null;
-  aeronef: { immatriculation: string; societe: string; volume_cuve_l: number } | null;
-}
+// Contrat OpenAPI, pas une redéclaration à la main (CLAUDE.md « Contrat API mobile ↔
+// backend ») : un champ ajouté/renommé côté EquipeAerienneRead/AeronefRead doit casser
+// la compilation ici, pas disparaître silencieusement à l'exécution.
+export type EquipeAerienneOption = components['schemas']['EquipeAerienneRead'];
 
 interface EquipeAerienneFieldProps {
   value: string | null;
@@ -45,38 +41,35 @@ export function EquipeAerienneField({ value, onChange, label = 'Équipe aérienn
   const [loaded, setLoaded] = useState(false);
   const { run: runChargement, isRunning: isChargement } = useAsyncAction();
 
+  // Ne dépend que de `token` : stable pendant toute la session, donc la closure que
+  // `useFocusEffect` capture ci-dessous ne se fige jamais sur une valeur périmée de
+  // `value`/`onChange` (#stale-closure-equipe-aerienne-field — un chef de base qui
+  // choisissait une équipe puis revenait sur l'écran se la voyait silencieusement
+  // réimposée, base et stand compris, par l'ancienne closure du tout premier rendu).
   const charger = useCallback(
     () =>
       runChargement(
         async () => {
           const resultat = await apiClient.listEquipesAeriennes(token!);
-          const options: EquipeAerienneOption[] = resultat.map((e) => ({
-            id: e.id,
-            nom: e.nom,
-            chef_de_base_id: e.chef_de_base_id,
-            pilote: e.pilote ?? null,
-            mecanicien: e.mecanicien ?? null,
-            consultant_international: e.consultant_international ?? null,
-            aeronef: e.aeronef ?? null,
-          }));
-          setEquipes(options);
+          setEquipes(resultat);
           setLoaded(true);
-          const sienne = options.find((o) => o.chef_de_base_id === utilisateurId);
-          if (sienne && value === null) onChange(sienne.id, sienne);
         },
         { screen: 'equipe-aerienne-field', precondition: !!token }
       ),
-    [runChargement, token, utilisateurId, value, onChange]
+    [runChargement, token]
   );
 
-  useFocusEffect(
-    useCallback(() => {
-      void charger();
-      // Chargement à l'ouverture de l'écran uniquement : `charger` change à chaque
-      // sélection (dépend de `value`), il ne doit pas relancer le réseau à chaque tap.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [])
-  );
+  useFocusEffect(useCallback(() => void charger(), [charger]));
+
+  // Présélection de l'équipe du chef connecté, une fois la liste chargée — dans un
+  // effet séparé (pas dans `charger`) pour ne jamais agir sur un `value`/`onChange`
+  // capturés au moment du fetch : si l'utilisateur a déjà choisi une équipe entre-temps
+  // (`value !== null`), on ne touche à rien.
+  useEffect(() => {
+    if (value !== null) return;
+    const sienne = equipes.find((o) => o.chef_de_base_id === utilisateurId);
+    if (sienne) onChange(sienne.id, sienne);
+  }, [equipes, value, utilisateurId, onChange]);
 
   return (
     <View style={styles.card}>

@@ -96,7 +96,7 @@ describe('StandRemplissageField', () => {
     expect(screen.queryByText('+ Nouveau stand de remplissage')).toBeNull();
   });
 
-  it('crée un nouveau stand avec les coordonnées GPS capturées automatiquement', async () => {
+  it("crée un nouveau stand avec les coordonnées GPS capturées automatiquement, pour l'équipe de la fiche", async () => {
     jest.mocked(apiClient.createStandRemplissage).mockResolvedValue({
       id: 'stand-2',
       numero: 'STD02',
@@ -108,7 +108,12 @@ describe('StandRemplissageField', () => {
       actif: true,
     } as any);
     const onChange = jest.fn();
-    await render(<StandRemplissageField value={null} onChange={onChange} />);
+    // `equipeId` : l'équipe choisie sur la fiche, pas celle de l'acteur connecté — sans
+    // l'envoyer dans le payload de création, le serveur rattachait le stand à l'équipe du
+    // chef de base connecté (`_resoudre_equipe_creation`), pas à celle-ci : le stand créé
+    // était aussitôt filtré hors de `standsVisibles`, provoquant un 422 incompréhensible
+    // à la soumission de la fiche.
+    await render(<StandRemplissageField value={null} onChange={onChange} equipeId="equipe-1" />);
 
     await screen.findByText('+ Nouveau stand de remplissage');
     fireEvent.press(screen.getByText('+ Nouveau stand de remplissage'));
@@ -128,13 +133,17 @@ describe('StandRemplissageField', () => {
         latitude: -22.4,
         longitude: 46.1,
         altitude: 700,
+        equipe_aerienne_id: 'equipe-1',
       })
     );
-    expect(onChange).toHaveBeenCalledWith('stand-2', {
-      id: 'stand-2',
-      numero: 'STD02',
-      localite: 'Betroka',
-      equipe_aerienne_id: 'equipe-1',
-    });
+    await waitFor(() =>
+      expect(onChange).toHaveBeenCalledWith('stand-2', {
+        id: 'stand-2',
+        numero: 'STD02',
+        localite: 'Betroka',
+        equipe_aerienne_id: 'equipe-1',
+      })
+    );
   });
+
 });

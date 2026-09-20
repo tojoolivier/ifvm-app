@@ -92,7 +92,7 @@ export function StandRemplissageField({ value, onChange, label = 'Stand de rempl
       { screen: 'stand-remplissage-field' }
     );
 
-  // Un stand « sans équipe » (antérieur à la migration 0075) n'appartient à personne :
+  // Un stand « sans équipe » (antérieur à la migration 0077) n'appartient à personne :
   // il n'est proposé à aucune équipe tant qu'un admin ne l'a pas rattaché.
   const standsVisibles = equipeId ? stands.filter((s) => s.equipe_aerienne_id === equipeId) : stands;
 
@@ -110,6 +110,11 @@ export function StandRemplissageField({ value, onChange, label = 'Stand de rempl
           latitude: position?.latitude ?? null,
           longitude: position?.longitude ?? null,
           altitude: position?.altitude ?? null,
+          // Équipe de la fiche en cours, pas celle de l'acteur connecté : un admin (ou
+          // un chef de base éditant pour une autre équipe) créerait sinon un stand
+          // rattaché à la mauvaise équipe — auto-sélectionné puis aussitôt filtré hors
+          // de `standsVisibles`, 422 incompréhensible à la soumission de la fiche.
+          equipe_aerienne_id: equipeId ?? undefined,
         });
         const option = {
           id: cree.id,
