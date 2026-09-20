@@ -256,6 +256,14 @@ describe('updateTraitementMoyens', () => {
       hauteur_strate_herbeuse_m: 1.2,
       hauteur_strate_arboree_m: 5,
       recouvrement_percent: 40,
+      nb_agents_permanents: null,
+      nb_agents_temporaires: null,
+      nb_personnel_local: null,
+      moyens_atomiseur_nb: null,
+      moyens_essence_litres: null,
+      moyens_disque_rotatif_nb: null,
+      moyens_piles_nb: null,
+      moyens_ulvamast_nb: null,
     });
 
     expect(runAsync).toHaveBeenCalledWith(

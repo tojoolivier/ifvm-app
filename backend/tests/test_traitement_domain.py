@@ -1806,6 +1806,14 @@ def _traitement_terrestre_sync(**overrides) -> Traitement:
         latitude=None,
         longitude=None,
         altitude=None,
+        nb_agents_permanents=None,
+        nb_agents_temporaires=None,
+        nb_personnel_local=None,
+        moyens_atomiseur_nb=None,
+        moyens_essence_litres=None,
+        moyens_disque_rotatif_nb=None,
+        moyens_piles_nb=None,
+        moyens_ulvamast_nb=None,
         kit_combinaison=0,
         kit_gants=0,
         kit_lunettes=0,
@@ -1917,6 +1925,14 @@ def test_contenu_diverge_champ_commun_different():
 def test_contenu_diverge_champ_terrestre_different():
     existant = _traitement_terrestre_sync()
     entrant = _traitement_terrestre_sync(surface_atomiseur_ha=99.0)
+    assert contenu_diverge(existant, entrant) is True
+
+
+def test_contenu_diverge_moyens_humains_materiels_different():
+    """#moyens-humains-materiels : champs communs (Aérien/Terrestre) ajoutés à
+    _CHAMPS_CONTENU_COMMUNS — une modification isolée doit être détectée."""
+    existant = _traitement_terrestre_sync(nb_agents_permanents=4, moyens_atomiseur_nb=3)
+    entrant = _traitement_terrestre_sync(nb_agents_permanents=6, moyens_atomiseur_nb=3)
     assert contenu_diverge(existant, entrant) is True
 
 

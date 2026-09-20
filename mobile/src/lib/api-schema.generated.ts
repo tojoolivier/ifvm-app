@@ -4070,6 +4070,22 @@ export interface components {
             longitude?: number | null;
             /** Altitude */
             altitude?: number | null;
+            /** Nb Agents Permanents */
+            nb_agents_permanents?: number | null;
+            /** Nb Agents Temporaires */
+            nb_agents_temporaires?: number | null;
+            /** Nb Personnel Local */
+            nb_personnel_local?: number | null;
+            /** Moyens Atomiseur Nb */
+            moyens_atomiseur_nb?: number | null;
+            /** Moyens Essence Litres */
+            moyens_essence_litres?: number | null;
+            /** Moyens Disque Rotatif Nb */
+            moyens_disque_rotatif_nb?: number | null;
+            /** Moyens Piles Nb */
+            moyens_piles_nb?: number | null;
+            /** Moyens Ulvamast Nb */
+            moyens_ulvamast_nb?: number | null;
             /**
              * Kit Combinaison
              * @default 0
@@ -4186,6 +4202,22 @@ export interface components {
             longitude: number | null;
             /** Altitude */
             altitude: number | null;
+            /** Nb Agents Permanents */
+            nb_agents_permanents: number | null;
+            /** Nb Agents Temporaires */
+            nb_agents_temporaires: number | null;
+            /** Nb Personnel Local */
+            nb_personnel_local: number | null;
+            /** Moyens Atomiseur Nb */
+            moyens_atomiseur_nb: number | null;
+            /** Moyens Essence Litres */
+            moyens_essence_litres: number | null;
+            /** Moyens Disque Rotatif Nb */
+            moyens_disque_rotatif_nb: number | null;
+            /** Moyens Piles Nb */
+            moyens_piles_nb: number | null;
+            /** Moyens Ulvamast Nb */
+            moyens_ulvamast_nb: number | null;
             /** Kit Combinaison */
             kit_combinaison: number;
             /** Kit Gants */
@@ -4298,6 +4330,22 @@ export interface components {
             longitude?: number | null;
             /** Altitude */
             altitude?: number | null;
+            /** Nb Agents Permanents */
+            nb_agents_permanents?: number | null;
+            /** Nb Agents Temporaires */
+            nb_agents_temporaires?: number | null;
+            /** Nb Personnel Local */
+            nb_personnel_local?: number | null;
+            /** Moyens Atomiseur Nb */
+            moyens_atomiseur_nb?: number | null;
+            /** Moyens Essence Litres */
+            moyens_essence_litres?: number | null;
+            /** Moyens Disque Rotatif Nb */
+            moyens_disque_rotatif_nb?: number | null;
+            /** Moyens Piles Nb */
+            moyens_piles_nb?: number | null;
+            /** Moyens Ulvamast Nb */
+            moyens_ulvamast_nb?: number | null;
             /**
              * Kit Combinaison
              * @default 0

@@ -130,6 +130,15 @@ const MIGRATED_COLUMNS = [
 
   // Autres colonnes
   { name: 'server_updated_at' },
+  // Moyens humains et matériels (migration backend 0076, #moyens-humains-materiels).
+  { name: 'nb_agents_permanents' },
+  { name: 'nb_agents_temporaires' },
+  { name: 'nb_personnel_local' },
+  { name: 'moyens_atomiseur_nb' },
+  { name: 'moyens_essence_litres' },
+  { name: 'moyens_disque_rotatif_nb' },
+  { name: 'moyens_piles_nb' },
+  { name: 'moyens_ulvamast_nb' },
   { name: 'surface_station' },
   { name: 'surface_prospectee' },
   { name: 'surface_infestee' },

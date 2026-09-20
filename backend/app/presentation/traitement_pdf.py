@@ -107,19 +107,18 @@ def _section_traitement(traitement: TraitementRead) -> str:
 
 
 def _section_moyens(traitement: TraitementRead) -> str:
-    # §4.1/4.2 (moyens humains/matériels) : absents du modèle actuel (issue
-    # #495) — cases volontairement vides, pas d'extension de schéma ici.
+    # §4.1/4.2 (moyens humains/matériels, migration 0076, #moyens-humains-materiels).
     return _section(
         "4. Moyens",
         [
-            ("Nb agents permanents", None),
-            ("Nb agents temporaires", None),
-            ("Nb personnel local", None),
-            ("Atomiseur", None),
-            ("Essence (litres)", None),
-            ("Disque rotatif", None),
-            ("Piles (nb)", None),
-            ("Ulvamast (nb)", None),
+            ("Nb agents permanents", traitement.nb_agents_permanents),
+            ("Nb agents temporaires", traitement.nb_agents_temporaires),
+            ("Nb personnel local", traitement.nb_personnel_local),
+            ("Atomiseur", traitement.moyens_atomiseur_nb),
+            ("Essence (litres)", traitement.moyens_essence_litres),
+            ("Disque rotatif", traitement.moyens_disque_rotatif_nb),
+            ("Piles (nb)", traitement.moyens_piles_nb),
+            ("Ulvamast (nb)", traitement.moyens_ulvamast_nb),
             ("Combinaison", traitement.kit_combinaison),
             ("Gants", traitement.kit_gants),
             ("Lunettes", traitement.kit_lunettes),

@@ -1,13 +1,16 @@
 /**
  * #terrestre-decimales-virgule : sur l'écran « Équipe » (Terrestre,
  * TerrestreForm.tsx), les champs numériques (vitesse du vent, température,
- * surfaces atomiseur/disque rotatif, pesticides consommés par produit,
- * approvisionnement, essence, nombre de piles) utilisaient `Number(v)`
+ * surfaces atomiseur/disque rotatif, taux de mortalité, pesticides consommés
+ * par produit, stock initial/approvisionnement) utilisaient `Number(v)`
  * directement sur `onChangeText`. Taper une virgule (séparateur décimal
  * français, ex "3,2") produisait `NaN`, aussitôt réaffiché tel quel — la
  * valeur saisie semblait disparaître ou rester bloquée à "NaN". Même
  * correctif que rotations.tsx (#pesticides-rotations-decimales) : conversion
  * virgule→point + état brouillon local par champ.
+ *
+ * Essence/Nombre de piles ne sont plus testés ici : retirés de cet écran au
+ * profit de « Moyens & protection » (#moyens-humains-materiels).
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import TraitementScreen from '@/app/(traitement)/traitement';
@@ -153,13 +156,12 @@ describe('TraitementScreen (Équipe, Terrestre) — saisie décimale francophone
     expect(screen.queryByDisplayValue('NaN')).toBeNull();
   });
 
-  it('permet de renseigner Essence (l) avec une virgule, sans rester bloqué à NaN', async () => {
+  it('permet de renseigner Stock initial (l) avec une virgule, sans rester bloqué à NaN (#stock-initial-terrestre)', async () => {
     await render(<TraitementScreen />);
     await waitFor(() => expect(useTraitementCaptureStore.getState().terrestre.chefEquipeId).toBe('chef-equipe-1'));
 
-    // ... Pesticides consommés (6), Stock initial (7, #stock-initial-terrestre),
-    // Approvisionnement (8), Essence (9).
-    fireEvent.changeText(screen.getAllByPlaceholderText('0')[9], '10,75');
+    // ... Pesticides consommés (6), Stock initial (7).
+    fireEvent.changeText(screen.getAllByPlaceholderText('0')[7], '10,75');
 
     expect(await screen.findByDisplayValue('10,75')).toBeVisible();
     expect(screen.queryByDisplayValue('NaN')).toBeNull();
