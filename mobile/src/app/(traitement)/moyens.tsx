@@ -451,7 +451,7 @@ export default function MoyensScreen() {
           );
         })}
 
-        <Text style={styles.label}>Zones exposées</Text>
+        <Text style={styles.sectionLabel}>Zones exposées</Text>
         <View style={styles.chipRow}>
           {ZONES.map((z) => (
             <Chip
