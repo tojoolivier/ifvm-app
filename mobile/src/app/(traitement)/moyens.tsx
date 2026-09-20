@@ -6,7 +6,6 @@ import {
   getTraitement,
   updateTraitementMoyens,
   updateTraitementAerienEfficacite,
-  updateTraitementTerrestreEfficacite,
 } from '@/lib/traitement-repository';
 import { getProspection } from '@/lib/prospection-repository';
 import { validateRecouvrement } from '@/lib/traitement-validation';
@@ -64,8 +63,9 @@ export default function MoyensScreen() {
   const [hauteurArboree, setHauteurArboree] = useState<number | null>(null);
   const [recouvrement, setRecouvrement] = useState<number | null>(null);
   // Efficacité (migration backend 0058, fiche CRT papier section "Traitement") —
-  // déplacée ici depuis Équipe/Pesticides & rotations (#efficacite-moyens-protection) :
-  // une seule évaluation par fiche, commune à l'Aérien et au Terrestre.
+  // Aérien uniquement désormais : déplacée ici depuis Équipe/Pesticides & rotations
+  // (#efficacite-moyens-protection), puis le Terrestre est reparti sur Équipe
+  // (#efficacite-equipe-terrestre) — seul l'Aérien la saisit encore sur cet écran.
   const [tauxMortalite, setTauxMortalite] = useState<number | null>(null);
   const [evaluationEfficaciteHeures, setEvaluationEfficaciteHeures] = useState<number | null>(null);
   const [methodeEvaluation, setMethodeEvaluation] = useState<'ESTIMATION_VISUELLE' | 'COMPTAGES_PRE_POST' | null>(null);
@@ -107,12 +107,14 @@ export default function MoyensScreen() {
         setHauteurHerbeuse(draft.hauteur_strate_herbeuse_m);
         setHauteurArboree(draft.hauteur_strate_arboree_m);
         setRecouvrement(draft.recouvrement_percent);
-        const efficacite = draft.type_traitement === 'AERIEN' ? draft.aerien : draft.terrestre;
-        if (efficacite) {
-          setTauxMortalite(efficacite.taux_mortalite_pourcent);
-          setEvaluationEfficaciteHeures(efficacite.evaluation_efficacite_heures_apres);
+        // Terrestre : Efficacité vit désormais sur l'écran Équipe
+        // (#efficacite-equipe-terrestre, retour arrière sur
+        // #efficacite-moyens-protection) — seul l'Aérien la saisit encore ici.
+        if (draft.type_traitement === 'AERIEN' && draft.aerien) {
+          setTauxMortalite(draft.aerien.taux_mortalite_pourcent);
+          setEvaluationEfficaciteHeures(draft.aerien.evaluation_efficacite_heures_apres);
           setMethodeEvaluation(
-            efficacite.methode_evaluation_efficacite as 'ESTIMATION_VISUELLE' | 'COMPTAGES_PRE_POST' | null
+            draft.aerien.methode_evaluation_efficacite as 'ESTIMATION_VISUELLE' | 'COMPTAGES_PRE_POST' | null
           );
         }
       })
@@ -189,17 +191,13 @@ export default function MoyensScreen() {
       async () => {
         // Déjà visible à l'écran (message par champ) : pas de second signal.
         if (recouvrementErrors.length > 0) return;
+        // Terrestre : Efficacité enregistrée sur l'écran Équipe
+        // (#efficacite-equipe-terrestre) — rien à faire ici pour lui.
         if (typeTraitement === 'AERIEN') {
           await updateTraitementAerienEfficacite(traitementId, {
             tauxMortalitePourcent: tauxMortalite,
             evaluationEfficaciteHeuresApres: evaluationEfficaciteHeures,
             methodeEvaluationEfficacite: methodeEvaluation,
-          });
-        } else if (typeTraitement === 'TERRESTRE') {
-          await updateTraitementTerrestreEfficacite(traitementId, {
-            taux_mortalite_pourcent: tauxMortalite,
-            evaluation_efficacite_heures_apres: evaluationEfficaciteHeures,
-            methode_evaluation_efficacite: methodeEvaluation,
           });
         }
         await updateTraitementMoyens(traitementId, {
@@ -233,42 +231,49 @@ export default function MoyensScreen() {
         />
         <Text style={styles.title}>Moyens & protection</Text>
 
-        <Text style={styles.sectionLabel}>Efficacité</Text>
-        <Text style={styles.fieldLabel}>Taux de mortalité (%)</Text>
-        <TextInput
-          testID="taux-mortalite-input"
-          editable={!readOnly}
-          style={styles.input}
-          placeholder="0"
-          keyboardType="decimal-pad"
-          value={decimalDrafts.tauxMortalite ?? formatDecimalDisplay(tauxMortalite)}
-          onChangeText={(v) => handleDecimalChange('tauxMortalite', v)}
-          onBlur={() => handleDecimalBlur('tauxMortalite')}
-        />
-        <Text style={styles.fieldLabel}>Évalué après traitement (heures)</Text>
-        <TextInput
-          testID="evaluation-efficacite-heures-input"
-          editable={!readOnly}
-          style={styles.input}
-          placeholder="0"
-          keyboardType="decimal-pad"
-          value={decimalDrafts.evaluationEfficaciteHeures ?? formatDecimalDisplay(evaluationEfficaciteHeures)}
-          onChangeText={(v) => handleDecimalChange('evaluationEfficaciteHeures', v)}
-          onBlur={() => handleDecimalBlur('evaluationEfficaciteHeures')}
-        />
-        <Text style={styles.fieldLabel}>Méthode d&apos;évaluation</Text>
-        <View style={styles.chipRow}>
-          <Chip
-            label="Estimation visuelle"
-            selected={methodeEvaluation === 'ESTIMATION_VISUELLE'}
-            onPress={() => !readOnly && setMethodeEvaluation('ESTIMATION_VISUELLE')}
-          />
-          <Chip
-            label="Comptages pré/post-traitement"
-            selected={methodeEvaluation === 'COMPTAGES_PRE_POST'}
-            onPress={() => !readOnly && setMethodeEvaluation('COMPTAGES_PRE_POST')}
-          />
-        </View>
+        {/* Terrestre : Efficacité déplacée sur l'écran Équipe
+            (#efficacite-equipe-terrestre) — seul l'Aérien la saisit encore ici,
+            où elle vivait déjà (#efficacite-moyens-protection). */}
+        {typeTraitement === 'AERIEN' && (
+          <>
+            <Text style={styles.sectionLabel}>Efficacité</Text>
+            <Text style={styles.fieldLabel}>Taux de mortalité (%)</Text>
+            <TextInput
+              testID="taux-mortalite-input"
+              editable={!readOnly}
+              style={styles.input}
+              placeholder="0"
+              keyboardType="decimal-pad"
+              value={decimalDrafts.tauxMortalite ?? formatDecimalDisplay(tauxMortalite)}
+              onChangeText={(v) => handleDecimalChange('tauxMortalite', v)}
+              onBlur={() => handleDecimalBlur('tauxMortalite')}
+            />
+            <Text style={styles.fieldLabel}>Évalué après traitement (heures)</Text>
+            <TextInput
+              testID="evaluation-efficacite-heures-input"
+              editable={!readOnly}
+              style={styles.input}
+              placeholder="0"
+              keyboardType="decimal-pad"
+              value={decimalDrafts.evaluationEfficaciteHeures ?? formatDecimalDisplay(evaluationEfficaciteHeures)}
+              onChangeText={(v) => handleDecimalChange('evaluationEfficaciteHeures', v)}
+              onBlur={() => handleDecimalBlur('evaluationEfficaciteHeures')}
+            />
+            <Text style={styles.fieldLabel}>Méthode d&apos;évaluation</Text>
+            <View style={styles.chipRow}>
+              <Chip
+                label="Estimation visuelle"
+                selected={methodeEvaluation === 'ESTIMATION_VISUELLE'}
+                onPress={() => !readOnly && setMethodeEvaluation('ESTIMATION_VISUELLE')}
+              />
+              <Chip
+                label="Comptages pré/post-traitement"
+                selected={methodeEvaluation === 'COMPTAGES_PRE_POST'}
+                onPress={() => !readOnly && setMethodeEvaluation('COMPTAGES_PRE_POST')}
+              />
+            </View>
+          </>
+        )}
 
         <Card variant={nbKitFournis === 5 ? 'info' : 'avertissement'}>
           <Text style={nbKitFournis === 5 ? styles.bannerTextOk : styles.bannerTextWarn}>

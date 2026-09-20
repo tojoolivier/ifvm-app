@@ -1,10 +1,12 @@
 /**
  * Efficacité (migration backend 0058, fiche CRT papier section "Traitement") :
- * taux de mortalité, délai d'évaluation et méthode — une seule évaluation par
- * fiche, commune à l'Aérien et au Terrestre. Déplacée sur l'écran « Moyens &
- * protection » (moyens.tsx, #efficacite-moyens-protection) : premiers champs
- * de la fiche, avant même le matériel de protection — vivait auparavant sur
- * Équipe (Terrestre) et Pesticides & rotations (Aérien).
+ * taux de mortalité, délai d'évaluation et méthode. Aérien uniquement sur cet
+ * écran « Moyens & protection » (moyens.tsx) — premiers champs de la fiche,
+ * avant même le matériel de protection (#efficacite-moyens-protection).
+ * Le Terrestre l'a saisie ici un temps, mais est reparti sur l'écran Équipe
+ * (#efficacite-equipe-terrestre, cf. traitement-terrestre-decimales-virgule.test.tsx
+ * pour sa couverture décimale côté Équipe) — le bloc « Efficacité absente »
+ * ci-dessous vérifie juste qu'elle a bien disparu de cet écran-ci pour lui.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import MoyensScreen from '@/app/(traitement)/moyens';
@@ -22,7 +24,6 @@ jest.mock('@/lib/traitement-repository', () => ({
   getTraitement: jest.fn(),
   updateTraitementMoyens: jest.fn().mockResolvedValue({}),
   updateTraitementAerienEfficacite: jest.fn().mockResolvedValue({}),
-  updateTraitementTerrestreEfficacite: jest.fn().mockResolvedValue({}),
 }));
 
 jest.mock('@/lib/prospection-repository', () => ({
@@ -32,7 +33,7 @@ jest.mock('@/lib/prospection-repository', () => ({
 function draft(overrides: Record<string, unknown> = {}) {
   return {
     id: 'trait-1',
-    type_traitement: 'TERRESTRE',
+    type_traitement: 'AERIEN',
     kit_combinaison: 0,
     kit_gants: 0,
     kit_lunettes: 0,
@@ -51,7 +52,6 @@ beforeEach(() => {
   jest.mocked(traitementRepository.getTraitement).mockReset().mockResolvedValue(draft());
   jest.mocked(traitementRepository.updateTraitementMoyens).mockClear().mockResolvedValue({} as any);
   jest.mocked(traitementRepository.updateTraitementAerienEfficacite).mockClear().mockResolvedValue({} as any);
-  jest.mocked(traitementRepository.updateTraitementTerrestreEfficacite).mockClear().mockResolvedValue({} as any);
   jest.mocked(prospectionRepository.getProspection).mockReset().mockResolvedValue(null);
 });
 
@@ -59,12 +59,12 @@ beforeEach(() => {
  * qu'ailleurs dans ce module. */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
 
-describe('MoyensScreen — Efficacité en premier champ', () => {
+describe('MoyensScreen — Efficacité en premier champ (Aérien)', () => {
   it('affiche Efficacité avant le matériel de protection', async () => {
     jest.mocked(traitementRepository.getTraitement).mockResolvedValue(
       draft({
-        type_traitement: 'TERRESTRE',
-        terrestre: {
+        type_traitement: 'AERIEN',
+        aerien: {
           taux_mortalite_pourcent: null,
           evaluation_efficacite_heures_apres: null,
           methode_evaluation_efficacite: null,
@@ -87,58 +87,26 @@ describe('MoyensScreen — Efficacité en premier champ', () => {
   });
 });
 
-describe('MoyensScreen (Terrestre) — efficacité (taux de mortalité)', () => {
-  it('saisit et enregistre le taux de mortalité, le délai et la méthode', async () => {
+describe('MoyensScreen (Terrestre) — Efficacité absente (#efficacite-equipe-terrestre)', () => {
+  it("n'affiche plus Efficacité, saisie désormais sur l'écran Équipe", async () => {
     jest.mocked(traitementRepository.getTraitement).mockResolvedValue(
       draft({
         type_traitement: 'TERRESTRE',
         terrestre: {
-          taux_mortalite_pourcent: null,
-          evaluation_efficacite_heures_apres: null,
-          methode_evaluation_efficacite: null,
-        },
-      })
-    );
-
-    await render(<MoyensScreen />);
-    await screen.findByText('Efficacité');
-
-    fireEvent.changeText(screen.getByTestId('taux-mortalite-input'), '87.5');
-    await settle();
-    fireEvent.changeText(screen.getByTestId('evaluation-efficacite-heures-input'), '6');
-    await settle();
-    fireEvent.press(screen.getByText('Comptages pré/post-traitement'));
-    await settle();
-    fireEvent.press(screen.getByText('Continuer  ›'));
-
-    await waitFor(() =>
-      expect(traitementRepository.updateTraitementTerrestreEfficacite).toHaveBeenCalledWith('trait-1', {
-        taux_mortalite_pourcent: 87.5,
-        evaluation_efficacite_heures_apres: 6,
-        methode_evaluation_efficacite: 'COMPTAGES_PRE_POST',
-      })
-    );
-  });
-
-  it('restaure une évaluation déjà enregistrée', async () => {
-    jest.mocked(traitementRepository.getTraitement).mockResolvedValue(
-      draft({
-        type_traitement: 'TERRESTRE',
-        terrestre: {
-          taux_mortalite_pourcent: 92,
+          taux_mortalite_pourcent: 87.5,
           evaluation_efficacite_heures_apres: 6,
-          methode_evaluation_efficacite: 'ESTIMATION_VISUELLE',
+          methode_evaluation_efficacite: 'COMPTAGES_PRE_POST',
         },
       })
     );
 
     await render(<MoyensScreen />);
+    await waitFor(() => expect(screen.getByText('Moyens & protection')).toBeVisible());
 
-    expect(await screen.findByDisplayValue('92')).toBeVisible();
-    expect(screen.getByDisplayValue('6')).toBeVisible();
-    expect(screen.getByText('Estimation visuelle').props.style).toEqual(
-      expect.arrayContaining([expect.objectContaining({ color: '#fff' })])
-    );
+    expect(screen.queryByText('Efficacité')).toBeNull();
+    expect(screen.queryByText('Taux de mortalité (%)')).toBeNull();
+    expect(screen.queryByText('Évalué après traitement (heures)')).toBeNull();
+    expect(screen.queryByText("Méthode d'évaluation")).toBeNull();
   });
 });
 

@@ -148,6 +148,15 @@ export interface TerrestreDraft {
   // Stock avant approvisionnement (migration backend 0075, fiche CRT papier
   // section 5) — Terrestre uniquement, pas d'équivalent AerienDraft.
   stockInitialL?: number | null;
+  // Efficacité (migration backend 0058, fiche CRT papier section "Traitement",
+  // juste après Condition de traitement) — désormais saisie ici
+  // (#efficacite-equipe-terrestre) plutôt que sur « Moyens & protection »
+  // (retour arrière sur #efficacite-moyens-protection, Terrestre uniquement ;
+  // l'Aérien continue de la saisir sur Moyens & protection, gérée localement
+  // là-bas, pas dans ce store).
+  taux_mortalite_pourcent?: number | null;
+  evaluation_efficacite_heures_apres?: number | null;
+  methode_evaluation_efficacite?: string | null;
   produits: ProduitDraft[];
 }
 

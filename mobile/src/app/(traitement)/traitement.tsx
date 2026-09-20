@@ -106,6 +106,9 @@ export default function TraitementScreen() {
           nb_piles: draft.terrestre.nb_piles,
           pesticideRecuL: draft.terrestre.pesticide_recu_l,
           stockInitialL: draft.terrestre.stock_initial_l,
+          taux_mortalite_pourcent: draft.terrestre.taux_mortalite_pourcent,
+          evaluation_efficacite_heures_apres: draft.terrestre.evaluation_efficacite_heures_apres,
+          methode_evaluation_efficacite: draft.terrestre.methode_evaluation_efficacite,
         });
         // Présélection reprise : uniquement sur une fiche fraîchement amorcée
         // depuis "Zones à reprendre" (draft.terrestre.reprise_traitement pas
@@ -262,6 +265,9 @@ export default function TraitementScreen() {
             nb_piles: store.terrestre.nb_piles,
             pesticideRecuL: store.terrestre.pesticideRecuL,
             stockInitialL: store.terrestre.stockInitialL,
+            taux_mortalite_pourcent: store.terrestre.taux_mortalite_pourcent,
+            evaluation_efficacite_heures_apres: store.terrestre.evaluation_efficacite_heures_apres,
+            methode_evaluation_efficacite: store.terrestre.methode_evaluation_efficacite,
           });
           // Purge avant re-création (#persistance-fiches-traitement) : même
           // raison que côté Aérien (rotations.tsx) — le store ne porte pas

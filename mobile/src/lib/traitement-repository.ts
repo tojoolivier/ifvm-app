@@ -736,6 +736,14 @@ export interface TerrestreUpdateInput {
   nb_piles?: number | null;
   pesticideRecuL?: number | null;
   stockInitialL?: number | null;
+  // Efficacité (migration backend 0058, fiche CRT papier section "Traitement",
+  // juste après Condition de traitement) — désormais saisie ici, sur l'écran
+  // Équipe (#efficacite-equipe-terrestre), plutôt que sur « Moyens & protection »
+  // (moyens.tsx, retour arrière sur #efficacite-moyens-protection) : seul
+  // l'Aérien continue de la saisir sur Moyens & protection.
+  taux_mortalite_pourcent?: number | null;
+  evaluation_efficacite_heures_apres?: number | null;
+  methode_evaluation_efficacite?: string | null;
 }
 
 export async function updateTraitementTerrestre(
@@ -764,7 +772,10 @@ export async function updateTraitementTerrestre(
       essence_litres = ?,
       nb_piles = ?,
       pesticide_recu_l = ?,
-      stock_initial_l = ?
+      stock_initial_l = ?,
+      taux_mortalite_pourcent = ?,
+      evaluation_efficacite_heures_apres = ?,
+      methode_evaluation_efficacite = ?
      WHERE traitement_id = ?`,
     [
       input.chefEquipeId,
@@ -786,43 +797,6 @@ export async function updateTraitementTerrestre(
       input.nb_piles ?? null,
       input.pesticideRecuL ?? null,
       input.stockInitialL ?? null,
-      traitementId,
-    ]
-  );
-
-  const updated = await getTraitement(traitementId);
-  if (!updated) {
-    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
-  }
-  return updated;
-}
-
-/**
- * Efficacité (migration backend 0058, fiche CRT papier section "Traitement") —
- * saisie sur l'écran « Moyens & protection » (moyens.tsx), même patron que
- * `updateTraitementAerienEfficacite` : information propre au résultat du
- * traitement, pas à l'équipe, fonction dédiée plutôt qu'un champ de plus sur
- * `TerrestreUpdateInput` (#efficacite-moyens-protection).
- */
-export interface TerrestreEfficaciteInput {
-  taux_mortalite_pourcent?: number | null;
-  evaluation_efficacite_heures_apres?: number | null;
-  methode_evaluation_efficacite?: string | null;
-}
-
-export async function updateTraitementTerrestreEfficacite(
-  traitementId: string,
-  input: TerrestreEfficaciteInput
-): Promise<DraftTraitement> {
-  const db = await getDb();
-
-  await db.runAsync(
-    `UPDATE traitement_terrestre SET
-      taux_mortalite_pourcent = ?,
-      evaluation_efficacite_heures_apres = ?,
-      methode_evaluation_efficacite = ?
-     WHERE traitement_id = ?`,
-    [
       input.taux_mortalite_pourcent ?? null,
       input.evaluation_efficacite_heures_apres ?? null,
       input.methode_evaluation_efficacite ?? null,
