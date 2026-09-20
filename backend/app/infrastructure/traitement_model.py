@@ -41,6 +41,15 @@ class TraitementModel(Base):
     latitude: Mapped[float | None] = mapped_column(Numeric(10, 8), nullable=True)
     longitude: Mapped[float | None] = mapped_column(Numeric(11, 8), nullable=True)
     altitude: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
+    # Moyens humains et matériels (fiche CRT papier §4.1/4.2, migration 0076).
+    nb_agents_permanents: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    nb_agents_temporaires: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    nb_personnel_local: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    moyens_atomiseur_nb: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    moyens_essence_litres: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    moyens_disque_rotatif_nb: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    moyens_piles_nb: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    moyens_ulvamast_nb: Mapped[int | None] = mapped_column(Integer(), nullable=True)
     kit_combinaison: Mapped[int] = mapped_column(Integer(), nullable=False, default=0)
     kit_gants: Mapped[int] = mapped_column(Integer(), nullable=False, default=0)
     kit_lunettes: Mapped[int] = mapped_column(Integer(), nullable=False, default=0)
@@ -393,6 +402,7 @@ class TraitementTerrestreModel(Base):
     nb_piles: Mapped[int | None] = mapped_column(Integer(), nullable=True)
     total_pesticide_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     pesticide_recu_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    stock_initial_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     pesticide_stock_restant_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
 
     traitement: Mapped[TraitementModel] = relationship(

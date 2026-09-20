@@ -83,7 +83,8 @@ type VegetationDecimalField = 'herbeuse' | 'arboree' | 'recouvrement';
  * aujourd'hui), pas encore la lecture directe de la prospection liée envisagée par
  * #325 (bloquant non résolu, cf. discussion) — hors périmètre ici.
  *
- * `kit_*`/`zones_exposees` sont chargés et réécrits tels quels (round-trip, jamais
+ * `kit_*`/`zones_exposees`/moyens humains et matériels (migration backend 0076,
+ * #moyens-humains-materiels) sont chargés et réécrits tels quels (round-trip, jamais
  * affichés ni modifiés ici) : `updateTraitementMoyens` persiste toute la ligne
  * `traitement` en un seul UPDATE, et moyens.tsx fait le même round-trip en sens
  * inverse pour la végétation — les deux écrans se repassent mutuellement les
@@ -101,6 +102,19 @@ export default function SyntheseScreen() {
   const [hauteurHerbeuse, setHauteurHerbeuse] = useState<number | null>(null);
   const [hauteurArboree, setHauteurArboree] = useState<number | null>(null);
   const [recouvrement, setRecouvrement] = useState<number | null>(null);
+  // Moyens humains et matériels (migration backend 0076, #moyens-humains-materiels) :
+  // ni affichés ni modifiés ici (saisis sur moyens.tsx) — même round-trip que
+  // kit_*/zones_exposees ci-dessus, pour ne jamais les écraser silencieusement.
+  const [moyensHumainsMateriels, setMoyensHumainsMateriels] = useState({
+    nb_agents_permanents: null as number | null,
+    nb_agents_temporaires: null as number | null,
+    nb_personnel_local: null as number | null,
+    moyens_atomiseur_nb: null as number | null,
+    moyens_essence_litres: null as number | null,
+    moyens_disque_rotatif_nb: null as number | null,
+    moyens_piles_nb: null as number | null,
+    moyens_ulvamast_nb: null as number | null,
+  });
   // Cf. handleVegetationChange/Blur ci-dessous — même garde de saisie intermédiaire
   // ("1," / "1.") que moyens.tsx.
   const [decimalDrafts, setDecimalDrafts] = useState<Partial<Record<VegetationDecimalField, string>>>({});
@@ -132,6 +146,16 @@ export default function SyntheseScreen() {
         setHauteurHerbeuse(draft.hauteur_strate_herbeuse_m);
         setHauteurArboree(draft.hauteur_strate_arboree_m);
         setRecouvrement(draft.recouvrement_percent);
+        setMoyensHumainsMateriels({
+          nb_agents_permanents: draft.nb_agents_permanents,
+          nb_agents_temporaires: draft.nb_agents_temporaires,
+          nb_personnel_local: draft.nb_personnel_local,
+          moyens_atomiseur_nb: draft.moyens_atomiseur_nb,
+          moyens_essence_litres: draft.moyens_essence_litres,
+          moyens_disque_rotatif_nb: draft.moyens_disque_rotatif_nb,
+          moyens_piles_nb: draft.moyens_piles_nb,
+          moyens_ulvamast_nb: draft.moyens_ulvamast_nb,
+        });
       })
       .catch((error) => signalerChargement(error, { traitementId }));
   }, [traitementId, signalerChargement]);
@@ -204,6 +228,7 @@ export default function SyntheseScreen() {
           hauteur_strate_herbeuse_m: hauteurHerbeuse,
           hauteur_strate_arboree_m: hauteurArboree,
           recouvrement_percent: recouvrement,
+          ...moyensHumainsMateriels,
         });
         router.push({ pathname: '/(traitement)/traitement' as any, params: { traitementId, isValidationView, origineId } });
       },

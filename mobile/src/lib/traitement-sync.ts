@@ -75,6 +75,17 @@ function buildTraitementSyncPayload(draft: DraftTraitement): components['schemas
     latitude: draft.latitude,
     longitude: draft.longitude,
     altitude: draft.altitude,
+    // Moyens humains et matériels (fiche CRT papier §4.1/4.2, migration
+    // backend 0076, #moyens-humains-materiels) — communs à l'Aérien et au
+    // Terrestre, comme kit_combinaison ci-dessous.
+    nb_agents_permanents: draft.nb_agents_permanents,
+    nb_agents_temporaires: draft.nb_agents_temporaires,
+    nb_personnel_local: draft.nb_personnel_local,
+    moyens_atomiseur_nb: draft.moyens_atomiseur_nb,
+    moyens_essence_litres: draft.moyens_essence_litres,
+    moyens_disque_rotatif_nb: draft.moyens_disque_rotatif_nb,
+    moyens_piles_nb: draft.moyens_piles_nb,
+    moyens_ulvamast_nb: draft.moyens_ulvamast_nb,
     kit_combinaison: draft.kit_combinaison ?? 0,
     kit_gants: draft.kit_gants ?? 0,
     kit_lunettes: draft.kit_lunettes ?? 0,
@@ -168,6 +179,7 @@ function buildTraitementSyncPayload(draft: DraftTraitement): components['schemas
         essence_litres: draft.terrestre.essence_litres,
         nb_piles: draft.terrestre.nb_piles,
         pesticide_recu_l: draft.terrestre.pesticide_recu_l,
+        stock_initial_l: draft.terrestre.stock_initial_l,
         reprise_traitement: draft.terrestre.reprise_traitement,
         traitement_origine_id: draft.terrestre.traitement_origine_id,
       } as components['schemas']['TraitementTerrestreCreate'],

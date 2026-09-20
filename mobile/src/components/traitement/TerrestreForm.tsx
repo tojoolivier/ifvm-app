@@ -33,9 +33,10 @@ type TerrestreDecimalField =
   | 'temperature_c'
   | 'surface_atomiseur_ha'
   | 'surface_disque_rotatif_ha'
-  | 'pesticideRecuL'
-  | 'essence_litres'
-  | 'nb_piles';
+  | 'taux_mortalite_pourcent'
+  | 'evaluation_efficacite_heures_apres'
+  | 'stockInitialL'
+  | 'pesticideRecuL';
 
 export interface TerrestreFormProps {
   readOnly: boolean;
@@ -47,6 +48,9 @@ export interface TerrestreFormProps {
   surfaceCumulee: number;
   surfaceRestante: number;
   totalPesticideTerrestre: number;
+  // « Stock Final » affiché à l'écran — intègre désormais stockInitialL en plus
+  // de pesticideRecuL (migration backend 0075, #stock-initial-terrestre) ;
+  // nom de prop conservé tel quel malgré le renommage du libellé affiché.
   pesticideStockRestant: number | null;
   errors: Record<string, string>;
 }
@@ -211,7 +215,7 @@ export function TerrestreForm({
         ))}
       </View>
 
-      <Text style={styles.label}>Moyens &amp; surfaces (ha)</Text>
+      <Text style={styles.sectionTitle}>Traitement</Text>
       <Text style={styles.label}>Atomiseur à dos</Text>
       <TextInput
         editable={!readOnly}
@@ -282,7 +286,47 @@ export function TerrestreForm({
         </Fragment>
       )}
 
-      <Text style={styles.label}>Produits utilisés</Text>
+      <Text style={styles.sectionTitle}>Efficacité</Text>
+      <Text style={styles.label}>Taux de mortalité (%)</Text>
+      <TextInput
+        editable={!readOnly}
+        style={styles.input}
+        placeholder="0"
+        keyboardType="decimal-pad"
+        value={
+          getDecimalDraft('taux_mortalite_pourcent') ?? formatDecimalDisplay(store.terrestre.taux_mortalite_pourcent)
+        }
+        onChangeText={(v) => handleDecimalChange('taux_mortalite_pourcent', v)}
+        onBlur={() => clearDecimalDraft('taux_mortalite_pourcent')}
+      />
+      <Text style={styles.label}>Évalué après traitement (heures)</Text>
+      <TextInput
+        editable={!readOnly}
+        style={styles.input}
+        placeholder="0"
+        keyboardType="decimal-pad"
+        value={
+          getDecimalDraft('evaluation_efficacite_heures_apres') ??
+          formatDecimalDisplay(store.terrestre.evaluation_efficacite_heures_apres)
+        }
+        onChangeText={(v) => handleDecimalChange('evaluation_efficacite_heures_apres', v)}
+        onBlur={() => clearDecimalDraft('evaluation_efficacite_heures_apres')}
+      />
+      <Text style={styles.label}>Méthode d&apos;évaluation</Text>
+      <View style={styles.chipRow}>
+        <Chip
+          label="Estimation visuelle"
+          selected={store.terrestre.methode_evaluation_efficacite === 'ESTIMATION_VISUELLE'}
+          onPress={() => !readOnly && store.updateTerrestre({ methode_evaluation_efficacite: 'ESTIMATION_VISUELLE' })}
+        />
+        <Chip
+          label="Comptages pré/post-traitement"
+          selected={store.terrestre.methode_evaluation_efficacite === 'COMPTAGES_PRE_POST'}
+          onPress={() => !readOnly && store.updateTerrestre({ methode_evaluation_efficacite: 'COMPTAGES_PRE_POST' })}
+        />
+      </View>
+
+      <Text style={styles.sectionTitle}>Produits utilisés</Text>
       {produits.map((produit, index) => (
         <Card key={produit.localId} style={styles.rotationCard}>
           <View style={styles.rotationHeader}>
@@ -334,6 +378,16 @@ export function TerrestreForm({
         <Text style={styles.derivedValue}>{totalPesticideTerrestre}</Text>
       </Card>
 
+      <Text style={styles.label}>Stock initial (l)</Text>
+      <TextInput
+        editable={!readOnly}
+        style={styles.input}
+        placeholder="0"
+        keyboardType="decimal-pad"
+        value={getDecimalDraft('stockInitialL') ?? formatDecimalDisplay(store.terrestre.stockInitialL)}
+        onChangeText={(v) => handleDecimalChange('stockInitialL', v)}
+        onBlur={() => clearDecimalDraft('stockInitialL')}
+      />
       <Text style={styles.label}>Approvisionnement (l)</Text>
       <TextInput
         editable={!readOnly}
@@ -346,31 +400,10 @@ export function TerrestreForm({
       />
       {pesticideStockRestant != null && (
         <Card variant="derivee">
-          <Text style={styles.label}>Reste en stock (l)</Text>
+          <Text style={styles.label}>Stock Final (l)</Text>
           <Text style={styles.derivedValue}>{pesticideStockRestant}</Text>
         </Card>
       )}
-
-      <Text style={styles.label}>Essence (l)</Text>
-      <TextInput
-        editable={!readOnly}
-        style={styles.input}
-        placeholder="0"
-        keyboardType="decimal-pad"
-        value={getDecimalDraft('essence_litres') ?? formatDecimalDisplay(store.terrestre.essence_litres)}
-        onChangeText={(v) => handleDecimalChange('essence_litres', v)}
-        onBlur={() => clearDecimalDraft('essence_litres')}
-      />
-      <Text style={styles.label}>Nombre de piles</Text>
-      <TextInput
-        editable={!readOnly}
-        style={styles.input}
-        placeholder="0"
-        keyboardType="decimal-pad"
-        value={getDecimalDraft('nb_piles') ?? formatDecimalDisplay(store.terrestre.nb_piles)}
-        onChangeText={(v) => handleDecimalChange('nb_piles', v)}
-        onBlur={() => clearDecimalDraft('nb_piles')}
-      />
     </Fragment>
   );
 }

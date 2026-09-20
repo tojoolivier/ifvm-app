@@ -42,6 +42,16 @@ export interface DraftTraitementRow {
   latitude: number | null;
   longitude: number | null;
   altitude: number | null;
+  // Moyens humains et matériels (fiche CRT papier §4.1/4.2, migration backend
+  // 0076, #moyens-humains-materiels) — communs à l'Aérien et au Terrestre.
+  nb_agents_permanents: number | null;
+  nb_agents_temporaires: number | null;
+  nb_personnel_local: number | null;
+  moyens_atomiseur_nb: number | null;
+  moyens_essence_litres: number | null;
+  moyens_disque_rotatif_nb: number | null;
+  moyens_piles_nb: number | null;
+  moyens_ulvamast_nb: number | null;
   /** Nombre de personnes équipées de chaque matériel — plus des booléens
    * depuis que tout l'équipage doit être équipé, pas seulement une personne. */
   kit_combinaison: number | null;
@@ -193,6 +203,9 @@ export interface TraitementTerrestre {
   surface_restante_ha: number | null;
   total_pesticide_l: number | null;
   pesticide_recu_l: number | null;
+  // Stock avant approvisionnement (migration backend 0075, fiche CRT papier
+  // section 5) — entre dans le calcul de pesticide_stock_restant_l (« Stock final »).
+  stock_initial_l: number | null;
   pesticide_stock_restant_l: number | null;
 }
 
@@ -732,6 +745,15 @@ export interface TerrestreUpdateInput {
   essence_litres?: number | null;
   nb_piles?: number | null;
   pesticideRecuL?: number | null;
+  stockInitialL?: number | null;
+  // Efficacité (migration backend 0058, fiche CRT papier section "Traitement",
+  // juste après Condition de traitement) — désormais saisie ici, sur l'écran
+  // Équipe (#efficacite-equipe-terrestre), plutôt que sur « Moyens & protection »
+  // (moyens.tsx, retour arrière sur #efficacite-moyens-protection) : seul
+  // l'Aérien continue de la saisir sur Moyens & protection.
+  taux_mortalite_pourcent?: number | null;
+  evaluation_efficacite_heures_apres?: number | null;
+  methode_evaluation_efficacite?: string | null;
 }
 
 export async function updateTraitementTerrestre(
@@ -759,7 +781,11 @@ export async function updateTraitementTerrestre(
       motif_surface_restante_abandonnee = ?,
       essence_litres = ?,
       nb_piles = ?,
-      pesticide_recu_l = ?
+      pesticide_recu_l = ?,
+      stock_initial_l = ?,
+      taux_mortalite_pourcent = ?,
+      evaluation_efficacite_heures_apres = ?,
+      methode_evaluation_efficacite = ?
      WHERE traitement_id = ?`,
     [
       input.chefEquipeId,
@@ -780,43 +806,7 @@ export async function updateTraitementTerrestre(
       input.essence_litres ?? null,
       input.nb_piles ?? null,
       input.pesticideRecuL ?? null,
-      traitementId,
-    ]
-  );
-
-  const updated = await getTraitement(traitementId);
-  if (!updated) {
-    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
-  }
-  return updated;
-}
-
-/**
- * Efficacité (migration backend 0058, fiche CRT papier section "Traitement") —
- * saisie sur l'écran « Moyens & protection » (moyens.tsx), même patron que
- * `updateTraitementAerienEfficacite` : information propre au résultat du
- * traitement, pas à l'équipe, fonction dédiée plutôt qu'un champ de plus sur
- * `TerrestreUpdateInput` (#efficacite-moyens-protection).
- */
-export interface TerrestreEfficaciteInput {
-  taux_mortalite_pourcent?: number | null;
-  evaluation_efficacite_heures_apres?: number | null;
-  methode_evaluation_efficacite?: string | null;
-}
-
-export async function updateTraitementTerrestreEfficacite(
-  traitementId: string,
-  input: TerrestreEfficaciteInput
-): Promise<DraftTraitement> {
-  const db = await getDb();
-
-  await db.runAsync(
-    `UPDATE traitement_terrestre SET
-      taux_mortalite_pourcent = ?,
-      evaluation_efficacite_heures_apres = ?,
-      methode_evaluation_efficacite = ?
-     WHERE traitement_id = ?`,
-    [
+      input.stockInitialL ?? null,
       input.taux_mortalite_pourcent ?? null,
       input.evaluation_efficacite_heures_apres ?? null,
       input.methode_evaluation_efficacite ?? null,
@@ -841,6 +831,16 @@ export interface MoyensUpdateInput {
   hauteur_strate_herbeuse_m: number | null;
   hauteur_strate_arboree_m: number | null;
   recouvrement_percent: number | null;
+  // Moyens humains et matériels (fiche CRT papier §4.1/4.2, migration backend
+  // 0076, #moyens-humains-materiels) — communs à l'Aérien et au Terrestre.
+  nb_agents_permanents: number | null;
+  nb_agents_temporaires: number | null;
+  nb_personnel_local: number | null;
+  moyens_atomiseur_nb: number | null;
+  moyens_essence_litres: number | null;
+  moyens_disque_rotatif_nb: number | null;
+  moyens_piles_nb: number | null;
+  moyens_ulvamast_nb: number | null;
 }
 
 export async function updateTraitementMoyens(
@@ -861,6 +861,14 @@ export async function updateTraitementMoyens(
       hauteur_strate_herbeuse_m = ?,
       hauteur_strate_arboree_m = ?,
       recouvrement_percent = ?,
+      nb_agents_permanents = ?,
+      nb_agents_temporaires = ?,
+      nb_personnel_local = ?,
+      moyens_atomiseur_nb = ?,
+      moyens_essence_litres = ?,
+      moyens_disque_rotatif_nb = ?,
+      moyens_piles_nb = ?,
+      moyens_ulvamast_nb = ?,
       updated_at = ?
      WHERE id = ?`,
     [
@@ -873,6 +881,14 @@ export async function updateTraitementMoyens(
       input.hauteur_strate_herbeuse_m,
       input.hauteur_strate_arboree_m,
       input.recouvrement_percent,
+      input.nb_agents_permanents,
+      input.nb_agents_temporaires,
+      input.nb_personnel_local,
+      input.moyens_atomiseur_nb,
+      input.moyens_essence_litres,
+      input.moyens_disque_rotatif_nb,
+      input.moyens_piles_nb,
+      input.moyens_ulvamast_nb,
       now,
       traitementId,
     ]

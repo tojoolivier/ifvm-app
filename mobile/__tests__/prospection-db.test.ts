@@ -130,6 +130,15 @@ const MIGRATED_COLUMNS = [
 
   // Autres colonnes
   { name: 'server_updated_at' },
+  // Moyens humains et matériels (migration backend 0076, #moyens-humains-materiels).
+  { name: 'nb_agents_permanents' },
+  { name: 'nb_agents_temporaires' },
+  { name: 'nb_personnel_local' },
+  { name: 'moyens_atomiseur_nb' },
+  { name: 'moyens_essence_litres' },
+  { name: 'moyens_disque_rotatif_nb' },
+  { name: 'moyens_piles_nb' },
+  { name: 'moyens_ulvamast_nb' },
   { name: 'surface_station' },
   { name: 'surface_prospectee' },
   { name: 'surface_infestee' },
@@ -184,6 +193,8 @@ const MIGRATED_COLUMNS = [
   // Colonnes de traitement_aerien et traitement_terrestre (partagées)
   { name: 'pesticide_recu_l' },
   { name: 'pesticide_stock_restant_l' },
+  // Stock avant approvisionnement (migration backend 0075) — Terrestre uniquement.
+  { name: 'stock_initial_l' },
   // agent_encadreur_id (FK utilisateur) -> texte libre (migration backend 0057,
   // même retour en arrière que pilote/mecanicien/consultant_international
   // ci-dessus, migration 0048).

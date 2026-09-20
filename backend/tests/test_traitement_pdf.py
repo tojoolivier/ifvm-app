@@ -27,6 +27,14 @@ def _traitement_aerien(**overrides) -> TraitementRead:
         latitude=None,
         longitude=None,
         altitude=None,
+        nb_agents_permanents=None,
+        nb_agents_temporaires=None,
+        nb_personnel_local=None,
+        moyens_atomiseur_nb=None,
+        moyens_essence_litres=None,
+        moyens_disque_rotatif_nb=None,
+        moyens_piles_nb=None,
+        moyens_ulvamast_nb=None,
         kit_combinaison=0,
         kit_gants=0,
         kit_lunettes=0,
@@ -115,6 +123,7 @@ def _traitement_terrestre(**overrides) -> TraitementRead:
         nb_piles=None,
         total_pesticide_l=None,
         pesticide_recu_l=None,
+        stock_initial_l=None,
         pesticide_stock_restant_l=None,
         produits=[],
     )
@@ -163,10 +172,51 @@ def test_build_crt_html_affiche_les_signatures():
 
 
 def test_build_crt_html_champs_manquants_au_modele_affiches_vides():
-    """§4.1/4.2 (moyens humains/materiels) et §5.3 (stock initial pesticide) ne
-    sont pas modelises (cf. issue #495) : la case doit rester vide, pas
-    disparaitre ni planter."""
+    """§4.1/4.2 (moyens humains/matériels, désormais modélisés — migration 0076,
+    #moyens-humains-materiels) et §5.3 (stock initial pesticide, Terrestre
+    uniquement — #stock-initial-terrestre) : sur une fiche qui ne les renseigne
+    pas, la case doit rester vide, pas disparaitre ni planter (cf.
+    test_build_crt_html_affiche_moyens_humains_materiels et
+    test_build_crt_html_terrestre_affiche_stock_initial pour le cas renseigné)."""
     html = build_crt_html(_traitement_aerien())
 
     assert "Nb agents permanents" in html
     assert "Stock initial" in html
+
+
+def test_build_crt_html_affiche_moyens_humains_materiels():
+    """#moyens-humains-materiels : contrairement au test ci-dessus (fiche vide),
+    la case affiche la vraie valeur quand ces champs sont renseignés."""
+    traitement = _traitement_aerien(
+        nb_agents_permanents=4,
+        nb_agents_temporaires=2,
+        nb_personnel_local=6,
+        moyens_atomiseur_nb=3,
+        moyens_essence_litres=50.0,
+        moyens_disque_rotatif_nb=1,
+        moyens_piles_nb=12,
+        moyens_ulvamast_nb=2,
+    )
+
+    html = build_crt_html(traitement)
+
+    assert ">4<" in html
+    assert ">2<" in html
+    assert ">6<" in html
+    assert ">3<" in html
+    assert ">50.0<" in html
+    assert ">1<" in html
+    assert ">12<" in html
+
+
+def test_build_crt_html_terrestre_affiche_stock_initial():
+    """#stock-initial-terrestre : contrairement à l'Aérien (ci-dessus), la case
+    "Stock initial" du Terrestre est désormais alimentée par une vraie valeur,
+    pas seulement affichée vide."""
+    traitement = _traitement_terrestre()
+    traitement.terrestre.stock_initial_l = 40.0
+
+    html = build_crt_html(traitement)
+
+    assert "Stock initial" in html
+    assert "40.0" in html

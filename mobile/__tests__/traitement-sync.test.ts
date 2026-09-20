@@ -76,6 +76,14 @@ function draft(overrides: Partial<DraftTraitement> = {}): DraftTraitement {
     latitude: null,
     longitude: null,
     altitude: null,
+    nb_agents_permanents: null,
+    nb_agents_temporaires: null,
+    nb_personnel_local: null,
+    moyens_atomiseur_nb: null,
+    moyens_essence_litres: null,
+    moyens_disque_rotatif_nb: null,
+    moyens_piles_nb: null,
+    moyens_ulvamast_nb: null,
     kit_combinaison: null,
     kit_gants: null,
     kit_lunettes: null,
@@ -408,7 +416,8 @@ describe('enregistrerEtSynchroniserTraitement', () => {
         surface_cumulee_ha: null,
         surface_restante_ha: null,
         total_pesticide_l: null,
-        pesticide_recu_l: null,
+        pesticide_recu_l: 150,
+        stock_initial_l: 40,
         pesticide_stock_restant_l: null,
         taux_mortalite_pourcent: null,
         evaluation_efficacite_heures_apres: null,
@@ -423,7 +432,15 @@ describe('enregistrerEtSynchroniserTraitement', () => {
       'token-1',
       expect.objectContaining({
         type_traitement: 'TERRESTRE',
-        terrestre: expect.objectContaining({ chef_equipe_id: 'chef-equipe-1', vitesse_vent_ms: 2 }),
+        terrestre: expect.objectContaining({
+          chef_equipe_id: 'chef-equipe-1',
+          vitesse_vent_ms: 2,
+          // #stock-initial-terrestre : doit être transmis au même titre que
+          // pesticide_recu_l, sans quoi le stock final resterait mal calculé
+          // côté serveur après synchronisation.
+          pesticide_recu_l: 150,
+          stock_initial_l: 40,
+        }),
       })
     );
   });
@@ -468,6 +485,7 @@ describe('enregistrerEtSynchroniserTraitement', () => {
         surface_restante_ha: null,
         total_pesticide_l: null,
         pesticide_recu_l: null,
+        stock_initial_l: null,
         pesticide_stock_restant_l: null,
         taux_mortalite_pourcent: null,
         evaluation_efficacite_heures_apres: null,

@@ -125,13 +125,21 @@ class TraitementSyncConflitError(Exception):
         super().__init__("Conflit de synchronisation — la version serveur fait foi")
 
 
-def _stock_pesticide_restant(recu: float | None, consomme: float | None) -> float | None:
-    """« Reste en stock » = reçu − consommé, plancher à 0 (même convention que
-    `surface_restante_ha`, CDG §9). `None` tant que « reçu » n'est pas renseigné —
-    un stock ne se déduit pas d'une consommation seule."""
-    if recu is None:
+def _stock_pesticide_restant(
+    recu: float | None, consomme: float | None, initial: float | None = None
+) -> float | None:
+    """« Stock final » = initial + reçu − consommé, plancher à 0 (même convention
+    que `surface_restante_ha`, CDG §9). `None` tant que ni « initial » ni « reçu »
+    ne sont renseignés — un stock ne se déduit pas d'une consommation seule.
+
+    `initial` (« Stock initial », fiche CRT papier section 5 — Terrestre
+    uniquement, cf. `TraitementTerrestre.stock_initial_l`) est optionnel : côté
+    Aérien, qui n'a pas cette notion, l'appel reste `_stock_pesticide_restant(recu,
+    consomme)` inchangé, équivalent à `initial=0`.
+    """
+    if recu is None and initial is None:
         return None
-    return max(recu - (consomme or 0.0), 0.0)
+    return max((initial or 0.0) + (recu or 0.0) - (consomme or 0.0), 0.0)
 
 
 @dataclass
@@ -424,6 +432,10 @@ class TraitementTerrestre:
     total_pesticide_l: float | None = None
     # Stock de pesticide par fiche — même patron que TraitementAerien.
     pesticide_recu_l: float | None = None
+    # Stock avant approvisionnement (fiche CRT papier, section 5 — Terrestre
+    # uniquement, pas d'équivalent Aérien) : saisi par l'agent, entre dans le
+    # calcul de pesticide_stock_restant_l ci-dessous (« Stock final »).
+    stock_initial_l: float | None = None
     pesticide_stock_restant_l: float | None = None
     produits: list[ProduitUtilise] = field(default_factory=list)
 
@@ -440,7 +452,7 @@ class TraitementTerrestre:
         synchronisation où les produits existants ne sont pas rechargés.
         """
         self.pesticide_stock_restant_l = _stock_pesticide_restant(
-            self.pesticide_recu_l, self.total_pesticide_l
+            self.pesticide_recu_l, self.total_pesticide_l, self.stock_initial_l
         )
 
     def recalculer_surfaces(
@@ -507,6 +519,24 @@ class Traitement:
     latitude: float | None = None
     longitude: float | None = None
     altitude: float | None = None
+    # Moyens humains et matériels (fiche CRT papier §4.1/4.2, migration 0076) —
+    # comblent un trou du gabarit PDF (traitement_pdf.py::_section_moyens,
+    # cases "Nb agents permanents"/"Atomiseur"/... jamais alimentées jusqu'ici,
+    # cf. issue #495). Communs à l'Aérien et au Terrestre, comme kit_combinaison
+    # ci-dessous — saisis sur l'écran « Moyens & protection ».
+    nb_agents_permanents: int | None = None
+    nb_agents_temporaires: int | None = None
+    nb_personnel_local: int | None = None
+    # Comptage de matériel disponible sur le terrain — notion distincte des
+    # champs Terrestre `surface_atomiseur_ha`/`surface_disque_rotatif_ha`
+    # (surface traitée par équipement, écran Équipe) et `essence_litres`/
+    # `nb_piles` (consommation, retirés de cet écran au profit de ceux-ci,
+    # #moyens-humains-materiels).
+    moyens_atomiseur_nb: int | None = None
+    moyens_essence_litres: float | None = None
+    moyens_disque_rotatif_nb: int | None = None
+    moyens_piles_nb: int | None = None
+    moyens_ulvamast_nb: int | None = None
     # Nombre de personnes équipées de chaque matériel de protection (toutes les
     # personnes à bord de l'hélicoptère/dans l'équipe doivent être équipées, pas
     # seulement « au moins une ») — plus des cases à cocher depuis la migration 0036.
@@ -641,6 +671,14 @@ _CHAMPS_CONTENU_COMMUNS = (
     "latitude",
     "longitude",
     "altitude",
+    "nb_agents_permanents",
+    "nb_agents_temporaires",
+    "nb_personnel_local",
+    "moyens_atomiseur_nb",
+    "moyens_essence_litres",
+    "moyens_disque_rotatif_nb",
+    "moyens_piles_nb",
+    "moyens_ulvamast_nb",
     "kit_combinaison",
     "kit_gants",
     "kit_lunettes",
@@ -727,6 +765,7 @@ _CHAMPS_CONTENU_TERRESTRE = (
     "essence_litres",
     "nb_piles",
     "pesticide_recu_l",
+    "stock_initial_l",
 )
 
 

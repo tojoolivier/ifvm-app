@@ -1,13 +1,16 @@
 /**
  * #terrestre-decimales-virgule : sur l'écran « Équipe » (Terrestre,
  * TerrestreForm.tsx), les champs numériques (vitesse du vent, température,
- * surfaces atomiseur/disque rotatif, pesticides consommés par produit,
- * approvisionnement, essence, nombre de piles) utilisaient `Number(v)`
+ * surfaces atomiseur/disque rotatif, taux de mortalité, pesticides consommés
+ * par produit, stock initial/approvisionnement) utilisaient `Number(v)`
  * directement sur `onChangeText`. Taper une virgule (séparateur décimal
  * français, ex "3,2") produisait `NaN`, aussitôt réaffiché tel quel — la
  * valeur saisie semblait disparaître ou rester bloquée à "NaN". Même
  * correctif que rotations.tsx (#pesticides-rotations-decimales) : conversion
  * virgule→point + état brouillon local par champ.
+ *
+ * Essence/Nombre de piles ne sont plus testés ici : retirés de cet écran au
+ * profit de « Moyens & protection » (#moyens-humains-materiels).
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import TraitementScreen from '@/app/(traitement)/traitement';
@@ -71,6 +74,7 @@ const TERRESTRE_DRAFT = {
   essence_litres: null,
   nb_piles: null,
   pesticide_recu_l: null,
+  stock_initial_l: null,
   produits: [],
 };
 
@@ -112,32 +116,52 @@ describe('TraitementScreen (Équipe, Terrestre) — saisie décimale francophone
     await render(<TraitementScreen />);
     await waitFor(() => expect(useTraitementCaptureStore.getState().terrestre.chefEquipeId).toBe('chef-equipe-1'));
 
-    // vitesse_vent_ms (0), temperature_c (1), surface_atomiseur_ha (2)
-    // (efficacité déplacée sur Moyens & protection, #efficacite-moyens-protection).
+    // vitesse_vent_ms (0), temperature_c (1), surface_atomiseur_ha (2).
     fireEvent.changeText(screen.getAllByPlaceholderText('0')[2], '1,5');
 
     expect(await screen.findByDisplayValue('1,5')).toBeVisible();
     expect(screen.queryByDisplayValue('NaN')).toBeNull();
   });
 
+  it("permet de renseigner Taux de mortalité (%) avec une virgule, sans rester bloqué à NaN (#efficacite-equipe-terrestre)", async () => {
+    await render(<TraitementScreen />);
+    await waitFor(() => expect(useTraitementCaptureStore.getState().terrestre.chefEquipeId).toBe('chef-equipe-1'));
+
+    // vitesse_vent_ms (0), temperature_c (1), surface_atomiseur_ha (2),
+    // surface_disque_rotatif_ha (3), Taux de mortalité (4).
+    fireEvent.changeText(screen.getAllByPlaceholderText('0')[4], '87,5');
+
+    expect(await screen.findByDisplayValue('87,5')).toBeVisible();
+    expect(screen.queryByDisplayValue('NaN')).toBeNull();
+
+    fireEvent.press(screen.getByText('Continuer  ›'));
+
+    await waitFor(() =>
+      expect(traitementRepository.updateTraitementTerrestre).toHaveBeenCalledWith(
+        'trait-1',
+        expect.objectContaining({ taux_mortalite_pourcent: 87.5 })
+      )
+    );
+  });
+
   it('permet de renseigner Pesticides consommés (l) d’un produit avec une virgule, sans rester bloqué à NaN', async () => {
     await render(<TraitementScreen />);
     await waitFor(() => expect(useTraitementCaptureStore.getState().terrestre.chefEquipeId).toBe('chef-equipe-1'));
 
-    // ... surface_disque_rotatif_ha (3), Pesticides consommés du 1er produit (4)
-    // (Atomiseur autoporté retiré de l'écran).
-    fireEvent.changeText(screen.getAllByPlaceholderText('0')[4], '4,25');
+    // ... surface_disque_rotatif_ha (3), Taux de mortalité (4, #efficacite-equipe-
+    // terrestre), Évalué après (5), Pesticides consommés du 1er produit (6).
+    fireEvent.changeText(screen.getAllByPlaceholderText('0')[6], '4,25');
 
     expect(await screen.findByDisplayValue('4,25')).toBeVisible();
     expect(screen.queryByDisplayValue('NaN')).toBeNull();
   });
 
-  it('permet de renseigner Essence (l) avec une virgule, sans rester bloqué à NaN', async () => {
+  it('permet de renseigner Stock initial (l) avec une virgule, sans rester bloqué à NaN (#stock-initial-terrestre)', async () => {
     await render(<TraitementScreen />);
     await waitFor(() => expect(useTraitementCaptureStore.getState().terrestre.chefEquipeId).toBe('chef-equipe-1'));
 
-    // ... Pesticides consommés (4), Approvisionnement (5), Essence (6).
-    fireEvent.changeText(screen.getAllByPlaceholderText('0')[6], '10,75');
+    // ... Pesticides consommés (6), Stock initial (7).
+    fireEvent.changeText(screen.getAllByPlaceholderText('0')[7], '10,75');
 
     expect(await screen.findByDisplayValue('10,75')).toBeVisible();
     expect(screen.queryByDisplayValue('NaN')).toBeNull();

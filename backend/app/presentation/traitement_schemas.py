@@ -148,6 +148,9 @@ class TraitementTerrestreCreate(BaseModel):
     essence_litres: float | None = Field(None, ge=0)
     nb_piles: int | None = Field(None, ge=0)
     pesticide_recu_l: float | None = Field(None, ge=0)
+    # Stock avant approvisionnement (fiche CRT papier, section 5) — Terrestre
+    # uniquement, pas d'équivalent côté TraitementAerienCreate.
+    stock_initial_l: float | None = Field(None, ge=0)
     reprise_traitement: bool = False
     traitement_origine_id: uuid.UUID | None = None
 
@@ -189,6 +192,16 @@ class TraitementCreate(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
     altitude: float | None = None
+    # Moyens humains et matériels (fiche CRT papier §4.1/4.2, migration 0076) —
+    # communs à l'Aérien et au Terrestre, comme kit_combinaison ci-dessous.
+    nb_agents_permanents: int | None = Field(None, ge=0)
+    nb_agents_temporaires: int | None = Field(None, ge=0)
+    nb_personnel_local: int | None = Field(None, ge=0)
+    moyens_atomiseur_nb: int | None = Field(None, ge=0)
+    moyens_essence_litres: float | None = Field(None, ge=0)
+    moyens_disque_rotatif_nb: int | None = Field(None, ge=0)
+    moyens_piles_nb: int | None = Field(None, ge=0)
+    moyens_ulvamast_nb: int | None = Field(None, ge=0)
     kit_combinaison: int = Field(0, ge=0)
     kit_gants: int = Field(0, ge=0)
     kit_lunettes: int = Field(0, ge=0)
@@ -468,6 +481,7 @@ class TraitementTerrestreRead(BaseModel):
     nb_piles: int | None
     total_pesticide_l: float | None
     pesticide_recu_l: float | None
+    stock_initial_l: float | None
     pesticide_stock_restant_l: float | None
     produits: list[ProduitUtiliseRead] = []
 
@@ -489,6 +503,14 @@ class TraitementRead(BaseModel):
     latitude: float | None
     longitude: float | None
     altitude: float | None
+    nb_agents_permanents: int | None
+    nb_agents_temporaires: int | None
+    nb_personnel_local: int | None
+    moyens_atomiseur_nb: int | None
+    moyens_essence_litres: float | None
+    moyens_disque_rotatif_nb: int | None
+    moyens_piles_nb: int | None
+    moyens_ulvamast_nb: int | None
     kit_combinaison: int
     kit_gants: int
     kit_lunettes: int
