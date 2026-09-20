@@ -211,7 +211,7 @@ export function TerrestreForm({
         ))}
       </View>
 
-      <Text style={styles.label}>Moyens &amp; surfaces (ha)</Text>
+      <Text style={styles.sectionTitle}>Moyens &amp; surfaces (ha)</Text>
       <Text style={styles.label}>Atomiseur à dos</Text>
       <TextInput
         editable={!readOnly}
