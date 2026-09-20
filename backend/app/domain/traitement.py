@@ -429,6 +429,15 @@ class TraitementTerrestre:
     motif_surface_restante_abandonnee: str | None = None
     essence_litres: float | None = None
     nb_piles: int | None = None
+    # Unité choisie pour toute la section « Produits utilisés » (fiche CRT papier
+    # section 5, #produits-unite-l-kg) : un seul choix pour toute la fiche (pas
+    # par produit comme les rotations Aérien, `Rotation.unite` — confirmé avec
+    # l'utilisateur) — gouverne le libellé et la sémantique de quantite_l (chaque
+    # ProduitUtilise), total_pesticide_l, pesticide_recu_l, stock_initial_l et
+    # pesticide_stock_restant_l ci-dessous. Les noms de colonnes historiques
+    # (suffixe `_l`) restent inchangés même quand l'unité choisie est "kg" —
+    # simple stockage numérique, la conversion d'affichage se fait à la lecture.
+    pesticide_unite: str = "L"
     total_pesticide_l: float | None = None
     # Stock de pesticide par fiche — même patron que TraitementAerien.
     pesticide_recu_l: float | None = None
@@ -764,6 +773,7 @@ _CHAMPS_CONTENU_TERRESTRE = (
     "motif_surface_restante_abandonnee",
     "essence_litres",
     "nb_piles",
+    "pesticide_unite",
     "pesticide_recu_l",
     "stock_initial_l",
 )

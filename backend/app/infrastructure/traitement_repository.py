@@ -314,6 +314,7 @@ class TraitementRepositoryImpl(TraitementRepository):
                 ),
                 essence_litres=traitement.terrestre.essence_litres,
                 nb_piles=traitement.terrestre.nb_piles,
+                pesticide_unite=traitement.terrestre.pesticide_unite,
                 total_pesticide_l=traitement.terrestre.total_pesticide_l,
                 pesticide_recu_l=traitement.terrestre.pesticide_recu_l,
                 stock_initial_l=traitement.terrestre.stock_initial_l,
@@ -727,6 +728,7 @@ class TraitementRepositoryImpl(TraitementRepository):
             t.motif_surface_restante_abandonnee = src.motif_surface_restante_abandonnee
             t.essence_litres = src.essence_litres
             t.nb_piles = src.nb_piles
+            t.pesticide_unite = src.pesticide_unite
             t.pesticide_recu_l = src.pesticide_recu_l
             t.stock_initial_l = src.stock_initial_l
             t.pesticide_stock_restant_l = src.pesticide_stock_restant_l
@@ -1044,6 +1046,7 @@ class TraitementRepositoryImpl(TraitementRepository):
                 if model.terrestre.essence_litres is not None
                 else None,
                 nb_piles=model.terrestre.nb_piles,
+                pesticide_unite=model.terrestre.pesticide_unite,
                 total_pesticide_l=float(model.terrestre.total_pesticide_l)
                 if model.terrestre.total_pesticide_l is not None
                 else None,

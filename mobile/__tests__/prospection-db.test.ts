@@ -195,6 +195,8 @@ const MIGRATED_COLUMNS = [
   { name: 'pesticide_stock_restant_l' },
   // Stock avant approvisionnement (migration backend 0075) — Terrestre uniquement.
   { name: 'stock_initial_l' },
+  // Unité pour toute la section « Produits utilisés » (migration backend 0077).
+  { name: 'pesticide_unite' },
   // agent_encadreur_id (FK utilisateur) -> texte libre (migration backend 0057,
   // même retour en arrière que pilote/mecanicien/consultant_international
   // ci-dessus, migration 0048).

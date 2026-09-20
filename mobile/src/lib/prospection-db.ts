@@ -431,6 +431,7 @@ async function creerTables(db: SQLite.SQLiteDatabase): Promise<void> {
       surface_traitee_ha REAL,
       surface_cumulee_ha REAL,
       surface_restante_ha REAL,
+      pesticide_unite TEXT,
       total_pesticide_l REAL,
       pesticide_recu_l REAL,
       stock_initial_l REAL,
@@ -877,6 +878,9 @@ const COLONNES_TRAITEMENT_TERRESTRE: readonly Colonne[] = [
   // pesticide_stock_restant_l ci-dessus (« Stock final »), cf. construireCible-
   // équivalent côté backend `_stock_pesticide_restant`.
   { name: 'stock_initial_l', type: 'REAL' },
+  // Unité pour toute la section « Produits utilisés » (migration backend 0077,
+  // #produits-unite-l-kg) — 'L' ou 'kg', un seul choix pour toute la fiche.
+  { name: 'pesticide_unite', type: 'TEXT' },
   // agent_encadreur_id (FK utilisateur) -> texte libre (migration backend 0057,
   // même retour en arrière que pilote/mécanicien/consultant_international côté
   // Aérien, migration 0048). agent_encadreur_id ci-dessus (dans le CREATE TABLE)

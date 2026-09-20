@@ -142,7 +142,9 @@ describe('RecapScreen — Terrestre : rien de saisi ne manque à la relecture', 
     await render(<RecapScreen />);
 
     expect(await screen.findByText('Fyfanon')).toBeVisible();
-    expect(screen.getByText('12 l')).toBeVisible();
+    // "L" majuscule : #produits-unite-l-kg, repli par défaut d'une fiche sans
+    // pesticide_unite explicite (créée avant cet ajout).
+    expect(screen.getByText('12 L')).toBeVisible();
     expect(screen.getByText('Zone inaccessible')).toBeVisible();
   });
 

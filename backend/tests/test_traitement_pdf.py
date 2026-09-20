@@ -121,6 +121,7 @@ def _traitement_terrestre(**overrides) -> TraitementRead:
         motif_surface_restante_abandonnee=None,
         essence_litres=None,
         nb_piles=None,
+        pesticide_unite="L",
         total_pesticide_l=None,
         pesticide_recu_l=None,
         stock_initial_l=None,
@@ -220,3 +221,23 @@ def test_build_crt_html_terrestre_affiche_stock_initial():
 
     assert "Stock initial" in html
     assert "40.0" in html
+
+
+def test_build_crt_html_terrestre_libelles_pesticides_suivent_unite_choisie():
+    """#produits-unite-l-kg : "Approvisionnement"/"Stock final restant" affichent
+    "(kg)" quand cette unité est choisie, "(L)" par défaut (Aérien inclus, qui
+    n'a pas ce champ — repli sur "L", comportement inchangé)."""
+    traitement_l = _traitement_terrestre()
+    html_l = build_crt_html(traitement_l)
+    assert "Approvisionnement (produit reçu, L)" in html_l
+    assert "Stock final restant (L)" in html_l
+
+    traitement_kg = _traitement_terrestre()
+    traitement_kg.terrestre.pesticide_unite = "kg"
+    html_kg = build_crt_html(traitement_kg)
+    assert "Approvisionnement (produit reçu, kg)" in html_kg
+    assert "Stock final restant (kg)" in html_kg
+
+    html_aerien = build_crt_html(_traitement_aerien())
+    assert "Approvisionnement (produit reçu, L)" in html_aerien
+    assert "Stock final restant (L)" in html_aerien

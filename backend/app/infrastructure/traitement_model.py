@@ -400,6 +400,10 @@ class TraitementTerrestreModel(Base):
     motif_surface_restante_abandonnee: Mapped[str | None] = mapped_column(Text(), nullable=True)
     essence_litres: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     nb_piles: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    # Unité pour toute la section « Produits utilisés » (#produits-unite-l-kg) —
+    # même contrainte que Rotation.unite (Aérien), mais un seul choix pour toute
+    # la fiche Terrestre plutôt que par produit.
+    pesticide_unite: Mapped[str] = mapped_column(String(2), nullable=False, default="L")
     total_pesticide_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     pesticide_recu_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     stock_initial_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
@@ -424,6 +428,9 @@ class TraitementTerrestreModel(Base):
             "surface_restante_ha IS NULL OR surface_restante_ha <= 0"
             " OR surface_restante_abandonnee IS NOT NULL",
             name="ck_traitement_terrestre_surface_restante",
+        ),
+        CheckConstraint(
+            "pesticide_unite IN ('L','kg')", name="ck_traitement_terrestre_pesticide_unite"
         ),
         Index(
             "uq_traitement_terrestre_origine_id",

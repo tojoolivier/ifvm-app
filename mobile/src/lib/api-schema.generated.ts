@@ -4477,6 +4477,8 @@ export interface components {
             essence_litres?: number | null;
             /** Nb Piles */
             nb_piles?: number | null;
+            /** @default L */
+            pesticide_unite: components["schemas"]["UniteQuantite"];
             /** Pesticide Recu L */
             pesticide_recu_l?: number | null;
             /** Stock Initial L */
@@ -4544,6 +4546,7 @@ export interface components {
             essence_litres: number | null;
             /** Nb Piles */
             nb_piles: number | null;
+            pesticide_unite: components["schemas"]["UniteQuantite"];
             /** Total Pesticide L */
             total_pesticide_l: number | null;
             /** Pesticide Recu L */

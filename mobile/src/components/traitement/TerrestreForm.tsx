@@ -70,6 +70,9 @@ export function TerrestreForm({
   errors,
 }: TerrestreFormProps) {
   const store = useTraitementCaptureStore();
+  // Unité pour toute la section « Produits utilisés » (#produits-unite-l-kg) —
+  // un seul choix pour toute la fiche, gouverne les 5 libellés ci-dessous.
+  const unite = store.terrestre.pesticideUnite ?? 'L';
   // Texte brut en cours de saisie pour les champs décimaux libres de cet écran —
   // permet de taper un séparateur décimal ou un zéro de fin ("3," / "3,2") sans que
   // le champ ne se reformate à chaque frappe (cf. `formatDecimalDisplay` sinon
@@ -327,6 +330,11 @@ export function TerrestreForm({
       </View>
 
       <Text style={styles.sectionTitle}>Produits utilisés</Text>
+      <Text style={styles.label}>Unité</Text>
+      <View style={styles.chipRow}>
+        <Chip label="Litres (L)" selected={unite === 'L'} onPress={() => !readOnly && store.updateTerrestre({ pesticideUnite: 'L' })} />
+        <Chip label="Kilos (kg)" selected={unite === 'kg'} onPress={() => !readOnly && store.updateTerrestre({ pesticideUnite: 'kg' })} />
+      </View>
       {produits.map((produit, index) => (
         <Card key={produit.localId} style={styles.rotationCard}>
           <View style={styles.rotationHeader}>
@@ -356,7 +364,7 @@ export function TerrestreForm({
             <Text style={styles.label}>Nom commercial</Text>
             <Text style={styles.derivedValue}>{produit.nom_commercial || '—'}</Text>
           </Card>
-          <Text style={styles.label}>Pesticides consommés (l)</Text>
+          <Text style={styles.label}>{`Pesticides consommés (${unite})`}</Text>
           <TextInput
             editable={!readOnly}
             style={styles.input}
@@ -374,11 +382,11 @@ export function TerrestreForm({
         </TouchableOpacity>
       )}
       <Card variant="derivee">
-        <Text style={styles.label}>Total pesticide (l)</Text>
+        <Text style={styles.label}>{`Total pesticide (${unite})`}</Text>
         <Text style={styles.derivedValue}>{totalPesticideTerrestre}</Text>
       </Card>
 
-      <Text style={styles.label}>Stock initial (l)</Text>
+      <Text style={styles.label}>{`Stock initial (${unite})`}</Text>
       <TextInput
         editable={!readOnly}
         style={styles.input}
@@ -388,7 +396,7 @@ export function TerrestreForm({
         onChangeText={(v) => handleDecimalChange('stockInitialL', v)}
         onBlur={() => clearDecimalDraft('stockInitialL')}
       />
-      <Text style={styles.label}>Approvisionnement (l)</Text>
+      <Text style={styles.label}>{`Approvisionnement (${unite})`}</Text>
       <TextInput
         editable={!readOnly}
         style={styles.input}
@@ -400,7 +408,7 @@ export function TerrestreForm({
       />
       {pesticideStockRestant != null && (
         <Card variant="derivee">
-          <Text style={styles.label}>Stock Final (l)</Text>
+          <Text style={styles.label}>{`Stock Final (${unite})`}</Text>
           <Text style={styles.derivedValue}>{pesticideStockRestant}</Text>
         </Card>
       )}
