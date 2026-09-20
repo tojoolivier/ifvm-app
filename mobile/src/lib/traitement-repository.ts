@@ -201,6 +201,10 @@ export interface TraitementTerrestre {
   surface_traitee_ha: number | null;
   surface_cumulee_ha: number | null;
   surface_restante_ha: number | null;
+  // Unité pour toute la section « Produits utilisés » (migration backend 0077,
+  // #produits-unite-l-kg) — 'L' ou 'kg', un seul choix pour toute la fiche
+  // (contrairement à Rotation.unite côté Aérien, propre à chaque rotation).
+  pesticide_unite: string;
   total_pesticide_l: number | null;
   pesticide_recu_l: number | null;
   // Stock avant approvisionnement (migration backend 0075, fiche CRT papier
@@ -744,6 +748,9 @@ export interface TerrestreUpdateInput {
   motifSurfaceRestanteAbandonnee?: string | null;
   essence_litres?: number | null;
   nb_piles?: number | null;
+  // Unité pour toute la section « Produits utilisés » (migration backend 0077,
+  // #produits-unite-l-kg) — 'L' ou 'kg'.
+  pesticideUnite?: string | null;
   pesticideRecuL?: number | null;
   stockInitialL?: number | null;
   // Efficacité (migration backend 0058, fiche CRT papier section "Traitement",
@@ -781,6 +788,7 @@ export async function updateTraitementTerrestre(
       motif_surface_restante_abandonnee = ?,
       essence_litres = ?,
       nb_piles = ?,
+      pesticide_unite = ?,
       pesticide_recu_l = ?,
       stock_initial_l = ?,
       taux_mortalite_pourcent = ?,
@@ -805,6 +813,7 @@ export async function updateTraitementTerrestre(
       input.motifSurfaceRestanteAbandonnee ?? null,
       input.essence_litres ?? null,
       input.nb_piles ?? null,
+      input.pesticideUnite ?? 'L',
       input.pesticideRecuL ?? null,
       input.stockInitialL ?? null,
       input.taux_mortalite_pourcent ?? null,

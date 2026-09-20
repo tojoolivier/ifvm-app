@@ -178,6 +178,7 @@ function buildTraitementSyncPayload(draft: DraftTraitement): components['schemas
         motif_surface_restante_abandonnee: draft.terrestre.motif_surface_restante_abandonnee,
         essence_litres: draft.terrestre.essence_litres,
         nb_piles: draft.terrestre.nb_piles,
+        pesticide_unite: (draft.terrestre.pesticide_unite ?? 'L') as components['schemas']['UniteQuantite'],
         pesticide_recu_l: draft.terrestre.pesticide_recu_l,
         stock_initial_l: draft.terrestre.stock_initial_l,
         reprise_traitement: draft.terrestre.reprise_traitement,

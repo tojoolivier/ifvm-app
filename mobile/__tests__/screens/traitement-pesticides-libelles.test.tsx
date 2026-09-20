@@ -80,11 +80,13 @@ describe('TraitementScreen (Équipe, Terrestre) — libellés Pesticides', () =>
     } as any);
   });
 
-  it('affiche « Approvisionnement (l) » et « Pesticides consommés (l) », plus « Pesticide reçu »/« Quantité (l) »', async () => {
+  it('affiche « Approvisionnement (L) » et « Pesticides consommés (L) », plus « Pesticide reçu »/« Quantité (l) »', async () => {
     await render(<TraitementScreen />);
 
-    await waitFor(() => expect(screen.getByText('Approvisionnement (l)')).toBeVisible());
-    expect(screen.getByText('Pesticides consommés (l)')).toBeVisible();
+    // (L) majuscule : #produits-unite-l-kg, la même casse que le contrat backend
+    // UniteQuantite ("L"/"kg"), plutôt que le litre littéral figé d'avant.
+    await waitFor(() => expect(screen.getByText('Approvisionnement (L)')).toBeVisible());
+    expect(screen.getByText('Pesticides consommés (L)')).toBeVisible();
     expect(screen.queryByText('Pesticide reçu (l)')).toBeNull();
     expect(screen.queryByText('Quantité (l)')).toBeNull();
   });

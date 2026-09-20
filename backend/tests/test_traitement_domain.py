@@ -1080,6 +1080,25 @@ async def test_creation_terrestre_transmet_stock_initial():
 
 
 @pytest.mark.asyncio
+async def test_creation_terrestre_transmet_pesticide_unite():
+    """#produits-unite-l-kg : un seul choix d'unité pour toute la section
+    "Produits utilisés" — défaut "L" si non transmis."""
+    prospection = _prospection(surface_infestee=100.0)
+
+    use_case_defaut, _ = _use_case_terrestre(prospection=prospection, chef=_CHEF_EQUIPE)
+    traitement_defaut = await use_case_defaut.execute(
+        **_args_terrestre(surface_restante_abandonnee=False)
+    )
+    assert traitement_defaut.terrestre.pesticide_unite == "L"
+
+    use_case_kg, _ = _use_case_terrestre(prospection=prospection, chef=_CHEF_EQUIPE)
+    traitement_kg = await use_case_kg.execute(
+        **_args_terrestre(surface_restante_abandonnee=False, pesticide_unite="kg")
+    )
+    assert traitement_kg.terrestre.pesticide_unite == "kg"
+
+
+@pytest.mark.asyncio
 async def test_creation_terrestre_transmet_efficacite():
     prospection = _prospection(surface_infestee=100.0)
     use_case, _ = _use_case_terrestre(prospection=prospection, chef=_CHEF_EQUIPE)
@@ -1855,6 +1874,7 @@ def _traitement_terrestre_sync(**overrides) -> Traitement:
         motif_surface_restante_abandonnee=None,
         essence_litres=None,
         nb_piles=None,
+        pesticide_unite="L",
         pesticide_recu_l=None,
         stock_initial_l=None,
     )
@@ -1933,6 +1953,14 @@ def test_contenu_diverge_moyens_humains_materiels_different():
     _CHAMPS_CONTENU_COMMUNS — une modification isolée doit être détectée."""
     existant = _traitement_terrestre_sync(nb_agents_permanents=4, moyens_atomiseur_nb=3)
     entrant = _traitement_terrestre_sync(nb_agents_permanents=6, moyens_atomiseur_nb=3)
+    assert contenu_diverge(existant, entrant) is True
+
+
+def test_contenu_diverge_pesticide_unite_terrestre_different():
+    """#produits-unite-l-kg : une modification isolée de `pesticide_unite`
+    doit être détectée comme un contenu divergent."""
+    existant = _traitement_terrestre_sync(pesticide_unite="L")
+    entrant = _traitement_terrestre_sync(pesticide_unite="kg")
     assert contenu_diverge(existant, entrant) is True
 
 
@@ -2158,6 +2186,19 @@ async def test_sync_push_terrestre_transmet_stock_initial():
     assert cree is True
     assert traitement.terrestre.stock_initial_l == 40.0
     assert traitement.terrestre.pesticide_stock_restant_l == 190.0
+
+
+@pytest.mark.asyncio
+async def test_sync_push_terrestre_transmet_pesticide_unite():
+    """#produits-unite-l-kg côté synchronisation (create-branch, id inconnu)."""
+    fiche_id = uuid.uuid4()
+    use_case, _ = _sync_use_case(existant=None)
+
+    args = _sync_terrestre_args(fiche_id, base_updated_at=datetime.utcnow(), pesticide_unite="kg")
+    traitement, cree = await use_case.execute(**args)
+
+    assert cree is True
+    assert traitement.terrestre.pesticide_unite == "kg"
 
 
 @pytest.mark.asyncio
