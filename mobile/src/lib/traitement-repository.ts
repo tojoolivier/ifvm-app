@@ -42,6 +42,16 @@ export interface DraftTraitementRow {
   latitude: number | null;
   longitude: number | null;
   altitude: number | null;
+  // Moyens humains et matériels (fiche CRT papier §4.1/4.2, migration backend
+  // 0076, #moyens-humains-materiels) — communs à l'Aérien et au Terrestre.
+  nb_agents_permanents: number | null;
+  nb_agents_temporaires: number | null;
+  nb_personnel_local: number | null;
+  moyens_atomiseur_nb: number | null;
+  moyens_essence_litres: number | null;
+  moyens_disque_rotatif_nb: number | null;
+  moyens_piles_nb: number | null;
+  moyens_ulvamast_nb: number | null;
   /** Nombre de personnes équipées de chaque matériel — plus des booléens
    * depuis que tout l'équipage doit être équipé, pas seulement une personne. */
   kit_combinaison: number | null;
@@ -821,6 +831,16 @@ export interface MoyensUpdateInput {
   hauteur_strate_herbeuse_m: number | null;
   hauteur_strate_arboree_m: number | null;
   recouvrement_percent: number | null;
+  // Moyens humains et matériels (fiche CRT papier §4.1/4.2, migration backend
+  // 0076, #moyens-humains-materiels) — communs à l'Aérien et au Terrestre.
+  nb_agents_permanents: number | null;
+  nb_agents_temporaires: number | null;
+  nb_personnel_local: number | null;
+  moyens_atomiseur_nb: number | null;
+  moyens_essence_litres: number | null;
+  moyens_disque_rotatif_nb: number | null;
+  moyens_piles_nb: number | null;
+  moyens_ulvamast_nb: number | null;
 }
 
 export async function updateTraitementMoyens(
@@ -841,6 +861,14 @@ export async function updateTraitementMoyens(
       hauteur_strate_herbeuse_m = ?,
       hauteur_strate_arboree_m = ?,
       recouvrement_percent = ?,
+      nb_agents_permanents = ?,
+      nb_agents_temporaires = ?,
+      nb_personnel_local = ?,
+      moyens_atomiseur_nb = ?,
+      moyens_essence_litres = ?,
+      moyens_disque_rotatif_nb = ?,
+      moyens_piles_nb = ?,
+      moyens_ulvamast_nb = ?,
       updated_at = ?
      WHERE id = ?`,
     [
@@ -853,6 +881,14 @@ export async function updateTraitementMoyens(
       input.hauteur_strate_herbeuse_m,
       input.hauteur_strate_arboree_m,
       input.recouvrement_percent,
+      input.nb_agents_permanents,
+      input.nb_agents_temporaires,
+      input.nb_personnel_local,
+      input.moyens_atomiseur_nb,
+      input.moyens_essence_litres,
+      input.moyens_disque_rotatif_nb,
+      input.moyens_piles_nb,
+      input.moyens_ulvamast_nb,
       now,
       traitementId,
     ]

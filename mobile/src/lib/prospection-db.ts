@@ -320,6 +320,14 @@ async function creerTables(db: SQLite.SQLiteDatabase): Promise<void> {
       latitude REAL,
       longitude REAL,
       altitude REAL,
+      nb_agents_permanents INTEGER,
+      nb_agents_temporaires INTEGER,
+      nb_personnel_local INTEGER,
+      moyens_atomiseur_nb INTEGER,
+      moyens_essence_litres REAL,
+      moyens_disque_rotatif_nb INTEGER,
+      moyens_piles_nb INTEGER,
+      moyens_ulvamast_nb INTEGER,
       kit_combinaison INTEGER,
       kit_gants INTEGER,
       kit_lunettes INTEGER,
@@ -765,6 +773,16 @@ const COLONNES_OPERATION_AERIENNE: readonly Colonne[] = [
 /** Colonnes ajoutées à `traitement` après sa création initiale. */
 const COLONNES_TRAITEMENT: readonly Colonne[] = [
   { name: 'server_updated_at', type: 'TEXT' },
+  // Moyens humains et matériels (migration backend 0076, fiche CRT papier
+  // §4.1/4.2, #moyens-humains-materiels) — communs à l'Aérien et au Terrestre.
+  { name: 'nb_agents_permanents', type: 'INTEGER' },
+  { name: 'nb_agents_temporaires', type: 'INTEGER' },
+  { name: 'nb_personnel_local', type: 'INTEGER' },
+  { name: 'moyens_atomiseur_nb', type: 'INTEGER' },
+  { name: 'moyens_essence_litres', type: 'REAL' },
+  { name: 'moyens_disque_rotatif_nb', type: 'INTEGER' },
+  { name: 'moyens_piles_nb', type: 'INTEGER' },
+  { name: 'moyens_ulvamast_nb', type: 'INTEGER' },
 ];
 
 /** Colonnes ajoutées à `rotation` après sa création initiale. */

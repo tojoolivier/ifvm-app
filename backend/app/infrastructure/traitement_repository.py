@@ -203,6 +203,14 @@ class TraitementRepositoryImpl(TraitementRepository):
             latitude=traitement.latitude,
             longitude=traitement.longitude,
             altitude=traitement.altitude,
+            nb_agents_permanents=traitement.nb_agents_permanents,
+            nb_agents_temporaires=traitement.nb_agents_temporaires,
+            nb_personnel_local=traitement.nb_personnel_local,
+            moyens_atomiseur_nb=traitement.moyens_atomiseur_nb,
+            moyens_essence_litres=traitement.moyens_essence_litres,
+            moyens_disque_rotatif_nb=traitement.moyens_disque_rotatif_nb,
+            moyens_piles_nb=traitement.moyens_piles_nb,
+            moyens_ulvamast_nb=traitement.moyens_ulvamast_nb,
             kit_combinaison=traitement.kit_combinaison,
             kit_gants=traitement.kit_gants,
             kit_lunettes=traitement.kit_lunettes,
@@ -628,6 +636,14 @@ class TraitementRepositoryImpl(TraitementRepository):
         model.latitude = traitement.latitude
         model.longitude = traitement.longitude
         model.altitude = traitement.altitude
+        model.nb_agents_permanents = traitement.nb_agents_permanents
+        model.nb_agents_temporaires = traitement.nb_agents_temporaires
+        model.nb_personnel_local = traitement.nb_personnel_local
+        model.moyens_atomiseur_nb = traitement.moyens_atomiseur_nb
+        model.moyens_essence_litres = traitement.moyens_essence_litres
+        model.moyens_disque_rotatif_nb = traitement.moyens_disque_rotatif_nb
+        model.moyens_piles_nb = traitement.moyens_piles_nb
+        model.moyens_ulvamast_nb = traitement.moyens_ulvamast_nb
         model.kit_combinaison = traitement.kit_combinaison
         model.kit_gants = traitement.kit_gants
         model.kit_lunettes = traitement.kit_lunettes
@@ -820,6 +836,16 @@ class TraitementRepositoryImpl(TraitementRepository):
             latitude=float(model.latitude) if model.latitude is not None else None,
             longitude=float(model.longitude) if model.longitude is not None else None,
             altitude=float(model.altitude) if model.altitude is not None else None,
+            nb_agents_permanents=model.nb_agents_permanents,
+            nb_agents_temporaires=model.nb_agents_temporaires,
+            nb_personnel_local=model.nb_personnel_local,
+            moyens_atomiseur_nb=model.moyens_atomiseur_nb,
+            moyens_essence_litres=float(model.moyens_essence_litres)
+            if model.moyens_essence_litres is not None
+            else None,
+            moyens_disque_rotatif_nb=model.moyens_disque_rotatif_nb,
+            moyens_piles_nb=model.moyens_piles_nb,
+            moyens_ulvamast_nb=model.moyens_ulvamast_nb,
             kit_combinaison=model.kit_combinaison,
             kit_gants=model.kit_gants,
             kit_lunettes=model.kit_lunettes,

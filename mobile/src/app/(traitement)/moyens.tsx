@@ -40,7 +40,20 @@ function formatDecimalDisplay(value: number | null): string {
   return value != null ? String(value).replace('.', ',') : '';
 }
 
-type MoyensDecimalField = 'herbeuse' | 'arboree' | 'recouvrement' | 'tauxMortalite' | 'evaluationEfficaciteHeures';
+type MoyensDecimalField =
+  | 'herbeuse'
+  | 'arboree'
+  | 'recouvrement'
+  | 'tauxMortalite'
+  | 'evaluationEfficaciteHeures'
+  | 'nbAgentsPermanents'
+  | 'nbAgentsTemporaires'
+  | 'nbPersonnelLocal'
+  | 'moyensAtomiseurNb'
+  | 'moyensEssenceLitres'
+  | 'moyensDisqueRotatifNb'
+  | 'moyensPilesNb'
+  | 'moyensUlvamastNb';
 
 // Réduit à Cultures/Pâturages — Habitations, Points d'eau, Aire protégée et
 // Ruchers retirés du choix (décision produit).
@@ -69,6 +82,16 @@ export default function MoyensScreen() {
   const [tauxMortalite, setTauxMortalite] = useState<number | null>(null);
   const [evaluationEfficaciteHeures, setEvaluationEfficaciteHeures] = useState<number | null>(null);
   const [methodeEvaluation, setMethodeEvaluation] = useState<'ESTIMATION_VISUELLE' | 'COMPTAGES_PRE_POST' | null>(null);
+  // Moyens humains et matériels (fiche CRT papier §4.1/4.2, migration backend
+  // 0076, #moyens-humains-materiels) — communs à l'Aérien et au Terrestre.
+  const [nbAgentsPermanents, setNbAgentsPermanents] = useState<number | null>(null);
+  const [nbAgentsTemporaires, setNbAgentsTemporaires] = useState<number | null>(null);
+  const [nbPersonnelLocal, setNbPersonnelLocal] = useState<number | null>(null);
+  const [moyensAtomiseurNb, setMoyensAtomiseurNb] = useState<number | null>(null);
+  const [moyensEssenceLitres, setMoyensEssenceLitres] = useState<number | null>(null);
+  const [moyensDisqueRotatifNb, setMoyensDisqueRotatifNb] = useState<number | null>(null);
+  const [moyensPilesNb, setMoyensPilesNb] = useState<number | null>(null);
+  const [moyensUlvamastNb, setMoyensUlvamastNb] = useState<number | null>(null);
   // Texte brut en cours de saisie pour les champs décimaux de cet écran — permet de
   // taper la virgule ou un zéro de fin ("1,", "1,50") sans que le champ ne se reformate à
   // chaque frappe (cf. `formatDecimalDisplay` sinon appelé sur une valeur encore inexploitable).
@@ -107,6 +130,14 @@ export default function MoyensScreen() {
         setHauteurHerbeuse(draft.hauteur_strate_herbeuse_m);
         setHauteurArboree(draft.hauteur_strate_arboree_m);
         setRecouvrement(draft.recouvrement_percent);
+        setNbAgentsPermanents(draft.nb_agents_permanents);
+        setNbAgentsTemporaires(draft.nb_agents_temporaires);
+        setNbPersonnelLocal(draft.nb_personnel_local);
+        setMoyensAtomiseurNb(draft.moyens_atomiseur_nb);
+        setMoyensEssenceLitres(draft.moyens_essence_litres);
+        setMoyensDisqueRotatifNb(draft.moyens_disque_rotatif_nb);
+        setMoyensPilesNb(draft.moyens_piles_nb);
+        setMoyensUlvamastNb(draft.moyens_ulvamast_nb);
         // Terrestre : Efficacité vit désormais sur l'écran Équipe
         // (#efficacite-equipe-terrestre, retour arrière sur
         // #efficacite-moyens-protection) — seul l'Aérien la saisit encore ici.
@@ -158,6 +189,14 @@ export default function MoyensScreen() {
     recouvrement: setRecouvrement,
     tauxMortalite: setTauxMortalite,
     evaluationEfficaciteHeures: setEvaluationEfficaciteHeures,
+    nbAgentsPermanents: setNbAgentsPermanents,
+    nbAgentsTemporaires: setNbAgentsTemporaires,
+    nbPersonnelLocal: setNbPersonnelLocal,
+    moyensAtomiseurNb: setMoyensAtomiseurNb,
+    moyensEssenceLitres: setMoyensEssenceLitres,
+    moyensDisqueRotatifNb: setMoyensDisqueRotatifNb,
+    moyensPilesNb: setMoyensPilesNb,
+    moyensUlvamastNb: setMoyensUlvamastNb,
   };
 
   // Accepte "," et "." et tolère la saisie intermédiaire ("1," / "1.") sans la figer tant
@@ -210,6 +249,14 @@ export default function MoyensScreen() {
           hauteur_strate_herbeuse_m: hauteurHerbeuse,
           hauteur_strate_arboree_m: hauteurArboree,
           recouvrement_percent: recouvrement,
+          nb_agents_permanents: nbAgentsPermanents,
+          nb_agents_temporaires: nbAgentsTemporaires,
+          nb_personnel_local: nbPersonnelLocal,
+          moyens_atomiseur_nb: moyensAtomiseurNb,
+          moyens_essence_litres: moyensEssenceLitres,
+          moyens_disque_rotatif_nb: moyensDisqueRotatifNb,
+          moyens_piles_nb: moyensPilesNb,
+          moyens_ulvamast_nb: moyensUlvamastNb,
         });
         router.push({ pathname: '/(traitement)/impacts' as any, params: { traitementId, isValidationView } });
       },
@@ -275,6 +322,102 @@ export default function MoyensScreen() {
           </>
         )}
 
+        {/* Moyens humains et matériels (fiche CRT papier §4.1/4.2, migration
+            backend 0076, #moyens-humains-materiels) — communs à l'Aérien et
+            au Terrestre. */}
+        <Text style={styles.sectionLabel}>Humains</Text>
+        <Text style={styles.fieldLabel}>Nb agents permanents</Text>
+        <TextInput
+          testID="nb-agents-permanents-input"
+          editable={!readOnly}
+          style={styles.input}
+          placeholder="0"
+          keyboardType="number-pad"
+          value={decimalDrafts.nbAgentsPermanents ?? formatDecimalDisplay(nbAgentsPermanents)}
+          onChangeText={(v) => handleDecimalChange('nbAgentsPermanents', v)}
+          onBlur={() => handleDecimalBlur('nbAgentsPermanents')}
+        />
+        <Text style={styles.fieldLabel}>Nb agents temporaires</Text>
+        <TextInput
+          testID="nb-agents-temporaires-input"
+          editable={!readOnly}
+          style={styles.input}
+          placeholder="0"
+          keyboardType="number-pad"
+          value={decimalDrafts.nbAgentsTemporaires ?? formatDecimalDisplay(nbAgentsTemporaires)}
+          onChangeText={(v) => handleDecimalChange('nbAgentsTemporaires', v)}
+          onBlur={() => handleDecimalBlur('nbAgentsTemporaires')}
+        />
+        <Text style={styles.fieldLabel}>Nb personnel local</Text>
+        <TextInput
+          testID="nb-personnel-local-input"
+          editable={!readOnly}
+          style={styles.input}
+          placeholder="0"
+          keyboardType="number-pad"
+          value={decimalDrafts.nbPersonnelLocal ?? formatDecimalDisplay(nbPersonnelLocal)}
+          onChangeText={(v) => handleDecimalChange('nbPersonnelLocal', v)}
+          onBlur={() => handleDecimalBlur('nbPersonnelLocal')}
+        />
+
+        <Text style={styles.sectionLabel}>Matériels</Text>
+        <Text style={styles.fieldLabel}>Atomiseur</Text>
+        <TextInput
+          testID="moyens-atomiseur-input"
+          editable={!readOnly}
+          style={styles.input}
+          placeholder="0"
+          keyboardType="number-pad"
+          value={decimalDrafts.moyensAtomiseurNb ?? formatDecimalDisplay(moyensAtomiseurNb)}
+          onChangeText={(v) => handleDecimalChange('moyensAtomiseurNb', v)}
+          onBlur={() => handleDecimalBlur('moyensAtomiseurNb')}
+        />
+        <Text style={styles.fieldLabel}>Essence (litres)</Text>
+        <TextInput
+          testID="moyens-essence-litres-input"
+          editable={!readOnly}
+          style={styles.input}
+          placeholder="0"
+          keyboardType="decimal-pad"
+          value={decimalDrafts.moyensEssenceLitres ?? formatDecimalDisplay(moyensEssenceLitres)}
+          onChangeText={(v) => handleDecimalChange('moyensEssenceLitres', v)}
+          onBlur={() => handleDecimalBlur('moyensEssenceLitres')}
+        />
+        <Text style={styles.fieldLabel}>Disque rotatif</Text>
+        <TextInput
+          testID="moyens-disque-rotatif-input"
+          editable={!readOnly}
+          style={styles.input}
+          placeholder="0"
+          keyboardType="number-pad"
+          value={decimalDrafts.moyensDisqueRotatifNb ?? formatDecimalDisplay(moyensDisqueRotatifNb)}
+          onChangeText={(v) => handleDecimalChange('moyensDisqueRotatifNb', v)}
+          onBlur={() => handleDecimalBlur('moyensDisqueRotatifNb')}
+        />
+        <Text style={styles.fieldLabel}>Nombre de piles</Text>
+        <TextInput
+          testID="moyens-piles-input"
+          editable={!readOnly}
+          style={styles.input}
+          placeholder="0"
+          keyboardType="number-pad"
+          value={decimalDrafts.moyensPilesNb ?? formatDecimalDisplay(moyensPilesNb)}
+          onChangeText={(v) => handleDecimalChange('moyensPilesNb', v)}
+          onBlur={() => handleDecimalBlur('moyensPilesNb')}
+        />
+        <Text style={styles.fieldLabel}>Ulvamast</Text>
+        <TextInput
+          testID="moyens-ulvamast-input"
+          editable={!readOnly}
+          style={styles.input}
+          placeholder="0"
+          keyboardType="number-pad"
+          value={decimalDrafts.moyensUlvamastNb ?? formatDecimalDisplay(moyensUlvamastNb)}
+          onChangeText={(v) => handleDecimalChange('moyensUlvamastNb', v)}
+          onBlur={() => handleDecimalBlur('moyensUlvamastNb')}
+        />
+
+        <Text style={styles.sectionLabel}>Kit de protection</Text>
         <Card variant={nbKitFournis === 5 ? 'info' : 'avertissement'}>
           <Text style={nbKitFournis === 5 ? styles.bannerTextOk : styles.bannerTextWarn}>
             {nbKitFournis === 5 ? '✓ Tous les matériels fournis (5/5)' : `⚠ Matériel(s) manquant(s) (${nbKitFournis}/5)`}

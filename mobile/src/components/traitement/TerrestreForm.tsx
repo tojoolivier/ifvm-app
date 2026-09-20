@@ -36,9 +36,7 @@ type TerrestreDecimalField =
   | 'taux_mortalite_pourcent'
   | 'evaluation_efficacite_heures_apres'
   | 'stockInitialL'
-  | 'pesticideRecuL'
-  | 'essence_litres'
-  | 'nb_piles';
+  | 'pesticideRecuL';
 
 export interface TerrestreFormProps {
   readOnly: boolean;
@@ -406,27 +404,6 @@ export function TerrestreForm({
           <Text style={styles.derivedValue}>{pesticideStockRestant}</Text>
         </Card>
       )}
-
-      <Text style={styles.label}>Essence (l)</Text>
-      <TextInput
-        editable={!readOnly}
-        style={styles.input}
-        placeholder="0"
-        keyboardType="decimal-pad"
-        value={getDecimalDraft('essence_litres') ?? formatDecimalDisplay(store.terrestre.essence_litres)}
-        onChangeText={(v) => handleDecimalChange('essence_litres', v)}
-        onBlur={() => clearDecimalDraft('essence_litres')}
-      />
-      <Text style={styles.label}>Nombre de piles</Text>
-      <TextInput
-        editable={!readOnly}
-        style={styles.input}
-        placeholder="0"
-        keyboardType="decimal-pad"
-        value={getDecimalDraft('nb_piles') ?? formatDecimalDisplay(store.terrestre.nb_piles)}
-        onChangeText={(v) => handleDecimalChange('nb_piles', v)}
-        onBlur={() => clearDecimalDraft('nb_piles')}
-      />
     </Fragment>
   );
 }
