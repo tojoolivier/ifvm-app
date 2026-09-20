@@ -9,6 +9,7 @@ import {
   computeSurfaceCumulee,
   computeSurfaceRestante,
   computePesticideStockRestant,
+  computePesticideConsommeSuggere,
   validateReferences,
   validateTerrestreConditions,
   validateRotationsHeures,
@@ -220,6 +221,45 @@ describe('computeSurfaceRestante', () => {
 
   it('is zero when the infested surface is unknown', () => {
     expect(computeSurfaceRestante(null, 4)).toBe(0);
+  });
+});
+
+/**
+ * #pesticide-consomme-suggere-mode-traitement : suggestion de "Pesticides
+ * consommés" dérivée de "Cumulée" selon le mode de traitement et l'unité —
+ * seulement 3 combinaisons ont une formule, confirmées avec l'utilisateur.
+ */
+describe('computePesticideConsommeSuggere', () => {
+  it('Barrière + L : Cumulée / 5', () => {
+    expect(computePesticideConsommeSuggere('BARRIERE', 'L', 20)).toBe(4);
+  });
+
+  it('Barrière + kg : aucune formule pour l’instant, reste manuel', () => {
+    expect(computePesticideConsommeSuggere('BARRIERE', 'kg', 20)).toBeNull();
+  });
+
+  it('Couverture totale + L : égal à Cumulée', () => {
+    expect(computePesticideConsommeSuggere('TOTAL', 'L', 15)).toBe(15);
+  });
+
+  it('Couverture totale + kg : Cumulée / 20', () => {
+    expect(computePesticideConsommeSuggere('TOTAL', 'kg', 100)).toBe(5);
+  });
+
+  it('Irrégulier : aucune formule, reste manuel', () => {
+    expect(computePesticideConsommeSuggere('IRREGULIER', 'L', 20)).toBeNull();
+  });
+
+  it('mode non renseigné : aucune formule', () => {
+    expect(computePesticideConsommeSuggere(null, 'L', 20)).toBeNull();
+  });
+
+  it('unité non renseignée : traitée comme Litre (défaut)', () => {
+    expect(computePesticideConsommeSuggere('TOTAL', null, 15)).toBe(15);
+  });
+
+  it('arrondit à 2 décimales', () => {
+    expect(computePesticideConsommeSuggere('BARRIERE', 'L', 17)).toBe(3.4);
   });
 });
 

@@ -179,6 +179,35 @@ export function computeSurfaceRestante(
 }
 
 /**
+ * Suggestion de « Pesticides consommés » (#pesticide-consomme-suggere-mode-traitement),
+ * dérivée de « Cumulée (ha) » selon le mode de traitement et l'unité choisie
+ * (#produits-unite-l-kg) — un simple pré-remplissage, jamais verrouillé : le
+ * champ reste modifiable, cette fonction ne sert qu'à calculer la valeur
+ * affichée tant que l'agent n'a rien saisi lui-même (cf. TerrestreForm.tsx).
+ *
+ * Règles confirmées avec l'utilisateur (aucune autre combinaison n'a de
+ * formule pour l'instant — Irrégulier et Barrière+kg restent entièrement
+ * manuels, `null` ci-dessous) :
+ * - Barrière + L : Cumulée / 5.
+ * - Couverture totale + L : Cumulée.
+ * - Couverture totale + kg : Cumulée / 20.
+ */
+export function computePesticideConsommeSuggere(
+  modeTraitement: 'TOTAL' | 'BARRIERE' | 'IRREGULIER' | null | undefined,
+  unite: 'L' | 'kg' | null | undefined,
+  surfaceCumuleeHa: number
+): number | null {
+  const uniteEffective = unite ?? 'L';
+  let valeur: number | null = null;
+  if (modeTraitement === 'BARRIERE' && uniteEffective === 'L') {
+    valeur = surfaceCumuleeHa / 5;
+  } else if (modeTraitement === 'TOTAL') {
+    valeur = uniteEffective === 'kg' ? surfaceCumuleeHa / 20 : surfaceCumuleeHa;
+  }
+  return valeur === null ? null : Math.round(valeur * 100) / 100;
+}
+
+/**
  * « Reste en stock » = reçu − consommé, plancher à 0 (même convention que
  * computeSurfaceRestante) — miroir de `_stock_pesticide_restant` côté backend.
  * `null` tant que « reçu » n'est pas renseigné : un stock ne se déduit pas
