@@ -136,7 +136,9 @@ def _section_pesticides(traitement: TraitementRead) -> str:
         [
             ("Nom commercial", None),
             ("Matières actives", None),
-            ("Stock initial", None),
+            # Terrestre uniquement (pas d'équivalent Aérien) — `getattr` plutôt
+            # qu'un accès direct, `fait` pouvant être un TraitementAerienRead.
+            ("Stock initial", getattr(fait, "stock_initial_l", None) if fait else None),
             ("Approvisionnement (produit reçu, L)", fait.pesticide_recu_l if fait else None),
             ("Stock final restant (L)", fait.pesticide_stock_restant_l if fait else None),
         ],

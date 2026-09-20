@@ -33,6 +33,7 @@ type TerrestreDecimalField =
   | 'temperature_c'
   | 'surface_atomiseur_ha'
   | 'surface_disque_rotatif_ha'
+  | 'stockInitialL'
   | 'pesticideRecuL'
   | 'essence_litres'
   | 'nb_piles';
@@ -47,6 +48,9 @@ export interface TerrestreFormProps {
   surfaceCumulee: number;
   surfaceRestante: number;
   totalPesticideTerrestre: number;
+  // « Stock Final » affiché à l'écran — intègre désormais stockInitialL en plus
+  // de pesticideRecuL (migration backend 0075, #stock-initial-terrestre) ;
+  // nom de prop conservé tel quel malgré le renommage du libellé affiché.
   pesticideStockRestant: number | null;
   errors: Record<string, string>;
 }
@@ -334,6 +338,16 @@ export function TerrestreForm({
         <Text style={styles.derivedValue}>{totalPesticideTerrestre}</Text>
       </Card>
 
+      <Text style={styles.label}>Stock initial (l)</Text>
+      <TextInput
+        editable={!readOnly}
+        style={styles.input}
+        placeholder="0"
+        keyboardType="decimal-pad"
+        value={getDecimalDraft('stockInitialL') ?? formatDecimalDisplay(store.terrestre.stockInitialL)}
+        onChangeText={(v) => handleDecimalChange('stockInitialL', v)}
+        onBlur={() => clearDecimalDraft('stockInitialL')}
+      />
       <Text style={styles.label}>Approvisionnement (l)</Text>
       <TextInput
         editable={!readOnly}
@@ -346,7 +360,7 @@ export function TerrestreForm({
       />
       {pesticideStockRestant != null && (
         <Card variant="derivee">
-          <Text style={styles.label}>Reste en stock (l)</Text>
+          <Text style={styles.label}>Stock Final (l)</Text>
           <Text style={styles.derivedValue}>{pesticideStockRestant}</Text>
         </Card>
       )}

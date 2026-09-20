@@ -71,6 +71,7 @@ const TERRESTRE_DRAFT = {
   essence_litres: null,
   nb_piles: null,
   pesticide_recu_l: null,
+  stock_initial_l: null,
   produits: [],
 };
 
@@ -136,8 +137,9 @@ describe('TraitementScreen (Équipe, Terrestre) — saisie décimale francophone
     await render(<TraitementScreen />);
     await waitFor(() => expect(useTraitementCaptureStore.getState().terrestre.chefEquipeId).toBe('chef-equipe-1'));
 
-    // ... Pesticides consommés (4), Approvisionnement (5), Essence (6).
-    fireEvent.changeText(screen.getAllByPlaceholderText('0')[6], '10,75');
+    // ... Pesticides consommés (4), Stock initial (5, #stock-initial-terrestre),
+    // Approvisionnement (6), Essence (7).
+    fireEvent.changeText(screen.getAllByPlaceholderText('0')[7], '10,75');
 
     expect(await screen.findByDisplayValue('10,75')).toBeVisible();
     expect(screen.queryByDisplayValue('NaN')).toBeNull();

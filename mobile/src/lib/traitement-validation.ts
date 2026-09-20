@@ -184,12 +184,20 @@ export function computeSurfaceRestante(
  * `null` tant que « reçu » n'est pas renseigné : un stock ne se déduit pas
  * d'une consommation seule.
  */
+/**
+ * « Stock final » = stock initial + reçu − consommé, plancher à 0 — même
+ * formule que `_stock_pesticide_restant` (backend/app/domain/traitement.py).
+ * `stockInitialL` est optionnel : l'Aérien (`rotations.tsx`), qui n'a pas cette
+ * notion, appelle cette fonction avec 2 arguments, comme avant l'ajout du
+ * stock initial (Terrestre uniquement, migration backend 0075).
+ */
 export function computePesticideStockRestant(
   pesticideRecuL: number | null | undefined,
-  pesticideConsommeL: number
+  pesticideConsommeL: number,
+  stockInitialL?: number | null
 ): number | null {
-  if (pesticideRecuL == null) return null;
-  return Math.max(0, pesticideRecuL - pesticideConsommeL);
+  if (pesticideRecuL == null && stockInitialL == null) return null;
+  return Math.max(0, (stockInitialL ?? 0) + (pesticideRecuL ?? 0) - pesticideConsommeL);
 }
 
 // ==========================================

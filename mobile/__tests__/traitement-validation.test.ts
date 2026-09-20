@@ -8,6 +8,7 @@ import {
   computeSurfaceTraitee,
   computeSurfaceCumulee,
   computeSurfaceRestante,
+  computePesticideStockRestant,
   validateReferences,
   validateTerrestreConditions,
   validateRotationsHeures,
@@ -20,6 +21,38 @@ import {
   estAerienPretPourSynchro,
   estTerrestrePretPourSynchro,
 } from '../src/lib/traitement-validation';
+
+/**
+ * « Stock final » (#stock-initial-terrestre, migration backend 0075) — même
+ * formule que `_stock_pesticide_restant` côté backend
+ * (backend/app/domain/traitement.py), y compris pour l'Aérien qui n'a pas de
+ * stock initial (appel à 2 arguments, comportement inchangé).
+ */
+describe('computePesticideStockRestant', () => {
+  it('reçu − consommé, sans stock initial (Aérien, comportement historique)', () => {
+    expect(computePesticideStockRestant(200, 60)).toBe(140);
+  });
+
+  it('renvoie null si ni reçu ni stock initial ne sont renseignés', () => {
+    expect(computePesticideStockRestant(null, 40)).toBeNull();
+  });
+
+  it('plancher à 0 en cas de surconsommation, sans stock initial', () => {
+    expect(computePesticideStockRestant(50, 80)).toBe(0);
+  });
+
+  it('intègre le stock initial (Terrestre) : initial + reçu − consommé', () => {
+    expect(computePesticideStockRestant(100, 40, 30)).toBe(90);
+  });
+
+  it('stock initial seul (sans réception) suffit à déduire un stock final', () => {
+    expect(computePesticideStockRestant(null, 20, 50)).toBe(30);
+  });
+
+  it('plancher à 0 avec stock initial, en cas de surconsommation', () => {
+    expect(computePesticideStockRestant(10, 40, 10)).toBe(0);
+  });
+});
 
 /**
  * #produit-nom-commercial : « texte avant le premier chiffre », vérifié contre
