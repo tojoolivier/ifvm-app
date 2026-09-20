@@ -870,6 +870,24 @@ export async function updateProspectionReference(id: string, input: ReferenceUpd
   return updated;
 }
 
+/**
+ * #localite-traitement-poste-acridien-autre-agent : comble un `station_nom`
+ * manquant sur une fiche DÉJÀ locale (matérialisée avant que le référentiel
+ * `station_fixe` n'ait fini de se synchroniser sur cet appareil, ou avant
+ * l'introduction de cette résolution) — `assurerProspectionDisponibleLocalement`
+ * ne fait normalement rien sur une fiche déjà locale (jamais n'écrase un
+ * brouillon potentiellement en cours d'usage ailleurs) ; ce correctif ciblé
+ * ne touche QUE cette seule colonne, jamais le reste de la ligne.
+ */
+export async function updateProspectionStationNom(id: string, stationNom: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('UPDATE prospection SET station_nom = ?, updated_at = ? WHERE id = ?', [
+    stationNom,
+    new Date().toISOString(),
+    id,
+  ]);
+}
+
 export interface GpsPositionUpdateInput {
   latitude: number;
   longitude: number;
