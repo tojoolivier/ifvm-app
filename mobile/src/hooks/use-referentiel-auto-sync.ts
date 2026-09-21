@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import * as Network from 'expo-network';
 
-import { pullReferentiel } from '@/lib/referentiel-sync';
+import { pullReferentiel, resetReferentielSyncCursors } from '@/lib/referentiel-sync';
 import { runTask } from '@/lib/run-task';
 
 interface ConnectivityTransition {
@@ -66,6 +66,14 @@ export async function checkAndSyncReferentiel(
       isConnectedObserve = Boolean(state.isConnected && state.isInternetReachable);
 
       if (shouldTriggerAutoSync({ wasConnected, isConnected: isConnectedObserve })) {
+        // Même raison que le bouton "Synchroniser" (sync.tsx) : un pull
+        // incrémental ne redemande que ce qui a changé depuis le curseur par
+        // table, et le garde-fou #201 ne couvre que le cas "table vide". Une
+        // table déjà partiellement peuplée mais à qui il manque des lignes
+        // (ex: un couple espece/categorie/sexe de code_stade jamais reçu) ne
+        // les rattraperait jamais tant que l'app ne fait que ce pull
+        // incrémental — y compris ici, à la reconnexion.
+        await resetReferentielSyncCursors();
         await pullReferentiel(token);
       }
     },
