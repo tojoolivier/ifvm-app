@@ -1,10 +1,9 @@
-name: Mobile build (EAS preview, local)
+name: Mobile build (EAS preview/production, local)
 
 on:
   push:
     branches: [main]
-    paths:
-      - "mobile/**"
+    tags: ["v*"]
   workflow_dispatch: {}
 
 concurrency:
@@ -16,11 +15,16 @@ defaults:
     working-directory: mobile
 
 jobs:
-  # Detecte si le push touche du natif (deps, config Expo) ou seulement du JS/TS.
+  # Detecte si le push touche mobile/** (le trigger n'est plus filtre par chemin au
+  # niveau du workflow, car un tag de release doit declencher le build production
+  # meme quand le tag ne touche pas mobile/**) et, parmi les changements mobile,
+  # si c'est du natif (deps, config Expo) ou seulement du JS/TS.
   # JS/TS seul -> update OTA (secondes) ; natif -> build APK complet sur le runner self-hoste.
   changes:
+    if: github.ref_type == 'branch'
     runs-on: self-hosted-linux
     outputs:
+      mobile: ${{ steps.filter.outputs.mobile }}
       native: ${{ steps.filter.outputs.native }}
     steps:
       - uses: actions/checkout@v4
@@ -28,6 +32,8 @@ jobs:
         id: filter
         with:
           filters: |
+            mobile:
+              - "mobile/**"
             native:
               - "mobile/package.json"
               - "mobile/package-lock.json"
@@ -44,7 +50,7 @@ jobs:
   # runtimeVersion "fingerprint" garantit qu'une update n'atteint que les binaires compatibles.
   ota-update:
     needs: changes
-    if: github.event_name == 'push' && needs.changes.outputs.native != 'true'
+    if: github.ref_type == 'branch' && needs.changes.outputs.mobile == 'true' && needs.changes.outputs.native != 'true'
     runs-on: self-hosted-linux
     steps:
       - uses: actions/checkout@v4
@@ -78,7 +84,7 @@ jobs:
   build:
     needs: changes
     # Build natif complet uniquement si necessaire (changement natif ou declenchement manuel)
-    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.native == 'true'
+    if: github.event_name == 'workflow_dispatch' || (github.ref_type == 'branch' && needs.changes.outputs.native == 'true')
     # Runner self-hoste (ARC) : JDK 17 + Android SDK/NDK deja preinstalles dans l'image,
     # voir infra-k8s/clusters/production/infrastructure/actions-runner-controller.
     # Remplace le detour "EAS local build sur ubuntu-latest" (workaround quota EAS Build
@@ -153,3 +159,52 @@ jobs:
           name: ifvm-preview-apk
           path: mobile/ifvm-preview.apk
           retention-days: 14
+
+  # Build production sur tag de release (v*), inconditionnellement — pas de path-filter
+  # comme pour "changes" : un tag est un evenement rare et volontaire, le cout d'un build
+  # Android inutile occasionnel est negligeable face a la complexite d'un diff inter-tags.
+  # Meme profil "production" (mobile/eas.json) que celui deja utilise si l'app est
+  # publiee sur un store : APK release, pas de soumission automatique (eas submit) —
+  # l'artifact est uploade pour installation/verification manuelle, geste de publication
+  # au store laisse volontairement humain.
+  build-production:
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: android-build
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - run: npm ci
+
+      - name: Enable Gradle task-output cache (persisted on the runner volume)
+        run: |
+          mkdir -p "$HOME/.gradle"
+          printf 'org.gradle.caching=true\n' > "$HOME/.gradle/gradle.properties"
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+          packager: npm
+
+      - name: Build Android production locally (EAS local build)
+        env:
+          # Workingdir distinct de celui du job "build" (profil preview) : les deux
+          # peuvent tourner en parallele sur le meme pool de runners self-hostes
+          # ("android-build") pour des refs differentes (branche main vs tag).
+          EAS_LOCAL_BUILD_WORKINGDIR: /home/runner/.gradle/easwork-production
+        run: |
+          rm -rf "$EAS_LOCAL_BUILD_WORKINGDIR"
+          mkdir -p "$EAS_LOCAL_BUILD_WORKINGDIR"
+          eas build --platform android --profile production --local --non-interactive --output ./ifvm-production.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ifvm-production-apk
+          path: mobile/ifvm-production.apk
+          retention-days: 90
