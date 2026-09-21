@@ -17,13 +17,15 @@
     },
     "production": {
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://ifvm.orakotondravao.com/api"
+        "EXPO_PUBLIC_API_URL": "https://ifvm-prod.orakotondravao.com/api"
       },
       "ios": {
         "autoIncrement": "buildNumber"
       },
       "android": {
-        "autoIncrement": "versionCode"
+        "autoIncrement": "versionCode",
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
       },
       "channel": "production"
     }
