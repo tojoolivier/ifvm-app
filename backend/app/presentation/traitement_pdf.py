@@ -11,7 +11,9 @@ from typing import Any
 
 from app.infrastructure.pdf_renderer import PDF_BASE_CSS
 from app.presentation.traitement_schemas import (
+    EspeceCible,
     EvaluationRisquePopulationRead,
+    RepartitionPopulation,
     SignatureRead,
     TraitementRead,
     TypeTraitement,
@@ -26,8 +28,28 @@ th, td { border: 1px solid #9ca3af; padding: 0.15cm 0.2cm; font-size: 9.5pt; tex
 .signature-image { max-height: 2cm; }
 """
 
+# Libellés des axes de risque environnemental captés par l'écran mobile
+# `impacts.tsx` (champ `evaluation_risque`) — absents du formulaire papier
+# (12 sections), rendus dans une section complémentaire non numérotée plutôt
+# que silencieusement ignorés (cf. build_crt_html).
+_LIBELLES_AXES_RISQUE = {
+    "ressources_eau": "Ressources en eau",
+    "sol": "Sol",
+    "faune_non_cible": "Faune non cible",
+    "abeilles": "Abeilles / pollinisateurs",
+}
+
 
 def _texte(valeur: Any) -> str:
+    # Un `str, Enum` (ModeTraitement, EspeceCible...) affiché via `str()` rend
+    # "ModeTraitement.TOTAL" et non "TOTAL" en Python 3.14 (le mixin `str`
+    # perd la priorité sur `__str__` face à `Enum.__str__`, contrairement à
+    # `__format__` — cf. commentaire historique sur `pesticide_unite` plus
+    # bas) : on déballe `.value` explicitement avant toute mise en forme.
+    if isinstance(valeur, Enum):
+        valeur = valeur.value
+    if isinstance(valeur, bool):
+        valeur = "Oui" if valeur else "Non"
     if valeur is None or valeur == "":
         return '<span class="champ-vide"></span>'
     return escape(str(valeur))
@@ -57,19 +79,40 @@ def _section_references(traitement: TraitementRead) -> str:
     coordonnees = None
     if traitement.latitude is not None:
         coordonnees = f"{traitement.latitude} / {traitement.longitude} / {traitement.altitude}"
+    terrestre = traitement.terrestre
     return _section(
         "1. Références",
         [
             ("N° CRT", traitement.numero_fiche),
+            # Chef d'équipe (1.2 du formulaire papier) : seul `chef_equipe_id`
+            # (FK Utilisateur) existe côté modèle, aucun nom résolu — pas de
+            # jointure sur Utilisateur dans ce ticket (cf. #495, "pas
+            # d'extension de schéma"). Case vide plutôt qu'un UUID brut.
+            ("Chef d'équipe", None),
+            ("Agent encadreur", terrestre.agent_encadreur if terrestre else None),
             ("Date de validation", traitement.date_validation),
             ("Date de traitement", traitement.date_traitement),
             ("Localité", traitement.localite),
-            ("Région", traitement.region),
-            ("District", traitement.district),
             ("Commune", traitement.commune),
+            ("District", traitement.district),
+            ("Région", traitement.region),
             ("Coordonnées", coordonnees),
         ],
     )
+
+
+def _densite_infestation(cible) -> float | None:
+    """Densité (ind./ha, §2.2 du formulaire papier) : dérivée de la paire
+    (espèce, répartition) parmi les colonnes dédiées par espèce du modèle
+    (migration 0066) — absente en tant que champ générique unique."""
+    if cible is None or cible.espece is None or cible.repartition_population is None:
+        return None
+    diffuse = cible.repartition_population == RepartitionPopulation.DIFFUSE
+    if cible.espece == EspeceCible.LMC:
+        return cible.densite_diffuse_lmc if diffuse else cible.densite_groupee_lmc
+    if cible.espece == EspeceCible.NSE:
+        return cible.densite_diffuse_nse if diffuse else cible.densite_groupee_nse
+    return None
 
 
 def _section_cibles(traitement: TraitementRead) -> str:
@@ -83,18 +126,30 @@ def _section_cibles(traitement: TraitementRead) -> str:
             ("Vols clairs / essaims", cible.vols_clairs_essaims if cible else None),
             ("Répartition population", cible.repartition_population if cible else None),
             ("Surface infestée (ha)", cible.surface_infestee_ha if cible else None),
+            ("Densité (ind./ha)", _densite_infestation(cible)),
         ],
     )
 
 
 def _section_traitement(traitement: TraitementRead) -> str:
     terrestre = traitement.terrestre
+    aerien = traitement.aerien
     fait = _fait_traitement(traitement)
     evaluation_heures = fait.evaluation_efficacite_heures_apres if fait else None
     return _section(
         "3. Traitement",
         [
             ("Mode de traitement", traitement.mode_traitement),
+            # §3.2 : surface traitée par moyen — Ulvamast sans équivalent au
+            # modèle (case vide, pas d'extension de schéma dans ce ticket).
+            ("Surface atomiseur à dos (ha)", terrestre.surface_atomiseur_ha if terrestre else None),
+            (
+                "Surface disque rotatif (ha)",
+                terrestre.surface_disque_rotatif_ha if terrestre else None,
+            ),
+            ("Surface ulvamast (ha)", None),
+            ("Surface traitée par aéronef (ha)", aerien.surface_traitee_ha if aerien else None),
+            ("Surface reste à traiter (ha)", fait.surface_restante_ha if fait else None),
             ("Début (heure)", terrestre.heure_debut if terrestre else None),
             ("Fin (heure)", terrestre.heure_fin if terrestre else None),
             ("Vent — vitesse (m/s)", terrestre.vitesse_vent_ms if terrestre else None),
@@ -135,9 +190,6 @@ def _section_pesticides(traitement: TraitementRead) -> str:
     # d'équivalent Aérien : `getattr` avec repli sur "L" pour ne rien changer
     # à l'affichage Aérien (toujours en litres, comme avant cet ajout).
     unite_brute = getattr(fait, "pesticide_unite", "L") if fait else "L"
-    # `.value` : `pesticide_unite` est un `UniteQuantite` (str, Enum) — sans ça,
-    # l'interpolation f-string produit "UniteQuantite.L" au lieu de "L"
-    # (Enum.__format__ prime sur str.__format__ avant Python 3.12).
     unite = unite_brute.value if isinstance(unite_brute, Enum) else unite_brute
     return _section(
         "5. Pesticides",
@@ -148,15 +200,38 @@ def _section_pesticides(traitement: TraitementRead) -> str:
             # qu'un accès direct, `fait` pouvant être un TraitementAerienRead.
             ("Stock initial", getattr(fait, "stock_initial_l", None) if fait else None),
             (f"Approvisionnement (produit reçu, {unite})", fait.pesticide_recu_l if fait else None),
+            # §5.5 — total consommé (somme des rotations Aérien, des produits
+            # utilisés Terrestre) : existait déjà sur le modèle, jamais affiché.
+            (f"Produit consommé ({unite})", fait.total_pesticide_l if fait else None),
             (f"Stock final restant ({unite})", fait.pesticide_stock_restant_l if fait else None),
         ],
     )
 
 
 def _section_zones_cibles(traitement: TraitementRead) -> str:
+    # Le choix produit a réduit les zones cibles saisissables à Cultures et
+    # Pâturages (mobile/(traitement)/moyens.tsx) : les autres postes du
+    # formulaire papier (Maïs/Riz/.../Sorgho, Apiculture, Aquaculture,
+    # Production organique, Zone forestier) restent des cases vides,
+    # reproduites ici pour la fidélité de mise en page plutôt que supprimées.
     zones = traitement.zones_exposees or {}
-    lignes = list(zones.items()) or [("Zones exposées", None)]
-    return _section("6. Zones cibles", lignes)
+    return _section(
+        "6. Zones cibles",
+        [
+            ("Culture", zones.get("cultures")),
+            ("Maïs (ha)", None),
+            ("Riz (ha)", None),
+            ("Canne à sucre (ha)", None),
+            ("Banane (ha)", None),
+            ("Manioc (ha)", None),
+            ("Sorgho (ha)", None),
+            ("Pâturage", zones.get("paturages")),
+            ("Apiculture", None),
+            ("Aquaculture", None),
+            ("Production organique", None),
+            ("Zone forestier", None),
+        ],
+    )
 
 
 def _section_vegetation(traitement: TraitementRead) -> str:
@@ -174,7 +249,7 @@ def _section_empoisonnement(traitement: TraitementRead) -> str:
     return _section(
         "8. Empoisonnement",
         [
-            ("Cas d'empoisonnement", "Oui" if traitement.empoisonnement else "Non"),
+            ("Cas d'empoisonnement", traitement.empoisonnement),
             ("Type", traitement.empoisonnement_type),
             ("Mode", traitement.empoisonnement_mode),
             ("Autre (précision)", traitement.empoisonnement_autre),
@@ -183,9 +258,7 @@ def _section_empoisonnement(traitement: TraitementRead) -> str:
 
 
 def _sensibilisation_texte(evaluation: EvaluationRisquePopulationRead) -> str:
-    if evaluation.sensibilisation is None:
-        return _texte(None)
-    return _texte("Oui" if evaluation.sensibilisation else "Non")
+    return _texte(evaluation.sensibilisation)
 
 
 def _section_evaluation_risque(traitement: TraitementRead) -> str:
@@ -211,24 +284,45 @@ def _section_evaluation_risque(traitement: TraitementRead) -> str:
     """
 
 
+def _section_observation_non_cibles(traitement: TraitementRead) -> str:
+    comportement = traitement.comportement_non_cibles or {}
+    familles = ", ".join(comportement.keys()) if comportement else None
+    return _section(
+        "10. Observation sur non cibles",
+        [
+            ("Comportement anormal", traitement.comportement_anormal),
+            ("Famille(s) concernée(s)", familles),
+        ],
+    )
+
+
 def _section_mortalite(traitement: TraitementRead) -> str:
     familles = traitement.mortalite_familles or {}
-    comportement = traitement.comportement_non_cibles or {}
-    familles_comportement = ", ".join(comportement.keys()) if comportement else None
-    familles_mortalite = ", ".join(familles.keys()) if familles else None
+    familles_texte = ", ".join(familles.keys()) if familles else None
     return _section(
-        "10. Comportement non cibles et mortalité",
+        "11. Mortalité",
         [
-            ("Comportement anormal", "Oui" if traitement.comportement_anormal else "Non"),
-            ("Familles concernées (comportement)", familles_comportement),
-            ("Mortalité constatée", "Oui" if traitement.mortalite else "Non"),
-            ("Familles concernées (mortalité)", familles_mortalite),
+            ("Mortalité constatée", traitement.mortalite),
+            ("Famille(s) concernée(s)", familles_texte),
         ],
     )
 
 
 def _section_observations(traitement: TraitementRead) -> str:
-    return _section("11. Observation générale", [("Observations", traitement.observations)])
+    return _section("12. Observation générale", [("Observations", traitement.observations)])
+
+
+def _section_axes_risque(traitement: TraitementRead) -> str:
+    """Axes de risque environnemental (`evaluation_risque`, écran mobile
+    `impacts.tsx`) — hors des 12 sections du formulaire papier, mais saisis
+    par le terrain et jusqu'ici jamais restitués dans le PDF (champ mort).
+    Section complémentaire, omise quand rien n'est renseigné (contrairement
+    aux 12 sections numérotées, toujours rendues même vides)."""
+    axes = traitement.evaluation_risque or {}
+    if not axes:
+        return ""
+    lignes = [(_LIBELLES_AXES_RISQUE.get(cle, cle), valeur) for cle, valeur in axes.items()]
+    return _section("Axes de risque environnemental (complément)", lignes)
 
 
 def _section_bloc_aerien(traitement: TraitementRead) -> str:
@@ -240,7 +334,6 @@ def _section_bloc_aerien(traitement: TraitementRead) -> str:
         [
             ("Pilote", aerien.pilote),
             ("Mécanicien", aerien.mecanicien),
-            ("Chef de base", aerien.chef_de_base_id),
             ("Consultant international", aerien.consultant_international),
             ("Base principale", aerien.base_principale),
             ("Stand", aerien.stand),
@@ -260,8 +353,6 @@ def _section_bloc_terrestre(traitement: TraitementRead) -> str:
     return _section(
         "Détail Terrestre",
         [
-            ("Chef d'équipe", terrestre.chef_equipe_id),
-            ("Agent encadreur", terrestre.agent_encadreur),
             ("Consultant international", terrestre.consultant_international),
             ("Surface atomiseur (ha)", terrestre.surface_atomiseur_ha),
             ("Surface disque rotatif (ha)", terrestre.surface_disque_rotatif_ha),
@@ -317,15 +408,17 @@ def build_crt_html(traitement: TraitementRead) -> str:
 {_section_references(traitement)}
 {_section_cibles(traitement)}
 {_section_traitement(traitement)}
-{bloc_specifique}
 {_section_moyens(traitement)}
 {_section_pesticides(traitement)}
 {_section_zones_cibles(traitement)}
 {_section_vegetation(traitement)}
 {_section_empoisonnement(traitement)}
 {_section_evaluation_risque(traitement)}
+{_section_observation_non_cibles(traitement)}
 {_section_mortalite(traitement)}
 {_section_observations(traitement)}
+{_section_axes_risque(traitement)}
+{bloc_specifique}
 {_section_signatures(traitement)}
 </body>
 </html>
