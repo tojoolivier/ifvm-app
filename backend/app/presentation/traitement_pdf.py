@@ -229,7 +229,7 @@ def _section_zones_cibles(traitement: TraitementRead) -> str:
             ("Apiculture", None),
             ("Aquaculture", None),
             ("Production organique", None),
-            ("Zone forestière", None),
+            ("Zone forestier", None),
         ],
     )
 

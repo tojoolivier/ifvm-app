@@ -314,6 +314,51 @@ def test_build_crt_html_espece_et_repartition_ne_fuient_pas_leur_repr_enum():
     assert ">3.5<" in html
 
 
+def _cible_dict(espece: str, repartition: str, **densites) -> dict:
+    base = {
+        "espece": espece,
+        "petites_larves": None,
+        "grandes_larves": None,
+        "vols_clairs_essaims": None,
+        "repartition_population": repartition,
+        "surface_infestee_ha": None,
+        "petites_larves_lmc": None,
+        "petites_larves_nse": None,
+        "grandes_larves_lmc": None,
+        "grandes_larves_nse": None,
+        "densite_diffuse_lmc": None,
+        "densite_groupee_lmc": None,
+        "densite_diffuse_nse": None,
+        "densite_groupee_nse": None,
+    }
+    base.update(densites)
+    return base
+
+
+def test_build_crt_html_densite_infestation_lmc_groupee():
+    traitement = _traitement_aerien(cible=_cible_dict("LMC", "GROUPEE", densite_groupee_lmc=7.0))
+
+    html = build_crt_html(traitement)
+
+    assert ">7.0<" in html
+
+
+def test_build_crt_html_densite_infestation_nse_diffuse():
+    traitement = _traitement_aerien(cible=_cible_dict("NSE", "DIFFUSE", densite_diffuse_nse=1.2))
+
+    html = build_crt_html(traitement)
+
+    assert ">1.2<" in html
+
+
+def test_build_crt_html_densite_infestation_nse_groupee():
+    traitement = _traitement_aerien(cible=_cible_dict("NSE", "GROUPEE", densite_groupee_nse=9.9))
+
+    html = build_crt_html(traitement)
+
+    assert ">9.9<" in html
+
+
 def test_build_crt_html_affiche_les_surfaces_par_moyen_et_le_reste_a_traiter():
     """§3.2/3.3 du formulaire papier : surfaces par moyen de traitement et
     surface restante — présentes sur le modèle mais jamais affichées avant."""
