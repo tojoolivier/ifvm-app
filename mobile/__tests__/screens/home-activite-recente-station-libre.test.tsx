@@ -25,12 +25,12 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock('@/lib/prospection-repository', () => ({
-  listRecentProspections: jest.fn().mockResolvedValue([]),
+  listToutesProspectionsLocal: jest.fn().mockResolvedValue([]),
   countUnsyncedProspections: jest.fn().mockResolvedValue(0),
 }));
 
 jest.mock('@/lib/traitement-repository', () => ({
-  listRecentTraitements: jest.fn().mockResolvedValue([]),
+  listToutesTraitementsLocal: jest.fn().mockResolvedValue([]),
 }));
 
 jest.mock('expo-network', () => ({
@@ -51,13 +51,13 @@ describe('DashboardScreen — Activité récente : repli sur station_libre', () 
       } as any,
       token: 'token-test',
     });
-    jest.mocked(prospectionRepository.listRecentProspections).mockClear();
+    jest.mocked(prospectionRepository.listToutesProspectionsLocal).mockClear();
     jest.mocked(prospectionRepository.countUnsyncedProspections).mockClear();
     jest.mocked(Network.getNetworkStateAsync).mockClear();
   });
 
   it('affiche station_libre (extensif/validation) au lieu de « Station non spécifiée »', async () => {
-    jest.mocked(prospectionRepository.listRecentProspections).mockResolvedValue([
+    jest.mocked(prospectionRepository.listToutesProspectionsLocal).mockResolvedValue([
       {
         id: 'prosp-1',
         station_nom: null,
@@ -79,7 +79,7 @@ describe('DashboardScreen — Activité récente : repli sur station_libre', () 
   });
 
   it('affiche station_nom (intensif, référentiel) en priorité quand les deux sont renseignés', async () => {
-    jest.mocked(prospectionRepository.listRecentProspections).mockResolvedValue([
+    jest.mocked(prospectionRepository.listToutesProspectionsLocal).mockResolvedValue([
       {
         id: 'prosp-1',
         station_nom: 'Poste Ambatondrazaka',
@@ -100,7 +100,7 @@ describe('DashboardScreen — Activité récente : repli sur station_libre', () 
   });
 
   it('affiche toujours « Station non spécifiée » quand ni l’un ni l’autre n’est renseigné', async () => {
-    jest.mocked(prospectionRepository.listRecentProspections).mockResolvedValue([
+    jest.mocked(prospectionRepository.listToutesProspectionsLocal).mockResolvedValue([
       {
         id: 'prosp-1',
         station_nom: null,

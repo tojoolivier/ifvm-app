@@ -1,6 +1,6 @@
 /**
  * Écran d'accueil — section « ACTIVITÉ RÉCENTE » (#activite-recente-traitements) :
- * n'affichait jusqu'ici que les fiches de prospection (`listRecentProspections`),
+ * n'affichait jusqu'ici que les fiches de prospection (`listToutesProspectionsLocal`),
  * alors que « Mes fiches » (fiches.tsx) affiche déjà prospections ET
  * traitements confondus. Toute fiche créée — y compris une fiche de
  * traitement — doit désormais y apparaître, triée avec les prospections par
@@ -25,12 +25,12 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock('@/lib/prospection-repository', () => ({
-  listRecentProspections: jest.fn().mockResolvedValue([]),
+  listToutesProspectionsLocal: jest.fn().mockResolvedValue([]),
   countUnsyncedProspections: jest.fn().mockResolvedValue(0),
 }));
 
 jest.mock('@/lib/traitement-repository', () => ({
-  listRecentTraitements: jest.fn().mockResolvedValue([]),
+  listToutesTraitementsLocal: jest.fn().mockResolvedValue([]),
 }));
 
 jest.mock('expo-network', () => ({
@@ -51,13 +51,13 @@ describe('DashboardScreen — Activité récente : inclut les fiches de traiteme
       } as any,
       token: 'token-test',
     });
-    jest.mocked(prospectionRepository.listRecentProspections).mockReset().mockResolvedValue([]);
-    jest.mocked(traitementRepository.listRecentTraitements).mockReset().mockResolvedValue([]);
+    jest.mocked(prospectionRepository.listToutesProspectionsLocal).mockReset().mockResolvedValue([]);
+    jest.mocked(traitementRepository.listToutesTraitementsLocal).mockReset().mockResolvedValue([]);
     jest.mocked(Network.getNetworkStateAsync).mockClear();
   });
 
   it('affiche une fiche de traitement récente, avec sa localité et son numéro', async () => {
-    jest.mocked(traitementRepository.listRecentTraitements).mockResolvedValue([
+    jest.mocked(traitementRepository.listToutesTraitementsLocal).mockResolvedValue([
       {
         id: 'trait-1',
         numero_fiche: 'CRT-2026-00042',
@@ -81,7 +81,7 @@ describe('DashboardScreen — Activité récente : inclut les fiches de traiteme
   });
 
   it('mélange prospections et traitements, triés par dernière modification', async () => {
-    jest.mocked(prospectionRepository.listRecentProspections).mockResolvedValue([
+    jest.mocked(prospectionRepository.listToutesProspectionsLocal).mockResolvedValue([
       {
         id: 'prosp-1',
         station_nom: 'Poste Ambatondrazaka',
@@ -92,7 +92,7 @@ describe('DashboardScreen — Activité récente : inclut les fiches de traiteme
         updated_at: '2026-09-10T08:00:00Z',
       } as any,
     ]);
-    jest.mocked(traitementRepository.listRecentTraitements).mockResolvedValue([
+    jest.mocked(traitementRepository.listToutesTraitementsLocal).mockResolvedValue([
       {
         id: 'trait-1',
         numero_fiche: 'CRT-1',

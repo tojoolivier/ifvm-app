@@ -1586,7 +1586,7 @@ export async function synchroniserStatutServeur(
 
   // `updated_at` délibérément jamais touché ici : un simple recalage de
   // statut ne doit pas faire remonter la fiche en tête de « Mes prospections »
-  // (listRecentProspections, triée sur updated_at), qui reflète une saisie,
+  // (listToutesProspectionsLocal, triée sur updated_at), qui reflète une saisie,
   // pas une consultation.
   for (const fiche of fiches) {
     await db.runAsync(
@@ -1634,21 +1634,27 @@ export async function listDraftProspections(): Promise<DraftProspection[]> {
   return db.getAllAsync<DraftProspection>(`SELECT * FROM prospection WHERE statut = 'brouillon' ORDER BY updated_at DESC`);
 }
 
-export async function listRecentProspections(limit = 20): Promise<DraftProspection[]> {
+/**
+ * Toutes les fiches locales (tous statuts), triées par dernière modification —
+ * alimente « Mes prospections »/« Mes fiches » (listes intégralement
+ * navigables, y compris hors ligne) et le décompte hebdomadaire de l'écran
+ * Accueil. Anciennement plafonnée à 20 (`listRecentProspections`) : une fiche
+ * déjà validée, mais pas parmi les 20 les plus récemment modifiées, en
+ * disparaissait purement et simplement hors ligne, alors qu'elle est
+ * intégralement présente en local depuis sa création sur cet appareil
+ * (#fiches-validees-liste-non-plafonnee).
+ */
+export async function listToutesProspectionsLocal(): Promise<DraftProspection[]> {
   const db = await getDb();
-  return db.getAllAsync<DraftProspection>(`SELECT * FROM prospection ORDER BY updated_at DESC LIMIT ?`, [limit]);
+  return db.getAllAsync<DraftProspection>(`SELECT * FROM prospection ORDER BY updated_at DESC`);
 }
 
 /**
- * Fiches réellement en attente d'envoi, sans la limite d'affichage de
- * `listRecentProspections` (#synchronisation-automatique) — une fiche
- * au-delà des 20 plus récentes ne doit jamais rester hors de portée d'une
- * synchronisation, automatique ou manuelle : seul l'écran d'accueil borne sa
- * liste affichée, jamais la file d'envoi elle-même. `statut = 'en_attente'`
- * exclut les brouillons encore en cours de saisie (même filtre que
- * `pendingSync` sur l'écran Prospection) ; `statut_sync` exclut les fiches
- * déjà parties et celles en `'echec'` (refusées par le serveur, à corriger
- * manuellement plutôt qu'à renvoyer à l'identique).
+ * Fiches réellement en attente d'envoi (#synchronisation-automatique) —
+ * `statut = 'en_attente'` exclut les brouillons encore en cours de saisie
+ * (même filtre que `pendingSync` sur l'écran Prospection) ; `statut_sync`
+ * exclut les fiches déjà parties et celles en `'echec'` (refusées par le
+ * serveur, à corriger manuellement plutôt qu'à renvoyer à l'identique).
  */
 export async function listUnsyncedProspections(): Promise<DraftProspection[]> {
   const db = await getDb();

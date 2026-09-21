@@ -6,7 +6,7 @@ import { useAuthStore } from '@/lib/auth-store';
 import { loadAccueilData, loadMesProspectionsServeur } from '@/lib/prospection-accueil';
 import { DraftProspection, synchroniserStatutServeur } from '@/lib/prospection-repository';
 import { ProspectionRead } from '@/lib/api-client';
-import { listRecentTraitements, DraftTraitementRow } from '@/lib/traitement-repository';
+import { listToutesTraitementsLocal, DraftTraitementRow } from '@/lib/traitement-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { navigateToProspectionConsult, navigateToProspectionDraft, navigateToTraitement } from '@/lib/fiche-routing';
 import { FicheCard } from '@/components/fiches/FicheCard';
@@ -100,7 +100,7 @@ export default function FichesScreen() {
         // chef assigné n'apparaissait jamais, malgré la fiche déjà présente
         // localement — contrairement aux prospections (`loadAccueilData`, aucun
         // filtre par rôle).
-        runTask(() => listRecentTraitements(), {
+        runTask(() => listToutesTraitementsLocal(), {
           name: 'fiches.traitements',
           criticality: 'essential',
         }),

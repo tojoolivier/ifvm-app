@@ -22,12 +22,12 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock('@/lib/prospection-repository', () => ({
-  listRecentProspections: jest.fn().mockResolvedValue([]),
+  listToutesProspectionsLocal: jest.fn().mockResolvedValue([]),
   countUnsyncedProspections: jest.fn().mockResolvedValue(0),
 }));
 
 jest.mock('@/lib/traitement-repository', () => ({
-  listRecentTraitements: jest.fn().mockResolvedValue([]),
+  listToutesTraitementsLocal: jest.fn().mockResolvedValue([]),
 }));
 
 jest.mock('expo-network', () => ({
@@ -48,7 +48,7 @@ describe('DashboardScreen — Accès rapide', () => {
       } as any,
       token: 'token-test',
     });
-    jest.mocked(prospectionRepository.listRecentProspections).mockClear();
+    jest.mocked(prospectionRepository.listToutesProspectionsLocal).mockClear();
     jest.mocked(prospectionRepository.countUnsyncedProspections).mockClear();
     jest.mocked(Network.getNetworkStateAsync).mockClear();
   });

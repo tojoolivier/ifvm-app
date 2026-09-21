@@ -7,7 +7,7 @@ import {
   countUnsyncedProspections,
   deleteProspection as deleteLocalProspection,
   listDraftProspections,
-  listRecentProspections,
+  listToutesProspectionsLocal,
   listUnsyncedProspections,
   materialiserProspectionValidee,
   updateProspectionStationNom,
@@ -33,13 +33,12 @@ const log = logger.child({ module: 'prospection-accueil' });
 export interface AccueilViewModel {
   unsyncedCount: number;
   activeDraft: DraftProspection | null;
+  /** Toutes les fiches locales (tous statuts), jamais plafonnées
+   * (`listToutesProspectionsLocal` — #fiches-validees-liste-non-plafonnee) :
+   * « Mes prospections »/« Mes fiches » doivent rester intégralement
+   * navigables hors ligne, y compris une fiche validée ancienne. */
   recent: DraftProspection[];
   validated: ProspectionRead[];
-  /**
-   * File d'envoi réelle (#synchronisation-automatique), distincte de `recent`
-   * qui plafonne à 20 fiches pour l'affichage — une fiche en attente au-delà
-   * de ces 20 ne doit jamais être exclue d'une synchronisation.
-   */
   pendingSync: DraftProspection[];
 }
 
@@ -47,7 +46,7 @@ export interface AccueilViewModel {
 export async function loadAccueilData(): Promise<AccueilViewModel> {
   const [drafts, recent, unsyncedCount, pendingSync] = await Promise.all([
     listDraftProspections(),
-    listRecentProspections(),
+    listToutesProspectionsLocal(),
     countUnsyncedProspections(),
     listUnsyncedProspections(),
   ]);
