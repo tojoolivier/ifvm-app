@@ -22,6 +22,10 @@ interface Prospection {
   campagne_id?: string
   prospecteur_id: string
   station_id: string | null
+  /** Localité saisie à la main — seule information de lieu d'une fiche
+   * Extensive/Validation, qui n'a jamais de `station_id` (station du référentiel
+   * réservée à l'Intensive). */
+  station_libre?: string | null
   date_prospection: string
   statut: string
   n_fiche: string | null
@@ -116,7 +120,10 @@ export function ProspectionsPage() {
 
   const stationLabel = (p: Prospection) => {
     const station = p.station_id ? stationMap[p.station_id] : null
-    return station ? `${station.code} ${station.nom}` : shortId(p.station_id)
+    if (station) return `${station.code} ${station.nom}`
+    // Extensive/Validation : pas de station du référentiel — la localité saisie
+    // à la fiche de prospection en tient lieu.
+    return p.station_libre?.trim() || shortId(p.station_id)
   }
 
   const agentLabel = (p: Prospection) => nomAgent(p.prospecteur_id)

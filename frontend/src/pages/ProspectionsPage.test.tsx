@@ -190,6 +190,47 @@ describe('ProspectionsPage — maquette §3 du handoff', () => {
     expect(screen.getByText('ST-014 Ankazoabo')).toBeInTheDocument()
   })
 
+  /** Seule l'Intensive porte une station du référentiel : pour l'Extensive et la
+   * Validation, la localité saisie à la fiche (`station_libre`) en tient lieu. */
+  it('affiche la localité saisie comme station pour une fiche Extensive/Validation sans station_id', async () => {
+    mockedGet.mockImplementation((url: string) => {
+      if (url === '/prospections')
+        return Promise.resolve({
+          data: [
+            { ...PROSPECTIONS[1], station_id: null, station_libre: 'Andasibe-Village' },
+            { ...PROSPECTIONS[2], station_id: null, station_libre: 'Betioky Centre' },
+          ],
+        })
+      if (url === '/stations') return Promise.resolve({ data: STATIONS })
+      return Promise.resolve({ data: url === '/users/' ? UTILISATEURS : [] })
+    })
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Andasibe-Village')).toBeInTheDocument())
+    expect(screen.getByText('Betioky Centre')).toBeInTheDocument()
+  })
+
+  it('retrouve une fiche Extensive par sa localité dans la recherche', async () => {
+    mockedGet.mockImplementation((url: string) => {
+      if (url === '/prospections')
+        return Promise.resolve({
+          data: [
+            { ...PROSPECTIONS[1], station_id: null, station_libre: 'Andasibe-Village' },
+            { ...PROSPECTIONS[2], station_id: null, station_libre: 'Betioky Centre' },
+          ],
+        })
+      if (url === '/stations') return Promise.resolve({ data: STATIONS })
+      return Promise.resolve({ data: url === '/users/' ? UTILISATEURS : [] })
+    })
+    renderPage()
+
+    await waitFor(() => expect(rows()).toHaveLength(2))
+    fireEvent.change(screen.getByLabelText('Recherche'), { target: { value: 'andasibe' } })
+
+    await waitFor(() => expect(rows()).toHaveLength(1))
+    expect(screen.getByText('Andasibe-Village')).toBeInTheDocument()
+  })
+
   it('reste affichable quand /users/ est refusé (rôle non admin)', async () => {
     mockApi({ usersFail: true })
     renderPage()
