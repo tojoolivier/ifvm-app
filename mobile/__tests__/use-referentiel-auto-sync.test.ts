@@ -21,8 +21,10 @@ jest.mock('react-native', () => ({
 }));
 
 const pullReferentiel = jest.fn();
+const resetReferentielSyncCursors = jest.fn();
 jest.mock('@/lib/referentiel-sync', () => ({
   pullReferentiel: (...args: unknown[]) => pullReferentiel(...args),
+  resetReferentielSyncCursors: (...args: unknown[]) => resetReferentielSyncCursors(...args),
 }));
 
 function enLigne() {
@@ -32,6 +34,7 @@ function enLigne() {
 beforeEach(() => {
   getNetworkStateAsync.mockReset();
   pullReferentiel.mockReset();
+  resetReferentielSyncCursors.mockReset();
   resetLoggerForTests();
 });
 
@@ -53,12 +56,22 @@ describe('checkAndSyncReferentiel', () => {
     expect(apres).toBe(true);
   });
 
+  it('reset les curseurs avant de tirer le pull — une table déjà partiellement peuplée ne rattraperait sinon jamais ses lignes manquantes', async () => {
+    enLigne();
+    pullReferentiel.mockResolvedValue(undefined);
+
+    await checkAndSyncReferentiel('tok', false);
+
+    expect(resetReferentielSyncCursors).toHaveBeenCalled();
+  });
+
   it('ne tire pas le pull quand la connectivité était déjà là', async () => {
     enLigne();
 
     await checkAndSyncReferentiel('tok', true);
 
     expect(pullReferentiel).not.toHaveBeenCalled();
+    expect(resetReferentielSyncCursors).not.toHaveBeenCalled();
   });
 
   it('journalise un pull en échec au lieu de l’avaler, sans jamais rejeter', async () => {
