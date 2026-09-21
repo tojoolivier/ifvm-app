@@ -16,6 +16,9 @@ import {
   saveProspectionCaptures,
   saveOperationsAeriennes,
   getProspection,
+  listAllProspectionPopulations,
+  listAllProspectionInfestations,
+  listAllProspectionCaptures,
   DraftProspection,
   TypeProspection,
   PopulationRow,
@@ -152,6 +155,12 @@ export async function assurerProspectionDisponibleLocalement(fiche: ProspectionR
       const stationNom = (await getStationById(fiche.station_id))?.nom ?? null;
       if (stationNom) await updateProspectionStationNom(fiche.id, stationNom);
     }
+    // #cible-extensif-populations-non-materialisees : une matérialisation
+    // interrompue après l'insertion de la fiche mais avant celle de ses
+    // populations laissait une fiche locale « vide » pour toujours (le
+    // `return` ci-dessus ne la rejouait jamais) — sa cible de traitement
+    // restait alors sans aucune donnée.
+    await rapatrierEnfants(fiche, { seulementSiAbsents: true });
     return;
   }
 
@@ -249,28 +258,71 @@ export async function assurerProspectionDisponibleLocalement(fiche: ProspectionR
     updatedAt: fiche.updated_at,
   });
 
-  for (const population of fiche.populations ?? []) {
-    await saveProspectionPopulation(fiche.id, population as unknown as PopulationRow);
+  await rapatrierEnfants(fiche, { seulementSiAbsents: false });
+  if ((fiche.operations_aeriennes ?? []).length > 0) {
+    await saveOperationsAeriennes(fiche.id, fiche.operations_aeriennes as unknown as OperationAerienneRow[]);
   }
-  for (const infestation of fiche.infestations ?? []) {
-    await saveProspectionInfestation(fiche.id, infestation.type_cible, infestation as unknown as InfestationRow);
+}
+
+/**
+ * L'API renvoie `stades_imago`/`densites_larve` en objets et `type_cible` en
+ * tableau, alors que SQLite les stocke en JSON texte — l'inverse exact de
+ * `buildPopulationsPayload` (prospection-review.ts). Les écrire tels quels
+ * faisait échouer la liaison SQLite pour toute fiche Extensive (seule à
+ * renseigner ces champs) : la fiche restait matérialisée SANS ses populations,
+ * d'où une cible de traitement vide (#cible-extensif-populations-non-materialisees).
+ */
+function populationServeurVersLocale(population: unknown): PopulationRow {
+  const brute = population as Record<string, unknown>;
+  const enJson = (valeur: unknown): string | null =>
+    valeur == null ? null : typeof valeur === 'string' ? valeur : JSON.stringify(valeur);
+  return {
+    ...brute,
+    stades_imago: enJson(brute.stades_imago),
+    densites_larve: enJson(brute.densites_larve),
+    type_cible: enJson(brute.type_cible),
+  } as unknown as PopulationRow;
+}
+
+/**
+ * Écrit populations, infestations et captures d'une fiche serveur en local.
+ * `seulementSiAbsents` : chaque famille n'est écrite que si la fiche locale n'en
+ * a encore aucune — jamais d'écrasement de ce qu'un appareil détient déjà
+ * (propre fiche de l'agent, complète dès sa création).
+ */
+async function rapatrierEnfants(fiche: ProspectionRead, options: { seulementSiAbsents: boolean }): Promise<void> {
+  const { seulementSiAbsents } = options;
+
+  const populations = fiche.populations ?? [];
+  if (populations.length > 0 && (!seulementSiAbsents || (await listAllProspectionPopulations(fiche.id)).length === 0)) {
+    for (const population of populations) {
+      await saveProspectionPopulation(fiche.id, populationServeurVersLocale(population));
+    }
   }
+
+  const infestations = fiche.infestations ?? [];
+  if (infestations.length > 0 && (!seulementSiAbsents || (await listAllProspectionInfestations(fiche.id)).length === 0)) {
+    for (const infestation of infestations) {
+      await saveProspectionInfestation(fiche.id, infestation.type_cible, infestation as unknown as InfestationRow);
+    }
+  }
+
   // Jusqu'ici absents de cette matérialisation (#revalidation-prospection) :
   // sans eux, une fiche intensive/aérienne créée sur un AUTRE appareil se
   // matérialiserait sans ses captures ni ses opérations aériennes.
-  const capturesParGroupe = new Map<string, CaptureRow[]>();
-  for (const capture of (fiche.captures ?? []) as unknown as CaptureRow[]) {
-    const cle = `${capture.espece}::${capture.categorie}`;
-    const groupe = capturesParGroupe.get(cle) ?? [];
-    groupe.push(capture);
-    capturesParGroupe.set(cle, groupe);
-  }
-  for (const [cle, rows] of capturesParGroupe) {
-    const [espece, categorie] = cle.split('::');
-    await saveProspectionCaptures(fiche.id, espece, categorie, rows);
-  }
-  if ((fiche.operations_aeriennes ?? []).length > 0) {
-    await saveOperationsAeriennes(fiche.id, fiche.operations_aeriennes as unknown as OperationAerienneRow[]);
+  const captures = (fiche.captures ?? []) as unknown as CaptureRow[];
+  if (captures.length > 0 && (!seulementSiAbsents || (await listAllProspectionCaptures(fiche.id)).length === 0)) {
+    const capturesParGroupe = new Map<string, CaptureRow[]>();
+    for (const capture of captures) {
+      const cle = `${capture.espece}::${capture.categorie}`;
+      const groupe = capturesParGroupe.get(cle) ?? [];
+      groupe.push(capture);
+      capturesParGroupe.set(cle, groupe);
+    }
+    for (const [cle, rows] of capturesParGroupe) {
+      const [espece, categorie] = cle.split('::');
+      await saveProspectionCaptures(fiche.id, espece, categorie, rows);
+    }
   }
 }
 
