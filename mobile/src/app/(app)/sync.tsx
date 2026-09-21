@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
-import { pullReferentiel } from '@/lib/referentiel-sync';
+import { pullReferentiel, resetReferentielSyncCursors } from '@/lib/referentiel-sync';
 import { compterReferentielLocal, EtatTableReferentiel } from '@/lib/referentiel-db';
 import { loadAccueilData, AccueilViewModel } from '@/lib/prospection-accueil';
 import { syncAllProspections } from '@/lib/prospection-review';
@@ -134,6 +134,16 @@ export default function SyncScreen() {
         setResume(null);
 
         try {
+          // Un pull incrémental (curseur par table) ne redemande que ce qui a
+          // changé depuis le dernier succès — si une table locale contient déjà
+          // des lignes mais qu'il en manque une partie (ex: un espece/sexe/
+          // catégorie jamais reçu), le garde-fou #201 ("table vide -> full
+          // pull") ne se déclenche pas et ces lignes ne reviennent jamais. Le
+          // bouton "Synchroniser" doit tenir la promesse du message "Stades
+          // indisponibles hors ligne" (cf. intensive-imagos.tsx/intensive-
+          // larves.tsx) : reset les curseurs pour forcer un pull complet, comme
+          // le fait déjà "Forcer une resynchronisation complète" (profile.tsx).
+          await resetReferentielSyncCursors();
           await pullReferentiel(token!);
         } catch (error) {
           logger.failure('sync.referentiel.failed', error);
