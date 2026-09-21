@@ -562,9 +562,6 @@ export function TraitementDetailPage() {
             <Carte className="overflow-hidden">
               <div className="flex items-baseline gap-3 border-b border-[#f1ecdd] px-5 py-[15px]">
                 <h2 className="font-sans text-[14px] font-bold">Rotations</h2>
-                <p className="font-sans text-[11px] font-medium text-ifvm-text-weak">
-                  rapprochement fiche de vol par n° de cuve
-                </p>
                 <div className="flex-1" />
                 <p className="font-mono text-[12px] font-semibold text-ifvm-green-text">
                   {totalRotations}
