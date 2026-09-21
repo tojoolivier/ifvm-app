@@ -956,10 +956,8 @@ class GetEquipeAerienne:
 
 
 class CreateEquipeAerienne:
-    """`utilisateur_repo` (duck-typé, même contrat que `SyncPushFicheVol` —
-    #fiche-vol-creation-mobile) : valide que `chef_de_base_id` référence un
-    utilisateur actif du rôle `chef_de_base`, comme la fiche de vol le fait déjà
-    pour son propre `chef_de_base_id`."""
+    """`utilisateur_repo` (duck-typé) : valide que `chef_de_base_id` référence un
+    utilisateur actif du rôle `chef_de_base`."""
 
     def __init__(self, repository: EquipeAerienneRepository, utilisateur_repo: object):
         self.repository = repository
@@ -1013,8 +1011,7 @@ class ListAeronefs:
 class UpdateAeronef:
     """Mise à jour partielle, `actif` compris. Pas de création isolée : un aéronef naît
     avec son équipe (`CreateEquipeAerienne`). Pas de suppression : `actif=False` est la
-    seule sortie. Modifier la société ou le volume de cuve ne réécrit jamais les fiches de
-    vol déjà saisies — elles gardent l'exploitant du jour (snapshot, cf. `FicheVol`)."""
+    seule sortie."""
 
     def __init__(self, repository: AeronefRepository):
         self.repository = repository

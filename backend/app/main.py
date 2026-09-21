@@ -7,7 +7,6 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from app.config import settings
 from app.presentation import (
     campagne_routes,
-    fiche_vol_routes,
     prospection_routes,
     referentiel_routes,
     traitement_routes,
@@ -37,7 +36,6 @@ app.include_router(campagne_routes.router, prefix="/campagnes", tags=["campagnes
 app.include_router(referentiel_routes.router, prefix="", tags=["referentiels"])
 app.include_router(prospection_routes.router, prefix="/prospections", tags=["prospections"])
 app.include_router(traitement_routes.router, prefix="/traitements", tags=["traitements"])
-app.include_router(fiche_vol_routes.router, prefix="/fiches-vol", tags=["fiches-vol"])
 
 
 @app.get("/health", tags=["system"])

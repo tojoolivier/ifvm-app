@@ -1,7 +1,7 @@
 from weasyprint import HTML
 
-# Base commune aux gabarits de #494 (fiche de vol) et #495 (CRT), pour un rendu
-# visuel cohérent entre les deux documents malgré des gabarits écrits séparément.
+# Base commune aux gabarits PDF (aujourd'hui : le CRT), pour un rendu visuel
+# cohérent entre les documents malgré des gabarits écrits séparément.
 PDF_BASE_CSS = """
 @page {
     size: A4;
