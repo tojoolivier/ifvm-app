@@ -21,7 +21,6 @@ L'**IFVM** (Ivotoerana Famongorana ny Valala eto Madagasikara) est le centre nat
 | Prospection de validation | — | Vérification d'un signalement | À la demande | Signalement agriculteur/non-specialiste |
 | Relevé météorologique | — | Données journalières par station météo | Quotidien | Quotidien |
 | Compte-rendu de traitement | CRT | Rapport d'une opération de traitement (table `traitement` — voir note ci-dessous) | À chaque traitement | Décision de traitement |
-| Fiche de vol | — | Journal journalier d'un aéronef, tous types de vols confondus | Quotidien (1 fiche / jour / aéronef) | Vol effectué |
 
 ### Chaînes de déclenchement
 
@@ -34,37 +33,13 @@ Agriculteur → Signalement → Prospection de Validation
 
 - **Prospection de validation** : type de prospection déclenchée par un **signalement d'agriculteur ou non-specialiste**. Vérification sur le terrain si le signalement est réel. Station `ponctuelle`.
 - **Validation de fiche** : workflow en 3 étapes (voir ci-dessous). À ne pas confondre avec "prospection de validation".
-- **Vol** vs **rotation** vs **fiche de vol**. Un **vol** est un déplacement unitaire de
-  l'aéronef, du décollage à l'atterrissage, et porte un **type de vol**. Une **rotation**
-  (`traitement_rotation`, côté CRT) est le cycle d'épandage d'**une cuve**. Ce ne sont pas le même
-  fait : une rotation exige **au minimum une mise en place et une application**, donc **au moins
-  deux vols**. La **fiche de vol** est le journal d'une journée pour un aéronef donné : elle
-  regroupe tous ses vols, y compris ceux qui ne se rattachent à aucun traitement.
-  Le terme « passage » n'est pas retenu.
+- **Fiche de vol : fonctionnalité supprimée** (migration 0080, `docs/adr/ADR-017`). Les tables
+  `fiche_vol`, `vol`, `fiche_vol_signature` et `campagne_fiche_vol_compteur` n'existent plus ; la
+  page web « Heures de vol » est une page d'attente. Une **rotation** (`traitement_rotation`, côté
+  CRT) reste le cycle d'épandage d'**une cuve**. Le cadrage historique est dans
+  `docs/adr/ADR-011` (parties fiche de vol abandonnées ; le relevé météo n'est pas concerné).
 
-- **Les cinq types de vol** :
-
-  | Type | Définition |
-  |------|-----------|
-  | `PROSPECTION` | vol rattaché à une fiche de prospection |
-  | `MEP` (mise en place) | du stand de remplissage jusqu'au bloc à traiter |
-  | `APPLICATION` | épandage ou pulvérisation du pesticide |
-  | `CONVOYAGE` | transit entre deux points (Tana → Toliara, stand → base aérienne) |
-  | `DIVERS` | rinçage, maintenance aérienne, autre |
-
-  Seuls `MEP` et `APPLICATION` se rattachent à une rotation ; `PROSPECTION` se rattache à une
-  prospection ; `CONVOYAGE` et `DIVERS` ne se rattachent à rien.
-
-- **`fiche_vol` : le nom retient la feuille, la table représente un fait.** Une fiche de vol
-  regroupe les vols d'un aéronef sur **une journée** — le regroupement est déterminé par
-  `(jour, aéronef)`, pas par la feuille : il existe que quelqu'un la remplisse ou non. Le nom
-  est donc une **exception de vocabulaire**, retenue parce que « fiche de vol » est le mot du
-  terrain, et non une exception de modélisation. Comme pour le CRT (voir `traitement`
-  ci-dessous), l'identité du **document** vit dans `numero_fiche`, pas dans le nom de la table.
-  Une seconde fiche le même jour pour le même appareil n'est pas censée exister ; elle n'est
-  pourtant pas refusée — bloquer un pilote hors-ligne coûterait plus cher que la numéroter.
-
-- **Base aérienne** vs **stand de remplissage**. Deux lieux distincts d'une même journée de vol,
+- **Base aérienne** vs **stand de remplissage**. Deux lieux distincts d'une équipe aérienne,
   chacun relevé en position (lat/lon/alt captées automatiquement, hors ligne) et nommé à la main.
   Ni l'un ni l'autre n'est un **poste acridien** ou une **station fixe**.
 
@@ -76,12 +51,8 @@ Agriculteur → Signalement → Prospection de Validation
   principale (`base_aerienne.equipe_id`), ses bases secondaires (héritées de la principale) et
   ses stands (`stand_remplissage.equipe_aerienne_id`). **Seul le chef de base de l'équipe (ou
   un admin) crée ses lieux**, rattachés d'office à SON équipe (contrôle serveur, 403 sinon).
-  Créer une fiche de vol commence par choisir l'équipe : chef de base, pilote, mécanicien,
-  consultant, immatriculation et société de l'hélicoptère s'en déduisent (le serveur fait
-  autorité et les **copie** sur la fiche — snapshot du jour, jamais recalculé), et seuls les
-  lieux de cette équipe sont proposés (`LieuVolHorsEquipeError`, 422 sinon). Le référentiel de
-  lieux de la fiche de vol reste `base_aerienne`/`stand_remplissage` (décision 0064), distinct
-  de `lieu_aerien` (prospection/traitement).
+  Le référentiel de lieux d'une équipe reste `base_aerienne`/`stand_remplissage` (décision 0064),
+  distinct de `lieu_aerien` (prospection/traitement).
 
 - **Pilote** et **mécanicien** sont **externes à l'IFVM** (compagnie aérienne ou Armée malgache) :
   ce sont des noms, pas des comptes `utilisateur`. Seul le **chef de base** est un agent IFVM. Le
@@ -211,8 +182,8 @@ Chaque rôle a un dashboard adapté dans l'app mobile :
 | `validation_finale` | Prospection intensive (validation web) | Autre équipe — valide ou rejette sur l'interface web |
 | `chef_equipe` | CRT + toutes prospections (lecture/écriture) | Encadre l'équipe terrain |
 | `agent_encadreur` | CRT (lecture seule ou co-remplissage) | Co-remplissage CRT |
-| `pilote` | Fiche de vol | Pilote d'aéronef |
-| `mecanicien` | Fiche de vol | Mécanicien d'aéronef |
+| `pilote` | Gestion d'équipe aérienne (mobile) | Pilote d'aéronef |
+| `mecanicien` | Gestion d'équipe aérienne (mobile) | Mécanicien d'aéronef |
 | `chef_de_base` | Tout en lecture/écriture + validation + sync status | Supervise son PA |
 | `admin` | Gestion utilisateurs + config postes acridiens + résolution conflits | Configuration système |
 
@@ -246,7 +217,7 @@ prospection → station (fixe pour intensive, ponctuelle pour extensive/validati
   └── prospection_infestation (taches, bandes, vols, essaims)                             [queryable]
 
 audit_log
-  ├── fiche_type (intensive | extensive | validation | traitement | vol | meteo)
+  ├── fiche_type (intensive | extensive | validation | traitement | vol | meteo)  — `vol` : valeur morte depuis 0080
   ├── fiche_id
   ├── auteur_id → utilisateur
   ├── action (creation | modification | soumission | verification | validation | rejet | commentaire)
@@ -272,17 +243,7 @@ traitement (ex-CRT — le sigle CRT désigne le compte-rendu affiché à l'utili
   └── traitement_signature (1-N selon rôle : PILOTE | MECANICIEN | CHEF_DE_BASE |
                              CHEF_EQUIPE | CONSULTANT_INTERNATIONAL)
 
-fiche_vol (hors périmètre — future table ; cadrage : docs/adr/ADR-011)
-  ├── 1 fiche par jour et par aéronef (compagnie, immatriculation, base aérienne,
-  │   stand de remplissage, observations)
-  ├── vol (1-N)   type_vol : PROSPECTION | MEP | APPLICATION | CONVOYAGE | DIVERS
-  │   ├── → prospection          (si type_vol = PROSPECTION)
-  │   └── → traitement_rotation  (si type_vol ∈ MEP | APPLICATION ; N:1 —
-  │                               une rotation = 1 MEP + 1 application)
-  └── fiche_vol_signature (1-N) — même patron que traitement_signature
-                          (PILOTE | MECANICIEN | CHEF_DE_BASE | CONSULTANT_INTERNATIONAL)
-
-  Durées de vol et cumuls (jour / semaine / mois / total) sont dérivés : jamais stockés.
+(fiche_vol, vol, fiche_vol_signature : supprimées en 0080 — voir docs/adr/ADR-017)
 ```
 
 > **Domaine `espece` : `cible` vs `prospection`.** `prospection.espece` et
@@ -340,7 +301,7 @@ mobile/src/app/
 > cf. `.env.example`) sert uniquement à réintégrer dans les URLs générées par FastAPI (docs
 > OpenAPI, redirections), pas à faire le routing lui-même (`ProxyHeadersMiddleware` d'uvicorn ne
 > gère que `X-Forwarded-For`/`-Proto`, pas le strip de préfixe). **Si le reverse proxy en
-> production ne retire pas `/api`, toutes les routes referentiels/fiches-vol renvoient 404**
+> production ne retire pas `/api`, toutes les routes referentiels renvoient 404**
 > côté mobile (symptôme observé : `equipes-aeriennes`, `referentiels-aeriens`) — c'est une
 > config d'infra externe au repo, à vérifier sur le serveur, pas un bug applicatif.
 
