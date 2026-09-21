@@ -390,3 +390,62 @@ describe('ProspectionDetailPage — toutes les données de la fiche', () => {
     expect(screen.getByText('40')).toBeInTheDocument()
   })
 })
+
+describe('ProspectionDetailPage — détail des populations (fiche Extensive)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  /** Ces champs arrivaient en base mais n'étaient lus par aucune vue web : la
+   * fiche vue sur le web paraissait n'en montrer qu'une petite partie. */
+  it('affiche captures par phase, stades, larves par stade, accouplement, ponte… saisis sur le téléphone', async () => {
+    renderPage('validee', {
+      type_prospection: 'extensive',
+      populations: [
+        {
+          id: 'pop-1',
+          espece: 'LMC',
+          categorie: 'imago',
+          densite_diffuse: 20,
+          densite_groupee: null,
+          captures_nombre: 12,
+          captures_sol: 5,
+          captures_trans: 0,
+          captures_solitaro_transiens: 0,
+          captures_greg: 2,
+          stades_imago: { femelleA1: 3, maleA1: 4 },
+          accouplement: 'rare',
+          ponte: 'beaucoup',
+          interdistance: 2.5,
+          type_cible: ['vol_clair'],
+          etat: 'repos',
+        },
+        {
+          id: 'pop-2',
+          espece: 'NSE',
+          categorie: 'larve',
+          densite_diffuse: null,
+          densite_groupee: null,
+          densites_larve: { L1: 10, L4: 3 },
+          tache_larvaire: true,
+        },
+      ] as never,
+    })
+
+    await waitFor(() => expect(screen.getByText('Populations — détail par espèce')).toBeInTheDocument())
+    expect(screen.getByText('LMC · Imagos')).toBeInTheDocument()
+    expect(screen.getByText('NSE · Larves')).toBeInTheDocument()
+    expect(screen.getByText('Sol. 5 · Trans. 0 · Sol-Trans. 0 · Grég. 2')).toBeInTheDocument()
+    expect(screen.getByText('femelleA1 3 · maleA1 4')).toBeInTheDocument()
+    expect(screen.getByText('Rare')).toBeInTheDocument()
+    expect(screen.getByText('Beaucoup')).toBeInTheDocument()
+    expect(screen.getByText('L1 10 · L4 3')).toBeInTheDocument()
+    expect(screen.getByText('Tache larvaire')).toBeInTheDocument()
+  })
+
+  it('n’affiche pas ce bloc quand la fiche n’a aucune population', async () => {
+    renderPage('validee')
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'F-001' })).toBeInTheDocument())
+    expect(screen.queryByText('Populations — détail par espèce')).not.toBeInTheDocument()
+  })
+})

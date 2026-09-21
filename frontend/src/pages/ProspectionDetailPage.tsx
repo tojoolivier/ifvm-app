@@ -22,6 +22,7 @@ import {
   type InfestationRead,
   type PopulationRead,
 } from '@/lib/prospection-fiche-lecture'
+import { buildPopulationsDetail, type PopulationDetailRead } from '@/lib/prospection-populations-detail'
 import {
   buildCapturesSynthese,
   buildImagoRows,
@@ -46,11 +47,12 @@ import { shortId, useAnnuaire } from '@/lib/use-annuaire'
 // Types
 // ---------------------------------------------------------------------------
 
-type Population = PopulationRead & {
-  phase?: string | null
-  methode?: string | null
-  temps_capture?: number | null
-}
+type Population = PopulationRead &
+  Omit<PopulationDetailRead, 'espece' | 'categorie'> & {
+    phase?: string | null
+    methode?: string | null
+    temps_capture?: number | null
+  }
 type Capture = CaptureRead & { sexe?: string | null }
 /** La fiche de lecture exploite la spécialisation larve/imago, plus riche que `InfestationRead`. */
 type Infestation = InfestationRead & InfestationFiche
@@ -538,6 +540,7 @@ export function ProspectionDetailPage() {
   const larveRows = buildLarveRows(findLarve(prospection.infestations))
   const imagoRows = buildImagoRows(findImago(prospection.infestations))
   const capturesSynthese = buildCapturesSynthese(prospection.captures, prospection.populations)
+  const populationsDetail = buildPopulationsDetail(prospection.populations)
   const piste = buildPisteValidation(auditLog, prospection.statut, nomAgent)
 
   // Bloc E : recouvrement total des strates du JSONB `vegetation` (ADR-006).
@@ -687,6 +690,29 @@ export function ProspectionDetailPage() {
             emptyMessage="Aucune capture enregistrée."
           />
         </Carte>
+
+        {/* Populations — détail par espèce (mêmes lignes que le récapitulatif du téléphone) */}
+        {populationsDetail.length > 0 && (
+          <Carte className="px-5 py-[18px]">
+            <div className="mb-3">
+              <BlocLabel>Populations — détail par espèce</BlocLabel>
+            </div>
+            <div className="flex flex-col gap-5">
+              {populationsDetail.map((groupe) => (
+                <div key={`${groupe.espece}-${groupe.categorie}`}>
+                  <h3 className="mb-2 font-sans text-[12.5px] font-bold text-ifvm-green-text">
+                    {groupe.titre}
+                  </h3>
+                  <div className="grid grid-cols-1 gap-x-6 gap-y-[9px] md:grid-cols-2">
+                    {groupe.lignes.map((l) => (
+                      <LigneCle key={l.k} ligne={champ(l.k, l.v)} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Carte>
+        )}
 
         {/* E · Végétation & sol */}
         <Carte className="px-5 py-[18px]">
