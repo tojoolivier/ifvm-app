@@ -37,14 +37,15 @@ garder l'exploitant, le pilote et l'appareil *du jour*, même si l'équipe chang
 ou de pilote ensuite). Le serveur les renseigne depuis l'équipe à la création ; il ne les
 recalcule jamais ensuite.
 
-Revision ID: 0077
-Revises: 0076
+Revision ID: 0078
+Revises: 0077
 Create Date: 2026-09-19
 
-Renumérotée 0075 -> 0077 (collision) : cette migration a été créée en parallèle de
-`0075_traitement_terrestre_stock_initial.py`, fusionnée sur main entretemps avec le
-même `down_revision="0074"`, qui a elle-même reçu `0076_traitement_moyens_humains_
-materiels.py` à sa suite — même précédent que le rebase 0046->0047.
+Renumérotée 0075 -> 0078 (collisions successives) : cette migration a été créée en
+parallèle de migrations d'autres PR fusionnées sur main entretemps
+(`0075_traitement_terrestre_stock_initial.py`, `0076_traitement_moyens_humains_
+materiels.py`, `0077_traitement_terrestre_pesticide_unite.py`), chacune avec le même
+`down_revision` que la sienne à l'époque — même précédent que le rebase 0046->0047.
 """
 
 import sqlalchemy as sa
@@ -52,8 +53,8 @@ from sqlalchemy.dialects.postgresql import UUID
 
 from alembic import op
 
-revision = "0077"
-down_revision = "0076"
+revision = "0078"
+down_revision = "0077"
 branch_labels = None
 depends_on = None
 

@@ -342,7 +342,7 @@ class EquipeAerienneRead(BaseModel):
     pilote: str | None = None
     mecanicien: str | None = None
     consultant_international: str | None = None
-    # Hélicoptère de l'équipe (migration 0077) — nullable pour les équipes antérieures.
+    # Hélicoptère de l'équipe (migration 0078) — nullable pour les équipes antérieures.
     aeronef_id: uuid.UUID | None = None
     aeronef: AeronefRead | None = None
     membres: list[MembreEquipeAerienneRead] = Field(default_factory=list)
@@ -362,7 +362,7 @@ class EquipeAerienneCreate(BaseModel):
         Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
         | None
     ) = None
-    # Hélicoptère de l'équipe (migration 0077) : exigé pour toute nouvelle équipe, comme
+    # Hélicoptère de l'équipe (migration 0078) : exigé pour toute nouvelle équipe, comme
     # pilote/mécanicien — nullable en base uniquement pour les équipes antérieures.
     aeronef: AeronefCreate
     membres: list[MembreEquipeAerienneCreate] = Field(default_factory=list)
@@ -449,7 +449,7 @@ class StandRemplissageRead(BaseModel):
     longitude: float | None
     latitude: float | None
     altitude: float | None
-    # `None` pour un stand créé avant la migration 0077, non encore rattaché à une équipe.
+    # `None` pour un stand créé avant la migration 0078, non encore rattaché à une équipe.
     equipe_aerienne_id: uuid.UUID | None = None
     actif: bool
     created_at: datetime
@@ -478,7 +478,7 @@ class StandRemplissageUpdate(BaseModel):
     latitude: float | None = Field(default=None, ge=-90, le=90)
     altitude: float | None = None
     # Réservé aux admins : rattache/change l'équipe d'un stand (dont ceux antérieurs à la
-    # migration 0077, « sans équipe »).
+    # migration 0078, « sans équipe »).
     equipe_aerienne_id: uuid.UUID | None = None
     actif: bool | None = None
 

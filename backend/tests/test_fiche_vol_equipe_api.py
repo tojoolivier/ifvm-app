@@ -1,4 +1,4 @@
-"""Fiche de vol et équipe aérienne (migration 0077).
+"""Fiche de vol et équipe aérienne (migration 0078).
 
 Choisir une équipe à la création renseigne l'en-tête (chef de base, pilote, mécanicien,
 immatriculation, société de l'hélicoptère) depuis l'équipe — le serveur fait autorité — et

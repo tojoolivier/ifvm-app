@@ -341,7 +341,7 @@ class FicheVolRepositoryImpl:
         return parent_equipe == equipe_id
 
     async def stand_appartient_a_equipe(self, stand_id: uuid.UUID, equipe_id: uuid.UUID) -> bool:
-        """Un stand « sans équipe » (antérieur à la migration 0077) n'appartient à
+        """Un stand « sans équipe » (antérieur à la migration 0078) n'appartient à
         personne : il n'est proposable à aucune équipe tant qu'un admin ne l'a pas
         rattaché."""
         row = (

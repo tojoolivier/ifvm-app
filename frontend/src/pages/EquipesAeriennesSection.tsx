@@ -220,7 +220,7 @@ export function EquipesAeriennesSection() {
     },
   })
 
-  // Rattache un stand antérieur à la migration 0077 (« sans équipe ») à son équipe :
+  // Rattache un stand antérieur à la migration 0078 (« sans équipe ») à son équipe :
   // réservé aux admins côté serveur, un stand sans équipe n'étant proposé à personne.
   const rattacherStandMutation = useMutation({
     mutationFn: ({ id, equipe_aerienne_id }: { id: string; equipe_aerienne_id: string }) =>

@@ -328,7 +328,7 @@ class EquipeRequiseError(ValueError):
 
 @dataclass
 class Aeronef:
-    """Hélicoptère d'une équipe aérienne (migration 0077). `immatriculation` est sa clé
+    """Hélicoptère d'une équipe aérienne (migration 0078). `immatriculation` est sa clé
     candidate : `societe` (exploitant) et `volume_cuve_l` en dépendent, d'où une entité à
     part plutôt que des colonnes de `EquipeAerienne`. Jamais supprimé : `actif=false`."""
 
@@ -372,7 +372,7 @@ class EquipeAerienne:
     pilote: str | None = None
     mecanicien: str | None = None
     consultant_international: str | None = None
-    # Hélicoptère de l'équipe (migration 0077) : 1:1, `None` pour les équipes créées
+    # Hélicoptère de l'équipe (migration 0078) : 1:1, `None` pour les équipes créées
     # avant cette migration. `aeronef` est résolu par jointure à la lecture.
     aeronef_id: uuid.UUID | None = None
     aeronef: Aeronef | None = None
@@ -409,7 +409,7 @@ class BaseAerienne:
 @dataclass
 class StandRemplissage:
     """Stand de remplissage de la fiche de vol — même forme que `BaseAerienne`, sans
-    hiérarchie. `equipe_aerienne_id` (migration 0077) : équipe propriétaire, plusieurs
+    hiérarchie. `equipe_aerienne_id` (migration 0078) : équipe propriétaire, plusieurs
     stands par équipe ; `None` pour les stands antérieurs, exigé à la création."""
 
     id: uuid.UUID = field(default_factory=uuid.uuid4)

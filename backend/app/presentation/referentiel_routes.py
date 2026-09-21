@@ -809,7 +809,7 @@ async def get_equipe_aerienne(
     return equipe
 
 
-# --- aeronef (hélicoptère d'une équipe aérienne, migration 0077) -------------------
+# --- aeronef (hélicoptère d'une équipe aérienne, migration 0078) -------------------
 #
 # Pas de POST : un aéronef naît avec son équipe (POST /equipes-aeriennes, champ
 # `aeronef`), jamais orphelin. Pas de DELETE : la sortie de service est `actif=false`.
