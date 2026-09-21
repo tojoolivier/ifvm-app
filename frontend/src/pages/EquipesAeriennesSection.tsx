@@ -20,7 +20,7 @@ const labelClass = 'mb-1 block text-sm font-medium text-gray-700'
 
 /**
  * Assigner un chef de base à une base aérienne, depuis le portail web — même
- * flux que mobile (`mobile/src/app/(fiche-vol)/referentiels.tsx`) : Équipes /
+ * flux que mobile (`mobile/src/app/(app)/equipes-aeriennes.tsx`) : Équipes /
  * Bases principales / Bases secondaires / Stands, cardinalité confirmée
  * (migration 0066) : 1 équipe = 1 chef de base = 1 base principale
  * (`parent_base_id IS NULL`) ; une base secondaire hérite de l'équipe de sa
