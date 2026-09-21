@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -78,6 +79,13 @@ async def list_traitements(
     chef_equipe_id: uuid.UUID | None = Query(default=None),
     reprenable: bool | None = Query(default=None),
     statut: str | None = Query(default=None),
+    date_traitement: date | None = Query(
+        default=None,
+        description=(
+            "N'inclut que les fiches de cette date — « fiche de vol » (mobile) : choisir "
+            "le traitement du jour d'un vol MEP/APPLICATION."
+        ),
+    ),
 ):
     repository = get_repository(db)
     use_case = ListTraitements(repository)
@@ -87,6 +95,7 @@ async def list_traitements(
         chef_equipe_id=chef_equipe_id,
         reprenable=reprenable,
         statut=statut,
+        date_traitement=date_traitement,
     )
 
 

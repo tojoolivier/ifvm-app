@@ -62,6 +62,7 @@ class ProspectionRepository(ABC):
         prospecteur_id: uuid.UUID | None = None,
         disponible_pour_traitement: bool = False,
         a_revalider: bool = False,
+        date_prospection: date | None = None,
     ) -> list[Prospection]:
         pass
 
@@ -95,6 +96,7 @@ class TraitementRepository(ABC):
         chef_equipe_id: uuid.UUID | None = None,
         reprenable: bool | None = None,
         statut: str | None = None,
+        date_traitement: date | None = None,
     ) -> list[Traitement]:
         pass
 

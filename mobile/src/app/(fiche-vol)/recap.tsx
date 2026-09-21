@@ -8,6 +8,8 @@ import type { components } from '@/lib/api-schema.generated';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { TimeField } from '@/components/TimeField';
 import { SignaturePad } from '@/components/traitement/SignaturePad';
+import { ProspectionValideeField } from '@/components/referentiel/ProspectionValideeField';
+import { TraitementAerienDuJourField } from '@/components/referentiel/TraitementAerienDuJourField';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -87,6 +89,10 @@ export default function FicheVolRecapScreen() {
   const [heureDebut, setHeureDebut] = useState<string | null>(null);
   const [heureFin, setHeureFin] = useState<string | null>(null);
   const [rotationId, setRotationId] = useState<string | null>(null);
+  // Rattachement du vol en cours de saisie, choisi vol par vol (une journée peut mêler des
+  // vols de prospection et de traitement aérien : un seul `prospection_id` d'en-tête ne suffit pas).
+  const [prospectionVolId, setProspectionVolId] = useState<string | null>(null);
+  const [traitementChoisi, setTraitementChoisi] = useState<TraitementRead | null>(null);
   const [signatureEnEdition, setSignatureEnEdition] = useState<RoleSignature | null>(null);
   const [traceSignature, setTraceSignature] = useState('');
 
@@ -111,13 +117,18 @@ export default function FicheVolRecapScreen() {
   useFocusEffect(charger);
 
   const verrouillee = fiche?.statut === 'validee';
-  const rotations: RotationRead[] = traitement?.aerien?.rotations ?? [];
-  const blocs: BlocRead[] = traitement?.aerien?.blocs ?? [];
-  const especeCible = traitement?.cible?.espece ?? null;
+  const traitementAffiche = traitementChoisi ?? traitement;
+  const rotations: RotationRead[] = traitementAffiche?.aerien?.rotations ?? [];
+  const blocs: BlocRead[] = traitementAffiche?.aerien?.blocs ?? [];
+  const especeCible = traitementAffiche?.cible?.espece ?? null;
 
   const volsActuels = fiche?.vols ?? [];
   const prochainNumero = volsActuels.length === 0 ? 1 : Math.max(...volsActuels.map((v) => v.numero)) + 1;
   const rattachementRotation = typeVol === 'MEP' || typeVol === 'APPLICATION';
+  // `uq_vol_rotation_type` : une rotation = une mise en place + une application.
+  const rotationsIndisponibles = volsActuels
+    .filter((v) => v.type_vol === typeVol && v.rotation_id)
+    .map((v) => v.rotation_id as string);
 
   const ajouterVol = () =>
     runAjoutVol(
@@ -128,12 +139,16 @@ export default function FicheVolRecapScreen() {
           heure_debut: heureDebut!,
           heure_fin: heureFin!,
           rotation_id: rattachementRotation ? rotationId : null,
-          prospection_id: typeVol === 'PROSPECTION' ? (fiche?.prospection_id ?? null) : null,
+          // Prospection choisie pour CE vol ; à défaut, la prospection d'en-tête (comportement
+          // historique, fiches sans choix explicite).
+          prospection_id:
+            typeVol === 'PROSPECTION' ? (prospectionVolId ?? fiche?.prospection_id ?? null) : null,
         });
         setFiche(mis_a_jour);
         setHeureDebut(null);
         setHeureFin(null);
         setRotationId(null);
+        setProspectionVolId(null);
       },
       {
         screen: 'fiche-vol-recap',
@@ -268,6 +283,7 @@ export default function FicheVolRecapScreen() {
                   </Text>
                   <Text style={styles.volRowSousTexte}>
                     {vol.heure_debut.slice(0, 5)} → {vol.heure_fin.slice(0, 5)} · {formatMinutes(vol.duree_minutes)}
+                    {vol.numero_cuve ? ` · Cuve ${vol.numero_cuve}${vol.produit_nom ? ` · ${vol.produit_nom}` : ''}` : ''}
                   </Text>
                 </View>
                 {!verrouillee && (
@@ -289,6 +305,7 @@ export default function FicheVolRecapScreen() {
                       onPress={() => {
                         setTypeVol(value);
                         setRotationId(null);
+                        setProspectionVolId(null);
                       }}
                       accessibilityRole="button"
                     >
@@ -308,29 +325,25 @@ export default function FicheVolRecapScreen() {
                   </View>
                 </View>
 
+                {typeVol === 'PROSPECTION' && (
+                  <ProspectionValideeField
+                    value={prospectionVolId}
+                    onChange={(id) => setProspectionVolId(id)}
+                    date={fiche.date_vol}
+                    statut={null}
+                    label="Fiche de prospection du jour"
+                  />
+                )}
+
                 {rattachementRotation && (
-                  <View style={styles.gap8}>
-                    <Text style={styles.sousLabel}>Cuve (rotation)</Text>
-                    {rotations.length === 0 && (
-                      <Text style={styles.hint}>
-                        Aucune rotation trouvée sur le CRT de la prospection de référence.
-                      </Text>
-                    )}
-                    <View style={styles.chipsRow}>
-                      {rotations.map((rotation) => (
-                        <TouchableOpacity
-                          key={rotation.id}
-                          style={[styles.chip, rotationId === rotation.id && styles.chipSelectionne]}
-                          onPress={() => setRotationId(rotation.id)}
-                          accessibilityRole="button"
-                        >
-                          <Text style={[styles.chipText, rotationId === rotation.id && styles.chipTextSelectionne]}>
-                            Cuve {rotation.numero_cuve} · {rotation.nom_commercial ?? 'produit inconnu'}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
+                  <TraitementAerienDuJourField
+                    date={fiche.date_vol}
+                    traitement={traitementChoisi}
+                    rotationId={rotationId}
+                    onTraitementChange={setTraitementChoisi}
+                    onRotationChange={setRotationId}
+                    rotationsIndisponibles={rotationsIndisponibles}
+                  />
                 )}
 
                 <TouchableOpacity

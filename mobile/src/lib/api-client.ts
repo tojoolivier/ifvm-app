@@ -263,6 +263,11 @@ export interface ListProspectionsParams {
   statut?: string;
   prospecteur_id?: string;
   /**
+   * YYYY-MM-DD — n'inclut que les fiches de cette date : la prospection du jour d'un
+   * vol PROSPECTION (fiche de vol), tous statuts confondus si `statut` est omis.
+   */
+  date_prospection?: string;
+  /**
    * N'inclut que les fiches sans traitement associé — « Fiches de traitement
    * → Consulter une fiche validée » (#fiches-validees-multi-utilisateurs),
    * combiné à `statut: 'validee'`. Aucun filtre `type` ici : les trois types
@@ -1365,12 +1370,23 @@ export const apiClient = {
    */
   listTraitements: async (
     token: string,
-    params: { prospection_id?: string } = {},
+    params: {
+      prospection_id?: string;
+      type_traitement?: 'AERIEN' | 'TERRESTRE';
+      /** YYYY-MM-DD — le traitement du jour d'un vol MEP/APPLICATION (fiche de vol). */
+      date_traitement?: string;
+    } = {},
     onUnauthorized?: OnUnauthorized
   ): Promise<components['schemas']['TraitementRead'][]> => {
     const query = new URLSearchParams();
     if (params.prospection_id) {
       query.set('prospection_id', params.prospection_id);
+    }
+    if (params.type_traitement) {
+      query.set('type_traitement', params.type_traitement);
+    }
+    if (params.date_traitement) {
+      query.set('date_traitement', params.date_traitement);
     }
     const qs = query.toString();
     return makeRequest<components['schemas']['TraitementRead'][]>(
@@ -1422,6 +1438,13 @@ export const apiClient = {
       query.set(
         'prospecteur_id',
         params.prospecteur_id
+      );
+    }
+
+    if (params.date_prospection) {
+      query.set(
+        'date_prospection',
+        params.date_prospection
       );
     }
 

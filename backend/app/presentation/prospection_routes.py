@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -56,6 +56,13 @@ async def list_prospections(
     campagne_id: uuid.UUID | None = Query(default=None),
     station_id: uuid.UUID | None = Query(default=None),
     prospecteur_id: uuid.UUID | None = Query(default=None),
+    date_prospection: date | None = Query(
+        default=None,
+        description=(
+            "N'inclut que les fiches de cette date — « fiche de vol » (mobile) : choisir "
+            "la prospection du jour d'un vol de type PROSPECTION."
+        ),
+    ),
     disponible_pour_traitement: bool = Query(
         default=False,
         description=(
@@ -84,6 +91,7 @@ async def list_prospections(
         prospecteur_id=prospecteur_id,
         disponible_pour_traitement=disponible_pour_traitement,
         a_revalider=a_revalider,
+        date_prospection=date_prospection,
     )
 
 

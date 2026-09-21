@@ -832,6 +832,42 @@ async def test_list_prospections_filtre_par_type(
 
 
 @pytest.mark.asyncio
+async def test_list_prospections_filtre_par_date_prospection(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+):
+    """« Fiche de vol » (mobile) : un vol PROSPECTION choisit la prospection du jour —
+    le filtre `date_prospection` ne renvoie que les fiches de cette date, quel que soit
+    leur statut."""
+    for jour in ("2026-06-25", "2026-06-26"):
+        creation = await client.post(
+            "/prospections",
+            json={
+                "type_prospection": "intensive",
+                "campagne_id": str(campagne_id),
+                "station_id": str(station_id),
+                "date_prospection": jour,
+                "biotope": ["xerophyle"],
+            },
+            headers=auth_headers,
+        )
+        assert creation.status_code == 201, creation.text
+
+    du_jour = await client.get(
+        "/prospections", params={"date_prospection": "2026-06-26"}, headers=auth_headers
+    )
+    assert du_jour.status_code == 200
+    assert [p["date_prospection"] for p in du_jour.json()] == ["2026-06-26"]
+
+    sans_filtre = await client.get("/prospections", headers=auth_headers)
+    assert {p["date_prospection"] for p in sans_filtre.json()} == {"2026-06-25", "2026-06-26"}
+
+    autre_jour = await client.get(
+        "/prospections", params={"date_prospection": "2026-07-01"}, headers=auth_headers
+    )
+    assert autre_jour.json() == []
+
+
+@pytest.mark.asyncio
 async def test_get_prospection_par_id(
     client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
 ):

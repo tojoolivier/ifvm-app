@@ -1035,6 +1035,45 @@ async def test_list_traitements_filtres(
     assert vide.json() == []
 
 
+@pytest.mark.asyncio
+async def test_list_traitements_filtre_par_date_traitement(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+):
+    """« Fiche de vol » (mobile) : un vol MEP/APPLICATION choisit le traitement aérien du
+    jour — le filtre `date_traitement` ne renvoie que les fiches de cette date."""
+    p1 = await _creer_prospection(db_session, campagne_id, utilisateur)
+    p2 = await _creer_prospection(db_session, campagne_id, utilisateur)
+    await client.post(
+        "/traitements",
+        json=payload_traitement(p1, date_traitement="2026-08-11"),
+        headers=auth_headers,
+    )
+    await client.post(
+        "/traitements",
+        json=payload_traitement(p2, date_traitement="2026-08-12"),
+        headers=auth_headers,
+    )
+
+    du_jour = await client.get(
+        "/traitements",
+        params={"type_traitement": "AERIEN", "date_traitement": "2026-08-12"},
+        headers=auth_headers,
+    )
+    assert du_jour.status_code == 200
+    assert [t["prospection_id"] for t in du_jour.json()] == [str(p2)]
+    assert du_jour.json()[0]["date_traitement"] == "2026-08-12"
+
+    sans_filtre = await client.get(
+        "/traitements", params={"type_traitement": "AERIEN"}, headers=auth_headers
+    )
+    assert len(sans_filtre.json()) == 2
+
+    autre_jour = await client.get(
+        "/traitements", params={"date_traitement": "2026-09-01"}, headers=auth_headers
+    )
+    assert autre_jour.json() == []
+
+
 @pytest.fixture
 def payload_traitement_terrestre(chef_equipe):
     def _build(prospection_id, **overrides):

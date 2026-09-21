@@ -338,6 +338,7 @@ class ListProspections:
         prospecteur_id: uuid.UUID | None = None,
         disponible_pour_traitement: bool = False,
         a_revalider: bool = False,
+        date_prospection: date | None = None,
     ) -> list[Prospection]:
         return await self.repository.list_by_filters(
             type_prospection=type_prospection,
@@ -347,6 +348,7 @@ class ListProspections:
             prospecteur_id=prospecteur_id,
             disponible_pour_traitement=disponible_pour_traitement,
             a_revalider=a_revalider,
+            date_prospection=date_prospection,
         )
 
 
