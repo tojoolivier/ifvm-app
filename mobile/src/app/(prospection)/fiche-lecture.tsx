@@ -2,12 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
 import { useAuthStore } from '@/lib/auth-store';
 import { apiClient, ProspectionRead } from '@/lib/api-client';
 import { buildFicheLecture, FicheLectureViewModel, isFicheValidee } from '@/lib/prospection-fiche-lecture';
-import { buildFicheLecturePdfHtml } from '@/lib/prospection-fiche-lecture-pdf';
+import { telechargerEtPartagerPdf } from '@/lib/pdf-partage';
+import { depsPdfPartage } from '@/lib/pdf-partage-natif';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { runTask } from '@/lib/run-task';
 import { EtatVide } from '@/components/erreurs/etat-vide';
@@ -45,17 +44,17 @@ export default function FicheLectureScreen() {
     charger();
   }, [charger]);
 
+  // PDF (#494/#594) généré côté backend (WeasyPrint, #533) — même pattern que
+  // le CRT (recap.tsx) : pas de rendu HTML côté client, un fetch authentifié +
+  // partage natif.
   const handleExportPdf = () =>
     run(
-      async () => {
-        const prospecteurLabel = user ? `${user.prenom} ${user.nom}` : '—';
-        const { uri } = await Print.printToFileAsync({
-          html: buildFicheLecturePdfHtml(buildFicheLecture(prospection!), prospecteurLabel),
-        });
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
-        }
-      },
+      () =>
+        telechargerEtPartagerPdf(
+          depsPdfPartage(),
+          `/prospections/${prospection!.id}/pdf`,
+          `fiche-prospection-${prospection!.n_fiche ?? prospection!.id}.pdf`
+        ),
       { screen: 'fiche-lecture', precondition: !!prospection, context: { id } }
     );
 

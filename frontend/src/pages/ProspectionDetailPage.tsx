@@ -421,6 +421,8 @@ export function ProspectionDetailPage() {
   const queryClient = useQueryClient()
   const [activeAction, setActiveAction] = useState<ActionType>(null)
   const [showPrintView, setShowPrintView] = useState(false)
+  const [telechargementPdfEnCours, setTelechargementPdfEnCours] = useState(false)
+  const [erreurPdf, setErreurPdf] = useState<string | null>(null)
 
   const { data: prospection, isLoading, isError } = useQuery<ProspectionDetail>({
     queryKey: ['prospection', id],
@@ -505,6 +507,27 @@ export function ProspectionDetailPage() {
 
   const validationEntry = auditLogSorted.find((entry) => entry.action === 'validation')
 
+  // PDF (#494/#594) généré côté backend (WeasyPrint, #533) — même pattern que
+  // le CRT (TraitementDetailPage.telechargerPdf), distinct de « Imprimer A4 »
+  // ci-dessus (vue imprimable React existante, window.print).
+  async function telechargerPdf() {
+    setErreurPdf(null)
+    setTelechargementPdfEnCours(true)
+    try {
+      const response = await api.get(`/prospections/${id}/pdf`, { responseType: 'blob' })
+      const url = URL.createObjectURL(response.data as Blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `fiche-prospection-${prospection?.n_fiche ?? id}.pdf`
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setErreurPdf('Impossible de télécharger le PDF.')
+    } finally {
+      setTelechargementPdfEnCours(false)
+    }
+  }
+
   useEffect(() => {
     if (!showPrintView) return
     const handleAfterPrint = () => setShowPrintView(false)
@@ -587,7 +610,21 @@ export function ProspectionDetailPage() {
               Imprimer A4
             </button>
           )}
+          {ficheValidee && (
+            <button
+              type="button"
+              onClick={telechargerPdf}
+              disabled={telechargementPdfEnCours}
+              className="shrink-0 rounded-[9px] bg-white px-[14px] py-[9px] font-sans text-[11.5px] font-bold text-ifvm-green-text disabled:opacity-60"
+            >
+              {telechargementPdfEnCours ? 'Génération…' : 'Télécharger le PDF'}
+            </button>
+          )}
         </header>
+
+        {erreurPdf && (
+          <p className="text-[11.5px] font-medium text-destructive">{erreurPdf}</p>
+        )}
 
         {/* Bandeau ambre — avertissements de la fiche (#106) */}
         {prospection.avertissements.length > 0 && (
