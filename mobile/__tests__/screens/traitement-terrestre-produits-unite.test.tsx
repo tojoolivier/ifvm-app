@@ -51,11 +51,11 @@ function terrestreDraft(overrides: Record<string, unknown> = {}) {
     chef_equipe_id: 'chef-equipe-1',
     agent_encadreur: null,
     consultant_international: null,
-    heure_debut: null,
-    heure_fin: null,
-    vitesse_vent_ms: null,
+    heure_debut: '06:00',
+    heure_fin: '09:00',
+    vitesse_vent_ms: 2.5,
     direction_vent: null,
-    temperature_c: null,
+    temperature_c: 26,
     taux_mortalite_pourcent: null,
     evaluation_efficacite_heures_apres: null,
     methode_evaluation_efficacite: null,
@@ -71,7 +71,9 @@ function terrestreDraft(overrides: Record<string, unknown> = {}) {
     pesticide_unite: null,
     pesticide_recu_l: null,
     stock_initial_l: null,
-    produits: [],
+    produits: [
+      { id: 'prod-1', traitement_terrestre_id: 'trait-1', numero: 1, produit_id: 'p1', quantite_l: 10, nom_commercial: 'Fyfanon' },
+    ],
     ...overrides,
   };
 }

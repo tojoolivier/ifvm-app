@@ -21,6 +21,7 @@ import {
   computePesticideStockRestant,
   validateTerrestreConditions,
   validateAerienEquipe,
+  produitsTerrestrePretsPourSynchro,
 } from '@/lib/traitement-validation';
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN, PROGRESS_SEGMENTS_TERRESTRE } from '@/components/traitement/ProgressBar';
 import { AerienForm } from '@/components/traitement/AerienForm';
@@ -235,14 +236,26 @@ export default function TraitementScreen() {
           const conditionErrors = validateTerrestreConditions({
             heureDebut: store.terrestre.heureDebut ?? null,
             heureFin: store.terrestre.heureFin ?? null,
+            vitesseVentMs: store.terrestre.vitesse_vent_ms,
+            temperatureC: store.terrestre.temperature_c,
             surfaceRestanteHa: surfaceRestante,
             surfaceRestanteAbandonnee: store.terrestre.surfaceRestanteAbandonnee ?? null,
             motifSurfaceRestanteAbandonnee: store.terrestre.motifSurfaceRestanteAbandonnee ?? null,
           });
-          if (!store.terrestre.chefEquipeId || conditionErrors.length > 0) {
+          // #traitement-terrestre-sync-apres-enregistrement : un produit ajouté
+          // (bouton « + ») mais jamais rempli (produit non choisi, quantité vide)
+          // passait inaperçu jusqu'ici — seule la synchronisation, bien plus
+          // tard, le détectait (« Fiche incomplète »), sans jamais dire lequel.
+          const produitsPrets = produitsTerrestrePretsPourSynchro(
+            produits.map((p) => ({ produitId: p.produit_id, quantiteL: p.quantite_l }))
+          );
+          if (!store.terrestre.chefEquipeId || conditionErrors.length > 0 || !produitsPrets) {
             const byField: Record<string, string> = {};
             if (!store.terrestre.chefEquipeId) byField.chefEquipeId = "Le chef d'équipe est obligatoire";
             for (const e of conditionErrors) byField[e.field] = e.message;
+            if (!produitsPrets) {
+              byField.produits = 'Chaque produit utilisé doit avoir un produit et une quantité renseignés';
+            }
             setErrors(byField);
             return;
           }
