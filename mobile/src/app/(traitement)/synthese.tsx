@@ -25,8 +25,12 @@ function displayVolsClairsEssaims(value: number | null | undefined): string {
 }
 
 /** Une espèce est « présente » sur la cible dès que l'un de ses champs détaillés
- * (petites/grandes larves ou densités) est renseigné — `null` sur les 4 signifie
- * que cette espèce n'a aucune ligne population sur la prospection liée. */
+ * (petites/grandes larves ou densités) est renseigné (non `null`/`undefined`).
+ * Depuis #cible-extensif-signalement-defauts-zero, ces 4 champs valent 0 (jamais
+ * `null`) QUE pour une espèce réellement présente dans `cible.espece` — jamais
+ * pour les deux à la fois sur une prospection Extensif/Signalement "rien
+ * trouvé" (cf. traitement-cible.ts::deriveLarvesParEspece/deriveDensitesParEspece).
+ * Même logique que cibles.tsx/recap.tsx. */
 function especePresente(cible: Cible | null, espece: 'lmc' | 'nse'): boolean {
   if (!cible) return false;
   return (

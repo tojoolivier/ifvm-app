@@ -70,9 +70,14 @@ function infestation(overrides: Partial<InfestationRow>): InfestationRow {
   } as InfestationRow;
 }
 
+// Intensif : `type_prospection` neutre (ni "extensive" ni "validation"), même
+// comportement "non renseigné" qu'avant #cible-extensif-signalement-defauts-zero.
+// Voir le describe dédié plus bas pour Extensif/Signalement (défauts à 0).
+const PROSPECTION_INTENSIVE = { type_prospection: 'intensive' } as const;
+
 describe('construireCible', () => {
   it('renvoie tout à null quand la prospection est vide', () => {
-    expect(construireCible({ surface_infestee: null }, [], [])).toEqual({
+    expect(construireCible({ surface_infestee: null, ...PROSPECTION_INTENSIVE }, [], [])).toEqual({
       espece: null,
       petites_larves: null,
       grandes_larves: null,
@@ -91,13 +96,13 @@ describe('construireCible', () => {
   });
 
   it('reprend l’espèce unique des populations', () => {
-    const cible = construireCible({ surface_infestee: null }, [population({ espece: 'LMC' })], []);
+    const cible = construireCible({ surface_infestee: null, ...PROSPECTION_INTENSIVE }, [population({ espece: 'LMC' })], []);
     expect(cible.espece).toBe('LMC');
   });
 
   it('renvoie MELANGE quand deux espèces sont présentes', () => {
     const cible = construireCible(
-      { surface_infestee: null },
+      { surface_infestee: null, ...PROSPECTION_INTENSIVE },
       [population({ espece: 'LMC', categorie: 'imago' }), population({ espece: 'NSE', categorie: 'larve' })],
       []
     );
@@ -105,13 +110,13 @@ describe('construireCible', () => {
   });
 
   it('reprend aussi les espèces des infestations', () => {
-    const cible = construireCible({ surface_infestee: null }, [], [infestation({ espece: 'LMC' })]);
+    const cible = construireCible({ surface_infestee: null, ...PROSPECTION_INTENSIVE }, [], [infestation({ espece: 'LMC' })]);
     expect(cible.espece).toBe('LMC');
   });
 
   it('cumule les densités L1 à L3 en petites larves et le reste en grandes larves', () => {
     const cible = construireCible(
-      { surface_infestee: null },
+      { surface_infestee: null, ...PROSPECTION_INTENSIVE },
       [
         population({
           espece: 'LMC',
@@ -127,7 +132,7 @@ describe('construireCible', () => {
 
   it('détaille les petites/grandes larves par espèce (LMC et NSE séparément)', () => {
     const cible = construireCible(
-      { surface_infestee: null },
+      { surface_infestee: null, ...PROSPECTION_INTENSIVE },
       [
         population({
           espece: 'LMC',
@@ -153,7 +158,7 @@ describe('construireCible', () => {
 
   it('laisse à null le détail larvaire d’une espèce absente de la prospection', () => {
     const cible = construireCible(
-      { surface_infestee: null },
+      { surface_infestee: null, ...PROSPECTION_INTENSIVE },
       [population({ espece: 'LMC', categorie: 'larve', densites_larve: JSON.stringify({ L1: 10 }) })],
       []
     );
@@ -168,7 +173,7 @@ describe('construireCible', () => {
     // sur densites_larve (propre à l'Extensif) — avant ce correctif, "Cibles"/
     // "Synthèse" affichaient toujours "non renseigné" pour ces fiches.
     const cible = construireCible(
-      { surface_infestee: null },
+      { surface_infestee: null, ...PROSPECTION_INTENSIVE },
       [],
       [],
       [
@@ -190,7 +195,7 @@ describe('construireCible', () => {
     // (l'Extensif n'écrit jamais dans prospection_capture, l'Intensif jamais
     // dans densites_larve) : garde-fou défensif, pas un scénario réel.
     const cible = construireCible(
-      { surface_infestee: null },
+      { surface_infestee: null, ...PROSPECTION_INTENSIVE },
       [population({ espece: 'NSE', categorie: 'larve', densites_larve: JSON.stringify({ L1: 2 }) })],
       [],
       [capture({ espece: 'NSE', stade: 'L1', effectif: 5 })]
@@ -200,7 +205,7 @@ describe('construireCible', () => {
 
   it('détaille les densités diffuse/groupée par espèce, cumulées sur les lignes imago + larve', () => {
     const cible = construireCible(
-      { surface_infestee: null },
+      { surface_infestee: null, ...PROSPECTION_INTENSIVE },
       [
         population({ espece: 'LMC', categorie: 'imago', densite_diffuse: 12, densite_groupee: 3 }),
         population({ espece: 'LMC', categorie: 'larve', densite_diffuse: 8 }),
@@ -215,14 +220,14 @@ describe('construireCible', () => {
   });
 
   it('ne renseigne ni petites ni grandes larves si aucune densité larvaire', () => {
-    const cible = construireCible({ surface_infestee: null }, [population({ categorie: 'larve', densites_larve: null })], []);
+    const cible = construireCible({ surface_infestee: null, ...PROSPECTION_INTENSIVE }, [population({ categorie: 'larve', densites_larve: null })], []);
     expect(cible.petites_larves).toBeNull();
     expect(cible.grandes_larves).toBeNull();
   });
 
   it('vols_clairs_essaims = 1 dès qu’une population a essaim_observe=true', () => {
     const cible = construireCible(
-      { surface_infestee: null },
+      { surface_infestee: null, ...PROSPECTION_INTENSIVE },
       [population({ essaim_observe: false }), population({ essaim_observe: true })],
       []
     );
@@ -230,18 +235,18 @@ describe('construireCible', () => {
   });
 
   it('vols_clairs_essaims = 0 quand renseigné mais jamais à true', () => {
-    const cible = construireCible({ surface_infestee: null }, [population({ essaim_observe: false })], []);
+    const cible = construireCible({ surface_infestee: null, ...PROSPECTION_INTENSIVE }, [population({ essaim_observe: false })], []);
     expect(cible.vols_clairs_essaims).toBe(0);
   });
 
   it('vols_clairs_essaims = null quand jamais renseigné', () => {
-    const cible = construireCible({ surface_infestee: null }, [population({ essaim_observe: null })], []);
+    const cible = construireCible({ surface_infestee: null, ...PROSPECTION_INTENSIVE }, [population({ essaim_observe: null })], []);
     expect(cible.vols_clairs_essaims).toBeNull();
   });
 
   it('vols_clairs_essaims = 1 pour une population Extensif Imagos (essaim_en_vol, migration 0033 — essaim_observe non renseigné)', () => {
     const cible = construireCible(
-      { surface_infestee: null },
+      { surface_infestee: null, ...PROSPECTION_INTENSIVE },
       [population({ essaim_observe: null, essaim_en_vol: true, essaim_pose: false })],
       []
     );
@@ -250,7 +255,7 @@ describe('construireCible', () => {
 
   it('vols_clairs_essaims = 1 pour une population Extensif Imagos (essaim_pose, migration 0033)', () => {
     const cible = construireCible(
-      { surface_infestee: null },
+      { surface_infestee: null, ...PROSPECTION_INTENSIVE },
       [population({ essaim_observe: null, essaim_en_vol: false, essaim_pose: true })],
       []
     );
@@ -259,7 +264,7 @@ describe('construireCible', () => {
 
   it('vols_clairs_essaims = null quand essaim_observe et essaim_en_vol/pose sont tous non renseignés (Extensif Imagos sans État sélectionné)', () => {
     const cible = construireCible(
-      { surface_infestee: null },
+      { surface_infestee: null, ...PROSPECTION_INTENSIVE },
       [population({ essaim_observe: null, essaim_en_vol: null, essaim_pose: null })],
       []
     );
@@ -268,7 +273,7 @@ describe('construireCible', () => {
 
   it('répartition groupée prioritaire sur diffuse', () => {
     const cible = construireCible(
-      { surface_infestee: null },
+      { surface_infestee: null, ...PROSPECTION_INTENSIVE },
       [population({ densite_diffuse: 1.0, densite_groupee: 2.0 })],
       []
     );
@@ -276,15 +281,75 @@ describe('construireCible', () => {
   });
 
   it('répartition diffuse si aucune densité groupée', () => {
-    const cible = construireCible({ surface_infestee: null }, [population({ densite_diffuse: 1.0 })], []);
+    const cible = construireCible({ surface_infestee: null, ...PROSPECTION_INTENSIVE }, [population({ densite_diffuse: 1.0 })], []);
     expect(cible.repartition_population).toBe('DIFFUSE');
   });
 
   it('reprend la surface infestée telle quelle', () => {
-    const cible = construireCible({ surface_infestee: 42.5 }, [], []);
+    const cible = construireCible({ surface_infestee: 42.5, ...PROSPECTION_INTENSIVE }, [], []);
     expect(cible.surface_infestee_ha).toBe(42.5);
   });
 });
+
+/**
+ * #cible-extensif-signalement-defauts-zero : Extensif et Signalement
+ * ("validation") — une prospection validée y est toujours conclusive (y
+ * compris "rien trouvé", résultat légitime et fréquent) : les champs sans
+ * donnée y prennent un défaut neutre (0, "non" pour vols_clairs_essaims,
+ * "DIFFUSE") plutôt que `null`, contrairement à l'Intensif ci-dessus.
+ */
+describe.each(['extensive', 'validation'] as const)(
+  'construireCible — défauts à 0 (type_prospection=%s)',
+  (type_prospection) => {
+    it('prospection réellement vide (rien trouvé) : totaux agrégés à 0/"non"/"DIFFUSE", détail par espèce à null (ni LMC ni NSE jamais mentionnée)', () => {
+      const cible = construireCible({ surface_infestee: null, type_prospection }, [], []);
+      expect(cible.espece).toBeNull();
+      expect(cible.petites_larves).toBe(0);
+      expect(cible.grandes_larves).toBe(0);
+      expect(cible.petites_larves_lmc).toBeNull();
+      expect(cible.petites_larves_nse).toBeNull();
+      expect(cible.grandes_larves_lmc).toBeNull();
+      expect(cible.grandes_larves_nse).toBeNull();
+      expect(cible.densite_diffuse_lmc).toBeNull();
+      expect(cible.densite_groupee_lmc).toBeNull();
+      expect(cible.densite_diffuse_nse).toBeNull();
+      expect(cible.densite_groupee_nse).toBeNull();
+      expect(cible.vols_clairs_essaims).toBe(0);
+      expect(cible.repartition_population).toBe('DIFFUSE');
+      expect(cible.surface_infestee_ha).toBe(0);
+    });
+
+    it('surface infestée déjà renseignée : pas écrasée par le défaut', () => {
+      const cible = construireCible({ surface_infestee: 42.5, type_prospection }, [], []);
+      expect(cible.surface_infestee_ha).toBe(42.5);
+    });
+
+    it('LMC en scope (une ligne la mentionne) : son détail passe à 0/absent, NSE (jamais mentionnée) reste à null', () => {
+      const cible = construireCible(
+        { surface_infestee: null, type_prospection },
+        [population({ espece: 'LMC', categorie: 'larve', densites_larve: JSON.stringify({ L1: 10 }) })],
+        []
+      );
+      expect(cible.petites_larves_lmc).toBe(10);
+      expect(cible.petites_larves_nse).toBeNull();
+      expect(cible.grandes_larves_nse).toBeNull();
+    });
+
+    it('LMC en scope sans densité larvaire précise (ligne imago) : son détail larvaire/densités passe à 0, pas à null', () => {
+      const cible = construireCible(
+        { surface_infestee: null, type_prospection },
+        [population({ espece: 'LMC', categorie: 'imago' })],
+        []
+      );
+      expect(cible.petites_larves_lmc).toBe(0);
+      expect(cible.grandes_larves_lmc).toBe(0);
+      expect(cible.densite_diffuse_lmc).toBe(0);
+      expect(cible.densite_groupee_lmc).toBe(0);
+      expect(cible.petites_larves_nse).toBeNull();
+      expect(cible.densite_diffuse_nse).toBeNull();
+    });
+  }
+);
 
 /**
  * construireDetailPhaseStade() — écran Cibles (Terrestre), lu EN DIRECT à chaque
