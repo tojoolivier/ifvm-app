@@ -138,6 +138,11 @@ def _grille_imagos(captures: list[CaptureRead], espece: str) -> str:
 
 
 def _grille_larves(captures: list[CaptureRead], espece: str, stades: list[str]) -> str:
+    # LMC a une phase « Solitaro-trans » aux larves (formulaire papier, §Larves LMC,
+    # lignes 70-75) — NSE ne l'a pas (§Larves NSE, lignes 90-94, 3 phases seulement).
+    phases = (
+        _PHASES_IMAGO if espece == "LMC" else [p for p in _PHASES_IMAGO if p[0] != "solitaro_trans"]
+    )
     entetes = "".join(f"<th>{s}</th>" for s in stades)
     lignes = "".join(
         f'<tr><td class="label">{escape(label)}</td>'
@@ -146,19 +151,24 @@ def _grille_larves(captures: list[CaptureRead], espece: str, stades: list[str]) 
             for s in stades
         )
         + "</tr>"
-        for valeur, label in _PHASES_IMAGO
-        if valeur != "solitaro_trans"
+        for valeur, label in phases
     )
     return f'<table><tr><th class="label">Phase</th>{entetes}</tr>{lignes}</table>'
 
 
-def _table_niveau(titre1: str, titre2: str, population: PopulationRead | None) -> str:
+def _table_niveau(
+    titre1: str, titre2: str, population: PopulationRead | None, avec_dominant: bool = True
+) -> str:
+    # LMC a une colonne « Dominant » (§Accouplement/Ponte LMC, lignes 55-58) — NSE
+    # n'en a que 4, jamais de Dominant (§Accouplement/ponte NSE, lignes 76-79).
+    niveaux = _NIVEAUX_POPULATION if avec_dominant else _NIVEAUX_POPULATION[:-1]
+
     def ligne(label: str, valeur: Any) -> str:
         valeur_str = valeur.value if isinstance(valeur, Enum) else valeur
-        cellules = "".join(f"<td>{_coche(valeur_str == v)}</td>" for v, _ in _NIVEAUX_POPULATION)
+        cellules = "".join(f"<td>{_coche(valeur_str == v)}</td>" for v, _ in niveaux)
         return f'<tr><td class="label">{escape(label)}</td>{cellules}</tr>'
 
-    entetes = "".join(f"<th>{label}</th>" for _, label in _NIVEAUX_POPULATION)
+    entetes = "".join(f"<th>{label}</th>" for _, label in niveaux)
     return f"""
     <table>
       <tr><th class="label"></th>{entetes}</tr>
@@ -353,7 +363,7 @@ def build_prospection_intensive_html(p: ProspectionRead) -> str:
   18. Densité population groupée :
   {_texte(nse_imago.densite_groupee if nse_imago else None)}/m²</p>
 <p class="ref"><b>Accouplement / ponte</b></p>
-{_table_niveau("16. Accplt", "17. Ponte", nse_imago)}
+{_table_niveau("16. Accplt", "17. Ponte", nse_imago, avec_dominant=False)}
 <p class="ref">19. Capture — Nombre :
   {_texte(nse_imago.captures_nombre if nse_imago else None)} (30 max)</p>
 {_grille_imagos(p.captures, "NSE")}

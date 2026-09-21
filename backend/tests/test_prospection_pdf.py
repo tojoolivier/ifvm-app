@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from app.presentation.prospection_pdf import build_prospection_html
+from app.presentation.prospection_pdf import _grille_larves, build_prospection_html
 from app.presentation.prospection_schemas import (
     CaptureRead,
     InfestationRead,
@@ -147,3 +147,20 @@ def test_extensive_reproduit_les_blocs_par_espece():
 def test_type_prospection_validation_suit_le_gabarit_extensif():
     html = build_prospection_html(_prospection(type_prospection="validation"))
     assert "Prospection extensive" in html
+
+
+def test_intensive_larves_lmc_garde_solitaro_trans_nse_ne_l_a_pas():
+    # Formulaire papier : LMC a 4 phases aux larves (Solitaires/Solitaro-trans/
+    # Transiens/Grégaires, §Larves LMC), NSE seulement 3 — pas de Solitaro-trans
+    # (§Larves NSE).
+    assert "Solitaro-trans" in _grille_larves([], "LMC", ["L1", "L2", "L3", "L4", "L5"])
+    assert "Solitaro-trans" not in _grille_larves(
+        [], "NSE", ["L1", "L2", "L3", "L4", "L5", "L6", "L7"]
+    )
+
+
+def test_intensive_accouplement_ponte_dominant_seulement_pour_lmc():
+    # Formulaire papier : la colonne « Dominant » n'existe que pour LMC (§11/12),
+    # pas pour NSE (§16/17, 4 niveaux seulement).
+    html = build_prospection_html(_prospection())
+    assert html.count("<th>Dominant</th>") == 1
