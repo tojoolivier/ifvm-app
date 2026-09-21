@@ -211,6 +211,34 @@ describe('buildActiviteRecente', () => {
     })
   })
 
+  /** Une fiche Extensive/Validation n'a jamais de station du référentiel : la
+   * localité saisie à la fiche de prospection tient lieu de lieu. */
+  it('utilise la localité saisie (station_libre) quand la fiche n’a pas de station du référentiel', () => {
+    const lignes = buildActiviteRecente(
+      [
+        prospection({
+          id: 'ext',
+          type_prospection: 'extensive',
+          station_id: null,
+          station_libre: 'Andasibe-Village',
+          created_at: new Date('2026-08-17T08:00:00').toISOString(),
+        }),
+      ],
+      [],
+      options,
+    )
+    expect(lignes[0].lieu).toBe('Andasibe-Village')
+  })
+
+  it('garde « — » quand la fiche n’a ni station ni localité saisie', () => {
+    const lignes = buildActiviteRecente(
+      [prospection({ id: 'vide', station_id: null, station_libre: null, created_at: new Date('2026-08-17T08:00:00').toISOString() })],
+      [],
+      options,
+    )
+    expect(lignes[0].lieu).toBe('—')
+  })
+
   it('écarte ce qui sort de la fenêtre de 24 h', () => {
     const lignes = buildActiviteRecente(
       [prospection({ id: 'vieux', created_at: new Date('2026-08-15T09:00:00').toISOString() })],

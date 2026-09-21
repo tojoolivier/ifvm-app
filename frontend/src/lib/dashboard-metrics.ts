@@ -13,6 +13,8 @@ export interface DashboardProspection {
   type_prospection: string
   campagne_id: string | null
   station_id: string | null
+  /** Localité saisie — tient lieu de station pour les fiches Extensive/Validation. */
+  station_libre?: string | null
   prospecteur_id: string
   statut: string
   n_fiche: string | null
@@ -230,8 +232,8 @@ export function buildActiviteRecente(
   const debutFenetre = maintenant.getTime() - fenetreHeures * MS_PAR_HEURE
 
   const index = indexStations(stations)
-  const libelleStation = (id: string | null): string => {
-    if (!id) return '—'
+  const libelleStation = (id: string | null, stationLibre?: string | null): string => {
+    if (!id) return stationLibre?.trim() || '—'
     const station = index.get(id)
     return station ? `${station.code} ${station.nom}` : 'Station inconnue'
   }
@@ -242,7 +244,7 @@ export function buildActiviteRecente(
       numero: p.n_fiche ?? p.id.slice(0, 8) + '…',
       type: TYPE_PROSPECTION_LABELS[p.type_prospection] ?? p.type_prospection,
       agent: nomAgent(p.prospecteur_id),
-      lieu: libelleStation(p.station_id),
+      lieu: libelleStation(p.station_id, p.station_libre),
       statut: p.statut,
       recuLe: p.created_at ?? p.updated_at,
       lien: `/prospections/${p.id}`,
