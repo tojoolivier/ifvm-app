@@ -299,6 +299,95 @@ def test_cible_surface_infestee_reprise():
 
 
 # ==========================================
+# construire_cible — défauts à 0 (Extensif / Signalement)
+# ==========================================
+#
+# Une prospection Extensive ou Signalement ("validation") validée est
+# toujours conclusive — y compris "rien trouvé", résultat légitime et
+# fréquent : les champs sans donnée y prennent un défaut neutre (0, "non",
+# "DIFFUSE") plutôt que None, pour ne jamais afficher "non renseigné" sur la
+# fiche de traitement qui en découle. L'Intensif garde son comportement
+# actuel (None = "pas encore évalué", cf. tests ci-dessus, aucun `type_prospection`
+# passé à `_prospection()` donc `""` par défaut, ni extensive ni validation).
+
+
+@pytest.mark.parametrize("type_prospection", ["extensive", "validation"])
+def test_cible_extensif_signalement_prospection_vide_tout_a_zero(type_prospection):
+    """Prospection réellement vide (aucune population/infestation, "rien
+    trouvé") : les totaux agrégés passent à 0/"non"/"DIFFUSE", mais le détail
+    par espèce (LMC/NSE) reste `None` — ni LMC ni NSE n'a jamais été
+    mentionnée sur cette prospection, leur inventer un 0 chacune laisserait
+    croire que les deux ont été surveillées (cf. test suivant pour le cas où
+    une seule espèce est effectivement en scope)."""
+    cible = construire_cible(_prospection(type_prospection=type_prospection))
+    assert cible.espece is None  # aucune espèce à inventer : reste non renseigné
+    assert cible.petites_larves == "0"
+    assert cible.grandes_larves == "0"
+    assert cible.petites_larves_lmc is None
+    assert cible.petites_larves_nse is None
+    assert cible.grandes_larves_lmc is None
+    assert cible.grandes_larves_nse is None
+    assert cible.densite_diffuse_lmc is None
+    assert cible.densite_groupee_lmc is None
+    assert cible.densite_diffuse_nse is None
+    assert cible.densite_groupee_nse is None
+    assert cible.vols_clairs_essaims == "non"
+    assert cible.repartition_population == "DIFFUSE"
+    assert cible.surface_infestee_ha == 0.0
+
+
+def test_cible_extensif_surface_infestee_deja_renseignee_pas_ecrasee():
+    p = _prospection(type_prospection="extensive", surface_infestee=42.5)
+    assert construire_cible(p).surface_infestee_ha == 42.5
+
+
+def test_cible_extensif_larves_partiellement_renseignees_espece_absente_reste_a_none():
+    """LMC est en scope (une ligne population la mentionne) : son détail
+    larvaire passe à 0 s'il n'a rien de plus précis. NSE, elle, n'apparaît
+    nulle part sur cette prospection — elle reste `None`, pas 0 : le défaut à
+    0 ne s'applique qu'aux espèces réellement en scope, jamais à une espèce
+    absente de la prospection (cf. test ci-dessus, prospection vraiment vide)."""
+    p = _prospection(
+        type_prospection="extensive",
+        populations=[
+            ProspectionPopulation(espece="LMC", categorie="larve", densites_larve={"L1": 10}),
+        ],
+    )
+    cible = construire_cible(p)
+    assert cible.petites_larves_lmc == 10
+    assert cible.petites_larves_nse is None
+    assert cible.grandes_larves_nse is None
+
+
+def test_cible_extensif_espece_en_scope_sans_densite_larvaire_precise_passe_a_zero():
+    """LMC est en scope (une ligne population imago la mentionne, même sans
+    aucune densité larvaire précise) : son détail larvaire passe bien à 0,
+    pas à `None` — seule une espèce totalement absente de la prospection
+    reste `None` (cf. test ci-dessus pour NSE)."""
+    p = _prospection(
+        type_prospection="extensive",
+        populations=[ProspectionPopulation(espece="LMC", categorie="imago")],
+    )
+    cible = construire_cible(p)
+    assert cible.petites_larves_lmc == 0
+    assert cible.grandes_larves_lmc == 0
+    assert cible.densite_diffuse_lmc == 0
+    assert cible.densite_groupee_lmc == 0
+    assert cible.petites_larves_nse is None
+    assert cible.densite_diffuse_nse is None
+
+
+def test_cible_intensif_reste_non_renseigne_meme_champs_absents():
+    """Garde-fou : le type Intensif ("intensive") n'est pas concerné par les
+    défauts à 0 — seuls extensive/validation le sont."""
+    cible = construire_cible(_prospection(type_prospection="intensive"))
+    assert cible.petites_larves is None
+    assert cible.vols_clairs_essaims is None
+    assert cible.repartition_population is None
+    assert cible.surface_infestee_ha is None
+
+
+# ==========================================
 # CreateTraitementAerien (fakes en mémoire)
 # ==========================================
 

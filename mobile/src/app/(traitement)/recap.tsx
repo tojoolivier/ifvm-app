@@ -143,7 +143,11 @@ function displayVolsClairsEssaims(value: number | null | undefined): string {
 }
 
 /** Une espèce est « présente » sur la cible dès que l'un de ses champs
- * détaillés est renseigné — même logique que cibles.tsx/synthese.tsx. */
+ * détaillés est renseigné (non `null`/`undefined`). Depuis
+ * #cible-extensif-signalement-defauts-zero, ces 4 champs valent 0 (jamais
+ * `null`) QUE pour une espèce réellement présente dans `cible.espece` — jamais
+ * pour les deux à la fois sur une prospection Extensif/Signalement "rien
+ * trouvé". Même logique que cibles.tsx/synthese.tsx. */
 function especePresenteRecap(cible: Cible | null | undefined, espece: 'lmc' | 'nse'): boolean {
   if (!cible) return false;
   return (
