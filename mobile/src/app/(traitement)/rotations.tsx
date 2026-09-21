@@ -21,6 +21,7 @@ import {
   formatDureeRotation,
   validateRotationsHeures,
   deriveNomCommercial,
+  rotationsAerienPretesPourSynchro,
 } from '@/lib/traitement-validation';
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN } from '@/components/traitement/ProgressBar';
 import { Card } from '@/components/traitement/Card';
@@ -243,6 +244,19 @@ export default function RotationsScreen() {
         );
         if (heuresErrors.length > 0) {
           setError(heuresErrors[0].message);
+          return;
+        }
+        // #traitement-aerien-sync-apres-enregistrement : une rotation ajoutée
+        // (bouton « + ») mais jamais remplie (produit non choisi, quantité
+        // vide) passait inaperçue jusqu'ici — seule la synchronisation, bien
+        // plus tard, la détectait (« Fiche incomplète »), sans jamais dire
+        // laquelle.
+        if (
+          !rotationsAerienPretesPourSynchro(
+            store.aerien.rotations.map((r) => ({ produitId: r.produit_id, quantite: r.quantite }))
+          )
+        ) {
+          setError('Chaque rotation doit avoir un produit et une quantité renseignés');
           return;
         }
         setError(undefined);
