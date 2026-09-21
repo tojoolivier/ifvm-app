@@ -9,6 +9,7 @@ import { MODE_LABELS, STATUS_LABELS, TYPE_LABELS } from '@/lib/traitement-labels
 import {
   compteurSignatures,
   formatSurface,
+  libelleSurfaceTraitee,
   responsableTraitement,
 } from '@/lib/traitement-fiche'
 
@@ -116,10 +117,17 @@ export function TraitementsPage() {
     { key: 'responsable', header: 'Responsable', render: responsableTraitement },
     {
       key: 'traitee',
-      header: 'Traitée (ha)',
+      // Une seule colonne pour les deux cas : un aérien en barrière *protège*
+      // sa surface au lieu de la traiter (cf. `libelleSurfaceTraitee`). Le mode
+      // est dans la colonne voisine ; l'infobulle nomme la valeur de la ligne.
+      header: 'Traitée / protégée (ha)',
       align: 'right',
       mono: true,
-      render: (t) => formatSurface(t.terrestre?.surface_traitee_ha ?? t.aerien?.surface_traitee_ha),
+      render: (t) => (
+        <span title={`Surface ${libelleSurfaceTraitee(t).toLowerCase()}`}>
+          {formatSurface(t.terrestre?.surface_traitee_ha ?? t.aerien?.surface_traitee_ha)}
+        </span>
+      ),
     },
     {
       key: 'restante',

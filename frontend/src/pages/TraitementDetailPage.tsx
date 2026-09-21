@@ -18,6 +18,7 @@ import {
   formatHorodatage,
   formatSurface,
   libelleImpact,
+  libelleSurfaceTraitee,
   resumeEspeces,
   zonesExposeesLabels,
 } from '@/lib/traitement-fiche'
@@ -860,7 +861,10 @@ export function TraitementDetailPage() {
           <section className="flex flex-col gap-[10px] rounded-[11px] border border-ifvm-green-border bg-ifvm-green-bg px-[18px] py-4">
             <h2 className="font-sans text-[12.5px] font-bold text-ifvm-green-text">Surfaces (ha)</h2>
             <LigneSurface label="Infestée (snapshot)" valeur={formatSurface(surfaceInfestee)} />
-            <LigneSurface label="Traitée" valeur={formatSurface(surfaceTraitee)} />
+            <LigneSurface
+              label={libelleSurfaceTraitee(traitement)}
+              valeur={formatSurface(surfaceTraitee)}
+            />
             <LigneSurface label="Cumulée (reprises)" valeur={formatSurface(surfaceCumulee)} />
             <LigneSurface
               label="Restante"
