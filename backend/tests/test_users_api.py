@@ -192,6 +192,34 @@ async def test_admin_peut_modifier_un_autre_compte(
 
 
 @pytest.mark.asyncio
+async def test_changement_de_role_redescend_dans_le_delta_de_synchro_referentiel(
+    client: AsyncClient, admin_headers: dict, utilisateur_rattache: Utilisateur, db_session
+):
+    """Un rôle modifié doit atteindre les téléphones déjà synchronisés : la synchro
+    `utilisateurs_equipe` est un delta sur `updated_at > curseur`. Avant le correctif,
+    `PATCH /users/{id}` ne faisait pas avancer `updated_at` — le téléphone gardait l'ancien
+    `chef_equipe`, l'agent le choisissait, et le serveur refusait l'envoi de la fiche."""
+    await db_session.refresh(utilisateur_rattache)
+    curseur = utilisateur_rattache.updated_at
+
+    response = await client.patch(
+        f"/users/{utilisateur_rattache.id}",
+        json={"role": "verificateur"},
+        headers=admin_headers,
+    )
+    assert response.status_code == 200
+
+    delta = await client.get(
+        "/referentiel/pull",
+        params={"since_utilisateurs_equipe": curseur.isoformat()},
+        headers=admin_headers,
+    )
+    assert delta.status_code == 200
+    par_id = {u["id"]: u for u in delta.json()["utilisateurs_equipe"]["upserts"]}
+    assert par_id[str(utilisateur_rattache.id)]["role"] == "verificateur"
+
+
+@pytest.mark.asyncio
 async def test_admin_peut_attribuer_un_sigle(
     client: AsyncClient, admin_headers: dict, utilisateur_rattache: Utilisateur
 ):
