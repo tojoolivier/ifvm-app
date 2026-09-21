@@ -14,8 +14,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
 import { ThemedText } from '@/components/themed-text';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { listRecentProspections, countUnsyncedProspections, DraftProspection } from '@/lib/prospection-repository';
-import { listRecentTraitements, DraftTraitementRow } from '@/lib/traitement-repository';
+import { listToutesProspectionsLocal, countUnsyncedProspections, DraftProspection } from '@/lib/prospection-repository';
+import { listToutesTraitementsLocal, DraftTraitementRow } from '@/lib/traitement-repository';
 import { NewFicheFab } from '@/components/fiches/NewFicheFab';
 import * as Network from 'expo-network';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
@@ -162,8 +162,8 @@ export default function DashboardScreen() {
 
     try {
       const [fiches, ficheTraitements, pendingCount] = await Promise.all([
-        listRecentProspections(),
-        listRecentTraitements(),
+        listToutesProspectionsLocal(),
+        listToutesTraitementsLocal(),
         countUnsyncedProspections(),
       ]);
 

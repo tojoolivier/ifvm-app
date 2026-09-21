@@ -39,7 +39,7 @@ jest.mock('@/lib/referentiel-db', () => ({
 
 jest.mock('@/lib/traitement-repository', () => ({
   getTraitement: jest.fn(),
-  listRecentTraitements: jest.fn(),
+  listToutesTraitementsLocal: jest.fn(),
 }));
 
 jest.mock('@/lib/traitement-sync', () => ({
@@ -69,7 +69,7 @@ describe('SyncScreen — fiches de traitement en attente', () => {
       .mockResolvedValue({ reussies: [], echouees: [], conflits: [] });
     jest.mocked(referentielSync.pullReferentiel).mockReset().mockResolvedValue(undefined);
     jest.mocked(referentielDb.compterReferentielLocal).mockReset().mockResolvedValue([]);
-    jest.mocked(traitementRepository.listRecentTraitements)
+    jest.mocked(traitementRepository.listToutesTraitementsLocal)
       .mockReset()
       .mockResolvedValue([TRAITEMENT_EN_ATTENTE]);
     jest.mocked(traitementRepository.getTraitement)

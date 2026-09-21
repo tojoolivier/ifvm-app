@@ -3,7 +3,7 @@ import {
   createDraftProspection,
   countUnsyncedProspections,
   listDraftProspections,
-  listRecentProspections,
+  listToutesProspectionsLocal,
   listUnsyncedProspections,
   deleteProspection,
   materialiserProspectionValidee,
@@ -55,7 +55,7 @@ jest.mock('../src/lib/prospection-repository', () => ({
   createDraftProspection: jest.fn(),
   countUnsyncedProspections: jest.fn(),
   listDraftProspections: jest.fn(),
-  listRecentProspections: jest.fn(),
+  listToutesProspectionsLocal: jest.fn(),
   listUnsyncedProspections: jest.fn(),
   deleteProspection: jest.fn(),
   materialiserProspectionValidee: jest.fn(),
@@ -76,7 +76,7 @@ const mockApiClient = jest.mocked(apiClient);
 const mockCreateDraft = jest.mocked(createDraftProspection);
 const mockCountUnsynced = jest.mocked(countUnsyncedProspections);
 const mockListDrafts = jest.mocked(listDraftProspections);
-const mockListRecent = jest.mocked(listRecentProspections);
+const mockListRecent = jest.mocked(listToutesProspectionsLocal);
 const mockListUnsynced = jest.mocked(listUnsyncedProspections);
 const mockDeleteLocal = jest.mocked(deleteProspection);
 const mockListCampagnesLocal = jest.mocked(listCampagnesLocal);
@@ -208,16 +208,16 @@ describe('loadAccueilData', () => {
     expect(result.pendingSync).toEqual([STORED_ROW]);
   });
 
-  it('la file d\'envoi n\'est pas plafonnée à 20 fiches, contrairement à `recent` (#synchronisation-automatique)', async () => {
+  it('`recent` comme la file d\'envoi restent tous deux non plafonnés au-delà de 20 fiches (#fiches-validees-liste-non-plafonnee, #synchronisation-automatique)', async () => {
     const fichesAuDelaDe20 = Array.from({ length: 25 }, (_, i) => ({ ...STORED_ROW, id: `fiche-${i}` }));
     mockListDrafts.mockResolvedValueOnce([]);
-    mockListRecent.mockResolvedValueOnce(fichesAuDelaDe20.slice(0, 20));
+    mockListRecent.mockResolvedValueOnce(fichesAuDelaDe20);
     mockCountUnsynced.mockResolvedValueOnce(25);
     mockListUnsynced.mockResolvedValueOnce(fichesAuDelaDe20);
 
     const result = await loadAccueilData();
 
-    expect(result.recent).toHaveLength(20);
+    expect(result.recent).toHaveLength(25);
     expect(result.pendingSync).toHaveLength(25);
   });
 });

@@ -1477,25 +1477,29 @@ export async function countUnsyncedTraitements(): Promise<number> {
 }
 
 /**
- * Fiches de traitement récentes, tous statuts confondus — pendant de
- * `listRecentProspections()` côté prospection, pour l'écran Synchronisation
- * (#erreur-sync-fiche-introuvable). Avant cette fonction, le domaine
- * « traitement » n'existait pas sur cet écran : ni affiché dans « Fiches en
- * attente », ni inclus dans le lot envoyé par le bouton « Synchroniser » —
- * une fiche de traitement complète restait donc indéfiniment signalée
- * « Aucune fiche à synchroniser », quel que soit le nombre de tentatives.
+ * Fiches de traitement locales, tous statuts confondus — pendant de
+ * `listToutesProspectionsLocal()` côté prospection, pour l'écran
+ * Synchronisation (#erreur-sync-fiche-introuvable). Avant cette fonction, le
+ * domaine « traitement » n'existait pas sur cet écran : ni affiché dans
+ * « Fiches en attente », ni inclus dans le lot envoyé par le bouton
+ * « Synchroniser » — une fiche de traitement complète restait donc
+ * indéfiniment signalée « Aucune fiche à synchroniser », quel que soit le
+ * nombre de tentatives.
  *
  * Volontairement sans filtre sur `statut_sync` (contrairement à
  * `listUnsyncedTraitements`) : l'écran a besoin de voir aussi les fiches déjà
  * synchronisées (compteur "Synchronisé") et celles en échec (badge ❌), pas
  * seulement celles qui repartiront au prochain envoi.
+ *
+ * Anciennement plafonnée à 20 (`listRecentTraitements`) : une fiche déjà
+ * validée, mais pas parmi les 20 les plus récemment modifiées, disparaissait
+ * purement et simplement de « Mes fiches »/du compteur de synchronisation
+ * hors ligne, alors qu'elle est intégralement présente en local depuis sa
+ * création sur cet appareil (#fiches-validees-liste-non-plafonnee).
  */
-export async function listRecentTraitements(limit = 20): Promise<DraftTraitementRow[]> {
+export async function listToutesTraitementsLocal(): Promise<DraftTraitementRow[]> {
   const db = await getDb();
-  return db.getAllAsync<DraftTraitementRow>(
-    `SELECT * FROM traitement ORDER BY updated_at DESC LIMIT ?`,
-    [limit]
-  );
+  return db.getAllAsync<DraftTraitementRow>(`SELECT * FROM traitement ORDER BY updated_at DESC`);
 }
 
 /**
