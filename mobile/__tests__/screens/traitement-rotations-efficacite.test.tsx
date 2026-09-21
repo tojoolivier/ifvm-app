@@ -69,6 +69,12 @@ beforeEach(() => {
 
 describe('RotationsScreen — saisie décimale francophone (virgule)', () => {
   it("conserve la valeur saisie avec une virgule sur Approvisionnement, sans jamais afficher NaN", async () => {
+    useTraitementCaptureStore.setState({
+      ...RESET_STATE,
+      aerien: {
+        rotations: [{ localId: 'r1', produit_id: 'p1', quantite: 10, unite: 'L', surface_ha: 5 }],
+      },
+    });
     await render(<RotationsScreen />);
     await screen.findByTestId('rotation-numero-cuve-0');
 

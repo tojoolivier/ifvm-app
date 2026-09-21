@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getTraitement, Cible } from '@/lib/traitement-repository';
-import { listAllProspectionCaptures, listAllProspectionPopulations } from '@/lib/prospection-repository';
+import { getProspection, listAllProspectionCaptures, listAllProspectionPopulations } from '@/lib/prospection-repository';
 import { construireDetailPhaseStade, PhaseStadeGroup } from '@/lib/traitement-cible';
 import { Card } from '@/components/traitement/Card';
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN, PROGRESS_SEGMENTS_TERRESTRE } from '@/components/traitement/ProgressBar';
@@ -23,9 +23,14 @@ function displayVolsClairsEssaims(value: number | null | undefined): string {
 }
 
 /** Une espèce est « présente » sur la cible dès que l'un de ses champs détaillés
- * (petites/grandes larves ou densités) est renseigné — `null` sur les 4 signifie
- * que cette espèce n'a aucune ligne population sur la prospection liée. Même
- * logique que synthese.tsx (écran Aérien). */
+ * (petites/grandes larves ou densités) est renseigné (non `null`/`undefined`) —
+ * `null` sur les 4 signifie que cette espèce n'a aucune ligne population sur la
+ * prospection liée, `undefined` qu'ils n'existent pas du tout (fiche créée avant
+ * l'ajout du détail par espèce). Depuis #cible-extensif-signalement-defauts-zero,
+ * `construireCible`/`construire_cible()` ne mettent ces 4 champs à 0 (jamais
+ * `null`) QUE pour une espèce réellement présente dans `cible.espece` — jamais
+ * pour les deux à la fois sur une prospection "rien trouvé", ce test-ci reste
+ * donc valide sans traitement spécial. Même logique que synthese.tsx/recap.tsx. */
 function especePresente(cible: Cible | null, espece: 'lmc' | 'nse'): boolean {
   if (!cible) return false;
   return (
@@ -45,12 +50,23 @@ function displayEspeces(cible: Cible | null): string {
   return display(cible?.espece);
 }
 
-function PhaseStadeTable({ title, entries }: { title: string; entries: { label: string; value: number }[] }) {
+/** Extensif/Signalement, prospection "rien trouvé" (#cible-extensif-signalement-
+ * defauts-zero) : "0" plutôt que "non renseigné" quand aucune phase/stade n'a
+ * été capturé pour ce groupe espèce/catégorie — l'Intensif garde "non renseigné". */
+function PhaseStadeTable({
+  title,
+  entries,
+  defautsZero,
+}: {
+  title: string;
+  entries: { label: string; value: number }[];
+  defautsZero: boolean;
+}) {
   return (
     <View style={styles.phaseStadeTable}>
       <Text style={styles.phaseStadeTitle}>{title}</Text>
       {entries.length === 0 ? (
-        <Text style={styles.value}>non renseigné</Text>
+        <Text style={styles.value}>{defautsZero ? '0' : 'non renseigné'}</Text>
       ) : (
         entries.map((entry) => (
           <View key={entry.label} style={styles.detailRow}>
@@ -89,6 +105,10 @@ export default function CiblesScreen() {
   // aérien avec l'écran Rotations, 6 en terrestre sans lui).
   const [typeTraitement, setTypeTraitement] = useState<'AERIEN' | 'TERRESTRE' | null>(null);
   const [phaseStadeGroups, setPhaseStadeGroups] = useState<PhaseStadeGroup[]>([]);
+  // #cible-extensif-signalement-defauts-zero : Extensif/Signalement seulement —
+  // décide si les tableaux Phase/Stade vides affichent "0" (rien trouvé,
+  // conclusif) ou "non renseigné" (Intensif, inchangé).
+  const [defautsZero, setDefautsZero] = useState(false);
   const signalerChargement = useSignalerChargement('cibles');
 
   useEffect(() => {
@@ -99,13 +119,18 @@ export default function CiblesScreen() {
         setTypeTraitement(draft?.type_traitement ?? null);
         if (!draft?.prospection_id) {
           setPhaseStadeGroups([]);
+          setDefautsZero(false);
           return;
         }
-        const [populations, captures] = await Promise.all([
+        const [populations, captures, prospection] = await Promise.all([
           listAllProspectionPopulations(draft.prospection_id),
           listAllProspectionCaptures(draft.prospection_id),
+          getProspection(draft.prospection_id),
         ]);
         setPhaseStadeGroups(construireDetailPhaseStade(populations, captures));
+        setDefautsZero(
+          prospection?.type_prospection === 'extensive' || prospection?.type_prospection === 'validation'
+        );
       })
       .catch((error) => signalerChargement(error, { traitementId }));
   }, [traitementId, signalerChargement]);
@@ -150,8 +175,8 @@ export default function CiblesScreen() {
         {phaseStadeGroups.map((group) => (
           <Card key={`${group.espece}-${group.categorie}`}>
             <Text style={styles.groupTitle}>{group.label}</Text>
-            <PhaseStadeTable title="Phase" entries={group.phases} />
-            <PhaseStadeTable title="Stade" entries={group.stades} />
+            <PhaseStadeTable title="Phase" entries={group.phases} defautsZero={defautsZero} />
+            <PhaseStadeTable title="Stade" entries={group.stades} defautsZero={defautsZero} />
           </Card>
         ))}
 

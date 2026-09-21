@@ -9,6 +9,7 @@ import {
   computeSurfaceCumulee,
   computeSurfaceRestante,
   computePesticideStockRestant,
+  computePesticideConsommeSuggere,
   validateReferences,
   validateTerrestreConditions,
   validateRotationsHeures,
@@ -223,6 +224,45 @@ describe('computeSurfaceRestante', () => {
   });
 });
 
+/**
+ * #pesticide-consomme-suggere-mode-traitement : suggestion de "Pesticides
+ * consommés" dérivée de "Cumulée" selon le mode de traitement et l'unité —
+ * seulement 3 combinaisons ont une formule, confirmées avec l'utilisateur.
+ */
+describe('computePesticideConsommeSuggere', () => {
+  it('Barrière + L : Cumulée / 5', () => {
+    expect(computePesticideConsommeSuggere('BARRIERE', 'L', 20)).toBe(4);
+  });
+
+  it('Barrière + kg : aucune formule pour l’instant, reste manuel', () => {
+    expect(computePesticideConsommeSuggere('BARRIERE', 'kg', 20)).toBeNull();
+  });
+
+  it('Couverture totale + L : égal à Cumulée', () => {
+    expect(computePesticideConsommeSuggere('TOTAL', 'L', 15)).toBe(15);
+  });
+
+  it('Couverture totale + kg : Cumulée / 20', () => {
+    expect(computePesticideConsommeSuggere('TOTAL', 'kg', 100)).toBe(5);
+  });
+
+  it('Irrégulier : aucune formule, reste manuel', () => {
+    expect(computePesticideConsommeSuggere('IRREGULIER', 'L', 20)).toBeNull();
+  });
+
+  it('mode non renseigné : aucune formule', () => {
+    expect(computePesticideConsommeSuggere(null, 'L', 20)).toBeNull();
+  });
+
+  it('unité non renseignée : traitée comme Litre (défaut)', () => {
+    expect(computePesticideConsommeSuggere('TOTAL', null, 15)).toBe(15);
+  });
+
+  it('arrondit à 2 décimales', () => {
+    expect(computePesticideConsommeSuggere('BARRIERE', 'L', 17)).toBe(3.4);
+  });
+});
+
 describe('validateReferences', () => {
   const valid = {
     typeTraitement: 'AERIEN' as const,
@@ -277,6 +317,8 @@ describe('validateTerrestreConditions', () => {
   const base = {
     heureDebut: '08:00',
     heureFin: '10:00',
+    vitesseVentMs: 2.5,
+    temperatureC: 26,
     surfaceRestanteHa: 0,
     surfaceRestanteAbandonnee: null,
     motifSurfaceRestanteAbandonnee: null,
@@ -284,6 +326,20 @@ describe('validateTerrestreConditions', () => {
 
   it('accepts consistent conditions with no restante surface', () => {
     expect(validateTerrestreConditions(base)).toEqual([]);
+  });
+
+  /** #traitement-terrestre-sync-apres-enregistrement : ces 4 champs sont
+   * obligatoires côté backend (TraitementTerrestreCreate) — la fiche ne
+   * doit plus jamais paraître "complète" sur le récapitulatif tant qu'ils
+   * manquent, sous peine d'échouer bien plus tard, à la synchronisation. */
+  it.each([
+    ['heureDebut', { heureDebut: null }],
+    ['heureFin', { heureFin: null }],
+    ['vitesseVentMs', { vitesseVentMs: null }],
+    ['temperatureC', { temperatureC: null }],
+  ])('requires %s to be present', (field, overrides) => {
+    const errors = validateTerrestreConditions({ ...base, ...overrides });
+    expect(errors.some((e) => e.field === field)).toBe(true);
   });
 
   it('rejects an end time not after the start time', () => {
@@ -575,6 +631,8 @@ describe('aggregateRecapErrors', () => {
     empoisonnement: { empoisonnement: false, empoisonnementType: null, empoisonnementMode: null, empoisonnementAutre: null },
     terrestreConditions: null,
     aerienEquipe: null,
+    aerienRotations: [],
+    terrestreProduits: [],
     signatureMatrix: [{ role: 'PILOTE' as const, required: true, champRenseigne: true, signe: true }],
   };
 
@@ -609,11 +667,42 @@ describe('aggregateRecapErrors', () => {
       terrestreConditions: {
         heureDebut: '08:00',
         heureFin: '08:00',
+        vitesseVentMs: 2.5,
+        temperatureC: 26,
         surfaceRestanteHa: 0,
         surfaceRestanteAbandonnee: null,
         motifSurfaceRestanteAbandonnee: null,
       },
     });
     expect(errors.some((e) => e.field === 'heureFin')).toBe(true);
+  });
+
+  /** #traitement-aerien-sync-apres-enregistrement : une rotation ajoutée mais
+   * jamais remplie ne doit plus paraître "complète" sur le récapitulatif. */
+  it('reports an incomplete rotation (aérien) even when everything else is valid', () => {
+    const errors = aggregateRecapErrors({
+      ...validAerien,
+      aerienRotations: [{ produitId: null, quantite: null }],
+    });
+    expect(errors.some((e) => e.field === 'rotations')).toBe(true);
+  });
+
+  /** Symétrique côté Terrestre — #traitement-terrestre-sync-apres-enregistrement. */
+  it('reports an incomplete produit utilisé (terrestre) even when everything else is valid', () => {
+    const errors = aggregateRecapErrors({
+      ...validAerien,
+      typeTraitement: 'TERRESTRE',
+      terrestreConditions: {
+        heureDebut: '08:00',
+        heureFin: '10:00',
+        vitesseVentMs: 2.5,
+        temperatureC: 26,
+        surfaceRestanteHa: 0,
+        surfaceRestanteAbandonnee: null,
+        motifSurfaceRestanteAbandonnee: null,
+      },
+      terrestreProduits: [{ produitId: null, quantiteL: null }],
+    });
+    expect(errors.some((e) => e.field === 'produits')).toBe(true);
   });
 });

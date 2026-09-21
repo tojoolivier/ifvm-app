@@ -14,8 +14,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
 import { ThemedText } from '@/components/themed-text';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { listRecentProspections, countUnsyncedProspections, DraftProspection } from '@/lib/prospection-repository';
-import { listRecentTraitements, DraftTraitementRow } from '@/lib/traitement-repository';
+import { listToutesProspectionsLocal, countUnsyncedProspections, DraftProspection } from '@/lib/prospection-repository';
+import { listToutesTraitementsLocal, DraftTraitementRow } from '@/lib/traitement-repository';
 import { NewFicheFab } from '@/components/fiches/NewFicheFab';
 import * as Network from 'expo-network';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
@@ -162,8 +162,8 @@ export default function DashboardScreen() {
 
     try {
       const [fiches, ficheTraitements, pendingCount] = await Promise.all([
-        listRecentProspections(),
-        listRecentTraitements(),
+        listToutesProspectionsLocal(),
+        listToutesTraitementsLocal(),
         countUnsyncedProspections(),
       ]);
 
@@ -302,43 +302,6 @@ export default function DashboardScreen() {
           </Animated.View>
         )}
 
-        {/* Activité récente */}
-        {activiteRecente.length > 0 && (
-          <Animated.View style={[styles.recentSection, { opacity: fadeAnim, transform: [{ translateY: Animated.multiply(slideAnim, new Animated.Value(0.1)) }] }]}>
-            <View style={styles.sectionHeader}>
-              <ThemedText style={styles.sectionTitle}>ACTIVITÉ RÉCENTE</ThemedText>
-              <TouchableOpacity onPress={() => navigateTo('/(app)/fiches')}>
-                <ThemedText style={styles.viewAll}>Tout voir ›</ThemedText>
-              </TouchableOpacity>
-            </View>
-            {activiteRecente.map((item, index) => (
-              <TouchableOpacity
-                key={item.id}
-                style={[styles.ficheCard, index === activiteRecente.length - 1 && styles.ficheCardLast]}
-                onPress={() => navigateTo('/(app)/fiches')}
-                activeOpacity={0.7}
-              >
-                <View>
-                  <ThemedText style={styles.ficheTitle}>{item.titre}</ThemedText>
-                  <ThemedText style={styles.ficheSub}>{item.sousTitre}</ThemedText>
-                </View>
-                <View
-                  style={[
-                    styles.statusBadge,
-                    { backgroundColor: item.synced ? IFVM_GREEN_BG : IFVM_ORANGE_BG },
-                  ]}
-                >
-                  <ThemedText
-                    style={[styles.statusBadgeText, { color: item.synced ? IFVM_GREEN_LIGHT : IFVM_ORANGE }]}
-                  >
-                    {item.synced ? 'SYNCHRO ✓' : 'À SYNCHRO'}
-                  </ThemedText>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </Animated.View>
-        )}
-
         {/* Accès rapide */}
         <Animated.View style={[styles.quickAccessSection, { opacity: fadeAnim }]}>
           <ThemedText style={styles.sectionTitle}>ACCÈS RAPIDE</ThemedText>
@@ -394,6 +357,43 @@ export default function DashboardScreen() {
             </View>
           </View>
         </Animated.View>
+
+        {/* Activité récente */}
+        {activiteRecente.length > 0 && (
+          <Animated.View style={[styles.recentSection, { opacity: fadeAnim, transform: [{ translateY: Animated.multiply(slideAnim, new Animated.Value(0.1)) }] }]}>
+            <View style={styles.sectionHeader}>
+              <ThemedText style={styles.sectionTitle}>ACTIVITÉ RÉCENTE</ThemedText>
+              <TouchableOpacity onPress={() => navigateTo('/(app)/fiches')}>
+                <ThemedText style={styles.viewAll}>Tout voir ›</ThemedText>
+              </TouchableOpacity>
+            </View>
+            {activiteRecente.map((item, index) => (
+              <TouchableOpacity
+                key={item.id}
+                style={[styles.ficheCard, index === activiteRecente.length - 1 && styles.ficheCardLast]}
+                onPress={() => navigateTo('/(app)/fiches')}
+                activeOpacity={0.7}
+              >
+                <View>
+                  <ThemedText style={styles.ficheTitle}>{item.titre}</ThemedText>
+                  <ThemedText style={styles.ficheSub}>{item.sousTitre}</ThemedText>
+                </View>
+                <View
+                  style={[
+                    styles.statusBadge,
+                    { backgroundColor: item.synced ? IFVM_GREEN_BG : IFVM_ORANGE_BG },
+                  ]}
+                >
+                  <ThemedText
+                    style={[styles.statusBadgeText, { color: item.synced ? IFVM_GREEN_LIGHT : IFVM_ORANGE }]}
+                  >
+                    {item.synced ? 'SYNCHRO ✓' : 'À SYNCHRO'}
+                  </ThemedText>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </Animated.View>
+        )}
 
         {/* Footer */}
         <View style={styles.footer}>

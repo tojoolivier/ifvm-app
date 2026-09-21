@@ -144,6 +144,10 @@ export interface TerrestreDraft {
   motifSurfaceRestanteAbandonnee?: string | null;
   essence_litres?: number | null;
   nb_piles?: number | null;
+  // Unité pour toute la section « Produits utilisés » (migration backend 0077,
+  // #produits-unite-l-kg) — 'L' ou 'kg', un seul choix pour toute la fiche
+  // (contrairement à RotationDraft.unite côté Aérien, propre à chaque rotation).
+  pesticideUnite?: 'L' | 'kg' | null;
   pesticideRecuL?: number | null;
   // Stock avant approvisionnement (migration backend 0075, fiche CRT papier
   // section 5) — Terrestre uniquement, pas d'équivalent AerienDraft.

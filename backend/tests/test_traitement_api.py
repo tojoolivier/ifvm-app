@@ -367,8 +367,14 @@ async def test_create_prospection_inexistante_404(
 async def test_get_traitement_snapshot_non_renseigne(
     client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
 ):
-    # prospection sans populations ni surface → snapshot avec champs "non renseigné"
-    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    """Intensif seulement : `infestation.tsx` y porte sa propre notion de cible
+    (plus riche), `None`/« non renseigné » y reste le signal légitime « pas
+    encore évalué » — cf. test suivant pour l'Extensif/Signalement, où une
+    prospection sans populations ni surface est désormais un « rien trouvé »
+    conclusif (0, "non", "DIFFUSE"), jamais « non renseigné »."""
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, type_prospection="intensive"
+    )
     created = await client.post(
         "/traitements", json=payload_traitement(prospection_id), headers=auth_headers
     )
@@ -383,6 +389,34 @@ async def test_get_traitement_snapshot_non_renseigne(
     assert cible["vols_clairs_essaims"] == "non renseigné"
     assert cible["repartition_population"] == "non renseigné"
     assert cible["surface_infestee_ha"] == "non renseigné"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("type_prospection", ["extensive", "validation"])
+async def test_get_traitement_snapshot_extensif_signalement_defauts_zero(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, type_prospection
+):
+    """Extensif/Signalement : une prospection validée sans populations ni
+    surface (« rien trouvé ») ne doit plus jamais afficher « non renseigné »
+    sur la fiche de traitement qui en découle — cf. discussion utilisateur
+    #cible-extensif-signalement-defauts-zero."""
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, type_prospection=type_prospection
+    )
+    created = await client.post(
+        "/traitements", json=payload_traitement(prospection_id), headers=auth_headers
+    )
+    traitement_id = created.json()["id"]
+
+    resp = await client.get(f"/traitements/{traitement_id}", headers=auth_headers)
+    assert resp.status_code == 200
+    cible = resp.json()["cible"]
+    assert cible["espece"] == "non renseigné"  # aucune espèce à inventer
+    assert cible["petites_larves"] == "0"
+    assert cible["grandes_larves"] == "0"
+    assert cible["vols_clairs_essaims"] == "non"
+    assert cible["repartition_population"] == "DIFFUSE"
+    assert cible["surface_infestee_ha"] == 0.0
 
 
 @pytest.mark.asyncio
@@ -422,7 +456,15 @@ def payload_rotation(pesticide):
 async def _creer_traitement(
     client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
 ):
-    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    # surface_infestee généreuse et sans rapport avec le sujet réel de ces tests
+    # (rotations/blocs) : depuis que `construire_cible` (Extensif/Signalement)
+    # ne renvoie plus jamais `None` pour la surface infestée (0.0 « rien
+    # trouvé » plutôt que « non renseigné »), une prospection par défaut
+    # (surface_infestee=None ci-avant) aurait fait échouer la validation de
+    # `payload_bloc()` (2000 ha) contre une cible à 0 ha.
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surface_infestee=100000.0
+    )
     resp = await client.post(
         "/traitements", json=payload_traitement(prospection_id), headers=auth_headers
     )

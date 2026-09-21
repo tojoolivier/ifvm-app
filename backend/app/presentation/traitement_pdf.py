@@ -5,6 +5,7 @@ Aérien ou Terrestre selon `traitement.type_traitement` — pas un template
 unique à trous (cf. issue #495).
 """
 
+from enum import Enum
 from html import escape
 from typing import Any
 
@@ -130,6 +131,14 @@ def _section_moyens(traitement: TraitementRead) -> str:
 
 def _section_pesticides(traitement: TraitementRead) -> str:
     fait = _fait_traitement(traitement)
+    # `pesticide_unite` (#produits-unite-l-kg) — Terrestre uniquement, pas
+    # d'équivalent Aérien : `getattr` avec repli sur "L" pour ne rien changer
+    # à l'affichage Aérien (toujours en litres, comme avant cet ajout).
+    unite_brute = getattr(fait, "pesticide_unite", "L") if fait else "L"
+    # `.value` : `pesticide_unite` est un `UniteQuantite` (str, Enum) — sans ça,
+    # l'interpolation f-string produit "UniteQuantite.L" au lieu de "L"
+    # (Enum.__format__ prime sur str.__format__ avant Python 3.12).
+    unite = unite_brute.value if isinstance(unite_brute, Enum) else unite_brute
     return _section(
         "5. Pesticides",
         [
@@ -138,8 +147,8 @@ def _section_pesticides(traitement: TraitementRead) -> str:
             # Terrestre uniquement (pas d'équivalent Aérien) — `getattr` plutôt
             # qu'un accès direct, `fait` pouvant être un TraitementAerienRead.
             ("Stock initial", getattr(fait, "stock_initial_l", None) if fait else None),
-            ("Approvisionnement (produit reçu, L)", fait.pesticide_recu_l if fait else None),
-            ("Stock final restant (L)", fait.pesticide_stock_restant_l if fait else None),
+            (f"Approvisionnement (produit reçu, {unite})", fait.pesticide_recu_l if fait else None),
+            (f"Stock final restant ({unite})", fait.pesticide_stock_restant_l if fait else None),
         ],
     )
 

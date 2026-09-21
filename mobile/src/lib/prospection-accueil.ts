@@ -7,9 +7,10 @@ import {
   countUnsyncedProspections,
   deleteProspection as deleteLocalProspection,
   listDraftProspections,
-  listRecentProspections,
+  listToutesProspectionsLocal,
   listUnsyncedProspections,
   materialiserProspectionValidee,
+  updateProspectionStationNom,
   saveProspectionPopulation,
   saveProspectionInfestation,
   saveProspectionCaptures,
@@ -32,13 +33,12 @@ const log = logger.child({ module: 'prospection-accueil' });
 export interface AccueilViewModel {
   unsyncedCount: number;
   activeDraft: DraftProspection | null;
+  /** Toutes les fiches locales (tous statuts), jamais plafonnées
+   * (`listToutesProspectionsLocal` — #fiches-validees-liste-non-plafonnee) :
+   * « Mes prospections »/« Mes fiches » doivent rester intégralement
+   * navigables hors ligne, y compris une fiche validée ancienne. */
   recent: DraftProspection[];
   validated: ProspectionRead[];
-  /**
-   * File d'envoi réelle (#synchronisation-automatique), distincte de `recent`
-   * qui plafonne à 20 fiches pour l'affichage — une fiche en attente au-delà
-   * de ces 20 ne doit jamais être exclue d'une synchronisation.
-   */
   pendingSync: DraftProspection[];
 }
 
@@ -46,7 +46,7 @@ export interface AccueilViewModel {
 export async function loadAccueilData(): Promise<AccueilViewModel> {
   const [drafts, recent, unsyncedCount, pendingSync] = await Promise.all([
     listDraftProspections(),
-    listRecentProspections(),
+    listToutesProspectionsLocal(),
     countUnsyncedProspections(),
     listUnsyncedProspections(),
   ]);
@@ -139,11 +139,21 @@ export async function loadFichesARevalider(token: string): Promise<ProspectionRe
  * Sans effet si la fiche existe déjà en local (cas courant : l'agent choisit
  * l'une de ses propres fiches, déjà là depuis sa création) — jamais
  * n'écrase silencieusement une fiche locale potentiellement en cours d'usage
- * ailleurs (brouillon de traitement déjà démarré dessus, par ex.).
+ * ailleurs (brouillon de traitement déjà démarré dessus, par ex.) — sauf pour
+ * combler un `station_nom` resté vide (#localite-traitement-poste-acridien-
+ * autre-agent : peut arriver si cette fiche avait été matérialisée avant que
+ * le référentiel `station_fixe` ait fini de se synchroniser sur cet appareil),
+ * seule colonne jamais réécrite ici sur une fiche déjà locale.
  */
 export async function assurerProspectionDisponibleLocalement(fiche: ProspectionRead): Promise<void> {
   const dejaLocale = await getProspection(fiche.id);
-  if (dejaLocale) return;
+  if (dejaLocale) {
+    if (!dejaLocale.station_nom && fiche.station_id) {
+      const stationNom = (await getStationById(fiche.station_id))?.nom ?? null;
+      if (stationNom) await updateProspectionStationNom(fiche.id, stationNom);
+    }
+    return;
+  }
 
   // #localite-traitement-poste-acridien-autre-agent : `ProspectionRead` (réponse
   // serveur) n'expose pas le nom de la station (contrairement à `prospecteur_nom`,

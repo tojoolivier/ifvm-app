@@ -41,6 +41,20 @@ const DRAFT_AERIEN = {
   mode_traitement: 'BARRIERE',
   localite: 'Betioky',
   date_traitement: '2026-09-17',
+  region: 'Atsimo-Andrefana',
+  district: 'Betioky Sud',
+  commune: 'Betioky',
+  latitude: -23.7167,
+  longitude: 44.3833,
+  altitude: 210,
+  nb_agents_permanents: 12,
+  nb_agents_temporaires: 5,
+  nb_personnel_local: 8,
+  moyens_atomiseur_nb: 6,
+  moyens_essence_litres: 55,
+  moyens_disque_rotatif_nb: 2,
+  moyens_piles_nb: 33,
+  moyens_ulvamast_nb: 1,
   kit_combinaison: 4,
   kit_gants: 4,
   kit_lunettes: 3,
@@ -83,12 +97,16 @@ const DRAFT_AERIEN = {
     immatricule_aeronef: '5R-ABC',
     base_principale: 'Base Betioky',
     stand: 'Stand 1',
+    stand_date_installation: '2026-09-10',
     base_secondaire: 'Base secondaire X',
+    base_secondaire_date_installation: '2026-09-12',
     reprise_traitement: true,
     nb_rotations: 3,
     total_pesticide_l: 45,
     total_pesticide_kg: null,
     surface_traitee_ha: 100,
+    surface_cumulee_ha: 140,
+    surface_restante_ha: 25,
     pesticide_recu_l: 60,
     pesticide_stock_restant_l: 15,
     taux_mortalite_pourcent: 92,
@@ -159,5 +177,36 @@ describe('RecapScreen — Aérien : rien de saisi ne manque à la relecture', ()
     await render(<RecapScreen />);
 
     expect(await screen.findByText('Rizière · 1.5 km · sensibilisée')).toBeVisible();
+  });
+
+  it('affiche les dates d’installation du Stand et de la Base secondaire, et les surfaces cumulée/restante', async () => {
+    await render(<RecapScreen />);
+
+    await screen.findByText('5R-ABC');
+    expect(screen.getByText('2026-09-10')).toBeVisible();
+    expect(screen.getByText('2026-09-12')).toBeVisible();
+    expect(screen.getByText('140')).toBeVisible();
+    expect(screen.getByText('25')).toBeVisible();
+  });
+
+  it('affiche la carte Localisation (région/district/commune, coordonnées GPS, altitude)', async () => {
+    await render(<RecapScreen />);
+
+    await screen.findByText('Localisation');
+    expect(screen.getByText('Atsimo-Andrefana · Betioky Sud · Betioky')).toBeVisible();
+    expect(screen.getByText('-23.7167, 44.3833')).toBeVisible();
+    expect(screen.getByText('210')).toBeVisible();
+  });
+
+  /** #moyens-humains-materiels : communs à l'Aérien et au Terrestre — cf. le
+   * même test côté Terrestre (recap-screen-terrestre.test.tsx). */
+  it('affiche les sous-sections Humains et Matériels de Moyens & protection', async () => {
+    await render(<RecapScreen />);
+
+    await screen.findByText('Humains');
+    expect(screen.getByText('Matériels')).toBeVisible();
+    expect(screen.getByText('12')).toBeVisible(); // Nb agents permanents
+    expect(screen.getByText('55')).toBeVisible(); // Essence (litres)
+    expect(screen.getByText('33')).toBeVisible(); // Nombre de piles
   });
 });

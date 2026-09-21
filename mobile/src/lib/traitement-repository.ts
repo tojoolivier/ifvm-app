@@ -201,6 +201,10 @@ export interface TraitementTerrestre {
   surface_traitee_ha: number | null;
   surface_cumulee_ha: number | null;
   surface_restante_ha: number | null;
+  // Unité pour toute la section « Produits utilisés » (migration backend 0077,
+  // #produits-unite-l-kg) — 'L' ou 'kg', un seul choix pour toute la fiche
+  // (contrairement à Rotation.unite côté Aérien, propre à chaque rotation).
+  pesticide_unite: string;
   total_pesticide_l: number | null;
   pesticide_recu_l: number | null;
   // Stock avant approvisionnement (migration backend 0075, fiche CRT papier
@@ -744,6 +748,9 @@ export interface TerrestreUpdateInput {
   motifSurfaceRestanteAbandonnee?: string | null;
   essence_litres?: number | null;
   nb_piles?: number | null;
+  // Unité pour toute la section « Produits utilisés » (migration backend 0077,
+  // #produits-unite-l-kg) — 'L' ou 'kg'.
+  pesticideUnite?: string | null;
   pesticideRecuL?: number | null;
   stockInitialL?: number | null;
   // Efficacité (migration backend 0058, fiche CRT papier section "Traitement",
@@ -781,6 +788,7 @@ export async function updateTraitementTerrestre(
       motif_surface_restante_abandonnee = ?,
       essence_litres = ?,
       nb_piles = ?,
+      pesticide_unite = ?,
       pesticide_recu_l = ?,
       stock_initial_l = ?,
       taux_mortalite_pourcent = ?,
@@ -805,6 +813,7 @@ export async function updateTraitementTerrestre(
       input.motifSurfaceRestanteAbandonnee ?? null,
       input.essence_litres ?? null,
       input.nb_piles ?? null,
+      input.pesticideUnite ?? 'L',
       input.pesticideRecuL ?? null,
       input.stockInitialL ?? null,
       input.taux_mortalite_pourcent ?? null,
@@ -1468,25 +1477,29 @@ export async function countUnsyncedTraitements(): Promise<number> {
 }
 
 /**
- * Fiches de traitement récentes, tous statuts confondus — pendant de
- * `listRecentProspections()` côté prospection, pour l'écran Synchronisation
- * (#erreur-sync-fiche-introuvable). Avant cette fonction, le domaine
- * « traitement » n'existait pas sur cet écran : ni affiché dans « Fiches en
- * attente », ni inclus dans le lot envoyé par le bouton « Synchroniser » —
- * une fiche de traitement complète restait donc indéfiniment signalée
- * « Aucune fiche à synchroniser », quel que soit le nombre de tentatives.
+ * Fiches de traitement locales, tous statuts confondus — pendant de
+ * `listToutesProspectionsLocal()` côté prospection, pour l'écran
+ * Synchronisation (#erreur-sync-fiche-introuvable). Avant cette fonction, le
+ * domaine « traitement » n'existait pas sur cet écran : ni affiché dans
+ * « Fiches en attente », ni inclus dans le lot envoyé par le bouton
+ * « Synchroniser » — une fiche de traitement complète restait donc
+ * indéfiniment signalée « Aucune fiche à synchroniser », quel que soit le
+ * nombre de tentatives.
  *
  * Volontairement sans filtre sur `statut_sync` (contrairement à
  * `listUnsyncedTraitements`) : l'écran a besoin de voir aussi les fiches déjà
  * synchronisées (compteur "Synchronisé") et celles en échec (badge ❌), pas
  * seulement celles qui repartiront au prochain envoi.
+ *
+ * Anciennement plafonnée à 20 (`listRecentTraitements`) : une fiche déjà
+ * validée, mais pas parmi les 20 les plus récemment modifiées, disparaissait
+ * purement et simplement de « Mes fiches »/du compteur de synchronisation
+ * hors ligne, alors qu'elle est intégralement présente en local depuis sa
+ * création sur cet appareil (#fiches-validees-liste-non-plafonnee).
  */
-export async function listRecentTraitements(limit = 20): Promise<DraftTraitementRow[]> {
+export async function listToutesTraitementsLocal(): Promise<DraftTraitementRow[]> {
   const db = await getDb();
-  return db.getAllAsync<DraftTraitementRow>(
-    `SELECT * FROM traitement ORDER BY updated_at DESC LIMIT ?`,
-    [limit]
-  );
+  return db.getAllAsync<DraftTraitementRow>(`SELECT * FROM traitement ORDER BY updated_at DESC`);
 }
 
 /**

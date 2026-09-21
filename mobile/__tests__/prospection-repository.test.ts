@@ -4,7 +4,7 @@ import {
   materialiserProspectionValidee,
   getProspection,
   listDraftProspections,
-  listRecentProspections,
+  listToutesProspectionsLocal,
   listUnsyncedProspections,
   listValidatedProspections,
   listProspectionsDisponiblesPourTraitementLocal,
@@ -266,30 +266,22 @@ describe('listDraftProspections', () => {
   });
 });
 
-describe('listRecentProspections', () => {
-  it('lists all statuses ordered by most recently updated, capped at the given limit', async () => {
+describe('listToutesProspectionsLocal', () => {
+  it("liste toutes les fiches locales, tous statuts, triées par dernière modification — jamais plafonnée (#fiches-validees-liste-non-plafonnee)", async () => {
     getAllAsync.mockResolvedValueOnce([STORED_ROW]);
 
-    const result = await listRecentProspections(5);
+    const result = await listToutesProspectionsLocal();
 
     expect(result).toEqual([STORED_ROW]);
-    expect(getAllAsync).toHaveBeenCalledWith(
-      expect.stringContaining('ORDER BY updated_at DESC'),
-      [5]
-    );
-  });
-
-  it('defaults the limit to 20', async () => {
-    getAllAsync.mockResolvedValueOnce([]);
-
-    await listRecentProspections();
-
-    expect(getAllAsync).toHaveBeenCalledWith(expect.any(String), [20]);
+    const [sql, params] = getAllAsync.mock.calls[0];
+    expect(sql).toEqual(expect.stringContaining('ORDER BY updated_at DESC'));
+    expect(sql).not.toMatch(/LIMIT/i);
+    expect(params).toBeUndefined();
   });
 });
 
 describe('listUnsyncedProspections (#synchronisation-automatique)', () => {
-  it('n\'est pas plafonnée (contrairement à listRecentProspections) : aucune LIMIT dans la requête', async () => {
+  it('n\'est pas plafonnée : aucune LIMIT dans la requête', async () => {
     getAllAsync.mockResolvedValueOnce([STORED_ROW]);
 
     const result = await listUnsyncedProspections();

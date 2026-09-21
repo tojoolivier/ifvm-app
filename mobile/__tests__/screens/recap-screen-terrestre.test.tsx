@@ -39,6 +39,20 @@ const DRAFT_TERRESTRE = {
   mode_traitement: 'TOTAL',
   localite: 'Ambovombe',
   date_traitement: '2026-09-17',
+  region: 'Androy',
+  district: 'Ambovombe',
+  commune: 'Antaritarika',
+  latitude: -25.1719,
+  longitude: 46.0938,
+  altitude: 120,
+  nb_agents_permanents: 41,
+  nb_agents_temporaires: 17,
+  nb_personnel_local: 63,
+  moyens_atomiseur_nb: 9,
+  moyens_essence_litres: 77,
+  moyens_disque_rotatif_nb: 22,
+  moyens_piles_nb: 99,
+  moyens_ulvamast_nb: 3,
   kit_combinaison: 2,
   kit_gants: 2,
   kit_lunettes: 2,
@@ -142,7 +156,9 @@ describe('RecapScreen — Terrestre : rien de saisi ne manque à la relecture', 
     await render(<RecapScreen />);
 
     expect(await screen.findByText('Fyfanon')).toBeVisible();
-    expect(screen.getByText('12 l')).toBeVisible();
+    // "L" majuscule : #produits-unite-l-kg, repli par défaut d'une fiche sans
+    // pesticide_unite explicite (créée avant cet ajout).
+    expect(screen.getByText('12 L')).toBeVisible();
     expect(screen.getByText('Zone inaccessible')).toBeVisible();
   });
 
@@ -160,5 +176,50 @@ describe('RecapScreen — Terrestre : rien de saisi ne manque à la relecture', 
 
     await screen.findByText('Empoisonnement');
     expect(screen.getAllByText('Non').length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('affiche la répartition par espèce (densités diffuse/groupée) quand le détail par espèce est renseigné', async () => {
+    jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
+      ...DRAFT_TERRESTRE,
+      cible: {
+        ...DRAFT_TERRESTRE.cible,
+        petites_larves_lmc: 22,
+        densite_diffuse_lmc: 20,
+        densite_groupee_lmc: 3,
+      },
+    });
+
+    await render(<RecapScreen />);
+
+    await screen.findByText('Répartition LMC');
+    expect(screen.getByText('diffuse : 20 ind./ha · groupée : 3 ind./m²')).toBeVisible();
+    expect(screen.queryByText('Répartition de la population')).toBeNull();
+  });
+
+  it('affiche la carte Localisation (région/district/commune, coordonnées GPS, altitude)', async () => {
+    await render(<RecapScreen />);
+
+    await screen.findByText('Localisation');
+    expect(screen.getByText('Androy · Ambovombe · Antaritarika')).toBeVisible();
+    expect(screen.getByText('-25.1719, 46.0938')).toBeVisible();
+    expect(screen.getByText('120')).toBeVisible();
+  });
+
+  /** #moyens-humains-materiels : ajoutés à l'écran Moyens (Humains/Matériels)
+   * dans une session précédente, mais jamais reportés au récapitulatif —
+   * revenir « voir ce qui a été saisi » les faisait paraître disparus. */
+  it('affiche les sous-sections Humains et Matériels de Moyens & protection', async () => {
+    await render(<RecapScreen />);
+
+    await screen.findByText('Humains');
+    expect(screen.getByText('Matériels')).toBeVisible();
+    expect(screen.getByText('41')).toBeVisible(); // Nb agents permanents
+    expect(screen.getByText('17')).toBeVisible(); // Nb agents temporaires
+    expect(screen.getByText('63')).toBeVisible(); // Nb personnel local
+    expect(screen.getByText('9')).toBeVisible(); // Atomiseur
+    expect(screen.getByText('77')).toBeVisible(); // Essence (litres)
+    expect(screen.getByText('22')).toBeVisible(); // Disque rotatif
+    expect(screen.getByText('99')).toBeVisible(); // Nombre de piles
+    expect(screen.getByText('3')).toBeVisible(); // Ulvamast
   });
 });

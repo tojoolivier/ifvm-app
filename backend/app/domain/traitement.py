@@ -429,6 +429,15 @@ class TraitementTerrestre:
     motif_surface_restante_abandonnee: str | None = None
     essence_litres: float | None = None
     nb_piles: int | None = None
+    # Unité choisie pour toute la section « Produits utilisés » (fiche CRT papier
+    # section 5, #produits-unite-l-kg) : un seul choix pour toute la fiche (pas
+    # par produit comme les rotations Aérien, `Rotation.unite` — confirmé avec
+    # l'utilisateur) — gouverne le libellé et la sémantique de quantite_l (chaque
+    # ProduitUtilise), total_pesticide_l, pesticide_recu_l, stock_initial_l et
+    # pesticide_stock_restant_l ci-dessous. Les noms de colonnes historiques
+    # (suffixe `_l`) restent inchangés même quand l'unité choisie est "kg" —
+    # simple stockage numérique, la conversion d'affichage se fait à la lecture.
+    pesticide_unite: str = "L"
     total_pesticide_l: float | None = None
     # Stock de pesticide par fiche — même patron que TraitementAerien.
     pesticide_recu_l: float | None = None
@@ -764,6 +773,7 @@ _CHAMPS_CONTENU_TERRESTRE = (
     "motif_surface_restante_abandonnee",
     "essence_litres",
     "nb_piles",
+    "pesticide_unite",
     "pesticide_recu_l",
     "stock_initial_l",
 )
@@ -809,15 +819,26 @@ def generer_numero_fiche(
 def construire_cible(prospection: Prospection) -> Cible:
     """Snapshot en lecture seule de la cible depuis la fiche de prospection liée.
 
-    Les champs absents côté prospection restent à None (affichés « non renseigné »
-    côté présentation). surface_infestee_ha est NOT NULL en base: 0 si inconnue.
+    Extensif et Signalement (`type_prospection` "extensive"/"validation") : une
+    prospection validée y est toujours conclusive (y compris "rien trouvé", un
+    résultat légitime et fréquent) — les champs sans donnée y prennent donc un
+    défaut neutre (0, "non", "DIFFUSE") plutôt que None, pour ne jamais afficher
+    « non renseigné » sur une fiche de traitement qui en découle. Intensif
+    inchangé : `infestation.tsx` y porte sa propre notion, plus riche, de cible
+    (surface/taille/densité par `type_cible`) — None reste le signal légitime
+    « pas encore évalué » pour ce type-là, jamais recalculé ici en 0.
     """
+    defauts_zero = prospection.type_prospection in ("extensive", "validation")
+
     especes = {p.espece for p in prospection.populations if p.espece}
     especes |= {i.espece for i in prospection.infestations if i.espece}
+    # `next(iter(...))` plutôt que `.pop()` : `especes` est réutilisé plus bas
+    # pour scoper le défaut à 0 par espèce (`defauts_zero`) — `.pop()` l'aurait
+    # vidé ici même pour une prospection à une seule espèce.
     if not especes:
         espece = None
     elif len(especes) == 1:
-        espece = especes.pop()
+        espece = next(iter(especes))
     else:
         espece = "MELANGE"
 
@@ -878,8 +899,20 @@ def construire_cible(prospection: Prospection) -> Cible:
     # les lignes de cette espece (imago + larve), meme logique additive que
     # les larves ci-dessus — une espece peut avoir une densite saisie sur sa
     # ligne imago ET sa ligne larve.
-    densite_diffuse_par_espece: dict[str, float | None] = {"LMC": None, "NSE": None}
-    densite_groupee_par_espece: dict[str, float | None] = {"LMC": None, "NSE": None}
+    #
+    # Le defaut a 0 (defauts_zero) ne s'applique qu'aux especes reellement en
+    # scope (`especes`, calcule plus haut) — jamais aux deux a la fois sur une
+    # prospection "rien trouve" (aucune ligne population/infestation du tout) :
+    # LMC ET NSE y resteraient `None`, comme pour l'Intensif, pour ne pas
+    # laisser croire que les deux especes ont ete surveillees.
+    densite_diffuse_par_espece: dict[str, float | None] = {
+        "LMC": 0 if defauts_zero and "LMC" in especes else None,
+        "NSE": 0 if defauts_zero and "NSE" in especes else None,
+    }
+    densite_groupee_par_espece: dict[str, float | None] = {
+        "LMC": 0 if defauts_zero and "LMC" in especes else None,
+        "NSE": 0 if defauts_zero and "NSE" in especes else None,
+    }
     for p in prospection.populations:
         if p.espece not in densite_diffuse_par_espece:
             continue
@@ -909,36 +942,51 @@ def construire_cible(prospection: Prospection) -> Cible:
             essaims.append(True)
     if any(essaims):
         vols_clairs_essaims = "oui"
-    elif essaims:
+    elif essaims or defauts_zero:
         vols_clairs_essaims = "non"
     else:
         vols_clairs_essaims = None
 
     if any(p.densite_groupee is not None for p in prospection.populations):
         repartition = "GROUPEE"
-    elif any(p.densite_diffuse is not None for p in prospection.populations):
+    elif any(p.densite_diffuse is not None for p in prospection.populations) or defauts_zero:
         repartition = "DIFFUSE"
     else:
         repartition = None
 
     return Cible(
         espece=espece,
-        petites_larves=str(petites_total) if larves_renseignees else None,
-        grandes_larves=str(grandes_total) if larves_renseignees else None,
+        petites_larves=str(petites_total) if larves_renseignees or defauts_zero else None,
+        grandes_larves=str(grandes_total) if larves_renseignees or defauts_zero else None,
         vols_clairs_essaims=vols_clairs_essaims,
         repartition_population=repartition,
-        surface_infestee_ha=prospection.surface_infestee,
+        surface_infestee_ha=(
+            prospection.surface_infestee
+            if prospection.surface_infestee is not None
+            else (0.0 if defauts_zero else None)
+        ),
+        # Le défaut à 0 par espèce n'est appliqué que pour une espèce
+        # réellement en scope (`especes`) — jamais aux deux (LMC et NSE) sur
+        # une prospection "rien trouvé", cf. commentaire sur les densités.
         petites_larves_lmc=(
-            petites_par_espece["LMC"] if larves_renseignees_par_espece["LMC"] else None
+            petites_par_espece["LMC"]
+            if larves_renseignees_par_espece["LMC"] or (defauts_zero and "LMC" in especes)
+            else None
         ),
         petites_larves_nse=(
-            petites_par_espece["NSE"] if larves_renseignees_par_espece["NSE"] else None
+            petites_par_espece["NSE"]
+            if larves_renseignees_par_espece["NSE"] or (defauts_zero and "NSE" in especes)
+            else None
         ),
         grandes_larves_lmc=(
-            grandes_par_espece["LMC"] if larves_renseignees_par_espece["LMC"] else None
+            grandes_par_espece["LMC"]
+            if larves_renseignees_par_espece["LMC"] or (defauts_zero and "LMC" in especes)
+            else None
         ),
         grandes_larves_nse=(
-            grandes_par_espece["NSE"] if larves_renseignees_par_espece["NSE"] else None
+            grandes_par_espece["NSE"]
+            if larves_renseignees_par_espece["NSE"] or (defauts_zero and "NSE" in especes)
+            else None
         ),
         densite_diffuse_lmc=densite_diffuse_par_espece["LMC"],
         densite_groupee_lmc=densite_groupee_par_espece["LMC"],

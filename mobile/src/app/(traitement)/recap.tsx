@@ -143,7 +143,11 @@ function displayVolsClairsEssaims(value: number | null | undefined): string {
 }
 
 /** Une espèce est « présente » sur la cible dès que l'un de ses champs
- * détaillés est renseigné — même logique que cibles.tsx/synthese.tsx. */
+ * détaillés est renseigné (non `null`/`undefined`). Depuis
+ * #cible-extensif-signalement-defauts-zero, ces 4 champs valent 0 (jamais
+ * `null`) QUE pour une espèce réellement présente dans `cible.espece` — jamais
+ * pour les deux à la fois sur une prospection Extensif/Signalement "rien
+ * trouvé". Même logique que cibles.tsx/synthese.tsx. */
 function especePresenteRecap(cible: Cible | null | undefined, espece: 'lmc' | 'nse'): boolean {
   if (!cible) return false;
   return (
@@ -400,6 +404,8 @@ export default function RecapScreen() {
         ? {
             heureDebut: draft.terrestre.heure_debut,
             heureFin: draft.terrestre.heure_fin,
+            vitesseVentMs: draft.terrestre.vitesse_vent_ms,
+            temperatureC: draft.terrestre.temperature_c,
             surfaceRestanteHa: surfaceRestante,
             surfaceRestanteAbandonnee: draft.terrestre.surface_restante_abandonnee,
             motifSurfaceRestanteAbandonnee: draft.terrestre.motif_surface_restante_abandonnee,
@@ -417,6 +423,15 @@ export default function RecapScreen() {
             basePrincipale: draft.aerien.base_principale,
           }
         : null,
+    // #traitement-aerien-sync-apres-enregistrement / #traitement-terrestre-sync-apres-enregistrement
+    aerienRotations: (draft.aerien?.rotations ?? []).map((r) => ({
+      produitId: r.produit_id,
+      quantite: r.quantite,
+    })),
+    terrestreProduits: (draft.terrestre?.produits ?? []).map((p) => ({
+      produitId: p.produit_id,
+      quantiteL: p.quantite_l,
+    })),
     signatureMatrix,
   });
 
@@ -495,6 +510,23 @@ export default function RecapScreen() {
           );
         })}
 
+        <Card>
+          <Text style={styles.sectionTitle}>Localisation</Text>
+          <RecapLigne
+            label="Région · district · commune"
+            value={[draft.region, draft.district, draft.commune].filter(Boolean).join(' · ') || null}
+          />
+          <RecapLigne
+            label="Coordonnées GPS"
+            value={
+              draft.latitude != null && draft.longitude != null
+                ? `${draft.latitude.toFixed(4)}, ${draft.longitude.toFixed(4)}`
+                : null
+            }
+          />
+          <RecapLigne label="Altitude (m)" value={display(draft.altitude)} />
+        </Card>
+
         {draft.cible && (
           <Card>
             <Text style={styles.sectionTitle}>Cible</Text>
@@ -508,7 +540,21 @@ export default function RecapScreen() {
               value={displayParEspeceRecap(draft.cible.grandes_larves_lmc, draft.cible.grandes_larves_nse)}
             />
             <RecapLigne label="Vols/essaims" value={displayVolsClairsEssaims(draft.cible.vols_clairs_essaims)} />
-            <RecapLigne label="Répartition de la population" value={display(draft.cible.repartition_population)} />
+            {especePresenteRecap(draft.cible, 'lmc') && (
+              <RecapLigne
+                label="Répartition LMC"
+                value={`diffuse : ${display(draft.cible.densite_diffuse_lmc)} ind./ha · groupée : ${display(draft.cible.densite_groupee_lmc)} ind./m²`}
+              />
+            )}
+            {especePresenteRecap(draft.cible, 'nse') && (
+              <RecapLigne
+                label="Répartition NSE"
+                value={`diffuse : ${display(draft.cible.densite_diffuse_nse)} ind./ha · groupée : ${display(draft.cible.densite_groupee_nse)} ind./m²`}
+              />
+            )}
+            {!especePresenteRecap(draft.cible, 'lmc') && !especePresenteRecap(draft.cible, 'nse') && (
+              <RecapLigne label="Répartition de la population" value={display(draft.cible.repartition_population)} />
+            )}
             <RecapLigne label="Surface infestée (ha)" value={display(draft.cible.surface_infestee_ha)} />
           </Card>
         )}
@@ -524,7 +570,12 @@ export default function RecapScreen() {
               <RecapLigne label="Immatriculation aéronef" value={draft.aerien.immatricule_aeronef} />
               <RecapLigne label="Base principale" value={draft.aerien.base_principale} />
               <RecapLigne label="Stand" value={draft.aerien.stand} />
+              <RecapLigne label="Date d'installation (Stand)" value={display(draft.aerien.stand_date_installation)} />
               <RecapLigne label="Base secondaire" value={draft.aerien.base_secondaire} />
+              <RecapLigne
+                label="Date d'installation (Base secondaire)"
+                value={display(draft.aerien.base_secondaire_date_installation)}
+              />
               <RecapLigne label="Reprise de traitement" value={displayBool(draft.aerien.reprise_traitement)} />
             </Card>
 
@@ -534,6 +585,8 @@ export default function RecapScreen() {
               <RecapLigne label="Total pesticide (l)" value={draft.aerien.total_pesticide_l != null ? String(draft.aerien.total_pesticide_l) : null} />
               <RecapLigne label="Total pesticide (kg)" value={draft.aerien.total_pesticide_kg != null ? String(draft.aerien.total_pesticide_kg) : null} />
               <RecapLigne label="Surface traitée (ha)" value={draft.aerien.surface_traitee_ha != null ? String(draft.aerien.surface_traitee_ha) : null} />
+              <RecapLigne label="Surface cumulée (ha)" value={display(draft.aerien.surface_cumulee_ha)} />
+              <RecapLigne label="Surface restante (ha)" value={display(draft.aerien.surface_restante_ha)} />
               <RecapLigne label="Approvisionnement (l)" value={draft.aerien.pesticide_recu_l != null ? String(draft.aerien.pesticide_recu_l) : null} />
               <RecapLigne label="Reste en stock (l)" value={display(draft.aerien.pesticide_stock_restant_l)} />
               <RecapLigne label="Taux de mortalité (%)" value={display(draft.aerien.taux_mortalite_pourcent)} />
@@ -585,14 +638,26 @@ export default function RecapScreen() {
                   <RecapLigne
                     key={p.id}
                     label={p.nom_commercial ?? `Produit ${index + 1}`}
-                    value={p.quantite_l != null ? `${p.quantite_l} l` : null}
+                    value={p.quantite_l != null ? `${p.quantite_l} ${draft.terrestre?.pesticide_unite ?? 'L'}` : null}
                   />
                 ))
               )}
-              <RecapLigne label="Total pesticide (l)" value={display(draft.terrestre.total_pesticide_l)} />
-              <RecapLigne label="Stock initial (l)" value={display(draft.terrestre.stock_initial_l)} />
-              <RecapLigne label="Approvisionnement (l)" value={display(draft.terrestre.pesticide_recu_l)} />
-              <RecapLigne label="Stock Final (l)" value={display(draft.terrestre.pesticide_stock_restant_l)} />
+              <RecapLigne
+                label={`Total pesticide (${draft.terrestre.pesticide_unite ?? 'L'})`}
+                value={display(draft.terrestre.total_pesticide_l)}
+              />
+              <RecapLigne
+                label={`Stock initial (${draft.terrestre.pesticide_unite ?? 'L'})`}
+                value={display(draft.terrestre.stock_initial_l)}
+              />
+              <RecapLigne
+                label={`Approvisionnement (${draft.terrestre.pesticide_unite ?? 'L'})`}
+                value={display(draft.terrestre.pesticide_recu_l)}
+              />
+              <RecapLigne
+                label={`Stock Final (${draft.terrestre.pesticide_unite ?? 'L'})`}
+                value={display(draft.terrestre.pesticide_stock_restant_l)}
+              />
               <RecapLigne label="Essence (l)" value={display(draft.terrestre.essence_litres)} />
               <RecapLigne label="Nombre de piles" value={display(draft.terrestre.nb_piles)} />
             </Card>
@@ -601,6 +666,17 @@ export default function RecapScreen() {
 
         <Card>
           <Text style={styles.sectionTitle}>Moyens & protection</Text>
+          <Text style={styles.subsectionTitle}>Humains</Text>
+          <RecapLigne label="Nb agents permanents" value={display(draft.nb_agents_permanents)} />
+          <RecapLigne label="Nb agents temporaires" value={display(draft.nb_agents_temporaires)} />
+          <RecapLigne label="Nb personnel local" value={display(draft.nb_personnel_local)} />
+          <Text style={styles.subsectionTitle}>Matériels</Text>
+          <RecapLigne label="Atomiseur" value={display(draft.moyens_atomiseur_nb)} />
+          <RecapLigne label="Essence (litres)" value={display(draft.moyens_essence_litres)} />
+          <RecapLigne label="Disque rotatif" value={display(draft.moyens_disque_rotatif_nb)} />
+          <RecapLigne label="Nombre de piles" value={display(draft.moyens_piles_nb)} />
+          <RecapLigne label="Ulvamast" value={display(draft.moyens_ulvamast_nb)} />
+          <Text style={styles.subsectionTitle}>Kit de protection</Text>
           <RecapLigne label="Combinaisons" value={display(draft.kit_combinaison)} />
           <RecapLigne label="Gants" value={display(draft.kit_gants)} />
           <RecapLigne label="Lunettes" value={display(draft.kit_lunettes)} />
@@ -720,6 +796,19 @@ const styles = StyleSheet.create({
   controlLabel: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre, flex: 1 },
   controlDetail: { fontFamily: traitementFonts.mono, fontSize: traitementTypeSizes.label, color: traitementColors.texteSecondaire },
   sectionTitle: { fontFamily: traitementFonts.uiExtraBold, fontSize: traitementTypeSizes.corps + 1, color: traitementColors.texteTitre, marginBottom: 4 },
+  // Sous-titre à l'intérieur d'une Card qui regroupe plusieurs sous-sections
+  // de l'écran source (ex. "Moyens & protection" = Humains + Matériels + Kit
+  // de protection sur moyens.tsx) — plus discret que `sectionTitle` (titre de
+  // la Card elle-même), avec un espace au-dessus pour marquer la coupure.
+  subsectionTitle: {
+    fontFamily: traitementFonts.uiSemiBold,
+    fontSize: traitementTypeSizes.label,
+    color: traitementColors.texteLabel,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginTop: 6,
+    marginBottom: 2,
+  },
   recapLigne: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, paddingVertical: 2 },
   recapLabel: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.corps, color: traitementColors.texteSecondaire, flex: 1 },
   recapValue: { fontFamily: traitementFonts.uiSemiBold, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre, textAlign: 'right' },

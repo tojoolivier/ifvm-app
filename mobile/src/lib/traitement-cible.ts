@@ -17,28 +17,50 @@ import { logger } from './logger';
  * (prospection-db.ts, table `cible`) déclare petites_larves/grandes_larves/
  * vols_clairs_essaims en colonnes REAL — on y stocke donc les valeurs numériques
  * brutes (1/0 pour vols_clairs_essaims), et c'est à l'écran de les présenter.
+ *
+ * Extensif/Signalement (`type_prospection` "extensive"/"validation") : une
+ * prospection validée y est toujours conclusive (y compris "rien trouvé", un
+ * résultat légitime et fréquent) — les champs sans donnée y prennent un
+ * défaut neutre (0, essaims "non", répartition "DIFFUSE") plutôt que `null`,
+ * pour ne jamais afficher "non renseigné" sur la fiche de traitement qui en
+ * découle. Intensif inchangé (`null` reste "pas encore évalué" : `infestation.tsx`
+ * y porte sa propre notion, plus riche, de cible) — même distinction que
+ * `TYPES_DEFAUTS_ZERO` côté backend.
  */
+const TYPES_DEFAUTS_ZERO = new Set(['extensive', 'validation']);
+
 export function construireCible(
-  prospection: Pick<DraftProspection, 'surface_infestee'>,
+  prospection: Pick<DraftProspection, 'surface_infestee' | 'type_prospection'>,
   populations: PopulationRow[],
   infestations: InfestationRow[],
   captures: CaptureRow[] = []
 ): CibleInput {
+  const defautsZero = TYPES_DEFAUTS_ZERO.has(prospection.type_prospection);
+  const especes = especesEnScope(populations, infestations);
   return {
-    espece: deriveEspece(populations, infestations),
-    ...deriveLarves(populations, captures),
-    vols_clairs_essaims: deriveVolsClairsEssaims(populations),
-    repartition_population: deriveRepartition(populations),
-    surface_infestee_ha: prospection.surface_infestee ?? null,
-    ...deriveLarvesParEspece(populations, captures),
-    ...deriveDensitesParEspece(populations),
+    espece: deriveEspece(especes),
+    ...deriveLarves(populations, captures, defautsZero),
+    vols_clairs_essaims: deriveVolsClairsEssaims(populations, defautsZero),
+    repartition_population: deriveRepartition(populations, defautsZero),
+    surface_infestee_ha: prospection.surface_infestee ?? (defautsZero ? 0 : null),
+    // Le défaut à 0 (Extensif/Signalement) ne s'applique qu'aux espèces
+    // réellement en scope (`especes`, ci-dessus) — jamais aux deux à la fois
+    // sur une prospection "rien trouvé" (aucune ligne population/infestation
+    // du tout) : LMC ET NSE y resteraient `null`, comme pour l'Intensif,
+    // pour ne pas laisser croire que les deux espèces ont été surveillées.
+    ...deriveLarvesParEspece(populations, captures, defautsZero, especes),
+    ...deriveDensitesParEspece(populations, defautsZero, especes),
   };
 }
 
-function deriveEspece(populations: PopulationRow[], infestations: InfestationRow[]): string | null {
+function especesEnScope(populations: PopulationRow[], infestations: InfestationRow[]): Set<string> {
   const especes = new Set<string>();
   for (const p of populations) if (p.espece) especes.add(p.espece);
   for (const i of infestations) if (i.espece) especes.add(i.espece);
+  return especes;
+}
+
+function deriveEspece(especes: Set<string>): string | null {
   if (especes.size === 0) return null;
   if (especes.size === 1) return [...especes][0];
   return 'MELANGE';
@@ -51,7 +73,8 @@ function deriveEspece(populations: PopulationRow[], infestations: InfestationRow
  * façon pas de stade au-delà du sien), même seuil que le backend. */
 function deriveLarves(
   populations: PopulationRow[],
-  captures: CaptureRow[]
+  captures: CaptureRow[],
+  defautsZero: boolean
 ): { petites_larves: number | null; grandes_larves: number | null } {
   let petites = 0;
   let grandes = 0;
@@ -99,7 +122,10 @@ function deriveLarves(
     }
   }
 
-  return { petites_larves: renseignees ? petites : null, grandes_larves: renseignees ? grandes : null };
+  return {
+    petites_larves: renseignees || defautsZero ? petites : null,
+    grandes_larves: renseignees || defautsZero ? grandes : null,
+  };
 }
 
 type EspeceCible = 'LMC' | 'NSE';
@@ -114,7 +140,12 @@ interface LarvesParEspece {
 /** Même règle que `deriveLarves` (L1-L3 = petites, le reste = grandes), mais
  * détaillée par espèce plutôt qu'agrégée — écran Synthèse (Aérien). `null`
  * pour une espèce jamais rencontrée avec une densité larvaire renseignée. */
-function deriveLarvesParEspece(populations: PopulationRow[], captures: CaptureRow[]): LarvesParEspece {
+function deriveLarvesParEspece(
+  populations: PopulationRow[],
+  captures: CaptureRow[],
+  defautsZero: boolean,
+  especes: Set<string>
+): LarvesParEspece {
   const petites: Record<EspeceCible, number> = { LMC: 0, NSE: 0 };
   const grandes: Record<EspeceCible, number> = { LMC: 0, NSE: 0 };
   const renseignees: Record<EspeceCible, boolean> = { LMC: false, NSE: false };
@@ -153,10 +184,10 @@ function deriveLarvesParEspece(populations: PopulationRow[], captures: CaptureRo
   }
 
   return {
-    petites_larves_lmc: renseignees.LMC ? petites.LMC : null,
-    petites_larves_nse: renseignees.NSE ? petites.NSE : null,
-    grandes_larves_lmc: renseignees.LMC ? grandes.LMC : null,
-    grandes_larves_nse: renseignees.NSE ? grandes.NSE : null,
+    petites_larves_lmc: renseignees.LMC || (defautsZero && especes.has('LMC')) ? petites.LMC : null,
+    petites_larves_nse: renseignees.NSE || (defautsZero && especes.has('NSE')) ? petites.NSE : null,
+    grandes_larves_lmc: renseignees.LMC || (defautsZero && especes.has('LMC')) ? grandes.LMC : null,
+    grandes_larves_nse: renseignees.NSE || (defautsZero && especes.has('NSE')) ? grandes.NSE : null,
   };
 }
 
@@ -171,9 +202,15 @@ interface DensitesParEspece {
  * larve) d'une même espèce — une espèce peut avoir une densité saisie sur sa
  * ligne imago ET sa ligne larve, même logique additive que les larves
  * ci-dessus. `null` si aucune ligne de cette espèce ne porte cette densité. */
-function deriveDensitesParEspece(populations: PopulationRow[]): DensitesParEspece {
-  const diffuse: Record<EspeceCible, number | null> = { LMC: null, NSE: null };
-  const groupee: Record<EspeceCible, number | null> = { LMC: null, NSE: null };
+function deriveDensitesParEspece(
+  populations: PopulationRow[],
+  defautsZero: boolean,
+  especes: Set<string>
+): DensitesParEspece {
+  const zeroLmc = defautsZero && especes.has('LMC');
+  const zeroNse = defautsZero && especes.has('NSE');
+  const diffuse: Record<EspeceCible, number | null> = { LMC: zeroLmc ? 0 : null, NSE: zeroNse ? 0 : null };
+  const groupee: Record<EspeceCible, number | null> = { LMC: zeroLmc ? 0 : null, NSE: zeroNse ? 0 : null };
 
   for (const p of populations) {
     if (p.espece !== 'LMC' && p.espece !== 'NSE') continue;
@@ -207,7 +244,7 @@ function deriveDensitesParEspece(populations: PopulationRow[]): DensitesParEspec
  * bouton ne le permet) : une ligne sans essaim_observe ni essaim_en_vol/pose
  * reste exclue, comme avant.
  */
-function deriveVolsClairsEssaims(populations: PopulationRow[]): number | null {
+function deriveVolsClairsEssaims(populations: PopulationRow[], defautsZero: boolean): number | null {
   const essaims: boolean[] = [];
   for (const p of populations) {
     if (p.essaim_observe !== null && p.essaim_observe !== undefined) {
@@ -216,15 +253,15 @@ function deriveVolsClairsEssaims(populations: PopulationRow[]): number | null {
       essaims.push(true);
     }
   }
-  if (essaims.length === 0) return null;
+  if (essaims.length === 0) return defautsZero ? 0 : null;
   return essaims.some(Boolean) ? 1 : 0;
 }
 
 /** Groupée prioritaire sur diffuse dès qu'une seule population porte une densité
  * groupée, même si d'autres n'ont que du diffus — même règle que le backend. */
-function deriveRepartition(populations: PopulationRow[]): 'GROUPEE' | 'DIFFUSE' | null {
+function deriveRepartition(populations: PopulationRow[], defautsZero: boolean): 'GROUPEE' | 'DIFFUSE' | null {
   if (populations.some((p) => p.densite_groupee != null)) return 'GROUPEE';
-  if (populations.some((p) => p.densite_diffuse != null)) return 'DIFFUSE';
+  if (populations.some((p) => p.densite_diffuse != null) || defautsZero) return 'DIFFUSE';
   return null;
 }
 

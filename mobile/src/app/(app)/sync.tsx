@@ -20,7 +20,7 @@ import { DraftProspection } from '@/lib/prospection-repository';
 import {
   DraftTraitementRow,
   getTraitement,
-  listRecentTraitements,
+  listToutesTraitementsLocal,
 } from '@/lib/traitement-repository';
 import { syncAllTraitements } from '@/lib/traitement-sync';
 import { TRAITEMENT_SUBTYPE_BADGE_CONFIG } from '@/components/fiches/tokens';
@@ -81,7 +81,7 @@ export default function SyncScreen() {
 
   const refresh = useCallback(() => {
     void loadAccueilData().then(setData).catch((error) => signalerChargement(error));
-    void listRecentTraitements().then(setTraitements).catch((error) => signalerChargement(error));
+    void listToutesTraitementsLocal().then(setTraitements).catch((error) => signalerChargement(error));
     // « Synchro réussie » ne dit pas ce qui a atterri : on montre le contenu réel.
     void compterReferentielLocal()
       .then(setEtatReferentiel)
@@ -142,8 +142,8 @@ export default function SyncScreen() {
         }
 
         // `getTraitement` reconstruit la fiche complète (aerien/terrestre/
-        // rotations/produits) — `listRecentTraitements` ne rend que la ligne à
-        // plat, insuffisante pour `syncOneTraitement` (cf. traitement-sync.ts).
+        // rotations/produits) — `listToutesTraitementsLocal` ne rend que la
+        // ligne à plat, insuffisante pour `syncOneTraitement` (cf. traitement-sync.ts).
         const traitementsComplets = (
           await Promise.all(draftsTraitements.map((row) => getTraitement(row.id)))
         ).filter((t): t is NonNullable<typeof t> => t !== null);
