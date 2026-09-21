@@ -10,22 +10,30 @@ import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
 /**
  * Écran « Surface traitée » (#326) — aérien uniquement, dernière étape avant
- * Signatures. Lecture seule : `surface_traitee_ha` est déjà la somme des
- * `surface_ha` de chaque rotation, dérivée et persistée par le backend à chaque
- * écriture sur `traitement_rotation` (migration 0047) — jamais recalculée ni
- * saisissable ici, seulement relue telle quelle (même posture que cibles.tsx
- * pour son snapshot `cible`).
+ * Signatures. Lecture seule : `surface_traitee_ha` (produit de choc) ou
+ * `surface_protegee_ha` (produit de barrière, mode BARRIERE — migration 0081)
+ * est déjà la somme des `surface_ha` de chaque rotation, dérivée et persistée
+ * par le backend à chaque écriture sur `traitement_rotation` (migration 0047) —
+ * jamais recalculée ni saisissable ici, seulement relue telle quelle (même
+ * posture que cibles.tsx pour son snapshot `cible`).
  */
 export default function SurfaceTraiteeScreen() {
   const router = useRouter();
   const { traitementId, isValidationView } = useLocalSearchParams<{ traitementId: string; isValidationView?: string }>();
   const [surfaceTraiteeHa, setSurfaceTraiteeHa] = useState<number | null>(null);
+  const [estProtegee, setEstProtegee] = useState(false);
   const signalerChargement = useSignalerChargement('surface-traitee');
 
   useEffect(() => {
     if (!traitementId) return;
     void getTraitement(traitementId)
-      .then((draft) => setSurfaceTraiteeHa(draft?.aerien?.surface_traitee_ha ?? null))
+      .then((draft) => {
+        const protegee = draft?.mode_traitement === 'BARRIERE';
+        setEstProtegee(protegee);
+        setSurfaceTraiteeHa(
+          (protegee ? draft?.aerien?.surface_protegee_ha : draft?.aerien?.surface_traitee_ha) ?? null
+        );
+      })
       .catch((error) => signalerChargement(error, { traitementId }));
   }, [traitementId, signalerChargement]);
 
@@ -33,10 +41,10 @@ export default function SurfaceTraiteeScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <ProgressBar currentIndex={6} segments={PROGRESS_SEGMENTS_AERIEN} />
-        <Text style={styles.title}>Surface traitée</Text>
+        <Text style={styles.title}>{estProtegee ? 'Surface protégée' : 'Surface traitée'}</Text>
 
         <Card variant="derivee" style={styles.deriveeCentree}>
-          <Text style={styles.label}>Surface traitée (ha)</Text>
+          <Text style={styles.label}>{estProtegee ? 'Surface protégée (ha)' : 'Surface traitée (ha)'}</Text>
           <Text style={styles.derivedValue}>{surfaceTraiteeHa ?? 'non renseigné'}</Text>
         </Card>
 

@@ -311,7 +311,11 @@ class TraitementAerien:
     # défaut 0).
     total_pesticide_l: float = 0.0
     total_pesticide_kg: float = 0.0
+    # Répartition de la somme des rotations selon le produit (migration 0081) : jamais
+    # renseignées ensemble. Produit de choc (mode hors BARRIERE) → surface_traitee_ha ;
+    # produit de barrière (BARRIERE) → surface_protegee_ha.
     surface_traitee_ha: float = 0.0
+    surface_protegee_ha: float = 0.0
     surface_restante_ha: float | None = None
     # Chaînage de reprise (migration 0050) — mirroir de TraitementTerrestre,
     # généralisé à l'Aérien : une prospection partiellement traitée par une
@@ -336,13 +340,34 @@ class TraitementAerien:
     rotations: list[Rotation] = field(default_factory=list)
     blocs: list[Bloc] = field(default_factory=list)
 
-    def recalculer_totaux(self) -> None:
+    @property
+    def surface_couverte_ha(self) -> float:
+        """Surface traitée + protégée : ce que l'aéronef a couvert, quel que soit le produit.
+        C'est elle qui alimente le cumul de reprise et la surface restante."""
+        return self.surface_traitee_ha + self.surface_protegee_ha
+
+    def repartir_surface(self, surface_couverte_ha: float, mode_traitement: str | None) -> None:
+        """Seul endroit qui classe une surface couverte en « traitée » ou « protégée » :
+        produit de barrière (BARRIERE) → protégée ; produit de choc, irrégulier ou mode
+        absent → traitée. L'autre colonne est remise à zéro (jamais les deux à la fois)."""
+        if mode_traitement == "BARRIERE":
+            self.surface_protegee_ha = surface_couverte_ha
+            self.surface_traitee_ha = 0.0
+        else:
+            self.surface_traitee_ha = surface_couverte_ha
+            self.surface_protegee_ha = 0.0
+
+    def recalculer_totaux(self, mode_traitement: str | None) -> None:
         """Seul chemin d'écriture pour nb_rotations/total_pesticide_l/
-        total_pesticide_kg/surface_traitee_ha — jamais en lecture."""
+        total_pesticide_kg/surface_traitee_ha/surface_protegee_ha — jamais en lecture.
+
+        `mode_traitement` est celui du `Traitement` porteur (il ne vit pas sur
+        `TraitementAerien`) : il décide si la somme des surfaces de rotation est
+        « traitée » (choc) ou « protégée » (barrière), cf. `repartir_surface`."""
         self.nb_rotations = len(self.rotations)
         self.total_pesticide_l = sum(r.quantite for r in self.rotations if r.unite == "L")
         self.total_pesticide_kg = sum(r.quantite for r in self.rotations if r.unite == "kg")
-        self.surface_traitee_ha = sum(r.surface_ha for r in self.rotations)
+        self.repartir_surface(sum(r.surface_ha for r in self.rotations), mode_traitement)
         self.recalculer_stock_pesticide()
 
     def recalculer_surfaces(
@@ -352,15 +377,15 @@ class TraitementAerien:
         en lecture.
 
         Doit être appelée après `recalculer_totaux()` (ou après un ré-épinglage de
-        `surface_traitee_ha` en synchronisation) : c'est `self.surface_traitee_ha`,
-        dérivé des rotations, qui alimente ce calcul.
+        `surface_traitee_ha`/`surface_protegee_ha` en synchronisation) : c'est
+        `self.surface_couverte_ha`, dérivée des rotations, qui alimente ce calcul.
 
         `surface_cumulee_precedente` (migration 0050) : chaînage de reprise,
         mirroir de `TraitementTerrestre.recalculer_surfaces` — 0.0 par défaut
         (fiche indépendante, pas de reprise), sinon `surface_cumulee_ha` de la
         fiche d'origine. Plancher à 0 (CDG §9).
         """
-        self.surface_cumulee_ha = surface_cumulee_precedente + self.surface_traitee_ha
+        self.surface_cumulee_ha = surface_cumulee_precedente + self.surface_couverte_ha
         self.surface_restante_ha = (
             max(surface_infestee_ha - self.surface_cumulee_ha, 0.0)
             if surface_infestee_ha is not None

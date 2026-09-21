@@ -157,6 +157,8 @@ const MIGRATED_COLUMNS = [
   // Colonnes de traitement_aerien
   { name: 'immatricule_aeronef' },
   { name: 'surface_traitee_ha' },
+  // Migration backend 0081 : produit de barrière → surface protégée.
+  { name: 'surface_protegee_ha' },
   { name: 'surface_restante_ha' },
   // Migration backend 0047 (quantite_l -> quantite + unite, surface_ha, vanne)
   { name: 'total_pesticide_kg' },

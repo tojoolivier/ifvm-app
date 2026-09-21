@@ -127,6 +127,7 @@ function draft(overrides: Partial<DraftTraitement> = {}): DraftTraitement {
       total_pesticide_l: null,
       total_pesticide_kg: null,
       surface_traitee_ha: null,
+      surface_protegee_ha: null,
       reprise_traitement: null,
       traitement_origine_id: null,
       surface_cumulee_ha: null,

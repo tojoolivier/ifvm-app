@@ -310,7 +310,12 @@ def _section_traitement(traitement: TraitementRead) -> str:
             ),
             ("par disque rotatif (ha)", terrestre.surface_disque_rotatif_ha if terrestre else None),
             ("par ulvamast (ha)", None),
-            ("par aéronef (ha)", aerien.surface_traitee_ha if aerien else None),
+            # Surface couverte par l'aéronef, quel que soit le produit : le mode
+            # (case « Barrière » de §3.1) dit déjà si elle est traitée ou protégée.
+            (
+                "par aéronef (ha)",
+                aerien.surface_traitee_ha + aerien.surface_protegee_ha if aerien else None,
+            ),
         )
         + _ligne(("3.3 Surface reste à traiter (ha)", fait.surface_restante_ha if fait else None))
         + _texte_ligne("3.4 Condition de traitement")

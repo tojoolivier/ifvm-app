@@ -279,6 +279,7 @@ class TraitementRepositoryImpl(TraitementRepository):
                 total_pesticide_l=traitement.aerien.total_pesticide_l,
                 total_pesticide_kg=traitement.aerien.total_pesticide_kg,
                 surface_traitee_ha=traitement.aerien.surface_traitee_ha,
+                surface_protegee_ha=traitement.aerien.surface_protegee_ha,
                 reprise_traitement=traitement.aerien.reprise_traitement,
                 traitement_origine_id=traitement.aerien.traitement_origine_id,
                 surface_cumulee_ha=traitement.aerien.surface_cumulee_ha,
@@ -374,6 +375,7 @@ class TraitementRepositoryImpl(TraitementRepository):
         total_pesticide_l: float,
         total_pesticide_kg: float,
         surface_traitee_ha: float,
+        surface_protegee_ha: float,
         surface_cumulee_ha: float,
         surface_restante_ha: float | None,
         pesticide_stock_restant_l: float | None,
@@ -406,6 +408,7 @@ class TraitementRepositoryImpl(TraitementRepository):
             total_pesticide_l,
             total_pesticide_kg,
             surface_traitee_ha,
+            surface_protegee_ha,
             surface_cumulee_ha,
             surface_restante_ha,
             pesticide_stock_restant_l,
@@ -420,6 +423,7 @@ class TraitementRepositoryImpl(TraitementRepository):
         total_pesticide_l: float,
         total_pesticide_kg: float,
         surface_traitee_ha: float,
+        surface_protegee_ha: float,
         surface_cumulee_ha: float,
         surface_restante_ha: float | None,
         pesticide_stock_restant_l: float | None,
@@ -447,6 +451,7 @@ class TraitementRepositoryImpl(TraitementRepository):
             total_pesticide_l,
             total_pesticide_kg,
             surface_traitee_ha,
+            surface_protegee_ha,
             surface_cumulee_ha,
             surface_restante_ha,
             pesticide_stock_restant_l,
@@ -461,6 +466,7 @@ class TraitementRepositoryImpl(TraitementRepository):
         total_pesticide_l: float,
         total_pesticide_kg: float,
         surface_traitee_ha: float,
+        surface_protegee_ha: float,
         surface_cumulee_ha: float,
         surface_restante_ha: float | None,
         pesticide_stock_restant_l: float | None,
@@ -474,6 +480,7 @@ class TraitementRepositoryImpl(TraitementRepository):
             total_pesticide_l,
             total_pesticide_kg,
             surface_traitee_ha,
+            surface_protegee_ha,
             surface_cumulee_ha,
             surface_restante_ha,
             pesticide_stock_restant_l,
@@ -695,10 +702,14 @@ class TraitementRepositoryImpl(TraitementRepository):
                 traitement.aerien.base_secondaire_date_installation
             )
             model.aerien.immatricule_aeronef = traitement.aerien.immatricule_aeronef
-            # nb_rotations/total_pesticide_l/total_pesticide_kg/surface_traitee_ha n'y
-            # figurent pas : sous-ressource distincte (rotations), jamais écrasés par
-            # cette synchronisation — même philosophie déjà en place pour les deux
-            # premiers avant la migration 0047, désormais étendue aux deux derniers.
+            # nb_rotations/total_pesticide_l/total_pesticide_kg n'y figurent pas :
+            # sous-ressource distincte (rotations), jamais écrasés par cette
+            # synchronisation. La surface couverte non plus, mais son classement
+            # traitée/protégée dépend du mode, que ce push peut changer (migration
+            # 0081) : le cas d'usage reclasse la même somme, on ne persiste que la
+            # répartition.
+            model.aerien.surface_traitee_ha = traitement.aerien.surface_traitee_ha
+            model.aerien.surface_protegee_ha = traitement.aerien.surface_protegee_ha
             model.aerien.surface_restante_ha = traitement.aerien.surface_restante_ha
             model.aerien.pesticide_recu_l = traitement.aerien.pesticide_recu_l
             model.aerien.pesticide_stock_restant_l = traitement.aerien.pesticide_stock_restant_l
@@ -811,6 +822,7 @@ class TraitementRepositoryImpl(TraitementRepository):
         total_pesticide_l: float,
         total_pesticide_kg: float,
         surface_traitee_ha: float,
+        surface_protegee_ha: float,
         surface_cumulee_ha: float,
         surface_restante_ha: float | None,
         pesticide_stock_restant_l: float | None,
@@ -820,8 +832,9 @@ class TraitementRepositoryImpl(TraitementRepository):
         aerien_model.total_pesticide_l = total_pesticide_l
         aerien_model.total_pesticide_kg = total_pesticide_kg
         aerien_model.surface_traitee_ha = surface_traitee_ha
+        aerien_model.surface_protegee_ha = surface_protegee_ha
         # Chaînage de reprise (migration 0050) : surface_cumulee_ha suit le même
-        # sort que surface_traitee_ha dont elle dérive — seul chemin d'écriture,
+        # sort que les surfaces traitée/protégée dont elle dérive — seul chemin d'écriture,
         # recalculée à chaque mutation de rotation.
         aerien_model.surface_cumulee_ha = surface_cumulee_ha
         aerien_model.surface_restante_ha = surface_restante_ha
@@ -935,6 +948,7 @@ class TraitementRepositoryImpl(TraitementRepository):
                 total_pesticide_l=float(model.aerien.total_pesticide_l),
                 total_pesticide_kg=float(model.aerien.total_pesticide_kg),
                 surface_traitee_ha=float(model.aerien.surface_traitee_ha),
+                surface_protegee_ha=float(model.aerien.surface_protegee_ha),
                 reprise_traitement=model.aerien.reprise_traitement,
                 traitement_origine_id=model.aerien.traitement_origine_id,
                 surface_cumulee_ha=float(model.aerien.surface_cumulee_ha),

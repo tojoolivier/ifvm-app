@@ -498,6 +498,123 @@ async def test_add_rotation_incremente_totaux(
     assert body["aerien"]["surface_traitee_ha"] == 5.0
 
 
+# Migration 0081 : produit de choc → surface traitée ; produit de barrière → surface protégée.
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("mode", "traitee", "protegee"),
+    [("TOTAL", 5.0, 0.0), ("BARRIERE", 0.0, 5.0), ("IRREGULIER", 5.0, 0.0), (None, 5.0, 0.0)],
+)
+async def test_add_rotation_repartit_la_surface_selon_le_produit(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement,
+    payload_rotation,
+    mode,
+    traitee,
+    protegee,
+):
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surface_infestee=100000.0
+    )
+    cree = await client.post(
+        "/traitements",
+        json=payload_traitement(prospection_id, mode_traitement=mode),
+        headers=auth_headers,
+    )
+    assert cree.status_code == 201, cree.text
+    traitement_id = cree.json()["id"]
+    # Aucune rotation : les deux surfaces sont à 0, jamais None.
+    assert cree.json()["aerien"]["surface_traitee_ha"] == 0.0
+    assert cree.json()["aerien"]["surface_protegee_ha"] == 0.0
+
+    resp = await client.post(
+        f"/traitements/{traitement_id}/rotations", json=payload_rotation(), headers=auth_headers
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["aerien"]["surface_traitee_ha"] == traitee
+    assert resp.json()["aerien"]["surface_protegee_ha"] == protegee
+    # La surface couverte alimente le cumul quel que soit le produit.
+    assert resp.json()["aerien"]["surface_cumulee_ha"] == 5.0
+
+    # Relue depuis la base, pas seulement renvoyée par la mutation.
+    relu = await client.get(f"/traitements/{traitement_id}", headers=auth_headers)
+    assert relu.json()["aerien"]["surface_traitee_ha"] == traitee
+    assert relu.json()["aerien"]["surface_protegee_ha"] == protegee
+
+
+@pytest.mark.asyncio
+async def test_delete_rotation_barriere_recalcule_surface_protegee(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_rotation
+):
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surface_infestee=100000.0
+    )
+    cree = await client.post(
+        "/traitements",
+        json=payload_traitement(prospection_id, mode_traitement="BARRIERE"),
+        headers=auth_headers,
+    )
+    traitement_id = cree.json()["id"]
+    for surface in (5.0, 7.0):
+        await client.post(
+            f"/traitements/{traitement_id}/rotations",
+            json=payload_rotation(surface_ha=surface),
+            headers=auth_headers,
+        )
+    apres_ajouts = await client.get(f"/traitements/{traitement_id}", headers=auth_headers)
+    assert apres_ajouts.json()["aerien"]["surface_protegee_ha"] == 12.0
+
+    premiere = apres_ajouts.json()["aerien"]["rotations"][0]["id"]
+    resp = await client.delete(
+        f"/traitements/{traitement_id}/rotations/{premiere}", headers=auth_headers
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["aerien"]["surface_protegee_ha"] == 7.0
+    assert resp.json()["aerien"]["surface_traitee_ha"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_reprise_melangeant_choc_puis_barriere_cumule_les_deux_surfaces(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_rotation
+):
+    """Une reprise peut changer de produit : chaque fiche garde sa propre colonne
+    (traitée pour le choc, protégée pour la barrière), le cumul de reprise additionne les deux."""
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surface_infestee=200.0
+    )
+    choc = await _creer_fiche_aerien_chainee(
+        client,
+        auth_headers,
+        payload_traitement(prospection_id, mode_traitement="TOTAL"),
+        payload_rotation,
+        surface_ha=30.0,
+    )
+    assert (choc["aerien"]["surface_traitee_ha"], choc["aerien"]["surface_protegee_ha"]) == (
+        30.0,
+        0.0,
+    )
+
+    barriere = await _creer_fiche_aerien_chainee(
+        client,
+        auth_headers,
+        payload_traitement(prospection_id, mode_traitement="BARRIERE"),
+        payload_rotation,
+        surface_ha=20.0,
+        traitement_origine_id=choc["id"],
+    )
+    assert (
+        barriere["aerien"]["surface_traitee_ha"],
+        barriere["aerien"]["surface_protegee_ha"],
+    ) == (0.0, 20.0)
+    assert barriere["aerien"]["surface_cumulee_ha"] == 50.0
+    assert barriere["aerien"]["surface_restante_ha"] == 150.0
+
+
 @pytest.mark.asyncio
 async def test_add_rotation_numero_cuve_toujours_derive(
     client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_rotation
@@ -2153,6 +2270,44 @@ def _payload_sync(fiche_id, prospection_id, base_updated_at, **overrides):
     if "terrestre" in overrides:
         payload["terrestre"].update(overrides["terrestre"])
     return payload
+
+
+@pytest.mark.asyncio
+async def test_sync_push_aerien_reclasse_la_surface_quand_le_mode_change(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, payload_rotation
+):
+    """La surface couverte (rotations) ne change pas par sync, mais son classement
+    traitée/protégée dépend du mode (migration 0081) : un push qui passe la fiche de
+    choc à barrière doit déplacer la surface, sans jamais garder les deux."""
+    prospection_id = await _creer_prospection(
+        db_session, campagne_id, utilisateur, surface_infestee=100000.0
+    )
+    fiche_id = uuid.uuid4()
+    base = payload_traitement(prospection_id, mode_traitement="TOTAL")
+    base.update({"id": str(fiche_id), "base_updated_at": datetime.utcnow().isoformat()})
+
+    cree = await client.post("/traitements/sync", json=base, headers=auth_headers)
+    assert cree.status_code == 201, cree.text
+    await client.post(
+        f"/traitements/{fiche_id}/rotations", json=payload_rotation(), headers=auth_headers
+    )
+    avant = (await client.get(f"/traitements/{fiche_id}", headers=auth_headers)).json()
+    assert (avant["aerien"]["surface_traitee_ha"], avant["aerien"]["surface_protegee_ha"]) == (
+        5.0,
+        0.0,
+    )
+
+    # Le client repart de la version serveur qu'il vient de lire : pas de conflit.
+    repush = {**base, "mode_traitement": "BARRIERE", "base_updated_at": avant["updated_at"]}
+    resp = await client.post("/traitements/sync", json=repush, headers=auth_headers)
+    assert resp.status_code == 200, resp.text
+    apres = (await client.get(f"/traitements/{fiche_id}", headers=auth_headers)).json()
+    assert apres["mode_traitement"] == "BARRIERE"
+    assert (apres["aerien"]["surface_traitee_ha"], apres["aerien"]["surface_protegee_ha"]) == (
+        0.0,
+        5.0,
+    )
+    assert apres["aerien"]["surface_cumulee_ha"] == 5.0
 
 
 @pytest.mark.asyncio

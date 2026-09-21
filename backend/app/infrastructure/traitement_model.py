@@ -197,8 +197,11 @@ class TraitementAerienModel(Base):
     # que `total_pesticide_l` avant cette migration).
     total_pesticide_l: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
     total_pesticide_kg: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
-    # Dérivée (somme de `traitement_rotation.surface_ha`), non saisissable.
+    # Dérivées (somme de `traitement_rotation.surface_ha`), non saisissables, jamais
+    # renseignées ensemble (migration 0081) : produit de choc (mode_traitement hors
+    # BARRIERE) → surface_traitee_ha ; produit de barrière (BARRIERE) → surface_protegee_ha.
     surface_traitee_ha: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    surface_protegee_ha: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
     surface_restante_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     pesticide_recu_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     pesticide_stock_restant_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
@@ -240,6 +243,10 @@ class TraitementAerienModel(Base):
         CheckConstraint(
             "NOT reprise_traitement OR traitement_origine_id IS NOT NULL",
             name="ck_traitement_aerien_reprise",
+        ),
+        CheckConstraint(
+            "surface_traitee_ha = 0 OR surface_protegee_ha = 0",
+            name="ck_traitement_aerien_surface_exclusive",
         ),
         Index(
             "uq_traitement_aerien_origine_id",

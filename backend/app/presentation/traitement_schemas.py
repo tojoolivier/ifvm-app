@@ -441,10 +441,14 @@ class TraitementAerienRead(BaseModel):
     nb_rotations: int
     total_pesticide_l: float
     total_pesticide_kg: float
+    # Jamais renseignées ensemble (migration 0081) : produit de choc → traitée,
+    # produit de barrière (mode_traitement BARRIERE) → protégée.
     surface_traitee_ha: float
+    surface_protegee_ha: float
     # Chaînage de reprise (migration 0050) — mirroir de TraitementTerrestreRead.
     reprise_traitement: bool
     traitement_origine_id: uuid.UUID | None
+    # Surface couverte cumulée : précédente + traitée + protégée.
     surface_cumulee_ha: float
     surface_restante_ha: float | None
     pesticide_recu_l: float | None

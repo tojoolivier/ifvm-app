@@ -584,7 +584,11 @@ export default function RecapScreen() {
               <RecapLigne label="Nb rotations" value={draft.aerien.nb_rotations != null ? String(draft.aerien.nb_rotations) : null} />
               <RecapLigne label="Total pesticide (l)" value={draft.aerien.total_pesticide_l != null ? String(draft.aerien.total_pesticide_l) : null} />
               <RecapLigne label="Total pesticide (kg)" value={draft.aerien.total_pesticide_kg != null ? String(draft.aerien.total_pesticide_kg) : null} />
-              <RecapLigne label="Surface traitée (ha)" value={draft.aerien.surface_traitee_ha != null ? String(draft.aerien.surface_traitee_ha) : null} />
+              {draft.mode_traitement === 'BARRIERE' ? (
+                <RecapLigne label="Surface protégée (ha)" value={draft.aerien.surface_protegee_ha != null ? String(draft.aerien.surface_protegee_ha) : null} />
+              ) : (
+                <RecapLigne label="Surface traitée (ha)" value={draft.aerien.surface_traitee_ha != null ? String(draft.aerien.surface_traitee_ha) : null} />
+              )}
               <RecapLigne label="Surface cumulée (ha)" value={display(draft.aerien.surface_cumulee_ha)} />
               <RecapLigne label="Surface restante (ha)" value={display(draft.aerien.surface_restante_ha)} />
               <RecapLigne label="Approvisionnement (l)" value={draft.aerien.pesticide_recu_l != null ? String(draft.aerien.pesticide_recu_l) : null} />
