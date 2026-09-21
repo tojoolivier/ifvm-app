@@ -101,7 +101,7 @@ class EquipeVolIntrouvableError(LookupError):
 
 class LieuVolHorsEquipeError(ValueError):
     """La base ou le stand choisi n'appartient pas à l'équipe aérienne de la fiche : une
-    équipe ne vole que depuis ses propres lieux (migration 0077)."""
+    équipe ne vole que depuis ses propres lieux (migration 0078)."""
 
 
 class CampagneVolIntrouvableError(LookupError):
@@ -398,7 +398,7 @@ class FicheVol:
     # (Vol.prospection_id/rotation_id). numero_fiche_prospection/date_validation
     # ci-dessous en sont dérivés par jointure, jamais stockés.
     prospection_id: uuid.UUID | None = None
-    # Équipe aérienne choisie à la création (migration 0077). Quand elle est renseignée,
+    # Équipe aérienne choisie à la création (migration 0078). Quand elle est renseignée,
     # le serveur écrase chef_de_base_id/pilote/mecanicien/consultant/immatriculation/
     # compagnie par ceux de l'équipe (snapshot du jour, cf. la docstring de classe) et
     # exige que base_id/stand_id lui appartiennent. `None` : fiches antérieures et clients
@@ -464,7 +464,7 @@ class FicheVol:
 
 @dataclass(frozen=True)
 class EquipeVolContexte:
-    """Ce que l'équipe aérienne fournit à une fiche de vol (migration 0077). Les champs
+    """Ce que l'équipe aérienne fournit à une fiche de vol (migration 0078). Les champs
     `None` viennent d'une équipe créée avant les migrations 0072/0075 : sans pilote,
     mécanicien ou aéronef renseigné, on garde ce que le client a saisi."""
 

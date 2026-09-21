@@ -1,4 +1,4 @@
-"""Aéronef d'une équipe aérienne + « seule l'équipe crée ses lieux » (migration 0077).
+"""Aéronef d'une équipe aérienne + « seule l'équipe crée ses lieux » (migration 0078).
 
 Règle produit (2026-09-19) : une équipe aérienne a un aéronef (immatriculation, société,
 volume de cuve) ; seul le chef de base de l'équipe — le seul compte utilisateur de

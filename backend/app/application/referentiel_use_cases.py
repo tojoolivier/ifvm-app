@@ -768,7 +768,7 @@ async def _exiger_droit_sur_equipe(
     equipe_id: uuid.UUID | None,
 ) -> None:
     """Modifier un lieu existant : admin, ou chef de base de l'équipe qui le possède.
-    Un lieu « sans équipe » (antérieur à la migration 0077/0074) n'est modifiable que
+    Un lieu « sans équipe » (antérieur à la migration 0078/0074) n'est modifiable que
     par un admin — personne ne peut prétendre en être le propriétaire."""
     if _est_admin(acteur):
         return
@@ -1190,7 +1190,7 @@ class UpdateStandRemplissage:
         )
 
         # Rattacher/changer/détacher l'équipe d'un stand : admin seulement — c'est ainsi
-        # qu'on rattache les stands antérieurs à la migration 0077 (« sans équipe »).
+        # qu'on rattache les stands antérieurs à la migration 0078 (« sans équipe »).
         # Gardé sur `champs_fournis` + comparaison à la valeur actuelle (pas seulement
         # `is not None`) : un PUT qui échoue simplement l'équipe déjà en place (lecture-
         # modification-écriture d'un client) ne doit pas 403 son propriétaire légitime,

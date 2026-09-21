@@ -92,7 +92,7 @@ export function StandRemplissageField({ value, onChange, label = 'Stand de rempl
       { screen: 'stand-remplissage-field' }
     );
 
-  // Un stand « sans équipe » (antérieur à la migration 0077) n'appartient à personne :
+  // Un stand « sans équipe » (antérieur à la migration 0078) n'appartient à personne :
   // il n'est proposé à aucune équipe tant qu'un admin ne l'a pas rattaché.
   const standsVisibles = equipeId ? stands.filter((s) => s.equipe_aerienne_id === equipeId) : stands;
 

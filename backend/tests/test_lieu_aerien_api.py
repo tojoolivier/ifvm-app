@@ -399,7 +399,7 @@ async def test_referentiel_pull_transporte_equipe_aerienne_id(
     assert lieu["equipe_aerienne_id"] == str(equipe_aerienne.id)
 
 
-# --- Autorisation par équipe (migration 0077) --------------------------------------
+# --- Autorisation par équipe (migration 0078) --------------------------------------
 
 
 @pytest.mark.asyncio
@@ -499,7 +499,7 @@ async def test_chef_de_base_ne_modifie_pas_un_lieu_d_une_autre_equipe_403(
 async def test_chef_de_base_ne_modifie_pas_un_lieu_sans_equipe_403(
     client: AsyncClient, chef_headers: dict, lieu_aerien
 ):
-    """Un lieu antérieur à la migration 0074/0077, sans équipe, n'est modifiable que
+    """Un lieu antérieur à la migration 0074/0078, sans équipe, n'est modifiable que
     par un admin — un chef de base ne peut prétendre en être le propriétaire."""
     response = await client.put(
         f"/lieux-aeriens/{lieu_aerien.id}",
