@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.prospection_use_cases import (
@@ -10,6 +10,7 @@ from app.application.prospection_use_cases import (
     ChangerStatut,
     CreateProspection,
     DeleteProspection,
+    GenererProspectionPdf,
     GetAuditLog,
     GetProspection,
     ListProspections,
@@ -21,14 +22,17 @@ from app.domain.prospection import (
     ProspectionCapture,
     ProspectionInfestation,
     ProspectionIntegriteError,
+    ProspectionNonValideeError,
     ProspectionOperationAerienne,
     ProspectionPopulation,
     StadeInconnuError,
 )
 from app.domain.referentiel import StationNotFoundError
 from app.infrastructure.audit_log_repository import AuditLogRepositoryImpl
+from app.infrastructure.pdf_renderer import render_html_to_pdf
 from app.infrastructure.prospection_repository import ProspectionRepositoryImpl
 from app.models.users import Utilisateur
+from app.presentation.prospection_pdf import build_prospection_html
 from app.presentation.prospection_schemas import (
     AuditLogRead,
     CommentaireCreate,
@@ -263,6 +267,32 @@ async def get_prospection(
     if prospection is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prospection non trouvée")
     return prospection
+
+
+@router.get("/{prospection_id}/pdf")
+async def get_prospection_pdf(
+    prospection_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    repository = get_repository(db)
+    use_case = GenererProspectionPdf(repository)
+    try:
+        prospection = await use_case.execute(prospection_id)
+    except ProspectionNonValideeError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    if prospection is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prospection non trouvée")
+
+    prospection_read = ProspectionRead.model_validate(prospection)
+    html = build_prospection_html(prospection_read)
+    pdf = render_html_to_pdf(html)
+    nom_fichier = f"fiche-prospection-{prospection_read.n_fiche}.pdf"
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{nom_fichier}"'},
+    )
 
 
 @router.put("/{prospection_id}", response_model=ProspectionRead)

@@ -358,6 +358,22 @@ class GetProspection:
         return await self.repository.get_by_id(prospection_id)
 
 
+class GenererProspectionPdf:
+    """PDF de la fiche de prospection (#494/#594) — délègue la garde « validée
+    uniquement » à `Prospection.verifier_disponible_pour_pdf`, symétrique de
+    `GenererTraitementPdf` (#495)."""
+
+    def __init__(self, repository: ProspectionRepository):
+        self.repository = repository
+
+    async def execute(self, prospection_id: uuid.UUID) -> Prospection | None:
+        prospection = await self.repository.get_by_id(prospection_id)
+        if prospection is None:
+            return None
+        prospection.verifier_disponible_pour_pdf()
+        return prospection
+
+
 class UpdateProspection:
     def __init__(self, repository: ProspectionRepository):
         self.repository = repository

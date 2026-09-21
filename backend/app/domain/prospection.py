@@ -30,6 +30,11 @@ class ProspectionIntegriteError(Exception):
     """La fiche viole une contrainte de la base autre que la référence à la station."""
 
 
+class ProspectionNonValideeError(PermissionError):
+    """Le PDF (#494/#594) n'est disponible que pour une fiche validée — symétrique de
+    `TraitementNonValideeError` (#495)."""
+
+
 class StadeInconnuError(Exception):
     """Une capture référence un stade absent du référentiel."""
 
@@ -336,6 +341,12 @@ class Prospection:
             self.validated_by = acteur_id
             self.validated_at = now
         return _ACTION_MAP[nouveau_statut]
+
+    def verifier_disponible_pour_pdf(self) -> None:
+        """Garde pour la génération du PDF (#494/#594) : uniquement pour une fiche
+        de prospection validée, symétrique de `Traitement.verifier_disponible_pour_pdf`."""
+        if self.statut != "validee":
+            raise ProspectionNonValideeError("Le PDF n'est disponible que pour une fiche validée")
 
 
 @dataclass
