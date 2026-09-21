@@ -11,6 +11,7 @@ import {
   formatSurface,
   libelleSurfaceTraitee,
   responsableTraitement,
+  surfaceTraiteeOuProtegee,
 } from '@/lib/traitement-fiche'
 
 interface Traitement {
@@ -29,6 +30,7 @@ interface Traitement {
   aerien: {
     pilote: string
     surface_traitee_ha: number | null
+    surface_protegee_ha: number | null
     surface_restante_ha: number | null
   } | null
   terrestre: { surface_traitee_ha: number | null; surface_restante_ha: number | null } | null
@@ -125,7 +127,7 @@ export function TraitementsPage() {
       mono: true,
       render: (t) => (
         <span title={`Surface ${libelleSurfaceTraitee(t).toLowerCase()}`}>
-          {formatSurface(t.terrestre?.surface_traitee_ha ?? t.aerien?.surface_traitee_ha)}
+          {formatSurface(surfaceTraiteeOuProtegee(t))}
         </span>
       ),
     },

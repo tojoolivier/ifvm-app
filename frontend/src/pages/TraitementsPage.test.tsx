@@ -25,7 +25,9 @@ function traitementAerien() {
       mecanicien: 'Paul Randria',
       nb_rotations: 4,
       total_pesticide_l: 1060,
-      surface_traitee_ha: 320,
+      // Barrière : la surface est protégée, jamais traitée (migration 0081).
+      surface_traitee_ha: 0,
+      surface_protegee_ha: 320,
       surface_restante_ha: null,
     },
     terrestre: null,

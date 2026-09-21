@@ -20,6 +20,7 @@ import {
   libelleImpact,
   libelleSurfaceTraitee,
   resumeEspeces,
+  surfaceTraiteeOuProtegee,
   zonesExposeesLabels,
 } from '@/lib/traitement-fiche'
 import { useAnnuaire } from '@/lib/use-annuaire'
@@ -73,7 +74,9 @@ interface TraitementAerien {
   nb_rotations: number
   total_pesticide_l: number | null
   total_pesticide_kg: number | null
+  // Jamais renseignées ensemble (migration 0081) : choc → traitée, barrière → protégée.
   surface_traitee_ha: number | null
+  surface_protegee_ha: number | null
   reprise_traitement: boolean
   traitement_origine_id: string | null
   surface_cumulee_ha: number | null
@@ -450,7 +453,8 @@ export function TraitementDetailPage() {
   // 0050 a généralisé le chaînage de reprise à l'Aérien) : le panneau
   // « Surfaces » ne doit pas rester muet sur les trois lignes du bas pour une
   // fiche aérienne, comme c'était le cas en ne lisant que `terrestre`.
-  const surfaceTraitee = traitement.terrestre?.surface_traitee_ha ?? traitement.aerien?.surface_traitee_ha
+  // Traitée (choc, terrestre) ou protégée (barrière aérienne) — cf. `libelleSurfaceTraitee`.
+  const surfaceTraitee = surfaceTraiteeOuProtegee(traitement)
   const surfaceCumulee = traitement.terrestre?.surface_cumulee_ha ?? traitement.aerien?.surface_cumulee_ha
   const restanteGenerique = traitement.terrestre?.surface_restante_ha ?? traitement.aerien?.surface_restante_ha
   const repriseFiche = traitement.terrestre?.reprise_traitement
