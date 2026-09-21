@@ -593,13 +593,6 @@ export default function RecapScreen() {
               <RecapLigne label="Évalué après (heures)" value={display(draft.aerien.evaluation_efficacite_heures_apres)} />
               <RecapLigne label="Méthode d'évaluation" value={displayMethodeEvaluation(draft.aerien.methode_evaluation_efficacite)} />
             </Card>
-
-            <Card variant="info">
-              <Text style={styles.label}>Rapprochement fiche de vol</Text>
-              <Text style={styles.note}>
-                À faire manuellement — pas encore de correspondance automatique par n° de cuve dans ce lot.
-              </Text>
-            </Card>
           </>
         )}
 

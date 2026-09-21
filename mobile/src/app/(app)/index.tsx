@@ -20,7 +20,7 @@ import { NewFicheFab } from '@/components/fiches/NewFicheFab';
 import * as Network from 'expo-network';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { logger } from '@/lib/logger';
-import { peutSaisirFicheVol } from '@/lib/fiche-vol-access';
+import { peutVoirEquipesAeriennes } from '@/lib/equipe-aerienne-access';
 
 // ============================================
 // CONSTANTES - PALETTE CLAIRE
@@ -333,20 +333,18 @@ export default function DashboardScreen() {
               <ThemedText style={styles.quickTileText}>Nouveau traitement</ThemedText>
             </TouchableOpacity>
 
-            {/* #fiche-vol-menu-entree : point d'entrée unique du parcours fiche
-                de vol — ouvre un menu (créer un lieu aérien, nouvelle fiche,
-                mes fiches) plutôt que d'aller droit à la création.
-                #fiche-vol-acces-roles : réservé au chef de base et à l'équipe
-                aérienne (pilote/mécanicien) — masqué pour les autres rôles
-                plutôt qu'un raccourci qui mène à un écran d'accès refusé. */}
-            {peutSaisirFicheVol(user?.role) && (
+            {/* Gestion des équipes aériennes (équipes, bases, stands) : réservée
+                au chef de base et à l'équipe aérienne (pilote/mécanicien) —
+                masquée pour les autres rôles plutôt qu'un raccourci qui mène à
+                un écran inutilisable. */}
+            {peutVoirEquipesAeriennes(user?.role) && (
               <TouchableOpacity
                 style={styles.quickTile}
-                onPress={() => navigateTo('/(fiche-vol)/menu')}
+                onPress={() => navigateTo('/(app)/equipes-aeriennes')}
                 activeOpacity={0.85}
               >
                 <ThemedText style={styles.quickTileIcon}>🛫</ThemedText>
-                <ThemedText style={styles.quickTileText}>Fiche de vol</ThemedText>
+                <ThemedText style={styles.quickTileText}>Équipes aériennes</ThemedText>
               </TouchableOpacity>
             )}
 

@@ -113,7 +113,6 @@ export default function RootLayout() {
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
           <Stack.Screen name="(prospection)" options={{ headerShown: false }} />
           <Stack.Screen name="(traitement)" options={{ headerShown: false }} />
-          <Stack.Screen name="(fiche-vol)" options={{ headerShown: false }} />
         </Stack>
       </ErrorBoundary>
       <ErrorBanner />

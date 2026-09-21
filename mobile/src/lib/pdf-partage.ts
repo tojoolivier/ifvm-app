@@ -1,6 +1,6 @@
 /**
  * Téléchargement + partage d'un PDF généré côté backend (#533) — partagé entre
- * le récap fiche de vol (#494) et le récap CRT (#495), pour que les deux
+ * les récaps qui exportent un PDF (aujourd'hui : le CRT, #495), pour que les
  * écrans appellent la même logique plutôt que de réinventer chacun son fetch
  * authentifié et son mécanisme de partage.
  *
@@ -20,8 +20,8 @@ export interface PdfPartageDeps {
 
 /**
  * Télécharge le PDF exposé par `endpoint` (authentifié) puis lance le partage
- * natif. `endpoint` est relatif (ex. `/fiches-vol/{id}/pdf`), `nomFichier` sert
- * de nom au fichier local (ex. `fiche-vol-2026-042.pdf`).
+ * natif. `endpoint` est relatif (ex. `/traitements/{id}/pdf`), `nomFichier` sert
+ * de nom au fichier local (ex. `fiche-crt-2026-042.pdf`).
  */
 export async function telechargerEtPartagerPdf(
   deps: PdfPartageDeps,

@@ -1113,7 +1113,7 @@ export const apiClient = {
   },
 
   /**
-   * Référentiels de la fiche de vol (#fiche-vol-referentiel-creation-mobile) —
+   * Référentiels aériens (bases, stands, équipes) —
    * `numero`/`localite` saisis à la main (pas d'auto-génération côté backend,
    * cf. CreateBaseAerienne/CreateStandRemplissage), en ligne uniquement : ni
    * `id` client, ni sync hors-ligne pour ces deux référentiels — même contrat
@@ -1172,7 +1172,7 @@ export const apiClient = {
   /**
    * Équipe aérienne (#equipe-aerienne) — une équipe = un chef de base = une
    * base aérienne principale (migration 0066). En ligne uniquement, même
-   * contrat que les autres référentiels de la fiche de vol.
+   * contrat que les autres référentiels aériens.
    */
   listEquipesAeriennes: async (
     token: string,
@@ -1223,12 +1223,12 @@ export const apiClient = {
 
   /*
    * -------------------------------------------------------
-   * FICHE DE VOL
+   * ÉQUIPES AÉRIENNES
    * -------------------------------------------------------
    */
 
   /**
-   * Annuaire des chefs de base actifs (#fiche-vol-creation-mobile) —
+   * Annuaire des chefs de base actifs (gestion des équipes aériennes) —
    * `chef_de_base_id` est une FK qui doit préexister (issue #319, pas de
    * création à la volée comme pour pilote/mécanicien) : ouvert à tout
    * utilisateur authentifié, pas réservé aux admins comme `GET /users/`.
@@ -1239,142 +1239,6 @@ export const apiClient = {
   ): Promise<components['schemas']['UtilisateurAnnuaireRead'][]> => {
     return makeRequest<components['schemas']['UtilisateurAnnuaireRead'][]>(
       '/users/chefs-de-base',
-      { method: 'GET' },
-      token,
-      onUnauthorized
-    );
-  },
-
-  /**
-   * Création en ligne de l'en-tête d'une fiche de vol (#fiche-vol-creation-
-   * mobile) — pas de `syncPush` ici : contrairement à la capture des vols
-   * eux-mêmes (hors-ligne, vol après vol), l'en-tête se crée en une fois, en
-   * ligne, exactement comme `createBaseAerienne`/`createStandRemplissage` ;
-   * `numero_fiche` est généré côté serveur (compteur atomique, cf. ADR-011).
-   */
-  createFicheVol: async (
-    token: string,
-    body: components['schemas']['FicheVolCreate'],
-    onUnauthorized?: OnUnauthorized
-  ): Promise<components['schemas']['FicheVolRead']> => {
-    return makeRequest<components['schemas']['FicheVolRead']>(
-      '/fiches-vol',
-      { method: 'POST', body: JSON.stringify(body) },
-      token,
-      onUnauthorized
-    );
-  },
-
-  /**
-   * Liste des fiches de vol (#fiche-vol-menu-entree) — pas de champ « créée
-   * par », contrairement à la prospection (`prospecteur_id`) : une fiche de
-   * vol couvre tout un hélicoptère pour une journée, partagée par l'équipe,
-   * pas rattachée à un seul agent. « Mes fiches de vol » liste donc toutes
-   * les fiches, pas seulement celles de l'utilisateur courant.
-   */
-  listFichesVol: async (
-    token: string,
-    onUnauthorized?: OnUnauthorized
-  ): Promise<components['schemas']['FicheVolRead'][]> => {
-    return makeRequest<components['schemas']['FicheVolRead'][]>(
-      '/fiches-vol',
-      { method: 'GET' },
-      token,
-      onUnauthorized
-    );
-  },
-
-  getFicheVol: async (
-    token: string,
-    ficheVolId: string,
-    onUnauthorized?: OnUnauthorized
-  ): Promise<components['schemas']['FicheVolRead']> => {
-    return makeRequest<components['schemas']['FicheVolRead']>(
-      `/fiches-vol/${ficheVolId}`,
-      { method: 'GET' },
-      token,
-      onUnauthorized
-    );
-  },
-
-  /**
-   * Ajoute un vol à une fiche brouillon (#fiche-vol-saisie-vols) — en ligne
-   * uniquement, comme la création de la fiche elle-même (POST /fiches-vol) ;
-   * `numero` est fourni par l'appelant (prochain numéro libre côté client).
-   */
-  addVolFicheVol: async (
-    token: string,
-    ficheVolId: string,
-    body: components['schemas']['VolCreate'],
-    onUnauthorized?: OnUnauthorized
-  ): Promise<components['schemas']['FicheVolRead']> => {
-    return makeRequest<components['schemas']['FicheVolRead']>(
-      `/fiches-vol/${ficheVolId}/vols`,
-      { method: 'POST', body: JSON.stringify(body) },
-      token,
-      onUnauthorized
-    );
-  },
-
-  removeVolFicheVol: async (
-    token: string,
-    ficheVolId: string,
-    volId: string,
-    onUnauthorized?: OnUnauthorized
-  ): Promise<components['schemas']['FicheVolRead']> => {
-    return makeRequest<components['schemas']['FicheVolRead']>(
-      `/fiches-vol/${ficheVolId}/vols/${volId}`,
-      { method: 'DELETE' },
-      token,
-      onUnauthorized
-    );
-  },
-
-  upsertSignatureFicheVol: async (
-    token: string,
-    ficheVolId: string,
-    body: components['schemas']['SignatureVolUpsert'],
-    onUnauthorized?: OnUnauthorized
-  ): Promise<components['schemas']['FicheVolRead']> => {
-    return makeRequest<components['schemas']['FicheVolRead']>(
-      `/fiches-vol/${ficheVolId}/signatures`,
-      { method: 'PUT', body: JSON.stringify(body) },
-      token,
-      onUnauthorized
-    );
-  },
-
-  validerFicheVol: async (
-    token: string,
-    ficheVolId: string,
-    onUnauthorized?: OnUnauthorized
-  ): Promise<components['schemas']['FicheVolRead']> => {
-    return makeRequest<components['schemas']['FicheVolRead']>(
-      `/fiches-vol/${ficheVolId}/valider`,
-      { method: 'PUT' },
-      token,
-      onUnauthorized
-    );
-  },
-
-  /**
-   * Traitement(s) (CRT) rattaché(s) à une prospection — utilisé par la fiche
-   * de vol (#fiche-vol-saisie-vols) pour proposer les rotations/blocs déjà
-   * saisis côté CRT aérien comme rattachement d'un vol MEP/APPLICATION,
-   * sans les ressaisir (lecture seule ici, aucune écriture).
-   */
-  listTraitements: async (
-    token: string,
-    params: { prospection_id?: string } = {},
-    onUnauthorized?: OnUnauthorized
-  ): Promise<components['schemas']['TraitementRead'][]> => {
-    const query = new URLSearchParams();
-    if (params.prospection_id) {
-      query.set('prospection_id', params.prospection_id);
-    }
-    const qs = query.toString();
-    return makeRequest<components['schemas']['TraitementRead'][]>(
-      `/traitements${qs ? `?${qs}` : ''}`,
       { method: 'GET' },
       token,
       onUnauthorized
