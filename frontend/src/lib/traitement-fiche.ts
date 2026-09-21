@@ -187,6 +187,66 @@ export function formatSurface(valeur: number | string | null | undefined): strin
   return nombre.toLocaleString('fr-FR')
 }
 
+/**
+ * Ce qu'un traitement aérien fait de sa surface dépend du produit : un produit
+ * de choc (`mode_traitement` TOTAL) *traite* la surface infestée, un produit de
+ * barrière (BARRIERE) la *protège* (#surface-bloc-mode-infestee, cf.
+ * `valider_surfaces_bloc` côté backend). Le chiffre `aerien.surface_traitee_ha`
+ * (somme des rotations) est le même dans les deux cas : seul son libellé change.
+ * Le terrestre n'a pas cette distinction, il reste « Traitée ».
+ */
+export function libelleSurfaceTraitee(traitement: {
+  mode_traitement: string | null
+  aerien: unknown | null
+}): 'Traitée' | 'Protégée' {
+  return traitement.aerien != null && traitement.mode_traitement === 'BARRIERE'
+    ? 'Protégée'
+    : 'Traitée'
+}
+
+type Surface = number | string | null
+
+export interface TraitementSurfacesLike {
+  prospection_id: string
+  mode_traitement: string | null
+  aerien: { surface_traitee_ha: Surface } | null
+  terrestre: { surface_traitee_ha: Surface } | null
+}
+
+export interface SurfacesProspection {
+  traitee: number | null
+  protegee: number | null
+}
+
+/**
+ * Surfaces traitée et protégée (ha) cumulées par prospection, tous les
+ * traitements rattachés à la fiche confondus (une reprise, migration 0050,
+ * ajoute une fiche de traitement pour la même prospection).
+ *
+ * Source : la surface du traitement (`surface_traitee_ha`, somme des rotations
+ * pour l'aérien — le mobile ne saisit aucune surface par bloc), classée selon
+ * `libelleSurfaceTraitee` : aérien en barrière → protégée, tout le reste →
+ * traitée. Une valeur absente n'est pas un 0 : `null` (tiret côté affichage)
+ * tant qu'aucun traitement n'a alimenté la catégorie.
+ */
+export function surfacesParProspection(
+  traitements: TraitementSurfacesLike[],
+): Map<string, SurfacesProspection> {
+  const parProspection = new Map<string, SurfacesProspection>()
+  for (const t of traitements) {
+    const brute = t.terrestre?.surface_traitee_ha ?? t.aerien?.surface_traitee_ha
+    if (brute == null || brute === '') continue
+    const surface = Number(brute)
+    if (!Number.isFinite(surface)) continue
+
+    const cumul = parProspection.get(t.prospection_id) ?? { traitee: null, protegee: null }
+    const categorie = libelleSurfaceTraitee(t) === 'Protégée' ? 'protegee' : 'traitee'
+    cumul[categorie] = (cumul[categorie] ?? 0) + surface
+    parProspection.set(t.prospection_id, cumul)
+  }
+  return parProspection
+}
+
 /** Zones cochées, dans l'ordre du référentiel ; les clés hors référentiel suivent. */
 export function zonesExposeesLabels(zones: Record<string, unknown> | null | undefined): string[] {
   if (!zones) return []

@@ -9,8 +9,10 @@ import {
   formatHorodatage,
   formatSurface,
   libelleImpact,
+  libelleSurfaceTraitee,
   responsableTraitement,
   resumeEspeces,
+  surfacesParProspection,
   zonesExposeesLabels,
 } from './traitement-fiche'
 
@@ -130,6 +132,67 @@ describe('formatSurface — mono fr-FR de la maquette (« 1 200 »)', () => {
 
   it('rend un tiret pour une chaîne non numérique', () => {
     expect(formatSurface('n/a')).toBe('—')
+  })
+})
+
+describe('libelleSurfaceTraitee — choc traite, barrière protège (aérien)', () => {
+  it('nomme « Protégée » la surface d’un aérien traité avec un produit de barrière', () => {
+    expect(libelleSurfaceTraitee({ mode_traitement: 'BARRIERE', aerien: {} })).toBe('Protégée')
+  })
+
+  it('nomme « Traitée » un aérien en produit de choc, irrégulier ou sans mode', () => {
+    expect(libelleSurfaceTraitee({ mode_traitement: 'TOTAL', aerien: {} })).toBe('Traitée')
+    expect(libelleSurfaceTraitee({ mode_traitement: 'IRREGULIER', aerien: {} })).toBe('Traitée')
+    expect(libelleSurfaceTraitee({ mode_traitement: null, aerien: {} })).toBe('Traitée')
+  })
+
+  it('reste « Traitée » pour un terrestre, même si le mode vaut BARRIERE', () => {
+    expect(libelleSurfaceTraitee({ mode_traitement: 'BARRIERE', aerien: null })).toBe('Traitée')
+  })
+})
+
+describe('surfacesParProspection — colonnes « Surf. traitée » et « Surf. prot. » de la liste des prospections', () => {
+  const aerien = (surface: number | string | null) => ({ surface_traitee_ha: surface })
+
+  it('classe la surface selon le produit : choc → traitée, barrière → protégée', () => {
+    const cumul = surfacesParProspection([
+      { prospection_id: 'p-choc', mode_traitement: 'TOTAL', aerien: aerien(120), terrestre: null },
+      { prospection_id: 'p-barriere', mode_traitement: 'BARRIERE', aerien: aerien(80), terrestre: null },
+    ])
+    expect(cumul.get('p-choc')).toEqual({ traitee: 120, protegee: null })
+    expect(cumul.get('p-barriere')).toEqual({ traitee: null, protegee: 80 })
+  })
+
+  it('cumule les traitements d’une même prospection (reprise) et sépare les deux catégories', () => {
+    const cumul = surfacesParProspection([
+      { prospection_id: 'p-1', mode_traitement: 'TOTAL', aerien: aerien(100), terrestre: null },
+      { prospection_id: 'p-1', mode_traitement: 'TOTAL', aerien: aerien(50.5), terrestre: null },
+      { prospection_id: 'p-1', mode_traitement: 'BARRIERE', aerien: aerien(30), terrestre: null },
+    ])
+    expect(cumul.get('p-1')).toEqual({ traitee: 150.5, protegee: 30 })
+  })
+
+  it('range un terrestre en « traitée », même en mode BARRIERE', () => {
+    const cumul = surfacesParProspection([
+      { prospection_id: 'p-1', mode_traitement: 'BARRIERE', aerien: null, terrestre: { surface_traitee_ha: 5 } },
+    ])
+    expect(cumul.get('p-1')).toEqual({ traitee: 5, protegee: null })
+  })
+
+  it('n’a pas d’entrée sans surface : prospection sans traitement ou surface absente', () => {
+    const cumul = surfacesParProspection([
+      { prospection_id: 'p-sans-surface', mode_traitement: 'TOTAL', aerien: aerien(null), terrestre: null },
+      { prospection_id: 'p-vide', mode_traitement: 'TOTAL', aerien: null, terrestre: null },
+    ])
+    expect(cumul.size).toBe(0)
+  })
+
+  it('accepte les décimaux sérialisés en chaîne et ignore les valeurs non numériques', () => {
+    const cumul = surfacesParProspection([
+      { prospection_id: 'p-1', mode_traitement: 'TOTAL', aerien: aerien('860.00'), terrestre: null },
+      { prospection_id: 'p-1', mode_traitement: 'TOTAL', aerien: aerien('n/a'), terrestre: null },
+    ])
+    expect(cumul.get('p-1')).toEqual({ traitee: 860, protegee: null })
   })
 })
 

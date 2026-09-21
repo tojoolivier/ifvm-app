@@ -20,7 +20,14 @@ function traitementAerien() {
     date_traitement: '2026-08-12',
     localite: 'Beroroha',
     statut: 'validee',
-    aerien: { pilote: 'Jean Rakoto', mecanicien: 'Paul Randria', nb_rotations: 4, total_pesticide_l: 1060 },
+    aerien: {
+      pilote: 'Jean Rakoto',
+      mecanicien: 'Paul Randria',
+      nb_rotations: 4,
+      total_pesticide_l: 1060,
+      surface_traitee_ha: 320,
+      surface_restante_ha: null,
+    },
     terrestre: null,
     signatures: [
       { id: 's1', role: 'PILOTE', signataire_nom: 'Jean Rakoto', horodatage: '2026-08-13T08:00:00Z' },
@@ -85,6 +92,17 @@ describe('TraitementsPage — colonnes maquette (README §7)', () => {
     expect(screen.getByText("Hery Rasoa (chef d'équipe)")).toBeInTheDocument()
   })
 
+  /** Choc → surface traitée ; barrière (aérien) → surface protégée : même colonne, l'infobulle nomme la ligne. */
+  it('nomme la surface de chaque ligne en infobulle : protégée pour l’aérien en barrière, traitée sinon', async () => {
+    mockedGet.mockResolvedValue({ data: [traitementAerien(), traitementTerrestreAvecRestante()] })
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('320')).toBeInTheDocument())
+    expect(screen.getByText('320')).toHaveAttribute('title', 'Surface protégée')
+    // Terrestre (traitée 5 ha) : « Traitée », même si le mode de la fiche est TOTAL ici.
+    expect(screen.getByText('5')).toHaveAttribute('title', 'Surface traitée')
+  })
+
   it('teinte le badge Type : aérien en bleu, terrestre en vert (prototype ligne 1461)', async () => {
     mockedGet.mockResolvedValue({ data: [traitementAerien(), traitementTerrestreAvecRestante()] })
     renderPage()
@@ -132,7 +150,7 @@ describe('TraitementsPage — colonnes maquette (README §7)', () => {
       'Mode',
       'Date',
       'Responsable',
-      'Traitée (ha)',
+      'Traitée / protégée (ha)',
       'Restante',
       'Signatures',
       '',

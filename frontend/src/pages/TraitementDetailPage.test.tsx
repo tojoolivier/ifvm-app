@@ -377,6 +377,20 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
     expect(screen.getByText('Infestée (snapshot)').parentElement?.textContent).toMatch(/3,2/)
   })
 
+  /** Choc → la surface est traitée ; barrière → elle est protégée (même chiffre, autre libellé). */
+  it('nomme « Protégée » la surface d’un aérien en produit de barrière, « Traitée » en produit de choc', async () => {
+    const { unmount } = renderPage(traitementAerien({ mode_traitement: 'BARRIERE' }))
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    expect(screen.getByText('Protégée').parentElement?.textContent).toMatch(/320/)
+    expect(screen.queryByText('Traitée')).not.toBeInTheDocument()
+    unmount()
+
+    renderPage(traitementAerien({ mode_traitement: 'TOTAL' }))
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    expect(screen.getByText('Traitée').parentElement?.textContent).toMatch(/320/)
+    expect(screen.queryByText('Protégée')).not.toBeInTheDocument()
+  })
+
   it('formate l’horodatage de signature comme la maquette (sans secondes)', async () => {
     renderPage(
       traitementAerien({
