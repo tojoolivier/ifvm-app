@@ -71,15 +71,12 @@ describe('DashboardScreen — Accès rapide', () => {
     expect(screen.getByText('Alertes')).toBeTruthy();
   });
 
-  // #fiche-vol-creation-mobile : « Prospections à revalider » a été déplacé
-  // vers le choix du type de prospection (à côté de « Vérifier un
-  // signalement ») pour laisser la place au nouveau raccourci fiche de vol.
-  // #fiche-vol-menu-entree : ce raccourci ouvre désormais un menu (créer un
-  // lieu aérien, nouvelle fiche, mes fiches) plutôt que d'aller droit à la
-  // création — d'où le libellé « Fiche de vol » plutôt que « Nouvelle ... ».
-  // #fiche-vol-acces-roles : réservé au chef de base et à l'équipe aérienne —
-  // un chef de base ici, un prospecteur dans le test suivant.
-  it('« Fiche de vol » est accessible depuis le tableau de bord pour un chef de base', async () => {
+  // « Prospections à revalider » a été déplacé vers le choix du type de
+  // prospection (à côté de « Vérifier un signalement »). La tuile « Équipes
+  // aériennes » (gestion des équipes, bases et stands) est réservée au chef de
+  // base et à l'équipe aérienne — un chef de base ici, un prospecteur dans le
+  // test suivant. Elle a remplacé la tuile « Fiche de vol » (fiche supprimée).
+  it('« Équipes aériennes » est accessible depuis le tableau de bord pour un chef de base', async () => {
     useAuthStore.setState((state) => ({ user: { ...state.user, role: 'chef_de_base' } as any }));
 
     await render(
@@ -89,11 +86,12 @@ describe('DashboardScreen — Accès rapide', () => {
     );
     await waitFor(() => expect(screen.getByText('ACCÈS RAPIDE')).toBeTruthy());
 
-    expect(screen.getByText('Fiche de vol')).toBeTruthy();
+    expect(screen.getByText('Équipes aériennes')).toBeTruthy();
+    expect(screen.queryByText('Fiche de vol')).toBeNull();
     expect(screen.queryByText('Prospections à revalider')).toBeNull();
   });
 
-  it('« Fiche de vol » n\'apparaît pas pour un rôle hors chef de base / équipe aérienne', async () => {
+  it('« Équipes aériennes » n\'apparaît pas pour un rôle hors chef de base / équipe aérienne', async () => {
     // role: 'prospecteur' posé par le beforeEach.
     await render(
       <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
@@ -102,11 +100,11 @@ describe('DashboardScreen — Accès rapide', () => {
     );
     await waitFor(() => expect(screen.getByText('ACCÈS RAPIDE')).toBeTruthy());
 
-    expect(screen.queryByText('Fiche de vol')).toBeNull();
+    expect(screen.queryByText('Équipes aériennes')).toBeNull();
   });
 
   it.each(['pilote', 'mecanicien'] as const)(
-    '« Fiche de vol » est accessible pour le rôle %s',
+    '« Équipes aériennes » est accessible pour le rôle %s',
     async (role) => {
       useAuthStore.setState((state) => ({ user: { ...state.user, role } as any }));
 
@@ -117,7 +115,7 @@ describe('DashboardScreen — Accès rapide', () => {
       );
       await waitFor(() => expect(screen.getByText('ACCÈS RAPIDE')).toBeTruthy());
 
-      expect(screen.getByText('Fiche de vol')).toBeTruthy();
+      expect(screen.getByText('Équipes aériennes')).toBeTruthy();
     }
   );
 });

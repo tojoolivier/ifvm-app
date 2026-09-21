@@ -4,7 +4,7 @@
  * Cardinalités : 1 équipe = 1 chef de base = 1 base principale.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import ReferentielsAeriensScreen from '@/app/(fiche-vol)/referentiels';
+import ReferentielsAeriensScreen from '@/app/(app)/equipes-aeriennes';
 import { useAuthStore } from '@/lib/auth-store';
 import { apiClient } from '@/lib/api-client';
 import { getCurrentPosition } from '@/lib/location';

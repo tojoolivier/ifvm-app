@@ -7,7 +7,7 @@ import { apiClient } from '@/lib/api-client';
 import { getCurrentPosition } from '@/lib/location';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { logger } from '@/lib/logger';
-import { peutCreerLieuAerien } from '@/lib/fiche-vol-access';
+import { peutCreerLieuAerien } from '@/lib/equipe-aerienne-access';
 
 const log = logger.child({ module: 'referentiels-aeriens' });
 
@@ -45,12 +45,12 @@ interface Stand {
 }
 
 /**
- * Écran de gestion des référentiels de la fiche de vol (#equipe-aerienne) :
+ * Écran de gestion des référentiels aériens (#equipe-aerienne) :
  * équipes aériennes, bases principales, bases secondaires, stands de
  * remplissage. Cardinalités (confirmées avec l'utilisateur le 2026-09-16) :
  * 1 équipe = 1 chef de base = 1 base principale ; une base secondaire hérite
  * de l'équipe de sa principale. En ligne uniquement, comme tous les
- * référentiels de la fiche de vol (pas de synchronisation hors-ligne).
+ * référentiels aériens (pas de synchronisation hors-ligne).
  */
 export default function ReferentielsAeriensScreen() {
   const router = useRouter();
