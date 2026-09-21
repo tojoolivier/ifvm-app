@@ -117,7 +117,10 @@ export interface TraitementAerien {
   nb_rotations: number | null;
   total_pesticide_l: number | null;
   total_pesticide_kg: number | null;
+  // Jamais renseignées ensemble (migration backend 0081) : produit de choc →
+  // traitée ; produit de barrière (mode BARRIERE) → protégée.
   surface_traitee_ha: number | null;
+  surface_protegee_ha: number | null;
   // Chaînage de reprise (migration backend 0050) — mirroir de TraitementTerrestre,
   // généralisé à l'Aérien.
   reprise_traitement: boolean | null;

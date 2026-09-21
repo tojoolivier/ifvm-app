@@ -364,10 +364,10 @@ class CreateTraitementAerien:
             reprise_traitement=reprise_traitement,
             traitement_origine_id=traitement_origine_id,
         )
-        # surface_traitee_ha est désormais dérivé des rotations (migration 0047) :
-        # aucune à la création, recalculer_totaux() avant recalculer_surfaces()
-        # (qui en dépend).
-        traitement.aerien.recalculer_totaux()
+        # surface_traitee_ha/surface_protegee_ha sont dérivées des rotations
+        # (migrations 0047/0081) : aucune à la création, recalculer_totaux() avant
+        # recalculer_surfaces() (qui en dépend).
+        traitement.aerien.recalculer_totaux(traitement.mode_traitement)
         traitement.aerien.recalculer_surfaces(
             traitement.cible.surface_infestee_ha, surface_cumulee_precedente
         )
@@ -751,11 +751,11 @@ class AddRotation:
         )
         # Chaînage de reprise (migration 0050) : la part cumulée héritée de la
         # fiche d'origine (0.0 si fiche indépendante) se déduit de l'invariant
-        # surface_cumulee_ha == precedente + surface_traitee_ha, valable avant
-        # que recalculer_totaux() ne change surface_traitee_ha ci-dessous.
-        surface_cumulee_precedente = aerien.surface_cumulee_ha - aerien.surface_traitee_ha
+        # surface_cumulee_ha == precedente + surface couverte (traitée + protégée),
+        # valable avant que recalculer_totaux() ne change les surfaces ci-dessous.
+        surface_cumulee_precedente = aerien.surface_cumulee_ha - aerien.surface_couverte_ha
         aerien.rotations.append(rotation)
-        aerien.recalculer_totaux()
+        aerien.recalculer_totaux(traitement.mode_traitement)
         aerien.recalculer_surfaces(_surface_infestee_ha(traitement), surface_cumulee_precedente)
 
         return await self.repository.add_rotation(
@@ -765,6 +765,7 @@ class AddRotation:
             aerien.total_pesticide_l,
             aerien.total_pesticide_kg,
             aerien.surface_traitee_ha,
+            aerien.surface_protegee_ha,
             aerien.surface_cumulee_ha,
             aerien.surface_restante_ha,
             aerien.pesticide_stock_restant_l,
@@ -820,8 +821,8 @@ class UpdateRotation:
         rotation.heure_fermeture_vanne = heure_fermeture_vanne
         rotation.heure_fin = heure_fin
         rotation.nom_commercial = nom_commercial
-        surface_cumulee_precedente = aerien.surface_cumulee_ha - aerien.surface_traitee_ha
-        aerien.recalculer_totaux()
+        surface_cumulee_precedente = aerien.surface_cumulee_ha - aerien.surface_couverte_ha
+        aerien.recalculer_totaux(traitement.mode_traitement)
         aerien.recalculer_surfaces(_surface_infestee_ha(traitement), surface_cumulee_precedente)
 
         return await self.repository.update_rotation(
@@ -831,6 +832,7 @@ class UpdateRotation:
             aerien.total_pesticide_l,
             aerien.total_pesticide_kg,
             aerien.surface_traitee_ha,
+            aerien.surface_protegee_ha,
             aerien.surface_cumulee_ha,
             aerien.surface_restante_ha,
             aerien.pesticide_stock_restant_l,
@@ -847,9 +849,9 @@ class RemoveRotation:
         aerien = traitement.aerien
         rotation = _trouver_rotation(aerien, rotation_id)
 
-        surface_cumulee_precedente = aerien.surface_cumulee_ha - aerien.surface_traitee_ha
+        surface_cumulee_precedente = aerien.surface_cumulee_ha - aerien.surface_couverte_ha
         aerien.rotations.remove(rotation)
-        aerien.recalculer_totaux()
+        aerien.recalculer_totaux(traitement.mode_traitement)
         aerien.recalculer_surfaces(_surface_infestee_ha(traitement), surface_cumulee_precedente)
 
         return await self.repository.remove_rotation(
@@ -859,6 +861,7 @@ class RemoveRotation:
             aerien.total_pesticide_l,
             aerien.total_pesticide_kg,
             aerien.surface_traitee_ha,
+            aerien.surface_protegee_ha,
             aerien.surface_cumulee_ha,
             aerien.surface_restante_ha,
             aerien.pesticide_stock_restant_l,
@@ -1267,10 +1270,10 @@ class SyncPushTraitementAerien:
 
         if existant is None:
             # Rotations pas encore poussées (sous-ressource distincte) : le total
-            # consommé est nul, comme à la création — surface_traitee_ha aussi
-            # (migration 0047, dérivée des rotations). recalculer_totaux() avant
+            # consommé est nul, comme à la création — surfaces traitée/protégée aussi
+            # (migrations 0047/0081, dérivées des rotations). recalculer_totaux() avant
             # recalculer_surfaces() (qui en dépend).
-            candidat.aerien.recalculer_totaux()
+            candidat.aerien.recalculer_totaux(candidat.mode_traitement)
             candidat.aerien.recalculer_surfaces(
                 candidat.cible.surface_infestee_ha, surface_cumulee_precedente
             )
@@ -1289,15 +1292,18 @@ class SyncPushTraitementAerien:
             marque = await self.traitement_repository.marquer_conflict(traitement_id)
             raise TraitementSyncConflitError(marque)
 
-        # nb_rotations/total_pesticide_l/total_pesticide_kg/surface_traitee_ha
+        # nb_rotations/total_pesticide_l/total_pesticide_kg/surface couverte
         # existants ne sont pas renvoyés par ce push (rotations = sous-ressource
-        # distincte) : on les reprend tels quels, sans jamais les écraser
-        # (update_sync ne les touche pas), puis on recalcule ce qui en dépend
-        # (surface_restante_ha, stock de pesticide).
+        # distincte) : on les reprend tels quels, puis on recalcule ce qui en dépend
+        # (surface_restante_ha, stock de pesticide). Seule exception : le mode peut
+        # changer via ce push — la surface couverte (inchangée) est alors reclassée
+        # en traitée/protégée selon le nouveau produit (migration 0081).
         candidat.aerien.nb_rotations = existant.aerien.nb_rotations
         candidat.aerien.total_pesticide_l = existant.aerien.total_pesticide_l
         candidat.aerien.total_pesticide_kg = existant.aerien.total_pesticide_kg
-        candidat.aerien.surface_traitee_ha = existant.aerien.surface_traitee_ha
+        candidat.aerien.repartir_surface(
+            existant.aerien.surface_couverte_ha, candidat.mode_traitement
+        )
         candidat.aerien.recalculer_surfaces(
             candidat.cible.surface_infestee_ha, surface_cumulee_precedente
         )

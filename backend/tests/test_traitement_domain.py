@@ -635,7 +635,7 @@ def _rotation(**overrides) -> Rotation:
 
 def test_recalculer_totaux_sans_rotation():
     aerien = TraitementAerien()
-    aerien.recalculer_totaux()
+    aerien.recalculer_totaux("TOTAL")
     assert aerien.nb_rotations == 0
     assert aerien.total_pesticide_l == 0.0
 
@@ -647,7 +647,7 @@ def test_recalculer_totaux_trois_rotations():
         _rotation(numero=2, quantite=15.5),
         _rotation(numero=3, quantite=8.25),
     ]
-    aerien.recalculer_totaux()
+    aerien.recalculer_totaux("TOTAL")
     assert aerien.nb_rotations == 3
     assert aerien.total_pesticide_l == 33.75
 
@@ -661,7 +661,7 @@ def test_recalculer_totaux_cumuls_separes_par_unite():
         _rotation(numero=2, quantite=15.5, unite="L"),
         _rotation(numero=3, quantite=4.0, unite="kg"),
     ]
-    aerien.recalculer_totaux()
+    aerien.recalculer_totaux("TOTAL")
     assert aerien.total_pesticide_l == 25.5
     assert aerien.total_pesticide_kg == 4.0
 
@@ -670,9 +670,9 @@ def test_recalculer_totaux_apres_suppression():
     aerien = TraitementAerien()
     r1, r2 = _rotation(numero=1, quantite=10.0), _rotation(numero=2, quantite=5.0)
     aerien.rotations = [r1, r2]
-    aerien.recalculer_totaux()
+    aerien.recalculer_totaux("TOTAL")
     aerien.rotations.remove(r1)
-    aerien.recalculer_totaux()
+    aerien.recalculer_totaux("TOTAL")
     assert aerien.nb_rotations == 1
     assert aerien.total_pesticide_l == 5.0
 
@@ -681,9 +681,9 @@ def test_recalculer_totaux_derniere_suppression_repasse_a_none():
     aerien = TraitementAerien()
     r1 = _rotation(numero=1, quantite=10.0)
     aerien.rotations = [r1]
-    aerien.recalculer_totaux()
+    aerien.recalculer_totaux("TOTAL")
     aerien.rotations.remove(r1)
-    aerien.recalculer_totaux()
+    aerien.recalculer_totaux("TOTAL")
     assert aerien.nb_rotations == 0
     assert aerien.total_pesticide_l == 0.0
 
@@ -697,7 +697,7 @@ def test_recalculer_totaux_surface_traitee_somme_des_rotations():
         _rotation(numero=1, surface_ha=12.0),
         _rotation(numero=2, surface_ha=8.5),
     ]
-    aerien.recalculer_totaux()
+    aerien.recalculer_totaux("TOTAL")
     assert aerien.surface_traitee_ha == 20.5
     aerien.recalculer_surfaces(surface_infestee_ha=100.0)
     assert aerien.surface_restante_ha == 79.5
@@ -707,8 +707,70 @@ def test_recalculer_totaux_sans_rotation_surface_traitee_zero():
     """Migration 0047 : surface_traitee_ha n'est plus nullable — sans rotation,
     recalculer_totaux() la remet à 0.0, jamais à None."""
     aerien = TraitementAerien()
-    aerien.recalculer_totaux()
+    aerien.recalculer_totaux("TOTAL")
     assert aerien.surface_traitee_ha == 0.0
+
+
+# Migration 0081 : produit de choc → surface traitée ; produit de barrière → surface protégée.
+
+
+def _aerien_deux_rotations() -> TraitementAerien:
+    aerien = TraitementAerien()
+    aerien.rotations = [
+        _rotation(numero=1, surface_ha=12.0),
+        _rotation(numero=2, surface_ha=8.5),
+    ]
+    return aerien
+
+
+def test_recalculer_totaux_produit_de_choc_alimente_surface_traitee():
+    aerien = _aerien_deux_rotations()
+    aerien.recalculer_totaux("TOTAL")
+    assert aerien.surface_traitee_ha == 20.5
+    assert aerien.surface_protegee_ha == 0.0
+
+
+def test_recalculer_totaux_produit_de_barriere_alimente_surface_protegee():
+    aerien = _aerien_deux_rotations()
+    aerien.recalculer_totaux("BARRIERE")
+    assert aerien.surface_protegee_ha == 20.5
+    assert aerien.surface_traitee_ha == 0.0
+
+
+def test_recalculer_totaux_irregulier_ou_sans_mode_compte_comme_traitee():
+    for mode in ("IRREGULIER", None):
+        aerien = _aerien_deux_rotations()
+        aerien.recalculer_totaux(mode)
+        assert aerien.surface_traitee_ha == 20.5
+        assert aerien.surface_protegee_ha == 0.0
+
+
+def test_recalculer_totaux_ne_garde_jamais_les_deux_surfaces():
+    """Un mode qui change (synchronisation) doit vider l'ancienne colonne."""
+    aerien = _aerien_deux_rotations()
+    aerien.recalculer_totaux("TOTAL")
+    aerien.recalculer_totaux("BARRIERE")
+    assert aerien.surface_traitee_ha == 0.0
+    assert aerien.surface_protegee_ha == 20.5
+
+
+def test_surface_cumulee_compte_traitee_et_protegee_en_reprise():
+    """La surface couverte (traitée + protégée) alimente le cumul et la restante,
+    quel que soit le produit de la fiche."""
+    aerien = _aerien_deux_rotations()
+    aerien.recalculer_totaux("BARRIERE")
+    aerien.recalculer_surfaces(surface_infestee_ha=100.0, surface_cumulee_precedente=30.0)
+    assert aerien.surface_couverte_ha == 20.5
+    assert aerien.surface_cumulee_ha == 50.5
+    assert aerien.surface_restante_ha == 49.5
+
+
+def test_repartir_surface_reclasse_une_surface_existante():
+    aerien = TraitementAerien(surface_traitee_ha=40.0)
+    aerien.repartir_surface(aerien.surface_couverte_ha, "BARRIERE")
+    assert (aerien.surface_traitee_ha, aerien.surface_protegee_ha) == (0.0, 40.0)
+    aerien.repartir_surface(aerien.surface_couverte_ha, "TOTAL")
+    assert (aerien.surface_traitee_ha, aerien.surface_protegee_ha) == (40.0, 0.0)
 
 
 def test_recalculer_surfaces_aerien_restante_plancher_zero_cdg_9():
@@ -745,7 +807,7 @@ def test_recalculer_surfaces_aerien_avec_cumul_precedent():
 def test_recalculer_totaux_aerien_alimente_le_stock_pesticide():
     aerien = TraitementAerien(pesticide_recu_l=200.0)
     aerien.rotations = [_rotation(numero=1, quantite=60.0)]
-    aerien.recalculer_totaux()
+    aerien.recalculer_totaux("TOTAL")
     assert aerien.total_pesticide_l == 60.0
     assert aerien.pesticide_stock_restant_l == 140.0
 
@@ -753,7 +815,7 @@ def test_recalculer_totaux_aerien_alimente_le_stock_pesticide():
 def test_recalculer_stock_pesticide_aerien_sans_reception_reste_none():
     aerien = TraitementAerien()
     aerien.rotations = [_rotation(numero=1, quantite=60.0)]
-    aerien.recalculer_totaux()
+    aerien.recalculer_totaux("TOTAL")
     assert aerien.pesticide_stock_restant_l is None
 
 
@@ -762,7 +824,7 @@ def test_recalculer_stock_pesticide_aerien_plancher_zero_surconsommation():
     le stock ne descend jamais sous 0, même convention que surface_restante_ha."""
     aerien = TraitementAerien(pesticide_recu_l=50.0)
     aerien.rotations = [_rotation(numero=1, quantite=80.0)]
-    aerien.recalculer_totaux()
+    aerien.recalculer_totaux("TOTAL")
     assert aerien.pesticide_stock_restant_l == 0.0
 
 
@@ -792,6 +854,7 @@ class FakeTraitementRepoRotations:
         total_pesticide_l,
         total_pesticide_kg,
         surface_traitee_ha,
+        surface_protegee_ha,
         surface_cumulee_ha,
         surface_restante_ha,
         pesticide_stock_restant_l,
@@ -800,6 +863,7 @@ class FakeTraitementRepoRotations:
         self.traitement.aerien.total_pesticide_l = total_pesticide_l
         self.traitement.aerien.total_pesticide_kg = total_pesticide_kg
         self.traitement.aerien.surface_traitee_ha = surface_traitee_ha
+        self.traitement.aerien.surface_protegee_ha = surface_protegee_ha
         self.traitement.aerien.surface_cumulee_ha = surface_cumulee_ha
         self.traitement.aerien.surface_restante_ha = surface_restante_ha
         self.traitement.aerien.pesticide_stock_restant_l = pesticide_stock_restant_l
@@ -813,6 +877,7 @@ class FakeTraitementRepoRotations:
         total_pesticide_l,
         total_pesticide_kg,
         surface_traitee_ha,
+        surface_protegee_ha,
         surface_cumulee_ha,
         surface_restante_ha,
         pesticide_stock_restant_l,
@@ -821,6 +886,7 @@ class FakeTraitementRepoRotations:
         self.traitement.aerien.total_pesticide_l = total_pesticide_l
         self.traitement.aerien.total_pesticide_kg = total_pesticide_kg
         self.traitement.aerien.surface_traitee_ha = surface_traitee_ha
+        self.traitement.aerien.surface_protegee_ha = surface_protegee_ha
         self.traitement.aerien.surface_cumulee_ha = surface_cumulee_ha
         self.traitement.aerien.surface_restante_ha = surface_restante_ha
         self.traitement.aerien.pesticide_stock_restant_l = pesticide_stock_restant_l
@@ -834,6 +900,7 @@ class FakeTraitementRepoRotations:
         total_pesticide_l,
         total_pesticide_kg,
         surface_traitee_ha,
+        surface_protegee_ha,
         surface_cumulee_ha,
         surface_restante_ha,
         pesticide_stock_restant_l,
@@ -842,6 +909,7 @@ class FakeTraitementRepoRotations:
         self.traitement.aerien.total_pesticide_l = total_pesticide_l
         self.traitement.aerien.total_pesticide_kg = total_pesticide_kg
         self.traitement.aerien.surface_traitee_ha = surface_traitee_ha
+        self.traitement.aerien.surface_protegee_ha = surface_protegee_ha
         self.traitement.aerien.surface_cumulee_ha = surface_cumulee_ha
         self.traitement.aerien.surface_restante_ha = surface_restante_ha
         self.traitement.aerien.pesticide_stock_restant_l = pesticide_stock_restant_l
@@ -1477,7 +1545,7 @@ def test_recalculer_stock_pesticide_aerien_sans_stock_initial_inchange():
     comporter exactement comme avant l'ajout du stock initial (Terrestre)."""
     aerien = TraitementAerien(pesticide_recu_l=200.0)
     aerien.rotations = [_rotation(numero=1, quantite=60.0)]
-    aerien.recalculer_totaux()
+    aerien.recalculer_totaux("TOTAL")
     assert aerien.pesticide_stock_restant_l == 140.0
 
 

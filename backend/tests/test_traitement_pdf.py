@@ -74,6 +74,7 @@ def _traitement_aerien(**overrides) -> TraitementRead:
             total_pesticide_l=10.0,
             total_pesticide_kg=0.0,
             surface_traitee_ha=25.0,
+            surface_protegee_ha=0.0,
             reprise_traitement=False,
             traitement_origine_id=None,
             surface_cumulee_ha=25.0,

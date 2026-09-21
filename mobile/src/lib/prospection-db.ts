@@ -385,6 +385,7 @@ async function creerTables(db: SQLite.SQLiteDatabase): Promise<void> {
       nb_rotations INTEGER,
       total_pesticide_l REAL,
       surface_traitee_ha REAL,
+      surface_protegee_ha REAL,
       surface_restante_ha REAL,
       pesticide_recu_l REAL,
       pesticide_stock_restant_l REAL
@@ -811,6 +812,9 @@ const COLONNES_PRODUIT_UTILISE: readonly Colonne[] = [
 const COLONNES_TRAITEMENT_AERIEN: readonly Colonne[] = [
   { name: 'immatricule_aeronef', type: 'TEXT' },
   { name: 'surface_traitee_ha', type: 'REAL' },
+  // Migration backend 0081 : produit de barrière → surface protégée (jamais
+  // renseignée avec surface_traitee_ha, réservée au produit de choc).
+  { name: 'surface_protegee_ha', type: 'REAL' },
   { name: 'surface_restante_ha', type: 'REAL' },
   { name: 'pesticide_recu_l', type: 'REAL' },
   { name: 'pesticide_stock_restant_l', type: 'REAL' },
