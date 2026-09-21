@@ -58,7 +58,9 @@ function traitementAerien(overrides: Record<string, unknown> = {}) {
       nb_rotations: 2,
       total_pesticide_l: 530,
       total_pesticide_kg: null,
-      surface_traitee_ha: 320,
+      // Barrière (mode ci-dessus) : surface protégée, pas traitée (migration 0081).
+      surface_traitee_ha: 0,
+      surface_protegee_ha: 320,
       reprise_traitement: false,
       traitement_origine_id: null,
       surface_cumulee_ha: 320,
@@ -385,7 +387,12 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
     expect(screen.queryByText('Traitée')).not.toBeInTheDocument()
     unmount()
 
-    renderPage(traitementAerien({ mode_traitement: 'TOTAL' }))
+    renderPage(
+      traitementAerien({
+        mode_traitement: 'TOTAL',
+        aerien: { ...traitementAerien().aerien, surface_traitee_ha: 320, surface_protegee_ha: 0 },
+      }),
+    )
     await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
     expect(screen.getByText('Traitée').parentElement?.textContent).toMatch(/320/)
     expect(screen.queryByText('Protégée')).not.toBeInTheDocument()

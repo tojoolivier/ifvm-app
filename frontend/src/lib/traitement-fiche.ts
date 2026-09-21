@@ -191,8 +191,9 @@ export function formatSurface(valeur: number | string | null | undefined): strin
  * Ce qu'un traitement aérien fait de sa surface dépend du produit : un produit
  * de choc (`mode_traitement` TOTAL) *traite* la surface infestée, un produit de
  * barrière (BARRIERE) la *protège* (#surface-bloc-mode-infestee, cf.
- * `valider_surfaces_bloc` côté backend). Le chiffre `aerien.surface_traitee_ha`
- * (somme des rotations) est le même dans les deux cas : seul son libellé change.
+ * `valider_surfaces_bloc` côté backend). Depuis la migration 0081 le backend
+ * stocke deux colonnes distinctes, `aerien.surface_traitee_ha` (choc) et
+ * `aerien.surface_protegee_ha` (barrière), jamais renseignées ensemble.
  * Le terrestre n'a pas cette distinction, il reste « Traitée ».
  */
 export function libelleSurfaceTraitee(traitement: {
@@ -206,10 +207,25 @@ export function libelleSurfaceTraitee(traitement: {
 
 type Surface = number | string | null
 
+/**
+ * La surface à montrer pour une fiche : la colonne `surface_protegee_ha` d'un
+ * aérien en barrière, sinon `surface_traitee_ha` (terrestre compris). Associée
+ * à `libelleSurfaceTraitee`, qui la nomme.
+ */
+export function surfaceTraiteeOuProtegee(traitement: {
+  mode_traitement: string | null
+  aerien: { surface_traitee_ha?: Surface; surface_protegee_ha?: Surface } | null
+  terrestre?: { surface_traitee_ha?: Surface } | null
+}): Surface | undefined {
+  if (traitement.terrestre) return traitement.terrestre.surface_traitee_ha
+  if (libelleSurfaceTraitee(traitement) === 'Protégée') return traitement.aerien?.surface_protegee_ha
+  return traitement.aerien?.surface_traitee_ha
+}
+
 export interface TraitementSurfacesLike {
   prospection_id: string
   mode_traitement: string | null
-  aerien: { surface_traitee_ha: Surface } | null
+  aerien: { surface_traitee_ha: Surface; surface_protegee_ha?: Surface } | null
   terrestre: { surface_traitee_ha: Surface } | null
 }
 
@@ -223,26 +239,35 @@ export interface SurfacesProspection {
  * traitements rattachés à la fiche confondus (une reprise, migration 0050,
  * ajoute une fiche de traitement pour la même prospection).
  *
- * Source : la surface du traitement (`surface_traitee_ha`, somme des rotations
- * pour l'aérien — le mobile ne saisit aucune surface par bloc), classée selon
- * `libelleSurfaceTraitee` : aérien en barrière → protégée, tout le reste →
- * traitée. Une valeur absente n'est pas un 0 : `null` (tiret côté affichage)
- * tant qu'aucun traitement n'a alimenté la catégorie.
+ * Source : les colonnes du traitement (`surface_traitee_ha` / `surface_protegee_ha`,
+ * sommes des rotations pour l'aérien — le mobile ne saisit aucune surface par
+ * bloc) : un terrestre alimente « traitée », un aérien l'une ou l'autre selon
+ * son produit. Une catégorie sans surface (absente ou à 0, cas de l'autre colonne
+ * d'un aérien) n'est pas un chiffre : `null` (tiret côté affichage) tant qu'aucun
+ * traitement ne l'a alimentée.
  */
 export function surfacesParProspection(
   traitements: TraitementSurfacesLike[],
 ): Map<string, SurfacesProspection> {
   const parProspection = new Map<string, SurfacesProspection>()
-  for (const t of traitements) {
-    const brute = t.terrestre?.surface_traitee_ha ?? t.aerien?.surface_traitee_ha
-    if (brute == null || brute === '') continue
+  const ajouter = (
+    prospectionId: string,
+    categorie: keyof SurfacesProspection,
+    brute: Surface | undefined,
+  ) => {
     const surface = Number(brute)
-    if (!Number.isFinite(surface)) continue
-
-    const cumul = parProspection.get(t.prospection_id) ?? { traitee: null, protegee: null }
-    const categorie = libelleSurfaceTraitee(t) === 'Protégée' ? 'protegee' : 'traitee'
+    if (brute == null || brute === '' || !Number.isFinite(surface) || surface <= 0) return
+    const cumul = parProspection.get(prospectionId) ?? { traitee: null, protegee: null }
     cumul[categorie] = (cumul[categorie] ?? 0) + surface
-    parProspection.set(t.prospection_id, cumul)
+    parProspection.set(prospectionId, cumul)
+  }
+  for (const t of traitements) {
+    if (t.terrestre) {
+      ajouter(t.prospection_id, 'traitee', t.terrestre.surface_traitee_ha)
+    } else if (t.aerien) {
+      ajouter(t.prospection_id, 'traitee', t.aerien.surface_traitee_ha)
+      ajouter(t.prospection_id, 'protegee', t.aerien.surface_protegee_ha)
+    }
   }
   return parProspection
 }
