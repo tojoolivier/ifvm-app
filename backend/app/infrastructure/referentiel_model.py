@@ -147,7 +147,7 @@ class LieuAerienModel(Base):
     # application pour toute nouvelle création (LieuAerienCreate). Pas d'UNIQUE :
     # une équipe peut posséder plusieurs lieux (bases principales/secondaires/stands),
     # contrairement à `BaseAerienneModel.equipe_id` (1:1, référentiel distinct dédié à
-    # la fiche de vol).
+    # la gestion d'équipe aérienne).
     equipe_aerienne_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("equipe_aerienne.id", ondelete="RESTRICT"),
@@ -190,12 +190,11 @@ class AeronefModel(Base):
 class EquipeAerienneModel(Base):
     """Équipe aérienne (#equipe-aerienne, migration 0066) : une équipe = un chef de
     base (`chef_de_base_id` UNIQUE) = une base aérienne principale
-    (`BaseAerienneModel.equipe_id` UNIQUE). Demande utilisateur du 2026-09-16, en
-    continuité de la fiche de vol (migration 0064).
+    (`BaseAerienneModel.equipe_id` UNIQUE). Demande utilisateur du 2026-09-16.
 
     `pilote`/`mecanicien`/`consultant_international` (migration 0072) : texte libre,
     même choix que partout ailleurs dans le domaine aérien
-    (`fiche_vol.pilote`/`.mecanicien`, `traitement_aerien.pilote`/`.mecanicien`) —
+    (`traitement_aerien.pilote`/`.mecanicien`) —
     externes à l'IFVM, pas des comptes `utilisateur`. Nullable en base pour ne pas
     invalider les équipes créées avant cette migration ; `EquipeAerienneCreate`
     (schéma API) exige `pilote`/`mecanicien` pour toute nouvelle équipe,
@@ -255,7 +254,7 @@ class EquipeAerienneMembreModel(Base):
     de base/pilote/mécanicien/consultant déjà nommés sur `EquipeAerienneModel` — un
     nom, en nombre variable. Table fille plutôt qu'une chaîne concaténée sur
     `equipe_aerienne` (1FN) : chaque membre reste identifiable et supprimable
-    individuellement, même patron que `fiche_vol_signature`/`traitement_rotation`."""
+    individuellement, même patron que `traitement_rotation`."""
 
     __tablename__ = "equipe_aerienne_membre"
 
@@ -332,7 +331,7 @@ class EquipeTerrestreMembreModel(Base):
 
 
 class BaseAerienneModel(Base):
-    """Base principale ou base secondaire de la fiche de vol.
+    """Base principale ou base secondaire d'une équipe aérienne.
 
     Table unique auto-référencée (`parent_base_id NULL` = principale, sinon
     secondaire) plutôt que deux tables — même raisonnement que
@@ -342,9 +341,9 @@ class BaseAerienneModel(Base):
     conceptuel : `lieu_aerien` a été débranché deux fois des fiches qui le
     référençaient (`traitement_aerien` en 0054, `prospection` en 0063) parce
     que choisir la base dans un référentiel synchronisé s'est révélé être une
-    contrainte terrain non voulue. La fiche de vol reprend malgré tout un
-    référentiel dédié — décision produit explicite, maintenue en connaissance
-    de ce précédent (cf. docstring de la migration 0064).
+    contrainte terrain non voulue. Les bases d'équipe aérienne restent malgré
+    tout un référentiel dédié — décision produit explicite, maintenue en
+    connaissance de ce précédent (cf. docstring de la migration 0064).
 
     `equipe_id` (migration 0066) : NOT NULL uniquement sur une base principale
     (`ck_base_aerienne_equipe_coherente`) — une base secondaire hérite de l'équipe
@@ -388,7 +387,7 @@ class BaseAerienneModel(Base):
 
 
 class StandRemplissageModel(Base):
-    """Stand de remplissage de la fiche de vol — même forme que `BaseAerienneModel`,
+    """Stand de remplissage d'une équipe aérienne — même forme que `BaseAerienneModel`,
     sans hiérarchie.
 
     `equipe_aerienne_id` (migration 0078) : équipe propriétaire du stand. Sans UNIQUE —

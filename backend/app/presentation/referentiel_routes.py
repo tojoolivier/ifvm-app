@@ -730,9 +730,9 @@ async def update_lieu_aerien(
     return lieu
 
 
-# --- equipe_aerienne / base_aerienne / stand_remplissage (fiche de vol) -------------
+# --- equipe_aerienne / base_aerienne / stand_remplissage (gestion d'équipe) ---------
 #
-# Référentiel dédié à la fiche de vol (migration 0064), distinct de lieu_aerien malgré
+# Référentiel dédié à la gestion d'équipe aérienne (migration 0064), distinct de lieu_aerien malgré
 # le chevauchement conceptuel — cf. docstring de BaseAerienneModel. `equipe_aerienne`
 # (migration 0066, #equipe-aerienne) s'ajoute au-dessus de la base principale. Aucune
 # route DELETE, volontairement : la sortie de service passe par `actif=false`.

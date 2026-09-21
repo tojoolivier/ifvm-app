@@ -356,11 +356,10 @@ class MembreEquipeAerienne:
 class EquipeAerienne:
     """Équipe aérienne (#equipe-aerienne, migration 0066) : une équipe = un chef de
     base (`chef_de_base_id` UNIQUE) = une base aérienne principale (`base_aerienne.
-    equipe_id` UNIQUE, cf. `BaseAerienne`). Demande utilisateur du 2026-09-16, en
-    continuité de la fiche de vol (migration 0064).
+    equipe_id` UNIQUE, cf. `BaseAerienne`). Demande utilisateur du 2026-09-16.
 
     `pilote`/`mecanicien`/`consultant_international` (migration 0072) : texte libre,
-    externes à l'IFVM — même patron que `FicheVol`/`TraitementAerien`. Nullable
+    externes à l'IFVM — même patron que `TraitementAerien`. Nullable
     pour les équipes créées avant cette migration ; `pilote`/`mecanicien` sont
     exigés par `EquipeAerienneCreate` pour toute nouvelle équipe,
     `consultant_international` reste facultatif. `membres` couvre les autres
@@ -385,7 +384,7 @@ class EquipeAerienne:
 @dataclass
 class BaseAerienne:
     """Base aérienne principale (`parent_base_id is None`) ou secondaire (référence sa
-    principale). Référentiel dédié à la fiche de vol, distinct de `LieuAerien` —
+    principale). Référentiel dédié à la gestion d'équipe aérienne, distinct de `LieuAerien` —
     décision produit du 2026-09-15 maintenue malgré le précédent `lieu_aerien` (cf.
     migration `0064`).
 
@@ -408,7 +407,7 @@ class BaseAerienne:
 
 @dataclass
 class StandRemplissage:
-    """Stand de remplissage de la fiche de vol — même forme que `BaseAerienne`, sans
+    """Stand de remplissage d'une équipe aérienne — même forme que `BaseAerienne`, sans
     hiérarchie. `equipe_aerienne_id` (migration 0078) : équipe propriétaire, plusieurs
     stands par équipe ; `None` pour les stands antérieurs, exigé à la création."""
 

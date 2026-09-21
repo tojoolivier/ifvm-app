@@ -31,7 +31,7 @@ class UtilisateurUpdate(BaseModel):
 class UtilisateurAnnuaireRead(BaseModel):
     """Identité minimale exposée à tout utilisateur authentifié (pas de rôle
     admin requis) — pour les sélecteurs de type « chef de base » dans les
-    formulaires de saisie (fiche de vol), sans exposer l'email des tiers
+    formulaires de saisie (équipe aérienne), sans exposer l'email des tiers
     comme le fait `UtilisateurRead` (réservé à `/users/` admin-only)."""
 
     model_config = ConfigDict(from_attributes=True)

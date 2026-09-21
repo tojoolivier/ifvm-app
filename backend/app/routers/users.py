@@ -62,7 +62,7 @@ async def list_chefs_de_base(
     _: Annotated[Utilisateur, Depends(get_current_user)],
 ):
     """Annuaire des chefs de base actifs, pour le sélecteur `chef_de_base_id`
-    du formulaire de création de fiche de vol (#fiche-vol-creation-mobile) —
+    de la gestion des équipes aériennes —
     ce champ FK doit préexister (comme pour `create_user_a_la_volee`, issue
     #319), donc pas de création à la volée ici. Ouvert à tout utilisateur
     authentifié comme `POST /users/a-la-volee` : l'appelant est un agent de
