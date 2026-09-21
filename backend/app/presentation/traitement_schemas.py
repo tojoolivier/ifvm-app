@@ -545,8 +545,13 @@ class TraitementRead(BaseModel):
     signatures: list[SignatureRead] = []
     evaluations_risque_population: list[EvaluationRisquePopulationRead] = []
 
-    # Champ dérivé, non stocké (#numero-fiche-prospection-liee) — résolu par
-    # TraitementRepositoryImpl à partir de `prospection_id`, jamais accepté en
-    # entrée (absent de TraitementCreate/Update) : la seule relation entre les
-    # deux fiches reste `prospection_id`, ce champ n'en est qu'une lecture.
+    # Champs dérivés, non stockés (#numero-fiche-prospection-liee) — résolus
+    # par TraitementRepositoryImpl à partir de `prospection_id`, jamais
+    # acceptés en entrée (absents de TraitementCreate/Update) : la seule
+    # relation entre les deux fiches reste `prospection_id`, ces champs n'en
+    # sont qu'une lecture. `prospection_date_validation` alimente §1.4 du CRT
+    # papier (cf. #495, retour utilisateur : référence la prospection liée,
+    # pas une validation propre au CRT — même pattern que
+    # FicheVol.prospection_date_validation).
     prospection_n_fiche: str | None = None
+    prospection_date_validation: datetime | None = None

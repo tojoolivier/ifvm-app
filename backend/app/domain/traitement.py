@@ -586,8 +586,13 @@ class Traitement:
     # déjà aligné sur n_message pour un signalement) de la fiche de prospection
     # d'origine, jamais recalculé/dupliqué en colonne — `prospection_id` reste
     # l'unique relation entre les deux fiches, ce champ n'en est qu'une lecture.
+    # Même pattern (#495, retour utilisateur) : §1.4 "Date de validation" du
+    # CRT papier référence la validation de la prospection liée, pas
+    # `self.date_validation` (validation propre au CRT, distincte) — même
+    # `prospection.validated_at` que `FicheVol.prospection_date_validation`.
     # ==========================================
     prospection_n_fiche: str | None = None
+    prospection_date_validation: datetime | None = None
 
     def verifier_modifiable(self) -> None:
         """Garde commune, réutilisée par tous les writes (rotations, produits, validation).
