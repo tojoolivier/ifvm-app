@@ -1,0 +1,67 @@
+name: Mobile build (EAS production, local)
+
+# Workflow separe de mobile-build.yml : un tag de release doit declencher le
+# build production meme quand le tag ne touche pas mobile/** (le backend/frontend
+# deploie deja sur prod au tag, cf. deploy.yml). Mettre ce trigger dans
+# mobile-build.yml aurait force a retirer son filtre "paths: mobile/**" au
+# niveau du workflow, faisant tourner son job "changes" (runner self-hoste) a
+# chaque merge sur main meme sans changement mobile.
+on:
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: mobile-build-production-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: mobile
+
+jobs:
+  # Build production sur tag de release (v*), inconditionnellement — pas de path-filter :
+  # un tag est un evenement rare et volontaire, le cout d'un build Android inutile
+  # occasionnel est negligeable face a la complexite d'un diff inter-tags.
+  # Profil "production" (mobile/eas.json) : APK release, pas de soumission automatique
+  # (eas submit) — l'artifact est uploade pour installation/verification manuelle, le
+  # geste de publication au store est laisse volontairement humain.
+  build-production:
+    runs-on: android-build
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - run: npm ci
+
+      - name: Enable Gradle task-output cache (persisted on the runner volume)
+        run: |
+          mkdir -p "$HOME/.gradle"
+          printf 'org.gradle.caching=true\n' > "$HOME/.gradle/gradle.properties"
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+          packager: npm
+
+      - name: Build Android production locally (EAS local build)
+        env:
+          # Workingdir distinct de celui de mobile-build.yml (profil preview) : les deux
+          # peuvent tourner en parallele sur le meme pool de runners self-hostes
+          # ("android-build") pour des refs differentes (branche main vs tag).
+          EAS_LOCAL_BUILD_WORKINGDIR: /home/runner/.gradle/easwork-production
+        run: |
+          rm -rf "$EAS_LOCAL_BUILD_WORKINGDIR"
+          mkdir -p "$EAS_LOCAL_BUILD_WORKINGDIR"
+          eas build --platform android --profile production --local --non-interactive --output ./ifvm-production.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ifvm-production-apk
+          path: mobile/ifvm-production.apk
+          retention-days: 90
