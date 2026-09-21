@@ -141,10 +141,14 @@ class TraitementRepositoryImpl(TraitementRepository):
         return traitements
 
     async def _resoudre_prospection_n_fiche(self, traitements: list[Traitement]) -> None:
-        """Peuple `Traitement.prospection_n_fiche` par une seule requête groupée
-        (#numero-fiche-prospection-liee), même pattern que
-        `ProspectionRepositoryImpl._resoudre_noms` : `prospection_id` reste
-        l'unique relation entre les deux fiches, ce champ n'en est qu'une
+        """Peuple `Traitement.prospection_n_fiche`/`prospection_date_validation`
+        par une seule requête groupée (#numero-fiche-prospection-liee), même
+        pattern que `ProspectionRepositoryImpl._resoudre_noms` et que
+        `FicheVolRepositoryImpl` pour `prospection_numero_fiche`/
+        `prospection_date_validation` (§1.5/§1.4 du CRT papier — cf. #495,
+        retour utilisateur : ces deux champs référencent la prospection liée,
+        pas une validation propre au traitement) : `prospection_id` reste
+        l'unique relation entre les deux fiches, ces champs n'en sont qu'une
         lecture dérivée, jamais une seconde relation ni une colonne dupliquée.
         Fallback n_message si n_fiche n'est pas encore renseigné, même ordre
         de priorité que l'écran mobile « Consulter une fiche validée »
@@ -157,11 +161,14 @@ class TraitementRepositoryImpl(TraitementRepository):
                 ProspectionModel.id,
                 ProspectionModel.n_fiche,
                 ProspectionModel.n_message,
+                ProspectionModel.validated_at,
             ).where(ProspectionModel.id.in_(ids))
         )
-        numeros = {row.id: row.n_fiche or row.n_message for row in result.all()}
+        rows = {row.id: row for row in result.all()}
         for t in traitements:
-            t.prospection_n_fiche = numeros.get(t.prospection_id)
+            row = rows.get(t.prospection_id)
+            t.prospection_n_fiche = (row.n_fiche or row.n_message) if row else None
+            t.prospection_date_validation = row.validated_at if row else None
 
     async def origine_deja_utilisee(
         self, traitement_origine_id: uuid.UUID, exclude_traitement_id: uuid.UUID | None = None
