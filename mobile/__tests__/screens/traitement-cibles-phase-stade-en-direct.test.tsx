@@ -32,12 +32,14 @@ jest.mock('@/lib/traitement-repository', () => ({
 jest.mock('@/lib/prospection-repository', () => ({
   listAllProspectionPopulations: jest.fn(),
   listAllProspectionCaptures: jest.fn(),
+  getProspection: jest.fn(),
 }));
 
 beforeEach(() => {
   jest.mocked(traitementRepository.getTraitement).mockReset();
   jest.mocked(prospectionRepository.listAllProspectionPopulations).mockReset();
   jest.mocked(prospectionRepository.listAllProspectionCaptures).mockReset();
+  jest.mocked(prospectionRepository.getProspection).mockReset().mockResolvedValue({ type_prospection: 'intensive' } as any);
 });
 
 describe('CiblesScreen (Terrestre) — Phase/Stade en direct', () => {

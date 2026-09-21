@@ -3,7 +3,7 @@ import {
   createDraftProspection,
   countUnsyncedProspections,
   listDraftProspections,
-  listRecentProspections,
+  listToutesProspectionsLocal,
   listUnsyncedProspections,
   deleteProspection,
   materialiserProspectionValidee,
@@ -12,6 +12,7 @@ import {
   saveProspectionCaptures,
   saveOperationsAeriennes,
   getProspection,
+  updateProspectionStationNom,
   DraftProspection,
 } from '../src/lib/prospection-repository';
 import { listCampagnesLocal, getStationById } from '../src/lib/referentiel-db';
@@ -54,7 +55,7 @@ jest.mock('../src/lib/prospection-repository', () => ({
   createDraftProspection: jest.fn(),
   countUnsyncedProspections: jest.fn(),
   listDraftProspections: jest.fn(),
-  listRecentProspections: jest.fn(),
+  listToutesProspectionsLocal: jest.fn(),
   listUnsyncedProspections: jest.fn(),
   deleteProspection: jest.fn(),
   materialiserProspectionValidee: jest.fn(),
@@ -63,6 +64,7 @@ jest.mock('../src/lib/prospection-repository', () => ({
   saveProspectionCaptures: jest.fn(),
   saveOperationsAeriennes: jest.fn(),
   getProspection: jest.fn(),
+  updateProspectionStationNom: jest.fn(),
 }));
 
 jest.mock('../src/lib/referentiel-db', () => ({
@@ -74,7 +76,7 @@ const mockApiClient = jest.mocked(apiClient);
 const mockCreateDraft = jest.mocked(createDraftProspection);
 const mockCountUnsynced = jest.mocked(countUnsyncedProspections);
 const mockListDrafts = jest.mocked(listDraftProspections);
-const mockListRecent = jest.mocked(listRecentProspections);
+const mockListRecent = jest.mocked(listToutesProspectionsLocal);
 const mockListUnsynced = jest.mocked(listUnsyncedProspections);
 const mockDeleteLocal = jest.mocked(deleteProspection);
 const mockListCampagnesLocal = jest.mocked(listCampagnesLocal);
@@ -85,6 +87,7 @@ const mockSaveCaptures = jest.mocked(saveProspectionCaptures);
 const mockSaveOperations = jest.mocked(saveOperationsAeriennes);
 const mockGetProspection = jest.mocked(getProspection);
 const mockGetStationById = jest.mocked(getStationById);
+const mockUpdateStationNom = jest.mocked(updateProspectionStationNom);
 
 const STORED_ROW: DraftProspection = {
   id: '11111111-1111-1111-1111-111111111111',
@@ -205,16 +208,16 @@ describe('loadAccueilData', () => {
     expect(result.pendingSync).toEqual([STORED_ROW]);
   });
 
-  it('la file d\'envoi n\'est pas plafonnée à 20 fiches, contrairement à `recent` (#synchronisation-automatique)', async () => {
+  it('`recent` comme la file d\'envoi restent tous deux non plafonnés au-delà de 20 fiches (#fiches-validees-liste-non-plafonnee, #synchronisation-automatique)', async () => {
     const fichesAuDelaDe20 = Array.from({ length: 25 }, (_, i) => ({ ...STORED_ROW, id: `fiche-${i}` }));
     mockListDrafts.mockResolvedValueOnce([]);
-    mockListRecent.mockResolvedValueOnce(fichesAuDelaDe20.slice(0, 20));
+    mockListRecent.mockResolvedValueOnce(fichesAuDelaDe20);
     mockCountUnsynced.mockResolvedValueOnce(25);
     mockListUnsynced.mockResolvedValueOnce(fichesAuDelaDe20);
 
     const result = await loadAccueilData();
 
-    expect(result.recent).toHaveLength(20);
+    expect(result.recent).toHaveLength(25);
     expect(result.pendingSync).toHaveLength(25);
   });
 });
@@ -436,14 +439,56 @@ describe('assurerProspectionDisponibleLocalement', () => {
     operations_aeriennes: [{ type_operation: 'traitement', numero: 1 }],
   } as any;
 
-  it('ne fait rien si la fiche existe déjà en local (cas courant : propre fiche de l’agent)', async () => {
-    mockGetProspection.mockResolvedValueOnce({ id: FICHE_SERVEUR.id } as any);
+  it('ne fait rien si la fiche existe déjà en local avec station_nom déjà renseigné (cas courant : propre fiche de l’agent)', async () => {
+    mockGetProspection.mockResolvedValueOnce({ id: FICHE_SERVEUR.id, station_nom: 'Poste Ambovombe' } as any);
 
-    await assurerProspectionDisponibleLocalement(FICHE_SERVEUR);
+    await assurerProspectionDisponibleLocalement({ ...FICHE_SERVEUR, type_prospection: 'intensive', station_id: 'station-1' });
 
     expect(mockMaterialiser).not.toHaveBeenCalled();
     expect(mockSavePopulation).not.toHaveBeenCalled();
     expect(mockSaveInfestation).not.toHaveBeenCalled();
+    expect(mockGetStationById).not.toHaveBeenCalled();
+    expect(mockUpdateStationNom).not.toHaveBeenCalled();
+  });
+
+  /** #localite-traitement-poste-acridien-autre-agent : une fiche déjà locale
+   * (matérialisée avant que le référentiel `station_fixe` ait fini de se
+   * synchroniser sur cet appareil, par ex.) ne doit pas rester bloquée à
+   * jamais avec `station_nom` vide — seule cette colonne est comblée, jamais
+   * le reste de la ligne (`materialiserProspectionValidee` n'est pas rappelé). */
+  it('comble station_nom sur une fiche déjà locale qui ne l’a pas encore', async () => {
+    mockGetProspection.mockResolvedValueOnce({ id: FICHE_SERVEUR.id, station_nom: null } as any);
+    mockGetStationById.mockResolvedValueOnce({
+      id: 'station-1',
+      code: 'ST01',
+      nom: 'Poste Ambovombe',
+      paId: 'pa-1',
+      latitude: -25.1,
+      longitude: 46.1,
+      altitude: null,
+      commune: 'Ambovombe',
+      district: 'Ambovombe',
+      region: 'Androy',
+    });
+
+    await assurerProspectionDisponibleLocalement({
+      ...FICHE_SERVEUR,
+      type_prospection: 'intensive',
+      station_id: 'station-1',
+    });
+
+    expect(mockGetStationById).toHaveBeenCalledWith('station-1');
+    expect(mockUpdateStationNom).toHaveBeenCalledWith(FICHE_SERVEUR.id, 'Poste Ambovombe');
+    expect(mockMaterialiser).not.toHaveBeenCalled();
+  });
+
+  it("ne comble rien si la fiche déjà locale n'a pas de station (Extensif) ou si le référentiel ne la connaît pas", async () => {
+    mockGetProspection.mockResolvedValueOnce({ id: FICHE_SERVEUR.id, station_nom: null } as any);
+
+    await assurerProspectionDisponibleLocalement(FICHE_SERVEUR);
+
+    expect(mockGetStationById).not.toHaveBeenCalled();
+    expect(mockUpdateStationNom).not.toHaveBeenCalled();
   });
 
   it('rapatrie la fiche et ses populations/infestations si elle vient d’un autre agent', async () => {

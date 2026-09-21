@@ -179,6 +179,35 @@ export function computeSurfaceRestante(
 }
 
 /**
+ * Suggestion de « Pesticides consommés » (#pesticide-consomme-suggere-mode-traitement),
+ * dérivée de « Cumulée (ha) » selon le mode de traitement et l'unité choisie
+ * (#produits-unite-l-kg) — un simple pré-remplissage, jamais verrouillé : le
+ * champ reste modifiable, cette fonction ne sert qu'à calculer la valeur
+ * affichée tant que l'agent n'a rien saisi lui-même (cf. TerrestreForm.tsx).
+ *
+ * Règles confirmées avec l'utilisateur (aucune autre combinaison n'a de
+ * formule pour l'instant — Irrégulier et Barrière+kg restent entièrement
+ * manuels, `null` ci-dessous) :
+ * - Barrière + L : Cumulée / 5.
+ * - Couverture totale + L : Cumulée.
+ * - Couverture totale + kg : Cumulée / 20.
+ */
+export function computePesticideConsommeSuggere(
+  modeTraitement: 'TOTAL' | 'BARRIERE' | 'IRREGULIER' | null | undefined,
+  unite: 'L' | 'kg' | null | undefined,
+  surfaceCumuleeHa: number
+): number | null {
+  const uniteEffective = unite ?? 'L';
+  let valeur: number | null = null;
+  if (modeTraitement === 'BARRIERE' && uniteEffective === 'L') {
+    valeur = surfaceCumuleeHa / 5;
+  } else if (modeTraitement === 'TOTAL') {
+    valeur = uniteEffective === 'kg' ? surfaceCumuleeHa / 20 : surfaceCumuleeHa;
+  }
+  return valeur === null ? null : Math.round(valeur * 100) / 100;
+}
+
+/**
  * « Reste en stock » = reçu − consommé, plancher à 0 (même convention que
  * computeSurfaceRestante) — miroir de `_stock_pesticide_restant` côté backend.
  * `null` tant que « reçu » n'est pas renseigné : un stock ne se déduit pas
@@ -366,7 +395,11 @@ export interface AerienSyncPreconditionInput {
  * ne boucle sur rien dans ce cas, donc rien n'est envoyé au serveur — seule une
  * rotation existante mais incomplète pose problème.
  */
-function rotationsAerienPretesPourSynchro(rotations: RotationSyncPreconditionInput[]): boolean {
+/** Exportée pour être appliquée dès l'écran de saisie (rotations.tsx, bouton
+ * « Continuer ») et sur le récapitulatif (`aggregateRecapErrors`) — pas
+ * seulement en dernier recours à la synchronisation : voir le commentaire de
+ * `estAerienPretPourSynchro` ci-dessous (#traitement-aerien-sync-apres-enregistrement). */
+export function rotationsAerienPretesPourSynchro(rotations: RotationSyncPreconditionInput[]): boolean {
   return rotations.every((r) => !!r.produitId && r.quantite != null && r.quantite > 0);
 }
 
@@ -404,8 +437,9 @@ export interface TerrestreSyncPreconditionInput {
 
 /** Même raison que `rotationsAerienPretesPourSynchro` : `ProduitUtiliseCreate`
  * exige aussi `produit_id` (UUID) et `quantite_l` (> 0) sans défaut côté
- * backend. Une fiche sans aucun produit n'est pas bloquée, même règle. */
-function produitsTerrestrePretsPourSynchro(produits: ProduitUtiliseSyncPreconditionInput[]): boolean {
+ * backend. Une fiche sans aucun produit n'est pas bloquée, même règle.
+ * Exportée pour la même raison qu'elle (traitement.tsx, `aggregateRecapErrors`). */
+export function produitsTerrestrePretsPourSynchro(produits: ProduitUtiliseSyncPreconditionInput[]): boolean {
   return produits.every((p) => !!p.produitId && p.quantiteL != null && p.quantiteL > 0);
 }
 
@@ -466,13 +500,35 @@ export function validateRotationsHeures(rotations: RotationHeuresInput[]): Valid
 export interface TerrestreConditionsInput {
   heureDebut: string | null;
   heureFin: string | null;
+  vitesseVentMs: number | null | undefined;
+  temperatureC: number | null | undefined;
   surfaceRestanteHa: number;
   surfaceRestanteAbandonnee: boolean | null;
   motifSurfaceRestanteAbandonnee: string | null;
 }
 
+/**
+ * #traitement-terrestre-sync-apres-enregistrement : `heureDebut`/`heureFin`/
+ * `vitesseVentMs`/`temperatureC` sont obligatoires côté backend
+ * (`TraitementTerrestreCreate`, cf. `estTerrestrePretPourSynchro` plus bas) —
+ * mais cette fonction, appelée à la fois pour bloquer « Continuer » sur cet
+ * écran (traitement.tsx) ET pour le récapitulatif (`aggregateRecapErrors`),
+ * ne les vérifiait pas : un agent pouvait traverser tout le reste du parcours
+ * fiche « complète » à l'écran (coches vertes), pour se heurter à « Fiche
+ * incomplète » seulement à l'enregistrement, sans jamais avoir su quel champ
+ * combler. Désormais bloqué au bon endroit, dès cet écran.
+ */
 export function validateTerrestreConditions(input: TerrestreConditionsInput): ValidationError[] {
   const errors: ValidationError[] = [];
+
+  if (!input.heureDebut) errors.push({ field: 'heureDebut', message: "L'heure de début est obligatoire" });
+  if (!input.heureFin) errors.push({ field: 'heureFin', message: "L'heure de fin est obligatoire" });
+  if (input.vitesseVentMs == null) {
+    errors.push({ field: 'vitesseVentMs', message: 'La vitesse du vent est obligatoire' });
+  }
+  if (input.temperatureC == null) {
+    errors.push({ field: 'temperatureC', message: 'La température est obligatoire' });
+  }
 
   if (input.heureDebut && input.heureFin && input.heureFin <= input.heureDebut) {
     errors.push({ field: 'heureFin', message: "L'heure de fin doit être postérieure à l'heure de début" });
@@ -611,6 +667,14 @@ export interface RecapAggregateInput {
   empoisonnement: EmpoisonnementValidationInput;
   terrestreConditions: TerrestreConditionsInput | null;
   aerienEquipe: AerienEquipeValidationInput | null;
+  /** #traitement-aerien-sync-apres-enregistrement : une rotation ajoutée
+   * (bouton « + ») mais jamais remplie (produit non choisi, quantité vide)
+   * passait inaperçue sur ce récapitulatif — seule la synchronisation la
+   * détectait, trop tard. `[]` (aucune rotation) n'est jamais une erreur, cf.
+   * `rotationsAerienPretesPourSynchro`. */
+  aerienRotations: RotationSyncPreconditionInput[];
+  /** Même garde-fou côté Terrestre — cf. `produitsTerrestrePretsPourSynchro`. */
+  terrestreProduits: ProduitUtiliseSyncPreconditionInput[];
   signatureMatrix: SignatureRequirementWithState[];
 }
 
@@ -627,6 +691,20 @@ export function aggregateRecapErrors(input: RecapAggregateInput): ValidationErro
 
   if (input.typeTraitement === 'AERIEN' && input.aerienEquipe) {
     errors.push(...validateAerienEquipe(input.aerienEquipe));
+  }
+
+  if (input.typeTraitement === 'AERIEN' && !rotationsAerienPretesPourSynchro(input.aerienRotations)) {
+    errors.push({
+      field: 'rotations',
+      message: 'Chaque rotation doit avoir un produit et une quantité renseignés',
+    });
+  }
+
+  if (input.typeTraitement === 'TERRESTRE' && !produitsTerrestrePretsPourSynchro(input.terrestreProduits)) {
+    errors.push({
+      field: 'produits',
+      message: 'Chaque produit utilisé doit avoir un produit et une quantité renseignés',
+    });
   }
 
   for (const requirement of input.signatureMatrix) {

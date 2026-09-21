@@ -1,8 +1,8 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity } from 'react-native';
 import { UtilisateurEquipe, Pesticide } from '@/lib/referentiel-db';
 import { ProduitDraft, useTraitementCaptureStore } from '@/lib/traitement-capture-store';
-import { deriveNomCommercial } from '@/lib/traitement-validation';
+import { computePesticideConsommeSuggere, deriveNomCommercial } from '@/lib/traitement-validation';
 import { generateId } from '@/lib/id';
 import { Card } from '@/components/traitement/Card';
 import { Chip } from '@/components/traitement/Chip';
@@ -70,6 +70,9 @@ export function TerrestreForm({
   errors,
 }: TerrestreFormProps) {
   const store = useTraitementCaptureStore();
+  // Unité pour toute la section « Produits utilisés » (#produits-unite-l-kg) —
+  // un seul choix pour toute la fiche, gouverne les 5 libellés ci-dessous.
+  const unite = store.terrestre.pesticideUnite ?? 'L';
   // Texte brut en cours de saisie pour les champs décimaux libres de cet écran —
   // permet de taper un séparateur décimal ou un zéro de fin ("3," / "3,2") sans que
   // le champ ne se reformate à chaque frappe (cf. `formatDecimalDisplay` sinon
@@ -77,6 +80,42 @@ export function TerrestreForm({
   // `store.terrestre`, un autre indexé par produit (`localId`) pour la quantité.
   const [decimalDrafts, setDecimalDrafts] = useState<Partial<Record<TerrestreDecimalField, string>>>({});
   const [produitDrafts, setProduitDrafts] = useState<Record<string, string>>({});
+
+  // Pré-remplit « Pesticides consommés » selon le mode de traitement et l'unité
+  // choisie (#pesticide-consomme-suggere-mode-traitement) — sur chaque produit
+  // de la liste, mais jamais d'écrasement d'une valeur saisie à la main : on
+  // ne retouche que les produits vides, ou dont la valeur actuelle est encore
+  // exactement celle qu'on y a nous-même posée précédemment (`autoFillRef`).
+  // Recalcule/efface aussi la suggestion périmée si l'agent change ensuite le
+  // mode ou l'unité (ex. Barrière -> kg, sans formule) : sans ce suivi, une
+  // valeur posée au montage sous une combinaison (mode, unité) resterait
+  // affichée telle quelle après un changement, silencieusement fausse.
+  const autoFillRef = useRef<Record<string, number>>({});
+  useEffect(() => {
+    if (readOnly) return;
+    const suggestion = computePesticideConsommeSuggere(store.ref.modeTraitement, unite, surfaceCumulee);
+    setProduits((prev) => {
+      let changed = false;
+      const next = prev.map((p) => {
+        const posePar_nous = autoFillRef.current[p.localId];
+        const modifiableParNous = p.quantite_l == null || posePar_nous === p.quantite_l;
+        if (!modifiableParNous) return p;
+        if (suggestion === null) {
+          if (posePar_nous !== undefined) delete autoFillRef.current[p.localId];
+          if (p.quantite_l != null) {
+            changed = true;
+            return { ...p, quantite_l: null };
+          }
+          return p;
+        }
+        if (p.quantite_l === suggestion) return p;
+        autoFillRef.current[p.localId] = suggestion;
+        changed = true;
+        return { ...p, quantite_l: suggestion };
+      });
+      return changed ? next : prev;
+    });
+  }, [readOnly, store.ref.modeTraitement, unite, surfaceCumulee, produits.length, setProduits]);
 
   const getDecimalDraft = (field: TerrestreDecimalField): string | undefined => decimalDrafts[field];
 
@@ -327,6 +366,11 @@ export function TerrestreForm({
       </View>
 
       <Text style={styles.sectionTitle}>Produits utilisés</Text>
+      <Text style={styles.label}>Unité</Text>
+      <View style={styles.chipRow}>
+        <Chip label="Litres (L)" selected={unite === 'L'} onPress={() => !readOnly && store.updateTerrestre({ pesticideUnite: 'L' })} />
+        <Chip label="Kilos (kg)" selected={unite === 'kg'} onPress={() => !readOnly && store.updateTerrestre({ pesticideUnite: 'kg' })} />
+      </View>
       {produits.map((produit, index) => (
         <Card key={produit.localId} style={styles.rotationCard}>
           <View style={styles.rotationHeader}>
@@ -356,8 +400,9 @@ export function TerrestreForm({
             <Text style={styles.label}>Nom commercial</Text>
             <Text style={styles.derivedValue}>{produit.nom_commercial || '—'}</Text>
           </Card>
-          <Text style={styles.label}>Pesticides consommés (l)</Text>
+          <Text style={styles.label}>{`Pesticides consommés (${unite})`}</Text>
           <TextInput
+            testID={`produit-quantite-input-${index}`}
             editable={!readOnly}
             style={styles.input}
             placeholder="0"
@@ -374,11 +419,11 @@ export function TerrestreForm({
         </TouchableOpacity>
       )}
       <Card variant="derivee">
-        <Text style={styles.label}>Total pesticide (l)</Text>
+        <Text style={styles.label}>{`Total pesticide (${unite})`}</Text>
         <Text style={styles.derivedValue}>{totalPesticideTerrestre}</Text>
       </Card>
 
-      <Text style={styles.label}>Stock initial (l)</Text>
+      <Text style={styles.label}>{`Stock initial (${unite})`}</Text>
       <TextInput
         editable={!readOnly}
         style={styles.input}
@@ -388,7 +433,7 @@ export function TerrestreForm({
         onChangeText={(v) => handleDecimalChange('stockInitialL', v)}
         onBlur={() => clearDecimalDraft('stockInitialL')}
       />
-      <Text style={styles.label}>Approvisionnement (l)</Text>
+      <Text style={styles.label}>{`Approvisionnement (${unite})`}</Text>
       <TextInput
         editable={!readOnly}
         style={styles.input}
@@ -400,7 +445,7 @@ export function TerrestreForm({
       />
       {pesticideStockRestant != null && (
         <Card variant="derivee">
-          <Text style={styles.label}>Stock Final (l)</Text>
+          <Text style={styles.label}>{`Stock Final (${unite})`}</Text>
           <Text style={styles.derivedValue}>{pesticideStockRestant}</Text>
         </Card>
       )}

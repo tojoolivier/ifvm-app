@@ -147,6 +147,9 @@ class TraitementTerrestreCreate(BaseModel):
     motif_surface_restante_abandonnee: str | None = None
     essence_litres: float | None = Field(None, ge=0)
     nb_piles: int | None = Field(None, ge=0)
+    # Unité pour toute la section « Produits utilisés » (#produits-unite-l-kg) —
+    # un seul choix par fiche, pas par produit comme Rotation.unite (Aérien).
+    pesticide_unite: UniteQuantite = UniteQuantite.L
     pesticide_recu_l: float | None = Field(None, ge=0)
     # Stock avant approvisionnement (fiche CRT papier, section 5) — Terrestre
     # uniquement, pas d'équivalent côté TraitementAerienCreate.
@@ -479,6 +482,7 @@ class TraitementTerrestreRead(BaseModel):
     motif_surface_restante_abandonnee: str | None
     essence_litres: float | None
     nb_piles: int | None
+    pesticide_unite: UniteQuantite
     total_pesticide_l: float | None
     pesticide_recu_l: float | None
     stock_initial_l: float | None

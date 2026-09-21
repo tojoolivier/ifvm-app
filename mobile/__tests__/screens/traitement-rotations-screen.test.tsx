@@ -208,6 +208,24 @@ describe('RotationsScreen — validation des heures de vanne', () => {
   });
 
   it('purge les rotations déjà enregistrées avant de repousser la liste actuelle, pour ne pas les dupliquer à un nouveau passage sur cet écran (#persistance-fiches-traitement)', async () => {
+    useTraitementCaptureStore.setState({
+      ...RESET_STATE,
+      aerien: {
+        rotations: [
+          {
+            localId: 'r1',
+            produit_id: 'p1',
+            quantite: 10,
+            unite: 'L',
+            surface_ha: 5,
+            heure_debut: '06:00',
+            heure_fin: '06:30',
+            heure_ouverture_vanne: '06:05',
+            heure_fermeture_vanne: '06:20',
+          },
+        ],
+      },
+    });
     await render(<RotationsScreen />);
     await screen.findByTestId('rotation-numero-cuve-0');
 
@@ -236,6 +254,12 @@ describe('RotationsScreen — pesticide reçu (déplacé depuis Équipe)', () =>
       cible: { surface_infestee_ha: 100 },
       aerien: { pesticide_recu_l: 200, rotations: [] },
     } as any);
+    useTraitementCaptureStore.setState({
+      ...RESET_STATE,
+      aerien: {
+        rotations: [{ localId: 'r1', produit_id: 'p1', quantite: 10, unite: 'L', surface_ha: 5 }],
+      },
+    });
 
     await render(<RotationsScreen />);
     expect(await screen.findByDisplayValue('200')).toBeVisible();
@@ -248,6 +272,12 @@ describe('RotationsScreen — pesticide reçu (déplacé depuis Équipe)', () =>
   });
 
   it('saisit puis enregistre une nouvelle valeur de pesticide reçu', async () => {
+    useTraitementCaptureStore.setState({
+      ...RESET_STATE,
+      aerien: {
+        rotations: [{ localId: 'r1', produit_id: 'p1', quantite: 10, unite: 'L', surface_ha: 5 }],
+      },
+    });
     await render(<RotationsScreen />);
     await screen.findByTestId('rotation-numero-cuve-0');
 

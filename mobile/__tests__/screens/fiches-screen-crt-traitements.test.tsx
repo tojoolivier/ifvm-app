@@ -6,7 +6,7 @@
  * de chef assigné) ou créée par un agent qui n'est pas lui-même désigné chef
  * n'apparaissait alors jamais, alors que la fiche existe déjà localement —
  * contrairement aux prospections, jamais filtrées par ce rôle. Remplacée par
- * `listRecentTraitements()` (déjà utilisée par l'écran Synchronisation), sans
+ * `listToutesTraitementsLocal()` (déjà utilisée par l'écran Synchronisation), sans
  * filtre de rôle.
  */
 import { render, screen, waitFor } from '@testing-library/react-native';
@@ -32,7 +32,7 @@ jest.mock('@/lib/prospection-accueil', () => ({
 }));
 
 jest.mock('@/lib/traitement-repository', () => ({
-  listRecentTraitements: jest.fn().mockResolvedValue([]),
+  listToutesTraitementsLocal: jest.fn().mockResolvedValue([]),
 }));
 
 describe('FichesScreen — filtre CRT inclut toute fiche de traitement créée localement', () => {
@@ -51,11 +51,11 @@ describe('FichesScreen — filtre CRT inclut toute fiche de traitement créée l
     });
     jest.mocked(prospectionAccueil.loadAccueilData).mockClear();
     jest.mocked(prospectionAccueil.loadMesProspectionsServeur).mockClear();
-    jest.mocked(traitementRepository.listRecentTraitements).mockReset().mockResolvedValue([]);
+    jest.mocked(traitementRepository.listToutesTraitementsLocal).mockReset().mockResolvedValue([]);
   });
 
   it('affiche une fiche de traitement sans chef d’équipe/chef de base encore assigné', async () => {
-    jest.mocked(traitementRepository.listRecentTraitements).mockResolvedValue([
+    jest.mocked(traitementRepository.listToutesTraitementsLocal).mockResolvedValue([
       {
         id: 'trait-1',
         numero_fiche: null,
@@ -71,13 +71,13 @@ describe('FichesScreen — filtre CRT inclut toute fiche de traitement créée l
 
     expect(await screen.findByText('Fiche sans numéro')).toBeVisible();
     expect(screen.getByText('Ambovombe · 2026-09-17')).toBeVisible();
-    expect(traitementRepository.listRecentTraitements).toHaveBeenCalledWith();
+    expect(traitementRepository.listToutesTraitementsLocal).toHaveBeenCalledWith();
   });
 
   it('n’appelle plus listMesTraitements (filtrée par chef assigné, remplacée)', async () => {
     await render(<FichesScreen />);
 
-    await waitFor(() => expect(traitementRepository.listRecentTraitements).toHaveBeenCalled());
+    await waitFor(() => expect(traitementRepository.listToutesTraitementsLocal).toHaveBeenCalled());
     expect((traitementRepository as any).listMesTraitements).toBeUndefined();
   });
 });
