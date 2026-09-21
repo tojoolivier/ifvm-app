@@ -67,6 +67,7 @@ class TraitementRepositoryImpl(TraitementRepository):
         chef_equipe_id: uuid.UUID | None = None,
         reprenable: bool | None = None,
         statut: str | None = None,
+        date_traitement: date | None = None,
     ) -> list[Traitement]:
         stmt = select(TraitementModel).options(
             selectinload(TraitementModel.cible),
@@ -82,6 +83,8 @@ class TraitementRepositoryImpl(TraitementRepository):
             stmt = stmt.where(TraitementModel.prospection_id == prospection_id)
         if statut is not None:
             stmt = stmt.where(TraitementModel.statut == statut)
+        if date_traitement is not None:
+            stmt = stmt.where(TraitementModel.date_traitement == date_traitement)
         if chef_equipe_id is not None or reprenable:
             # outerjoin (pas join) dès `reprenable` : une fiche AERIEN n'a pas de
             # ligne traitement_terrestre — un join simple l'exclurait avant même

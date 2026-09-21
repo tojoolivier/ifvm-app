@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useAuthStore } from '@/lib/auth-store';
 import { apiClient } from '@/lib/api-client';
@@ -19,6 +19,18 @@ export interface ProspectionValideeOption {
 interface ProspectionValideeFieldProps {
   value: string | null;
   onChange: (id: string | null, option: ProspectionValideeOption | null) => void;
+  /**
+   * YYYY-MM-DD : ne propose que les prospections de cette date, et charge la liste
+   * d'emblée (le vol PROSPECTION d'une fiche de vol choisit la prospection du jour de
+   * ce vol). Absente : comportement historique (référence d'en-tête, toutes dates).
+   */
+  date?: string;
+  /**
+   * Statut filtré côté serveur. Par défaut `validee` (référence d'en-tête). `null` : tous
+   * statuts — le jour même, une prospection n'est en général pas encore validée.
+   */
+  statut?: string | null;
+  label?: string;
 }
 
 const GREEN = '#235a36';
@@ -39,7 +51,13 @@ const BORDER = '#e7e0cd';
  * même journée de traitement aérien — l'exclure ici la rendrait introuvable
  * au moment précis où elle est la plus probable.
  */
-export function ProspectionValideeField({ value, onChange }: ProspectionValideeFieldProps) {
+export function ProspectionValideeField({
+  value,
+  onChange,
+  date,
+  statut = STATUT_VALIDE,
+  label = 'Prospection traitée (facultatif)',
+}: ProspectionValideeFieldProps) {
   const token = useAuthStore((s) => s.token);
   const [prospections, setProspections] = useState<ProspectionValideeOption[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -49,7 +67,10 @@ export function ProspectionValideeField({ value, onChange }: ProspectionValideeF
     () =>
       runChargement(
         async () => {
-          const resultat = await apiClient.listProspections(token!, { statut: STATUT_VALIDE });
+          const resultat = await apiClient.listProspections(token!, {
+            ...(statut ? { statut } : {}),
+            ...(date ? { date_prospection: date } : {}),
+          });
           setProspections(
             resultat.map((p) => ({
               id: p.id,
@@ -66,21 +87,27 @@ export function ProspectionValideeField({ value, onChange }: ProspectionValideeF
         },
         { screen: 'prospection-validee-field', precondition: !!token }
       ),
-    [runChargement, token]
+    [runChargement, token, date, statut]
   );
+
+  useEffect(() => {
+    if (date) void charger();
+  }, [date, charger]);
 
   const selectionnee = prospections.find((p) => p.id === value) ?? null;
 
   return (
     <View style={styles.card}>
-      <Text style={styles.label}>Prospection traitée (facultatif)</Text>
+      <Text style={styles.label}>{label}</Text>
 
       {!loaded && !isChargement && (
         <TouchableOpacity style={styles.chargerLink} onPress={charger}>
           <Text style={styles.chargerLinkText}>
             {selectionnee
               ? `${selectionnee.n_fiche ?? selectionnee.n_message ?? 'sans référence'} — changer ›`
-              : 'Choisir une fiche de prospection validée ›'}
+              : date
+                ? 'Choisir la fiche de prospection du jour ›'
+                : 'Choisir une fiche de prospection validée ›'}
           </Text>
         </TouchableOpacity>
       )}
@@ -94,7 +121,11 @@ export function ProspectionValideeField({ value, onChange }: ProspectionValideeF
             </TouchableOpacity>
           )}
           {prospections.length === 0 && (
-            <Text style={styles.hint}>Aucune fiche de prospection validée pour le moment.</Text>
+            <Text style={styles.hint}>
+              {date
+                ? `Aucune fiche de prospection à la date du ${date}.`
+                : 'Aucune fiche de prospection validée pour le moment.'}
+            </Text>
           )}
           {prospections.map((prospection) => (
             <TouchableOpacity

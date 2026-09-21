@@ -6880,6 +6880,8 @@ export interface operations {
                 campagne_id?: string | null;
                 station_id?: string | null;
                 prospecteur_id?: string | null;
+                /** @description N'inclut que les fiches de cette date — « fiche de vol » (mobile) : choisir la prospection du jour d'un vol de type PROSPECTION. */
+                date_prospection?: string | null;
                 /** @description N'inclut que les fiches sans traitement associé, ni périmées (#revalidation-prospection : extensive/validation validées depuis plus de 5 jours sans traitement) — « Fiches de traitement → Consulter une fiche validée » (mobile), combiné à statut=validee. */
                 disponible_pour_traitement?: boolean;
                 /** @description N'inclut que les fiches périmées (#revalidation-prospection) — exactement celles qu'exclut disponible_pour_traitement pour cette raison, sans traitement associé et pas déjà revalidées. */
@@ -7197,6 +7199,8 @@ export interface operations {
                 chef_equipe_id?: string | null;
                 reprenable?: boolean | null;
                 statut?: string | null;
+                /** @description N'inclut que les fiches de cette date — « fiche de vol » (mobile) : choisir le traitement du jour d'un vol MEP/APPLICATION. */
+                date_traitement?: string | null;
             };
             header?: never;
             path?: never;

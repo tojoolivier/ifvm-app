@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import and_, delete, select
 from sqlalchemy.exc import IntegrityError
@@ -133,6 +133,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         prospecteur_id: uuid.UUID | None = None,
         disponible_pour_traitement: bool = False,
         a_revalider: bool = False,
+        date_prospection: date | None = None,
     ) -> list[Prospection]:
         stmt = select(ProspectionModel).options(
             selectinload(ProspectionModel.populations),
@@ -155,6 +156,8 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             stmt = stmt.where(ProspectionModel.station_id == station_id)
         if prospecteur_id is not None:
             stmt = stmt.where(ProspectionModel.prospecteur_id == prospecteur_id)
+        if date_prospection is not None:
+            stmt = stmt.where(ProspectionModel.date_prospection == date_prospection)
         if disponible_pour_traitement:
             # « Fiches de traitement → Consulter une fiche validée » (#fiches-
             # validees-multi-utilisateurs) : une fiche déjà transformée en
