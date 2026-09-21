@@ -116,7 +116,6 @@ Cinq types de fiches terrain :
 | Prospection intensive | `GET/POST /prospection/intensive` | stub |
 | Relevé météo | `GET/POST /meteo/releves` | stub |
 | Compte-rendu de traitement (CRT) | `GET/POST /traitement/crt` | stub |
-| Fiche de vol | `GET/POST /vol/` | stub |
 
 > Voir `CONTEXT.md` et `docs/adr/` pour le détail du domaine et les décisions d'architecture.
 

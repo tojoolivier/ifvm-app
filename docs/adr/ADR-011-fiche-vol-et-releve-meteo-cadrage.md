@@ -1,5 +1,9 @@
 # Fiche de vol & relevé météo — note de cadrage, arbitrage produit requis
 
+> **Mise à jour 2026-09-21 — fiche de vol abandonnée.** La fiche de vol (§3.1, 3.2, 3.4, 7 et 8)
+> a été construite puis **supprimée** (migration 0080, `docs/adr/ADR-017`). Ce cadrage n'est
+> conservé que comme historique. La partie **relevé météo** n'est pas concernée par cet abandon.
+
 **Statut** : *Proposé* — aucune migration ne doit être écrite avant arbitrage (cf. ADR-009, qui
 range le lot 5 en `needs-info` ; l'issue porte en pratique `needs-triage`, le label `needs-info`
 n'ayant été créé qu'ensuite dans le tracker — et `docs/design_handoff_web/PROMPT.md` § Lot 5 :
