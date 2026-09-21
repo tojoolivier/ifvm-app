@@ -13,6 +13,9 @@ import {
   saveOperationsAeriennes,
   getProspection,
   updateProspectionStationNom,
+  listAllProspectionPopulations,
+  listAllProspectionInfestations,
+  listAllProspectionCaptures,
   DraftProspection,
 } from '../src/lib/prospection-repository';
 import { listCampagnesLocal, getStationById } from '../src/lib/referentiel-db';
@@ -65,6 +68,9 @@ jest.mock('../src/lib/prospection-repository', () => ({
   saveOperationsAeriennes: jest.fn(),
   getProspection: jest.fn(),
   updateProspectionStationNom: jest.fn(),
+  listAllProspectionPopulations: jest.fn(),
+  listAllProspectionInfestations: jest.fn(),
+  listAllProspectionCaptures: jest.fn(),
 }));
 
 jest.mock('../src/lib/referentiel-db', () => ({
@@ -88,6 +94,9 @@ const mockSaveOperations = jest.mocked(saveOperationsAeriennes);
 const mockGetProspection = jest.mocked(getProspection);
 const mockGetStationById = jest.mocked(getStationById);
 const mockUpdateStationNom = jest.mocked(updateProspectionStationNom);
+const mockListPopulationsLocales = jest.mocked(listAllProspectionPopulations);
+const mockListInfestationsLocales = jest.mocked(listAllProspectionInfestations);
+const mockListCapturesLocales = jest.mocked(listAllProspectionCaptures);
 
 const STORED_ROW: DraftProspection = {
   id: '11111111-1111-1111-1111-111111111111',
@@ -439,6 +448,14 @@ describe('assurerProspectionDisponibleLocalement', () => {
     operations_aeriennes: [{ type_operation: 'traitement', numero: 1 }],
   } as any;
 
+  // Par défaut, une fiche déjà locale porte déjà ses populations/infestations/
+  // captures (cas courant : propre fiche de l'agent) — jamais réécrites.
+  beforeEach(() => {
+    mockListPopulationsLocales.mockResolvedValue([{}] as any);
+    mockListInfestationsLocales.mockResolvedValue([{}] as any);
+    mockListCapturesLocales.mockResolvedValue([{}] as any);
+  });
+
   it('ne fait rien si la fiche existe déjà en local avec station_nom déjà renseigné (cas courant : propre fiche de l’agent)', async () => {
     mockGetProspection.mockResolvedValueOnce({ id: FICHE_SERVEUR.id, station_nom: 'Poste Ambovombe' } as any);
 
@@ -570,6 +587,80 @@ describe('assurerProspectionDisponibleLocalement', () => {
     expect(mockMaterialiser).toHaveBeenCalledWith(
       expect.objectContaining({ stationId: 'station-1', stationNom: 'Poste Ambovombe' })
     );
+  });
+
+  /** #cible-extensif-populations-non-materialisees : le serveur renvoie
+   * `stades_imago`/`densites_larve` en objets et `type_cible` en tableau ;
+   * SQLite les stocke en JSON texte. Les écrire tels quels faisait échouer la
+   * matérialisation des fiches Extensives — cible de traitement vide. */
+  it('convertit stades_imago/densites_larve/type_cible en JSON texte avant de les écrire en local (fiche Extensive)', async () => {
+    mockGetProspection.mockResolvedValueOnce(null);
+
+    await assurerProspectionDisponibleLocalement({
+      ...FICHE_SERVEUR,
+      populations: [
+        {
+          espece: 'LMC',
+          categorie: 'larve',
+          densites_larve: { L1: 10, L4: 3 },
+          stades_imago: { femelleA1: 2 },
+          type_cible: ['vol_clair', 'dense'],
+          densite_diffuse: 0,
+        },
+      ],
+    });
+
+    expect(mockSavePopulation).toHaveBeenCalledWith(
+      'presp-autre-agent',
+      expect.objectContaining({
+        espece: 'LMC',
+        densites_larve: JSON.stringify({ L1: 10, L4: 3 }),
+        stades_imago: JSON.stringify({ femelleA1: 2 }),
+        type_cible: JSON.stringify(['vol_clair', 'dense']),
+        densite_diffuse: 0,
+      })
+    );
+  });
+
+  it('laisse à null les champs JSON absents, sans jamais écrire la chaîne "null"', async () => {
+    mockGetProspection.mockResolvedValueOnce(null);
+
+    await assurerProspectionDisponibleLocalement({
+      ...FICHE_SERVEUR,
+      populations: [{ espece: 'NSE', categorie: 'imago', densites_larve: null, stades_imago: null, type_cible: null }],
+    });
+
+    expect(mockSavePopulation).toHaveBeenCalledWith(
+      'presp-autre-agent',
+      expect.objectContaining({ densites_larve: null, stades_imago: null, type_cible: null })
+    );
+  });
+
+  it('répare une fiche déjà locale matérialisée sans ses populations (matérialisation interrompue)', async () => {
+    mockGetProspection.mockResolvedValueOnce({ id: FICHE_SERVEUR.id, station_nom: 'Poste' } as any);
+    mockListPopulationsLocales.mockResolvedValueOnce([]);
+    mockListInfestationsLocales.mockResolvedValueOnce([]);
+    mockListCapturesLocales.mockResolvedValueOnce([]);
+
+    await assurerProspectionDisponibleLocalement(FICHE_SERVEUR);
+
+    expect(mockMaterialiser).not.toHaveBeenCalled();
+    expect(mockSavePopulation).toHaveBeenCalledWith(
+      'presp-autre-agent',
+      expect.objectContaining({ espece: 'LMC', categorie: 'imago' })
+    );
+    expect(mockSaveInfestation).toHaveBeenCalled();
+    expect(mockSaveCaptures).toHaveBeenCalled();
+  });
+
+  it('ne réécrit jamais les populations d’une fiche locale qui en a déjà', async () => {
+    mockGetProspection.mockResolvedValueOnce({ id: FICHE_SERVEUR.id, station_nom: 'Poste' } as any);
+
+    await assurerProspectionDisponibleLocalement(FICHE_SERVEUR);
+
+    expect(mockSavePopulation).not.toHaveBeenCalled();
+    expect(mockSaveInfestation).not.toHaveBeenCalled();
+    expect(mockSaveCaptures).not.toHaveBeenCalled();
   });
 
   it("ne cherche jamais de station quand la fiche n'en a pas (Extensif)", async () => {
