@@ -1,6 +1,13 @@
 # Abandon de la fiche de vol (heures de vol)
 
-**Statut** : accepté (2026-09-21). Remplace, pour la partie fiche de vol, `ADR-011`.
+**Statut** : accepté (2026-09-21), **partiellement révoqué** par `ADR-018` (2026-09-22).
+Remplace, pour la partie fiche de vol, `ADR-011`.
+
+> ⚠️ `ADR-018` réintroduit une entité **`vol`** — une ligne d'activité aérienne, exigée par le
+> document de cadrage métier des opérations aériennes. Tout le reste de cet ADR reste en
+> vigueur : `fiche_vol`, `fiche_vol_signature`, `campagne_fiche_vol_compteur`, le carnet de
+> bord, les signatures et les cumuls d'heures restent abandonnés, et la perte de données de la
+> migration `0080` reste assumée.
 
 ## Contexte
 

@@ -38,6 +38,10 @@ Agriculteur → Signalement → Prospection de Validation
   page web « Heures de vol » est une page d'attente. Une **rotation** (`traitement_rotation`, côté
   CRT) reste le cycle d'épandage d'**une cuve**. Le cadrage historique est dans
   `docs/adr/ADR-011` (parties fiche de vol abandonnées ; le relevé météo n'est pas concerné).
+  Une **entité `vol`** (ligne d'activité aérienne : type, équipe, aéronef, rattachements de
+  site) est re-cadrée par `docs/adr/ADR-018` — **cadrage seul, rien n'est encore
+  implémenté** ; ce n'est pas l'ancienne fiche de vol (ni signatures, ni cumuls, ni
+  `rotation_id`).
 
 - **Base aérienne** vs **stand de remplissage**. Deux lieux distincts d'une équipe aérienne,
   chacun relevé en position (lat/lon/alt captées automatiquement, hors ligne) et nommé à la main.
@@ -53,6 +57,11 @@ Agriculteur → Signalement → Prospection de Validation
   un admin) crée ses lieux**, rattachés d'office à SON équipe (contrôle serveur, 403 sinon).
   Le référentiel de lieux d'une équipe reste `base_aerienne`/`stand_remplissage` (décision 0064),
   distinct de `lieu_aerien` (prospection/traitement).
+  ⚠️ Une remodélisation est **cadrée mais pas implémentée** (`docs/adr/ADR-018`, épic #592) :
+  `equipe_terrestre` + `equipe_aerienne` → `equipe` (membres génériques),
+  `base_aerienne` + `stand_remplissage` → `site_aerienne` (principale / secondaire / stand
+  distinguées par `parent_base_id`), positions historisées, stock de pesticides centralisé.
+  Tout ce paragraphe décrit l'état **actuel** du code, qui reste vrai jusqu'aux migrations.
 
 - **Pilote** et **mécanicien** sont **externes à l'IFVM** (compagnie aérienne ou Armée malgache) :
   ce sont des noms, pas des comptes `utilisateur`. Seul le **chef de base** est un agent IFVM. Le
