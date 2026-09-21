@@ -144,7 +144,7 @@ def test_build_crt_html_aerien_affiche_le_bloc_aerien_pas_le_bloc_terrestre():
 
     assert "5R-ABC" in html
     assert "J. Dupont" in html
-    assert "Chef d’équipe" not in html or "chef_equipe" not in html
+    assert "Détail Terrestre" not in html
 
 
 def test_build_crt_html_terrestre_affiche_le_bloc_terrestre_pas_le_bloc_aerien():
@@ -224,20 +224,163 @@ def test_build_crt_html_terrestre_affiche_stock_initial():
 
 
 def test_build_crt_html_terrestre_libelles_pesticides_suivent_unite_choisie():
-    """#produits-unite-l-kg : "Approvisionnement"/"Stock final restant" affichent
-    "(kg)" quand cette unité est choisie, "(L)" par défaut (Aérien inclus, qui
-    n'a pas ce champ — repli sur "L", comportement inchangé)."""
+    """#produits-unite-l-kg : "Approvisionnement"/"Produit consommé"/"Stock final
+    restant" affichent "(kg)" quand cette unité est choisie, "(L)" par défaut
+    (Aérien inclus, qui n'a pas ce champ — repli sur "L", comportement inchangé)."""
     traitement_l = _traitement_terrestre()
     html_l = build_crt_html(traitement_l)
     assert "Approvisionnement (produit reçu, L)" in html_l
+    assert "Produit consommé (L)" in html_l
     assert "Stock final restant (L)" in html_l
 
     traitement_kg = _traitement_terrestre()
     traitement_kg.terrestre.pesticide_unite = "kg"
     html_kg = build_crt_html(traitement_kg)
     assert "Approvisionnement (produit reçu, kg)" in html_kg
+    assert "Produit consommé (kg)" in html_kg
     assert "Stock final restant (kg)" in html_kg
 
     html_aerien = build_crt_html(_traitement_aerien())
     assert "Approvisionnement (produit reçu, L)" in html_aerien
+    assert "Produit consommé (L)" in html_aerien
     assert "Stock final restant (L)" in html_aerien
+
+
+def test_build_crt_html_affiche_le_produit_consomme():
+    """§5.5 du formulaire papier : existait sur le modèle (`total_pesticide_l`,
+    déjà affiché dans "Détail Aérien"/"Détail Terrestre") mais jamais restitué
+    dans la section Pesticides elle-même — c'est ce que corrige ce champ."""
+    html = build_crt_html(_traitement_aerien())
+
+    assert "Produit consommé (L)" in html
+    assert ">10.0<" in html
+
+
+def test_build_crt_html_naffiche_jamais_la_representation_brute_dun_enum():
+    """Bug racine (#495) : `str(ModeTraitement.TOTAL)` rend "ModeTraitement.TOTAL"
+    en Python 3.14 (le mixin `str` perd la priorité sur `Enum.__str__`) —
+    chaque enum affiché dans le PDF doit passer par `.value`, jamais par
+    `str()` nu, sous peine d'afficher du texte technique illisible."""
+    traitement = _traitement_terrestre(
+        mode_traitement="TOTAL",
+        empoisonnement_type="AGENT",
+        empoisonnement_mode="INGESTION",
+    )
+    traitement.terrestre.direction_vent = "NE"
+    traitement.terrestre.methode_evaluation_efficacite = "ESTIMATION_VISUELLE"
+
+    html = build_crt_html(traitement)
+
+    assert "ModeTraitement" not in html
+    assert "EmpoisonnementType" not in html
+    assert "EmpoisonnementMode" not in html
+    assert "DirectionVent" not in html
+    assert "MethodeEvaluationEfficacite" not in html
+    assert ">TOTAL<" in html
+    assert ">AGENT<" in html
+    assert ">INGESTION<" in html
+    assert ">NE<" in html
+    assert ">ESTIMATION_VISUELLE<" in html
+
+
+def test_build_crt_html_espece_et_repartition_ne_fuient_pas_leur_repr_enum():
+    """Même bug que ci-dessus mais côté §2 Cibles (EspeceCible, RepartitionPopulation)."""
+    traitement = _traitement_aerien(
+        cible={
+            "espece": "LMC",
+            "petites_larves": None,
+            "grandes_larves": None,
+            "vols_clairs_essaims": None,
+            "repartition_population": "DIFFUSE",
+            "surface_infestee_ha": 12.0,
+            "petites_larves_lmc": None,
+            "petites_larves_nse": None,
+            "grandes_larves_lmc": None,
+            "grandes_larves_nse": None,
+            "densite_diffuse_lmc": 3.5,
+            "densite_groupee_lmc": None,
+            "densite_diffuse_nse": None,
+            "densite_groupee_nse": None,
+        }
+    )
+
+    html = build_crt_html(traitement)
+
+    assert "EspeceCible" not in html
+    assert "RepartitionPopulation" not in html
+    assert ">LMC<" in html
+    assert ">DIFFUSE<" in html
+    # Densité (ind./ha) dérivée de la paire (espèce=LMC, répartition=DIFFUSE).
+    assert ">3.5<" in html
+
+
+def test_build_crt_html_affiche_les_surfaces_par_moyen_et_le_reste_a_traiter():
+    """§3.2/3.3 du formulaire papier : surfaces par moyen de traitement et
+    surface restante — présentes sur le modèle mais jamais affichées avant."""
+    traitement = _traitement_terrestre()
+    traitement.terrestre.surface_atomiseur_ha = 5.0
+    traitement.terrestre.surface_disque_rotatif_ha = 2.0
+    traitement.terrestre.surface_restante_ha = 1.0
+
+    html = build_crt_html(traitement)
+
+    assert "Surface atomiseur à dos (ha)" in html
+    assert "Surface disque rotatif (ha)" in html
+    assert "Surface reste à traiter (ha)" in html
+    assert ">5.0<" in html
+    assert ">2.0<" in html
+    assert ">1.0<" in html
+
+
+def test_build_crt_html_zones_cibles_affiche_oui_non_pas_de_booleen_python():
+    traitement = _traitement_aerien(zones_exposees={"cultures": True, "paturages": False})
+
+    html = build_crt_html(traitement)
+
+    assert "Culture" in html
+    assert "Pâturage" in html
+    assert "True" not in html
+    assert "False" not in html
+
+
+def test_build_crt_html_sections_10_11_12_sont_distinctes_et_dans_lordre():
+    """Le formulaire papier sépare "10. Observation sur non cibles" et
+    "11. Mortalité" — l'ancien gabarit les fusionnait sous un même "10.", ce
+    qui décalait "Observation générale" à "11." au lieu de "12."."""
+    html = build_crt_html(_traitement_aerien())
+
+    assert "10. Observation sur non cibles" in html
+    assert "11. Mortalité" in html
+    assert "12. Observation générale" in html
+    assert html.index("10. Observation sur non cibles") < html.index("11. Mortalité")
+    assert html.index("11. Mortalité") < html.index("12. Observation générale")
+
+
+def test_build_crt_html_affiche_les_axes_de_risque_quand_renseignes():
+    """`evaluation_risque` (écran mobile impacts.tsx) était saisi et persisté
+    mais jamais restitué dans le PDF — champ mort corrigé ici."""
+    traitement = _traitement_aerien(evaluation_risque={"ressources_eau": True, "sol": False})
+
+    html = build_crt_html(traitement)
+
+    assert "Ressources en eau" in html
+    assert "Sol" in html
+
+
+def test_build_crt_html_naffiche_pas_la_section_axes_de_risque_si_vide():
+    html = build_crt_html(_traitement_aerien(evaluation_risque=None))
+
+    assert "Axes de risque" not in html
+
+
+def test_build_crt_html_naffiche_jamais_duuid_brut_pour_chef_equipe():
+    """Ni `chef_equipe_id` (Terrestre) ni `chef_de_base_id` (Aérien) ne sont
+    des noms lisibles : aucune jointure Utilisateur dans ce ticket (#495), donc
+    le PDF ne doit jamais imprimer l'UUID brut à la place d'un nom."""
+    chef_equipe_id = uuid.uuid4()
+    traitement = _traitement_terrestre()
+    traitement.terrestre.chef_equipe_id = chef_equipe_id
+
+    html = build_crt_html(traitement)
+
+    assert str(chef_equipe_id) not in html
