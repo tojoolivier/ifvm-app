@@ -220,7 +220,7 @@ export default function ProspectionScreen() {
   // File d'envoi réelle (#synchronisation-automatique) — distincte de
   // `data.recent`, plafonné à 20 fiches pour l'affichage : une fiche en
   // attente au-delà de ces 20 ne doit jamais être exclue d'une
-  // synchronisation. Déjà filtrée par `loadAccueilData` (statut = 'en_attente',
+  // synchronisation. Déjà filtrée par `loadAccueilData` (statut != 'brouillon',
   // hors 'echec' — le serveur a refusé ces dernières, les renvoyer à
   // l'identique reproduirait le refus ; elles se relancent depuis l'écran de
   // synchronisation, qui montre leur motif, #177).

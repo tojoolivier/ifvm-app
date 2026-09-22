@@ -91,8 +91,14 @@ export default function SyncScreen() {
   useFocusEffect(refresh);
 
   // Fiches complétées localement mais pas encore confirmées côté serveur (cf. prospection.tsx).
+  // `statut !== 'brouillon'` et non `statut === 'en_attente'` (#revalidation-
+  // validation-jamais-synchronisee, cf. listUnsyncedProspections) : une fiche
+  // `type_prospection = 'validation'` (signalisation, y compris sa
+  // revalidation) passe directement de 'brouillon' à 'validee', sans jamais
+  // transiter par 'en_attente' — le filtre précédent la faisait disparaître de
+  // cette liste et du bouton « Synchroniser » qui s'appuie dessus.
   const pendingFiches = data.recent.filter(
-    (item) => item.statut === 'en_attente' && item.statut_sync !== 'synced'
+    (item) => item.statut !== 'brouillon' && item.statut_sync !== 'synced'
   );
   const syncedFiches = data.recent.filter((item) => item.statut_sync === 'synced');
 

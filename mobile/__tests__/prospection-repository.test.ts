@@ -285,16 +285,36 @@ describe('listUnsyncedProspections (#synchronisation-automatique)', () => {
     expect(params).toBeUndefined();
   });
 
-  it('ne retient que les fiches en_attente non encore synchronisées (hors échec)', async () => {
+  it('ne retient que les fiches non brouillon non encore synchronisées (hors échec)', async () => {
     getAllAsync.mockResolvedValueOnce([]);
 
     await listUnsyncedProspections();
 
     const [sql] = getAllAsync.mock.calls[0];
-    expect(sql).toContain("statut = 'en_attente'");
+    expect(sql).toContain("statut != 'brouillon'");
     expect(sql).toContain("statut_sync = 'local'");
     expect(sql).toContain("statut_sync = 'conflict'");
     expect(sql).not.toContain("'echec'");
+  });
+
+  /**
+   * #revalidation-validation-jamais-synchronisee : une fiche `type_prospection
+   * = 'validation'` passe directement de 'brouillon' à 'validee'
+   * (`completeProspection`), sans jamais transiter par 'en_attente' — un
+   * filtre `statut = 'en_attente'` l'aurait donc exclue à tort de la
+   * synchronisation automatique et du bouton « Synchroniser tout », alors que
+   * `countUnsyncedProspections` la compte déjà dans le badge « non
+   * synchronisé ».
+   */
+  it('inclut une fiche déjà validee localement (signalisation) tant que non synchronisée', async () => {
+    const ficheValidation = { ...STORED_ROW, statut: 'validee', statut_sync: 'local' };
+    getAllAsync.mockResolvedValueOnce([ficheValidation]);
+
+    const result = await listUnsyncedProspections();
+
+    expect(result).toEqual([ficheValidation]);
+    const [sql] = getAllAsync.mock.calls[0];
+    expect(sql).not.toContain("statut = 'en_attente'");
   });
 });
 
