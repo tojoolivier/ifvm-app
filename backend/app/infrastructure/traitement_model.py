@@ -181,6 +181,13 @@ class TraitementAerienModel(Base):
     # facultatif (vide = ravitaillement fait directement à une base) ; base
     # secondaire facultative.
     base_principale: Mapped[str] = mapped_column(String(255), nullable=False)
+    # FK référentiel `site_aerienne` (migration 0087, #605) : nullable en base
+    # (fiches existantes non rapprochées par le backfill, cf. docstring de la
+    # migration), exigée côté `TraitementAerienCreate` pour toute nouvelle
+    # fiche. `base_principale` (texte) n'est pas supprimée — hors périmètre.
+    site_principal_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("site_aerienne.id", ondelete="RESTRICT"), nullable=True
+    )
     stand: Mapped[str | None] = mapped_column(String(255), nullable=True)
     base_secondaire: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # Date d'installation (migration 0056) — facultative, indépendante de

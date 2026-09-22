@@ -5,6 +5,7 @@ from typing import Any
 from app.domain.prospection import Prospection
 from app.domain.repositories import (
     ProspectionRepository,
+    SiteAerienneRepository,
     TraitementRepository,
     UtilisateurRepository,
 )
@@ -21,6 +22,7 @@ from app.domain.traitement import (
     Rotation,
     RotationBlocInvalideError,
     RotationIntrouvableError,
+    SitePrincipalIntrouvableError,
     Traitement,
     TraitementAerien,
     TraitementIntrouvableError,
@@ -192,10 +194,12 @@ class CreateTraitementAerien:
         traitement_repository: TraitementRepository,
         prospection_repository: ProspectionRepository,
         utilisateur_repository: UtilisateurRepository,
+        site_aerienne_repository: SiteAerienneRepository,
     ):
         self.traitement_repository = traitement_repository
         self.prospection_repository = prospection_repository
         self.utilisateur_repository = utilisateur_repository
+        self.site_aerienne_repository = site_aerienne_repository
 
     async def execute(
         self,
@@ -207,6 +211,7 @@ class CreateTraitementAerien:
         mecanicien: str,
         chef_de_base_id: uuid.UUID,
         base_principale: str,
+        site_principal_id: uuid.UUID,
         immatricule_aeronef: str,
         consultant_international: str | None = None,
         stand: str | None = None,
@@ -297,6 +302,13 @@ class CreateTraitementAerien:
             )
         valider_roles_aerien_distincts(f"{chef.prenom} {chef.nom}", pilote, mecanicien)
 
+        site_principal = await self.site_aerienne_repository.get_by_id(site_principal_id)
+        if site_principal is None:
+            raise SitePrincipalIntrouvableError(
+                f"site_principal_id {site_principal_id} ne référence aucun site du "
+                "référentiel des sites aériens"
+            )
+
         base_numero = _generer_et_valider_numero_fiche(
             numero_fiche, chef.prenom, date_traitement, "Aerien"
         )
@@ -352,6 +364,7 @@ class CreateTraitementAerien:
             chef_de_base_id=chef_de_base_id,
             consultant_international=consultant_international,
             base_principale=base_principale,
+            site_principal_id=site_principal_id,
             stand=stand,
             stand_date_installation=stand_date_installation,
             base_secondaire=base_secondaire,
@@ -1088,10 +1101,12 @@ class SyncPushTraitementAerien:
         traitement_repository: TraitementRepository,
         prospection_repository: ProspectionRepository,
         utilisateur_repository: UtilisateurRepository,
+        site_aerienne_repository: SiteAerienneRepository,
     ):
         self.traitement_repository = traitement_repository
         self.prospection_repository = prospection_repository
         self.utilisateur_repository = utilisateur_repository
+        self.site_aerienne_repository = site_aerienne_repository
 
     async def execute(
         self,
@@ -1105,6 +1120,7 @@ class SyncPushTraitementAerien:
         mecanicien: str,
         chef_de_base_id: uuid.UUID,
         base_principale: str,
+        site_principal_id: uuid.UUID,
         immatricule_aeronef: str,
         consultant_international: str | None = None,
         stand: str | None = None,
@@ -1202,6 +1218,13 @@ class SyncPushTraitementAerien:
             )
         valider_roles_aerien_distincts(f"{chef.prenom} {chef.nom}", pilote, mecanicien)
 
+        site_principal = await self.site_aerienne_repository.get_by_id(site_principal_id)
+        if site_principal is None:
+            raise SitePrincipalIntrouvableError(
+                f"site_principal_id {site_principal_id} ne référence aucun site du "
+                "référentiel des sites aériens"
+            )
+
         base_numero = _generer_et_valider_numero_fiche(
             numero_fiche, chef.prenom, date_traitement, "Aerien"
         )
@@ -1257,6 +1280,7 @@ class SyncPushTraitementAerien:
             chef_de_base_id=chef_de_base_id,
             consultant_international=consultant_international,
             base_principale=base_principale,
+            site_principal_id=site_principal_id,
             stand=stand,
             stand_date_installation=stand_date_installation,
             base_secondaire=base_secondaire,

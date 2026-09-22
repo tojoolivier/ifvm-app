@@ -9,7 +9,7 @@ from app.infrastructure.prospection_model import ProspectionModel, ProspectionPo
 
 
 @pytest.fixture
-def payload_traitement(chef_de_base, pilote, mecanicien):
+def payload_traitement(chef_de_base, pilote, mecanicien, base_aerienne):
     def _build(prospection_id, **overrides):
         payload = {
             "prospection_id": str(prospection_id),
@@ -21,9 +21,11 @@ def payload_traitement(chef_de_base, pilote, mecanicien):
                 "mecanicien": f"{mecanicien.prenom} {mecanicien.nom}",
                 "chef_de_base_id": str(chef_de_base.id),
                 # Texte libre (#traitement-aerien-base-texte-libre) — une valeur
-                # absente du référentiel lieu_aerien doit être acceptée telle
-                # quelle, jamais résolue/validée contre celui-ci.
+                # absente du référentiel site_aerienne doit être acceptée telle
+                # quelle, jamais résolue/validée contre celui-ci. site_principal_id
+                # (#605) est le seul champ validé contre le référentiel.
                 "base_principale": "Base Betioky",
+                "site_principal_id": str(base_aerienne.id),
                 "immatricule_aeronef": "5R-ABC",
             },
         }
@@ -87,7 +89,15 @@ async def test_create_traitement_aerien_brouillon(
 
 @pytest.mark.asyncio
 async def test_traitement_aerien_stand_et_base_secondaire_avec_date_installation(
-    client, auth_headers, db_session, campagne_id, utilisateur, chef_de_base, pilote, mecanicien
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    chef_de_base,
+    pilote,
+    mecanicien,
+    base_aerienne,
 ):
     """#stand-base-secondaire-date-installation : Stand/Base secondaire restent
     du texte libre, la date d'installation de chacun est facultative et
@@ -105,6 +115,7 @@ async def test_traitement_aerien_stand_et_base_secondaire_avec_date_installation
                 "mecanicien": f"{mecanicien.prenom} {mecanicien.nom}",
                 "chef_de_base_id": str(chef_de_base.id),
                 "base_principale": "Base Betioky",
+                "site_principal_id": str(base_aerienne.id),
                 "stand": "Stand Ihosy",
                 "stand_date_installation": "2026-07-01",
                 "base_secondaire": "Base Ambovombe",
@@ -143,6 +154,38 @@ async def test_traitement_aerien_stand_et_base_secondaire_dates_facultatives(
     assert aerien["stand_date_installation"] is None
     assert aerien["base_secondaire"] is None
     assert aerien["base_secondaire_date_installation"] is None
+
+
+@pytest.mark.asyncio
+async def test_traitement_aerien_expose_le_site_principal_rattache(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, base_aerienne
+):
+    """#605 : la fiche renvoie le site rattaché (site_principal_id), en plus du
+    texte libre `base_principale` conservé."""
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    resp = await client.post(
+        "/traitements", json=payload_traitement(prospection_id), headers=auth_headers
+    )
+    assert resp.status_code == 201, resp.text
+    aerien = resp.json()["aerien"]
+    assert aerien["site_principal_id"] == str(base_aerienne.id)
+    assert aerien["base_principale"] == "Base Betioky"
+
+    relu = await client.get(f"/traitements/{resp.json()['id']}", headers=auth_headers)
+    assert relu.json()["aerien"]["site_principal_id"] == str(base_aerienne.id)
+
+
+@pytest.mark.asyncio
+async def test_traitement_aerien_refuse_site_principal_inconnu(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+):
+    """#605 : une site_principal_id absente du référentiel est refusée
+    explicitement (404), jamais une 500."""
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    payload = payload_traitement(prospection_id)
+    payload["aerien"]["site_principal_id"] = str(uuid.uuid4())
+    resp = await client.post("/traitements", json=payload, headers=auth_headers)
+    assert resp.status_code == 404, resp.text
 
 
 @pytest.mark.asyncio

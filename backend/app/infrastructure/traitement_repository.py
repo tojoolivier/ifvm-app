@@ -268,6 +268,7 @@ class TraitementRepositoryImpl(TraitementRepository):
                 chef_de_base_id=traitement.aerien.chef_de_base_id,
                 consultant_international=traitement.aerien.consultant_international,
                 base_principale=traitement.aerien.base_principale,
+                site_principal_id=traitement.aerien.site_principal_id,
                 stand=traitement.aerien.stand,
                 stand_date_installation=traitement.aerien.stand_date_installation,
                 base_secondaire=traitement.aerien.base_secondaire,
@@ -696,6 +697,7 @@ class TraitementRepositoryImpl(TraitementRepository):
             model.aerien.chef_de_base_id = traitement.aerien.chef_de_base_id
             model.aerien.consultant_international = traitement.aerien.consultant_international
             model.aerien.base_principale = traitement.aerien.base_principale
+            model.aerien.site_principal_id = traitement.aerien.site_principal_id
             model.aerien.stand = traitement.aerien.stand
             model.aerien.stand_date_installation = traitement.aerien.stand_date_installation
             model.aerien.base_secondaire = traitement.aerien.base_secondaire
@@ -945,6 +947,7 @@ class TraitementRepositoryImpl(TraitementRepository):
                 chef_de_base_id=model.aerien.chef_de_base_id,
                 consultant_international=model.aerien.consultant_international,
                 base_principale=model.aerien.base_principale,
+                site_principal_id=model.aerien.site_principal_id,
                 stand=model.aerien.stand,
                 stand_date_installation=model.aerien.stand_date_installation,
                 base_secondaire=model.aerien.base_secondaire,

@@ -28,6 +28,10 @@ class ProspectionIntrouvableError(LookupError):
     """La prospection liée au traitement n'existe pas."""
 
 
+class SitePrincipalIntrouvableError(LookupError):
+    """site_principal_id ne référence aucun site du référentiel `site_aerienne`."""
+
+
 class ChefDeBaseInvalideError(PermissionError):
     """chef_de_base_id ne référence pas un utilisateur avec le rôle chef_de_base."""
 
@@ -294,6 +298,13 @@ class TraitementAerien:
     # (vide = ravitaillement fait directement à une base) ; base secondaire
     # facultative.
     base_principale: str = ""
+    # FK référentiel (migration 0087, #605) : nullable en base (fiches
+    # existantes non rapprochées, cf. docstring de la migration), mais exigée
+    # côté `TraitementAerienCreate` pour toute nouvelle fiche. `base_principale`
+    # (texte) reste la source affichée/synchronisée avec le mobile ; ceci n'est
+    # qu'un rattachement en plus, pas un remplacement (hors périmètre de ce
+    # ticket, cf. #605 « Ne pas supprimer l'ancienne colonne »).
+    site_principal_id: uuid.UUID | None = None
     stand: str | None = None
     base_secondaire: str | None = None
     # Date d'installation (migration 0056) — facultative et indépendante du

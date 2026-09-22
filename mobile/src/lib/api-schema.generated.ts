@@ -3584,6 +3584,11 @@ export interface components {
             consultant_international?: string | null;
             /** Base Principale */
             base_principale: string;
+            /**
+             * Site Principal Id
+             * Format: uuid
+             */
+            site_principal_id: string;
             /** Stand */
             stand?: string | null;
             /** Stand Date Installation */
@@ -3624,6 +3629,8 @@ export interface components {
             consultant_international: string | null;
             /** Base Principale */
             base_principale: string;
+            /** Site Principal Id */
+            site_principal_id: string | null;
             /** Stand */
             stand: string | null;
             /** Stand Date Installation */

@@ -65,6 +65,7 @@ def _traitement_aerien(**overrides) -> TraitementRead:
             chef_de_base_id=uuid.uuid4(),
             consultant_international=None,
             base_principale="Base Betioky",
+            site_principal_id=uuid.uuid4(),
             stand=None,
             stand_date_installation=None,
             base_secondaire=None,

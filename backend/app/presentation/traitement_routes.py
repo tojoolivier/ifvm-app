@@ -38,6 +38,7 @@ from app.domain.traitement import (
     ProspectionIntrouvableError,
     RotationBlocInvalideError,
     RotationIntrouvableError,
+    SitePrincipalIntrouvableError,
     TraitementIntrouvableError,
     TraitementNonValideeError,
     TraitementOrigineDejaUtiliseeError,
@@ -48,6 +49,7 @@ from app.domain.traitement import (
 )
 from app.infrastructure.pdf_renderer import render_html_to_pdf
 from app.infrastructure.prospection_repository import ProspectionRepositoryImpl
+from app.infrastructure.referentiel_sync_repository import SiteAerienneRepositoryImpl
 from app.infrastructure.traitement_repository import TraitementRepositoryImpl
 from app.infrastructure.utilisateur_repository import UtilisateurRepositoryImpl
 from app.models.users import Utilisateur
@@ -150,12 +152,14 @@ async def create_traitement(
     repository = get_repository(db)
     prospection_repository = ProspectionRepositoryImpl(db)
     utilisateur_repository = UtilisateurRepositoryImpl(db)
+    site_aerienne_repository = SiteAerienneRepositoryImpl(db)
     try:
         if body.aerien is not None:
             use_case = CreateTraitementAerien(
                 traitement_repository=repository,
                 prospection_repository=prospection_repository,
                 utilisateur_repository=utilisateur_repository,
+                site_aerienne_repository=site_aerienne_repository,
             )
             return await use_case.execute(
                 **_champs_communs(body),
@@ -164,6 +168,7 @@ async def create_traitement(
                 chef_de_base_id=body.aerien.chef_de_base_id,
                 consultant_international=body.aerien.consultant_international,
                 base_principale=body.aerien.base_principale,
+                site_principal_id=body.aerien.site_principal_id,
                 stand=body.aerien.stand,
                 stand_date_installation=body.aerien.stand_date_installation,
                 base_secondaire=body.aerien.base_secondaire,
@@ -209,7 +214,11 @@ async def create_traitement(
         )
     except (ChefDeBaseInvalideError, ChefEquipeInvalideError) as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
-    except (ProspectionIntrouvableError, TraitementOrigineIntrouvableError) as e:
+    except (
+        ProspectionIntrouvableError,
+        TraitementOrigineIntrouvableError,
+        SitePrincipalIntrouvableError,
+    ) as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except (NumeroFicheConflitError, TraitementOrigineDejaUtiliseeError) as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
@@ -232,12 +241,14 @@ async def sync_traitement(
     repository = get_repository(db)
     prospection_repository = ProspectionRepositoryImpl(db)
     utilisateur_repository = UtilisateurRepositoryImpl(db)
+    site_aerienne_repository = SiteAerienneRepositoryImpl(db)
     try:
         if body.aerien is not None:
             use_case = SyncPushTraitementAerien(
                 traitement_repository=repository,
                 prospection_repository=prospection_repository,
                 utilisateur_repository=utilisateur_repository,
+                site_aerienne_repository=site_aerienne_repository,
             )
             traitement, cree = await use_case.execute(
                 traitement_id=body.id,
@@ -248,6 +259,7 @@ async def sync_traitement(
                 chef_de_base_id=body.aerien.chef_de_base_id,
                 consultant_international=body.aerien.consultant_international,
                 base_principale=body.aerien.base_principale,
+                site_principal_id=body.aerien.site_principal_id,
                 stand=body.aerien.stand,
                 stand_date_installation=body.aerien.stand_date_installation,
                 base_secondaire=body.aerien.base_secondaire,
@@ -301,7 +313,11 @@ async def sync_traitement(
         )
     except (ChefDeBaseInvalideError, ChefEquipeInvalideError) as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
-    except (ProspectionIntrouvableError, TraitementOrigineIntrouvableError) as e:
+    except (
+        ProspectionIntrouvableError,
+        TraitementOrigineIntrouvableError,
+        SitePrincipalIntrouvableError,
+    ) as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except (NumeroFicheConflitError, TraitementOrigineDejaUtiliseeError) as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))

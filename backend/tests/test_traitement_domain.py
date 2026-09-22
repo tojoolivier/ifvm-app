@@ -32,6 +32,7 @@ from app.domain.traitement import (
     Rotation,
     RotationIntrouvableError,
     SignaturesManquantesError,
+    SitePrincipalIntrouvableError,
     Traitement,
     TraitementAerien,
     TraitementIntrouvableError,
@@ -437,10 +438,24 @@ class FakeUtilisateurRepo:
         return self.user
 
 
+class FakeSiteAerienneRepo:
+    def __init__(self, site=None):
+        self.site = site
+
+    async def get_by_id(self, site_id):
+        return self.site
+
+
+_CHEF = UtilisateurRef(id=uuid.uuid4(), prenom="Hery", role="chef_de_base")
+_SITE_PRINCIPAL_ID = uuid.uuid4()
+_SITE_PRINCIPAL = object()  # get_by_id ne renvoie jamais None => site trouvé
+
+
 def _use_case(
     prospection: Prospection | None = None,
     chef: UtilisateurRef | None = None,
     conflits: int = 0,
+    site_principal: object | None = _SITE_PRINCIPAL,
 ) -> tuple[CreateTraitementAerien, FakeTraitementRepo]:
     repo = FakeTraitementRepo(conflits=conflits)
     return (
@@ -448,12 +463,10 @@ def _use_case(
             traitement_repository=repo,
             prospection_repository=FakeProspectionRepo(prospection),
             utilisateur_repository=FakeUtilisateurRepo(chef),
+            site_aerienne_repository=FakeSiteAerienneRepo(site_principal),
         ),
         repo,
     )
-
-
-_CHEF = UtilisateurRef(id=uuid.uuid4(), prenom="Hery", role="chef_de_base")
 
 
 def _args(**overrides):
@@ -466,6 +479,7 @@ def _args(**overrides):
         mecanicien="Marc Rabe",
         chef_de_base_id=_CHEF.id,
         base_principale="Base Betioky",
+        site_principal_id=_SITE_PRINCIPAL_ID,
         immatricule_aeronef="5R-XYZ",
     )
     args.update(overrides)
@@ -553,6 +567,13 @@ async def test_rejette_chef_de_base_avec_mauvais_role():
 async def test_rejette_chef_de_base_inconnu():
     use_case, _ = _use_case(prospection=_prospection(), chef=None)
     with pytest.raises(ChefDeBaseInvalideError):
+        await use_case.execute(**_args())
+
+
+@pytest.mark.asyncio
+async def test_rejette_site_principal_inconnu():
+    use_case, _ = _use_case(prospection=_prospection(), chef=_CHEF, site_principal=None)
+    with pytest.raises(SitePrincipalIntrouvableError):
         await use_case.execute(**_args())
 
 
