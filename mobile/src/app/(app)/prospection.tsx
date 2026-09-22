@@ -24,13 +24,18 @@ import {
 } from '@/components/fiches/tokens';
 import { statutFicheAffiche, StatutFicheAffiche } from '@/lib/prospection-statut';
 
-const EMPTY_DATA: AccueilViewModel = { unsyncedCount: 0, activeDraft: null, recent: [], validated: [], pendingSync: [] };
+const EMPTY_DATA: AccueilViewModel = { unsyncedCount: 0, activeDraft: null, draftsCount: 0, recent: [], validated: [], pendingSync: [] };
 
 type BadgeKind = StatutFicheAffiche;
 type FilterKey = 'TOUS' | StatutFicheAffiche;
 
 const FILTERS: FilterOption<FilterKey>[] = [
   { value: 'TOUS', label: 'Toutes' },
+  // #dossier-brouillons : distinct de « À synchro » depuis le correctif de
+  // statutFicheAffiche — un brouillon n'a jamais été soumis à l'envoi (cf.
+  // l'écran dédié (app)/brouillons.tsx pour la reprise de N'IMPORTE LEQUEL,
+  // pas seulement le plus récent).
+  { value: 'brouillon', label: 'Brouillons' },
   { value: 'a_synchro', label: 'À synchro' },
   { value: 'echec_synchro', label: 'Échec envoi' },
   { value: 'en_attente', label: 'En attente' },

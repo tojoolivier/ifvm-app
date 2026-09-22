@@ -9,7 +9,15 @@ describe('statutFicheAffiche', () => {
 
   it('distingue « échec d’envoi » (le serveur a refusé) de « à synchro » (attend juste le réseau) — sinon une fiche définitivement bloquée est indiscernable d’une fiche qui partira au prochain passage réseau', () => {
     expect(statutFicheAffiche('en_attente', 'echec')).toBe('echec_synchro');
-    expect(statutFicheAffiche('brouillon', 'echec')).toBe('echec_synchro');
+  });
+
+  it('#dossier-brouillons : une fiche encore en brouillon affiche toujours « brouillon », jamais un état de synchro — elle n’a jamais été soumise à l’envoi', () => {
+    expect(statutFicheAffiche('brouillon', 'local')).toBe('brouillon');
+    // `statut_sync = 'echec'` n'est pas un état atteignable pour un brouillon
+    // (cf. commentaire de `statutFicheAffiche`), mais même dans ce cas
+    // théorique, `brouillon` prime : il n'y a rien à synchroniser tant que la
+    // fiche n'est pas terminée.
+    expect(statutFicheAffiche('brouillon', 'echec')).toBe('brouillon');
   });
 
   it('affiche « en attente » pour une fiche synchronisée en attente de vérification', () => {
@@ -25,6 +33,7 @@ describe('statutFicheAffiche', () => {
   it('chaque état rendu a bien une entrée dans STATUT_BADGE_CONFIG', () => {
     for (const [statut, sync] of [
       ['x', 'local'],
+      ['brouillon', 'local'],
       ['en_attente', 'synced'],
       ['verifiee', 'synced'],
       ['validee', 'synced'],

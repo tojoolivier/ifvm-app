@@ -36,6 +36,12 @@ const log = logger.child({ module: 'prospection-accueil' });
 export interface AccueilViewModel {
   unsyncedCount: number;
   activeDraft: DraftProspection | null;
+  /** #dossier-brouillons : nombre total de brouillons locaux (intensive/
+   * extensive/validation confondus), toujours cohérent avec la liste de
+   * l'écran Brouillons (`listDraftProspections`) — sert de pastille sur la
+   * tuile ACCÈS RAPIDE correspondante, distinct de `activeDraft` qui n'en
+   * retient qu'un seul (le plus récent) pour la reprise rapide historique. */
+  draftsCount: number;
   /** Toutes les fiches locales (tous statuts), jamais plafonnées
    * (`listToutesProspectionsLocal` — #fiches-validees-liste-non-plafonnee) :
    * « Mes prospections »/« Mes fiches » doivent rester intégralement
@@ -57,6 +63,7 @@ export async function loadAccueilData(): Promise<AccueilViewModel> {
   return {
     unsyncedCount,
     activeDraft: drafts[0] ?? null,
+    draftsCount: drafts.length,
     recent,
     validated: [],
     pendingSync,

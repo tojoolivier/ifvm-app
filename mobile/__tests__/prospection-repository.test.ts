@@ -989,12 +989,18 @@ describe('concludeValidation', () => {
 
 describe('completeProspection', () => {
   it('bascule une fiche de validation/signalement directement en validee, n_fiche aligné sur n_message', async () => {
-    getFirstAsync.mockResolvedValueOnce({
+    const ligne = {
       ...STORED_ROW,
       type_prospection: 'validation',
       statut: 'validee',
       n_fiche: '20260711-ABCD',
-    });
+    };
+    // #numeros-fiche-uniques : `completeProspection` relit désormais la fiche
+    // avant de la clôturer (contrôle anti-doublon) puis une seconde fois après
+    // — deux appels à `getFirstAsync`, tous deux servis par la même ligne ici
+    // (le contrôle anti-doublon lui-même ne consomme aucun appel supplémentaire
+    // pour cette fiche : `n_message` est absent du fixture, donc rien à vérifier).
+    getFirstAsync.mockResolvedValueOnce(ligne).mockResolvedValueOnce(ligne);
 
     await completeProspection(BASE_INPUT.id);
 
@@ -1022,6 +1028,60 @@ describe('completeProspection', () => {
     await expect(completeProspection(BASE_INPUT.id)).rejects.toThrow(
       'Échec de la mise à jour de la fiche brouillon locale'
     );
+  });
+
+  describe('#numeros-fiche-uniques : refus de clôturer un doublon', () => {
+    it('refuse de clôturer si une autre fiche locale porte déjà ce n_fiche (Intensif/Extensif)', async () => {
+      const ligne = { ...STORED_ROW, n_fiche: '20260711-ABCD', revalide_de_id: null };
+      getFirstAsync
+        .mockResolvedValueOnce(ligne) // lecture initiale (current)
+        .mockResolvedValueOnce({ id: 'autre-fiche-id' }); // contrôle anti-doublon : trouvé
+
+      await expect(completeProspection(BASE_INPUT.id)).rejects.toThrow(
+        'Le numéro « 20260711-ABCD » est déjà utilisé par une autre fiche'
+      );
+      expect(runAsync).not.toHaveBeenCalled();
+    });
+
+    it('vérifie n_message (pas n_fiche, pas encore posé) pour une fiche de Validation/Signalement', async () => {
+      const ligne = { ...STORED_ROW, type_prospection: 'validation', n_fiche: null, n_message: 'MSG-001', revalide_de_id: null };
+      getFirstAsync
+        .mockResolvedValueOnce(ligne)
+        .mockResolvedValueOnce({ id: 'autre-fiche-id' });
+
+      await expect(completeProspection(BASE_INPUT.id)).rejects.toThrow(
+        'Le numéro « MSG-001 » est déjà utilisé par une autre fiche'
+      );
+      expect(getFirstAsync).toHaveBeenCalledWith(
+        expect.stringContaining('WHERE id != ? AND n_fiche = ?'),
+        [BASE_INPUT.id, 'MSG-001']
+      );
+      expect(runAsync).not.toHaveBeenCalled();
+    });
+
+    it('#revalidation-prospection : ne bloque jamais quand le seul « doublon » trouvé est la fiche périmée que celle-ci revalide', async () => {
+      const ligne = {
+        ...STORED_ROW,
+        n_fiche: '20260711-ABCD',
+        revalide_de_id: 'fiche-perimee-id',
+      };
+      getFirstAsync
+        .mockResolvedValueOnce(ligne) // lecture initiale (current)
+        .mockResolvedValueOnce({ id: 'fiche-perimee-id' }) // contrôle anti-doublon : la source elle-même
+        .mockResolvedValueOnce(ligne); // lecture finale (updated)
+
+      await expect(completeProspection(BASE_INPUT.id)).resolves.toBeTruthy();
+      expect(runAsync).toHaveBeenCalled();
+    });
+
+    it("n'appelle aucun contrôle quand la fiche n'a encore aucun numéro (rien à vérifier)", async () => {
+      const ligne = { ...STORED_ROW, n_fiche: null, n_message: null };
+      getFirstAsync.mockResolvedValueOnce(ligne).mockResolvedValueOnce(ligne);
+
+      await expect(completeProspection(BASE_INPUT.id)).resolves.toBeTruthy();
+      expect(getFirstAsync).toHaveBeenCalledTimes(2);
+      expect(runAsync).toHaveBeenCalled();
+    });
   });
 });
 
@@ -1436,6 +1496,23 @@ describe('countUnsyncedProspections', () => {
     expect(result).toBe(3);
     expect(getFirstAsync).toHaveBeenCalledWith(
       expect.stringContaining("statut_sync != 'synced'")
+    );
+  });
+
+  /**
+   * #dossier-brouillons : un brouillon n'est par construction jamais envoyé
+   * (`listUnsyncedProspections` ne sélectionne que `statut = 'en_attente'`) —
+   * le compter ici gonflerait à tort le badge « non synchronisé » de
+   * l'accueil d'un nombre de fiches qui ne partiront jamais tant qu'elles ne
+   * sont pas terminées.
+   */
+  it('exclut les fiches encore en brouillon de la requête', async () => {
+    getFirstAsync.mockResolvedValueOnce({ count: 0 });
+
+    await countUnsyncedProspections();
+
+    expect(getFirstAsync).toHaveBeenCalledWith(
+      expect.stringContaining("statut != 'brouillon'")
     );
   });
 
