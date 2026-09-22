@@ -886,6 +886,7 @@ describe('updateProspectionExtensiveObservations', () => {
         null, // futsRecues
         null, // signatureVisaNom
         null, // signatureVisaHorodatage
+        null, // signatureVisaImage
         null, // signatureConsultantFaoNom
         null, // signatureConsultantFaoHorodatage
         null, // signatureConsultantFaoImage
@@ -917,6 +918,7 @@ describe('updateProspectionExtensiveObservations', () => {
       futsRecues: 5,
       signatureVisaNom: 'Rakoto V.',
       signatureVisaHorodatage: '2026-09-01T09:00:00.000Z',
+      signatureVisaImage: 'M-1 -1 L9 9',
       signatureConsultantFaoNom: 'John Smith',
       signatureConsultantFaoHorodatage: '2026-09-01T09:05:00.000Z',
       signatureConsultantFaoImage: 'M0 0 L1 1',
@@ -946,6 +948,7 @@ describe('updateProspectionExtensiveObservations', () => {
         5,
         'Rakoto V.',
         '2026-09-01T09:00:00.000Z',
+        'M-1 -1 L9 9',
         'John Smith',
         '2026-09-01T09:05:00.000Z',
         'M0 0 L1 1',

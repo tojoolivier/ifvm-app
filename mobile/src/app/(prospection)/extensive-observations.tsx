@@ -8,6 +8,7 @@ import {
   updateProspectionExtensiveObservations,
 } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
+import { useAuthStore } from '@/lib/auth-store';
 import { DEGATS_CULTURES_EXTENSIF_OPTIONS, NIVEAU_OPTIONS } from '@/lib/prospection-extensive';
 import { listUtilisateursByRole, UtilisateurEquipe } from '@/lib/referentiel-db';
 import { DateField } from '@/components/DateField';
@@ -22,6 +23,9 @@ const TEXT = '#16201a';
 const TEXT_SECONDARY = '#6f6a59';
 const BORDER = '#e7e0cd';
 const INACTIVE_BG = '#efeada';
+// Auto-signature du prospecteur (section Signature, après Remarques) — même
+// teinte que la carte "Prospecteur" de observations.tsx (Intensif).
+const AUTO_BG = '#eaf2ec';
 
 // La colonne backend `hauteur_herbe_cm` reste en centimètres (partagée avec l'intensif,
 // cf. reference.tsx/observations.tsx) : seule l'unité affichée/saisie à l'écran devient
@@ -143,6 +147,28 @@ export default function ExtensiveObservationsScreen() {
   // colonne, juste un intitulé différent à l'écran (pas de nouvelle colonne).
   const [remarques, setRemarques] = useState(draft?.observations ?? '');
 
+  // ==========================================
+  // SIGNATURE — auto-signature du prospecteur connecté, après Remarques
+  // ==========================================
+  // Les deux modes (terrestre et aérien), contrairement aux signatures
+  // Consultant FAO/Chef de Base plus bas (mode aérien uniquement). Le nom
+  // vient uniquement du compte connecté — jamais ressaisi, jamais choisi dans
+  // une liste — seul le tracé (`SignaturePad`) est capturé ici. Réutilise
+  // `signature_visa_nom`/`_horodatage` (migration 0036) + `signature_visa_image`
+  // (migration 0082) — mêmes colonnes que l'auto-signature de observations.tsx
+  // (Intensif), même mécanique VALIDER/MODIFIER.
+  const user = useAuthStore((s) => s.user);
+  const prospecteurNom = user ? `${user.prenom} ${user.nom}` : null;
+  const [signatureVisaNomState, setSignatureVisaNomState] = useState<string | null>(draft?.signature_visa_nom ?? null);
+  const [signatureVisaHorodatageState, setSignatureVisaHorodatageState] = useState<string | null>(
+    draft?.signature_visa_horodatage ?? null
+  );
+  const [signatureVisaImageState, setSignatureVisaImageState] = useState<string | null>(draft?.signature_visa_image ?? null);
+  const [pendingPathVisa, setPendingPathVisa] = useState('');
+  const [resetTickVisa, setResetTickVisa] = useState(0);
+  const [editingSignatureVisa, setEditingSignatureVisa] = useState(false);
+  const enEditionSignatureVisa = editingSignatureVisa || !signatureVisaImageState;
+
   // Mode aérien uniquement — invisibles et jamais lus/écrits en mode terrestre.
   const [pesticidesEmbarques, setPesticidesEmbarques] = useState<boolean | null>(
     normalizeBoolean(draft?.pesticides_embarques)
@@ -257,7 +283,8 @@ export default function ExtensiveObservationsScreen() {
    * référence déjà déclarée, pas sur une qui le sera plus loin dans le composant.
    */
   const buildPayload = (
-    overrides?: Partial<Record<SignatureRole, { nom: string | null; horodatage: string | null; image: string | null }>>
+    overrides?: Partial<Record<SignatureRole, { nom: string | null; horodatage: string | null; image: string | null }>>,
+    overrideVisa?: { nom: string | null; horodatage: string | null; image: string | null }
   ): ExtensiveObservationsUpdateInput => {
     const noms = { ...signatureNoms };
     const horodatages = { ...signatureHorodatages };
@@ -288,11 +315,16 @@ export default function ExtensiveObservationsScreen() {
       futsPleins: futsActifs ? validerEntierPositif(futsPleins, 'Fûts pleins').value : null,
       futsVides: futsActifs ? validerEntierPositif(futsVides, 'Fûts vides').value : null,
       futsRecues: futsActifs ? validerEntierPositif(futsRecues, 'Fûts reçues').value : null,
-      // VISA et Pilote retirés de l'UI mais jamais réécrits : on renvoie tel
-      // quel ce que la fiche portait déjà (historique préservé, cf. commentaire
-      // sur SignatureRole plus haut).
-      signatureVisaNom: draft?.signature_visa_nom ?? null,
-      signatureVisaHorodatage: draft?.signature_visa_horodatage ?? null,
+      // VISA — auto-signature du prospecteur (cf. commentaire sur
+      // `signatureVisaNomState` plus haut) : pilotée par l'état local de cet
+      // écran, plus par simple passthrough de `draft` — c'est désormais un champ
+      // à part entière de ce slide, après Remarques.
+      signatureVisaNom: overrideVisa ? overrideVisa.nom : signatureVisaNomState,
+      signatureVisaHorodatage: overrideVisa ? overrideVisa.horodatage : signatureVisaHorodatageState,
+      signatureVisaImage: overrideVisa ? overrideVisa.image : signatureVisaImageState,
+      // Pilote retiré de l'UI mais jamais réécrit : on renvoie tel quel ce que
+      // la fiche portait déjà (historique préservé, cf. commentaire sur
+      // SignatureRole plus haut).
       signaturePiloteNom: draft?.signature_pilote_nom ?? null,
       signaturePiloteHorodatage: draft?.signature_pilote_horodatage ?? null,
       signaturePiloteImage: draft?.signature_pilote_image ?? null,
@@ -377,6 +409,11 @@ export default function ExtensiveObservationsScreen() {
       setDernierePluie(draft.derniere_pluie ?? '');
       setIntensite(draft.intensite_pluie ?? 'faible');
       setRemarques(draft.observations ?? '');
+      // Auto-signature du prospecteur, après Remarques — les deux modes.
+      setSignatureVisaNomState(draft.signature_visa_nom ?? null);
+      setSignatureVisaHorodatageState(draft.signature_visa_horodatage ?? null);
+      setSignatureVisaImageState(draft.signature_visa_image ?? null);
+      setEditingSignatureVisa(false);
       // Mode aérien uniquement — sans effet sur une fiche terrestre (colonnes NULL).
       setPesticidesEmbarques(normalizeBoolean(draft.pesticides_embarques));
       setPesticideNomCommercial(draft.pesticide_nom_commercial ?? '');
@@ -449,6 +486,43 @@ export default function ExtensiveObservationsScreen() {
     setPendingPaths((current) => ({ ...current, [role]: '' }));
     setResetTicks((current) => ({ ...current, [role]: (current[role] ?? 0) + 1 }));
     setEditingRoles((current) => new Set(current).add(role));
+  };
+
+  /** VALIDER — auto-signature du prospecteur (après Remarques, les deux modes).
+   * Capture définitivement le tracé en cours, persisté immédiatement (SQLite
+   * local), pas seulement gardé en state React — même principe offline-first
+   * que `handleValider` ci-dessus et que observations.tsx (Intensif). */
+  const handleValiderSignatureVisa = () => {
+    const trace = pendingPathVisa;
+    if (!prospecteurNom || !trace) return; // Précondition déjà imposée par le bouton désactivé.
+    const horodatage = new Date().toISOString();
+    return run(
+      async () => {
+        const updated = await updateProspectionExtensiveObservations(
+          draftId,
+          buildPayload(undefined, { nom: prospecteurNom, horodatage, image: trace })
+        );
+        setDraft(updated);
+        setSignatureVisaNomState(prospecteurNom);
+        setSignatureVisaHorodatageState(horodatage);
+        setSignatureVisaImageState(trace);
+        setEditingSignatureVisa(false);
+      },
+      {
+        screen: 'extensive-observations',
+        precondition: !!draftId,
+        preconditionMessage: 'Session de saisie perdue — revenez à l’écran précédent et réessayez.',
+        context: { draftId },
+      }
+    );
+  };
+
+  /** MODIFIER — auto-signature du prospecteur : repart d'un tracé vierge ; la
+   * signature déjà validée n'est remplacée qu'au prochain VALIDER. */
+  const handleModifierSignatureVisa = () => {
+    setPendingPathVisa('');
+    setResetTickVisa((tick) => tick + 1);
+    setEditingSignatureVisa(true);
   };
 
   const handleContinue = () => {
@@ -768,6 +842,45 @@ export default function ExtensiveObservationsScreen() {
               />
             </View>
 
+            {/* ==========================================
+                SECTION : SIGNATURE (auto-signature du prospecteur, après Remarques)
+                ========================================== */}
+
+            <Text style={styles.sectionLabel}>Signature</Text>
+            <View style={[styles.card, styles.signatureRow]}>
+              <View style={styles.autoCardVisa}>
+                <Text style={styles.autoLabelVisa}>Prospecteur</Text>
+                <Text style={styles.autoValueVisa}>{prospecteurNom ?? '—'}</Text>
+              </View>
+
+              {enEditionSignatureVisa ? (
+                <>
+                  <SignaturePad
+                    key={`signature-visa-${resetTickVisa}`}
+                    testID="signature-pad-visa"
+                    value={null}
+                    onChange={setPendingPathVisa}
+                  />
+                  <TouchableOpacity
+                    style={[styles.signButton, (!prospecteurNom || !pendingPathVisa) && styles.signButtonDone]}
+                    onPress={handleValiderSignatureVisa}
+                    disabled={!prospecteurNom || !pendingPathVisa}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.signButtonText}>VALIDER</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <SignaturePad testID="signature-pad-visa" value={signatureVisaImageState} onChange={() => {}} readOnly />
+                  <Text style={styles.signatureStamp}>Signé à {formatHeureLocale(signatureVisaHorodatageState)}</Text>
+                  <TouchableOpacity style={styles.modifyButton} onPress={handleModifierSignatureVisa} activeOpacity={0.85}>
+                    <Text style={styles.modifyButtonText}>MODIFIER</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+
             <View style={styles.footerNote}>
               <Text style={styles.footerNoteText}>Dernier écran de saisie — données culture/climat, communes aux deux espèces.</Text>
             </View>
@@ -833,6 +946,10 @@ const styles = StyleSheet.create({
   signButtonText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   modifyButton: { borderWidth: 1, borderColor: BORDER, borderRadius: 9, paddingVertical: 9, alignItems: 'center' },
   modifyButtonText: { color: TEXT, fontWeight: '800', fontSize: 12 },
+  // ===== Signature (auto-signature du prospecteur, après Remarques) =====
+  autoCardVisa: { backgroundColor: AUTO_BG, borderRadius: 10, padding: 11, marginBottom: 9 },
+  autoLabelVisa: { fontSize: 9, fontWeight: '600', color: GREEN, textTransform: 'uppercase', marginBottom: 4 },
+  autoValueVisa: { fontSize: 14, fontWeight: '700', color: TEXT },
   // ===== Remarques (terrestre + aérien) =====
   remarquesCard: { marginBottom: 9 },
   remarquesInput: { minHeight: 90, fontFamily: 'System', fontWeight: '500' },
