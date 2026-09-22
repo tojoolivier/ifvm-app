@@ -1,12 +1,18 @@
-import { useCallback, useMemo, useState } from 'react';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
 import { loadAccueilData, loadMesProspectionsServeur } from '@/lib/prospection-accueil';
 import { DraftProspection, synchroniserStatutServeur } from '@/lib/prospection-repository';
+import { syncAllProspections } from '@/lib/prospection-review';
 import { ProspectionRead } from '@/lib/api-client';
-import { listToutesTraitementsLocal, DraftTraitementRow } from '@/lib/traitement-repository';
+import {
+  listToutesTraitementsLocal,
+  getTraitement,
+  DraftTraitementRow,
+} from '@/lib/traitement-repository';
+import { syncAllTraitements } from '@/lib/traitement-sync';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { navigateToProspectionConsult, navigateToProspectionDraft, navigateToTraitement } from '@/lib/fiche-routing';
 import { FicheCard } from '@/components/fiches/FicheCard';
@@ -24,6 +30,7 @@ import {
   TYPE_BADGE_CONFIG,
 } from '@/components/fiches/tokens';
 import { statutFicheAffiche } from '@/lib/prospection-statut';
+import { useAsyncAction } from '@/hooks/use-async-action';
 
 type FilterKey = 'TOUS' | 'PROSPECTION' | 'CRT' | 'METEO';
 
@@ -45,6 +52,24 @@ function stationLabel(item: { station_nom?: string | null; station_libre?: strin
   return item.station_nom || item.station_libre || 'Localité inconnue';
 }
 
+/**
+ * Pendant de `statutFicheAffiche` (prospection-statut.ts) pour un traitement —
+ * même priorité (`statut_sync` d'abord), mais le domaine traitement ne connaît
+ * que `'brouillon'`/`'validee'` (pas de vérifiée/en attente/rejetée) : la case
+ * par défaut de `statutFicheAffiche` retomberait donc à tort sur « En attente »
+ * pour un brouillon jamais synchronisé.
+ */
+function statutTraitementAffiche(traitement: DraftTraitementRow): string {
+  if (traitement.statut_sync === 'echec') return 'echec_synchro';
+  if (traitement.statut_sync !== 'synced') return 'a_synchro';
+  return traitement.statut === 'validee' ? 'validee' : 'brouillon';
+}
+
+/** Cette clé de badge signale-t-elle une fiche encore à envoyer (#synchro-fiche-par-fiche) ? */
+function estEncoreASynchroniser(cleBadge: string): boolean {
+  return cleBadge === 'a_synchro' || cleBadge === 'echec_synchro';
+}
+
 interface FicheRow {
   id: string;
   filterKey: FilterKey;
@@ -55,6 +80,12 @@ interface FicheRow {
   statutBadge: BadgeStyle;
   date: string;
   onPress: () => void;
+  /**
+   * Non-null seulement pour une fiche encore « à synchro »/« échec envoi » —
+   * le badge de statut devient alors le bouton qui synchronise CETTE fiche
+   * seule, sans passer par l'écran Synchronisation (#synchro-fiche-par-fiche).
+   */
+  onSyncPress: (() => void) | null;
 }
 
 export default function FichesScreen() {
@@ -132,6 +163,95 @@ export default function FichesScreen() {
 
   useFocusEffect(refresh);
 
+  /**
+   * Synchro d'une seule fiche depuis son badge « À SYNCHRO »/« ÉCHEC ENVOI »
+   * (#synchro-fiche-par-fiche) : l'agent n'a plus besoin d'aller sur l'écran
+   * Synchronisation pour renvoyer une fiche isolée.
+   *
+   * Une seule à la fois — `syncingIdRef` (lu à l'appel, pas dans les deps des
+   * callbacks ci-dessous) bloque un second appui pendant qu'un envoi est en
+   * cours, y compris sur une autre fiche.
+   */
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+  const syncingIdRef = useRef<string | null>(null);
+  const { run: runSync } = useAsyncAction();
+
+  const demarrerSync = (id: string) => {
+    syncingIdRef.current = id;
+    setSyncingId(id);
+  };
+  const terminerSync = () => {
+    syncingIdRef.current = null;
+    setSyncingId(null);
+  };
+
+  const handleSyncProspection = useCallback(
+    (draft: DraftProspection) => {
+      if (syncingIdRef.current) return;
+      demarrerSync(draft.id);
+      void runSync(
+        async () => {
+          // Le lot résume, il ne lève pas (ADR-012 décision 9) : un lot d'une
+          // seule fiche reste le même contrat, réutilisé tel quel plutôt que
+          // réécrit (marquage échec/conflit compris, cf. sync-lot.ts).
+          const resume = await syncAllProspections([draft], token!);
+          if (resume.echouees.length > 0) {
+            Alert.alert('Échec de synchronisation', resume.echouees[0].message);
+          } else if (resume.conflits.length > 0) {
+            Alert.alert(
+              'Fiche modifiée sur le serveur',
+              `${resume.conflits[0].label} a été modifiée ou validée sur le serveur. Votre version est conservée sur l'appareil.`
+            );
+          }
+          refresh();
+        },
+        {
+          screen: 'fiches',
+          precondition: !!token,
+          preconditionMessage: 'Session expirée — reconnectez-vous pour synchroniser.',
+          context: { prospectionId: draft.id },
+        }
+      ).finally(terminerSync);
+    },
+    [runSync, token, refresh]
+  );
+
+  const handleSyncTraitement = useCallback(
+    (row: DraftTraitementRow) => {
+      if (syncingIdRef.current) return;
+      demarrerSync(row.id);
+      void runSync(
+        async () => {
+          // `getTraitement` reconstruit la fiche complète (aerien/terrestre/
+          // rotations/produits) — la ligne à plat ne suffit pas à
+          // `syncOneTraitement` (même commentaire que sync.tsx).
+          const complet = await getTraitement(row.id);
+          if (!complet) {
+            Alert.alert('Fiche introuvable', "Cette fiche n'existe plus sur cet appareil.");
+            return;
+          }
+          const resume = await syncAllTraitements([complet], token!);
+          if (resume.echouees.length > 0) {
+            Alert.alert('Échec de synchronisation', resume.echouees[0].message);
+          } else if (resume.conflits.length > 0) {
+            Alert.alert(
+              'Fiche modifiée sur le serveur',
+              `${resume.conflits[0].label} a été modifiée ou validée sur le serveur. Votre version est conservée sur l'appareil.`
+            );
+          }
+          refresh();
+        },
+        {
+          screen: 'fiches',
+          precondition: !!token,
+          preconditionMessage: 'Session expirée — reconnectez-vous pour synchroniser.',
+          context: { traitementId: row.id },
+        }
+      ).finally(terminerSync);
+    },
+    [runSync, token, refresh]
+  );
+
   const today = new Date();
   const decade = Math.ceil(today.getDate() / 10);
   const mois = today.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
@@ -142,20 +262,24 @@ export default function FichesScreen() {
 
     const prospectionRows: FicheRow[] = draftsRecent
       .filter((draft) => !validatedIds.has(draft.id))
-      .map((draft) => ({
-        id: draft.id,
-        filterKey: 'PROSPECTION',
-        code: draft.n_fiche ?? 'Fiche sans numéro',
-        meta: `${stationLabel(draft)} · ${draft.date_prospection}`,
-        typeBadge: TYPE_BADGE_CONFIG.PROSPECTION,
-        subTypeBadge: PROSPECTION_SUBTYPE_BADGE_CONFIG[draft.type_prospection] ?? null,
-        statutBadge:
-          STATUT_BADGE_CONFIG[statutFicheAffiche(draft.statut, draft.statut_sync)] ??
-          STATUT_BADGE_CONFIG.brouillon,
-        date: draft.date_prospection,
-        onPress: () => navigateToProspectionDraft(router, hydrateFromDraft, draft),
-      }));
+      .map((draft) => {
+        const cleBadge = statutFicheAffiche(draft.statut, draft.statut_sync);
+        return {
+          id: draft.id,
+          filterKey: 'PROSPECTION',
+          code: draft.n_fiche ?? 'Fiche sans numéro',
+          meta: `${stationLabel(draft)} · ${draft.date_prospection}`,
+          typeBadge: TYPE_BADGE_CONFIG.PROSPECTION,
+          subTypeBadge: PROSPECTION_SUBTYPE_BADGE_CONFIG[draft.type_prospection] ?? null,
+          statutBadge: STATUT_BADGE_CONFIG[cleBadge] ?? STATUT_BADGE_CONFIG.brouillon,
+          date: draft.date_prospection,
+          onPress: () => navigateToProspectionDraft(router, hydrateFromDraft, draft),
+          onSyncPress: estEncoreASynchroniser(cleBadge) ? () => handleSyncProspection(draft) : null,
+        };
+      });
 
+    // Déjà connue du serveur (`statut_sync` forcé à 'synced' ici) : jamais
+    // « à synchro », donc jamais de bouton de synchro sur ces lignes.
     const validatedRows: FicheRow[] = validated.map((prospection) => ({
       id: prospection.id,
       filterKey: 'PROSPECTION',
@@ -166,23 +290,28 @@ export default function FichesScreen() {
       statutBadge: STATUT_BADGE_CONFIG[statutFicheAffiche(prospection.statut, 'synced')],
       date: prospection.date_prospection,
       onPress: () => navigateToProspectionConsult(router, prospection),
+      onSyncPress: null,
     }));
 
-    const traitementRows: FicheRow[] = traitements.map((traitement) => ({
-      id: traitement.id,
-      filterKey: 'CRT',
-      code: traitement.numero_fiche ?? 'Fiche sans numéro',
-      meta: `${traitement.localite ?? 'Localité inconnue'} · ${traitement.date_traitement ?? '—'}`,
-      typeBadge: TYPE_BADGE_CONFIG.CRT,
-      subTypeBadge: TRAITEMENT_SUBTYPE_BADGE_CONFIG[traitement.type_traitement] ?? null,
-      statutBadge: STATUT_BADGE_CONFIG[traitement.statut] ?? STATUT_BADGE_CONFIG.brouillon,
-      date: traitement.date_traitement ?? traitement.updated_at,
-      onPress: () =>
-        navigateToTraitement(router, traitement, { validationView: traitement.statut === 'validee' }),
-    }));
+    const traitementRows: FicheRow[] = traitements.map((traitement) => {
+      const cleBadge = statutTraitementAffiche(traitement);
+      return {
+        id: traitement.id,
+        filterKey: 'CRT',
+        code: traitement.numero_fiche ?? 'Fiche sans numéro',
+        meta: `${traitement.localite ?? 'Localité inconnue'} · ${traitement.date_traitement ?? '—'}`,
+        typeBadge: TYPE_BADGE_CONFIG.CRT,
+        subTypeBadge: TRAITEMENT_SUBTYPE_BADGE_CONFIG[traitement.type_traitement] ?? null,
+        statutBadge: STATUT_BADGE_CONFIG[cleBadge] ?? STATUT_BADGE_CONFIG.brouillon,
+        date: traitement.date_traitement ?? traitement.updated_at,
+        onPress: () =>
+          navigateToTraitement(router, traitement, { validationView: traitement.statut === 'validee' }),
+        onSyncPress: estEncoreASynchroniser(cleBadge) ? () => handleSyncTraitement(traitement) : null,
+      };
+    });
 
     return [...prospectionRows, ...validatedRows, ...traitementRows].sort((a, b) => b.date.localeCompare(a.date));
-  }, [draftsRecent, validated, traitements, router, hydrateFromDraft]);
+  }, [draftsRecent, validated, traitements, router, hydrateFromDraft, handleSyncProspection, handleSyncTraitement]);
 
   const fichesFiltrees = useMemo(() => {
     return rows.filter((row) => {
@@ -239,6 +368,9 @@ export default function FichesScreen() {
             statutBadge={item.statutBadge}
             meta={item.meta}
             onPress={item.onPress}
+            onSyncPress={item.onSyncPress ?? undefined}
+            syncing={syncingId === item.id}
+            syncDisabled={syncingId !== null && syncingId !== item.id}
           />
         )}
         contentContainerStyle={styles.listContent}
