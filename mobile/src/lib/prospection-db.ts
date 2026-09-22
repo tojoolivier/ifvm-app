@@ -853,6 +853,13 @@ const COLONNES_TRAITEMENT_AERIEN: readonly Colonne[] = [
   // comme le reste des colonnes ajoutées après coup : la contrainte NOT NULL
   // n'existe que côté backend (schéma de création).
   { name: 'base_principale', type: 'TEXT' },
+  // FK référentiel site_aerienne (migration backend 0087, #605) — colonne
+  // déclarée par anticipation, comme lieu_base_principale_id/pilote_id
+  // ci-dessus : aucun écran mobile ne la capture ni ne l'envoie encore
+  // (#605 exclut explicitement l'adaptation des écrans de saisie), donc
+  // jamais lue/écrite pour l'instant. Nullable ici comme toute colonne
+  // ajoutée après coup ; TraitementAerienCreate l'exige côté backend.
+  { name: 'site_principal_id', type: 'TEXT' },
   { name: 'stand', type: 'TEXT' },
   { name: 'base_secondaire', type: 'TEXT' },
   // Date d'installation du Stand / de la Base secondaire (migration backend

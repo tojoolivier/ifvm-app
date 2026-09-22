@@ -73,6 +73,18 @@ def _valider_dates(date_traitement: date, date_validation: date) -> None:
         raise ValueError("date_traitement doit être postérieure ou égale à date_validation")
 
 
+async def _valider_site_principal(
+    site_aerienne_repository: SiteAerienneRepository, site_principal_id: uuid.UUID
+) -> None:
+    """Partagée entre `CreateTraitementAerien` et `SyncPushTraitementAerien` (#605)."""
+    site_principal = await site_aerienne_repository.get_by_id(site_principal_id)
+    if site_principal is None:
+        raise SitePrincipalIntrouvableError(
+            f"site_principal_id {site_principal_id} ne référence aucun site du "
+            "référentiel des sites aériens"
+        )
+
+
 def _generer_et_valider_numero_fiche(
     numero_fiche: str | None, prenom_chef: str, date_traitement: date, type_libelle: str
 ) -> str:
@@ -302,12 +314,7 @@ class CreateTraitementAerien:
             )
         valider_roles_aerien_distincts(f"{chef.prenom} {chef.nom}", pilote, mecanicien)
 
-        site_principal = await self.site_aerienne_repository.get_by_id(site_principal_id)
-        if site_principal is None:
-            raise SitePrincipalIntrouvableError(
-                f"site_principal_id {site_principal_id} ne référence aucun site du "
-                "référentiel des sites aériens"
-            )
+        await _valider_site_principal(self.site_aerienne_repository, site_principal_id)
 
         base_numero = _generer_et_valider_numero_fiche(
             numero_fiche, chef.prenom, date_traitement, "Aerien"
@@ -1218,12 +1225,7 @@ class SyncPushTraitementAerien:
             )
         valider_roles_aerien_distincts(f"{chef.prenom} {chef.nom}", pilote, mecanicien)
 
-        site_principal = await self.site_aerienne_repository.get_by_id(site_principal_id)
-        if site_principal is None:
-            raise SitePrincipalIntrouvableError(
-                f"site_principal_id {site_principal_id} ne référence aucun site du "
-                "référentiel des sites aériens"
-            )
+        await _valider_site_principal(self.site_aerienne_repository, site_principal_id)
 
         base_numero = _generer_et_valider_numero_fiche(
             numero_fiche, chef.prenom, date_traitement, "Aerien"
