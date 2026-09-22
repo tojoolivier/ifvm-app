@@ -2,7 +2,9 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Generic, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+
+from app.models.users import FONCTIONS_EQUIPE
 
 
 class ZoneAntiAcridienRead(BaseModel):
@@ -286,16 +288,6 @@ class LieuAerienUpdate(BaseModel):
     actif: bool | None = None
 
 
-class MembreEquipeAerienneRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: uuid.UUID
-    nom: str
-
-
-class MembreEquipeAerienneCreate(BaseModel):
-    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
-
-
 class AeronefRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
@@ -332,67 +324,68 @@ class AeronefUpdate(BaseModel):
     actif: bool | None = None
 
 
-class EquipeAerienneRead(BaseModel):
+class MembreEquipeRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    id: uuid.UUID
-    nom: str
-    chef_de_base_id: uuid.UUID
-    # Nullable : équipes créées avant la migration 0072. Toujours renseignés pour
-    # une équipe créée depuis (EquipeAerienneCreate les exige).
-    pilote: str | None = None
-    mecanicien: str | None = None
-    consultant_international: str | None = None
-    # Hélicoptère de l'équipe (migration 0078) — nullable pour les équipes antérieures.
-    aeronef_id: uuid.UUID | None = None
-    aeronef: AeronefRead | None = None
-    membres: list[MembreEquipeAerienneRead] = Field(default_factory=list)
-    actif: bool
-    created_at: datetime
-    updated_at: datetime
+    user_id: uuid.UUID
+    fonction: str
+    # Résolus par jointure sur `utilisateur` : l'identité n'est plus stockée sur la
+    # ligne de membre (ADR-018), elle est lue là où elle vit.
+    nom: str | None = None
+    prenom: str | None = None
 
 
-class EquipeAerienneCreate(BaseModel):
-    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
-    chef_de_base_id: uuid.UUID
-    pilote: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
-    mecanicien: Annotated[
-        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)
-    ]
-    consultant_international: (
-        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
+class MembreEquipeCreate(BaseModel):
+    """Membre désigné soit par son compte (`user_id`), soit par son identité — auquel
+    cas un compte non authentifiable est créé à la volée (`ROLES_A_LA_VOLEE`)."""
+
+    fonction: Literal[FONCTIONS_EQUIPE]  # type: ignore[valid-type]
+    user_id: uuid.UUID | None = None
+    nom: (
+        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
         | None
     ) = None
-    # Hélicoptère de l'équipe (migration 0078) : exigé pour toute nouvelle équipe, comme
-    # pilote/mécanicien — nullable en base uniquement pour les équipes antérieures.
-    aeronef: AeronefCreate
-    membres: list[MembreEquipeAerienneCreate] = Field(default_factory=list)
+    prenom: Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)] | None = None
+
+    @model_validator(mode="after")
+    def _exiger_compte_ou_identite(self) -> "MembreEquipeCreate":
+        if self.user_id is None and not self.nom:
+            raise ValueError("un membre doit porter soit user_id, soit nom")
+        if self.user_id is not None and self.nom:
+            raise ValueError("user_id et nom sont exclusifs : le compte porte déjà l'identité")
+        return self
 
 
-class MembreEquipeTerrestreRead(BaseModel):
+class EquipeRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     nom: str
-
-
-class MembreEquipeTerrestreCreate(BaseModel):
-    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
-
-
-class EquipeTerrestreRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: uuid.UUID
-    nom: str
-    chef_equipe_id: uuid.UUID
-    membres: list[MembreEquipeTerrestreRead] = Field(default_factory=list)
+    type: Literal["terrestre", "aerien"]
+    # Hélicoptère de l'équipe (migration 0078) — aérien uniquement, nullable.
+    aeronef_id: uuid.UUID | None = None
+    aeronef: AeronefRead | None = None
+    membres: list[MembreEquipeRead] = Field(default_factory=list)
     actif: bool
     created_at: datetime
     updated_at: datetime
 
 
-class EquipeTerrestreCreate(BaseModel):
+class EquipeCreate(BaseModel):
     nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
-    chef_equipe_id: uuid.UUID
-    membres: list[MembreEquipeTerrestreCreate] = Field(default_factory=list)
+    type: Literal["terrestre", "aerien"]
+    # Réservé à une équipe aérienne (`ck_equipe_aeronef_reserve_aerien`).
+    aeronef: AeronefCreate | None = None
+    membres: list[MembreEquipeCreate] = Field(default_factory=list)
+
+
+class EquipeUpdate(BaseModel):
+    """Mise à jour partielle. `type` en est volontairement absent : le type d'une équipe
+    n'est pas modifiable après création (ADR-018) — garanti ici, sans trigger en base.
+    Pas de suppression non plus : `actif=False` est la seule sortie."""
+
+    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)] | (
+        None
+    ) = None
+    actif: bool | None = None
 
 
 class BaseAerienneRead(BaseModel):

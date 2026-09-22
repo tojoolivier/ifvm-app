@@ -41,11 +41,11 @@ export function AdministrationPage() {
   })
   const { data: equipesAeriennes = [] } = useQuery<unknown[]>({
     queryKey: ['equipes-aeriennes'],
-    queryFn: () => api.get('/equipes-aeriennes').then((r) => r.data),
+    queryFn: () => api.get('/equipes?type=aerien').then((r) => r.data),
   })
   const { data: equipesTerrestres = [] } = useQuery<unknown[]>({
     queryKey: ['equipes-terrestres'],
-    queryFn: () => api.get('/equipes-terrestres').then((r) => r.data),
+    queryFn: () => api.get('/equipes?type=terrestre').then((r) => r.data),
   })
 
   const navItems: {
@@ -56,8 +56,8 @@ export function AdministrationPage() {
   }[] = [
     { key: 'utilisateurs', label: 'Utilisateurs', table: 'utilisateur', count: users.length },
     { key: 'stations', label: 'Stations', table: 'station_fixe', count: stations.length },
-    { key: 'equipe_aerienne', label: 'Équipes aériennes', table: 'equipe_aerienne', count: equipesAeriennes.length },
-    { key: 'equipe_terrestre', label: 'Équipes terrestres', table: 'equipe_terrestre', count: equipesTerrestres.length },
+    { key: 'equipe_aerienne', label: 'Équipes aériennes', table: 'equipe (aerien)', count: equipesAeriennes.length },
+    { key: 'equipe_terrestre', label: 'Équipes terrestres', table: 'equipe (terrestre)', count: equipesTerrestres.length },
   ]
 
   return (

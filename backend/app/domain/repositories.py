@@ -11,9 +11,9 @@ from app.domain.referentiel import (
     CodeStade,
     Commune,
     Culture,
-    EquipeAerienne,
-    EquipeTerrestre,
+    Equipe,
     LieuAerien,
+    MembreEquipe,
     Pesticide,
     PosteAcridien,
     StandRemplissage,
@@ -213,6 +213,12 @@ class TraitementRepository(ABC):
 class UtilisateurRepository(ABC):
     @abstractmethod
     async def get_by_id(self, utilisateur_id: uuid.UUID) -> UtilisateurRef | None:
+        pass
+
+    @abstractmethod
+    async def creer_a_la_volee(self, nom: str, prenom: str, role: str) -> UtilisateurRef:
+        """Compte « identité seule » (`peut_se_connecter=False`) pour un membre
+        d'équipe externe, sans écrire en base tant que l'équipe n'est pas commitée."""
         pass
 
 
@@ -483,50 +489,44 @@ class AeronefRepository(ABC):
     @abstractmethod
     async def update(self, aeronef: Aeronef) -> Aeronef:
         """Pas de `create` : un aéronef naît avec son équipe (cf.
-        `EquipeAerienneRepository.create`), jamais orphelin."""
+        `EquipeRepository.create`), jamais orphelin."""
         pass
 
 
-class EquipeAerienneRepository(ABC):
-    """Aucune méthode de suppression : la sortie du référentiel est `actif=false`."""
+class EquipeRepository(ABC):
+    """Référentiel unique des équipes (ADR-018). Aucune méthode de suppression : la
+    sortie du référentiel est `actif=false`."""
 
     @abstractmethod
-    async def list_all(self, actif: bool | None = True) -> list[EquipeAerienne]:
+    async def list_all(
+        self, actif: bool | None = True, type_equipe: str | None = None
+    ) -> list[Equipe]:
         pass
 
     @abstractmethod
-    async def get_by_id(self, equipe_id: uuid.UUID) -> EquipeAerienne | None:
+    async def get_by_id(self, equipe_id: uuid.UUID) -> Equipe | None:
         pass
 
     @abstractmethod
-    async def get_by_chef_de_base_id(self, chef_de_base_id: uuid.UUID) -> EquipeAerienne | None:
-        """L'équipe dirigée par cet utilisateur (UNIQUE `chef_de_base_id`), `None` s'il
-        n'en dirige aucune — c'est ainsi qu'on déduit « son » équipe."""
+    async def get_by_chef_id(self, user_id: uuid.UUID) -> Equipe | None:
+        """L'équipe dirigée par cet utilisateur (index partiel
+        `uq_equipe_membre_chef_par_utilisateur`), `None` s'il n'en dirige aucune —
+        c'est ainsi qu'on déduit « son » équipe."""
         pass
 
     @abstractmethod
-    async def create(self, equipe: EquipeAerienne) -> EquipeAerienne:
-        """Crée l'équipe et, si `equipe.aeronef` est fourni, son aéronef dans la même
-        transaction."""
-        pass
-
-
-class EquipeTerrestreRepository(ABC):
-    """Aucune méthode de suppression : la sortie du référentiel est `actif=false`.
-    Pas de `PUT` pour ce lot (mirroring `EquipeAerienneRepository`) : ni le
-    renommage, ni le changement de chef, ni l'édition des membres après création
-    ne sont exposés."""
-
-    @abstractmethod
-    async def list_all(self, actif: bool | None = True) -> list[EquipeTerrestre]:
+    async def create(self, equipe: Equipe) -> Equipe:
+        """Crée l'équipe, ses membres et, si `equipe.aeronef` est fourni, son aéronef
+        dans la même transaction."""
         pass
 
     @abstractmethod
-    async def get_by_id(self, equipe_id: uuid.UUID) -> EquipeTerrestre | None:
+    async def update(self, equipe: Equipe) -> Equipe:
+        """Renommage / mise hors service uniquement : `type` n'est jamais réécrit."""
         pass
 
     @abstractmethod
-    async def create(self, equipe: EquipeTerrestre) -> EquipeTerrestre:
+    async def ajouter_membre(self, membre: MembreEquipe) -> MembreEquipe:
         pass
 
 

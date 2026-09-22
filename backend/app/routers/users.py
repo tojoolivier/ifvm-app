@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import get_current_user, hash_password
 from app.database import get_db
 from app.infrastructure.referentiel_model import PosteAcridienModel
+from app.infrastructure.utilisateur_repository import construire_utilisateur_a_la_volee
 from app.models.users import ROLES_A_LA_VOLEE, Utilisateur
 from app.schemas.users import (
     UtilisateurAnnuaireRead,
@@ -168,15 +169,7 @@ async def create_user_a_la_volee(
                 "(chef de base doit préexister)."
             ),
         )
-    jeton = uuid.uuid4().hex
-    user = Utilisateur(
-        nom=body.nom,
-        prenom=body.prenom,
-        email=f"a-la-volee.{jeton}@ifvm.invalid",
-        password_hash=hash_password(jeton),
-        role=body.role,
-        peut_se_connecter=False,
-    )
+    user = construire_utilisateur_a_la_volee(nom=body.nom, prenom=body.prenom, role=body.role)
     db.add(user)
     await db.commit()
     await db.refresh(user)

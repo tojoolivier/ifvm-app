@@ -1170,16 +1170,17 @@ export const apiClient = {
   },
 
   /**
-   * Équipe aérienne (#equipe-aerienne) — une équipe = un chef de base = une
-   * base aérienne principale (migration 0066). En ligne uniquement, même
-   * contrat que les autres référentiels aériens.
+   * Équipes (référentiel unifié, ADR-018 / migration 0082) : une seule table
+   * `equipe` typée `terrestre` | `aerien`, et des membres génériques porteurs de
+   * leur `fonction` — le chef de base est devenu un membre `fonction: 'chef'`.
+   * En ligne uniquement, même contrat que les autres référentiels aériens.
    */
   listEquipesAeriennes: async (
     token: string,
     onUnauthorized?: OnUnauthorized
-  ): Promise<components['schemas']['EquipeAerienneRead'][]> => {
-    return makeRequest<components['schemas']['EquipeAerienneRead'][]>(
-      '/equipes-aeriennes',
+  ): Promise<components['schemas']['EquipeRead'][]> => {
+    return makeRequest<components['schemas']['EquipeRead'][]>(
+      '/equipes?type=aerien',
       { method: 'GET' },
       token,
       onUnauthorized
@@ -1188,11 +1189,11 @@ export const apiClient = {
 
   createEquipeAerienne: async (
     token: string,
-    body: components['schemas']['EquipeAerienneCreate'],
+    body: components['schemas']['EquipeCreate'],
     onUnauthorized?: OnUnauthorized
-  ): Promise<components['schemas']['EquipeAerienneRead']> => {
-    return makeRequest<components['schemas']['EquipeAerienneRead']>(
-      '/equipes-aeriennes',
+  ): Promise<components['schemas']['EquipeRead']> => {
+    return makeRequest<components['schemas']['EquipeRead']>(
+      '/equipes',
       { method: 'POST', body: JSON.stringify(body) },
       token,
       onUnauthorized

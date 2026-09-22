@@ -299,20 +299,25 @@ async def lieu_aerien(db_session: AsyncSession):
     return lieu
 
 
-@pytest_asyncio.fixture
-async def equipe_aerienne(db_session: AsyncSession, chef_de_base: Utilisateur):
-    from app.infrastructure.referentiel_model import EquipeAerienneModel
+async def _creer_equipe(db_session: AsyncSession, nom: str, type_equipe: str, chef: Utilisateur):
+    """Équipe + son chef, en une fois (ADR-018 : le chef est une ligne de
+    `equipe_membre`, plus une colonne de l'équipe)."""
+    from app.infrastructure.referentiel_model import EquipeMembreModel, EquipeModel
 
-    equipe = EquipeAerienneModel(
-        id=uuid.uuid4(),
-        nom="Équipe Ihosy",
-        chef_de_base_id=chef_de_base.id,
-        actif=True,
-    )
+    equipe = EquipeModel(id=uuid.uuid4(), nom=nom, type=type_equipe, actif=True)
+    equipe.membres = [EquipeMembreModel(user_id=chef.id, fonction="chef")]
     db_session.add(equipe)
     await db_session.commit()
     await db_session.refresh(equipe)
+    # Chargé explicitement : les fixtures synchrones qui lisent `equipe.membres` ne
+    # peuvent pas déclencher un lazy load (pas de greenlet asyncio).
+    await db_session.refresh(equipe, attribute_names=["membres"])
     return equipe
+
+
+@pytest_asyncio.fixture
+async def equipe_aerienne(db_session: AsyncSession, chef_de_base: Utilisateur):
+    return await _creer_equipe(db_session, "Équipe Ihosy", "aerien", chef_de_base)
 
 
 @pytest_asyncio.fixture
@@ -320,8 +325,6 @@ async def equipe_aerienne_bis(db_session: AsyncSession):
     """Deuxième équipe, chef distinct — pour les tests qui ont besoin d'une équipe
     encore libre (`base_aerienne.equipe_id` UNIQUE) sans réutiliser celle de la
     fixture `base_aerienne`."""
-    from app.infrastructure.referentiel_model import EquipeAerienneModel
-
     chef = Utilisateur(
         id=uuid.uuid4(),
         nom="Rasolo",
@@ -333,17 +336,7 @@ async def equipe_aerienne_bis(db_session: AsyncSession):
     )
     db_session.add(chef)
     await db_session.commit()
-
-    equipe = EquipeAerienneModel(
-        id=uuid.uuid4(),
-        nom="Équipe Betroka",
-        chef_de_base_id=chef.id,
-        actif=True,
-    )
-    db_session.add(equipe)
-    await db_session.commit()
-    await db_session.refresh(equipe)
-    return equipe
+    return await _creer_equipe(db_session, "Équipe Betroka", "aerien", chef)
 
 
 @pytest_asyncio.fixture
@@ -406,18 +399,7 @@ async def chef_equipe(db_session: AsyncSession) -> Utilisateur:
 
 @pytest_asyncio.fixture
 async def equipe_terrestre(db_session: AsyncSession, chef_equipe: Utilisateur):
-    from app.infrastructure.referentiel_model import EquipeTerrestreModel
-
-    equipe = EquipeTerrestreModel(
-        id=uuid.uuid4(),
-        nom="Équipe Terrestre Ihosy",
-        chef_equipe_id=chef_equipe.id,
-        actif=True,
-    )
-    db_session.add(equipe)
-    await db_session.commit()
-    await db_session.refresh(equipe)
-    return equipe
+    return await _creer_equipe(db_session, "Équipe Terrestre Ihosy", "terrestre", chef_equipe)
 
 
 @pytest_asyncio.fixture

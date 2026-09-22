@@ -10,7 +10,21 @@ import type { components } from '@/lib/api-schema.generated'
 // cf. package.json) — jamais recopiés à la main, même règle que côté mobile
 // (CLAUDE.md, « Contrat API mobile ↔ backend »).
 type ChefDeBase = components['schemas']['UtilisateurAnnuaireRead']
-type EquipeAerienne = components['schemas']['EquipeAerienneRead']
+type EquipeAerienne = components['schemas']['EquipeRead']
+type MembreEquipe = components['schemas']['MembreEquipeRead']
+
+/** Chef de base, pilote, mécanicien et consultant ne sont plus des colonnes de
+ *  l'équipe : ce sont des membres porteurs de leur `fonction` (ADR-018 / migration
+ *  0082). Ces accesseurs gardent l'affichage du tableau inchangé. */
+function membreParFonction(equipe: EquipeAerienne, fonction: string): MembreEquipe | undefined {
+  return equipe.membres?.find((m) => m.fonction === fonction)
+}
+
+function nomComplet(membre: MembreEquipe | undefined): string {
+  return membre ? [membre.prenom, membre.nom].filter(Boolean).join(' ') : '—'
+}
+
+const FONCTIONS_NOMMEES = ['chef', 'pilote', 'mecanicien', 'consultant_international']
 type BaseAerienne = components['schemas']['BaseAerienneRead']
 type StandRemplissage = components['schemas']['StandRemplissageRead']
 
@@ -91,7 +105,7 @@ export function EquipesAeriennesSection() {
     error: equipesError,
   } = useQuery<EquipeAerienne[]>({
     queryKey: ['equipes-aeriennes'],
-    queryFn: () => api.get('/equipes-aeriennes').then((r) => r.data),
+    queryFn: () => api.get('/equipes?type=aerien').then((r) => r.data),
   })
 
   const {
@@ -123,8 +137,13 @@ export function EquipesAeriennesSection() {
   const baseIdParEquipe = new Map(
     basesPrincipales.filter((b) => b.equipe_id).map((b) => [b.equipe_id as string, b.id]),
   )
-  // Chef -> équipe qu'il dirige déjà (au plus une, UNIQUE(chef_de_base_id)).
-  const equipeIdParChef = new Map(equipes.filter((e) => e.actif).map((e) => [e.chef_de_base_id, e.id]))
+  // Chef -> équipe qu'il dirige déjà (au plus une, `uq_equipe_membre_chef_par_utilisateur`).
+  const equipeIdParChef = new Map(
+    equipes.filter((e) => e.actif).flatMap((e) => {
+      const chef = membreParFonction(e, 'chef')
+      return chef ? [[chef.user_id, e.id] as const] : []
+    })
+  )
 
   function nomChef(chefId: string) {
     const chef = chefsById.get(chefId)
@@ -141,8 +160,7 @@ export function EquipesAeriennesSection() {
   const equipesSansBase = equipes.filter((e) => e.actif && !baseIdParEquipe.has(e.id))
 
   const createEquipeMutation = useMutation({
-    mutationFn: (data: components['schemas']['EquipeAerienneCreate']) =>
-      api.post('/equipes-aeriennes', data),
+    mutationFn: (data: components['schemas']['EquipeCreate']) => api.post('/equipes', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipes-aeriennes'] })
       setShowCreateEquipe(false)
@@ -246,13 +264,21 @@ export function EquipesAeriennesSection() {
 
   const equipeColumns: DataTableColumn<EquipeAerienne>[] = [
     { key: 'nom', header: 'Équipe', render: (e) => <span className="font-semibold">{e.nom}</span> },
-    { key: 'chef', header: 'Chef de base', render: (e) => nomChef(e.chef_de_base_id) },
-    { key: 'pilote', header: 'Pilote', render: (e) => e.pilote ?? '—' },
-    { key: 'mecanicien', header: 'Mécanicien', render: (e) => e.mecanicien ?? '—' },
+    {
+      key: 'chef',
+      header: 'Chef de base',
+      render: (e) => nomChef(membreParFonction(e, 'chef')?.user_id ?? ''),
+    },
+    { key: 'pilote', header: 'Pilote', render: (e) => nomComplet(membreParFonction(e, 'pilote')) },
+    {
+      key: 'mecanicien',
+      header: 'Mécanicien',
+      render: (e) => nomComplet(membreParFonction(e, 'mecanicien')),
+    },
     {
       key: 'consultant',
       header: 'Consultant international',
-      render: (e) => e.consultant_international ?? '—',
+      render: (e) => nomComplet(membreParFonction(e, 'consultant_international')),
     },
     {
       key: 'aeronef',
@@ -270,12 +296,14 @@ export function EquipesAeriennesSection() {
     {
       key: 'membres',
       header: 'Autres membres',
-      render: (e) =>
-        e.membres && e.membres.length > 0 ? (
-          e.membres.map((m) => m.nom).join(', ')
+      render: (e) => {
+        const autres = (e.membres ?? []).filter((m) => !FONCTIONS_NOMMEES.includes(m.fonction))
+        return autres.length > 0 ? (
+          autres.map((m) => nomComplet(m)).join(', ')
         ) : (
           <span className="text-ifvm-text-weak">—</span>
-        ),
+        )
+      },
     },
     {
       key: 'base',
@@ -312,7 +340,7 @@ export function EquipesAeriennesSection() {
           {!b.equipe_id && <option value="">— aucune —</option>}
           {equipesDisponiblesPour(b.id).map((e) => (
             <option key={e.id} value={e.id}>
-              {e.nom} — {nomChef(e.chef_de_base_id)}
+              {e.nom} — {nomChef(membreParFonction(e, 'chef')?.user_id ?? '')}
             </option>
           ))}
         </select>
@@ -526,16 +554,28 @@ export function EquipesAeriennesSection() {
                 setCreateEquipeError('')
                 createEquipeMutation.mutate({
                   nom: nomEquipe.trim(),
-                  chef_de_base_id: chefDeBaseId,
-                  pilote: piloteEquipe.trim(),
-                  mecanicien: mecanicienEquipe.trim(),
-                  consultant_international: consultantEquipe.trim() || null,
+                  type: 'aerien',
                   aeronef: {
                     immatriculation: immatriculationEquipe.trim(),
                     societe: societeEquipe.trim(),
                     volume_cuve_l: Number(volumeCuveEquipe.replace(',', '.')),
                   },
-                  membres: membres.map((nom) => ({ nom })),
+                  // Pilote, mécanicien et consultant n'ont pas de compte : le backend
+                  // en crée un à la volée à partir du seul nom saisi.
+                  membres: [
+                    { user_id: chefDeBaseId, fonction: 'chef' as const },
+                    { nom: piloteEquipe.trim(), fonction: 'pilote' as const },
+                    { nom: mecanicienEquipe.trim(), fonction: 'mecanicien' as const },
+                    ...(consultantEquipe.trim()
+                      ? [
+                          {
+                            nom: consultantEquipe.trim(),
+                            fonction: 'consultant_international' as const,
+                          },
+                        ]
+                      : []),
+                    ...membres.map((nom) => ({ nom, fonction: 'membre' as const })),
+                  ],
                 })
               }}
               className="space-y-4 px-6 py-4"
@@ -811,7 +851,7 @@ export function EquipesAeriennesSection() {
                   </option>
                   {equipesSansBase.map((e) => (
                     <option key={e.id} value={e.id}>
-                      {e.nom} — {nomChef(e.chef_de_base_id)}
+                      {e.nom} — {nomChef(membreParFonction(e, 'chef')?.user_id ?? '')}
                     </option>
                   ))}
                 </select>

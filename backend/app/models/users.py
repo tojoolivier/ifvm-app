@@ -17,13 +17,24 @@ ROLES = (
     "mecanicien",
     "chef_de_base",
     "consultant_international",
+    # Membre d'équipe sans rôle fonctionnel nommé : une identité, aucun droit
+    # applicatif. Ajouté avec `equipe_membre` (ADR-018) pour accueillir les membres
+    # qui n'étaient jusque-là qu'un `nom` en texte libre dans
+    # `equipe_*_membre` — il leur fallait un rôle pour devenir des comptes.
+    "membre",
     "admin",
 )
 
 # Rôles créables "à la volée" (identité seule, compte non-authentifiable) depuis
 # le formulaire de traitement aérien. `chef_de_base` en est exclu à dessein :
 # il doit préexister (voir issue #319).
-ROLES_A_LA_VOLEE = ("pilote", "mecanicien", "consultant_international")
+ROLES_A_LA_VOLEE = ("pilote", "mecanicien", "consultant_international", "membre")
+
+# Fonctions occupables dans une `equipe` (ADR-018) : le vocabulaire des rôles, plus
+# `chef` — la fonction de direction, commune aux deux types d'équipe, là où `ROLES`
+# la décline en `chef_de_base` (aérien) et `chef_equipe` (terrestre). C'est cette
+# fonction-là, et elle seule, que les index partiels de `equipe_membre` contraignent.
+FONCTIONS_EQUIPE = ("chef", *ROLES)
 
 
 class Utilisateur(Base):

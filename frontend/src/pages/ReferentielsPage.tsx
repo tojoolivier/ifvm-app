@@ -521,7 +521,7 @@ const ENTITES: EntitySpec[] = [
           nullable: true,
           hint: 'Plusieurs postes peuvent partager la même équipe.',
           optionsFrom: {
-            path: '/equipes-terrestres',
+            path: '/equipes?type=terrestre',
             queryKey: 'equipes-terrestres',
             valueKey: 'id',
             labelKey: 'nom',
@@ -614,7 +614,7 @@ const ENTITES: EntitySpec[] = [
           required: true,
           hint: 'Une équipe peut posséder plusieurs lieux.',
           optionsFrom: {
-            path: '/equipes-aeriennes',
+            path: '/equipes?type=aerien',
             queryKey: 'equipes-aeriennes',
             valueKey: 'id',
             labelKey: 'nom',
@@ -803,7 +803,7 @@ export function ReferentielsPage() {
 
   const { data: equipesTerrestresFiltre = [] } = useQuery<Row[]>({
     queryKey: ['equipes-terrestres'],
-    queryFn: () => api.get('/equipes-terrestres').then((r) => r.data),
+    queryFn: () => api.get('/equipes?type=terrestre').then((r) => r.data),
     enabled: filtreEquipeVisible,
   })
 

@@ -14,7 +14,7 @@ from app.domain.repositories import (
 from app.infrastructure.referentiel_model import (
     CommuneModel,
     DistrictModel,
-    EquipeTerrestreModel,
+    EquipeModel,
     PosteAcridienModel,
     RegionModel,
     StationFixeModel,
@@ -190,15 +190,15 @@ class PosteAcridienRepositoryImpl(PosteAcridienRepository):
                 PosteAcridienModel,
                 ZoneAntiAcridienModel.code.label("za_code"),
                 ZoneAntiAcridienModel.nom.label("za_nom"),
-                EquipeTerrestreModel.nom.label("equipe_terrestre_nom"),
+                EquipeModel.nom.label("equipe_terrestre_nom"),
                 nb_stations.label("nb_stations"),
             )
             .join(ZoneAntiAcridienModel, PosteAcridienModel.za_id == ZoneAntiAcridienModel.id)
             # LEFT JOIN : equipe_terrestre_id est nullable, un poste sans équipe
             # rattachée reste listable.
             .outerjoin(
-                EquipeTerrestreModel,
-                PosteAcridienModel.equipe_terrestre_id == EquipeTerrestreModel.id,
+                EquipeModel,
+                PosteAcridienModel.equipe_terrestre_id == EquipeModel.id,
             )
         )
 

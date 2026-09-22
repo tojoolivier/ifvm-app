@@ -29,8 +29,27 @@ def chef_headers(chef_de_base) -> dict:
 
 @pytest.fixture
 def chef_bis_headers(equipe_aerienne_bis) -> dict:
-    """Le chef de base de `equipe_aerienne_bis` — une autre équipe."""
-    return _headers(equipe_aerienne_bis.chef_de_base_id)
+    """Le chef de base de `equipe_aerienne_bis` — une autre équipe. Depuis ADR-018 le
+    chef est une ligne de `equipe_membre`, plus une colonne de l'équipe."""
+    chef = next(m for m in equipe_aerienne_bis.membres if m.fonction == "chef")
+    return _headers(chef.user_id)
+
+
+def _corps_equipe(chef_id, **extra) -> dict:
+    """Corps de `POST /equipes` pour une équipe aérienne (référentiel unifié, ADR-018)."""
+    corps = {
+        "nom": "Équipe Ihosy",
+        "type": "aerien",
+        "membres": [
+            {"user_id": str(chef_id), "fonction": "chef"},
+            {"nom": "Rakoto", "prenom": "Jean", "fonction": "pilote"},
+            {"nom": "Andria", "prenom": "Paul", "fonction": "mecanicien"},
+        ],
+        "aeronef": AERONEF,
+        **extra,
+    }
+    # `aeronef=None` sert aux tests qui vérifient qu'il est exigé.
+    return {k: v for k, v in corps.items() if v is not None}
 
 
 # --- Aéronef -----------------------------------------------------------------------
@@ -41,19 +60,13 @@ async def test_equipe_relue_avec_son_aeronef(
     client: AsyncClient, admin_headers: dict, chef_de_base
 ):
     creee = await client.post(
-        "/equipes-aeriennes",
-        json={
-            "nom": "Équipe Ihosy",
-            "chef_de_base_id": str(chef_de_base.id),
-            "pilote": "Jean Rakoto",
-            "mecanicien": "Paul Andria",
-            "aeronef": AERONEF,
-        },
+        "/equipes",
+        json=_corps_equipe(chef_de_base.id, nom="Équipe Ihosy", aeronef=AERONEF),
         headers=admin_headers,
     )
     assert creee.status_code == 201, creee.text
 
-    relue = await client.get(f"/equipes-aeriennes/{creee.json()['id']}", headers=admin_headers)
+    relue = await client.get(f"/equipes/{creee.json()['id']}", headers=admin_headers)
     assert relue.json()["aeronef"]["immatriculation"] == "5R-MJA"
     assert relue.json()["aeronef"]["volume_cuve_l"] == 800
 
@@ -63,13 +76,8 @@ async def test_equipe_sans_aeronef_422(client: AsyncClient, admin_headers: dict,
     """L'hélicoptère est exigé pour toute nouvelle équipe (nullable en base uniquement
     pour les équipes antérieures à la migration)."""
     reponse = await client.post(
-        "/equipes-aeriennes",
-        json={
-            "nom": "Équipe Ihosy",
-            "chef_de_base_id": str(chef_de_base.id),
-            "pilote": "Jean Rakoto",
-            "mecanicien": "Paul Andria",
-        },
+        "/equipes",
+        json=_corps_equipe(chef_de_base.id, nom="Équipe Ihosy", aeronef=None),
         headers=admin_headers,
     )
     assert reponse.status_code == 422
@@ -81,14 +89,12 @@ async def test_volume_cuve_doit_etre_positif_422(
     client: AsyncClient, admin_headers: dict, chef_de_base, volume
 ):
     reponse = await client.post(
-        "/equipes-aeriennes",
-        json={
-            "nom": "Équipe Ihosy",
-            "chef_de_base_id": str(chef_de_base.id),
-            "pilote": "Jean Rakoto",
-            "mecanicien": "Paul Andria",
-            "aeronef": {**AERONEF, "volume_cuve_l": volume},
-        },
+        "/equipes",
+        json=_corps_equipe(
+            chef_de_base.id,
+            nom="Équipe Ihosy",
+            aeronef={**AERONEF, "volume_cuve_l": volume},
+        ),
         headers=admin_headers,
     )
     assert reponse.status_code == 422
@@ -101,14 +107,8 @@ async def test_immatriculation_deja_prise_409_sans_ecrire_l_equipe(
     """Deux hélicoptères ne partagent pas une immatriculation ; l'échec n'écrit ni
     l'équipe ni l'aéronef (même transaction)."""
     premiere = await client.post(
-        "/equipes-aeriennes",
-        json={
-            "nom": "Équipe A",
-            "chef_de_base_id": str(chef_de_base.id),
-            "pilote": "P1",
-            "mecanicien": "M1",
-            "aeronef": AERONEF,
-        },
+        "/equipes",
+        json=_corps_equipe(chef_de_base.id, nom="Équipe A", aeronef=AERONEF),
         headers=admin_headers,
     )
     assert premiere.status_code == 201, premiere.text
@@ -127,34 +127,22 @@ async def test_immatriculation_deja_prise_409_sans_ecrire_l_equipe(
     await db_session.commit()
 
     doublon = await client.post(
-        "/equipes-aeriennes",
-        json={
-            "nom": "Équipe B",
-            "chef_de_base_id": str(autre_chef.id),
-            "pilote": "P2",
-            "mecanicien": "M2",
-            "aeronef": AERONEF,
-        },
+        "/equipes",
+        json=_corps_equipe(autre_chef.id, nom="Équipe B", aeronef=AERONEF),
         headers=admin_headers,
     )
     assert doublon.status_code == 409, doublon.text
     assert "immatriculation" in doublon.json()["detail"]
 
-    equipes = await client.get("/equipes-aeriennes?inclure_inactifs=true", headers=admin_headers)
+    equipes = await client.get("/equipes?inclure_inactifs=true", headers=admin_headers)
     assert [e["nom"] for e in equipes.json()] == ["Équipe A"]
 
 
 @pytest.mark.asyncio
 async def test_liste_des_aeronefs(client: AsyncClient, admin_headers: dict, chef_de_base):
     await client.post(
-        "/equipes-aeriennes",
-        json={
-            "nom": "Équipe Ihosy",
-            "chef_de_base_id": str(chef_de_base.id),
-            "pilote": "Jean Rakoto",
-            "mecanicien": "Paul Andria",
-            "aeronef": AERONEF,
-        },
+        "/equipes",
+        json=_corps_equipe(chef_de_base.id, nom="Équipe Ihosy", aeronef=AERONEF),
         headers=admin_headers,
     )
     reponse = await client.get("/aeronefs", headers=admin_headers)
@@ -168,14 +156,8 @@ async def test_admin_modifie_societe_et_volume_de_cuve(
 ):
     equipe = (
         await client.post(
-            "/equipes-aeriennes",
-            json={
-                "nom": "Équipe Ihosy",
-                "chef_de_base_id": str(chef_de_base.id),
-                "pilote": "Jean Rakoto",
-                "mecanicien": "Paul Andria",
-                "aeronef": AERONEF,
-            },
+            "/equipes",
+            json=_corps_equipe(chef_de_base.id, nom="Équipe Ihosy", aeronef=AERONEF),
             headers=admin_headers,
         )
     ).json()
@@ -197,14 +179,8 @@ async def test_seul_un_admin_modifie_un_aeronef(
 ):
     equipe = (
         await client.post(
-            "/equipes-aeriennes",
-            json={
-                "nom": "Équipe Ihosy",
-                "chef_de_base_id": str(chef_de_base.id),
-                "pilote": "Jean Rakoto",
-                "mecanicien": "Paul Andria",
-                "aeronef": AERONEF,
-            },
+            "/equipes",
+            json=_corps_equipe(chef_de_base.id, nom="Équipe Ihosy", aeronef=AERONEF),
             headers=admin_headers,
         )
     ).json()

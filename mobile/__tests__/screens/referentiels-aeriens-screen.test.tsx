@@ -56,7 +56,8 @@ describe('ReferentielsAeriensScreen', () => {
     jest.mocked(apiClient.createEquipeAerienne).mockResolvedValue({
       id: 'equipe-1',
       nom: 'Équipe Ihosy',
-      chef_de_base_id: 'chef-1',
+      type: 'aerien',
+      membres: [{ user_id: 'chef-1', fonction: 'chef', nom: 'Rabe', prenom: 'Toky' }],
       actif: true,
     } as any);
     jest.mocked(apiClient.createBaseAerienne)
@@ -101,12 +102,14 @@ describe('ReferentielsAeriensScreen', () => {
     await waitFor(() =>
       expect(apiClient.createEquipeAerienne).toHaveBeenCalledWith('token-test', {
         nom: 'Équipe Ihosy',
-        chef_de_base_id: 'chef-1',
-        pilote: 'Jean Rakoto',
-        mecanicien: 'Paul Rasoa',
-        consultant_international: null,
+        type: 'aerien',
         aeronef: { immatriculation: '5R-MJA', societe: 'Heli Madagascar', volume_cuve_l: 800 },
-        membres: [{ nom: 'Marie Rafara' }],
+        membres: [
+          { user_id: 'chef-1', fonction: 'chef' },
+          { nom: 'Jean Rakoto', fonction: 'pilote' },
+          { nom: 'Paul Rasoa', fonction: 'mecanicien' },
+          { nom: 'Marie Rafara', fonction: 'membre' },
+        ],
       })
     );
     await screen.findByText('Équipe Ihosy');
@@ -171,7 +174,8 @@ describe('ReferentielsAeriensScreen', () => {
     jest.mocked(apiClient.createEquipeAerienne).mockResolvedValue({
       id: 'equipe-1',
       nom: 'Équipe Ihosy',
-      chef_de_base_id: 'chef-1',
+      type: 'aerien',
+      membres: [{ user_id: 'chef-1', fonction: 'chef', nom: 'Rabe', prenom: 'Toky' }],
       actif: true,
     } as any);
 
@@ -197,12 +201,13 @@ describe('ReferentielsAeriensScreen', () => {
     await waitFor(() =>
       expect(apiClient.createEquipeAerienne).toHaveBeenCalledWith('token-test', {
         nom: 'Équipe Ihosy',
-        chef_de_base_id: 'chef-1',
-        pilote: 'Jean Rakoto',
-        mecanicien: 'Paul Rasoa',
-        consultant_international: null,
+        type: 'aerien',
         aeronef: { immatriculation: '5R-MJA', societe: 'Heli Madagascar', volume_cuve_l: 800 },
-        membres: [],
+        membres: [
+          { user_id: 'chef-1', fonction: 'chef' },
+          { nom: 'Jean Rakoto', fonction: 'pilote' },
+          { nom: 'Paul Rasoa', fonction: 'mecanicien' },
+        ],
       })
     );
   });
@@ -219,7 +224,7 @@ describe('ReferentielsAeriensScreen', () => {
   // environnement (404) ne doit pas retomber sur le bouton « Charger les
   // référentiels » indéfiniment alors que les 3 autres référentiels ont bien
   // été chargés — chacun d'eux est indépendant, l'écran doit rester utilisable.
-  it('reste utilisable (bases/stands) même si /equipes-aeriennes échoue', async () => {
+  it('reste utilisable (bases/stands) même si /equipes échoue', async () => {
     jest.mocked(apiClient.listEquipesAeriennes).mockRejectedValue(new Error('Not Found'));
     jest.mocked(apiClient.listBasesAeriennes).mockResolvedValue([
       {
@@ -248,7 +253,13 @@ describe('ReferentielsAeriensScreen', () => {
   it("masque la création de bases et de stands à un rôle autre que chef de base", async () => {
     useAuthStore.setState({ token: 'token-test', user: { id: 'pilote-1', role: 'pilote' } } as any);
     jest.mocked(apiClient.listEquipesAeriennes).mockResolvedValue([
-      { id: 'equipe-1', nom: 'Équipe Ihosy', chef_de_base_id: 'chef-1', actif: true },
+      {
+        id: 'equipe-1',
+        nom: 'Équipe Ihosy',
+        type: 'aerien',
+        membres: [{ user_id: 'chef-1', fonction: 'chef', nom: 'Rabe', prenom: 'Toky' }],
+        actif: true,
+      },
     ] as any);
     jest.mocked(apiClient.listBasesAeriennes).mockResolvedValue([
       { id: 'base-1', numero: 'IHO01', localite: 'Ihosy', parent_base_id: null, equipe_id: 'equipe-1', actif: true },
@@ -267,7 +278,8 @@ describe('ReferentielsAeriensScreen', () => {
       {
         id: 'equipe-1',
         nom: 'Équipe Ihosy',
-        chef_de_base_id: 'chef-1',
+        type: 'aerien',
+        membres: [{ user_id: 'chef-1', fonction: 'chef', nom: 'Rabe', prenom: 'Toky' }],
         aeronef: { immatriculation: '5R-MJA', societe: 'Heli Madagascar', volume_cuve_l: 800 },
         actif: true,
       },

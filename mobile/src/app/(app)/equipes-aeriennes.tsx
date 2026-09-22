@@ -26,8 +26,14 @@ interface Chef {
 interface Equipe {
   id: string;
   nom: string;
-  chef_de_base_id: string;
+  // Le chef n'est plus une colonne de l'équipe mais un membre `fonction: 'chef'`
+  // (référentiel unifié, ADR-018) ; résolu ici pour garder l'affichage inchangé.
+  chef_de_base_id: string | null;
   aeronef?: { immatriculation: string; societe: string; volume_cuve_l: number } | null;
+}
+
+function chefDe(equipe: { membres?: { user_id: string; fonction: string }[] }): string | null {
+  return equipe.membres?.find((m) => m.fonction === 'chef')?.user_id ?? null;
 }
 
 interface Base {
@@ -91,7 +97,15 @@ export default function ReferentielsAeriensScreen() {
             echecs.push('chefs de base');
             log.ignore(chefsRes.reason, 'Chefs de base indisponibles — écran affiché en dégradé.');
           }
-          if (equipesRes.status === 'fulfilled') setEquipes(equipesRes.value);
+          if (equipesRes.status === 'fulfilled')
+            setEquipes(
+              equipesRes.value.map((e) => ({
+                id: e.id,
+                nom: e.nom,
+                chef_de_base_id: chefDe(e),
+                aeronef: e.aeronef ?? null,
+              }))
+            );
           else {
             echecs.push('équipes aériennes');
             log.ignore(equipesRes.reason, 'Équipes aériennes indisponibles — écran affiché en dégradé.');
@@ -267,23 +281,35 @@ function SectionEquipes({
   const creer = () =>
     run(
       async () => {
+        // Les rôles autrefois en texte libre (pilote, mécanicien, consultant) sont
+        // désormais des membres : sans compte, le backend en crée un à la volée.
         const cree = await apiClient.createEquipeAerienne(token, {
           nom: nom.trim(),
-          chef_de_base_id: chefDeBaseId!,
-          pilote: pilote.trim(),
-          mecanicien: mecanicien.trim(),
-          consultant_international: consultantInternational.trim() || null,
+          type: 'aerien',
           aeronef: {
             immatriculation: immatriculation.trim(),
             societe: societe.trim(),
             volume_cuve_l: parseFloat(volumeCuve.replace(',', '.')),
           },
-          membres: membres.map((nomMembre) => ({ nom: nomMembre })),
+          membres: [
+            { user_id: chefDeBaseId!, fonction: 'chef' as const },
+            { nom: pilote.trim(), fonction: 'pilote' as const },
+            { nom: mecanicien.trim(), fonction: 'mecanicien' as const },
+            ...(consultantInternational.trim()
+              ? [
+                  {
+                    nom: consultantInternational.trim(),
+                    fonction: 'consultant_international' as const,
+                  },
+                ]
+              : []),
+            ...membres.map((nomMembre) => ({ nom: nomMembre, fonction: 'membre' as const })),
+          ],
         });
         onCreated({
           id: cree.id,
           nom: cree.nom,
-          chef_de_base_id: cree.chef_de_base_id,
+          chef_de_base_id: chefDe(cree),
           aeronef: cree.aeronef ?? null,
         });
         setCreation(false);
@@ -321,7 +347,7 @@ function SectionEquipes({
       {equipes.map((equipe) => (
         <View key={equipe.id} style={styles.item}>
           <Text style={styles.itemText}>{equipe.nom}</Text>
-          <Text style={styles.itemSubtext}>Chef de base : {nomChef(equipe.chef_de_base_id)}</Text>
+          <Text style={styles.itemSubtext}>Chef de base : {nomChef(equipe.chef_de_base_id ?? '')}</Text>
           {equipe.aeronef && (
             <Text style={styles.itemSubtext}>
               Hélicoptère : {equipe.aeronef.immatriculation} — {equipe.aeronef.societe} (cuve{' '}

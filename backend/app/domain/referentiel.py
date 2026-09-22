@@ -268,7 +268,7 @@ class BaseAerienneEquipeInvalideError(Exception):
 
 
 class EquipeAerienneIntrouvableError(Exception):
-    """`equipe_id` ne référence aucune `equipe_aerienne` existante."""
+    """`equipe_id` ne référence aucune `equipe` de type `aerien`."""
 
     pass
 
@@ -280,15 +280,49 @@ class EquipeAerienneDejaAssigneeError(Exception):
     pass
 
 
-class ChefDeBaseEquipeInvalideError(Exception):
-    """`chef_de_base_id` ne référence pas un utilisateur avec le rôle `chef_de_base`."""
+class ChefEquipeInvalideError(Exception):
+    """Le membre désigné `fonction='chef'` n'a pas le rôle attendu par le type d'équipe :
+    `chef_de_base` pour une équipe aérienne, `chef_equipe` pour une terrestre."""
 
     pass
 
 
-class ChefDeBaseDejaEquipeError(Exception):
-    """L'utilisateur référencé dirige déjà une autre équipe aérienne (UNIQUE
-    `equipe_aerienne.chef_de_base_id`, un chef de base = une équipe)."""
+class ChefDejaDansUneAutreEquipeError(Exception):
+    """L'utilisateur dirige déjà une autre équipe (index partiel
+    `uq_equipe_membre_chef_par_utilisateur`, un chef = une équipe)."""
+
+    pass
+
+
+class EquipeADejaUnChefError(Exception):
+    """L'équipe a déjà un chef (index partiel `uq_equipe_membre_chef_par_equipe`)."""
+
+    pass
+
+
+class MembreDejaDansEquipeError(Exception):
+    """L'utilisateur est déjà membre de cette équipe (PK `(equipe_id, user_id)`) — une
+    personne n'y occupe qu'une fonction."""
+
+    pass
+
+
+class CompteALaVoleeInterditError(Exception):
+    """Un membre sans `user_id` demande la création d'un compte à la volée pour une
+    fonction qui ne l'autorise pas. Seuls `ROLES_A_LA_VOLEE` (pilote, mécanicien,
+    consultant international) sont créables ainsi : un chef doit préexister (#319)."""
+
+    pass
+
+
+class UtilisateurMembreIntrouvableError(Exception):
+    """`user_id` d'un membre ne référence aucun utilisateur existant."""
+
+    pass
+
+
+class EquipeIntrouvableError(Exception):
+    """`equipe_id` ne référence aucune `equipe` existante."""
 
     pass
 
@@ -342,43 +376,45 @@ class Aeronef:
 
 
 @dataclass
-class MembreEquipeAerienne:
-    """Membre d'une équipe aérienne au-delà des rôles nommés (chef de base, pilote,
-    mécanicien, consultant international) — migration 0072. Entité faible de
-    `EquipeAerienne`, un nom en nombre variable."""
+class MembreEquipe:
+    """Appartenance d'un utilisateur à une équipe, avec sa fonction (ADR-018).
 
-    id: uuid.UUID = field(default_factory=uuid.uuid4)
-    equipe_aerienne_id: uuid.UUID = field(default_factory=uuid.uuid4)
-    nom: str = ""
+    `nom`/`prenom` sont résolus par jointure à la lecture — l'identité vit sur
+    `Utilisateur`, pas ici : c'est tout l'intérêt d'avoir remplacé le texte libre des
+    anciennes tables de membres par un `user_id`."""
+
+    equipe_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    user_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    fonction: str = ""
+    nom: str | None = None
+    prenom: str | None = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
 
 
 @dataclass
-class EquipeAerienne:
-    """Équipe aérienne (#equipe-aerienne, migration 0066) : une équipe = un chef de
-    base (`chef_de_base_id` UNIQUE) = une base aérienne principale (`base_aerienne.
-    equipe_id` UNIQUE, cf. `BaseAerienne`). Demande utilisateur du 2026-09-16.
+class Equipe:
+    """Équipe terrestre ou aérienne (ADR-018, migration 0082).
 
-    `pilote`/`mecanicien`/`consultant_international` (migration 0072) : texte libre,
-    externes à l'IFVM — même patron que `TraitementAerien`. Nullable
-    pour les équipes créées avant cette migration ; `pilote`/`mecanicien` sont
-    exigés par `EquipeAerienneCreate` pour toute nouvelle équipe,
-    `consultant_international` reste facultatif. `membres` couvre les autres
-    membres de l'équipe, en nombre variable."""
+    Fusion de `EquipeAerienne` et `EquipeTerrestre` : un `type` discriminant, et des
+    membres génériques porteurs de leur `fonction` à la place des rôles nommés en dur.
+    `type` n'est pas modifiable après création — garanti par son absence de
+    `EquipeUpdate`, pas par un trigger.
+
+    `aeronef_id` ne vaut que pour une équipe aérienne (1:1, comme l'ancienne
+    `equipe_aerienne.aeronef_id`) ; #603 le remplacera par des affectations datées."""
 
     id: uuid.UUID = field(default_factory=uuid.uuid4)
     nom: str = ""
-    chef_de_base_id: uuid.UUID = field(default_factory=uuid.uuid4)
-    pilote: str | None = None
-    mecanicien: str | None = None
-    consultant_international: str | None = None
-    # Hélicoptère de l'équipe (migration 0078) : 1:1, `None` pour les équipes créées
-    # avant cette migration. `aeronef` est résolu par jointure à la lecture.
+    type: str = "terrestre"
     aeronef_id: uuid.UUID | None = None
     aeronef: Aeronef | None = None
     actif: bool = True
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
-    membres: list[MembreEquipeAerienne] = field(default_factory=list)
+    membres: list[MembreEquipe] = field(default_factory=list)
+
+    def chef(self) -> MembreEquipe | None:
+        return next((m for m in self.membres if m.fonction == "chef"), None)
 
 
 @dataclass
@@ -424,48 +460,6 @@ class StandRemplissage:
 
 
 class EquipeTerrestreIntrouvableError(Exception):
-    """`equipe_terrestre_id` ne référence aucune `equipe_terrestre` existante."""
+    """`equipe_terrestre_id` ne référence aucune `equipe` de type `terrestre`."""
 
     pass
-
-
-class ChefEquipeInvalideError(Exception):
-    """`chef_equipe_id` ne référence pas un utilisateur avec le rôle `chef_equipe`."""
-
-    pass
-
-
-class ChefEquipeDejaEquipeError(Exception):
-    """L'utilisateur référencé dirige déjà une autre équipe terrestre (UNIQUE
-    `equipe_terrestre.chef_equipe_id`, un chef d'équipe = une équipe)."""
-
-    pass
-
-
-@dataclass
-class MembreEquipeTerrestre:
-    """Membre d'une équipe terrestre au-delà du chef d'équipe (migration 0073) —
-    entité faible de `EquipeTerrestre`, un nom en nombre variable. Même patron que
-    `MembreEquipeAerienne`."""
-
-    id: uuid.UUID = field(default_factory=uuid.uuid4)
-    equipe_terrestre_id: uuid.UUID = field(default_factory=uuid.uuid4)
-    nom: str = ""
-
-
-@dataclass
-class EquipeTerrestre:
-    """Équipe terrestre (migration 0073) : une équipe = un chef d'équipe
-    (`chef_equipe_id` UNIQUE, rôle `chef_equipe`). Contrairement à l'équipe aérienne,
-    pas de base physique unique : plusieurs postes acridiens peuvent partager la même
-    équipe (`PosteAcridien.equipe_terrestre_id`, sans UNIQUE), une équipe terrestre
-    étant mobile. `membres` couvre les autres membres de l'équipe, en nombre
-    variable."""
-
-    id: uuid.UUID = field(default_factory=uuid.uuid4)
-    nom: str = ""
-    chef_equipe_id: uuid.UUID = field(default_factory=uuid.uuid4)
-    actif: bool = True
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
-    membres: list[MembreEquipeTerrestre] = field(default_factory=list)

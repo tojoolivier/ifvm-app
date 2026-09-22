@@ -10,23 +10,22 @@ from app.domain.referentiel import (
     BaseAerienne,
     BaseAerienneEquipeInvalideError,
     BaseAerienneParentInvalideError,
-    ChefDeBaseEquipeInvalideError,
     ChefEquipeInvalideError,
     CodeReferentielDejaPrisError,
     CodeStade,
     Commune,
     CommuneInconnueError,
+    CompteALaVoleeInterditError,
     Culture,
-    EquipeAerienne,
+    Equipe,
     EquipeAerienneIntrouvableError,
+    EquipeIntrouvableError,
     EquipeNonAutoriseeError,
     EquipeRequiseError,
-    EquipeTerrestre,
     EquipeTerrestreIntrouvableError,
     GrilleDejaOccupeeError,
     LieuAerien,
-    MembreEquipeAerienne,
-    MembreEquipeTerrestre,
+    MembreEquipe,
     Pesticide,
     PosteAcridien,
     PosteAcridienAvecStationsActivesError,
@@ -37,6 +36,7 @@ from app.domain.referentiel import (
     StationFixe,
     TypeLieuAerienInvalideError,
     UtilisateurEquipe,
+    UtilisateurMembreIntrouvableError,
     ZoneAntiAcridien,
     ZoneAntiAcridienAvecPostesActifsError,
     ZoneAntiAcridienIntrouvableError,
@@ -48,8 +48,7 @@ from app.domain.repositories import (
     CodeStadeRepository,
     CommuneRepository,
     CultureRepository,
-    EquipeAerienneRepository,
-    EquipeTerrestreRepository,
+    EquipeRepository,
     LieuAerienRepository,
     PesticideRepository,
     PosteAcridienRepository,
@@ -58,6 +57,7 @@ from app.domain.repositories import (
     UtilisateurEquipeRepository,
     ZoneAntiAcridienRepository,
 )
+from app.models.users import ROLES_A_LA_VOLEE
 
 
 class ListZonesAntiAcridiennes:
@@ -121,6 +121,15 @@ class UpdateZoneAntiAcridien:
         return await self.repository.update(zone)
 
 
+async def _equipe_terrestre_existe(repository: EquipeRepository, equipe_id: uuid.UUID) -> bool:
+    """Le `type` est vérifié ici, pas seulement l'existence : depuis l'unification en
+    une seule table `equipe` (ADR-018), un id d'équipe aérienne est un id valide. La FK
+    composite `(equipe_terrestre_id, equipe_type)` le refuserait de toute façon, mais
+    avec une violation de contrainte brute au lieu d'un 404 explicite."""
+    equipe = await repository.get_by_id(equipe_id)
+    return equipe is not None and equipe.type == "terrestre"
+
+
 class ListPostesAcridiens:
     def __init__(self, repository: PosteAcridienRepository):
         self.repository = repository
@@ -142,7 +151,7 @@ class CreatePosteAcridien:
         self,
         repository: PosteAcridienRepository,
         zone_repository: ZoneAntiAcridienRepository,
-        equipe_terrestre_repository: EquipeTerrestreRepository,
+        equipe_terrestre_repository: EquipeRepository,
     ):
         self.repository = repository
         self.zone_repository = zone_repository
@@ -157,9 +166,8 @@ class CreatePosteAcridien:
     ) -> PosteAcridien:
         if not await self.zone_repository.exists(za_id):
             raise ZoneAntiAcridienIntrouvableError(str(za_id))
-        if (
-            equipe_terrestre_id is not None
-            and await self.equipe_terrestre_repository.get_by_id(equipe_terrestre_id) is None
+        if equipe_terrestre_id is not None and not await _equipe_terrestre_existe(
+            self.equipe_terrestre_repository, equipe_terrestre_id
         ):
             raise EquipeTerrestreIntrouvableError(str(equipe_terrestre_id))
         if await self.repository.code_pris_par_un_autre(code):
@@ -189,7 +197,7 @@ class UpdatePosteAcridien:
         self,
         repository: PosteAcridienRepository,
         zone_repository: ZoneAntiAcridienRepository,
-        equipe_terrestre_repository: EquipeTerrestreRepository,
+        equipe_terrestre_repository: EquipeRepository,
     ):
         self.repository = repository
         self.zone_repository = zone_repository
@@ -218,9 +226,8 @@ class UpdatePosteAcridien:
         # équipe) : seul `champs_fournis` (model_fields_set côté Pydantic) distingue
         # « absent » de « mis à NULL », même patron que `UpdateBaseAerienne.equipe_id`.
         if "equipe_terrestre_id" in champs_fournis:
-            if (
-                equipe_terrestre_id is not None
-                and await self.equipe_terrestre_repository.get_by_id(equipe_terrestre_id) is None
+            if equipe_terrestre_id is not None and not await _equipe_terrestre_existe(
+                self.equipe_terrestre_repository, equipe_terrestre_id
             ):
                 raise EquipeTerrestreIntrouvableError(str(equipe_terrestre_id))
             poste.equipe_terrestre_id = equipe_terrestre_id
@@ -613,7 +620,7 @@ class CreateLieuAerien:
     def __init__(
         self,
         repository: LieuAerienRepository,
-        equipe_aerienne_repository: EquipeAerienneRepository,
+        equipe_aerienne_repository: EquipeRepository,
     ):
         self.repository = repository
         self.equipe_aerienne_repository = equipe_aerienne_repository
@@ -659,7 +666,7 @@ class UpdateLieuAerien:
     def __init__(
         self,
         repository: LieuAerienRepository,
-        equipe_aerienne_repository: EquipeAerienneRepository,
+        equipe_aerienne_repository: EquipeRepository,
     ):
         self.repository = repository
         self.equipe_aerienne_repository = equipe_aerienne_repository
@@ -739,14 +746,15 @@ def _est_admin(acteur: object) -> bool:
 
 async def _resoudre_equipe_creation(
     acteur: object,
-    equipe_repository: EquipeAerienneRepository,
+    equipe_repository: EquipeRepository,
     equipe_demandee_id: uuid.UUID | None,
 ) -> uuid.UUID:
     """Équipe pour laquelle `acteur` crée un lieu aérien (bases, stands).
 
-    Seul le chef de base d'une équipe crée les lieux de SON équipe — seul compte
-    utilisateur de l'équipe (pilote/mécanicien sont des noms libres, sans accès). Il n'en
-    a qu'une (UNIQUE `chef_de_base_id`) : on la déduit, jamais choisie. S'il en désigne
+    Seul le chef de base d'une équipe crée les lieux de SON équipe — seul membre à
+    pouvoir se connecter (les comptes pilote/mécanicien sont créés à la volée, sans accès
+    applicatif). Il ne dirige qu'une équipe (`uq_equipe_membre_chef_par_utilisateur`) :
+    on la déduit, jamais choisie. S'il en désigne
     une autre, c'est un refus, pas une correction silencieuse. Un admin agit pour le
     compte de n'importe quelle équipe, mais doit alors la désigner.
     """
@@ -754,7 +762,7 @@ async def _resoudre_equipe_creation(
         if equipe_demandee_id is None:
             raise EquipeRequiseError("equipe_aerienne_id est requis pour un admin")
         return equipe_demandee_id
-    equipe = await equipe_repository.get_by_chef_de_base_id(acteur.id)
+    equipe = await equipe_repository.get_by_chef_id(acteur.id)
     if equipe is None:
         raise EquipeNonAutoriseeError("seul le chef de base d'une équipe aérienne crée ses lieux")
     if equipe_demandee_id is not None and equipe_demandee_id != equipe.id:
@@ -764,7 +772,7 @@ async def _resoudre_equipe_creation(
 
 async def _exiger_droit_sur_equipe(
     acteur: object,
-    equipe_repository: EquipeAerienneRepository,
+    equipe_repository: EquipeRepository,
     equipe_id: uuid.UUID | None,
 ) -> None:
     """Modifier un lieu existant : admin, ou chef de base de l'équipe qui le possède.
@@ -772,7 +780,7 @@ async def _exiger_droit_sur_equipe(
     par un admin — personne ne peut prétendre en être le propriétaire."""
     if _est_admin(acteur):
         return
-    equipe = await equipe_repository.get_by_chef_de_base_id(acteur.id)
+    equipe = await equipe_repository.get_by_chef_id(acteur.id)
     if equipe is None or equipe_id is None or equipe.id != equipe_id:
         raise EquipeNonAutoriseeError("ce lieu aérien appartient à une autre équipe")
 
@@ -817,7 +825,7 @@ class CreateBaseAerienne:
     def __init__(
         self,
         repository: BaseAerienneRepository,
-        equipe_aerienne_repository: EquipeAerienneRepository,
+        equipe_aerienne_repository: EquipeRepository,
     ):
         self.repository = repository
         self.equipe_aerienne_repository = equipe_aerienne_repository
@@ -872,7 +880,7 @@ class UpdateBaseAerienne:
     def __init__(
         self,
         repository: BaseAerienneRepository,
-        equipe_aerienne_repository: EquipeAerienneRepository,
+        equipe_aerienne_repository: EquipeRepository,
     ):
         self.repository = repository
         self.equipe_aerienne_repository = equipe_aerienne_repository
@@ -939,65 +947,162 @@ class UpdateBaseAerienne:
         return await self.repository.update(base)
 
 
-class ListEquipesAeriennes:
-    def __init__(self, repository: EquipeAerienneRepository):
+# Fonction de direction attendue selon le type d'équipe : `ROLES` distingue toujours
+# `chef_de_base` (aérien) et `chef_equipe` (terrestre), alors que `equipe_membre` ne
+# connaît plus qu'une fonction `chef`. C'est ici que la correspondance est faite.
+ROLE_DU_CHEF_PAR_TYPE = {"aerien": "chef_de_base", "terrestre": "chef_equipe"}
+
+
+@dataclass
+class MembreDemande:
+    """Membre tel que demandé par l'API : soit un compte existant (`user_id`), soit une
+    identité à créer à la volée (`nom`/`prenom`)."""
+
+    fonction: str
+    user_id: uuid.UUID | None = None
+    nom: str | None = None
+    prenom: str | None = None
+
+
+class ListEquipes:
+    def __init__(self, repository: EquipeRepository):
         self.repository = repository
 
-    async def execute(self, actif: bool | None = True) -> list[EquipeAerienne]:
-        return await self.repository.list_all(actif=actif)
+    async def execute(
+        self, actif: bool | None = True, type_equipe: str | None = None
+    ) -> list[Equipe]:
+        return await self.repository.list_all(actif=actif, type_equipe=type_equipe)
 
 
-class GetEquipeAerienne:
-    def __init__(self, repository: EquipeAerienneRepository):
+class GetEquipe:
+    def __init__(self, repository: EquipeRepository):
         self.repository = repository
 
-    async def execute(self, equipe_id: uuid.UUID) -> EquipeAerienne | None:
+    async def execute(self, equipe_id: uuid.UUID) -> Equipe | None:
         return await self.repository.get_by_id(equipe_id)
 
 
-class CreateEquipeAerienne:
-    """`utilisateur_repo` (duck-typé) : valide que `chef_de_base_id` référence un
-    utilisateur actif du rôle `chef_de_base`."""
+class ResoudreMembre:
+    """Transforme un `MembreDemande` en `MembreEquipe` prêt à écrire, en créant au
+    besoin le compte « à la volée ».
 
-    def __init__(self, repository: EquipeAerienneRepository, utilisateur_repo: object):
-        self.repository = repository
+    `utilisateur_repo` est duck-typé (`get_by_id`, `creer_a_la_volee`) — même contrat
+    souple que les anciens `CreateEquipe*`."""
+
+    def __init__(self, utilisateur_repo: object):
         self.utilisateur_repo = utilisateur_repo
+
+    async def execute(
+        self, equipe_id: uuid.UUID, type_equipe: str, demande: MembreDemande
+    ) -> MembreEquipe:
+        if demande.user_id is not None:
+            utilisateur = await self.utilisateur_repo.get_by_id(demande.user_id)
+            if utilisateur is None:
+                raise UtilisateurMembreIntrouvableError(str(demande.user_id))
+            if (
+                demande.fonction == "chef"
+                and utilisateur.role != ROLE_DU_CHEF_PAR_TYPE[type_equipe]
+            ):
+                raise ChefEquipeInvalideError(str(demande.user_id))
+            return MembreEquipe(
+                equipe_id=equipe_id,
+                user_id=utilisateur.id,
+                fonction=demande.fonction,
+                nom=utilisateur.nom,
+                prenom=utilisateur.prenom,
+                created_at=datetime.now(timezone.utc),
+            )
+
+        # Pas de compte désigné : on en crée un, mais seulement pour les fonctions que
+        # le projet autorise déjà à naître ainsi (#319) — un chef doit préexister.
+        if demande.fonction not in ROLES_A_LA_VOLEE:
+            raise CompteALaVoleeInterditError(demande.fonction)
+        if not demande.nom:
+            raise CompteALaVoleeInterditError("nom requis pour un membre sans user_id")
+        utilisateur = await self.utilisateur_repo.creer_a_la_volee(
+            nom=demande.nom, prenom=demande.prenom or "", role=demande.fonction
+        )
+        return MembreEquipe(
+            equipe_id=equipe_id,
+            user_id=utilisateur.id,
+            fonction=demande.fonction,
+            nom=utilisateur.nom,
+            prenom=utilisateur.prenom,
+            created_at=datetime.now(timezone.utc),
+        )
+
+
+class CreateEquipe:
+    """Crée une équipe et ses membres. Le `type` est figé ici une fois pour toutes :
+    aucun chemin de mise à jour ne le réécrit."""
+
+    def __init__(self, repository: EquipeRepository, utilisateur_repo: object):
+        self.repository = repository
+        self.resoudre_membre = ResoudreMembre(utilisateur_repo)
 
     async def execute(
         self,
         nom: str,
-        chef_de_base_id: uuid.UUID,
-        pilote: str,
-        mecanicien: str,
-        consultant_international: str | None = None,
-        membres: list[str] | None = None,
+        type_equipe: str,
+        membres: list[MembreDemande] | None = None,
         aeronef: Aeronef | None = None,
-    ) -> EquipeAerienne:
-        chef = await self.utilisateur_repo.get_by_id(chef_de_base_id)
-        if chef is None or chef.role != "chef_de_base":
-            raise ChefDeBaseEquipeInvalideError(str(chef_de_base_id))
-
+    ) -> Equipe:
         maintenant = datetime.now(timezone.utc)
         equipe_id = uuid.uuid4()
+        membres_resolus = [
+            await self.resoudre_membre.execute(equipe_id, type_equipe, demande)
+            for demande in (membres or [])
+        ]
         return await self.repository.create(
-            EquipeAerienne(
+            Equipe(
                 id=equipe_id,
                 nom=nom,
-                chef_de_base_id=chef_de_base_id,
-                pilote=pilote,
-                mecanicien=mecanicien,
-                consultant_international=consultant_international,
+                type=type_equipe,
                 aeronef_id=aeronef.id if aeronef is not None else None,
                 aeronef=aeronef,
                 actif=True,
                 created_at=maintenant,
                 updated_at=maintenant,
-                membres=[
-                    MembreEquipeAerienne(equipe_aerienne_id=equipe_id, nom=nom_membre)
-                    for nom_membre in (membres or [])
-                ],
+                membres=membres_resolus,
             )
         )
+
+
+class UpdateEquipe:
+    """Renommage et mise hors service. `type` est volontairement absent : le type d'une
+    équipe n'est pas modifiable après création."""
+
+    def __init__(self, repository: EquipeRepository):
+        self.repository = repository
+
+    async def execute(
+        self,
+        equipe_id: uuid.UUID,
+        nom: str | None = None,
+        actif: bool | None = None,
+    ) -> Equipe:
+        equipe = await self.repository.get_by_id(equipe_id)
+        if equipe is None:
+            raise EquipeIntrouvableError(str(equipe_id))
+        if nom is not None:
+            equipe.nom = nom
+        if actif is not None:
+            equipe.actif = actif
+        equipe.updated_at = datetime.now(timezone.utc)
+        return await self.repository.update(equipe)
+
+
+class AjouterMembreEquipe:
+    def __init__(self, repository: EquipeRepository, utilisateur_repo: object):
+        self.repository = repository
+        self.resoudre_membre = ResoudreMembre(utilisateur_repo)
+
+    async def execute(self, equipe_id: uuid.UUID, demande: MembreDemande) -> MembreEquipe:
+        equipe = await self.repository.get_by_id(equipe_id)
+        if equipe is None:
+            raise EquipeIntrouvableError(str(equipe_id))
+        membre = await self.resoudre_membre.execute(equipe_id, equipe.type, demande)
+        return await self.repository.ajouter_membre(membre)
 
 
 class ListAeronefs:
@@ -1041,58 +1146,6 @@ class UpdateAeronef:
         return await self.repository.update(aeronef)
 
 
-class ListEquipesTerrestres:
-    def __init__(self, repository: EquipeTerrestreRepository):
-        self.repository = repository
-
-    async def execute(self, actif: bool | None = True) -> list[EquipeTerrestre]:
-        return await self.repository.list_all(actif=actif)
-
-
-class GetEquipeTerrestre:
-    def __init__(self, repository: EquipeTerrestreRepository):
-        self.repository = repository
-
-    async def execute(self, equipe_id: uuid.UUID) -> EquipeTerrestre | None:
-        return await self.repository.get_by_id(equipe_id)
-
-
-class CreateEquipeTerrestre:
-    """`utilisateur_repo` (duck-typé, même contrat que `CreateEquipeAerienne`) : valide
-    que `chef_equipe_id` référence un utilisateur actif du rôle `chef_equipe`."""
-
-    def __init__(self, repository: EquipeTerrestreRepository, utilisateur_repo: object):
-        self.repository = repository
-        self.utilisateur_repo = utilisateur_repo
-
-    async def execute(
-        self,
-        nom: str,
-        chef_equipe_id: uuid.UUID,
-        membres: list[str] | None = None,
-    ) -> EquipeTerrestre:
-        chef = await self.utilisateur_repo.get_by_id(chef_equipe_id)
-        if chef is None or chef.role != "chef_equipe":
-            raise ChefEquipeInvalideError(str(chef_equipe_id))
-
-        maintenant = datetime.now(timezone.utc)
-        equipe_id = uuid.uuid4()
-        return await self.repository.create(
-            EquipeTerrestre(
-                id=equipe_id,
-                nom=nom,
-                chef_equipe_id=chef_equipe_id,
-                actif=True,
-                created_at=maintenant,
-                updated_at=maintenant,
-                membres=[
-                    MembreEquipeTerrestre(equipe_terrestre_id=equipe_id, nom=nom_membre)
-                    for nom_membre in (membres or [])
-                ],
-            )
-        )
-
-
 class ListStandsRemplissage:
     def __init__(self, repository: StandRemplissageRepository):
         self.repository = repository
@@ -1116,7 +1169,7 @@ class CreateStandRemplissage:
     def __init__(
         self,
         repository: StandRemplissageRepository,
-        equipe_aerienne_repository: EquipeAerienneRepository,
+        equipe_aerienne_repository: EquipeRepository,
     ):
         self.repository = repository
         self.equipe_aerienne_repository = equipe_aerienne_repository
@@ -1160,7 +1213,7 @@ class UpdateStandRemplissage:
     def __init__(
         self,
         repository: StandRemplissageRepository,
-        equipe_aerienne_repository: EquipeAerienneRepository,
+        equipe_aerienne_repository: EquipeRepository,
     ):
         self.repository = repository
         self.equipe_aerienne_repository = equipe_aerienne_repository

@@ -47,25 +47,35 @@ Agriculteur → Signalement → Prospection de Validation
   chacun relevé en position (lat/lon/alt captées automatiquement, hors ligne) et nommé à la main.
   Ni l'un ni l'autre n'est un **poste acridien** ou une **station fixe**.
 
-- **Équipe aérienne** et **aéronef** (migrations 0066, 0072, 0075). Une équipe aérienne = un
-  chef de base (seul compte utilisateur de l'équipe) + un pilote, un mécanicien (noms libres),
-  un consultant international facultatif, des autres membres en nombre variable, et **un
-  aéronef** (hélicoptère : immatriculation, société, volume de cuve — table `aeronef`,
-  relation 1:1, `immatriculation` en est la clé candidate). Une équipe possède sa base
-  principale (`base_aerienne.equipe_id`), ses bases secondaires (héritées de la principale) et
-  ses stands (`stand_remplissage.equipe_aerienne_id`). **Seul le chef de base de l'équipe (ou
-  un admin) crée ses lieux**, rattachés d'office à SON équipe (contrôle serveur, 403 sinon).
-  Le référentiel de lieux d'une équipe reste `base_aerienne`/`stand_remplissage` (décision 0064),
-  distinct de `lieu_aerien` (prospection/traitement).
-  ⚠️ Une remodélisation est **cadrée mais pas implémentée** (`docs/adr/ADR-018`, épic #592) :
-  `equipe_terrestre` + `equipe_aerienne` → `equipe` (membres génériques),
+- **Équipe** (table unique `equipe`, migration 0082 — ADR-018 §2). Une équipe est
+  `terrestre` ou `aerien` (`type`, non modifiable après création), et ses intervenants sont des
+  lignes de `equipe_membre(equipe_id, user_id, fonction)` — il n'y a plus de rôle nommé en dur.
+  `fonction` reprend le vocabulaire de `ROLES`, plus `chef` : une équipe a **un seul chef**, un
+  chef ne dirige **qu'une équipe** (deux index partiels `WHERE fonction = 'chef'`). Une équipe
+  aérienne a en plus **un aéronef** (hélicoptère : immatriculation, société, volume de cuve —
+  table `aeronef`, 1:1, `immatriculation` en est la clé candidate). Elle possède sa base
+  principale (`base_aerienne.equipe_id`, UNIQUE), ses bases secondaires (héritées de la
+  principale) et ses stands (`stand_remplissage.equipe_aerienne_id`) ; une équipe terrestre est
+  rattachée à un ou plusieurs postes (`poste_acridien.equipe_terrestre_id`, sans UNIQUE : équipe
+  mobile). Toutes ces FK sont **composites et type-sûres** — `(equipe_id, equipe_type) →
+  equipe(id, type)`, la colonne `equipe_type` étant générée : un lieu aérien ne peut pas pointer
+  vers une équipe terrestre. **Seul le chef de base de l'équipe (ou un admin) crée ses lieux**,
+  rattachés d'office à SON équipe (contrôle serveur, 403 sinon). Le référentiel de lieux d'une
+  équipe reste `base_aerienne`/`stand_remplissage` (décision 0064), distinct de `lieu_aerien`
+  (prospection/traitement).
+  ⚠️ La suite de la remodélisation reste **cadrée mais pas implémentée**
+  (`docs/adr/ADR-018`, épic #592) : `equipe_aeronef` (affectations datées, #603),
   `base_aerienne` + `stand_remplissage` → `site_aerienne` (principale / secondaire / stand
   distinguées par `parent_base_id`), positions historisées, stock de pesticides centralisé.
-  Tout ce paragraphe décrit l'état **actuel** du code, qui reste vrai jusqu'aux migrations.
 
-- **Pilote** et **mécanicien** sont **externes à l'IFVM** (compagnie aérienne ou Armée malgache) :
-  ce sont des noms, pas des comptes `utilisateur`. Seul le **chef de base** est un agent IFVM. Le
-  **consultant international** signe lorsqu'il intervient.
+- **Pilote**, **mécanicien** et **consultant international** sont **externes à l'IFVM**
+  (compagnie aérienne ou Armée malgache) : ils n'ont pas d'accès applicatif, mais depuis la
+  migration 0082 ils ont bien une identité — un compte créé « à la volée »
+  (`peut_se_connecter = false`), comme membre de l'équipe, plutôt qu'un nom en texte libre.
+  Seul le **chef de base** est un agent IFVM authentifiable. Le **consultant international**
+  signe lorsqu'il intervient.
+  `utilisateur.chef_de_base_id` / `chef_equipe_id` sont conservés en l'état : redondance
+  assumée avec `equipe_membre(fonction='chef')`, dette explicite, sans synchronisation.
 
 - **Relevé** vs **fiche papier** : l'unité d'enregistrement en base est le **relevé** (un point, une ligne `prospection`). La feuille papier de l'extensive juxtapose **2** relevés par commodité d'impression ; en base ils deviennent **2 lignes distinctes** (regroupables via `n_fiche`).
 
