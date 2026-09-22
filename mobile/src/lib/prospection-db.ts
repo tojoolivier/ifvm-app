@@ -673,6 +673,10 @@ const COLONNES_PROSPECTION: readonly Colonne[] = [
   { name: 'futs_recues', type: 'INTEGER' },
   { name: 'signature_visa_nom', type: 'TEXT' },
   { name: 'signature_visa_horodatage', type: 'TEXT' },
+  // Tracé SVG de l'auto-signature du prospecteur — Intensif uniquement, écran
+  // Observations (migration backend 0082). Réutilise ces colonnes historiquement
+  // mortes (migration 0036) plutôt qu'un nouveau triplet, cf. la migration.
+  { name: 'signature_visa_image', type: 'TEXT' },
   { name: 'signature_consultant_fao_nom', type: 'TEXT' },
   { name: 'signature_consultant_fao_horodatage', type: 'TEXT' },
   // Tracé SVG (#signatures-digitales-extensif-aerien) — même principe que

@@ -193,14 +193,17 @@ class ProspectionModel(Base):
     # Signatures — indépendantes du choix Pesticides. Même principe nom +
     # horodatage que `TraitementSignatureModel`, en colonnes nommées à plat
     # (4 rôles fixes, jamais une liste ouverte comme côté traitement).
-    # `signature_visa_*` : le champ Visa est retiré du formulaire mobile
-    # (#signatures-digitales-extensif-aerien) mais ces 2 colonnes restent —
-    # historique des fiches déjà signées, jamais de DROP COLUMN pour un
-    # simple retrait d'usage applicatif.
+    # `signature_visa_*` : le Visa est retiré du formulaire mobile Extensif
+    # Aérien (#signatures-digitales-extensif-aerien) — nom/horodatage restent
+    # en base pour préserver l'historique. Réutilisé côté Intensif (dernier
+    # slide « Observations », migration 0082) : signature du prospecteur lui-
+    # même, nom auto-rempli depuis l'utilisateur connecté, jamais ressaisi.
     signature_visa_nom: Mapped[str | None] = mapped_column(Text(), nullable=True)
     signature_visa_horodatage: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
+    # Tracé SVG (migration 0082) — même format que les 3 signatures ci-dessous.
+    signature_visa_image: Mapped[str | None] = mapped_column(Text(), nullable=True)
     signature_consultant_fao_nom: Mapped[str | None] = mapped_column(Text(), nullable=True)
     signature_consultant_fao_horodatage: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True

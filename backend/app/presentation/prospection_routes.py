@@ -188,6 +188,7 @@ async def create_prospection(
             futs_recues=body.futs_recues,
             signature_visa_nom=body.signature_visa_nom,
             signature_visa_horodatage=body.signature_visa_horodatage,
+            signature_visa_image=body.signature_visa_image,
             signature_consultant_fao_nom=body.signature_consultant_fao_nom,
             signature_consultant_fao_horodatage=body.signature_consultant_fao_horodatage,
             signature_consultant_fao_image=body.signature_consultant_fao_image,

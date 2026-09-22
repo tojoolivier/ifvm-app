@@ -596,6 +596,7 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
     futs_recues: draft.futs_recues != null ? Number(draft.futs_recues) : null,
     signature_visa_nom: draft.signature_visa_nom || null,
     signature_visa_horodatage: draft.signature_visa_horodatage || null,
+    signature_visa_image: draft.signature_visa_image || null,
     signature_consultant_fao_nom: draft.signature_consultant_fao_nom || null,
     signature_consultant_fao_horodatage: draft.signature_consultant_fao_horodatage || null,
     signature_consultant_fao_image: draft.signature_consultant_fao_image || null,

@@ -8,9 +8,11 @@ import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { DEGATS_OPTIONS, formatHeureLocale } from '@/lib/prospection-fiche-lecture';
 import { ENNEMIS_OPTIONS, parseEnnemis, serializeEnnemis } from '@/lib/prospection-observations';
 import { ObservationsFormValues } from '@/lib/prospection-observations-schema';
-import { updateProspectionObservations } from '@/lib/prospection-repository';
+import { ObservationsUpdateInput, updateProspectionObservations } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
+import { useAuthStore } from '@/lib/auth-store';
 import { DateField } from '@/components/DateField';
+import { SignaturePad } from '@/components/traitement/SignaturePad';
 
 const ORANGE = '#e89b2b';
 const BG = '#faf7ef';
@@ -46,6 +48,31 @@ export default function ObservationsScreen() {
   // affichée (HH:mm) en est dérivée à l'affichage, jamais stockée séparément.
   const [heureObservationAt, setHeureObservationAt] = useState<string | null>(null);
 
+  // ==========================================
+  // SIGNATURE — auto-signature du prospecteur connecté
+  // ==========================================
+  // Remplace le champ « Photo » (jamais câblé). Le nom vient uniquement du
+  // compte connecté — jamais ressaisi, jamais choisi dans une liste — seul le
+  // tracé (`SignaturePad`) est capturé ici. Réutilise `signature_visa_nom`/
+  // `_horodatage` (migration 0036, colonnes historiquement mortes pour
+  // l'Intensif) + `signature_visa_image` (migration 0082). Même mécanique
+  // VALIDER/MODIFIER que extensive-observations.tsx, simplifiée à un unique
+  // signataire toujours connu (pas de sélection de personne).
+  const user = useAuthStore((s) => s.user);
+  const prospecteurNom = user ? `${user.prenom} ${user.nom}` : null;
+  const [signatureNom, setSignatureNom] = useState<string | null>(draft?.signature_visa_nom ?? null);
+  const [signatureHorodatage, setSignatureHorodatage] = useState<string | null>(draft?.signature_visa_horodatage ?? null);
+  const [signatureImage, setSignatureImage] = useState<string | null>(draft?.signature_visa_image ?? null);
+  // Tracé en cours (avant VALIDER), jamais persisté tant que VALIDER n'a pas
+  // été pressé. `resetTick` force le remontage du SignaturePad (non contrôlé)
+  // pour repartir d'un tracé vierge après MODIFIER.
+  const [pendingPath, setPendingPath] = useState('');
+  const [resetTick, setResetTick] = useState(0);
+  // Une signature jamais validée est implicitement en édition (`!signatureImage`) ;
+  // ce booléen ne sert qu'à rouvrir l'édition d'une signature déjà validée (MODIFIER).
+  const [editingSignature, setEditingSignature] = useState(false);
+  const enEditionSignature = editingSignature || !signatureImage;
+
   // Filet de sécurité si cet écran est atteint sans passer par reference.tsx (deep-link,
   // app relancée en plein milieu du parcours) : le store peut ne pas encore porter cette
   // fiche — cf. même garde sur reference.tsx / captures.tsx / veg.tsx.
@@ -73,17 +100,7 @@ export default function ObservationsScreen() {
     onSubmit: async ({ value }) => {
       return run(
         async () => {
-          // Mettre à jour la prospection avec les champs de pluie
-          // Note: ces champs doivent être ajoutés dans la table prospection
-          // et dans updateProspectionObservations
-          const updated = await updateProspectionObservations(draftId, {
-            degatsCultures: value.degatsCultures,
-            ennemisNaturels: serializeEnnemis(value.ennemisSelected, value.ennemisAutre),
-            observations: value.observation || null,
-            dernierePluie: value.dernierePluieDate || null,
-            intensitePluie: value.intensitePluie || null,
-            heureObservationAt,
-          });
+          const updated = await updateProspectionObservations(draftId, buildPayload(value));
           setDraft(updated);
           router.push({ pathname: '/(prospection)/review' as any, params: { draftId } });
         },
@@ -96,6 +113,69 @@ export default function ObservationsScreen() {
       );
     },
   });
+
+  /**
+   * Construit l'intégralité du payload d'enregistrement à partir des valeurs
+   * courantes du formulaire (pluie/dégâts/ennemis/observation) — utilisé aussi
+   * bien par « Vérifier & enregistrer » (tous les champs) que par VALIDER (la
+   * seule signature, `overridesSignature` fournissant le tracé qui vient
+   * d'être capturé sans attendre le prochain rendu, cf. même principe que
+   * `buildPayload` sur extensive-observations.tsx).
+   */
+  const buildPayload = (
+    values: Pick<ObservationsFormValues, 'degatsCultures' | 'ennemisSelected' | 'ennemisAutre' | 'observation'> & {
+      dernierePluieDate: string;
+      intensitePluie: string | null;
+    },
+    overridesSignature?: { nom: string | null; horodatage: string | null; image: string | null }
+  ): ObservationsUpdateInput => ({
+    degatsCultures: values.degatsCultures,
+    ennemisNaturels: serializeEnnemis(values.ennemisSelected, values.ennemisAutre),
+    observations: values.observation || null,
+    dernierePluie: values.dernierePluieDate || null,
+    intensitePluie: values.intensitePluie || null,
+    heureObservationAt,
+    signatureVisaNom: overridesSignature ? overridesSignature.nom : signatureNom,
+    signatureVisaHorodatage: overridesSignature ? overridesSignature.horodatage : signatureHorodatage,
+    signatureVisaImage: overridesSignature ? overridesSignature.image : signatureImage,
+  });
+
+  /** VALIDER — capture définitivement le tracé en cours. Persisté immédiatement
+   * (SQLite local), pas seulement gardé en state React : fermer l'app avant
+   * d'atteindre « Vérifier & enregistrer » ne perd jamais une signature déjà
+   * validée (même principe offline-first que extensive-observations.tsx). */
+  const handleValiderSignature = () => {
+    const trace = pendingPath;
+    if (!prospecteurNom || !trace) return; // Précondition déjà imposée par le bouton désactivé.
+    const horodatage = new Date().toISOString();
+    return run(
+      async () => {
+        const updated = await updateProspectionObservations(
+          draftId,
+          buildPayload(form.state.values, { nom: prospecteurNom, horodatage, image: trace })
+        );
+        setDraft(updated);
+        setSignatureNom(prospecteurNom);
+        setSignatureHorodatage(horodatage);
+        setSignatureImage(trace);
+        setEditingSignature(false);
+      },
+      {
+        screen: 'observations',
+        precondition: !!draftId,
+        preconditionMessage: 'Session de saisie perdue — revenez à l’écran précédent et réessayez.',
+        context: { draftId },
+      }
+    );
+  };
+
+  /** MODIFIER — repart d'un tracé vierge ; la signature déjà validée n'est
+   * remplacée qu'au prochain VALIDER, jamais avant. */
+  const handleModifierSignature = () => {
+    setPendingPath('');
+    setResetTick((tick) => tick + 1);
+    setEditingSignature(true);
+  };
 
   // Restaure la pluie, les dégâts, les ennemis naturels et l'observation libre déjà
   // enregistrés pour cette fiche — sans ça, cet écran repartait systématiquement de zéro
@@ -115,6 +195,10 @@ export default function ObservationsScreen() {
       form.setFieldValue('ennemisAutre', ennemis.autre);
       form.setFieldValue('observation', draft.observations ?? '');
       if (ennemis.autre) setShowAutre(true);
+      setSignatureNom(draft.signature_visa_nom ?? null);
+      setSignatureHorodatage(draft.signature_visa_horodatage ?? null);
+      setSignatureImage(draft.signature_visa_image ?? null);
+      setEditingSignature(false);
     });
 
     // Heure d'observation automatique : une heure déjà enregistrée pour cette fiche
@@ -315,14 +399,42 @@ export default function ObservationsScreen() {
             </form.Field>
 
             {/* ==========================================
-                SECTION : PHOTO
+                SECTION : SIGNATURE
                 ========================================== */}
 
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>Photo</Text>
-              <TouchableOpacity style={styles.photoSlot} activeOpacity={0.7}>
-                <Text style={styles.photoSlotText}>+ Photo</Text>
-              </TouchableOpacity>
+              <Text style={styles.cardTitle}>Signature</Text>
+              <View style={styles.autoCard}>
+                <Text style={styles.autoLabel}>Prospecteur</Text>
+                <Text style={styles.autoValue}>{prospecteurNom ?? '—'}</Text>
+              </View>
+
+              {enEditionSignature ? (
+                <>
+                  <SignaturePad
+                    key={`signature-visa-${resetTick}`}
+                    testID="signature-pad-visa"
+                    value={null}
+                    onChange={setPendingPath}
+                  />
+                  <TouchableOpacity
+                    style={[styles.signButton, (!prospecteurNom || !pendingPath) && styles.signButtonDisabled]}
+                    onPress={handleValiderSignature}
+                    disabled={!prospecteurNom || !pendingPath}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.signButtonText}>VALIDER</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <SignaturePad testID="signature-pad-visa" value={signatureImage} onChange={() => {}} readOnly />
+                  <Text style={styles.signatureStamp}>Signé à {formatHeureLocale(signatureHorodatage)}</Text>
+                  <TouchableOpacity style={styles.modifyButton} onPress={handleModifierSignature} activeOpacity={0.85}>
+                    <Text style={styles.modifyButtonText}>MODIFIER</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           </ScrollView>
 
@@ -362,21 +474,17 @@ const styles = StyleSheet.create({
   textArea: { minHeight: 70, textAlignVertical: 'top' },
   fieldGroup: { marginBottom: 8 },
   fieldLabel: { fontSize: 10, fontWeight: '600', color: TEXT_SECONDARY, marginBottom: 4 },
-  photoSlot: {
-    width: 84,
-    height: 84,
-    borderWidth: 1.5,
-    borderColor: '#cfc7ae',
-    borderStyle: 'dashed',
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  photoSlotText: { fontSize: 11, fontWeight: '600', color: '#9a9484' },
   errorText: { color: '#c0412b', fontSize: 11, marginBottom: 4 },
   footer: { padding: 16 },
   continueButton: { backgroundColor: ORANGE, borderRadius: 13, padding: 15, alignItems: 'center' },
   continueButtonText: { color: TEXT, fontWeight: '800', fontSize: 15 },
+  // ===== Signature =====
+  signatureStamp: { fontSize: 10, color: TEXT_SECONDARY, fontFamily: 'monospace', marginTop: 6 },
+  signButton: { backgroundColor: GREEN, borderRadius: 9, paddingVertical: 9, alignItems: 'center', marginTop: 8 },
+  signButtonDisabled: { backgroundColor: '#9a9484' },
+  signButtonText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  modifyButton: { borderWidth: 1, borderColor: BORDER, borderRadius: 9, paddingVertical: 9, alignItems: 'center', marginTop: 8 },
+  modifyButtonText: { color: TEXT, fontWeight: '800', fontSize: 12 },
 });
 
 /**

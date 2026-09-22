@@ -57,6 +57,7 @@ const MIGRATED_COLUMNS = [
   { name: 'futs_recues' },
   { name: 'signature_visa_nom' },
   { name: 'signature_visa_horodatage' },
+  { name: 'signature_visa_image' },
   { name: 'signature_consultant_fao_nom' },
   { name: 'signature_consultant_fao_horodatage' },
   { name: 'signature_consultant_fao_image' },
