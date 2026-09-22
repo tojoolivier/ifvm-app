@@ -414,6 +414,14 @@ export function ProspectionDetailPage() {
             <p className="mt-1 font-sans text-[12px] font-medium text-white/75">{sousTitre}</p>
           </div>
           <HeaderPill>{STATUT_LABELS[prospection.statut as Statut] ?? prospection.statut}</HeaderPill>
+          {/* #revalidation-web-informe : la fiche détaillée n'indiquait nulle
+              part qu'il s'agit d'une revalidation (seule la liste,
+              ProspectionsPage, le montrait via une pastille dédiée) — devient
+              nécessaire maintenant qu'une revalidation suit la même chaîne de
+              vérification qu'une fiche neuve : l'administrateur qui l'examine
+              doit savoir qu'elle documente à nouveau une situation déjà
+              connue, avec le même numéro qu'une fiche périmée. */}
+          {prospection.revalide_de_id && <HeaderPill>Revalidation</HeaderPill>}
           {prospection.statut_sync !== 'synced' && <HeaderPill>Non synchronisée</HeaderPill>}
           {ficheValidee && (
             <button

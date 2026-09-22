@@ -153,35 +153,35 @@ class CreateProspection:
         valider_surfaces_prospection(surface_prospectee, surface_infestee)
 
         now = datetime.utcnow()
-        # Une fiche de validation / signalisation est exploitable pour le
-        # traitement dès sa synchronisation : elle ne passe pas par la chaîne
-        # administrative en_attente -> verifiee -> validee réservée aux
-        # prospections intensive et extensive (`apply_transition`, jamais
-        # appelée ici). Le client ne décide donc pas de ce statut métier. Son
-        # numéro visible est celui du message créé à la référence, jamais un
-        # second numéro généré au serveur. `validated_at` est stampé ici pour
-        # la même raison qu'`apply_transition` le stampe pour les deux autres
-        # types : #revalidation-prospection en a besoin (délai de 5 jours
-        # depuis la validation) et ne doit pas dépendre du type pour trouver
-        # une valeur non-NULL.
+        # Une fiche de validation / signalisation NEUVE (jamais une
+        # revalidation) est exploitable pour le traitement dès sa
+        # synchronisation : elle ne passe pas par la chaîne administrative
+        # en_attente -> verifiee -> validee réservée aux prospections
+        # intensive et extensive (`apply_transition`, jamais appelée ici). Le
+        # client ne décide donc pas de ce statut métier pour ce cas précis.
+        # Son numéro visible est celui du message créé à la référence, jamais
+        # un second numéro généré au serveur.
+        #
+        # #revalidation-prospection : une revalidation (`revalide_de_id` non
+        # nul), quel que soit son `type_prospection`, suit désormais la MÊME
+        # chaîne de vérification qu'une fiche synchronisée ordinaire —
+        # `statut` vient donc du client (`completeProspection`, mobile),
+        # jamais forcé ici, exactement comme pour l'Intensif/l'Extensif.
+        # Décision produit assumée : l'ancien comportement (validation
+        # immédiate, `validated_at` daté d'aujourd'hui) évitait qu'une
+        # revalidation reste invisible du sélecteur de traitement pendant la
+        # revue administrative, au prix de sauter cette revue — désormais
+        # une revalidation est revue comme n'importe quelle fiche neuve.
         validated_at = None
-        if type_prospection == "validation":
+        if type_prospection == "validation" and revalide_de_id is None:
             statut = "validee"
             n_fiche = n_message
             validated_at = now
-        elif revalide_de_id is not None:
-            # #revalidation-prospection : une fiche qui revalide une prospection
-            # périmée documente une situation terrain qui vient d'être
-            # revérifiée sur le moment — la refaire passer par la chaîne
-            # administrative en_attente -> verifiee -> validee de sa fiche
-            # d'origine la laisserait invisible du sélecteur de traitement
-            # pendant potentiellement plusieurs jours de plus, ce qui
-            # réintroduirait exactement le problème que la revalidation sert à
-            # résoudre. `validated_at` reçoit une date fraîche (maintenant),
-            # jamais celle de la fiche source : c'est elle qui fait courir à
-            # nouveau le délai de péremption de 5 jours.
-            statut = "validee"
-            validated_at = now
+        elif type_prospection == "validation":
+            # Revalidation d'une fiche de Validation : le numéro reste aligné
+            # sur n_message (même règle qu'une fiche neuve), mais `statut`
+            # suit la chaîne de vérification (valeur transmise par le client).
+            n_fiche = n_message
 
         prospection = Prospection(
             type_prospection=type_prospection,
