@@ -427,14 +427,14 @@ export default function ExtensiveLarvesScreen() {
               <View style={styles.inputRow}>
                 <Text style={styles.inputLabel}>Déplacement</Text>
                 <View style={styles.deplacementRow}>
-                  {['repos', 'perchee'].map((option) => (
+                  {['repos', 'deplacement'].map((option) => (
                     <TouchableOpacity
                       key={option}
                       style={[styles.deplacementButton, data.deplacement === option && styles.deplacementButtonActive]}
                       onPress={() => updateSpeciesData({ deplacement: option })}
                     >
                       <Text style={[styles.deplacementText, data.deplacement === option && styles.deplacementTextActive]}>
-                        {option === 'repos' ? 'Repos' : 'Perchée'}
+                        {option === 'repos' ? 'Repos' : 'Déplacement'}
                       </Text>
                     </TouchableOpacity>
                   ))}

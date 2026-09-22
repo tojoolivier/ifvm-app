@@ -23,14 +23,6 @@ jest.mock('@/lib/prospection-repository', () => ({
   listOperationsAeriennes: jest.fn().mockResolvedValue([]),
   concludeValidation: jest.fn(),
   alignerNumeroFicheSurNumeroMessage: jest.fn(),
-  // Vraie implémentation (pas de mock utile ici) : `buildPesticidesRows` en dépend
-  // pour normaliser `pesticides_embarques` (0/1/null en SQLite).
-  normalizeBoolean: (value: unknown) => {
-    if (value === null || value === undefined) return null;
-    if (typeof value === 'boolean') return value;
-    if (typeof value === 'number') return value !== 0;
-    return null;
-  },
 }));
 
 jest.mock('@/lib/prospection-review', () => ({
@@ -75,7 +67,7 @@ const POPULATIONS = [
     espece: 'LMC', categorie: 'larve', captures_nombre: 6, captures_sol: 6, captures_trans: 0, captures_greg: 0,
     densite_diffuse: null, densite_groupee: null, methode: null, accouplement: null, ponte: null,
     densites_larve: JSON.stringify({ L1: 4, L2: 2 }), tache_larvaire: true, bande_larvaire: false,
-    interdistance: 15, deplacement: 'perchee', surface_contaminee_ha: 12.75,
+    interdistance: 15, deplacement: 'deplacement', surface_contaminee_ha: 12.75,
   },
 ] as any;
 
@@ -169,7 +161,7 @@ describe('ExtensiveRecapScreen — récapitulatif complet (#227)', () => {
     expect(screen.getByText('Surface contaminée (ha)')).toBeVisible();
     expect(screen.getByText('12.75')).toBeVisible();
     expect(screen.getByText('15')).toBeVisible(); // interdistance
-    expect(screen.getByText(/Tache larvaire · Déplacement : Perchée/)).toBeVisible();
+    expect(screen.getByText(/Tache larvaire · Déplacement : Déplacement/)).toBeVisible();
   });
 
   /**
@@ -328,7 +320,7 @@ describe('ExtensiveRecapScreen — densité diffuse facultative (#densite-diffus
     jest.mocked(prospectionRepository.listAllProspectionPopulations).mockResolvedValue([
       {
         espece: 'LMC', categorie: 'larve', captures_nombre: 6, densite_diffuse: null, densite_groupee: null,
-        methode: null, accouplement: null, ponte: null, tache_larvaire: true, interdistance: 3, deplacement: 'perchee',
+        methode: null, accouplement: null, ponte: null, tache_larvaire: true, interdistance: 3, deplacement: 'deplacement',
       },
     ] as any);
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
@@ -357,13 +349,14 @@ describe('ExtensiveRecapScreen — densité diffuse facultative (#densite-diffus
 });
 
 /**
- * Récapitulatif — mode aérien : pesticides embarqués + signatures (suite du mode
- * aérien #regroupement-slides). Doit afficher TOUTES les données aériennes —
- * Références équipe/aéronef, Opérations (avec Total heure de vol par opération et
- * Total jour), Pesticides embarqués et Signatures — jamais une valeur inventée ou
- * périmée quand Pesticides = NON (cf. `buildPesticidesRows`).
+ * Récapitulatif — mode aérien : opérations + signatures (suite du mode aérien
+ * #regroupement-slides). Doit afficher TOUTES les données aériennes —
+ * Références équipe/aéronef, Opérations (avec Total heure de vol par opération
+ * et Total heures) et Signatures. Aucun pesticide embarqué côté prospection
+ * (#pesticide-embarque-prospection) : une prospection est une reconnaissance,
+ * l'aéronef n'embarque jamais de pesticide pendant son vol.
  */
-describe('ExtensiveRecapScreen — mode aérien : pesticides embarqués + signatures', () => {
+describe('ExtensiveRecapScreen — mode aérien : opérations + signatures', () => {
   const DRAFT_AERIEN = {
     ...DRAFT_BASE,
     mode_extensif: 'aerien',
@@ -411,34 +404,11 @@ describe('ExtensiveRecapScreen — mode aérien : pesticides embarqués + signat
     expect(prospectionRepository.listOperationsAeriennes).not.toHaveBeenCalled();
   });
 
-  it('Pesticides = NON : une seule ligne « NON », aucun champ dépendant affiché', async () => {
-    useProspectionWizardStore.setState({
-      draft: { ...DRAFT_AERIEN, type_prospection: 'extensive', pesticides_embarques: 0 },
-      captures: [],
-    });
-
-    await render(<ExtensiveRecapScreen />);
-    await screen.findByText('E · Aérien');
-
-    expect(screen.getAllByText('Pesticides embarqués').length).toBeGreaterThan(0);
-    expect(screen.getByText('NON')).toBeVisible();
-    expect(screen.queryByText('Nom commercial')).toBeNull();
-    expect(screen.queryByText(/Fûts —/)).toBeNull();
-  });
-
-  it('Pesticides = OUI : références, opérations (total jour inclus), pesticides et fûts sont tous affichés', async () => {
+  it('références, opérations (total heures inclus) et signatures sont tous affichés', async () => {
     useProspectionWizardStore.setState({
       draft: {
         ...DRAFT_AERIEN,
         type_prospection: 'extensive',
-        pesticides_embarques: 1,
-        pesticide_nom_commercial: 'Fyfanon ULV',
-        pesticide_quantite_disponible: 500,
-        pesticide_quantite_recue: 200,
-        futs_disponible: 10,
-        futs_pleins: 6,
-        futs_vides: 4,
-        futs_recues: 5,
         // VISA retiré (#signatures-numeriques-extensif-aerien) : ces colonnes
         // restent en base (historique) mais ne sont plus jamais affichées.
         signature_visa_nom: 'Rakoto V.',
@@ -461,13 +431,13 @@ describe('ExtensiveRecapScreen — mode aérien : pesticides embarqués + signat
     expect(screen.getByText('Base secondaire')).toBeVisible();
 
     // Opérations + Total heure de vol par opération (150 min = 02:30, 135 min = 02:15,
-    // franchissement de minuit 23:00 → 01:15 inclus) + Total jour = 285 min = 04:45.
+    // franchissement de minuit 23:00 → 01:15 inclus) + Total heures = 285 min = 04:45.
     expect(screen.getByText('Opération 1')).toBeVisible();
     expect(screen.getByText('Opération 2')).toBeVisible();
     expect(screen.getAllByText('Total heure de vol')).toHaveLength(2);
     expect(screen.getByText('02:30')).toBeVisible();
     expect(screen.getByText('02:15')).toBeVisible();
-    expect(screen.getByText('Total jour')).toBeVisible();
+    expect(screen.getByText('Total heures')).toBeVisible();
     expect(screen.getByText('04:45')).toBeVisible();
 
     // Non-régression (#operations-heures-vol) : « Convoyage » n'est plus proposé à la
@@ -479,20 +449,6 @@ describe('ExtensiveRecapScreen — mode aérien : pesticides embarqués + signat
     expect(screen.getByText('3.2 m/s')).toBeVisible();
     expect(screen.getByText('26 °C')).toBeVisible();
     expect(screen.getByText('4.1 m/s')).toBeVisible();
-
-    // Pesticides embarqués + fûts (valeurs de test 10/6/4/5 du prompt)
-    expect(screen.getByText('OUI')).toBeVisible();
-    expect(screen.getByText('Fyfanon ULV')).toBeVisible();
-    expect(screen.getByText('500 L')).toBeVisible();
-    expect(screen.getByText('200 L')).toBeVisible();
-    expect(screen.getByText('Fûts — Disponible')).toBeVisible();
-    expect(screen.getByText('10')).toBeVisible();
-    expect(screen.getByText('Fûts — Pleins')).toBeVisible();
-    expect(screen.getByText('6')).toBeVisible();
-    expect(screen.getByText('Fûts — Vides')).toBeVisible();
-    expect(screen.getByText('4')).toBeVisible();
-    expect(screen.getByText('Fûts — Reçues')).toBeVisible();
-    expect(screen.getByText('5')).toBeVisible();
 
     // Signatures — VISA n'apparaît plus (donnée historique préservée en base,
     // jamais réaffichée) ; Rakoto V. n'était que sa valeur. Pilote n'est plus une
@@ -511,7 +467,7 @@ describe('ExtensiveRecapScreen — mode aérien : pesticides embarqués + signat
    * « Vérifier un signalement » en mode aérien (#signalement-mode-choisi) : une fois
    * `mode_extensif` fixé sur un brouillon de vérification, le récap doit montrer le
    * même bloc aérien qu'une fiche extensive normale — la saisie (Références/Opérations/
-   * Pesticides/Signatures) a bien lieu sur les mêmes écrans partagés (`isAerien` ne
+   * Signatures) a bien lieu sur les mêmes écrans partagés (`isAerien` ne
    * dépend jamais de `type_prospection`), donc la revue avant Confirmée/Infirmée ne
    * doit rien en cacher.
    */
@@ -523,8 +479,6 @@ describe('ExtensiveRecapScreen — mode aérien : pesticides embarqués + signat
         signalement_source: 'Rasoanaivo',
         signalement_date: '2026-08-24',
         signalement_description: 'Essaim visible près du village',
-        pesticides_embarques: 1,
-        pesticide_nom_commercial: 'Fyfanon ULV',
       },
       captures: [],
     });
@@ -536,10 +490,8 @@ describe('ExtensiveRecapScreen — mode aérien : pesticides embarqués + signat
     expect(screen.getByText('Air Acridien')).toBeVisible();
     expect(screen.getByText('Informations sur les heures de vol')).toBeVisible();
     expect(screen.getByText('Opération 1')).toBeVisible();
-    expect(screen.getByText('Total jour')).toBeVisible();
+    expect(screen.getByText('Total heures')).toBeVisible();
     expect(screen.getByText('04:45')).toBeVisible();
-    expect(screen.getAllByText('Pesticides embarqués').length).toBeGreaterThan(0);
-    expect(screen.getByText('Fyfanon ULV')).toBeVisible();
     expect(screen.getByText('Signatures')).toBeVisible();
     // La conclusion de vérification reste présente, inchangée par l'ajout du bloc aérien.
     expect(screen.getByText('✓ Confirmée')).toBeVisible();
@@ -592,7 +544,7 @@ describe('ExtensiveRecapScreen — mode aérien : pesticides embarqués + signat
       },
     ] as any);
     useProspectionWizardStore.setState({
-      draft: { ...DRAFT_AERIEN, type_prospection: 'extensive', pesticides_embarques: 0 },
+      draft: { ...DRAFT_AERIEN, type_prospection: 'extensive' },
       captures: [],
     });
 

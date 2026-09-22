@@ -932,7 +932,7 @@ export default function ExtensiveReferenceScreen() {
                 </TouchableOpacity>
 
                 <View style={styles.totalJourCard}>
-                  <Text style={styles.totalJourLabel}>TOTAL JOUR</Text>
+                  <Text style={styles.totalJourLabel}>TOTAL HEURES</Text>
                   <Text style={styles.totalJourValue}>{formatDuree(totalJourMinutes)}</Text>
                 </View>
               </>

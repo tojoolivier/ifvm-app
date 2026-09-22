@@ -106,7 +106,7 @@ class StadeImago(str, Enum):
 
 class Deplacement(str, Enum):
     REPOS = "repos"
-    PERCHEE = "perchee"
+    DEPLACEMENT = "deplacement"
 
 
 class Sexe(str, Enum):
@@ -524,16 +524,8 @@ class ProspectionCreate(BaseModel):
     base_secondaire_longitude: float | None = None
 
     # ==========================================
-    # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
+    # NOUVEAUX CHAMPS - Extensif : signatures
     # ==========================================
-    pesticides_embarques: bool | None = None
-    pesticide_nom_commercial: str | None = None
-    pesticide_quantite_disponible: float | None = Field(None, ge=0, allow_inf_nan=False)
-    pesticide_quantite_recue: float | None = Field(None, ge=0, allow_inf_nan=False)
-    futs_disponible: int | None = Field(None, ge=0)
-    futs_pleins: int | None = Field(None, ge=0)
-    futs_vides: int | None = Field(None, ge=0)
-    futs_recues: int | None = Field(None, ge=0)
     signature_visa_nom: str | None = None
     signature_visa_horodatage: datetime | None = None
     signature_visa_image: str | None = None
@@ -644,16 +636,8 @@ class ProspectionUpdate(BaseModel):
     base_secondaire_longitude: float | None = None
 
     # ==========================================
-    # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
+    # NOUVEAUX CHAMPS - Extensif : signatures
     # ==========================================
-    pesticides_embarques: bool | None = None
-    pesticide_nom_commercial: str | None = None
-    pesticide_quantite_disponible: float | None = Field(None, ge=0, allow_inf_nan=False)
-    pesticide_quantite_recue: float | None = Field(None, ge=0, allow_inf_nan=False)
-    futs_disponible: int | None = Field(None, ge=0)
-    futs_pleins: int | None = Field(None, ge=0)
-    futs_vides: int | None = Field(None, ge=0)
-    futs_recues: int | None = Field(None, ge=0)
     signature_visa_nom: str | None = None
     signature_visa_horodatage: datetime | None = None
     signature_visa_image: str | None = None
@@ -808,16 +792,8 @@ class ProspectionRead(BaseModel):
     base_secondaire_longitude: float | None = None
 
     # ==========================================
-    # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
+    # NOUVEAUX CHAMPS - Extensif : signatures
     # ==========================================
-    pesticides_embarques: bool | None = None
-    pesticide_nom_commercial: str | None = None
-    pesticide_quantite_disponible: float | None = None
-    pesticide_quantite_recue: float | None = None
-    futs_disponible: int | None = None
-    futs_pleins: int | None = None
-    futs_vides: int | None = None
-    futs_recues: int | None = None
     signature_visa_nom: str | None = None
     signature_visa_horodatage: datetime | None = None
     signature_visa_image: str | None = None

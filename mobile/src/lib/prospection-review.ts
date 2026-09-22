@@ -21,7 +21,6 @@ import {
   listAllProspectionPopulations,
   listAllProspectionInfestations,
   listOperationsAeriennes,
-  normalizeBoolean,
 } from './prospection-repository';
 import { PHENOTYPES, TYPE_CIBLE_OPTIONS, formatHeureLocale } from './prospection-fiche-lecture';
 import { parseSelectionMultiple, typeCibleImagoLabel } from './prospection-extensive';
@@ -173,7 +172,7 @@ function buildLarveDetailRows(espece: 'LMC' | 'NSE', captures: CaptureRow[], pop
     { label: 'Bande larvaire', value: population?.bande_larvaire ? 'Oui' : 'Non' },
     {
       label: 'Déplacement',
-      value: population?.deplacement === 'perchee' ? 'Perchée' : population?.deplacement === 'repos' ? 'Repos' : '—',
+      value: population?.deplacement === 'deplacement' ? 'Déplacement' : population?.deplacement === 'repos' ? 'Repos' : '—',
     },
   ];
 }
@@ -586,14 +585,6 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
     base_secondaire_date_installation: draft.base_secondaire_date_installation || null,
     base_secondaire_latitude: draft.base_secondaire_latitude != null ? Number(draft.base_secondaire_latitude) : null,
     base_secondaire_longitude: draft.base_secondaire_longitude != null ? Number(draft.base_secondaire_longitude) : null,
-    pesticides_embarques: normalizeBoolean(draft.pesticides_embarques),
-    pesticide_nom_commercial: draft.pesticide_nom_commercial || null,
-    pesticide_quantite_disponible: draft.pesticide_quantite_disponible != null ? Number(draft.pesticide_quantite_disponible) : null,
-    pesticide_quantite_recue: draft.pesticide_quantite_recue != null ? Number(draft.pesticide_quantite_recue) : null,
-    futs_disponible: draft.futs_disponible != null ? Number(draft.futs_disponible) : null,
-    futs_pleins: draft.futs_pleins != null ? Number(draft.futs_pleins) : null,
-    futs_vides: draft.futs_vides != null ? Number(draft.futs_vides) : null,
-    futs_recues: draft.futs_recues != null ? Number(draft.futs_recues) : null,
     signature_visa_nom: draft.signature_visa_nom || null,
     signature_visa_horodatage: draft.signature_visa_horodatage || null,
     signature_visa_image: draft.signature_visa_image || null,

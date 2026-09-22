@@ -344,9 +344,9 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
     // Opération restaurée : heures affichées, total calculé sans re-saisie.
     expect(screen.getByText('08:00')).toBeVisible();
     expect(screen.getByText('10:30')).toBeVisible();
-    // "02:30" apparaît deux fois : total de l'opération ET total jour (une seule opération).
+    // "02:30" apparaît deux fois : total de l'opération ET total heures (une seule opération).
     expect(screen.getAllByText('02:30')).toHaveLength(2);
-    expect(screen.getByText('TOTAL JOUR')).toBeVisible();
+    expect(screen.getByText('TOTAL HEURES')).toBeVisible();
 
     // #biotope-multi : désormais obligatoire (au moins un sélectionné), non
     // testé ici — hors sujet de ce test (équipe/aéronef/opération).

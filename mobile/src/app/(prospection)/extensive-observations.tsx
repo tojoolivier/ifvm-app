@@ -4,7 +4,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ExtensiveObservationsUpdateInput,
-  normalizeBoolean,
   updateProspectionExtensiveObservations,
 } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
@@ -53,19 +52,8 @@ function hauteurMInputToCm(m: string): number | null {
 }
 
 // ==========================================
-// Mode aérien — Pesticides embarqués + Signatures
+// Mode aérien — Signatures
 // ==========================================
-
-/** Entier non-négatif strict (zéro autorisé) — vide accepté (champ non renseigné,
- * pas bloquant), tout le reste rejeté avec un message nommant le champ en cause. */
-function validerEntierPositif(raw: string, label: string): { value: number | null; erreur: string | null } {
-  const trimmed = raw.trim();
-  if (trimmed === '') return { value: null, erreur: null };
-  if (!/^\d+$/.test(trimmed)) {
-    return { value: null, erreur: `${label} : un nombre entier positif ou nul est requis.` };
-  }
-  return { value: parseInt(trimmed, 10), erreur: null };
-}
 
 /** Pourcentage entier 0-100 — vide accepté (champ non renseigné, pas bloquant).
  * `verdissement_pourcent` est un entier côté backend (Pydantic `int`, pas de
@@ -169,24 +157,8 @@ export default function ExtensiveObservationsScreen() {
   const [editingSignatureVisa, setEditingSignatureVisa] = useState(false);
   const enEditionSignatureVisa = editingSignatureVisa || !signatureVisaImageState;
 
-  // Mode aérien uniquement — invisibles et jamais lus/écrits en mode terrestre.
-  const [pesticidesEmbarques, setPesticidesEmbarques] = useState<boolean | null>(
-    normalizeBoolean(draft?.pesticides_embarques)
-  );
-  const [pesticideNomCommercial, setPesticideNomCommercial] = useState(draft?.pesticide_nom_commercial ?? '');
-  const [pesticideQuantiteDisponible, setPesticideQuantiteDisponible] = useState(
-    draft?.pesticide_quantite_disponible != null ? String(draft.pesticide_quantite_disponible) : ''
-  );
-  const [pesticideQuantiteRecue, setPesticideQuantiteRecue] = useState(
-    draft?.pesticide_quantite_recue != null ? String(draft.pesticide_quantite_recue) : ''
-  );
-  const [futsDisponible, setFutsDisponible] = useState(draft?.futs_disponible != null ? String(draft.futs_disponible) : '');
-  const [futsPleins, setFutsPleins] = useState(draft?.futs_pleins != null ? String(draft.futs_pleins) : '');
-  const [futsVides, setFutsVides] = useState(draft?.futs_vides != null ? String(draft.futs_vides) : '');
-  const [futsRecues, setFutsRecues] = useState(draft?.futs_recues != null ? String(draft.futs_recues) : '');
-
   // Signatures numériques (#signatures-numeriques-extensif-aerien) —
-  // indépendantes du choix Pesticides, toujours affichées en mode aérien.
+  // toujours affichées en mode aérien.
   // `signatureNoms`/`Horodatages` : nom du signataire choisi + horodatage de
   // validation. `signatureImages` : tracé SVG (`SignaturePad`), la signature
   // réelle — un rôle n'est considéré « signé » que lorsqu'elle est non nulle
@@ -298,23 +270,12 @@ export default function ExtensiveObservationsScreen() {
         images[role] = o.image;
       });
     }
-    const futsActifs = isAerien && pesticidesEmbarques === true;
     return {
       degatsCultures: degatsCultures || null,
       verdissementPourcent: validerPourcentage(verdissement, 'Verdure strate herbeuse').value,
       hauteurHerbeCm: hauteurMInputToCm(hauteur),
       dernierePluie: dernierePluie || null,
       intensitePluie: intensite || null,
-      pesticidesEmbarques: isAerien ? pesticidesEmbarques : null,
-      pesticideNomCommercial: futsActifs ? pesticideNomCommercial || null : null,
-      // #saisie-decimale-virgule (cf. hauteurMInputToCm ci-dessus) — mêmes champs
-      // "decimal-pad" francophones, même perte silencieuse sans cette conversion.
-      pesticideQuantiteDisponible: futsActifs && pesticideQuantiteDisponible ? parseFloat(pesticideQuantiteDisponible.replace(',', '.')) : null,
-      pesticideQuantiteRecue: futsActifs && pesticideQuantiteRecue ? parseFloat(pesticideQuantiteRecue.replace(',', '.')) : null,
-      futsDisponible: futsActifs ? validerEntierPositif(futsDisponible, 'Fûts disponibles').value : null,
-      futsPleins: futsActifs ? validerEntierPositif(futsPleins, 'Fûts pleins').value : null,
-      futsVides: futsActifs ? validerEntierPositif(futsVides, 'Fûts vides').value : null,
-      futsRecues: futsActifs ? validerEntierPositif(futsRecues, 'Fûts reçues').value : null,
       // VISA — auto-signature du prospecteur (cf. commentaire sur
       // `signatureVisaNomState` plus haut) : pilotée par l'état local de cet
       // écran, plus par simple passthrough de `draft` — c'est désormais un champ
@@ -414,15 +375,6 @@ export default function ExtensiveObservationsScreen() {
       setSignatureVisaHorodatageState(draft.signature_visa_horodatage ?? null);
       setSignatureVisaImageState(draft.signature_visa_image ?? null);
       setEditingSignatureVisa(false);
-      // Mode aérien uniquement — sans effet sur une fiche terrestre (colonnes NULL).
-      setPesticidesEmbarques(normalizeBoolean(draft.pesticides_embarques));
-      setPesticideNomCommercial(draft.pesticide_nom_commercial ?? '');
-      setPesticideQuantiteDisponible(draft.pesticide_quantite_disponible != null ? String(draft.pesticide_quantite_disponible) : '');
-      setPesticideQuantiteRecue(draft.pesticide_quantite_recue != null ? String(draft.pesticide_quantite_recue) : '');
-      setFutsDisponible(draft.futs_disponible != null ? String(draft.futs_disponible) : '');
-      setFutsPleins(draft.futs_pleins != null ? String(draft.futs_pleins) : '');
-      setFutsVides(draft.futs_vides != null ? String(draft.futs_vides) : '');
-      setFutsRecues(draft.futs_recues != null ? String(draft.futs_recues) : '');
       setSignatureNoms((current) => ({
         ...current,
         consultant_fao: draft.signature_consultant_fao_nom ?? null,
@@ -526,30 +478,11 @@ export default function ExtensiveObservationsScreen() {
   };
 
   const handleContinue = () => {
-    // Verdure strate herbeuse : validée avant tout enregistrement, comme les
-    // fûts plus bas — message d'erreur nommant le champ, rien de bloquant si
-    // laissé vide.
+    // Verdure strate herbeuse : validée avant tout enregistrement — message
+    // d'erreur nommant le champ, rien de bloquant si laissé vide.
     const { erreur: verdissementErreur } = validerPourcentage(verdissement, 'Verdure strate herbeuse');
     if (verdissementErreur) {
       Alert.alert('Pourcentage invalide', verdissementErreur);
-      return;
-    }
-
-    // Fûts : validés avant tout enregistrement, seulement si Pesticides = OUI
-    // (compact/masqué sinon, donc rien à valider) — mêmes AlertDialogs bloquants
-    // que la validation des opérations sur extensive-reference.tsx.
-    const futsSaisis =
-      isAerien && pesticidesEmbarques === true
-        ? [
-            ['Fûts disponibles', futsDisponible] as const,
-            ['Fûts pleins', futsPleins] as const,
-            ['Fûts vides', futsVides] as const,
-            ['Fûts reçues', futsRecues] as const,
-          ].map(([label, raw]) => ({ label, ...validerEntierPositif(raw, label) }))
-        : [];
-    const futErreur = futsSaisis.find((f) => f.erreur);
-    if (futErreur) {
-      Alert.alert('Nombre de fûts invalide', futErreur.erreur!);
       return;
     }
 
@@ -655,106 +588,6 @@ export default function ExtensiveObservationsScreen() {
 
             {isAerien && (
               <>
-                <Text style={styles.sectionLabel}>Pesticides Embarqués</Text>
-                <View style={[styles.chipsRow, { marginBottom: 10 }]}>
-                  {([true, false] as const).map((value) => {
-                    const active = pesticidesEmbarques === value;
-                    return (
-                      <TouchableOpacity
-                        key={String(value)}
-                        style={{ flex: 1 }}
-                        onPress={() => setPesticidesEmbarques(value)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[styles.chip, active && styles.chipActive]}>{value ? 'Oui' : 'Non'}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                {pesticidesEmbarques === true && (
-                  <>
-                    <View style={[styles.card, { marginBottom: 9 }]}>
-                      <Text style={styles.label}>Nom Commercial</Text>
-                      <TextInput
-                        testID="pesticide-nom-commercial-input"
-                        value={pesticideNomCommercial}
-                        onChangeText={setPesticideNomCommercial}
-                        placeholder="Ex. Fyfanon ULV"
-                        placeholderTextColor={TEXT_SECONDARY}
-                        style={styles.input}
-                      />
-                    </View>
-
-                    <View style={styles.row}>
-                      <View style={[styles.card, styles.flex1]}>
-                        <Text style={styles.label}>Quantité Disponible (L)</Text>
-                        <TextInput
-                          testID="pesticide-quantite-disponible-input"
-                          value={pesticideQuantiteDisponible}
-                          onChangeText={setPesticideQuantiteDisponible}
-                          keyboardType="decimal-pad"
-                          style={styles.input}
-                        />
-                      </View>
-                      <View style={[styles.card, styles.flex1]}>
-                        <Text style={styles.label}>Quantité Reçue (L)</Text>
-                        <TextInput
-                          testID="pesticide-quantite-recue-input"
-                          value={pesticideQuantiteRecue}
-                          onChangeText={setPesticideQuantiteRecue}
-                          keyboardType="decimal-pad"
-                          style={styles.input}
-                        />
-                      </View>
-                    </View>
-
-                    <Text style={[styles.sectionLabel, { marginTop: 4 }]}>Nombre de fûts</Text>
-                    <View style={styles.futsGrid}>
-                      <View style={[styles.card, styles.futsCell]}>
-                        <Text style={styles.label}>Disponible</Text>
-                        <TextInput
-                          testID="futs-disponible-input"
-                          value={futsDisponible}
-                          onChangeText={setFutsDisponible}
-                          keyboardType="number-pad"
-                          style={styles.input}
-                        />
-                      </View>
-                      <View style={[styles.card, styles.futsCell]}>
-                        <Text style={styles.label}>Pleins</Text>
-                        <TextInput
-                          testID="futs-pleins-input"
-                          value={futsPleins}
-                          onChangeText={setFutsPleins}
-                          keyboardType="number-pad"
-                          style={styles.input}
-                        />
-                      </View>
-                      <View style={[styles.card, styles.futsCell]}>
-                        <Text style={styles.label}>Vides</Text>
-                        <TextInput
-                          testID="futs-vides-input"
-                          value={futsVides}
-                          onChangeText={setFutsVides}
-                          keyboardType="number-pad"
-                          style={styles.input}
-                        />
-                      </View>
-                      <View style={[styles.card, styles.futsCell]}>
-                        <Text style={styles.label}>Reçues</Text>
-                        <TextInput
-                          testID="futs-recues-input"
-                          value={futsRecues}
-                          onChangeText={setFutsRecues}
-                          keyboardType="number-pad"
-                          style={styles.input}
-                        />
-                      </View>
-                    </View>
-                  </>
-                )}
-
                 <Text style={styles.sectionLabel}>Signatures</Text>
                 {SIGNATURE_ROLES.map((role) => {
                   const image = signatureImages[role];
@@ -929,9 +762,7 @@ const styles = StyleSheet.create({
   footer: { padding: 16 },
   continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
   continueButtonText: { color: '#fff', fontWeight: '800', fontSize: 15 },
-  // ===== Mode aérien : Pesticides embarqués + Signatures =====
-  futsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 9 },
-  futsCell: { flexBasis: '47%', flexGrow: 1, marginBottom: 0 },
+  // ===== Mode aérien : Signatures =====
   signatureRow: { gap: 6 },
   // Chef de Base : nombre d'agents variable (contrairement aux chips à
   // effectif fixe du reste de l'écran, dimensionnées par `flex: 1`) — la rangée

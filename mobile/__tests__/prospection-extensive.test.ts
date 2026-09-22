@@ -266,7 +266,7 @@ describe('larveSpeciesDataToPopulationRow / populationRowToLarveSpeciesData — 
       tacheLarvaire: true,
       bandeLarvaire: false,
       interdistance: '0.6',
-      deplacement: 'perchee',
+      deplacement: 'deplacement',
       surfaceContamineeHa: '12.75',
     };
     const dataNse = { ...createEmptyLarveSpeciesData('NSE'), interdistance: '3.2', surfaceContamineeHa: '0.5' };
@@ -276,7 +276,7 @@ describe('larveSpeciesDataToPopulationRow / populationRowToLarveSpeciesData — 
 
     expect(rowLmc.tache_larvaire).toBe(true);
     expect(rowLmc.interdistance).toBe(0.6);
-    expect(rowLmc.deplacement).toBe('perchee');
+    expect(rowLmc.deplacement).toBe('deplacement');
     expect(rowLmc.surface_contaminee_ha).toBe(12.75);
 
     // LMC et NSE ne doivent jamais partager ces valeurs (bug corrigé : elles étaient

@@ -58,14 +58,6 @@ jest.mock('../src/lib/prospection-repository', () => ({
   listAllProspectionPopulations: jest.fn(),
   listAllProspectionInfestations: jest.fn(),
   listOperationsAeriennes: jest.fn(),
-  // Vraie implémentation (pas de mock utile ici) : `buildProspectionPayload`
-  // en dépend pour normaliser `pesticides_embarques` (0/1/null en SQLite).
-  normalizeBoolean: (value: unknown) => {
-    if (value === null || value === undefined) return null;
-    if (typeof value === 'boolean') return value;
-    if (typeof value === 'number') return value !== 0;
-    return null;
-  },
 }));
 jest.mock('../src/lib/api-client', () => ({
   apiClient: { createProspection: jest.fn() },
@@ -130,14 +122,6 @@ function draft(overrides: Partial<DraftProspection> = {}): DraftProspection {
     base_secondaire_date_installation: null,
     base_secondaire_latitude: null,
     base_secondaire_longitude: null,
-    pesticides_embarques: null,
-    pesticide_nom_commercial: null,
-    pesticide_quantite_disponible: null,
-    pesticide_quantite_recue: null,
-    futs_disponible: null,
-    futs_pleins: null,
-    futs_vides: null,
-    futs_recues: null,
     signature_visa_nom: null,
     signature_visa_horodatage: null,
     signature_visa_image: null,

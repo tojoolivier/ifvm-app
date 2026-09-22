@@ -627,7 +627,7 @@ export default function IntensiveLarvesScreen() {
 
             <Text style={styles.sectionLabel}>Déplacement</Text>
             <View style={styles.chipsRow}>
-              {(['repos', 'perchee'] as const).map((option) => {
+              {(['repos', 'deplacement'] as const).map((option) => {
                 const active = population.deplacement === option;
                 return (
                   <TouchableOpacity
@@ -636,7 +636,7 @@ export default function IntensiveLarvesScreen() {
                     style={[styles.chip, active && styles.chipActive]}
                     activeOpacity={0.8}
                   >
-                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{option === 'repos' ? 'Repos' : 'Perchée'}</Text>
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{option === 'repos' ? 'Repos' : 'Déplacement'}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -688,7 +688,7 @@ export default function IntensiveLarvesScreen() {
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Déplacement :</Text>
                 <Text style={styles.summaryValue}>
-                  {population.deplacement === 'perchee' ? 'Perchée' : population.deplacement === 'repos' ? 'Repos' : '—'}
+                  {population.deplacement === 'deplacement' ? 'Déplacement' : population.deplacement === 'repos' ? 'Repos' : '—'}
                 </Text>
               </View>
               <View style={styles.ruleBox}>

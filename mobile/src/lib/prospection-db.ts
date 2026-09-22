@@ -664,16 +664,12 @@ const COLONNES_PROSPECTION: readonly Colonne[] = [
   { name: 'base_secondaire_latitude', type: 'REAL' },
   { name: 'base_secondaire_longitude', type: 'REAL' },
   { name: 'lieu_base_id', type: 'TEXT' },
-  // Pesticides embarqués + signatures (mode aérien uniquement) — NULL sur toute
-  // fiche terrestre, comme le mode aérien lui-même. Cf. migration backend 0036.
-  { name: 'pesticides_embarques', type: 'INTEGER' },
-  { name: 'pesticide_nom_commercial', type: 'TEXT' },
-  { name: 'pesticide_quantite_disponible', type: 'REAL' },
-  { name: 'pesticide_quantite_recue', type: 'REAL' },
-  { name: 'futs_disponible', type: 'INTEGER' },
-  { name: 'futs_pleins', type: 'INTEGER' },
-  { name: 'futs_vides', type: 'INTEGER' },
-  { name: 'futs_recues', type: 'INTEGER' },
+  // Pesticides embarqués supprimés côté prospection par la migration backend
+  // 0085 (#pesticide-embarque-prospection) : une prospection est une
+  // reconnaissance, l'aéronef n'embarque jamais de pesticide pendant son vol.
+  // Colonnes SQLite déjà écrites sur les appareils existants laissées en place
+  // (SQLite ne supporte pas DROP COLUMN simplement) — plus jamais lues/écrites.
+  // Signatures (mode aérien uniquement) — NULL sur toute fiche terrestre.
   { name: 'signature_visa_nom', type: 'TEXT' },
   { name: 'signature_visa_horodatage', type: 'TEXT' },
   // Tracé SVG de l'auto-signature du prospecteur — Intensif uniquement, écran

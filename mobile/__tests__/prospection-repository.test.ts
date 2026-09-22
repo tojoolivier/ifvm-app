@@ -166,14 +166,6 @@ const CHAMPS_PROSPECTION_VALIDEE_PAR_DEFAUT = {
   baseSecondaireDateInstallation: null,
   baseSecondaireLatitude: null,
   baseSecondaireLongitude: null,
-  pesticidesEmbarques: null,
-  pesticideNomCommercial: null,
-  pesticideQuantiteDisponible: null,
-  pesticideQuantiteRecue: null,
-  futsDisponible: null,
-  futsPleins: null,
-  futsVides: null,
-  futsRecues: null,
   signatureVisaNom: null,
   signatureVisaHorodatage: null,
   signatureVisaImage: null,
@@ -876,14 +868,6 @@ describe('updateProspectionExtensiveObservations', () => {
         OBS_INPUT.hauteurHerbeCm,
         OBS_INPUT.dernierePluie,
         OBS_INPUT.intensitePluie,
-        null, // pesticidesEmbarques
-        null, // pesticideNomCommercial
-        null, // pesticideQuantiteDisponible
-        null, // pesticideQuantiteRecue
-        null, // futsDisponible
-        null, // futsPleins
-        null, // futsVides
-        null, // futsRecues
         null, // signatureVisaNom
         null, // signatureVisaHorodatage
         null, // signatureVisaImage
@@ -903,19 +887,11 @@ describe('updateProspectionExtensiveObservations', () => {
     );
   });
 
-  it('writes pesticides embarqués + fûts + signatures columns (mode aérien)', async () => {
+  it('writes signatures columns (mode aérien) — aucun pesticide embarqué côté prospection', async () => {
     getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW });
 
     await updateProspectionExtensiveObservations(BASE_INPUT.id, {
       ...OBS_INPUT,
-      pesticidesEmbarques: true,
-      pesticideNomCommercial: 'Fyfanon ULV',
-      pesticideQuantiteDisponible: 500,
-      pesticideQuantiteRecue: 200,
-      futsDisponible: 10,
-      futsPleins: 6,
-      futsVides: 4,
-      futsRecues: 5,
       signatureVisaNom: 'Rakoto V.',
       signatureVisaHorodatage: '2026-09-01T09:00:00.000Z',
       signatureVisaImage: 'M-1 -1 L9 9',
@@ -938,14 +914,6 @@ describe('updateProspectionExtensiveObservations', () => {
         OBS_INPUT.hauteurHerbeCm,
         OBS_INPUT.dernierePluie,
         OBS_INPUT.intensitePluie,
-        1, // pesticidesEmbarques stocké en 0/1 (SQLite n'a pas de type booléen natif)
-        'Fyfanon ULV',
-        500,
-        200,
-        10,
-        6,
-        4,
-        5,
         'Rakoto V.',
         '2026-09-01T09:00:00.000Z',
         'M-1 -1 L9 9',
