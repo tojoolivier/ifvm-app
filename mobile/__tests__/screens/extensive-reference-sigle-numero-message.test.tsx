@@ -56,6 +56,10 @@ describe('ExtensiveReferenceScreen — sigle utilisateur dans le N° de message'
     await render(<ExtensiveReferenceScreen />);
     await waitFor(() => expect(screen.getByText('Suivant : Imagos ›')).toBeVisible());
 
+    // #biotope-multi : désormais obligatoire (au moins un sélectionné), non
+    // testé ici — hors sujet de ce test (sigle dans le N° de message).
+    fireEvent.press(screen.getByText('Xerophyle'));
+    await screen.findByText('Xerophyle ✓');
     fireEvent.press(screen.getByText('Suivant : Imagos ›'));
 
     await waitFor(() => expect(prospectionRepository.updateProspectionExtensiveReference).toHaveBeenCalled());

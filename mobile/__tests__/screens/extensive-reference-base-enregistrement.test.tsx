@@ -70,6 +70,9 @@ describe('ExtensiveReferenceScreen — Base principale/secondaire : enregistreme
 
     fireEvent.changeText(screen.getByTestId('aerien-field-Numéro de base'), '12');
     fireEvent.changeText(screen.getByTestId('aerien-field-Base secondaire'), 'Ambositra');
+    // #biotope-multi : désormais obligatoire (au moins un sélectionné), non
+    // testé ici — hors sujet de ce test (base principale/secondaire).
+    fireEvent.press(screen.getByText('Xerophyle'));
     await settle();
 
     fireEvent.press(screen.getByText('Suivant : Imagos ›'));

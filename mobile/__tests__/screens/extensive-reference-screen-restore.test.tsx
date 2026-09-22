@@ -125,6 +125,10 @@ describe('ExtensiveReferenceScreen — restauration après hydratation tardive d
     fireEvent.changeText(screen.getAllByDisplayValue('')[2], '0.5');
     expect(await screen.findByDisplayValue('0.5')).toBeVisible();
 
+    // #biotope-multi : désormais obligatoire (au moins un sélectionné), non
+    // testé ici — hors sujet de ce test (surface infestée).
+    fireEvent.press(screen.getByText('Xerophyle'));
+    await screen.findByText('Xerophyle ✓');
     fireEvent.press(screen.getByText('Suivant : Imagos ›'));
 
     await waitFor(() =>
@@ -155,6 +159,10 @@ describe('ExtensiveReferenceScreen — restauration après hydratation tardive d
     const heureAttendue = formatHeureLocale(new Date(timestampGps).toISOString());
     expect(await screen.findByText(heureAttendue)).toBeVisible();
 
+    // #biotope-multi : désormais obligatoire (au moins un sélectionné), non
+    // testé ici — hors sujet de ce test (heure d'observation).
+    fireEvent.press(screen.getByText('Xerophyle'));
+    await screen.findByText('Xerophyle ✓');
     fireEvent.press(screen.getByText('Suivant : Imagos ›'));
 
     await waitFor(() =>
@@ -240,6 +248,10 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
     fireEvent.changeText(screen.getByTestId('aerien-field-Base principale'), 'Tuléar');
     expect(await screen.findByDisplayValue('Tuléar')).toBeVisible();
 
+    // #biotope-multi : désormais obligatoire (au moins un sélectionné), non
+    // testé ici — hors sujet de ce test (Base principale).
+    fireEvent.press(screen.getByText('Xerophyle'));
+    await screen.findByText('Xerophyle ✓');
     fireEvent.press(screen.getByText('Suivant : Imagos ›'));
     await waitFor(() =>
       expect(prospectionRepository.updateProspectionExtensiveReference).toHaveBeenCalledWith(
@@ -270,6 +282,10 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
 
     fireEvent.changeText(screen.getByDisplayValue('Tuléar'), '');
     await settle();
+    // #biotope-multi : désormais obligatoire (au moins un sélectionné), non
+    // testé ici — hors sujet de ce test (Base principale).
+    fireEvent.press(screen.getByText('Xerophyle'));
+    await screen.findByText('Xerophyle ✓');
     fireEvent.press(screen.getByText('Suivant : Imagos ›'));
     await waitFor(() =>
       expect(prospectionRepository.updateProspectionExtensiveReference).toHaveBeenCalledWith(
@@ -332,6 +348,10 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
     expect(screen.getAllByText('02:30')).toHaveLength(2);
     expect(screen.getByText('TOTAL JOUR')).toBeVisible();
 
+    // #biotope-multi : désormais obligatoire (au moins un sélectionné), non
+    // testé ici — hors sujet de ce test (équipe/aéronef/opération).
+    fireEvent.press(screen.getByText('Xerophyle'));
+    await screen.findByText('Xerophyle ✓');
     fireEvent.press(screen.getByText('Suivant : Imagos ›'));
 
     await waitFor(() =>
@@ -451,6 +471,10 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
     fireEvent.changeText(screen.getByPlaceholderText('Ex. Rinçage, maintenance, vérification…'), 'Rinçage');
     expect(await screen.findByDisplayValue('Rinçage')).toBeVisible();
 
+    // #biotope-multi : désormais obligatoire (au moins un sélectionné), non
+    // testé ici — hors sujet de ce test (motif du divers).
+    fireEvent.press(screen.getByText('Xerophyle'));
+    await screen.findByText('Xerophyle ✓');
     fireEvent.press(screen.getByText('Suivant : Imagos ›'));
 
     await waitFor(() =>

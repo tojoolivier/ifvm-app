@@ -51,6 +51,10 @@ describe('ExtensiveReferenceScreen — surface infestée facultative', () => {
     // gestionnaire reste lié à la fermeture du rendu précédent (surfaceInfestee
     // encore vide), même prudence que le test "positive" de cet écran.
     expect(await screen.findByDisplayValue('0')).toBeVisible();
+    // #biotope-multi : désormais obligatoire (au moins un sélectionné), non
+    // testé ici — hors sujet de ce test (surface infestée).
+    fireEvent.press(screen.getByText('Xerophyle'));
+    await screen.findByText('Xerophyle ✓');
     fireEvent.press(screen.getByText('Suivant : Imagos ›'));
 
     await waitFor(() =>
