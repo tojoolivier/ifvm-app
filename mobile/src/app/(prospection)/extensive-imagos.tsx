@@ -10,6 +10,7 @@ import {
   ExtensiveImagoSpeciesData,
   EtatImago,
   TYPE_CIBLE_IMAGO_OPTIONS,
+  accouplementOuPonteActif,
   createEmptySpeciesData,
   estEspeceImagoVide,
   speciesDataToPopulationRow,
@@ -125,14 +126,25 @@ export default function ExtensiveImagosScreen() {
     }));
   };
 
-  /** #accouplement-neant-sans-interdistance : « Néant » efface l'interdistance (la
-   * section correspondante se masque, cf. rendu ci-dessous) — elle n'a de sens que
-   * si un accouplement (Rare/Beaucoup) a été observé. Même patron que
-   * handleEtatChange, qui efface la direction devenue sans objet. */
+  /** #interdistance-obligatoire-si-accouplement-ou-ponte : l'interdistance (section
+   * masquée, cf. rendu ci-dessous) n'a de sens que si l'accouplement OU la ponte est
+   * « Rare »/« Beaucoup » — elle s'efface dès que les deux retombent à « Néant »/non
+   * renseigné. Même patron que handleEtatChange, qui efface la direction devenue
+   * sans objet. */
   const handleAccouplementChange = (option: string) => {
     const active = option === data.accouplement;
     const next = active ? null : option;
-    updateSpeciesData(next === 'Néant' ? { accouplement: next, interdistance: '' } : { accouplement: next });
+    updateSpeciesData(
+      accouplementOuPonteActif(next, data.ponte) ? { accouplement: next } : { accouplement: next, interdistance: '' }
+    );
+  };
+
+  const handlePonteChange = (option: string) => {
+    const active = option === data.ponte;
+    const next = active ? null : option;
+    updateSpeciesData(
+      accouplementOuPonteActif(data.accouplement, next) ? { ponte: next } : { ponte: next, interdistance: '' }
+    );
   };
 
   const updatePhase = (key: PhaseKey, value: number) => {
@@ -193,6 +205,24 @@ const handleContinue = () => {
   // faisait échouer la synchronisation de fiches de signalement (type
   // `validation`, mêmes écrans que l'extensif) pour une grille jamais
   // destinée à recevoir de densité.
+
+  // #interdistance-obligatoire-si-accouplement-ou-ponte : LMC et NSE sont
+  // enregistrés ensemble — vérifiée sur les deux, pas seulement l'onglet
+  // affiché, pour ne pas rater une espèce déjà quittée. Ne se déclenche que si
+  // l'agent a activement signalé un accouplement ou une ponte (jamais sur une
+  // fiche qui ne touche pas ces champs, ex. Signalement) : pas de risque de
+  // reproduire le blocage de sync déjà corrigé pour la densité diffuse.
+  const especesSansInterdistance = (['LMC', 'NSE'] as Espece[]).filter((sp) => {
+    const d = speciesData[sp];
+    return accouplementOuPonteActif(d.accouplement, d.ponte) && (!d.interdistance || d.interdistance.trim() === '');
+  });
+  if (especesSansInterdistance.length > 0) {
+    Alert.alert(
+      'Interdistance requise',
+      `Un accouplement ou une ponte a été signalé pour ${especesSansInterdistance.join(' et ')} : veuillez renseigner l'interdistance (m).`
+    );
+    return;
+  }
 
   const poursuivre = () =>
     run(
@@ -501,7 +531,7 @@ const handleContinue = () => {
                   return (
                     <TouchableOpacity
                       key={option}
-                      onPress={() => updateSpeciesData({ ponte: active ? null : option })}
+                      onPress={() => handlePonteChange(option)}
                       style={[styles.chip, active && styles.chipActive]}
                       activeOpacity={0.8}
                     >
@@ -513,13 +543,21 @@ const handleContinue = () => {
               <Text style={styles.speciesHint}>Données spécifiques à {species}</Text>
             </View>
 
-            {/* #accouplement-neant-sans-interdistance : masquée (et effacée par
-                handleAccouplementChange) dès que l'accouplement vaut « Néant ». */}
-            {data.accouplement !== 'Néant' && (
+            {/* #interdistance-obligatoire-si-accouplement-ou-ponte : masquée (et
+                effacée par handleAccouplementChange/handlePonteChange) tant que
+                l'accouplement ET la ponte valent « Néant »/ne sont pas renseignés —
+                obligatoire dès que l'un des deux est actif (Rare/Beaucoup). Règle
+                appliquée aussi ici (Extensif/Signalement, même écran) : contrairement
+                aux choix obligatoires de l'Intensif, elle ne se déclenche que si
+                l'agent a activement signalé un accouplement ou une ponte — jamais sur
+                une fiche qui ne touche pas ces champs, donc pas de risque de
+                reproduire le blocage de sync déjà corrigé pour la densité diffuse. */}
+            {accouplementOuPonteActif(data.accouplement, data.ponte) && (
               <View style={styles.densitySection}>
-                <Text style={styles.sectionLabel}>📊 Interdistance (m)</Text>
+                <Text style={[styles.sectionLabel, styles.requiredSectionLabel]}>📊 Interdistance (m) *</Text>
                 <View style={styles.card}>
                   <TextInput
+                    testID="interdistance-input"
                     value={data.interdistance}
                     onChangeText={(text) => updateSpeciesData({ interdistance: text })}
                     keyboardType="decimal-pad"
@@ -780,6 +818,7 @@ const styles = StyleSheet.create({
   sectionCount: { fontSize: 13, fontWeight: '700', color: GREEN, fontFamily: 'monospace' },
   errorCount: { color: '#d32f2f' },
   errorText: { fontSize: 11, color: '#d32f2f', marginTop: 4, marginBottom: 4 },
+  requiredSectionLabel: { color: '#d32f2f' },
   
   totalCaptureSection: { backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
   totalCaptureInputContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },

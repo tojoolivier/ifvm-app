@@ -1,12 +1,12 @@
 /**
- * intensive-imagos.tsx (B-Imagos) : #accouplement-neant-sans-interdistance —
- * un accouplement « Néant » n'a pas de sens accompagné d'une interdistance
- * (distance entre individus accouplés) : la section se masque et la valeur
- * déjà saisie est effacée, jamais envoyée au backend.
+ * intensive-imagos.tsx (B-Imagos) : #interdistance-obligatoire-si-accouplement-ou-ponte
+ * — pendant de intensive-imagos-interdistance-bloque.test.tsx : aucune
+ * obligation quand accouplement et ponte restent Néant/non renseignés.
  *
  * Fichier séparé des autres scénarios de cet écran — cf. le commentaire
  * d'intensive-imagos-densites-obligatoires.test.tsx pour le pourquoi.
  */
+import { Alert } from 'react-native';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import IntensiveImagosScreen from '@/app/(prospection)/intensive-imagos';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
@@ -36,7 +36,7 @@ jest.mock('@/lib/referentiel-db', () => ({ listStadesGrille: jest.fn() }));
 
 const settle = () => act(() => jest.advanceTimersByTimeAsync(20));
 
-describe('IntensiveImagosScreen — Accouplement Néant masque l’Interdistance', () => {
+describe('IntensiveImagosScreen — interdistance non exigée sans accouplement ni ponte', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => {
     cleanup();
@@ -50,41 +50,24 @@ describe('IntensiveImagosScreen — Accouplement Néant masque l’Interdistance
     mockPush.mockClear();
   });
 
-  it('masque la section et efface la valeur déjà saisie quand Accouplement passe à Néant', async () => {
+  it('n’exige pas l’interdistance quand accouplement et ponte restent Néant/non renseignés', async () => {
     useProspectionWizardStore.setState({ draft: draftLmcOnly(), captures: [] });
+    // #confirmation-espece-sans-donnee : LMC (seule espèce ici) reste entièrement
+    // vide dans ce scénario (précisément son objet) — confirme automatiquement ce
+    // modal, sans rapport avec l'interdistance testée ici.
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation((_titre, _message, boutons) => {
+      boutons?.find((b) => b.text === 'Continuer')?.onPress?.();
+    });
 
     await render(<IntensiveImagosScreen />);
     await screen.findByText('Type de cible');
     await settle();
 
-    fireEvent.changeText(screen.getByTestId('densite-diffuse-input'), '12');
-    // « Rare » : l'Interdistance est visible et saisissable.
-    fireEvent.press(screen.getAllByText('Rare')[0]);
-    await settle();
-    expect(screen.getByTestId('interdistance-input')).toBeVisible();
-    fireEvent.changeText(screen.getByTestId('interdistance-input'), '25.5');
-    await settle();
-    expect(screen.getByTestId('interdistance-input')).toHaveDisplayValue('25.5');
-
-    // Repasser sur « Néant » masque la section et efface la valeur.
-    fireEvent.press(screen.getAllByText('Néant')[0]);
-    await settle();
-
     expect(screen.queryByTestId('interdistance-input')).toBeNull();
-
-    // Ponte doit aussi rester « Néant » (deuxième occurrence, la première étant
-    // celle — désormais inactive — d'Accouplement) : #interdistance-obligatoire-
-    // si-accouplement-ou-ponte réexigerait sinon l'interdistance qu'on vient
-    // d'effacer, dès qu'une ponte « Rare »/« Beaucoup » serait signalée.
-    fireEvent.press(screen.getByText('Repos'));
-    fireEvent.press(screen.getAllByText('Néant')[1]);
-    fireEvent.press(screen.getByText('Vol clair'));
-    await settle();
 
     fireEvent.press(screen.getByText('Végétation & Sol  ›'));
 
     await waitFor(() => expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalledTimes(1));
-    const [, row] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
-    expect(row).toMatchObject({ accouplement: 'Néant', ponte: 'Néant', interdistance: null });
+    expect(alertSpy).not.toHaveBeenCalledWith('Interdistance requise', expect.anything());
   });
 });

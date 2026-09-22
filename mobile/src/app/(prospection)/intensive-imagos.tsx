@@ -16,7 +16,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Espece, accouplementOptionsFor, capturesMaxFor, grilleKeyToString, phasesFor } from '@/lib/prospection-especes-stades';
 import { parseEspeceSelection, buildGrilles, parseGrillesCompletees } from '@/lib/prospection-especes';
-import { estPopulationImagoVide, parseDensite, parseSelectionMultiple, TYPE_CIBLE_IMAGO_OPTIONS, TypeCibleImago, EtatImago } from '@/lib/prospection-extensive';
+import { accouplementOuPonteActif, estPopulationImagoVide, parseDensite, parseSelectionMultiple, TYPE_CIBLE_IMAGO_OPTIONS, TypeCibleImago, EtatImago } from '@/lib/prospection-extensive';
 import { COMPASS_DIRECTIONS, oppositeDirection, formatDirectionDeplacement } from '@/lib/prospection-infestation-insights';
 import { listStadesGrille } from '@/lib/referentiel-db';
 import { retourArriere } from '@/lib/fiche-routing';
@@ -102,6 +102,12 @@ export default function IntensiveImagosScreen() {
   // pour lesquelles cette obligation reproduirait le blocage de synchronisation déjà
   // corrigé pour la densité diffuse (#densite-diffuse-obligatoire).
   const [showRequiredChoicesError, setShowRequiredChoicesError] = useState(false);
+  // #interdistance-obligatoire-si-accouplement-ou-ponte : contrairement aux 4
+  // choix ci-dessus, cette règle s'applique aussi côté Extensif/Signalement
+  // (demande explicite) — elle ne se déclenche que si l'agent a activement
+  // signalé un accouplement ou une ponte (jamais sur une fiche qui ne touche
+  // pas ces champs), donc pas de risque de reproduire le blocage de sync.
+  const [showInterdistanceError, setShowInterdistanceError] = useState(false);
 
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('intensive-imagos');
@@ -269,14 +275,25 @@ export default function IntensiveImagosScreen() {
     }));
   };
 
-  /** #accouplement-neant-sans-interdistance : « Néant » efface l'interdistance (la
-   * section correspondante se masque, cf. rendu ci-dessous) — elle n'a de sens que
-   * si un accouplement (Rare/Beaucoup) a été observé. Même patron que
-   * handleEtatChange, qui efface la direction devenue sans objet. */
+  /** #interdistance-obligatoire-si-accouplement-ou-ponte : l'interdistance (section
+   * masquée, cf. rendu ci-dessous) n'a de sens que si l'accouplement OU la ponte est
+   * « Rare »/« Beaucoup » — elle s'efface dès que les deux retombent à « Néant »/non
+   * renseigné. Même patron que handleEtatChange, qui efface la direction devenue
+   * sans objet. */
   const handleAccouplementChange = (value: string) => {
     const active = value === population.accouplement;
     const next = active ? null : value;
-    patchPopulation(next === 'Néant' ? { accouplement: next, interdistance: null } : { accouplement: next });
+    patchPopulation(
+      accouplementOuPonteActif(next, population.ponte) ? { accouplement: next } : { accouplement: next, interdistance: null }
+    );
+  };
+
+  const handlePonteChange = (value: string) => {
+    const active = value === population.ponte;
+    const next = active ? null : value;
+    patchPopulation(
+      accouplementOuPonteActif(population.accouplement, next) ? { ponte: next } : { ponte: next, interdistance: null }
+    );
   };
 
   /** Même logique que handleEtatChange dans extensive-imagos.tsx (et
@@ -316,6 +333,19 @@ export default function IntensiveImagosScreen() {
     }
     // Densité groupée : redevenue facultative (demande explicite) — plus de
     // blocage ici, cf. backend prospection_schemas.py (#densite-groupee-obligatoire).
+
+    // #interdistance-obligatoire-si-accouplement-ou-ponte : indépendant du nombre de
+    // captures — dès que l'agent signale activement un accouplement ou une ponte
+    // (Rare/Beaucoup), l'interdistance devient obligatoire, quelle que soit la
+    // fiche (même règle côté Extensif/Signalement, cf. handleContinue).
+    if (accouplementOuPonteActif(population.accouplement, population.ponte) && population.interdistance == null) {
+      setShowInterdistanceError(true);
+      Alert.alert(
+        'Interdistance requise',
+        "Veuillez renseigner l'interdistance (m) : un accouplement ou une ponte a été signalé."
+      );
+      return false;
+    }
 
     if (totalCaptures > 0) {
       const manque: string[] = [];
@@ -767,7 +797,7 @@ export default function IntensiveImagosScreen() {
                 return (
                   <TouchableOpacity
                     key={option}
-                    onPress={() => setPopulationField('ponte', active ? null : option)}
+                    onPress={() => handlePonteChange(option)}
                     style={[styles.chip, active && styles.chipActive]}
                     activeOpacity={0.8}
                   >
@@ -781,13 +811,19 @@ export default function IntensiveImagosScreen() {
               <Text style={styles.errorText}>Ponte obligatoire.</Text>
             )}
 
-            {/* #accouplement-neant-sans-interdistance : masquée (et effacée par
-                handleAccouplementChange) dès que l'accouplement vaut « Néant » — elle
-                n'a de sens que si un accouplement a été observé. */}
-            {population.accouplement !== 'Néant' && (
+            {/* #interdistance-obligatoire-si-accouplement-ou-ponte : masquée (et
+                effacée par handleAccouplementChange/handlePonteChange) tant que
+                l'accouplement ET la ponte valent « Néant »/ne sont pas renseignés —
+                obligatoire dès que l'un des deux est actif (Rare/Beaucoup). */}
+            {accouplementOuPonteActif(population.accouplement, population.ponte) && (
               <>
-                <Text style={styles.sectionLabel}>Interdistance (m)</Text>
-                <View style={styles.field}>
+                <Text style={[styles.sectionLabel, styles.requiredLabel]}>Interdistance (m) *</Text>
+                <View
+                  style={[
+                    styles.field,
+                    showInterdistanceError && population.interdistance == null && styles.fieldError,
+                  ]}
+                >
                   <TextInput
                     testID="interdistance-input"
                     value={population.interdistance != null ? String(population.interdistance) : ''}
@@ -798,6 +834,9 @@ export default function IntensiveImagosScreen() {
                     placeholderTextColor={TEXT_SECONDARY}
                   />
                 </View>
+                {showInterdistanceError && population.interdistance == null && (
+                  <Text style={styles.errorText}>Veuillez renseigner l&apos;interdistance (m).</Text>
+                )}
               </>
             )}
 
