@@ -555,7 +555,7 @@ class EquipeRepositoryImpl(EquipeRepository):
             await self.session.commit()
         except IntegrityError as exc:
             await self.session.rollback()
-            raise _traduire_integrite_equipe(exc, aeronef) from exc
+            raise _traduire_integrite_equipe(exc, aeronef, aeronef_id) from exc
         await self.session.refresh(model, attribute_names=["membres", "affectations_aeronef"])
         return await self._relire(model.id)
 
@@ -742,19 +742,26 @@ def _membre_to_domain(model: EquipeMembreModel) -> MembreEquipe:
     )
 
 
-def _traduire_integrite_equipe(exc: IntegrityError, aeronef: Aeronef | None) -> Exception:
+def _traduire_integrite_equipe(
+    exc: IntegrityError, aeronef: Aeronef | None, aeronef_id: uuid.UUID | None = None
+) -> Exception:
     """Traduit une violation d'intégrité en erreur métier, par *nom de contrainte*.
 
-    Les noms lus ici sont ceux de la migration 0082 et des `__table_args__` : un
+    Les noms lus ici sont ceux des migrations 0082/0083 et des `__table_args__` : un
     renommage des deux côtés est obligatoire, sans quoi toute violation retomberait
-    silencieusement sur l'erreur générique."""
+    silencieusement sur l'erreur générique.
+
+    `aeronef_id` est passé à part : sur le chemin « appareil déjà au référentiel »
+    (#621) il n'y a pas d'objet `Aeronef` à créer, et c'est pourtant le seul chemin qui
+    puisse violer l'index partiel — sans lui le message sortait vide."""
     contrainte = _contrainte_violee(exc)
     if contrainte == "uq_aeronef_immatriculation":
         return ImmatriculationAeronefDejaPriseError(
             aeronef.immatriculation if aeronef is not None else ""
         )
     if contrainte == "uq_equipe_aeronef_ouverte_par_aeronef":
-        return AeronefDejaAffecteError(str(aeronef.id) if aeronef is not None else "")
+        vise = aeronef.id if aeronef is not None else aeronef_id
+        return AeronefDejaAffecteError(str(vise) if vise is not None else "")
     if contrainte == "uq_equipe_aeronef_ouverte_par_equipe":
         return EquipeDejaEquipeeError(contrainte)
     if contrainte == "uq_equipe_membre_chef_par_equipe":

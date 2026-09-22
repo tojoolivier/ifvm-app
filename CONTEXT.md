@@ -52,8 +52,16 @@ Agriculteur → Signalement → Prospection de Validation
   lignes de `equipe_membre(equipe_id, user_id, fonction)` — il n'y a plus de rôle nommé en dur.
   `fonction` reprend le vocabulaire de `ROLES`, plus `chef` : une équipe a **un seul chef**, un
   chef ne dirige **qu'une équipe** (deux index partiels `WHERE fonction = 'chef'`). Une équipe
-  aérienne a en plus **un aéronef** (hélicoptère : immatriculation, société, volume de cuve —
-  table `aeronef`, 1:1, `immatriculation` en est la clé candidate). Elle possède sa base
+  aérienne dispose de **2 à 3 aéronefs affectés successivement** (hélicoptère :
+  immatriculation, société, volume de cuve — table `aeronef`, `immatriculation` en est la clé
+  candidate ; le parc se peuple indépendamment des équipes, `POST /aeronefs`, admin). Les
+  affectations sont **bornées dans le temps** — `equipe_aeronef(equipe_id, aeronef_id,
+  date_debut, date_fin)`, migration 0083, ADR-018 §2 : `date_fin IS NULL` désigne l'appareil
+  **en service**, que `EquipeRead.aeronef` projette (`null` entre deux appareils), et
+  l'historique complet se lit par `GET /equipes/{id}/aeronefs`. « Un aéronef sur une seule
+  équipe à la fois » est une règle de **chevauchement d'intervalles**, pas un `UNIQUE` :
+  validée côté application (422) — `EXCLUDE USING gist` reste hors scope, les deux index
+  partiels `WHERE date_fin IS NULL` ne rattrapent que les courses. Elle possède sa base
   principale (`base_aerienne.equipe_id`, UNIQUE), ses bases secondaires (héritées de la
   principale) et ses stands (`stand_remplissage.equipe_aerienne_id`) ; une équipe terrestre est
   rattachée à un ou plusieurs postes (`poste_acridien.equipe_terrestre_id`, sans UNIQUE : équipe
@@ -64,7 +72,7 @@ Agriculteur → Signalement → Prospection de Validation
   équipe reste `base_aerienne`/`stand_remplissage` (décision 0064), distinct de `lieu_aerien`
   (prospection/traitement).
   ⚠️ La suite de la remodélisation reste **cadrée mais pas implémentée**
-  (`docs/adr/ADR-018`, épic #592) : `equipe_aeronef` (affectations datées, #603),
+  (`docs/adr/ADR-018`, épic #592) :
   `base_aerienne` + `stand_remplissage` → `site_aerienne` (principale / secondaire / stand
   distinguées par `parent_base_id`), positions historisées, stock de pesticides centralisé.
 

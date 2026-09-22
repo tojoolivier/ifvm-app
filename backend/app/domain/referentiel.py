@@ -363,6 +363,15 @@ class EquipeDejaEquipeeError(Exception):
     pass
 
 
+class AffectationDejaCloturee(Exception):
+    """L'affectation est déjà bornée : la reclôturer déplacerait une borne passée.
+
+    L'historique est l'objet même de `equipe_aeronef` (#603) ; le raccourcir après coup
+    le falsifierait. Retirer un appareil est un geste qui ne se rejoue pas."""
+
+    pass
+
+
 class AffectationAeronefIntrouvableError(Exception):
     """`affectation_id` ne référence aucune affectation de cette équipe."""
 
@@ -431,18 +440,7 @@ class AffectationAeronef:
     date_debut: date = field(default_factory=lambda: datetime.now(timezone.utc).date())
     date_fin: date | None = None
     aeronef: Aeronef | None = None
-    created_at: datetime = field(default_factory=datetime.utcnow)
-
-    def est_ouverte(self) -> bool:
-        return self.date_fin is None
-
-    def chevauche(self, date_debut: date, date_fin: date | None) -> bool:
-        """Deux intervalles semi-ouverts se chevauchent si chacun commence avant que
-        l'autre ne finisse ; `None` en fin vaut « pas de fin », donc `+infini`."""
-        fin_a = self.date_fin
-        return (fin_a is None or fin_a > date_debut) and (
-            date_fin is None or date_fin > self.date_debut
-        )
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @dataclass

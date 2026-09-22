@@ -10,6 +10,7 @@ from app.domain.referentiel import (
     AeronefIntrouvableError,
     AffectationAeronef,
     AffectationAeronefIntrouvableError,
+    AffectationDejaCloturee,
     BaseAerienne,
     BaseAerienneEquipeInvalideError,
     BaseAerienneParentInvalideError,
@@ -1063,11 +1064,13 @@ class CreateEquipe:
         self,
         repository: EquipeRepository,
         utilisateur_repo: object,
-        aeronef_repo: AeronefRepository | None = None,
+        aeronef_repo: AeronefRepository,
+        affectation_repo: EquipeAeronefRepository,
     ):
         self.repository = repository
         self.resoudre_membre = ResoudreMembre(utilisateur_repo)
         self.aeronef_repo = aeronef_repo
+        self.affectation_repo = affectation_repo
 
     async def execute(
         self,
@@ -1079,9 +1082,16 @@ class CreateEquipe:
     ) -> Equipe:
         maintenant = datetime.now(timezone.utc)
         equipe_id = uuid.uuid4()
-        if aeronef_id is not None and self.aeronef_repo is not None:
+        if aeronef_id is not None:
             if await self.aeronef_repo.get_by_id(aeronef_id) is None:
                 raise AeronefIntrouvableError(str(aeronef_id))
+            # Même règle qu'une affectation explicite (#603) : l'équipe naît avec une
+            # affectation ouverte à partir de `maintenant`, donc un appareil déjà en
+            # service ailleurs se chevaucherait. Vérifié ici plutôt que laissé à l'index
+            # partiel, dont le message ne dirait pas *quel* appareil coince.
+            await _refuser_chevauchement(
+                self.affectation_repo, equipe_id, aeronef_id, maintenant.date(), None
+            )
         membres_resolus = [
             await self.resoudre_membre.execute(equipe_id, type_equipe, demande)
             for demande in (membres or [])
@@ -1138,6 +1148,31 @@ class AjouterMembreEquipe:
         return await self.repository.ajouter_membre(membre)
 
 
+async def _refuser_chevauchement(
+    repository: EquipeAeronefRepository,
+    equipe_id: uuid.UUID,
+    aeronef_id: uuid.UUID,
+    date_debut: date,
+    date_fin: date | None,
+    sauf_id: uuid.UUID | None = None,
+) -> None:
+    """Règle centrale de `equipe_aeronef` (#603), vérifiée côté application.
+
+    Deux refus, selon le côté qui coince : l'appareil est ailleurs sur la période, ou
+    l'équipe en a déjà un. Distinguer les deux est ce qui rend le message utile — « ça
+    se chevauche » n'aide personne à savoir quoi corriger."""
+    for existante in await repository.list_chevauchements(
+        date_debut=date_debut,
+        date_fin=date_fin,
+        equipe_id=equipe_id,
+        aeronef_id=aeronef_id,
+        sauf_id=sauf_id,
+    ):
+        if existante.aeronef_id == aeronef_id:
+            raise AeronefDejaAffecteError(str(aeronef_id))
+        raise EquipeDejaEquipeeError(str(equipe_id))
+
+
 class ListerAffectationsAeronef:
     """Historique des appareils d'une équipe, affectation en cours d'abord (#603)."""
 
@@ -1187,12 +1222,7 @@ class AffecterAeronef:
         if date_fin is not None and date_fin < date_debut:
             raise PeriodeAffectationInvalideError(f"{date_fin} < {date_debut}")
 
-        for existante in await self.repository.list_chevauchements(
-            date_debut=date_debut, date_fin=date_fin, equipe_id=equipe_id, aeronef_id=aeronef_id
-        ):
-            if existante.aeronef_id == aeronef_id:
-                raise AeronefDejaAffecteError(str(aeronef_id))
-            raise EquipeDejaEquipeeError(str(equipe_id))
+        await _refuser_chevauchement(self.repository, equipe_id, aeronef_id, date_debut, date_fin)
 
         maintenant = datetime.now(timezone.utc)
         return await self.repository.create(
@@ -1222,21 +1252,22 @@ class CloturerAffectationAeronef:
         affectation = await self.repository.get_by_id(affectation_id)
         if affectation is None or affectation.equipe_id != equipe_id:
             raise AffectationAeronefIntrouvableError(str(affectation_id))
+        if affectation.date_fin is not None:
+            raise AffectationDejaCloturee(str(affectation_id))
         if date_fin < affectation.date_debut:
             raise PeriodeAffectationInvalideError(f"{date_fin} < {affectation.date_debut}")
 
-        # Clôturer ne peut que libérer du temps, sauf si la période était déjà bornée
-        # *plus tôt* : on la rallonge alors, et le chevauchement redevient possible.
-        for existante in await self.repository.list_chevauchements(
-            date_debut=affectation.date_debut,
-            date_fin=date_fin,
-            equipe_id=equipe_id,
-            aeronef_id=affectation.aeronef_id,
+        # Borner une affectation ouverte ne peut que *libérer* du temps : le
+        # chevauchement reste pourtant vérifié, parce qu'un `EXCLUDE` en base ne le fait
+        # pas et qu'une ligne concurrente a pu s'intercaler depuis la lecture.
+        await _refuser_chevauchement(
+            self.repository,
+            equipe_id,
+            affectation.aeronef_id,
+            affectation.date_debut,
+            date_fin,
             sauf_id=affectation.id,
-        ):
-            if existante.aeronef_id == affectation.aeronef_id:
-                raise AeronefDejaAffecteError(str(affectation.aeronef_id))
-            raise EquipeDejaEquipeeError(str(equipe_id))
+        )
 
         affectation.date_fin = date_fin
         return await self.repository.update(affectation)

@@ -65,6 +65,7 @@ from app.domain.referentiel import (
     AeronefDejaAffecteError,
     AeronefIntrouvableError,
     AffectationAeronefIntrouvableError,
+    AffectationDejaCloturee,
     BaseAerienneEquipeInvalideError,
     BaseAerienneParentInvalideError,
     ChefDejaDansUneAutreEquipeError,
@@ -833,7 +834,10 @@ async def create_equipe(
     _: Annotated[Utilisateur, Depends(get_current_user)],
 ):
     use_case = CreateEquipe(
-        EquipeRepositoryImpl(db), UtilisateurRepositoryImpl(db), AeronefRepositoryImpl(db)
+        EquipeRepositoryImpl(db),
+        UtilisateurRepositoryImpl(db),
+        AeronefRepositoryImpl(db),
+        EquipeAeronefRepositoryImpl(db),
     )
     try:
         return await use_case.execute(
@@ -872,7 +876,10 @@ async def create_equipe(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"immatriculation déjà utilisée par un autre aéronef : {exc.args[0]}",
         ) from exc
-    except AeronefDejaAffecteError as exc:
+    except (AeronefDejaAffecteError, EquipeDejaEquipeeError) as exc:
+        # 409 et non le 422 de `POST /equipes/{id}/aeronefs` : ici l'appelant ne choisit
+        # pas de période — il n'a donc rien à corriger dans son calendrier, c'est bien
+        # une collision avec l'état du parc (#621).
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"aéronef déjà affecté à une autre équipe : {exc.args[0]}",
@@ -1011,6 +1018,11 @@ async def cloturer_affectation_aeronef(
     except AffectationAeronefIntrouvableError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Affectation non trouvée"
+        ) from exc
+    except AffectationDejaCloturee as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"affectation déjà clôturée : {exc.args[0]}",
         ) from exc
     except (
         AeronefDejaAffecteError,

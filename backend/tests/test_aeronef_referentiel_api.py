@@ -185,3 +185,6 @@ async def test_aeronef_deja_affecte_a_une_autre_equipe_409(
         headers=admin_headers,
     )
     assert seconde.status_code == 409, seconde.text
+    # Le détail nomme l'appareil : sur ce chemin il n'y a pas d'objet `Aeronef` en
+    # cours de création, et le message sortait vide avant #603.
+    assert aeronef["id"] in seconde.json()["detail"]

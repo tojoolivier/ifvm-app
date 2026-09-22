@@ -4,6 +4,12 @@ Règle produit (2026-09-19) : une équipe aérienne a un aéronef (immatriculati
 volume de cuve) ; seul le chef de base de l'équipe — le seul compte utilisateur de
 l'équipe — crée ses bases et ses stands, rattachés d'office à SON équipe. Un admin peut
 agir pour n'importe quelle équipe en la désignant.
+
+Depuis #603 l'appareil n'est plus une colonne de l'équipe : `EquipeRead.aeronef_id` /
+`aeronef` projettent l'affectation **en cours** (`equipe_aeronef` avec
+`date_fin IS NULL`), posée à la création. Ce fichier garde donc son sujet — le parc et
+les lieux vus depuis l'équipe — et les affectations successives, l'historique et le
+refus du chevauchement vivent dans `test_equipe_aeronef_api.py`.
 """
 
 import uuid
@@ -70,11 +76,17 @@ async def test_equipe_relue_avec_son_aeronef(
     assert relue.json()["aeronef"]["immatriculation"] == "5R-MJA"
     assert relue.json()["aeronef"]["volume_cuve_l"] == 800
 
+    # Ce que la lecture projette est bien une affectation ouverte, pas une colonne.
+    historique = await client.get(f"/equipes/{creee.json()['id']}/aeronefs", headers=admin_headers)
+    assert [ligne["date_fin"] for ligne in historique.json()] == [None]
+    assert historique.json()[0]["aeronef_id"] == relue.json()["aeronef_id"]
+
 
 @pytest.mark.asyncio
 async def test_equipe_sans_aeronef_422(client: AsyncClient, admin_headers: dict, chef_de_base):
-    """L'hélicoptère est exigé pour toute nouvelle équipe (nullable en base uniquement
-    pour les équipes antérieures à la migration)."""
+    """L'hélicoptère est exigé pour toute nouvelle équipe : `aeronef` (créé à la volée)
+    ou `aeronef_id` (déjà au parc, #621). Une équipe peut ensuite se retrouver sans
+    appareil en service, mais seulement en bornant son affectation (#603)."""
     reponse = await client.post(
         "/equipes",
         json=_corps_equipe(chef_de_base.id, nom="Équipe Ihosy", aeronef=None),
@@ -162,6 +174,7 @@ async def test_admin_modifie_societe_et_volume_de_cuve(
         )
     ).json()
 
+    # `aeronef_id` est l'appareil *en service* dans l'équipe (#603), pas une colonne.
     reponse = await client.put(
         f"/aeronefs/{equipe['aeronef_id']}",
         json={"societe": "Autre Société", "volume_cuve_l": 1000},

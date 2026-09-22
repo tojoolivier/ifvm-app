@@ -356,3 +356,34 @@ async def test_equipe_creee_avec_son_aeronef_a_une_affectation_ouverte(
     assert len(historique.json()) == 1
     assert historique.json()[0]["date_fin"] is None
     assert historique.json()[0]["aeronef"]["immatriculation"] == "5R-MJA"
+
+
+@pytest.mark.asyncio
+async def test_recloturer_une_affectation_deja_close_409(
+    client: AsyncClient, admin_headers: dict, equipe: dict, aeronef_a: dict
+):
+    """Retirer un appareil est un geste qui ne se rejoue pas : déplacer une borne déjà
+    posée réécrirait l'historique, qui est l'objet même de la table."""
+    affectation = (
+        await client.post(
+            f"/equipes/{equipe['id']}/aeronefs",
+            json={"aeronef_id": aeronef_a["id"], "date_debut": "2026-06-01"},
+            headers=admin_headers,
+        )
+    ).json()
+    premiere = await client.put(
+        f"/equipes/{equipe['id']}/aeronefs/{affectation['id']}",
+        json={"date_fin": "2026-07-01"},
+        headers=admin_headers,
+    )
+    assert premiere.status_code == 200, premiere.text
+
+    seconde = await client.put(
+        f"/equipes/{equipe['id']}/aeronefs/{affectation['id']}",
+        json={"date_fin": "2026-06-15"},
+        headers=admin_headers,
+    )
+    assert seconde.status_code == 409, seconde.text
+
+    historique = await client.get(f"/equipes/{equipe['id']}/aeronefs", headers=admin_headers)
+    assert historique.json()[0]["date_fin"] == "2026-07-01"
