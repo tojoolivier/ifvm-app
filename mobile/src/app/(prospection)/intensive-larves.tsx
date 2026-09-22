@@ -16,7 +16,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Espece, capturesMaxFor, grilleKeyToString, phasesFor } from '@/lib/prospection-especes-stades';
 import { parseEspeceSelection, buildGrilles, parseGrillesCompletees } from '@/lib/prospection-especes';
-import { parseDensite } from '@/lib/prospection-extensive';
+import { estPopulationLarveVide, parseDensite } from '@/lib/prospection-extensive';
 import { listStadesGrille } from '@/lib/referentiel-db';
 import { retourArriere } from '@/lib/fiche-routing';
 import {
@@ -313,12 +313,47 @@ export default function IntensiveLarvesScreen() {
       router.replace(`/(prospection)/species?draftId=${draftId}`);
     });
 
+  /** Total de captures d'une espèce larve, quel que soit son onglet : celui en
+   * cours d'édition (`totalCaptures`, pas encore reflété par `captures` tant
+   * que `commitCurrentGrille` n'a pas tourné) sinon celui déjà persisté
+   * (`captures`, rechargé par `refreshCaptures` à chaque grille validée). */
+  const capturesTotalPourEspeceLarve = (sp: Espece): number =>
+    sp === species
+      ? totalCaptures
+      : captures.filter((c) => c.espece === sp && c.categorie === 'larve').reduce((sum, c) => sum + c.effectif, 0);
+
   const handleContinue = () =>
     run(
       async () => {
         const ok = await commitCurrentGrille();
         if (!ok) return;
-        router.push({ pathname: '/(prospection)/veg' as any, params: { draftId } });
+
+        const continuer = () => router.push({ pathname: '/(prospection)/veg' as any, params: { draftId } });
+
+        // #confirmation-espece-sans-donnee : ce bouton quitte l'écran Larves en
+        // entier, quel que soit l'onglet actif (LMC/NSE se changent par les
+        // boutons du haut, pas par « Suivant ») — rien n'empêche de l'appuyer
+        // sans jamais avoir ouvert l'autre espèce. On avertit avant de partir
+        // plutôt que de laisser un onglet entier sauté en silence.
+        const especesSansDonnee = larveIndices
+          .map(({ g }) => g.espece)
+          .filter((sp) =>
+            estPopulationLarveVide(populations[sp] ?? emptyLarvePopulation(sp), capturesTotalPourEspeceLarve(sp))
+          );
+
+        if (especesSansDonnee.length > 0) {
+          Alert.alert(
+            'Aucune donnée saisie',
+            `Aucune valeur n'a été saisie pour ${especesSansDonnee.join(' et ')}. Continuer quand même ?`,
+            [
+              { text: 'Annuler', style: 'cancel' },
+              { text: 'Continuer', onPress: continuer },
+            ]
+          );
+          return;
+        }
+
+        continuer();
       },
       {
         screen: 'intensive-larves',

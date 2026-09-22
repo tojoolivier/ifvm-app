@@ -7,6 +7,7 @@
  * (Vol clair/Dense/Très dense, un champ par espèce comme popDiff/popGroup) —
  * modifier LMC ne doit jamais modifier NSE, et réciproquement.
  */
+import { Alert } from 'react-native';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import ExtensiveImagosScreen from '@/app/(prospection)/extensive-imagos';
 import * as prospectionRepository from '@/lib/prospection-repository';
@@ -33,6 +34,14 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
   beforeEach(() => {
     jest.mocked(prospectionRepository.saveProspectionPopulation).mockClear();
     jest.mocked(prospectionRepository.getProspectionPopulation).mockResolvedValue(null);
+    // #confirmation-espece-sans-donnee : la plupart de ces scénarios ne renseignent
+    // qu'une espèce (LMC), ce qui est précisément leur objet — pas celui de ce
+    // fichier de test. Confirme automatiquement le modal d'avertissement pour
+    // laisser les scénarios se dérouler comme avant son introduction ; les tests
+    // dédiés au modal lui-même vivent dans leur propre fichier.
+    jest.spyOn(Alert, 'alert').mockImplementation((_titre, _message, boutons) => {
+      boutons?.find((b) => b.text === 'Continuer')?.onPress?.();
+    });
   });
 
   it("modifier le type de cible de NSE n'affecte pas celui de LMC (et réciproquement)", async () => {
