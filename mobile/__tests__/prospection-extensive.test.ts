@@ -1,4 +1,5 @@
 import {
+  accouplementOuPonteActif,
   createEmptySpeciesData,
   createEmptyLarveSpeciesData,
   speciesDataToPopulationRow,
@@ -13,6 +14,38 @@ import {
   IMAGO_PHASE_ROWS,
   LARVE_PHASE_ROWS,
 } from '../src/lib/prospection-extensive';
+
+// #interdistance-obligatoire-si-accouplement-ou-ponte : l'interdistance (imagos,
+// Intensif comme Extensif/Signalement) n'a de sens que si un accouplement OU une
+// ponte a été observé.
+describe('accouplementOuPonteActif', () => {
+  it('faux quand les deux valent « Néant »', () => {
+    expect(accouplementOuPonteActif('Néant', 'Néant')).toBe(false);
+  });
+
+  it('faux quand les deux sont non renseignés (null)', () => {
+    expect(accouplementOuPonteActif(null, null)).toBe(false);
+  });
+
+  it('faux pour un mélange Néant / non renseigné', () => {
+    expect(accouplementOuPonteActif('Néant', null)).toBe(false);
+    expect(accouplementOuPonteActif(null, 'Néant')).toBe(false);
+  });
+
+  it('vrai dès que l’accouplement est « Rare » ou « Beaucoup », même si la ponte est Néant/non renseignée', () => {
+    expect(accouplementOuPonteActif('Rare', 'Néant')).toBe(true);
+    expect(accouplementOuPonteActif('Beaucoup', null)).toBe(true);
+  });
+
+  it('vrai dès que la ponte est « Rare » ou « Beaucoup », même si l’accouplement est Néant/non renseigné', () => {
+    expect(accouplementOuPonteActif('Néant', 'Rare')).toBe(true);
+    expect(accouplementOuPonteActif(null, 'Beaucoup')).toBe(true);
+  });
+
+  it('vrai quand les deux sont actifs', () => {
+    expect(accouplementOuPonteActif('Rare', 'Beaucoup')).toBe(true);
+  });
+});
 
 // #phase-ordre-affichage : Solitaire → Solitaro-Transiens → Transiens → Grégaire
 // (écrans extensive-imagos.tsx / extensive-larves.tsx, Prospection Extensive).

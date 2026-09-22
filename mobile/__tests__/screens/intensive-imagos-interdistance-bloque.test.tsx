@@ -1,13 +1,16 @@
 /**
- * intensive-imagos.tsx (B-Imagos) : #accouplement-neant-sans-interdistance —
- * un accouplement « Néant » n'a pas de sens accompagné d'une interdistance
- * (distance entre individus accouplés) : la section se masque et la valeur
- * déjà saisie est effacée, jamais envoyée au backend.
+ * intensive-imagos.tsx (B-Imagos) : #interdistance-obligatoire-si-accouplement-ou-ponte
+ * — dès qu'un accouplement ou une ponte « Rare »/« Beaucoup » est signalé,
+ * l'interdistance devient obligatoire (indépendamment du nombre de captures,
+ * contrairement aux 4 choix obligatoires d'#accouplement-ponte-cible-etat-obligatoires) —
+ * « Suivant » bloque tant qu'elle manque.
  *
- * Fichier séparé des autres scénarios de cet écran — cf. le commentaire
- * d'intensive-imagos-densites-obligatoires.test.tsx pour le pourquoi.
+ * Fichier séparé des autres scénarios de cet écran (un test par fichier) — cf.
+ * le commentaire d'intensive-imagos-densites-obligatoires.test.tsx pour le
+ * pourquoi.
  */
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { Alert } from 'react-native';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react-native';
 import IntensiveImagosScreen from '@/app/(prospection)/intensive-imagos';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
@@ -36,7 +39,7 @@ jest.mock('@/lib/referentiel-db', () => ({ listStadesGrille: jest.fn() }));
 
 const settle = () => act(() => jest.advanceTimersByTimeAsync(20));
 
-describe('IntensiveImagosScreen — Accouplement Néant masque l’Interdistance', () => {
+describe('IntensiveImagosScreen — interdistance obligatoire, bloque tant que manquante', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => {
     cleanup();
@@ -50,41 +53,27 @@ describe('IntensiveImagosScreen — Accouplement Néant masque l’Interdistance
     mockPush.mockClear();
   });
 
-  it('masque la section et efface la valeur déjà saisie quand Accouplement passe à Néant', async () => {
+  it('bloque « Suivant » tant que l’interdistance manque, alors même qu’il n’y a aucune capture', async () => {
     useProspectionWizardStore.setState({ draft: draftLmcOnly(), captures: [] });
+    const alertSpy = jest.spyOn(Alert, 'alert');
 
     await render(<IntensiveImagosScreen />);
     await screen.findByText('Type de cible');
     await settle();
 
-    fireEvent.changeText(screen.getByTestId('densite-diffuse-input'), '12');
-    // « Rare » : l'Interdistance est visible et saisissable.
+    // Aucune capture saisie : la densité et les 4 choix « obligatoires » ne
+    // bloquent pas — seule l'interdistance, elle, doit bloquer.
     fireEvent.press(screen.getAllByText('Rare')[0]);
     await settle();
     expect(screen.getByTestId('interdistance-input')).toBeVisible();
-    fireEvent.changeText(screen.getByTestId('interdistance-input'), '25.5');
-    await settle();
-    expect(screen.getByTestId('interdistance-input')).toHaveDisplayValue('25.5');
-
-    // Repasser sur « Néant » masque la section et efface la valeur.
-    fireEvent.press(screen.getAllByText('Néant')[0]);
-    await settle();
-
-    expect(screen.queryByTestId('interdistance-input')).toBeNull();
-
-    // Ponte doit aussi rester « Néant » (deuxième occurrence, la première étant
-    // celle — désormais inactive — d'Accouplement) : #interdistance-obligatoire-
-    // si-accouplement-ou-ponte réexigerait sinon l'interdistance qu'on vient
-    // d'effacer, dès qu'une ponte « Rare »/« Beaucoup » serait signalée.
-    fireEvent.press(screen.getByText('Repos'));
-    fireEvent.press(screen.getAllByText('Néant')[1]);
-    fireEvent.press(screen.getByText('Vol clair'));
-    await settle();
 
     fireEvent.press(screen.getByText('Végétation & Sol  ›'));
 
-    await waitFor(() => expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalledTimes(1));
-    const [, row] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
-    expect(row).toMatchObject({ accouplement: 'Néant', ponte: 'Néant', interdistance: null });
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Interdistance requise',
+      expect.stringContaining("l'interdistance")
+    );
+    expect(prospectionRepository.saveProspectionPopulation).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
   });
 });
