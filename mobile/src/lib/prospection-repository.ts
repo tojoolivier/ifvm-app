@@ -241,6 +241,12 @@ export interface ExtensiveObservationsUpdateInput {
   futsRecues?: number | null;
   signatureVisaNom?: string | null;
   signatureVisaHorodatage?: string | null;
+  /** Auto-signature du prospecteur connecté, après « Remarques » — même
+   * mécanique VALIDER/MODIFIER que observations.tsx (Intensif) : nom auto-
+   * rempli (jamais ressaisi), tracé capturé au pavé de signature. Ces 2 modes
+   * (terrestre et aérien) partagent ce champ, contrairement aux signatures
+   * Consultant FAO/Chef de Base ci-dessous (mode aérien uniquement). */
+  signatureVisaImage?: string | null;
   signatureConsultantFaoNom?: string | null;
   signatureConsultantFaoHorodatage?: string | null;
   /** Tracé SVG du pavé de signature (#signatures-digitales-extensif-aerien) —
@@ -1024,7 +1030,7 @@ export async function updateProspectionExtensiveObservations(id: string, input: 
       pesticides_embarques = ?, pesticide_nom_commercial = ?,
       pesticide_quantite_disponible = ?, pesticide_quantite_recue = ?,
       futs_disponible = ?, futs_pleins = ?, futs_vides = ?, futs_recues = ?,
-      signature_visa_nom = ?, signature_visa_horodatage = ?,
+      signature_visa_nom = ?, signature_visa_horodatage = ?, signature_visa_image = ?,
       signature_consultant_fao_nom = ?, signature_consultant_fao_horodatage = ?, signature_consultant_fao_image = ?,
       signature_pilote_nom = ?, signature_pilote_horodatage = ?, signature_pilote_image = ?,
       signature_chef_base_nom = ?, signature_chef_base_horodatage = ?, signature_chef_base_image = ?,
@@ -1043,6 +1049,7 @@ export async function updateProspectionExtensiveObservations(id: string, input: 
       input.futsRecues ?? null,
       input.signatureVisaNom ?? null,
       input.signatureVisaHorodatage ?? null,
+      input.signatureVisaImage ?? null,
       input.signatureConsultantFaoNom ?? null,
       input.signatureConsultantFaoHorodatage ?? null,
       input.signatureConsultantFaoImage ?? null,
