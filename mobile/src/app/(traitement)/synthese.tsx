@@ -296,6 +296,16 @@ export default function SyntheseScreen() {
           <Text style={styles.derivedValue}>{display(cible?.surface_infestee_ha)}</Text>
         </Card>
 
+        {/* #zone-a-reprendre-surface-reste-a-traiter : uniquement pour une
+            fiche démarrée depuis « Zones à reprendre » — même affichage que
+            cibles.tsx (Terrestre), cf. son commentaire. */}
+        {cible?.surface_restante_origine_ha != null && (
+          <Card variant="derivee" style={styles.deriveeCentree}>
+            <Text style={styles.label}>Surface reste à traiter (ha)</Text>
+            <Text style={styles.derivedValue}>{display(cible.surface_restante_origine_ha)}</Text>
+          </Card>
+        )}
+
         <Text style={styles.sectionLabel}>Végétation</Text>
 
         <Text style={styles.fieldLabel}>Strate herbeuse (m) — pré-remplie, modifiable</Text>

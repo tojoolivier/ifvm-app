@@ -939,4 +939,11 @@ const COLONNES_CIBLE: readonly Colonne[] = [
   { name: 'densite_groupee_lmc', type: 'REAL' },
   { name: 'densite_diffuse_nse', type: 'REAL' },
   { name: 'densite_groupee_nse', type: 'REAL' },
+  // #zone-a-reprendre-surface-reste-a-traiter : uniquement pour une fiche
+  // démarrée depuis « Zones à reprendre » — la surface restante de la fiche
+  // d'origine au moment de la création (snapshot figé, comme le reste de la
+  // cible), jamais recalculée. `NULL` pour un traitement neuf sans lien.
+  // Purement local : jamais envoyée au serveur, qui reconstruit sa propre
+  // « cible » à partir des lignes population/infestation, pas de ce snapshot.
+  { name: 'surface_restante_origine_ha', type: 'REAL' },
 ];

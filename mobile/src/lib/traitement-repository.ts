@@ -100,6 +100,9 @@ export interface Cible {
   densite_groupee_lmc: number | null;
   densite_diffuse_nse: number | null;
   densite_groupee_nse: number | null;
+  /** #zone-a-reprendre-surface-reste-a-traiter : uniquement pour une fiche
+   * démarrée depuis « Zones à reprendre » — `null` pour un traitement neuf. */
+  surface_restante_origine_ha: number | null;
 }
 
 export interface TraitementAerien {
@@ -328,6 +331,7 @@ export interface CibleInput {
   densite_groupee_lmc?: number | null;
   densite_diffuse_nse?: number | null;
   densite_groupee_nse?: number | null;
+  surface_restante_origine_ha?: number | null;
 }
 
 export interface DraftTraitement extends DraftTraitementRow {
@@ -442,13 +446,14 @@ export async function genererNumeroFicheDisponible(
   typeTraitement: TypeTraitement,
   dateTraitementIso: string,
   excludeId?: string | null,
-  sigle?: string | null
+  sigle?: string | null,
+  estReprise?: boolean
 ): Promise<string> {
   const db = await getDb();
   let suffixe: number | null = null;
 
   for (let tentative = 0; tentative < MAX_TENTATIVES_NUMERO_FICHE; tentative++) {
-    const candidat = composerNumeroFiche(prenomChef, typeTraitement, dateTraitementIso, suffixe, sigle);
+    const candidat = composerNumeroFiche(prenomChef, typeTraitement, dateTraitementIso, suffixe, sigle, estReprise);
     const existant = await db.getFirstAsync<{ id: string }>(
       'SELECT id FROM traitement WHERE numero_fiche = ? AND (? IS NULL OR id != ?)',
       [candidat, excludeId ?? null, excludeId ?? null]
@@ -1017,8 +1022,9 @@ export async function saveCible(traitementId: string, input: CibleInput): Promis
       traitement_id, espece, petites_larves, grandes_larves,
       vols_clairs_essaims, repartition_population, surface_infestee_ha,
       petites_larves_lmc, petites_larves_nse, grandes_larves_lmc, grandes_larves_nse,
-      densite_diffuse_lmc, densite_groupee_lmc, densite_diffuse_nse, densite_groupee_nse
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      densite_diffuse_lmc, densite_groupee_lmc, densite_diffuse_nse, densite_groupee_nse,
+      surface_restante_origine_ha
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       traitementId,
       input.espece ?? null,
@@ -1035,6 +1041,7 @@ export async function saveCible(traitementId: string, input: CibleInput): Promis
       input.densite_groupee_lmc ?? null,
       input.densite_diffuse_nse ?? null,
       input.densite_groupee_nse ?? null,
+      input.surface_restante_origine_ha ?? null,
     ]
   );
 }

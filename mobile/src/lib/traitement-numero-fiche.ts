@@ -18,15 +18,23 @@ const LIBELLE_TYPE: Record<TypeTraitement, string> = {
  * ne connaît pas l'identité de l'appelant : ne s'applique qu'au numéro
  * généré ici, au moment normal de la création — pas au rare cas de collision
  * retentée par le serveur.
+ *
+ * #zone-a-reprendre-numero-annexe : « -ANNEXE » distingue au premier coup
+ * d'œil une fiche née de « Zones à reprendre » (même prospection/cible que
+ * l'origine, mais un nouveau traitement à part entière) — placé avant le
+ * suffixe de collision, jamais après (un « -2 » final reste la marque d'une
+ * collision, pas de la reprise elle-même).
  */
 export function composerNumeroFiche(
   prenomChef: string,
   typeTraitement: TypeTraitement,
   dateTraitementIso: string,
   suffixe?: number | null,
-  sigle?: string | null
+  sigle?: string | null,
+  estReprise?: boolean
 ): string {
   const sigleParts = sigle ? `-${sigle}` : '';
-  const base = `${prenomChef}-${LIBELLE_TYPE[typeTraitement]}-${dateTraitementIso.slice(0, 10)}${sigleParts}`;
+  const annexe = estReprise ? '-ANNEXE' : '';
+  const base = `${prenomChef}-${LIBELLE_TYPE[typeTraitement]}-${dateTraitementIso.slice(0, 10)}${sigleParts}${annexe}`;
   return suffixe ? `${base}-${suffixe}` : base;
 }

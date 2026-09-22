@@ -220,6 +220,8 @@ const MIGRATED_COLUMNS = [
   { name: 'densite_groupee_lmc' },
   { name: 'densite_diffuse_nse' },
   { name: 'densite_groupee_nse' },
+  // #zone-a-reprendre-surface-reste-a-traiter
+  { name: 'surface_restante_origine_ha' },
 ];
 
 const execAsync = jest.fn().mockResolvedValue(undefined);

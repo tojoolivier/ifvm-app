@@ -9,6 +9,15 @@ export interface FicheCardProps {
   code: string;
   typeBadge: BadgeStyle;
   subTypeBadge?: BadgeStyle | null;
+  /**
+   * Insigne complémentaire, indépendant du statut — #zone-a-reprendre-insigne :
+   * marque une fiche de traitement validée dont la surface restante n'est pas
+   * encore intégralement traitée, invitant à la reprendre depuis « Zones à
+   * reprendre ». Distinct de `subTypeBadge` (Terrestre/Aérien, jamais absent
+   * pour un traitement) et de `statutBadge` (toujours présent) : celui-ci est
+   * facultatif et n'apparaît que pour ce cas précis.
+   */
+  insigneBadge?: BadgeStyle | null;
   statutBadge: BadgeStyle;
   meta: string;
   extra?: string | null;
@@ -32,6 +41,7 @@ export function FicheCard({
   code,
   typeBadge,
   subTypeBadge,
+  insigneBadge,
   statutBadge,
   meta,
   extra,
@@ -55,6 +65,14 @@ export function FicheCard({
               <Text style={[styles.subTypeText, { color: subTypeBadge.color }]}>
                 {subTypeBadge.icon ? `${subTypeBadge.icon} ` : ''}
                 {subTypeBadge.label}
+              </Text>
+            </View>
+          )}
+          {insigneBadge && (
+            <View style={[styles.subTypeBadge, { backgroundColor: insigneBadge.bg }]}>
+              <Text style={[styles.subTypeText, { color: insigneBadge.color }]}>
+                {insigneBadge.icon ? `${insigneBadge.icon} ` : ''}
+                {insigneBadge.label}
               </Text>
             </View>
           )}

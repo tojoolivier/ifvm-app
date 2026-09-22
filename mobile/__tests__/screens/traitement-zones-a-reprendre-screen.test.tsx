@@ -85,6 +85,24 @@ describe('TraitementZonesAReprendreScreen', () => {
     });
   });
 
+  // #zone-a-reprendre-insigne
+  it('affiche l’insigne « REPRISE POSSIBLE » sur chaque fiche listée', async () => {
+    jest.mocked(traitementRepository.listReprenableTraitements).mockResolvedValue([
+      {
+        id: 'trait-1',
+        prospection_id: 'prosp-1',
+        numero_fiche: 'F-1',
+        type_traitement: 'TERRESTRE',
+        localite: 'Betioky',
+        surface_restante_ha: 3.5,
+      } as any,
+    ]);
+
+    await render(<TraitementZonesAReprendreScreen />);
+
+    expect(await screen.findByText('↻ REPRISE POSSIBLE')).toBeVisible();
+  });
+
   it('affiche un état vide quand aucune fiche n’est reprenable', async () => {
     jest.mocked(traitementRepository.listReprenableTraitements).mockResolvedValue([]);
 

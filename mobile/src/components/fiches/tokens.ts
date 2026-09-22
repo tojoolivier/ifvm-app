@@ -54,3 +54,17 @@ export const TRAITEMENT_SUBTYPE_BADGE_CONFIG: Record<string, BadgeStyle> = {
   AERIEN: { label: 'AÉRIEN', icon: '🚁', color: '#0891B2', bg: '#CFFAFE' },
   TERRESTRE: { label: 'TERRESTRE', icon: '🚜', color: '#166534', bg: '#DCFCE7' },
 };
+
+/**
+ * #zone-a-reprendre-insigne : insigne d'une fiche de traitement validée dont
+ * la surface restante n'est pas encore intégralement traitée — sur « Mes
+ * fiches » ET « Zones à reprendre » (`FicheCard.insigneBadge`), pour repérer
+ * au premier coup d'œil, sans ouvrir la liste dédiée, qu'un traitement mérite
+ * d'être repris.
+ */
+export const TRAITEMENT_INSIGNE_REPRISE: BadgeStyle = {
+  label: 'REPRISE POSSIBLE',
+  icon: '↻',
+  color: '#B45309',
+  bg: '#FEF3C7',
+};
