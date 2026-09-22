@@ -1,6 +1,10 @@
 /**
- * intensive-imagos.tsx (B-Imagos) : la densité diffuse/groupée reste obligatoire
- * (héritée de density.tsx) même une fois fusionnée dans le nouvel écran.
+ * intensive-imagos.tsx (B-Imagos) : la densité diffuse reste obligatoire dès
+ * qu'il y a des captures — mais plus à 0 capture (cf.
+ * intensive-imagos-densite-optionnelle-sans-capture.test.tsx, fichier séparé
+ * pour la même raison qu'ici) depuis #densite-diffuse-zero-si-sans-capture
+ * (demande explicite) : sans capture, la densité peut rester à 0/vide, comme
+ * les règles Phases/Stades ci-dessus (« cohérent par défaut » à 0 capture).
  *
  * Ce scénario vit dans son propre fichier — pas regroupé avec les autres tests de
  * cet écran — car un artefact de cet environnement de test (Windows, ce runner)
@@ -39,11 +43,10 @@ jest.mock('@/lib/referentiel-db', () => ({ listStadesGrille: jest.fn() }));
 
 /** `jest.useFakeTimers()` neutralise le chrono de l'écran (vrai `setInterval`,
  * 1s) : laissé actif, il tourne au-delà de la fin du test si le processus met
- * du temps à se terminer (CI partagée) et empêche Jest de sortir proprement —
- * un des facteurs du job `lint-mobile` qui traînait en CI sur cette suite. */
+ * du temps à se terminer (CI partagée) et empêche Jest de sortir proprement. */
 const settle = () => act(() => jest.advanceTimersByTimeAsync(20));
 
-describe('IntensiveImagosScreen — densités obligatoires', () => {
+describe('IntensiveImagosScreen — densité diffuse obligatoire dès qu’il y a des captures', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => {
     cleanup();
@@ -56,15 +59,33 @@ describe('IntensiveImagosScreen — densités obligatoires', () => {
     jest.mocked(referentielDb.listStadesGrille).mockImplementation(STADES_PAR_DEFAUT);
   });
 
-  it('bloque « Suivant » tant que les densités obligatoires manquent', async () => {
+  it('bloque « Suivant » tant que la densité diffuse manque, dès qu’un nombre de captures est saisi', async () => {
     useProspectionWizardStore.setState({ draft: draftLmcOnly(), captures: [] });
     const alertSpy = jest.spyOn(Alert, 'alert');
 
     await render(<IntensiveImagosScreen />);
-    await screen.findByText('Densité diffuse (ind./ha) *');
+    await screen.findByText('Type de cible');
     await settle();
 
+    fireEvent.changeText(screen.getByPlaceholderText('Saisir le nombre de captures'), '3');
+    await settle();
+
+    // Phases ET Stades cohérents avec les captures (règles bloquantes distinctes,
+    // cf. intensive-imagos-stade-bloque-suivant.test.tsx) : sans ça, « Suivant »
+    // est désactivé et n'atteint jamais la vérification de la densité diffuse.
+    // Ordre des « + » : 4 phases puis les stades ♀ — le 1er est Phases/Solitaire,
+    // le 5ᵉ (index 4) est Stades/A1.
+    for (let i = 0; i < 3; i++) {
+      fireEvent.press(screen.getAllByText('+')[0]);
+      await settle();
+    }
+    for (let i = 0; i < 3; i++) {
+      fireEvent.press(screen.getAllByText('+')[4]);
+      await settle();
+    }
+
     fireEvent.press(screen.getByText('Végétation & Sol  ›'));
+    await settle();
 
     expect(alertSpy).toHaveBeenCalledWith('Densité diffuse requise', expect.stringContaining('ind./ha'));
     expect(prospectionRepository.saveProspectionPopulation).not.toHaveBeenCalled();

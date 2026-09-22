@@ -62,7 +62,8 @@ describe('IntensiveImagosScreen — retour', () => {
     useProspectionWizardStore.setState({ draft: draftLmcOnly(), captures: [] });
 
     await render(<IntensiveImagosScreen />);
-    await screen.findByText('Densité diffuse (ind./ha) *');
+    // Pas d'astérisque : aucun total de captures saisi (0 par défaut, cf. #densite-diffuse-zero-si-sans-capture).
+    await screen.findByText('Densité diffuse (ind./ha)');
     fireEvent.press(screen.getByText('‹'));
 
     expect(mockBack).toHaveBeenCalled();
@@ -74,7 +75,8 @@ describe('IntensiveImagosScreen — retour', () => {
     useProspectionWizardStore.setState({ draft: draftLmcOnly(), captures: [] });
 
     await render(<IntensiveImagosScreen />);
-    await screen.findByText('Densité diffuse (ind./ha) *');
+    // Pas d'astérisque : aucun total de captures saisi (0 par défaut, cf. #densite-diffuse-zero-si-sans-capture).
+    await screen.findByText('Densité diffuse (ind./ha)');
     fireEvent.press(screen.getByText('‹'));
 
     expect(mockReplace).toHaveBeenCalledWith(expect.stringContaining('/(prospection)/species'));

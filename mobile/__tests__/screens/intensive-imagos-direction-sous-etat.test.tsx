@@ -1,23 +1,23 @@
 /**
- * intensive-imagos.tsx (B-Imagos) : une fois la grille imago validée, la fiche
- * route vers C-Larves (intensive-larves.tsx) si des larves sont aussi cochées.
+ * intensive-imagos.tsx (B-Imagos) : #direction-sous-etat — la section
+ * « Direction du déplacement » (visible seulement en État = Déplacement)
+ * s'affiche désormais SOUS « État », plus au-dessus, dans l'ordre de rendu.
  *
  * Fichier séparé des autres scénarios de cet écran — cf. le commentaire
  * d'intensive-imagos-densites-obligatoires.test.tsx pour le pourquoi.
  */
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react-native';
 import IntensiveImagosScreen from '@/app/(prospection)/intensive-imagos';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
 import * as prospectionRepository from '@/lib/prospection-repository';
 import * as referentielDb from '@/lib/referentiel-db';
-import { STADES_PAR_DEFAUT, draftLmcImagoAndLarve } from '../test-utils/intensive-imagos-fixtures';
+import { STADES_PAR_DEFAUT, draftLmcOnly } from '../test-utils/intensive-imagos-fixtures';
 
 const params: { draftId: string } = { draftId: 'draft-123' };
-const mockPush = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush, back: jest.fn(), replace: jest.fn(), canGoBack: () => true }),
+  useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: () => true }),
   useLocalSearchParams: () => params,
 }));
 
@@ -32,12 +32,9 @@ jest.mock('@/lib/prospection-repository', () => ({
 
 jest.mock('@/lib/referentiel-db', () => ({ listStadesGrille: jest.fn() }));
 
-/** `jest.useFakeTimers()` neutralise le chrono de l'écran (vrai `setInterval`,
- * 1s) : laissé actif, il tourne au-delà de la fin du test si le processus met
- * du temps à se terminer (CI partagée) et empêche Jest de sortir proprement. */
 const settle = () => act(() => jest.advanceTimersByTimeAsync(20));
 
-describe('IntensiveImagosScreen — routage vers C-Larves', () => {
+describe('IntensiveImagosScreen — Direction du déplacement sous État', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => {
     cleanup();
@@ -48,25 +45,25 @@ describe('IntensiveImagosScreen — routage vers C-Larves', () => {
     useProspectionCaptureStore.getState().setStadesParGrille({});
     jest.mocked(prospectionRepository.getProspectionPopulation).mockResolvedValue(null);
     jest.mocked(referentielDb.listStadesGrille).mockImplementation(STADES_PAR_DEFAUT);
-    mockPush.mockClear();
   });
 
-  it('route vers intensive-larves quand une grille larve est aussi cochée', async () => {
-    useProspectionWizardStore.setState({ draft: draftLmcImagoAndLarve(), captures: [] });
+  it('affiche « Direction du déplacement » après « État » une fois Déplacement sélectionné', async () => {
+    useProspectionWizardStore.setState({ draft: draftLmcOnly(), captures: [] });
 
     await render(<IntensiveImagosScreen />);
-    // Pas d'astérisque : aucun total de captures saisi (0 par défaut, cf. #densite-diffuse-zero-si-sans-capture).
-    await screen.findByText('Densité diffuse (ind./ha)');
+    await screen.findByText('Type de cible');
     await settle();
 
-    fireEvent.changeText(screen.getByTestId('densite-diffuse-input'), '10');
-    fireEvent.changeText(screen.getByTestId('densite-groupee-input'), '2');
+    fireEvent.press(screen.getByText('Déplacement'));
     await settle();
 
-    fireEvent.press(screen.getByText('Larves  ›'));
-
-    await waitFor(() =>
-      expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ pathname: '/(prospection)/intensive-larves' }))
-    );
+    // Le libellé « État » porte un enfant supplémentaire (astérisque conditionnel,
+    // vide ici puisqu'aucune capture n'a été saisie) : `children` est alors un
+    // tableau, à aplatir avant comparaison.
+    const texte = (enfants: unknown) => (Array.isArray(enfants) ? enfants.join('') : enfants);
+    const ordreTextes = screen
+      .getAllByText(/^(État|Direction du déplacement)$/)
+      .map((el) => texte(el.props.children));
+    expect(ordreTextes).toEqual(['État', 'Direction du déplacement']);
   });
 });

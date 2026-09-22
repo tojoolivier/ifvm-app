@@ -124,6 +124,16 @@ export default function ExtensiveImagosScreen() {
     }));
   };
 
+  /** #accouplement-neant-sans-interdistance : « Néant » efface l'interdistance (la
+   * section correspondante se masque, cf. rendu ci-dessous) — elle n'a de sens que
+   * si un accouplement (Rare/Beaucoup) a été observé. Même patron que
+   * handleEtatChange, qui efface la direction devenue sans objet. */
+  const handleAccouplementChange = (option: string) => {
+    const active = option === data.accouplement;
+    const next = active ? null : option;
+    updateSpeciesData(next === 'Néant' ? { accouplement: next, interdistance: '' } : { accouplement: next });
+  };
+
   const updatePhase = (key: PhaseKey, value: number) => {
     setSpeciesData((prev) => ({
       ...prev,
@@ -453,7 +463,7 @@ const handleContinue = () => {
                   return (
                     <TouchableOpacity
                       key={option}
-                      onPress={() => updateSpeciesData({ accouplement: active ? null : option })}
+                      onPress={() => handleAccouplementChange(option)}
                       style={[styles.chip, active && styles.chipActive]}
                       activeOpacity={0.8}
                     >
@@ -482,20 +492,24 @@ const handleContinue = () => {
               <Text style={styles.speciesHint}>Données spécifiques à {species}</Text>
             </View>
 
-            <View style={styles.densitySection}>
-              <Text style={styles.sectionLabel}>📊 Interdistance (m)</Text>
-              <View style={styles.card}>
-                <TextInput
-                  value={data.interdistance}
-                  onChangeText={(text) => updateSpeciesData({ interdistance: text })}
-                  keyboardType="decimal-pad"
-                  style={styles.inputMono}
-                  placeholder="0"
-                  placeholderTextColor={TEXT_SECONDARY}
-                />
+            {/* #accouplement-neant-sans-interdistance : masquée (et effacée par
+                handleAccouplementChange) dès que l'accouplement vaut « Néant ». */}
+            {data.accouplement !== 'Néant' && (
+              <View style={styles.densitySection}>
+                <Text style={styles.sectionLabel}>📊 Interdistance (m)</Text>
+                <View style={styles.card}>
+                  <TextInput
+                    value={data.interdistance}
+                    onChangeText={(text) => updateSpeciesData({ interdistance: text })}
+                    keyboardType="decimal-pad"
+                    style={styles.inputMono}
+                    placeholder="0"
+                    placeholderTextColor={TEXT_SECONDARY}
+                  />
+                </View>
+                <Text style={styles.speciesHint}>Données spécifiques à {species}</Text>
               </View>
-              <Text style={styles.speciesHint}>Données spécifiques à {species}</Text>
-            </View>
+            )}
 
             <View style={styles.typeSection}>
               <Text style={styles.sectionLabel}>📊 Type de cible</Text>
@@ -527,8 +541,28 @@ const handleContinue = () => {
               </View>
             </View>
 
-            {/* Direction du déplacement : n'a de sens qu'en État = Déplacement, comme côté
-                intensif (infestation.tsx, règle #4) — masquée (et effacée par
+            <View style={styles.typeSection}>
+              <Text style={styles.sectionLabel}>📊 État</Text>
+              <View style={styles.typeRow}>
+                {(['repos', 'deplacement'] as EtatImago[]).map((value) => {
+                  const active = data.etat === value;
+                  return (
+                    <TouchableOpacity
+                      key={value}
+                      style={[styles.typeButton, active && styles.typeButtonActive]}
+                      onPress={() => handleEtatChange(value)}
+                    >
+                      <Text style={[styles.typeButtonText, active && styles.typeButtonTextActive]}>
+                        {value === 'repos' ? 'Repos' : 'Déplacement'}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Direction du déplacement : n'a de sens qu'en État = Déplacement — placée
+                après État (#direction-sous-etat), masquée (et effacée par
                 handleEtatChange) tant que l'État n'est pas "Déplacement". */}
             {data.etat === 'deplacement' && (
               <View style={styles.densitySection}>
@@ -555,26 +589,6 @@ const handleContinue = () => {
                 <Text style={styles.speciesHint}>Données spécifiques à {species}</Text>
               </View>
             )}
-
-            <View style={styles.typeSection}>
-              <Text style={styles.sectionLabel}>📊 État</Text>
-              <View style={styles.typeRow}>
-                {(['repos', 'deplacement'] as EtatImago[]).map((value) => {
-                  const active = data.etat === value;
-                  return (
-                    <TouchableOpacity
-                      key={value}
-                      style={[styles.typeButton, active && styles.typeButtonActive]}
-                      onPress={() => handleEtatChange(value)}
-                    >
-                      <Text style={[styles.typeButtonText, active && styles.typeButtonTextActive]}>
-                        {value === 'repos' ? 'Repos' : 'Déplacement'}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
 
             <View style={styles.typeSection}>
               <Text style={styles.sectionLabel}>📊 Comportement de l&apos;essaim</Text>

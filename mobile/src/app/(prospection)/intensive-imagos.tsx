@@ -95,6 +95,13 @@ export default function IntensiveImagosScreen() {
   const [populationsLoaded, setPopulationsLoaded] = useState(false);
   const [totalCapturesInput, setTotalCapturesInput] = useState('');
   const [showDensiteDiffuseError, setShowDensiteDiffuseError] = useState(false);
+  // #accouplement-ponte-cible-etat-obligatoires : ces 4 choix deviennent obligatoires
+  // dès qu'il y a des captures — jamais à 0 (même logique que Phases/Stades ci-dessus,
+  // « cohérent par défaut » à 0 capture). Écran Intensif seulement : l'écran Extensif
+  // sert aussi aux fiches Signalement (type_prospection = 'validation', même composant),
+  // pour lesquelles cette obligation reproduirait le blocage de synchronisation déjà
+  // corrigé pour la densité diffuse (#densite-diffuse-obligatoire).
+  const [showRequiredChoicesError, setShowRequiredChoicesError] = useState(false);
 
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('intensive-imagos');
@@ -262,6 +269,16 @@ export default function IntensiveImagosScreen() {
     }));
   };
 
+  /** #accouplement-neant-sans-interdistance : « Néant » efface l'interdistance (la
+   * section correspondante se masque, cf. rendu ci-dessous) — elle n'a de sens que
+   * si un accouplement (Rare/Beaucoup) a été observé. Même patron que
+   * handleEtatChange, qui efface la direction devenue sans objet. */
+  const handleAccouplementChange = (value: string) => {
+    const active = value === population.accouplement;
+    const next = active ? null : value;
+    patchPopulation(next === 'Néant' ? { accouplement: next, interdistance: null } : { accouplement: next });
+  };
+
   /** Même logique que handleEtatChange dans extensive-imagos.tsx (et
    * infestation.tsx, règle #4) : le Comportement de l'essaim est entièrement
    * dérivé de l'État, jamais choisi indépendamment — appuyer à nouveau sur
@@ -290,13 +307,28 @@ export default function IntensiveImagosScreen() {
    * une règle bloquante échoue (mêmes règles qu'auparavant réparties entre
    * density.tsx/captures.tsx). */
   const commitCurrentGrille = async (): Promise<boolean> => {
-    if (population.densite_diffuse == null) {
+    // #densite-diffuse-zero-si-sans-capture : sans capture, la densité diffuse peut
+    // rester à 0/vide — l'obligation ne vaut que s'il y a au moins une capture.
+    if (totalCaptures > 0 && population.densite_diffuse == null) {
       setShowDensiteDiffuseError(true);
       Alert.alert('Densité diffuse requise', 'Veuillez renseigner la densité diffuse (ind./ha).');
       return false;
     }
     // Densité groupée : redevenue facultative (demande explicite) — plus de
     // blocage ici, cf. backend prospection_schemas.py (#densite-groupee-obligatoire).
+
+    if (totalCaptures > 0) {
+      const manque: string[] = [];
+      if (!population.accouplement) manque.push('Accouplement');
+      if (!population.ponte) manque.push('Ponte');
+      if (typeCible.length === 0) manque.push('Type de cible');
+      if (!population.etat) manque.push('État');
+      if (manque.length > 0) {
+        setShowRequiredChoicesError(true);
+        Alert.alert('Choix obligatoires manquants', `Veuillez renseigner : ${manque.join(', ')}.`);
+        return false;
+      }
+    }
 
     if (totalCaptures > 0) {
       if (!isPhasesConsistent) {
@@ -620,8 +652,15 @@ export default function IntensiveImagosScreen() {
             )}
 
             <View style={styles.fieldsRow}>
-              <View style={[styles.field, showDensiteDiffuseError && population.densite_diffuse == null && styles.fieldError]}>
-                <Text style={[styles.fieldLabel, styles.requiredLabel]}>Densité diffuse (ind./ha) *</Text>
+              <View
+                style={[
+                  styles.field,
+                  showDensiteDiffuseError && totalCaptures > 0 && population.densite_diffuse == null && styles.fieldError,
+                ]}
+              >
+                <Text style={[styles.fieldLabel, totalCaptures > 0 && styles.requiredLabel]}>
+                  Densité diffuse (ind./ha){totalCaptures > 0 ? ' *' : ''}
+                </Text>
                 <TextInput
                   testID="densite-diffuse-input"
                   value={population.densite_diffuse != null ? String(population.densite_diffuse) : ''}
@@ -641,7 +680,7 @@ export default function IntensiveImagosScreen() {
                 />
               </View>
             </View>
-            {showDensiteDiffuseError && population.densite_diffuse == null && (
+            {showDensiteDiffuseError && totalCaptures > 0 && population.densite_diffuse == null && (
               <Text style={styles.errorText}>Veuillez renseigner la densité diffuse (ind./ha).</Text>
             )}
 
@@ -662,14 +701,16 @@ export default function IntensiveImagosScreen() {
               })}
             </View>
 
-            <Text style={styles.sectionLabel}>Accouplement</Text>
+            <Text style={[styles.sectionLabel, totalCaptures > 0 && styles.requiredLabel]}>
+              Accouplement{totalCaptures > 0 ? ' *' : ''}
+            </Text>
             <View style={styles.chipsRow}>
               {accouplementOptionsFor(species).map((option) => {
                 const active = option === population.accouplement;
                 return (
                   <TouchableOpacity
                     key={option}
-                    onPress={() => setPopulationField('accouplement', active ? null : option)}
+                    onPress={() => handleAccouplementChange(option)}
                     style={[styles.chip, active && styles.chipActive]}
                     activeOpacity={0.8}
                   >
@@ -678,8 +719,13 @@ export default function IntensiveImagosScreen() {
                 );
               })}
             </View>
+            {showRequiredChoicesError && totalCaptures > 0 && !population.accouplement && (
+              <Text style={styles.errorText}>Accouplement obligatoire.</Text>
+            )}
 
-            <Text style={styles.sectionLabel}>Ponte</Text>
+            <Text style={[styles.sectionLabel, totalCaptures > 0 && styles.requiredLabel]}>
+              Ponte{totalCaptures > 0 ? ' *' : ''}
+            </Text>
             <View style={styles.chipsRow}>
               {accouplementOptionsFor(species).map((option) => {
                 const active = option === population.ponte;
@@ -696,20 +742,33 @@ export default function IntensiveImagosScreen() {
               })}
             </View>
 
-            <Text style={styles.sectionLabel}>Interdistance (m)</Text>
-            <View style={styles.field}>
-              <TextInput
-                testID="interdistance-input"
-                value={population.interdistance != null ? String(population.interdistance) : ''}
-                onChangeText={(text) => setPopulationField('interdistance', parseDensite(text))}
-                keyboardType="decimal-pad"
-                style={styles.fieldInput}
-                placeholder="0"
-                placeholderTextColor={TEXT_SECONDARY}
-              />
-            </View>
+            {showRequiredChoicesError && totalCaptures > 0 && !population.ponte && (
+              <Text style={styles.errorText}>Ponte obligatoire.</Text>
+            )}
 
-            <Text style={styles.sectionLabel}>Type de cible</Text>
+            {/* #accouplement-neant-sans-interdistance : masquée (et effacée par
+                handleAccouplementChange) dès que l'accouplement vaut « Néant » — elle
+                n'a de sens que si un accouplement a été observé. */}
+            {population.accouplement !== 'Néant' && (
+              <>
+                <Text style={styles.sectionLabel}>Interdistance (m)</Text>
+                <View style={styles.field}>
+                  <TextInput
+                    testID="interdistance-input"
+                    value={population.interdistance != null ? String(population.interdistance) : ''}
+                    onChangeText={(text) => setPopulationField('interdistance', parseDensite(text))}
+                    keyboardType="decimal-pad"
+                    style={styles.fieldInput}
+                    placeholder="0"
+                    placeholderTextColor={TEXT_SECONDARY}
+                  />
+                </View>
+              </>
+            )}
+
+            <Text style={[styles.sectionLabel, totalCaptures > 0 && styles.requiredLabel]}>
+              Type de cible{totalCaptures > 0 ? ' *' : ''}
+            </Text>
             <View style={styles.chipsRow}>
               {TYPE_CIBLE_IMAGO_OPTIONS.map((option) => {
                 const active = typeCible.includes(option.value);
@@ -725,10 +784,37 @@ export default function IntensiveImagosScreen() {
                 );
               })}
             </View>
+            {showRequiredChoicesError && totalCaptures > 0 && typeCible.length === 0 && (
+              <Text style={styles.errorText}>Type de cible obligatoire (au moins un).</Text>
+            )}
+
+            <Text style={[styles.sectionLabel, totalCaptures > 0 && styles.requiredLabel]}>
+              État{totalCaptures > 0 ? ' *' : ''}
+            </Text>
+            <View style={styles.chipsRow}>
+              {(['repos', 'deplacement'] as EtatImago[]).map((value) => {
+                const active = population.etat === value;
+                return (
+                  <TouchableOpacity
+                    key={value}
+                    onPress={() => handleEtatChange(value)}
+                    style={[styles.chip, active && styles.chipActive]}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                      {value === 'repos' ? 'Repos' : 'Déplacement'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {showRequiredChoicesError && totalCaptures > 0 && !population.etat && (
+              <Text style={styles.errorText}>État obligatoire.</Text>
+            )}
 
             {/* Direction du déplacement : n'a de sens qu'en État = Déplacement, comme
-                côté Extensif (extensive-imagos.tsx) et Infestation intensive — masquée
-                (et effacée par handleEtatChange) tant que l'État n'est pas "Déplacement". */}
+                côté Extensif (extensive-imagos.tsx) — placée après État (#direction-sous-etat),
+                masquée (et effacée par handleEtatChange) tant que l'État n'est pas "Déplacement". */}
             {population.etat === 'deplacement' && (
               <>
                 <Text style={styles.sectionLabel}>Direction du déplacement</Text>
@@ -753,25 +839,6 @@ export default function IntensiveImagosScreen() {
                 </View>
               </>
             )}
-
-            <Text style={styles.sectionLabel}>État</Text>
-            <View style={styles.chipsRow}>
-              {(['repos', 'deplacement'] as EtatImago[]).map((value) => {
-                const active = population.etat === value;
-                return (
-                  <TouchableOpacity
-                    key={value}
-                    onPress={() => handleEtatChange(value)}
-                    style={[styles.chip, active && styles.chipActive]}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                      {value === 'repos' ? 'Repos' : 'Déplacement'}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
 
             <Text style={styles.sectionLabel}>Comportement de l&apos;essaim</Text>
             <View style={styles.chipsRow}>
