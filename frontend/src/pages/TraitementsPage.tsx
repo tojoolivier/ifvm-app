@@ -7,7 +7,6 @@ import { NavTabs } from '@/components/ui/nav-tabs'
 import { PILL_TONES, Pill } from '@/components/ui/pill'
 import { MODE_LABELS, STATUS_LABELS, TYPE_LABELS } from '@/lib/traitement-labels'
 import {
-  compteurSignatures,
   formatSurface,
   libelleSurfaceTraitee,
   responsableTraitement,
@@ -34,7 +33,14 @@ interface Traitement {
     surface_restante_ha: number | null
   } | null
   terrestre: { surface_traitee_ha: number | null; surface_restante_ha: number | null } | null
+  // Utilisé uniquement par `responsableTraitement` (colonne Responsable) —
+  // la colonne Signatures elle-même a été retirée de cette liste : les
+  // signatures ne s'affichent plus que sur la fiche (TraitementDetailPage).
   signatures: { role: string; signataire_nom: string }[]
+  // Snapshot de la prospection liée (`Cible`, cf. `CibleRead` côté backend) —
+  // la surface infestée n'est jamais saisie côté traitement, elle vient de la
+  // fiche de prospection d'origine.
+  cible: { surface_infestee_ha: number | string | null } | null
 }
 
 /**
@@ -118,18 +124,31 @@ export function TraitementsPage() {
     { key: 'date', header: 'Date', mono: true, render: (t) => t.date_traitement },
     { key: 'responsable', header: 'Responsable', render: responsableTraitement },
     {
-      key: 'traitee',
-      // Une seule colonne pour les deux cas : un aérien en barrière *protège*
-      // sa surface au lieu de la traiter (cf. `libelleSurfaceTraitee`). Le mode
-      // est dans la colonne voisine ; l'infobulle nomme la valeur de la ligne.
-      header: 'Traitée / protégée (ha)',
+      // Snapshot de la prospection liée (`cible.surface_infestee_ha`) — c'est
+      // elle qui a déclenché ce traitement, jamais saisie ici.
+      key: 'infestee',
+      header: 'Surf. infestée (ha)',
       align: 'right',
       mono: true,
-      render: (t) => (
-        <span title={`Surface ${libelleSurfaceTraitee(t).toLowerCase()}`}>
-          {formatSurface(surfaceTraiteeOuProtegee(t))}
-        </span>
-      ),
+      render: (t) => formatSurface(t.cible?.surface_infestee_ha),
+    },
+    {
+      // Deux colonnes distinctes depuis la migration 0081 : un aérien en
+      // barrière *protège* sa surface au lieu de la traiter (cf.
+      // `libelleSurfaceTraitee`), jamais les deux à la fois — l'une des deux
+      // cellules est donc toujours à tiret.
+      key: 'traitee',
+      header: 'Surf. traitée (ha)',
+      align: 'right',
+      mono: true,
+      render: (t) => (libelleSurfaceTraitee(t) === 'Traitée' ? formatSurface(surfaceTraiteeOuProtegee(t)) : '—'),
+    },
+    {
+      key: 'protegee',
+      header: 'Surf. protégée (ha)',
+      align: 'right',
+      mono: true,
+      render: (t) => (libelleSurfaceTraitee(t) === 'Protégée' ? formatSurface(surfaceTraiteeOuProtegee(t)) : '—'),
     },
     {
       key: 'restante',
@@ -146,19 +165,6 @@ export function TraitementsPage() {
         return (
           <span className={enAlerte ? 'text-ifvm-amber-text' : 'text-[#16201a]'}>
             {formatSurface(restante)}
-          </span>
-        )
-      },
-    },
-    {
-      key: 'signatures',
-      header: 'Signatures',
-      mono: true,
-      render: (t) => {
-        const compteur = compteurSignatures(t.signatures)
-        return (
-          <span className={compteur.complet ? 'text-ifvm-green-text' : 'text-ifvm-amber-text'}>
-            {compteur.libelle}
           </span>
         )
       },
