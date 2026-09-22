@@ -771,10 +771,7 @@ def _erreur_membre_invalide(exc: Exception) -> HTTPException:
         )
     return HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail=(
-            "création de compte à la volée impossible pour cette fonction : "
-            f"{exc.args[0]} (seuls pilote, mécanicien et consultant international)"
-        ),
+        detail=f"création de compte à la volée impossible : {exc.args[0]}",
     )
 
 
@@ -906,7 +903,7 @@ async def ajouter_membre_equipe(
 
 # --- aeronef (hélicoptère d'une équipe aérienne, migration 0078) -------------------
 #
-# Pas de POST : un aéronef naît avec son équipe (POST /equipes-aeriennes, champ
+# Pas de POST : un aéronef naît avec son équipe (POST /equipes, champ
 # `aeronef`), jamais orphelin. Pas de DELETE : la sortie de service est `actif=false`.
 
 

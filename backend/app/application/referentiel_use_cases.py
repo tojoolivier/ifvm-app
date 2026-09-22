@@ -1019,9 +1019,16 @@ class ResoudreMembre:
             # que le projet autorise déjà à naître ainsi (#319) — un chef doit
             # préexister.
             if demande.fonction not in ROLES_A_LA_VOLEE:
-                raise CompteALaVoleeInterditError(demande.fonction)
+                raise CompteALaVoleeInterditError(
+                    f"fonction « {demande.fonction} » : seules "
+                    f"{', '.join(ROLES_A_LA_VOLEE)} naissent d'un simple nom"
+                )
             if not demande.nom:
-                raise CompteALaVoleeInterditError("nom requis pour un membre sans user_id")
+                # Inatteignable par l'API (`_exiger_compte_ou_identite` l'a déjà
+                # rejeté en 422) ; garde-fou pour un appel direct du cas d'usage.
+                raise CompteALaVoleeInterditError(
+                    "un membre sans user_id doit au moins porter un nom"
+                )
             utilisateur = await self.utilisateur_repo.creer_a_la_volee(
                 nom=demande.nom, prenom=demande.prenom or "", role=demande.fonction
             )

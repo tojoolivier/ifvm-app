@@ -29,6 +29,11 @@ Trois points structurants :
    de vérifier le mot de passe. Dédoublonnage par `(équipe, nom normalisé)`, chef
    compris : un même nom présent à la fois comme rôle nommé et comme membre ne crée
    qu'un compte, le rôle nommé l'emportant.
+   La contrepartie est assumée : la clé primaire `(equipe_id, user_id)` veut qu'une
+   personne n'occupe **qu'une** fonction par équipe, donc un chef de base saisi aussi
+   comme pilote de sa propre équipe reste `chef` et sa fonction `pilote` n'est pas
+   reprise. Aucune place dans le modèle ne peut l'accueillir ; la migration la
+   journalise (`RAISE NOTICE`) plutôt que de la perdre en silence.
 3. **Les FK entrantes deviennent composites et type-sûres.** `(equipe_id, equipe_type)
    -> equipe(id, type)`, la colonne `equipe_type` étant `GENERATED ALWAYS … STORED` à
    partir de la FK : aucune écriture applicative, donc aucune dérive possible. C'est ce
@@ -49,9 +54,13 @@ Revises: 0081
 Create Date: 2026-09-22
 """
 
+import logging
+
 import sqlalchemy as sa
 
 from alembic import op
+
+_log = logging.getLogger("alembic.runtime.migration")
 
 revision = "0082"
 down_revision = "0081"
@@ -249,25 +258,27 @@ def _migrer_membres() -> None:
             equipe_id,
             btrim(nom) AS nom_complet,
             fonction,
-            gen_random_uuid() AS user_id
+            gen_random_uuid() AS user_id,
+            -- Le chef a déjà été inséré à l'étape 1, avec son vrai compte. S'il figure
+            -- aussi en texte libre (comme pilote, ou dans la liste des membres), lui
+            -- créer un second compte dédoublerait son identité dans sa propre équipe.
+            EXISTS (
+                SELECT 1
+                FROM equipe_membre em
+                JOIN utilisateur u ON u.id = em.user_id
+                WHERE em.equipe_id = brut.equipe_id
+                  AND lower(btrim(brut.nom)) IN (
+                      lower(btrim(u.prenom || ' ' || u.nom)),
+                      lower(btrim(u.nom || ' ' || u.prenom)),
+                      lower(btrim(u.nom))
+                  )
+            ) AS deja_rattache
         FROM brut
-        -- Le chef a déjà été inséré à l'étape 1, avec son vrai compte : s'il figure
-        -- aussi en texte libre (comme pilote, ou dans la liste des membres), lui créer
-        -- un second compte dédoublerait son identité dans sa propre équipe.
-        WHERE NOT EXISTS (
-            SELECT 1
-            FROM equipe_membre em
-            JOIN utilisateur u ON u.id = em.user_id
-            WHERE em.equipe_id = brut.equipe_id
-              AND lower(btrim(brut.nom)) IN (
-                  lower(btrim(u.prenom || ' ' || u.nom)),
-                  lower(btrim(u.nom || ' ' || u.prenom)),
-                  lower(btrim(u.nom))
-              )
-        )
         ORDER BY equipe_id, lower(btrim(nom)), priorite
         """
     )
+
+    _journaliser_fonctions_absorbees()
 
     # 3. Un compte « identité seule » par nom retenu : `peut_se_connecter = false`,
     #    e-mail généré, `password_hash` vide — donc aucun mot de passe ne peut
@@ -296,14 +307,52 @@ def _migrer_membres() -> None:
             now(),
             now()
         FROM _membre_texte_libre
+        WHERE NOT deja_rattache
         """
     )
     op.execute(
         """
         INSERT INTO equipe_membre (equipe_id, user_id, fonction, created_at)
         SELECT equipe_id, user_id, fonction, now() FROM _membre_texte_libre
+        WHERE NOT deja_rattache
         """
     )
+
+
+def _journaliser_fonctions_absorbees() -> None:
+    """Nomme, dans la sortie d'`alembic upgrade`, chaque fonction texte libre qui n'a
+    pas pu être reprise.
+
+    Ce n'est pas un oubli rattrapable : la clé primaire `(equipe_id, user_id)` veut
+    qu'une personne n'occupe qu'une fonction dans une équipe donnée. Un chef de base
+    saisi par ailleurs comme pilote de sa propre équipe reste donc `chef`, et sa ligne
+    `pilote` disparaît — aucune place dans le modèle ne peut l'accueillir. Le seul choix
+    qui reste est entre la perdre en silence et le dire : `RAISE NOTICE` côté SQL
+    n'atteint pas la sortie d'alembic, d'où cette lecture côté Python.
+    """
+    lignes = (
+        op.get_bind()
+        .execute(
+            sa.text(
+                """
+                SELECT t.nom_complet, t.fonction, e.nom AS equipe_nom
+                FROM _membre_texte_libre t
+                JOIN equipe e ON e.id = t.equipe_id
+                WHERE t.deja_rattache
+                ORDER BY e.nom, t.nom_complet
+                """
+            )
+        )
+        .all()
+    )
+    for nom_complet, fonction, equipe_nom in lignes:
+        _log.warning(
+            "Migration 0082 : « %s » est déjà membre de l'équipe « %s » ; sa fonction "
+            "« %s » n'est pas reprise (une personne = une fonction par équipe).",
+            nom_complet,
+            equipe_nom,
+            fonction,
+        )
 
 
 def _retargeter_fk() -> None:

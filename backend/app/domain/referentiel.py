@@ -308,9 +308,12 @@ class MembreDejaDansEquipeError(Exception):
 
 
 class CompteALaVoleeInterditError(Exception):
-    """Un membre sans `user_id` demande la création d'un compte à la volée pour une
-    fonction qui ne l'autorise pas. Seuls `ROLES_A_LA_VOLEE` (pilote, mécanicien,
-    consultant international) sont créables ainsi : un chef doit préexister (#319)."""
+    """Un membre sans `user_id` ne peut pas recevoir de compte créé à la volée.
+
+    Seules les fonctions de `ROLES_A_LA_VOLEE` naissent d'un simple nom — un chef doit
+    préexister (#319). L'argument porte le message complet : la liste des fonctions
+    autorisées vit dans `ROLES_A_LA_VOLEE`, pas recopiée dans les couches au-dessus,
+    où elle se périme sans que rien ne le signale."""
 
     pass
 

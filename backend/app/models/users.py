@@ -25,8 +25,9 @@ ROLES = (
     "admin",
 )
 
-# Rôles créables "à la volée" (identité seule, compte non-authentifiable) depuis
-# le formulaire de traitement aérien. `chef_de_base` en est exclu à dessein :
+# Rôles créables "à la volée" (identité seule, compte non-authentifiable). Deux
+# appelants : le formulaire de traitement aérien (`POST /users/a-la-volee`) et l'ajout
+# d'un membre d'équipe sans compte (ADR-018). `chef_de_base` en est exclu à dessein :
 # il doit préexister (voir issue #319).
 ROLES_A_LA_VOLEE = ("pilote", "mecanicien", "consultant_international", "membre")
 

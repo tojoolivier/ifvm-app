@@ -28,6 +28,27 @@ async def equipes(equipe_aerienne, equipe_terrestre):
     return {"aerien": equipe_aerienne, "terrestre": equipe_terrestre}
 
 
+@pytest_asyncio.fixture
+async def chef_de_base_libre(db_session):
+    """Un second chef de base ne dirigeant aucune équipe — pour les tests qui créent
+    deux équipes aériennes et veulent isoler une violation *autre* que celle du chef."""
+    from app.auth import hash_password
+    from app.models.users import Utilisateur
+
+    chef = Utilisateur(
+        id=uuid.uuid4(),
+        nom="Rasolo",
+        prenom="Tiana",
+        email=f"tiana.rasolo+{uuid.uuid4().hex[:6]}@test.mg",
+        password_hash=hash_password("secret"),
+        role="chef_de_base",
+        actif=True,
+    )
+    db_session.add(chef)
+    await db_session.commit()
+    return chef
+
+
 def corps(type_equipe: str, chef_id, **extra) -> dict:
     """Corps minimal valide. L'aéronef n'est ajouté qu'en aérien, où il reste exigé
     (migration 0078) ; son immatriculation est unique par défaut, seuls les tests qui
@@ -57,16 +78,37 @@ async def test_create_equipe(client: AsyncClient, auth_headers: dict, type_equip
 
 @pytest.mark.parametrize("type_equipe", TYPES)
 @pytest.mark.asyncio
-async def test_create_equipe_sans_membres(client: AsyncClient, auth_headers: dict, type_equipe):
-    """Une équipe peut naître sans chef : le rattachement se fait ensuite, via
-    `POST /equipes/{id}/membres`."""
+async def test_create_equipe_sans_chef_422(client: AsyncClient, auth_headers: dict, type_equipe):
+    """Une équipe naît avec son chef, comme du temps où `chef_de_base_id` /
+    `chef_equipe_id` étaient NOT NULL : l'unification ne l'a pas rendu facultatif."""
     response = await client.post(
         "/equipes",
         json={**corps(type_equipe, uuid.uuid4()), "membres": []},
         headers=auth_headers,
     )
-    assert response.status_code == 201, response.text
-    assert response.json()["membres"] == []
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.parametrize("type_equipe", TYPES)
+@pytest.mark.asyncio
+async def test_create_equipe_avec_deux_chefs_422(
+    client: AsyncClient, auth_headers: dict, type_equipe, chefs
+):
+    """Refusé en amont plutôt qu'en violation de `uq_equipe_membre_chef_par_equipe`."""
+    chef = chefs[type_equipe]
+    response = await client.post(
+        "/equipes",
+        json=corps(
+            type_equipe,
+            chef.id,
+            membres=[
+                {"user_id": str(chef.id), "fonction": "chef"},
+                {"nom": "Autre", "prenom": "Chef", "fonction": "chef"},
+            ],
+        ),
+        headers=auth_headers,
+    )
+    assert response.status_code == 422, response.text
 
 
 @pytest.mark.parametrize("type_equipe", TYPES)
@@ -343,7 +385,7 @@ async def test_aeronef_refuse_sur_une_equipe_terrestre(
 
 @pytest.mark.asyncio
 async def test_immatriculation_deja_prise_409(
-    client: AsyncClient, auth_headers: dict, chef_de_base, chef_equipe
+    client: AsyncClient, auth_headers: dict, chef_de_base, chef_de_base_libre
 ):
     premiere = await client.post(
         "/equipes", json=corps("aerien", chef_de_base.id, aeronef=AERONEF), headers=auth_headers
@@ -351,7 +393,7 @@ async def test_immatriculation_deja_prise_409(
     assert premiere.status_code == 201, premiere.text
     response = await client.post(
         "/equipes",
-        json={"nom": "Deuxième", "type": "aerien", "aeronef": AERONEF},
+        json=corps("aerien", chef_de_base_libre.id, nom="Deuxième", aeronef=AERONEF),
         headers=auth_headers,
     )
     assert response.status_code == 409, response.text

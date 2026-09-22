@@ -376,6 +376,22 @@ class EquipeCreate(BaseModel):
     membres: list[MembreEquipeCreate] = Field(default_factory=list)
 
     @model_validator(mode="after")
+    def _exiger_un_chef_et_un_seul(self) -> "EquipeCreate":
+        """Une équipe naît avec son chef, comme du temps où `chef_de_base_id` /
+        `chef_equipe_id` étaient NOT NULL : l'unification en `equipe_membre` ne devait
+        pas rendre le chef facultatif. Une équipe sans chef est d'ailleurs inutilisable
+        — `_resoudre_equipe_creation` refuse ensuite la création de ses lieux.
+
+        L'unicité, elle, est déjà tenue en base (`uq_equipe_membre_chef_par_equipe`) ;
+        la vérifier ici n'en fait qu'un 422 explicite plutôt qu'un 409 de contrainte."""
+        chefs = [m for m in self.membres if m.fonction == "chef"]
+        if not chefs:
+            raise ValueError("une équipe doit avoir un membre de fonction 'chef'")
+        if len(chefs) > 1:
+            raise ValueError("une équipe n'a qu'un seul chef")
+        return self
+
+    @model_validator(mode="after")
     def _aeronef_suit_le_type(self) -> "EquipeCreate":
         """L'aéronef suit exactement le type : exigé en aérien (règle inchangée depuis
         la migration 0078), interdit en terrestre (`ck_equipe_aeronef_reserve_aerien`)."""
