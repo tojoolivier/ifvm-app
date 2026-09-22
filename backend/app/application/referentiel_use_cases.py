@@ -1,12 +1,15 @@
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from app.domain.campagne import Campagne
 from app.domain.referentiel import (
     TYPES_LIEU_AERIEN,
     Aeronef,
+    AeronefDejaAffecteError,
     AeronefIntrouvableError,
+    AffectationAeronef,
+    AffectationAeronefIntrouvableError,
     BaseAerienne,
     BaseAerienneEquipeInvalideError,
     BaseAerienneParentInvalideError,
@@ -19,13 +22,16 @@ from app.domain.referentiel import (
     Culture,
     Equipe,
     EquipeAerienneIntrouvableError,
+    EquipeDejaEquipeeError,
     EquipeIntrouvableError,
+    EquipeNonAerienneError,
     EquipeNonAutoriseeError,
     EquipeRequiseError,
     EquipeTerrestreIntrouvableError,
     GrilleDejaOccupeeError,
     LieuAerien,
     MembreEquipe,
+    PeriodeAffectationInvalideError,
     Pesticide,
     PosteAcridien,
     PosteAcridienAvecStationsActivesError,
@@ -48,6 +54,7 @@ from app.domain.repositories import (
     CodeStadeRepository,
     CommuneRepository,
     CultureRepository,
+    EquipeAeronefRepository,
     EquipeRepository,
     LieuAerienRepository,
     PesticideRepository,
@@ -1129,6 +1136,110 @@ class AjouterMembreEquipe:
             raise EquipeIntrouvableError(str(equipe_id))
         membre = await self.resoudre_membre.execute(equipe_id, equipe.type, demande)
         return await self.repository.ajouter_membre(membre)
+
+
+class ListerAffectationsAeronef:
+    """Historique des appareils d'une équipe, affectation en cours d'abord (#603)."""
+
+    def __init__(self, equipe_repo: EquipeRepository, repository: EquipeAeronefRepository):
+        self.equipe_repo = equipe_repo
+        self.repository = repository
+
+    async def execute(self, equipe_id: uuid.UUID) -> list[AffectationAeronef]:
+        if await self.equipe_repo.get_by_id(equipe_id) is None:
+            raise EquipeIntrouvableError(str(equipe_id))
+        return await self.repository.list_par_equipe(equipe_id)
+
+
+class AffecterAeronef:
+    """Affecte un appareil à une équipe à partir d'une date (#603).
+
+    C'est ici que vit la règle « un aéronef sur une seule équipe à la fois » — et sa
+    symétrique « une équipe n'a qu'un appareil à la fois ». Aucune des deux n'est un
+    `UNIQUE` : elles portent sur le chevauchement d'intervalles, que seul
+    `EXCLUDE USING gist` exprimerait en SQL (hors scope, ADR-018). Les index partiels
+    de la migration 0083 ne rattrapent que les courses entre deux requêtes."""
+
+    def __init__(
+        self,
+        equipe_repo: EquipeRepository,
+        aeronef_repo: AeronefRepository,
+        repository: EquipeAeronefRepository,
+    ):
+        self.equipe_repo = equipe_repo
+        self.aeronef_repo = aeronef_repo
+        self.repository = repository
+
+    async def execute(
+        self,
+        equipe_id: uuid.UUID,
+        aeronef_id: uuid.UUID,
+        date_debut: date,
+        date_fin: date | None = None,
+    ) -> AffectationAeronef:
+        equipe = await self.equipe_repo.get_by_id(equipe_id)
+        if equipe is None:
+            raise EquipeIntrouvableError(str(equipe_id))
+        if equipe.type != "aerien":
+            raise EquipeNonAerienneError(str(equipe_id))
+        if await self.aeronef_repo.get_by_id(aeronef_id) is None:
+            raise AeronefIntrouvableError(str(aeronef_id))
+        if date_fin is not None and date_fin < date_debut:
+            raise PeriodeAffectationInvalideError(f"{date_fin} < {date_debut}")
+
+        for existante in await self.repository.list_chevauchements(
+            date_debut=date_debut, date_fin=date_fin, equipe_id=equipe_id, aeronef_id=aeronef_id
+        ):
+            if existante.aeronef_id == aeronef_id:
+                raise AeronefDejaAffecteError(str(aeronef_id))
+            raise EquipeDejaEquipeeError(str(equipe_id))
+
+        maintenant = datetime.now(timezone.utc)
+        return await self.repository.create(
+            AffectationAeronef(
+                id=uuid.uuid4(),
+                equipe_id=equipe_id,
+                aeronef_id=aeronef_id,
+                date_debut=date_debut,
+                date_fin=date_fin,
+                created_at=maintenant,
+            )
+        )
+
+
+class CloturerAffectationAeronef:
+    """Retire un appareil d'une équipe en bornant son affectation (#603).
+
+    Seule `date_fin` bouge, et l'affectation reste : c'est ce qui distingue « cet
+    appareil a servi jusqu'au 12 » de « cet appareil n'a jamais servi »."""
+
+    def __init__(self, repository: EquipeAeronefRepository):
+        self.repository = repository
+
+    async def execute(
+        self, equipe_id: uuid.UUID, affectation_id: uuid.UUID, date_fin: date
+    ) -> AffectationAeronef:
+        affectation = await self.repository.get_by_id(affectation_id)
+        if affectation is None or affectation.equipe_id != equipe_id:
+            raise AffectationAeronefIntrouvableError(str(affectation_id))
+        if date_fin < affectation.date_debut:
+            raise PeriodeAffectationInvalideError(f"{date_fin} < {affectation.date_debut}")
+
+        # Clôturer ne peut que libérer du temps, sauf si la période était déjà bornée
+        # *plus tôt* : on la rallonge alors, et le chevauchement redevient possible.
+        for existante in await self.repository.list_chevauchements(
+            date_debut=affectation.date_debut,
+            date_fin=date_fin,
+            equipe_id=equipe_id,
+            aeronef_id=affectation.aeronef_id,
+            sauf_id=affectation.id,
+        ):
+            if existante.aeronef_id == affectation.aeronef_id:
+                raise AeronefDejaAffecteError(str(affectation.aeronef_id))
+            raise EquipeDejaEquipeeError(str(equipe_id))
+
+        affectation.date_fin = date_fin
+        return await self.repository.update(affectation)
 
 
 class ListAeronefs:

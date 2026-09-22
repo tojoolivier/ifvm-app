@@ -486,6 +486,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/equipes/{equipe_id}/aeronefs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Affectations Aeronef */
+        get: operations["list_affectations_aeronef_equipes__equipe_id__aeronefs_get"];
+        put?: never;
+        /** Affecter Aeronef */
+        post: operations["affecter_aeronef_equipes__equipe_id__aeronefs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/equipes/{equipe_id}/aeronefs/{affectation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Cloturer Affectation Aeronef */
+        put: operations["cloturer_affectation_aeronef_equipes__equipe_id__aeronefs__affectation_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/aeronefs": {
         parameters: {
             query?: never;
@@ -496,7 +531,8 @@ export interface paths {
         /** List Aeronefs */
         get: operations["list_aeronefs_aeronefs_get"];
         put?: never;
-        post?: never;
+        /** Create Aeronef */
+        post: operations["create_aeronef_aeronefs_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -510,7 +546,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Get Aeronef */
+        get: operations["get_aeronef_aeronefs__aeronef_id__get"];
         /** Update Aeronef */
         put: operations["update_aeronef_aeronefs__aeronef_id__put"];
         post?: never;
@@ -1031,8 +1068,8 @@ export interface components {
         ActionAudit: "creation" | "modification" | "soumission" | "verification" | "validation" | "rejet" | "commentaire";
         /**
          * AeronefCreate
-         * @description Aéronef créé avec son équipe (`EquipeAerienneCreate.aeronef`) — pas d'endpoint de
-         *     création isolé : un aéronef n'existe pas sans équipe.
+         * @description Corps de `POST /aeronefs` (#621), et forme imbriquée de `EquipeCreate.aeronef`
+         *     pour les formulaires qui saisissent l'appareil en même temps que l'équipe.
          */
         AeronefCreate: {
             /** Immatriculation */
@@ -1081,6 +1118,71 @@ export interface components {
             volume_cuve_l?: number | null;
             /** Actif */
             actif?: boolean | null;
+        };
+        /**
+         * AffectationAeronefCloture
+         * @description Retrait d'un appareil : on borne la période, on n'efface pas la ligne.
+         */
+        AffectationAeronefCloture: {
+            /**
+             * Date Fin
+             * Format: date
+             */
+            date_fin: string;
+        };
+        /**
+         * AffectationAeronefCreate
+         * @description `date_debut` est explicite : une affectation est saisie après coup aussi souvent
+         *     qu'en temps réel, et la dater du jour de la saisie fausserait l'historique.
+         */
+        AffectationAeronefCreate: {
+            /**
+             * Aeronef Id
+             * Format: uuid
+             */
+            aeronef_id: string;
+            /**
+             * Date Debut
+             * Format: date
+             */
+            date_debut: string;
+            /** Date Fin */
+            date_fin?: string | null;
+        };
+        /**
+         * AffectationAeronefRead
+         * @description Période pendant laquelle un appareil a servi dans une équipe (#603).
+         *     `date_fin: null` désigne l'affectation en cours.
+         */
+        AffectationAeronefRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Equipe Id
+             * Format: uuid
+             */
+            equipe_id: string;
+            /**
+             * Aeronef Id
+             * Format: uuid
+             */
+            aeronef_id: string;
+            /**
+             * Date Debut
+             * Format: date
+             */
+            date_debut: string;
+            /** Date Fin */
+            date_fin?: string | null;
+            aeronef?: components["schemas"]["AeronefRead"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** AuditLogRead */
         AuditLogRead: {
@@ -1714,6 +1816,8 @@ export interface components {
              */
             type: "terrestre" | "aerien";
             aeronef?: components["schemas"]["AeronefCreate"] | null;
+            /** Aeronef Id */
+            aeronef_id?: string | null;
             /** Membres */
             membres?: components["schemas"]["MembreEquipeCreate"][];
         };
@@ -5707,6 +5811,108 @@ export interface operations {
             };
         };
     };
+    list_affectations_aeronef_equipes__equipe_id__aeronefs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                equipe_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AffectationAeronefRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    affecter_aeronef_equipes__equipe_id__aeronefs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                equipe_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AffectationAeronefCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AffectationAeronefRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cloturer_affectation_aeronef_equipes__equipe_id__aeronefs__affectation_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                equipe_id: string;
+                affectation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AffectationAeronefCloture"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AffectationAeronefRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_aeronefs_aeronefs_get: {
         parameters: {
             query?: {
@@ -5726,6 +5932,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AeronefRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_aeronef_aeronefs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AeronefCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AeronefRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_aeronef_aeronefs__aeronef_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                aeronef_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AeronefRead"];
                 };
             };
             /** @description Validation Error */

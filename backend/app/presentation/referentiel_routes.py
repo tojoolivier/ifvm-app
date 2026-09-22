@@ -6,7 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.referentiel_use_cases import (
+    AffecterAeronef,
     AjouterMembreEquipe,
+    CloturerAffectationAeronef,
     CreateAeronef,
     CreateBaseAerienne,
     CreateCodeStade,
@@ -34,6 +36,7 @@ from app.application.referentiel_use_cases import (
     ListCommunes,
     ListCultures,
     ListEquipes,
+    ListerAffectationsAeronef,
     ListLieuxAeriens,
     ListPesticides,
     ListPostesAcridiens,
@@ -61,6 +64,7 @@ from app.domain.referentiel import (
     Aeronef,
     AeronefDejaAffecteError,
     AeronefIntrouvableError,
+    AffectationAeronefIntrouvableError,
     BaseAerienneEquipeInvalideError,
     BaseAerienneParentInvalideError,
     ChefDejaDansUneAutreEquipeError,
@@ -71,7 +75,9 @@ from app.domain.referentiel import (
     EquipeADejaUnChefError,
     EquipeAerienneDejaAssigneeError,
     EquipeAerienneIntrouvableError,
+    EquipeDejaEquipeeError,
     EquipeIntrouvableError,
+    EquipeNonAerienneError,
     EquipeNonAutoriseeError,
     EquipeRequiseError,
     EquipeTerrestreIntrouvableError,
@@ -80,6 +86,7 @@ from app.domain.referentiel import (
     MembreDejaDansEquipeError,
     NumeroBaseAerienneDejaPrisError,
     NumeroStandRemplissageDejaPrisError,
+    PeriodeAffectationInvalideError,
     PosteAcridienAvecStationsActivesError,
     PosteAcridienInactifError,
     PosteAcridienIntrouvableError,
@@ -101,6 +108,7 @@ from app.infrastructure.referentiel_sync_repository import (
     BaseAerienneRepositoryImpl,
     CodeStadeRepositoryImpl,
     CultureRepositoryImpl,
+    EquipeAeronefRepositoryImpl,
     EquipeRepositoryImpl,
     LieuAerienRepositoryImpl,
     PesticideRepositoryImpl,
@@ -113,6 +121,9 @@ from app.presentation.referentiel_schemas import (
     AeronefCreate,
     AeronefRead,
     AeronefUpdate,
+    AffectationAeronefCloture,
+    AffectationAeronefCreate,
+    AffectationAeronefRead,
     BaseAerienneCreate,
     BaseAerienneRead,
     BaseAerienneUpdate,
@@ -778,6 +789,20 @@ def _erreur_membre_invalide(exc: Exception) -> HTTPException:
     )
 
 
+def _erreur_affectation(exc: Exception) -> HTTPException:
+    """422 pour toutes : ce ne sont pas des collisions de clé mais des périodes qui ne
+    tiennent pas ensemble — le corps est recevable, le calendrier ne l'est pas (#603)."""
+    if isinstance(exc, AeronefDejaAffecteError):
+        detail = f"aéronef déjà affecté sur une période qui se chevauche : {exc.args[0]}"
+    elif isinstance(exc, EquipeDejaEquipeeError):
+        detail = f"l'équipe a déjà un aéronef sur cette période : {exc.args[0]}"
+    elif isinstance(exc, EquipeNonAerienneError):
+        detail = f"un aéronef ne s'affecte qu'à une équipe aérienne : {exc.args[0]}"
+    else:
+        detail = f"période d'affectation invalide : {exc.args[0]}"
+    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detail)
+
+
 def _demande(membre: MembreEquipeCreate) -> MembreDemande:
     return MembreDemande(
         fonction=membre.fonction, user_id=membre.user_id, nom=membre.nom, prenom=membre.prenom
@@ -909,6 +934,90 @@ async def ajouter_membre_equipe(
         MembreDejaDansEquipeError,
     ) as exc:
         raise _conflit_membre(exc) from exc
+
+
+# --- affectations d'aéronefs (equipe_aeronef, migration 0083, #603) ---------------
+#
+# Une équipe aérienne dispose de 2 à 3 appareils utilisés l'un après l'autre. Affecter
+# ouvre une période, retirer la borne ; la ligne reste, c'est l'historique. Pas de
+# DELETE : une affectation effacée ne se distinguerait plus d'une qui n'a jamais eu
+# lieu.
+
+
+@router.get("/equipes/{equipe_id}/aeronefs", response_model=list[AffectationAeronefRead])
+async def list_affectations_aeronef(
+    equipe_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = ListerAffectationsAeronef(EquipeRepositoryImpl(db), EquipeAeronefRepositoryImpl(db))
+    try:
+        return await use_case.execute(equipe_id)
+    except EquipeIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Équipe non trouvée"
+        ) from exc
+
+
+@router.post(
+    "/equipes/{equipe_id}/aeronefs", response_model=AffectationAeronefRead, status_code=201
+)
+async def affecter_aeronef(
+    equipe_id: uuid.UUID,
+    body: AffectationAeronefCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = AffecterAeronef(
+        EquipeRepositoryImpl(db), AeronefRepositoryImpl(db), EquipeAeronefRepositoryImpl(db)
+    )
+    try:
+        return await use_case.execute(
+            equipe_id=equipe_id,
+            aeronef_id=body.aeronef_id,
+            date_debut=body.date_debut,
+            date_fin=body.date_fin,
+        )
+    except EquipeIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Équipe non trouvée"
+        ) from exc
+    except AeronefIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"aéronef inconnu : {exc.args[0]}"
+        ) from exc
+    except (
+        EquipeNonAerienneError,
+        AeronefDejaAffecteError,
+        EquipeDejaEquipeeError,
+        PeriodeAffectationInvalideError,
+    ) as exc:
+        raise _erreur_affectation(exc) from exc
+
+
+@router.put("/equipes/{equipe_id}/aeronefs/{affectation_id}", response_model=AffectationAeronefRead)
+async def cloturer_affectation_aeronef(
+    equipe_id: uuid.UUID,
+    affectation_id: uuid.UUID,
+    body: AffectationAeronefCloture,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = CloturerAffectationAeronef(EquipeAeronefRepositoryImpl(db))
+    try:
+        return await use_case.execute(
+            equipe_id=equipe_id, affectation_id=affectation_id, date_fin=body.date_fin
+        )
+    except AffectationAeronefIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Affectation non trouvée"
+        ) from exc
+    except (
+        AeronefDejaAffecteError,
+        EquipeDejaEquipeeError,
+        PeriodeAffectationInvalideError,
+    ) as exc:
+        raise _erreur_affectation(exc) from exc
 
 
 # --- aeronef (parc d'hélicoptères, migration 0078 ; référentiel autonome #621) -----

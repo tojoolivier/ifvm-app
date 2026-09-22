@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime, timezone
 
 
 class StationNotFoundError(Exception):
@@ -343,8 +343,42 @@ class AeronefIntrouvableError(Exception):
 
 
 class AeronefDejaAffecteError(Exception):
-    """L'aéronef référencé est déjà affecté à une autre équipe aérienne (UNIQUE
-    `equipe_aerienne.aeronef_id`, un aéronef = une équipe)."""
+    """L'aéronef est déjà affecté sur une période qui chevauche celle demandée (#603).
+
+    La règle n'est pas « un aéronef = une équipe » mais « un aéronef sur une seule
+    équipe *à la fois* » : elle porte sur le chevauchement des intervalles
+    `[date_debut, date_fin)`, et se valide côté application — `EXCLUDE USING gist` est
+    hors scope (ADR-018)."""
+
+    pass
+
+
+class EquipeDejaEquipeeError(Exception):
+    """L'équipe a déjà un appareil affecté sur une période qui chevauche celle demandée.
+
+    Symétrique de `AeronefDejaAffecteError` : les appareils d'une équipe se succèdent
+    (#603), ils ne se cumulent pas. Sans cette règle l'« affectation active » n'aurait
+    pas de sens, deux lignes pouvant être ouvertes en même temps."""
+
+    pass
+
+
+class AffectationAeronefIntrouvableError(Exception):
+    """`affectation_id` ne référence aucune affectation de cette équipe."""
+
+    pass
+
+
+class PeriodeAffectationInvalideError(ValueError):
+    """`date_fin` est antérieure à `date_debut` (CHECK `ck_equipe_aeronef_periode`)."""
+
+    pass
+
+
+class EquipeNonAerienneError(Exception):
+    """Un appareil ne s'affecte qu'à une équipe aérienne — ce que portait le CHECK
+    `ck_equipe_aeronef_reserve_aerien`, et que porte désormais la FK composite
+    `(equipe_id, equipe_type) -> equipe(id, type)`."""
 
     pass
 
@@ -379,6 +413,39 @@ class Aeronef:
 
 
 @dataclass
+class AffectationAeronef:
+    """Période pendant laquelle un aéronef est affecté à une équipe (#603, migration
+    0083).
+
+    Remplace la FK 1:1 `equipe.aeronef_id` : une équipe dispose de 2 à 3 appareils
+    qu'elle utilise l'un après l'autre, et on veut pouvoir dire lequel était en service
+    à quelle date. L'intervalle est semi-ouvert `[date_debut, date_fin)` ;
+    `date_fin is None` désigne l'affectation en cours.
+
+    `aeronef` est résolu par jointure à la lecture — l'historique d'une équipe se lit
+    avec les immatriculations, pas avec des identifiants nus."""
+
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    equipe_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    aeronef_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    date_debut: date = field(default_factory=lambda: datetime.now(timezone.utc).date())
+    date_fin: date | None = None
+    aeronef: Aeronef | None = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+
+    def est_ouverte(self) -> bool:
+        return self.date_fin is None
+
+    def chevauche(self, date_debut: date, date_fin: date | None) -> bool:
+        """Deux intervalles semi-ouverts se chevauchent si chacun commence avant que
+        l'autre ne finisse ; `None` en fin vaut « pas de fin », donc `+infini`."""
+        fin_a = self.date_fin
+        return (fin_a is None or fin_a > date_debut) and (
+            date_fin is None or date_fin > self.date_debut
+        )
+
+
+@dataclass
 class MembreEquipe:
     """Appartenance d'un utilisateur à une équipe, avec sa fonction (ADR-018).
 
@@ -403,8 +470,15 @@ class Equipe:
     `type` n'est pas modifiable après création — garanti par son absence de
     `EquipeUpdate`, pas par un trigger.
 
-    `aeronef_id` ne vaut que pour une équipe aérienne (1:1, comme l'ancienne
-    `equipe_aerienne.aeronef_id`) ; #603 le remplacera par des affectations datées."""
+    `aeronef_id` / `aeronef` ne sont plus des colonnes depuis #603 : ce sont les champs
+    *dérivés* de l'affectation en cours (`equipe_aeronef` avec `date_fin IS NULL`), et
+    ils valent `None` pour une équipe momentanément sans appareil. Ils survivent sous ce
+    nom pour que le contrat lu par le mobile et le web ne bouge pas ; l'historique
+    complet, lui, se lit par `GET /equipes/{id}/aeronefs`.
+
+    En écriture (`EquipeRepository.create` uniquement), `aeronef` demande la création de
+    l'appareil et `aeronef_id` en désigne un du référentiel ; dans les deux cas une
+    affectation ouverte est posée dans la même transaction."""
 
     id: uuid.UUID = field(default_factory=uuid.uuid4)
     nom: str = ""

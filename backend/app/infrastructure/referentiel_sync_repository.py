@@ -1,14 +1,15 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.domain.referentiel import (
     Aeronef,
     AeronefDejaAffecteError,
+    AffectationAeronef,
     BaseAerienne,
     BaseAerienneEquipeInvalideError,
     ChefDejaDansUneAutreEquipeError,
@@ -18,12 +19,14 @@ from app.domain.referentiel import (
     EquipeADejaUnChefError,
     EquipeAerienneDejaAssigneeError,
     EquipeAerienneIntrouvableError,
+    EquipeDejaEquipeeError,
     ImmatriculationAeronefDejaPriseError,
     LieuAerien,
     MembreDejaDansEquipeError,
     MembreEquipe,
     NumeroBaseAerienneDejaPrisError,
     NumeroStandRemplissageDejaPrisError,
+    PeriodeAffectationInvalideError,
     Pesticide,
     StandRemplissage,
     UtilisateurEquipe,
@@ -33,6 +36,7 @@ from app.domain.repositories import (
     BaseAerienneRepository,
     CodeStadeRepository,
     CultureRepository,
+    EquipeAeronefRepository,
     EquipeRepository,
     LieuAerienRepository,
     PesticideRepository,
@@ -44,6 +48,7 @@ from app.infrastructure.referentiel_model import (
     BaseAerienneModel,
     CodeStadeModel,
     CultureModel,
+    EquipeAeronefModel,
     EquipeMembreModel,
     EquipeModel,
     LieuAerienModel,
@@ -445,16 +450,20 @@ class EquipeRepositoryImpl(EquipeRepository):
 
     _CHARGEMENT = (
         selectinload(EquipeModel.membres).joinedload(EquipeMembreModel.utilisateur),
-        selectinload(EquipeModel.aeronef),
+        selectinload(EquipeModel.affectations_aeronef).joinedload(EquipeAeronefModel.aeronef),
     )
 
     def _to_domain(self, model: EquipeModel) -> Equipe:
+        # `aeronef_id` / `aeronef` ne sont plus des colonnes (#603) : ils projettent
+        # l'affectation en cours, celle dont `date_fin IS NULL`. Une équipe entre deux
+        # appareils les voit à `None`, ce que le 1:1 ne savait pas exprimer.
+        active = next((a for a in model.affectations_aeronef if a.date_fin is None), None)
         return Equipe(
             id=model.id,
             nom=model.nom,
             type=model.type,
-            aeronef_id=model.aeronef_id,
-            aeronef=_aeronef_to_domain(model.aeronef) if model.aeronef is not None else None,
+            aeronef_id=active.aeronef_id if active is not None else None,
+            aeronef=_aeronef_to_domain(active.aeronef) if active is not None else None,
             actif=model.actif,
             created_at=model.created_at,
             updated_at=model.updated_at,
@@ -506,7 +515,6 @@ class EquipeRepositoryImpl(EquipeRepository):
             id=equipe.id,
             nom=equipe.nom,
             type=equipe.type,
-            aeronef_id=aeronef.id if aeronef is not None else equipe.aeronef_id,
             actif=equipe.actif,
             created_at=equipe.created_at,
             updated_at=equipe.updated_at,
@@ -518,22 +526,37 @@ class EquipeRepositoryImpl(EquipeRepository):
         if aeronef is not None:
             # Même transaction que l'équipe : un échec (immatriculation déjà prise,
             # chef déjà affecté) n'écrit ni l'un ni l'autre — jamais d'aéronef orphelin.
-            model.aeronef = AeronefModel(
-                id=aeronef.id,
-                immatriculation=aeronef.immatriculation,
-                societe=aeronef.societe,
-                volume_cuve_l=aeronef.volume_cuve_l,
-                actif=aeronef.actif,
-                created_at=aeronef.created_at,
-                updated_at=aeronef.updated_at,
+            self.session.add(
+                AeronefModel(
+                    id=aeronef.id,
+                    immatriculation=aeronef.immatriculation,
+                    societe=aeronef.societe,
+                    volume_cuve_l=aeronef.volume_cuve_l,
+                    actif=aeronef.actif,
+                    created_at=aeronef.created_at,
+                    updated_at=aeronef.updated_at,
+                )
             )
+        aeronef_id = aeronef.id if aeronef is not None else equipe.aeronef_id
+        if aeronef_id is not None:
+            # L'équipe naît avec son appareil en service : affectation ouverte, qui
+            # commence le jour de la création — la seule date que l'appelant fournisse.
+            model.affectations_aeronef = [
+                EquipeAeronefModel(
+                    id=uuid.uuid4(),
+                    aeronef_id=aeronef_id,
+                    date_debut=equipe.created_at.date(),
+                    date_fin=None,
+                    created_at=equipe.created_at,
+                )
+            ]
         self.session.add(model)
         try:
             await self.session.commit()
         except IntegrityError as exc:
             await self.session.rollback()
             raise _traduire_integrite_equipe(exc, aeronef) from exc
-        await self.session.refresh(model, attribute_names=["membres", "aeronef"])
+        await self.session.refresh(model, attribute_names=["membres", "affectations_aeronef"])
         return await self._relire(model.id)
 
     async def update(self, equipe: Equipe) -> Equipe:
@@ -579,6 +602,135 @@ class EquipeRepositoryImpl(EquipeRepository):
         )
 
 
+def _affectation_to_domain(model: EquipeAeronefModel) -> AffectationAeronef:
+    return AffectationAeronef(
+        id=model.id,
+        equipe_id=model.equipe_id,
+        aeronef_id=model.aeronef_id,
+        date_debut=model.date_debut,
+        date_fin=model.date_fin,
+        aeronef=_aeronef_to_domain(model.aeronef) if model.aeronef is not None else None,
+        created_at=model.created_at,
+    )
+
+
+class EquipeAeronefRepositoryImpl(EquipeAeronefRepository):
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def list_par_equipe(self, equipe_id: uuid.UUID) -> list[AffectationAeronef]:
+        result = await self.session.execute(
+            select(EquipeAeronefModel)
+            .options(joinedload(EquipeAeronefModel.aeronef))
+            .where(EquipeAeronefModel.equipe_id == equipe_id)
+            .order_by(EquipeAeronefModel.date_debut.desc(), EquipeAeronefModel.created_at.desc())
+            .execution_options(populate_existing=True)
+        )
+        return [_affectation_to_domain(m) for m in result.scalars().unique().all()]
+
+    async def get_by_id(self, affectation_id: uuid.UUID) -> AffectationAeronef | None:
+        result = await self.session.execute(
+            select(EquipeAeronefModel)
+            .options(joinedload(EquipeAeronefModel.aeronef))
+            .where(EquipeAeronefModel.id == affectation_id)
+            .execution_options(populate_existing=True)
+        )
+        model = result.unique().scalar_one_or_none()
+        return None if model is None else _affectation_to_domain(model)
+
+    async def list_chevauchements(
+        self,
+        date_debut: date,
+        date_fin: date | None,
+        equipe_id: uuid.UUID | None = None,
+        aeronef_id: uuid.UUID | None = None,
+        sauf_id: uuid.UUID | None = None,
+    ) -> list[AffectationAeronef]:
+        # Deux intervalles semi-ouverts se recoupent si chacun commence avant que
+        # l'autre ne finisse ; `date_fin IS NULL` vaut « pas de fin », donc la moitié
+        # correspondante de la condition tombe.
+        stmt = (
+            select(EquipeAeronefModel)
+            .options(joinedload(EquipeAeronefModel.aeronef))
+            .where(
+                or_(
+                    EquipeAeronefModel.date_fin.is_(None),
+                    EquipeAeronefModel.date_fin > date_debut,
+                )
+            )
+            .order_by(EquipeAeronefModel.date_debut)
+        )
+        if date_fin is not None:
+            stmt = stmt.where(EquipeAeronefModel.date_debut < date_fin)
+        cibles = [
+            c
+            for c in (
+                EquipeAeronefModel.equipe_id == equipe_id if equipe_id is not None else None,
+                EquipeAeronefModel.aeronef_id == aeronef_id if aeronef_id is not None else None,
+            )
+            if c is not None
+        ]
+        if not cibles:  # pragma: no cover — garde-fou : un appel sans cible balaierait tout
+            raise ValueError("list_chevauchements exige une equipe_id et/ou un aeronef_id")
+        stmt = stmt.where(or_(*cibles))
+        if sauf_id is not None:
+            stmt = stmt.where(EquipeAeronefModel.id != sauf_id)
+        result = await self.session.execute(stmt)
+        return [_affectation_to_domain(m) for m in result.scalars().unique().all()]
+
+    async def create(self, affectation: AffectationAeronef) -> AffectationAeronef:
+        model = EquipeAeronefModel(
+            id=affectation.id,
+            equipe_id=affectation.equipe_id,
+            aeronef_id=affectation.aeronef_id,
+            date_debut=affectation.date_debut,
+            date_fin=affectation.date_fin,
+            created_at=affectation.created_at,
+        )
+        self.session.add(model)
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise _traduire_integrite_affectation(exc, affectation) from exc
+        relue = await self.get_by_id(affectation.id)
+        assert relue is not None  # noqa: S101 — on vient de l'écrire dans cette session
+        return relue
+
+    async def update(self, affectation: AffectationAeronef) -> AffectationAeronef:
+        result = await self.session.execute(
+            select(EquipeAeronefModel).where(EquipeAeronefModel.id == affectation.id)
+        )
+        model = result.scalar_one()
+        # Seule `date_fin` bouge : rouvrir une période close ou déplacer son début
+        # réécrirait l'histoire, ce que cette table existe précisément pour empêcher.
+        model.date_fin = affectation.date_fin
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise _traduire_integrite_affectation(exc, affectation) from exc
+        relue = await self.get_by_id(affectation.id)
+        assert relue is not None  # noqa: S101 — on vient de l'écrire dans cette session
+        return relue
+
+
+def _traduire_integrite_affectation(
+    exc: IntegrityError, affectation: AffectationAeronef
+) -> Exception:
+    """Filet de sécurité derrière la validation applicative : les index partiels de la
+    migration 0083 ne couvrent que les affectations *ouvertes*, et la règle complète est
+    vérifiée en amont. Ce qui passe ici est donc une course entre deux requêtes."""
+    contrainte = _contrainte_violee(exc)
+    if contrainte == "uq_equipe_aeronef_ouverte_par_aeronef":
+        return AeronefDejaAffecteError(str(affectation.aeronef_id))
+    if contrainte == "uq_equipe_aeronef_ouverte_par_equipe":
+        return EquipeDejaEquipeeError(str(affectation.equipe_id))
+    if contrainte == "ck_equipe_aeronef_periode":
+        return PeriodeAffectationInvalideError(str(affectation.id))
+    return exc
+
+
 def _membre_to_domain(model: EquipeMembreModel) -> MembreEquipe:
     return MembreEquipe(
         equipe_id=model.equipe_id,
@@ -601,8 +753,10 @@ def _traduire_integrite_equipe(exc: IntegrityError, aeronef: Aeronef | None) -> 
         return ImmatriculationAeronefDejaPriseError(
             aeronef.immatriculation if aeronef is not None else ""
         )
-    if contrainte == "uq_equipe_aeronef_id":
+    if contrainte == "uq_equipe_aeronef_ouverte_par_aeronef":
         return AeronefDejaAffecteError(str(aeronef.id) if aeronef is not None else "")
+    if contrainte == "uq_equipe_aeronef_ouverte_par_equipe":
+        return EquipeDejaEquipeeError(contrainte)
     if contrainte == "uq_equipe_membre_chef_par_equipe":
         return EquipeADejaUnChefError(contrainte)
     if contrainte == "uq_equipe_membre_chef_par_utilisateur":

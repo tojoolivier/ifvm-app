@@ -324,6 +324,35 @@ class AeronefUpdate(BaseModel):
     actif: bool | None = None
 
 
+class AffectationAeronefRead(BaseModel):
+    """Période pendant laquelle un appareil a servi dans une équipe (#603).
+    `date_fin: null` désigne l'affectation en cours."""
+
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    equipe_id: uuid.UUID
+    aeronef_id: uuid.UUID
+    date_debut: date
+    date_fin: date | None = None
+    aeronef: AeronefRead | None = None
+    created_at: datetime
+
+
+class AffectationAeronefCreate(BaseModel):
+    """`date_debut` est explicite : une affectation est saisie après coup aussi souvent
+    qu'en temps réel, et la dater du jour de la saisie fausserait l'historique."""
+
+    aeronef_id: uuid.UUID
+    date_debut: date
+    date_fin: date | None = None
+
+
+class AffectationAeronefCloture(BaseModel):
+    """Retrait d'un appareil : on borne la période, on n'efface pas la ligne."""
+
+    date_fin: date
+
+
 class MembreEquipeRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     user_id: uuid.UUID
@@ -360,7 +389,9 @@ class EquipeRead(BaseModel):
     id: uuid.UUID
     nom: str
     type: Literal["terrestre", "aerien"]
-    # Hélicoptère de l'équipe (migration 0078) — aérien uniquement, nullable.
+    # Appareil **en service** dans l'équipe — projection de l'affectation ouverte de
+    # `equipe_aeronef` (#603), et non plus une colonne. `null` quand l'équipe est entre
+    # deux appareils. L'historique complet se lit par `GET /equipes/{id}/aeronefs`.
     aeronef_id: uuid.UUID | None = None
     aeronef: AeronefRead | None = None
     membres: list[MembreEquipeRead] = Field(default_factory=list)

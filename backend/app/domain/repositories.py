@@ -7,6 +7,7 @@ from app.domain.campagne import Campagne
 from app.domain.prospection import AuditLog, Prospection
 from app.domain.referentiel import (
     Aeronef,
+    AffectationAeronef,
     BaseAerienne,
     CodeStade,
     Commune,
@@ -495,6 +496,45 @@ class AeronefRepository(ABC):
 
     @abstractmethod
     async def update(self, aeronef: Aeronef) -> Aeronef:
+        pass
+
+
+class EquipeAeronefRepository(ABC):
+    """Affectations d'aéronefs à une équipe, bornées dans le temps (#603).
+
+    Aucune méthode de suppression : retirer un appareil, c'est borner l'affectation
+    (`date_fin`), pas effacer la ligne — tout l'intérêt de la table est l'historique."""
+
+    @abstractmethod
+    async def list_par_equipe(self, equipe_id: uuid.UUID) -> list[AffectationAeronef]:
+        """Historique complet, affectation en cours d'abord (`date_debut` décroissante)."""
+        pass
+
+    @abstractmethod
+    async def get_by_id(self, affectation_id: uuid.UUID) -> AffectationAeronef | None:
+        pass
+
+    @abstractmethod
+    async def list_chevauchements(
+        self,
+        date_debut: date,
+        date_fin: date | None,
+        equipe_id: uuid.UUID | None = None,
+        aeronef_id: uuid.UUID | None = None,
+        sauf_id: uuid.UUID | None = None,
+    ) -> list[AffectationAeronef]:
+        """Affectations dont l'intervalle recoupe `[date_debut, date_fin)`, pour cette
+        équipe et/ou cet appareil. `sauf_id` exclut l'affectation en cours de
+        modification, qui se chevauche toujours elle-même."""
+        pass
+
+    @abstractmethod
+    async def create(self, affectation: AffectationAeronef) -> AffectationAeronef:
+        pass
+
+    @abstractmethod
+    async def update(self, affectation: AffectationAeronef) -> AffectationAeronef:
+        """Seule `date_fin` est réécrite : borner une affectation, c'est la clôturer."""
         pass
 
 

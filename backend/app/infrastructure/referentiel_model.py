@@ -1,11 +1,12 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     TIMESTAMP,
     Boolean,
     CheckConstraint,
     Computed,
+    Date,
     ForeignKey,
     ForeignKeyConstraint,
     Index,
@@ -198,8 +199,8 @@ class AeronefModel(Base):
     """Hélicoptère d'une équipe aérienne (migration 0078) : `immatriculation` en est la
     clé candidate, `societe` (exploitant) et `volume_cuve_l` en dépendent — d'où une
     table à part plutôt que trois colonnes sur `equipe_aerienne` (dépendance transitive
-    équipe → immatriculation → société). Affecté à au plus une équipe
-    (`EquipeModel.aeronef_id` UNIQUE)."""
+    équipe → immatriculation → société). Existe indépendamment de toute équipe
+    (#621) ; ses affectations successives vivent dans `equipe_aeronef` (#603)."""
 
     __tablename__ = "aeronef"
 
@@ -232,8 +233,8 @@ class EquipeModel(Base):
     équipe — c'est ce qui interdit en SQL qu'un `lieu_aerien` pointe vers une équipe
     terrestre.
 
-    `aeronef_id` reste ici, 1:1 comme sur l'ancienne `equipe_aerienne` ; #603 le
-    remplacera par `equipe_aeronef` (affectations successives datées).
+    L'appareil n'est plus une colonne depuis #603 : `equipe_aeronef` porte les
+    affectations successives, bornées dans le temps.
     """
 
     __tablename__ = "equipe"
@@ -241,7 +242,6 @@ class EquipeModel(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     nom: Mapped[str] = mapped_column(Text(), nullable=False)
     type: Mapped[str] = mapped_column(Text(), nullable=False)
-    aeronef_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     actif: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
@@ -251,20 +251,91 @@ class EquipeModel(Base):
         cascade="all, delete-orphan",
         order_by="EquipeMembreModel.created_at",
     )
-    aeronef: Mapped["AeronefModel | None"] = relationship()
+    # `primaryjoin` / `foreign_keys` explicites : sans eux l'ORM déduit la jointure de
+    # la FK *composite* et tente d'écrire `equipe_type` à l'insertion — or c'est une
+    # colonne générée, que Postgres refuse en écriture. L'appartenance se joue sur
+    # `equipe_id` seul ; `equipe_type` reste l'affaire de la base.
+    affectations_aeronef: Mapped[list["EquipeAeronefModel"]] = relationship(
+        back_populates="equipe",
+        cascade="all, delete-orphan",
+        order_by="EquipeAeronefModel.date_debut.desc()",
+        primaryjoin="EquipeModel.id == EquipeAeronefModel.equipe_id",
+        foreign_keys="EquipeAeronefModel.equipe_id",
+    )
 
-    # Noms de contraintes explicites — doivent matcher la migration 0082 à l'identique :
-    # les dépôts s'en servent pour distinguer une violation métier d'une erreur générique.
+    # Noms de contraintes explicites — doivent matcher les migrations 0082/0083 à
+    # l'identique : les dépôts s'en servent pour distinguer une violation métier d'une
+    # erreur générique.
     __table_args__ = (
         CheckConstraint("type IN ('terrestre','aerien')", name="ck_equipe_type"),
         UniqueConstraint("id", "type", name="uq_equipe_id_type"),
+    )
+
+
+class EquipeAeronefModel(Base):
+    """Affectation d'un aéronef à une équipe sur une période (#603, migration 0083).
+
+    Remplace la FK 1:1 `equipe.aeronef_id` : une équipe aérienne dispose de 2 à 3
+    appareils utilisés l'un après l'autre, et le 1:1 interdisait d'en garder la trace.
+    Intervalle semi-ouvert `[date_debut, date_fin)`, `date_fin IS NULL` pour
+    l'affectation en cours.
+
+    `equipe_type` porte désormais « un appareil ne s'affecte qu'à une équipe aérienne »,
+    à la place de l'ancien CHECK `ck_equipe_aeronef_reserve_aerien`.
+
+    Les deux index partiels ne sont que des garde-fous : ils interdisent deux
+    affectations *ouvertes* pour la même équipe ou le même appareil. La règle complète —
+    pas de chevauchement d'intervalles — demanderait `EXCLUDE USING gist`, hors scope
+    (ADR-018) ; elle est validée côté application."""
+
+    __tablename__ = "equipe_aeronef"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    equipe_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    equipe_type: Mapped[str | None] = mapped_column(
+        Text(), _equipe_type_genere("equipe_id", "aerien"), nullable=True
+    )
+    aeronef_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    date_debut: Mapped[date] = mapped_column(Date(), nullable=False)
+    date_fin: Mapped[date | None] = mapped_column(Date(), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+
+    equipe: Mapped["EquipeModel"] = relationship(
+        back_populates="affectations_aeronef",
+        primaryjoin="EquipeModel.id == EquipeAeronefModel.equipe_id",
+        foreign_keys="EquipeAeronefModel.equipe_id",
+    )
+    aeronef: Mapped["AeronefModel"] = relationship()
+
+    __table_args__ = (
         ForeignKeyConstraint(
-            ["aeronef_id"], ["aeronef.id"], name="fk_equipe_aeronef_id", ondelete="RESTRICT"
+            ["equipe_id", "equipe_type"],
+            ["equipe.id", "equipe.type"],
+            name="fk_equipe_aeronef_equipe_id",
+            ondelete="CASCADE",
         ),
-        UniqueConstraint("aeronef_id", name="uq_equipe_aeronef_id"),
+        ForeignKeyConstraint(
+            ["aeronef_id"],
+            ["aeronef.id"],
+            name="fk_equipe_aeronef_aeronef_id",
+            ondelete="RESTRICT",
+        ),
         CheckConstraint(
-            "aeronef_id IS NULL OR type = 'aerien'", name="ck_equipe_aeronef_reserve_aerien"
+            "date_fin IS NULL OR date_fin >= date_debut", name="ck_equipe_aeronef_periode"
         ),
+        Index(
+            "uq_equipe_aeronef_ouverte_par_equipe",
+            "equipe_id",
+            unique=True,
+            postgresql_where=text("date_fin IS NULL"),
+        ),
+        Index(
+            "uq_equipe_aeronef_ouverte_par_aeronef",
+            "aeronef_id",
+            unique=True,
+            postgresql_where=text("date_fin IS NULL"),
+        ),
+        Index("ix_equipe_aeronef_aeronef_id", "aeronef_id"),
     )
 
 

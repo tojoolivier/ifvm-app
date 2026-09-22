@@ -161,8 +161,11 @@ async def test_aeronef_id_inconnu_404(client: AsyncClient, admin_headers: dict, 
 async def test_aeronef_deja_affecte_a_une_autre_equipe_409(
     client: AsyncClient, admin_headers: dict, chef_de_base, autre_chef_de_base
 ):
-    """`uq_equipe_aeronef_id` (migration 0082) : un appareil, une équipe. #603 remplace
-    cette règle par des affectations bornées dans le temps."""
+    """Depuis #603 la règle est temporelle : la seconde équipe demande l'appareil pour
+    une période qui recouvre celle de la première (toutes deux ouvertes). Sur ce chemin
+    — `POST /equipes`, où la date n'est pas saisie — le refus vient de l'index partiel
+    `uq_equipe_aeronef_ouverte_par_aeronef`, d'où un 409 et non le 422 de
+    `POST /equipes/{id}/aeronefs`."""
     aeronef = (await client.post("/aeronefs", json=AERONEF, headers=admin_headers)).json()
     premiere = await client.post(
         "/equipes",
