@@ -218,6 +218,14 @@ export default function ExtensiveReferenceScreen() {
   // que si le mode a été explicitement choisi sur extensive-mode-chooser.tsx — le
   // reste de cet écran (et de la fiche) reste identique dans tous les autres cas.
   const isAerien = draft?.mode_extensif === 'aerien';
+  // #revalidation-verrouillage-localisation : une fiche née de « Prospections
+  // à revalider » (`demarrerRevalidation`) documente la MÊME localisation que
+  // la fiche périmée qu'elle revalide — revérifier une situation ne veut pas
+  // dire la déplacer. Seule la Station (le seul champ de localisation
+  // réellement modifiable ici ; GPS et Région/District/Commune ne sont de
+  // toute façon que des affichages, jamais des champs de saisie) est donc
+  // verrouillée pour ce cas précis.
+  const estRevalidation = draft?.revalide_de_id != null;
   const signalerChargement = useSignalerChargement('extensive-reference');
 
   const [latitude, setLatitude] = useState<string>(draft?.latitude != null ? String(draft.latitude) : '');
@@ -689,9 +697,14 @@ export default function ExtensiveReferenceScreen() {
                 onChangeText={setStationLibre}
                 placeholder="Nom du lieu-dit / repère local"
                 placeholderTextColor={TEXT_SECONDARY}
-                style={styles.input}
+                editable={!estRevalidation}
+                style={[styles.input, estRevalidation && styles.inputLocked]}
               />
-              {isDetectingStation ? (
+              {estRevalidation ? (
+                <Text style={styles.stationAutoHint}>
+                  Localisation reprise de la fiche revalidée — non modifiable.
+                </Text>
+              ) : isDetectingStation ? (
                 <Text style={styles.stationAutoHint}>Détection automatique de la localité…</Text>
               ) : null}
             </View>
@@ -1012,6 +1025,8 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 9, marginBottom: 8 },
   label: { fontSize: 9, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase' },
   input: { fontSize: 13, fontWeight: '600', color: TEXT, padding: 0 },
+  // #revalidation-verrouillage-localisation : Station non modifiable.
+  inputLocked: { color: TEXT_SECONDARY },
   sectionLabel: { fontSize: 10, fontWeight: '700', color: TEXT_SECONDARY, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 4, marginBottom: 7 },
   requiredLabel: { color: '#c0412b' },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },

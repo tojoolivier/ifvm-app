@@ -189,6 +189,27 @@ describe('ProspectionDetailPage — en-tête et actions', () => {
 
     expect(screen.queryByRole('button', { name: 'Vérifier la fiche' })).not.toBeInTheDocument()
   })
+
+  /**
+   * #revalidation-web-informe : une revalidation suit désormais la même
+   * chaîne de vérification qu'une fiche neuve (au lieu d'être validée
+   * immédiatement) — l'administrateur qui l'examine doit donc pouvoir voir,
+   * sur la fiche elle-même, qu'il s'agit d'une revalidation (déjà visible
+   * sur la liste, ProspectionsPage, via une pastille dédiée).
+   */
+  it('affiche une pastille « Revalidation » quand la fiche revalide une autre fiche', async () => {
+    renderPage('en_attente', { revalide_de_id: 'p0' })
+    await attendreFiche()
+
+    expect(screen.getByText('Revalidation')).toBeInTheDocument()
+  })
+
+  it("n'affiche pas de pastille « Revalidation » pour une fiche neuve", async () => {
+    renderPage('en_attente', { revalide_de_id: null })
+    await attendreFiche()
+
+    expect(screen.queryByText('Revalidation')).not.toBeInTheDocument()
+  })
 })
 
 describe('ProspectionDetailPage — chaque colonne de la base est affichée', () => {

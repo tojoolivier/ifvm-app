@@ -506,6 +506,21 @@ describe('demarrerRevalidation', () => {
     expect(params).not.toContain(FICHE_PERIMEE.validated_at);
   });
 
+  it("#revalidation-nouvelle-date : pose la date du jour, jamais celle de la fiche périmée — le numéro (n_fiche), lui, reste identique", async () => {
+    getFirstAsync.mockResolvedValueOnce(FICHE_PERIMEE);
+    getAllAsync.mockResolvedValue([]);
+
+    await demarrerRevalidation('presp-perimee');
+
+    const [sql, params] = runAsync.mock.calls.find(([s]) => s.includes('INSERT INTO prospection'))!;
+    expect(sql).toContain('date_prospection');
+    expect(params).not.toContain(FICHE_PERIMEE.date_prospection);
+    const aujourdHui = new Date().toISOString().slice(0, 10);
+    expect(params).toContain(aujourdHui);
+    // Le numéro, lui, est bien conservé à l'identique (comportement inchangé).
+    expect(params).toContain('F-001');
+  });
+
   it('clone populations, infestations, captures et opérations aériennes vers le nouveau brouillon', async () => {
     getFirstAsync.mockResolvedValueOnce(FICHE_PERIMEE);
     getAllAsync
@@ -979,12 +994,47 @@ describe('completeProspection', () => {
     // un second numéro. Le mock ne rejoue pas le CASE lui-même, cette
     // assertion garde seulement une trace de non-régression sur sa présence.
     expect(runAsync).toHaveBeenCalledWith(
-      expect.stringContaining("CASE WHEN type_prospection = 'validation' THEN 'validee' ELSE 'en_attente' END"),
+      expect.stringContaining(
+        "CASE WHEN type_prospection = 'validation' AND revalide_de_id IS NULL THEN 'validee' ELSE 'en_attente' END"
+      ),
       [expect.any(String), BASE_INPUT.id]
     );
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining(
         "CASE WHEN type_prospection = 'validation' AND n_message IS NOT NULL THEN n_message ELSE n_fiche END"
+      ),
+      [expect.any(String), BASE_INPUT.id]
+    );
+  });
+
+  /**
+   * #revalidation-verification-standard : revirement du comportement
+   * historique — une revalidation (`revalide_de_id` non nul), y compris pour
+   * une fiche de type Validation, suit désormais la même chaîne en_attente ->
+   * vérifiée -> validée qu'une fiche neuve, plutôt que d'être validée
+   * immédiatement. Le SQL lui-même porte ce comportement (`AND revalide_de_id
+   * IS NULL`, cf. test ci-dessus) — ce test-ci documente juste le résultat.
+   */
+  it('#revalidation-verification-standard : une revalidation reste en_attente, même de type Validation', async () => {
+    const ligne = {
+      ...STORED_ROW,
+      type_prospection: 'validation',
+      statut: 'en_attente',
+      n_fiche: null,
+      n_message: 'MSG-010',
+      revalide_de_id: 'fiche-perimee-id',
+    };
+    getFirstAsync
+      .mockResolvedValueOnce(ligne) // lecture initiale (current)
+      .mockResolvedValueOnce(null) // contrôle anti-doublon : aucun
+      .mockResolvedValueOnce(ligne); // lecture finale (updated)
+
+    const resultat = await completeProspection(BASE_INPUT.id);
+
+    expect(resultat.statut).toBe('en_attente');
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "CASE WHEN type_prospection = 'validation' AND revalide_de_id IS NULL THEN 'validee' ELSE 'en_attente' END"
       ),
       [expect.any(String), BASE_INPUT.id]
     );
