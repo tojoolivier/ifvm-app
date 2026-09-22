@@ -454,92 +454,62 @@ class EquipeUpdate(BaseModel):
     actif: bool | None = None
 
 
-class BaseAerienneRead(BaseModel):
+class SiteAerienneRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
-    parent_base_id: uuid.UUID | None
-    # NOT NULL uniquement sur une base principale (#equipe-aerienne, migration
-    # 0066) — une secondaire hérite de l'équipe de sa principale via
-    # `parent_base_id`, elle n'a pas sa propre `equipe_id`.
+    parent_site_id: uuid.UUID | None
+    # NOT NULL uniquement sur un site principal (#equipe-aerienne, migration
+    # 0066) — un secondaire hérite de l'équipe de son principal via
+    # `parent_site_id`, il n'a pas sa propre `equipe_id`.
     equipe_id: uuid.UUID | None
     numero: str
     localite: str
-    longitude: float | None
-    latitude: float | None
-    altitude: float | None
     actif: bool
     created_at: datetime
     updated_at: datetime
 
 
-class BaseAerienneCreate(BaseModel):
+class SiteAerienneCreate(BaseModel):
     numero: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)]
     localite: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-    parent_base_id: uuid.UUID | None = None
-    # Requis si `parent_base_id` est absent (base principale), doit être absent
-    # sinon (base secondaire) — validé par `CreateBaseAerienne` (message clair)
-    # et par `ck_base_aerienne_equipe_coherente` (garde-fou base de données).
+    parent_site_id: uuid.UUID | None = None
+    # Requis si `parent_site_id` est absent (site principal), doit être absent
+    # sinon (site secondaire) — validé par `CreateSiteAerienne` (message clair)
+    # et par `ck_site_aerienne_equipe_coherente` (garde-fou base de données).
     equipe_id: uuid.UUID | None = None
-    longitude: float | None = Field(default=None, ge=-180, le=180)
-    latitude: float | None = Field(default=None, ge=-90, le=90)
-    altitude: float | None = None
 
 
-class BaseAerienneUpdate(BaseModel):
+class SiteAerienneUpdate(BaseModel):
     """Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie."""
 
     numero: (
         Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)] | None
     ) = None
     localite: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
-    parent_base_id: uuid.UUID | None = None
+    parent_site_id: uuid.UUID | None = None
     equipe_id: uuid.UUID | None = None
-    longitude: float | None = Field(default=None, ge=-180, le=180)
-    latitude: float | None = Field(default=None, ge=-90, le=90)
-    altitude: float | None = None
     actif: bool | None = None
 
 
-class StandRemplissageRead(BaseModel):
+class SiteAeriennePositionRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
-    numero: str
-    localite: str
-    longitude: float | None
-    latitude: float | None
+    site_id: uuid.UUID
+    latitude: float
+    longitude: float
     altitude: float | None
-    # `None` pour un stand créé avant la migration 0078, non encore rattaché à une équipe.
-    equipe_aerienne_id: uuid.UUID | None = None
-    actif: bool
+    date_debut: date
+    date_fin: date | None
+    # Dérivée à la lecture, jamais stockée (AC #604) : `date_fin - date_debut`, ou
+    # l'écart à `today()` si la position est encore active.
+    duree_jours: int
     created_at: datetime
-    updated_at: datetime
 
 
-class StandRemplissageCreate(BaseModel):
-    numero: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)]
-    localite: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-    longitude: float | None = Field(default=None, ge=-180, le=180)
-    latitude: float | None = Field(default=None, ge=-90, le=90)
+class SiteAeriennePositionInstaller(BaseModel):
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
     altitude: float | None = None
-    # Omis par un chef de base : le stand est rattaché à SON équipe (une seule possible).
-    # Obligatoire pour un admin, qui agit pour le compte d'une équipe qu'il doit désigner.
-    equipe_aerienne_id: uuid.UUID | None = None
-
-
-class StandRemplissageUpdate(BaseModel):
-    """Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie."""
-
-    numero: (
-        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)] | None
-    ) = None
-    localite: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
-    longitude: float | None = Field(default=None, ge=-180, le=180)
-    latitude: float | None = Field(default=None, ge=-90, le=90)
-    altitude: float | None = None
-    # Réservé aux admins : rattache/change l'équipe d'un stand (dont ceux antérieurs à la
-    # migration 0078, « sans équipe »).
-    equipe_aerienne_id: uuid.UUID | None = None
-    actif: bool | None = None
 
 
 class CultureSyncRead(BaseModel):

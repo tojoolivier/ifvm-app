@@ -323,7 +323,7 @@ async def equipe_aerienne(db_session: AsyncSession, chef_de_base: Utilisateur):
 @pytest_asyncio.fixture
 async def equipe_aerienne_bis(db_session: AsyncSession):
     """Deuxième équipe, chef distinct — pour les tests qui ont besoin d'une équipe
-    encore libre (`base_aerienne.equipe_id` UNIQUE) sans réutiliser celle de la
+    encore libre (`site_aerienne.equipe_id` UNIQUE) sans réutiliser celle de la
     fixture `base_aerienne`."""
     chef = Utilisateur(
         id=uuid.uuid4(),
@@ -341,43 +341,25 @@ async def equipe_aerienne_bis(db_session: AsyncSession):
 
 @pytest_asyncio.fixture
 async def base_aerienne(db_session: AsyncSession, equipe_aerienne):
-    from app.infrastructure.referentiel_model import BaseAerienneModel
+    """Site aérien principal (migration 0086, #604 — fusion de `base_aerienne` et
+    `stand_remplissage` en `site_aerienne`). Le nom de la fixture est conservé : elle
+    reste sémantiquement une base principale, seules les coordonnées GPS ont bougé vers
+    `site_aerienne_position` (installées via l'API par les tests qui en ont besoin)."""
+    from app.infrastructure.referentiel_model import SiteAerienneModel
 
     # #equipe-aerienne (migration 0066) : une base principale doit avoir une
-    # équipe (`ck_base_aerienne_equipe_coherente`).
-    base = BaseAerienneModel(
+    # équipe (`ck_site_aerienne_equipe_coherente`).
+    base = SiteAerienneModel(
         id=uuid.uuid4(),
         equipe_id=equipe_aerienne.id,
         numero="IHO01",
         localite="Ihosy",
-        latitude=-22.4021,
-        longitude=46.1250,
-        altitude=764.0,
         actif=True,
     )
     db_session.add(base)
     await db_session.commit()
     await db_session.refresh(base)
     return base
-
-
-@pytest_asyncio.fixture
-async def stand_remplissage(db_session: AsyncSession):
-    from app.infrastructure.referentiel_model import StandRemplissageModel
-
-    stand = StandRemplissageModel(
-        id=uuid.uuid4(),
-        numero="STD01",
-        localite="Stand Sud",
-        latitude=-22.4100,
-        longitude=46.1300,
-        altitude=770.0,
-        actif=True,
-    )
-    db_session.add(stand)
-    await db_session.commit()
-    await db_session.refresh(stand)
-    return stand
 
 
 @pytest_asyncio.fixture

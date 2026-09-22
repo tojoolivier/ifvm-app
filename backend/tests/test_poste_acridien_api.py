@@ -455,7 +455,7 @@ async def test_update_detache_le_poste_de_son_equipe_terrestre(
     client: AsyncClient, auth_headers: dict, poste_acridien, equipe_terrestre
 ):
     """`equipe_terrestre_id: null` explicite doit détacher le poste — distinct d'un
-    corps qui omet le champ (`champs_fournis`, cf. UpdateBaseAerienne.equipe_id)."""
+    corps qui omet le champ (`champs_fournis`, cf. UpdateSiteAerienne.equipe_id)."""
     await client.put(
         f"/postes-acridiens/{poste_acridien.id}",
         json={"equipe_terrestre_id": str(equipe_terrestre.id)},

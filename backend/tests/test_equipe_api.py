@@ -403,10 +403,10 @@ async def test_immatriculation_deja_prise_409(
 async def test_base_principale_avec_equipe_deja_assignee_409(
     client: AsyncClient, admin_headers: dict, base_aerienne, equipe_aerienne
 ):
-    """Une équipe ne possède qu'une base principale (UNIQUE base_aerienne.equipe_id) —
+    """Une équipe ne possède qu'un site principal (UNIQUE site_aerienne.equipe_id) —
     `base_aerienne` (fixture) possède déjà `equipe_aerienne`."""
     response = await client.post(
-        "/bases-aeriennes",
+        "/sites-aeriens",
         json={"numero": "IHO09", "localite": "Ailleurs", "equipe_id": str(equipe_aerienne.id)},
         headers=admin_headers,
     )
@@ -418,7 +418,7 @@ async def test_base_principale_avec_equipe_inexistante_404(
     client: AsyncClient, admin_headers: dict
 ):
     response = await client.post(
-        "/bases-aeriennes",
+        "/sites-aeriens",
         json={"numero": "IHO09", "localite": "Ailleurs", "equipe_id": str(uuid.uuid4())},
         headers=admin_headers,
     )
@@ -429,10 +429,10 @@ async def test_base_principale_avec_equipe_inexistante_404(
 async def test_base_principale_refuse_une_equipe_terrestre_404(
     client: AsyncClient, admin_headers: dict, equipe_terrestre
 ):
-    """La FK composite `(equipe_id, equipe_type)` interdit en SQL qu'une base aérienne
-    soit rattachée à une équipe terrestre — c'est tout l'intérêt du type dans la FK."""
+    """La FK composite `(equipe_id, equipe_type)` interdit en SQL qu'un site aérien
+    soit rattaché à une équipe terrestre — c'est tout l'intérêt du type dans la FK."""
     response = await client.post(
-        "/bases-aeriennes",
+        "/sites-aeriens",
         json={"numero": "IHO09", "localite": "Ailleurs", "equipe_id": str(equipe_terrestre.id)},
         headers=admin_headers,
     )
@@ -459,19 +459,3 @@ async def test_lieu_aerien_refuse_une_equipe_terrestre(
         headers=admin_headers,
     )
     assert response.status_code == 409, response.text
-
-
-@pytest.mark.asyncio
-async def test_stand_remplissage_refuse_une_equipe_terrestre(
-    client: AsyncClient, admin_headers: dict, equipe_terrestre
-):
-    response = await client.post(
-        "/stands-remplissage",
-        json={
-            "numero": "STD90",
-            "localite": "Ailleurs",
-            "equipe_aerienne_id": str(equipe_terrestre.id),
-        },
-        headers=admin_headers,
-    )
-    assert response.status_code == 404, response.text

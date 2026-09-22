@@ -272,7 +272,7 @@ async def test_plusieurs_lieux_aeriens_partagent_la_meme_equipe(
 ):
     """Pas d'UNIQUE sur `equipe_aerienne_id` : une équipe peut posséder plusieurs
     lieux (bases principales, secondaires, stands), contrairement à
-    `base_aerienne.equipe_id` (1:1)."""
+    `site_aerienne.equipe_id` (1:1)."""
     lieux = [("Base A", "principale"), ("Base B", "principale"), ("Stand C", "stand")]
     for nom, type_lieu in lieux:
         response = await client.post(

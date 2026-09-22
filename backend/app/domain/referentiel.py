@@ -233,35 +233,29 @@ class LieuAerien:
     equipe_aerienne_nom: str | None = None
 
 
-class NumeroBaseAerienneDejaPrisError(Exception):
-    """`numero` d'une base_aerienne est déjà pris (contrainte UNIQUE)."""
+class NumeroSiteAerienneDejaPrisError(Exception):
+    """`numero` d'un site_aerienne est déjà pris (contrainte UNIQUE)."""
 
     pass
 
 
-class NumeroStandRemplissageDejaPrisError(Exception):
-    """`numero` d'un stand_remplissage est déjà pris (contrainte UNIQUE)."""
+class SiteAerienneParentInvalideError(Exception):
+    """`parent_site_id` ne référence pas un site principal existant.
 
-    pass
-
-
-class BaseAerienneParentInvalideError(Exception):
-    """`parent_base_id` ne référence pas une base principale existante.
-
-    Couvre deux cas : l'id ne référence aucune base_aerienne, ou il en référence une
-    qui est elle-même une secondaire (`parent_base_id` non nul) — la hiérarchie
-    s'arrête à 2 niveaux, pas de secondaire d'une secondaire.
+    Couvre deux cas : l'id ne référence aucun site_aerienne, ou il en référence un
+    qui est lui-même secondaire (`parent_site_id` non nul) — la hiérarchie s'arrête à
+    2 niveaux, pas de secondaire d'un secondaire.
     """
 
     pass
 
 
-class BaseAerienneEquipeInvalideError(Exception):
+class SiteAerienneEquipeInvalideError(Exception):
     """`equipe_id` incohérent avec la hiérarchie (#equipe-aerienne, migration 0066).
 
-    Deux cas : une base principale (`parent_base_id is None`) sans `equipe_id`, ou une
-    base secondaire (`parent_base_id` non nul) à laquelle on tente d'assigner sa propre
-    `equipe_id` — elle hérite de celle de sa principale, elle n'en porte pas une à elle.
+    Deux cas : un site principal (`parent_site_id is None`) sans `equipe_id`, ou un
+    site secondaire (`parent_site_id` non nul) auquel on tente d'assigner sa propre
+    `equipe_id` — il hérite de celle de son principal, il n'en porte pas une à lui.
     """
 
     pass
@@ -274,8 +268,27 @@ class EquipeAerienneIntrouvableError(Exception):
 
 
 class EquipeAerienneDejaAssigneeError(Exception):
-    """L'équipe référencée possède déjà une base aérienne principale (UNIQUE
-    `base_aerienne.equipe_id`, une équipe = une base principale)."""
+    """L'équipe référencée possède déjà un site aérien principal (UNIQUE
+    `site_aerienne.equipe_id`, une équipe = un site principal)."""
+
+    pass
+
+
+class SiteAerienneIntrouvableError(Exception):
+    """`site_id` ne référence aucun `site_aerienne` existant."""
+
+    pass
+
+
+class PositionDejaActiveError(Exception):
+    """Le site a déjà une position active (`date_fin IS NULL`) — le démonter avant
+    d'en installer une nouvelle."""
+
+    pass
+
+
+class PositionActiveIntrouvableError(Exception):
+    """Le site n'a aucune position active à démonter."""
 
     pass
 
@@ -493,45 +506,49 @@ class Equipe:
 
 
 @dataclass
-class BaseAerienne:
-    """Base aérienne principale (`parent_base_id is None`) ou secondaire (référence sa
-    principale). Référentiel dédié à la gestion d'équipe aérienne, distinct de `LieuAerien` —
-    décision produit du 2026-09-15 maintenue malgré le précédent `lieu_aerien` (cf.
-    migration `0064`).
+class SiteAerienne:
+    """Site aérien principal (`parent_site_id is None`) ou secondaire (référence son
+    principal) — base ou stand de remplissage, indistinguables en base depuis la fusion
+    de migration 0086 (#604) : le rôle est contextuel, porté par l'appelant. Référentiel
+    dédié à la gestion d'équipe aérienne, distinct de `LieuAerien` — décision produit du
+    2026-09-15 maintenue malgré le précédent `lieu_aerien` (cf. migration `0064`).
 
-    `equipe_id` (migration 0066) n'est renseigné que sur une base principale — une
-    base secondaire hérite de l'équipe de sa principale via `parent_base_id`, elle ne
-    porte pas sa propre `equipe_id` (cf. `BaseAerienneEquipeInvalideError`)."""
+    `equipe_id` (migration 0066) n'est renseigné que sur un site principal — un site
+    secondaire hérite de l'équipe de son principal via `parent_site_id`, il ne porte pas
+    sa propre `equipe_id` (cf. `SiteAerienneEquipeInvalideError`).
+
+    La position GPS n'est plus portée ici depuis la migration 0086 : elle s'historise
+    dans `SiteAeriennePosition`."""
 
     id: uuid.UUID = field(default_factory=uuid.uuid4)
-    parent_base_id: uuid.UUID | None = None
+    parent_site_id: uuid.UUID | None = None
     equipe_id: uuid.UUID | None = None
     numero: str = ""
     localite: str = ""
-    longitude: float | None = None
-    latitude: float | None = None
-    altitude: float | None = None
     actif: bool = True
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
 
 
 @dataclass
-class StandRemplissage:
-    """Stand de remplissage d'une équipe aérienne — même forme que `BaseAerienne`, sans
-    hiérarchie. `equipe_aerienne_id` (migration 0078) : équipe propriétaire, plusieurs
-    stands par équipe ; `None` pour les stands antérieurs, exigé à la création."""
+class SiteAeriennePosition:
+    """Implantation d'un `SiteAerienne` sur une période (migration 0086, #604) —
+    même patron que `AffectationAeronef` (équipe/aéronef, migration 0085).
+    `date_fin is None` : position active (« installée », non démontée)."""
 
     id: uuid.UUID = field(default_factory=uuid.uuid4)
-    numero: str = ""
-    localite: str = ""
-    longitude: float | None = None
-    latitude: float | None = None
+    site_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    latitude: float = 0.0
+    longitude: float = 0.0
     altitude: float | None = None
-    equipe_aerienne_id: uuid.UUID | None = None
-    actif: bool = True
+    date_debut: date = field(default_factory=lambda: datetime.now(timezone.utc).date())
+    date_fin: date | None = None
     created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+
+    def duree_jours(self, aujourdhui: date | None = None) -> int:
+        """Durée d'implantation dérivée : jamais stockée (AC #604)."""
+        fin = self.date_fin or aujourdhui or datetime.now(timezone.utc).date()
+        return (fin - self.date_debut).days
 
 
 class EquipeTerrestreIntrouvableError(Exception):

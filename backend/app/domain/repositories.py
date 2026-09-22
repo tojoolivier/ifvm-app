@@ -8,7 +8,6 @@ from app.domain.prospection import AuditLog, Prospection
 from app.domain.referentiel import (
     Aeronef,
     AffectationAeronef,
-    BaseAerienne,
     CodeStade,
     Commune,
     Culture,
@@ -17,7 +16,8 @@ from app.domain.referentiel import (
     MembreEquipe,
     Pesticide,
     PosteAcridien,
-    StandRemplissage,
+    SiteAerienne,
+    SiteAeriennePosition,
     StationFixe,
     UtilisateurEquipe,
     ZoneAntiAcridien,
@@ -452,27 +452,47 @@ class LieuAerienRepository(ABC):
         pass
 
 
-class BaseAerienneRepository(ABC):
+class SiteAerienneRepository(ABC):
     """Aucune méthode de suppression : la sortie du référentiel est `actif=false`."""
 
     @abstractmethod
-    async def list_since(self, since: datetime | None) -> list[BaseAerienne]:
+    async def list_since(self, since: datetime | None) -> list[SiteAerienne]:
         pass
 
     @abstractmethod
-    async def list_all(self, actif: bool | None = True) -> list[BaseAerienne]:
+    async def list_all(self, actif: bool | None = True) -> list[SiteAerienne]:
         pass
 
     @abstractmethod
-    async def get_by_id(self, base_id: uuid.UUID) -> BaseAerienne | None:
+    async def get_by_id(self, site_id: uuid.UUID) -> SiteAerienne | None:
         pass
 
     @abstractmethod
-    async def create(self, base: BaseAerienne) -> BaseAerienne:
+    async def create(self, site: SiteAerienne) -> SiteAerienne:
         pass
 
     @abstractmethod
-    async def update(self, base: BaseAerienne) -> BaseAerienne:
+    async def update(self, site: SiteAerienne) -> SiteAerienne:
+        pass
+
+
+class SiteAeriennePositionRepository(ABC):
+    """Historique des implantations d'un `site_aerienne` (migration 0086, #604)."""
+
+    @abstractmethod
+    async def list_par_site(self, site_id: uuid.UUID) -> list[SiteAeriennePosition]:
+        pass
+
+    @abstractmethod
+    async def get_active(self, site_id: uuid.UUID) -> SiteAeriennePosition | None:
+        pass
+
+    @abstractmethod
+    async def installer(self, position: SiteAeriennePosition) -> SiteAeriennePosition:
+        pass
+
+    @abstractmethod
+    async def demonter(self, position: SiteAeriennePosition) -> SiteAeriennePosition:
         pass
 
 
@@ -572,30 +592,6 @@ class EquipeRepository(ABC):
 
     @abstractmethod
     async def ajouter_membre(self, membre: MembreEquipe) -> MembreEquipe:
-        pass
-
-
-class StandRemplissageRepository(ABC):
-    """Aucune méthode de suppression : la sortie du référentiel est `actif=false`."""
-
-    @abstractmethod
-    async def list_since(self, since: datetime | None) -> list[StandRemplissage]:
-        pass
-
-    @abstractmethod
-    async def list_all(self, actif: bool | None = True) -> list[StandRemplissage]:
-        pass
-
-    @abstractmethod
-    async def get_by_id(self, stand_id: uuid.UUID) -> StandRemplissage | None:
-        pass
-
-    @abstractmethod
-    async def create(self, stand: StandRemplissage) -> StandRemplissage:
-        pass
-
-    @abstractmethod
-    async def update(self, stand: StandRemplissage) -> StandRemplissage:
         pass
 
 

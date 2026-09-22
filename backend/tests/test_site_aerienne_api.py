@@ -5,14 +5,12 @@ from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
-async def test_create_base_principale(client: AsyncClient, admin_headers: dict, equipe_aerienne):
+async def test_create_site_principal(client: AsyncClient, admin_headers: dict, equipe_aerienne):
     response = await client.post(
-        "/bases-aeriennes",
+        "/sites-aeriens",
         json={
             "numero": "IHO01",
             "localite": "Ihosy",
-            "latitude": -22.4021,
-            "longitude": 46.1250,
             "equipe_id": str(equipe_aerienne.id),
         },
         headers=admin_headers,
@@ -20,34 +18,34 @@ async def test_create_base_principale(client: AsyncClient, admin_headers: dict, 
     assert response.status_code == 201
     data = response.json()
     assert data["numero"] == "IHO01"
-    assert data["parent_base_id"] is None
+    assert data["parent_site_id"] is None
     assert data["equipe_id"] == str(equipe_aerienne.id)
     assert data["actif"] is True
 
 
 @pytest.mark.asyncio
-async def test_create_base_principale_sans_equipe_422(client: AsyncClient, admin_headers: dict):
-    """#equipe-aerienne : une base principale doit appartenir à une équipe aérienne."""
+async def test_create_site_principal_sans_equipe_422(client: AsyncClient, admin_headers: dict):
+    """#equipe-aerienne : un site principal doit appartenir à une équipe aérienne."""
     response = await client.post(
-        "/bases-aeriennes",
-        json={"numero": "IHO01", "localite": "Ihosy", "latitude": -22.4021, "longitude": 46.1250},
+        "/sites-aeriens",
+        json={"numero": "IHO01", "localite": "Ihosy"},
         headers=admin_headers,
     )
     assert response.status_code == 422
 
 
 @pytest.mark.asyncio
-async def test_create_base_secondaire_avec_sa_propre_equipe_422(
+async def test_create_site_secondaire_avec_sa_propre_equipe_422(
     client: AsyncClient, admin_headers: dict, base_aerienne, equipe_aerienne_bis
 ):
-    """Une base secondaire hérite de l'équipe de sa principale, elle ne peut pas
-    en avoir une à elle."""
+    """Un site secondaire hérite de l'équipe de son principal, il ne peut pas
+    en avoir une à lui — qu'il joue le rôle de base secondaire ou de stand (#604)."""
     response = await client.post(
-        "/bases-aeriennes",
+        "/sites-aeriens",
         json={
             "numero": "IHO02",
             "localite": "Ihosy Sud",
-            "parent_base_id": str(base_aerienne.id),
+            "parent_site_id": str(base_aerienne.id),
             "equipe_id": str(equipe_aerienne_bis.id),
         },
         headers=admin_headers,
@@ -56,38 +54,38 @@ async def test_create_base_secondaire_avec_sa_propre_equipe_422(
 
 
 @pytest.mark.asyncio
-async def test_create_base_secondaire(client: AsyncClient, admin_headers: dict, base_aerienne):
+async def test_create_site_secondaire(client: AsyncClient, admin_headers: dict, base_aerienne):
     response = await client.post(
-        "/bases-aeriennes",
+        "/sites-aeriens",
         json={
             "numero": "IHO02",
             "localite": "Ihosy Sud",
-            "parent_base_id": str(base_aerienne.id),
+            "parent_site_id": str(base_aerienne.id),
         },
         headers=admin_headers,
     )
     assert response.status_code == 201
-    assert response.json()["parent_base_id"] == str(base_aerienne.id)
+    assert response.json()["parent_site_id"] == str(base_aerienne.id)
 
 
 @pytest.mark.asyncio
-async def test_create_base_secondaire_d_une_secondaire_refusee(
+async def test_create_site_secondaire_d_une_secondaire_refusee(
     client: AsyncClient, admin_headers: dict, base_aerienne
 ):
     """La hiérarchie s'arrête à 2 niveaux : pas de secondaire d'une secondaire."""
     secondaire = await client.post(
-        "/bases-aeriennes",
-        json={"numero": "IHO02", "localite": "Ihosy Sud", "parent_base_id": str(base_aerienne.id)},
+        "/sites-aeriens",
+        json={"numero": "IHO02", "localite": "Ihosy Sud", "parent_site_id": str(base_aerienne.id)},
         headers=admin_headers,
     )
     assert secondaire.status_code == 201
 
     reponse = await client.post(
-        "/bases-aeriennes",
+        "/sites-aeriens",
         json={
             "numero": "IHO03",
             "localite": "Ihosy Ouest",
-            "parent_base_id": secondaire.json()["id"],
+            "parent_site_id": secondaire.json()["id"],
         },
         headers=admin_headers,
     )
@@ -95,21 +93,21 @@ async def test_create_base_secondaire_d_une_secondaire_refusee(
 
 
 @pytest.mark.asyncio
-async def test_create_base_parent_inexistant_422(client: AsyncClient, admin_headers: dict):
+async def test_create_site_parent_inexistant_422(client: AsyncClient, admin_headers: dict):
     response = await client.post(
-        "/bases-aeriennes",
-        json={"numero": "IHO01", "localite": "Ihosy", "parent_base_id": str(uuid.uuid4())},
+        "/sites-aeriens",
+        json={"numero": "IHO01", "localite": "Ihosy", "parent_site_id": str(uuid.uuid4())},
         headers=admin_headers,
     )
     assert response.status_code == 422
 
 
 @pytest.mark.asyncio
-async def test_create_base_numero_deja_pris_409(
+async def test_create_site_numero_deja_pris_409(
     client: AsyncClient, admin_headers: dict, base_aerienne, equipe_aerienne_bis
 ):
     response = await client.post(
-        "/bases-aeriennes",
+        "/sites-aeriens",
         json={
             "numero": base_aerienne.numero,
             "localite": "Ailleurs",
@@ -121,40 +119,40 @@ async def test_create_base_numero_deja_pris_409(
 
 
 @pytest.mark.asyncio
-async def test_list_bases_masque_les_inactives_par_defaut(
+async def test_list_sites_masque_les_inactifs_par_defaut(
     client: AsyncClient, admin_headers: dict, base_aerienne
 ):
     await client.put(
-        f"/bases-aeriennes/{base_aerienne.id}", json={"actif": False}, headers=admin_headers
+        f"/sites-aeriens/{base_aerienne.id}", json={"actif": False}, headers=admin_headers
     )
-    response = await client.get("/bases-aeriennes", headers=admin_headers)
+    response = await client.get("/sites-aeriens", headers=admin_headers)
     assert str(base_aerienne.id) not in [b["id"] for b in response.json()]
 
-    response = await client.get("/bases-aeriennes?inclure_inactifs=true", headers=admin_headers)
+    response = await client.get("/sites-aeriens?inclure_inactifs=true", headers=admin_headers)
     assert str(base_aerienne.id) in [b["id"] for b in response.json()]
 
 
 @pytest.mark.asyncio
-async def test_get_base_aerienne_inexistante_404(client: AsyncClient, admin_headers: dict):
-    response = await client.get(f"/bases-aeriennes/{uuid.uuid4()}", headers=admin_headers)
+async def test_get_site_aerienne_inexistant_404(client: AsyncClient, admin_headers: dict):
+    response = await client.get(f"/sites-aeriens/{uuid.uuid4()}", headers=admin_headers)
     assert response.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_update_base_aerienne_inexistante_404(client: AsyncClient, admin_headers: dict):
+async def test_update_site_aerienne_inexistant_404(client: AsyncClient, admin_headers: dict):
     response = await client.put(
-        f"/bases-aeriennes/{uuid.uuid4()}", json={"localite": "Peu importe"}, headers=admin_headers
+        f"/sites-aeriens/{uuid.uuid4()}", json={"localite": "Peu importe"}, headers=admin_headers
     )
     assert response.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_une_base_ne_peut_pas_etre_son_propre_parent(
+async def test_un_site_ne_peut_pas_etre_son_propre_parent(
     client: AsyncClient, admin_headers: dict, base_aerienne
 ):
     response = await client.put(
-        f"/bases-aeriennes/{base_aerienne.id}",
-        json={"parent_base_id": str(base_aerienne.id)},
+        f"/sites-aeriens/{base_aerienne.id}",
+        json={"parent_site_id": str(base_aerienne.id)},
         headers=admin_headers,
     )
     assert response.status_code == 422

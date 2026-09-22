@@ -2,8 +2,9 @@
 
 Règle produit (2026-09-19) : une équipe aérienne a un aéronef (immatriculation, société,
 volume de cuve) ; seul le chef de base de l'équipe — le seul compte utilisateur de
-l'équipe — crée ses bases et ses stands, rattachés d'office à SON équipe. Un admin peut
-agir pour n'importe quelle équipe en la désignant.
+l'équipe — crée ses sites aériens (bases, stands — indistinguables depuis la fusion de
+migration 0086, #604), rattachés d'office à SON équipe. Un admin peut agir pour
+n'importe quelle équipe en la désignant.
 
 Depuis #603 l'appareil n'est plus une colonne de l'équipe : `EquipeRead.aeronef_id` /
 `aeronef` projettent l'affectation **en cours** (`equipe_aeronef` avec
@@ -220,7 +221,7 @@ async def test_chef_cree_sa_base_principale_sans_designer_l_equipe(
     client: AsyncClient, chef_headers: dict, equipe_aerienne
 ):
     reponse = await client.post(
-        "/bases-aeriennes",
+        "/sites-aeriens",
         json={"numero": "IHO01", "localite": "Ihosy"},
         headers=chef_headers,
     )
@@ -233,7 +234,7 @@ async def test_chef_ne_cree_pas_une_base_pour_une_autre_equipe_403(
     client: AsyncClient, chef_headers: dict, equipe_aerienne, equipe_aerienne_bis
 ):
     reponse = await client.post(
-        "/bases-aeriennes",
+        "/sites-aeriens",
         json={"numero": "BET01", "localite": "Betroka", "equipe_id": str(equipe_aerienne_bis.id)},
         headers=chef_headers,
     )
@@ -245,7 +246,7 @@ async def test_utilisateur_sans_equipe_ne_cree_pas_de_base_403(
     client: AsyncClient, auth_headers: dict, equipe_aerienne
 ):
     reponse = await client.post(
-        "/bases-aeriennes",
+        "/sites-aeriens",
         json={"numero": "IHO01", "localite": "Ihosy", "equipe_id": str(equipe_aerienne.id)},
         headers=auth_headers,
     )
@@ -253,16 +254,18 @@ async def test_utilisateur_sans_equipe_ne_cree_pas_de_base_403(
 
 
 @pytest.mark.asyncio
-async def test_chef_cree_une_base_secondaire_sous_sa_principale(
+async def test_chef_cree_un_site_secondaire_sous_sa_principale(
     client: AsyncClient, chef_headers: dict, base_aerienne
 ):
+    """Un site secondaire (base secondaire ou stand — indistinguables depuis #604) se
+    crée via `parent_site_id`, jamais via sa propre `equipe_id`."""
     reponse = await client.post(
-        "/bases-aeriennes",
-        json={"numero": "IHO02", "localite": "Ihosy nord", "parent_base_id": str(base_aerienne.id)},
+        "/sites-aeriens",
+        json={"numero": "IHO02", "localite": "Ihosy nord", "parent_site_id": str(base_aerienne.id)},
         headers=chef_headers,
     )
     assert reponse.status_code == 201, reponse.text
-    assert reponse.json()["parent_base_id"] == str(base_aerienne.id)
+    assert reponse.json()["parent_site_id"] == str(base_aerienne.id)
 
 
 @pytest.mark.asyncio
@@ -271,8 +274,8 @@ async def test_chef_ne_cree_pas_une_secondaire_sous_la_principale_d_une_autre_eq
 ):
     """`base_aerienne` appartient à `equipe_aerienne`, pas à l'équipe du chef « bis »."""
     reponse = await client.post(
-        "/bases-aeriennes",
-        json={"numero": "IHO02", "localite": "Volé", "parent_base_id": str(base_aerienne.id)},
+        "/sites-aeriens",
+        json={"numero": "IHO02", "localite": "Volé", "parent_site_id": str(base_aerienne.id)},
         headers=chef_bis_headers,
     )
     assert reponse.status_code == 403
@@ -283,7 +286,7 @@ async def test_chef_ne_modifie_pas_la_base_d_une_autre_equipe_403(
     client: AsyncClient, chef_bis_headers: dict, base_aerienne
 ):
     reponse = await client.put(
-        f"/bases-aeriennes/{base_aerienne.id}", json={"actif": False}, headers=chef_bis_headers
+        f"/sites-aeriens/{base_aerienne.id}", json={"actif": False}, headers=chef_bis_headers
     )
     assert reponse.status_code == 403
 
@@ -291,175 +294,9 @@ async def test_chef_ne_modifie_pas_la_base_d_une_autre_equipe_403(
 @pytest.mark.asyncio
 async def test_chef_modifie_sa_propre_base(client: AsyncClient, chef_headers: dict, base_aerienne):
     reponse = await client.put(
-        f"/bases-aeriennes/{base_aerienne.id}",
+        f"/sites-aeriens/{base_aerienne.id}",
         json={"localite": "Ihosy centre"},
         headers=chef_headers,
     )
     assert reponse.status_code == 200, reponse.text
     assert reponse.json()["localite"] == "Ihosy centre"
-
-
-# --- Stands : rattachés à l'équipe -------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_chef_cree_son_stand_rattache_a_son_equipe(
-    client: AsyncClient, chef_headers: dict, equipe_aerienne
-):
-    reponse = await client.post(
-        "/stands-remplissage",
-        json={"numero": "STD10", "localite": "Stand Ihosy"},
-        headers=chef_headers,
-    )
-    assert reponse.status_code == 201, reponse.text
-    assert reponse.json()["equipe_aerienne_id"] == str(equipe_aerienne.id)
-
-
-@pytest.mark.asyncio
-async def test_chef_ne_cree_pas_un_stand_pour_une_autre_equipe_403(
-    client: AsyncClient, chef_headers: dict, equipe_aerienne_bis
-):
-    reponse = await client.post(
-        "/stands-remplissage",
-        json={
-            "numero": "STD11",
-            "localite": "Ailleurs",
-            "equipe_aerienne_id": str(equipe_aerienne_bis.id),
-        },
-        headers=chef_headers,
-    )
-    assert reponse.status_code == 403
-
-
-@pytest.mark.asyncio
-async def test_utilisateur_sans_equipe_ne_cree_pas_de_stand_403(
-    client: AsyncClient, auth_headers: dict, equipe_aerienne
-):
-    reponse = await client.post(
-        "/stands-remplissage",
-        json={
-            "numero": "STD12",
-            "localite": "Ailleurs",
-            "equipe_aerienne_id": str(equipe_aerienne.id),
-        },
-        headers=auth_headers,
-    )
-    assert reponse.status_code == 403
-
-
-@pytest.mark.asyncio
-async def test_admin_doit_designer_l_equipe_du_stand_422(client: AsyncClient, admin_headers: dict):
-    reponse = await client.post(
-        "/stands-remplissage",
-        json={"numero": "STD13", "localite": "Sans équipe"},
-        headers=admin_headers,
-    )
-    assert reponse.status_code == 422
-
-
-@pytest.mark.asyncio
-async def test_admin_stand_pour_equipe_inexistante_404(client: AsyncClient, admin_headers: dict):
-    reponse = await client.post(
-        "/stands-remplissage",
-        json={
-            "numero": "STD14",
-            "localite": "Fantôme",
-            "equipe_aerienne_id": str(uuid.uuid4()),
-        },
-        headers=admin_headers,
-    )
-    assert reponse.status_code == 404
-
-
-@pytest.mark.asyncio
-async def test_chef_ne_modifie_pas_le_stand_d_une_autre_equipe_403(
-    client: AsyncClient, admin_headers: dict, chef_bis_headers: dict, equipe_aerienne
-):
-    stand = (
-        await client.post(
-            "/stands-remplissage",
-            json={
-                "numero": "STD15",
-                "localite": "Chez l'autre",
-                "equipe_aerienne_id": str(equipe_aerienne.id),
-            },
-            headers=admin_headers,
-        )
-    ).json()
-    reponse = await client.put(
-        f"/stands-remplissage/{stand['id']}", json={"actif": False}, headers=chef_bis_headers
-    )
-    assert reponse.status_code == 403
-
-
-@pytest.mark.asyncio
-async def test_stand_sans_equipe_modifiable_par_un_admin_seulement(
-    client: AsyncClient, admin_headers: dict, chef_headers: dict, stand_remplissage
-):
-    """Un stand antérieur à la migration (« sans équipe ») n'a pas de propriétaire : un
-    chef de base ne peut pas le modifier, un admin le peut."""
-    par_un_chef = await client.put(
-        f"/stands-remplissage/{stand_remplissage.id}", json={"localite": "X"}, headers=chef_headers
-    )
-    assert par_un_chef.status_code == 403
-
-    par_un_admin = await client.put(
-        f"/stands-remplissage/{stand_remplissage.id}", json={"localite": "X"}, headers=admin_headers
-    )
-    assert par_un_admin.status_code == 200
-
-
-@pytest.mark.asyncio
-async def test_admin_rattache_un_stand_existant_a_une_equipe(
-    client: AsyncClient, admin_headers: dict, stand_remplissage, equipe_aerienne
-):
-    reponse = await client.put(
-        f"/stands-remplissage/{stand_remplissage.id}",
-        json={"equipe_aerienne_id": str(equipe_aerienne.id)},
-        headers=admin_headers,
-    )
-    assert reponse.status_code == 200, reponse.text
-    assert reponse.json()["equipe_aerienne_id"] == str(equipe_aerienne.id)
-
-
-@pytest.mark.asyncio
-async def test_chef_ne_change_pas_l_equipe_de_son_stand_403(
-    client: AsyncClient, chef_headers: dict, equipe_aerienne, equipe_aerienne_bis
-):
-    stand = (
-        await client.post(
-            "/stands-remplissage",
-            json={"numero": "STD16", "localite": "Le mien"},
-            headers=chef_headers,
-        )
-    ).json()
-    reponse = await client.put(
-        f"/stands-remplissage/{stand['id']}",
-        json={"equipe_aerienne_id": str(equipe_aerienne_bis.id)},
-        headers=chef_headers,
-    )
-    assert reponse.status_code == 403
-
-
-@pytest.mark.asyncio
-async def test_chef_reenvoie_le_meme_stand_sans_403(
-    client: AsyncClient, chef_headers: dict, equipe_aerienne
-):
-    """Un PUT qui échoue simplement l'équipe déjà en place (lecture-modification-
-    écriture typique d'un client) ne doit pas 403 le propriétaire légitime — seul un
-    changement réel d'équipe est réservé à l'admin."""
-    stand = (
-        await client.post(
-            "/stands-remplissage",
-            json={"numero": "STD17", "localite": "Le mien"},
-            headers=chef_headers,
-        )
-    ).json()
-    reponse = await client.put(
-        f"/stands-remplissage/{stand['id']}",
-        json={"localite": "Le mien (renommé)", "equipe_aerienne_id": stand["equipe_aerienne_id"]},
-        headers=chef_headers,
-    )
-    assert reponse.status_code == 200, reponse.text
-    assert reponse.json()["localite"] == "Le mien (renommé)"
-    assert reponse.json()["equipe_aerienne_id"] == str(equipe_aerienne.id)

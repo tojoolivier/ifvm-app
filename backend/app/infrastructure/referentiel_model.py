@@ -172,7 +172,7 @@ class LieuAerienModel(Base):
     # en base restent "sans équipe" jusqu'à rattachement manuel ; obligatoire côté
     # application pour toute nouvelle création (LieuAerienCreate). Pas d'UNIQUE :
     # une équipe peut posséder plusieurs lieux (bases principales/secondaires/stands),
-    # contrairement à `BaseAerienneModel.equipe_id` (1:1, référentiel distinct dédié à
+    # contrairement à `SiteAerienneModel.equipe_id` (1:1, référentiel distinct dédié à
     # la gestion d'équipe aérienne).
     equipe_aerienne_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     equipe_type: Mapped[str | None] = mapped_column(
@@ -392,31 +392,34 @@ class EquipeMembreModel(Base):
     )
 
 
-class BaseAerienneModel(Base):
-    """Base principale ou base secondaire d'une équipe aérienne.
+class SiteAerienneModel(Base):
+    """Site aérien : base principale, base secondaire ou stand de remplissage d'une
+    équipe aérienne — table unique auto-référencée (`parent_site_id NULL` = principale,
+    sinon secondaire) plutôt que plusieurs tables, même raisonnement que
+    `LieuAerienModel.type_lieu`. Introduite en migration 0064 comme `base_aerienne`,
+    renommée et fusionnée avec `stand_remplissage` en migration 0086 (#604) : les deux
+    tables partageaient exactement la même forme (`numero`, `localite`, position),
+    seule la hiérarchie (`base_aerienne`) ou l'absence de hiérarchie
+    (`stand_remplissage`) différait. Après fusion, un ancien stand est une ligne
+    secondaire comme une ancienne base secondaire : le rôle (« stand » vs « base
+    secondaire ») est désormais **contextuel**, porté par la FK qui référence le site
+    depuis l'appelant — pas par une colonne discriminante (décision produit, #592
+    décision 6, confirmée par #604).
 
-    Table unique auto-référencée (`parent_base_id NULL` = principale, sinon
-    secondaire) plutôt que deux tables — même raisonnement que
-    `LieuAerienModel.type_lieu` : les deux niveaux partagent exactement les
-    mêmes attributs, seule la hiérarchie diffère. Introduite en migration
-    0064, délibérément distincte de `lieu_aerien` malgré le chevauchement
-    conceptuel : `lieu_aerien` a été débranché deux fois des fiches qui le
-    référençaient (`traitement_aerien` en 0054, `prospection` en 0063) parce
-    que choisir la base dans un référentiel synchronisé s'est révélé être une
-    contrainte terrain non voulue. Les bases d'équipe aérienne restent malgré
-    tout un référentiel dédié — décision produit explicite, maintenue en
-    connaissance de ce précédent (cf. docstring de la migration 0064).
+    `equipe_id` (migration 0066) : NOT NULL uniquement sur une principale
+    (`ck_site_aerienne_equipe_coherente`) — une secondaire hérite de l'équipe de sa
+    principale via `parent_site_id`, elle ne porte pas sa propre `equipe_id`.
 
-    `equipe_id` (migration 0066) : NOT NULL uniquement sur une base principale
-    (`ck_base_aerienne_equipe_coherente`) — une base secondaire hérite de l'équipe
-    de sa principale via `parent_base_id`, elle ne porte pas sa propre `equipe_id`.
+    La position GPS (`longitude`/`latitude`/`altitude`, figée depuis 0064) est sortie
+    en migration 0086 vers `site_aerienne_position`, qui historise les implantations
+    successives — un site qui se déplace ne perd plus sa position précédente.
     """
 
-    __tablename__ = "base_aerienne"
+    __tablename__ = "site_aerienne"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    parent_base_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("base_aerienne.id", ondelete="RESTRICT"), nullable=True
+    parent_site_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("site_aerienne.id", ondelete="RESTRICT"), nullable=True
     )
     equipe_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     equipe_type: Mapped[str | None] = mapped_column(
@@ -424,69 +427,62 @@ class BaseAerienneModel(Base):
     )
     numero: Mapped[str] = mapped_column(Text(), nullable=False, unique=True)
     localite: Mapped[str] = mapped_column(Text(), nullable=False)
-    longitude: Mapped[float | None] = mapped_column(Numeric(11, 8), nullable=True)
-    latitude: Mapped[float | None] = mapped_column(Numeric(10, 8), nullable=True)
-    altitude: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
     actif: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
 
-    # Noms de contraintes explicites — doivent matcher la migration 0066 à
+    # Noms de contraintes explicites — doivent matcher la migration 0086 à
     # l'identique (cf. commentaire équivalent sur `EquipeModel`).
     __table_args__ = (
         ForeignKeyConstraint(
             ["equipe_id", "equipe_type"],
             ["equipe.id", "equipe.type"],
-            name="fk_base_aerienne_equipe_id",
+            name="fk_site_aerienne_equipe_id",
             ondelete="RESTRICT",
         ),
-        UniqueConstraint("equipe_id", name="uq_base_aerienne_equipe_id"),
+        UniqueConstraint("equipe_id", name="uq_site_aerienne_equipe_id"),
         CheckConstraint(
-            "(parent_base_id IS NULL AND equipe_id IS NOT NULL) OR "
-            "(parent_base_id IS NOT NULL AND equipe_id IS NULL)",
-            name="ck_base_aerienne_equipe_coherente",
+            "(parent_site_id IS NULL AND equipe_id IS NOT NULL) OR "
+            "(parent_site_id IS NOT NULL AND equipe_id IS NULL)",
+            name="ck_site_aerienne_equipe_coherente",
         ),
     )
 
-    parent: Mapped["BaseAerienneModel"] = relationship(remote_side=[id])
+    parent: Mapped["SiteAerienneModel"] = relationship(remote_side=[id])
+    positions: Mapped[list["SiteAeriennePositionModel"]] = relationship(
+        back_populates="site", order_by="SiteAeriennePositionModel.date_debut"
+    )
 
 
-class StandRemplissageModel(Base):
-    """Stand de remplissage d'une équipe aérienne — même forme que `BaseAerienneModel`,
-    sans hiérarchie.
+class SiteAeriennePositionModel(Base):
+    """Implantation successive d'un `site_aerienne` (migration 0086, #604).
 
-    `equipe_aerienne_id` (migration 0078) : équipe propriétaire du stand. Sans UNIQUE —
-    une équipe possède plusieurs stands, contrairement à sa base principale. Nullable :
-    les stands antérieurs restent « sans équipe » jusqu'à rattachement manuel ; exigé à
-    la création côté application."""
+    Une ligne par période d'implantation, `date_fin IS NULL` pour la position en cours
+    — même patron que `equipe_aeronef` (migration 0085) pour l'affectation d'aéronef.
+    La durée d'implantation (`date_fin - date_debut`, ou l'écart à `today()` si la
+    position est encore active) est dérivée à la lecture, jamais stockée en colonne.
+    """
 
-    __tablename__ = "stand_remplissage"
+    __tablename__ = "site_aerienne_position"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    numero: Mapped[str] = mapped_column(Text(), nullable=False, unique=True)
-    localite: Mapped[str] = mapped_column(Text(), nullable=False)
-    longitude: Mapped[float | None] = mapped_column(Numeric(11, 8), nullable=True)
-    latitude: Mapped[float | None] = mapped_column(Numeric(10, 8), nullable=True)
-    altitude: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
-    equipe_aerienne_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
-    equipe_type: Mapped[str | None] = mapped_column(
-        Text(), _equipe_type_genere("equipe_aerienne_id", "aerien"), nullable=True
+    site_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("site_aerienne.id", ondelete="CASCADE"), nullable=False
     )
-    actif: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
+    latitude: Mapped[float] = mapped_column(Numeric(10, 8), nullable=False)
+    longitude: Mapped[float] = mapped_column(Numeric(11, 8), nullable=False)
+    altitude: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
+    date_debut: Mapped[date] = mapped_column(Date(), nullable=False)
+    date_fin: Mapped[date | None] = mapped_column(Date(), nullable=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
 
-    # Nom explicite, conservé depuis la migration 0078 (la cible passe à `equipe` en
-    # 0084) : le dépôt s'en sert pour distinguer une équipe inexistante d'un doublon de
-    # `numero`.
     __table_args__ = (
-        ForeignKeyConstraint(
-            ["equipe_aerienne_id", "equipe_type"],
-            ["equipe.id", "equipe.type"],
-            name="fk_stand_remplissage_equipe_aerienne_id",
-            ondelete="RESTRICT",
+        CheckConstraint(
+            "date_fin IS NULL OR date_fin >= date_debut", name="ck_site_aerienne_position_periode"
         ),
     )
+
+    site: Mapped["SiteAerienneModel"] = relationship(back_populates="positions")
 
 
 class PesticideModel(Base):

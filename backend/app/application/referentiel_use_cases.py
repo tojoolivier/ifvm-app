@@ -11,9 +11,6 @@ from app.domain.referentiel import (
     AffectationAeronef,
     AffectationAeronefIntrouvableError,
     AffectationDejaCloturee,
-    BaseAerienne,
-    BaseAerienneEquipeInvalideError,
-    BaseAerienneParentInvalideError,
     ChefEquipeInvalideError,
     CodeReferentielDejaPrisError,
     CodeStade,
@@ -34,12 +31,18 @@ from app.domain.referentiel import (
     MembreEquipe,
     PeriodeAffectationInvalideError,
     Pesticide,
+    PositionActiveIntrouvableError,
+    PositionDejaActiveError,
     PosteAcridien,
     PosteAcridienAvecStationsActivesError,
     PosteAcridienInactifError,
     PosteAcridienIntrouvableError,
+    SiteAerienne,
+    SiteAerienneEquipeInvalideError,
+    SiteAerienneIntrouvableError,
+    SiteAerienneParentInvalideError,
+    SiteAeriennePosition,
     StadeInconnuError,
-    StandRemplissage,
     StationFixe,
     TypeLieuAerienInvalideError,
     UtilisateurEquipe,
@@ -50,7 +53,6 @@ from app.domain.referentiel import (
 )
 from app.domain.repositories import (
     AeronefRepository,
-    BaseAerienneRepository,
     CampagneRepository,
     CodeStadeRepository,
     CommuneRepository,
@@ -60,7 +62,8 @@ from app.domain.repositories import (
     LieuAerienRepository,
     PesticideRepository,
     PosteAcridienRepository,
-    StandRemplissageRepository,
+    SiteAeriennePositionRepository,
+    SiteAerienneRepository,
     StationFixeRepository,
     UtilisateurEquipeRepository,
     ZoneAntiAcridienRepository,
@@ -243,7 +246,7 @@ class UpdatePosteAcridien:
 
         # `equipe_terrestre_id` est nullable (un poste peut être détaché de son
         # équipe) : seul `champs_fournis` (model_fields_set côté Pydantic) distingue
-        # « absent » de « mis à NULL », même patron que `UpdateBaseAerienne.equipe_id`.
+        # « absent » de « mis à NULL », même patron que `UpdateSiteAerienne.equipe_id`.
         if "equipe_terrestre_id" in champs_fournis:
             if equipe_terrestre_id is not None and not await _equipe_terrestre_existe(
                 self.equipe_terrestre_repository, equipe_terrestre_id
@@ -634,7 +637,7 @@ class GetLieuAerien:
 
 class CreateLieuAerien:
     """Seul le chef de base de l'équipe (ou un admin) crée ses lieux — même règle que
-    `CreateBaseAerienne`/`CreateStandRemplissage`."""
+    `CreateSiteAerienne`."""
 
     def __init__(
         self,
@@ -742,20 +745,20 @@ class UpdateLieuAerien:
         return await self.repository.update(lieu)
 
 
-class ListBasesAeriennes:
-    def __init__(self, repository: BaseAerienneRepository):
+class ListSitesAeriens:
+    def __init__(self, repository: SiteAerienneRepository):
         self.repository = repository
 
-    async def execute(self, actif: bool | None = True) -> list[BaseAerienne]:
+    async def execute(self, actif: bool | None = True) -> list[SiteAerienne]:
         return await self.repository.list_all(actif=actif)
 
 
-class GetBaseAerienne:
-    def __init__(self, repository: BaseAerienneRepository):
+class GetSiteAerienne:
+    def __init__(self, repository: SiteAerienneRepository):
         self.repository = repository
 
-    async def execute(self, base_id: uuid.UUID) -> BaseAerienne | None:
-        return await self.repository.get_by_id(base_id)
+    async def execute(self, site_id: uuid.UUID) -> SiteAerienne | None:
+        return await self.repository.get_by_id(site_id)
 
 
 def _est_admin(acteur: object) -> bool:
@@ -803,46 +806,47 @@ async def _exiger_droit_sur_equipe(
         raise EquipeNonAutoriseeError("ce lieu aérien appartient à une autre équipe")
 
 
-async def _valider_parent_base(
-    repository: BaseAerienneRepository, parent_base_id: uuid.UUID | None
+async def _valider_parent_site(
+    repository: SiteAerienneRepository, parent_site_id: uuid.UUID | None
 ) -> None:
     """La hiérarchie s'arrête à 2 niveaux : le parent référencé doit exister et être
-    lui-même une principale (pas de secondaire d'une secondaire)."""
-    if parent_base_id is None:
+    lui-même un principal (pas de secondaire d'un secondaire)."""
+    if parent_site_id is None:
         return
-    parent = await repository.get_by_id(parent_base_id)
-    if parent is None or parent.parent_base_id is not None:
-        raise BaseAerienneParentInvalideError(str(parent_base_id))
+    parent = await repository.get_by_id(parent_site_id)
+    if parent is None or parent.parent_site_id is not None:
+        raise SiteAerienneParentInvalideError(str(parent_site_id))
 
 
 def _valider_equipe_coherente(
-    parent_base_id: uuid.UUID | None, equipe_id: uuid.UUID | None
+    parent_site_id: uuid.UUID | None, equipe_id: uuid.UUID | None
 ) -> None:
-    """#equipe-aerienne (migration 0066) : une base principale (`parent_base_id`
-    NULL) doit avoir une équipe ; une base secondaire hérite de celle de sa
-    principale et n'en porte pas une à elle — même règle que le CHECK
-    `ck_base_aerienne_equipe_coherente`, vérifiée ici en amont pour un message
+    """#equipe-aerienne (migration 0066) : un site principal (`parent_site_id`
+    NULL) doit avoir une équipe ; un site secondaire hérite de celle de son
+    principal et n'en porte pas une à lui — même règle que le CHECK
+    `ck_site_aerienne_equipe_coherente`, vérifiée ici en amont pour un message
     d'erreur explicite plutôt qu'une violation de contrainte brute."""
-    est_principale = parent_base_id is None
-    if est_principale and equipe_id is None:
-        raise BaseAerienneEquipeInvalideError(
-            "une base aérienne principale doit appartenir à une équipe aérienne"
+    est_principal = parent_site_id is None
+    if est_principal and equipe_id is None:
+        raise SiteAerienneEquipeInvalideError(
+            "un site aérien principal doit appartenir à une équipe aérienne"
         )
-    if not est_principale and equipe_id is not None:
-        raise BaseAerienneEquipeInvalideError(
-            "une base aérienne secondaire hérite de l'équipe de sa base principale, "
-            "elle ne peut pas avoir sa propre équipe"
+    if not est_principal and equipe_id is not None:
+        raise SiteAerienneEquipeInvalideError(
+            "un site aérien secondaire hérite de l'équipe de son site principal, "
+            "il ne peut pas avoir sa propre équipe"
         )
 
 
-class CreateBaseAerienne:
-    """Seul le chef de base de l'équipe (ou un admin) crée ses bases. Une principale est
-    rattachée à l'équipe du chef sans qu'il la désigne ; une secondaire hérite de sa
-    principale, dont l'équipe doit être la sienne."""
+class CreateSiteAerienne:
+    """Seul le chef de base de l'équipe (ou un admin) crée ses sites (bases,
+    stands — le rôle est contextuel, cf. `SiteAerienneModel`). Un site principal est
+    rattaché à l'équipe du chef sans qu'il la désigne ; un secondaire hérite de son
+    principal, dont l'équipe doit être la sienne."""
 
     def __init__(
         self,
-        repository: BaseAerienneRepository,
+        repository: SiteAerienneRepository,
         equipe_aerienne_repository: EquipeRepository,
     ):
         self.repository = repository
@@ -853,14 +857,11 @@ class CreateBaseAerienne:
         acteur: object,
         numero: str,
         localite: str,
-        parent_base_id: uuid.UUID | None = None,
+        parent_site_id: uuid.UUID | None = None,
         equipe_id: uuid.UUID | None = None,
-        longitude: float | None = None,
-        latitude: float | None = None,
-        altitude: float | None = None,
-    ) -> BaseAerienne:
-        await _valider_parent_base(self.repository, parent_base_id)
-        if parent_base_id is None:
+    ) -> SiteAerienne:
+        await _valider_parent_site(self.repository, parent_site_id)
+        if parent_site_id is None:
             # Un admin sans `equipe_id` retombe sur `_valider_equipe_coherente`
             # (422 explicite) plutôt que sur « équipe requise » : même règle qu'avant.
             if not _est_admin(acteur) or equipe_id is not None:
@@ -868,22 +869,19 @@ class CreateBaseAerienne:
                     acteur, self.equipe_aerienne_repository, equipe_id
                 )
         else:
-            parent = await self.repository.get_by_id(parent_base_id)
+            parent = await self.repository.get_by_id(parent_site_id)
             await _exiger_droit_sur_equipe(
                 acteur, self.equipe_aerienne_repository, parent.equipe_id
             )
-        _valider_equipe_coherente(parent_base_id, equipe_id)
+        _valider_equipe_coherente(parent_site_id, equipe_id)
 
         maintenant = datetime.now(timezone.utc)
         return await self.repository.create(
-            BaseAerienne(
-                parent_base_id=parent_base_id,
+            SiteAerienne(
+                parent_site_id=parent_site_id,
                 equipe_id=equipe_id,
                 numero=numero,
                 localite=localite,
-                longitude=longitude,
-                latitude=latitude,
-                altitude=altitude,
                 actif=True,
                 created_at=maintenant,
                 updated_at=maintenant,
@@ -891,13 +889,13 @@ class CreateBaseAerienne:
         )
 
 
-class UpdateBaseAerienne:
+class UpdateSiteAerienne:
     """Mise à jour partielle, `actif` compris. Pas de suppression : `actif=False` est
     la seule sortie."""
 
     def __init__(
         self,
-        repository: BaseAerienneRepository,
+        repository: SiteAerienneRepository,
         equipe_aerienne_repository: EquipeRepository,
     ):
         self.repository = repository
@@ -906,63 +904,128 @@ class UpdateBaseAerienne:
     async def execute(
         self,
         acteur: object,
-        base_id: uuid.UUID,
+        site_id: uuid.UUID,
         numero: str | None = None,
         localite: str | None = None,
-        parent_base_id: uuid.UUID | None = None,
+        parent_site_id: uuid.UUID | None = None,
         equipe_id: uuid.UUID | None = None,
-        longitude: float | None = None,
-        latitude: float | None = None,
-        altitude: float | None = None,
         actif: bool | None = None,
         champs_fournis: set[str] = frozenset(),
-    ) -> BaseAerienne | None:
-        base = await self.repository.get_by_id(base_id)
-        if base is None:
+    ) -> SiteAerienne | None:
+        site = await self.repository.get_by_id(site_id)
+        if site is None:
             return None
 
-        # L'équipe qui possède la base : la sienne (principale) ou celle de sa principale
+        # L'équipe qui possède le site : la sienne (principal) ou celle de son principal
         # (secondaire). Contrôlée AVANT toute modification, sur l'état actuel.
-        if base.parent_base_id is None:
-            equipe_courante = base.equipe_id
+        if site.parent_site_id is None:
+            equipe_courante = site.equipe_id
         else:
-            principale = await self.repository.get_by_id(base.parent_base_id)
-            equipe_courante = principale.equipe_id if principale is not None else None
+            principal = await self.repository.get_by_id(site.parent_site_id)
+            equipe_courante = principal.equipe_id if principal is not None else None
         await _exiger_droit_sur_equipe(acteur, self.equipe_aerienne_repository, equipe_courante)
 
-        if "parent_base_id" in champs_fournis:
-            if parent_base_id == base_id:
-                raise BaseAerienneParentInvalideError("une base ne peut pas être son propre parent")
-            await _valider_parent_base(self.repository, parent_base_id)
-            if parent_base_id is not None:
-                nouveau_parent = await self.repository.get_by_id(parent_base_id)
+        if "parent_site_id" in champs_fournis:
+            if parent_site_id == site_id:
+                raise SiteAerienneParentInvalideError("un site ne peut pas être son propre parent")
+            await _valider_parent_site(self.repository, parent_site_id)
+            if parent_site_id is not None:
+                nouveau_parent = await self.repository.get_by_id(parent_site_id)
                 await _exiger_droit_sur_equipe(
                     acteur, self.equipe_aerienne_repository, nouveau_parent.equipe_id
                 )
-            base.parent_base_id = parent_base_id
+            site.parent_site_id = parent_site_id
         if "equipe_id" in champs_fournis:
             if equipe_id is not None:
                 await _exiger_droit_sur_equipe(acteur, self.equipe_aerienne_repository, equipe_id)
-            base.equipe_id = equipe_id
-        if "parent_base_id" in champs_fournis or "equipe_id" in champs_fournis:
-            _valider_equipe_coherente(base.parent_base_id, base.equipe_id)
+            site.equipe_id = equipe_id
+        if "parent_site_id" in champs_fournis or "equipe_id" in champs_fournis:
+            _valider_equipe_coherente(site.parent_site_id, site.equipe_id)
         if numero is not None:
-            base.numero = numero
+            site.numero = numero
         if localite is not None:
-            base.localite = localite
-        # Coordonnées nullables : seul le corps reçu distingue « absent » de « mis à
-        # NULL » — `champs_fournis` vient de `model_fields_set` côté schéma Pydantic.
-        if "longitude" in champs_fournis:
-            base.longitude = longitude
-        if "latitude" in champs_fournis:
-            base.latitude = latitude
-        if "altitude" in champs_fournis:
-            base.altitude = altitude
+            site.localite = localite
         if actif is not None:
-            base.actif = actif
+            site.actif = actif
 
-        base.updated_at = datetime.now(timezone.utc)
-        return await self.repository.update(base)
+        site.updated_at = datetime.now(timezone.utc)
+        return await self.repository.update(site)
+
+
+class InstallerPositionSiteAerienne:
+    """Ouvre une position (installe le site à des coordonnées GPS). Refuse s'il en
+    existe déjà une active — la démonter d'abord (AC #604)."""
+
+    def __init__(
+        self,
+        repository: SiteAeriennePositionRepository,
+        site_repository: SiteAerienneRepository,
+    ):
+        self.repository = repository
+        self.site_repository = site_repository
+
+    async def execute(
+        self,
+        site_id: uuid.UUID,
+        latitude: float,
+        longitude: float,
+        altitude: float | None = None,
+    ) -> SiteAeriennePosition:
+        if await self.site_repository.get_by_id(site_id) is None:
+            raise SiteAerienneIntrouvableError(str(site_id))
+        active = await self.repository.get_active(site_id)
+        if active is not None:
+            raise PositionDejaActiveError(str(site_id))
+
+        maintenant = datetime.now(timezone.utc)
+        return await self.repository.installer(
+            SiteAeriennePosition(
+                site_id=site_id,
+                latitude=latitude,
+                longitude=longitude,
+                altitude=altitude,
+                date_debut=maintenant.date(),
+                date_fin=None,
+                created_at=maintenant,
+            )
+        )
+
+
+class DemonterPositionSiteAerienne:
+    """Borne `date_fin` de la position active. Échoue s'il n'y en a aucune."""
+
+    def __init__(
+        self,
+        repository: SiteAeriennePositionRepository,
+        site_repository: SiteAerienneRepository,
+    ):
+        self.repository = repository
+        self.site_repository = site_repository
+
+    async def execute(self, site_id: uuid.UUID) -> SiteAeriennePosition:
+        if await self.site_repository.get_by_id(site_id) is None:
+            raise SiteAerienneIntrouvableError(str(site_id))
+        active = await self.repository.get_active(site_id)
+        if active is None:
+            raise PositionActiveIntrouvableError(str(site_id))
+        active.date_fin = datetime.now(timezone.utc).date()
+        return await self.repository.demonter(active)
+
+
+class ListerPositionsSiteAerienne:
+    def __init__(self, repository: SiteAeriennePositionRepository):
+        self.repository = repository
+
+    async def execute(self, site_id: uuid.UUID) -> list[SiteAeriennePosition]:
+        return await self.repository.list_par_site(site_id)
+
+
+class GetPositionActiveSiteAerienne:
+    def __init__(self, repository: SiteAeriennePositionRepository):
+        self.repository = repository
+
+    async def execute(self, site_id: uuid.UUID) -> SiteAeriennePosition | None:
+        return await self.repository.get_active(site_id)
 
 
 # Fonction de direction attendue selon le type d'équipe : `ROLES` distingue toujours
@@ -1340,134 +1403,6 @@ class UpdateAeronef:
 
         aeronef.updated_at = datetime.now(timezone.utc)
         return await self.repository.update(aeronef)
-
-
-class ListStandsRemplissage:
-    def __init__(self, repository: StandRemplissageRepository):
-        self.repository = repository
-
-    async def execute(self, actif: bool | None = True) -> list[StandRemplissage]:
-        return await self.repository.list_all(actif=actif)
-
-
-class GetStandRemplissage:
-    def __init__(self, repository: StandRemplissageRepository):
-        self.repository = repository
-
-    async def execute(self, stand_id: uuid.UUID) -> StandRemplissage | None:
-        return await self.repository.get_by_id(stand_id)
-
-
-class CreateStandRemplissage:
-    """Seul le chef de base de l'équipe (ou un admin) crée ses stands ; le stand est
-    rattaché à l'équipe du chef sans qu'il la désigne."""
-
-    def __init__(
-        self,
-        repository: StandRemplissageRepository,
-        equipe_aerienne_repository: EquipeRepository,
-    ):
-        self.repository = repository
-        self.equipe_aerienne_repository = equipe_aerienne_repository
-
-    async def execute(
-        self,
-        acteur: object,
-        numero: str,
-        localite: str,
-        equipe_aerienne_id: uuid.UUID | None = None,
-        longitude: float | None = None,
-        latitude: float | None = None,
-        altitude: float | None = None,
-    ) -> StandRemplissage:
-        equipe_aerienne_id = await _resoudre_equipe_creation(
-            acteur, self.equipe_aerienne_repository, equipe_aerienne_id
-        )
-        if not await _equipe_aerienne_existe(self.equipe_aerienne_repository, equipe_aerienne_id):
-            raise EquipeAerienneIntrouvableError(str(equipe_aerienne_id))
-
-        maintenant = datetime.now(timezone.utc)
-        return await self.repository.create(
-            StandRemplissage(
-                numero=numero,
-                localite=localite,
-                longitude=longitude,
-                latitude=latitude,
-                altitude=altitude,
-                equipe_aerienne_id=equipe_aerienne_id,
-                actif=True,
-                created_at=maintenant,
-                updated_at=maintenant,
-            )
-        )
-
-
-class UpdateStandRemplissage:
-    """Mise à jour partielle, `actif` compris. Pas de suppression : `actif=False` est
-    la seule sortie."""
-
-    def __init__(
-        self,
-        repository: StandRemplissageRepository,
-        equipe_aerienne_repository: EquipeRepository,
-    ):
-        self.repository = repository
-        self.equipe_aerienne_repository = equipe_aerienne_repository
-
-    async def execute(
-        self,
-        acteur: object,
-        stand_id: uuid.UUID,
-        numero: str | None = None,
-        localite: str | None = None,
-        longitude: float | None = None,
-        latitude: float | None = None,
-        altitude: float | None = None,
-        equipe_aerienne_id: uuid.UUID | None = None,
-        actif: bool | None = None,
-        champs_fournis: set[str] = frozenset(),
-    ) -> StandRemplissage | None:
-        stand = await self.repository.get_by_id(stand_id)
-        if stand is None:
-            return None
-
-        await _exiger_droit_sur_equipe(
-            acteur, self.equipe_aerienne_repository, stand.equipe_aerienne_id
-        )
-
-        # Rattacher/changer/détacher l'équipe d'un stand : admin seulement — c'est ainsi
-        # qu'on rattache les stands antérieurs à la migration 0078 (« sans équipe »).
-        # Gardé sur `champs_fournis` + comparaison à la valeur actuelle (pas seulement
-        # `is not None`) : un PUT qui échoue simplement l'équipe déjà en place (lecture-
-        # modification-écriture d'un client) ne doit pas 403 son propriétaire légitime,
-        # et un admin doit pouvoir explicitement détacher (`equipe_aerienne_id: null`).
-        if (
-            "equipe_aerienne_id" in champs_fournis
-            and equipe_aerienne_id != stand.equipe_aerienne_id
-        ):
-            if not _est_admin(acteur):
-                raise EquipeNonAutoriseeError("seul un admin change l'équipe d'un stand")
-            if equipe_aerienne_id is not None and not await _equipe_aerienne_existe(
-                self.equipe_aerienne_repository, equipe_aerienne_id
-            ):
-                raise EquipeAerienneIntrouvableError(str(equipe_aerienne_id))
-            stand.equipe_aerienne_id = equipe_aerienne_id
-
-        if numero is not None:
-            stand.numero = numero
-        if localite is not None:
-            stand.localite = localite
-        if "longitude" in champs_fournis:
-            stand.longitude = longitude
-        if "latitude" in champs_fournis:
-            stand.latitude = latitude
-        if "altitude" in champs_fournis:
-            stand.altitude = altitude
-        if actif is not None:
-            stand.actif = actif
-
-        stand.updated_at = datetime.now(timezone.utc)
-        return await self.repository.update(stand)
 
 
 class ListPesticides:
