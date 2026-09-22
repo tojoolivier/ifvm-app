@@ -33,4 +33,32 @@ describe('composerNumeroFiche', () => {
     expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11', null, null)).toBe('Hery-Aerien-2026-08-11');
     expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11', null, '')).toBe('Hery-Aerien-2026-08-11');
   });
+
+  // #zone-a-reprendre-numero-annexe
+  describe('estReprise (#zone-a-reprendre-numero-annexe)', () => {
+    it('ajoute « -ANNEXE » quand la fiche est une reprise', () => {
+      expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11', null, null, true)).toBe(
+        'Hery-Aerien-2026-08-11-ANNEXE'
+      );
+    });
+
+    it('place « -ANNEXE » avant le suffixe de collision, jamais après', () => {
+      expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11', 2, null, true)).toBe(
+        'Hery-Aerien-2026-08-11-ANNEXE-2'
+      );
+    });
+
+    it('combine sigle et « -ANNEXE » sans tiret orphelin', () => {
+      expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11', null, 'ADM', true)).toBe(
+        'Hery-Aerien-2026-08-11-ADM-ANNEXE'
+      );
+    });
+
+    it('omet « -ANNEXE » quand estReprise est absent, false ou undefined', () => {
+      expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11', null, null, false)).toBe(
+        'Hery-Aerien-2026-08-11'
+      );
+      expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11')).toBe('Hery-Aerien-2026-08-11');
+    });
+  });
 });

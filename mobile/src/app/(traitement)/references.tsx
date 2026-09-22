@@ -69,6 +69,11 @@ export default function ReferencesScreen() {
   const [prospectionNFiche, setProspectionNFiche] = useState<string | null>(null);
 
   const readOnly = isValidationView === '1';
+  // #zone-a-reprendre-numero-annexe : présence d'`origineId` = fiche démarrée
+  // depuis « Zones à reprendre » (cf. zones-a-reprendre.tsx) — son numéro
+  // porte alors « -ANNEXE », pour la distinguer au premier coup d'œil sur
+  // « Mes fiches »/« Zones à reprendre » d'un traitement neuf sans lien.
+  const estReprise = !!origineId;
   const hasGps = store.ref.latitude != null && store.ref.longitude != null;
   const { run: runGps, isRunning: isGpsLoading } = useAsyncAction();
   const { run, isRunning: isSaving } = useAsyncAction();
@@ -189,7 +194,8 @@ export default function ReferencesScreen() {
       typeTraitement,
       store.ref.dateTraitement,
       traitementId,
-      utilisateurConnecte.sigle
+      utilisateurConnecte.sigle,
+      estReprise
     )
       .then((numero) => {
         if (!cancelled) store.updateRef({ numeroFiche: numero });
@@ -199,7 +205,7 @@ export default function ReferencesScreen() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [readOnly, store.ref.numeroFiche, utilisateurConnecte, typeTraitement, store.ref.dateTraitement, traitementId]);
+  }, [readOnly, store.ref.numeroFiche, utilisateurConnecte, typeTraitement, store.ref.dateTraitement, traitementId, estReprise]);
 
   const handleContinuer = () =>
     run(
@@ -266,7 +272,21 @@ export default function ReferencesScreen() {
               listAllProspectionCaptures(prospectionId),
             ]);
             if (prospectionLiee) {
-              await saveCible(id, construireCible(prospectionLiee, populations, infestations, captures));
+              const cible = construireCible(prospectionLiee, populations, infestations, captures);
+              // #zone-a-reprendre-surface-reste-a-traiter : la référence de
+              // surface pour CETTE fiche est le reste à traiter de l'origine,
+              // pas sa `surface_infestee_ha` (qui reste affichée telle quelle,
+              // inchangée — c'est une donnée de la prospection, pas de la
+              // reprise). L'origine peut avoir un type de traitement différent
+              // de celui choisi ici (terrestre/aérien restent libres l'un de
+              // l'autre, cf. `estReprise`), donc on lit le sous-objet
+              // réellement renseigné plutôt que de supposer lequel.
+              if (origineId) {
+                const origine = await getTraitement(origineId);
+                cible.surface_restante_origine_ha =
+                  origine?.terrestre?.surface_restante_ha ?? origine?.aerien?.surface_restante_ha ?? null;
+              }
+              await saveCible(id, cible);
             }
           }
         }
@@ -281,7 +301,8 @@ export default function ReferencesScreen() {
             typeTraitement,
             store.ref.dateTraitement,
             id,
-            utilisateurConnecte.sigle
+            utilisateurConnecte.sigle,
+            estReprise
           );
           store.updateRef({ numeroFiche });
         }

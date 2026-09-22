@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { listReprenableTraitements, ReprenableTraitementRow } from '@/lib/traitement-repository';
@@ -61,7 +61,16 @@ export default function TraitementZonesAReprendreScreen() {
           }
           renderItem={({ item }) => (
             <TouchableOpacity style={styles.row} onPress={() => openFiche(item)}>
-              <Text style={styles.rowTitle}>{item.numero_fiche ?? 'généré à l’enregistrement'}</Text>
+              <View style={styles.rowHeader}>
+                <Text style={styles.rowTitle}>{item.numero_fiche ?? 'généré à l’enregistrement'}</Text>
+                {/* #zone-a-reprendre-insigne : même insigne que sur « Mes
+                    fiches » (FicheCard.insigneBadge) — cohérent entre les deux
+                    écrans, même si celui-ci n'utilise pas FicheCard (système
+                    de styles propre au module traitement). */}
+                <View style={styles.insigne}>
+                  <Text style={styles.insigneText}>↻ REPRISE POSSIBLE</Text>
+                </View>
+              </View>
               <Text style={styles.rowSubtitle}>
                 {item.type_traitement} · {item.localite ?? 'localité non renseignée'}
               </Text>
@@ -102,7 +111,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     gap: 2,
   },
+  rowHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   rowTitle: { fontFamily: traitementFonts.mono, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre },
+  insigne: {
+    backgroundColor: traitementColors.avertissementFond,
+    borderRadius: traitementRadii.chip,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  insigneText: { fontFamily: traitementFonts.uiExtraBold, fontSize: 10, color: traitementColors.avertissementTexte },
   rowSubtitle: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.label, color: traitementColors.texteSecondaire },
   rowSurface: {
     fontFamily: traitementFonts.uiMedium,
