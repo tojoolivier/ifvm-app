@@ -87,7 +87,7 @@ export default function TypeChooserScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity style={[styles.card, styles.cardDashed]} onPress={chooseValidation} activeOpacity={0.85}>
-            <Text style={styles.cardTitle}>☑ Vérifier un signalement</Text>
+            <Text style={styles.cardTitle}>☑ Validation</Text>
             <Text style={styles.cardSubtitle}>
               Même fiche A→D, conclue par Confirmée / Infirmée sur place.
             </Text>
