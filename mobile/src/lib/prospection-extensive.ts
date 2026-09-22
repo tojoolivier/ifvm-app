@@ -64,6 +64,23 @@ export function parseSelectionMultiple(raw: string | null | undefined): string[]
   return [raw];
 }
 
+/**
+ * #interdistance-obligatoire-si-accouplement-ou-ponte : l'interdistance
+ * (imagos, Intensif comme Extensif/Signalement — même écran) n'a de sens que
+ * si un accouplement OU une ponte a été observé (valeur "Rare" ou
+ * "Beaucoup") — jamais si les deux valent "Néant". `null` (jamais renseigné)
+ * est traité comme "Néant" : rien ne distingue "pas observé" de "pas encore
+ * choisi" pour cette règle, et une fiche qui ne touche jamais ces deux champs
+ * (ex. Signalement) ne doit pas se voir exiger une interdistance de ce fait.
+ */
+export function accouplementOuPonteActif(
+  accouplement: string | null | undefined,
+  ponte: string | null | undefined
+): boolean {
+  const estActif = (valeur: string | null | undefined) => valeur === 'Rare' || valeur === 'Beaucoup';
+  return estActif(accouplement) || estActif(ponte);
+}
+
 export const NIVEAU_OPTIONS: { value: string; label: string }[] = [
   { value: 'faible', label: 'Faible' },
   { value: 'moyenne', label: 'Moyenne' },

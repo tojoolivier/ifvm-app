@@ -61,26 +61,37 @@ describe('IntensiveImagosScreen — Suivant accepte si stades = captures', () =>
     await screen.findByText('Type de cible');
     await settle();
 
-    fireEvent.changeText(screen.getByPlaceholderText('Saisir le nombre de captures'), '3');
     fireEvent.changeText(screen.getByTestId('densite-diffuse-input'), '12');
     await settle();
 
-    // #accouplement-ponte-cible-etat-obligatoires : dès qu'il y a des captures (3
-    // ici), ces 4 choix deviennent obligatoires — sans rapport avec la règle
-    // Stades = Captures que ce test vise, mais nécessaires pour l'atteindre.
-    // Renseignés avant les compteurs de phases/stades ci-dessous : les nombreux
-    // appuis répétés du bloc « + » qui suit rendent les appuis suivants sur cet
-    // écran peu fiables dans ce runner (`act()` qui se chevauchent, cf. les
-    // commentaires « chrono de l'écran » des autres fichiers de ce dossier).
+    // #accouplement-ponte-cible-etat-obligatoires : dès qu'il y a des captures (3,
+    // saisies plus bas), ces 4 choix deviennent obligatoires — sans rapport avec la
+    // règle Stades = Captures que ce test vise, mais nécessaires pour l'atteindre.
+    // #interdistance-obligatoire-si-accouplement-ou-ponte : Accouplement et Ponte
+    // « Rare » l'exigent tous les deux désormais.
+    // Renseignés AVANT le nombre de captures (et donc avant les compteurs de
+    // phases/stades, qui n'apparaissent qu'une fois ce nombre saisi) : taper le
+    // nombre de captures démonte/remonte les tableaux Phases et Stades, ce qui
+    // rend les appuis sur les puces Accouplement/Ponte/État qui suivraient peu
+    // fiables dans ce runner (`act()` qui se chevauchent, cf. les commentaires
+    // « chrono de l'écran » des autres fichiers de ce dossier).
     // « Rare » apparaît deux fois avant toute sélection (chip Accouplement puis
     // chip Ponte, dans cet ordre de rendu) — le premier est celui d'Accouplement.
     fireEvent.press(screen.getAllByText('Rare')[0]);
     await settle();
+
     fireEvent.press(screen.getAllByText('Rare')[1]);
+    await settle();
+    fireEvent.changeText(screen.getByTestId('interdistance-input'), '5');
     await settle();
     fireEvent.press(screen.getByText('Vol clair'));
     await settle();
     fireEvent.press(screen.getByText('Repos'));
+    await settle();
+
+    // Le nombre de captures est saisi en dernier : il fait apparaître les
+    // tableaux Phases et Stades ci-dessous.
+    fireEvent.changeText(screen.getByPlaceholderText('Saisir le nombre de captures'), '3');
     await settle();
 
     // Ordre des « + » : 4 phases puis les stades ♀ — 3 captures = 3 phases

@@ -1,8 +1,7 @@
 /**
- * intensive-imagos.tsx (B-Imagos) : enregistrement complet d'une grille — densité,
- * interdistance (nouveau, repris d'extensive-imagos.tsx) et type de cible
- * (nouveau, Population — pas l'Infestation, plus riche, de infestation.tsx) —
- * multi-sélect, puis routage vers Infestation quand aucune larve n'est cochée.
+ * intensive-imagos.tsx (B-Imagos) : #interdistance-obligatoire-si-accouplement-ou-ponte
+ * — pendant de intensive-imagos-interdistance-bloque.test.tsx : « Suivant »
+ * enregistre normalement une fois l'interdistance renseignée.
  *
  * Fichier séparé des autres scénarios de cet écran — cf. le commentaire
  * d'intensive-imagos-densites-obligatoires.test.tsx pour le pourquoi.
@@ -34,16 +33,9 @@ jest.mock('@/lib/prospection-repository', () => ({
 
 jest.mock('@/lib/referentiel-db', () => ({ listStadesGrille: jest.fn() }));
 
-/** Enveloppé dans `act()` + `jest.useFakeTimers()` : le chrono de l'écran tourne
- * sur un vrai `setInterval` (1s) qui, laissé actif pendant plusieurs saisies
- * enchaînées dans le même test, interfère avec le suivi `act()` de React et fait
- * perdre silencieusement une mise à jour d'état (confirmé en traçant chaque appel
- * de `setPopulationField` : celui de l'interdistance était bien appelé, mais
- * jamais appliqué avant la lecture suivante). Neutraliser le chrono avec de vrais
- * timers avancés à la demande règle le problème à la racine. */
 const settle = () => act(() => jest.advanceTimersByTimeAsync(20));
 
-describe('IntensiveImagosScreen — enregistrement complet', () => {
+describe('IntensiveImagosScreen — interdistance obligatoire, renseignée', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => {
     cleanup();
@@ -57,46 +49,23 @@ describe('IntensiveImagosScreen — enregistrement complet', () => {
     mockPush.mockClear();
   });
 
-  it('enregistre densité, interdistance et type de cible (multi-sélect) puis route vers Infestation quand aucune larve n’est cochée', async () => {
+  it('laisse passer « Suivant » une fois l’interdistance renseignée', async () => {
     useProspectionWizardStore.setState({ draft: draftLmcOnly(), captures: [] });
 
     await render(<IntensiveImagosScreen />);
     await screen.findByText('Type de cible');
     await settle();
 
-    fireEvent.changeText(screen.getByTestId('densite-diffuse-input'), '12');
-    fireEvent.changeText(screen.getByTestId('densite-groupee-input'), '3');
-    await settle();
-    // #interdistance-obligatoire-si-accouplement-ou-ponte : la section n'apparaît
-    // que si l'accouplement ou la ponte est « Rare »/« Beaucoup » — jamais visible
-    // par défaut (accouplement/ponte non renseignés).
     fireEvent.press(screen.getAllByText('Rare')[0]);
     await settle();
-    fireEvent.changeText(screen.getByTestId('interdistance-input'), '25.5');
-    await settle();
-    expect(screen.getByTestId('interdistance-input')).toHaveDisplayValue('25.5');
-
-    fireEvent.press(screen.getByText('Vol clair'));
-    await settle();
-    fireEvent.press(screen.getByText('Dense'));
+    fireEvent.changeText(screen.getByTestId('interdistance-input'), '8.5');
     await settle();
 
     fireEvent.press(screen.getByText('Végétation & Sol  ›'));
 
     await waitFor(() => expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalledTimes(1));
     const [, row] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
-    expect(row).toMatchObject({
-      espece: 'LMC',
-      categorie: 'imago',
-      densite_diffuse: 12,
-      densite_groupee: 3,
-      accouplement: 'Rare',
-      interdistance: 25.5,
-    });
-    expect(JSON.parse(row.type_cible as string).sort()).toEqual(['dense', 'vol_clair']);
-
-    await waitFor(() =>
-      expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ pathname: '/(prospection)/veg' }))
-    );
+    expect(row).toMatchObject({ accouplement: 'Rare', interdistance: 8.5 });
+    expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ pathname: '/(prospection)/veg' }));
   });
 });

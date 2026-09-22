@@ -98,15 +98,21 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
 
   it("l'interdistance de LMC et NSE restent indépendantes (25,5 m vs 40,75 m)", async () => {
     await render(<ExtensiveImagosScreen />);
-    await screen.findByText('📊 Interdistance (m)');
+    await screen.findByText('📊 Accouplement');
     await settle();
 
-    // popDiff, popGroup puis interdistance sont les 3 champs vides, dans cet ordre.
-    fireEvent.changeText(screen.getAllByDisplayValue('')[2], '25.5');
+    // #interdistance-obligatoire-si-accouplement-ou-ponte : la section n'apparaît
+    // que si l'accouplement (ou la ponte) est actif — activée ici pour LMC, puis NSE.
+    fireEvent.press(screen.getAllByText('Rare')[0]);
     await settle();
+    fireEvent.changeText(screen.getByTestId('interdistance-input'), '25.5');
+    await settle();
+
     fireEvent.press(screen.getByText('NSE'));
     await settle();
-    fireEvent.changeText(screen.getAllByDisplayValue('')[2], '40.75');
+    fireEvent.press(screen.getAllByText('Rare')[0]);
+    await settle();
+    fireEvent.changeText(screen.getByTestId('interdistance-input'), '40.75');
     await settle();
 
     fireEvent.press(screen.getByText('Suivant : Larves ›'));
@@ -115,8 +121,8 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
     const [, lmcRow] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
     const [, nseRow] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[1];
 
-    expect(lmcRow).toMatchObject({ espece: 'LMC', interdistance: 25.5 });
-    expect(nseRow).toMatchObject({ espece: 'NSE', interdistance: 40.75 });
+    expect(lmcRow).toMatchObject({ espece: 'LMC', accouplement: 'Rare', interdistance: 25.5 });
+    expect(nseRow).toMatchObject({ espece: 'NSE', accouplement: 'Rare', interdistance: 40.75 });
   });
 
   it('Accouplement et Ponte se sauvegardent par espèce (mêmes options que la fiche Intensive)', async () => {
@@ -128,12 +134,16 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
     // premier est celui d'Accouplement.
     fireEvent.press(screen.getAllByText('Beaucoup')[0]);
     await settle();
+    // #interdistance-obligatoire-si-accouplement-ou-ponte : devenue obligatoire dès
+    // que l'accouplement est actif.
+    fireEvent.changeText(screen.getByTestId('interdistance-input'), '3');
+    await settle();
 
     fireEvent.press(screen.getByText('Suivant : Larves ›'));
 
     await waitFor(() => expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalledTimes(2));
     const [, lmcRow] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
-    expect(lmcRow).toMatchObject({ espece: 'LMC', accouplement: 'Beaucoup' });
+    expect(lmcRow).toMatchObject({ espece: 'LMC', accouplement: 'Beaucoup', interdistance: 3 });
   });
 
   it('État = Repos détermine automatiquement Comportement de l’essaim = Posé, et inversement pour Déplacement', async () => {
@@ -197,17 +207,19 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
     expect(await screen.findByDisplayValue('25')).toBeVisible();
     await settle();
 
-    // #accouplement-neant-sans-interdistance : la section Interdistance est encore
-    // visible avant la modification (accouplement = 'Beaucoup' dans la fixture).
-    expect(screen.getByText('📊 Interdistance (m)')).toBeVisible();
+    // #interdistance-obligatoire-si-accouplement-ou-ponte : la section Interdistance
+    // est encore visible avant la modification (accouplement = 'Beaucoup' dans la fixture).
+    expect(screen.getByText('📊 Interdistance (m) *')).toBeVisible();
 
     // Modifie l'Accouplement (champ indépendant, non soumis à la règle Captures = Phases).
     fireEvent.press(screen.getAllByText('Néant')[0]);
     await settle();
 
-    // « Néant » masque désormais la section et efface la valeur déjà saisie
-    // (12,5 m) : elle n'a plus de sens sans accouplement observé.
-    expect(screen.queryByText('📊 Interdistance (m)')).toBeNull();
+    // La ponte, elle, reste « Rare » (fixture) : la section reste visible et la
+    // valeur déjà saisie (12,5 m) n'est pas effacée — l'interdistance ne s'efface
+    // que si les deux retombent à « Néant »/non renseigné.
+    expect(screen.getByText('📊 Interdistance (m) *')).toBeVisible();
+    expect(screen.getByTestId('interdistance-input')).toHaveDisplayValue('12.5');
 
     fireEvent.press(screen.getByText('Suivant : Larves ›'));
 
@@ -216,12 +228,12 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
     // Nombre de captures : toujours 25, jamais réinitialisé par la modification d'Accouplement.
     expect(lmcRow).toMatchObject({ espece: 'LMC', captures_nombre: 25, accouplement: 'Néant' });
     // …et tous les autres champs déjà présents avant la modification survivent tels quels,
-    // sauf l'interdistance, effacée par le passage à « Néant ».
+    // interdistance comprise (ponte toujours « Rare »).
     expect(lmcRow).toMatchObject({
       densite_diffuse: 4.2,
       densite_groupee: 1.1,
       ponte: 'Rare',
-      interdistance: null,
+      interdistance: 12.5,
       type_cible: '["dense"]',
       etat: 'repos',
       essaim_en_vol: false,
