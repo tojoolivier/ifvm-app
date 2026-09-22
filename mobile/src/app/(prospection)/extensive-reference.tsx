@@ -224,6 +224,19 @@ export default function ExtensiveReferenceScreen() {
   const [longitude, setLongitude] = useState<string>(draft?.longitude != null ? String(draft.longitude) : '');
   const [isLoadingGps, setIsLoadingGps] = useState<boolean>(false);
   const [gpsError, setGpsError] = useState<string>('');
+  // Région/District/Commune — même mécanisme que reference.tsx (Intensif) :
+  // dérivés du géocodage inverse (`reverseGeocode`) dès l'acquisition GPS,
+  // purement informatifs (pas de champ à saisir), affichés sous Latitude/
+  // Longitude. Colonnes déjà persistées à la capture (`updateProspectionGpsPosition`
+  // ci-dessous, #localite-traitement-poste-acridien-autre-agent) — cet état
+  // local n'est que l'affichage, restauré depuis `draft` sur une fiche
+  // rouverte (la persistance immédiate ne met jamais à jour le store, cf.
+  // commentaire plus bas sur ce même principe pour `position`).
+  const [adminArea, setAdminArea] = useState<{ region: string | null; district: string | null; commune: string | null }>({
+    region: draft?.region ?? null,
+    district: draft?.district ?? null,
+    commune: draft?.commune ?? null,
+  });
   const [stationLibre, setStationLibre] = useState(draft?.station_libre ?? '');
   // #station-gps-auto : indicateur du géocodage inverse en cours, distinct de
   // `isLoadingGps` (l'acquisition GPS elle-même) — le champ Station reste
@@ -303,6 +316,7 @@ export default function ExtensiveReferenceScreen() {
           setLatitude(String(draft.latitude));
           setLongitude(String(draft.longitude));
           if (draft.heure_observation_at) setHeureObservationAt(draft.heure_observation_at);
+          setAdminArea({ region: draft.region ?? null, district: draft.district ?? null, commune: draft.commune ?? null });
         }
         return;
       }
@@ -344,6 +358,9 @@ export default function ExtensiveReferenceScreen() {
         if (isMounted) {
           if (localite) setStationLibre((current) => current || localite);
           setIsDetectingStation(false);
+          // Région/District/Commune — purement informatifs (cf. commentaire sur
+          // `adminArea` plus haut), même valeurs que celles persistées ci-dessous.
+          setAdminArea({ region: zone.region, district: zone.district, commune: zone.commune });
         }
 
         // #brouillon-gps-persistance-immediate : même garde-fou que
@@ -702,6 +719,17 @@ export default function ExtensiveReferenceScreen() {
                   <Text style={styles.gpsErrorText}>{gpsError}</Text>
                 ) : null}
               </View>
+            </View>
+
+            <View style={styles.autoCard}>
+              <Text style={styles.autoLabel}>Région / District / Commune</Text>
+              {isLoadingGps ? (
+                <Text style={styles.gpsLoading}>Récupération GPS...</Text>
+              ) : (
+                <Text style={styles.autoValue}>
+                  {[adminArea.region, adminArea.district, adminArea.commune].filter(Boolean).join(' · ') || '—'}
+                </Text>
+              )}
             </View>
 
             <View style={styles.autoCard}>
