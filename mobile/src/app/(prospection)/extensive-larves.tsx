@@ -9,6 +9,7 @@ import {
   PhaseKey,
   ExtensiveLarveSpeciesData,
   createEmptyLarveSpeciesData,
+  estEspeceLarveVide,
   larveSpeciesDataToPopulationRow,
   populationRowToLarveSpeciesData,
 } from '@/lib/prospection-extensive';
@@ -141,22 +142,43 @@ export default function ExtensiveLarvesScreen() {
     // (type `validation`, mêmes écrans que l'extensif) pour une grille jamais
     // destinée à recevoir de densité.
 
-    return run(
-      async () => {
-        await Promise.all([
-          saveProspectionPopulation(draftId, larveSpeciesDataToPopulationRow('LMC', speciesData.LMC)),
-          saveProspectionPopulation(draftId, larveSpeciesDataToPopulationRow('NSE', speciesData.NSE)),
-        ]);
+    const poursuivre = () =>
+      run(
+        async () => {
+          await Promise.all([
+            saveProspectionPopulation(draftId, larveSpeciesDataToPopulationRow('LMC', speciesData.LMC)),
+            saveProspectionPopulation(draftId, larveSpeciesDataToPopulationRow('NSE', speciesData.NSE)),
+          ]);
 
-        router.push({ pathname: '/(prospection)/extensive-observations' as any, params: { draftId } });
-      },
-      {
-        screen: 'extensive-larves',
-        precondition: !!draftId,
-        preconditionMessage: 'Session de saisie perdue — revenez à l’écran précédent et réessayez.',
-        context: { draftId, species },
-      }
-    );
+          router.push({ pathname: '/(prospection)/extensive-observations' as any, params: { draftId } });
+        },
+        {
+          screen: 'extensive-larves',
+          precondition: !!draftId,
+          preconditionMessage: 'Session de saisie perdue — revenez à l’écran précédent et réessayez.',
+          context: { draftId, species },
+        }
+      );
+
+    // #confirmation-espece-sans-donnee : LMC et NSE sont deux onglets du même
+    // écran — rien n'empêche de passer aux Observations sans jamais avoir
+    // ouvert l'un des deux. On avertit avant de partir plutôt que de laisser
+    // un onglet entier sauté en silence ; "Continuer" reprend l'enregistrement
+    // normal.
+    const especesSansDonnee = (['LMC', 'NSE'] as Espece[]).filter((sp) => estEspeceLarveVide(speciesData[sp]));
+    if (especesSansDonnee.length > 0) {
+      Alert.alert(
+        'Aucune donnée saisie',
+        `Aucune valeur n'a été saisie pour ${especesSansDonnee.join(' et ')}. Continuer quand même ?`,
+        [
+          { text: 'Annuler', style: 'cancel' },
+          { text: 'Continuer', onPress: () => void poursuivre() },
+        ]
+      );
+      return;
+    }
+
+    return poursuivre();
   };
 
   const stadesList = stadesLarvairesFor(species);

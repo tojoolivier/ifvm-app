@@ -11,6 +11,7 @@ import {
   EtatImago,
   TYPE_CIBLE_IMAGO_OPTIONS,
   createEmptySpeciesData,
+  estEspeceImagoVide,
   speciesDataToPopulationRow,
   populationRowToSpeciesData,
 } from '@/lib/prospection-extensive';
@@ -193,20 +194,40 @@ const handleContinue = () => {
   // `validation`, mêmes écrans que l'extensif) pour une grille jamais
   // destinée à recevoir de densité.
 
-  return run(
-    async () => {
-      await saveProspectionPopulation(draftId, speciesDataToPopulationRow('LMC', speciesData.LMC));
-      await saveProspectionPopulation(draftId, speciesDataToPopulationRow('NSE', speciesData.NSE));
+  const poursuivre = () =>
+    run(
+      async () => {
+        await saveProspectionPopulation(draftId, speciesDataToPopulationRow('LMC', speciesData.LMC));
+        await saveProspectionPopulation(draftId, speciesDataToPopulationRow('NSE', speciesData.NSE));
 
-      router.push({ pathname: '/(prospection)/extensive-larves' as any, params: { draftId } });
-    },
-    {
-      screen: 'extensive-imagos',
-      precondition: !!draftId,
-      preconditionMessage: 'Session de saisie perdue — revenez à l’écran précédent et réessayez.',
-      context: { draftId, species },
-    }
-  );
+        router.push({ pathname: '/(prospection)/extensive-larves' as any, params: { draftId } });
+      },
+      {
+        screen: 'extensive-imagos',
+        precondition: !!draftId,
+        preconditionMessage: 'Session de saisie perdue — revenez à l’écran précédent et réessayez.',
+        context: { draftId, species },
+      }
+    );
+
+  // #confirmation-espece-sans-donnee : LMC et NSE sont deux onglets du même
+  // écran — rien n'empêche de passer aux Larves sans jamais avoir ouvert l'un
+  // des deux. On avertit avant de partir plutôt que de laisser un onglet
+  // entier sauté en silence ; "Continuer" reprend l'enregistrement normal.
+  const especesSansDonnee = (['LMC', 'NSE'] as Espece[]).filter((sp) => estEspeceImagoVide(speciesData[sp]));
+  if (especesSansDonnee.length > 0) {
+    Alert.alert(
+      'Aucune donnée saisie',
+      `Aucune valeur n'a été saisie pour ${especesSansDonnee.join(' et ')}. Continuer quand même ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Continuer', onPress: () => void poursuivre() },
+      ]
+    );
+    return;
+  }
+
+  return poursuivre();
 };
 
   const renderStades = () => {
