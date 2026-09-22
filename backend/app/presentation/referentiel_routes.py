@@ -807,18 +807,6 @@ async def create_equipe(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Utilisateur, Depends(get_current_user)],
 ):
-    # L'aéronef suit exactement le type : exigé en aérien (règle inchangée depuis la
-    # migration 0078), interdit en terrestre (`ck_equipe_aeronef_reserve_aerien`).
-    if body.type == "aerien" and body.aeronef is None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="une équipe aérienne doit avoir un aéronef",
-        )
-    if body.type != "aerien" and body.aeronef is not None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="un aéronef ne s'affecte qu'à une équipe aérienne",
-        )
     use_case = CreateEquipe(EquipeRepositoryImpl(db), UtilisateurRepositoryImpl(db))
     try:
         return await use_case.execute(

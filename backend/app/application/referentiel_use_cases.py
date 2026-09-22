@@ -121,13 +121,24 @@ class UpdateZoneAntiAcridien:
         return await self.repository.update(zone)
 
 
-async def _equipe_terrestre_existe(repository: EquipeRepository, equipe_id: uuid.UUID) -> bool:
+async def _equipe_du_type_existe(
+    repository: EquipeRepository, equipe_id: uuid.UUID, type_attendu: str
+) -> bool:
     """Le `type` est vérifié ici, pas seulement l'existence : depuis l'unification en
-    une seule table `equipe` (ADR-018), un id d'équipe aérienne est un id valide. La FK
-    composite `(equipe_terrestre_id, equipe_type)` le refuserait de toute façon, mais
-    avec une violation de contrainte brute au lieu d'un 404 explicite."""
+    une seule table `equipe` (ADR-018), un id d'équipe terrestre est un id parfaitement
+    valide là où une équipe aérienne est attendue — et réciproquement. La FK composite
+    `(equipe_id, equipe_type)` le refuse de toute façon, mais par une violation de
+    contrainte brute (500) au lieu d'une erreur métier explicite."""
     equipe = await repository.get_by_id(equipe_id)
-    return equipe is not None and equipe.type == "terrestre"
+    return equipe is not None and equipe.type == type_attendu
+
+
+async def _equipe_terrestre_existe(repository: EquipeRepository, equipe_id: uuid.UUID) -> bool:
+    return await _equipe_du_type_existe(repository, equipe_id, "terrestre")
+
+
+async def _equipe_aerienne_existe(repository: EquipeRepository, equipe_id: uuid.UUID) -> bool:
+    return await _equipe_du_type_existe(repository, equipe_id, "aerien")
 
 
 class ListPostesAcridiens:
@@ -640,7 +651,7 @@ class CreateLieuAerien:
         equipe_aerienne_id = await _resoudre_equipe_creation(
             acteur, self.equipe_aerienne_repository, equipe_aerienne_id
         )
-        if await self.equipe_aerienne_repository.get_by_id(equipe_aerienne_id) is None:
+        if not await _equipe_aerienne_existe(self.equipe_aerienne_repository, equipe_aerienne_id):
             raise EquipeAerienneIntrouvableError(str(equipe_aerienne_id))
 
         maintenant = datetime.now(timezone.utc)
@@ -710,9 +721,8 @@ class UpdateLieuAerien:
         # équipe, même si le formulaire web n'expose pas cette option) — même patron
         # que `UpdatePosteAcridien.equipe_terrestre_id`.
         if "equipe_aerienne_id" in champs_fournis:
-            if (
-                equipe_aerienne_id is not None
-                and await self.equipe_aerienne_repository.get_by_id(equipe_aerienne_id) is None
+            if equipe_aerienne_id is not None and not await _equipe_aerienne_existe(
+                self.equipe_aerienne_repository, equipe_aerienne_id
             ):
                 raise EquipeAerienneIntrouvableError(str(equipe_aerienne_id))
             lieu.equipe_aerienne_id = equipe_aerienne_id
@@ -1004,24 +1014,18 @@ class ResoudreMembre:
                 and utilisateur.role != ROLE_DU_CHEF_PAR_TYPE[type_equipe]
             ):
                 raise ChefEquipeInvalideError(str(demande.user_id))
-            return MembreEquipe(
-                equipe_id=equipe_id,
-                user_id=utilisateur.id,
-                fonction=demande.fonction,
-                nom=utilisateur.nom,
-                prenom=utilisateur.prenom,
-                created_at=datetime.now(timezone.utc),
+        else:
+            # Pas de compte désigné : on en crée un, mais seulement pour les fonctions
+            # que le projet autorise déjà à naître ainsi (#319) — un chef doit
+            # préexister.
+            if demande.fonction not in ROLES_A_LA_VOLEE:
+                raise CompteALaVoleeInterditError(demande.fonction)
+            if not demande.nom:
+                raise CompteALaVoleeInterditError("nom requis pour un membre sans user_id")
+            utilisateur = await self.utilisateur_repo.creer_a_la_volee(
+                nom=demande.nom, prenom=demande.prenom or "", role=demande.fonction
             )
 
-        # Pas de compte désigné : on en crée un, mais seulement pour les fonctions que
-        # le projet autorise déjà à naître ainsi (#319) — un chef doit préexister.
-        if demande.fonction not in ROLES_A_LA_VOLEE:
-            raise CompteALaVoleeInterditError(demande.fonction)
-        if not demande.nom:
-            raise CompteALaVoleeInterditError("nom requis pour un membre sans user_id")
-        utilisateur = await self.utilisateur_repo.creer_a_la_volee(
-            nom=demande.nom, prenom=demande.prenom or "", role=demande.fonction
-        )
         return MembreEquipe(
             equipe_id=equipe_id,
             user_id=utilisateur.id,
@@ -1187,7 +1191,7 @@ class CreateStandRemplissage:
         equipe_aerienne_id = await _resoudre_equipe_creation(
             acteur, self.equipe_aerienne_repository, equipe_aerienne_id
         )
-        if await self.equipe_aerienne_repository.get_by_id(equipe_aerienne_id) is None:
+        if not await _equipe_aerienne_existe(self.equipe_aerienne_repository, equipe_aerienne_id):
             raise EquipeAerienneIntrouvableError(str(equipe_aerienne_id))
 
         maintenant = datetime.now(timezone.utc)
@@ -1251,9 +1255,8 @@ class UpdateStandRemplissage:
         ):
             if not _est_admin(acteur):
                 raise EquipeNonAutoriseeError("seul un admin change l'équipe d'un stand")
-            if (
-                equipe_aerienne_id is not None
-                and await self.equipe_aerienne_repository.get_by_id(equipe_aerienne_id) is None
+            if equipe_aerienne_id is not None and not await _equipe_aerienne_existe(
+                self.equipe_aerienne_repository, equipe_aerienne_id
             ):
                 raise EquipeAerienneIntrouvableError(str(equipe_aerienne_id))
             stand.equipe_aerienne_id = equipe_aerienne_id

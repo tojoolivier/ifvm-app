@@ -395,3 +395,41 @@ async def test_base_principale_refuse_une_equipe_terrestre_404(
         headers=admin_headers,
     )
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_lieu_aerien_refuse_une_equipe_terrestre(
+    client: AsyncClient, admin_headers: dict, equipe_terrestre
+):
+    """Les identifiants d'équipe étant désormais partagés entre les deux types, un id
+    d'équipe terrestre est un id parfaitement valide : sans contrôle de type côté
+    application, il ne se heurtait qu'à la FK composite — une violation brute (500) au
+    lieu d'une erreur métier."""
+    response = await client.post(
+        "/lieux-aeriens",
+        json={
+            "type_lieu": "stand",
+            "nom": "Stand",
+            "latitude": -22.4,
+            "longitude": 46.1,
+            "equipe_aerienne_id": str(equipe_terrestre.id),
+        },
+        headers=admin_headers,
+    )
+    assert response.status_code == 409, response.text
+
+
+@pytest.mark.asyncio
+async def test_stand_remplissage_refuse_une_equipe_terrestre(
+    client: AsyncClient, admin_headers: dict, equipe_terrestre
+):
+    response = await client.post(
+        "/stands-remplissage",
+        json={
+            "numero": "STD90",
+            "localite": "Ailleurs",
+            "equipe_aerienne_id": str(equipe_terrestre.id),
+        },
+        headers=admin_headers,
+    )
+    assert response.status_code == 404, response.text

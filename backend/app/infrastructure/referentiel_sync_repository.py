@@ -534,7 +534,7 @@ class EquipeRepositoryImpl(EquipeRepository):
             await self.session.rollback()
             raise _traduire_integrite_equipe(exc, aeronef) from exc
         await self.session.refresh(model, attribute_names=["membres", "aeronef"])
-        return await self.get_by_id(model.id)
+        return await self._relire(model.id)
 
     async def update(self, equipe: Equipe) -> Equipe:
         result = await self.session.execute(select(EquipeModel).where(EquipeModel.id == equipe.id))
@@ -544,7 +544,15 @@ class EquipeRepositoryImpl(EquipeRepository):
         model.actif = equipe.actif
         model.updated_at = equipe.updated_at
         await self.session.commit()
-        return await self.get_by_id(equipe.id)
+        return await self._relire(equipe.id)
+
+    async def _relire(self, equipe_id: uuid.UUID) -> Equipe:
+        """Une écriture relit l'équipe complète : `membres` porte les nom/prénom, qui
+        vivent sur `utilisateur` et non sur la ligne de membre."""
+        equipe = await self.get_by_id(equipe_id)
+        if equipe is None:  # pragma: no cover — on vient de l'écrire dans cette session
+            raise RuntimeError(f"Équipe {equipe_id} introuvable juste après écriture")
+        return equipe
 
     async def ajouter_membre(self, membre: MembreEquipe) -> MembreEquipe:
         model = EquipeMembreModel(
@@ -601,6 +609,8 @@ def _traduire_integrite_equipe(exc: IntegrityError, aeronef: Aeronef | None) -> 
         return ChefDejaDansUneAutreEquipeError(contrainte)
     if contrainte == "equipe_membre_pkey":
         return MembreDejaDansEquipeError(contrainte)
+    # Contrainte non reconnue : on rend l'erreur d'origine telle quelle plutôt que de la
+    # déguiser en erreur métier — le 500 qui suit est la bonne réponse.
     return exc
 
 

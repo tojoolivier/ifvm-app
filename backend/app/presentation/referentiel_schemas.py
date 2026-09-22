@@ -372,9 +372,18 @@ class EquipeRead(BaseModel):
 class EquipeCreate(BaseModel):
     nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
     type: Literal["terrestre", "aerien"]
-    # Réservé à une équipe aérienne (`ck_equipe_aeronef_reserve_aerien`).
     aeronef: AeronefCreate | None = None
     membres: list[MembreEquipeCreate] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _aeronef_suit_le_type(self) -> "EquipeCreate":
+        """L'aéronef suit exactement le type : exigé en aérien (règle inchangée depuis
+        la migration 0078), interdit en terrestre (`ck_equipe_aeronef_reserve_aerien`)."""
+        if self.type == "aerien" and self.aeronef is None:
+            raise ValueError("une équipe aérienne doit avoir un aéronef")
+        if self.type != "aerien" and self.aeronef is not None:
+            raise ValueError("un aéronef ne s'affecte qu'à une équipe aérienne")
+        return self
 
 
 class EquipeUpdate(BaseModel):
