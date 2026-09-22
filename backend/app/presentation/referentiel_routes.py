@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.referentiel_use_cases import (
     AjouterMembreEquipe,
+    CreateAeronef,
     CreateBaseAerienne,
     CreateCodeStade,
     CreateCulture,
@@ -17,6 +18,7 @@ from app.application.referentiel_use_cases import (
     CreateStandRemplissage,
     CreateStation,
     CreateZoneAntiAcridien,
+    GetAeronef,
     GetBaseAerienne,
     GetCodeStade,
     GetCulture,
@@ -108,6 +110,7 @@ from app.infrastructure.referentiel_sync_repository import (
 from app.infrastructure.utilisateur_repository import UtilisateurRepositoryImpl
 from app.models.users import Utilisateur
 from app.presentation.referentiel_schemas import (
+    AeronefCreate,
     AeronefRead,
     AeronefUpdate,
     BaseAerienneCreate,
@@ -804,7 +807,9 @@ async def create_equipe(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Utilisateur, Depends(get_current_user)],
 ):
-    use_case = CreateEquipe(EquipeRepositoryImpl(db), UtilisateurRepositoryImpl(db))
+    use_case = CreateEquipe(
+        EquipeRepositoryImpl(db), UtilisateurRepositoryImpl(db), AeronefRepositoryImpl(db)
+    )
     try:
         return await use_case.execute(
             nom=body.nom,
@@ -819,6 +824,7 @@ async def create_equipe(
                     volume_cuve_l=body.aeronef.volume_cuve_l,
                 )
             ),
+            aeronef_id=body.aeronef_id,
         )
     except (
         ChefEquipeInvalideError,
@@ -832,6 +838,10 @@ async def create_equipe(
         MembreDejaDansEquipeError,
     ) as exc:
         raise _conflit_membre(exc) from exc
+    except AeronefIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"aéronef inconnu : {exc.args[0]}"
+        ) from exc
     except ImmatriculationAeronefDejaPriseError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -901,10 +911,49 @@ async def ajouter_membre_equipe(
         raise _conflit_membre(exc) from exc
 
 
-# --- aeronef (hélicoptère d'une équipe aérienne, migration 0078) -------------------
+# --- aeronef (parc d'hélicoptères, migration 0078 ; référentiel autonome #621) -----
 #
-# Pas de POST : un aéronef naît avec son équipe (POST /equipes, champ
-# `aeronef`), jamais orphelin. Pas de DELETE : la sortie de service est `actif=false`.
+# Référentiel à part entière : un appareil s'enregistre sans équipe, arrive sur la
+# campagne avant sa première affectation et reste au parc entre deux (#603). Il reste
+# créable dans la foulée d'une équipe (POST /equipes, champ `aeronef`) pour les
+# formulaires existants. Pas de DELETE : la sortie de service est `actif=false`.
+#
+# Écriture réservée aux admins : le parc est une donnée d'administration.
+
+
+@router.post("/aeronefs", response_model=AeronefRead, status_code=201)
+async def create_aeronef(
+    body: AeronefCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    acteur: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    if acteur.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Réservé aux administrateurs"
+        )
+    try:
+        return await CreateAeronef(AeronefRepositoryImpl(db)).execute(
+            immatriculation=body.immatriculation,
+            societe=body.societe,
+            volume_cuve_l=body.volume_cuve_l,
+        )
+    except ImmatriculationAeronefDejaPriseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"immatriculation déjà utilisée par un autre aéronef : {exc.args[0]}",
+        ) from exc
+
+
+@router.get("/aeronefs/{aeronef_id}", response_model=AeronefRead)
+async def get_aeronef(
+    aeronef_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    aeronef = await GetAeronef(AeronefRepositoryImpl(db)).execute(aeronef_id)
+    if aeronef is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Aéronef non trouvé")
+    return aeronef
 
 
 @router.get("/aeronefs", response_model=list[AeronefRead])

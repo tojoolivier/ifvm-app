@@ -487,9 +487,14 @@ class AeronefRepository(ABC):
         pass
 
     @abstractmethod
+    async def create(self, aeronef: Aeronef) -> Aeronef:
+        """Enregistre un appareil au référentiel, sans équipe (#621). Un aéronef n'est
+        plus lié à une équipe pour exister : il peut arriver sur la campagne avant sa
+        première affectation, et rester au parc entre deux (#603)."""
+        pass
+
+    @abstractmethod
     async def update(self, aeronef: Aeronef) -> Aeronef:
-        """Pas de `create` : un aéronef naît avec son équipe (cf.
-        `EquipeRepository.create`), jamais orphelin."""
         pass
 
 

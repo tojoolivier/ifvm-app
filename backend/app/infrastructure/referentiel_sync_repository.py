@@ -644,6 +644,26 @@ class AeronefRepositoryImpl(AeronefRepository):
         model = result.scalar_one_or_none()
         return None if model is None else _aeronef_to_domain(model)
 
+    async def create(self, aeronef: Aeronef) -> Aeronef:
+        model = AeronefModel(
+            id=aeronef.id,
+            immatriculation=aeronef.immatriculation,
+            societe=aeronef.societe,
+            volume_cuve_l=aeronef.volume_cuve_l,
+            actif=aeronef.actif,
+            created_at=aeronef.created_at,
+            updated_at=aeronef.updated_at,
+        )
+        self.session.add(model)
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            # Seule contrainte possible ici : l'appareil n'a aucune FK sortante.
+            raise ImmatriculationAeronefDejaPriseError(aeronef.immatriculation) from exc
+        await self.session.refresh(model)
+        return _aeronef_to_domain(model)
+
     async def update(self, aeronef: Aeronef) -> Aeronef:
         result = await self.session.execute(
             select(AeronefModel).where(AeronefModel.id == aeronef.id)

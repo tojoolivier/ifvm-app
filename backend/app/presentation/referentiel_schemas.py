@@ -300,8 +300,8 @@ class AeronefRead(BaseModel):
 
 
 class AeronefCreate(BaseModel):
-    """Aéronef créé avec son équipe (`EquipeAerienneCreate.aeronef`) — pas d'endpoint de
-    création isolé : un aéronef n'existe pas sans équipe."""
+    """Corps de `POST /aeronefs` (#621), et forme imbriquée de `EquipeCreate.aeronef`
+    pour les formulaires qui saisissent l'appareil en même temps que l'équipe."""
 
     immatriculation: Annotated[
         str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)
@@ -372,7 +372,10 @@ class EquipeRead(BaseModel):
 class EquipeCreate(BaseModel):
     nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
     type: Literal["terrestre", "aerien"]
+    # Deux formes exclusives (#621) : l'appareil est saisi ici (création à la volée,
+    # forme historique) ou désigné au référentiel par son identifiant.
     aeronef: AeronefCreate | None = None
+    aeronef_id: uuid.UUID | None = None
     membres: list[MembreEquipeCreate] = Field(default_factory=list)
 
     @model_validator(mode="after")
@@ -394,10 +397,17 @@ class EquipeCreate(BaseModel):
     @model_validator(mode="after")
     def _aeronef_suit_le_type(self) -> "EquipeCreate":
         """L'aéronef suit exactement le type : exigé en aérien (règle inchangée depuis
-        la migration 0078), interdit en terrestre (`ck_equipe_aeronef_reserve_aerien`)."""
-        if self.type == "aerien" and self.aeronef is None:
+        la migration 0078), interdit en terrestre (`ck_equipe_aeronef_reserve_aerien`).
+
+        `aeronef` et `aeronef_id` sont exclusifs : l'un crée l'appareil, l'autre en
+        désigne un du référentiel ; accepter les deux obligerait à trancher lequel
+        l'emporte, sans qu'aucune réponse ne soit évidente pour l'appelant."""
+        if self.aeronef is not None and self.aeronef_id is not None:
+            raise ValueError("aeronef et aeronef_id sont exclusifs")
+        designe = self.aeronef is not None or self.aeronef_id is not None
+        if self.type == "aerien" and not designe:
             raise ValueError("une équipe aérienne doit avoir un aéronef")
-        if self.type != "aerien" and self.aeronef is not None:
+        if self.type != "aerien" and designe:
             raise ValueError("un aéronef ne s'affecte qu'à une équipe aérienne")
         return self
 

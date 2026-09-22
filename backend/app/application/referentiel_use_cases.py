@@ -1045,11 +1045,22 @@ class ResoudreMembre:
 
 class CreateEquipe:
     """Crée une équipe et ses membres. Le `type` est figé ici une fois pour toutes :
-    aucun chemin de mise à jour ne le réécrit."""
+    aucun chemin de mise à jour ne le réécrit.
 
-    def __init__(self, repository: EquipeRepository, utilisateur_repo: object):
+    L'appareil arrive sous deux formes exclusives (#621) : `aeronef`, créé à la volée
+    dans la même transaction (forme historique, conservée pour les formulaires web et
+    mobile), ou `aeronef_id`, déjà au référentiel — vérifié ici pour rendre un 404
+    explicite plutôt qu'une violation de FK."""
+
+    def __init__(
+        self,
+        repository: EquipeRepository,
+        utilisateur_repo: object,
+        aeronef_repo: AeronefRepository | None = None,
+    ):
         self.repository = repository
         self.resoudre_membre = ResoudreMembre(utilisateur_repo)
+        self.aeronef_repo = aeronef_repo
 
     async def execute(
         self,
@@ -1057,9 +1068,13 @@ class CreateEquipe:
         type_equipe: str,
         membres: list[MembreDemande] | None = None,
         aeronef: Aeronef | None = None,
+        aeronef_id: uuid.UUID | None = None,
     ) -> Equipe:
         maintenant = datetime.now(timezone.utc)
         equipe_id = uuid.uuid4()
+        if aeronef_id is not None and self.aeronef_repo is not None:
+            if await self.aeronef_repo.get_by_id(aeronef_id) is None:
+                raise AeronefIntrouvableError(str(aeronef_id))
         membres_resolus = [
             await self.resoudre_membre.execute(equipe_id, type_equipe, demande)
             for demande in (membres or [])
@@ -1069,7 +1084,7 @@ class CreateEquipe:
                 id=equipe_id,
                 nom=nom,
                 type=type_equipe,
-                aeronef_id=aeronef.id if aeronef is not None else None,
+                aeronef_id=aeronef.id if aeronef is not None else aeronef_id,
                 aeronef=aeronef,
                 actif=True,
                 created_at=maintenant,
@@ -1124,9 +1139,37 @@ class ListAeronefs:
         return await self.repository.list_all(actif=actif)
 
 
+class GetAeronef:
+    def __init__(self, repository: AeronefRepository):
+        self.repository = repository
+
+    async def execute(self, aeronef_id: uuid.UUID) -> Aeronef | None:
+        return await self.repository.get_by_id(aeronef_id)
+
+
+class CreateAeronef:
+    """Enregistre un appareil au parc, sans équipe (#621)."""
+
+    def __init__(self, repository: AeronefRepository):
+        self.repository = repository
+
+    async def execute(self, immatriculation: str, societe: str, volume_cuve_l: float) -> Aeronef:
+        maintenant = datetime.now(timezone.utc)
+        return await self.repository.create(
+            Aeronef(
+                id=uuid.uuid4(),
+                immatriculation=immatriculation,
+                societe=societe,
+                volume_cuve_l=volume_cuve_l,
+                actif=True,
+                created_at=maintenant,
+                updated_at=maintenant,
+            )
+        )
+
+
 class UpdateAeronef:
-    """Mise à jour partielle, `actif` compris. Pas de création isolée : un aéronef naît
-    avec son équipe (`CreateEquipeAerienne`). Pas de suppression : `actif=False` est la
+    """Mise à jour partielle, `actif` compris. Pas de suppression : `actif=False` est la
     seule sortie."""
 
     def __init__(self, repository: AeronefRepository):
