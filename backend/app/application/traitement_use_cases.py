@@ -573,7 +573,9 @@ class CreateTraitementTerrestre:
             evaluation_efficacite_heures_apres=evaluation_efficacite_heures_apres,
             methode_evaluation_efficacite=methode_evaluation_efficacite,
         )
-        terrestre.recalculer_surfaces(cible.surface_infestee_ha, surface_cumulee_precedente)
+        terrestre.recalculer_surfaces(
+            cible.surface_infestee_ha, surface_cumulee_precedente, mode_traitement
+        )
         terrestre.recalculer_total_pesticide()
         if (
             terrestre.surface_restante_ha
@@ -1517,7 +1519,9 @@ class SyncPushTraitementTerrestre:
             evaluation_efficacite_heures_apres=evaluation_efficacite_heures_apres,
             methode_evaluation_efficacite=methode_evaluation_efficacite,
         )
-        terrestre.recalculer_surfaces(cible.surface_infestee_ha, surface_cumulee_precedente)
+        terrestre.recalculer_surfaces(
+            cible.surface_infestee_ha, surface_cumulee_precedente, mode_traitement
+        )
         if (
             terrestre.surface_restante_ha
             and terrestre.surface_restante_ha > 0

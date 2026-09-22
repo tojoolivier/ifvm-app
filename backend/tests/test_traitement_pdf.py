@@ -117,6 +117,7 @@ def _traitement_terrestre(**overrides) -> TraitementRead:
         surface_disque_rotatif_ha=None,
         surface_atomiseur_autoporte_ha=None,
         surface_traitee_ha=None,
+        surface_protegee_ha=None,
         surface_cumulee_ha=None,
         surface_restante_ha=None,
         surface_restante_abandonnee=None,

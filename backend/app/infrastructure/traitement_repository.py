@@ -314,6 +314,7 @@ class TraitementRepositoryImpl(TraitementRepository):
                 surface_disque_rotatif_ha=traitement.terrestre.surface_disque_rotatif_ha,
                 surface_atomiseur_autoporte_ha=traitement.terrestre.surface_atomiseur_autoporte_ha,
                 surface_traitee_ha=traitement.terrestre.surface_traitee_ha,
+                surface_protegee_ha=traitement.terrestre.surface_protegee_ha,
                 surface_cumulee_ha=traitement.terrestre.surface_cumulee_ha,
                 surface_restante_ha=traitement.terrestre.surface_restante_ha,
                 surface_restante_abandonnee=traitement.terrestre.surface_restante_abandonnee,
@@ -739,7 +740,12 @@ class TraitementRepositoryImpl(TraitementRepository):
             t.surface_atomiseur_ha = src.surface_atomiseur_ha
             t.surface_disque_rotatif_ha = src.surface_disque_rotatif_ha
             t.surface_atomiseur_autoporte_ha = src.surface_atomiseur_autoporte_ha
+            # Le classement traitée/protégée dépend du mode, que ce push peut
+            # changer (migration 0083, même commentaire que le bloc Aérien
+            # ci-dessus) : le cas d'usage reclasse la même somme, on ne persiste
+            # que la répartition.
             t.surface_traitee_ha = src.surface_traitee_ha
+            t.surface_protegee_ha = src.surface_protegee_ha
             t.surface_cumulee_ha = src.surface_cumulee_ha
             t.surface_restante_ha = src.surface_restante_ha
             t.surface_restante_abandonnee = src.surface_restante_abandonnee
@@ -1052,6 +1058,9 @@ class TraitementRepositoryImpl(TraitementRepository):
                 else None,
                 surface_traitee_ha=float(model.terrestre.surface_traitee_ha)
                 if model.terrestre.surface_traitee_ha is not None
+                else None,
+                surface_protegee_ha=float(model.terrestre.surface_protegee_ha)
+                if model.terrestre.surface_protegee_ha is not None
                 else None,
                 surface_cumulee_ha=float(model.terrestre.surface_cumulee_ha)
                 if model.terrestre.surface_cumulee_ha is not None

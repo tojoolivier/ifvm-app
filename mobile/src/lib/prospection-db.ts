@@ -430,6 +430,9 @@ async function creerTables(db: SQLite.SQLiteDatabase): Promise<void> {
       essence_litres REAL,
       nb_piles INTEGER,
       surface_traitee_ha REAL,
+      -- Migration backend 0083 : produit de barrière → surface protégée (même
+      -- généralisation que traitement_aerien.surface_protegee_ha, migration 0081).
+      surface_protegee_ha REAL,
       surface_cumulee_ha REAL,
       surface_restante_ha REAL,
       pesticide_unite TEXT,
@@ -908,6 +911,10 @@ const COLONNES_TRAITEMENT_TERRESTRE: readonly Colonne[] = [
   // déjà (colonne morte, plus jamais lue/écrite), même principe
   // qu'agent_encadreur_id ci-dessus.
   { name: 'surface_atomiseur_autoporte_ha', type: 'REAL' },
+  // Migration backend 0083 : produit de barrière → surface protégée (jamais
+  // renseignée avec surface_traitee_ha, réservée au produit de choc) — même
+  // généralisation que COLONNES_TRAITEMENT_AERIEN (migration 0081) ci-dessus.
+  { name: 'surface_protegee_ha', type: 'REAL' },
 ];
 
 /**

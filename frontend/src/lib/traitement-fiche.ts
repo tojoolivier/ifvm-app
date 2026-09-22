@@ -188,38 +188,37 @@ export function formatSurface(valeur: number | string | null | undefined): strin
 }
 
 /**
- * Ce qu'un traitement aérien fait de sa surface dépend du produit : un produit
- * de choc (`mode_traitement` TOTAL) *traite* la surface infestée, un produit de
+ * Ce qu'un traitement fait de sa surface dépend du produit : un produit de
+ * choc (`mode_traitement` TOTAL) *traite* la surface infestée, un produit de
  * barrière (BARRIERE) la *protège* (#surface-bloc-mode-infestee, cf.
- * `valider_surfaces_bloc` côté backend). Depuis la migration 0081 le backend
- * stocke deux colonnes distinctes, `aerien.surface_traitee_ha` (choc) et
- * `aerien.surface_protegee_ha` (barrière), jamais renseignées ensemble.
- * Le terrestre n'a pas cette distinction, il reste « Traitée ».
+ * `valider_surfaces_bloc` côté backend). Le backend stocke deux colonnes
+ * distinctes, `surface_traitee_ha` (choc) et `surface_protegee_ha` (barrière),
+ * jamais renseignées ensemble — pour l'Aérien depuis la migration 0081, pour
+ * le Terrestre depuis la migration 0083 (généralisée : une équipe au sol peut
+ * elle aussi appliquer un produit de barrière). Le mode seul décide, quel que
+ * soit le type de traitement.
  */
 export function libelleSurfaceTraitee(traitement: {
   mode_traitement: string | null
-  aerien: unknown | null
 }): 'Traitée' | 'Protégée' {
-  return traitement.aerien != null && traitement.mode_traitement === 'BARRIERE'
-    ? 'Protégée'
-    : 'Traitée'
+  return traitement.mode_traitement === 'BARRIERE' ? 'Protégée' : 'Traitée'
 }
 
 type Surface = number | string | null
 
 /**
- * La surface à montrer pour une fiche : la colonne `surface_protegee_ha` d'un
- * aérien en barrière, sinon `surface_traitee_ha` (terrestre compris). Associée
- * à `libelleSurfaceTraitee`, qui la nomme.
+ * La surface à montrer pour une fiche : la colonne `surface_protegee_ha` en
+ * mode barrière, sinon `surface_traitee_ha` — aérien et terrestre confondus
+ * depuis la migration 0083. Associée à `libelleSurfaceTraitee`, qui la nomme.
  */
 export function surfaceTraiteeOuProtegee(traitement: {
   mode_traitement: string | null
   aerien: { surface_traitee_ha?: Surface; surface_protegee_ha?: Surface } | null
-  terrestre?: { surface_traitee_ha?: Surface } | null
+  terrestre?: { surface_traitee_ha?: Surface; surface_protegee_ha?: Surface } | null
 }): Surface | undefined {
-  if (traitement.terrestre) return traitement.terrestre.surface_traitee_ha
-  if (libelleSurfaceTraitee(traitement) === 'Protégée') return traitement.aerien?.surface_protegee_ha
-  return traitement.aerien?.surface_traitee_ha
+  const protegee = libelleSurfaceTraitee(traitement) === 'Protégée'
+  const specialisation = traitement.terrestre ?? traitement.aerien
+  return protegee ? specialisation?.surface_protegee_ha : specialisation?.surface_traitee_ha
 }
 
 /** Zones cochées, dans l'ordre du référentiel ; les clés hors référentiel suivent. */

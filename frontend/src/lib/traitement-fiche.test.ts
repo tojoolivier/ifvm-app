@@ -135,19 +135,19 @@ describe('formatSurface — mono fr-FR de la maquette (« 1 200 »)', () => {
   })
 })
 
-describe('libelleSurfaceTraitee — choc traite, barrière protège (aérien)', () => {
-  it('nomme « Protégée » la surface d’un aérien traité avec un produit de barrière', () => {
-    expect(libelleSurfaceTraitee({ mode_traitement: 'BARRIERE', aerien: {} })).toBe('Protégée')
+describe('libelleSurfaceTraitee — choc traite, barrière protège (aérien et terrestre)', () => {
+  it('nomme « Protégée » un traitement en produit de barrière', () => {
+    expect(libelleSurfaceTraitee({ mode_traitement: 'BARRIERE' })).toBe('Protégée')
   })
 
-  it('nomme « Traitée » un aérien en produit de choc, irrégulier ou sans mode', () => {
-    expect(libelleSurfaceTraitee({ mode_traitement: 'TOTAL', aerien: {} })).toBe('Traitée')
-    expect(libelleSurfaceTraitee({ mode_traitement: 'IRREGULIER', aerien: {} })).toBe('Traitée')
-    expect(libelleSurfaceTraitee({ mode_traitement: null, aerien: {} })).toBe('Traitée')
+  it('nomme « Traitée » un traitement en produit de choc, irrégulier ou sans mode', () => {
+    expect(libelleSurfaceTraitee({ mode_traitement: 'TOTAL' })).toBe('Traitée')
+    expect(libelleSurfaceTraitee({ mode_traitement: 'IRREGULIER' })).toBe('Traitée')
+    expect(libelleSurfaceTraitee({ mode_traitement: null })).toBe('Traitée')
   })
 
-  it('reste « Traitée » pour un terrestre, même si le mode vaut BARRIERE', () => {
-    expect(libelleSurfaceTraitee({ mode_traitement: 'BARRIERE', aerien: null })).toBe('Traitée')
+  it('nomme « Protégée » un terrestre en produit de barrière (migration 0083)', () => {
+    expect(libelleSurfaceTraitee({ mode_traitement: 'BARRIERE' })).toBe('Protégée')
   })
 })
 
@@ -170,14 +170,24 @@ describe('surfaceTraiteeOuProtegee — la colonne à montrer pour une fiche', ()
     ).toBe(120)
   })
 
-  it('lit surface_traitee_ha du terrestre, même en mode BARRIERE', () => {
+  it('lit surface_traitee_ha du terrestre en produit de choc', () => {
+    expect(
+      surfaceTraiteeOuProtegee({
+        mode_traitement: 'TOTAL',
+        aerien: null,
+        terrestre: { surface_traitee_ha: 5, surface_protegee_ha: 0 },
+      }),
+    ).toBe(5)
+  })
+
+  it('lit surface_protegee_ha du terrestre en produit de barrière (migration 0083)', () => {
     expect(
       surfaceTraiteeOuProtegee({
         mode_traitement: 'BARRIERE',
         aerien: null,
-        terrestre: { surface_traitee_ha: 5 },
+        terrestre: { surface_traitee_ha: 0, surface_protegee_ha: 12.5 },
       }),
-    ).toBe(5)
+    ).toBe(12.5)
   })
 })
 

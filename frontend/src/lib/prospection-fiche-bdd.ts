@@ -246,6 +246,7 @@ export const CATALOGUE_PROSPECTION: { [K in keyof P]-?: Colonne<P> } = {
 
   signature_visa_nom: txt(G_SIGN, 'Visa — nom'),
   signature_visa_horodatage: ts(G_SIGN, 'Visa — horodatage'),
+  signature_visa_image: trace(G_SIGN, 'Visa — tracé'),
   signature_consultant_fao_nom: txt(G_SIGN, 'Consultant FAO — nom'),
   signature_consultant_fao_horodatage: ts(G_SIGN, 'Consultant FAO — horodatage'),
   signature_consultant_fao_image: trace(G_SIGN, 'Consultant FAO — tracé'),

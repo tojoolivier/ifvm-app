@@ -4199,6 +4199,8 @@ export interface components {
             surface_atomiseur_autoporte_ha: number | null;
             /** Surface Traitee Ha */
             surface_traitee_ha: number | null;
+            /** Surface Protegee Ha */
+            surface_protegee_ha: number | null;
             /** Surface Cumulee Ha */
             surface_cumulee_ha: number | null;
             /** Surface Restante Ha */

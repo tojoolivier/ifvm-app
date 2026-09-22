@@ -201,7 +201,11 @@ export interface TraitementTerrestre {
   motif_surface_restante_abandonnee: string | null;
   essence_litres: number | null;
   nb_piles: number | null;
+  // Jamais renseignées ensemble (migration backend 0083, généralise le
+  // traitement Aérien de la migration 0081) : produit de choc → traitée ;
+  // produit de barrière (mode BARRIERE) → protégée.
   surface_traitee_ha: number | null;
+  surface_protegee_ha: number | null;
   surface_cumulee_ha: number | null;
   surface_restante_ha: number | null;
   // Unité pour toute la section « Produits utilisés » (migration backend 0077,

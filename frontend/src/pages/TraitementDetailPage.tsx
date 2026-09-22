@@ -100,7 +100,10 @@ interface TraitementTerrestre {
   surface_atomiseur_ha: number | null
   surface_disque_rotatif_ha: number | null
   surface_ulvamast_ha: number | null
+  // Jamais renseignées ensemble (migration 0083, généralise l'Aérien 0081) :
+  // choc → traitée, barrière → protégée.
   surface_traitee_ha: number | null
+  surface_protegee_ha: number | null
   surface_cumulee_ha: number | null
   surface_restante_ha: number | null
   surface_restante_abandonnee: boolean | null
@@ -453,7 +456,8 @@ export function TraitementDetailPage() {
   // 0050 a généralisé le chaînage de reprise à l'Aérien) : le panneau
   // « Surfaces » ne doit pas rester muet sur les trois lignes du bas pour une
   // fiche aérienne, comme c'était le cas en ne lisant que `terrestre`.
-  // Traitée (choc, terrestre) ou protégée (barrière aérienne) — cf. `libelleSurfaceTraitee`.
+  // Traitée (choc) ou protégée (barrière) — aérien et terrestre confondus
+  // depuis la migration 0083, cf. `libelleSurfaceTraitee`.
   const surfaceTraitee = surfaceTraiteeOuProtegee(traitement)
   const surfaceCumulee = traitement.terrestre?.surface_cumulee_ha ?? traitement.aerien?.surface_cumulee_ha
   const restanteGenerique = traitement.terrestre?.surface_restante_ha ?? traitement.aerien?.surface_restante_ha
