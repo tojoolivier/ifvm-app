@@ -174,6 +174,106 @@ export interface ExtensiveLarveSpeciesData {
   surfaceContamineeHa: string;
 }
 
+// ---------------------------------------------------------------------------
+// #confirmation-espece-sans-donnee : LMC et NSE sont deux onglets d'un même
+// écran (Imagos ou Larves) — rien n'empêche de passer à l'écran suivant sans
+// jamais avoir ouvert l'un des deux. Avant de partir, on avertit si l'une des
+// espèces (ou les deux) n'a strictement aucune valeur saisie : c'est le seul
+// signal qu'un onglet entier ait été purement et simplement sauté, plutôt
+// qu'un simple champ facultatif laissé vide. Un seul champ renseigné suffit à
+// ne pas déclencher l'avertissement.
+// ---------------------------------------------------------------------------
+
+/** Intensif — B-Imagos (`prospection_population`, catégorie imago). `capturesTotal`
+ * vient de `prospection_capture` (table séparée, cf. intensive-imagos.tsx) : le
+ * nombre de captures ne vit jamais sur la ligne population elle-même côté Intensif. */
+export function estPopulationImagoVide(
+  population: Pick<
+    PopulationRow,
+    | 'densite_diffuse'
+    | 'densite_groupee'
+    | 'methode'
+    | 'accouplement'
+    | 'ponte'
+    | 'interdistance'
+    | 'type_cible'
+    | 'direction_de'
+    | 'direction_vers'
+    | 'etat'
+    | 'essaim_en_vol'
+    | 'essaim_pose'
+  >,
+  capturesTotal: number,
+): boolean {
+  return (
+    capturesTotal === 0 &&
+    population.densite_diffuse == null &&
+    population.densite_groupee == null &&
+    population.methode == null &&
+    population.accouplement == null &&
+    population.ponte == null &&
+    population.interdistance == null &&
+    parseSelectionMultiple(population.type_cible).length === 0 &&
+    population.direction_de == null &&
+    population.direction_vers == null &&
+    population.etat == null &&
+    population.essaim_en_vol == null &&
+    population.essaim_pose == null
+  );
+}
+
+/** Intensif — C-Larves (`prospection_population`, catégorie larve). Même remarque
+ * que ci-dessus pour `capturesTotal`. */
+export function estPopulationLarveVide(
+  population: Pick<
+    PopulationRow,
+    'densite_diffuse' | 'densite_groupee' | 'methode' | 'interdistance' | 'tache_larvaire' | 'bande_larvaire' | 'deplacement'
+  >,
+  capturesTotal: number,
+): boolean {
+  return (
+    capturesTotal === 0 &&
+    population.densite_diffuse == null &&
+    population.densite_groupee == null &&
+    population.methode == null &&
+    population.interdistance == null &&
+    population.tache_larvaire == null &&
+    population.bande_larvaire == null &&
+    population.deplacement == null
+  );
+}
+
+/** Extensif — Imagos : toutes les données d'une espèce vivent déjà en mémoire
+ * (`speciesData[espece]`), contrairement à l'Intensif. */
+export function estEspeceImagoVide(data: ExtensiveImagoSpeciesData): boolean {
+  return (
+    data.totalCaptures === 0 &&
+    data.popDiff === '' &&
+    data.popGroup === '' &&
+    data.accouplement == null &&
+    data.ponte == null &&
+    data.interdistance === '' &&
+    data.typeCible.length === 0 &&
+    data.etat == null
+  );
+}
+
+/** Extensif — Larves. `deplacement` est exclu : `createEmptyLarveSpeciesData`
+ * l'initialise à `'repos'`, jamais vide — il ne renseigne donc pas sur le fait
+ * que l'espèce ait été touchée ou non (contrairement à l'Intensif, où `null`
+ * distingue vraiment l'absence de saisie). */
+export function estEspeceLarveVide(data: ExtensiveLarveSpeciesData): boolean {
+  return (
+    data.totalCaptures === 0 &&
+    data.popDiff === '' &&
+    data.popGroup === '' &&
+    !data.tacheLarvaire &&
+    !data.bandeLarvaire &&
+    data.interdistance === '' &&
+    data.surfaceContamineeHa === ''
+  );
+}
+
 export function createEmptySpeciesData(): ExtensiveImagoSpeciesData {
   return {
     totalCaptures: 0,

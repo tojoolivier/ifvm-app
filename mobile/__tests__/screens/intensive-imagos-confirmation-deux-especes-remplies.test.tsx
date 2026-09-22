@@ -1,10 +1,10 @@
 /**
- * intensive-imagos.tsx (B-Imagos) : #densite-diffuse-zero-si-sans-capture
- * (demande explicite) — sans capture (0 par défaut), la densité diffuse n'est
- * plus obligatoire, l'astérisque de la maquette disparaît, et « Suivant »
- * n'est jamais bloqué de ce fait. Pendant de
- * intensive-imagos-densites-obligatoires.test.tsx (au moins une capture),
- * fichier séparé pour la même raison (cf. son en-tête).
+ * intensive-imagos.tsx (B-Imagos) : #confirmation-espece-sans-donnee — pendant
+ * de intensive-imagos-confirmation-avertit.test.tsx : aucune confirmation
+ * n'est demandée quand LMC et NSE ont chacun au moins une valeur.
+ *
+ * Fichier séparé des autres scénarios de cet écran — cf. le commentaire
+ * d'intensive-imagos-densites-obligatoires.test.tsx pour le pourquoi.
  */
 import { Alert } from 'react-native';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
@@ -13,7 +13,7 @@ import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
 import * as prospectionRepository from '@/lib/prospection-repository';
 import * as referentielDb from '@/lib/referentiel-db';
-import { STADES_PAR_DEFAUT, draftLmcOnly } from '../test-utils/intensive-imagos-fixtures';
+import { STADES_PAR_DEFAUT, draftLmcAndNseImago } from '../test-utils/intensive-imagos-fixtures';
 
 const params: { draftId: string } = { draftId: 'draft-123' };
 const mockPush = jest.fn();
@@ -36,7 +36,7 @@ jest.mock('@/lib/referentiel-db', () => ({ listStadesGrille: jest.fn() }));
 
 const settle = () => act(() => jest.advanceTimersByTimeAsync(20));
 
-describe('IntensiveImagosScreen — densité diffuse facultative sans capture', () => {
+describe('IntensiveImagosScreen — confirmation, deux espèces déjà renseignées', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => {
     cleanup();
@@ -50,26 +50,26 @@ describe('IntensiveImagosScreen — densité diffuse facultative sans capture', 
     mockPush.mockClear();
   });
 
-  it('n’exige pas la densité diffuse quand aucune capture n’est saisie, et n’affiche pas l’astérisque « obligatoire »', async () => {
-    useProspectionWizardStore.setState({ draft: draftLmcOnly(), captures: [] });
-    // #confirmation-espece-sans-donnee : ce scénario laisse LMC entièrement
-    // vide par construction (c'est son objet) — le modal d'avertissement
-    // apparaît donc aussi, sans rapport avec la densité diffuse ciblée ici.
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation((_titre, _message, boutons) => {
-      boutons?.find((b) => b.text === 'Continuer')?.onPress?.();
-    });
+  it('ne demande aucune confirmation quand LMC et NSE ont chacun une valeur', async () => {
+    useProspectionWizardStore.setState({ draft: draftLmcAndNseImago(), captures: [] });
+    const alertSpy = jest.spyOn(Alert, 'alert');
 
     await render(<IntensiveImagosScreen />);
     await screen.findByText('Type de cible');
     await settle();
 
-    expect(screen.queryByText('Densité diffuse (ind./ha) *')).toBeNull();
-    expect(screen.getByText('Densité diffuse (ind./ha)')).toBeVisible();
+    // LMC : une densité. NSE : ouvert et renseigné avant de continuer depuis là.
+    fireEvent.changeText(screen.getByTestId('densite-diffuse-input'), '12');
+    await settle();
+    fireEvent.press(screen.getByText('NSE'));
+    await settle();
+    fireEvent.changeText(screen.getByTestId('densite-diffuse-input'), '7');
+    await settle();
 
+    // Sur NSE (dernier onglet imago), le bouton du bas devient « Végétation & Sol › ».
     fireEvent.press(screen.getByText('Végétation & Sol  ›'));
 
-    await waitFor(() => expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalled());
-    expect(alertSpy).not.toHaveBeenCalledWith('Densité diffuse requise', expect.anything());
-    expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ pathname: '/(prospection)/veg' }));
+    await waitFor(() => expect(mockPush).toHaveBeenCalled());
+    expect(alertSpy).not.toHaveBeenCalledWith('Aucune donnée saisie', expect.anything(), expect.anything());
   });
 });

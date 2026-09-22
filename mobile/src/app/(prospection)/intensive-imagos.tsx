@@ -16,7 +16,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Espece, accouplementOptionsFor, capturesMaxFor, grilleKeyToString, phasesFor } from '@/lib/prospection-especes-stades';
 import { parseEspeceSelection, buildGrilles, parseGrillesCompletees } from '@/lib/prospection-especes';
-import { parseDensite, parseSelectionMultiple, TYPE_CIBLE_IMAGO_OPTIONS, TypeCibleImago, EtatImago } from '@/lib/prospection-extensive';
+import { estPopulationImagoVide, parseDensite, parseSelectionMultiple, TYPE_CIBLE_IMAGO_OPTIONS, TypeCibleImago, EtatImago } from '@/lib/prospection-extensive';
 import { COMPASS_DIRECTIONS, oppositeDirection, formatDirectionDeplacement } from '@/lib/prospection-infestation-insights';
 import { listStadesGrille } from '@/lib/referentiel-db';
 import { retourArriere } from '@/lib/fiche-routing';
@@ -418,13 +418,48 @@ export default function IntensiveImagosScreen() {
       router.replace(`/(prospection)/species?draftId=${draftId}`);
     });
 
+  /** Total de captures d'une espèce imago, quel que soit son onglet : celui
+   * en cours d'édition (`totalCaptures`, pas encore reflété par `captures`
+   * tant que `commitCurrentGrille` n'a pas tourné) sinon celui déjà persisté
+   * (`captures`, rechargé par `refreshCaptures` à chaque grille validée). */
+  const capturesTotalPourEspeceImago = (sp: Espece): number =>
+    sp === species
+      ? totalCaptures
+      : captures.filter((c) => c.espece === sp && c.categorie === 'imago').reduce((sum, c) => sum + c.effectif, 0);
+
   const handleContinue = () =>
     run(
       async () => {
         const ok = await commitCurrentGrille();
         if (!ok) return;
+
         const next = hasLarveGrilles ? '/(prospection)/intensive-larves' : '/(prospection)/veg';
-        router.push({ pathname: next as any, params: { draftId } });
+        const continuer = () => router.push({ pathname: next as any, params: { draftId } });
+
+        // #confirmation-espece-sans-donnee : ce bouton quitte l'écran Imagos
+        // en entier, quel que soit l'onglet actif (LMC/NSE se changent par les
+        // boutons du haut, pas par « Suivant ») — rien n'empêche de l'appuyer
+        // sans jamais avoir ouvert l'autre espèce. On avertit avant de partir
+        // plutôt que de laisser un onglet entier sauté en silence.
+        const especesSansDonnee = imagoIndices
+          .map(({ g }) => g.espece)
+          .filter((sp) =>
+            estPopulationImagoVide(populations[sp] ?? emptyImagoPopulation(sp), capturesTotalPourEspeceImago(sp))
+          );
+
+        if (especesSansDonnee.length > 0) {
+          Alert.alert(
+            'Aucune donnée saisie',
+            `Aucune valeur n'a été saisie pour ${especesSansDonnee.join(' et ')}. Continuer quand même ?`,
+            [
+              { text: 'Annuler', style: 'cancel' },
+              { text: 'Continuer', onPress: continuer },
+            ]
+          );
+          return;
+        }
+
+        continuer();
       },
       {
         screen: 'intensive-imagos',
