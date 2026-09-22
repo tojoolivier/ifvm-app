@@ -222,56 +222,6 @@ export function surfaceTraiteeOuProtegee(traitement: {
   return traitement.aerien?.surface_traitee_ha
 }
 
-export interface TraitementSurfacesLike {
-  prospection_id: string
-  mode_traitement: string | null
-  aerien: { surface_traitee_ha: Surface; surface_protegee_ha?: Surface } | null
-  terrestre: { surface_traitee_ha: Surface } | null
-}
-
-export interface SurfacesProspection {
-  traitee: number | null
-  protegee: number | null
-}
-
-/**
- * Surfaces traitée et protégée (ha) cumulées par prospection, tous les
- * traitements rattachés à la fiche confondus (une reprise, migration 0050,
- * ajoute une fiche de traitement pour la même prospection).
- *
- * Source : les colonnes du traitement (`surface_traitee_ha` / `surface_protegee_ha`,
- * sommes des rotations pour l'aérien — le mobile ne saisit aucune surface par
- * bloc) : un terrestre alimente « traitée », un aérien l'une ou l'autre selon
- * son produit. Une catégorie sans surface (absente ou à 0, cas de l'autre colonne
- * d'un aérien) n'est pas un chiffre : `null` (tiret côté affichage) tant qu'aucun
- * traitement ne l'a alimentée.
- */
-export function surfacesParProspection(
-  traitements: TraitementSurfacesLike[],
-): Map<string, SurfacesProspection> {
-  const parProspection = new Map<string, SurfacesProspection>()
-  const ajouter = (
-    prospectionId: string,
-    categorie: keyof SurfacesProspection,
-    brute: Surface | undefined,
-  ) => {
-    const surface = Number(brute)
-    if (brute == null || brute === '' || !Number.isFinite(surface) || surface <= 0) return
-    const cumul = parProspection.get(prospectionId) ?? { traitee: null, protegee: null }
-    cumul[categorie] = (cumul[categorie] ?? 0) + surface
-    parProspection.set(prospectionId, cumul)
-  }
-  for (const t of traitements) {
-    if (t.terrestre) {
-      ajouter(t.prospection_id, 'traitee', t.terrestre.surface_traitee_ha)
-    } else if (t.aerien) {
-      ajouter(t.prospection_id, 'traitee', t.aerien.surface_traitee_ha)
-      ajouter(t.prospection_id, 'protegee', t.aerien.surface_protegee_ha)
-    }
-  }
-  return parProspection
-}
-
 /** Zones cochées, dans l'ordre du référentiel ; les clés hors référentiel suivent. */
 export function zonesExposeesLabels(zones: Record<string, unknown> | null | undefined): string[] {
   if (!zones) return []

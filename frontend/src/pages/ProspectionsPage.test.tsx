@@ -72,45 +72,10 @@ const PROSPECTIONS = [
   },
 ]
 
-/** Traitements liés : p-1 a une reprise au produit de choc (300 + 100 ha traités)
- * puis un passage au produit de barrière (250,5 ha protégés) ; p-4 un terrestre
- * (3 ha traités) ; p-2 et p-3 n'ont aucun traitement. */
-const TRAITEMENTS = [
-  {
-    id: 't-1',
-    prospection_id: 'p-1',
-    mode_traitement: 'TOTAL',
-    aerien: { surface_traitee_ha: 300, surface_protegee_ha: 0 },
-    terrestre: null,
-  },
-  {
-    id: 't-2',
-    prospection_id: 'p-1',
-    mode_traitement: 'TOTAL',
-    aerien: { surface_traitee_ha: 100, surface_protegee_ha: 0 },
-    terrestre: null,
-  },
-  {
-    id: 't-3',
-    prospection_id: 'p-1',
-    mode_traitement: 'BARRIERE',
-    aerien: { surface_traitee_ha: 0, surface_protegee_ha: 250.5 },
-    terrestre: null,
-  },
-  {
-    id: 't-4',
-    prospection_id: 'p-4',
-    mode_traitement: 'TOTAL',
-    aerien: null,
-    terrestre: { surface_traitee_ha: 3 },
-  },
-]
-
-/** Route les quatre requêtes de la page ; `/users/` peut échouer (403 non-admin). */
+/** Route les trois requêtes de la page ; `/users/` peut échouer (403 non-admin). */
 function mockApi({ usersFail = false } = {}) {
   mockedGet.mockImplementation((url: string) => {
     if (url === '/prospections') return Promise.resolve({ data: PROSPECTIONS })
-    if (url === '/traitements') return Promise.resolve({ data: TRAITEMENTS })
     if (url === '/stations') return Promise.resolve({ data: STATIONS })
     if (url === '/users/') {
       return usersFail
@@ -155,8 +120,6 @@ describe('ProspectionsPage — maquette §3 du handoff', () => {
       'Prospecteur',
       'Station',
       'Surf. inf. (ha)',
-      'Surf. traitée (ha)',
-      'Surf. prot. (ha)',
       'Statut',
       '',
     ])
@@ -327,46 +290,8 @@ describe('ProspectionsPage — maquette §3 du handoff', () => {
     renderPage()
 
     await waitFor(() => expect(screen.getByText('1 200')).toBeInTheDocument())
-    // Cellule « Surf. inf. » (index 5) : la ligne p-2 porte aussi des tirets dans les colonnes de surface traitée et protégée.
+    // Cellule « Surf. inf. » (index 5) : la ligne p-2 n'a pas de surface infestée saisie.
     expect(within(rows()[1]).getAllByRole('cell')[5]).toHaveTextContent('—')
-  })
-
-  /** Produit de choc → surface traitée ; produit de barrière → surface protégée. */
-  it('sépare la surface traitée (choc) de la surface protégée (barrière), cumulées par fiche, tiret sinon', async () => {
-    mockApi()
-    renderPage()
-
-    // p-1 : traitée 300 + 100 = 400 (t-1, t-2 en TOTAL), protégée 250,5 (t-3 en BARRIERE).
-    await waitFor(() => expect(screen.getByText('400')).toBeInTheDocument())
-    const cellulesP1 = within(screen.getByText('PR-2026-0148-INT').closest('tr')!).getAllByRole('cell')
-    expect(cellulesP1[6]).toHaveTextContent('400')
-    expect(cellulesP1[7]).toHaveTextContent('250,5')
-
-    // p-4 : un terrestre est toujours « traité », jamais « protégé ».
-    const cellulesP4 = within(screen.getByText('PR-2026-0150-EXT').closest('tr')!).getAllByRole('cell')
-    expect(cellulesP4[6]).toHaveTextContent('3')
-    expect(cellulesP4[7]).toHaveTextContent('—')
-
-    // p-2 : aucun traitement, tirets dans les deux colonnes.
-    const cellulesP2 = within(screen.getByText('PR-2026-0146-EXT').closest('tr')!).getAllByRole('cell')
-    expect(cellulesP2[6]).toHaveTextContent('—')
-    expect(cellulesP2[7]).toHaveTextContent('—')
-  })
-
-  it('reste affichable quand /traitements échoue : tirets dans les colonnes de surface traitée et protégée', async () => {
-    mockedGet.mockImplementation((url: string) => {
-      if (url === '/prospections') return Promise.resolve({ data: PROSPECTIONS })
-      if (url === '/traitements') return Promise.reject(new Error('403'))
-      if (url === '/stations') return Promise.resolve({ data: STATIONS })
-      return Promise.resolve({ data: url === '/users/' ? UTILISATEURS : [] })
-    })
-    renderPage()
-
-    await waitFor(() => expect(rows()).toHaveLength(4))
-    const ligne = screen.getByText('PR-2026-0148-INT').closest('tr')!
-    const cellules = within(ligne).getAllByRole('cell')
-    expect(cellules[6]).toHaveTextContent('—')
-    expect(cellules[7]).toHaveTextContent('—')
   })
 
   it('propose « Ouvrir › » sur chaque ligne', async () => {
