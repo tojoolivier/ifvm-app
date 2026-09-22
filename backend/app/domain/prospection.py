@@ -43,6 +43,25 @@ class StadeInconnuError(Exception):
         super().__init__("stade(s) absent(s) du référentiel : " + ", ".join(sorted(codes)))
 
 
+class SurfaceInfesteeSuperieureError(ValueError):
+    """La surface infestée dépasse la surface prospectée — impossible quel que soit
+    le type de fiche (intensive, extensive, validation) : la zone infestée relevée
+    ne peut pas être plus grande que la zone effectivement parcourue."""
+
+
+def valider_surfaces_prospection(
+    surface_prospectee: float | None, surface_infestee: float | None
+) -> None:
+    """Aucun contrôle si l'une des deux surfaces est inconnue — rien à comparer."""
+    if surface_prospectee is None or surface_infestee is None:
+        return
+    if surface_infestee > surface_prospectee:
+        raise SurfaceInfesteeSuperieureError(
+            f"La surface infestée ({surface_infestee} ha) dépasse la surface "
+            f"prospectée ({surface_prospectee} ha)."
+        )
+
+
 _ACTION_MAP: dict[str, str] = {
     "en_attente": "soumission",
     "verifiee": "verification",
@@ -274,16 +293,11 @@ class Prospection:
     base_secondaire_longitude: float | None = None
 
     # ==========================================
-    # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
+    # NOUVEAUX CHAMPS - Extensif : signatures
     # ==========================================
-    pesticides_embarques: bool | None = None
-    pesticide_nom_commercial: str | None = None
-    pesticide_quantite_disponible: float | None = None
-    pesticide_quantite_recue: float | None = None
-    futs_disponible: int | None = None
-    futs_pleins: int | None = None
-    futs_vides: int | None = None
-    futs_recues: int | None = None
+    # Pesticides embarqués (nom commercial, quantités, fûts) supprimés par la
+    # migration 0084 (#pesticide-embarque-prospection) : une prospection est une
+    # reconnaissance, l'aéronef n'embarque jamais de pesticide pendant son vol.
     signature_visa_nom: str | None = None
     signature_visa_horodatage: datetime | None = None
     signature_visa_image: str | None = None

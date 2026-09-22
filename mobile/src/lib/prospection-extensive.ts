@@ -101,7 +101,7 @@ export const DEGATS_CULTURES_EXTENSIF_OPTIONS: { value: string; label: string }[
 
 export const DEPLACEMENT_OPTIONS: { value: string; label: string }[] = [
   { value: 'repos', label: 'Repos' },
-  { value: 'perchee', label: 'Perchée' },
+  { value: 'deplacement', label: 'Déplacement' },
 ];
 
 

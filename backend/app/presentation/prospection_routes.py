@@ -176,16 +176,8 @@ async def create_prospection(
             base_secondaire_latitude=body.base_secondaire_latitude,
             base_secondaire_longitude=body.base_secondaire_longitude,
             # ==========================================
-            # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
+            # NOUVEAUX CHAMPS - Extensif : signatures
             # ==========================================
-            pesticides_embarques=body.pesticides_embarques,
-            pesticide_nom_commercial=body.pesticide_nom_commercial,
-            pesticide_quantite_disponible=body.pesticide_quantite_disponible,
-            pesticide_quantite_recue=body.pesticide_quantite_recue,
-            futs_disponible=body.futs_disponible,
-            futs_pleins=body.futs_pleins,
-            futs_vides=body.futs_vides,
-            futs_recues=body.futs_recues,
             signature_visa_nom=body.signature_visa_nom,
             signature_visa_horodatage=body.signature_visa_horodatage,
             signature_visa_image=body.signature_visa_image,

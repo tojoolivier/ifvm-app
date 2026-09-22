@@ -1615,7 +1615,7 @@ export interface components {
          * Deplacement
          * @enum {string}
          */
-        Deplacement: "repos" | "perchee";
+        Deplacement: "repos" | "deplacement";
         /**
          * DirectionVent
          * @enum {string}
@@ -2758,22 +2758,6 @@ export interface components {
             base_secondaire_latitude?: number | null;
             /** Base Secondaire Longitude */
             base_secondaire_longitude?: number | null;
-            /** Pesticides Embarques */
-            pesticides_embarques?: boolean | null;
-            /** Pesticide Nom Commercial */
-            pesticide_nom_commercial?: string | null;
-            /** Pesticide Quantite Disponible */
-            pesticide_quantite_disponible?: number | null;
-            /** Pesticide Quantite Recue */
-            pesticide_quantite_recue?: number | null;
-            /** Futs Disponible */
-            futs_disponible?: number | null;
-            /** Futs Pleins */
-            futs_pleins?: number | null;
-            /** Futs Vides */
-            futs_vides?: number | null;
-            /** Futs Recues */
-            futs_recues?: number | null;
             /** Signature Visa Nom */
             signature_visa_nom?: string | null;
             /** Signature Visa Horodatage */
@@ -2985,22 +2969,6 @@ export interface components {
             base_secondaire_latitude?: number | null;
             /** Base Secondaire Longitude */
             base_secondaire_longitude?: number | null;
-            /** Pesticides Embarques */
-            pesticides_embarques?: boolean | null;
-            /** Pesticide Nom Commercial */
-            pesticide_nom_commercial?: string | null;
-            /** Pesticide Quantite Disponible */
-            pesticide_quantite_disponible?: number | null;
-            /** Pesticide Quantite Recue */
-            pesticide_quantite_recue?: number | null;
-            /** Futs Disponible */
-            futs_disponible?: number | null;
-            /** Futs Pleins */
-            futs_pleins?: number | null;
-            /** Futs Vides */
-            futs_vides?: number | null;
-            /** Futs Recues */
-            futs_recues?: number | null;
             /** Signature Visa Nom */
             signature_visa_nom?: string | null;
             /** Signature Visa Horodatage */
@@ -3153,22 +3121,6 @@ export interface components {
             base_secondaire_latitude?: number | null;
             /** Base Secondaire Longitude */
             base_secondaire_longitude?: number | null;
-            /** Pesticides Embarques */
-            pesticides_embarques?: boolean | null;
-            /** Pesticide Nom Commercial */
-            pesticide_nom_commercial?: string | null;
-            /** Pesticide Quantite Disponible */
-            pesticide_quantite_disponible?: number | null;
-            /** Pesticide Quantite Recue */
-            pesticide_quantite_recue?: number | null;
-            /** Futs Disponible */
-            futs_disponible?: number | null;
-            /** Futs Pleins */
-            futs_pleins?: number | null;
-            /** Futs Vides */
-            futs_vides?: number | null;
-            /** Futs Recues */
-            futs_recues?: number | null;
             /** Signature Visa Nom */
             signature_visa_nom?: string | null;
             /** Signature Visa Horodatage */

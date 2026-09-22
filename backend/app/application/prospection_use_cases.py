@@ -10,6 +10,7 @@ from app.domain.prospection import (
     ProspectionOperationAerienne,
     ProspectionPopulation,
     StadeInconnuError,
+    valider_surfaces_prospection,
 )
 from app.domain.repositories import AuditLogRepository, ProspectionRepository
 
@@ -125,16 +126,8 @@ class CreateProspection:
         base_secondaire_longitude: float | None = None,
         operations_aeriennes: list[ProspectionOperationAerienne] | None = None,
         # ==========================================
-        # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
+        # NOUVEAUX CHAMPS - Extensif : signatures
         # ==========================================
-        pesticides_embarques: bool | None = None,
-        pesticide_nom_commercial: str | None = None,
-        pesticide_quantite_disponible: float | None = None,
-        pesticide_quantite_recue: float | None = None,
-        futs_disponible: int | None = None,
-        futs_pleins: int | None = None,
-        futs_vides: int | None = None,
-        futs_recues: int | None = None,
         signature_visa_nom: str | None = None,
         signature_visa_horodatage: datetime | None = None,
         signature_visa_image: str | None = None,
@@ -157,6 +150,7 @@ class CreateProspection:
             raise ValueError("station_id est obligatoire pour une prospection intensive")
 
         await _verifier_stades(self.repository, captures)
+        valider_surfaces_prospection(surface_prospectee, surface_infestee)
 
         now = datetime.utcnow()
         # Une fiche de validation / signalisation est exploitable pour le
@@ -267,16 +261,8 @@ class CreateProspection:
             base_secondaire_longitude=base_secondaire_longitude,
             operations_aeriennes=operations_aeriennes or [],
             # ==========================================
-            # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
+            # NOUVEAUX CHAMPS - Extensif : signatures
             # ==========================================
-            pesticides_embarques=pesticides_embarques,
-            pesticide_nom_commercial=pesticide_nom_commercial,
-            pesticide_quantite_disponible=pesticide_quantite_disponible,
-            pesticide_quantite_recue=pesticide_quantite_recue,
-            futs_disponible=futs_disponible,
-            futs_pleins=futs_pleins,
-            futs_vides=futs_vides,
-            futs_recues=futs_recues,
             signature_visa_nom=signature_visa_nom,
             signature_visa_horodatage=signature_visa_horodatage,
             signature_visa_image=signature_visa_image,
@@ -449,16 +435,8 @@ class UpdateProspection:
         base_secondaire_latitude: float | None = None,
         base_secondaire_longitude: float | None = None,
         # ==========================================
-        # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
+        # NOUVEAUX CHAMPS - Extensif : signatures
         # ==========================================
-        pesticides_embarques: bool | None = None,
-        pesticide_nom_commercial: str | None = None,
-        pesticide_quantite_disponible: float | None = None,
-        pesticide_quantite_recue: float | None = None,
-        futs_disponible: int | None = None,
-        futs_pleins: int | None = None,
-        futs_vides: int | None = None,
-        futs_recues: int | None = None,
         signature_visa_nom: str | None = None,
         signature_visa_horodatage: datetime | None = None,
         signature_visa_image: str | None = None,
@@ -603,24 +581,8 @@ class UpdateProspection:
             prospection.base_secondaire_longitude = base_secondaire_longitude
 
         # ==========================================
-        # Mise à jour des nouveaux champs - Extensif : pesticides embarqués + signatures
+        # Mise à jour des nouveaux champs - Extensif : signatures
         # ==========================================
-        if pesticides_embarques is not None:
-            prospection.pesticides_embarques = pesticides_embarques
-        if pesticide_nom_commercial is not None:
-            prospection.pesticide_nom_commercial = pesticide_nom_commercial
-        if pesticide_quantite_disponible is not None:
-            prospection.pesticide_quantite_disponible = pesticide_quantite_disponible
-        if pesticide_quantite_recue is not None:
-            prospection.pesticide_quantite_recue = pesticide_quantite_recue
-        if futs_disponible is not None:
-            prospection.futs_disponible = futs_disponible
-        if futs_pleins is not None:
-            prospection.futs_pleins = futs_pleins
-        if futs_vides is not None:
-            prospection.futs_vides = futs_vides
-        if futs_recues is not None:
-            prospection.futs_recues = futs_recues
         if signature_visa_nom is not None:
             prospection.signature_visa_nom = signature_visa_nom
         if signature_visa_horodatage is not None:
@@ -646,6 +608,7 @@ class UpdateProspection:
         if signature_chef_base_image is not None:
             prospection.signature_chef_base_image = signature_chef_base_image
 
+        valider_surfaces_prospection(prospection.surface_prospectee, prospection.surface_infestee)
         prospection.updated_at = datetime.utcnow()
 
         return await self.repository.update(prospection)

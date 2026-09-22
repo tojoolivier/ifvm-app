@@ -58,7 +58,9 @@ describe('IntensiveLarvesScreen — enregistrement complet', () => {
     useProspectionWizardStore.setState({ draft: draftLmcLarveOnly(), captures: [] });
 
     await render(<IntensiveLarvesScreen />);
-    await screen.findByText('Déplacement');
+    // « Déplacement » apparaît deux fois (libellé de section + option du même
+    // nom) — `findAllByText` attend l'affichage sans exiger l'unicité.
+    await screen.findAllByText('Déplacement');
     await settle();
 
     fireEvent.changeText(screen.getByTestId('densite-diffuse-input'), '40');
@@ -71,7 +73,9 @@ describe('IntensiveLarvesScreen — enregistrement complet', () => {
     // celui de Tache larvaire.
     fireEvent.press(screen.getAllByText('Non')[0]);
     await settle();
-    fireEvent.press(screen.getByText('Perchée'));
+    // « Déplacement » apparaît deux fois : le libellé de section, puis l'option du
+    // même nom (repos/déplacement) — la seconde est celle du bouton à presser.
+    fireEvent.press(screen.getAllByText('Déplacement')[1]);
     await settle();
 
     // Aucune "Surface contaminée" sur cet écran (exclue explicitement).
@@ -88,7 +92,7 @@ describe('IntensiveLarvesScreen — enregistrement complet', () => {
       densite_groupee: 9,
       interdistance: 14,
       tache_larvaire: true,
-      deplacement: 'perchee',
+      deplacement: 'deplacement',
     });
 
     await waitFor(() =>

@@ -102,17 +102,7 @@ export interface DraftProspection {
   base_secondaire_date_installation: string | null;
   base_secondaire_latitude: number | null;
   base_secondaire_longitude: number | null;
-  /** Pesticides embarqués + signatures (mode aérien uniquement) — NULL en mode
-   * terrestre. `pesticides_embarques` reste la valeur SQLite brute (0/1/NULL,
-   * pas de type booléen natif) : normaliser avec `normalizeBoolean` à la lecture. */
-  pesticides_embarques: number | null;
-  pesticide_nom_commercial: string | null;
-  pesticide_quantite_disponible: number | null;
-  pesticide_quantite_recue: number | null;
-  futs_disponible: number | null;
-  futs_pleins: number | null;
-  futs_vides: number | null;
-  futs_recues: number | null;
+  /** Signatures (mode aérien uniquement) — NULL en mode terrestre. */
   signature_visa_nom: string | null;
   signature_visa_horodatage: string | null;
   /** Tracé SVG du pavé de signature — Intensif uniquement (auto-signature du
@@ -230,16 +220,6 @@ export interface ExtensiveObservationsUpdateInput {
   hauteurHerbeCm: number | null;
   dernierePluie: string | null;
   intensitePluie: string | null;
-  /** Mode aérien uniquement — `null`/`undefined` en mode terrestre (colonnes
-   * jamais réclamées, comme les champs équipe/aéronef sur Référence). */
-  pesticidesEmbarques?: boolean | null;
-  pesticideNomCommercial?: string | null;
-  pesticideQuantiteDisponible?: number | null;
-  pesticideQuantiteRecue?: number | null;
-  futsDisponible?: number | null;
-  futsPleins?: number | null;
-  futsVides?: number | null;
-  futsRecues?: number | null;
   signatureVisaNom?: string | null;
   signatureVisaHorodatage?: string | null;
   /** Auto-signature du prospecteur connecté, après « Remarques » — même
@@ -622,14 +602,6 @@ export interface ProspectionValideeInput {
   baseSecondaireDateInstallation: string | null;
   baseSecondaireLatitude: number | null;
   baseSecondaireLongitude: number | null;
-  pesticidesEmbarques: boolean | null;
-  pesticideNomCommercial: string | null;
-  pesticideQuantiteDisponible: number | null;
-  pesticideQuantiteRecue: number | null;
-  futsDisponible: number | null;
-  futsPleins: number | null;
-  futsVides: number | null;
-  futsRecues: number | null;
   signatureVisaNom: string | null;
   signatureVisaHorodatage: string | null;
   signatureVisaImage: string | null;
@@ -673,8 +645,6 @@ export async function materialiserProspectionValidee(input: ProspectionValideeIn
       societe, immatricule_aeronef, pilote, mecanicien, chef_de_base, base,
       base_numero, base_date_installation, base_latitude, base_longitude,
       base_secondaire, base_secondaire_date_installation, base_secondaire_latitude, base_secondaire_longitude,
-      pesticides_embarques, pesticide_nom_commercial, pesticide_quantite_disponible,
-      pesticide_quantite_recue, futs_disponible, futs_pleins, futs_vides, futs_recues,
       signature_visa_nom, signature_visa_horodatage, signature_visa_image,
       signature_consultant_fao_nom, signature_consultant_fao_horodatage, signature_consultant_fao_image,
       signature_pilote_nom, signature_pilote_horodatage, signature_pilote_image,
@@ -683,7 +653,7 @@ export async function materialiserProspectionValidee(input: ProspectionValideeIn
     ) VALUES (
       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?,
       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
     )`,
     [
       input.id,
@@ -745,14 +715,6 @@ export async function materialiserProspectionValidee(input: ProspectionValideeIn
       input.baseSecondaireDateInstallation,
       input.baseSecondaireLatitude,
       input.baseSecondaireLongitude,
-      input.pesticidesEmbarques == null ? null : input.pesticidesEmbarques ? 1 : 0,
-      input.pesticideNomCommercial,
-      input.pesticideQuantiteDisponible,
-      input.pesticideQuantiteRecue,
-      input.futsDisponible,
-      input.futsPleins,
-      input.futsVides,
-      input.futsRecues,
       input.signatureVisaNom,
       input.signatureVisaHorodatage,
       input.signatureVisaImage,
@@ -1028,9 +990,6 @@ export async function updateProspectionExtensiveObservations(id: string, input: 
     `UPDATE prospection SET
       degats_cultures = ?, verdissement_pourcent = ?, hauteur_herbe_cm = ?,
       derniere_pluie = ?, intensite_pluie = ?,
-      pesticides_embarques = ?, pesticide_nom_commercial = ?,
-      pesticide_quantite_disponible = ?, pesticide_quantite_recue = ?,
-      futs_disponible = ?, futs_pleins = ?, futs_vides = ?, futs_recues = ?,
       signature_visa_nom = ?, signature_visa_horodatage = ?, signature_visa_image = ?,
       signature_consultant_fao_nom = ?, signature_consultant_fao_horodatage = ?, signature_consultant_fao_image = ?,
       signature_pilote_nom = ?, signature_pilote_horodatage = ?, signature_pilote_image = ?,
@@ -1040,14 +999,6 @@ export async function updateProspectionExtensiveObservations(id: string, input: 
      WHERE id = ?`,
     [
       input.degatsCultures, input.verdissementPourcent, input.hauteurHerbeCm, input.dernierePluie, input.intensitePluie,
-      input.pesticidesEmbarques == null ? null : input.pesticidesEmbarques ? 1 : 0,
-      input.pesticideNomCommercial ?? null,
-      input.pesticideQuantiteDisponible ?? null,
-      input.pesticideQuantiteRecue ?? null,
-      input.futsDisponible ?? null,
-      input.futsPleins ?? null,
-      input.futsVides ?? null,
-      input.futsRecues ?? null,
       input.signatureVisaNom ?? null,
       input.signatureVisaHorodatage ?? null,
       input.signatureVisaImage ?? null,

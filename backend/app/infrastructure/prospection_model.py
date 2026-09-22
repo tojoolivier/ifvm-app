@@ -175,22 +175,12 @@ class ProspectionModel(Base):
     base_secondaire_longitude: Mapped[float | None] = mapped_column(Numeric(), nullable=True)
 
     # ==========================================
-    # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures (migration 0036)
+    # NOUVEAUX CHAMPS - Extensif : signatures (migration 0036)
     # ==========================================
-    # Jeu de valeurs fixe et non répétable par fiche, comme l'équipe/aéronef
-    # ci-dessus — colonnes nullables directes, pas de table séparée.
-    pesticides_embarques: Mapped[bool | None] = mapped_column(Boolean(), nullable=True)
-    pesticide_nom_commercial: Mapped[str | None] = mapped_column(Text(), nullable=True)
-    pesticide_quantite_disponible: Mapped[float | None] = mapped_column(
-        Numeric(10, 2), nullable=True
-    )
-    pesticide_quantite_recue: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
-    futs_disponible: Mapped[int | None] = mapped_column(Integer(), nullable=True)
-    futs_pleins: Mapped[int | None] = mapped_column(Integer(), nullable=True)
-    futs_vides: Mapped[int | None] = mapped_column(Integer(), nullable=True)
-    futs_recues: Mapped[int | None] = mapped_column(Integer(), nullable=True)
-
-    # Signatures — indépendantes du choix Pesticides. Même principe nom +
+    # Pesticides embarqués (nom commercial, quantités, fûts) supprimés par la
+    # migration 0085 (#pesticide-embarque-prospection) : une prospection est une
+    # reconnaissance, l'aéronef n'embarque jamais de pesticide pendant son vol.
+    # Signatures — indépendantes de cet ex-choix Pesticides. Même principe nom +
     # horodatage que `TraitementSignatureModel`, en colonnes nommées à plat
     # (4 rôles fixes, jamais une liste ouverte comme côté traitement).
     # `signature_visa_*` : le Visa est retiré du formulaire mobile Extensif
@@ -388,7 +378,7 @@ class ProspectionPopulationModel(Base):
             name="ck_prospection_population_etat",
         ),
         CheckConstraint(
-            "deplacement IN ('repos','perchee')",
+            "deplacement IN ('repos','deplacement')",
             name="ck_prospection_population_deplacement",
         ),
         UniqueConstraint("prospection_id", "espece", "categorie", name="uq_prospection_population"),
@@ -439,7 +429,7 @@ class ProspectionOperationAerienneModel(Base):
     type_operation: Mapped[str] = mapped_column(Text(), nullable=False)
     # Pertinent seulement si type_operation = 'divers' (migration 0037) — laissé
     # à l'application plutôt qu'à un CHECK, même politique que les autres champs
-    # conditionnels de la fiche (ex. pesticide_nom_commercial).
+    # conditionnels de la fiche.
     motif_divers: Mapped[str | None] = mapped_column(Text(), nullable=True)
     debut_heure: Mapped[str] = mapped_column(Text(), nullable=False)
     debut_temperature_c: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)

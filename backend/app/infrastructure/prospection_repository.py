@@ -312,16 +312,8 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             base_secondaire_latitude=prospection.base_secondaire_latitude,
             base_secondaire_longitude=prospection.base_secondaire_longitude,
             # ==========================================
-            # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
+            # NOUVEAUX CHAMPS - Extensif : signatures
             # ==========================================
-            pesticides_embarques=prospection.pesticides_embarques,
-            pesticide_nom_commercial=prospection.pesticide_nom_commercial,
-            pesticide_quantite_disponible=prospection.pesticide_quantite_disponible,
-            pesticide_quantite_recue=prospection.pesticide_quantite_recue,
-            futs_disponible=prospection.futs_disponible,
-            futs_pleins=prospection.futs_pleins,
-            futs_vides=prospection.futs_vides,
-            futs_recues=prospection.futs_recues,
             signature_visa_nom=prospection.signature_visa_nom,
             signature_visa_horodatage=prospection.signature_visa_horodatage,
             signature_visa_image=prospection.signature_visa_image,
@@ -509,16 +501,8 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         model.base = prospection.base
 
         # ==========================================
-        # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
+        # NOUVEAUX CHAMPS - Extensif : signatures
         # ==========================================
-        model.pesticides_embarques = prospection.pesticides_embarques
-        model.pesticide_nom_commercial = prospection.pesticide_nom_commercial
-        model.pesticide_quantite_disponible = prospection.pesticide_quantite_disponible
-        model.pesticide_quantite_recue = prospection.pesticide_quantite_recue
-        model.futs_disponible = prospection.futs_disponible
-        model.futs_pleins = prospection.futs_pleins
-        model.futs_vides = prospection.futs_vides
-        model.futs_recues = prospection.futs_recues
         model.signature_visa_nom = prospection.signature_visa_nom
         model.signature_visa_horodatage = prospection.signature_visa_horodatage
         model.signature_visa_image = prospection.signature_visa_image
@@ -828,20 +812,8 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             if model.base_secondaire_longitude is not None
             else None,
             # ==========================================
-            # NOUVEAUX CHAMPS - Extensif : pesticides embarqués + signatures
+            # NOUVEAUX CHAMPS - Extensif : signatures
             # ==========================================
-            pesticides_embarques=model.pesticides_embarques,
-            pesticide_nom_commercial=model.pesticide_nom_commercial,
-            pesticide_quantite_disponible=float(model.pesticide_quantite_disponible)
-            if model.pesticide_quantite_disponible is not None
-            else None,
-            pesticide_quantite_recue=float(model.pesticide_quantite_recue)
-            if model.pesticide_quantite_recue is not None
-            else None,
-            futs_disponible=model.futs_disponible,
-            futs_pleins=model.futs_pleins,
-            futs_vides=model.futs_vides,
-            futs_recues=model.futs_recues,
             signature_visa_nom=model.signature_visa_nom,
             signature_visa_horodatage=model.signature_visa_horodatage,
             signature_visa_image=model.signature_visa_image,

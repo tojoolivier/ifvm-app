@@ -23,12 +23,6 @@ jest.mock('expo-router', () =>
 
 jest.mock('@/lib/prospection-repository', () => ({
   updateProspectionExtensiveObservations: jest.fn().mockResolvedValue({ id: 'draft-123' }),
-  normalizeBoolean: (value: unknown) => {
-    if (value === null || value === undefined) return null;
-    if (typeof value === 'boolean') return value;
-    if (typeof value === 'number') return value !== 0;
-    return null;
-  },
 }));
 
 jest.mock('@/lib/referentiel-db', () => ({
@@ -77,7 +71,6 @@ describe('ExtensiveObservationsScreen — Signature (après Remarques)', () => {
     await render(<ExtensiveObservationsScreen />);
     await screen.findByText('Signature');
 
-    expect(screen.queryByText('Pesticides Embarqués')).toBeNull();
     expect(screen.queryByText('Signatures')).toBeNull();
   });
 

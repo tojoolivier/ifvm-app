@@ -9,7 +9,6 @@ import {
   DraftProspection,
   listAllProspectionPopulations,
   listOperationsAeriennes,
-  normalizeBoolean,
   OperationAerienneRow,
   PopulationRow,
 } from '@/lib/prospection-repository';
@@ -130,7 +129,7 @@ function buildLarveRows(row: PopulationRow | null): DetailRow[] {
   const autres = [
     row?.tache_larvaire ? 'Tache larvaire' : null,
     row?.bande_larvaire ? 'Bande larvaire' : null,
-    row?.deplacement ? `Déplacement : ${row.deplacement === 'perchee' ? 'Perchée' : 'Repos'}` : null,
+    row?.deplacement ? `Déplacement : ${row.deplacement === 'deplacement' ? 'Déplacement' : 'Repos'}` : null,
   ].filter(Boolean);
 
   return [
@@ -160,11 +159,10 @@ function larveRowHasData(row: PopulationRow | null): boolean {
 
 /**
  * Bloc « E · Aérien » — mode aérien uniquement. Doit afficher TOUT le domaine
- * aérien de la fiche : Références (équipe/aéronef, déjà ajoutées) ET Pesticides
- * embarqués + Signatures (cf. prompt « pesticides embarqués + signatures »).
- * `Non applicable` — jamais de valeur par défaut/périmée — n'apparaît QUE si
- * Pesticides = NON : les champs dépendants (nom commercial, quantités, fûts)
- * sont alors omis plutôt qu'affichés à `null`, cf. `buildPesticidesRows`.
+ * aérien de la fiche : Références (équipe/aéronef) ET Signatures. Pas de
+ * pesticide embarqué côté prospection (#pesticide-embarque-prospection) : une
+ * prospection est une reconnaissance, l'aéronef n'embarque jamais de
+ * pesticide pendant son vol.
  */
 function buildReferencesAeriennesRows(draft: DraftProspection): DetailRow[] {
   const coordonneesBase =
@@ -226,25 +224,6 @@ function buildOperationRows(op: OperationAerienneRow): DetailRow[] {
     { label: 'Fin — Température', value: op.fin_temperature_c != null ? `${op.fin_temperature_c} °C` : '—' },
     { label: 'Fin — Vent', value: op.fin_vent_ms != null ? `${op.fin_vent_ms} m/s` : '—' },
     { label: 'Total heure de vol', value: formatDuree(op.duree_minutes) },
-  ];
-}
-
-/** `NON` (ou jamais renseigné) → une seule ligne, les champs dépendants ne sont
- * ni affichés à vide ni à une valeur périmée : ils sont absents du tableau. */
-function buildPesticidesRows(draft: DraftProspection): DetailRow[] {
-  const embarques = normalizeBoolean(draft.pesticides_embarques);
-  if (embarques !== true) {
-    return [{ label: 'Pesticides embarqués', value: embarques === false ? 'NON' : '—' }];
-  }
-  return [
-    { label: 'Pesticides embarqués', value: 'OUI' },
-    { label: 'Nom commercial', value: draft.pesticide_nom_commercial ?? '—' },
-    { label: 'Quantité disponible', value: draft.pesticide_quantite_disponible != null ? `${draft.pesticide_quantite_disponible} L` : '—' },
-    { label: 'Quantité reçue', value: draft.pesticide_quantite_recue != null ? `${draft.pesticide_quantite_recue} L` : '—' },
-    { label: 'Fûts — Disponible', value: draft.futs_disponible != null ? String(draft.futs_disponible) : '—' },
-    { label: 'Fûts — Pleins', value: draft.futs_pleins != null ? String(draft.futs_pleins) : '—' },
-    { label: 'Fûts — Vides', value: draft.futs_vides != null ? String(draft.futs_vides) : '—' },
-    { label: 'Fûts — Reçues', value: draft.futs_recues != null ? String(draft.futs_recues) : '—' },
   ];
 }
 
@@ -497,14 +476,9 @@ export default function ExtensiveRecapScreen() {
                       ))
                     )}
                     <View style={styles.detailRow}>
-                      <Text style={[styles.detailRowLabel, { fontWeight: '700' }]}>Total jour</Text>
+                      <Text style={[styles.detailRowLabel, { fontWeight: '700' }]}>Total heures</Text>
                       <Text style={styles.detailRowValue}>{formatDuree(totalJourMinutes)}</Text>
                     </View>
-                  </View>
-
-                  <Text style={styles.detailSubtitle}>Pesticides embarqués</Text>
-                  <View style={styles.summaryCard}>
-                    <DetailRows rows={buildPesticidesRows(draft)} />
                   </View>
 
                   <Text style={styles.detailSubtitle}>Signatures</Text>
@@ -677,12 +651,9 @@ export default function ExtensiveRecapScreen() {
                     ))
                   )}
                   <View style={styles.detailRow}>
-                    <Text style={[styles.detailRowLabel, { fontWeight: '700' }]}>Total jour</Text>
+                    <Text style={[styles.detailRowLabel, { fontWeight: '700' }]}>Total heures</Text>
                     <Text style={styles.detailRowValue}>{formatDuree(totalJourMinutes)}</Text>
                   </View>
-
-                  <Text style={[styles.detailSubtitle, { marginTop: 8 }]}>Pesticides embarqués</Text>
-                  <DetailRows rows={buildPesticidesRows(draft)} />
 
                   <Text style={[styles.detailSubtitle, { marginTop: 8 }]}>Signatures</Text>
                   <DetailRows rows={buildSignaturesRows(draft)} />

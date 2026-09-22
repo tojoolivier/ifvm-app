@@ -143,7 +143,6 @@ const G_SIGNAL = 'Signalement & validation'
 const G_EQUIPE = 'Extensif aérien — équipe & aéronef'
 const G_BASE1 = 'Extensif aérien — base principale'
 const G_BASE2 = 'Extensif aérien — base secondaire'
-const G_PESTI = 'Extensif aérien — pesticides embarqués'
 const G_SIGN = 'Extensif aérien — signatures'
 
 /** Table `prospection`. L'ordre des entrées est l'ordre d'affichage dans chaque groupe. */
@@ -234,15 +233,6 @@ export const CATALOGUE_PROSPECTION: { [K in keyof P]-?: Colonne<P> } = {
   base_secondaire_date_installation: txt(G_BASE2, "Date d'installation"),
   base_secondaire_latitude: num(G_BASE2, 'Latitude'),
   base_secondaire_longitude: num(G_BASE2, 'Longitude'),
-
-  pesticides_embarques: bool(G_PESTI, 'Pesticides embarqués'),
-  pesticide_nom_commercial: txt(G_PESTI, 'Nom commercial'),
-  pesticide_quantite_disponible: num(G_PESTI, 'Quantité disponible'),
-  pesticide_quantite_recue: num(G_PESTI, 'Quantité reçue'),
-  futs_disponible: num(G_PESTI, 'Fûts disponibles'),
-  futs_pleins: num(G_PESTI, 'Fûts pleins'),
-  futs_vides: num(G_PESTI, 'Fûts vides'),
-  futs_recues: num(G_PESTI, 'Fûts reçus'),
 
   signature_visa_nom: txt(G_SIGN, 'Visa — nom'),
   signature_visa_horodatage: ts(G_SIGN, 'Visa — horodatage'),
@@ -496,7 +486,6 @@ export const GROUPES_PROSPECTION: MetaGroupe<P>[] = [
   { titre: G_EQUIPE, applicable: estExtensifAerien },
   { titre: G_BASE1, applicable: estExtensifAerien },
   { titre: G_BASE2, applicable: estExtensifAerien },
-  { titre: G_PESTI, applicable: estExtensifAerien },
   { titre: G_SIGN, applicable: estExtensifAerien },
 ]
 

@@ -22,14 +22,6 @@ jest.mock('@/lib/prospection-repository', () => ({
     derniere_pluie: '2026-08-20',
     intensite_pluie: 'forte',
   }),
-  // Vraie implémentation (pas de mock utile ici) : l'écran en dépend pour
-  // normaliser `pesticides_embarques` (0/1/null en SQLite).
-  normalizeBoolean: (value: unknown) => {
-    if (value === null || value === undefined) return null;
-    if (typeof value === 'boolean') return value;
-    if (typeof value === 'number') return value !== 0;
-    return null;
-  },
 }));
 
 describe('ExtensiveObservationsScreen — restauration après hydratation tardive du draft', () => {
