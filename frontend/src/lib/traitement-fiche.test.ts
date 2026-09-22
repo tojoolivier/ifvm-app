@@ -13,7 +13,6 @@ import {
   responsableTraitement,
   resumeEspeces,
   surfaceTraiteeOuProtegee,
-  surfacesParProspection,
   zonesExposeesLabels,
 } from './traitement-fiche'
 
@@ -179,55 +178,6 @@ describe('surfaceTraiteeOuProtegee — la colonne à montrer pour une fiche', ()
         terrestre: { surface_traitee_ha: 5 },
       }),
     ).toBe(5)
-  })
-})
-
-describe('surfacesParProspection — colonnes « Surf. traitée » et « Surf. prot. » de la liste des prospections', () => {
-  const aerien = (traitee: number | string | null, protegee: number | string | null = 0) => ({
-    surface_traitee_ha: traitee,
-    surface_protegee_ha: protegee,
-  })
-
-  it('lit chaque colonne du traitement : choc → traitée, barrière → protégée', () => {
-    const cumul = surfacesParProspection([
-      { prospection_id: 'p-choc', mode_traitement: 'TOTAL', aerien: aerien(120, 0), terrestre: null },
-      { prospection_id: 'p-barriere', mode_traitement: 'BARRIERE', aerien: aerien(0, 80), terrestre: null },
-    ])
-    expect(cumul.get('p-choc')).toEqual({ traitee: 120, protegee: null })
-    expect(cumul.get('p-barriere')).toEqual({ traitee: null, protegee: 80 })
-  })
-
-  it('cumule les traitements d’une même prospection (reprise) et sépare les deux catégories', () => {
-    const cumul = surfacesParProspection([
-      { prospection_id: 'p-1', mode_traitement: 'TOTAL', aerien: aerien(100, 0), terrestre: null },
-      { prospection_id: 'p-1', mode_traitement: 'TOTAL', aerien: aerien(50.5, 0), terrestre: null },
-      { prospection_id: 'p-1', mode_traitement: 'BARRIERE', aerien: aerien(0, 30), terrestre: null },
-    ])
-    expect(cumul.get('p-1')).toEqual({ traitee: 150.5, protegee: 30 })
-  })
-
-  it('range un terrestre en « traitée »', () => {
-    const cumul = surfacesParProspection([
-      { prospection_id: 'p-1', mode_traitement: 'BARRIERE', aerien: null, terrestre: { surface_traitee_ha: 5 } },
-    ])
-    expect(cumul.get('p-1')).toEqual({ traitee: 5, protegee: null })
-  })
-
-  it('n’a pas d’entrée sans surface : valeur absente, ou 0 (fiche sans rotation)', () => {
-    const cumul = surfacesParProspection([
-      { prospection_id: 'p-null', mode_traitement: 'TOTAL', aerien: aerien(null, null), terrestre: null },
-      { prospection_id: 'p-zero', mode_traitement: 'TOTAL', aerien: aerien(0, 0), terrestre: null },
-      { prospection_id: 'p-vide', mode_traitement: 'TOTAL', aerien: null, terrestre: null },
-    ])
-    expect(cumul.size).toBe(0)
-  })
-
-  it('accepte les décimaux sérialisés en chaîne et ignore les valeurs non numériques', () => {
-    const cumul = surfacesParProspection([
-      { prospection_id: 'p-1', mode_traitement: 'TOTAL', aerien: aerien('860.00', 0), terrestre: null },
-      { prospection_id: 'p-1', mode_traitement: 'TOTAL', aerien: aerien('n/a', 0), terrestre: null },
-    ])
-    expect(cumul.get('p-1')).toEqual({ traitee: 860, protegee: null })
   })
 })
 

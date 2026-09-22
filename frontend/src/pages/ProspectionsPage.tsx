@@ -8,11 +8,6 @@ import { FilterChip } from '@/components/ui/filter-chip'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { STATUTS, STATUT_LABELS, StatusBadge, type Statut } from '@/components/ui/status-badge'
 import { shortId, useAnnuaire } from '@/lib/use-annuaire'
-import {
-  formatSurface,
-  surfacesParProspection,
-  type TraitementSurfacesLike,
-} from '@/lib/traitement-fiche'
 
 interface Station {
   id: string
@@ -66,11 +61,6 @@ function ficheType(p: Prospection): string {
   return p.revalide_de_id ? 'revalidation' : p.type_prospection
 }
 
-/** Surface en mono fr-FR, tiret atténué quand aucun traitement ne l'alimente. */
-function celluleSurface(surface: number | null | undefined) {
-  return surface == null ? <span className="text-[#bdb6a2]">—</span> : formatSurface(surface)
-}
-
 const PAGE_SIZE = 20
 const TOUS = 'Tous'
 
@@ -119,19 +109,6 @@ export function ProspectionsPage() {
     queryKey: ['stations'],
     queryFn: () => api.get('/stations').then((r) => r.data),
   })
-
-  // Même requête/clé que le tableau de bord : le cache est partagé. Un échec
-  // (droits, réseau) ne bloque pas la liste, les colonnes « Surf. traitée » et
-  // « Surf. prot. » affichent alors des tirets.
-  const { data: traitements = [] } = useQuery<TraitementSurfacesLike[]>({
-    queryKey: ['traitements', 'all'],
-    queryFn: () => api.get('/traitements').then((r) => r.data),
-  })
-
-  const surfacesTraitement = useMemo(
-    () => surfacesParProspection(Array.isArray(traitements) ? traitements : []),
-    [traitements],
-  )
 
   const { nomAgent } = useAnnuaire()
 
@@ -211,22 +188,6 @@ export function ProspectionsPage() {
         ) : (
           p.surface_infestee.toLocaleString('fr-FR')
         ),
-    },
-    // Produit de choc → surface *traitée* ; produit de barrière (aérien) → surface
-    // *protégée*. Tous traitements de la fiche confondus, cf. `surfacesParProspection`.
-    {
-      key: 'surface-traitee',
-      header: 'Surf. traitée (ha)',
-      align: 'right',
-      mono: true,
-      render: (p) => celluleSurface(surfacesTraitement.get(p.id)?.traitee),
-    },
-    {
-      key: 'surface-protegee',
-      header: 'Surf. prot. (ha)',
-      align: 'right',
-      mono: true,
-      render: (p) => celluleSurface(surfacesTraitement.get(p.id)?.protegee),
     },
     { key: 'statut', header: 'Statut', render: (p) => <StatusBadge statut={p.statut} /> },
     {

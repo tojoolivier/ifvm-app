@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { api } from '../api/client'
@@ -36,6 +36,8 @@ function traitementAerien() {
       { id: 's2', role: 'MECANICIEN', signataire_nom: 'Paul Randria', horodatage: '2026-08-13T08:00:00Z' },
       { id: 's3', role: 'CHEF_DE_BASE', signataire_nom: 'Marie Rabe', horodatage: '2026-08-13T08:00:00Z' },
     ],
+    // Snapshot de la prospection à l'origine de ce traitement.
+    cible: { surface_infestee_ha: 400 },
   }
 }
 
@@ -53,6 +55,7 @@ function traitementTerrestreAvecRestante() {
     signatures: [
       { id: 's4', role: 'CHEF_EQUIPE', signataire_nom: 'Hery Rasoa', horodatage: '2026-08-05T09:00:00Z' },
     ],
+    cible: { surface_infestee_ha: 8 },
   }
 }
 
@@ -72,7 +75,7 @@ describe('TraitementsPage — colonnes maquette (README §7)', () => {
     vi.restoreAllMocks()
   })
 
-  it('affiche mode, responsable, surface traitée, restante en ambre et signatures n/5', async () => {
+  it('affiche mode, responsable et restante en ambre', async () => {
     mockedGet.mockResolvedValue({ data: [traitementAerien(), traitementTerrestreAvecRestante()] })
     renderPage()
 
@@ -82,7 +85,6 @@ describe('TraitementsPage — colonnes maquette (README §7)', () => {
     // Maquette : « Rakoto A. (chef de base) » — le responsable hiérarchique,
     // pas le pilote.
     expect(screen.getByText('Marie Rabe (chef de base)')).toBeInTheDocument()
-    expect(screen.getByText('3/5')).toBeInTheDocument()
 
     // La maquette porte l'unité dans l'en-tête (« Traitée (ha) ») et laisse la
     // cellule en nombre nu, aligné à droite en mono.
@@ -90,19 +92,48 @@ describe('TraitementsPage — colonnes maquette (README §7)', () => {
     expect(restante).toBeInTheDocument()
     expect(restante.className).toMatch(/ifvm-amber-text/)
 
-    expect(screen.getByText('1/5')).toBeInTheDocument()
     expect(screen.getByText("Hery Rasoa (chef d'équipe)")).toBeInTheDocument()
   })
 
-  /** Choc → surface traitée ; barrière (aérien) → surface protégée : même colonne, l'infobulle nomme la ligne. */
-  it('nomme la surface de chaque ligne en infobulle : protégée pour l’aérien en barrière, traitée sinon', async () => {
+  /** Choc → colonne « Surf. traitée » ; barrière (aérien) → colonne « Surf. protégée » — jamais les deux à la fois (migration 0081). */
+  it('sépare la surface traitée de la surface protégée en deux colonnes, tiret dans la colonne inapplicable', async () => {
     mockedGet.mockResolvedValue({ data: [traitementAerien(), traitementTerrestreAvecRestante()] })
     renderPage()
 
     await waitFor(() => expect(screen.getByText('320')).toBeInTheDocument())
-    expect(screen.getByText('320')).toHaveAttribute('title', 'Surface protégée')
+
+    const ligneAerien = screen.getByText('Jean-AERIEN-2026-08-12').closest('tr')!
+    const cellulesAerien = within(ligneAerien).getAllByRole('cell')
+    // Ordre des colonnes : … Responsable, Surf. infestée, Surf. traitée, Surf. protégée, Restante …
+    expect(cellulesAerien[7]).toHaveTextContent('—')
+    expect(cellulesAerien[8]).toHaveTextContent('320')
+
     // Terrestre (traitée 5 ha) : « Traitée », même si le mode de la fiche est TOTAL ici.
-    expect(screen.getByText('5')).toHaveAttribute('title', 'Surface traitée')
+    const ligneTerrestre = screen.getByText('Hery-TERRESTRE-2026-08-05').closest('tr')!
+    const cellulesTerrestre = within(ligneTerrestre).getAllByRole('cell')
+    expect(cellulesTerrestre[7]).toHaveTextContent('5')
+    expect(cellulesTerrestre[8]).toHaveTextContent('—')
+  })
+
+  it('affiche la surface infestée de la prospection liée, en mono à droite', async () => {
+    mockedGet.mockResolvedValue({ data: [traitementAerien(), traitementTerrestreAvecRestante()] })
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    expect(screen.getByText('400')).toBeInTheDocument()
+    expect(screen.getByText('8')).toBeInTheDocument()
+  })
+
+  it('affiche un tiret quand la prospection liée n’a pas de surface infestée', async () => {
+    mockedGet.mockResolvedValue({
+      data: [{ ...traitementAerien(), cible: null }],
+    })
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    const ligne = screen.getByText('Jean-AERIEN-2026-08-12').closest('tr')!
+    // Colonne « Surf. infestée » : juste après Responsable.
+    expect(within(ligne).getAllByRole('cell')[6]).toHaveTextContent('—')
   })
 
   it('teinte le badge Type : aérien en bleu, terrestre en vert (prototype ligne 1461)', async () => {
@@ -114,32 +145,9 @@ describe('TraitementsPage — colonnes maquette (README §7)', () => {
     expect(screen.getByText('Terrestre').className).toMatch(/ifvm-green-bg/)
   })
 
-  it('teinte le compteur de signatures : vert si complet, ambre sinon', async () => {
-    mockedGet.mockResolvedValue({
-      data: [
-        traitementAerien(),
-        {
-          ...traitementTerrestreAvecRestante(),
-          id: 't-complet',
-          numero_fiche: 'Complet-01',
-          signatures: [
-            { id: 'a', role: 'PILOTE', signataire_nom: 'A', horodatage: '' },
-            { id: 'b', role: 'MECANICIEN', signataire_nom: 'B', horodatage: '' },
-            { id: 'c', role: 'CHEF_DE_BASE', signataire_nom: 'C', horodatage: '' },
-            { id: 'd', role: 'CHEF_EQUIPE', signataire_nom: 'D', horodatage: '' },
-            { id: 'e', role: 'CONSULTANT_INTERNATIONAL', signataire_nom: 'E', horodatage: '' },
-          ],
-        },
-      ],
-    })
-    renderPage()
-
-    await waitFor(() => expect(screen.getByText('5/5')).toBeInTheDocument())
-    expect(screen.getByText('5/5').className).toMatch(/ifvm-green-text/)
-    expect(screen.getByText('3/5').className).toMatch(/ifvm-amber-text/)
-  })
-
-  it('affiche les dix colonnes de la maquette + Localité, sans colonne Statut', async () => {
+  it('affiche les onze colonnes de la maquette + Localité, sans colonne Statut ni Signatures', async () => {
+    // La colonne Signatures est retirée de cette liste : les signatures ne
+    // s'affichent plus que sur la fiche (TraitementDetailPage).
     mockedGet.mockResolvedValue({ data: [traitementAerien()] })
     renderPage()
 
@@ -152,9 +160,10 @@ describe('TraitementsPage — colonnes maquette (README §7)', () => {
       'Mode',
       'Date',
       'Responsable',
-      'Traitée / protégée (ha)',
+      'Surf. infestée (ha)',
+      'Surf. traitée (ha)',
+      'Surf. protégée (ha)',
       'Restante',
-      'Signatures',
       '',
     ])
   })
