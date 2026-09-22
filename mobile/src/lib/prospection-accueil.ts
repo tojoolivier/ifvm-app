@@ -245,6 +245,7 @@ export async function assurerProspectionDisponibleLocalement(fiche: ProspectionR
     futsRecues: fiche.futs_recues ?? null,
     signatureVisaNom: fiche.signature_visa_nom ?? null,
     signatureVisaHorodatage: fiche.signature_visa_horodatage ?? null,
+    signatureVisaImage: fiche.signature_visa_image ?? null,
     signatureConsultantFaoNom: fiche.signature_consultant_fao_nom ?? null,
     signatureConsultantFaoHorodatage: fiche.signature_consultant_fao_horodatage ?? null,
     signatureConsultantFaoImage: fiche.signature_consultant_fao_image ?? null,

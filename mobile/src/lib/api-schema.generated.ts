@@ -2778,6 +2778,8 @@ export interface components {
             signature_visa_nom?: string | null;
             /** Signature Visa Horodatage */
             signature_visa_horodatage?: string | null;
+            /** Signature Visa Image */
+            signature_visa_image?: string | null;
             /** Signature Consultant Fao Nom */
             signature_consultant_fao_nom?: string | null;
             /** Signature Consultant Fao Horodatage */
@@ -3003,6 +3005,8 @@ export interface components {
             signature_visa_nom?: string | null;
             /** Signature Visa Horodatage */
             signature_visa_horodatage?: string | null;
+            /** Signature Visa Image */
+            signature_visa_image?: string | null;
             /** Signature Consultant Fao Nom */
             signature_consultant_fao_nom?: string | null;
             /** Signature Consultant Fao Horodatage */
@@ -3169,6 +3173,8 @@ export interface components {
             signature_visa_nom?: string | null;
             /** Signature Visa Horodatage */
             signature_visa_horodatage?: string | null;
+            /** Signature Visa Image */
+            signature_visa_image?: string | null;
             /** Signature Consultant Fao Nom */
             signature_consultant_fao_nom?: string | null;
             /** Signature Consultant Fao Horodatage */

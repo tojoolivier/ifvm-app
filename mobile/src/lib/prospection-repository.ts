@@ -114,6 +114,10 @@ export interface DraftProspection {
   futs_recues: number | null;
   signature_visa_nom: string | null;
   signature_visa_horodatage: string | null;
+  /** Tracé SVG du pavé de signature — Intensif uniquement (auto-signature du
+   * prospecteur connecté, écran Observations). Extensif Aérien retire ce rôle
+   * de son UI (cf. `ExtensiveObservationsUpdateInput`) sans jamais y toucher. */
+  signature_visa_image: string | null;
   signature_consultant_fao_nom: string | null;
   signature_consultant_fao_horodatage: string | null;
   signature_consultant_fao_image: string | null;
@@ -262,6 +266,15 @@ export interface ObservationsUpdateInput {
   intensitePluie?: string | null;
   observations: string | null;
   heureObservationAt: string | null;
+  /** Auto-signature du prospecteur connecté (remplace le champ « Photo », jamais
+   * câblé — cf. observations.tsx). Nom auto-rempli depuis l'utilisateur connecté
+   * (jamais ressaisi), horodatage posé au VALIDER, tracé capturé au pavé de
+   * signature (`SignaturePad`). Réutilise `signature_visa_nom`/`_horodatage`
+   * (migration 0036, colonnes historiquement mortes pour l'Intensif) + le
+   * nouveau `signature_visa_image` (migration 0082). */
+  signatureVisaNom?: string | null;
+  signatureVisaHorodatage?: string | null;
+  signatureVisaImage?: string | null;
 }
 
 export interface VegetationUpdateInput {
@@ -612,6 +625,7 @@ export interface ProspectionValideeInput {
   futsRecues: number | null;
   signatureVisaNom: string | null;
   signatureVisaHorodatage: string | null;
+  signatureVisaImage: string | null;
   signatureConsultantFaoNom: string | null;
   signatureConsultantFaoHorodatage: string | null;
   signatureConsultantFaoImage: string | null;
@@ -654,7 +668,7 @@ export async function materialiserProspectionValidee(input: ProspectionValideeIn
       base_secondaire, base_secondaire_date_installation, base_secondaire_latitude, base_secondaire_longitude,
       pesticides_embarques, pesticide_nom_commercial, pesticide_quantite_disponible,
       pesticide_quantite_recue, futs_disponible, futs_pleins, futs_vides, futs_recues,
-      signature_visa_nom, signature_visa_horodatage,
+      signature_visa_nom, signature_visa_horodatage, signature_visa_image,
       signature_consultant_fao_nom, signature_consultant_fao_horodatage, signature_consultant_fao_image,
       signature_pilote_nom, signature_pilote_horodatage, signature_pilote_image,
       signature_chef_base_nom, signature_chef_base_horodatage, signature_chef_base_image,
@@ -662,7 +676,7 @@ export async function materialiserProspectionValidee(input: ProspectionValideeIn
     ) VALUES (
       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?,
       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
     )`,
     [
       input.id,
@@ -734,6 +748,7 @@ export async function materialiserProspectionValidee(input: ProspectionValideeIn
       input.futsRecues,
       input.signatureVisaNom,
       input.signatureVisaHorodatage,
+      input.signatureVisaImage,
       input.signatureConsultantFaoNom,
       input.signatureConsultantFaoHorodatage,
       input.signatureConsultantFaoImage,
@@ -1111,11 +1126,14 @@ export async function updateProspectionObservations(id: string, input: Observati
   await db.runAsync(
     `UPDATE prospection SET
       degats_cultures = ?, ennemis_naturels = ?, observations = ?,
-      derniere_pluie = ?, intensite_pluie = ?, heure_observation_at = ?, updated_at = ?
+      derniere_pluie = ?, intensite_pluie = ?, heure_observation_at = ?,
+      signature_visa_nom = ?, signature_visa_horodatage = ?, signature_visa_image = ?,
+      updated_at = ?
      WHERE id = ?`,
     [
       input.degatsCultures, input.ennemisNaturels, input.observations,
       input.dernierePluie ?? null, input.intensitePluie ?? null, input.heureObservationAt,
+      input.signatureVisaNom ?? null, input.signatureVisaHorodatage ?? null, input.signatureVisaImage ?? null,
       now, id,
     ]
   );

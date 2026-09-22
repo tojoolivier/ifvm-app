@@ -137,6 +137,7 @@ class CreateProspection:
         futs_recues: int | None = None,
         signature_visa_nom: str | None = None,
         signature_visa_horodatage: datetime | None = None,
+        signature_visa_image: str | None = None,
         signature_consultant_fao_nom: str | None = None,
         signature_consultant_fao_horodatage: datetime | None = None,
         signature_consultant_fao_image: str | None = None,
@@ -278,6 +279,7 @@ class CreateProspection:
             futs_recues=futs_recues,
             signature_visa_nom=signature_visa_nom,
             signature_visa_horodatage=signature_visa_horodatage,
+            signature_visa_image=signature_visa_image,
             signature_consultant_fao_nom=signature_consultant_fao_nom,
             signature_consultant_fao_horodatage=signature_consultant_fao_horodatage,
             signature_consultant_fao_image=signature_consultant_fao_image,
@@ -459,6 +461,7 @@ class UpdateProspection:
         futs_recues: int | None = None,
         signature_visa_nom: str | None = None,
         signature_visa_horodatage: datetime | None = None,
+        signature_visa_image: str | None = None,
         signature_consultant_fao_nom: str | None = None,
         signature_consultant_fao_horodatage: datetime | None = None,
         signature_consultant_fao_image: str | None = None,
@@ -622,6 +625,8 @@ class UpdateProspection:
             prospection.signature_visa_nom = signature_visa_nom
         if signature_visa_horodatage is not None:
             prospection.signature_visa_horodatage = signature_visa_horodatage
+        if signature_visa_image is not None:
+            prospection.signature_visa_image = signature_visa_image
         if signature_consultant_fao_nom is not None:
             prospection.signature_consultant_fao_nom = signature_consultant_fao_nom
         if signature_consultant_fao_horodatage is not None:

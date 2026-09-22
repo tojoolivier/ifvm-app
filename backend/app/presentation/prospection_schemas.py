@@ -536,6 +536,7 @@ class ProspectionCreate(BaseModel):
     futs_recues: int | None = Field(None, ge=0)
     signature_visa_nom: str | None = None
     signature_visa_horodatage: datetime | None = None
+    signature_visa_image: str | None = None
     signature_consultant_fao_nom: str | None = None
     signature_consultant_fao_horodatage: datetime | None = None
     signature_consultant_fao_image: str | None = None
@@ -655,6 +656,7 @@ class ProspectionUpdate(BaseModel):
     futs_recues: int | None = Field(None, ge=0)
     signature_visa_nom: str | None = None
     signature_visa_horodatage: datetime | None = None
+    signature_visa_image: str | None = None
     signature_consultant_fao_nom: str | None = None
     signature_consultant_fao_horodatage: datetime | None = None
     signature_consultant_fao_image: str | None = None
@@ -818,6 +820,7 @@ class ProspectionRead(BaseModel):
     futs_recues: int | None = None
     signature_visa_nom: str | None = None
     signature_visa_horodatage: datetime | None = None
+    signature_visa_image: str | None = None
     signature_consultant_fao_nom: str | None = None
     signature_consultant_fao_horodatage: datetime | None = None
     signature_consultant_fao_image: str | None = None

@@ -324,6 +324,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             futs_recues=prospection.futs_recues,
             signature_visa_nom=prospection.signature_visa_nom,
             signature_visa_horodatage=prospection.signature_visa_horodatage,
+            signature_visa_image=prospection.signature_visa_image,
             signature_consultant_fao_nom=prospection.signature_consultant_fao_nom,
             signature_consultant_fao_horodatage=prospection.signature_consultant_fao_horodatage,
             signature_consultant_fao_image=prospection.signature_consultant_fao_image,
@@ -520,6 +521,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         model.futs_recues = prospection.futs_recues
         model.signature_visa_nom = prospection.signature_visa_nom
         model.signature_visa_horodatage = prospection.signature_visa_horodatage
+        model.signature_visa_image = prospection.signature_visa_image
         model.signature_consultant_fao_nom = prospection.signature_consultant_fao_nom
         model.signature_consultant_fao_horodatage = prospection.signature_consultant_fao_horodatage
         model.signature_consultant_fao_image = prospection.signature_consultant_fao_image
@@ -842,6 +844,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             futs_recues=model.futs_recues,
             signature_visa_nom=model.signature_visa_nom,
             signature_visa_horodatage=model.signature_visa_horodatage,
+            signature_visa_image=model.signature_visa_image,
             signature_consultant_fao_nom=model.signature_consultant_fao_nom,
             signature_consultant_fao_horodatage=model.signature_consultant_fao_horodatage,
             signature_consultant_fao_image=model.signature_consultant_fao_image,

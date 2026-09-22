@@ -176,6 +176,7 @@ const CHAMPS_PROSPECTION_VALIDEE_PAR_DEFAUT = {
   futsRecues: null,
   signatureVisaNom: null,
   signatureVisaHorodatage: null,
+  signatureVisaImage: null,
   signatureConsultantFaoNom: null,
   signatureConsultantFaoHorodatage: null,
   signatureConsultantFaoImage: null,
@@ -680,6 +681,9 @@ describe('updateProspectionObservations', () => {
         null,
         null,
         OBSERVATIONS_INPUT.heureObservationAt,
+        null, // signatureVisaNom
+        null, // signatureVisaHorodatage
+        null, // signatureVisaImage
         expect.any(String),
         BASE_INPUT.id,
       ]
@@ -706,6 +710,38 @@ describe('updateProspectionObservations', () => {
         input.dernierePluie,
         input.intensitePluie,
         input.heureObservationAt,
+        null, // signatureVisaNom
+        null, // signatureVisaHorodatage
+        null, // signatureVisaImage
+        expect.any(String),
+        BASE_INPUT.id,
+      ]
+    );
+  });
+
+  it('passe le triplet de la signature auto (nom/horodatage/tracé) quand fourni (écran Observations, remplace Photo)', async () => {
+    const input = {
+      ...OBSERVATIONS_INPUT,
+      signatureVisaNom: 'Jean Rakoto',
+      signatureVisaHorodatage: '2026-09-22T08:00:00.000Z',
+      signatureVisaImage: 'M0 0 L1 1',
+    };
+    getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW, ...input });
+
+    await updateProspectionObservations(BASE_INPUT.id, input);
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE prospection SET'),
+      [
+        input.degatsCultures,
+        input.ennemisNaturels,
+        input.observations,
+        null,
+        null,
+        input.heureObservationAt,
+        'Jean Rakoto',
+        '2026-09-22T08:00:00.000Z',
+        'M0 0 L1 1',
         expect.any(String),
         BASE_INPUT.id,
       ]

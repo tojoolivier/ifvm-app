@@ -159,6 +159,7 @@ const STORED_ROW: DraftProspection = {
   futs_recues: null,
   signature_visa_nom: null,
   signature_visa_horodatage: null,
+  signature_visa_image: null,
   signature_consultant_fao_nom: null,
   signature_consultant_fao_horodatage: null,
   signature_consultant_fao_image: null,
