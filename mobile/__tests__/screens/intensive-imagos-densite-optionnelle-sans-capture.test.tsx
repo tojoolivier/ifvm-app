@@ -1,17 +1,19 @@
 /**
- * intensive-imagos.tsx (B-Imagos) : une fois la grille imago validée, la fiche
- * route vers C-Larves (intensive-larves.tsx) si des larves sont aussi cochées.
- *
- * Fichier séparé des autres scénarios de cet écran — cf. le commentaire
- * d'intensive-imagos-densites-obligatoires.test.tsx pour le pourquoi.
+ * intensive-imagos.tsx (B-Imagos) : #densite-diffuse-zero-si-sans-capture
+ * (demande explicite) — sans capture (0 par défaut), la densité diffuse n'est
+ * plus obligatoire, l'astérisque de la maquette disparaît, et « Suivant »
+ * n'est jamais bloqué de ce fait. Pendant de
+ * intensive-imagos-densites-obligatoires.test.tsx (au moins une capture),
+ * fichier séparé pour la même raison (cf. son en-tête).
  */
+import { Alert } from 'react-native';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import IntensiveImagosScreen from '@/app/(prospection)/intensive-imagos';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
 import * as prospectionRepository from '@/lib/prospection-repository';
 import * as referentielDb from '@/lib/referentiel-db';
-import { STADES_PAR_DEFAUT, draftLmcImagoAndLarve } from '../test-utils/intensive-imagos-fixtures';
+import { STADES_PAR_DEFAUT, draftLmcOnly } from '../test-utils/intensive-imagos-fixtures';
 
 const params: { draftId: string } = { draftId: 'draft-123' };
 const mockPush = jest.fn();
@@ -32,12 +34,9 @@ jest.mock('@/lib/prospection-repository', () => ({
 
 jest.mock('@/lib/referentiel-db', () => ({ listStadesGrille: jest.fn() }));
 
-/** `jest.useFakeTimers()` neutralise le chrono de l'écran (vrai `setInterval`,
- * 1s) : laissé actif, il tourne au-delà de la fin du test si le processus met
- * du temps à se terminer (CI partagée) et empêche Jest de sortir proprement. */
 const settle = () => act(() => jest.advanceTimersByTimeAsync(20));
 
-describe('IntensiveImagosScreen — routage vers C-Larves', () => {
+describe('IntensiveImagosScreen — densité diffuse facultative sans capture', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => {
     cleanup();
@@ -51,22 +50,21 @@ describe('IntensiveImagosScreen — routage vers C-Larves', () => {
     mockPush.mockClear();
   });
 
-  it('route vers intensive-larves quand une grille larve est aussi cochée', async () => {
-    useProspectionWizardStore.setState({ draft: draftLmcImagoAndLarve(), captures: [] });
+  it('n’exige pas la densité diffuse quand aucune capture n’est saisie, et n’affiche pas l’astérisque « obligatoire »', async () => {
+    useProspectionWizardStore.setState({ draft: draftLmcOnly(), captures: [] });
+    const alertSpy = jest.spyOn(Alert, 'alert');
 
     await render(<IntensiveImagosScreen />);
-    // Pas d'astérisque : aucun total de captures saisi (0 par défaut, cf. #densite-diffuse-zero-si-sans-capture).
-    await screen.findByText('Densité diffuse (ind./ha)');
+    await screen.findByText('Type de cible');
     await settle();
 
-    fireEvent.changeText(screen.getByTestId('densite-diffuse-input'), '10');
-    fireEvent.changeText(screen.getByTestId('densite-groupee-input'), '2');
-    await settle();
+    expect(screen.queryByText('Densité diffuse (ind./ha) *')).toBeNull();
+    expect(screen.getByText('Densité diffuse (ind./ha)')).toBeVisible();
 
-    fireEvent.press(screen.getByText('Larves  ›'));
+    fireEvent.press(screen.getByText('Végétation & Sol  ›'));
 
-    await waitFor(() =>
-      expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ pathname: '/(prospection)/intensive-larves' }))
-    );
+    await waitFor(() => expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalled());
+    expect(alertSpy).not.toHaveBeenCalledWith('Densité diffuse requise', expect.anything());
+    expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ pathname: '/(prospection)/veg' }));
   });
 });

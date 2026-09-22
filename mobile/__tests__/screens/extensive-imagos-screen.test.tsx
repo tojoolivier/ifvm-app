@@ -188,9 +188,17 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
     expect(await screen.findByDisplayValue('25')).toBeVisible();
     await settle();
 
+    // #accouplement-neant-sans-interdistance : la section Interdistance est encore
+    // visible avant la modification (accouplement = 'Beaucoup' dans la fixture).
+    expect(screen.getByText('📊 Interdistance (m)')).toBeVisible();
+
     // Modifie l'Accouplement (champ indépendant, non soumis à la règle Captures = Phases).
     fireEvent.press(screen.getAllByText('Néant')[0]);
     await settle();
+
+    // « Néant » masque désormais la section et efface la valeur déjà saisie
+    // (12,5 m) : elle n'a plus de sens sans accouplement observé.
+    expect(screen.queryByText('📊 Interdistance (m)')).toBeNull();
 
     fireEvent.press(screen.getByText('Suivant : Larves ›'));
 
@@ -198,12 +206,13 @@ describe('ExtensiveImagosScreen — indépendance des champs LMC/NSE', () => {
     const [, lmcRow] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
     // Nombre de captures : toujours 25, jamais réinitialisé par la modification d'Accouplement.
     expect(lmcRow).toMatchObject({ espece: 'LMC', captures_nombre: 25, accouplement: 'Néant' });
-    // …et tous les autres champs déjà présents avant la modification survivent tels quels.
+    // …et tous les autres champs déjà présents avant la modification survivent tels quels,
+    // sauf l'interdistance, effacée par le passage à « Néant ».
     expect(lmcRow).toMatchObject({
       densite_diffuse: 4.2,
       densite_groupee: 1.1,
       ponte: 'Rare',
-      interdistance: 12.5,
+      interdistance: null,
       type_cible: '["dense"]',
       etat: 'repos',
       essaim_en_vol: false,

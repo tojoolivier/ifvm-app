@@ -1,6 +1,8 @@
 /**
- * intensive-imagos.tsx (B-Imagos) : une fois la grille imago validée, la fiche
- * route vers C-Larves (intensive-larves.tsx) si des larves sont aussi cochées.
+ * intensive-imagos.tsx (B-Imagos) : #accouplement-neant-sans-interdistance —
+ * un accouplement « Néant » n'a pas de sens accompagné d'une interdistance
+ * (distance entre individus accouplés) : la section se masque et la valeur
+ * déjà saisie est effacée, jamais envoyée au backend.
  *
  * Fichier séparé des autres scénarios de cet écran — cf. le commentaire
  * d'intensive-imagos-densites-obligatoires.test.tsx pour le pourquoi.
@@ -11,7 +13,7 @@ import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
 import * as prospectionRepository from '@/lib/prospection-repository';
 import * as referentielDb from '@/lib/referentiel-db';
-import { STADES_PAR_DEFAUT, draftLmcImagoAndLarve } from '../test-utils/intensive-imagos-fixtures';
+import { STADES_PAR_DEFAUT, draftLmcOnly } from '../test-utils/intensive-imagos-fixtures';
 
 const params: { draftId: string } = { draftId: 'draft-123' };
 const mockPush = jest.fn();
@@ -32,12 +34,9 @@ jest.mock('@/lib/prospection-repository', () => ({
 
 jest.mock('@/lib/referentiel-db', () => ({ listStadesGrille: jest.fn() }));
 
-/** `jest.useFakeTimers()` neutralise le chrono de l'écran (vrai `setInterval`,
- * 1s) : laissé actif, il tourne au-delà de la fin du test si le processus met
- * du temps à se terminer (CI partagée) et empêche Jest de sortir proprement. */
 const settle = () => act(() => jest.advanceTimersByTimeAsync(20));
 
-describe('IntensiveImagosScreen — routage vers C-Larves', () => {
+describe('IntensiveImagosScreen — Accouplement Néant masque l’Interdistance', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => {
     cleanup();
@@ -51,22 +50,39 @@ describe('IntensiveImagosScreen — routage vers C-Larves', () => {
     mockPush.mockClear();
   });
 
-  it('route vers intensive-larves quand une grille larve est aussi cochée', async () => {
-    useProspectionWizardStore.setState({ draft: draftLmcImagoAndLarve(), captures: [] });
+  it('masque la section et efface la valeur déjà saisie quand Accouplement passe à Néant', async () => {
+    useProspectionWizardStore.setState({ draft: draftLmcOnly(), captures: [] });
 
     await render(<IntensiveImagosScreen />);
-    // Pas d'astérisque : aucun total de captures saisi (0 par défaut, cf. #densite-diffuse-zero-si-sans-capture).
-    await screen.findByText('Densité diffuse (ind./ha)');
+    await screen.findByText('Type de cible');
     await settle();
 
-    fireEvent.changeText(screen.getByTestId('densite-diffuse-input'), '10');
-    fireEvent.changeText(screen.getByTestId('densite-groupee-input'), '2');
+    fireEvent.changeText(screen.getByTestId('densite-diffuse-input'), '12');
+    // « Rare » : l'Interdistance est visible et saisissable.
+    fireEvent.press(screen.getAllByText('Rare')[0]);
+    await settle();
+    expect(screen.getByTestId('interdistance-input')).toBeVisible();
+    fireEvent.changeText(screen.getByTestId('interdistance-input'), '25.5');
+    await settle();
+    expect(screen.getByTestId('interdistance-input')).toHaveDisplayValue('25.5');
+
+    // Repasser sur « Néant » masque la section et efface la valeur.
+    fireEvent.press(screen.getAllByText('Néant')[0]);
     await settle();
 
-    fireEvent.press(screen.getByText('Larves  ›'));
+    expect(screen.queryByTestId('interdistance-input')).toBeNull();
 
-    await waitFor(() =>
-      expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ pathname: '/(prospection)/intensive-larves' }))
-    );
+    // « Rare » reste doublé (chip Accouplement, désormais inactif, + chip Ponte) —
+    // le second est celui de Ponte.
+    fireEvent.press(screen.getByText('Repos'));
+    fireEvent.press(screen.getAllByText('Rare')[1]);
+    fireEvent.press(screen.getByText('Vol clair'));
+    await settle();
+
+    fireEvent.press(screen.getByText('Végétation & Sol  ›'));
+
+    await waitFor(() => expect(prospectionRepository.saveProspectionPopulation).toHaveBeenCalledTimes(1));
+    const [, row] = jest.mocked(prospectionRepository.saveProspectionPopulation).mock.calls[0];
+    expect(row).toMatchObject({ accouplement: 'Néant', interdistance: null });
   });
 });

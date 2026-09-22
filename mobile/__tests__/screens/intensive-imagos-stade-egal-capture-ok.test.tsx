@@ -65,6 +65,24 @@ describe('IntensiveImagosScreen — Suivant accepte si stades = captures', () =>
     fireEvent.changeText(screen.getByTestId('densite-diffuse-input'), '12');
     await settle();
 
+    // #accouplement-ponte-cible-etat-obligatoires : dès qu'il y a des captures (3
+    // ici), ces 4 choix deviennent obligatoires — sans rapport avec la règle
+    // Stades = Captures que ce test vise, mais nécessaires pour l'atteindre.
+    // Renseignés avant les compteurs de phases/stades ci-dessous : les nombreux
+    // appuis répétés du bloc « + » qui suit rendent les appuis suivants sur cet
+    // écran peu fiables dans ce runner (`act()` qui se chevauchent, cf. les
+    // commentaires « chrono de l'écran » des autres fichiers de ce dossier).
+    // « Rare » apparaît deux fois avant toute sélection (chip Accouplement puis
+    // chip Ponte, dans cet ordre de rendu) — le premier est celui d'Accouplement.
+    fireEvent.press(screen.getAllByText('Rare')[0]);
+    await settle();
+    fireEvent.press(screen.getAllByText('Rare')[1]);
+    await settle();
+    fireEvent.press(screen.getByText('Vol clair'));
+    await settle();
+    fireEvent.press(screen.getByText('Repos'));
+    await settle();
+
     // Ordre des « + » : 4 phases puis les stades ♀ — 3 captures = 3 phases
     // (solitaire, 1er « + ») = 3 stades ♀ (A1, 5ᵉ « + », index 4).
     const boutons = () => screen.getAllByText('+');
