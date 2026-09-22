@@ -968,7 +968,9 @@ export async function updateProspectionExtensiveReference(id: string, input: Ext
   await db.runAsync(
     `UPDATE prospection SET
       latitude = ?, longitude = ?, station_libre = ?, type_station = ?,
-      surface_station = ?, surface_infestee = ?, n_message = ?, heure_observation_at = ?,
+      surface_station = ?, surface_infestee = ?, n_message = ?,
+      n_fiche = COALESCE(?, n_fiche),
+      heure_observation_at = ?,
       societe = ?, immatricule_aeronef = ?, pilote = ?, mecanicien = ?,
       chef_de_base = ?, base = ?,
       base_numero = ?, base_date_installation = ?, base_latitude = ?, base_longitude = ?,
@@ -978,7 +980,19 @@ export async function updateProspectionExtensiveReference(id: string, input: Ext
      WHERE id = ?`,
     [
       input.latitude, input.longitude, input.stationLibre, input.typeStation,
-      input.surfaceStation, input.surfaceInfestee, input.nMessage, input.heureObservationAt,
+      input.surfaceStation, input.surfaceInfestee, input.nMessage,
+      // #numero-fiche-visible-des-le-brouillon : n_fiche reste aligné sur
+      // n_message dès l'écran Référence (Extensif ET Signalisation, tous deux
+      // servis par cet écran) — pas seulement à l'enregistrement final
+      // (`alignerNumeroFicheSurNumeroMessage`, conservé comme filet de
+      // sécurité pour une fiche qui n'aurait pas transité par ici, ex. clonée
+      // via `demarrerRevalidation`). Sans ça, le numéro n'était visible nulle
+      // part (dossier Brouillons compris) avant la toute dernière étape du
+      // parcours — contrairement à l'Intensif, dont `n_fiche` est posé dès
+      // reference.tsx. `COALESCE` : ne jamais effacer un n_fiche déjà posé si
+      // n_message venait à être vidé par erreur.
+      input.nMessage,
+      input.heureObservationAt,
       input.societe ?? null, input.immatriculeAeronef ?? null, input.pilote ?? null, input.mecanicien ?? null,
       input.chefDeBase ?? null, input.base ?? null,
       input.baseNumero ?? null, input.baseDateInstallation ?? null, input.baseLatitude ?? null, input.baseLongitude ?? null,
@@ -1493,11 +1507,12 @@ export async function deleteProspectionInfestation(prospectionId: string, typeCi
 
 /**
  * #numeros-fiche-uniques : refuse de clôturer un brouillon si le numéro
- * métier qu'il s'apprête à figer (`n_fiche`, déjà posé pour l'Intensif/
- * l'Extensif à ce stade du parcours — cf. `alignerNumeroFicheSurNumeroMessage`
- * — ou `n_message` pour la Signalisation, dont `n_fiche` n'est posé que par
- * `completeProspection` lui-même) est déjà porté par une AUTRE fiche locale.
- * Deux fiches ne doivent jamais partager le même numéro — c'est justement ce
+ * métier qu'il s'apprête à figer (`n_fiche`, déjà posé pour l'Intensif dès
+ * reference.tsx, et pour l'Extensif/la Signalisation dès extensive-reference.tsx
+ * depuis #numero-fiche-visible-des-le-brouillon — `n_message` sert malgré
+ * tout de repli pour une fiche de Signalisation qui n'aurait pas encore
+ * transité par cet écran) est déjà porté par une AUTRE fiche locale. Deux
+ * fiches ne doivent jamais partager le même numéro — c'est justement ce
  * numéro qui identifie la fiche pour un administrateur côté web.
  *
  * #revalidation-prospection fait exception à dessein : une fiche qui
