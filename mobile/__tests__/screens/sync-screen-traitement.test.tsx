@@ -46,7 +46,7 @@ jest.mock('@/lib/traitement-sync', () => ({
   syncAllTraitements: jest.fn(),
 }));
 
-const EMPTY_ACCUEIL = { unsyncedCount: 0, activeDraft: null, recent: [], validated: [], pendingSync: [] };
+const EMPTY_ACCUEIL = { unsyncedCount: 0, activeDraft: null, draftsCount: 0, recent: [], validated: [], pendingSync: [] };
 
 const TRAITEMENT_EN_ATTENTE = {
   id: 'trait-1',

@@ -1,6 +1,7 @@
 import { getDb } from './prospection-db';
 import { generateId } from './id';
 import { logger } from './logger';
+import { PreconditionError } from './errors';
 
 const log = logger.child({ module: 'prospection-repository' });
 
@@ -1528,9 +1529,45 @@ export async function deleteProspectionInfestation(prospectionId: string, typeCi
   );
 }
 
+/**
+ * #numeros-fiche-uniques : refuse de clôturer un brouillon si le numéro
+ * métier qu'il s'apprête à figer (`n_fiche`, déjà posé pour l'Intensif/
+ * l'Extensif à ce stade du parcours — cf. `alignerNumeroFicheSurNumeroMessage`
+ * — ou `n_message` pour la Signalisation, dont `n_fiche` n'est posé que par
+ * `completeProspection` lui-même) est déjà porté par une AUTRE fiche locale.
+ * Deux fiches ne doivent jamais partager le même numéro — c'est justement ce
+ * numéro qui identifie la fiche pour un administrateur côté web.
+ *
+ * #revalidation-prospection fait exception à dessein : une fiche qui
+ * revalide une fiche périmée reprend délibérément le même numéro
+ * (`demarrerRevalidation` clone `n_fiche`/`n_message` tels quels) — ce n'est
+ * pas un doublon accidentel, c'est le mécanisme même de la revalidation,
+ * déjà toléré côté backend (`CreateProspection.execute` ne rejette jamais un
+ * `n_fiche` déjà pris par la fiche que `revalide_de_id` désigne).
+ */
+async function assurerNumeroFicheUnique(id: string, current: DraftProspection): Promise<void> {
+  const numero = current.type_prospection === 'validation' ? current.n_message : current.n_fiche;
+  if (!numero) return;
+
+  const db = await getDb();
+  const doublon = await db.getFirstAsync<{ id: string }>(
+    `SELECT id FROM prospection WHERE id != ? AND n_fiche = ? LIMIT 1`,
+    [id, numero]
+  );
+  if (doublon && doublon.id !== current.revalide_de_id) {
+    throw new PreconditionError(
+      `Le numéro « ${numero} » est déjà utilisé par une autre fiche — deux fiches ne peuvent pas partager le même numéro.`
+    );
+  }
+}
+
 export async function completeProspection(id: string): Promise<DraftProspection> {
   const db = await getDb();
   const now = new Date().toISOString();
+
+  const current = await getProspection(id);
+  if (!current) throw new Error('Échec de la mise à jour de la fiche brouillon locale');
+  await assurerNumeroFicheUnique(id, current);
 
   // Signalisation : validée pour traitement dès l'enregistrement local, tout
   // en restant dans la file Offline-First. Intensive/Extensive conservent le
@@ -1819,9 +1856,18 @@ export async function getDerniereDensiteMemeSite(stationId: string, typeCible: s
   return row?.densite_moy ?? null;
 }
 
+/**
+ * #dossier-brouillons : exclut `statut = 'brouillon'` — une fiche encore en
+ * cours de saisie n'est par construction jamais envoyée
+ * (`listUnsyncedProspections` ne la sélectionne pas non plus), la compter
+ * ici gonflait à tort le badge « non synchronisé » de l'accueil d'un nombre
+ * de fiches qui ne partiront jamais tant qu'elles ne sont pas terminées.
+ */
 export async function countUnsyncedProspections(): Promise<number> {
   const db = await getDb();
-  const row = await db.getFirstAsync<{ count: number }>(`SELECT COUNT(*) as count FROM prospection WHERE statut_sync != 'synced'`);
+  const row = await db.getFirstAsync<{ count: number }>(
+    `SELECT COUNT(*) as count FROM prospection WHERE statut_sync != 'synced' AND statut != 'brouillon'`
+  );
   return row?.count ?? 0;
 }
 

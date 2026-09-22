@@ -201,7 +201,7 @@ describe('loadAccueilData', () => {
 
     const result = await loadAccueilData();
 
-    expect(result).toEqual({ unsyncedCount: 0, activeDraft: null, recent: [], validated: [], pendingSync: [] });
+    expect(result).toEqual({ unsyncedCount: 0, activeDraft: null, draftsCount: 0, recent: [], validated: [], pendingSync: [] });
   });
 
   it('surfaces the most recent draft and the unsynced count', async () => {
@@ -213,6 +213,7 @@ describe('loadAccueilData', () => {
     const result = await loadAccueilData();
 
     expect(result.activeDraft).toEqual(STORED_ROW);
+    expect(result.draftsCount).toBe(1);
     expect(result.recent).toEqual([STORED_ROW]);
     expect(result.unsyncedCount).toBe(1);
     expect(result.pendingSync).toEqual([STORED_ROW]);

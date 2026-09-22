@@ -44,7 +44,7 @@ jest.mock('@/lib/traitement-sync', () => ({
   syncAllTraitements: jest.fn(),
 }));
 
-const EMPTY_ACCUEIL = { unsyncedCount: 0, activeDraft: null, recent: [], validated: [], pendingSync: [] };
+const EMPTY_ACCUEIL = { unsyncedCount: 0, activeDraft: null, draftsCount: 0, recent: [], validated: [], pendingSync: [] };
 
 const PROSPECTION_A_SYNCHRO = {
   id: 'prosp-1',
