@@ -54,6 +54,10 @@ describe('ExtensiveReferenceScreen — surface infestée facultative', () => {
     await render(<ExtensiveReferenceScreen />);
     await waitFor(() => expect(screen.getByText('Suivant : Imagos ›')).toBeVisible());
 
+    // #biotope-multi : désormais obligatoire (au moins un sélectionné), non
+    // testé ici — hors sujet de ce test (surface infestée).
+    fireEvent.press(screen.getByText('Xerophyle'));
+    await screen.findByText('Xerophyle ✓');
     fireEvent.press(screen.getByText('Suivant : Imagos ›'));
 
     await waitFor(() =>

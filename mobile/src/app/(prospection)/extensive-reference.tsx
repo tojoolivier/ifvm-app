@@ -229,8 +229,9 @@ export default function ExtensiveReferenceScreen() {
   // `isLoadingGps` (l'acquisition GPS elle-même) — le champ Station reste
   // éditable pendant ce temps, ce n'est qu'un texte informatif sous le champ.
   const [isDetectingStation, setIsDetectingStation] = useState<boolean>(false);
-  // Type de station / biotope (#biotope-multi) : sélection multiple, reste
-  // facultatif (aucun contrôle « au moins un » — comportement inchangé).
+  // Type de station / biotope (#biotope-multi) : sélection multiple,
+  // désormais TOUJOURS obligatoire (au moins un sélectionné) — même règle
+  // que Biotope sur reference.tsx (Intensif), contrôlée dans handleContinue.
   const [selectedTypeStation, setSelectedTypeStation] = useState<string[]>(
     parseSelectionMultiple(draft?.type_station ?? null)
   );
@@ -538,6 +539,13 @@ export default function ExtensiveReferenceScreen() {
           return;
         }
       }
+    }
+
+    // Biotope est TOUJOURS obligatoire (#biotope-multi : au moins un sélectionné)
+    // — même règle que reference.tsx (Intensif), désormais alignée sur l'Extensif.
+    if (selectedTypeStation.length === 0) {
+      Alert.alert('Biotope requis', 'Choisissez au moins un type de biotope (station).');
+      return;
     }
 
     return run(
@@ -902,7 +910,7 @@ export default function ExtensiveReferenceScreen() {
               </>
             )}
 
-            <Text style={styles.sectionLabel}>Biotopes (type de station) — sélection multiple</Text>
+            <Text style={[styles.sectionLabel, styles.requiredLabel]}>Biotopes (type de station) — sélection multiple *</Text>
             <View style={styles.chipsRow}>
               {BIOTOPE_EXTENSIVE_OPTIONS.map((option) => {
                 const active = selectedTypeStation.includes(option.value);
@@ -977,6 +985,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 9, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase' },
   input: { fontSize: 13, fontWeight: '600', color: TEXT, padding: 0 },
   sectionLabel: { fontSize: 10, fontWeight: '700', color: TEXT_SECONDARY, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 4, marginBottom: 7 },
+  requiredLabel: { color: '#c0412b' },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { 
     fontSize: 11.5, 

@@ -71,6 +71,10 @@ describe('ExtensiveReferenceScreen — Station auto-remplie par géocodage inver
     expect(await screen.findByDisplayValue('Andasibe')).toBeVisible();
     expect(location.reverseGeocode).toHaveBeenCalledWith(-18.9, 47.5);
 
+    // #biotope-multi : désormais obligatoire (au moins un sélectionné), non
+    // testé ici — hors sujet de ce test (géocodage de la Station).
+    fireEvent.press(screen.getByText('Xerophyle'));
+    await screen.findByText('Xerophyle ✓');
     fireEvent.press(screen.getByText('Suivant : Imagos ›'));
 
     await waitFor(() =>

@@ -1,10 +1,10 @@
 /**
  * #biotope-multi : « Type de station (biotope) » de la fiche Extensive/Validation
- * devient à choix multiples — reste facultatif (aucune règle « au moins un »
- * ajoutée, comportement inchangé). Un seul montage d'écran par fichier — même mise
- * en garde que extensive-reference-screen-restore.test.tsx (fuite de la chaîne de
- * promesses GPS entre tests d'un même fichier) ; cf.
- * extensive-reference-typestation-facultatif.test.tsx pour le second scénario.
+ * est à choix multiples et TOUJOURS obligatoire (au moins un sélectionné) — cf.
+ * extensive-reference-typestation-obligatoire.test.tsx pour le blocage sans
+ * sélection. Un seul montage d'écran par fichier — même mise en garde que
+ * extensive-reference-screen-restore.test.tsx (fuite de la chaîne de promesses
+ * GPS entre tests d'un même fichier).
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import ExtensiveReferenceScreen from '@/app/(prospection)/extensive-reference';
