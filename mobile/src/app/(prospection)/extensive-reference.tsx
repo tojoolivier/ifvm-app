@@ -558,6 +558,25 @@ export default function ExtensiveReferenceScreen() {
       }
     }
 
+    // Cohérence relationnelle prospectée >= infestée (ADR-006), même règle que
+    // reference.tsx (Intensif) — cet écran ne collecte jamais `surface_prospectee`
+    // (l'Extensif/la Validation ne connaissent que Station et Infestée), mais la
+    // colonne peut déjà porter une valeur héritée d'une revalidation
+    // (`demarrerRevalidation` clone TOUTES les colonnes sauf celles listées dans
+    // `COLONNES_REVALIDATION_NON_CLONEES`, y compris `surface_prospectee`). Sans
+    // ce contrôle, une fiche revalidée où l'agent relève une surface infestée plus
+    // grande qu'avant échouait silencieusement à la synchronisation
+    // (`SurfaceInfesteeSuperieureError`, backend) sans qu'aucun champ visible ici
+    // n'explique pourquoi.
+    const surfaceInfesteeNum = surfaceInfestee ? parseFloat(surfaceInfestee) : 0;
+    if (draft?.surface_prospectee != null && surfaceInfesteeNum > draft.surface_prospectee) {
+      Alert.alert(
+        'Surface infestée invalide',
+        `La surface infestée (${surfaceInfesteeNum} ha) ne peut pas dépasser la surface prospectée (${draft.surface_prospectee} ha) déjà connue pour cette fiche.`
+      );
+      return;
+    }
+
     // Biotope est TOUJOURS obligatoire (#biotope-multi : au moins un sélectionné)
     // — même règle que reference.tsx (Intensif), désormais alignée sur l'Extensif.
     if (selectedTypeStation.length === 0) {

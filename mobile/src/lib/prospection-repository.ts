@@ -1664,16 +1664,29 @@ export async function listToutesProspectionsLocal(): Promise<DraftProspection[]>
 
 /**
  * Fiches réellement en attente d'envoi (#synchronisation-automatique) —
- * `statut = 'en_attente'` exclut les brouillons encore en cours de saisie
- * (même filtre que `pendingSync` sur l'écran Prospection) ; `statut_sync`
- * exclut les fiches déjà parties et celles en `'echec'` (refusées par le
- * serveur, à corriger manuellement plutôt qu'à renvoyer à l'identique).
+ * `statut != 'brouillon'` exclut les brouillons encore en cours de saisie
+ * (même filtre que `pendingSync` sur l'écran Prospection **et** que
+ * `countUnsyncedProspections` ci-dessous) ; `statut_sync` exclut les fiches
+ * déjà parties et celles en `'echec'` (refusées par le serveur, à corriger
+ * manuellement plutôt qu'à renvoyer à l'identique).
+ *
+ * `statut != 'brouillon'` et non `statut = 'en_attente'` (#revalidation-
+ * validation-jamais-synchronisee) : une fiche `type_prospection = 'validation'`
+ * (signalisation, y compris sa revalidation) passe directement de
+ * `'brouillon'` à `'validee'` dans `completeProspection`, sans jamais
+ * transiter par `'en_attente'` (réservé à l'intensif/extensif). Filtrer sur
+ * `'en_attente'` ici l'excluait donc silencieusement de la synchronisation
+ * automatique (`use-fiches-auto-sync.ts`) et du bouton « Synchroniser tout »
+ * (`prospection.tsx`/`sync.tsx`), alors même que `countUnsyncedProspections`
+ * la comptait déjà dans le badge « non synchronisé » — la fiche restait donc
+ * indéfiniment `statut_sync = 'local'`, jamais renvoyée tant que l'agent ne
+ * tapait pas individuellement sur son bouton de synchro (`fiches.tsx`).
  */
 export async function listUnsyncedProspections(): Promise<DraftProspection[]> {
   const db = await getDb();
   return db.getAllAsync<DraftProspection>(
     `SELECT * FROM prospection
-     WHERE statut = 'en_attente' AND (statut_sync = 'local' OR statut_sync = 'conflict')
+     WHERE statut != 'brouillon' AND (statut_sync = 'local' OR statut_sync = 'conflict')
      ORDER BY updated_at DESC`
   );
 }

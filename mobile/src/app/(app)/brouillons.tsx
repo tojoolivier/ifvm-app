@@ -17,8 +17,8 @@ import { FICHES_BG, FICHES_GREEN_DARK, FICHES_TEXT_SECONDARY, PROSPECTION_SUBTYP
  * #dossier-brouillons : « dossier » dédié aux fiches de prospection encore en
  * cours de saisie (intensive/extensive/validation confondues) — un brouillon
  * n'est par construction jamais envoyé à la synchronisation
- * (`listUnsyncedProspections` ne sélectionne que `statut = 'en_attente'`,
- * jamais `'brouillon'`) : cet écran ne fait que lister ce que
+ * (`listUnsyncedProspections` exclut `statut = 'brouillon'`) : cet écran ne
+ * fait que lister ce que
  * `listDraftProspections` sait déjà filtrer, pour que l'agent puisse reprendre
  * N'IMPORTE LEQUEL de ses brouillons — pas seulement le plus récent (la seule
  * reprise possible jusqu'ici, depuis la carte « Reprendre le brouillon » de

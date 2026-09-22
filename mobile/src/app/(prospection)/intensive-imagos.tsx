@@ -351,7 +351,6 @@ export default function IntensiveImagosScreen() {
       const manque: string[] = [];
       if (!population.accouplement) manque.push('Accouplement');
       if (!population.ponte) manque.push('Ponte');
-      if (typeCible.length === 0) manque.push('Type de cible');
       if (!population.etat) manque.push('État');
       if (manque.length > 0) {
         setShowRequiredChoicesError(true);
@@ -840,9 +839,7 @@ export default function IntensiveImagosScreen() {
               </>
             )}
 
-            <Text style={[styles.sectionLabel, totalCaptures > 0 && styles.requiredLabel]}>
-              Type de cible{totalCaptures > 0 ? ' *' : ''}
-            </Text>
+            <Text style={styles.sectionLabel}>Type de cible</Text>
             <View style={styles.chipsRow}>
               {TYPE_CIBLE_IMAGO_OPTIONS.map((option) => {
                 const active = typeCible.includes(option.value);
@@ -858,9 +855,6 @@ export default function IntensiveImagosScreen() {
                 );
               })}
             </View>
-            {showRequiredChoicesError && totalCaptures > 0 && typeCible.length === 0 && (
-              <Text style={styles.errorText}>Type de cible obligatoire (au moins un).</Text>
-            )}
 
             <Text style={[styles.sectionLabel, totalCaptures > 0 && styles.requiredLabel]}>
               État{totalCaptures > 0 ? ' *' : ''}
