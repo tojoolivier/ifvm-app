@@ -15,153 +15,30 @@ import {
 import { cn } from '@/lib/utils'
 import { STATUT_LABELS, type Statut } from '@/components/ui/status-badge'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { buildFicheImprimable, isFicheValidee } from '@/lib/prospection-fiche-lecture'
 import {
-  buildFicheImprimable,
-  isFicheValidee,
-  type CaptureRead,
-  type InfestationRead,
-  type PopulationRead,
-} from '@/lib/prospection-fiche-lecture'
-import { buildPopulationsDetail, type PopulationDetailRead } from '@/lib/prospection-populations-detail'
-import {
-  buildCapturesSynthese,
-  buildImagoRows,
-  buildInfestationRows,
-  buildLarveRows,
-  buildPisteValidation,
-  buildReferenceRows,
-  findImago,
-  findLarve,
-  formatHeure,
-  formatNombre,
-  humaniser,
-  NUMERO_FICHE,
+  CATALOGUE_CAPTURE,
+  CATALOGUE_OPERATION,
   TIRET,
-  type InfestationFiche,
-  type LigneCapture,
-  type LigneFiche,
-} from '@/lib/prospection-fiche-maquette'
+  colonnesTable,
+  entreesAudit,
+  groupesInfestation,
+  groupesPopulation,
+  groupesProspection,
+  humaniser,
+  type AuditBdd,
+  type CaptureBdd,
+  type ContexteFiche,
+  type GroupeBdd,
+  type LigneBdd,
+  type OperationBdd,
+  type ProspectionBdd,
+} from '@/lib/prospection-fiche-bdd'
 import { shortId, useAnnuaire } from '@/lib/use-annuaire'
 
 // ---------------------------------------------------------------------------
-// Types
+// Types — issus du contrat OpenAPI (jamais recopiés à la main)
 // ---------------------------------------------------------------------------
-
-type Population = PopulationRead &
-  Omit<PopulationDetailRead, 'espece' | 'categorie'> & {
-    phase?: string | null
-    methode?: string | null
-    temps_capture?: number | null
-  }
-type Capture = CaptureRead & { sexe?: string | null }
-/** La fiche de lecture exploite la spécialisation larve/imago, plus riche que `InfestationRead`. */
-type Infestation = InfestationRead & InfestationFiche
-
-interface OperationAerienne {
-  id: string
-  numero: number
-  type_operation: string
-  motif_divers: string | null
-  debut_heure: string
-  debut_temperature_c: number | null
-  debut_vent_ms: number | null
-  fin_heure: string
-  fin_temperature_c: number | null
-  fin_vent_ms: number | null
-  duree_minutes: number
-}
-
-interface ProspectionDetail {
-  id: string
-  type_prospection: string
-  campagne_id: string
-  prospecteur_id: string
-  station_id: string | null
-  date_prospection: string
-  statut: string
-  statut_sync: string
-  n_fiche: string | null
-  n_message: string | null
-  created_at: string
-  updated_at: string
-  latitude: number | null
-  longitude: number | null
-  altitude: number | null
-  region: string | null
-  district: string | null
-  commune: string | null
-  za: string | null
-  pa_code: string | null
-  station_libre: string | null
-  biotope: string[]
-  surface_station: number | null
-  surface_prospectee: number | null
-  surface_infestee: number | null
-  hauteur_herbe_cm: number | null
-  hauteur_strate: number | null
-  verdissement: number | null
-  verdissement_pourcent: number | null
-  degats_cultures_pourcent: number | null
-  derniere_pluie: string | null
-  intensite_pluie: string | null
-  ennemis_naturels: string | null
-  observations: string | null
-  vegetation: Record<string, unknown> | null
-  sol: Record<string, unknown> | null
-  degats_cultures: string | null
-  avertissements: string[]
-  // Traçabilité vérification/validation
-  verified_by: string | null
-  verified_at: string | null
-  validated_by: string | null
-  validated_at: string | null
-  // Extensif & validation
-  type_station: string[]
-  verdure_strate: string | null
-  signalement_source: string | null
-  signalement_date: string | null
-  signalement_description: string | null
-  conclusion_validation: string | null
-  // Extensif : mode aérien
-  mode_extensif: string | null
-  societe: string | null
-  immatricule_aeronef: string | null
-  pilote: string | null
-  mecanicien: string | null
-  chef_de_base: string | null
-  lieu_base_id: string | null
-  // Extensif : pesticides embarqués + signatures
-  pesticides_embarques: boolean | null
-  pesticide_nom_commercial: string | null
-  pesticide_quantite_disponible: number | null
-  pesticide_quantite_recue: number | null
-  futs_disponible: number | null
-  futs_pleins: number | null
-  futs_vides: number | null
-  futs_recues: number | null
-  signature_visa_nom: string | null
-  signature_visa_horodatage: string | null
-  signature_consultant_fao_nom: string | null
-  signature_consultant_fao_horodatage: string | null
-  signature_pilote_nom: string | null
-  signature_pilote_horodatage: string | null
-  signature_chef_base_nom: string | null
-  signature_chef_base_horodatage: string | null
-  populations: Population[]
-  captures: Capture[]
-  infestations: Infestation[]
-  operations_aeriennes: OperationAerienne[]
-}
-
-interface AuditLogEntry {
-  id: string
-  fiche_type: string
-  fiche_id: string
-  auteur_id: string
-  action: string
-  details: Record<string, unknown> | null
-  created_at: string
-}
 
 interface StationDetail {
   id: string
@@ -182,7 +59,6 @@ interface CurrentUser {
 // ---------------------------------------------------------------------------
 // Composants utilitaires
 // ---------------------------------------------------------------------------
-
 /** Pilule de l'en-tête vert (maquette : `rgba(255,255,255,.16)` sur fond `#235a36`). */
 function HeaderPill({ children }: { children: React.ReactNode }) {
   return (
@@ -219,124 +95,79 @@ function BlocLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
-/** Ligne clé/valeur des blocs A et D : libellé sur 132px, valeur en mono. */
-function LigneCle({ ligne }: { ligne: LigneFiche }) {
+/** Une colonne de la base : libellé, valeur ; l'infobulle donne `table.colonne`. */
+function LigneDonnee({ ligne }: { ligne: LigneBdd }) {
   return (
-    <div className="flex items-baseline gap-[10px]">
-      <span className="w-[132px] shrink-0 font-sans text-[11.5px] font-medium text-ifvm-text-tertiary">
-        {ligne.k}
+    <div className="flex items-baseline gap-[10px]" title={ligne.origine} data-colonne={ligne.colonne}>
+      <span className="w-[168px] shrink-0 font-sans text-[11.5px] font-medium text-ifvm-text-tertiary">
+        {ligne.label}
       </span>
       <span
         className={cn(
-          'font-mono text-[12px] font-semibold',
-          ligne.muted ? 'text-[#bdb6a2]' : 'text-foreground',
+          'min-w-0 break-words font-mono text-[12px] font-semibold',
+          ligne.vide ? 'text-[#bdb6a2]' : 'text-foreground',
         )}
       >
-        {ligne.v}
+        {ligne.valeur}
       </span>
     </div>
   )
 }
 
-/** Cellule des cartes larve / imago : libellé fin au-dessus, valeur mono en gras. */
-function CelluleSpecialisation({ ligne }: { ligne: LigneFiche }) {
+/** Carte d'un groupe de colonnes ; la légende dit de quelle table elles viennent. */
+function CarteGroupe({ groupe, table }: { groupe: GroupeBdd; table: string }) {
   return (
-    <div>
-      <div className="font-sans text-[10px] font-medium text-ifvm-text-weak">{ligne.k}</div>
-      <div
-        className={cn(
-          'font-mono text-[12.5px] font-bold',
-          ligne.muted ? 'text-[#bdb6a2]' : 'text-foreground',
-        )}
-      >
-        {ligne.v}
+    <Carte className="px-5 py-[18px]">
+      <div className="mb-3 flex items-baseline gap-[10px]">
+        <BlocLabel>{groupe.titre}</BlocLabel>
+        <span className="font-mono text-[10px] font-medium text-ifvm-text-weak">{table}</span>
       </div>
-    </div>
+      <div className="flex flex-col gap-[9px]">
+        {groupe.lignes.map((l, i) => (
+          <LigneDonnee key={`${l.colonne}-${i}`} ligne={l} />
+        ))}
+      </div>
+    </Carte>
   )
 }
 
-/** Tuile de statistique du bloc E (fond `#faf7ef`, rayon 9px). */
-function Tuile({ label, value }: { label: string; value: string }) {
+/** Section d'une table enfant : titre, table d'origine, nombre de lignes. */
+function SectionTable({
+  titre,
+  table,
+  nombre,
+  children,
+}: {
+  titre: string
+  table: string
+  nombre: number
+  children: React.ReactNode
+}) {
   return (
-    <div className="rounded-[9px] bg-background px-[14px] py-3">
-      <div className="font-sans text-[10.5px] font-medium text-ifvm-text-weak">{label}</div>
-      <div className="font-mono text-[17px] font-bold text-foreground">{value}</div>
-    </div>
+    <section className="flex flex-col gap-3">
+      <div className="flex items-baseline gap-[10px]">
+        <h2 className="font-sans text-[14px] font-bold">{titre}</h2>
+        <span className="font-mono text-[10.5px] font-medium text-ifvm-text-weak">
+          {table} · {nombre} ligne{nombre > 1 ? 's' : ''}
+        </span>
+      </div>
+      {children}
+    </section>
   )
 }
 
-/** Même convention que `ligne()` de prospection-fiche-maquette.ts (non exportée) : une
- * valeur absente est grisée plutôt que masquée. */
-function champ(k: string, v: string): LigneFiche {
-  return v === TIRET ? { k, v, muted: true } : { k, v }
-}
-
-const captureColumns: DataTableColumn<LigneCapture>[] = [
-  {
-    key: 'phase',
-    header: 'Phase',
-    render: (l) => <span className="font-semibold">{l.phaseLabel}</span>,
-  },
-  { key: 'males', header: 'Mâles', align: 'right', mono: true, render: (l) => l.males },
-  { key: 'femelles', header: 'Femelles', align: 'right', mono: true, render: (l) => l.femelles },
-  {
-    key: 'stade',
-    header: 'Stade dominant',
-    render: (l) => <span className="text-ifvm-text-tertiary">{l.stade}</span>,
-  },
-  {
-    key: 'methode',
-    header: 'Méthode',
-    render: (l) => <span className="text-ifvm-text-tertiary">{l.methode}</span>,
-  },
-  {
-    key: 'densite',
-    header: 'Densité (ind/ha)',
-    align: 'right',
+/** Colonnes d'un tableau : une colonne par colonne de la table, valeurs brutes. */
+function colonnesDataTable<R>(
+  colonnes: ReturnType<typeof colonnesTable<R>>,
+  alignerADroite: string[] = [],
+): DataTableColumn<R>[] {
+  return colonnes.map((c) => ({
+    key: c.cle,
+    header: c.label,
     mono: true,
-    render: (l) => <span className="text-ifvm-green-text">{l.densite}</span>,
-  },
-]
-
-const operationColumns: DataTableColumn<OperationAerienne>[] = [
-  { key: 'numero', header: 'N°', mono: true, render: (o) => o.numero },
-  {
-    key: 'type',
-    header: 'Type',
-    render: (o) => (
-      <span className="font-semibold">
-        {humaniser(o.type_operation)}
-        {o.motif_divers ? ` — ${o.motif_divers}` : ''}
-      </span>
-    ),
-  },
-  {
-    key: 'debut',
-    header: 'Début',
-    align: 'right',
-    mono: true,
-    render: (o) =>
-      `${formatHeure(o.debut_heure)} · ${formatNombre(o.debut_temperature_c)} °C · ${formatNombre(o.debut_vent_ms)} m/s`,
-  },
-  {
-    key: 'fin',
-    header: 'Fin',
-    align: 'right',
-    mono: true,
-    render: (o) =>
-      `${formatHeure(o.fin_heure)} · ${formatNombre(o.fin_temperature_c)} °C · ${formatNombre(o.fin_vent_ms)} m/s`,
-  },
-  { key: 'duree', header: 'Durée (min)', align: 'right', mono: true, render: (o) => o.duree_minutes },
-]
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+    align: alignerADroite.includes(c.cle) ? ('right' as const) : undefined,
+    render: (rec: R) => c.fmt(rec),
+  }))
 }
 
 // ---------------------------------------------------------------------------
@@ -424,13 +255,13 @@ export function ProspectionDetailPage() {
   const [telechargementPdfEnCours, setTelechargementPdfEnCours] = useState(false)
   const [erreurPdf, setErreurPdf] = useState<string | null>(null)
 
-  const { data: prospection, isLoading, isError } = useQuery<ProspectionDetail>({
+  const { data: prospection, isLoading, isError } = useQuery<ProspectionBdd>({
     queryKey: ['prospection', id],
     queryFn: () => api.get(`/prospections/${id}`).then((r) => r.data),
     enabled: !!id,
   })
 
-  const { data: auditLog = [] } = useQuery<AuditLogEntry[]>({
+  const { data: auditLog = [] } = useQuery<AuditBdd[]>({
     queryKey: ['prospection-audit', id],
     queryFn: () => api.get(`/prospections/${id}/audit-log`).then((r) => r.data),
     enabled: !!id,
@@ -454,16 +285,6 @@ export function ProspectionDetailPage() {
   })
 
   const { nomAgent } = useAnnuaire()
-
-  // Base aérienne (extensif, mode aérien) — référentiel distinct de la station.
-  const { data: lieuxAeriens = [] } = useQuery<{ id: string; nom: string }[]>({
-    queryKey: ['lieux-aeriens'],
-    queryFn: () =>
-      api.get('/referentiel/lieux-aeriens', { params: { inclure_inactifs: true } }).then((r) => r.data),
-    enabled: !!prospection?.lieu_base_id,
-  })
-  const nomLieu = (lieuId: string | null | undefined) =>
-    lieuxAeriens.find((l) => l.id === lieuId)?.nom ?? shortId(lieuId)
 
   const campagneName = campagnes.find((c) => c.id === prospection?.campagne_id)?.name
 
@@ -490,10 +311,6 @@ export function ProspectionDetailPage() {
     mutation.mutate({ statut, commentaire: commentaire.trim() || undefined })
   }
 
-  const auditLogSorted = [...auditLog].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-  )
-
   const role = currentUser?.role ?? ''
   const statut = prospection?.statut ?? ''
 
@@ -505,7 +322,9 @@ export function ProspectionDetailPage() {
     statut === 'verifiee' && (role === 'validation_finale' || role === 'admin')
   const ficheValidee = isFicheValidee(statut)
 
-  const validationEntry = auditLogSorted.find((entry) => entry.action === 'validation')
+  const validationEntry = [...auditLog]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .find((entry) => entry.action === 'validation')
 
   // PDF (#494/#594) généré côté backend (WeasyPrint, #533) — même pattern que
   // le CRT (TraitementDetailPage.telechargerPdf), distinct de « Imprimer A4 »
@@ -551,31 +370,26 @@ export function ProspectionDetailPage() {
     )
   }
 
-  const referenceRows = buildReferenceRows(
-    prospection,
-    station ? { code: station.code, nom: station.nom } : null,
+  // Tout ce qui suit lit la base telle quelle : aucune valeur calculée, aucun regroupement inventé.
+  const ctx: ContexteFiche = {
+    nomAgent,
+    campagneNom: campagneName ?? null,
+    station: station ? { code: station.code, nom: station.nom, pa_nom: station.pa_nom } : null,
+  }
+  const { groupes, sansDonnees } = groupesProspection(prospection, ctx)
+  const colonnesCaptures = colonnesDataTable(colonnesTable<CaptureBdd>(CATALOGUE_CAPTURE, ctx), [
+    'effectif',
+  ])
+  const colonnesOperations = colonnesDataTable(
+    colonnesTable<OperationBdd>(CATALOGUE_OPERATION, ctx),
+    ['numero', 'duree_minutes'],
   )
-  const infestationRows = buildInfestationRows(
-    prospection,
-    prospection.infestations,
-    prospection.populations,
-  )
-  const larveRows = buildLarveRows(findLarve(prospection.infestations))
-  const imagoRows = buildImagoRows(findImago(prospection.infestations))
-  const capturesSynthese = buildCapturesSynthese(prospection.captures, prospection.populations)
-  const populationsDetail = buildPopulationsDetail(prospection.populations)
-  const piste = buildPisteValidation(auditLog, prospection.statut, nomAgent)
-
-  // Bloc E : recouvrement total des strates du JSONB `vegetation` (ADR-006).
-  const strates =
-    (prospection.vegetation?.strates as Record<string, { recouvrement?: number }> | undefined) ?? {}
-  const recouvrement = Object.values(strates).reduce((s, d) => s + (d?.recouvrement ?? 0), 0)
-
-  // Durée de comptage : `temps_capture` est saisi par population, en minutes.
-  const tempsCaptures = prospection.populations
-    .map((p) => p.temps_capture)
-    .filter((t): t is number => t != null)
-  const dureeComptage = tempsCaptures.length > 0 ? Math.max(...tempsCaptures) : null
+  const journal = entreesAudit(auditLog, nomAgent)
+  const populations = prospection.populations ?? []
+  const captures = prospection.captures ?? []
+  const infestations = prospection.infestations ?? []
+  const operations = prospection.operations_aeriennes ?? []
+  const avertissements = prospection.avertissements ?? []
 
   const sousTitre = [
     humaniser(prospection.type_prospection),
@@ -588,14 +402,14 @@ export function ProspectionDetailPage() {
     .join(' · ')
 
   return (
-    // Grille de la maquette : 1fr (fiche) / 316px (piste de validation + actions).
+    // Grille de la maquette : 1fr (fiche) / 316px (journal de validation + actions).
     <div className="grid grid-cols-1 items-start gap-5 px-7 pb-10 pt-[26px] lg:grid-cols-[1fr_316px]">
       <div className="flex min-w-0 flex-col gap-4">
         {/* En-tête vert de la maquette */}
         <header className="flex items-center gap-5 rounded-[12px] bg-ifvm-green-text px-[22px] py-5 text-white">
           <div className="min-w-0 flex-1">
             <h1 className="truncate font-mono text-[17px] font-bold tracking-[.4px]">
-              {NUMERO_FICHE(prospection)}
+              {prospection.n_fiche ?? TIRET}
             </h1>
             <p className="mt-1 font-sans text-[12px] font-medium text-white/75">{sousTitre}</p>
           </div>
@@ -626,14 +440,14 @@ export function ProspectionDetailPage() {
           <p className="text-[11.5px] font-medium text-destructive">{erreurPdf}</p>
         )}
 
-        {/* Bandeau ambre — avertissements de la fiche (#106) */}
-        {prospection.avertissements.length > 0 && (
+        {/* Bandeau ambre — colonne `prospection.avertissements` (#106) */}
+        {avertissements.length > 0 && (
           <div className="flex flex-col gap-[7px] rounded-[10px] border border-ifvm-amber-border bg-ifvm-amber-bg px-4 py-[13px]">
             <p className="font-sans text-[11.5px] font-bold text-ifvm-amber-text">
-              Avertissements de la fiche · {prospection.avertissements.length}
+              Avertissements de la fiche · {avertissements.length}
             </p>
             <ul className="flex flex-col gap-[7px]">
-              {prospection.avertissements.map((avertissement, index) => (
+              {avertissements.map((avertissement, index) => (
                 <li
                   key={index}
                   className="font-sans text-[11.5px] font-medium leading-[1.45] text-ifvm-amber-text"
@@ -645,343 +459,132 @@ export function ProspectionDetailPage() {
           </div>
         )}
 
-        {/* D · Infestation — spécialisation larve / imago (tables distinctes) */}
-        <Carte className="px-5 py-[18px]">
-          <div className="mb-3 flex items-baseline gap-[10px]">
-            <BlocLabel>D · Infestation — spécialisation</BlocLabel>
-            <span className="font-sans text-[10.5px] font-medium text-ifvm-text-weak">
-              tables imago / larve distinctes
-            </span>
-          </div>
-          <div className="grid grid-cols-1 gap-[14px] md:grid-cols-2">
-            <div className="overflow-hidden rounded-[10px] border border-ifvm-danger-border">
-              <div className="bg-ifvm-danger-bg px-3 py-2 font-sans text-[11px] font-bold text-ifvm-danger-text">
-                Larve · bande larvaire
-              </div>
-              <div className="grid grid-cols-2 gap-x-[14px] gap-y-[9px] p-3">
-                {larveRows.map((l) => (
-                  <CelluleSpecialisation key={l.k} ligne={l} />
-                ))}
-              </div>
-            </div>
-            <div className="overflow-hidden rounded-[10px] border border-[#e7e0cd]">
-              <div className="bg-background px-3 py-2 font-sans text-[11px] font-bold text-ifvm-text-tertiary">
-                Imago · vol clair
-              </div>
-              <div className="grid grid-cols-2 gap-x-[14px] gap-y-[9px] p-3">
-                {imagoRows.map((l) => (
-                  <CelluleSpecialisation key={l.k} ligne={l} />
-                ))}
-              </div>
-            </div>
-          </div>
-        </Carte>
-
-        {/* A · Référence & localisation | D · Infestation */}
+        {/* Table `prospection` : chaque colonne, dans son groupe */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Carte className="px-5 py-[18px]">
-            <div className="mb-3">
-              <BlocLabel>A · Référence &amp; localisation</BlocLabel>
-            </div>
-            <div className="flex flex-col gap-[9px]">
-              {referenceRows.map((l) => (
-                <LigneCle key={l.k} ligne={l} />
-              ))}
-              <LigneCle
-                ligne={{
-                  k: 'Campagne',
-                  v: campagneName ?? shortId(prospection.campagne_id),
-                }}
-              />
-            </div>
-          </Carte>
-          <Carte className="px-5 py-[18px]">
-            <div className="mb-3">
-              <BlocLabel>D · Infestation</BlocLabel>
-            </div>
-            <div className="flex flex-col gap-[9px]">
-              {infestationRows.map((l) => (
-                <LigneCle key={l.k} ligne={l} />
-              ))}
-            </div>
-          </Carte>
+          {groupes.map((groupe) => (
+            <CarteGroupe key={groupe.titre} groupe={groupe} table="prospection" />
+          ))}
         </div>
-
-        {/* B · Captures agrégées par phase */}
-        <Carte className="overflow-hidden">
-          <div className="flex flex-wrap items-baseline gap-3 border-b border-[#f1ecdd] px-5 py-4">
-            <h2 className="font-sans text-[14px] font-bold">B · Captures — synthèse par phase</h2>
-            <span className="font-sans text-[11px] font-medium text-ifvm-text-weak">
-              Grille de comptage repliée en synthèse
-              {dureeComptage != null ? ` · durée ${formatNombre(dureeComptage)} min` : ''}
-            </span>
-            <span className="flex-1" />
-            <span className="font-mono text-[12px] font-semibold text-ifvm-green-text">
-              Total {formatNombre(capturesSynthese.total)}
-            </span>
-          </div>
-          <DataTable
-            columns={captureColumns}
-            rows={capturesSynthese.lignes}
-            getRowKey={(l) => l.phase}
-            emptyMessage="Aucune capture enregistrée."
-          />
-        </Carte>
-
-        {/* Populations — détail par espèce (mêmes lignes que le récapitulatif du téléphone) */}
-        {populationsDetail.length > 0 && (
-          <Carte className="px-5 py-[18px]">
-            <div className="mb-3">
-              <BlocLabel>Populations — détail par espèce</BlocLabel>
-            </div>
-            <div className="flex flex-col gap-5">
-              {populationsDetail.map((groupe) => (
-                <div key={`${groupe.espece}-${groupe.categorie}`}>
-                  <h3 className="mb-2 font-sans text-[12.5px] font-bold text-ifvm-green-text">
-                    {groupe.titre}
-                  </h3>
-                  <div className="grid grid-cols-1 gap-x-6 gap-y-[9px] md:grid-cols-2">
-                    {groupe.lignes.map((l) => (
-                      <LigneCle key={l.k} ligne={champ(l.k, l.v)} />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Carte>
+        {sansDonnees.length > 0 && (
+          <p className="font-sans text-[11px] font-medium text-ifvm-text-weak">
+            Colonnes sans valeur et propres à un autre type de fiche : {sansDonnees.join(' · ')}.
+          </p>
         )}
 
-        {/* E · Végétation & sol */}
-        <Carte className="px-5 py-[18px]">
-          <div className="mb-3">
-            <BlocLabel>E · Végétation &amp; sol</BlocLabel>
-          </div>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Tuile
-              label="Strate herbeuse"
-              value={
-                prospection.hauteur_herbe_cm == null
-                  ? TIRET
-                  : `${formatNombre(prospection.hauteur_herbe_cm / 100)} m`
-              }
-            />
-            <Tuile
-              label="Strate arborée"
-              value={
-                prospection.hauteur_strate == null
-                  ? TIRET
-                  : `${formatNombre(prospection.hauteur_strate)} m`
-              }
-            />
-            <Tuile
-              label="Recouvrement"
-              value={recouvrement > 0 ? `${formatNombre(recouvrement)} %` : TIRET}
-            />
-            <Tuile
-              label="Type de sol"
-              value={
-                // Sélection multiple (cf. mobile veg.tsx) : `sol.texture` est un tableau ;
-                // une ancienne fiche enregistrée avant le multi-select peut encore porter
-                // une simple string — les deux formats sont acceptés.
-                Array.isArray(prospection.sol?.texture)
-                  ? prospection.sol.texture.map((t) => humaniser(t as string)).join(', ') || TIRET
-                  : humaniser(prospection.sol?.texture as string | undefined)
-              }
-            />
-          </div>
-        </Carte>
-
-        {/* Autres observations — champs jusqu'ici absents de la fiche de
-            lecture web (issue « afficher toutes les données ») */}
-        <Carte className="px-5 py-[18px]">
-          <div className="mb-3">
-            <BlocLabel>Autres observations</BlocLabel>
-          </div>
-          <div className="grid grid-cols-1 gap-x-6 gap-y-[9px] md:grid-cols-2">
-            {[
-              champ('N° message', prospection.n_message ?? TIRET),
-              champ('Biotope', prospection.biotope?.map((b) => humaniser(b)).join(', ') || TIRET),
-              champ(
-                'Dégâts sur cultures',
-                prospection.degats_cultures_pourcent != null
-                  ? `${humaniser(prospection.degats_cultures)} · ${prospection.degats_cultures_pourcent} %`
-                  : humaniser(prospection.degats_cultures),
-              ),
-              champ('Verdissement', prospection.verdissement_pourcent == null ? TIRET : `${prospection.verdissement_pourcent} %`),
-              champ('Dernière pluie', prospection.derniere_pluie ?? TIRET),
-              champ('Intensité de pluie', prospection.intensite_pluie ?? TIRET),
-              champ('Ennemis naturels', prospection.ennemis_naturels ?? TIRET),
-              champ('Zone anti-acridienne / poste', [prospection.za, prospection.pa_code].filter(Boolean).join(' / ') || TIRET),
-              champ('Type de station', prospection.type_station?.map((t) => humaniser(t)).join(', ') || TIRET),
-              champ('Verdure de la strate', humaniser(prospection.verdure_strate)),
-            ].map((l) => (
-              <LigneCle key={l.k} ligne={l} />
-            ))}
-          </div>
-          {prospection.observations && (
-            <p className="mt-3 border-t border-[#f1ecdd] pt-3 font-sans text-[11.5px] font-medium leading-[1.5] text-ifvm-text-tertiary">
-              Observations : <span className="text-foreground">{prospection.observations}</span>
+        {/* Table `prospection_population` */}
+        <SectionTable titre="Populations" table="prospection_population" nombre={populations.length}>
+          {populations.length === 0 && (
+            <p className="font-sans text-[11.5px] text-ifvm-text-weak">
+              Aucune ligne enregistrée pour cette fiche.
             </p>
           )}
-        </Carte>
+          {populations.map((population) => (
+            <div key={population.id} className="flex flex-col gap-3">
+              <h3 className="font-sans text-[12.5px] font-bold text-ifvm-green-text">
+                {population.espece} · {humaniser(population.categorie)}
+              </h3>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {groupesPopulation(population, ctx).groupes.map((g) => (
+                  <CarteGroupe key={g.titre} groupe={g} table="prospection_population" />
+                ))}
+              </div>
+            </div>
+          ))}
+        </SectionTable>
 
-        {/* Signalement & traçabilité de la validation */}
-        <Carte className="px-5 py-[18px]">
-          <div className="mb-3">
-            <BlocLabel>Signalement &amp; traçabilité</BlocLabel>
-          </div>
-          <div className="grid grid-cols-1 gap-x-6 gap-y-[9px] md:grid-cols-2">
-            {[
-              champ('Source du signalement', prospection.signalement_source ?? TIRET),
-              champ('Date du signalement', prospection.signalement_date ?? TIRET),
-              champ('Conclusion de validation', humaniser(prospection.conclusion_validation)),
-              champ('Vérifiée par', prospection.verified_by ? nomAgent(prospection.verified_by) : TIRET),
-              champ('Validée par', prospection.validated_by ? nomAgent(prospection.validated_by) : TIRET),
-              champ('Dernière mise à jour', formatDate(prospection.updated_at)),
-            ].map((l) => (
-              <LigneCle key={l.k} ligne={l} />
-            ))}
-          </div>
-          {prospection.signalement_description && (
-            <p className="mt-3 border-t border-[#f1ecdd] pt-3 font-sans text-[11.5px] font-medium leading-[1.5] text-ifvm-text-tertiary">
-              {prospection.signalement_description}
+        {/* Tables `prospection_infestation` (+ `_imago` / `_larve`) */}
+        <SectionTable
+          titre="Infestations"
+          table="prospection_infestation"
+          nombre={infestations.length}
+        >
+          {infestations.length === 0 && (
+            <p className="font-sans text-[11.5px] text-ifvm-text-weak">
+              Aucune ligne enregistrée pour cette fiche.
             </p>
           )}
-        </Carte>
+          {infestations.map((infestation) => (
+            <div key={infestation.id} className="flex flex-col gap-3">
+              <h3 className="font-sans text-[12.5px] font-bold text-ifvm-green-text">
+                {humaniser(infestation.type_cible)}
+                {infestation.espece ? ` · ${infestation.espece}` : ''}
+              </h3>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {groupesInfestation(infestation, ctx).groupes.map((g) => (
+                  <CarteGroupe key={g.titre} groupe={g} table="prospection_infestation" />
+                ))}
+              </div>
+            </div>
+          ))}
+        </SectionTable>
 
-        {/* Extensif — mode aérien : équipe, aéronef, base (pilote/mécanicien/chef de
-            base sont du texte libre depuis le retour en arrière de la migration 0048,
-            même patron que traitement_aerien). N'apparaît que si la fiche est extensive
-            aérienne — inutile d'afficher une carte pleine de tirets sur une intensive. */}
-        {prospection.mode_extensif && (
-          <Carte className="px-5 py-[18px]">
-            <div className="mb-3">
-              <BlocLabel>Extensif — équipe &amp; aéronef</BlocLabel>
-            </div>
-            <div className="grid grid-cols-1 gap-x-6 gap-y-[9px] md:grid-cols-2">
-              {[
-                champ('Mode', humaniser(prospection.mode_extensif)),
-                champ('Société', prospection.societe ?? TIRET),
-                champ('Immatriculation aéronef', prospection.immatricule_aeronef ?? TIRET),
-                champ('Pilote', prospection.pilote ?? TIRET),
-                champ('Mécanicien', prospection.mecanicien ?? TIRET),
-                champ('Chef de base', prospection.chef_de_base ?? TIRET),
-                champ('Base', nomLieu(prospection.lieu_base_id)),
-              ].map((l) => (
-                <LigneCle key={l.k} ligne={l} />
-              ))}
-            </div>
-          </Carte>
-        )}
-
-        {/* Extensif — pesticides embarqués (fûts, quantités) */}
-        {prospection.pesticides_embarques != null && (
-          <Carte className="px-5 py-[18px]">
-            <div className="mb-3">
-              <BlocLabel>Extensif — pesticides embarqués</BlocLabel>
-            </div>
-            <div className="grid grid-cols-1 gap-x-6 gap-y-[9px] md:grid-cols-2">
-              {[
-                champ('Pesticides embarqués', prospection.pesticides_embarques ? 'Oui' : 'Non'),
-                champ('Nom commercial', prospection.pesticide_nom_commercial ?? TIRET),
-                champ('Quantité disponible', formatNombre(prospection.pesticide_quantite_disponible)),
-                champ('Quantité reçue', formatNombre(prospection.pesticide_quantite_recue)),
-                champ('Fûts disponibles', formatNombre(prospection.futs_disponible)),
-                champ('Fûts pleins', formatNombre(prospection.futs_pleins)),
-                champ('Fûts vides', formatNombre(prospection.futs_vides)),
-                champ('Fûts reçus', formatNombre(prospection.futs_recues)),
-              ].map((l) => (
-                <LigneCle key={l.k} ligne={l} />
-              ))}
-            </div>
-          </Carte>
-        )}
-
-        {/* Extensif — signatures (visa, consultant international, pilote, chef de base) */}
-        {(prospection.signature_visa_nom ||
-          prospection.signature_consultant_fao_nom ||
-          prospection.signature_pilote_nom ||
-          prospection.signature_chef_base_nom) && (
-          <Carte className="px-5 py-[18px]">
-            <div className="mb-3">
-              <BlocLabel>Extensif — signatures</BlocLabel>
-            </div>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {(
-                [
-                  ['Visa', prospection.signature_visa_nom, prospection.signature_visa_horodatage],
-                  [
-                    'Consultant International',
-                    prospection.signature_consultant_fao_nom,
-                    prospection.signature_consultant_fao_horodatage,
-                  ],
-                  ['Pilote', prospection.signature_pilote_nom, prospection.signature_pilote_horodatage],
-                  [
-                    'Chef de base',
-                    prospection.signature_chef_base_nom,
-                    prospection.signature_chef_base_horodatage,
-                  ],
-                ] as [string, string | null, string | null][]
-              ).map(([label, nom, horodatage]) => (
-                <div key={label} className="rounded-[9px] bg-background px-[14px] py-3">
-                  <div className="font-sans text-[10.5px] font-medium text-ifvm-text-weak">{label}</div>
-                  <div className="font-mono text-[12.5px] font-bold text-foreground">{nom ?? TIRET}</div>
-                  {horodatage && (
-                    <div className="font-mono text-[10px] font-medium text-ifvm-text-weak">
-                      {formatDate(horodatage)}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </Carte>
-        )}
-
-        {/* Extensif (mode aérien) — opérations aériennes 1-N */}
-        {(prospection.operations_aeriennes ?? []).length > 0 && (
-          <Carte className="overflow-hidden">
-            <div className="border-b border-[#f1ecdd] px-5 py-4">
-              <h2 className="font-sans text-[14px] font-bold">Opérations aériennes</h2>
-            </div>
+        {/* Table `prospection_capture` : une ligne du tableau par ligne de la table */}
+        <SectionTable titre="Captures" table="prospection_capture" nombre={captures.length}>
+          <Carte className="overflow-x-auto">
             <DataTable
-              columns={operationColumns}
-              rows={prospection.operations_aeriennes}
-              getRowKey={(o) => o.id}
-              emptyMessage="Aucune opération aérienne."
+              columns={colonnesCaptures}
+              rows={captures}
+              getRowKey={(c) => c.id}
+              emptyMessage="Aucune ligne enregistrée pour cette fiche."
             />
           </Carte>
-        )}
+        </SectionTable>
+
+        {/* Table `prospection_operation_aerienne` */}
+        <SectionTable
+          titre="Opérations aériennes"
+          table="prospection_operation_aerienne"
+          nombre={operations.length}
+        >
+          <Carte className="overflow-x-auto">
+            <DataTable
+              columns={colonnesOperations}
+              rows={operations}
+              getRowKey={(o) => o.id}
+              emptyMessage="Aucune ligne enregistrée pour cette fiche."
+            />
+          </Carte>
+        </SectionTable>
       </div>
 
       <aside className="flex min-w-0 flex-col gap-[14px]">
-        {/* Piste de validation — chronologie du plus ancien au plus récent */}
+        {/* Journal d'audit — table `audit_log`, entrées réelles uniquement */}
         <Carte className="px-5 py-[18px]">
-          <h2 className="mb-3 font-sans text-[13px] font-bold">Piste de validation</h2>
-          {piste.length === 0 ? (
+          <div className="mb-3 flex items-baseline gap-[10px]">
+            <h2 className="font-sans text-[13px] font-bold">Journal de validation</h2>
+            <span className="font-mono text-[10px] font-medium text-ifvm-text-weak">audit_log</span>
+          </div>
+          {journal.length === 0 ? (
             <p className="font-sans text-[11.5px] text-ifvm-text-weak">
-              Aucun historique disponible.
+              Aucune entrée dans le journal d'audit.
             </p>
           ) : (
             <ol className="flex flex-col">
-              {piste.map((etape, i) => (
-                <li key={etape.id} className="flex gap-[11px]">
+              {journal.map((entree, i) => (
+                <li key={entree.id} className="flex gap-[11px]">
                   <div className="flex w-[14px] flex-col items-center">
-                    <span
-                      className="mt-[3px] h-[10px] w-[10px] shrink-0 rounded-full"
-                      style={{ background: etape.dot }}
-                    />
-                    {i < piste.length - 1 && <span className="w-[2px] flex-1 bg-[#f1ecdd]" />}
+                    <span className="mt-[3px] h-[10px] w-[10px] shrink-0 rounded-full bg-[#bdb6a2]" />
+                    {i < journal.length - 1 && <span className="w-[2px] flex-1 bg-[#f1ecdd]" />}
                   </div>
                   <div className="min-w-0 pb-[14px]">
                     <div className="font-sans text-[12px] font-bold text-foreground">
-                      {etape.label}
+                      {entree.label}
                     </div>
                     <div className="font-sans text-[11px] font-medium text-ifvm-text-tertiary">
-                      {etape.who}
+                      {entree.auteur}
                     </div>
                     <div className="font-mono text-[10.5px] font-medium text-ifvm-text-weak">
-                      {etape.when === TIRET ? TIRET : formatDate(etape.when)}
+                      {entree.quand}
                     </div>
+                    {entree.details.map((d, j) => (
+                      <div
+                        key={j}
+                        className="mt-1 break-words font-sans text-[11px] leading-[1.4] text-ifvm-text-tertiary"
+                      >
+                        {d.chemin ? `${d.chemin} : ` : ''}
+                        <span className="text-foreground">{d.valeur}</span>
+                      </div>
+                    ))}
                   </div>
                 </li>
               ))}
@@ -1063,7 +666,7 @@ function FicheImprimable({
   station,
   validateurId,
 }: {
-  prospection: ProspectionDetail
+  prospection: ProspectionBdd
   station: StationDetail | undefined
   validateurId: string | null
 }) {
