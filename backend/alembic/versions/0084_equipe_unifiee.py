@@ -62,8 +62,8 @@ from alembic import op
 
 _log = logging.getLogger("alembic.runtime.migration")
 
-revision = "0082"
-down_revision = "0081"
+revision = "0084"
+down_revision = "0083"
 branch_labels = None
 depends_on = None
 

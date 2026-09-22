@@ -1,4 +1,4 @@
-"""Affectations d'aéronefs bornées dans le temps (#603, migration 0083).
+"""Affectations d'aéronefs bornées dans le temps (#603, migration 0085).
 
 Une équipe aérienne dispose de 2 à 3 appareils, utilisés l'un après l'autre pendant la
 campagne. L'ancien `equipe.aeronef_id` sous `UNIQUE` n'en savait dire qu'un, et

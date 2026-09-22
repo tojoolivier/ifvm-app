@@ -47,7 +47,7 @@ Agriculteur → Signalement → Prospection de Validation
   chacun relevé en position (lat/lon/alt captées automatiquement, hors ligne) et nommé à la main.
   Ni l'un ni l'autre n'est un **poste acridien** ou une **station fixe**.
 
-- **Équipe** (table unique `equipe`, migration 0082 — ADR-018 §2). Une équipe est
+- **Équipe** (table unique `equipe`, migration 0084 — ADR-018 §2). Une équipe est
   `terrestre` ou `aerien` (`type`, non modifiable après création), et ses intervenants sont des
   lignes de `equipe_membre(equipe_id, user_id, fonction)` — il n'y a plus de rôle nommé en dur.
   `fonction` reprend le vocabulaire de `ROLES`, plus `chef` : une équipe a **un seul chef**, un
@@ -56,7 +56,7 @@ Agriculteur → Signalement → Prospection de Validation
   immatriculation, société, volume de cuve — table `aeronef`, `immatriculation` en est la clé
   candidate ; le parc se peuple indépendamment des équipes, `POST /aeronefs`, admin). Les
   affectations sont **bornées dans le temps** — `equipe_aeronef(equipe_id, aeronef_id,
-  date_debut, date_fin)`, migration 0083, ADR-018 §2 : `date_fin IS NULL` désigne l'appareil
+  date_debut, date_fin)`, migration 0085, ADR-018 §2 : `date_fin IS NULL` désigne l'appareil
   **en service**, que `EquipeRead.aeronef` projette (`null` entre deux appareils), et
   l'historique complet se lit par `GET /equipes/{id}/aeronefs`. « Un aéronef sur une seule
   équipe à la fois » est une règle de **chevauchement d'intervalles**, pas un `UNIQUE` :
@@ -78,7 +78,7 @@ Agriculteur → Signalement → Prospection de Validation
 
 - **Pilote**, **mécanicien** et **consultant international** sont **externes à l'IFVM**
   (compagnie aérienne ou Armée malgache) : ils n'ont pas d'accès applicatif, mais depuis la
-  migration 0082 ils ont bien une identité — un compte créé « à la volée »
+  migration 0084 ils ont bien une identité — un compte créé « à la volée »
   (`peut_se_connecter = false`), comme membre de l'équipe, plutôt qu'un nom en texte libre.
   Seul le **chef de base** est un agent IFVM authentifiable. Le **consultant international**
   signe lorsqu'il intervient.

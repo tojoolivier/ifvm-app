@@ -750,7 +750,7 @@ async def update_lieu_aerien(
 
 # --- equipe_aerienne / base_aerienne / stand_remplissage (gestion d'équipe) ---------
 #
-# --- equipe (référentiel unifié, ADR-018 / migration 0082) -------------------------
+# --- equipe (référentiel unifié, ADR-018 / migration 0084) -------------------------
 #
 # Une seule table `equipe`, typée `terrestre` | `aerien`, et des membres génériques
 # porteurs de leur `fonction` — à la place des deux tables asymétriques
@@ -943,7 +943,7 @@ async def ajouter_membre_equipe(
         raise _conflit_membre(exc) from exc
 
 
-# --- affectations d'aéronefs (equipe_aeronef, migration 0083, #603) ---------------
+# --- affectations d'aéronefs (equipe_aeronef, migration 0085, #603) ---------------
 #
 # Une équipe aérienne dispose de 2 à 3 appareils utilisés l'un après l'autre. Affecter
 # ouvre une période, retirer la borne ; la ligne reste, c'est l'historique. Pas de

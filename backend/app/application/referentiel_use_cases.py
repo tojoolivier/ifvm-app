@@ -1193,7 +1193,7 @@ class AffecterAeronef:
     symétrique « une équipe n'a qu'un appareil à la fois ». Aucune des deux n'est un
     `UNIQUE` : elles portent sur le chevauchement d'intervalles, que seul
     `EXCLUDE USING gist` exprimerait en SQL (hors scope, ADR-018). Les index partiels
-    de la migration 0083 ne rattrapent que les courses entre deux requêtes."""
+    de la migration 0085 ne rattrapent que les courses entre deux requêtes."""
 
     def __init__(
         self,

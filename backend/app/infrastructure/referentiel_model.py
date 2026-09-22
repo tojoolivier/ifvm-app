@@ -62,7 +62,7 @@ class PosteAcridienModel(Base):
         UUID(as_uuid=True), ForeignKey("zone_anti_acridien.id"), nullable=False
     )
     # Rattachement à une équipe terrestre (migration 0073, retargeté sur `equipe` en
-    # 0082) : nullable, sans UNIQUE — plusieurs postes peuvent partager la même équipe
+    # 0084) : nullable, sans UNIQUE — plusieurs postes peuvent partager la même équipe
     # (équipe mobile). Le nom de colonne est conservé pour ne pas propager un renommage
     # jusqu'au cache SQLite du mobile ; c'est bien `equipe` qui est référencée.
     equipe_terrestre_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
@@ -219,7 +219,7 @@ class AeronefModel(Base):
 
 
 class EquipeModel(Base):
-    """Équipe unique du référentiel — terrestre ou aérienne (ADR-018, migration 0082).
+    """Équipe unique du référentiel — terrestre ou aérienne (ADR-018, migration 0084).
 
     Remplace `equipe_terrestre` et `equipe_aerienne`, qui étaient deux tables
     asymétriques pour la même notion. Spécialisation ramenée à une table unique typée
@@ -263,7 +263,7 @@ class EquipeModel(Base):
         foreign_keys="EquipeAeronefModel.equipe_id",
     )
 
-    # Noms de contraintes explicites — doivent matcher les migrations 0082/0083 à
+    # Noms de contraintes explicites — doivent matcher les migrations 0084/0085 à
     # l'identique : les dépôts s'en servent pour distinguer une violation métier d'une
     # erreur générique.
     __table_args__ = (
@@ -273,7 +273,7 @@ class EquipeModel(Base):
 
 
 class EquipeAeronefModel(Base):
-    """Affectation d'un aéronef à une équipe sur une période (#603, migration 0083).
+    """Affectation d'un aéronef à une équipe sur une période (#603, migration 0085).
 
     Remplace la FK 1:1 `equipe.aeronef_id` : une équipe aérienne dispose de 2 à 3
     appareils utilisés l'un après l'autre, et le 1:1 interdisait d'en garder la trace.
@@ -477,7 +477,7 @@ class StandRemplissageModel(Base):
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
 
     # Nom explicite, conservé depuis la migration 0078 (la cible passe à `equipe` en
-    # 0082) : le dépôt s'en sert pour distinguer une équipe inexistante d'un doublon de
+    # 0084) : le dépôt s'en sert pour distinguer une équipe inexistante d'un doublon de
     # `numero`.
     __table_args__ = (
         ForeignKeyConstraint(

@@ -719,7 +719,7 @@ def _traduire_integrite_affectation(
     exc: IntegrityError, affectation: AffectationAeronef
 ) -> Exception:
     """Filet de sécurité derrière la validation applicative : les index partiels de la
-    migration 0083 ne couvrent que les affectations *ouvertes*, et la règle complète est
+    migration 0085 ne couvrent que les affectations *ouvertes*, et la règle complète est
     vérifiée en amont. Ce qui passe ici est donc une course entre deux requêtes."""
     contrainte = _contrainte_violee(exc)
     if contrainte == "uq_equipe_aeronef_ouverte_par_aeronef":
@@ -747,7 +747,7 @@ def _traduire_integrite_equipe(
 ) -> Exception:
     """Traduit une violation d'intégrité en erreur métier, par *nom de contrainte*.
 
-    Les noms lus ici sont ceux des migrations 0082/0083 et des `__table_args__` : un
+    Les noms lus ici sont ceux des migrations 0084/0085 et des `__table_args__` : un
     renommage des deux côtés est obligatoire, sans quoi toute violation retomberait
     silencieusement sur l'erreur générique.
 

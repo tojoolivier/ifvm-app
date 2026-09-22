@@ -424,7 +424,7 @@ class Aeronef:
 @dataclass
 class AffectationAeronef:
     """Période pendant laquelle un aéronef est affecté à une équipe (#603, migration
-    0083).
+    0085).
 
     Remplace la FK 1:1 `equipe.aeronef_id` : une équipe dispose de 2 à 3 appareils
     qu'elle utilise l'un après l'autre, et on veut pouvoir dire lequel était en service
@@ -461,7 +461,7 @@ class MembreEquipe:
 
 @dataclass
 class Equipe:
-    """Équipe terrestre ou aérienne (ADR-018, migration 0082).
+    """Équipe terrestre ou aérienne (ADR-018, migration 0084).
 
     Fusion de `EquipeAerienne` et `EquipeTerrestre` : un `type` discriminant, et des
     membres génériques porteurs de leur `fonction` à la place des rôles nommés en dur.
