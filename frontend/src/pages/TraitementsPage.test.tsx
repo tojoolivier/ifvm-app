@@ -108,11 +108,35 @@ describe('TraitementsPage — colonnes maquette (README §7)', () => {
     expect(cellulesAerien[7]).toHaveTextContent('—')
     expect(cellulesAerien[8]).toHaveTextContent('320')
 
-    // Terrestre (traitée 5 ha) : « Traitée », même si le mode de la fiche est TOTAL ici.
+    // Terrestre en mode TOTAL (choc) : « Traitée ».
     const ligneTerrestre = screen.getByText('Hery-TERRESTRE-2026-08-05').closest('tr')!
     const cellulesTerrestre = within(ligneTerrestre).getAllByRole('cell')
     expect(cellulesTerrestre[7]).toHaveTextContent('5')
     expect(cellulesTerrestre[8]).toHaveTextContent('—')
+  })
+
+  /** Migration 0083 : généralise au Terrestre la répartition traitée/protégée
+   * déjà appliquée à l'Aérien (migration 0081) — une équipe au sol peut elle
+   * aussi appliquer un produit de barrière. */
+  it('affiche la surface protégée d’un terrestre en mode barrière, tiret dans la colonne traitée', async () => {
+    mockedGet.mockResolvedValue({
+      data: [
+        {
+          ...traitementTerrestreAvecRestante(),
+          id: 't-terrestre-barriere',
+          numero_fiche: 'Hery-TERRESTRE-BARRIERE-01',
+          mode_traitement: 'BARRIERE',
+          terrestre: { surface_traitee_ha: 0, surface_protegee_ha: 6.5, surface_restante_ha: 3 },
+        },
+      ],
+    })
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Hery-TERRESTRE-BARRIERE-01')).toBeInTheDocument())
+    const ligne = screen.getByText('Hery-TERRESTRE-BARRIERE-01').closest('tr')!
+    const cellules = within(ligne).getAllByRole('cell')
+    expect(cellules[7]).toHaveTextContent('—')
+    expect(cellules[8]).toHaveTextContent('6,5')
   })
 
   it('affiche la surface infestée de la prospection liée, en mono à droite', async () => {

@@ -32,7 +32,14 @@ interface Traitement {
     surface_protegee_ha: number | null
     surface_restante_ha: number | null
   } | null
-  terrestre: { surface_traitee_ha: number | null; surface_restante_ha: number | null } | null
+  terrestre: {
+    surface_traitee_ha: number | null
+    // Migration 0083 : généralise au Terrestre la répartition traitée/protégée
+    // déjà appliquée à l'Aérien (migration 0081) — une équipe au sol peut elle
+    // aussi appliquer un produit de barrière.
+    surface_protegee_ha: number | null
+    surface_restante_ha: number | null
+  } | null
   // Utilisé uniquement par `responsableTraitement` (colonne Responsable) —
   // la colonne Signatures elle-même a été retirée de cette liste : les
   // signatures ne s'affichent plus que sur la fiche (TraitementDetailPage).

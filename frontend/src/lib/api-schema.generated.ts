@@ -2778,6 +2778,8 @@ export interface components {
             signature_visa_nom?: string | null;
             /** Signature Visa Horodatage */
             signature_visa_horodatage?: string | null;
+            /** Signature Visa Image */
+            signature_visa_image?: string | null;
             /** Signature Consultant Fao Nom */
             signature_consultant_fao_nom?: string | null;
             /** Signature Consultant Fao Horodatage */
@@ -3003,6 +3005,8 @@ export interface components {
             signature_visa_nom?: string | null;
             /** Signature Visa Horodatage */
             signature_visa_horodatage?: string | null;
+            /** Signature Visa Image */
+            signature_visa_image?: string | null;
             /** Signature Consultant Fao Nom */
             signature_consultant_fao_nom?: string | null;
             /** Signature Consultant Fao Horodatage */
@@ -3169,6 +3173,8 @@ export interface components {
             signature_visa_nom?: string | null;
             /** Signature Visa Horodatage */
             signature_visa_horodatage?: string | null;
+            /** Signature Visa Image */
+            signature_visa_image?: string | null;
             /** Signature Consultant Fao Nom */
             signature_consultant_fao_nom?: string | null;
             /** Signature Consultant Fao Horodatage */
@@ -4193,6 +4199,8 @@ export interface components {
             surface_atomiseur_autoporte_ha: number | null;
             /** Surface Traitee Ha */
             surface_traitee_ha: number | null;
+            /** Surface Protegee Ha */
+            surface_protegee_ha: number | null;
             /** Surface Cumulee Ha */
             surface_cumulee_ha: number | null;
             /** Surface Restante Ha */

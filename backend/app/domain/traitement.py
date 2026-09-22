@@ -447,7 +447,13 @@ class TraitementTerrestre:
     surface_atomiseur_ha: float | None = None
     surface_disque_rotatif_ha: float | None = None
     surface_atomiseur_autoporte_ha: float | None = None
+    # Répartition de la somme des 3 champs ci-dessus selon le produit (migration
+    # 0083, généralise à l'Terrestre ce que la migration 0081 fait déjà pour
+    # l'Aérien) : jamais renseignées ensemble. Produit de choc (mode hors
+    # BARRIERE) → surface_traitee_ha ; produit de barrière (BARRIERE) →
+    # surface_protegee_ha.
     surface_traitee_ha: float | None = None
+    surface_protegee_ha: float | None = None
     surface_cumulee_ha: float | None = None
     surface_restante_ha: float | None = None
     surface_restante_abandonnee: bool | None = None
@@ -489,19 +495,48 @@ class TraitementTerrestre:
             self.pesticide_recu_l, self.total_pesticide_l, self.stock_initial_l
         )
 
+    @property
+    def surface_couverte_ha(self) -> float:
+        """Surface traitée + protégée : ce que l'équipe au sol a couvert, quel que
+        soit le produit — même rôle que `TraitementAerien.surface_couverte_ha`.
+        C'est elle qui alimente le cumul de reprise et la surface restante."""
+        return (self.surface_traitee_ha or 0.0) + (self.surface_protegee_ha or 0.0)
+
+    def repartir_surface(self, surface_couverte_ha: float, mode_traitement: str | None) -> None:
+        """Seul endroit qui classe une surface couverte en « traitée » ou « protégée » —
+        même règle que `TraitementAerien.repartir_surface` (migration 0083) : produit de
+        barrière (BARRIERE) → protégée ; produit de choc, irrégulier ou mode absent →
+        traitée. L'autre colonne est remise à zéro (jamais les deux à la fois)."""
+        if mode_traitement == "BARRIERE":
+            self.surface_protegee_ha = surface_couverte_ha
+            self.surface_traitee_ha = 0.0
+        else:
+            self.surface_traitee_ha = surface_couverte_ha
+            self.surface_protegee_ha = 0.0
+
     def recalculer_surfaces(
-        self, surface_infestee_ha: float | None, surface_cumulee_precedente: float = 0.0
+        self,
+        surface_infestee_ha: float | None,
+        surface_cumulee_precedente: float = 0.0,
+        mode_traitement: str | None = None,
     ) -> None:
-        """Seul chemin d'écriture pour surface_traitee_ha/surface_cumulee_ha/surface_restante_ha.
+        """Seul chemin d'écriture pour surface_traitee_ha/surface_protegee_ha/
+        surface_cumulee_ha/surface_restante_ha.
+
+        `mode_traitement` est celui du `Traitement` porteur (il ne vit pas sur
+        `TraitementTerrestre`, même patron que `TraitementAerien.recalculer_totaux`) :
+        il décide si la somme des 3 surfaces saisies est « traitée » (choc) ou
+        « protégée » (barrière), cf. `repartir_surface`.
 
         surface_restante_ha est ramenée à 0 si négative (critère CDG §9).
         """
-        self.surface_traitee_ha = (
+        somme = (
             (self.surface_atomiseur_ha or 0.0)
             + (self.surface_disque_rotatif_ha or 0.0)
             + (self.surface_atomiseur_autoporte_ha or 0.0)
         )
-        self.surface_cumulee_ha = surface_cumulee_precedente + self.surface_traitee_ha
+        self.repartir_surface(somme, mode_traitement)
+        self.surface_cumulee_ha = surface_cumulee_precedente + self.surface_couverte_ha
         self.surface_restante_ha = (
             max(surface_infestee_ha - self.surface_cumulee_ha, 0.0)
             if surface_infestee_ha is not None

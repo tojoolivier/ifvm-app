@@ -480,6 +480,7 @@ class TraitementTerrestreRead(BaseModel):
     surface_disque_rotatif_ha: float | None
     surface_atomiseur_autoporte_ha: float | None
     surface_traitee_ha: float | None
+    surface_protegee_ha: float | None
     surface_cumulee_ha: float | None
     surface_restante_ha: float | None
     surface_restante_abandonnee: bool | None

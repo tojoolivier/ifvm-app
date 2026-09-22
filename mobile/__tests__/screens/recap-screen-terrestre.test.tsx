@@ -196,6 +196,27 @@ describe('RecapScreen — Terrestre : rien de saisi ne manque à la relecture', 
     expect(screen.queryByText('Répartition de la population')).toBeNull();
   });
 
+  /** Migration backend 0083 : généralise au Terrestre la répartition traitée/
+   * protégée déjà appliquée à l'Aérien (migration 0081) — même bascule de
+   * libellé que l'écran « Surface traitée » aérien (#326). */
+  it('affiche « Surface protégée » (et sa valeur) plutôt que « Surface traitée » en mode barrière', async () => {
+    jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
+      ...DRAFT_TERRESTRE,
+      mode_traitement: 'BARRIERE',
+      terrestre: {
+        ...DRAFT_TERRESTRE.terrestre,
+        surface_traitee_ha: 0,
+        surface_protegee_ha: 6.5,
+      },
+    });
+
+    await render(<RecapScreen />);
+
+    await screen.findByText('Surface protégée (ha)');
+    expect(screen.getByText('6.5')).toBeVisible();
+    expect(screen.queryByText('Surface traitée (ha)')).toBeNull();
+  });
+
   it('affiche la carte Localisation (région/district/commune, coordonnées GPS, altitude)', async () => {
     await render(<RecapScreen />);
 

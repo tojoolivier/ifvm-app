@@ -1138,6 +1138,70 @@ def test_recalculer_surfaces_avec_cumul_precedent():
     assert terrestre.surface_restante_ha == 60.0
 
 
+# Migration 0083 : généralise à l'Terrestre la répartition traitée/protégée déjà
+# appliquée à l'Aérien par la migration 0081 — produit de choc → surface traitée ;
+# produit de barrière → surface protégée.
+
+
+def _terrestre_trois_materiels() -> TraitementTerrestre:
+    return TraitementTerrestre(
+        surface_atomiseur_ha=10.0,
+        surface_disque_rotatif_ha=5.5,
+        surface_atomiseur_autoporte_ha=2.25,
+    )
+
+
+def test_recalculer_surfaces_produit_de_choc_alimente_surface_traitee():
+    terrestre = _terrestre_trois_materiels()
+    terrestre.recalculer_surfaces(surface_infestee_ha=100.0, mode_traitement="TOTAL")
+    assert terrestre.surface_traitee_ha == 17.75
+    assert terrestre.surface_protegee_ha == 0.0
+
+
+def test_recalculer_surfaces_produit_de_barriere_alimente_surface_protegee():
+    terrestre = _terrestre_trois_materiels()
+    terrestre.recalculer_surfaces(surface_infestee_ha=100.0, mode_traitement="BARRIERE")
+    assert terrestre.surface_protegee_ha == 17.75
+    assert terrestre.surface_traitee_ha == 0.0
+
+
+def test_recalculer_surfaces_terrestre_irregulier_ou_sans_mode_compte_comme_traitee():
+    for mode in ("IRREGULIER", None):
+        terrestre = _terrestre_trois_materiels()
+        terrestre.recalculer_surfaces(surface_infestee_ha=100.0, mode_traitement=mode)
+        assert terrestre.surface_traitee_ha == 17.75
+        assert terrestre.surface_protegee_ha == 0.0
+
+
+def test_recalculer_surfaces_terrestre_ne_garde_jamais_les_deux_surfaces():
+    """Un mode qui change (synchronisation) doit vider l'ancienne colonne."""
+    terrestre = _terrestre_trois_materiels()
+    terrestre.recalculer_surfaces(surface_infestee_ha=100.0, mode_traitement="TOTAL")
+    terrestre.recalculer_surfaces(surface_infestee_ha=100.0, mode_traitement="BARRIERE")
+    assert terrestre.surface_traitee_ha == 0.0
+    assert terrestre.surface_protegee_ha == 17.75
+
+
+def test_surface_cumulee_terrestre_compte_traitee_et_protegee_en_reprise():
+    """La surface couverte (traitée + protégée) alimente le cumul et la restante,
+    quel que soit le produit de la fiche — même règle que l'Aérien."""
+    terrestre = _terrestre_trois_materiels()
+    terrestre.recalculer_surfaces(
+        surface_infestee_ha=100.0, surface_cumulee_precedente=30.0, mode_traitement="BARRIERE"
+    )
+    assert terrestre.surface_couverte_ha == 17.75
+    assert terrestre.surface_cumulee_ha == 47.75
+    assert terrestre.surface_restante_ha == 52.25
+
+
+def test_repartir_surface_terrestre_reclasse_une_surface_existante():
+    terrestre = TraitementTerrestre(surface_traitee_ha=40.0)
+    terrestre.repartir_surface(terrestre.surface_couverte_ha, "BARRIERE")
+    assert (terrestre.surface_traitee_ha, terrestre.surface_protegee_ha) == (0.0, 40.0)
+    terrestre.repartir_surface(terrestre.surface_couverte_ha, "TOTAL")
+    assert (terrestre.surface_traitee_ha, terrestre.surface_protegee_ha) == (40.0, 0.0)
+
+
 # ==========================================
 # CreateTraitementTerrestre (fakes en mémoire)
 # ==========================================

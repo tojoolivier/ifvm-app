@@ -400,7 +400,12 @@ class TraitementTerrestreModel(Base):
     surface_atomiseur_autoporte_ha: Mapped[float | None] = mapped_column(
         Numeric(10, 2), nullable=True
     )
+    # Répartition selon le produit (migration 0083, généralise à l'Terrestre ce
+    # que la migration 0081 fait déjà pour l'Aérien) : jamais renseignées
+    # ensemble. Produit de choc (mode_traitement hors BARRIERE) → surface_traitee_ha ;
+    # produit de barrière (BARRIERE) → surface_protegee_ha.
     surface_traitee_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    surface_protegee_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     surface_cumulee_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     surface_restante_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     surface_restante_abandonnee: Mapped[bool | None] = mapped_column(Boolean(), nullable=True)
@@ -435,6 +440,10 @@ class TraitementTerrestreModel(Base):
             "surface_restante_ha IS NULL OR surface_restante_ha <= 0"
             " OR surface_restante_abandonnee IS NOT NULL",
             name="ck_traitement_terrestre_surface_restante",
+        ),
+        CheckConstraint(
+            "COALESCE(surface_traitee_ha, 0) = 0 OR COALESCE(surface_protegee_ha, 0) = 0",
+            name="ck_traitement_terrestre_surface_exclusive",
         ),
         CheckConstraint(
             "pesticide_unite IN ('L','kg')", name="ck_traitement_terrestre_pesticide_unite"
