@@ -68,6 +68,7 @@ def upgrade() -> None:
     _renommer_base_aerienne()
     _refuser_stands_orphelins(conn)
     _refuser_collisions_numero(conn)
+    _refuser_stands_sans_base_principale(conn)
     _fusionner_stands()
     _creer_table_position()
     _reprendre_positions()
@@ -136,6 +137,36 @@ def _refuser_collisions_numero(conn) -> None:
             f"stand_remplissage et site_aerienne ({', '.join(lignes)}) — numero est "
             "UNIQUE sur la table fusionnée. Renommez l'un des deux (stand ou base) "
             "avant de relancer cette migration."
+        )
+
+
+def _refuser_stands_sans_base_principale(conn) -> None:
+    """`_fusionner_stands` joint sur `site_aerienne.equipe_id = stand.equipe_aerienne_id` en
+    comptant sur `uq_site_aerienne_equipe_id` pour qu'au plus une principale matche par
+    équipe — mais rien n'empêche une équipe sans base principale (`equipe_aerienne_id`
+    valide, non orpheline, mais qui ne référence aucune ligne `site_aerienne`) : le JOIN
+    exclurait alors silencieusement ce stand de l'INSERT plutôt que d'échouer fort, comme
+    les deux garde-fous précédents."""
+    if context.is_offline_mode():
+        return
+    lignes = (
+        conn.execute(
+            sa.text(
+                "SELECT s.numero FROM stand_remplissage s "
+                "WHERE NOT EXISTS ("
+                "  SELECT 1 FROM site_aerienne b WHERE b.equipe_id = s.equipe_aerienne_id"
+                ") ORDER BY s.numero"
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if lignes:
+        raise RuntimeError(
+            f"Migration 0086 : {len(lignes)} stand(s) de remplissage rattachés à une "
+            f"équipe sans base principale ({', '.join(lignes)}) — aucun parent_site_id "
+            "déductible. Créez d'abord la base principale de cette équipe, puis "
+            "relancez cette migration."
         )
 
 

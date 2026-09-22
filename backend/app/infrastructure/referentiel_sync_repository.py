@@ -486,11 +486,19 @@ class SiteAeriennePositionRepositoryImpl(SiteAeriennePositionRepository):
             await self.session.commit()
         except IntegrityError as exc:
             await self.session.rollback()
-            if _contrainte_violee(exc) == "uq_site_aerienne_position_ouverte_par_site":
-                raise PositionDejaActiveError(str(position.site_id)) from exc
-            raise
+            traduite = self._traduire_integrite(exc, position)
+            raise (traduite if traduite is not None else exc) from exc
         await self.session.refresh(model)
         return self._to_domain(model)
+
+    def _traduire_integrite(
+        self, exc: IntegrityError, position: SiteAeriennePosition
+    ) -> Exception | None:
+        """`None` : contrainte non reconnue, l'IntegrityError d'origine remonte telle
+        quelle plutôt que d'inventer une erreur domaine trompeuse."""
+        if _contrainte_violee(exc) == "uq_site_aerienne_position_ouverte_par_site":
+            return PositionDejaActiveError(str(position.site_id))
+        return None
 
     async def demonter(self, position: SiteAeriennePosition) -> SiteAeriennePosition:
         result = await self.session.execute(
