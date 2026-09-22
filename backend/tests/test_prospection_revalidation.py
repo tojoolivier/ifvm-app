@@ -29,6 +29,7 @@ async def _creer_prospection(
     type_prospection: str = "extensive",
     station_id: uuid.UUID | None = None,
     revalide_de_id: str | None = None,
+    statut: str | None = None,
 ) -> str:
     payload: dict = {
         "type_prospection": type_prospection,
@@ -41,6 +42,8 @@ async def _creer_prospection(
         payload["station_id"] = str(station_id)
     if revalide_de_id is not None:
         payload["revalide_de_id"] = revalide_de_id
+    if statut is not None:
+        payload["statut"] = statut
     resp = await client.post("/prospections", json=payload, headers=auth_headers)
     assert resp.status_code == 201, resp.text
     return resp.json()["id"]
@@ -119,7 +122,7 @@ async def test_validated_at_stampe_a_la_creation_pour_type_validation(
 
 
 @pytest.mark.asyncio
-async def test_revalidation_est_validee_immediatement_a_la_creation(
+async def test_revalidation_suit_desormais_la_chaine_de_verification_comme_une_fiche_neuve(
     client: AsyncClient,
     db_session: AsyncSession,
     auth_headers: dict,
@@ -127,11 +130,14 @@ async def test_revalidation_est_validee_immediatement_a_la_creation(
     verificateur: Utilisateur,
     validateur: Utilisateur,
 ):
-    """#revalidation-immediate : une fiche qui revalide une prospection
-    extensive périmée ne doit pas repasser par la chaîne administrative
-    en_attente -> verifiee -> validee de sa fiche d'origine — elle doit être
-    exploitable pour le traitement dès sa synchronisation, comme une fiche
-    `validation` (Signalement)."""
+    """#revalidation-verification-standard : revirement du comportement
+    historique (#revalidation-immediate) — une fiche qui revalide une
+    prospection extensive périmée suit désormais la MÊME chaîne
+    administrative en_attente -> verifiee -> validee qu'une fiche neuve.
+    `statut` vient du client (comme pour l'Intensif/l'Extensif), jamais
+    forcé ici — décision produit assumée après discussion : une revalidation
+    doit être revue comme n'importe quelle fiche neuve, quitte à rester
+    temporairement invisible du sélecteur de traitement pendant la revue."""
     pid_origine = await _valider_extensive(
         client, auth_headers, campagne_id, verificateur, validateur
     )
@@ -144,17 +150,60 @@ async def test_revalidation_est_validee_immediatement_a_la_creation(
             "campagne_id": str(campagne_id),
             "date_prospection": "2026-08-01",
             "revalide_de_id": pid_origine,
+            "statut": "en_attente",
         },
         headers=auth_headers,
     )
     assert resp.status_code == 201, resp.text
     data = resp.json()
-    assert data["statut"] == "validee"
-    assert data["validated_at"] is not None
+    assert data["statut"] == "en_attente"
+    assert data["validated_at"] is None
 
 
 @pytest.mark.asyncio
-async def test_revalidation_recoit_une_date_de_validation_fraiche_pas_celle_de_la_source(
+async def test_revalidation_d_une_fiche_validation_suit_aussi_la_chaine_de_verification(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+):
+    """Une fiche de Validation NEUVE (jamais une revalidation) reste validée
+    immédiatement (#nouvelle-fiche-validation-immediate, inchangé) — mais SA
+    revalidation, elle, suit désormais la chaîne de vérification comme
+    n'importe quelle autre fiche, y compris pour ce type. Seul le numéro
+    (`n_fiche` aligné sur `n_message`) reste posé immédiatement, comme pour
+    une fiche de Validation neuve."""
+    resp = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "validation",
+            "campagne_id": str(campagne_id),
+            "date_prospection": "2026-08-01",
+            "n_message": "MSG-010",
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    pid_origine = resp.json()["id"]
+
+    resp = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "validation",
+            "campagne_id": str(campagne_id),
+            "date_prospection": "2026-08-01",
+            "n_message": "MSG-010",
+            "revalide_de_id": pid_origine,
+            "statut": "en_attente",
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    data = resp.json()
+    assert data["statut"] == "en_attente"
+    assert data["validated_at"] is None
+    assert data["n_fiche"] == "MSG-010"
+
+
+@pytest.mark.asyncio
+async def test_revalidation_recoit_une_date_de_validation_fraiche_une_fois_verifiee_et_validee(
     client: AsyncClient,
     db_session: AsyncSession,
     auth_headers: dict,
@@ -164,30 +213,36 @@ async def test_revalidation_recoit_une_date_de_validation_fraiche_pas_celle_de_l
 ):
     """La fiche d'origine est périmée (`validated_at` reculé de plus de 5
     jours) précisément parce que sa date de validation est trop ancienne —
-    la copier sur l'enfant ferait repartir celui-ci déjà périmé. `validated_at`
-    doit être une date fraîche (maintenant), jamais celle de la source."""
+    une fois la revalidation elle-même passée par la chaîne de vérification,
+    sa propre `validated_at` doit être une date fraîche (maintenant), jamais
+    celle de la source (`apply_transition` la stampe à chaque passage à
+    'validee', quel que soit le type ou l'origine de la fiche)."""
     pid_origine = await _valider_extensive(
         client, auth_headers, campagne_id, verificateur, validateur
     )
     await _reculer_validated_at(db_session, pid_origine, DELAI_REVALIDATION_JOURS + 1)
 
-    resp = await client.post(
-        "/prospections",
-        json={
-            "type_prospection": "extensive",
-            "campagne_id": str(campagne_id),
-            "date_prospection": "2026-08-01",
-            "revalide_de_id": pid_origine,
-        },
-        headers=auth_headers,
+    pid_enfant = await _creer_prospection(
+        client,
+        auth_headers,
+        campagne_id,
+        "extensive",
+        revalide_de_id=pid_origine,
+        statut="en_attente",
     )
-    assert resp.status_code == 201, resp.text
-    validated_at = datetime.fromisoformat(resp.json()["validated_at"])
+    await _changer_statut(client, pid_enfant, "verifiee", _headers(verificateur))
+    await _changer_statut(client, pid_enfant, "validee", _headers(validateur))
+
+    resp = await client.get(f"/prospections/{pid_enfant}", headers=auth_headers)
+    assert resp.status_code == 200
+    # `GET /prospections/{id}` sérialise `validated_at` avec fuseau (contrairement
+    # à la réponse de création) — comparaison en naïf, comme le reste de ce fichier.
+    validated_at = datetime.fromisoformat(resp.json()["validated_at"]).replace(tzinfo=None)
     assert datetime.utcnow() - validated_at < timedelta(minutes=1)
 
 
 @pytest.mark.asyncio
-async def test_disponible_pour_traitement_inclut_immediatement_une_fiche_revalidee(
+async def test_disponible_pour_traitement_exclut_revalidation_pas_encore_validee(
     client: AsyncClient,
     db_session: AsyncSession,
     auth_headers: dict,
@@ -195,17 +250,60 @@ async def test_disponible_pour_traitement_inclut_immediatement_une_fiche_revalid
     verificateur: Utilisateur,
     validateur: Utilisateur,
 ):
-    """Conséquence directe de la validation immédiate : la fiche de
-    revalidation doit pouvoir servir de base à un nouveau traitement dès sa
-    synchronisation, sans étape de validation manuelle supplémentaire."""
+    """Conséquence directe de #revalidation-verification-standard : une fiche
+    de revalidation fraîchement créée est `en_attente`, donc absente de
+    « disponible pour traitement » (qui ne liste que les fiches `validee`) —
+    comme n'importe quelle fiche extensive neuve, revirement du comportement
+    historique (#revalidation-immediate)."""
     pid_origine = await _valider_extensive(
         client, auth_headers, campagne_id, verificateur, validateur
     )
     await _reculer_validated_at(db_session, pid_origine, DELAI_REVALIDATION_JOURS + 1)
 
     pid_enfant = await _creer_prospection(
-        client, auth_headers, campagne_id, "extensive", revalide_de_id=pid_origine
+        client,
+        auth_headers,
+        campagne_id,
+        "extensive",
+        revalide_de_id=pid_origine,
+        statut="en_attente",
     )
+
+    resp = await client.get(
+        "/prospections",
+        params={"statut": "validee", "disponible_pour_traitement": "true"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    assert pid_enfant not in [p["id"] for p in resp.json()]
+
+
+@pytest.mark.asyncio
+async def test_disponible_pour_traitement_inclut_la_fiche_revalidee_une_fois_verifiee_et_validee(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    verificateur: Utilisateur,
+    validateur: Utilisateur,
+):
+    """... et redevient disponible normalement, une fois passée par la même
+    chaîne de vérification que n'importe quelle fiche."""
+    pid_origine = await _valider_extensive(
+        client, auth_headers, campagne_id, verificateur, validateur
+    )
+    await _reculer_validated_at(db_session, pid_origine, DELAI_REVALIDATION_JOURS + 1)
+
+    pid_enfant = await _creer_prospection(
+        client,
+        auth_headers,
+        campagne_id,
+        "extensive",
+        revalide_de_id=pid_origine,
+        statut="en_attente",
+    )
+    await _changer_statut(client, pid_enfant, "verifiee", _headers(verificateur))
+    await _changer_statut(client, pid_enfant, "validee", _headers(validateur))
 
     resp = await client.get(
         "/prospections",
@@ -385,12 +483,21 @@ async def test_a_revalider_retourne_exactement_les_fiches_perimees(
     assert creation.status_code == 201, creation.text
 
     # Périmée mais déjà revalidée : ne doit plus apparaître (remplacée).
+    # L'enfant est créé `en_attente` (#revalidation-verification-standard,
+    # comme le ferait réellement `completeProspection` côté mobile) — la
+    # condition d'exclusion (`enfant.statut != 'brouillon'`) doit se
+    # déclencher dès `en_attente`, sans attendre `validee`.
     pid_perimee_revalidee = await _valider_extensive(
         client, auth_headers, campagne_id, verificateur, validateur
     )
     await _reculer_validated_at(db_session, pid_perimee_revalidee, DELAI_REVALIDATION_JOURS + 1)
     await _creer_prospection(
-        client, auth_headers, campagne_id, "extensive", revalide_de_id=pid_perimee_revalidee
+        client,
+        auth_headers,
+        campagne_id,
+        "extensive",
+        revalide_de_id=pid_perimee_revalidee,
+        statut="en_attente",
     )
 
     # Intensive périmée : jamais concernée par la règle.

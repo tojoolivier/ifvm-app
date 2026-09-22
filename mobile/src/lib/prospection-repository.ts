@@ -752,6 +752,13 @@ const COLONNES_REVALIDATION_NON_CLONEES = new Set([
   // pas sur `statut`). Le serveur la reposera à une date fraîche à la
   // synchronisation (`CreateProspection.execute`, backend).
   'validated_at',
+  // #revalidation-nouvelle-date : la fiche périmée documente une situation
+  // qui vient d'être revérifiée AUJOURD'HUI, pas à la date de l'ancienne
+  // prospection — copier `date_prospection` laisserait croire que la
+  // situation observée date de l'ancienne fiche. Le numéro (`n_fiche`/
+  // `n_message`), lui, reste volontairement identique (cf. clonage
+  // générique ci-dessous) : seule la date change.
+  'date_prospection',
 ]);
 
 /**
@@ -788,6 +795,10 @@ export async function demarrerRevalidation(sourceProspectionId: string): Promise
   const db = await getDb();
   const draftId = generateId();
   const now = new Date().toISOString();
+  // #revalidation-nouvelle-date : aujourd'hui, jamais la date de l'ancienne
+  // fiche (cf. commentaire de `COLONNES_REVALIDATION_NON_CLONEES`) — même
+  // format `YYYY-MM-DD` que la colonne partout ailleurs.
+  const dateProspectionFraiche = now.slice(0, 10);
 
   const colonnesClonees = Object.keys(source).filter(
     (cle) => !COLONNES_REVALIDATION_NON_CLONEES.has(cle)
@@ -798,9 +809,9 @@ export async function demarrerRevalidation(sourceProspectionId: string): Promise
 
   await db.runAsync(
     `INSERT INTO prospection (
-      id, statut, statut_sync, created_at, updated_at, revalide_de_id, ${colonnesClonees.join(', ')}
-    ) VALUES (?, 'brouillon', 'local', ?, ?, ?, ${colonnesClonees.map(() => '?').join(', ')})`,
-    [draftId, now, now, sourceProspectionId, ...valeursClonees]
+      id, statut, statut_sync, created_at, updated_at, revalide_de_id, date_prospection, ${colonnesClonees.join(', ')}
+    ) VALUES (?, 'brouillon', 'local', ?, ?, ?, ?, ${colonnesClonees.map(() => '?').join(', ')})`,
+    [draftId, now, now, sourceProspectionId, dateProspectionFraiche, ...valeursClonees]
   );
 
   for (const population of await listAllProspectionPopulations(sourceProspectionId)) {
@@ -1520,12 +1531,18 @@ export async function completeProspection(id: string): Promise<DraftProspection>
   if (!current) throw new Error('Échec de la mise à jour de la fiche brouillon locale');
   await assurerNumeroFicheUnique(id, current);
 
-  // Signalisation : validée pour traitement dès l'enregistrement local, tout
-  // en restant dans la file Offline-First. Intensive/Extensive conservent le
-  // parcours administratif normal.
+  // Signalisation NEUVE (jamais une revalidation) : validée pour traitement
+  // dès l'enregistrement local, tout en restant dans la file Offline-First.
+  // Intensive/Extensive conservent le parcours administratif normal.
+  //
+  // #revalidation-verification-standard : une revalidation (`revalide_de_id`
+  // non nul), quel que soit son `type_prospection`, suit désormais la même
+  // chaîne en_attente -> vérifiée -> validée qu'une fiche neuve — le serveur
+  // (CreateProspection.execute) applique la même règle à la synchronisation,
+  // ne force plus jamais `validee` pour une revalidation.
   await db.runAsync(
     `UPDATE prospection
-       SET statut = CASE WHEN type_prospection = 'validation' THEN 'validee' ELSE 'en_attente' END,
+       SET statut = CASE WHEN type_prospection = 'validation' AND revalide_de_id IS NULL THEN 'validee' ELSE 'en_attente' END,
            n_fiche = CASE WHEN type_prospection = 'validation' AND n_message IS NOT NULL THEN n_message ELSE n_fiche END,
            updated_at = ?
      WHERE id = ?`,
