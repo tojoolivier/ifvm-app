@@ -23,6 +23,7 @@
  * Synchronisation, qui lit `statut_sync` séparément).
  */
 export type StatutFicheAffiche =
+  | 'brouillon'
   | 'a_synchro'
   | 'echec_synchro'
   | 'en_attente'
@@ -30,7 +31,20 @@ export type StatutFicheAffiche =
   | 'validee'
   | 'rejetee';
 
+/**
+ * `'brouillon'` (#dossier-brouillons) prime sur tout le reste : une fiche
+ * encore en cours de saisie n'a jamais été soumise à l'envoi, donc
+ * `statut_sync` n'a par construction rien à en dire — la confondre avec
+ * « à synchro » (avant ce correctif) laissait croire à l'agent qu'elle
+ * partirait au prochain passage réseau, alors qu'elle ne partira jamais tant
+ * qu'il ne l'a pas terminée (`completeProspection`, seul point de sortie du
+ * statut `brouillon`). `statut_sync = 'echec'` sur une fiche `brouillon` n'est
+ * d'ailleurs pas un état atteignable : `markProspectionEchec` ne peut être
+ * appelée que sur une fiche déjà tentée à l'envoi (`listUnsyncedProspections`
+ * ne sélectionne jamais `statut = 'brouillon'`).
+ */
 export function statutFicheAffiche(statut: string, statutSync: string): StatutFicheAffiche {
+  if (statut === 'brouillon') return 'brouillon';
   if (statutSync === 'echec') return 'echec_synchro';
   if (statutSync !== 'synced') return 'a_synchro';
   switch (statut) {

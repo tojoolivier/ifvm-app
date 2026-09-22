@@ -24,6 +24,7 @@ jest.mock('@/lib/prospection-accueil', () => ({
   loadAccueilData: jest.fn().mockResolvedValue({
     unsyncedCount: 0,
     activeDraft: null,
+    draftsCount: 0,
     recent: [],
     validated: [],
     pendingSync: [],

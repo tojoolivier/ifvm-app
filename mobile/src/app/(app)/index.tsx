@@ -96,6 +96,10 @@ export default function DashboardScreen() {
 
   const [prospections, setProspections] = useState<DraftProspection[]>([]);
   const [traitements, setTraitements] = useState<DraftTraitementRow[]>([]);
+  // #dossier-brouillons : pastille sur la tuile ACCÈS RAPIDE — dérivée de
+  // `prospections` (déjà chargée intégralement par `loadData`), pas d'appel
+  // réseau/local supplémentaire.
+  const draftsCount = useMemo(() => prospections.filter((p) => p.statut === 'brouillon').length, [prospections]);
   const [refreshing, setRefreshing] = useState(false);
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [showSyncBanner, setShowSyncBanner] = useState(false);
@@ -322,6 +326,22 @@ export default function DashboardScreen() {
             >
               <ThemedText style={styles.quickTileIcon}>📄</ThemedText>
               <ThemedText style={styles.quickTileText}>Mes fiches</ThemedText>
+            </TouchableOpacity>
+
+            {/* #dossier-brouillons : toutes les fiches de prospection encore en
+                cours de saisie (intensive/extensive/validation) — jamais
+                envoyées tant qu'elles ne sont pas terminées (completeProspection).
+                Distinct de « Mes fiches », qui liste tout SAUF ces brouillons
+                en pratique confus (cf. statutFicheAffiche avant #dossier-brouillons). */}
+            <TouchableOpacity
+              style={styles.quickTile}
+              onPress={() => navigateTo('/(app)/brouillons')}
+              activeOpacity={0.85}
+            >
+              <ThemedText style={styles.quickTileIcon}>📝</ThemedText>
+              <ThemedText style={styles.quickTileText}>
+                Brouillons{draftsCount > 0 ? ` (${draftsCount})` : ''}
+              </ThemedText>
             </TouchableOpacity>
 
             <TouchableOpacity
