@@ -133,7 +133,6 @@ class TraitementRepository(ABC):
         rotation: Rotation,
         nb_rotations: int,
         total_pesticide_l: float | None,
-        pesticide_stock_restant_l: float | None,
     ) -> Traitement:
         pass
 
@@ -144,7 +143,6 @@ class TraitementRepository(ABC):
         rotation: Rotation,
         nb_rotations: int,
         total_pesticide_l: float | None,
-        pesticide_stock_restant_l: float | None,
     ) -> Traitement:
         pass
 
@@ -155,7 +153,6 @@ class TraitementRepository(ABC):
         rotation_id: uuid.UUID,
         nb_rotations: int,
         total_pesticide_l: float | None,
-        pesticide_stock_restant_l: float | None,
     ) -> Traitement:
         pass
 
@@ -654,6 +651,27 @@ class MouvementPesticideRepository(ABC):
     ) -> list[SoldePesticide]:
         """Solde agrégé par (site, pesticide, unité), calculé à la volée — pas de
         colonne dénormalisée (décision actée, #606)."""
+        pass
+
+    @abstractmethod
+    async def regenerer_consommation(
+        self,
+        traitement_id: uuid.UUID,
+        site_id: uuid.UUID | None,
+        date_mouvement: date,
+        consommations: list[tuple[uuid.UUID, str, float]],
+    ) -> None:
+        """Seule exception à l'immutabilité ci-dessus (#609) : remplace les mouvements
+        `consommation` rattachés à `traitement_id` par `consommations` (un mouvement
+        par couple (pesticide_id, unité)) — appelée à chaque écriture sur les
+        rotations d'une fiche aérienne (ajout, modification, suppression), jamais
+        depuis une saisie manuelle.
+
+        `site_id=None` (fiche historique sans `site_principal_id` rapproché, #605)
+        supprime les mouvements existants sans en recréer : pas de débit sans site
+        connu, mais pas de résidu non plus si la fiche en avait déjà (cas impossible
+        aujourd'hui, la validation à la création l'exclut, mais couvert par
+        symétrie)."""
         pass
 
 

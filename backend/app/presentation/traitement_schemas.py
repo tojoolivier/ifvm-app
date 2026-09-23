@@ -105,7 +105,9 @@ class TraitementAerienCreate(BaseModel):
     immatricule_aeronef: str = Field(..., min_length=1)
     # surface_traitee_ha n'y figure plus (migration 0047) : dérivée de la somme
     # des `surface_ha` de rotation, ajoutées après coup via /rotations.
-    pesticide_recu_l: float | None = Field(None, ge=0)
+    # pesticide_recu_l supprimé (#609) : le stock est désormais débité
+    # automatiquement du site principal via `mouvement_pesticide` (#606), plus
+    # de saisie manuelle du reçu par fiche.
     # Efficacité (migration 0058, fiche CRT papier section "Traitement") : une
     # seule évaluation par fiche, après l'ensemble des rotations — pas de
     # contrainte de cohérence entre les 3 champs, chacun facultatif
@@ -461,8 +463,6 @@ class TraitementAerienRead(BaseModel):
     # Surface couverte cumulée : précédente + traitée + protégée.
     surface_cumulee_ha: float
     surface_restante_ha: float | None
-    pesticide_recu_l: float | None
-    pesticide_stock_restant_l: float | None
     taux_mortalite_pourcent: float | None
     evaluation_efficacite_heures_apres: float | None
     methode_evaluation_efficacite: MethodeEvaluationEfficacite | None

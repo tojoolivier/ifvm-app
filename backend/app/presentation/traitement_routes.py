@@ -51,6 +51,7 @@ from app.infrastructure.pdf_renderer import render_html_to_pdf
 from app.infrastructure.prospection_repository import ProspectionRepositoryImpl
 from app.infrastructure.referentiel_sync_repository import (
     EquipeRepositoryImpl,
+    MouvementPesticideRepositoryImpl,
     SiteAerienneRepositoryImpl,
 )
 from app.infrastructure.traitement_repository import TraitementRepositoryImpl
@@ -180,7 +181,6 @@ async def create_traitement(
                 base_secondaire=body.aerien.base_secondaire,
                 base_secondaire_date_installation=body.aerien.base_secondaire_date_installation,
                 immatricule_aeronef=body.aerien.immatricule_aeronef,
-                pesticide_recu_l=body.aerien.pesticide_recu_l,
                 taux_mortalite_pourcent=body.aerien.taux_mortalite_pourcent,
                 evaluation_efficacite_heures_apres=body.aerien.evaluation_efficacite_heures_apres,
                 methode_evaluation_efficacite=body.aerien.methode_evaluation_efficacite,
@@ -274,7 +274,6 @@ async def sync_traitement(
                 base_secondaire=body.aerien.base_secondaire,
                 base_secondaire_date_installation=body.aerien.base_secondaire_date_installation,
                 immatricule_aeronef=body.aerien.immatricule_aeronef,
-                pesticide_recu_l=body.aerien.pesticide_recu_l,
                 taux_mortalite_pourcent=body.aerien.taux_mortalite_pourcent,
                 evaluation_efficacite_heures_apres=body.aerien.evaluation_efficacite_heures_apres,
                 methode_evaluation_efficacite=body.aerien.methode_evaluation_efficacite,
@@ -387,7 +386,7 @@ async def add_rotation(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Utilisateur, Depends(get_current_user)],
 ):
-    use_case = AddRotation(get_repository(db))
+    use_case = AddRotation(get_repository(db), MouvementPesticideRepositoryImpl(db))
     try:
         return await use_case.execute(
             traitement_id=traitement_id,
@@ -422,7 +421,7 @@ async def update_rotation(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Utilisateur, Depends(get_current_user)],
 ):
-    use_case = UpdateRotation(get_repository(db))
+    use_case = UpdateRotation(get_repository(db), MouvementPesticideRepositoryImpl(db))
     try:
         return await use_case.execute(
             traitement_id=traitement_id,
@@ -457,7 +456,7 @@ async def remove_rotation(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Utilisateur, Depends(get_current_user)],
 ):
-    use_case = RemoveRotation(get_repository(db))
+    use_case = RemoveRotation(get_repository(db), MouvementPesticideRepositoryImpl(db))
     try:
         return await use_case.execute(traitement_id=traitement_id, rotation_id=rotation_id)
     except (TraitementIntrouvableError, RotationIntrouvableError) as e:

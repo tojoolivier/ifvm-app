@@ -542,6 +542,14 @@ class MouvementPesticideModel(Base):
     unite: Mapped[str] = mapped_column(String(2), nullable=False)
     date_mouvement: Mapped[date] = mapped_column(Date(), nullable=False)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+    # Fiche traitement aérien d'origine (migration 0093, #609) : NULL pour tout
+    # mouvement manuel (approvisionnement, transfert) — renseigné uniquement pour
+    # une `consommation` générée depuis les rotations d'une fiche, seul moyen de
+    # la retrouver et de la régénérer (`ondelete=CASCADE` : ces mouvements n'ont
+    # pas de sens sans la fiche qui les a produits).
+    traitement_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("traitement.id", ondelete="CASCADE"), nullable=True
+    )
 
     __table_args__ = (
         CheckConstraint(
@@ -560,6 +568,7 @@ class MouvementPesticideModel(Base):
         Index("ix_mouvement_pesticide_site_id", "site_id"),
         Index("ix_mouvement_pesticide_site_destination_id", "site_destination_id"),
         Index("ix_mouvement_pesticide_pesticide_id", "pesticide_id"),
+        Index("ix_mouvement_pesticide_traitement_id", "traitement_id"),
     )
 
 

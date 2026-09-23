@@ -606,6 +606,12 @@ class MouvementPesticide:
     unite: str = "L"
     date_mouvement: date = field(default_factory=lambda: datetime.now(timezone.utc).date())
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    # Fiche traitement aérien d'origine (migration 0093, #609) : renseigné si et
+    # seulement si `type == 'consommation'` généré automatiquement depuis les
+    # rotations d'une fiche — `None` pour tout mouvement saisi à la main
+    # (approvisionnement, transfert). Seul moyen de retrouver, et régénérer, les
+    # mouvements produits par une fiche donnée.
+    traitement_id: uuid.UUID | None = None
 
 
 @dataclass

@@ -1,7 +1,7 @@
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
-from sqlalchemy import func, or_, select, union_all
+from sqlalchemy import delete, func, or_, select, union_all
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
@@ -1038,6 +1038,7 @@ class MouvementPesticideRepositoryImpl(MouvementPesticideRepository):
             unite=model.unite,
             date_mouvement=model.date_mouvement,
             created_at=model.created_at,
+            traitement_id=model.traitement_id,
         )
 
     async def create(self, mouvement: MouvementPesticide) -> MouvementPesticide:
@@ -1051,11 +1052,44 @@ class MouvementPesticideRepositoryImpl(MouvementPesticideRepository):
             unite=mouvement.unite,
             date_mouvement=mouvement.date_mouvement,
             created_at=mouvement.created_at,
+            traitement_id=mouvement.traitement_id,
         )
         self.session.add(model)
         await self.session.commit()
         await self.session.refresh(model)
         return self._to_domain(model)
+
+    async def regenerer_consommation(
+        self,
+        traitement_id: uuid.UUID,
+        site_id: uuid.UUID | None,
+        date_mouvement: date,
+        consommations: list[tuple[uuid.UUID, str, float]],
+    ) -> None:
+        await self.session.execute(
+            delete(MouvementPesticideModel).where(
+                MouvementPesticideModel.traitement_id == traitement_id,
+                MouvementPesticideModel.type == "consommation",
+            )
+        )
+        if site_id is not None:
+            maintenant = datetime.now(timezone.utc)
+            for pesticide_id, unite, quantite in consommations:
+                if quantite <= 0:
+                    continue
+                self.session.add(
+                    MouvementPesticideModel(
+                        type="consommation",
+                        pesticide_id=pesticide_id,
+                        site_id=site_id,
+                        quantite=quantite,
+                        unite=unite,
+                        date_mouvement=date_mouvement,
+                        created_at=maintenant,
+                        traitement_id=traitement_id,
+                    )
+                )
+        await self.session.commit()
 
     async def solde(
         self,

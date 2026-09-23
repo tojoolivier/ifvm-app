@@ -286,8 +286,6 @@ class TraitementRepositoryImpl(TraitementRepository):
                 traitement_origine_id=traitement.aerien.traitement_origine_id,
                 surface_cumulee_ha=traitement.aerien.surface_cumulee_ha,
                 surface_restante_ha=traitement.aerien.surface_restante_ha,
-                pesticide_recu_l=traitement.aerien.pesticide_recu_l,
-                pesticide_stock_restant_l=traitement.aerien.pesticide_stock_restant_l,
                 taux_mortalite_pourcent=traitement.aerien.taux_mortalite_pourcent,
                 evaluation_efficacite_heures_apres=(
                     traitement.aerien.evaluation_efficacite_heures_apres
@@ -381,7 +379,6 @@ class TraitementRepositoryImpl(TraitementRepository):
         surface_protegee_ha: float,
         surface_cumulee_ha: float,
         surface_restante_ha: float | None,
-        pesticide_stock_restant_l: float | None,
     ) -> Traitement:
         self.session.add(
             RotationModel(
@@ -414,7 +411,6 @@ class TraitementRepositoryImpl(TraitementRepository):
             surface_protegee_ha,
             surface_cumulee_ha,
             surface_restante_ha,
-            pesticide_stock_restant_l,
         )
         return await self.get_by_id(traitement_id)
 
@@ -429,7 +425,6 @@ class TraitementRepositoryImpl(TraitementRepository):
         surface_protegee_ha: float,
         surface_cumulee_ha: float,
         surface_restante_ha: float | None,
-        pesticide_stock_restant_l: float | None,
     ) -> Traitement:
         rotation_model = await self.session.get(RotationModel, rotation.id)
         rotation_model.bloc_id = rotation.bloc_id
@@ -457,7 +452,6 @@ class TraitementRepositoryImpl(TraitementRepository):
             surface_protegee_ha,
             surface_cumulee_ha,
             surface_restante_ha,
-            pesticide_stock_restant_l,
         )
         return await self.get_by_id(traitement_id)
 
@@ -472,7 +466,6 @@ class TraitementRepositoryImpl(TraitementRepository):
         surface_protegee_ha: float,
         surface_cumulee_ha: float,
         surface_restante_ha: float | None,
-        pesticide_stock_restant_l: float | None,
     ) -> Traitement:
         rotation_model = await self.session.get(RotationModel, rotation_id)
         await self.session.delete(rotation_model)
@@ -486,7 +479,6 @@ class TraitementRepositoryImpl(TraitementRepository):
             surface_protegee_ha,
             surface_cumulee_ha,
             surface_restante_ha,
-            pesticide_stock_restant_l,
         )
         return await self.get_by_id(traitement_id)
 
@@ -715,8 +707,6 @@ class TraitementRepositoryImpl(TraitementRepository):
             model.aerien.surface_traitee_ha = traitement.aerien.surface_traitee_ha
             model.aerien.surface_protegee_ha = traitement.aerien.surface_protegee_ha
             model.aerien.surface_restante_ha = traitement.aerien.surface_restante_ha
-            model.aerien.pesticide_recu_l = traitement.aerien.pesticide_recu_l
-            model.aerien.pesticide_stock_restant_l = traitement.aerien.pesticide_stock_restant_l
             model.aerien.taux_mortalite_pourcent = traitement.aerien.taux_mortalite_pourcent
             model.aerien.evaluation_efficacite_heures_apres = (
                 traitement.aerien.evaluation_efficacite_heures_apres
@@ -834,7 +824,6 @@ class TraitementRepositoryImpl(TraitementRepository):
         surface_protegee_ha: float,
         surface_cumulee_ha: float,
         surface_restante_ha: float | None,
-        pesticide_stock_restant_l: float | None,
     ) -> None:
         aerien_model = await self.session.get(TraitementAerienModel, traitement_id)
         aerien_model.nb_rotations = nb_rotations
@@ -847,7 +836,6 @@ class TraitementRepositoryImpl(TraitementRepository):
         # recalculée à chaque mutation de rotation.
         aerien_model.surface_cumulee_ha = surface_cumulee_ha
         aerien_model.surface_restante_ha = surface_restante_ha
-        aerien_model.pesticide_stock_restant_l = pesticide_stock_restant_l
         await self.session.commit()
         self.session.expire(aerien_model, ["rotations"])
 
@@ -965,12 +953,6 @@ class TraitementRepositoryImpl(TraitementRepository):
                 surface_cumulee_ha=float(model.aerien.surface_cumulee_ha),
                 surface_restante_ha=float(model.aerien.surface_restante_ha)
                 if model.aerien.surface_restante_ha is not None
-                else None,
-                pesticide_recu_l=float(model.aerien.pesticide_recu_l)
-                if model.aerien.pesticide_recu_l is not None
-                else None,
-                pesticide_stock_restant_l=float(model.aerien.pesticide_stock_restant_l)
-                if model.aerien.pesticide_stock_restant_l is not None
                 else None,
                 taux_mortalite_pourcent=float(model.aerien.taux_mortalite_pourcent)
                 if model.aerien.taux_mortalite_pourcent is not None

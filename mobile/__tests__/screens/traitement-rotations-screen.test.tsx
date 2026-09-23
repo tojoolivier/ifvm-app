@@ -21,7 +21,6 @@ jest.mock('@/lib/traitement-repository', () => ({
   getTraitement: jest.fn(),
   addRotation: jest.fn().mockResolvedValue({}),
   deleteAllRotationsForTraitementAerien: jest.fn().mockResolvedValue(undefined),
-  updateTraitementAerienPesticideRecu: jest.fn().mockResolvedValue({}),
   updateTraitementAerienEfficacite: jest.fn().mockResolvedValue({}),
 }));
 
@@ -50,19 +49,13 @@ beforeEach(() => {
     id: 'trait-1',
     type_traitement: 'AERIEN',
     cible: { surface_infestee_ha: 100 },
-    aerien: { pesticide_recu_l: null, rotations: [] },
+    aerien: { rotations: [] },
   } as any);
   jest.mocked(traitementRepository.addRotation).mockClear().mockResolvedValue({} as any);
   jest.mocked(traitementRepository.deleteAllRotationsForTraitementAerien).mockClear().mockResolvedValue(undefined);
-  jest.mocked(traitementRepository.updateTraitementAerienPesticideRecu).mockClear().mockResolvedValue({} as any);
   jest.mocked(traitementRepository.updateTraitementAerienEfficacite).mockClear().mockResolvedValue({} as any);
   useTraitementCaptureStore.setState(RESET_STATE);
 });
-
-/** Laisse un vrai tick s'écouler entre une saisie et un `fireEvent.press` — un
- * `act(async () => {})` manuel imbriqué dans celui déjà posé par `fireEvent` casse
- * le suivi interne des scopes act() (leçon déjà tirée ailleurs dans ce dépôt). */
-const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
 
 describe('RotationsScreen — numéro de cuve et unité', () => {
   it('affiche un numéro de cuve non éditable (1, 2, …), incrémenté à l’ajout d’une rotation', async () => {
@@ -238,55 +231,5 @@ describe('RotationsScreen — validation des heures de vanne', () => {
       .invocationCallOrder[0];
     const ordreAjout = jest.mocked(traitementRepository.addRotation).mock.invocationCallOrder[0];
     expect(ordrePurge).toBeLessThan(ordreAjout);
-  });
-});
-
-/**
- * « Pesticide reçu (l) » a été déplacé depuis l'écran Équipe (traitement.tsx) vers
- * celui-ci — #equipe-slide-aerien : c'est une information propre au traitement
- * (stock de pesticide), pas à l'équipe.
- */
-describe('RotationsScreen — pesticide reçu (déplacé depuis Équipe)', () => {
-  it('restaure la valeur déjà enregistrée et la réenregistre via updateTraitementAerienPesticideRecu', async () => {
-    jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
-      id: 'trait-1',
-      type_traitement: 'AERIEN',
-      cible: { surface_infestee_ha: 100 },
-      aerien: { pesticide_recu_l: 200, rotations: [] },
-    } as any);
-    useTraitementCaptureStore.setState({
-      ...RESET_STATE,
-      aerien: {
-        rotations: [{ localId: 'r1', produit_id: 'p1', quantite: 10, unite: 'L', surface_ha: 5 }],
-      },
-    });
-
-    await render(<RotationsScreen />);
-    expect(await screen.findByDisplayValue('200')).toBeVisible();
-
-    fireEvent.press(screen.getByText('Continuer  ›'));
-
-    await waitFor(() =>
-      expect(traitementRepository.updateTraitementAerienPesticideRecu).toHaveBeenCalledWith('trait-1', 200)
-    );
-  });
-
-  it('saisit puis enregistre une nouvelle valeur de pesticide reçu', async () => {
-    useTraitementCaptureStore.setState({
-      ...RESET_STATE,
-      aerien: {
-        rotations: [{ localId: 'r1', produit_id: 'p1', quantite: 10, unite: 'L', surface_ha: 5 }],
-      },
-    });
-    await render(<RotationsScreen />);
-    await screen.findByTestId('rotation-numero-cuve-0');
-
-    fireEvent.changeText(screen.getByTestId('pesticide-recu-input'), '150');
-    await settle();
-    fireEvent.press(screen.getByText('Continuer  ›'));
-
-    await waitFor(() =>
-      expect(traitementRepository.updateTraitementAerienPesticideRecu).toHaveBeenCalledWith('trait-1', 150)
-    );
   });
 });

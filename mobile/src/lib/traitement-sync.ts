@@ -142,7 +142,8 @@ function buildTraitementSyncPayload(draft: DraftTraitement): components['schemas
         base_secondaire_date_installation: draft.aerien.base_secondaire_date_installation,
         // surface_traitee_ha n'y figure plus (migration 0047) : dérivée des rotations
         // côté serveur, plus un champ accepté par TraitementSyncPush.
-        pesticide_recu_l: draft.aerien.pesticide_recu_l,
+        // pesticide_recu_l supprimé (#609) : le stock aérien vit désormais dans
+        // `mouvement_pesticide` (#606), plus un champ de `TraitementAerienCreate`.
         // Efficacité (migration backend 0058) — une seule évaluation par
         // fiche, après l'ensemble des rotations.
         taux_mortalite_pourcent: draft.aerien.taux_mortalite_pourcent,

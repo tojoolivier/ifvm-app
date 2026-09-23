@@ -266,6 +266,9 @@ class MouvementPesticideRead(BaseModel):
     unite: str
     date_mouvement: date
     created_at: datetime
+    # Fiche traitement aérien d'origine (migration 0093, #609) — None pour tout
+    # mouvement manuel (approvisionnement, transfert).
+    traitement_id: uuid.UUID | None
 
 
 class SoldePesticideRead(BaseModel):

@@ -136,11 +136,8 @@ def _stock_pesticide_restant(
     que `surface_restante_ha`, CDG §9). `None` tant que ni « initial » ni « reçu »
     ne sont renseignés — un stock ne se déduit pas d'une consommation seule.
 
-    `initial` (« Stock initial », fiche CRT papier section 5 — Terrestre
-    uniquement, cf. `TraitementTerrestre.stock_initial_l`) est optionnel : côté
-    Aérien, qui n'a pas cette notion, l'appel reste `_stock_pesticide_restant(recu,
-    consomme)` inchangé, équivalent à `initial=0`.
-    """
+    Terrestre uniquement (`TraitementTerrestre.stock_initial_l`) — l'Aérien a perdu
+    cette notion de stock par fiche au profit de `mouvement_pesticide` (#609)."""
     if recu is None and initial is None:
         return None
     return max((initial or 0.0) + (recu or 0.0) - (consomme or 0.0), 0.0)
@@ -336,11 +333,6 @@ class TraitementAerien:
     # NOT NULL défaut 0, contrairement à son équivalent Terrestre (nullable) —
     # même choix que les autres champs dérivés ci-dessus.
     surface_cumulee_ha: float = 0.0
-    # Stock de pesticide par fiche (pas de suivi cumulatif par aéronef/opération) :
-    # « reçu » saisi, « consommé » = total_pesticide_l (dérivé des rotations),
-    # « reste en stock » dérivé des deux.
-    pesticide_recu_l: float | None = None
-    pesticide_stock_restant_l: float | None = None
     # Efficacité (fiche CRT papier, section "Traitement") : taux de mortalité
     # observé, quelques heures après le traitement — une seule évaluation par
     # fiche (après l'ensemble des rotations), pas par rotation individuelle,
@@ -379,7 +371,6 @@ class TraitementAerien:
         self.total_pesticide_l = sum(r.quantite for r in self.rotations if r.unite == "L")
         self.total_pesticide_kg = sum(r.quantite for r in self.rotations if r.unite == "kg")
         self.repartir_surface(sum(r.surface_ha for r in self.rotations), mode_traitement)
-        self.recalculer_stock_pesticide()
 
     def recalculer_surfaces(
         self, surface_infestee_ha: float | None, surface_cumulee_precedente: float = 0.0
@@ -403,16 +394,17 @@ class TraitementAerien:
             else None
         )
 
-    def recalculer_stock_pesticide(self) -> None:
-        """Seul chemin d'écriture pour pesticide_stock_restant_l — jamais en lecture.
-
-        Basé sur `total_pesticide_l` déjà à jour, pas recalculé depuis les rotations
-        directement : reste utilisable lors d'une synchronisation où les rotations
-        existantes ne sont pas rechargées (elles ne font pas partie du corps du push).
-        """
-        self.pesticide_stock_restant_l = _stock_pesticide_restant(
-            self.pesticide_recu_l, self.total_pesticide_l
-        )
+    def consommations_pesticide(self) -> list[tuple[uuid.UUID, str, float]]:
+        """Agrège les rotations par (produit, unité) — un mouvement `consommation`
+        par couple, jamais un total unique mêlant L et kg (AC #609). Recalculée
+        entièrement à chaque appel depuis `self.rotations` (jamais stockée) : c'est
+        `TraitementRepository`/`MouvementPesticideRepository` qui régénèrent les
+        mouvements correspondants à chaque écriture sur les rotations."""
+        totaux: dict[tuple[uuid.UUID, str], float] = {}
+        for rotation in self.rotations:
+            cle = (rotation.produit_id, rotation.unite)
+            totaux[cle] = totaux.get(cle, 0.0) + rotation.quantite
+        return [(produit_id, unite, quantite) for (produit_id, unite), quantite in totaux.items()]
 
 
 @dataclass
@@ -498,9 +490,8 @@ class TraitementTerrestre:
     def recalculer_stock_pesticide(self) -> None:
         """Seul chemin d'écriture pour pesticide_stock_restant_l — jamais en lecture.
 
-        Voir `TraitementAerien.recalculer_stock_pesticide` : séparé de
-        `recalculer_total_pesticide` pour rester appelable seul lors d'une
-        synchronisation où les produits existants ne sont pas rechargés.
+        Séparé de `recalculer_total_pesticide` pour rester appelable seul lors
+        d'une synchronisation où les produits existants ne sont pas rechargés.
         """
         self.pesticide_stock_restant_l = _stock_pesticide_restant(
             self.pesticide_recu_l, self.total_pesticide_l, self.stock_initial_l
@@ -826,7 +817,9 @@ _CHAMPS_CONTENU_AERIEN = (
     # surface_traitee_ha n'y figure plus (migration 0047) : dérivée des rotations
     # (sous-ressource distincte, absente du payload de synchronisation), au même
     # titre que nb_rotations/total_pesticide_l/total_pesticide_kg déjà exclus.
-    "pesticide_recu_l",
+    # pesticide_recu_l/pesticide_stock_restant_l supprimées de TraitementAerien
+    # (#609) — remplacées par des mouvements `mouvement_pesticide`, hors du
+    # payload de synchronisation au même titre que les rotations.
     "taux_mortalite_pourcent",
     "evaluation_efficacite_heures_apres",
     "methode_evaluation_efficacite",

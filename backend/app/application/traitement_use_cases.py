@@ -5,6 +5,7 @@ from typing import Any
 from app.domain.prospection import Prospection
 from app.domain.repositories import (
     EquipeRepository,
+    MouvementPesticideRepository,
     ProspectionRepository,
     SiteAerienneRepository,
     TraitementRepository,
@@ -255,7 +256,6 @@ class CreateTraitementAerien:
         stand_date_installation: date | None = None,
         base_secondaire: str | None = None,
         base_secondaire_date_installation: date | None = None,
-        pesticide_recu_l: float | None = None,
         taux_mortalite_pourcent: float | None = None,
         evaluation_efficacite_heures_apres: float | None = None,
         methode_evaluation_efficacite: str | None = None,
@@ -404,7 +404,6 @@ class CreateTraitementAerien:
             base_secondaire=base_secondaire,
             base_secondaire_date_installation=base_secondaire_date_installation,
             immatricule_aeronef=immatricule_aeronef,
-            pesticide_recu_l=pesticide_recu_l,
             taux_mortalite_pourcent=taux_mortalite_pourcent,
             evaluation_efficacite_heures_apres=evaluation_efficacite_heures_apres,
             methode_evaluation_efficacite=methode_evaluation_efficacite,
@@ -752,9 +751,34 @@ def _valider_heures_vanne(
         )
 
 
+async def _regenerer_consommation_pesticide(
+    mouvement_repository: MouvementPesticideRepository,
+    traitement: Traitement,
+    aerien: TraitementAerien,
+) -> None:
+    """Rattache l'écriture sur une rotation à la génération/régénération des
+    mouvements `consommation` de la fiche (AC #609) — un mouvement par couple
+    (pesticide, unité), agrégé sur `aerien.rotations` déjà à jour.
+
+    `aerien.site_principal_id` peut être `None` pour une fiche historique non
+    rapprochée à un site (#605) : dans ce cas on supprime sans recréer, on ne
+    débite jamais un site inconnu (point délicat #609)."""
+    await mouvement_repository.regenerer_consommation(
+        traitement_id=aerien.traitement_id,
+        site_id=aerien.site_principal_id,
+        date_mouvement=traitement.date_traitement,
+        consommations=aerien.consommations_pesticide(),
+    )
+
+
 class AddRotation:
-    def __init__(self, repository: TraitementRepository):
+    def __init__(
+        self,
+        repository: TraitementRepository,
+        mouvement_pesticide_repository: MouvementPesticideRepository,
+    ):
         self.repository = repository
+        self.mouvement_pesticide_repository = mouvement_pesticide_repository
 
     async def execute(
         self,
@@ -813,7 +837,7 @@ class AddRotation:
         aerien.recalculer_totaux(traitement.mode_traitement)
         aerien.recalculer_surfaces(_surface_infestee_ha(traitement), surface_cumulee_precedente)
 
-        return await self.repository.add_rotation(
+        resultat = await self.repository.add_rotation(
             traitement_id,
             rotation,
             aerien.nb_rotations,
@@ -823,13 +847,21 @@ class AddRotation:
             aerien.surface_protegee_ha,
             aerien.surface_cumulee_ha,
             aerien.surface_restante_ha,
-            aerien.pesticide_stock_restant_l,
         )
+        await _regenerer_consommation_pesticide(
+            self.mouvement_pesticide_repository, traitement, aerien
+        )
+        return resultat
 
 
 class UpdateRotation:
-    def __init__(self, repository: TraitementRepository):
+    def __init__(
+        self,
+        repository: TraitementRepository,
+        mouvement_pesticide_repository: MouvementPesticideRepository,
+    ):
         self.repository = repository
+        self.mouvement_pesticide_repository = mouvement_pesticide_repository
 
     async def execute(
         self,
@@ -880,7 +912,7 @@ class UpdateRotation:
         aerien.recalculer_totaux(traitement.mode_traitement)
         aerien.recalculer_surfaces(_surface_infestee_ha(traitement), surface_cumulee_precedente)
 
-        return await self.repository.update_rotation(
+        resultat = await self.repository.update_rotation(
             traitement_id,
             rotation,
             aerien.nb_rotations,
@@ -890,13 +922,21 @@ class UpdateRotation:
             aerien.surface_protegee_ha,
             aerien.surface_cumulee_ha,
             aerien.surface_restante_ha,
-            aerien.pesticide_stock_restant_l,
         )
+        await _regenerer_consommation_pesticide(
+            self.mouvement_pesticide_repository, traitement, aerien
+        )
+        return resultat
 
 
 class RemoveRotation:
-    def __init__(self, repository: TraitementRepository):
+    def __init__(
+        self,
+        repository: TraitementRepository,
+        mouvement_pesticide_repository: MouvementPesticideRepository,
+    ):
         self.repository = repository
+        self.mouvement_pesticide_repository = mouvement_pesticide_repository
 
     async def execute(self, traitement_id: uuid.UUID, rotation_id: uuid.UUID) -> Traitement:
         traitement = await _get_traitement_aerien(self.repository, traitement_id)
@@ -909,7 +949,7 @@ class RemoveRotation:
         aerien.recalculer_totaux(traitement.mode_traitement)
         aerien.recalculer_surfaces(_surface_infestee_ha(traitement), surface_cumulee_precedente)
 
-        return await self.repository.remove_rotation(
+        resultat = await self.repository.remove_rotation(
             traitement_id,
             rotation_id,
             aerien.nb_rotations,
@@ -919,8 +959,11 @@ class RemoveRotation:
             aerien.surface_protegee_ha,
             aerien.surface_cumulee_ha,
             aerien.surface_restante_ha,
-            aerien.pesticide_stock_restant_l,
         )
+        await _regenerer_consommation_pesticide(
+            self.mouvement_pesticide_repository, traitement, aerien
+        )
+        return resultat
 
 
 class AddBloc:
@@ -1170,7 +1213,6 @@ class SyncPushTraitementAerien:
         stand_date_installation: date | None = None,
         base_secondaire: str | None = None,
         base_secondaire_date_installation: date | None = None,
-        pesticide_recu_l: float | None = None,
         taux_mortalite_pourcent: float | None = None,
         evaluation_efficacite_heures_apres: float | None = None,
         methode_evaluation_efficacite: str | None = None,
@@ -1326,7 +1368,6 @@ class SyncPushTraitementAerien:
             base_secondaire=base_secondaire,
             base_secondaire_date_installation=base_secondaire_date_installation,
             immatricule_aeronef=immatricule_aeronef,
-            pesticide_recu_l=pesticide_recu_l,
             taux_mortalite_pourcent=taux_mortalite_pourcent,
             evaluation_efficacite_heures_apres=evaluation_efficacite_heures_apres,
             methode_evaluation_efficacite=methode_evaluation_efficacite,
@@ -1361,9 +1402,11 @@ class SyncPushTraitementAerien:
         # nb_rotations/total_pesticide_l/total_pesticide_kg/surface couverte
         # existants ne sont pas renvoyés par ce push (rotations = sous-ressource
         # distincte) : on les reprend tels quels, puis on recalcule ce qui en dépend
-        # (surface_restante_ha, stock de pesticide). Seule exception : le mode peut
-        # changer via ce push — la surface couverte (inchangée) est alors reclassée
-        # en traitée/protégée selon le nouveau produit (migration 0081).
+        # (surface_restante_ha). Seule exception : le mode peut changer via ce push —
+        # la surface couverte (inchangée) est alors reclassée en traitée/protégée
+        # selon le nouveau produit (migration 0081). Les mouvements de consommation
+        # (#609) ne sont pas concernés : générés depuis les rotations, sous-ressource
+        # distincte au même titre, ce push ne les touche pas.
         candidat.aerien.nb_rotations = existant.aerien.nb_rotations
         candidat.aerien.total_pesticide_l = existant.aerien.total_pesticide_l
         candidat.aerien.total_pesticide_kg = existant.aerien.total_pesticide_kg
@@ -1373,7 +1416,6 @@ class SyncPushTraitementAerien:
         candidat.aerien.recalculer_surfaces(
             candidat.cible.surface_infestee_ha, surface_cumulee_precedente
         )
-        candidat.aerien.recalculer_stock_pesticide()
 
         candidat.created_at = existant.created_at
         synced = await self.traitement_repository.update_sync(candidat)

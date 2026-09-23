@@ -2323,6 +2323,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Traitement Id */
+            traitement_id: string | null;
         };
         /**
          * NiveauPopulation
@@ -3762,8 +3764,6 @@ export interface components {
             base_secondaire_date_installation?: string | null;
             /** Immatricule Aeronef */
             immatricule_aeronef: string;
-            /** Pesticide Recu L */
-            pesticide_recu_l?: number | null;
             /** Taux Mortalite Pourcent */
             taux_mortalite_pourcent?: number | null;
             /** Evaluation Efficacite Heures Apres */
@@ -3822,10 +3822,6 @@ export interface components {
             surface_cumulee_ha: number;
             /** Surface Restante Ha */
             surface_restante_ha: number | null;
-            /** Pesticide Recu L */
-            pesticide_recu_l: number | null;
-            /** Pesticide Stock Restant L */
-            pesticide_stock_restant_l: number | null;
             /** Taux Mortalite Pourcent */
             taux_mortalite_pourcent: number | null;
             /** Evaluation Efficacite Heures Apres */

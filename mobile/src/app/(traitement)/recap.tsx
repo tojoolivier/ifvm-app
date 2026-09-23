@@ -646,8 +646,6 @@ export default function RecapScreen() {
               )}
               <RecapLigne label="Surface cumulée (ha)" value={display(draft.aerien.surface_cumulee_ha)} />
               <RecapLigne label="Surface restante (ha)" value={display(draft.aerien.surface_restante_ha)} />
-              <RecapLigne label="Approvisionnement (l)" value={draft.aerien.pesticide_recu_l != null ? String(draft.aerien.pesticide_recu_l) : null} />
-              <RecapLigne label="Reste en stock (l)" value={display(draft.aerien.pesticide_stock_restant_l)} />
               <RecapLigne label="Taux de mortalité (%)" value={display(draft.aerien.taux_mortalite_pourcent)} />
               <RecapLigne label="Évalué après (heures)" value={display(draft.aerien.evaluation_efficacite_heures_apres)} />
               <RecapLigne label="Méthode d'évaluation" value={displayMethodeEvaluation(draft.aerien.methode_evaluation_efficacite)} />

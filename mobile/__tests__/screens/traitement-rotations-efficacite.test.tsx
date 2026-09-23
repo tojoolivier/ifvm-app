@@ -1,12 +1,14 @@
 /**
  * Saisie décimale francophone (virgule) sur l'écran « Pesticides & rotations »
- * (rotations.tsx) — Approvisionnement et vent fin de rotation.
+ * (rotations.tsx) — vent fin de rotation.
  *
  * L'efficacité (taux de mortalité, délai d'évaluation, méthode) vivait ici
  * jusqu'à son déplacement sur « Moyens & protection » (moyens.tsx,
  * #efficacite-moyens-protection) — cf. traitement-moyens-efficacite.test.tsx.
+ * « Approvisionnement » (pesticide_recu_l) y vivait aussi jusqu'à sa suppression
+ * par #609 (stock aérien désormais dans `mouvement_pesticide`, #606).
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import RotationsScreen from '@/app/(traitement)/rotations';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import * as traitementRepository from '@/lib/traitement-repository';
@@ -22,7 +24,6 @@ jest.mock('@/lib/traitement-repository', () => ({
   getTraitement: jest.fn(),
   addRotation: jest.fn().mockResolvedValue({}),
   deleteAllRotationsForTraitementAerien: jest.fn().mockResolvedValue(undefined),
-  updateTraitementAerienPesticideRecu: jest.fn().mockResolvedValue({}),
 }));
 
 jest.mock('@/lib/referentiel-db', () => ({
@@ -54,7 +55,6 @@ beforeEach(() => {
     type_traitement: 'AERIEN',
     cible: { surface_infestee_ha: 100 },
     aerien: {
-      pesticide_recu_l: null,
       taux_mortalite_pourcent: null,
       evaluation_efficacite_heures_apres: null,
       methode_evaluation_efficacite: null,
@@ -63,34 +63,10 @@ beforeEach(() => {
   } as any);
   jest.mocked(traitementRepository.addRotation).mockClear().mockResolvedValue({} as any);
   jest.mocked(traitementRepository.deleteAllRotationsForTraitementAerien).mockClear().mockResolvedValue(undefined);
-  jest.mocked(traitementRepository.updateTraitementAerienPesticideRecu).mockClear().mockResolvedValue({} as any);
   useTraitementCaptureStore.setState(RESET_STATE);
 });
 
 describe('RotationsScreen — saisie décimale francophone (virgule)', () => {
-  it("conserve la valeur saisie avec une virgule sur Approvisionnement, sans jamais afficher NaN", async () => {
-    useTraitementCaptureStore.setState({
-      ...RESET_STATE,
-      aerien: {
-        rotations: [{ localId: 'r1', produit_id: 'p1', quantite: 10, unite: 'L', surface_ha: 5 }],
-      },
-    });
-    await render(<RotationsScreen />);
-    await screen.findByTestId('rotation-numero-cuve-0');
-
-    fireEvent.changeText(screen.getByTestId('pesticide-recu-input'), '12,5');
-    await settle();
-
-    expect(screen.getByDisplayValue('12,5')).toBeVisible();
-    expect(screen.queryByDisplayValue('NaN')).toBeNull();
-
-    fireEvent.press(screen.getByText('Continuer  ›'));
-
-    await waitFor(() =>
-      expect(traitementRepository.updateTraitementAerienPesticideRecu).toHaveBeenCalledWith('trait-1', 12.5)
-    );
-  });
-
   it("permet de renseigner la Vitesse du vent fin (m/s) avec une virgule, sans rester bloqué à NaN", async () => {
     await render(<RotationsScreen />);
     await screen.findByTestId('rotation-numero-cuve-0');

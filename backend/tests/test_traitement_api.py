@@ -3,6 +3,7 @@ import uuid
 from datetime import date, datetime, timedelta
 
 import pytest
+import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.prospection_model import ProspectionModel, ProspectionPopulationModel
@@ -805,6 +806,214 @@ async def test_delete_rotation_recalcule_totaux(
     assert aerien["nb_rotations"] == 1
     assert aerien["total_pesticide_l"] == 5.0
     assert r2.status_code == 201
+
+
+@pytest_asyncio.fixture
+async def deuxieme_pesticide(db_session: AsyncSession):
+    from app.infrastructure.referentiel_model import PesticideModel
+
+    p = PesticideModel(id=uuid.uuid4(), code=f"PEST-{uuid.uuid4().hex[:6]}", nom="Deltamethrine")
+    db_session.add(p)
+    await db_session.commit()
+    await db_session.refresh(p)
+    return p
+
+
+async def _approvisionner(client, auth_headers, pesticide_id, site_id, quantite, unite="L"):
+    resp = await client.post(
+        "/mouvements-pesticide",
+        json={
+            "type": "approvisionnement",
+            "pesticide_id": str(pesticide_id),
+            "site_id": str(site_id),
+            "quantite": quantite,
+            "unite": unite,
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201, resp.text
+
+
+async def _solde(client, auth_headers, site_id, pesticide_id, unite):
+    resp = await client.get(
+        f"/stock-pesticide/solde?site_id={site_id}&pesticide_id={pesticide_id}",
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    lignes = [ligne for ligne in resp.json() if ligne["unite"] == unite]
+    return lignes[0]["quantite"] if lignes else 0.0
+
+
+# #609 : le traitement aérien débite automatiquement le stock de son site principal —
+# un mouvement `consommation` par couple (pesticide, unité), régénéré à chaque
+# écriture sur les rotations (jamais de double débit, jamais de résidu).
+
+
+@pytest.mark.asyncio
+async def test_approvisionnement_puis_traitement_debite_le_solde_exactement(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement,
+    payload_rotation,
+    pesticide,
+    base_aerienne,
+):
+    await _approvisionner(client, auth_headers, pesticide.id, base_aerienne.id, 100.0)
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    resp = await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(quantite=10.0, unite="L"),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201, resp.text
+
+    solde = await _solde(client, auth_headers, base_aerienne.id, pesticide.id, "L")
+    assert solde == 90.0
+
+
+@pytest.mark.asyncio
+async def test_traitement_a_deux_produits_debite_chacun_separement(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement,
+    payload_rotation,
+    pesticide,
+    deuxieme_pesticide,
+    base_aerienne,
+):
+    await _approvisionner(client, auth_headers, pesticide.id, base_aerienne.id, 100.0)
+    await _approvisionner(client, auth_headers, deuxieme_pesticide.id, base_aerienne.id, 50.0)
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(produit_id=str(pesticide.id), quantite=10.0, unite="L"),
+        headers=auth_headers,
+    )
+    resp = await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(produit_id=str(deuxieme_pesticide.id), quantite=4.0, unite="L"),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201, resp.text
+
+    assert await _solde(client, auth_headers, base_aerienne.id, pesticide.id, "L") == 90.0
+    assert await _solde(client, auth_headers, base_aerienne.id, deuxieme_pesticide.id, "L") == 46.0
+
+
+@pytest.mark.asyncio
+async def test_traitement_melangeant_l_et_kg_genere_deux_mouvements_distincts(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement,
+    payload_rotation,
+    pesticide,
+    base_aerienne,
+):
+    await _approvisionner(client, auth_headers, pesticide.id, base_aerienne.id, 100.0, "L")
+    await _approvisionner(client, auth_headers, pesticide.id, base_aerienne.id, 50.0, "kg")
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(quantite=10.0, unite="L"),
+        headers=auth_headers,
+    )
+    resp = await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(quantite=4.0, unite="kg"),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201, resp.text
+
+    assert await _solde(client, auth_headers, base_aerienne.id, pesticide.id, "L") == 90.0
+    assert await _solde(client, auth_headers, base_aerienne.id, pesticide.id, "kg") == 46.0
+
+
+@pytest.mark.asyncio
+async def test_modification_rotation_regenere_le_mouvement_sans_double_debit(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement,
+    payload_rotation,
+    pesticide,
+    base_aerienne,
+):
+    await _approvisionner(client, auth_headers, pesticide.id, base_aerienne.id, 100.0)
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    created = await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(quantite=10.0, unite="L"),
+        headers=auth_headers,
+    )
+    rotation_id = created.json()["aerien"]["rotations"][0]["id"]
+    assert await _solde(client, auth_headers, base_aerienne.id, pesticide.id, "L") == 90.0
+
+    resp = await client.put(
+        f"/traitements/{traitement_id}/rotations/{rotation_id}",
+        json=payload_rotation(quantite=25.0, unite="L"),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200, resp.text
+
+    # Régénéré, pas cumulé : 100 - 25, jamais 90 - 25.
+    assert await _solde(client, auth_headers, base_aerienne.id, pesticide.id, "L") == 75.0
+
+
+@pytest.mark.asyncio
+async def test_suppression_rotation_ne_laisse_aucun_residu_de_consommation(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement,
+    payload_rotation,
+    pesticide,
+    base_aerienne,
+):
+    await _approvisionner(client, auth_headers, pesticide.id, base_aerienne.id, 100.0)
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    r1 = await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(quantite=10.0, unite="L"),
+        headers=auth_headers,
+    )
+    await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(quantite=5.0, unite="L"),
+        headers=auth_headers,
+    )
+    rotation_id_1 = r1.json()["aerien"]["rotations"][0]["id"]
+    assert await _solde(client, auth_headers, base_aerienne.id, pesticide.id, "L") == 85.0
+
+    resp = await client.delete(
+        f"/traitements/{traitement_id}/rotations/{rotation_id_1}", headers=auth_headers
+    )
+    assert resp.status_code == 200, resp.text
+
+    # Plus que la seconde rotation (5.0) consommée — aucun résidu de la première.
+    assert await _solde(client, auth_headers, base_aerienne.id, pesticide.id, "L") == 95.0
 
 
 @pytest.mark.asyncio

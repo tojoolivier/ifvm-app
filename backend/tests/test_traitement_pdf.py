@@ -80,8 +80,6 @@ def _traitement_aerien(**overrides) -> TraitementRead:
             traitement_origine_id=None,
             surface_cumulee_ha=25.0,
             surface_restante_ha=None,
-            pesticide_recu_l=50.0,
-            pesticide_stock_restant_l=40.0,
             taux_mortalite_pourcent=None,
             evaluation_efficacite_heures_apres=None,
             methode_evaluation_efficacite=None,

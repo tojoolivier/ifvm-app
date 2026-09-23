@@ -238,8 +238,8 @@ class TraitementAerienModel(Base):
     surface_traitee_ha: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
     surface_protegee_ha: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
     surface_restante_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
-    pesticide_recu_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
-    pesticide_stock_restant_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    # pesticide_recu_l/pesticide_stock_restant_l supprimées (migration 0094, #609) :
+    # le stock vit désormais dans `mouvement_pesticide` (#606), pas par fiche.
     # Efficacité (migration 0058, fiche CRT papier section "Traitement") : une
     # seule évaluation par fiche (après l'ensemble des rotations), pas par
     # rotation individuelle — même patron que TraitementTerrestreModel ci-dessous.
