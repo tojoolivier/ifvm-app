@@ -820,6 +820,7 @@ describe('updateProspectionExtensiveReference', () => {
         REF_INPUT.surfaceStation,
         REF_INPUT.surfaceInfestee,
         REF_INPUT.nMessage,
+        REF_INPUT.nMessage, // #numero-fiche-visible-des-le-brouillon : n_fiche = COALESCE(n_message, n_fiche)
         REF_INPUT.heureObservationAt,
         // Mode aérien uniquement — non fournis par REF_INPUT (mode terrestre implicite
         // dans ce test), donc null : cf. les champs équipe/aéronef/base (+ numéro,
@@ -839,6 +840,36 @@ describe('updateProspectionExtensiveReference', () => {
     await expect(updateProspectionExtensiveReference(BASE_INPUT.id, REF_INPUT)).rejects.toThrow(
       'Échec de la mise à jour de la fiche brouillon locale'
     );
+  });
+
+  /**
+   * #numero-fiche-visible-des-le-brouillon : le numéro de fiche doit être
+   * visible dès le brouillon pour l'Extensif/la Signalisation (comme pour
+   * l'Intensif, dont `n_fiche` est posé dès reference.tsx) — pas seulement à
+   * l'enregistrement final (`alignerNumeroFicheSurNumeroMessage`, conservé
+   * comme filet de sécurité).
+   */
+  it('aligne n_fiche sur n_message dès l’écran Référence, pas seulement à l’enregistrement final', async () => {
+    getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW });
+
+    await updateProspectionExtensiveReference(BASE_INPUT.id, REF_INPUT);
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('n_fiche = COALESCE(?, n_fiche)'),
+      expect.arrayContaining([REF_INPUT.nMessage])
+    );
+  });
+
+  it('ne remet jamais n_fiche à null si n_message est vidé (COALESCE conserve la valeur déjà posée)', async () => {
+    getFirstAsync.mockResolvedValueOnce({ ...STORED_ROW, n_fiche: '2026-0301' });
+
+    await updateProspectionExtensiveReference(BASE_INPUT.id, { ...REF_INPUT, nMessage: null });
+
+    const [sql, params] = runAsync.mock.calls[0];
+    expect(sql).toContain('n_fiche = COALESCE(?, n_fiche)');
+    // Le paramètre lié est bien `null` (n_message vidé) — c'est le SQL,
+    // via COALESCE, qui garde la valeur déjà posée, pas le code JS.
+    expect(params).toContain(null);
   });
 });
 

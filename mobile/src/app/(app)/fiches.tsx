@@ -9,6 +9,7 @@ import { syncAllProspections } from '@/lib/prospection-review';
 import { ProspectionRead } from '@/lib/api-client';
 import {
   listToutesTraitementsLocal,
+  listReprenableTraitements,
   getTraitement,
   DraftTraitementRow,
 } from '@/lib/traitement-repository';
@@ -26,6 +27,7 @@ import {
   FICHES_GREEN_DARK,
   PROSPECTION_SUBTYPE_BADGE_CONFIG,
   STATUT_BADGE_CONFIG,
+  TRAITEMENT_INSIGNE_REPRISE,
   TRAITEMENT_SUBTYPE_BADGE_CONFIG,
   TYPE_BADGE_CONFIG,
 } from '@/components/fiches/tokens';
@@ -77,6 +79,8 @@ interface FicheRow {
   meta: string;
   typeBadge: BadgeStyle;
   subTypeBadge: BadgeStyle | null;
+  /** #zone-a-reprendre-insigne : cf. `FicheCard.insigneBadge`. */
+  insigneBadge?: BadgeStyle | null;
   statutBadge: BadgeStyle;
   date: string;
   onPress: () => void;
@@ -99,6 +103,12 @@ export default function FichesScreen() {
   const [draftsRecent, setDraftsRecent] = useState<DraftProspection[]>([]);
   const [validated, setValidated] = useState<ProspectionRead[]>([]);
   const [traitements, setTraitements] = useState<DraftTraitementRow[]>([]);
+  // #zone-a-reprendre-insigne : ids des traitements déjà validés dont la
+  // surface restante justifie une reprise (mêmes critères que
+  // zones-a-reprendre.tsx) — sert uniquement à poser l'insigne « REPRISE
+  // POSSIBLE » sur la carte de la fiche d'origine, purement informatif :
+  // jamais critique, une lecture ratée se contente de ne pas l'afficher.
+  const [reprenableIds, setReprenableIds] = useState<Set<string>>(new Set());
   const [erreurDeLecture, setErreurDeLecture] = useState<unknown>(null);
 
   /**
@@ -158,6 +168,14 @@ export default function FichesScreen() {
       // taire ferait exactement le vide muet que ce ticket supprime.
       const ratee = lectures.find((l) => l !== null && !l.ok);
       setErreurDeLecture(ratee && !ratee.ok ? ratee.error : null);
+
+      // #zone-a-reprendre-insigne : purement informatif (insigne), pas critique
+      // — hors du `Promise.all` ci-dessus, jamais comptée dans `ratee`.
+      const reprenables = await runTask(() => listReprenableTraitements(), {
+        name: 'fiches.traitements.reprenables',
+        criticality: 'best-effort',
+      });
+      if (reprenables.ok) setReprenableIds(new Set(reprenables.value.map((r) => r.id)));
     })();
   }, [user, token]);
 
@@ -302,6 +320,7 @@ export default function FichesScreen() {
         meta: `${traitement.localite ?? 'Localité inconnue'} · ${traitement.date_traitement ?? '—'}`,
         typeBadge: TYPE_BADGE_CONFIG.CRT,
         subTypeBadge: TRAITEMENT_SUBTYPE_BADGE_CONFIG[traitement.type_traitement] ?? null,
+        insigneBadge: reprenableIds.has(traitement.id) ? TRAITEMENT_INSIGNE_REPRISE : null,
         statutBadge: STATUT_BADGE_CONFIG[cleBadge] ?? STATUT_BADGE_CONFIG.brouillon,
         date: traitement.date_traitement ?? traitement.updated_at,
         onPress: () =>
@@ -311,7 +330,7 @@ export default function FichesScreen() {
     });
 
     return [...prospectionRows, ...validatedRows, ...traitementRows].sort((a, b) => b.date.localeCompare(a.date));
-  }, [draftsRecent, validated, traitements, router, hydrateFromDraft, handleSyncProspection, handleSyncTraitement]);
+  }, [draftsRecent, validated, traitements, reprenableIds, router, hydrateFromDraft, handleSyncProspection, handleSyncTraitement]);
 
   const fichesFiltrees = useMemo(() => {
     return rows.filter((row) => {
@@ -365,6 +384,7 @@ export default function FichesScreen() {
             code={item.code}
             typeBadge={item.typeBadge}
             subTypeBadge={item.subTypeBadge}
+            insigneBadge={item.insigneBadge}
             statutBadge={item.statutBadge}
             meta={item.meta}
             onPress={item.onPress}

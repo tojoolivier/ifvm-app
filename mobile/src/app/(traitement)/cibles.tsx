@@ -185,6 +185,18 @@ export default function CiblesScreen() {
           <Text style={styles.derivedValue}>{display(cible?.surface_infestee_ha)}</Text>
         </Card>
 
+        {/* #zone-a-reprendre-surface-reste-a-traiter : uniquement pour une
+            fiche démarrée depuis « Zones à reprendre » — la référence pour
+            CE traitement est le reste à traiter de la fiche d'origine, pas
+            la surface infestée totale ci-dessus (qui reste affichée telle
+            quelle, inchangée : c'est une donnée de la prospection). */}
+        {cible?.surface_restante_origine_ha != null && (
+          <Card variant="derivee" style={styles.deriveeCentree}>
+            <Text style={styles.label}>Surface reste à traiter (ha)</Text>
+            <Text style={styles.derivedValue}>{display(cible.surface_restante_origine_ha)}</Text>
+          </Card>
+        )}
+
         <TouchableOpacity
           style={styles.continueButton}
           onPress={() =>

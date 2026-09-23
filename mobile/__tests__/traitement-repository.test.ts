@@ -653,7 +653,7 @@ describe('saveCible', () => {
 
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT OR REPLACE INTO cible'),
-      [AERIEN_INPUT.id, 'LMC', 1, 2, 0, 'diffuse', 3.5, null, null, null, null, null, null, null, null]
+      [AERIEN_INPUT.id, 'LMC', 1, 2, 0, 'diffuse', 3.5, null, null, null, null, null, null, null, null, null]
     );
   });
 
@@ -677,8 +677,24 @@ describe('saveCible', () => {
 
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT OR REPLACE INTO cible'),
-      [AERIEN_INPUT.id, 'MELANGE', 24, 8, null, 'DIFFUSE', 10, 22, 2, 3, 5, 20, 3, 5, null]
+      [AERIEN_INPUT.id, 'MELANGE', 24, 8, null, 'DIFFUSE', 10, 22, 2, 3, 5, 20, 3, 5, null, null]
     );
+  });
+
+  /**
+   * #zone-a-reprendre-surface-reste-a-traiter : uniquement pour une fiche
+   * démarrée depuis « Zones à reprendre » — `null` pour un traitement neuf
+   * (cf. les deux tests ci-dessus, qui ne le fournissent pas).
+   */
+  it('upserts surface_restante_origine_ha for a fiche started from Zones à reprendre', async () => {
+    await saveCible(AERIEN_INPUT.id, {
+      espece: 'LMC',
+      surface_infestee_ha: 5,
+      surface_restante_origine_ha: 2.5,
+    });
+
+    const [, params] = runAsync.mock.calls[0];
+    expect(params[params.length - 1]).toBe(2.5);
   });
 });
 
