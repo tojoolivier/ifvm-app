@@ -1,13 +1,16 @@
 import uuid
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 from app.domain.campagne import Campagne
 from app.domain.referentiel import (
     TYPES_LIEU_AERIEN,
+    TYPES_VOL_MOTIF_REQUIS,
+    TYPES_VOL_SITE_OBLIGATOIRE,
     Aeronef,
     AeronefDejaAffecteError,
     AeronefIntrouvableError,
+    AeronefNonAffecteError,
     AffectationAeronef,
     AffectationAeronefIntrouvableError,
     AffectationDejaCloturee,
@@ -45,6 +48,7 @@ from app.domain.referentiel import (
     SiteAerienneParentInvalideError,
     SiteAeriennePosition,
     SiteDestinationIncoherentError,
+    SiteHorsBaseError,
     SiteNonPrincipalError,
     SoldePesticide,
     StadeInconnuError,
@@ -52,6 +56,10 @@ from app.domain.referentiel import (
     TypeLieuAerienInvalideError,
     UtilisateurEquipe,
     UtilisateurMembreIntrouvableError,
+    Vol,
+    VolLieuxConvoyageRequisError,
+    VolMotifRequisError,
+    VolSiteObligatoireError,
     ZoneAntiAcridien,
     ZoneAntiAcridienAvecPostesActifsError,
     ZoneAntiAcridienIntrouvableError,
@@ -72,6 +80,7 @@ from app.domain.repositories import (
     SiteAerienneRepository,
     StationFixeRepository,
     UtilisateurEquipeRepository,
+    VolRepository,
     ZoneAntiAcridienRepository,
 )
 from app.models.users import ROLES_A_LA_VOLEE
@@ -1262,7 +1271,7 @@ class AffecterAeronef:
     symétrique « une équipe n'a qu'un appareil à la fois ». Aucune des deux n'est un
     `UNIQUE` : elles portent sur le chevauchement d'intervalles, que seul
     `EXCLUDE USING gist` exprimerait en SQL (hors scope, ADR-018). Les index partiels
-    de la migration 0085 ne rattrapent que les courses entre deux requêtes."""
+    de la migration 0087 ne rattrapent que les courses entre deux requêtes."""
 
     def __init__(
         self,
@@ -1652,3 +1661,134 @@ class ConsulterSoldePesticide:
         pesticide_id: uuid.UUID | None = None,
     ) -> list[SoldePesticide]:
         return await self.repository.solde(site_id=site_id, pesticide_id=pesticide_id)
+
+
+async def _valider_rattachement_site(
+    site_repository: SiteAerienneRepository,
+    site_principal_id: uuid.UUID | None,
+    site_id: uuid.UUID | None,
+) -> None:
+    """`site_id` (stand ou base secondaire) doit être rattaché, par son
+    `parent_site_id`, au `site_principal_id` du même vol (§9 du document de cadrage,
+    #608) — pas de CHECK SQL possible, `site_aerienne.parent_site_id` n'est pas
+    visible depuis `vol` sans jointure."""
+    if site_id is None:
+        return
+    site = await site_repository.get_by_id(site_id)
+    if site is None:
+        raise SiteAerienneIntrouvableError(str(site_id))
+    if site.parent_site_id != site_principal_id:
+        raise SiteHorsBaseError(str(site_id))
+
+
+class CreateVol:
+    """Enregistre une ligne d'activité aérienne (ADR-018, #608).
+
+    `equipe_id` et `aeronef_id` sont obligatoires pour toutes les catégories — c'est
+    la seule façon de tracer l'équipe et l'appareil sur un convoyage ou un vol
+    divers, qui n'ont ni traitement ni prospection. Les règles d'obligation de site
+    par catégorie et la cohérence hiérarchique stand/base secondaire ↔ site
+    principal sont vérifiées ici, en amont des CHECK SQL, pour un 422 explicite."""
+
+    def __init__(
+        self,
+        repository: VolRepository,
+        equipe_repository: EquipeRepository,
+        aeronef_repository: AeronefRepository,
+        equipe_aeronef_repository: EquipeAeronefRepository,
+        site_repository: SiteAerienneRepository,
+    ):
+        self.repository = repository
+        self.equipe_repository = equipe_repository
+        self.aeronef_repository = aeronef_repository
+        self.equipe_aeronef_repository = equipe_aeronef_repository
+        self.site_repository = site_repository
+
+    async def execute(
+        self,
+        type: str,
+        equipe_id: uuid.UUID,
+        aeronef_id: uuid.UUID,
+        date_vol: date,
+        heure_debut: time,
+        heure_fin: time,
+        site_principal_id: uuid.UUID | None = None,
+        stand_id: uuid.UUID | None = None,
+        base_secondaire_id: uuid.UUID | None = None,
+        motif: str | None = None,
+        lieu_depart: str | None = None,
+        lieu_arrivee: str | None = None,
+        observations: str | None = None,
+    ) -> Vol:
+        equipe = await self.equipe_repository.get_by_id(equipe_id)
+        if equipe is None:
+            raise EquipeIntrouvableError(str(equipe_id))
+        if equipe.type != "aerien":
+            raise EquipeNonAerienneError(str(equipe_id))
+        if await self.aeronef_repository.get_by_id(aeronef_id) is None:
+            raise AeronefIntrouvableError(str(aeronef_id))
+
+        if type in TYPES_VOL_SITE_OBLIGATOIRE and (site_principal_id is None or stand_id is None):
+            raise VolSiteObligatoireError(f"{type} exige site_principal_id et stand_id")
+        if type in TYPES_VOL_MOTIF_REQUIS and motif is None:
+            raise VolMotifRequisError(f"{type} exige un motif")
+        if type == "convoyage" and (lieu_depart is None or lieu_arrivee is None):
+            raise VolLieuxConvoyageRequisError("convoyage exige lieu_depart et lieu_arrivee")
+
+        if (
+            site_principal_id is not None
+            and await self.site_repository.get_by_id(site_principal_id) is None
+        ):
+            raise SiteAerienneIntrouvableError(str(site_principal_id))
+        await _valider_rattachement_site(self.site_repository, site_principal_id, stand_id)
+        await _valider_rattachement_site(
+            self.site_repository, site_principal_id, base_secondaire_id
+        )
+
+        affectations = await self.equipe_aeronef_repository.list_chevauchements(
+            date_debut=date_vol,
+            date_fin=date_vol + timedelta(days=1),
+            equipe_id=equipe_id,
+            aeronef_id=aeronef_id,
+        )
+        affecte = any(a.equipe_id == equipe_id and a.aeronef_id == aeronef_id for a in affectations)
+        if not affecte:
+            raise AeronefNonAffecteError(str(aeronef_id))
+
+        maintenant = datetime.now(timezone.utc)
+        return await self.repository.create(
+            Vol(
+                id=uuid.uuid4(),
+                type=type,
+                equipe_id=equipe_id,
+                aeronef_id=aeronef_id,
+                site_principal_id=site_principal_id,
+                stand_id=stand_id,
+                base_secondaire_id=base_secondaire_id,
+                date_vol=date_vol,
+                heure_debut=heure_debut,
+                heure_fin=heure_fin,
+                motif=motif,
+                lieu_depart=lieu_depart,
+                lieu_arrivee=lieu_arrivee,
+                observations=observations,
+                created_at=maintenant,
+                updated_at=maintenant,
+            )
+        )
+
+
+class GetVol:
+    def __init__(self, repository: VolRepository):
+        self.repository = repository
+
+    async def execute(self, vol_id: uuid.UUID) -> Vol | None:
+        return await self.repository.get_by_id(vol_id)
+
+
+class ListVols:
+    def __init__(self, repository: VolRepository):
+        self.repository = repository
+
+    async def execute(self, equipe_id: uuid.UUID | None = None) -> list[Vol]:
+        return await self.repository.list_all(equipe_id=equipe_id)

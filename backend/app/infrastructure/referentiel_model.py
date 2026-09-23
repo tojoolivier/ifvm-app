@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, time
 
 from sqlalchemy import (
     TIMESTAMP,
@@ -14,6 +14,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    Time,
     UniqueConstraint,
     text,
 )
@@ -219,7 +220,7 @@ class AeronefModel(Base):
 
 
 class EquipeModel(Base):
-    """Équipe unique du référentiel — terrestre ou aérienne (ADR-018, migration 0084).
+    """Équipe unique du référentiel — terrestre ou aérienne (ADR-018, migration 0086).
 
     Remplace `equipe_terrestre` et `equipe_aerienne`, qui étaient deux tables
     asymétriques pour la même notion. Spécialisation ramenée à une table unique typée
@@ -263,7 +264,7 @@ class EquipeModel(Base):
         foreign_keys="EquipeAeronefModel.equipe_id",
     )
 
-    # Noms de contraintes explicites — doivent matcher les migrations 0084/0085 à
+    # Noms de contraintes explicites — doivent matcher les migrations 0086/0087 à
     # l'identique : les dépôts s'en servent pour distinguer une violation métier d'une
     # erreur générique.
     __table_args__ = (
@@ -273,7 +274,7 @@ class EquipeModel(Base):
 
 
 class EquipeAeronefModel(Base):
-    """Affectation d'un aéronef à une équipe sur une période (#603, migration 0085).
+    """Affectation d'un aéronef à une équipe sur une période (#603, migration 0087).
 
     Remplace la FK 1:1 `equipe.aeronef_id` : une équipe aérienne dispose de 2 à 3
     appareils utilisés l'un après l'autre, et le 1:1 interdisait d'en garder la trace.
@@ -397,7 +398,7 @@ class SiteAerienneModel(Base):
     équipe aérienne — table unique auto-référencée (`parent_site_id NULL` = principale,
     sinon secondaire) plutôt que plusieurs tables, même raisonnement que
     `LieuAerienModel.type_lieu`. Introduite en migration 0064 comme `base_aerienne`,
-    renommée et fusionnée avec `stand_remplissage` en migration 0086 (#604) : les deux
+    renommée et fusionnée avec `stand_remplissage` en migration 0088 (#604) : les deux
     tables partageaient exactement la même forme (`numero`, `localite`, position),
     seule la hiérarchie (`base_aerienne`) ou l'absence de hiérarchie
     (`stand_remplissage`) différait. Après fusion, un ancien stand est une ligne
@@ -411,7 +412,7 @@ class SiteAerienneModel(Base):
     principale via `parent_site_id`, elle ne porte pas sa propre `equipe_id`.
 
     La position GPS (`longitude`/`latitude`/`altitude`, figée depuis 0064) est sortie
-    en migration 0086 vers `site_aerienne_position`, qui historise les implantations
+    en migration 0088 vers `site_aerienne_position`, qui historise les implantations
     successives — un site qui se déplace ne perd plus sa position précédente.
     """
 
@@ -431,7 +432,7 @@ class SiteAerienneModel(Base):
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
 
-    # Noms de contraintes explicites — doivent matcher la migration 0086 à
+    # Noms de contraintes explicites — doivent matcher la migration 0088 à
     # l'identique (cf. commentaire équivalent sur `EquipeModel`).
     __table_args__ = (
         ForeignKeyConstraint(
@@ -455,10 +456,10 @@ class SiteAerienneModel(Base):
 
 
 class SiteAeriennePositionModel(Base):
-    """Implantation successive d'un `site_aerienne` (migration 0086, #604).
+    """Implantation successive d'un `site_aerienne` (migration 0088, #604).
 
     Une ligne par période d'implantation, `date_fin IS NULL` pour la position en cours
-    — même patron que `equipe_aeronef` (migration 0085) pour l'affectation d'aéronef.
+    — même patron que `equipe_aeronef` (migration 0087) pour l'affectation d'aéronef.
     La durée d'implantation (`date_fin - date_debut`, ou l'écart à `today()` si la
     position est encore active) est dérivée à la lecture, jamais stockée en colonne.
     """
@@ -559,6 +560,88 @@ class MouvementPesticideModel(Base):
         Index("ix_mouvement_pesticide_site_id", "site_id"),
         Index("ix_mouvement_pesticide_site_destination_id", "site_destination_id"),
         Index("ix_mouvement_pesticide_pesticide_id", "pesticide_id"),
+    )
+
+
+class VolModel(Base):
+    """Ligne d'activité aérienne (ADR-018, migration 0092, #608).
+
+    Réintroduite après la suppression de l'ancienne `vol` (migration 0080, ADR-017) —
+    ce n'est pas le même objet, cf. docstring du domaine `Vol`.
+
+    `equipe_type` est en `GENERATED ALWAYS ... STORED`, même patron que
+    `EquipeAeronefModel` (migration 0087) : `equipe_id` sur un vol ne vise jamais
+    qu'une équipe aérienne.
+
+    Les trois FK vers `site_aerienne` (`site_principal_id`, `stand_id`,
+    `base_secondaire_id`) sont indépendantes : un vol peut désigner le même site pour
+    plusieurs rôles, ou trois sites différents. Seule la paire
+    mise_en_place/application impose `site_principal_id` et `stand_id` NOT NULL en
+    base (`ck_vol_site_mise_en_place_application`) ; la cohérence hiérarchique
+    (stand/base secondaire rattachés au site principal) n'est pas exprimable en CHECK
+    SQL — validée côté application (`SiteHorsBaseError`)."""
+
+    __tablename__ = "vol"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    type: Mapped[str] = mapped_column(Text(), nullable=False)
+    equipe_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    equipe_type: Mapped[str | None] = mapped_column(
+        Text(), _equipe_type_genere("equipe_id", "aerien"), nullable=True
+    )
+    aeronef_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("aeronef.id", ondelete="RESTRICT"), nullable=False
+    )
+    site_principal_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("site_aerienne.id", ondelete="RESTRICT"), nullable=True
+    )
+    stand_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("site_aerienne.id", ondelete="RESTRICT"), nullable=True
+    )
+    base_secondaire_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("site_aerienne.id", ondelete="RESTRICT"), nullable=True
+    )
+    date_vol: Mapped[date] = mapped_column(Date(), nullable=False)
+    heure_debut: Mapped[time] = mapped_column(Time(), nullable=False)
+    heure_fin: Mapped[time] = mapped_column(Time(), nullable=False)
+    motif: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    lieu_depart: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    lieu_arrivee: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    observations: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["equipe_id", "equipe_type"],
+            ["equipe.id", "equipe.type"],
+            name="fk_vol_equipe_id",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint(
+            "type IN ('mise_en_place', 'application', 'convoyage', 'prospection', 'divers')",
+            name="ck_vol_type",
+        ),
+        CheckConstraint(
+            "type NOT IN ('mise_en_place', 'application') OR "
+            "(site_principal_id IS NOT NULL AND stand_id IS NOT NULL)",
+            name="ck_vol_site_mise_en_place_application",
+        ),
+        CheckConstraint(
+            "type NOT IN ('convoyage', 'divers') OR motif IS NOT NULL",
+            name="ck_vol_motif_requis",
+        ),
+        CheckConstraint(
+            "type != 'convoyage' OR (lieu_depart IS NOT NULL AND lieu_arrivee IS NOT NULL)",
+            name="ck_vol_lieux_convoyage",
+        ),
+        CheckConstraint("heure_fin > heure_debut", name="ck_vol_heures_coherentes"),
+        Index("ix_vol_equipe_id", "equipe_id"),
+        Index("ix_vol_aeronef_id", "aeronef_id"),
+        Index("ix_vol_site_principal_id", "site_principal_id"),
+        Index("ix_vol_stand_id", "stand_id"),
+        Index("ix_vol_base_secondaire_id", "base_secondaire_id"),
+        Index("ix_vol_date_vol", "date_vol"),
     )
 
 

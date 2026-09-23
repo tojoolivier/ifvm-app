@@ -34,20 +34,26 @@ Agriculteur → Signalement → Prospection de Validation
 - **Prospection de validation** : type de prospection déclenchée par un **signalement d'agriculteur ou non-specialiste**. Vérification sur le terrain si le signalement est réel. Station `ponctuelle`.
 - **Validation de fiche** : workflow en 3 étapes (voir ci-dessous). À ne pas confondre avec "prospection de validation".
 - **Fiche de vol : fonctionnalité supprimée** (migration 0080, `docs/adr/ADR-017`). Les tables
-  `fiche_vol`, `vol`, `fiche_vol_signature` et `campagne_fiche_vol_compteur` n'existent plus ; la
+  `fiche_vol`, `fiche_vol_signature` et `campagne_fiche_vol_compteur` n'existent plus ; la
   page web « Heures de vol » est une page d'attente. Une **rotation** (`traitement_rotation`, côté
   CRT) reste le cycle d'épandage d'**une cuve**. Le cadrage historique est dans
   `docs/adr/ADR-011` (parties fiche de vol abandonnées ; le relevé météo n'est pas concerné).
-  Une **entité `vol`** (ligne d'activité aérienne : type, équipe, aéronef, rattachements de
-  site) est re-cadrée par `docs/adr/ADR-018` — **cadrage seul, rien n'est encore
-  implémenté** ; ce n'est pas l'ancienne fiche de vol (ni signatures, ni cumuls, ni
-  `rotation_id`).
+  Une **entité `vol`** (ligne d'activité aérienne : `type ∈ {mise_en_place, application,
+  convoyage, prospection, divers}`, `equipe_id`/`aeronef_id` obligatoires, trois FK
+  indépendantes vers `site_aerienne` — `site_principal_id`, `stand_id`, `base_secondaire_id`)
+  a été **réintroduite** par `docs/adr/ADR-018` (migration 0092, #608) — **révocation partielle**
+  d'ADR-017, pas l'ancienne fiche de vol : ni signatures, ni cumuls d'heures, ni `rotation_id`,
+  ni lien vers `traitement_aerien`/`prospection` (ticket séparé, bloqué par #608). Site principal
+  et stand obligatoires pour `mise_en_place`/`application` (§6 du document de cadrage, CHECK
+  SQL) ; motif obligatoire pour `convoyage`/`divers`, lieux de départ/arrivée pour `convoyage`
+  (CHECK SQL). L'aéronef affecté à l'équipe à la date du vol, et le rattachement hiérarchique
+  stand/base secondaire → site principal, sont validés côté application (422), pas en SQL.
 
 - **Base aérienne** vs **stand de remplissage**. Deux lieux distincts d'une équipe aérienne,
   chacun relevé en position (lat/lon/alt captées automatiquement, hors ligne) et nommé à la main.
   Ni l'un ni l'autre n'est un **poste acridien** ou une **station fixe**.
 
-- **Équipe** (table unique `equipe`, migration 0084 — ADR-018 §2). Une équipe est
+- **Équipe** (table unique `equipe`, migration 0086 — ADR-018 §2). Une équipe est
   `terrestre` ou `aerien` (`type`, non modifiable après création), et ses intervenants sont des
   lignes de `equipe_membre(equipe_id, user_id, fonction)` — il n'y a plus de rôle nommé en dur.
   `fonction` reprend le vocabulaire de `ROLES`, plus `chef` : une équipe a **un seul chef**, un
@@ -56,7 +62,7 @@ Agriculteur → Signalement → Prospection de Validation
   immatriculation, société, volume de cuve — table `aeronef`, `immatriculation` en est la clé
   candidate ; le parc se peuple indépendamment des équipes, `POST /aeronefs`, admin). Les
   affectations sont **bornées dans le temps** — `equipe_aeronef(equipe_id, aeronef_id,
-  date_debut, date_fin)`, migration 0085, ADR-018 §2 : `date_fin IS NULL` désigne l'appareil
+  date_debut, date_fin)`, migration 0087, ADR-018 §2 : `date_fin IS NULL` désigne l'appareil
   **en service**, que `EquipeRead.aeronef` projette (`null` entre deux appareils), et
   l'historique complet se lit par `GET /equipes/{id}/aeronefs`. « Un aéronef sur une seule
   équipe à la fois » est une règle de **chevauchement d'intervalles**, pas un `UNIQUE` :
@@ -78,7 +84,7 @@ Agriculteur → Signalement → Prospection de Validation
 
 - **Pilote**, **mécanicien** et **consultant international** sont **externes à l'IFVM**
   (compagnie aérienne ou Armée malgache) : ils n'ont pas d'accès applicatif, mais depuis la
-  migration 0084 ils ont bien une identité — un compte créé « à la volée »
+  migration 0086 ils ont bien une identité — un compte créé « à la volée »
   (`peut_se_connecter = false`), comme membre de l'équipe, plutôt qu'un nom en texte libre.
   Seul le **chef de base** est un agent IFVM authentifiable. Le **consultant international**
   signe lorsqu'il intervient.
@@ -244,7 +250,8 @@ prospection → station (fixe pour intensive, ponctuelle pour extensive/validati
   └── prospection_infestation (taches, bandes, vols, essaims)                             [queryable]
 
 audit_log
-  ├── fiche_type (intensive | extensive | validation | traitement | vol | meteo)  — `vol` : valeur morte depuis 0080
+  ├── fiche_type (intensive | extensive | validation | traitement | vol | meteo)  — `vol` : valeur
+  │              morte pour l'audit_log (la nouvelle entité `vol`, #608, n'y écrit pas encore)
   ├── fiche_id
   ├── auteur_id → utilisateur
   ├── action (creation | modification | soumission | verification | validation | rejet | commentaire)
@@ -270,7 +277,17 @@ traitement (ex-CRT — le sigle CRT désigne le compte-rendu affiché à l'utili
   └── traitement_signature (1-N selon rôle : PILOTE | MECANICIEN | CHEF_DE_BASE |
                              CHEF_EQUIPE | CONSULTANT_INTERNATIONAL)
 
-(fiche_vol, vol, fiche_vol_signature : supprimées en 0080 — voir docs/adr/ADR-017)
+(fiche_vol, fiche_vol_signature, campagne_fiche_vol_compteur : supprimées en 0080 —
+ docs/adr/ADR-017 ; restent supprimées, ADR-018 ne les réintroduit pas)
+
+vol (ligne d'activité aérienne, migration 0092, #608 — réintroduite, révocation
+     partielle d'ADR-017 par docs/adr/ADR-018 ; PAS l'ancienne `vol`)
+  ├── type: mise_en_place | application | convoyage | prospection | divers
+  ├── → equipe (obligatoire, equipe_type='aerien' forcé par FK composite)
+  ├── → aeronef (obligatoire ; doit être affecté à l'équipe à date_vol, côté application)
+  └── → site_aerienne × 3, indépendantes : site_principal_id, stand_id, base_secondaire_id
+      (site_principal_id + stand_id obligatoires pour mise_en_place/application, CHECK SQL ;
+       stand_id/base_secondaire_id doivent être rattachés à site_principal_id, côté application)
 ```
 
 > **Domaine `espece` : `cible` vs `prospection`.** `prospection.espece` et

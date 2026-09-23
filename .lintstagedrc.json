@@ -2,5 +2,8 @@
   "mobile/**/*.{js,jsx,ts,tsx}": ["bash -c 'cd mobile && npx expo lint --fix'"],
   "mobile/src/lib/{prospection-db.ts,api-schema.generated.ts}": ["bash -c 'cd mobile && npm run --silent check:schema-drift'"],
   "frontend/**/*.{js,jsx,ts,tsx}": ["bash -c 'cd frontend && npx eslint --fix'"],
-  "backend/**/*.py": ["python -m ruff check --fix", "python -m ruff format"]
+  "backend/**/*.py": [
+    "bash -c 'cd backend && uv run ruff check --fix .'",
+    "bash -c 'cd backend && uv run ruff format .'"
+  ]
 }

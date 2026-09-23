@@ -20,6 +20,7 @@ from app.application.referentiel_use_cases import (
     CreatePosteAcridien,
     CreateSiteAerienne,
     CreateStation,
+    CreateVol,
     CreateZoneAntiAcridien,
     DemonterPositionSiteAerienne,
     GetAeronef,
@@ -32,6 +33,7 @@ from app.application.referentiel_use_cases import (
     GetPosteAcridien,
     GetSiteAerienne,
     GetStation,
+    GetVol,
     InstallerPositionSiteAerienne,
     ListAeronefs,
     ListCodesStades,
@@ -45,6 +47,7 @@ from app.application.referentiel_use_cases import (
     ListPostesAcridiens,
     ListSitesAeriens,
     ListStations,
+    ListVols,
     ListZonesAntiAcridiennes,
     MembreDemande,
     PullReferentiel,
@@ -66,6 +69,7 @@ from app.domain.referentiel import (
     Aeronef,
     AeronefDejaAffecteError,
     AeronefIntrouvableError,
+    AeronefNonAffecteError,
     AffectationAeronefIntrouvableError,
     AffectationDejaCloturee,
     ChefDejaDansUneAutreEquipeError,
@@ -96,10 +100,14 @@ from app.domain.referentiel import (
     SiteAerienneIntrouvableError,
     SiteAerienneParentInvalideError,
     SiteDestinationIncoherentError,
+    SiteHorsBaseError,
     SiteNonPrincipalError,
     StadeInconnuError,
     TypeLieuAerienInvalideError,
     UtilisateurMembreIntrouvableError,
+    VolLieuxConvoyageRequisError,
+    VolMotifRequisError,
+    VolSiteObligatoireError,
     ZoneAntiAcridienAvecPostesActifsError,
     ZoneAntiAcridienIntrouvableError,
 )
@@ -122,6 +130,7 @@ from app.infrastructure.referentiel_sync_repository import (
     SiteAeriennePositionRepositoryImpl,
     SiteAerienneRepositoryImpl,
     UtilisateurEquipeRepositoryImpl,
+    VolRepositoryImpl,
 )
 from app.infrastructure.utilisateur_repository import UtilisateurRepositoryImpl
 from app.models.users import Utilisateur
@@ -166,6 +175,8 @@ from app.presentation.referentiel_schemas import (
     StationFixeCreate,
     StationFixeRead,
     StationFixeUpdate,
+    VolCreate,
+    VolRead,
     ZoneAntiAcridienCreate,
     ZoneAntiAcridienRead,
     ZoneAntiAcridienUpdate,
@@ -759,7 +770,7 @@ async def update_lieu_aerien(
 
 # --- equipe_aerienne / site_aerienne (gestion d'équipe) ----------------------------
 #
-# --- equipe (référentiel unifié, ADR-018 / migration 0084) -------------------------
+# --- equipe (référentiel unifié, ADR-018 / migration 0086) -------------------------
 #
 # Une seule table `equipe`, typée `terrestre` | `aerien`, et des membres génériques
 # porteurs de leur `fonction` — à la place des deux tables asymétriques
@@ -952,7 +963,7 @@ async def ajouter_membre_equipe(
         raise _conflit_membre(exc) from exc
 
 
-# --- affectations d'aéronefs (equipe_aeronef, migration 0085, #603) ---------------
+# --- affectations d'aéronefs (equipe_aeronef, migration 0087, #603) ---------------
 #
 # Une équipe aérienne dispose de 2 à 3 appareils utilisés l'un après l'autre. Affecter
 # ouvre une période, retirer la borne ; la ligne reste, c'est l'historique. Pas de
@@ -1480,6 +1491,98 @@ async def get_solde_pesticide(
 ):
     use_case = ConsulterSoldePesticide(MouvementPesticideRepositoryImpl(db))
     return await use_case.execute(site_id=site_id, pesticide_id=pesticide_id)
+
+
+@router.post("/vols", response_model=VolRead, status_code=201)
+async def create_vol(
+    body: VolCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = CreateVol(
+        VolRepositoryImpl(db),
+        EquipeRepositoryImpl(db),
+        AeronefRepositoryImpl(db),
+        EquipeAeronefRepositoryImpl(db),
+        SiteAerienneRepositoryImpl(db),
+    )
+    try:
+        return await use_case.execute(
+            type=body.type,
+            equipe_id=body.equipe_id,
+            aeronef_id=body.aeronef_id,
+            date_vol=body.date_vol,
+            heure_debut=body.heure_debut,
+            heure_fin=body.heure_fin,
+            site_principal_id=body.site_principal_id,
+            stand_id=body.stand_id,
+            base_secondaire_id=body.base_secondaire_id,
+            motif=body.motif,
+            lieu_depart=body.lieu_depart,
+            lieu_arrivee=body.lieu_arrivee,
+            observations=body.observations,
+        )
+    except EquipeIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"équipe introuvable : {exc.args[0]}"
+        ) from exc
+    except EquipeNonAerienneError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"l'équipe {exc.args[0]} n'est pas une équipe aérienne",
+        ) from exc
+    except AeronefIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"aéronef introuvable : {exc.args[0]}",
+        ) from exc
+    except AeronefNonAffecteError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"l'aéronef {exc.args[0]} n'est pas affecté à cette équipe à la date du vol",
+        ) from exc
+    except VolSiteObligatoireError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    except VolMotifRequisError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    except VolLieuxConvoyageRequisError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    except SiteHorsBaseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"le site {exc.args[0]} n'est pas rattaché au site principal du vol",
+        ) from exc
+    except SiteAerienneIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"site introuvable : {exc.args[0]}"
+        ) from exc
+
+
+@router.get("/vols/{vol_id}", response_model=VolRead)
+async def get_vol(
+    vol_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    vol = await GetVol(VolRepositoryImpl(db)).execute(vol_id)
+    if vol is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vol non trouvé")
+    return vol
+
+
+@router.get("/vols", response_model=list[VolRead])
+async def list_vols(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+    equipe_id: uuid.UUID | None = Query(default=None),
+):
+    return await ListVols(VolRepositoryImpl(db)).execute(equipe_id=equipe_id)
 
 
 @router.get("/referentiel/pull", response_model=ReferentielPullResponse)

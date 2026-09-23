@@ -3,7 +3,7 @@
 Règle produit (2026-09-19) : une équipe aérienne a un aéronef (immatriculation, société,
 volume de cuve) ; seul le chef de base de l'équipe — le seul compte utilisateur de
 l'équipe — crée ses sites aériens (bases, stands — indistinguables depuis la fusion de
-migration 0086, #604), rattachés d'office à SON équipe. Un admin peut agir pour
+migration 0088, #604), rattachés d'office à SON équipe. Un admin peut agir pour
 n'importe quelle équipe en la désignant.
 
 Depuis #603 l'appareil n'est plus une colonne de l'équipe : `EquipeRead.aeronef_id` /

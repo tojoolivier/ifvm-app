@@ -33,6 +33,7 @@ from app.domain.referentiel import (
     SiteAeriennePosition,
     SoldePesticide,
     UtilisateurEquipe,
+    Vol,
 )
 from app.domain.repositories import (
     AeronefRepository,
@@ -46,6 +47,7 @@ from app.domain.repositories import (
     SiteAeriennePositionRepository,
     SiteAerienneRepository,
     UtilisateurEquipeRepository,
+    VolRepository,
 )
 from app.infrastructure.referentiel_model import (
     AeronefModel,
@@ -60,6 +62,7 @@ from app.infrastructure.referentiel_model import (
     SiteAerienneModel,
     SiteAeriennePositionModel,
     StadeModel,
+    VolModel,
 )
 from app.models.users import Utilisateur
 
@@ -792,7 +795,7 @@ def _traduire_integrite_affectation(
     exc: IntegrityError, affectation: AffectationAeronef
 ) -> Exception:
     """Filet de sécurité derrière la validation applicative : les index partiels de la
-    migration 0085 ne couvrent que les affectations *ouvertes*, et la règle complète est
+    migration 0087 ne couvrent que les affectations *ouvertes*, et la règle complète est
     vérifiée en amont. Ce qui passe ici est donc une course entre deux requêtes."""
     contrainte = _contrainte_violee(exc)
     if contrainte == "uq_equipe_aeronef_ouverte_par_aeronef":
@@ -820,7 +823,7 @@ def _traduire_integrite_equipe(
 ) -> Exception:
     """Traduit une violation d'intégrité en erreur métier, par *nom de contrainte*.
 
-    Les noms lus ici sont ceux des migrations 0084/0085 et des `__table_args__` : un
+    Les noms lus ici sont ceux des migrations 0086/0087 et des `__table_args__` : un
     renommage des deux côtés est obligatoire, sans quoi toute violation retomberait
     silencieusement sur l'erreur générique.
 
@@ -1105,3 +1108,65 @@ class MouvementPesticideRepositoryImpl(MouvementPesticideRepository):
             )
             for row in result.all()
         ]
+
+
+def _vol_to_domain(model: VolModel) -> Vol:
+    return Vol(
+        id=model.id,
+        type=model.type,
+        equipe_id=model.equipe_id,
+        aeronef_id=model.aeronef_id,
+        site_principal_id=model.site_principal_id,
+        stand_id=model.stand_id,
+        base_secondaire_id=model.base_secondaire_id,
+        date_vol=model.date_vol,
+        heure_debut=model.heure_debut,
+        heure_fin=model.heure_fin,
+        motif=model.motif,
+        lieu_depart=model.lieu_depart,
+        lieu_arrivee=model.lieu_arrivee,
+        observations=model.observations,
+        created_at=model.created_at,
+        updated_at=model.updated_at,
+    )
+
+
+class VolRepositoryImpl(VolRepository):
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def create(self, vol: Vol) -> Vol:
+        model = VolModel(
+            id=vol.id,
+            type=vol.type,
+            equipe_id=vol.equipe_id,
+            aeronef_id=vol.aeronef_id,
+            site_principal_id=vol.site_principal_id,
+            stand_id=vol.stand_id,
+            base_secondaire_id=vol.base_secondaire_id,
+            date_vol=vol.date_vol,
+            heure_debut=vol.heure_debut,
+            heure_fin=vol.heure_fin,
+            motif=vol.motif,
+            lieu_depart=vol.lieu_depart,
+            lieu_arrivee=vol.lieu_arrivee,
+            observations=vol.observations,
+            created_at=vol.created_at,
+            updated_at=vol.updated_at,
+        )
+        self.session.add(model)
+        await self.session.commit()
+        await self.session.refresh(model)
+        return _vol_to_domain(model)
+
+    async def get_by_id(self, vol_id: uuid.UUID) -> Vol | None:
+        result = await self.session.execute(select(VolModel).where(VolModel.id == vol_id))
+        model = result.scalar_one_or_none()
+        return None if model is None else _vol_to_domain(model)
+
+    async def list_all(self, equipe_id: uuid.UUID | None = None) -> list[Vol]:
+        stmt = select(VolModel).order_by(VolModel.date_vol.desc(), VolModel.created_at.desc())
+        if equipe_id is not None:
+            stmt = stmt.where(VolModel.equipe_id == equipe_id)
+        result = await self.session.execute(stmt)
+        return [_vol_to_domain(m) for m in result.scalars().all()]

@@ -1,8 +1,15 @@
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, time
 from typing import Annotated, Generic, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    computed_field,
+    model_validator,
+)
 
 from app.models.users import FONCTIONS_EQUIPE
 
@@ -266,6 +273,65 @@ class SoldePesticideRead(BaseModel):
     pesticide_id: uuid.UUID
     unite: str
     quantite: float
+
+
+class VolCreate(BaseModel):
+    """Les règles d'obligation par catégorie (site principal + stand pour
+    mise_en_place/application, motif pour convoyage/divers, lieux pour convoyage —
+    §6/§5.3/§5.5 du document de cadrage) sont vérifiées côté use case, pas ici : le
+    message d'erreur y est plus précis qu'un `ValueError` de validateur Pydantic."""
+
+    type: Literal["mise_en_place", "application", "convoyage", "prospection", "divers"]
+    equipe_id: uuid.UUID
+    aeronef_id: uuid.UUID
+    date_vol: date
+    heure_debut: time
+    heure_fin: time
+    site_principal_id: uuid.UUID | None = None
+    stand_id: uuid.UUID | None = None
+    base_secondaire_id: uuid.UUID | None = None
+    motif: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
+    lieu_depart: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = (
+        None
+    )
+    lieu_arrivee: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = (
+        None
+    )
+    observations: str | None = None
+
+    @model_validator(mode="after")
+    def _valider_heures(self) -> "VolCreate":
+        if self.heure_fin <= self.heure_debut:
+            raise ValueError("heure_fin doit être postérieure à heure_debut")
+        return self
+
+
+class VolRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    type: str
+    equipe_id: uuid.UUID
+    aeronef_id: uuid.UUID
+    site_principal_id: uuid.UUID | None
+    stand_id: uuid.UUID | None
+    base_secondaire_id: uuid.UUID | None
+    date_vol: date
+    heure_debut: time
+    heure_fin: time
+    motif: str | None
+    lieu_depart: str | None
+    lieu_arrivee: str | None
+    observations: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def duree_minutes(self) -> int:
+        """Dérivée de heure_debut/heure_fin à la lecture, jamais stockée (#608)."""
+        debut = datetime.combine(date.min, self.heure_debut)
+        fin = datetime.combine(date.min, self.heure_fin)
+        return int((fin - debut).total_seconds() // 60)
 
 
 class CultureRead(BaseModel):

@@ -715,6 +715,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/vols": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Vols */
+        get: operations["list_vols_vols_get"];
+        put?: never;
+        /** Create Vol */
+        post: operations["create_vol_vols_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/vols/{vol_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Vol */
+        get: operations["get_vol_vols__vol_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/referentiel/pull": {
         parameters: {
             query?: never;
@@ -4545,6 +4580,123 @@ export interface components {
          * @enum {string}
          */
         VerdureStrate: "faible" | "moyenne" | "forte";
+        /**
+         * VolCreate
+         * @description Les règles d'obligation par catégorie (site principal + stand pour
+         *     mise_en_place/application, motif pour convoyage/divers, lieux pour convoyage —
+         *     §6/§5.3/§5.5 du document de cadrage) sont vérifiées côté use case, pas ici : le
+         *     message d'erreur y est plus précis qu'un `ValueError` de validateur Pydantic.
+         */
+        VolCreate: {
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "mise_en_place" | "application" | "convoyage" | "prospection" | "divers";
+            /**
+             * Equipe Id
+             * Format: uuid
+             */
+            equipe_id: string;
+            /**
+             * Aeronef Id
+             * Format: uuid
+             */
+            aeronef_id: string;
+            /**
+             * Date Vol
+             * Format: date
+             */
+            date_vol: string;
+            /**
+             * Heure Debut
+             * Format: time
+             */
+            heure_debut: string;
+            /**
+             * Heure Fin
+             * Format: time
+             */
+            heure_fin: string;
+            /** Site Principal Id */
+            site_principal_id?: string | null;
+            /** Stand Id */
+            stand_id?: string | null;
+            /** Base Secondaire Id */
+            base_secondaire_id?: string | null;
+            /** Motif */
+            motif?: string | null;
+            /** Lieu Depart */
+            lieu_depart?: string | null;
+            /** Lieu Arrivee */
+            lieu_arrivee?: string | null;
+            /** Observations */
+            observations?: string | null;
+        };
+        /** VolRead */
+        VolRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Type */
+            type: string;
+            /**
+             * Equipe Id
+             * Format: uuid
+             */
+            equipe_id: string;
+            /**
+             * Aeronef Id
+             * Format: uuid
+             */
+            aeronef_id: string;
+            /** Site Principal Id */
+            site_principal_id: string | null;
+            /** Stand Id */
+            stand_id: string | null;
+            /** Base Secondaire Id */
+            base_secondaire_id: string | null;
+            /**
+             * Date Vol
+             * Format: date
+             */
+            date_vol: string;
+            /**
+             * Heure Debut
+             * Format: time
+             */
+            heure_debut: string;
+            /**
+             * Heure Fin
+             * Format: time
+             */
+            heure_fin: string;
+            /** Motif */
+            motif: string | null;
+            /** Lieu Depart */
+            lieu_depart: string | null;
+            /** Lieu Arrivee */
+            lieu_arrivee: string | null;
+            /** Observations */
+            observations: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Duree Minutes
+             * @description Dérivée de heure_debut/heure_fin à la lecture, jamais stockée (#608).
+             */
+            readonly duree_minutes: number;
+        };
         /** ZoneAntiAcridienCreate */
         ZoneAntiAcridienCreate: {
             /** Code */
@@ -6607,6 +6759,101 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SoldePesticideRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_vols_vols_get: {
+        parameters: {
+            query?: {
+                equipe_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VolRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_vol_vols_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VolCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VolRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_vol_vols__vol_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vol_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VolRead"];
                 };
             };
             /** @description Validation Error */

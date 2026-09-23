@@ -1,4 +1,4 @@
-"""Historisation des positions d'un site aérien (migration 0086, #604) : installer,
+"""Historisation des positions d'un site aérien (migration 0088, #604) : installer,
 démonter, réinstaller ailleurs, lire l'historique complet avec la durée d'implantation
 dérivée, lire la position active, refuser une seconde position active."""
 

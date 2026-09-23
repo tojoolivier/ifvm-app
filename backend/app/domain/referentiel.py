@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timezone
 
 
 class StationNotFoundError(Exception):
@@ -474,7 +474,7 @@ class MembreEquipe:
 
 @dataclass
 class Equipe:
-    """Équipe terrestre ou aérienne (ADR-018, migration 0084).
+    """Équipe terrestre ou aérienne (ADR-018, migration 0086).
 
     Fusion de `EquipeAerienne` et `EquipeTerrestre` : un `type` discriminant, et des
     membres génériques porteurs de leur `fonction` à la place des rôles nommés en dur.
@@ -509,7 +509,7 @@ class Equipe:
 class SiteAerienne:
     """Site aérien principal (`parent_site_id is None`) ou secondaire (référence son
     principal) — base ou stand de remplissage, indistinguables en base depuis la fusion
-    de migration 0086 (#604) : le rôle est contextuel, porté par l'appelant. Référentiel
+    de migration 0088 (#604) : le rôle est contextuel, porté par l'appelant. Référentiel
     dédié à la gestion d'équipe aérienne, distinct de `LieuAerien` — décision produit du
     2026-09-15 maintenue malgré le précédent `lieu_aerien` (cf. migration `0064`).
 
@@ -517,7 +517,7 @@ class SiteAerienne:
     secondaire hérite de l'équipe de son principal via `parent_site_id`, il ne porte pas
     sa propre `equipe_id` (cf. `SiteAerienneEquipeInvalideError`).
 
-    La position GPS n'est plus portée ici depuis la migration 0086 : elle s'historise
+    La position GPS n'est plus portée ici depuis la migration 0088 : elle s'historise
     dans `SiteAeriennePosition`."""
 
     id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -532,8 +532,8 @@ class SiteAerienne:
 
 @dataclass
 class SiteAeriennePosition:
-    """Implantation d'un `SiteAerienne` sur une période (migration 0086, #604) —
-    même patron que `AffectationAeronef` (équipe/aéronef, migration 0085).
+    """Implantation d'un `SiteAerienne` sur une période (migration 0088, #604) —
+    même patron que `AffectationAeronef` (équipe/aéronef, migration 0087).
     `date_fin is None` : position active (« installée », non démontée)."""
 
     id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -617,3 +617,82 @@ class SoldePesticide:
     pesticide_id: uuid.UUID
     unite: str
     quantite: float
+
+
+TYPES_VOL = ("mise_en_place", "application", "convoyage", "prospection", "divers")
+# Catégories dont le document de cadrage impose site principal + stand (§6, règle dure).
+TYPES_VOL_SITE_OBLIGATOIRE = ("mise_en_place", "application")
+# Catégories dont `motif` est obligatoire (§5.3/§5.5).
+TYPES_VOL_MOTIF_REQUIS = ("convoyage", "divers")
+
+
+class AeronefNonAffecteError(Exception):
+    """`aeronef_id` n'est pas affecté à `equipe_id` à `date_vol` (via `equipe_aeronef`) —
+    le document de cadrage n'exige pas cette cohérence noir sur blanc, mais sans elle
+    le suivi des heures de vol ne peut pas être ventilé par appareil (#608). Pas de
+    CHECK SQL possible : la vérification suppose une jointure temporelle."""
+
+    pass
+
+
+class SiteHorsBaseError(Exception):
+    """`stand_id` ou `base_secondaire_id` d'un vol doit être rattaché, par son
+    `parent_site_id`, au `site_principal_id` de ce même vol (§9 du document de
+    cadrage) — pas de CHECK SQL possible (`site_aerienne.parent_site_id` n'est pas
+    visible depuis `vol` sans jointure), validée côté application (#608)."""
+
+    pass
+
+
+class VolSiteObligatoireError(Exception):
+    """`site_principal_id` et `stand_id` sont obligatoires pour `mise_en_place` et
+    `application` (§6 du document de cadrage, `ck_vol_site_mise_en_place_application`)
+    — vérifiée ici en amont pour un 422 lisible plutôt qu'une violation de contrainte
+    brute."""
+
+    pass
+
+
+class VolMotifRequisError(Exception):
+    """`motif` est obligatoire pour `convoyage` et `divers` (§5.3, `ck_vol_motif_requis`)."""
+
+    pass
+
+
+class VolLieuxConvoyageRequisError(Exception):
+    """`lieu_depart` et `lieu_arrivee` sont obligatoires pour `convoyage` (§5.3/§5.5,
+    `ck_vol_lieux_convoyage`)."""
+
+    pass
+
+
+@dataclass
+class Vol:
+    """Ligne d'activité aérienne : un type, une équipe, un aéronef, une date, et ses
+    rattachements de site (ADR-018, #608).
+
+    Réintroduite après la suppression de l'ancienne `vol` (migration 0080, ADR-017) :
+    ce n'est pas le même objet — pas de carnet de bord, de signatures, de cumuls
+    d'heures ni de `rotation_id`. `equipe_id` est obligatoire pour toutes les
+    catégories, y compris convoyage et divers, qui n'ont ni traitement ni
+    prospection pour porter la trace de l'équipe autrement.
+
+    La durée de vol (`heure_fin - heure_debut`) est dérivée à la lecture, jamais
+    stockée — même choix que `duree_jours` sur `SiteAeriennePosition`."""
+
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    type: str = "divers"
+    equipe_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    aeronef_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    site_principal_id: uuid.UUID | None = None
+    stand_id: uuid.UUID | None = None
+    base_secondaire_id: uuid.UUID | None = None
+    date_vol: date = field(default_factory=lambda: datetime.now(timezone.utc).date())
+    heure_debut: time = field(default_factory=lambda: time(0, 0))
+    heure_fin: time = field(default_factory=lambda: time(0, 0))
+    motif: str | None = None
+    lieu_depart: str | None = None
+    lieu_arrivee: str | None = None
+    observations: str | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))

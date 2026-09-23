@@ -341,7 +341,7 @@ async def equipe_aerienne_bis(db_session: AsyncSession):
 
 @pytest_asyncio.fixture
 async def base_aerienne(db_session: AsyncSession, equipe_aerienne):
-    """Site aérien principal (migration 0086, #604 — fusion de `base_aerienne` et
+    """Site aérien principal (migration 0088, #604 — fusion de `base_aerienne` et
     `stand_remplissage` en `site_aerienne`). Le nom de la fixture est conservé : elle
     reste sémantiquement une base principale, seules les coordonnées GPS ont bougé vers
     `site_aerienne_position` (installées via l'API par les tests qui en ont besoin)."""

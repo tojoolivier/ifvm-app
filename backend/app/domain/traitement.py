@@ -298,7 +298,7 @@ class TraitementAerien:
     # (vide = ravitaillement fait directement à une base) ; base secondaire
     # facultative.
     base_principale: str = ""
-    # FK référentiel (migration 0087, #605) : nullable en base (fiches
+    # FK référentiel (migration 0089, #605) : nullable en base (fiches
     # existantes non rapprochées, cf. docstring de la migration), mais exigée
     # côté `TraitementAerienCreate` pour toute nouvelle fiche. `base_principale`
     # (texte) reste la source affichée/synchronisée avec le mobile ; ceci n'est

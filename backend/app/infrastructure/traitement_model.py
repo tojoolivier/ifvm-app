@@ -209,7 +209,7 @@ class TraitementAerienModel(Base):
     # facultatif (vide = ravitaillement fait directement à une base) ; base
     # secondaire facultative.
     base_principale: Mapped[str] = mapped_column(String(255), nullable=False)
-    # FK référentiel `site_aerienne` (migration 0087, #605) : nullable en base
+    # FK référentiel `site_aerienne` (migration 0089, #605) : nullable en base
     # (fiches existantes non rapprochées par le backfill, cf. docstring de la
     # migration), exigée côté `TraitementAerienCreate` pour toute nouvelle
     # fiche. `base_principale` (texte) n'est pas supprimée — hors périmètre.

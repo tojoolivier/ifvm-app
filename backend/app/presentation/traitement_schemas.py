@@ -91,7 +91,7 @@ class TraitementAerienCreate(BaseModel):
     # que pilote/mécanicien/consultant_international ci-dessus, migration
     # 0048). Base principale obligatoire, stand/base secondaire facultatifs.
     base_principale: str = Field(..., min_length=1, max_length=255)
-    # FK référentiel (migration 0087, #605) : nullable en base pour les fiches
+    # FK référentiel (migration 0089, #605) : nullable en base pour les fiches
     # existantes non rapprochées au backfill, mais exigée ici pour toute
     # nouvelle fiche — base_principale (texte) reste conservée en parallèle.
     site_principal_id: uuid.UUID

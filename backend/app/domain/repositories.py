@@ -22,6 +22,7 @@ from app.domain.referentiel import (
     SoldePesticide,
     StationFixe,
     UtilisateurEquipe,
+    Vol,
     ZoneAntiAcridien,
 )
 from app.domain.traitement import Bloc, ProduitUtilise, Rotation, Traitement, TraitementSignature
@@ -480,7 +481,7 @@ class SiteAerienneRepository(ABC):
 
 
 class SiteAeriennePositionRepository(ABC):
-    """Historique des implantations d'un `site_aerienne` (migration 0086, #604)."""
+    """Historique des implantations d'un `site_aerienne` (migration 0088, #604)."""
 
     @abstractmethod
     async def list_par_site(self, site_id: uuid.UUID) -> list[SiteAeriennePosition]:
@@ -653,4 +654,21 @@ class MouvementPesticideRepository(ABC):
     ) -> list[SoldePesticide]:
         """Solde agrégé par (site, pesticide, unité), calculé à la volée — pas de
         colonne dénormalisée (décision actée, #606)."""
+        pass
+
+
+class VolRepository(ABC):
+    """Lignes d'activité aérienne (#608). Aucune méthode de suppression ni de mise à
+    jour dans ce ticket : hors scope, le vol saisi n'est pas corrigé après coup."""
+
+    @abstractmethod
+    async def create(self, vol: Vol) -> Vol:
+        pass
+
+    @abstractmethod
+    async def get_by_id(self, vol_id: uuid.UUID) -> Vol | None:
+        pass
+
+    @abstractmethod
+    async def list_all(self, equipe_id: uuid.UUID | None = None) -> list[Vol]:
         pass
